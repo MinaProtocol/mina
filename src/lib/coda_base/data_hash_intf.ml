@@ -50,7 +50,7 @@ module type Basic = sig
 
   include Hashable with type t := t
 
-  include Comparable.S with type t := t
+  include Comparable with type t := t
 
   val fold : t -> bool Triple.t Fold.t
 end

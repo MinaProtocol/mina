@@ -494,7 +494,8 @@ let daemon logger =
            or_from_config
              (Fn.compose Option.return
                 (Fn.compose work_selection_method_val YJ.Util.to_string))
-             "work-selection" ~default:Cli_lib.Arg_type.Random
+             "work-selection"
+             ~default:Cli_lib.Arg_type.Work_selection_method.Random
              work_selection_method_flag
          in
          let work_reassignment_wait =
@@ -515,7 +516,7 @@ let daemon logger =
              ~default:false log_transaction_pool_diff
          in
          let log_gossip_heard =
-           { Coda_networking.Gossip_net.Config.snark_pool_diff=
+           { Coda_networking.Config.snark_pool_diff=
                log_received_snark_pool_diff
            ; transaction_pool_diff= log_transaction_pool_diff
            ; new_state= log_received_blocks }
@@ -638,9 +639,6 @@ let daemon logger =
          let trust_dir = conf_dir ^/ "trust" in
          let () = Snark_params.set_chunked_hashing true in
          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-         let transition_frontier_location =
-           conf_dir ^/ "transition_frontier"
-         in
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let time_controller =
@@ -658,27 +656,33 @@ let daemon logger =
          in
          trace_database_initialization "consensus local state" __LOC__
            trust_dir ;
+         let gossip_net_params =
+           Gossip_net.Real.Config.
+             { timeout= Time.Span.of_sec 3.
+             ; logger
+             ; target_peer_count= 8
+             ; conf_dir
+             ; chain_id= Lazy.force chain_id
+             ; initial_peers= initial_peers_cleaned
+             ; addrs_and_ports
+             ; trust_system
+             ; enable_libp2p= not disable_libp2p
+             ; disable_haskell= not enable_old_discovery
+             ; libp2p_keypair
+             ; libp2p_peers=
+                 List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
+             ; max_concurrent_connections }
+         in
          let net_config =
            { Coda_networking.Config.logger
            ; trust_system
            ; time_controller
            ; consensus_local_state
-           ; gossip_net_params=
-               { timeout= Time.Span.of_sec 3.
-               ; logger
-               ; target_peer_count= 8
-               ; conf_dir
-               ; chain_id= Lazy.force chain_id
-               ; initial_peers= initial_peers_cleaned
-               ; addrs_and_ports
-               ; trust_system
-               ; log_gossip_heard
-               ; enable_libp2p= not disable_libp2p
-               ; disable_haskell= not enable_old_discovery
-               ; libp2p_keypair
-               ; libp2p_peers=
-                   List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
-               ; max_concurrent_connections } }
+           ; log_gossip_heard
+           ; creatable_gossip_net=
+               Coda_networking.Gossip_net.(
+                 Any.Creatable ((module Real), Real.create gossip_net_params))
+           }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
@@ -758,7 +762,7 @@ let daemon logger =
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~net_config
+                ~net_config ~gossip_net_params
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
@@ -768,12 +772,13 @@ let daemon logger =
                   ; shutdown_on_disconnect= true }
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~wallets_disk_location:(conf_dir ^/ "wallets")
-                ~ledger_db_location:(conf_dir ^/ "ledger_db")
+                ~persistent_root_location:(conf_dir ^/ "root")
+                ~persistent_frontier_location:(conf_dir ^/ "frontier")
                 ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-                ~transition_frontier_location ~time_controller
-                ~initial_propose_keypairs ~monitor ~consensus_local_state
-                ~transaction_database ~external_transition_database
-                ~is_archive_node ~work_reassignment_wait ())
+                ~time_controller ~initial_propose_keypairs ~monitor
+                ~consensus_local_state ~transaction_database
+                ~external_transition_database ~is_archive_node
+                ~work_reassignment_wait ())
          in
          {Coda_initialization.coda; client_whitelist; rest_server_port}
        in
@@ -986,6 +991,7 @@ let () =
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
+  Snarky.Libsnark.set_printing_off () ;
   (* intercept command-line processing for "version", because we don't
      use the Jane Street scripts that generate their version information
    *)

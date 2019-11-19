@@ -210,7 +210,7 @@ let create_fee_transfers completed_works delta public_key coinbase_fts =
               else Public_key.Compressed.Map.remove accum (fst single) )
       (* TODO: This creates a weird incentive to have a small public_key *)
       |> Map.to_alist ~key_order:`Increasing
-      |> Fee_transfer.of_single_list )
+      |> One_or_two.group_list )
   |> to_staged_ledger_or_error
 
 let get_individual_info coinbase_parts proposer user_commands completed_works

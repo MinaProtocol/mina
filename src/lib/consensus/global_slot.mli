@@ -1,4 +1,12 @@
-include Coda_numbers.Nat.Intf.S_unchecked
+module Stable : sig
+  module V1 : sig
+    type t [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+  end
+
+  module Latest = V1
+end
+
+include Coda_numbers.Nat.Intf.S_unchecked with type t = Stable.Latest.t
 
 val ( + ) : t -> int -> t
 

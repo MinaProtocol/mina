@@ -1,0 +1,5 @@
+(library
+  (name persistent_root)
+  (public_name transition_frontier_persistent_root)
+  (libraries core_kernel coda_base transition_frontier_full_frontier)
+  (preprocess (pps ppx_jane ppx_coda)))

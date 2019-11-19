@@ -9,7 +9,7 @@ open Module_version
 let parity y = Tick.Bigint.(test_bit (of_field y) 0)
 
 let gen_uncompressed =
-  Quickcheck.Generator.filter_map Tick.Field.gen ~f:(fun x ->
+  Quickcheck.Generator.filter_map Tick.Field.gen_uniform ~f:(fun x ->
       let open Option.Let_syntax in
       let%map y = Tick.Inner_curve.find_y x in
       (x, y) )
@@ -102,7 +102,7 @@ module Compressed = struct
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
         let known_good_hash =
-          "\x20\x1E\xC9\xEC\x67\x5E\x76\x79\x18\xBB\x28\x2C\x51\x5B\x36\x37\x5B\x5F\x39\x18\x21\x3A\x33\x4C\x69\x4B\x8C\xC6\x09\x24\xAD\xE7"
+          "\xDF\x60\x51\x95\x81\xC9\xE5\xC2\xBC\xEB\xD7\xB8\x07\x81\xAE\x17\x66\xC0\xBC\xAF\xD8\x3C\x02\xEC\x9F\x62\x0A\xBA\x55\xC7\xCB\xCA"
         in
         Serialization.check_serialization (module V1) point known_good_hash
 
@@ -115,7 +115,7 @@ module Compressed = struct
             ~seed:(`Deterministic "nonzero_curve_point_compressed-seed") V1.gen
         in
         let known_good_hash =
-          "\x20\x1E\xC9\xEC\x67\x5E\x76\x79\x18\xBB\x28\x2C\x51\x5B\x36\x37\x5B\x5F\x39\x18\x21\x3A\x33\x4C\x69\x4B\x8C\xC6\x09\x24\xAD\xE7"
+          "\xA9\x77\x56\x90\x5F\x61\x9B\x27\x43\x4F\x1A\xB7\x94\xD5\x39\x05\xBD\xD6\xCE\x63\x3A\xAF\xA3\x14\x75\x60\x52\x95\xA4\x4E\x2B\x50"
         in
         Serialization.check_serialization (module V1) point known_good_hash
 
@@ -128,8 +128,7 @@ module Compressed = struct
     end
   end
 
-  (* bin_io, sexp omitted *)
-  type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving compare, hash]
+  type t = (Field.t, bool) Poly.t [@@deriving compare, hash]
 
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
@@ -288,7 +287,7 @@ module Stable = struct
           ~seed:(`Deterministic "nonzero_curve_point-seed") V1.gen
       in
       let known_good_hash =
-        "\x47\xCA\x5D\x76\x2C\xBF\xC0\xF1\x11\x9F\x56\x6A\x79\x03\x77\x4C\xC4\x2F\x6D\xB8\x3F\xC3\x0E\x03\x99\x71\x1B\xF3\x54\xDD\x84\xFA"
+        "\x9F\x36\xA5\x8E\xF2\x0F\x58\xFA\x79\xA4\x47\x18\x79\x43\xE0\x38\xC2\x6B\x6B\x7E\xD3\xF5\xE2\x45\x4E\x20\x19\x64\x62\xCF\x63\x75"
       in
       Serialization.check_serialization (module V1) point known_good_hash
 
@@ -301,7 +300,7 @@ module Stable = struct
           ~seed:(`Deterministic "nonzero_curve_point-seed") V1.gen
       in
       let known_good_hash =
-        "\x47\xCA\x5D\x76\x2C\xBF\xC0\xF1\x11\x9F\x56\x6A\x79\x03\x77\x4C\xC4\x2F\x6D\xB8\x3F\xC3\x0E\x03\x99\x71\x1B\xF3\x54\xDD\x84\xFA"
+        "\xE2\x8A\xF9\x55\x41\x07\x54\x1F\xF4\x90\x09\x94\xE8\xA5\x7C\x0E\xD3\xED\x8C\xC1\xC9\x1F\x05\x3E\x2C\x39\x28\x9F\x9C\xF1\x10\xCC"
       in
       Serialization.check_serialization (module V1) point known_good_hash
 

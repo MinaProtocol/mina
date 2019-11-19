@@ -20,15 +20,6 @@ module type Basic = sig
 
   val gen : t Quickcheck.Generator.t
 
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t
-      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
-    end
-
-    module Latest = V1
-  end
-
   include Bits_intf.Convertible_bits with type t := t
 
   val fold : t -> bool Triple.t Fold.t
@@ -78,47 +69,39 @@ module type Arithmetic_intf = sig
   val ( - ) : t -> t -> t option
 end
 
+module Signed = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('magnitude, 'sgn) t = {magnitude: 'magnitude; sgn: 'sgn}
+      [@@deriving sexp, hash, compare, eq, yojson]
+    end
+  end]
+
+  type ('magnitude, 'sgn) t = ('magnitude, 'sgn) Stable.Latest.t =
+    {magnitude: 'magnitude; sgn: 'sgn}
+  [@@deriving sexp, hash, compare, eq, yojson]
+end
+
 module type Signed_intf = sig
   type magnitude
 
   type magnitude_var
 
-  module Poly : sig
-    type ('magnitude, 'sgn) t
-
-    module Stable :
-      sig
-        module V1 : sig
-          type ('magnitude, 'sgn) t [@@deriving version]
-        end
-
-        module Latest = V1
-      end
-      with type ('magnitude, 'sgn) V1.t = ('magnitude, 'sgn) t
-  end
-
-  module Stable : sig
-    module V1 : sig
-      type t = (magnitude, Sgn.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, yojson]
+  type t = (magnitude, Sgn.t) Signed.t
+  [@@deriving sexp, hash, compare, eq, yojson]
 
   val gen : t Quickcheck.Generator.t
 
   val length_in_triples : int
 
-  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Poly.t
+  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed.t
 
   val sgn : t -> Sgn.t
 
   val magnitude : t -> magnitude
 
-  type var = (magnitude_var, Sgn.var) Poly.t
+  type var = (magnitude_var, Sgn.var) Signed.t
 
   val typ : (var, t) Typ.t
 
@@ -153,7 +136,7 @@ module type Signed_intf = sig
 
     val cswap :
          Boolean.var
-      -> (magnitude_var, Sgn.t) Poly.t * (magnitude_var, Sgn.t) Poly.t
+      -> (magnitude_var, Sgn.t) Signed.t * (magnitude_var, Sgn.t) Signed.t
       -> (var * var, _) Checked.t
   end
 end
@@ -224,46 +207,23 @@ end = struct
 
   let length_in_triples = (length_in_bits + 2) / 3
 
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Unsigned.t [@@deriving sexp, compare, hash]
+  type t = Unsigned.t [@@deriving sexp, compare, hash]
 
-      let to_latest = Fn.id
+  module Arg = struct
+    type typ = t [@@deriving sexp, hash, compare]
 
-      module T = struct
-        type typ = t [@@deriving sexp, compare, hash]
+    type t = typ [@@deriving sexp, hash, compare]
 
-        type t = typ [@@deriving sexp, compare, hash]
+    [%%define_locally
+    Unsigned.(of_int, to_int)]
+  end
 
-        let of_int = Unsigned.of_int
+  include Codable.Make_of_int (Arg)
+  include Hashable.Make (Arg)
+  include Comparable.Make (Arg)
 
-        let to_int = Unsigned.to_int
-      end
-
-      include Codable.Make_of_int (T)
-      include Hashable.Make (T)
-      include Comparable.Make (T)
-    end
-  end]
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
-
-  include Codable.Make_of_int (Stable.Latest.T)
-  include Hashable.Make (Stable.Latest.T)
-  include Comparable.Make (Stable.Latest.T)
-
-  let to_uint64 = Unsigned.to_uint64
-
-  let of_uint64 = Unsigned.of_uint64
-
-  let of_int = Unsigned.of_int
-
-  let to_int = Unsigned.to_int
-
-  let of_string = Unsigned.of_string
-
-  let to_string = Unsigned.to_string
+  [%%define_locally
+  Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
 
   let gen_incl a b : t Quickcheck.Generator.t =
     let a = Bignum_bigint.of_string Unsigned.(to_string a) in
@@ -338,42 +298,18 @@ end = struct
     >>= unpack_var
 
   module Signed = struct
-    module Poly = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type ('magnitude, 'sgn) t = {magnitude: 'magnitude; sgn: 'sgn}
-          [@@deriving sexp, hash, compare, eq, yojson]
-        end
-      end]
+    type ('magnitude, 'sgn) typ = ('magnitude, 'sgn) Signed.t =
+      {magnitude: 'magnitude; sgn: 'sgn}
+    [@@deriving sexp, hash, compare, yojson]
 
-      type ('magnitude, 'sgn) t = ('magnitude, 'sgn) Stable.Latest.t =
-        {magnitude: 'magnitude; sgn: 'sgn}
-    end
-
-    module Stable_outer = Stable
-
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = (Stable.V1.t, Sgn.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving sexp, hash, compare, eq, yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    (* bin_io, version omitted *)
-    type t = (Stable_outer.V1.t, Sgn.Stable.V1.t) Poly.Stable.V1.t
+    type t = (Unsigned.t, Sgn.t) Signed.t
     [@@deriving sexp, hash, compare, eq, yojson]
 
-    (* = Stable.Latest.t *)
+    let create ~magnitude ~sgn = {magnitude; sgn}
 
-    let create ~magnitude ~sgn = Poly.{magnitude; sgn}
+    let sgn {sgn; _} = sgn
 
-    let sgn Poly.{sgn; _} = sgn
-
-    let magnitude Poly.{magnitude; _} = magnitude
+    let magnitude {magnitude; _} = magnitude
 
     let zero = create ~magnitude:zero ~sgn:Sgn.Pos
 
@@ -381,17 +317,16 @@ end = struct
       Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
           create ~magnitude ~sgn )
 
-    type nonrec var = (var, Sgn.var) Poly.t
+    type nonrec var = (var, Sgn.var) Signed.t
 
     let length_in_bits = Int.( + ) length_in_bits 1
 
     let length_in_triples = Int.((length_in_bits + 2) / 3)
 
-    let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) Poly.t
-        =
+    let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) typ =
       Snarky.H_list.(fun [magnitude; sgn] -> {magnitude; sgn})
 
-    let to_hlist Poly.{magnitude; sgn} = Snarky.H_list.[magnitude; sgn]
+    let to_hlist {magnitude; sgn} = Snarky.H_list.[magnitude; sgn]
 
     let typ =
       Typ.of_hlistable
@@ -429,28 +364,27 @@ end = struct
                 ~magnitude:Unsigned.Infix.(x.magnitude - y.magnitude)
             else zero )
 
-    let negate t = Poly.{t with sgn= Sgn.negate t.sgn}
+    let negate t = {t with sgn= Sgn.negate t.sgn}
 
     let of_unsigned magnitude = create ~magnitude ~sgn:Sgn.Pos
 
     let ( + ) = add
 
     module Checked = struct
-      let to_bits Poly.{magnitude; sgn} =
+      let to_bits {magnitude; sgn} =
         (var_to_bits magnitude :> Boolean.var list) @ [Sgn.Checked.is_pos sgn]
 
-      let constant Poly.{magnitude; sgn} =
-        Poly.{magnitude= var_of_t magnitude; sgn= Sgn.Checked.constant sgn}
+      let constant {magnitude; sgn} =
+        {magnitude= var_of_t magnitude; sgn= Sgn.Checked.constant sgn}
 
-      let of_unsigned magnitude = Poly.{magnitude; sgn= Sgn.Checked.pos}
+      let of_unsigned magnitude = {magnitude; sgn= Sgn.Checked.pos}
 
       let if_ cond ~then_ ~else_ =
-        Poly.Stable.Latest.(
-          let%map sgn = Sgn.Checked.if_ cond ~then_:then_.sgn ~else_:else_.sgn
-          and magnitude =
-            if_ cond ~then_:then_.magnitude ~else_:else_.magnitude
-          in
-          {sgn; magnitude})
+        let%map sgn = Sgn.Checked.if_ cond ~then_:then_.sgn ~else_:else_.sgn
+        and magnitude =
+          if_ cond ~then_:then_.magnitude ~else_:else_.magnitude
+        in
+        {sgn; magnitude}
 
       let to_triples t =
         Bitstring.pad_to_triple_list ~default:Boolean.false_ (to_bits t)
@@ -472,7 +406,7 @@ end = struct
           Tick.Field.Checked.mul (sgn :> Field.Var.t) (Field.Var.add xv yv)
         in
         let%map magnitude = unpack_var res in
-        Poly.{magnitude; sgn}
+        {magnitude; sgn}
 
       let ( + ) = add
 
@@ -486,7 +420,7 @@ end = struct
 
       let cswap b (x, y) =
         let l_sgn, r_sgn =
-          match Poly.(x.sgn, y.sgn) with
+          match (x.sgn, y.sgn) with
           | Sgn.Pos, Sgn.Pos ->
               Sgn.Checked.(pos, pos)
           | Neg, Neg ->
@@ -503,7 +437,7 @@ end = struct
           let%map l = unpack_var l and r = unpack_var r in
           (l, r)
         in
-        Poly.({sgn= l_sgn; magnitude= l_mag}, {sgn= r_sgn; magnitude= r_mag})
+        ({sgn= l_sgn; magnitude= l_mag}, {sgn= r_sgn; magnitude= r_mag})
     end
   end
 
@@ -650,6 +584,16 @@ end
 let currency_length = 64
 
 module Fee = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Unsigned_extended.UInt64.Stable.V1.t
+      [@@deriving sexp, compare, hash, eq, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
   module T =
     Make
       (Unsigned_extended.UInt64)
@@ -662,14 +606,22 @@ module Fee = struct
 end
 
 module Amount = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Unsigned_extended.UInt64.Stable.V1.t
+      [@@deriving sexp, compare, hash, eq, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
   module T =
     Make
       (Unsigned_extended.UInt64)
       (struct
         let length = currency_length
       end)
-
-  type amount = T.Stable.Latest.t [@@deriving bin_io, sexp]
 
   include (
     T :
@@ -699,7 +651,16 @@ module Amount = struct
 end
 
 module Balance = struct
-  include (Amount : Basic with type t = Amount.t and type var = Amount.var)
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Amount.Stable.V1.t [@@deriving sexp, compare, hash, yojson, eq]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  include (Amount : Basic with type t = Amount.t with type var = Amount.var)
 
   let to_amount = Fn.id
 

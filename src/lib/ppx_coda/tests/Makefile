@@ -34,6 +34,9 @@ positive-tests : unexpired.ml
 	@ echo -n "Module versioning, should succeed..."
 	@ dune exec ./versioned_module_good.exe ${REDIRECT}
 	@ echo "OK"
+	@ echo -n "Module signature versioning, should succeed..."
+	@ dune exec ./versioned_sig_good.exe ${REDIRECT}
+	@ echo "OK"
 
 negative-tests :
 # expiration

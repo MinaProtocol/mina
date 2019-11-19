@@ -115,6 +115,12 @@ include Debug
 
 [%%endif]
 
+type _ type_witness =
+  | Debug : Debug.t type_witness
+  | Prod : Prod.t type_witness
+
+type with_witness = With_witness : 't * 't type_witness -> with_witness
+
 module For_tests = struct
   let mk_dummy_proof statement =
     create ~statement ~sok_digest:Sok_message.Digest.default ~proof:Proof.dummy

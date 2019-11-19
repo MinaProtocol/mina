@@ -150,7 +150,17 @@ end
 
 module Not = struct
   module Versioned = struct
-    type t = bool [@@deriving bin_io]
+    type t = bool
+
+    module Arg = struct
+      type nonrec t = t
+
+      let to_binable = Fn.id
+
+      let of_binable = Fn.id
+    end
+
+    include Binable.Of_binable (Bool) (Arg)
   end
 end
 
