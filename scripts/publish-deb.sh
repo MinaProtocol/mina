@@ -31,7 +31,7 @@ else
 
     # only publish wanted jobs
     if [[ "$CIRCLE_JOB" == "build-artifacts--testnet_postake_medium_curves"  ]]; then
-          cd src/_build
+          cd _build
           echo "Publishing debs:"
           ls coda-*.deb
           set -x
