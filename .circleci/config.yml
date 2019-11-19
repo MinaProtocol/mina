@@ -331,7 +331,7 @@ jobs:
     build-artifacts--testnet_postake_medium_curves_10k_ledger:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run:
@@ -375,6 +375,22 @@ jobs:
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+            - setup_remote_docker
+            - run:
+                  name: Build and Upload Docker
+                  command: |
+                    source /tmp/DOCKER_DEPLOY_ENV
+                    echo "Publishing Docker"
+                    echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
+                    set -x
+                    if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
+
+                        echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+                        ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
+                        -s coda-daemon \
+                        -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                        --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                    fi
     test-unit--test_postake_snarkless_unittest:
         resource_class: xlarge
         docker:
