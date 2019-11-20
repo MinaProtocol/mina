@@ -317,10 +317,12 @@ module Base = struct
       Transaction_union.Tag.Checked.is_stake_delegation tag
     in
     let%bind sender_compressed = Public_key.compress_var sender in
-    let proposer = payload.body.public_key in
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
     let%bind computed_pending_coinbase_stack_after =
-      let coinbase = (proposer, payload.body.amount, state_body_hash) in
+      let coinbase_receiver = payload.body.public_key in
+      let coinbase =
+        (coinbase_receiver, payload.body.amount, state_body_hash)
+      in
       let%bind stack' =
         Pending_coinbase.Stack.Checked.push pending_coinbase_stack_before
           coinbase
@@ -1591,24 +1593,25 @@ let%test_module "transaction_snark" =
           let mk_pubkey () =
             Public_key.(compress (of_private_key_exn (Private_key.create ())))
           in
-          let proposer = mk_pubkey () in
+          let coinbase_receiver = mk_pubkey () in
           let other = mk_pubkey () in
           let pending_coinbase_init = Pending_coinbase.Stack.empty in
           let state_body_hash = State_body_hash.dummy in
           let cb =
             Coinbase.create
               ~amount:(Currency.Amount.of_int 10)
-              ~proposer
+              ~receiver:coinbase_receiver
               ~fee_transfer:(Some (other, Currency.Fee.of_int 1))
               ~state_body_hash
             |> Or_error.ok_exn
           in
           let transaction = Transaction.Coinbase cb in
           Ledger.with_ledger ~f:(fun ledger ->
-              Ledger.create_new_account_exn ledger proposer
-                (Account.create proposer Balance.zero) ;
+              Ledger.create_new_account_exn ledger coinbase_receiver
+                (Account.create coinbase_receiver Balance.zero) ;
               let sparse_ledger =
-                Sparse_ledger.of_ledger_subset_exn ledger [proposer; other]
+                Sparse_ledger.of_ledger_subset_exn ledger
+                  [coinbase_receiver; other]
               in
               check_transaction transaction
                 (unstage (Sparse_ledger.handler sparse_ledger))
