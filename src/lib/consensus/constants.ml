@@ -41,4 +41,4 @@ let slots_per_window =
   Unsigned.UInt32.(mul sub_windows_per_window slots_per_sub_window)
 
 (** Number of slots =24k in ouroboros praos *)
-let slots_per_epoch = Unsigned.UInt32.(mul (of_int 3) slots_per_window)
+let slots_per_epoch = Unsigned.UInt32.(of_int (3 * c * k))
