@@ -17,7 +17,7 @@ module Poly = struct
         ; sok_digest: 'sok_digest
         ; supply_increase: 'amount
         ; ledger_proof: Proof.Stable.V1.t option
-        ; proposer: 'proposer_pk
+        ; coinbase_receiver: 'proposer_pk
         ; coinbase_amount: 'amount
         ; coinbase_state_body_hash: 'state_body_hash }
       [@@deriving bin_io, to_yojson, sexp, fields, version]
@@ -43,7 +43,7 @@ module Poly = struct
     ; sok_digest: 'sok_digest
     ; supply_increase: 'amount
     ; ledger_proof: Proof.Stable.V1.t option
-    ; proposer: 'proposer_pk
+    ; coinbase_receiver: 'proposer_pk
     ; coinbase_amount: 'amount
     ; coinbase_state_body_hash: 'state_body_hash }
   [@@deriving sexp, to_yojson, fields]
@@ -77,7 +77,7 @@ Poly.
   , ledger_proof
   , sok_digest
   , supply_increase
-  , proposer
+  , coinbase_receiver
   , coinbase_amount
   , coinbase_state_body_hash )]
 
@@ -93,14 +93,14 @@ type var =
   Poly.t
 
 let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
-    ~supply_increase ~blockchain_state ~consensus_transition ~proposer
+    ~supply_increase ~blockchain_state ~consensus_transition ~coinbase_receiver
     ~coinbase_amount ~coinbase_state_body_hash () : Value.t =
   { blockchain_state
   ; consensus_transition
   ; ledger_proof
   ; sok_digest
   ; supply_increase
-  ; proposer
+  ; coinbase_receiver
   ; coinbase_amount
   ; coinbase_state_body_hash }
 
@@ -116,7 +116,7 @@ let genesis : value lazy_t =
               Account.public_key
                 (List.hd_exn (Ledger.to_list (Lazy.force Genesis_ledger.t))) }
     ; ledger_proof= None
-    ; proposer= Signature_lib.Public_key.Compressed.empty
+    ; coinbase_receiver= Signature_lib.Public_key.Compressed.empty
     ; coinbase_amount= Currency.Amount.zero
     ; coinbase_state_body_hash= State_body_hash.dummy }
 
@@ -126,7 +126,7 @@ let to_hlist
     ; sok_digest
     ; supply_increase
     ; ledger_proof
-    ; proposer
+    ; coinbase_receiver
     ; coinbase_amount
     ; coinbase_state_body_hash } =
   Snarky.H_list.
@@ -135,7 +135,7 @@ let to_hlist
     ; sok_digest
     ; supply_increase
     ; ledger_proof
-    ; proposer
+    ; coinbase_receiver
     ; coinbase_amount
     ; coinbase_state_body_hash ]
 
@@ -145,7 +145,7 @@ let of_hlist
      ; sok_digest
      ; supply_increase
      ; ledger_proof
-     ; proposer
+     ; coinbase_receiver
      ; coinbase_amount
      ; coinbase_state_body_hash ] :
       (unit, _) Snarky.H_list.t) =
@@ -154,7 +154,7 @@ let of_hlist
   ; sok_digest
   ; supply_increase
   ; ledger_proof
-  ; proposer
+  ; coinbase_receiver
   ; coinbase_amount
   ; coinbase_state_body_hash }
 

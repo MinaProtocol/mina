@@ -14,7 +14,7 @@ module Poly : sig
     ; sok_digest: 'sok_digest
     ; supply_increase: 'amount
     ; ledger_proof: Proof.Stable.V1.t option
-    ; proposer: 'proposer_pk
+    ; coinbase_receiver: 'proposer_pk
     ; coinbase_amount: 'amount
     ; coinbase_state_body_hash: 'state_body_hash }
   [@@deriving sexp, fields]
@@ -90,7 +90,7 @@ val create_value :
   -> supply_increase:Currency.Amount.t
   -> blockchain_state:Blockchain_state.Value.t
   -> consensus_transition:Consensus.Data.Consensus_transition.Value.Stable.V1.t
-  -> proposer:Signature_lib.Public_key.Compressed.t
+  -> coinbase_receiver:Signature_lib.Public_key.Compressed.t
   -> coinbase_amount:Currency.Amount.t
   -> coinbase_state_body_hash:State_body_hash.t
   -> unit
@@ -115,4 +115,5 @@ val coinbase_state_body_hash :
 
 val ledger_proof : _ Poly.t -> Proof.t option
 
-val proposer : (_, _, _, _, _, 'proposer_pk) Poly.t -> 'proposer_pk
+val coinbase_receiver :
+  (_, _, _, _, _, 'coinbase_receiver) Poly.t -> 'coinbase_receiver
