@@ -1690,6 +1690,8 @@ module Data = struct
                  , Core.Int.gen_incl (i * slots_per_sub_window)
                      ((i + 1) * slots_per_sub_window) ) )
 
+        let num_global_slots_to_test = 1
+
         (* generate an initial global_slot and a list of successive global_slot following
            the initial slot. The length of the list is fixed because this same list would
            also passed into a snarky computation, and the *Typ* of the list requires a
@@ -1698,7 +1700,9 @@ module Data = struct
           let open Quickcheck.Generator in
           let open Quickcheck.Generator.Let_syntax in
           let%bind prev_global_slot = small_positive_int in
-          let%bind slot_diffs = Core.List.gen_with_length 5 gen_slot_diff in
+          let%bind slot_diffs =
+            Core.List.gen_with_length num_global_slots_to_test gen_slot_diff
+          in
           let _, global_slots =
             List.fold slot_diffs ~init:(prev_global_slot, [])
               ~f:(fun (prev_global_slot, acc) slot_diff ->
@@ -1801,7 +1805,8 @@ module Data = struct
               (Test_util.test_equal
                  (Typ.tuple2
                     (Typ.tuple2 Global_slot.typ
-                       (Typ.list ~length:5 Global_slot.typ))
+                       (Typ.list ~length:num_global_slots_to_test
+                          Global_slot.typ))
                     (Typ.tuple2 Length.typ
                        (Typ.list ~length:sub_windows_per_window Length.typ)))
                  (Typ.tuple3 Global_slot.typ
