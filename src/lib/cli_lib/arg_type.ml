@@ -57,6 +57,9 @@ let receipt_chain_hash =
 let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
 
+let global_slot =
+  Command.Arg_type.map Command.Param.int ~f:Coda_numbers.Global_slot.of_int
+
 let txn_fee =
   Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_string
 
