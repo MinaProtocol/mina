@@ -1,9 +1,0 @@
-(library
-  (name archive_lib)
-  (public_name archive_lib)
-  (libraries async coda_base coda_transition core graphql_client_lib graphql_query one_or_two transition_frontier_controller_tests)
-  (inline_tests)
-  (preprocessor_deps ../archive_graphql_schema.json)
-  (preprocess (pps ppx_coda ppx_jane graphql_ppx -- -schema src/app/archive/archive_graphql_schema.json))
-  )
-  

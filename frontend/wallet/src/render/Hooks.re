@@ -2,6 +2,7 @@ let useActiveAccount = () => {
   let url = ReasonReact.Router.useUrl();
   switch (url.path) {
   | ["account", accountKey] => Some(PublicKey.uriDecode(accountKey))
+  | ["settings", accountKey, ..._] => Some(PublicKey.uriDecode(accountKey))
   | _ => None
   };
 };
@@ -20,6 +21,9 @@ let useToast = () => {
     });
   };
 };
+
+[@bs.scope "window"] [@bs.val] external fileRoot: string = "fileRoot";
+let useAsset = fileName => Filename.concat(fileRoot, fileName);
 
 // Vanilla React.useReducer aren't supposed to have any effects themselves.
 // The following supports the handling of the effects.

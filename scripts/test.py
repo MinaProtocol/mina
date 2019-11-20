@@ -44,10 +44,7 @@ small_curves_tests = {
     'test_postake_bootstrap':
     ['coda-bootstrap-test', 'coda-long-fork -num-proposers 2'],
     'test_postake_three_proposers': ['coda-txns-and-restart-non-proposers'],
-    'test_postake_holy_grail': [
-        'coda-restarts-and-txns-holy-grail -num-proposers 5',
-        'coda-long-fork -num-proposers 5'
-    ],
+    'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
     'test_postake_five_even_snarkless':
@@ -78,6 +75,7 @@ ci_blacklist = [
 required_blacklist = [
     'test_postake_five_even_snarkless:*',
     'test_postake_catchup:*',
+    'test_postake_holy_grail:*',
 ]
 
 # these extra jobs are not filters, they are full status check names
@@ -237,7 +235,7 @@ def run(args):
                 coda_exe, test)
             cmd += '| tee \'%s\' | %s -f \'%s\' ' % (log, logproc_exe,
                                                      logproc_filter)
-            cmd += '; ./scripts/link-subprocess-logs.sh \'%s\' ' % profile_dir
+            cmd += '&& ./scripts/link-subprocess-logs.sh \'%s\' ' % profile_dir
             print('Running: %s' % (cmd))
             run_cmd(cmd, lambda: fail('Test "%s:%s" failed' % (profile, test)))
 
@@ -260,7 +258,6 @@ def get_required_status():
                                     ("build-artifacts--%s" % profile
                                      for profile in build_artifact_profiles))),
                   extra_required_status_checks)))
-
 
 def required_status(args):
     print('\n'.join(get_required_status()))

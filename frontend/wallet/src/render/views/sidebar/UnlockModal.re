@@ -1,7 +1,7 @@
 open Tc;
 
 module UnlockAccount = [%graphql
-  {| mutation unlock($password: String, $publicKey: PublicKey) {
+  {| mutation unlock($password: String!, $publicKey: PublicKey!) {
       unlockWallet(input: {password: $password, publicKey: $publicKey}) {
           publicKey
         }
@@ -27,6 +27,7 @@ let make = (~account, ~onClose, ~onSuccess) => {
         <form
           className=Modal.Styles.default
           onSubmit={event => {
+            ReactEvent.Synthetic.stopPropagation(event);
             ReactEvent.Form.preventDefault(event);
             mutation(
               ~variables,
@@ -70,7 +71,10 @@ let make = (~account, ~onClose, ~onSuccess) => {
             <Button
               label="Cancel"
               style=Button.Gray
-              onClick={_ => onClose()}
+              onClick={evt => {
+                ReactEvent.Synthetic.stopPropagation(evt);
+                onClose();
+              }}
             />
             <Spacer width=1. />
             <Button label="Unlock" style=Button.Green type_="submit" />

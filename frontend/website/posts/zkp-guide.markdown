@@ -104,7 +104,7 @@ First, Izaak and Vanishree, two members of our cryptography team who have devote
 
 
 <a href="https://codaprotocol.com/blog/zkp.html" class="customLink">Zero-knowledge Proofs: An Intuitive Explanation</a>  
-Vanishee Rao, a cryptographer working on Coda Protocol, offers up this explanation, using the classic 3 coloring problem to introduce key concepts including soundness, zero-knowledgness, and verifiers. Highly visual, this short (<5 minute) read is a great place to start. 
+Vanishree Rao, a cryptographer working on Coda Protocol, offers up this explanation, using the classic 3 coloring problem to introduce key concepts including soundness, zero-knowledgness, and verifiers. Highly visual, this short (<5 minute) read is a great place to start. 
 
 <a href="https://www.youtube.com/watch?v=fjdDbE_fgww&feature=youtu.be" class="customLink">Using zk-SNARKs For A Constant Sized Blockchain</a>  
 In this presentation, Izaak Meckler, co-founder and CTO of O(1) Labs, and principal cryptographer working on Coda Protocol, provides an overview and introduction not only of the concepts behind zk-SNARKs but complete with practical examples of why they matter. 
@@ -137,7 +137,7 @@ Now that you’ve had a chance to really wrap your head around the basic idea of
 <a href="https://www.bitrates.com/news/p/zero-knowledge-proofs-part-one-the-cryptographic-protocols-and-their-variations" class="customLink">Zero Knowledge Proofs Part One: The Cryptographic Protocols and Their Variations</a>  
 This piece more or less reiterates a lot of the concepts discussed in the previous pieces. One valuable addition is an additional simplified definition of zk-SNARKs and a comparison to zk-STARKs. 
 
-<a href="https://www.youtube.com/watch?v=Rku9pABMLKI" class="customLink">[Video] What are ZK-Snarks?</a>
+<a href="https://www.youtube.com/watch?v=Rku9pABMLKI" class="customLink">[Video] What are ZK-Snarks?</a>  
 Now that we’ve bridged from zero knowledge proofs to SNARKs, let’s drop another quick intro video for the visually minded. This 4 minute overview is going to give you the basics so that we can dive back into some more substantive content. 
 
 <a href="https://www.binance.vision/blockchain/zk-snarks-and-zk-starks-explained" class="customLink">zk-SNARKS and zk-STARKS Explained</a>  

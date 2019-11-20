@@ -483,6 +483,13 @@ let next_on_new_tree = Parallel_scan.next_on_new_tree
 
 let base_jobs_on_latest_tree = Parallel_scan.base_jobs_on_latest_tree
 
+(* TODO: make this operation O(1) -- gets used in Sync_handler RPC, which is performance sensitive (#3733) *)
+let target_merkle_root t =
+  let open Transaction_with_witness in
+  let open Option.Let_syntax in
+  let%map last_item = List.last (Parallel_scan.pending_data t) in
+  last_item.statement.target
+
 (*All the transactions in the order in which they were applied*)
 let staged_transactions t =
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
@@ -582,6 +589,8 @@ let all_work_pairs_exn t =
   List.concat_map all_jobs ~f:(fun jobs ->
       List.map (One_or_two.group_list jobs) ~f:(One_or_two.map ~f:single_spec)
   )
+
+let update_metrics = Parallel_scan.update_metrics
 
 let fill_work_and_enqueue_transactions t transactions work =
   let open Or_error.Let_syntax in
