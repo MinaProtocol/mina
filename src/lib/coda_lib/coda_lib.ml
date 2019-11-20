@@ -547,9 +547,11 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     match best_staged_ledger t |> Participating_state.active with
     | Some staged_ledger ->
         let snark_pool = snark_pool t in
-        let fee = snark_work_fee t in
+        let fee_opt =
+          Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
+        in
         let pending_work =
-          Work_selection_method.pending_work_statements ~snark_pool ~fee
+          Work_selection_method.pending_work_statements ~snark_pool ~fee_opt
             ~staged_ledger
           |> List.length
         in
