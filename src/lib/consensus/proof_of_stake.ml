@@ -1448,6 +1448,9 @@ module Data = struct
     end
   end
 
+  [%%if
+  false]
+
   module Min_window_density = struct
     (* Three cases for updating the lengths of sub_windows
        - same sub_window, then add 1 to the sub_window_densities
@@ -1817,6 +1820,22 @@ module Data = struct
                      ~prev_sub_window_densities ~prev_min_window_density ))
       end )
   end
+
+  [%%else]
+
+  module Min_window_density = struct
+    let update_min_window_density ~prev_global_slot ~next_global_slot
+        ~prev_sub_window_densities ~prev_min_window_density =
+      (prev_min_window_density, prev_sub_window_densities)
+
+    module Checked = struct
+      let update_min_window_density ~prev_global_slot ~next_global_slot
+          ~prev_sub_window_densities ~prev_min_window_density =
+        Tick.Checked.return (prev_min_window_density, prev_sub_window_densities)
+    end
+  end
+
+  [%%endif]
 
   (* We have a list of state hashes. When we extend the blockchain,
      we see if the **previous** state should be saved as a checkpoint.
