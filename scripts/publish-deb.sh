@@ -31,7 +31,7 @@ else
 
     # only publish wanted jobs
     case "$CIRCLE_JOB" in
-        build-artifacts--testnet_postake_medium_curves | build-artifacts--net_10k)
+        build-artifacts--testnet_postake_medium_curves | build-artifacts--net_10k | build-artifacts--net_5tps)
             cd src/_build
             echo "Publishing debs:"
             ls coda-*.deb
