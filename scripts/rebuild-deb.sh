@@ -60,8 +60,8 @@ cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc
 
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
-cp ../config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
-rsync -Huav ../config/* "${BUILDDIR}/etc/coda/build_config/."
+cp ../src/config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
+rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
 # Keys
 # Identify actual keys used in build
