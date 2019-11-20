@@ -71,12 +71,12 @@ dht: kademlia libp2p_helper
 
 build: git_hooks reformat-diff
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build app/logproc/logproc.exe app/cli/src/coda.exe  --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe  --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 build_archive: git_hooks reformat-diff
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build app/archive/archive.exe --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 dev: codabuilder containerstart build
@@ -100,13 +100,13 @@ update-graphql:
 ## Lint
 
 reformat: git_hooks
-	$(WRAPAPP) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
+	$(WRAPAPP) dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path .
 
 reformat-diff:
 	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
 check-format:
-	$(WRAPAPP) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
+	$(WRAPAPP) dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path . -check
 
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
