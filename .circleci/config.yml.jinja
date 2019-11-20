@@ -59,6 +59,7 @@ jobs:
                   name: Build bot
                   command: cd frontend/bot && yarn run build-ci
 
+    {# # Disabled until working
     build-archive:
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
@@ -88,7 +89,7 @@ jobs:
                   command:  bash -c 'eval `opam config env` && make build_archive'
             - run:
                   name: Configure Hasura
-                  command: ls && ./scripts/archive/make_hasura_configurations.sh
+                  command: ls && ./scripts/archive/make_hasura_configurations.sh #}
     lint:
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
@@ -458,7 +459,7 @@ workflows:
                     only: develop
             - tracetool
             - build-wallet
-            - build-archive
+            {# - build-archive #}
             - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
