@@ -38,28 +38,30 @@ end
 
 module type Blockchain_state_intf = sig
   module Poly : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp]
       end
-    end
+    end]
 
     type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
-      ('staged_ledger_hash, 'snarked_ledger_hash, 'time) Stable.V1.t
+      ('staged_ledger_hash, 'snarked_ledger_hash, 'time) Stable.Latest.t
     [@@deriving sexp]
   end
 
   module Value : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type t =
           (Staged_ledger_hash.t, Frozen_ledger_hash.t, Block_time.t) Poly.t
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp]
       end
-    end
+    end]
 
-    type t = Stable.V1.t [@@deriving sexp]
+    type t = Stable.Latest.t [@@deriving sexp]
   end
 
   type var =
@@ -93,14 +95,12 @@ module type Protocol_state_intf = sig
   type consensus_state_var
 
   module Poly : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('state_hash, 'body) t
-        [@@deriving eq, bin_io, hash, sexp, to_yojson, version]
+        type ('state_hash, 'body) t [@@deriving eq, hash, sexp, to_yojson]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t
     [@@deriving sexp]
@@ -108,43 +108,40 @@ module type Protocol_state_intf = sig
 
   module Body : sig
     module Poly : sig
+      [%%versioned:
       module Stable : sig
         module V1 : sig
-          type ('blockchain_state, 'consensus_state) t
-          [@@deriving bin_io, sexp]
+          type ('blockchain_state, 'consensus_state) t [@@deriving sexp]
         end
-
-        module Latest = V1
-      end
+      end]
 
       type ('blockchain_state, 'consensus_state) t =
-        ('blockchain_state, 'consensus_state) Stable.V1.t
+        ('blockchain_state, 'consensus_state) Stable.Latest.t
       [@@deriving sexp]
     end
 
     module Value : sig
+      [%%versioned:
       module Stable : sig
         module V1 : sig
           type t = (blockchain_state, consensus_state) Poly.Stable.V1.t
-          [@@deriving bin_io, sexp, to_yojson]
+          [@@deriving sexp, to_yojson]
         end
-      end
+      end]
     end
 
-    type var = (blockchain_state_var, consensus_state_var) Poly.Stable.V1.t
+    type var = (blockchain_state_var, consensus_state_var) Poly.Stable.Latest.t
   end
 
   module Value : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type t = (State_hash.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving sexp, bin_io, eq, compare]
+        [@@deriving sexp, eq, compare]
       end
+    end]
 
-      module Latest = V1
-    end
-
-    (* bin_io omitted *)
     type t = Stable.V1.t [@@deriving sexp, eq, compare]
   end
 
@@ -339,13 +336,12 @@ module type S = sig
     module Vrf : sig
       module Output : sig
         module Truncated : sig
+          [%%versioned:
           module Stable : sig
             module V1 : sig
               type t
             end
-
-            module Latest = V1
-          end
+          end]
 
           type t = Stable.Latest.t
 
@@ -356,16 +352,15 @@ module type S = sig
 
     module Epoch_ledger : sig
       module Value : sig
-        type t
-
-        module Stable :
-          sig
-            module V1 : sig
-              type t
-              [@@deriving hash, eq, compare, bin_io, sexp, to_yojson, version]
-            end
+        [%%versioned:
+        module Stable : sig
+          module V1 : sig
+            type t [@@deriving hash, eq, compare, sexp, to_yojson]
           end
-          with type V1.t = t
+        end]
+
+        type t = Stable.Latest.t
+        [@@deriving hash, eq, compare, sexp, to_yojson]
       end
 
       val hash : Value.t -> Frozen_ledger_hash.t
@@ -388,17 +383,14 @@ module type S = sig
     end
 
     module Prover_state : sig
-      type t [@@deriving to_yojson, sexp]
-
-      module Stable :
-        sig
-          module V1 : sig
-            type t [@@deriving bin_io, sexp, to_yojson, version]
-          end
-
-          module Latest = V1
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t [@@deriving sexp, to_yojson]
         end
-        with type V1.t = t
+      end]
+
+      type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
       val precomputed_handler : Snark_params.Tick.Handler.t Lazy.t
 
@@ -410,11 +402,12 @@ module type S = sig
 
     module Consensus_transition : sig
       module Value : sig
+        [%%versioned:
         module Stable : sig
           module V1 : sig
-            type t [@@deriving sexp, bin_io, to_yojson, version]
+            type t [@@deriving sexp, to_yojson]
           end
-        end
+        end]
 
         type t = Stable.V1.t [@@deriving to_yojson, sexp]
       end
@@ -438,17 +431,15 @@ module type S = sig
 
     module Consensus_state : sig
       module Value : sig
-        (* bin_io omitted *)
-        type t [@@deriving hash, eq, compare, sexp, to_yojson]
-
-        module Stable :
-          sig
-            module V1 : sig
-              type t
-              [@@deriving hash, eq, compare, bin_io, sexp, to_yojson, version]
-            end
+        [%%versioned:
+        module Stable : sig
+          module V1 : sig
+            type t [@@deriving hash, eq, compare, sexp, to_yojson]
           end
-          with type V1.t = t
+        end]
+
+        type t = Stable.Latest.t
+        [@@deriving hash, eq, compare, sexp, to_yojson]
       end
 
       type display [@@deriving yojson]
