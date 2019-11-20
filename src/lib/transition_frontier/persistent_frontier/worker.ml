@@ -133,6 +133,8 @@ module Worker = struct
       Database.set_frontier_hash t.db result_hash
     with
     | Ok () ->
+        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+          "diffs are being added successfully" ;
         ()
     (* TODO: log the diff that failed *)
     | Error (`Apply_diff _) ->
