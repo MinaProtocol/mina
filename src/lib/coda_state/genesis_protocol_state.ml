@@ -21,6 +21,8 @@ let create_with_custom_ledger ~genesis_consensus_state ~genesis_ledger =
   in
   let state =
     Protocol_state.create_value
+      ~genesis_state_hash:
+        (State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash)
       ~previous_state_hash:negative_one_protocol_state_hash ~blockchain_state
       ~consensus_state:genesis_consensus_state
   in
@@ -37,6 +39,8 @@ let t =
      in
      let state =
        Protocol_state.create_value
+         ~genesis_state_hash:
+           (State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash)
          ~previous_state_hash:negative_one_protocol_state_hash
          ~blockchain_state:(Lazy.force Blockchain_state.genesis)
          ~consensus_state:genesis_consensus_state

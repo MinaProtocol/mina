@@ -299,8 +299,11 @@ module For_tests = struct
               {data= previous_protocol_state; hash= previous_state_hash}
       in
       let protocol_state =
-        Protocol_state.create_value ~previous_state_hash
-          ~blockchain_state:next_blockchain_state ~consensus_state
+        Protocol_state.create_value
+          ~genesis_state_hash:
+            (Protocol_state.genesis_state_hash previous_protocol_state)
+          ~previous_state_hash ~blockchain_state:next_blockchain_state
+          ~consensus_state
       in
       let next_external_transition =
         External_transition.create ~protocol_state

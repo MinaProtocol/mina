@@ -2858,6 +2858,8 @@ module Hooks = struct
       in
       let protocol_state =
         Protocol_state.create_value
+          ~genesis_state_hash:
+            (Protocol_state.genesis_state_hash previous_protocol_state)
           ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
           ~blockchain_state ~consensus_state
       in

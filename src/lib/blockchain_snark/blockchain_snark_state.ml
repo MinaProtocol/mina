@@ -158,6 +158,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
       in
       let new_state =
         Protocol_state.create_var ~previous_state_hash
+          ~genesis_state_hash:
+            (Protocol_state.genesis_state_hash previous_state)
           ~blockchain_state:(Snark_transition.blockchain_state transition)
           ~consensus_state
       in

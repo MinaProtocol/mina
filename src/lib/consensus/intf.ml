@@ -110,28 +110,33 @@ module type Protocol_state_intf = sig
     module Poly : sig
       module Stable : sig
         module V1 : sig
-          type ('blockchain_state, 'consensus_state) t
+          type ('state_hash, 'blockchain_state, 'consensus_state) t
           [@@deriving bin_io, sexp]
         end
 
         module Latest = V1
       end
 
-      type ('blockchain_state, 'consensus_state) t =
-        ('blockchain_state, 'consensus_state) Stable.V1.t
+      type ('state_hash, 'blockchain_state, 'consensus_state) t =
+        ('state_hash, 'blockchain_state, 'consensus_state) Stable.V1.t
       [@@deriving sexp]
     end
 
     module Value : sig
       module Stable : sig
         module V1 : sig
-          type t = (blockchain_state, consensus_state) Poly.Stable.V1.t
+          type t =
+            (State_hash.t, blockchain_state, consensus_state) Poly.Stable.V1.t
           [@@deriving bin_io, sexp, to_yojson]
         end
       end
     end
 
-    type var = (blockchain_state_var, consensus_state_var) Poly.Stable.V1.t
+    type var =
+      ( State_hash.var
+      , blockchain_state_var
+      , consensus_state_var )
+      Poly.Stable.V1.t
   end
 
   module Value : sig
@@ -152,6 +157,7 @@ module type Protocol_state_intf = sig
 
   val create_value :
        previous_state_hash:State_hash.t
+    -> genesis_state_hash:State_hash.t
     -> blockchain_state:blockchain_state
     -> consensus_state:consensus_state
     -> Value.t
@@ -161,10 +167,13 @@ module type Protocol_state_intf = sig
   val body : (_, 'body) Poly.t -> 'body
 
   val blockchain_state :
-    (_, ('blockchain_state, _) Body.Poly.t) Poly.t -> 'blockchain_state
+    (_, (_, 'blockchain_state, _) Body.Poly.t) Poly.t -> 'blockchain_state
+
+  val genesis_state_hash :
+    (_, ('genesis_state_hash, _, _) Body.Poly.t) Poly.t -> 'genesis_state_hash
 
   val consensus_state :
-    (_, (_, 'consensus_state) Body.Poly.t) Poly.t -> 'consensus_state
+    (_, (_, _, 'consensus_state) Body.Poly.t) Poly.t -> 'consensus_state
 
   val hash : Value.t -> State_hash.t
 end
