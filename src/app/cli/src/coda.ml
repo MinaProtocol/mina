@@ -29,7 +29,7 @@ let maybe_sleep s = after (Time.Span.of_sec s)
 let maybe_sleep _ = Deferred.unit
 
 [%%endif]
-
+(*TODO: genesis ledger hash, genesis timestamp and epoch size or all the consensus constants*)
 let chain_id =
   lazy
     (let genesis_state_hash =

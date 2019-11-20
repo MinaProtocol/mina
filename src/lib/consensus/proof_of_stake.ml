@@ -37,7 +37,7 @@ let genesis_ledger_total_currency =
 
 let genesis_ledger_hash =
   lazy
-    ( Coda_base.Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+    ( Coda_base.Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t)
     |> Coda_base.Frozen_ledger_hash.of_ledger_hash )
 
 let compute_delegatee_table keys ~iter_accounts =
@@ -953,7 +953,7 @@ module Data = struct
           (let pk, sk = keypairs.(0) in
            let dummy_sparse_ledger =
              Coda_base.Sparse_ledger.of_ledger_subset_exn
-               (Lazy.force Genesis_ledger.t)
+               (Lazy.force Genesis_ledger.Dummy.t)
                [pk]
            in
            let empty_pending_coinbase =
@@ -2960,7 +2960,7 @@ let%test_module "Proof of stake tests" =
       (* build pieces needed to apply "update" *)
       let snarked_ledger_hash =
         Frozen_ledger_hash.of_ledger_hash
-          (Ledger.merkle_root (Lazy.force Genesis_ledger.t))
+          (Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t))
       in
       let previous_protocol_state_hash = State_hash.(of_hash zero) in
       let previous_consensus_state =
