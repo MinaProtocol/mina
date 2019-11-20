@@ -503,7 +503,7 @@ module Data = struct
       type ('ledger_hash, 'amount) t =
             ('ledger_hash, 'amount) Stable.Latest.t =
         {hash: 'ledger_hash; total_currency: 'amount}
-      [@@deriving sexp, compare, hash, to_yojson]
+      [@@deriving sexp, eq, compare, hash, to_yojson]
     end
 
     module Value = struct
@@ -520,7 +520,7 @@ module Data = struct
         end
       end]
 
-      type t = Stable.Latest.t [@@deriving sexp, compare, hash, to_yojson]
+      type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, to_yojson]
     end
 
     let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =

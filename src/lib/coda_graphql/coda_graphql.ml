@@ -516,7 +516,7 @@ module Types = struct
              ; field "epochDelegateAccount" ~typ:(Lazy.force account)
                  ~doc:
                    "The account that you delegated on the staking ledger of \
-                    the current block"
+                    the current block's epoch"
                  ~args:Arg.[]
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
                    let open Option.Let_syntax in
