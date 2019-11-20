@@ -681,13 +681,17 @@ end
 let genesis =
   let open Lazy.Let_syntax in
   let%map genesis_protocol_state = Genesis_protocol_state.t in
+  let creator =
+    Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
+  in
   let empty_diff =
     { Staged_ledger_diff.diff=
         ( { completed_works= []
           ; user_commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
-    ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
+    ; creator
+    ; coinbase_receiver= creator
     ; state_body_hash=
         Protocol_state.body (With_hash.data genesis_protocol_state)
         |> Protocol_state.Body.hash }
