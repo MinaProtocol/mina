@@ -10,7 +10,7 @@ module type Update_intf = sig
   module Checked : sig
     val update :
          logger:Logger.t
-      -> State_hash.var * Protocol_state.var
+      -> State_hash.var * State_body_hash.var * Protocol_state.var
       -> Snark_transition.var
       -> ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
          , _ )
@@ -48,8 +48,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           fun _ _ _ _ _ _ _ -> Checked.return Boolean.true_
 
     let%snarkydef update ~(logger : Logger.t)
-        ((previous_state_hash, previous_state) :
-          State_hash.var * Protocol_state.var)
+        ((previous_state_hash, previous_state_body_hash, previous_state) :
+          State_hash.var * State_body_hash.var * Protocol_state.var)
         (transition : Snark_transition.var) :
         ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
         , _ )
@@ -80,9 +80,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
             Pending_coinbase.Checked.pop_coinbases prev_pending_coinbase_root
               ~proof_emitted:(Boolean.not ledger_hash_didn't_change)
           in
-          let%bind prev_state_body_hash =
-            Protocol_state.(Body.hash_checked (body previous_state))
-          in
+          (*If snarked ledger hash did not change (no new ledger proof) then pop_coinbases should be a no-op*)
           let%bind no_coinbases_popped =
             let%bind check =
               Pending_coinbase.Hash.equal_var root_after_delete
@@ -97,7 +95,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
               (Pending_coinbase.Checked.add_coinbase root_after_delete
                  ( Snark_transition.proposer transition
                  , Snark_transition.coinbase_amount transition
-                 , prev_state_body_hash ))
+                 , previous_state_body_hash ))
           in
           (new_root, deleted_stack, no_coinbases_popped)
         in
@@ -141,6 +139,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
                 let%map correct_transaction_snark =
                   read Boolean.typ correct_transaction_snark
                 and nothing_changed = read Boolean.typ nothing_changed
+                and no_coinbases_popped = read Boolean.typ no_coinbases_popped
                 and updated_consensus_state =
                   read Boolean.typ updated_consensus_state
                 and correct_coinbase_status =
@@ -150,8 +149,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
                   "blockchain snark update success (check pending coinbase = \
                    $check): $result = \
                    (correct_transaction_snark=$correct_transaction_snark ∨ \
-                   nothing_changed=$nothing_changed) ∧ \
-                   updated_consensus_state=$updated_consensus_state ∧ \
+                   nothing_changed \
+                   (no_coinbases_popped=$no_coinbases_popped)=$nothing_changed) \
+                   ∧ updated_consensus_state=$updated_consensus_state ∧ \
                    correct_coinbase_status=$correct_coinbase_status"
                   ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
@@ -160,7 +160,8 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
                     ; ("nothing_changed", `Bool nothing_changed)
                     ; ("updated_consensus_state", `Bool updated_consensus_state)
                     ; ("correct_coinbase_status", `Bool correct_coinbase_status)
-                    ; ("result", `Bool result) ]))
+                    ; ("result", `Bool result)
+                    ; ("no_coinbases_popped", `Bool no_coinbases_popped) ]))
         in
         result
       in
@@ -169,7 +170,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           ~blockchain_state:(Snark_transition.blockchain_state transition)
           ~consensus_state
       in
-      let%map state_hash = Protocol_state.hash_checked new_state in
+      let%map state_hash, _ = Protocol_state.hash_checked new_state in
       (state_hash, new_state, `Success success)
   end
 end
