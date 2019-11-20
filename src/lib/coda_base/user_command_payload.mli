@@ -21,19 +21,21 @@ end
 
 module Common : sig
   module Poly : sig
-    type ('fee, 'nonce, 'memo) t = {fee: 'fee; nonce: 'nonce; memo: 'memo}
+    type ('fee, 'nonce, 'global_slot, 'memo) t =
+      {fee: 'fee; nonce: 'nonce; valid_until: 'global_slot; memo: 'memo}
     [@@deriving eq, sexp, hash, yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type ('fee, 'nonce, 'memo) t
+          type ('fee, 'nonce, 'global_slot, 'memo) t
           [@@deriving bin_io, eq, sexp, hash, yojson, version]
         end
 
         module Latest = V1
       end
-      with type ('fee, 'nonce, 'memo) V1.t = ('fee, 'nonce, 'memo) t
+      with type ('fee, 'nonce, 'global_slot, 'memo) V1.t =
+                  ('fee, 'nonce, 'global_slot, 'memo) t
   end
 
   module Stable : sig
@@ -41,6 +43,7 @@ module Common : sig
       type t =
         ( Currency.Fee.Stable.V1.t
         , Coda_numbers.Account_nonce.Stable.V1.t
+        , Coda_numbers.Global_slot.Stable.V1.t
         , User_command_memo.t )
         Poly.Stable.V1.t
       [@@deriving bin_io, eq, sexp, hash]
@@ -56,6 +59,7 @@ module Common : sig
   type var =
     ( Currency.Fee.var
     , Coda_numbers.Account_nonce.Checked.t
+    , Coda_numbers.Global_slot.Checked.t
     , User_command_memo.Checked.t )
     Poly.t
 
@@ -105,6 +109,7 @@ type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 val create :
      fee:Currency.Fee.t
   -> nonce:Coda_numbers.Account_nonce.t
+  -> valid_until:Coda_numbers.Global_slot.t
   -> memo:User_command_memo.t
   -> body:Body.t
   -> t
