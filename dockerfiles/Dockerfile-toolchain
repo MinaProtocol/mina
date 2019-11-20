@@ -40,9 +40,14 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     zlib1g-dev \
     libbz2-dev
 
-RUN sudo pip install sexpdata
+RUN sudo pip install sexpdata awscli
 
 RUN sudo gem install deb-s3
+
+RUN VER="19.03.4" && \
+    curl -L -o /tmp/docker-$VER.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$VER.tgz && \
+    tar -xz -C /tmp -f /tmp/docker-$VER.tgz && \
+    sudo mv /tmp/docker/* /usr/bin
 
 # Google Cloud tools
 RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
