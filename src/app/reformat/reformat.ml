@@ -12,6 +12,7 @@ let dirs_whitelist =
   ; "external"
   ; "ocamlformat"
   ; "node_modules"
+  ; "tablecloth"
   ; "snarky" ]
 
 let rec fold_over_files ~path ~process_path ~init ~f =
