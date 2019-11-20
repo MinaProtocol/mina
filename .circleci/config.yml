@@ -299,6 +299,56 @@ jobs:
                     fi
             - store_artifacts:
                   path: /tmp/artifacts
+    build-artifacts--net_10k:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+        steps:
+            - checkout
+            - run:
+                  name: Artifacts Path
+                  command: |
+                      mkdir -p /tmp/artifacts
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
+            - run:
+                  name: Install awscli
+                  command: sudo pip install awscli
+            - run:
+                  name: Build OCaml
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  environment:
+                    DUNE_PROFILE: net_10k
+                  no_output_timeout: 20m
+            - run:
+                  name: Upload generated PV keys
+                  command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
+            - run:
+                  name: Rebuild for pvkey changes
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                  environment:
+                    DUNE_PROFILE: net_10k
+                  no_output_timeout: 20m
+            - run:
+                  name: Build deb package with PV keys and PV key tar
+                  command: ./scripts/skip_if_only_frontend.sh make deb
+                  environment:
+                    DUNE_PROFILE: net_10k
+                  no_output_timeout: 20m
+            - run:
+                  name: Store genesis public/private keypairs
+                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
+                  no_output_timeout: 20m
+            - run:
+                  name: Copy artifacts to cloud
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     test-unit--test_postake_snarkless_unittest:
         resource_class: xlarge
         docker:
@@ -673,6 +723,7 @@ workflows:
             
             - build-macos
             - build-artifacts--testnet_postake_medium_curves
+            - build-artifacts--net_10k
             - test-unit--test_postake_snarkless_unittest
             - test-unit--dev
             - test--fake_hash
