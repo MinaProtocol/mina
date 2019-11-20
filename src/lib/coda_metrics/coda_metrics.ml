@@ -1,3 +1,6 @@
+[%%import
+"../../config.mlh"]
+
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 open Core_kernel
 open Prometheus
@@ -218,24 +221,24 @@ module Runtime = struct
 
   let jemalloc_active_bytes =
     simple_metric ~metric_type:Gauge "jemalloc_active_bytes"
-      (fun () -> float_of_int @@ (1024 * !current_jemalloc.active))
+      (fun () -> float_of_int !current_jemalloc.active)
       ~help:"active memory in bytes"
 
   let jemalloc_resident_bytes =
     simple_metric ~metric_type:Gauge "jemalloc_resident_bytes"
-      (fun () -> float_of_int @@ (1024 * !current_jemalloc.resident))
+      (fun () -> float_of_int !current_jemalloc.resident)
       ~help:
         "resident memory in bytes (may be zero depending on jemalloc compile \
          options)"
 
   let jemalloc_allocated_bytes =
     simple_metric ~metric_type:Gauge "jemalloc_allocated_bytes"
-      (fun () -> float_of_int @@ (1024 * !current_jemalloc.allocated))
+      (fun () -> float_of_int !current_jemalloc.allocated)
       ~help:"memory allocated to heap objects in bytes"
 
   let jemalloc_mapped_bytes =
     simple_metric ~metric_type:Gauge "jemalloc_mapped_bytes"
-      (fun () -> float_of_int @@ (1024 * !current_jemalloc.mapped))
+      (fun () -> float_of_int !current_jemalloc.mapped)
       ~help:"memory mapped into process address space in bytes"
 
   let process_cpu_seconds_total =
@@ -320,11 +323,34 @@ end
 module Transaction_pool = struct
   let subsystem = "Transaction_pool"
 end
-
-module Snark_pool = struct
-  let subsystem = "Snark_pool"
-end
 *)
+
+module Metric_map (Metric : sig
+  type t
+
+  val subsystem : string
+
+  val v :
+       ?registry:CollectorRegistry.t
+    -> help:string
+    -> ?namespace:string
+    -> ?subsystem:string
+    -> string
+    -> t
+end) =
+struct
+  module Metric_name_map = Hashtbl.Make (String)
+  include Metric_name_map
+
+  let add t ~name ~help : Metric.t =
+    if Metric_name_map.mem t name then Metric_name_map.find_exn t name
+    else
+      let metric =
+        Metric.v ~help ~namespace ~subsystem:Metric.subsystem name
+      in
+      Metric_name_map.add_exn t ~key:name ~data:metric ;
+      metric
+end
 
 module Network = struct
   let subsystem = "Network"
@@ -337,25 +363,48 @@ module Network = struct
     let help = "# of messages received" in
     Counter.v "messages_received" ~help ~namespace ~subsystem
 
-  module Rpc_map = Hashtbl.Make (String)
+  module Gauge_map = Metric_map (struct
+    type t = Gauge.t
 
-  module Rpc_histogram = Histogram (struct
+    let subsystem = subsystem
+
+    let v = Gauge.v
+  end)
+
+  module Rpc_latency_histogram = Histogram (struct
+    let spec = Histogram_spec.of_exponential 1000. 10. 5
+  end)
+
+  module Rpc_size_histogram = Histogram (struct
     let spec = Histogram_spec.of_exponential 500. 2. 7
   end)
 
-  let rpc_table = Rpc_map.of_alist_exn []
+  module Histogram_map = Metric_map (struct
+    type t = Rpc_size_histogram.t
+
+    let subsystem = subsystem
+
+    let v = Rpc_size_histogram.v
+  end)
+
+  let rpc_latency_table = Gauge_map.of_alist_exn []
+
+  let rpc_size_table = Histogram_map.of_alist_exn []
 
   let rpc_latency_ms ~name : Gauge.t =
-    if Rpc_map.mem rpc_table name then Rpc_map.find_exn rpc_table name
-    else
-      let help = "time elapsed while doing rpc calls in ms" in
-      let rpc_gauge = Gauge.v name ~help ~namespace ~subsystem in
-      Rpc_map.add_exn rpc_table ~key:name ~data:rpc_gauge ;
-      rpc_gauge
+    let help = "time elapsed while doing RPC calls in ms" in
+    let name = name ^ "_latency" in
+    Gauge_map.add rpc_latency_table ~name ~help
 
-  let rpc_latency_ms_summary : Rpc_histogram.t =
-    let help = "A histogram for all rpc call latencies" in
-    Rpc_histogram.v "rpc_latency_ms_summary" ~help ~namespace ~subsystem
+  let rpc_size_bytes ~name : Rpc_size_histogram.t =
+    let help = "size for RPC reponse in bytes" in
+    let name = name ^ "_size" in
+    Histogram_map.add rpc_size_table ~name ~help
+
+  let rpc_latency_ms_summary : Rpc_latency_histogram.t =
+    let help = "A histogram for all RPC call latencies" in
+    Rpc_latency_histogram.v "rpc_latency_ms_summary" ~help ~namespace
+      ~subsystem
 end
 
 module Snark_work = struct
@@ -385,16 +434,9 @@ module Snark_work = struct
     let help = "# of completed snark work bundles in the snark pool" in
     Gauge.v "snark_pool_size" ~help ~namespace ~subsystem
 
-  let completed_snark_work_last_block : Gauge.t =
-    let help = "# of snark work bundles purchased per block" in
-    Gauge.v "completed_snark_work_last_block" ~help ~namespace ~subsystem
-
-  let scan_state_snark_work : Gauge.t =
-    let help =
-      "# of snark work in the scan state that are yet to be done/purchased \
-       after every block"
-    in
-    Gauge.v "scan_state_snark_work" ~help ~namespace ~subsystem
+  let pending_snark_work : Gauge.t =
+    let help = "total # of snark work bundles that are yet to be generated" in
+    Gauge.v "pending_snark_work" ~help ~namespace ~subsystem
 
   module Snark_fee_histogram = Histogram (struct
     let spec = Histogram_spec.of_linear 0. 1. 10
@@ -403,6 +445,100 @@ module Snark_work = struct
   let snark_fee =
     let help = "A histogram for snark fees" in
     Snark_fee_histogram.v "snark_fee" ~help ~namespace ~subsystem
+end
+
+module Scan_state_metrics = struct
+  let subsystem = "Scan_state"
+
+  (*duplicating Snark_params.Scan_state_constants because of a dependency cycle*)
+  module Scan_state_constants = struct
+    [%%inject
+    "work_delay", scan_state_work_delay]
+
+    [%%if
+    scan_state_with_tps_goal]
+
+    open Core_kernel
+
+    [%%inject
+    "tps_goal_x10", scan_state_tps_goal_x10]
+
+    [%%inject
+    "block_window_duration", block_window_duration]
+
+    let max_coinbases = 2
+
+    (* block_window_duration is in milliseconds, so divide by 1000
+       divide by 10 again because we have tps * 10
+     *)
+    let max_user_commands_per_block =
+      tps_goal_x10 * block_window_duration / (1000 * 10)
+
+    let transaction_capacity_log_2 =
+      1
+      + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
+
+    [%%else]
+
+    [%%inject
+    "transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
+
+    [%%endif]
+  end
+
+  module Metric = struct
+    type t = Gauge.t
+
+    let subsystem = subsystem
+
+    let v = Gauge.v
+  end
+
+  module Gauge_metric_map = Metric_map (Metric)
+
+  let base_snark_required_map = Gauge_metric_map.of_alist_exn []
+
+  let slots_available_map = Gauge_metric_map.of_alist_exn []
+
+  let merge_snark_required_map = Gauge_metric_map.of_alist_exn []
+
+  let max_trees =
+    let open Scan_state_constants in
+    ((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1
+
+  let scan_state_available_space ~name : Gauge.t =
+    let help = "# of slots available" in
+    let name = "slots_available_" ^ name in
+    Gauge_metric_map.add slots_available_map ~help ~name
+
+  let scan_state_base_snarks ~name : Gauge.t =
+    let help = "# of base snarks required" in
+    let name = "base_snarks_required_" ^ name in
+    Gauge_metric_map.add base_snark_required_map ~help ~name
+
+  let scan_state_merge_snarks ~name : Gauge.t =
+    let help = "# of merge snarks required" in
+    let name = "merge_snarks_required_" ^ name in
+    Gauge_metric_map.add merge_snark_required_map ~help ~name
+
+  let snark_fee_per_block : Gauge.t =
+    let help = "Total snark fee per block" in
+    Gauge.v "snark_fees_per_block" ~help ~namespace ~subsystem
+
+  let transaction_fees_per_block : Gauge.t =
+    let help = "Total transaction fee per block" in
+    Gauge.v "transaction_fees_per_block" ~help ~namespace ~subsystem
+
+  let purchased_snark_work_per_block : Gauge.t =
+    let help = "# of snark work bundles purchased per block" in
+    Gauge.v "purchased_snark_work_per_block" ~help ~namespace ~subsystem
+
+  let snark_work_required : Gauge.t =
+    let help =
+      "# of snark work bundles in the scan state that are yet to be \
+       done/purchased"
+    in
+    Gauge.v "snark_work_required" ~help ~namespace ~subsystem
 end
 
 module Trust_system = struct
@@ -484,22 +620,22 @@ module Transition_frontier = struct
     let help = "total # of staged txns that have been finalized" in
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
 
-  module TPS_10min = Moving_average (struct
-    let tick_interval = Core.Time.Span.of_min 1.
+  module TPS_30min = Moving_average (struct
+    let tick_interval = Core.Time.Span.of_min 3.
 
-    let rolling_interval = Core.Time.Span.of_min 10.
+    let rolling_interval = Core.Time.Span.of_min 30.
 
     let display total_txns =
       total_txns /. Core.Time.Span.to_sec rolling_interval
   end)
 
-  let tps_10min =
-    let name = "tps_10min" in
+  let tps_30min =
+    let name = "tps_30min" in
     let help =
       "moving average for transaction per second, the rolling interval is set \
-       to 10 min"
+       to 30 min"
     in
-    TPS_10min.create ~name ~help ~namespace ~subsystem ()
+    TPS_30min.create ~name ~help ~namespace ~subsystem ()
 
   let recently_finalized_staged_txns : Gauge.t =
     let help =

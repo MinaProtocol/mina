@@ -11,15 +11,6 @@ module type S_unchecked = sig
 
   include Hashable.S with type t := t
 
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-    end
-
-    module Latest = V1
-  end
-
   val length_in_bits : int
 
   val length_in_triples : int
@@ -112,7 +103,15 @@ module type S = sig
 end
 
 module type UInt32 = sig
-  include S with type t = Unsigned_extended.UInt32.t
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = Unsigned_extended.UInt32.t
+      [@@deriving sexp, eq, compare, hash, yojson]
+    end
+  end]
+
+  include S with type t = Stable.Latest.t
 
   val to_uint32 : t -> uint32
 
@@ -120,7 +119,15 @@ module type UInt32 = sig
 end
 
 module type UInt64 = sig
-  include S with type t = Unsigned_extended.UInt64.t
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = Unsigned_extended.UInt64.t
+      [@@deriving sexp, eq, compare, hash, yojson]
+    end
+  end]
+
+  include S with type t = Stable.Latest.t
 
   val to_uint64 : t -> uint64
 

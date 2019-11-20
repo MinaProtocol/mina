@@ -335,12 +335,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
     match transfer with
-    | One (pk, fee) ->
+    | `One (pk, fee) ->
         let emptys, a, loc = get_or_create t pk in
         let%map balance = modify_balance a.balance fee in
         set t loc {a with balance} ;
         emptys
-    | Two ((pk1, fee1), (pk2, fee2)) ->
+    | `Two ((pk1, fee1), (pk2, fee2)) ->
         let emptys1, a1, l1 = get_or_create t pk1 in
         if Public_key.Compressed.equal pk1 pk2 then (
           let%bind fee = error_opt "overflow" (Fee.add fee1 fee2) in

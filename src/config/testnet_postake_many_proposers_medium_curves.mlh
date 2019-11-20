@@ -20,4 +20,8 @@
 
 [%%define mock_frontend_data false]
 
+[%%define print_versioned_types false]
+
 [%%define daemon_expiry "never"]
+
+[%%define pending_coinbase_hack false]

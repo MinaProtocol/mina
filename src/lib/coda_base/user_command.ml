@@ -4,24 +4,18 @@
 open Core
 open Import
 open Coda_numbers
-open Module_version
 module Fee = Currency.Fee
 module Payload = User_command_payload
 
 module Poly = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('payload, 'pk, 'signature) t =
-          {payload: 'payload; sender: 'pk; signature: 'signature}
-        [@@deriving bin_io, compare, sexp, hash, yojson, version, eq]
-      end
-
-      include T
+      type ('payload, 'pk, 'signature) t =
+        {payload: 'payload; sender: 'pk; signature: 'signature}
+      [@@deriving compare, sexp, hash, yojson, eq]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('payload, 'pk, 'signature) t =
         ('payload, 'pk, 'signature) Stable.Latest.t =
@@ -29,41 +23,36 @@ module Poly = struct
   [@@deriving compare, eq, sexp, hash, yojson]
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        ( Payload.Stable.V1.t
-        , Public_key.Stable.V1.t
-        , Signature.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving compare, bin_io, sexp, hash, yojson, version]
-    end
+    type t =
+      ( Payload.Stable.V1.t
+      , Public_key.Stable.V1.t
+      , Signature.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving compare, sexp, hash, yojson]
+
+    let to_latest = Fn.id
 
     let description = "User command"
 
     let version_byte = Base58_check.Version_bytes.user_command
 
-    include T
-    include Registration.Make_latest_version (T)
+    module T = struct
+      (* can't use nonrec + deriving *)
+      type typ = t [@@deriving compare, sexp, hash]
+
+      type t = typ [@@deriving compare, sexp, hash]
+    end
+
     include Comparable.Make (T)
     include Hashable.Make (T)
 
     let accounts_accessed ({payload; sender; _} : t) =
       Public_key.compress sender :: Payload.accounts_accessed payload
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "user_command"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
@@ -76,6 +65,11 @@ let payload Poly.{payload; _} = payload
 let fee = Fn.compose Payload.fee payload
 
 let nonce = Fn.compose Payload.nonce payload
+
+(* for filtering *)
+let minimum_fee = Fee.of_int 2
+
+let is_trivial t = Fee.(fee t < minimum_fee)
 
 let sender t = Public_key.compress Poly.(t.sender)
 
@@ -171,46 +165,45 @@ module Gen = struct
     if Int.(n_commands = 0) then return []
     else
       let n_accounts = Array.length account_info in
-      (* How many commands will be issued from each account? *)
-      let%bind command_splits =
-        Quickcheck_lib.gen_division n_commands n_accounts
-      in
-      let command_splits' = Array.of_list command_splits in
-      (* List of payment senders in the final order. *)
-      let%bind command_senders =
-        Quickcheck_lib.shuffle
-        @@ List.concat_mapi command_splits ~f:(fun idx cmds ->
-               List.init cmds ~f:(Fn.const idx) )
-      in
-      (* within the accounts, how will the currency be split into separate
-         payments? *)
-      let%bind currency_splits =
-        let t =
-          Quickcheck_lib.init_gen_array
-            ~f:(fun i ->
-              let%bind spend_all = bool in
-              let balance = Tuple3.get2 account_info.(i) in
-              let amount_to_spend =
-                if spend_all then balance
-                else Currency.Amount.of_int (Currency.Amount.to_int balance / 2)
-              in
-              Quickcheck_lib.gen_division_currency amount_to_spend
-                command_splits'.(i) )
-            n_accounts
-        in
-        (* We need to ensure each command has enough currency for a fee of 2
-             or more, so it'll be enough to buy the requisite transaction snarks.
-          *)
-        Quickcheck.Generator.filter
-          ~f:(fun splits ->
-            Array.for_all splits ~f:(fun split ->
-                List.for_all split ~f:(fun amt ->
-                    if Currency.Amount.(amt < of_int 2) then
-                      (*gen_division_currency splits it the same way everytime this condition is true leading to an infinite loop?*)
-                      failwith
-                        "Insufficient account balance to create user command" ;
-                    true ) ) )
-          t
+      let%bind command_senders, currency_splits =
+        (* How many commands will be issued from each account? *)
+        (let%bind command_splits =
+           Quickcheck_lib.gen_division n_commands n_accounts
+         in
+         let command_splits' = Array.of_list command_splits in
+         (* List of payment senders in the final order. *)
+         let%bind command_senders =
+           Quickcheck_lib.shuffle
+           @@ List.concat_mapi command_splits ~f:(fun idx cmds ->
+                  List.init cmds ~f:(Fn.const idx) )
+         in
+         (* within the accounts, how will the currency be split into separate
+            payments? *)
+         let%bind currency_splits =
+           Quickcheck_lib.init_gen_array
+             ~f:(fun i ->
+               let%bind spend_all = bool in
+               let balance = Tuple3.get2 account_info.(i) in
+               let amount_to_spend =
+                 if spend_all then balance
+                 else
+                   Currency.Amount.of_int (Currency.Amount.to_int balance / 2)
+               in
+               Quickcheck_lib.gen_division_currency amount_to_spend
+                 command_splits'.(i) )
+             n_accounts
+         in
+         return (command_senders, currency_splits))
+        |> (* We need to ensure each command has enough currency for a fee of 2
+              or more, so it'll be enough to buy the requisite transaction
+              snarks. It's important that the backtracking from filter goes and
+              redraws command_splits as well as currency_splits, so we don't get
+              stuck in a situation where it's very unlikely for the predicate to
+              pass. *)
+           Quickcheck.Generator.filter ~f:(fun (_, splits) ->
+               Array.for_all splits ~f:(fun split ->
+                   List.for_all split ~f:(fun amt ->
+                       Currency.Amount.(amt >= of_int 2) ) ) )
       in
       let account_nonces = Array.map ~f:Tuple3.get3 account_info in
       let uncons_exn = function
@@ -249,32 +242,18 @@ module Gen = struct
 end
 
 module With_valid_signature = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Stable.V1.t
-        [@@deriving sexp, eq, bin_io, yojson, version, hash]
-      end
+      type t = Stable.V1.t [@@deriving sexp, eq, yojson, hash]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
 
       let compare = Stable.V1.compare
 
       module Gen = Gen
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "user_command_with_valid_signature"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 

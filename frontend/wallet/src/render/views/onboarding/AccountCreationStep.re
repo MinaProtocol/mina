@@ -80,37 +80,37 @@ let make = (~nextStep, ~prevStep) => {
   <div className=Theme.Onboarding.main>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
-        <h1 className=Styles.header>
         <FadeIn duration=500>
-          {React.string("Create Your Account")}
-        </FadeIn> 
-        </h1>
-        <Spacer height=0.5 />
-        <p className=Styles.heroBody>
-        <FadeIn duration=500 delay=150>
-          {React.string(
-             "Create your first account to complete setting up Coda Wallet. Please be sure to choose a secure password.",
-           )}
+          <h1 className=Styles.header>
+            {React.string("Create Your Account")}
+          </h1>
         </FadeIn>
-        </p>
-        <div className=Styles.textFields>
+        <Spacer height=0.5 />
+        <FadeIn duration=500 delay=150>
+          <p className=Styles.heroBody>
+            {React.string(
+               "Create your first account to complete setting up Coda Wallet. Please be sure to choose a secure password.",
+             )}
+          </p>
+        </FadeIn>
         <FadeIn duration=500 delay=200>
-          <Spacer height=0.5 />
-          <TextField
-            label="Name"
-            onChange={value => setName(_ => value)}
-            value=accountName
-          />
-          <Spacer height=0.5 />
-          <TextField
-            label="Password"
-            type_="password"
-            onChange={value => setPassword(_ => value)}
-            value=password
-          />
-          <Spacer height=2. />
-          </FadeIn>
-        </div>
+          <div className=Styles.textFields>
+            <Spacer height=0.5 />
+            <TextField
+              label="Name"
+              onChange={value => setName(_ => value)}
+              value=accountName
+            />
+            <Spacer height=0.5 />
+            <TextField
+              label="Password"
+              type_="password"
+              onChange={value => setPassword(_ => value)}
+              value=password
+            />
+            <Spacer height=2. />
+          </div>
+        </FadeIn>
         <div className=Styles.buttonRow>
           <Button
             style=Button.Gray
@@ -123,6 +123,7 @@ let make = (~nextStep, ~prevStep) => {
                <>
                  <Button
                    label="Create"
+                   style=Button.HyperlinkBlue
                    disabled={
                      switch (result) {
                      | Loading => true

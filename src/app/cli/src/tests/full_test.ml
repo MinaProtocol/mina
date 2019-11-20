@@ -83,7 +83,8 @@ let run_test () : unit Deferred.t =
   setup_time_offsets () ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
-  File_system.with_temp_dir "full_test_config" ~f:(fun temp_conf_dir ->
+  File_system.with_temp_dir (Filename.temp_dir_name ^/ "full_test_config")
+    ~f:(fun temp_conf_dir ->
       let keypair = Genesis_ledger.largest_account_keypair_exn () in
       let%bind () =
         match Unix.getenv "CODA_TRACING" with
@@ -98,7 +99,7 @@ let run_test () : unit Deferred.t =
           typ
       in
       let%bind trust_dir = Async.Unix.mkdtemp (temp_conf_dir ^/ "trust_db") in
-      let trust_system = Trust_system.create ~db_dir:trust_dir in
+      let trust_system = Trust_system.create trust_dir in
       trace_database_initialization "trust_system" __LOC__ trust_dir ;
       let%bind receipt_chain_dir_name =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "receipt_chain")
@@ -106,7 +107,7 @@ let run_test () : unit Deferred.t =
       trace_database_initialization "receipt_chain_database" __LOC__
         receipt_chain_dir_name ;
       let receipt_chain_database =
-        Receipt_chain_database.create ~directory:receipt_chain_dir_name
+        Receipt_chain_database.create receipt_chain_dir_name
       in
       let%bind transaction_database_dir =
         Async.Unix.mkdtemp (temp_conf_dir ^/ "transaction_database")
@@ -136,36 +137,42 @@ let run_test () : unit Deferred.t =
       let communication_port = 8000 in
       let client_port = 8123 in
       let libp2p_port = 8002 in
+      let gossip_net_params =
+        Gossip_net.Real.Config.
+          { timeout= Time.Span.of_sec 3.
+          ; logger
+          ; target_peer_count= 8
+          ; initial_peers= []
+          ; conf_dir= temp_conf_dir
+          ; chain_id= "bogus chain id for testing"
+          ; addrs_and_ports=
+              { external_ip= Unix.Inet_addr.localhost
+              ; bind_ip= Unix.Inet_addr.localhost
+              ; discovery_port
+              ; communication_port
+              ; libp2p_port
+              ; client_port }
+          ; trust_system
+          ; enable_libp2p= false
+          ; disable_haskell= false
+          ; libp2p_keypair= None
+          ; libp2p_peers= []
+          ; max_concurrent_connections= Some 10 }
+      in
       let net_config =
         Coda_networking.Config.
           { logger
           ; trust_system
           ; time_controller
           ; consensus_local_state
-          ; gossip_net_params=
-              { timeout= Time.Span.of_sec 3.
-              ; logger
-              ; target_peer_count= 8
-              ; initial_peers= []
-              ; conf_dir= temp_conf_dir
-              ; chain_id= "bogus chain id for testing"
-              ; addrs_and_ports=
-                  { external_ip= Unix.Inet_addr.localhost
-                  ; bind_ip= Unix.Inet_addr.localhost
-                  ; discovery_port
-                  ; communication_port
-                  ; libp2p_port
-                  ; client_port }
-              ; trust_system
-              ; enable_libp2p= false
-              ; disable_haskell= false
-              ; libp2p_keypair= None
-              ; libp2p_peers= []
-              ; max_concurrent_connections= Some 10
-              ; log_gossip_heard=
-                  { snark_pool_diff= false
-                  ; transaction_pool_diff= false
-                  ; new_state= false } } }
+          ; log_gossip_heard=
+              { snark_pool_diff= false
+              ; transaction_pool_diff= false
+              ; new_state= false }
+          ; creatable_gossip_net=
+              Coda_networking.Gossip_net.(
+                Any.Creatable ((module Real), Real.create gossip_net_params))
+          }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
@@ -179,7 +186,7 @@ let run_test () : unit Deferred.t =
       let%bind coda =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
-             ~conf_dir:temp_conf_dir
+             ~conf_dir:temp_conf_dir ~gossip_net_params
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_propose_keypairs:(Keypair.Set.singleton keypair)
@@ -191,6 +198,8 @@ let run_test () : unit Deferred.t =
                  ; shutdown_on_disconnect= true }
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
+             ~persistent_root_location:(temp_conf_dir ^/ "root")
+             ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
              ~time_controller ~receipt_chain_database ~snark_work_fee
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000 ())

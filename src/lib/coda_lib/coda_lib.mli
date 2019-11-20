@@ -28,7 +28,7 @@ val replace_snark_worker_key :
 
 val add_block_subscriber :
      t
-  -> Public_key.Compressed.t
+  -> Public_key.Compressed.t option
   -> ( Auxiliary_database.Filtered_external_transition.t
      , State_hash.t )
      With_hash.t
@@ -43,6 +43,8 @@ val snark_work_fee : t -> Currency.Fee.t
 val set_snark_work_fee : t -> Currency.Fee.t -> unit
 
 val request_work : t -> Snark_worker.Work.Spec.t option
+
+val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
 val add_work : t -> Snark_worker.Work.Result.t -> unit Deferred.t
 
@@ -69,8 +71,20 @@ val client_port : t -> int
 val validated_transitions :
   t -> External_transition.Validated.t Strict_pipe.Reader.t
 
-val root_diff :
-  t -> Transition_frontier.Diff.Root_diff.view Strict_pipe.Reader.t
+module Root_diff : sig
+  module Stable : sig
+    module V1 : sig
+      type t = {user_commands: User_command.Stable.V1.t list; root_length: int}
+      [@@deriving bin_io]
+    end
+
+    module Latest = V1
+  end
+
+  type t = Stable.Latest.t
+end
+
+val root_diff : t -> Root_diff.t Strict_pipe.Reader.t
 
 val dump_tf : t -> string Or_error.t
 

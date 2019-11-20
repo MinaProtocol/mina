@@ -12,7 +12,7 @@ module Input = struct
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
     ; proposer: int option
-    ; work_selection_method: Cli_lib.Arg_type.work_selection_method
+    ; work_selection_method: Cli_lib.Arg_type.Work_selection_method.Stable.V1.t
     ; conf_dir: string
     ; trace_dir: string option
     ; program_dir: string
@@ -26,14 +26,21 @@ end
 open Input
 
 module Send_payment_input = struct
-  (* TODO : version *)
-  type t =
-    Private_key.Stable.V1.t
-    * Public_key.Compressed.Stable.V1.t
-    * Currency.Amount.Stable.V1.t
-    * Currency.Fee.Stable.V1.t
-    * User_command_memo.Stable.V1.t
-  [@@deriving bin_io]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        Private_key.Stable.V1.t
+        * Public_key.Compressed.Stable.V1.t
+        * Currency.Amount.Stable.V1.t
+        * Currency.Fee.Stable.V1.t
+        * User_command_memo.Stable.V1.t
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t
 end
 
 module T = struct
@@ -88,7 +95,7 @@ module T = struct
     ; root_diff:
         ( 'worker
         , unit
-        , Transition_frontier.Diff.Root_diff.view Pipe.Reader.t )
+        , Coda_lib.Root_diff.t Pipe.Reader.t )
         Rpc_parallel.Function.t
     ; prove_receipt:
         ( 'worker
@@ -147,9 +154,7 @@ module T = struct
     ; coda_validated_transitions_keyswaptest:
            unit
         -> External_transition.Validated.Stable.V1.t Pipe.Reader.t Deferred.t
-    ; coda_root_diff:
-           unit
-        -> Transition_frontier.Diff.Root_diff.view Pipe.Reader.t Deferred.t
+    ; coda_root_diff: unit -> Coda_lib.Root_diff.t Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
         -> (Receipt.Chain_hash.t * User_command.t list) Deferred.t
@@ -298,7 +303,7 @@ module T = struct
 
     let send_user_command =
       C.create_rpc ~name:"send_user_command" ~f:send_payment_impl
-        ~bin_input:Send_payment_input.bin_t
+        ~bin_input:Send_payment_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 
@@ -315,8 +320,7 @@ module T = struct
 
     let root_diff =
       C.create_pipe ~name:"root_diff" ~f:root_diff_impl ~bin_input:Unit.bin_t
-        ~bin_output:[%bin_type_class: Transition_frontier.Diff.Root_diff.view]
-        ()
+        ~bin_output:[%bin_type_class: Coda_lib.Root_diff.Stable.V1.t] ()
 
     let sync_status =
       C.create_pipe ~name:"sync_status" ~f:sync_status_impl
@@ -424,11 +428,11 @@ module T = struct
               ~location typ
           in
           let receipt_chain_database =
-            Receipt_chain_database.create ~directory:receipt_chain_dir_name
+            Receipt_chain_database.create receipt_chain_dir_name
           in
           trace_database_initialization "receipt_chain_database" __LOC__
             receipt_chain_dir_name ;
-          let trust_system = Trust_system.create ~db_dir:trust_dir in
+          let trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let transaction_database =
             Auxiliary_database.Transaction_database.create ~logger
@@ -463,29 +467,35 @@ module T = struct
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_propose_keys
           in
+          let gossip_net_params =
+            Gossip_net.Real.Config.
+              { timeout= Time.Span.of_sec 3.
+              ; target_peer_count= 8
+              ; conf_dir
+              ; initial_peers= peers
+              ; chain_id= "bogus chain id for testing"
+              ; addrs_and_ports
+              ; logger
+              ; trust_system
+              ; enable_libp2p= false
+              ; disable_haskell= false
+              ; libp2p_keypair= None
+              ; libp2p_peers= []
+              ; max_concurrent_connections }
+          in
           let net_config =
             { Coda_networking.Config.logger
             ; trust_system
             ; time_controller
             ; consensus_local_state
-            ; gossip_net_params=
-                { Coda_networking.Gossip_net.Config.timeout= Time.Span.of_sec 3.
-                ; target_peer_count= 8
-                ; conf_dir
-                ; initial_peers= peers
-                ; chain_id= "bogus chain id for testing"
-                ; addrs_and_ports
-                ; logger
-                ; trust_system
-                ; enable_libp2p= false
-                ; disable_haskell= false
-                ; libp2p_keypair= None
-                ; libp2p_peers= []
-                ; max_concurrent_connections
-                ; log_gossip_heard=
-                    { snark_pool_diff= false
-                    ; transaction_pool_diff= false
-                    ; new_state= false } } }
+            ; log_gossip_heard=
+                { snark_pool_diff= false
+                ; transaction_pool_diff= false
+                ; new_state= false }
+            ; creatable_gossip_net=
+                Coda_networking.Gossip_net.(
+                  Any.Creatable ((module Real), Real.create gossip_net_params))
+            }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
@@ -494,7 +504,7 @@ module T = struct
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~net_config
+                 ~net_config ~gossip_net_params
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
@@ -503,6 +513,8 @@ module T = struct
                      { initial_snark_worker_key= snark_worker_key
                      ; shutdown_on_disconnect= true }
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                 ~persistent_root_location:(conf_dir ^/ "root")
+                 ~persistent_frontier_location:(conf_dir ^/ "frontier")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
@@ -599,7 +611,8 @@ module T = struct
             Coda_lib.stop_snark_worker ~should_wait_kill:true coda
           in
           let coda_new_block key =
-            Deferred.return @@ Coda_commands.Subscriptions.new_block coda key
+            Deferred.return
+            @@ Coda_commands.Subscriptions.new_block coda (Some key)
           in
           (* TODO: #2836 Remove validated_transitions_keyswaptest once the refactoring of broadcast pipe enters the code base *)
           let ( validated_transitions_keyswaptest_reader

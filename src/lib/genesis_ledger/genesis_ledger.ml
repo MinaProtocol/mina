@@ -64,6 +64,11 @@ genesis_ledger = "van_helsing"]
 
 include Van_helsing_ledger
 
+[%%elif
+genesis_ledger = "rising_phoenix"]
+
+include Rising_phoenix_ledger
+
 [%%else]
 
 [%%error

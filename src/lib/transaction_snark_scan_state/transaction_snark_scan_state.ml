@@ -81,12 +81,12 @@ module Job_view = struct
   [@@deriving sexp]
 
   let to_yojson ({value; position} : t) : Yojson.Safe.json =
-    let hash_string h = Sexp.to_string (Frozen_ledger_hash.sexp_of_t h) in
+    let hash_yojson h = Frozen_ledger_hash.to_yojson h in
     let statement_to_yojson (s : Transaction_snark.Statement.t) =
       `Assoc
         [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
-        ; ("Source", `String (hash_string s.source))
-        ; ("Target", `String (hash_string s.target))
+        ; ("Source", hash_yojson s.source)
+        ; ("Target", hash_yojson s.target)
         ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
         ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase) ]
     in
@@ -198,7 +198,9 @@ let create_expected_statement
   let pending_coinbase_after =
     match transaction with
     | Coinbase c ->
-        Pending_coinbase.Stack.push pending_coinbase_before c
+        if Coda_compile_config.pending_coinbase_hack then
+          Pending_coinbase.Stack.empty
+        else Pending_coinbase.Stack.push pending_coinbase_before c
     | _ ->
         pending_coinbase_before
   in
@@ -481,6 +483,13 @@ let next_on_new_tree = Parallel_scan.next_on_new_tree
 
 let base_jobs_on_latest_tree = Parallel_scan.base_jobs_on_latest_tree
 
+(* TODO: make this operation O(1) -- gets used in Sync_handler RPC, which is performance sensitive (#3733) *)
+let target_merkle_root t =
+  let open Transaction_with_witness in
+  let open Option.Let_syntax in
+  let%map last_item = List.last (Parallel_scan.pending_data t) in
+  last_item.statement.target
+
 (*All the transactions in the order in which they were applied*)
 let staged_transactions t =
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
@@ -580,6 +589,8 @@ let all_work_pairs_exn t =
   List.concat_map all_jobs ~f:(fun jobs ->
       List.map (One_or_two.group_list jobs) ~f:(One_or_two.map ~f:single_spec)
   )
+
+let update_metrics = Parallel_scan.update_metrics
 
 let fill_work_and_enqueue_transactions t transactions work =
   let open Or_error.Let_syntax in
