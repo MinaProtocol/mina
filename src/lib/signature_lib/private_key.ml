@@ -6,17 +6,12 @@ open Async_kernel
 open Snark_params
 open Module_version
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t = Tick.Inner_curve.Scalar.t
-      [@@deriving bin_io, sexp, version {asserted}]
+    type t = Tick.Inner_curve.Scalar.t [@@deriving sexp, version {asserted}]
 
-      let to_yojson t = `String (Tick.Inner_curve.Scalar.to_string t)
-    end
-
-    include T
-    include Registration.Make_latest_version (T)
+    let to_yojson t = `String (Tick.Inner_curve.Scalar.to_string t)
 
     let gen =
       let open Bignum_bigint in
@@ -25,19 +20,8 @@ module Stable = struct
         ~f:Snark_params.Tock.Bigint.(Fn.compose to_field of_bignum_bigint)
   end
 
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "private_key"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-
   (* see lib/module_version/README-version-asserted.md *)
-  module For_tests = struct
+  module Tests = struct
     [%%if
     curve_size = 298]
 
@@ -71,7 +55,7 @@ module Stable = struct
 
     [%%endif]
   end
-end
+end]
 
 type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
