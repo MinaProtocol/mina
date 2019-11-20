@@ -387,6 +387,7 @@ module Make (Action : Action_intf) = Make0 (struct
   end
 
   module Config = String
-  module Db = Rocksdb.Serializable.Make (Unix.Inet_addr.Blocking_sexp) (Record)
+  module Db =
+    Rocksdb.Serializable.Make (Unix.Inet_addr.Blocking_sexp) (Record.Stable.V1)
   module Action = Action
 end)

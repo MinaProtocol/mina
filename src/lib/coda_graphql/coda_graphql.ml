@@ -1919,9 +1919,13 @@ module Queries = struct
         with
         | Some staged_ledger ->
             let snark_pool = Coda_lib.snark_pool coda in
-            let fee = Coda_lib.snark_work_fee coda in
+            let fee_opt =
+              Coda_lib.(
+                Option.map (snark_worker_key coda) ~f:(fun _ ->
+                    snark_work_fee coda ))
+            in
             let (module S) = Coda_lib.work_selection_method coda in
-            S.pending_work_statements ~snark_pool ~fee ~staged_ledger
+            S.pending_work_statements ~snark_pool ~fee_opt ~staged_ledger
         | None ->
             [] )
 

@@ -4,6 +4,7 @@ let make = () => {
   let (isOnboarding, _) as onboardingValue =
     OnboardingProvider.createContext();
   let dispatch = CodaProcess.useHook();
+  let toastValue = ToastProvider.createContext();
 
   <AddressBookProvider value=settingsValue>
     <OnboardingProvider value=onboardingValue>
@@ -11,11 +12,11 @@ let make = () => {
         <ReasonApollo.Provider client=Apollo.client>
           {isOnboarding
              ? <Onboarding />
-             : <>
+             : <ToastProvider value=toastValue>
                  <Header />
                  <Main> <SideBar /> <Router /> </Main>
                  <Footer />
-               </>}
+               </ToastProvider>}
         </ReasonApollo.Provider>
       </ProcessDispatchProvider>
     </OnboardingProvider>
