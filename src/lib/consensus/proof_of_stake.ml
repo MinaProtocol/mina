@@ -1293,12 +1293,10 @@ module Data = struct
   end
 
   module Consensus_transition = struct
-    include Global_slot
-    module Value = Global_slot
+    include Coda_numbers.Global_slot
+    module Value = Coda_numbers.Global_slot
 
-    let typ = Global_slot.Checked.typ
-
-    type var = Global_slot.Checked.t
+    type var = Checked.t
 
     let genesis = zero
   end
