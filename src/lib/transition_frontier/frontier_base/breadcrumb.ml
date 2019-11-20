@@ -251,8 +251,8 @@ module For_tests = struct
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
-          ~self:largest_account_public_key ~transactions_by_fee:transactions
-          ~get_completed_work
+          ~coinbase_receiver:`Proposer ~self:largest_account_public_key
+          ~transactions_by_fee:transactions ~get_completed_work
           ~state_body_hash:
             ( validated_transition parent_breadcrumb
             |> External_transition.Validated.protocol_state
