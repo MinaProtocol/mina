@@ -2,7 +2,9 @@ open Async_kernel
 open Core_kernel
 open Signed
 open Unsigned
+module GS = Global_slot
 open Coda_numbers
+module Global_slot = GS
 open Currency
 open Fold_lib
 open Signature_lib
@@ -1530,7 +1532,7 @@ module Data = struct
             ( Length.Stable.V1.t
             , Vrf.Output.Truncated.Stable.V1.t
             , Amount.Stable.V1.t
-            , Global_slot.Stable.V1.t
+            , Coda_numbers.Global_slot.Stable.V1.t
             , Epoch_data.Staking.Value.Stable.V1.t
             , Epoch_data.Next.Value.Stable.V1.t
             , bool
