@@ -42,7 +42,7 @@ module Coinbase_data = struct
   type t = Stable.Latest.t
 
   let of_coinbase (cb : Coinbase.t) : t =
-    (cb.proposer, cb.amount, cb.state_body_hash)
+    (cb.receiver, cb.amount, cb.state_body_hash)
 
   type var = Public_key.Compressed.var * Amount.var * State_body_hash.var
 
@@ -1016,7 +1016,7 @@ let add_coinbase_with_zero_checks (type t)
         ~amount:
           ( Amount.sub max_coinbase_amount coinbase.amount
           |> Option.value_exn ?here:None ?message:None ?error:None )
-        ~proposer:coinbase.proposer ~fee_transfer:None
+        ~receiver:coinbase.receiver ~fee_transfer:None
         ~state_body_hash:coinbase.state_body_hash
       |> Or_error.ok_exn
     in
