@@ -56,6 +56,7 @@ type t =
   ; components: components
   ; pipes: pipes
   ; wallets: Secrets.Wallets.t
+  ; coinbase_receiver: [`Proposer | `Other of Public_key.Compressed.t]
   ; propose_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
@@ -578,6 +579,7 @@ let start t =
       (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
     ~time_controller:t.config.time_controller
     ~keypairs:(Agent.read_only t.propose_keypairs)
+    ~coinbase_receiver:t.coinbase_receiver
     ~consensus_local_state:t.config.consensus_local_state
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.proposer_transition_writer ;
@@ -934,6 +936,7 @@ let create (config : Config.t) =
                       external_transitions_writer }
             ; wallets
             ; propose_keypairs
+            ; coinbase_receiver= config.coinbase_receiver
             ; seen_jobs=
                 Work_selector.State.init
                   ~reassignment_wait:config.work_reassignment_wait
