@@ -243,8 +243,9 @@ module Make (T : Transaction_snark.Verification.S) = struct
              (Step_base.main (Logger.null ())))
 
     let cached () =
+      let open Cached.Deferred_with_track_generated.Let_syntax in
       let paths = Fn.compose Cache_dir.possible_paths Filename.basename in
-      let%bind (step_vk, step_pk), dirty1 = Cached.run step_cached in
+      let%bind step_vk, step_pk = Cached.run step_cached in
       let module Wrap = Wrap_base (struct
         let verification_key = step_vk.value
       end) in
@@ -271,7 +272,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
           ~input:(lazy (Tock.constraint_system ~exposing:Wrap.input Wrap.main))
           ~create_env:(fun x -> Tock.Keypair.generate (Lazy.force x))
       in
-      let%map (wrap_vk, wrap_pk), dirty2 = Cached.run wrap_cached in
+      let%map wrap_vk, wrap_pk = Cached.run wrap_cached in
       let location : Location.t =
         { proving= {step= paths step_pk.path; wrap= paths wrap_pk.path}
         ; verification= {step= paths step_vk.path; wrap= paths wrap_vk.path} }
@@ -284,7 +285,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
         }
       in
       let t : Verification.t = {step= step_vk.value; wrap= wrap_vk.value} in
-      ((location, t, checksum), Cached.Track_generated.(dirty1 + dirty2))
+      (location, t, checksum)
   end
 end
 

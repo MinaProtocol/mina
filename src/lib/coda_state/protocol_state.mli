@@ -24,31 +24,28 @@ val hash_abstract :
 
 module Body : sig
   module Poly : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('a, 'b) t [@@deriving bin_io, sexp, version]
+        type ('a, 'b) t [@@deriving sexp]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type ('a, 'b) t = ('a, 'b) Stable.V1.t [@@deriving sexp]
   end
 
   module Value : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type t =
           ( Blockchain_state.Value.Stable.V1.t
           , Consensus.Data.Consensus_state.Value.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, to_yojson, version]
+        [@@deriving sexp, to_yojson]
       end
+    end]
 
-      module Latest : module type of V1
-    end
-
-    (* bin_io omitted *)
     type t = Stable.Latest.t [@@deriving sexp, to_yojson]
   end
 
@@ -62,17 +59,15 @@ module Body : sig
 end
 
 module Value : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t =
         (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, bin_io, compare, eq, to_yojson, version]
+      [@@deriving sexp, compare, eq, to_yojson]
     end
+  end]
 
-    module Latest : module type of V1
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, compare, eq, to_yojson]
 
   include Hashable.S with type t := t
