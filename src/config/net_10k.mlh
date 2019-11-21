@@ -1,4 +1,4 @@
-[%%define ledger_depth 14]
+[%%define ledger_depth 15]
 [%%define fake_accounts_target 20000]
 [%%import "config/curve/medium.mlh"]
 [%%import "config/coinbase/standard.mlh"]
