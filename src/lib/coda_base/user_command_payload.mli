@@ -124,6 +124,8 @@ val fee : t -> Currency.Fee.t
 
 val nonce : t -> Coda_numbers.Account_nonce.t
 
+val valid_until : t -> Coda_numbers.Global_slot.t
+
 val memo : t -> User_command_memo.t
 
 val body : t -> Body.t

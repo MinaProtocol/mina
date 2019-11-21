@@ -204,6 +204,8 @@ let fee (t : t) = t.common.fee
 
 let nonce (t : t) = t.common.nonce
 
+let valid_until (t : t) = t.common.valid_until
+
 let memo (t : t) = t.common.memo
 
 let body (t : t) = t.body
