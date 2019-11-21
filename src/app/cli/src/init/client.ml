@@ -3,7 +3,7 @@ open Async
 open Signature_lib
 open Coda_base
 
-module Client = Graphql_client_lib.Make (struct
+module Client = Graphql_lib.Client.Make (struct
   let address = "graphql"
 
   let preprocess_variables_string = Fn.id
@@ -1025,8 +1025,7 @@ let pending_snark_work =
                       Array.map bundle#workBundle ~f:(fun w ->
                           let f = w#fee_excess in
                           let hash_of_string =
-                            Coda_graphql.Types.Stringable.Frozen_ledger_hash
-                            .of_base58_check_exn
+                            Coda_base.Frozen_ledger_hash.of_string
                           in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id= w#work_id

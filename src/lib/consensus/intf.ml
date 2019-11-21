@@ -261,28 +261,6 @@ module type State_hooks_intf = sig
   end
 end
 
-module type Epoch_data_intf = sig
-  type ledger
-
-  type seed
-
-  type lock_checkpoint
-
-  module Value : sig
-    type t
-  end
-
-  val ledger : Value.t -> ledger
-
-  val seed : Value.t -> seed
-
-  val start_checkpoint : Value.t -> State_hash.t
-
-  val lock_checkpoint : Value.t -> lock_checkpoint
-
-  val epoch_length : Value.t -> Length.t
-end
-
 module type S = sig
   val name : string
 
@@ -314,12 +292,6 @@ module type S = sig
   end
 
   module Data : sig
-    module Epoch_seed : sig
-      type t
-
-      val to_base58_check : t -> string
-    end
-
     module Local_state : sig
       type t [@@deriving sexp, to_yojson]
 
@@ -334,57 +306,6 @@ module type S = sig
         -> Signature_lib.Public_key.Compressed.Set.t
         -> Coda_base.Block_time.t
         -> unit
-    end
-
-    module Vrf : sig
-      module Output : sig
-        module Truncated : sig
-          module Stable : sig
-            module V1 : sig
-              type t
-            end
-
-            module Latest = V1
-          end
-
-          type t = Stable.Latest.t
-
-          val to_base58_check : t -> string
-        end
-      end
-    end
-
-    module Epoch_ledger : sig
-      module Value : sig
-        type t
-
-        module Stable :
-          sig
-            module V1 : sig
-              type t
-              [@@deriving hash, eq, compare, bin_io, sexp, to_yojson, version]
-            end
-          end
-          with type V1.t = t
-      end
-
-      val hash : Value.t -> Frozen_ledger_hash.t
-
-      val total_currency : Value.t -> Currency.Amount.t
-    end
-
-    module Epoch_data : sig
-      module Staking :
-        Epoch_data_intf
-        with type ledger := Epoch_ledger.Value.t
-         and type seed := Epoch_seed.t
-         and type lock_checkpoint := State_hash.t
-
-      module Next :
-        Epoch_data_intf
-        with type ledger := Epoch_ledger.Value.t
-         and type seed := Epoch_seed.t
-         and type lock_checkpoint := State_hash.t option
     end
 
     module Prover_state : sig
@@ -422,18 +343,6 @@ module type S = sig
       include Snark_params.Tick.Snarkable.S with type value := Value.t
 
       val genesis : Value.t
-    end
-
-    module Checkpoints : sig
-      type t
-
-      module Hash : sig
-        type t
-
-        val to_base58_check : t -> string
-      end
-
-      val hash : t -> Hash.t
     end
 
     module Consensus_state : sig
@@ -482,29 +391,16 @@ module type S = sig
 
       val network_delay : Configuration.t -> int
 
+      val curr_slot : Value.t -> Slot.t
+
+      val curr_epoch : Value.t -> Epoch.t
+
       val global_slot : Value.t -> Unsigned.uint32
 
       val blockchain_length : Value.t -> Length.t
 
-      val epoch_count : Value.t -> Length.t
-
-      val min_epoch_length : Value.t -> Length.t
-
-      val last_vrf_output : Value.t -> Vrf.Output.Truncated.t
-
-      val total_currency : Value.t -> Amount.t
-
-      val staking_epoch_data : Value.t -> Epoch_data.Staking.Value.t
-
-      val next_epoch_data : Value.t -> Epoch_data.Next.Value.t
-
-      val has_ancestor_in_same_checkpoint_window : Value.t -> bool
-
-      val checkpoints : Value.t -> Checkpoints.t
-
-      val curr_epoch : Value.t -> Epoch.t
-
-      val curr_slot : Value.t -> Slot.t
+      val graphql_type :
+        unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
     end
 
     module Proposal_data : sig
@@ -585,6 +481,11 @@ module type S = sig
       -> candidate:Consensus_state.Value.t
       -> logger:Logger.t
       -> bool
+
+    val get_epoch_ledger :
+         consensus_state:Consensus_state.Value.t
+      -> local_state:Local_state.t
+      -> Coda_base.Sparse_ledger.t
 
     (** Data needed to synchronize the local state. *)
     type local_state_sync [@@deriving to_yojson]

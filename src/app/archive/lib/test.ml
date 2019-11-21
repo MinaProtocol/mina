@@ -38,7 +38,7 @@ let%test_module "Processor" =
            ; Result.map_error clear_action ~f:(fun error ->
                  Error.createf
                    !"Issue clearing data in database: %{sexp:Error.t}"
-                 @@ Graphql_client_lib.Connection_error.to_error error )
+                 @@ Graphql_lib.Client.Connection_error.to_error error )
              |> Result.ignore ]
 
     let assert_user_command
