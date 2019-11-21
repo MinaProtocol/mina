@@ -8,11 +8,16 @@ module Styles = {
       textDecoration(`none),
       padding(`rem(2.0)),
       margin(`auto),
-      height(`rem(13.)),
-      width(`percent(80.)),
-      media("(min-width: 35rem)", [height(`rem(10.)), width(`rem(29.))]),
-      media("(min-width: 50rem)", [height(`rem(11.)), width(`rem(23.))]),
-      media("(min-width: 75rem)", [height(`rem(10.)), width(`rem(35.))]),
+      height(`rem(14.25)),
+      width(`rem(21.25)),
+      media(
+        "(min-width: 60rem)",
+        [height(`rem(12.5)), width(`rem(23.8))],
+      ),
+      media(
+        "(min-width: 105rem)",
+        [height(`rem(11.5)), width(`rem(32.5))],
+      ),
       hover([
         backgroundColor(`hex("FAFCFD")),
         cursor(`pointer),
@@ -30,13 +35,14 @@ module Styles = {
   let ctaContent =
     style([display(`flex), selector("p", [fontSize(`px(36))])]);
 
-  let ctaText = style([width(`percent(100.)), marginLeft(`px(13))]);
+  let ctaText = style([width(`percent(100.))]);
 
   let ctaHeading =
     merge([
       Style.H2.basic,
       style([
         Style.Typeface.ibmplexsans,
+        fontWeight(`bold),
         color(Style.Colors.marine),
         textAlign(`left),
         paddingBottom(`rem(0.3)),

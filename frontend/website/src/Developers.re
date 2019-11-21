@@ -1,7 +1,13 @@
 module Styles = {
   open Css;
   let page =
-    style([marginLeft(`auto), marginRight(`auto), maxWidth(`rem(72.))]);
+    style([
+      marginLeft(`auto),
+      marginRight(`auto),
+      maxWidth(`rem(22.43)),
+      media("(min-width: 60rem)", [maxWidth(`rem(50.66)),]),
+      media("(min-width: 105rem)", [maxWidth(`rem(66.5))]),
+    ]);
 
   let lineBreak =
     style([
@@ -9,6 +15,12 @@ module Styles = {
       borderTop(px(1), `dashed, Style.Colors.marine),
       borderLeft(`zero, solid, transparent),
       borderBottom(px(1), `dashed, Style.Colors.marine),
+    ]);
+
+  let heroImage =
+    style([
+      display(`none),
+      media("(min-width: 60rem)", [display(`flex)]),
     ]);
 
   let header =
@@ -27,7 +39,7 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      media("(min-width: 70rem)", [flexDirection(`row)]),
+      media("(min-width: 60rem)", [flexDirection(`row)]),
     ]);
 
   let heroText =
@@ -36,35 +48,28 @@ module Styles = {
   let buttonRow =
     style([
       display(`grid),
-      gridTemplateColumns([`repeat((`num(1), `rem(25.0)))]),
-      gridTemplateRows([`repeat((`num(1), `rem(13.0)))]),
+      gridTemplateColumns([`repeat((`num(1), `rem(21.25)))]),
+      gridTemplateRows([`repeat((`num(1), `rem(14.25)))]),
       media(
-        "(min-width: 35rem)",
+        "(min-width: 60rem)",
         [
-          gridTemplateColumns([`repeat((`num(1), `rem(30.0)))]),
-          gridTemplateRows([`repeat((`num(1), `rem(10.0)))]),
+          gridTemplateColumns([`repeat((`num(2), `rem(23.8)))]),
+          gridTemplateRows([`repeat((`num(2), `rem(12.5)))]),
         ],
       ),
       media(
-        "(min-width: 50rem)",
+        "(min-width: 105rem)",
         [
-          gridTemplateColumns([`repeat((`num(2), `rem(23.0)))]),
-          gridTemplateRows([`repeat((`num(2), `rem(11.0)))]),
+          gridTemplateColumns([`repeat((`num(2), `rem(32.5)))]),
+          gridTemplateRows([`repeat((`num(2), `rem(11.5)))]),
         ],
       ),
-      media(
-        "(min-width: 75rem)",
-        [
-          gridTemplateColumns([`repeat((`num(2), `rem(35.0)))]),
-          gridTemplateRows([`repeat((`num(2), `rem(10.0)))]),
-        ],
-      ),
-      gridRowGap(rem(1.7)),
-      gridColumnGap(rem(1.9)),
+      gridRowGap(rem(2.625)),
+      gridColumnGap(rem(3.)),
       justifyContent(`center),
       marginLeft(`auto),
       marginRight(`auto),
-      marginTop(rem(3.)),
+      marginTop(rem(5.18)),
       marginBottom(rem(3.)),
     ]);
 };
@@ -84,7 +89,14 @@ let make = () => {
         </p>
         <br />
       </div>
+      <Svg
+        link="/static/img/Developers.svg"
+        dims=(29.75, 25.76)
+        alt="Collage of developer images"
+        className=Styles.heroImage
+      />
     </div>
+    <br />
     <hr className=Styles.lineBreak />
     <div>
       <div className=Styles.buttonRow>
