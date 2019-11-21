@@ -547,9 +547,11 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     match best_staged_ledger t |> Participating_state.active with
     | Some staged_ledger ->
         let snark_pool = snark_pool t in
-        let fee = snark_work_fee t in
+        let fee_opt =
+          Option.map (snark_worker_key t) ~f:(fun _ -> snark_work_fee t)
+        in
         let pending_work =
-          Work_selection_method.pending_work_statements ~snark_pool ~fee
+          Work_selection_method.pending_work_statements ~snark_pool ~fee_opt
             ~staged_ledger
           |> List.length
         in
@@ -564,6 +566,18 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   Network_pool.Snark_pool.add_completed_work (snark_pool t) work
 
 let next_proposal t = t.next_proposal
+
+let staking_ledger t =
+  let open Option.Let_syntax in
+  let%map transition_frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let consensus_state =
+    Transition_frontier.Breadcrumb.consensus_state
+      (Transition_frontier.best_tip transition_frontier)
+  in
+  let local_state = t.config.consensus_local_state in
+  Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
 
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier

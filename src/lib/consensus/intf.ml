@@ -32,34 +32,42 @@ module type Constants_intf = sig
 
   val inactivity_ms : int
 
+  val sub_windows_per_window : Unsigned.UInt32.t
+
+  val slots_per_sub_window : Unsigned.UInt32.t
+
+  val slots_per_window : Unsigned.UInt32.t
+
   (** Number of slots in one epoch *)
   val slots_per_epoch : Unsigned.UInt32.t
 end
 
 module type Blockchain_state_intf = sig
   module Poly : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp]
       end
-    end
+    end]
 
     type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
-      ('staged_ledger_hash, 'snarked_ledger_hash, 'time) Stable.V1.t
+      ('staged_ledger_hash, 'snarked_ledger_hash, 'time) Stable.Latest.t
     [@@deriving sexp]
   end
 
   module Value : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type t =
           (Staged_ledger_hash.t, Frozen_ledger_hash.t, Block_time.t) Poly.t
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp]
       end
-    end
+    end]
 
-    type t = Stable.V1.t [@@deriving sexp]
+    type t = Stable.Latest.t [@@deriving sexp]
   end
 
   type var =
@@ -93,14 +101,12 @@ module type Protocol_state_intf = sig
   type consensus_state_var
 
   module Poly : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('state_hash, 'body) t
-        [@@deriving eq, bin_io, hash, sexp, to_yojson, version]
+        type ('state_hash, 'body) t [@@deriving eq, hash, sexp, to_yojson]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t
     [@@deriving sexp]
@@ -108,43 +114,40 @@ module type Protocol_state_intf = sig
 
   module Body : sig
     module Poly : sig
+      [%%versioned:
       module Stable : sig
         module V1 : sig
-          type ('blockchain_state, 'consensus_state) t
-          [@@deriving bin_io, sexp]
+          type ('blockchain_state, 'consensus_state) t [@@deriving sexp]
         end
-
-        module Latest = V1
-      end
+      end]
 
       type ('blockchain_state, 'consensus_state) t =
-        ('blockchain_state, 'consensus_state) Stable.V1.t
+        ('blockchain_state, 'consensus_state) Stable.Latest.t
       [@@deriving sexp]
     end
 
     module Value : sig
+      [%%versioned:
       module Stable : sig
         module V1 : sig
           type t = (blockchain_state, consensus_state) Poly.Stable.V1.t
-          [@@deriving bin_io, sexp, to_yojson]
+          [@@deriving sexp, to_yojson]
         end
-      end
+      end]
     end
 
-    type var = (blockchain_state_var, consensus_state_var) Poly.Stable.V1.t
+    type var = (blockchain_state_var, consensus_state_var) Poly.Stable.Latest.t
   end
 
   module Value : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type t = (State_hash.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving sexp, bin_io, eq, compare]
+        [@@deriving sexp, eq, compare]
       end
+    end]
 
-      module Latest = V1
-    end
-
-    (* bin_io omitted *)
     type t = Stable.V1.t [@@deriving sexp, eq, compare]
   end
 
@@ -261,28 +264,6 @@ module type State_hooks_intf = sig
   end
 end
 
-module type Epoch_data_intf = sig
-  type ledger
-
-  type seed
-
-  type lock_checkpoint
-
-  module Value : sig
-    type t
-  end
-
-  val ledger : Value.t -> ledger
-
-  val seed : Value.t -> seed
-
-  val start_checkpoint : Value.t -> State_hash.t
-
-  val lock_checkpoint : Value.t -> lock_checkpoint
-
-  val epoch_length : Value.t -> Length.t
-end
-
 module type S = sig
   val name : string
 
@@ -314,12 +295,6 @@ module type S = sig
   end
 
   module Data : sig
-    module Epoch_seed : sig
-      type t
-
-      val to_base58_check : t -> string
-    end
-
     module Local_state : sig
       type t [@@deriving sexp, to_yojson]
 
@@ -336,69 +311,15 @@ module type S = sig
         -> unit
     end
 
-    module Vrf : sig
-      module Output : sig
-        module Truncated : sig
-          module Stable : sig
-            module V1 : sig
-              type t
-            end
-
-            module Latest = V1
-          end
-
-          type t = Stable.Latest.t
-
-          val to_base58_check : t -> string
-        end
-      end
-    end
-
-    module Epoch_ledger : sig
-      module Value : sig
-        type t
-
-        module Stable :
-          sig
-            module V1 : sig
-              type t
-              [@@deriving hash, eq, compare, bin_io, sexp, to_yojson, version]
-            end
-          end
-          with type V1.t = t
-      end
-
-      val hash : Value.t -> Frozen_ledger_hash.t
-
-      val total_currency : Value.t -> Currency.Amount.t
-    end
-
-    module Epoch_data : sig
-      module Staking :
-        Epoch_data_intf
-        with type ledger := Epoch_ledger.Value.t
-         and type seed := Epoch_seed.t
-         and type lock_checkpoint := State_hash.t
-
-      module Next :
-        Epoch_data_intf
-        with type ledger := Epoch_ledger.Value.t
-         and type seed := Epoch_seed.t
-         and type lock_checkpoint := State_hash.t option
-    end
-
     module Prover_state : sig
-      type t [@@deriving to_yojson, sexp]
-
-      module Stable :
-        sig
-          module V1 : sig
-            type t [@@deriving bin_io, sexp, to_yojson, version]
-          end
-
-          module Latest = V1
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t [@@deriving sexp, to_yojson]
         end
-        with type V1.t = t
+      end]
+
+      type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
       val precomputed_handler : Snark_params.Tick.Handler.t Lazy.t
 
@@ -410,11 +331,12 @@ module type S = sig
 
     module Consensus_transition : sig
       module Value : sig
+        [%%versioned:
         module Stable : sig
           module V1 : sig
-            type t [@@deriving sexp, bin_io, to_yojson, version]
+            type t [@@deriving sexp, to_yojson]
           end
-        end
+        end]
 
         type t = Stable.V1.t [@@deriving to_yojson, sexp]
       end
@@ -424,31 +346,17 @@ module type S = sig
       val genesis : Value.t
     end
 
-    module Checkpoints : sig
-      type t
-
-      module Hash : sig
-        type t
-
-        val to_base58_check : t -> string
-      end
-
-      val hash : t -> Hash.t
-    end
-
     module Consensus_state : sig
       module Value : sig
-        (* bin_io omitted *)
-        type t [@@deriving hash, eq, compare, sexp, to_yojson]
-
-        module Stable :
-          sig
-            module V1 : sig
-              type t
-              [@@deriving hash, eq, compare, bin_io, sexp, to_yojson, version]
-            end
+        [%%versioned:
+        module Stable : sig
+          module V1 : sig
+            type t [@@deriving hash, eq, compare, sexp, to_yojson]
           end
-          with type V1.t = t
+        end]
+
+        type t = Stable.Latest.t
+        [@@deriving hash, eq, compare, sexp, to_yojson]
       end
 
       type display [@@deriving yojson]
@@ -482,29 +390,16 @@ module type S = sig
 
       val network_delay : Configuration.t -> int
 
+      val curr_slot : Value.t -> Slot.t
+
+      val curr_epoch : Value.t -> Epoch.t
+
       val global_slot : Value.t -> Unsigned.uint32
 
       val blockchain_length : Value.t -> Length.t
 
-      val epoch_count : Value.t -> Length.t
-
-      val min_epoch_length : Value.t -> Length.t
-
-      val last_vrf_output : Value.t -> Vrf.Output.Truncated.t
-
-      val total_currency : Value.t -> Amount.t
-
-      val staking_epoch_data : Value.t -> Epoch_data.Staking.Value.t
-
-      val next_epoch_data : Value.t -> Epoch_data.Next.Value.t
-
-      val has_ancestor_in_same_checkpoint_window : Value.t -> bool
-
-      val checkpoints : Value.t -> Checkpoints.t
-
-      val curr_epoch : Value.t -> Epoch.t
-
-      val curr_slot : Value.t -> Slot.t
+      val graphql_type :
+        unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
     end
 
     module Proposal_data : sig
@@ -590,6 +485,11 @@ module type S = sig
       -> candidate:Consensus_state.Value.t
       -> logger:Logger.t
       -> bool
+
+    val get_epoch_ledger :
+         consensus_state:Consensus_state.Value.t
+      -> local_state:Local_state.t
+      -> Coda_base.Sparse_ledger.t
 
     (** Data needed to synchronize the local state. *)
     type local_state_sync [@@deriving to_yojson]

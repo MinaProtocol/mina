@@ -21,6 +21,8 @@ module type S_unchecked = sig
 
   val succ : t -> t
 
+  val add : t -> t -> t
+
   val of_int : int -> t
 
   val to_int : t -> int
@@ -58,6 +60,8 @@ module type S_checked = sig
   val zero : t
 
   val succ : t -> (t, _) Checked.t
+
+  val add : t -> t -> (t, _) Checked.t
 
   val is_succ : pred:t -> succ:t -> (Boolean.var, _) Checked.t
 
@@ -103,14 +107,13 @@ module type S = sig
 end
 
 module type UInt32 = sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type nonrec t = Unsigned_extended.UInt32.t
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+      type t = Unsigned_extended.UInt32.t
+      [@@deriving sexp, eq, compare, hash, yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include S with type t = Stable.Latest.t
 
@@ -120,14 +123,13 @@ module type UInt32 = sig
 end
 
 module type UInt64 = sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t = Unsigned_extended.UInt64.t
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+      [@@deriving sexp, eq, compare, hash, yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include S with type t = Stable.Latest.t
 
