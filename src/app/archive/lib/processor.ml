@@ -6,10 +6,10 @@ open Coda_state
 open Coda_base
 open Signature_lib
 
-module Make (Config : Graphql_client_lib.Config_intf) = struct
+module Make (Config : Graphql_lib.Client.Config_intf) = struct
   type t = {port: int}
 
-  module Client = Graphql_client_lib.Make (Config)
+  module Client = Graphql_lib.Client.Make (Config)
 
   let added_transactions {port} added =
     let open Deferred.Result.Let_syntax in
@@ -209,7 +209,7 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
             added_transition t block sender_receipt_chains_from_parent_ledger
           with
           | Error e ->
-              Graphql_client_lib.Connection_error.ok_exn e
+              Graphql_lib.Client.Connection_error.ok_exn e
           | Ok () ->
               Deferred.return () )
       | Diff.Transition_frontier _ ->
@@ -220,5 +220,5 @@ module Make (Config : Graphql_client_lib.Config_intf) = struct
           | Ok result ->
               Deferred.return result
           | Error e ->
-              Graphql_client_lib.Connection_error.ok_exn e ) )
+              Graphql_lib.Client.Connection_error.ok_exn e ) )
 end
