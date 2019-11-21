@@ -25,6 +25,9 @@ module Rpcs = struct
 
      https://ocaml.janestreet.com/ocaml-core/latest/doc/async_rpc_kernel/Async_rpc_kernel/Versioned_rpc/
 
+     The "master" types are the ones used internally in the code base. Each
+     version has coercions between their query and response types and the master
+     types.
    *)
 
   module Get_staged_ledger_aux_and_pending_coinbases_at_hash = struct

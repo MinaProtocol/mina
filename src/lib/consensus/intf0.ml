@@ -5,13 +5,12 @@ open Coda_base
 module Time = Block_time
 
 module type Global_slot = sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+      type t [@@deriving sexp, eq, compare, hash, yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include Coda_numbers.Nat.Intf.S_unchecked with type t = Stable.Latest.t
 
