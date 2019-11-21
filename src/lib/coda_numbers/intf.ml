@@ -21,6 +21,8 @@ module type S_unchecked = sig
 
   val succ : t -> t
 
+  val add : t -> t -> t
+
   val of_int : int -> t
 
   val to_int : t -> int
@@ -58,6 +60,8 @@ module type S_checked = sig
   val zero : t
 
   val succ : t -> (t, _) Checked.t
+
+  val add : t -> t -> (t, _) Checked.t
 
   val is_succ : pred:t -> succ:t -> (Boolean.var, _) Checked.t
 
