@@ -1500,6 +1500,400 @@ module Data = struct
     end
   end
 
+  [%%if
+  false]
+
+  module Min_window_density = struct
+    (* Three cases for updating the lengths of sub_windows
+       - same sub_window, then add 1 to the sub_window_densities
+       - passed a few sub_windows, but didn't skip a window, then
+         assign 0 to all the skipped sub_window, then mark next_sub_window_length to be 1
+       - skipped more than a window, set every sub_windows to be 0 and mark next_sub_window_length to be 1
+     *)
+
+    let update_min_window_density ~prev_global_slot ~next_global_slot
+        ~prev_sub_window_densities ~prev_min_window_density =
+      let prev_global_sub_window =
+        Global_sub_window.of_global_slot prev_global_slot
+      in
+      let next_global_sub_window =
+        Global_sub_window.of_global_slot next_global_slot
+      in
+      let prev_relative_sub_window =
+        Global_sub_window.sub_window prev_global_sub_window
+      in
+      let next_relative_sub_window =
+        Global_sub_window.sub_window next_global_sub_window
+      in
+      let same_sub_window =
+        Global_sub_window.equal prev_global_sub_window next_global_sub_window
+      in
+      let same_window =
+        Global_sub_window.(
+          add prev_global_sub_window
+            (constant Constants.sub_windows_per_window)
+          >= next_global_sub_window)
+      in
+      let new_sub_window_densities =
+        List.mapi prev_sub_window_densities ~f:(fun i length ->
+            let gt_prev_sub_window =
+              Sub_window.(of_int i > prev_relative_sub_window)
+            in
+            let lt_next_sub_window =
+              Sub_window.(of_int i < next_relative_sub_window)
+            in
+            let within_range =
+              if prev_relative_sub_window < next_relative_sub_window then
+                gt_prev_sub_window && lt_next_sub_window
+              else gt_prev_sub_window || lt_next_sub_window
+            in
+            if same_sub_window then length
+            else if same_window && not within_range then length
+            else Length.zero )
+      in
+      let new_window_length =
+        List.fold new_sub_window_densities ~init:Length.zero ~f:Length.add
+      in
+      let min_window_density =
+        if same_sub_window then prev_min_window_density
+        else Length.min new_window_length prev_min_window_density
+      in
+      let sub_window_densities =
+        List.mapi new_sub_window_densities ~f:(fun i length ->
+            let is_next_sub_window =
+              Sub_window.(of_int i = next_relative_sub_window)
+            in
+            if is_next_sub_window then
+              if same_sub_window then Length.(succ length)
+              else Length.(succ zero)
+            else length )
+      in
+      (min_window_density, sub_window_densities)
+
+    module Checked = struct
+      open Tick.Checked
+      open Tick.Checked.Let_syntax
+
+      let%snarkydef update_min_window_density ~prev_global_slot
+          ~next_global_slot ~prev_sub_window_densities ~prev_min_window_density
+          =
+        let open Tick in
+        let open Tick.Checked.Let_syntax in
+        let%bind prev_global_sub_window =
+          Global_sub_window.Checked.of_global_slot prev_global_slot
+        in
+        let%bind next_global_sub_window =
+          Global_sub_window.Checked.of_global_slot next_global_slot
+        in
+        let%bind prev_relative_sub_window =
+          Global_sub_window.Checked.sub_window prev_global_sub_window
+        in
+        let%bind next_relative_sub_window =
+          Global_sub_window.Checked.sub_window next_global_sub_window
+        in
+        let%bind same_sub_window =
+          Global_sub_window.Checked.equal prev_global_sub_window
+            next_global_sub_window
+        in
+        let%bind same_window =
+          Global_sub_window.Checked.(
+            add prev_global_sub_window
+              (constant Constants.sub_windows_per_window)
+            >= next_global_sub_window)
+        in
+        let if_ cond ~then_ ~else_ =
+          let%bind cond = cond and then_ = then_ and else_ = else_ in
+          Length.Checked.if_ cond ~then_ ~else_
+        in
+        let%bind new_sub_window_densities =
+          Checked.List.mapi prev_sub_window_densities ~f:(fun i length ->
+              let%bind gt_prev_sub_window =
+                Sub_window.Checked.(
+                  constant (UInt32.of_int i) > prev_relative_sub_window)
+              in
+              let%bind lt_next_sub_window =
+                Sub_window.Checked.(
+                  constant (UInt32.of_int i) < next_relative_sub_window)
+              in
+              let%bind within_range =
+                Sub_window.Checked.(
+                  let if_ cond ~then_ ~else_ =
+                    let%bind cond = cond and then_ = then_ and else_ = else_ in
+                    Boolean.if_ cond ~then_ ~else_
+                  in
+                  if_
+                    (prev_relative_sub_window < next_relative_sub_window)
+                    ~then_:Boolean.(gt_prev_sub_window && lt_next_sub_window)
+                    ~else_:Boolean.(gt_prev_sub_window || lt_next_sub_window))
+              in
+              if_
+                (Checked.return same_sub_window)
+                ~then_:(Checked.return length)
+                ~else_:
+                  (if_
+                     Boolean.(same_window && not within_range)
+                     ~then_:(Checked.return length)
+                     ~else_:(Checked.return Length.Checked.zero)) )
+        in
+        let%bind new_window_length =
+          Checked.List.fold new_sub_window_densities ~init:Length.Checked.zero
+            ~f:Length.Checked.add
+        in
+        let%bind min_window_density =
+          if_
+            (Checked.return same_sub_window)
+            ~then_:(Checked.return prev_min_window_density)
+            ~else_:
+              (Length.Checked.min new_window_length prev_min_window_density)
+        in
+        let%bind sub_window_densities =
+          Checked.List.mapi new_sub_window_densities ~f:(fun i length ->
+              let%bind is_next_sub_window =
+                Sub_window.Checked.(
+                  constant (UInt32.of_int i) = next_relative_sub_window)
+              in
+              if_
+                (Checked.return is_next_sub_window)
+                ~then_:
+                  (if_
+                     (Checked.return same_sub_window)
+                     ~then_:Length.Checked.(succ length)
+                     ~else_:Length.Checked.(succ zero))
+                ~else_:(Checked.return length) )
+        in
+        return (min_window_density, sub_window_densities)
+    end
+
+    let%test_module "Min window length tests" =
+      ( module struct
+        (* This is the reference implementation, which is much more readable than
+           the actual implementation. The reason this one is not implemented is because
+           array-indexing is not supported in Snarky. We could use list-indexing, but it
+           takes O(n) instead of O(1).
+         *)
+        let update_min_window_density_reference_implementation
+            ~prev_global_slot ~next_global_slot ~prev_sub_window_densities
+            ~prev_min_window_density =
+          let prev_global_sub_window =
+            Global_sub_window.of_global_slot prev_global_slot
+          in
+          let next_global_sub_window =
+            Global_sub_window.of_global_slot next_global_slot
+          in
+          let sub_window_diff =
+            UInt32.(
+              to_int
+              @@ min (succ Constants.sub_windows_per_window)
+              @@ Global_sub_window.sub next_global_sub_window
+                   prev_global_sub_window)
+          in
+          let n = Array.length prev_sub_window_densities in
+          let new_sub_window_densities =
+            Array.init n ~f:(fun i ->
+                if i + sub_window_diff < n then
+                  prev_sub_window_densities.(i + sub_window_diff)
+                else Length.zero )
+          in
+          let new_window_length =
+            Array.fold new_sub_window_densities ~init:Length.zero ~f:Length.add
+          in
+          let min_window_density =
+            if sub_window_diff = 0 then prev_min_window_density
+            else Length.min new_window_length prev_min_window_density
+          in
+          new_sub_window_densities.(n - 1)
+          <- Length.succ new_sub_window_densities.(n - 1) ;
+          (min_window_density, new_sub_window_densities)
+
+        (* converting the input for actual implementation to the input required by the
+           reference implementation *)
+        let actual_to_reference ~prev_global_slot ~prev_sub_window_densities =
+          let prev_global_sub_window =
+            Global_sub_window.of_global_slot prev_global_slot
+          in
+          let prev_relative_sub_window =
+            Sub_window.to_int
+            @@ Global_sub_window.sub_window prev_global_sub_window
+          in
+          List.to_array
+          @@ List.drop prev_sub_window_densities prev_relative_sub_window
+          @ List.take prev_sub_window_densities prev_relative_sub_window
+          @ [List.nth_exn prev_sub_window_densities prev_relative_sub_window]
+
+        let slots_per_sub_window = UInt32.to_int Constants.slots_per_sub_window
+
+        let sub_windows_per_window =
+          UInt32.to_int Constants.sub_windows_per_window
+
+        (* slot_diff are generated in such a way so that we can test different cases
+           in the update function, I use a weighted union to generate it.
+           weight | range of the slot diff
+           1      | [0*slots_per_sub_window, 1*slots_per_sub_window)
+           1/4    | [1*slots_per_sub_window, 2*slots_per_sub_window)
+           1/9    | [2*slots_per_sub_window, 3*slots_per_sub_window)
+           ...
+           1/n^2  | [n*slots_per_sub_window, (n+1)*slots_per_sub_window)
+         *)
+        let gen_slot_diff =
+          let open Quickcheck.Generator in
+          Quickcheck.Generator.weighted_union
+          @@ List.init (2 * sub_windows_per_window) ~f:(fun i ->
+                 ( 1.0 /. (Float.of_int (i + 1) ** 2.)
+                 , Core.Int.gen_incl (i * slots_per_sub_window)
+                     ((i + 1) * slots_per_sub_window) ) )
+
+        let num_global_slots_to_test = 1
+
+        (* generate an initial global_slot and a list of successive global_slot following
+           the initial slot. The length of the list is fixed because this same list would
+           also passed into a snarky computation, and the *Typ* of the list requires a
+           fixed length. *)
+        let gen_global_slots =
+          let open Quickcheck.Generator in
+          let open Quickcheck.Generator.Let_syntax in
+          let%bind prev_global_slot = small_positive_int in
+          let%bind slot_diffs =
+            Core.List.gen_with_length num_global_slots_to_test gen_slot_diff
+          in
+          let _, global_slots =
+            List.fold slot_diffs ~init:(prev_global_slot, [])
+              ~f:(fun (prev_global_slot, acc) slot_diff ->
+                let next_global_slot = prev_global_slot + slot_diff in
+                (next_global_slot, next_global_slot :: acc) )
+          in
+          return
+            ( Global_slot.of_int prev_global_slot
+            , List.map global_slots ~f:Global_slot.of_int |> List.rev )
+
+        let gen_length =
+          Quickcheck.Generator.union
+          @@ List.init slots_per_sub_window ~f:(fun n ->
+                 Quickcheck.Generator.return @@ Length.of_int n )
+
+        let gen_min_window_density =
+          let open Quickcheck.Generator in
+          let open Quickcheck.Generator.Let_syntax in
+          let%bind prev_sub_window_densities =
+            list_with_length sub_windows_per_window gen_length
+          in
+          let min_window_density =
+            let initial xs = List.(rev (tl_exn (rev xs))) in
+            List.fold
+              (initial prev_sub_window_densities)
+              ~init:Length.zero ~f:Length.add
+          in
+          return (min_window_density, prev_sub_window_densities)
+
+        let gen =
+          Quickcheck.Generator.tuple2 gen_global_slots gen_min_window_density
+
+        let update_several_times ~f ~prev_global_slot ~next_global_slots
+            ~prev_sub_window_densities ~prev_min_window_density =
+          List.fold next_global_slots
+            ~init:
+              ( prev_global_slot
+              , prev_sub_window_densities
+              , prev_min_window_density )
+            ~f:(fun ( prev_global_slot
+                    , prev_sub_window_densities
+                    , prev_min_window_density )
+               next_global_slot
+               ->
+              let min_window_density, sub_window_densities =
+                f ~prev_global_slot ~next_global_slot
+                  ~prev_sub_window_densities ~prev_min_window_density
+              in
+              (next_global_slot, sub_window_densities, min_window_density) )
+
+        let update_several_times_checked ~f ~prev_global_slot
+            ~next_global_slots ~prev_sub_window_densities
+            ~prev_min_window_density =
+          let open Tick.Checked in
+          let open Tick.Checked.Let_syntax in
+          List.fold next_global_slots
+            ~init:
+              ( prev_global_slot
+              , prev_sub_window_densities
+              , prev_min_window_density )
+            ~f:(fun ( prev_global_slot
+                    , prev_sub_window_densities
+                    , prev_min_window_density )
+               next_global_slot
+               ->
+              let%bind min_window_density, sub_window_densities =
+                f ~prev_global_slot ~next_global_slot
+                  ~prev_sub_window_densities ~prev_min_window_density
+              in
+              return
+                (next_global_slot, sub_window_densities, min_window_density) )
+
+        let%test_unit "the actual implementation is equivalent to the \
+                       reference implementation" =
+          Quickcheck.test ~trials:100 gen
+            ~f:(fun ( (prev_global_slot, next_global_slots)
+                    , (prev_min_window_density, prev_sub_window_densities) )
+               ->
+              let _, _, min_window_density1 =
+                update_several_times ~f:update_min_window_density
+                  ~prev_global_slot ~next_global_slots
+                  ~prev_sub_window_densities ~prev_min_window_density
+              in
+              let _, _, min_window_density2 =
+                update_several_times
+                  ~f:update_min_window_density_reference_implementation
+                  ~prev_global_slot ~next_global_slots
+                  ~prev_sub_window_densities:
+                    (actual_to_reference ~prev_global_slot
+                       ~prev_sub_window_densities)
+                  ~prev_min_window_density
+              in
+              assert (Length.(equal min_window_density1 min_window_density2))
+          )
+
+        let%test_unit "Inside snark computation is equivalent to outside \
+                       snark computation" =
+          Quickcheck.test ~trials:100 gen
+            ~f:
+              (Test_util.test_equal
+                 (Typ.tuple2
+                    (Typ.tuple2 Global_slot.typ
+                       (Typ.list ~length:num_global_slots_to_test
+                          Global_slot.typ))
+                    (Typ.tuple2 Length.typ
+                       (Typ.list ~length:sub_windows_per_window Length.typ)))
+                 (Typ.tuple3 Global_slot.typ
+                    (Typ.list ~length:sub_windows_per_window Length.typ)
+                    Length.typ)
+                 (fun ( (prev_global_slot, next_global_slots)
+                      , (prev_min_window_density, prev_sub_window_densities) ) ->
+                   update_several_times_checked
+                     ~f:Checked.update_min_window_density ~prev_global_slot
+                     ~next_global_slots ~prev_sub_window_densities
+                     ~prev_min_window_density )
+                 (fun ( (prev_global_slot, next_global_slots)
+                      , (prev_min_window_density, prev_sub_window_densities) ) ->
+                   update_several_times ~f:update_min_window_density
+                     ~prev_global_slot ~next_global_slots
+                     ~prev_sub_window_densities ~prev_min_window_density ))
+      end )
+  end
+
+  [%%else]
+
+  module Min_window_density = struct
+    let update_min_window_density ~prev_global_slot ~next_global_slot
+        ~prev_sub_window_densities ~prev_min_window_density =
+      (prev_min_window_density, prev_sub_window_densities)
+
+    module Checked = struct
+      let update_min_window_density ~prev_global_slot ~next_global_slot
+          ~prev_sub_window_densities ~prev_min_window_density =
+        Tick.Checked.return (prev_min_window_density, prev_sub_window_densities)
+    end
+  end
+
+  [%%endif]
+
   (* We have a list of state hashes. When we extend the blockchain,
      we see if the **previous** state should be saved as a checkpoint.
      This is because we have convenient access to the entire previous
@@ -1530,7 +1924,8 @@ module Data = struct
                t =
             { blockchain_length: 'length
             ; epoch_count: 'length
-            ; min_epoch_length: 'length
+            ; min_window_density: 'length
+            ; sub_window_densities: 'length list
             ; last_vrf_output: 'vrf_output
             ; total_currency: 'amount
             ; curr_global_slot: 'global_slot
@@ -1562,7 +1957,8 @@ module Data = struct
             Stable.Latest.t =
         { blockchain_length: 'length
         ; epoch_count: 'length
-        ; min_epoch_length: 'length
+        ; min_window_density: 'length
+        ; sub_window_densities: 'length list
         ; last_vrf_output: 'vrf_output
         ; total_currency: 'amount
         ; curr_global_slot: 'global_slot
@@ -1595,7 +1991,10 @@ module Data = struct
             `Assoc
               [ ("blockchain_length", Length.to_yojson t.Poly.blockchain_length)
               ; ("epoch_count", Length.to_yojson t.epoch_count)
-              ; ("min_epoch_length", Length.to_yojson t.min_epoch_length)
+              ; ("min_window_density", Length.to_yojson t.min_window_density)
+              ; ( "sub_window_densities"
+                , `List (List.map ~f:Length.to_yojson t.sub_window_densities)
+                )
               ; ("last_vrf_output", `String "<opaque>")
               ; ("total_currency", Amount.to_yojson t.total_currency)
               ; ("curr_global_slot", Global_slot.to_yojson t.curr_global_slot)
@@ -1630,7 +2029,8 @@ module Data = struct
     let to_hlist
         { Poly.blockchain_length
         ; epoch_count
-        ; min_epoch_length
+        ; min_window_density
+        ; sub_window_densities
         ; last_vrf_output
         ; total_currency
         ; curr_global_slot
@@ -1641,7 +2041,8 @@ module Data = struct
       let open Coda_base.H_list in
       [ blockchain_length
       ; epoch_count
-      ; min_epoch_length
+      ; min_window_density
+      ; sub_window_densities
       ; last_vrf_output
       ; total_currency
       ; curr_global_slot
@@ -1655,6 +2056,7 @@ module Data = struct
            ,    'length
              -> 'length
              -> 'length
+             -> 'length list
              -> 'vrf_output
              -> 'amount
              -> 'global_slot
@@ -1676,7 +2078,8 @@ module Data = struct
      fun Coda_base.H_list.
            [ blockchain_length
            ; epoch_count
-           ; min_epoch_length
+           ; min_window_density
+           ; sub_window_densities
            ; last_vrf_output
            ; total_currency
            ; curr_global_slot
@@ -1686,7 +2089,8 @@ module Data = struct
            ; checkpoints ] ->
       { blockchain_length
       ; epoch_count
-      ; min_epoch_length
+      ; min_window_density
+      ; sub_window_densities
       ; last_vrf_output
       ; total_currency
       ; curr_global_slot
@@ -1700,6 +2104,9 @@ module Data = struct
       [ Length.typ
       ; Length.typ
       ; Length.typ
+      ; Typ.list
+          ~length:(UInt32.to_int Constants.sub_windows_per_window)
+          Length.typ
       ; Vrf.Output.Truncated.typ
       ; Amount.typ
       ; Global_slot.Checked.typ
@@ -1716,7 +2123,8 @@ module Data = struct
     let to_input
         ({ Poly.blockchain_length
          ; epoch_count
-         ; min_epoch_length
+         ; min_window_density
+         ; sub_window_densities
          ; last_vrf_output
          ; total_currency
          ; curr_global_slot
@@ -1729,7 +2137,8 @@ module Data = struct
         { Random_oracle.Input.bitstrings=
             [| Length.Bits.to_bits blockchain_length
              ; Length.Bits.to_bits epoch_count
-             ; Length.Bits.to_bits min_epoch_length
+             ; Length.Bits.to_bits min_window_density
+             ; List.concat_map ~f:Length.Bits.to_bits sub_window_densities
              ; Vrf.Output.Truncated.to_bits last_vrf_output
              ; Amount.to_bits total_currency
              ; Global_slot.Bits.to_bits curr_global_slot
@@ -1744,7 +2153,8 @@ module Data = struct
     let var_to_input
         ({ Poly.blockchain_length
          ; epoch_count
-         ; min_epoch_length
+         ; min_window_density
+         ; sub_window_densities
          ; last_vrf_output
          ; total_currency
          ; curr_global_slot
@@ -1760,14 +2170,18 @@ module Data = struct
         let length = up Length.Checked.to_bits in
         let%map blockchain_length = length blockchain_length
         and epoch_count = length epoch_count
-        and min_epoch_length = length min_epoch_length
-        and curr_global_slot =
-          up Global_slot.Checked.to_bits curr_global_slot
+        and min_window_density = length min_window_density
+        and curr_global_slot = up Global_slot.Checked.to_bits curr_global_slot
+        and sub_window_densities =
+          Checked.List.fold sub_window_densities ~init:[] ~f:(fun acc l ->
+              let%map res = length l in
+              List.append acc res )
         in
         { Random_oracle.Input.bitstrings=
             [| blockchain_length
              ; epoch_count
-             ; min_epoch_length
+             ; min_window_density
+             ; sub_window_densities
              ; Array.to_list last_vrf_output
              ; bs (Amount.var_to_bits total_currency)
              ; curr_global_slot
@@ -1782,6 +2196,8 @@ module Data = struct
 
     let length_in_triples =
       Length.length_in_triples + Length.length_in_triples
+      + Length.length_in_triples
+        * UInt32.to_int Constants.sub_windows_per_window
       + Vrf.Output.Truncated.length_in_triples + Epoch.length_in_triples
       + Epoch.Slot.length_in_triples + Amount.length_in_triples
       + Epoch_data.length_in_triples + Epoch_data.length_in_triples
@@ -1841,16 +2257,19 @@ module Data = struct
           Checkpoints.cons previous_protocol_state_hash
             previous_consensus_state.checkpoints
       in
+      let min_window_density, sub_window_densities =
+        Min_window_density.update_min_window_density
+          ~prev_global_slot:previous_consensus_state.curr_global_slot
+          ~next_global_slot:consensus_transition
+          ~prev_sub_window_densities:
+            previous_consensus_state.sub_window_densities
+          ~prev_min_window_density:previous_consensus_state.min_window_density
+      in
       { Poly.blockchain_length=
           Length.succ previous_consensus_state.blockchain_length
       ; epoch_count
-      ; min_epoch_length=
-          ( if Epoch.equal prev_epoch next_epoch then
-            previous_consensus_state.min_epoch_length
-          else if Epoch.(equal next_epoch (succ prev_epoch)) then
-            Length.min previous_consensus_state.min_epoch_length
-              previous_consensus_state.next_epoch_data.epoch_length
-          else Length.zero )
+      ; min_window_density
+      ; sub_window_densities
       ; last_vrf_output= Vrf.Output.truncate proposer_vrf_result
       ; total_currency
       ; curr_global_slot= consensus_transition
@@ -1887,16 +2306,27 @@ module Data = struct
 
     let negative_one : Value.t Lazy.t =
       lazy
-        { Poly.blockchain_length= Length.zero
-        ; epoch_count= Length.zero
-        ; min_epoch_length= Length.of_int (UInt32.to_int Constants.Epoch.size)
-        ; last_vrf_output= Vrf.Output.Truncated.dummy
-        ; total_currency= Lazy.force genesis_ledger_total_currency
-        ; curr_global_slot= Global_slot.zero
-        ; staking_epoch_data= Lazy.force Epoch_data.Staking.genesis
-        ; next_epoch_data= Lazy.force Epoch_data.Next.genesis
-        ; has_ancestor_in_same_checkpoint_window= false
-        ; checkpoints= Checkpoints.empty }
+        (let max_sub_window_density =
+           Length.of_int (UInt32.to_int Constants.slots_per_sub_window)
+         in
+         let max_window_density =
+           Length.of_int (UInt32.to_int Constants.slots_per_window)
+         in
+         { Poly.blockchain_length= Length.zero
+         ; epoch_count= Length.zero
+         ; min_window_density= max_window_density
+         ; sub_window_densities=
+             Length.zero
+             :: List.init
+                  (UInt32.to_int Constants.sub_windows_per_window - 1)
+                  ~f:(Fn.const max_sub_window_density)
+         ; last_vrf_output= Vrf.Output.Truncated.dummy
+         ; total_currency= Lazy.force genesis_ledger_total_currency
+         ; curr_global_slot= Global_slot.zero
+         ; staking_epoch_data= Lazy.force Epoch_data.Staking.genesis
+         ; next_epoch_data= Lazy.force Epoch_data.Next.genesis
+         ; has_ancestor_in_same_checkpoint_window= false
+         ; checkpoints= Checkpoints.empty })
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
         ~consensus_transition : Value.t =
@@ -2028,28 +2458,18 @@ module Data = struct
         Amount.Checked.add previous_state.total_currency supply_increase
       and epoch_count =
         Length.Checked.succ_if previous_state.epoch_count epoch_increased
-      and min_epoch_length =
-        let if_ b ~then_ ~else_ =
-          let%bind b = b and then_ = then_ and else_ = else_ in
-          Length.Checked.if_ b ~then_ ~else_
-        in
-        let return = Checked.return in
-        if_
-          (return Boolean.(not epoch_increased))
-          ~then_:(return previous_state.min_epoch_length)
-          ~else_:
-            (if_
-               (Epoch.Checked.is_succ ~pred:prev_epoch ~succ:next_epoch)
-               ~then_:
-                 (Length.Checked.min previous_state.min_epoch_length
-                    previous_state.next_epoch_data.epoch_length)
-               ~else_:(return Length.Checked.zero))
+      and min_window_density, sub_window_densities =
+        Min_window_density.Checked.update_min_window_density ~prev_global_slot
+          ~next_global_slot
+          ~prev_sub_window_densities:previous_state.sub_window_densities
+          ~prev_min_window_density:previous_state.min_window_density
       in
       Checked.return
         ( `Success threshold_satisfied
         , { Poly.blockchain_length
           ; epoch_count
-          ; min_epoch_length
+          ; min_window_density
+          ; sub_window_densities
           ; last_vrf_output= truncated_vrf_result
           ; curr_global_slot= next_global_slot
           ; total_currency= new_total_currency
@@ -2109,10 +2529,10 @@ module Data = struct
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.epoch_count; _} ->
                 Coda_numbers.Length.to_uint32 epoch_count )
-          ; field "minEpochLength" ~typ:(non_null uint32)
+          ; field "minWindowDensity" ~typ:(non_null uint32)
               ~args:Arg.[]
-              ~resolve:(fun _ {Poly.min_epoch_length; _} ->
-                Coda_numbers.Length.to_uint32 min_epoch_length )
+              ~resolve:(fun _ {Poly.min_window_density; _} ->
+                Coda_numbers.Length.to_uint32 min_window_density )
           ; field "lastVrfOutput" ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:
@@ -2638,9 +3058,9 @@ module Hooks = struct
                       (* There is a gap of an entire epoch *)
                     else if Epoch.(succ curr_epoch = newest_epoch) then
                       Length.(
-                        min s.min_epoch_length s.next_epoch_data.epoch_length)
+                        min s.min_window_density s.next_epoch_data.epoch_length)
                       (* Imagine the latest epoch was padded out with zeros to reach the newest_epoch *)
-                    else s.min_epoch_length
+                    else s.min_window_density
                   in
                   Length.(
                     virtual_min_length existing < virtual_min_length candidate))
@@ -2982,14 +3402,17 @@ module Hooks = struct
               prev.checkpoints
             else Checkpoints.cons previous_protocol_state.hash prev.checkpoints
           in
+          let min_window_density, sub_window_densities =
+            Min_window_density.update_min_window_density
+              ~prev_global_slot:prev.curr_global_slot
+              ~next_global_slot:curr_global_slot
+              ~prev_sub_window_densities:prev.sub_window_densities
+              ~prev_min_window_density:prev.min_window_density
+          in
           { Poly.blockchain_length
           ; epoch_count
-          ; min_epoch_length=
-              ( if Epoch.equal prev_epoch curr_epoch then prev.min_epoch_length
-              else if Epoch.(equal curr_epoch (succ prev_epoch)) then
-                Length.min prev.min_epoch_length
-                  prev.next_epoch_data.epoch_length
-              else Length.zero )
+          ; min_window_density
+          ; sub_window_densities
           ; last_vrf_output= Vrf.Output.truncate proposer_vrf_result
           ; total_currency
           ; curr_global_slot

@@ -32,6 +32,12 @@ module type Constants_intf = sig
 
   val inactivity_ms : int
 
+  val sub_windows_per_window : Unsigned.UInt32.t
+
+  val slots_per_sub_window : Unsigned.UInt32.t
+
+  val slots_per_window : Unsigned.UInt32.t
+
   (** Number of slots in one epoch *)
   val slots_per_epoch : Unsigned.UInt32.t
 end
