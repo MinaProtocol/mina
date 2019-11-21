@@ -11,6 +11,7 @@ digraph G {
   // Actionable Dependencies
   {
     node [shape=rectangle];
+    ScanMerkle [label="Scan State Merklization"];
     ELSync [label="Epoch Ledger Sync Time (-)"];
     ELMem [label="Epoch Ledger Memory (-)"];
     StLDiffApp [label="Staged Ledger Diff Application Time (-)"];
@@ -35,6 +36,8 @@ digraph G {
   // Positive Arcs
   {
     edge [color=black];
+    ScanMerkle -> {ScanSyncTime, ScanSyncSlotDivorce};
+    ScanMem -> ScanSyncTime;
     {ScanSyncTime, ScanSyncSlotDivorce, HashTime} -> ScanSize
     {StLDiffApp, ScanSyncSlotDivorce, SnLCommit, HashTime} -> SlotTime;
     HashTime -> StLDiffApp;

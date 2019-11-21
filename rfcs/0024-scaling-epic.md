@@ -74,43 +74,60 @@ There are multiple potential fixes that need to be weighed and compared for impl
 ##### Child RFC: &#x1F534;
 
 ### Reduce Scan State Memory Usage
-##### Priority: 3
+##### Priority: 1
 ##### Why this Priority?
 This is important and will cause issues at some point, but it looks like this will show itself as a bottleneck later than most of the other scaling dependencies.
 ##### Why is it important?
 At high parameterization, the scan state will use an increadible amount of memory. The memory usage needs to be before we can significantly turn up the scan state's size.
 ##### Proposed Fix
-Use content addressed storage to share references to memory across transaction witnesses (which potentially saves a lot of duplicate intermediate hashes from being stored).
+There are a number of things that can be done in order to reduce the memory usage of the scan states in the transition frontier:
+1. Use content addressed storage to share references to memory across transaction witnesses (which potentially saves a lot of duplicate intermediate hashes from being stored).
+2. Only store scan state witnesses at the tips of the transition frontier, throwing out witnesses on scan states where there are already known successor blocks. This can also be combined with a probalistic "dead fork" algorithm which will prune witnesses from tips in the frontier which we don't think will be extended. If the tips that are pruned are extended later, we can always rebuild new witnesses.
+3. If this is not sufficient, it is possible to persist scan states that have not been accessed recently in order to free them from memory, and reload them into memory when they are accessed.
+##### Child RFC: &#x1F534;
+
+### Scan State Merklization
+##### Priority: 1
+##### Why this Priority?
+Doing this will make some (potentially major) changes to the scan state's structure, so it should be done before any other major scan state changes are made. It's the first dependency for reducing scan state memory usage, which is a high priority.
+##### Why is it important?
+Scan state merklization will allow the scan state to be synchronized using what is currently the "sync ledger" abstraction (which will be modified to be a "merkle sync" abstraction instead; this part should be pretty easy). This helps divorce the scan state single slot synchronization requirement, while also reducing the amount of data a single node needs to provide to clients synchronizing their scan state during bootstrap. This also has potential applications in the non-consensus protocol since it allows nodes to generate merkle proofs of transactions in the staged ledger.
+##### Proposed Fix
+Wrap the current scan state structure with merklization logic, such that every node hash a hash which is a hash of it's contents. This allows the scan state to be plugged in as a merkle tree to other parts of the code base, for instance, "sync ledger". The scan state's structure doesn't exactly follow the same structure as a merkle tree since all of the intermediate nodes contain data in adition to pointers to their children, but it should be rather easy to write a more generalized "merkle DAG" or "dataful merkle tree" abstraction which is a more generic interface into a merklized tree structure (and both "merkle ledgers" and "merkle scan states" would implement this interface).
 ##### Child RFC: &#x1F534;
 
 ### Reduce Scan State Synchronization Time
-##### Priority: ?
+##### Priority: 2
 ##### Why this Priority?
-TODO
+Depends on scan state merklization.
 ##### Why is it important?
-TODO
+The current implementation of scan state synchronization downloads a single bin\_io serialized copy of an entire scan state from a single peer. This does not scale as the scan state gets bigger since it puts too much bandwidth pressure on a signle peer, and long network downloads introduce more likelihood for network failures (which will require a full restart of the download to recover from).
 ##### Proposed Fix
-TODO
+Once the scan state is merklized, the scan state can be plugged into the "sync ledger" abstraction in order to synchronize only the diff of data against an existing structure and download the data in chunks from multiple peers at once (increasing speed, reducing bandwidth usage, and reducing the likelihood of network failures).
 ##### Child RFC: &#x1F534;
 
 ### Divorce Scan State Synchronization from the Single Slot Requirement
-##### Priority: ?
+##### Priority: 2
 ##### Why this Priority?
-TODO
+Depends on scan state merklization.
 ##### Why is it important?
-TODO
+As the total size of the scan state increases, the existing single slot requirement will require the slot time to be increased to still allow the scan state to be downloadable.
 ##### Proposed Fix
-TODO
+Once the scan state is merklized, the scan state can be plugged into the "sync ledger" abstraction. This fixes the issue since the "sync ledger" supports dynamic retargetting of the data you are synchronizing.
 ##### Child RFC: &#x1F534;
 
 ### Optimize Staged Ledger Diff Application
-##### Priority: ?
+##### Priority: 2
 ##### Why this Priority?
-TODO
+Staged ledger diff application is likely to be one of the major computational bottlenecks for consensus nodes participating on the network, regardless of snark working and block production.
 ##### Why is it important?
-TODO
+Staged ledger diff application has to be short enough that it can be done multiple times within a slot, otherwise the nodes on the conesnsus network are at risk of not being able to keep up with block production. Furthermore, there still needs to be enough time in the slot to produce blocks.
 ##### Proposed Fix
-TODO
+There are a number of mostly independent optimizations we can implement for staged ledger diff application (the sub-RFC should attempt to rank these by cost/benefit):
+1. Perform witness generation hashes in parallel with no duplicates (see parallel poseidon hashing for details)
+2. Batch verification of included completed work proofs
+3. Cache completed work verification to avoid duplicate verification of completed work included across multiple forks
+4. If transaction signature verification cost is significant, parallelize that as well
 ##### Child RFC: &#x1F534;
 
 ### Optimize Snarked Ledger Commit
