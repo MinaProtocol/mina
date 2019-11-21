@@ -114,15 +114,6 @@ module Types = struct
                (String.map ~f:Char.uppercase @@ Sync_status.to_string status)
                ~value:status ))
 
-  let proposal_status :
-      ('context, [`Check_again | `Propose | `Propose_now] option) typ =
-    enum "ProposalState"
-      ~doc:"Status indicating when you will propose for the next block"
-      ~values:
-        [ enum_value "CHECK_NEXT_EPOCH" ~value:`Check_again
-        ; enum_value "PLAN_PROPOSING" ~value:`Propose
-        ; enum_value "PROPOSE_NOW" ~value:`Propose_now ]
-
   let transaction_status : ('context, Transaction_status.State.t option) typ =
     enum "TransactionStatus" ~doc:"Status of a transaction"
       ~values:
@@ -138,47 +129,23 @@ module Types = struct
                 "The transaction has either been snarked, reached finality \
                  through consensus or has been dropped" ]
 
-  let consensus_time : (_, Consensus.Global_slot.t option) typ =
-    let open Consensus.Global_slot in
-    obj "ConsensusTime" ~fields:(fun _ ->
-        [ field "epoch"
-            ~typ:(non_null @@ uint32 ())
-            ~args:Arg.[]
-            ~resolve:(fun _ global_slot -> epoch global_slot)
-        ; field "slot"
-            ~typ:(non_null @@ uint32 ())
-            ~args:Arg.[]
-            ~resolve:(fun _ global_slot -> slot global_slot)
-        ; field "startTime" ~typ:(non_null string)
-            ~args:Arg.[]
-            ~resolve:(fun _ global_slot ->
-              Block_time.to_string @@ start_time global_slot )
-        ; field "endTime" ~typ:(non_null string)
-            ~args:Arg.[]
-            ~resolve:(fun _ global_slot ->
-              Block_time.to_string @@ end_time global_slot ) ] )
-
   let block_proposal :
       ( _
       , [`Check_again of Block_time.t | `Propose of Block_time.t | `Propose_now]
         option )
       typ =
-    obj "BlockProposal" ~fields:(fun _ ->
-        [ field "proposalState" ~typ:(non_null proposal_status)
+    obj "BlockProposals" ~fields:(fun _ ->
+        let of_time = Consensus.Data.Consensus_time.of_time_exn in
+        [ field "consensusTimes"
+            ~typ:
+              ( non_null @@ list @@ non_null
+              @@ Consensus.Data.Consensus_time.graphql_type () )
             ~args:Arg.[]
-            ~resolve:(fun _ -> function `Check_again _ -> `Check_again
-              | `Propose _ -> `Propose | `Propose_now -> `Propose_now )
-        ; field "consensusTime" ~typ:(non_null consensus_time)
-            ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} ->
-              Fn.compose Consensus.Global_slot.of_time_exn
-              @@ function
-              | `Check_again time ->
-                  time
-              | `Propose time ->
-                  time
-              | `Propose_now ->
-                  Block_time.now (Coda_lib.config coda).time_controller ) ] )
+            ~resolve:(fun {ctx= coda; _} -> function `Check_again _time -> []
+              | `Propose time -> [of_time time] | `Propose_now ->
+                  [ of_time
+                    @@ Block_time.now (Coda_lib.config coda).time_controller ]
+              ) ] )
 
   module DaemonStatus = struct
     type t = Daemon_rpcs.Types.Status.t
@@ -268,8 +235,14 @@ module Types = struct
                ~propose_pubkeys:
                  (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms)
-               ~consensus_time_best_tip:(id ~typ:consensus_time)
-               ~consensus_time_now:(id ~typ:Schema.(non_null consensus_time))
+               ~consensus_time_best_tip:
+                 (id ~typ:(Consensus.Data.Consensus_time.graphql_type ()))
+               ~consensus_time_now:
+                 (id
+                    ~typ:
+                      Schema.(
+                        non_null
+                          (Consensus.Data.Consensus_time.graphql_type ())))
                ~consensus_mechanism:nn_string
                ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
                ~libp2p_peer_id:nn_string

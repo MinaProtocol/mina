@@ -2,7 +2,6 @@
 "../../config.mlh"]
 
 module Intf = Intf
-module Global_slot = Global_slot
 
 [%%if
 consensus_mechanism = "proof_of_stake"]

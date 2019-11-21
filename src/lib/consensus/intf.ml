@@ -4,7 +4,37 @@ open Async
 open Currency
 open Signature_lib
 open Coda_base
-include Intf0
+
+(** Constants are defined with a single letter (latin or greek) based on
+ * their usage in the Ouroboros suite of papers *)
+module type Constants = sig
+  (** The timestamp for the genesis block *)
+  val genesis_state_timestamp : Block_time.t
+
+  (** [k] is the number of blocks required to reach finality *)
+  val k : int
+
+  (** The amount of money minted and given to the proposer whenever a block
+   * is created *)
+  val coinbase : Currency.Amount.t
+
+  val block_window_duration_ms : int
+
+  (** The window duration in which blocks are created *)
+  val block_window_duration : Block_time.Span.t
+
+  (** [delta] is the number of slots in the valid window for receiving blocks over the network *)
+  val delta : int
+
+  (** [c] is the number of slots in which we can probalistically expect at least 1
+   * block. In sig, it's exactly 1 as blocks should be produced every slot. *)
+  val c : int
+
+  val inactivity_ms : int
+
+  (** Number of slots in one epoch *)
+  val slots_per_epoch : Unsigned.UInt32.t
+end
 
 module type Blockchain_state = sig
   module Poly : sig
@@ -311,11 +341,20 @@ module type S = sig
     end
 
     module Consensus_time : sig
-      type t [@@deriving sexp, compare, yojson]
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t [@@deriving compare, sexp, yojson]
+        end
+      end]
+
+      type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
 
       val graphql_type : unit -> ('ctx, t option) Graphql_async.Schema.typ
 
       val to_string_hum : t -> string
+
+      val of_time_exn : Block_time.t -> t
 
       (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)
       val get_old : t -> t
