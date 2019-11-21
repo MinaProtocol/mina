@@ -1330,6 +1330,63 @@ module Data = struct
     end
   end
 
+  module Consensus_time = struct
+    open Graphql_async
+    open Schema
+    include Global_slot
+
+    let graphql_type () =
+      let open Graphql_lib.Base_types in
+      obj "ConsensusTime" ~fields:(fun _ ->
+          [ field "epoch"
+              ~typ:(non_null @@ uint32 ())
+              ~args:Arg.[]
+              ~resolve:(fun _ global_slot -> epoch global_slot)
+          ; field "slot"
+              ~typ:(non_null @@ uint32 ())
+              ~args:Arg.[]
+              ~resolve:(fun _ global_slot -> slot global_slot)
+          ; field "startTime" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ global_slot ->
+                Time.to_string @@ start_time global_slot )
+          ; field "endTime" ~typ:(non_null string)
+              ~args:Arg.[]
+              ~resolve:(fun _ global_slot ->
+                Time.to_string @@ end_time global_slot ) ] )
+
+    let to_string_hum = time_hum
+
+    let delay =
+      UInt32.of_int @@ Configuration.acceptable_network_delay Configuration.t
+
+    open UInt32
+    open Infix
+
+    let gc_width : UInt32.t = delay * of_int 2
+
+    (* epoch, slot components of gc_width *)
+    let gc_width_epoch : UInt32.t = gc_width / of_int Constants.epoch_size
+
+    let gc_width_slot : UInt32.t = gc_width mod of_int Constants.epoch_size
+
+    let gc_interval : UInt32.t = gc_width
+
+    (* create dummy proposal to split map on *)
+    let get_old (t : Global_slot.t) : Global_slot.t =
+      if
+        Global_slot.(
+          t < Global_slot.of_epoch_and_slot (gc_width_epoch, gc_width_slot))
+      then (* proposal not beyond gc_width *)
+        Global_slot.zero
+      else
+        let open Int in
+        (* subtract epoch, slot components of gc_width *)
+        Global_slot.diff t (gc_width_epoch, gc_width_slot)
+
+    let to_uint32 = Global_slot.to_uint32
+  end
+
   (* We have a list of state hashes. When we extend the blockchain,
      we see if the **previous** state should be saved as a checkpoint.
      This is because we have convenient access to the entire previous
@@ -1919,7 +1976,7 @@ module Data = struct
 
     let curr_slot = curr_ Global_slot.slot
 
-    let global_slot (t : Value.t) = t.curr_global_slot
+    let consensus_time (t : Value.t) = t.curr_global_slot
 
     let blockchain_length {Poly.blockchain_length; _} = blockchain_length
 

@@ -34,6 +34,15 @@ let time_hum t =
 let of_time_exn time =
   of_epoch_and_slot @@ Epoch.epoch_and_slot_of_time_exn time
 
+let diff t (other_epoch, other_slot) =
+  let open UInt32.Infix in
+  let epoch, slot = to_epoch_and_slot t in
+  let old_epoch =
+    epoch - other_epoch - (UInt32.of_int @@ if other_slot > slot then 1 else 0)
+  in
+  let old_slot = (slot - other_slot) mod UInt32.of_int Constants.epoch_size in
+  of_epoch_and_slot (old_epoch, old_slot)
+
 module Checked = struct
   include T.Checked
 

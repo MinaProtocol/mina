@@ -321,6 +321,19 @@ module type S = sig
       val genesis : Value.t
     end
 
+    module Consensus_time : sig
+      type t [@@deriving sexp, compare, yojson]
+
+      val graphql_type : unit -> ('ctx, t option) Graphql_async.Schema.typ
+
+      val to_string_hum : t -> string
+
+      (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)
+      val get_old : t -> t
+
+      val to_uint32 : t -> Unsigned.UInt32.t
+    end
+
     module Consensus_state : sig
       module Value : sig
         (* bin_io omitted *)
@@ -359,19 +372,13 @@ module type S = sig
 
       val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
-      val time_hum : Value.t -> string
-
       val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
       val display : Value.t -> display
 
       val network_delay : Configuration.t -> int
 
-      val curr_slot : Value.t -> Slot.t
-
-      val curr_epoch : Value.t -> Epoch.t
-
-      val global_slot : Value.t -> Global_slot.t
+      val consensus_time : Value.t -> Consensus_time.t
 
       val blockchain_length : Value.t -> Length.t
 

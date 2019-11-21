@@ -39,6 +39,8 @@ module type Global_slot = sig
 
   val of_time_exn : Time.t -> t
 
+  val diff : t -> Epoch.t * Slot.t -> t
+
   module Checked : sig
     include Coda_numbers.Nat.Intf.S_checked with type unchecked := t
 

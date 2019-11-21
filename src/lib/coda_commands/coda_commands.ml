@@ -248,7 +248,7 @@ type active_state_fields =
   ; blockchain_length: int option
   ; ledger_merkle_root: string option
   ; state_hash: string option
-  ; consensus_time_best_tip: Consensus.Global_slot.t option }
+  ; consensus_time_best_tip: Consensus.Data.Consensus_time.t option }
 
 let get_status ~flag t =
   let open Coda_lib.Config in
@@ -353,7 +353,7 @@ let get_status ~flag t =
           `Active `Catchup
     in
     let consensus_time_best_tip =
-      Consensus.Data.Consensus_state.global_slot consensus_state
+      Consensus.Data.Consensus_state.consensus_time consensus_state
     in
     ( sync_status
     , { num_accounts= Some num_accounts

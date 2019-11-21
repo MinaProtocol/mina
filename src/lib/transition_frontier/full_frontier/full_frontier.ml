@@ -458,8 +458,8 @@ let update_metrics_with_diff (type mutant) t
           |> Coda_numbers.Length.to_int )
       in
       let global_slot =
-        Consensus.Data.Consensus_state.global_slot consensus_state
-        |> Consensus.Global_slot.to_uint32 |> Unsigned.UInt32.to_int
+        Consensus.Data.Consensus_state.consensus_time consensus_state
+        |> Consensus.Data.Consensus_time.to_uint32 |> Unsigned.UInt32.to_int
         |> Float.of_int
       in
       Coda_metrics.(

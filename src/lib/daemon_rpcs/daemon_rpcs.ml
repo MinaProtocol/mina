@@ -232,7 +232,7 @@ module Types = struct
 
       let consensus_time_best_tip =
         option_entry "Best tip consensus time"
-          ~f:Consensus.Global_slot.time_hum
+          ~f:Consensus.Data.Consensus_time.to_string_hum
 
       let next_proposal =
         option_entry "Next proposal" ~f:(fun proposal_status ->
@@ -259,7 +259,8 @@ module Types = struct
                 "Now" )
 
       let consensus_time_now =
-        map_entry "Consensus time now" ~f:Consensus.Global_slot.time_hum
+        map_entry "Consensus time now"
+          ~f:Consensus.Data.Consensus_time.to_string_hum
 
       let consensus_mechanism = string_entry "Consensus mechanism"
 
@@ -318,13 +319,14 @@ module Types = struct
       ; sync_status: Sync_status.Stable.V1.t
       ; propose_pubkeys: string list
       ; histograms: Histograms.t option
-      ; consensus_time_best_tip: Consensus.Global_slot.Stable.V1.t option
+      ; consensus_time_best_tip:
+          Consensus.Data.Consensus_time.Stable.V1.t option
       ; next_proposal:
           [ `Check_again of Block_time.Stable.V1.t
           | `Propose of Block_time.Stable.V1.t
           | `Propose_now ]
           option
-      ; consensus_time_now: Consensus.Global_slot.Stable.V1.t
+      ; consensus_time_now: Consensus.Data.Consensus_time.Stable.V1.t
       ; consensus_mechanism: string
       ; consensus_configuration: Consensus.Configuration.t
       ; addrs_and_ports: Kademlia.Node_addrs_and_ports.Display.Stable.V1.t
