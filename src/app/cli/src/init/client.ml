@@ -11,53 +11,6 @@ module Client = Graphql_client_lib.Make (struct
   let headers = String.Map.empty
 end)
 
-let print_rpc_error error =
-  eprintf "RPC connection error: %s\n" (Error.to_string_hum error)
-
-let dispatch rpc query port =
-  Tcp.with_connection
-    (Tcp.Where_to_connect.of_host_and_port (Cli_lib.Port.of_local port))
-    ~timeout:(Time.Span.of_sec 1.)
-    (fun _ r w ->
-      let open Deferred.Let_syntax in
-      match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
-      | Error exn ->
-          return
-            (Or_error.errorf
-               !"Error connecting to the daemon on port %d using the RPC \
-                 call, %s,: %s"
-               port (Rpc.Rpc.name rpc) (Exn.to_string exn))
-      | Ok conn ->
-          Rpc.Rpc.dispatch rpc conn query )
-
-let dispatch_join_errors rpc query port =
-  let open Deferred.Let_syntax in
-  let%map res = dispatch rpc query port in
-  Or_error.join res
-
-(** Call an RPC, passing handlers for a successful call and a failing one. Note
-    that a successful *call* may have failed on the server side and returned a
-    failing result. To deal with that, the success handler returns an
-    Or_error. *)
-let dispatch_with_message rpc query port ~success ~error
-    ~(join_error : 'a Or_error.t -> 'b Or_error.t) =
-  let fail err = eprintf "%s\n%!" err ; exit 18 in
-  let%bind res = dispatch rpc query port in
-  match join_error res with
-  | Ok x ->
-      printf "%s\n" (success x) ;
-      Deferred.unit
-  | Error e ->
-      fail (error e)
-
-let dispatch_pretty_message (type t)
-    (module Print : Cli_lib.Render.Printable_intf with type t = t)
-    ?(json = true) ~(join_error : 'a Or_error.t -> t Or_error.t) ~error_ctx rpc
-    query port =
-  let%bind res = dispatch rpc query port in
-  Cli_lib.Render.print (module Print) json (join_error res) ~error_ctx
-  |> Deferred.return
-
 module Args = struct
   open Command.Param
 
@@ -85,7 +38,7 @@ let stop_daemon =
   let open Command.Param in
   Command.async ~summary:"Stop the daemon"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
-         let%map res = dispatch Stop_daemon.rpc () port in
+         let%map res = Daemon_rpcs.Client.dispatch Stop_daemon.rpc () port in
          printf "%s"
            (or_error_str res
               ~f_ok:(fun _ -> "Daemon stopping\n")
@@ -102,7 +55,7 @@ let get_balance =
   Command.async ~summary:"Get balance associated with a public key"
     (Cli_lib.Background_daemon.rpc_init address_flag ~f:(fun port address ->
          let%map res =
-           dispatch_join_errors Daemon_rpcs.Get_balance.rpc
+           Daemon_rpcs.Client.dispatch_join_errors Daemon_rpcs.Get_balance.rpc
              (Public_key.compress address)
              port
          in
@@ -174,7 +127,8 @@ let get_trust_status =
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (ip_address, json) ->
          match%map
-           dispatch Daemon_rpcs.Get_trust_status.rpc ip_address port
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_trust_status.rpc
+             ip_address port
          with
          | Ok status ->
              print_trust_status (round_trust_score status) json
@@ -212,7 +166,10 @@ let get_trust_status_all =
   Command.async
     ~summary:"Get trust statuses for all peers known to the trust system"
     (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (nonzero, json) ->
-         match%map dispatch Daemon_rpcs.Get_trust_status_all.rpc () port with
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_trust_status_all.rpc ()
+             port
+         with
          | Ok ip_trust_statuses ->
              (* always round the trust scores for display *)
              let ip_rounded_trust_statuses =
@@ -247,7 +204,8 @@ let reset_trust_status =
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (ip_address, json) ->
          match%map
-           dispatch Daemon_rpcs.Reset_trust_status.rpc ip_address port
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Reset_trust_status.rpc
+             ip_address port
          with
          | Ok status ->
              print_trust_status status json
@@ -268,11 +226,13 @@ let get_public_keys =
        (Args.zip2 with_details_flag Cli_lib.Flag.json)
        ~f:(fun port (is_balance_included, json) ->
          if is_balance_included then
-           dispatch_pretty_message ~json ~join_error:Or_error.join ~error_ctx
+           Daemon_rpcs.Client.dispatch_pretty_message ~json
+             ~join_error:Or_error.join ~error_ctx
              (module Cli_lib.Render.Public_key_with_details)
              Get_public_keys_with_details.rpc () port
          else
-           dispatch_pretty_message ~json ~join_error:Or_error.join ~error_ctx
+           Daemon_rpcs.Client.dispatch_pretty_message ~json
+             ~join_error:Or_error.join ~error_ctx
              (module Cli_lib.Render.String_list_formatter)
              Get_public_keys.rpc () port ))
 
@@ -295,7 +255,8 @@ let generate_receipt =
     (Cli_lib.Background_daemon.rpc_init
        (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
-         dispatch_with_message Prove_receipt.rpc (receipt_chain_hash, pk) port
+         Daemon_rpcs.Client.dispatch_with_message Prove_receipt.rpc
+           (receipt_chain_hash, pk) port
            ~success:Cli_lib.Render.Prove_receipt.to_text
            ~error:Error.to_string_hum ~join_error:Or_error.join ))
 
@@ -359,7 +320,8 @@ let verify_receipt =
                   ~error:
                     (sprintf "Proof file %s has invalid json format" proof_path)
            in
-           dispatch Verify_proof.rpc (pk, payment, proof) port
+           Daemon_rpcs.Client.dispatch Verify_proof.rpc (pk, payment, proof)
+             port
          in
          match%map dispatch_result with
          | Ok (Ok ()) ->
@@ -377,7 +339,9 @@ let get_nonce :
     -> (Account.Nonce.t, string) Deferred.Result.t =
  fun ~rpc addr port ->
   let open Deferred.Let_syntax in
-  let%map res = dispatch rpc (Public_key.compress addr) port in
+  let%map res =
+    Daemon_rpcs.Client.dispatch rpc (Public_key.compress addr) port
+  in
   match Or_error.join res with
   | Ok (Some n) ->
       Ok n
@@ -408,7 +372,7 @@ let status =
   Command.async ~summary:"Get running daemon status"
     (Cli_lib.Background_daemon.rpc_init flag
        ~f:(fun port (json, performance) ->
-         dispatch_pretty_message ~json ~join_error:Fn.id
+         Daemon_rpcs.Client.dispatch_pretty_message ~json ~join_error:Fn.id
            ~error_ctx:"Failed to get status"
            (module Daemon_rpcs.Types.Status)
            Get_status.rpc
@@ -421,7 +385,7 @@ let status_clear_hist =
   Command.async ~summary:"Clear histograms reported in status"
     (Cli_lib.Background_daemon.rpc_init flag
        ~f:(fun port (json, performance) ->
-         dispatch_pretty_message ~json ~join_error:Fn.id
+         Daemon_rpcs.Client.dispatch_pretty_message ~json ~join_error:Fn.id
            ~error_ctx:"Failed to clear histograms reported in status"
            (module Daemon_rpcs.Types.Status)
            Clear_hist_status.rpc
@@ -496,7 +460,7 @@ let batch_send_payments =
                           Public_key.Compressed.of_base58_check_exn receiver
                       ; amount })) ) )
     in
-    dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
+    Daemon_rpcs.Client.dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
       (ts :> User_command.t list)
       port
       ~success:(fun _ -> "Successfully enqueued payments in pool")
@@ -575,7 +539,8 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            let command =
              Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp body
            in
-           dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
+           Daemon_rpcs.Client.dispatch_with_message
+             Daemon_rpcs.Send_user_command.rpc command port
              ~success:(fun receipt_chain_hash ->
                sprintf
                  "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
@@ -731,8 +696,8 @@ let cancel_transaction =
                  ~nonce:cancelled_nonce ~memo:User_command_memo.empty
                  ~sender_kp body
              in
-             dispatch_with_message Daemon_rpcs.Send_user_command.rpc command
-               port
+             Daemon_rpcs.Client.dispatch_with_message
+               Daemon_rpcs.Send_user_command.rpc command port
                ~success:(fun receipt_chain_hash ->
                  sprintf
                    "Dispatched cancel transaction with ID %s\n\
@@ -828,8 +793,8 @@ let get_transaction_status =
        ~f:(fun port serialized_transaction ->
          match User_command.of_base58_check serialized_transaction with
          | Ok user_command ->
-             dispatch_with_message Daemon_rpcs.Get_transaction_status.rpc
-               user_command port
+             Daemon_rpcs.Client.dispatch_with_message
+               Daemon_rpcs.Get_transaction_status.rpc user_command port
                ~success:(fun status ->
                  sprintf !"Transaction status : %s\n"
                  @@ Transaction_status.State.to_string status )
@@ -919,10 +884,11 @@ let dump_ledger =
                Sexp.of_string_conv_exn s Staged_ledger_hash.Stable.V1.t_of_sexp
            )
          in
-         dispatch Daemon_rpcs.Get_ledger.rpc staged_ledger_hash port
+         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc
+           staged_ledger_hash port
          >>| function
          | Error e ->
-             print_rpc_error e
+             Daemon_rpcs.Client.print_rpc_error e
          | Ok (Error e) ->
              printf !"Ledger not found: %s\n" (Error.to_string_hum e)
          | Ok (Ok accounts) ->
@@ -956,12 +922,13 @@ let snark_job_list =
        blocks"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
          match%map
-           dispatch_join_errors Daemon_rpcs.Snark_job_list.rpc () port
+           Daemon_rpcs.Client.dispatch_join_errors
+             Daemon_rpcs.Snark_job_list.rpc () port
          with
          | Ok str ->
              printf "%s" str
          | Error e ->
-             print_rpc_error e ))
+             Daemon_rpcs.Client.print_rpc_error e ))
 
 let snark_pool_list =
   let open Command.Param in
@@ -1055,22 +1022,26 @@ let start_tracing =
   let open Command.Param in
   Command.async ~summary:"Start async tracing to $config-directory/$pid.trace"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
-         match%map dispatch Daemon_rpcs.Start_tracing.rpc () port with
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Start_tracing.rpc () port
+         with
          | Ok () ->
              printf "Daemon started tracing!"
          | Error e ->
-             print_rpc_error e ))
+             Daemon_rpcs.Client.print_rpc_error e ))
 
 let stop_tracing =
   let open Deferred.Let_syntax in
   let open Command.Param in
   Command.async ~summary:"Stop async tracing"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
-         match%map dispatch Daemon_rpcs.Stop_tracing.rpc () port with
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Stop_tracing.rpc () port
+         with
          | Ok () ->
              printf "Daemon stopped printing!"
          | Error e ->
-             print_rpc_error e ))
+             Daemon_rpcs.Client.print_rpc_error e ))
 
 let set_staking =
   let privkey_path = Cli_lib.Flag.privkey_read_path in
@@ -1080,9 +1051,12 @@ let set_staking =
          let%bind ({Keypair.public_key; _} as keypair) =
            Secrets.Keypair.Terminal_stdin.read_exn privkey_path
          in
-         match%map dispatch Daemon_rpcs.Set_staking.rpc [keypair] port with
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Set_staking.rpc [keypair]
+             port
+         with
          | Error e ->
-             print_rpc_error e
+             Daemon_rpcs.Client.print_rpc_error e
          | Ok () ->
              printf
                !"New block proposer public key : %s\n"
@@ -1394,7 +1368,7 @@ module Visualization = struct
          Command.Param.(anon @@ ("output-filepath" %: string))
          ~f:(fun port filename ->
            let%map message =
-             match%map dispatch rpc filename port with
+             match%map Daemon_rpcs.Client.dispatch rpc filename port with
              | Ok response ->
                  f filename response
              | Error e ->
