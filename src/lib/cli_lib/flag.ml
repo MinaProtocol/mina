@@ -43,7 +43,7 @@ module Port = struct
       "Client to daemon rest server"
 
   let archive =
-    create ~name:"archive-port" ~default:default_archive
+    create ~name:"new-archive" ~default:default_archive
       "Daemon to archive process communication"
 end
 

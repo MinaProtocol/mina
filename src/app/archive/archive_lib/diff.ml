@@ -5,32 +5,28 @@ open Coda_base
 module Breadcrumb = Transition_frontier.Breadcrumb
 
 (* TODO: We should be able to fully deserialize and serialize via json *)
-module Transition_frontier = struct
-  open Transition_frontier.Diff
 
+module Transition_frontier = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          | Breadcrumb_added of
-              { block:
-                  ( External_transition.Stable.V1.t
-                  , State_hash.Stable.V1.t )
-                  With_hash.Stable.V1.t
-              ; sender_receipt_chains_from_parent_ledger:
-                  ( Public_key.Compressed.Stable.V1.t
-                  * Receipt.Chain_hash.Stable.V1.t )
-                  list }
-          | Root_transitioned of Root_transition.Lite.Stable.V1.t
-          | Bootstrap of {lost_blocks: State_hash.Stable.V1.t list}
-        [@@deriving bin_io, version]
-      end
+      type t =
+        | Breadcrumb_added of
+            { block:
+                ( External_transition.Stable.V1.t
+                , State_hash.Stable.V1.t )
+                With_hash.Stable.V1.t
+            ; sender_receipt_chains_from_parent_ledger:
+                ( Public_key.Compressed.Stable.V1.t
+                * Receipt.Chain_hash.Stable.V1.t )
+                list }
+        | Root_transitioned of
+            Transition_frontier.Diff.Root_transition.Lite.Stable.V1.t
+        | Bootstrap of {lost_blocks: State_hash.Stable.V1.t list}
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t =
     | Breadcrumb_added of
@@ -41,7 +37,8 @@ module Transition_frontier = struct
         ; sender_receipt_chains_from_parent_ledger:
             (Public_key.Compressed.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t)
             list }
-    | Root_transitioned of Root_transition.Lite.Stable.V1.t
+    | Root_transitioned of
+        Transition_frontier.Diff.Root_transition.Lite.Stable.V1.t
     | Bootstrap of {lost_blocks: State_hash.Stable.V1.t list}
 end
 
