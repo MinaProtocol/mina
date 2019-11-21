@@ -66,7 +66,7 @@ val length_in_triples : int
 
 val negative_one : Value.t Lazy.t
 
-val genesis : Value.t Lazy.t
+val genesis : genesis_ledger_hash:Ledger_hash.t -> Value.t
 
 val set_timestamp : ('a, 'b, 'c) Poly.t -> 'c -> ('a, 'b, 'c) Poly.t
 

@@ -16,7 +16,9 @@ let create_with_custom_ledger ~genesis_consensus_state ~genesis_ledger =
   in
   let blockchain_state =
     Blockchain_state.create_value
-      ~timestamp:Blockchain_state.(timestamp (Lazy.force genesis))
+      ~timestamp:
+        Blockchain_state.(
+          timestamp (genesis ~genesis_ledger_hash:root_ledger_hash))
       ~staged_ledger_hash ~snarked_ledger_hash
   in
   let state =
@@ -28,21 +30,26 @@ let create_with_custom_ledger ~genesis_consensus_state ~genesis_ledger =
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state
 
-let t =
+let t ~genesis_ledger =
   lazy
     (let negative_one_protocol_state_hash =
        Protocol_state.(hash @@ Lazy.force negative_one)
      in
+     let genesis_ledger_hash =
+       Ledger.merkle_root (Lazy.force genesis_ledger)
+     in
      let genesis_consensus_state =
        Consensus.Data.Consensus_state.create_genesis
-         ~negative_one_protocol_state_hash
+         ~negative_one_protocol_state_hash ~genesis_ledger_hash
      in
      let state =
        Protocol_state.create_value
          ~genesis_state_hash:
            (State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash)
          ~previous_state_hash:negative_one_protocol_state_hash
-         ~blockchain_state:(Lazy.force Blockchain_state.genesis)
+         ~blockchain_state:(Blockchain_state.genesis ~genesis_ledger_hash)
          ~consensus_state:genesis_consensus_state
      in
      With_hash.of_data ~hash_data:Protocol_state.hash state)
+
+let compile_time_genesis = t ~genesis_ledger:Genesis_ledger.Dummy.t

@@ -680,7 +680,9 @@ end
 
 let genesis =
   let open Lazy.Let_syntax in
-  let%map genesis_protocol_state = Genesis_protocol_state.t in
+  let%map genesis_protocol_state =
+    Genesis_protocol_state.compile_time_genesis
+  in
   let empty_diff =
     { Staged_ledger_diff.diff=
         ( { completed_works= []

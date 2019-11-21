@@ -106,11 +106,16 @@ module Non_snark = struct
 
   type value = t [@@deriving sexp, compare, hash, yojson]
 
-  let dummy : t Lazy.t =
+  let negative_one : t Lazy.t =
     lazy
       { ledger_hash= Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t)
       ; aux_hash= Aux_hash.dummy
       ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
+
+  let genesis ~genesis_ledger_hash : t =
+    { ledger_hash= genesis_ledger_hash
+    ; aux_hash= Aux_hash.dummy
+    ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
 
   type var = Boolean.var list
 
@@ -150,7 +155,7 @@ module Non_snark = struct
         * computations. It's useful when debugging to dump the protocol state
         * and so we can just lie here instead. *)
         printf "WARNING: improperly transporting staged-ledger-hash\n" ;
-        Lazy.force dummy )
+        Lazy.force negative_one )
 end
 
 module Poly = struct
@@ -213,11 +218,16 @@ let of_aux_ledger_and_coinbase_hash aux_hash ledger_hash pending_coinbase : t =
         (Pending_coinbase.hash_extra pending_coinbase)
   ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 
-let genesis : t Lazy.t =
+let genesis ~genesis_ledger_hash : t =
+  let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
+  { non_snark= Non_snark.genesis ~genesis_ledger_hash
+  ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
+
+let negative_one =
   lazy
-    (let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
-     { non_snark= Lazy.force Non_snark.dummy
-     ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase })
+    (genesis
+       ~genesis_ledger_hash:
+         (Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t)))
 
 let var_of_t ({pending_coinbase_hash; non_snark} : t) : var =
   let non_snark = Non_snark.var_of_t non_snark in

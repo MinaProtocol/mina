@@ -8,7 +8,9 @@ module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 let genesis_root_identifier =
   lazy
     (let open Root_identifier.Stable.Latest in
-    { state_hash= With_hash.hash (Lazy.force Genesis_protocol_state.t)
+    (*TODO: needs to be Genesis_protocol_state.t with the genesis ledger*)
+    { state_hash=
+        With_hash.hash (Lazy.force Genesis_protocol_state.compile_time_genesis)
     ; frontier_hash= Frontier_hash.empty })
 
 let with_file ?size filename access_level ~f =

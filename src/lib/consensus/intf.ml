@@ -469,10 +469,13 @@ module type S = sig
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
+        -> genesis_ledger_hash:Ledger_hash.t
         -> Value.t
 
       val create_genesis :
-        negative_one_protocol_state_hash:Coda_base.State_hash.t -> Value.t
+           negative_one_protocol_state_hash:Coda_base.State_hash.t
+        -> genesis_ledger_hash:Ledger_hash.t
+        -> Value.t
 
       val length_in_triples : int
 

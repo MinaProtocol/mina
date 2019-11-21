@@ -29,11 +29,12 @@ let maybe_sleep s = after (Time.Span.of_sec s)
 let maybe_sleep _ = Deferred.unit
 
 [%%endif]
+
 (*TODO: genesis ledger hash, genesis timestamp and epoch size or all the consensus constants*)
-let chain_id =
+let chain_id ~genesis_ledger =
   lazy
     (let genesis_state_hash =
-       (Lazy.force Coda_state.Genesis_protocol_state.t).hash
+       (Lazy.force (Coda_state.Genesis_protocol_state.t ~genesis_ledger)).hash
        |> State_hash.to_base58_check
      in
      let all_snark_keys =
@@ -662,7 +663,7 @@ let daemon logger =
              ; logger
              ; target_peer_count= 8
              ; conf_dir
-             ; chain_id= Lazy.force chain_id
+             ; chain_id= Lazy.force (chain_id ~genesis_ledger:Genesis_ledger.t)
              ; initial_peers= initial_peers_cleaned
              ; addrs_and_ports
              ; trust_system

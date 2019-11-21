@@ -106,7 +106,7 @@ let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
 
 let genesis : value lazy_t =
   lazy
-    { Poly.blockchain_state= Lazy.force Blockchain_state.genesis
+    { Poly.blockchain_state= Lazy.force Blockchain_state.negative_one
     ; consensus_transition= Consensus.Data.Consensus_transition.genesis
     ; supply_increase= Currency.Amount.zero
     ; sok_digest=
