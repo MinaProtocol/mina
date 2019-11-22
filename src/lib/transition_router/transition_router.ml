@@ -8,7 +8,11 @@ open O1trace
 let create_bufferred_pipe ?name () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
-let is_transition_for_bootstrap ~logger root_state new_transition =
+let is_transition_for_bootstrap ~logger frontier new_transition =
+  let root_state =
+    Transition_frontier.root frontier
+    |> Transition_frontier.Breadcrumb.protocol_state
+  in
   let new_state =
     External_transition.Initial_validated.protocol_state new_transition
   in
@@ -19,10 +23,6 @@ let is_transition_for_bootstrap ~logger root_state new_transition =
       (Logger.extend logger
          [ ( "selection_context"
            , `String "Transition_router.is_transition_for_bootstrap" ) ])
-
-let get_root_state frontier =
-  Transition_frontier.root frontier
-  |> Transition_frontier.Breadcrumb.protocol_state
 
 let start_transition_frontier_controller ~logger ~trust_system ~verifier
     ~network ~time_controller ~proposer_transition_reader
@@ -104,7 +104,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
             ~transition_reader_ref ~transition_writer_ref ~frontier_w
             ~initialization_finish_signal new_frontier ) )
 
-let _download_best_tip ~logger ~network ~verifier ~trust_system
+let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer =
   let num_peers = 8 in
   let peers = Coda_networking.random_peers network num_peers in
@@ -171,17 +171,8 @@ let _download_best_tip ~logger ~network ~verifier ~trust_system
   in
   best_tip
 
-let _load_frontier ~logger ~verifier ~time_controller
-    ~persistent_frontier_location ~persistent_root_location
+let load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
     ~consensus_local_state =
-  let persistent_frontier =
-    Transition_frontier.Persistent_frontier.create ~logger ~verifier
-      ~time_controller ~directory:persistent_frontier_location
-  in
-  let persistent_root =
-    Transition_frontier.Persistent_root.create ~logger
-      ~directory:persistent_root_location
-  in
   match%map
     Transition_frontier.load ~logger ~verifier ~consensus_local_state
       ~persistent_root ~persistent_frontier ()
@@ -198,7 +189,7 @@ let _load_frontier ~logger ~verifier ~time_controller
   | Error (`Failure e) ->
       failwith ("failed to initialize transition frontier: " ^ e)
 
-let _wait_for_high_connectivity ~logger ~network =
+let wait_for_high_connectivity ~logger ~network =
   let connectivity_time_upperbound = 60.0 in
   let high_connectivity =
     Coda_networking.on_first_high_connectivity network ~f:Fn.id
@@ -218,15 +209,70 @@ let _wait_for_high_connectivity ~logger ~network =
         Logger.info logger ~location:__LOC__ ~module_:__MODULE__
           "Already connected to enough peers, start bootstrapping" ) ]
 
-(*
-let initialize ~logger ~network ~verifier ~trust_system ~frontier
-  ~time_controller ~ledger_db ~frontier_w ~proposer_transition_reader
-  ~clear_reader ~verified_transition_writer ~transition_reader_ref
-  ~transition_writer_ref ~most_recent_valid_block_writer =
-  let%bind () =
-    wait_for_high_connectivity ~logger ~network
-  in 
-*)
+let _initialize ~logger ~network ~verifier ~trust_system ~time_controller
+    ~frontier_w ~proposer_transition_reader ~clear_reader
+    ~verified_transition_writer ~transition_reader_ref ~transition_writer_ref
+    ~most_recent_valid_block_writer ~persistent_root_location
+    ~persistent_frontier_location ~consensus_local_state =
+  let initialization_finish_signal = ref false in
+  let persistent_frontier =
+    Transition_frontier.Persistent_frontier.create ~logger ~verifier
+      ~time_controller ~directory:persistent_frontier_location
+  in
+  let persistent_root =
+    Transition_frontier.Persistent_root.create ~logger
+      ~directory:persistent_root_location
+  in
+  let%bind () = wait_for_high_connectivity ~logger ~network in
+  match%bind
+    Deferred.both
+      (download_best_tip ~logger ~network ~verifier ~trust_system
+         ~most_recent_valid_block_writer)
+      (load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
+         ~consensus_local_state)
+  with
+  | _, None ->
+      let%map initial_root_transition =
+        Persistent_frontier.(
+          with_instance_exn persistent_frontier ~f:Instance.get_root_transition)
+        >>| Result.ok_or_failwith
+      in
+      start_bootstrap_controller ~logger ~trust_system ~verifier ~network
+        ~time_controller ~proposer_transition_reader
+        ~verified_transition_writer ~clear_reader ~transition_reader_ref
+        ~consensus_local_state ~transition_writer_ref ~frontier_w
+        ~initialization_finish_signal ~persistent_root ~persistent_frontier
+        ~initial_root_transition
+  | None, Some frontier ->
+      return
+      @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
+           ~network ~time_controller ~proposer_transition_reader
+           ~verified_transition_writer ~clear_reader ~collected_transitions:[]
+           ~transition_reader_ref ~transition_writer_ref ~frontier_w
+           ~initialization_finish_signal frontier
+  | Some best_tip, Some frontier ->
+      if
+        is_transition_for_bootstrap ~logger frontier
+          (best_tip |> Envelope.Incoming.data)
+      then
+        let initial_root_transition =
+          Transition_frontier.(Breadcrumb.validated_transition (root frontier))
+        in
+        let%map () = Transition_frontier.close frontier in
+        start_bootstrap_controller ~logger ~trust_system ~verifier ~network
+          ~time_controller ~proposer_transition_reader
+          ~verified_transition_writer ~clear_reader ~transition_reader_ref
+          ~consensus_local_state ~transition_writer_ref ~frontier_w
+          ~initialization_finish_signal ~persistent_root ~persistent_frontier
+          ~initial_root_transition
+      else
+        return
+        @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
+             ~network ~time_controller ~proposer_transition_reader
+             ~verified_transition_writer ~clear_reader
+             ~collected_transitions:[best_tip] ~transition_reader_ref
+             ~transition_writer_ref ~frontier_w ~initialization_finish_signal
+             frontier
 
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~consensus_local_state ~persistent_root ~persistent_frontier
@@ -367,9 +413,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
               (let%map () =
                  match Broadcast_pipe.Reader.peek frontier_r with
                  | Some frontier ->
-                     if
-                       is_transition_for_bootstrap ~logger
-                         (get_root_state frontier) transition
+                     if is_transition_for_bootstrap ~logger frontier transition
                      then (
                        Strict_pipe.Writer.kill !transition_writer_ref ;
                        don't_wait_for
