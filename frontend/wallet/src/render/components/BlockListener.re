@@ -14,30 +14,43 @@ let newBlock = NewBlock.make();
 let newBlockAst = gql(. newBlock##query);
 
 module SubscriptionWrapper = {
-    [@react.component]
-    let make = (~children, ~subscribeToMore) => {
+  [@react.component]
+  let make = (~children, ~subscribeToMore) => {
     let _ =
-        React.useEffect0(() => {
-            subscribeToMore();
-            None;
-        });
-        children
-    };
+      React.useEffect0(() => {
+        subscribeToMore();
+        None;
+      });
+    children;
+  };
 };
 
 [@react.component]
-let make = (~children, ~response: Transactions.TransactionsQuery.renderPropObj) => 
-    <SubscriptionWrapper subscribeToMore={() => 
-        response.subscribeToMore(
-            ~document=newBlockAst,
-            ~updateQuery=
-                (prev, _) => {
-                    response.refetch(None) |> ignore;
-                    prev
-                },
-                (),
-            );
-        }
-    >
-        {children}
-    </SubscriptionWrapper>;
+let make =
+    (
+      ~children,
+      ~subscribeToMore:
+         (
+           ~document: ReasonApolloTypes.queryString,
+           ~variables: Js.Json.t=?,
+           ~updateQuery: ReasonApolloQuery.updateQuerySubscriptionT=?,
+           ~onError: ReasonApolloQuery.onErrorT=?,
+           unit
+         ) =>
+         unit,
+      ~refetch,
+    ) =>
+  <SubscriptionWrapper
+    subscribeToMore={() =>
+      subscribeToMore(
+        ~document=newBlockAst,
+        ~updateQuery=
+          (prev, _) => {
+            refetch(None) |> ignore;
+            prev;
+          },
+        (),
+      )
+    }>
+    children
+  </SubscriptionWrapper>;
