@@ -292,7 +292,7 @@ module NavWrapper = {
           style([
             position(`relative),
             width(`auto),
-            maxWidth(px(500)),
+            maxWidth(`rem(24.)),
             order(2),
             NavStyle.bottomNudgeOffset(0.5),
             media(
