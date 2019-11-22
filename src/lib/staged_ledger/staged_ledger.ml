@@ -1946,7 +1946,6 @@ let%test_module "test" =
         Pending_coinbase.merkle_root (Sl.pending_coinbase_collection sl_after)
       in
       let coinbase_data =
-        (*let (p1, p2_opt) = Staged_ledger_diff.diff diff in*)
         let create amount fee_transfer =
           Coinbase.create ~amount
             ~proposer:(Staged_ledger_diff.creator diff)
@@ -1982,9 +1981,8 @@ let%test_module "test" =
         let (), x = Or_error.ok_exn (run_and_check comp ()) in
         x
       in
-      assert (
-        Pending_coinbase.(
-          Hash.equal unchecked_root_after checked_root_after_update) )
+      [%test_eq: Pending_coinbase.Hash.t] unchecked_root_after
+        checked_root_after_update
 
     let test_pending_coinbase :
            Ledger.init_state
