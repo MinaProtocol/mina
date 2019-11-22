@@ -5,13 +5,13 @@ module Styles = {
       marginLeft(`auto),
       marginRight(`auto),
       maxWidth(`rem(22.43)),
-      media("(min-width: 60rem)", [maxWidth(`rem(50.66)),]),
-      media("(min-width: 105rem)", [maxWidth(`rem(66.5))]),
+      media("(min-width: 60rem)", [maxWidth(`rem(50.66))]),
+      media("(min-width: 105rem)", [maxWidth(`rem(68.))]),
     ]);
 
   let lineBreak =
     style([
-      height(px(4)),
+      height(px(2)),
       borderTop(px(1), `dashed, Style.Colors.marine),
       borderLeft(`zero, solid, transparent),
       borderBottom(px(1), `dashed, Style.Colors.marine),
@@ -28,7 +28,7 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       width(`percent(100.)),
-      color(Style.Colors.slate),
+      color(Style.Colors.saville),
       textAlign(`center),
       margin2(~v=rem(3.5), ~h=`zero),
     ]);
@@ -43,7 +43,38 @@ module Styles = {
     ]);
 
   let heroText =
-    merge([header, style([maxWidth(`px(500)), textAlign(`left)])]);
+    merge([
+      header,
+      style([
+        maxWidth(`px(500)),
+        marginLeft(`rem(2.1875)),
+        textAlign(`left),
+        color(Style.Colors.midnight),
+      ]),
+    ]);
+
+  let heroHeading = merge([Style.H1.hero, style([marginTop(`rem(1.53))])]);
+
+  let heroCopy =
+    merge([
+      Style.Body.basic,
+      style([marginTop(`rem(3.)), marginBottom(`rem(3.375))]),
+    ]);
+
+  let ctaButton =
+    merge([
+      Style.Body.basic_semibold,
+      style([
+        width(`rem(14.)),
+        height(`rem(3.)),
+        backgroundColor(Style.Colors.hyperlink),
+        borderRadius(`px(6)),
+        textDecoration(`none),
+        color(white),
+        padding2(~v=`px(12), ~h=`px(24)),
+        textAlign(`center),
+      ]),
+    ]);
 
   let buttonRow =
     style([
@@ -64,7 +95,7 @@ module Styles = {
           gridTemplateRows([`repeat((`num(2), `rem(11.5)))]),
         ],
       ),
-      gridRowGap(rem(2.625)),
+      gridRowGap(rem(2.5625)),
       gridColumnGap(rem(3.)),
       justifyContent(`center),
       marginLeft(`auto),
@@ -79,15 +110,17 @@ let make = () => {
   <div className=Styles.page>
     <div className=Styles.heroRow>
       <div className=Styles.heroText>
-        <h1 className=Style.H1.hero>
+        <h1 className=Styles.heroHeading>
           {React.string("Coda Developer Portal")}
         </h1>
-        <p className=Style.Body.basic>
+        <p className=Styles.heroCopy>
           {React.string(
              "We're an open-source community of engineers, cryptographers, researchers, and dreamers. Help us build the first succinct blockchain.",
            )}
         </p>
-        <br />
+        <a href="/docs/getting-started/" className=Styles.ctaButton>
+          {React.string({js| Get Started →|js})}
+        </a>
       </div>
       <Svg
         link="/static/img/Developers.svg"

@@ -3,7 +3,7 @@ module Styles = {
 
   let ctaButton =
     style([
-      background(Style.Colors.lightBlue(0.1)),
+      background(Style.Colors.hyperlinkAlpha(0.3 *. 0.2)),
       borderRadius(`px(6)),
       textDecoration(`none),
       padding(`rem(1.43)),
@@ -33,8 +33,7 @@ module Styles = {
       ]),
     ]);
 
-  let ctaContent =
-    style([display(`flex), selector("p", [fontSize(`px(36))])]);
+  let ctaContent = style([display(`flex)]);
 
   let ctaText = style([width(`percent(100.))]);
 
@@ -49,7 +48,11 @@ module Styles = {
       ]),
     ]);
 
-  let ctaBody = merge([Style.Body.basic, style([marginTop(`rem(1.))])]);
+  let ctaBody =
+    merge([
+      Style.Body.basic,
+      style([marginTop(`rem(1.)), color(Style.Colors.midnight)]),
+    ]);
 
   let ctaIcon =
     style([
@@ -91,7 +94,7 @@ let make = (~heading, ~text, ~href) => {
             />
           </svg>
         </div>
-        <h4 className=Styles.ctaBody> text </h4>
+        <p className=Styles.ctaBody> text </p>
       </div>
     </div>
   </a>;

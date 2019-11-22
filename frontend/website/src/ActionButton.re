@@ -20,8 +20,7 @@ module Styles = {
       media("(min-width: 82rem)", [height(`rem(6.0))]),
     ]);
 
-  let ctaContent =
-    style([display(`flex), selector("p", [fontSize(`px(36))])]);
+  let ctaContent = style([display(`flex)]);
 
   let ctaText = style([marginLeft(`px(13))]);
 
@@ -65,7 +64,7 @@ let make = (~icon=?, ~heading, ~text, ~href) => {
        }}
       <div className=Styles.ctaText>
         <h2 className=Styles.ctaHeading> heading </h2>
-        <h4 className=Styles.ctaBody> text </h4>
+        <p className=Styles.ctaBody> text </p>
       </div>
     </div>
   </a>;
