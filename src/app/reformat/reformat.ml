@@ -9,6 +9,7 @@ let dirs_whitelist =
   ; "_build"
   ; "stationary"
   ; ".un~"
+  ; "frontend"
   ; "external"
   ; "ocamlformat"
   ; "node_modules"
