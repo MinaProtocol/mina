@@ -345,7 +345,9 @@ module type Transition_router_intf = sig
                                  * [`Time_received of Block_time.t] )
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> most_recent_valid_block:External_transition.t Broadcast_pipe.Reader.t
-                               * External_transition.t Broadcast_pipe.Writer.t
+    -> most_recent_valid_block:External_transition.Initial_validated.t
+                               Broadcast_pipe.Reader.t
+                               * External_transition.Initial_validated.t
+                                 Broadcast_pipe.Writer.t
     -> External_transition.Validated.t Strict_pipe.Reader.t
 end

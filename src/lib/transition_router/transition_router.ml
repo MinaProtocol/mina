@@ -27,11 +27,9 @@ let is_transition_for_bootstrap ~logger frontier new_transition =
 let start_transition_frontier_controller ~logger ~trust_system ~verifier
     ~network ~time_controller ~proposer_transition_reader
     ~verified_transition_writer ~clear_reader ~collected_transitions
-    ~transition_reader_ref ~transition_writer_ref ~frontier_w
-    ~initialization_finish_signal frontier =
+    ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Starting Transition Frontier Controller phase" ;
-  initialization_finish_signal := true ;
   let ( transition_frontier_controller_reader
       , transition_frontier_controller_writer ) =
     create_bufferred_pipe ~name:"transition frontier controller pipe" ()
@@ -55,11 +53,10 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
 let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
     ~time_controller ~proposer_transition_reader ~verified_transition_writer
     ~clear_reader ~transition_reader_ref ~transition_writer_ref
-    ~consensus_local_state ~frontier_w ~initialization_finish_signal
-    ~initial_root_transition ~persistent_root ~persistent_frontier =
+    ~consensus_local_state ~frontier_w ~initial_root_transition
+    ~persistent_root ~persistent_frontier =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Starting Bootstrap Controller phase" ;
-  initialization_finish_signal := false ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
     create_bufferred_pipe ~name:"bootstrap controller pipe" ()
   in
@@ -92,7 +89,6 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
                    "Already connected to enough peers, start bootstrapping" )
              ]
          in
-         initialization_finish_signal := true ;
          Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
            ~consensus_local_state ~transition_reader:!transition_reader_ref
            ~persistent_frontier ~persistent_root ~initial_root_transition)
@@ -102,7 +98,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
             ~network ~time_controller ~proposer_transition_reader
             ~verified_transition_writer ~clear_reader ~collected_transitions
             ~transition_reader_ref ~transition_writer_ref ~frontier_w
-            ~initialization_finish_signal new_frontier ) )
+            new_frontier ) )
 
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer =
@@ -151,16 +147,14 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                         enveloped_candidate_best_tip
                         ->
                        let candidate_best_tip =
-                         With_hash.data @@ fst
-                         @@ Envelope.Incoming.data enveloped_candidate_best_tip
+                         Envelope.Incoming.data enveloped_candidate_best_tip
                        in
                        let existing_best_tip =
-                         With_hash.data @@ fst
-                         @@ Envelope.Incoming.data enveloped_existing_best_tip
+                         Envelope.Incoming.data enveloped_existing_best_tip
                        in
                        if
-                         External_transition.compare candidate_best_tip
-                           existing_best_tip
+                         External_transition.Initial_validated.compare
+                           candidate_best_tip existing_best_tip
                          > 0
                        then (
                          don't_wait_for
@@ -184,7 +178,8 @@ let load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
         "persistent frontier unexpectedly malformed -- this should not happen \
          with retry enabled"
   | Error `Bootstrap_required ->
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ "" ;
+      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+        "Fast forward has not been implemented. Bootstrapping instead." ;
       None
   | Error (`Failure e) ->
       failwith ("failed to initialize transition frontier: " ^ e)
@@ -209,20 +204,11 @@ let wait_for_high_connectivity ~logger ~network =
         Logger.info logger ~location:__LOC__ ~module_:__MODULE__
           "Already connected to enough peers, start bootstrapping" ) ]
 
-let _initialize ~logger ~network ~verifier ~trust_system ~time_controller
+let initialize ~logger ~network ~verifier ~trust_system ~time_controller
     ~frontier_w ~proposer_transition_reader ~clear_reader
     ~verified_transition_writer ~transition_reader_ref ~transition_writer_ref
-    ~most_recent_valid_block_writer ~persistent_root_location
-    ~persistent_frontier_location ~consensus_local_state =
-  let initialization_finish_signal = ref false in
-  let persistent_frontier =
-    Transition_frontier.Persistent_frontier.create ~logger ~verifier
-      ~time_controller ~directory:persistent_frontier_location
-  in
-  let persistent_root =
-    Transition_frontier.Persistent_root.create ~logger
-      ~directory:persistent_root_location
-  in
+    ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
+    ~consensus_local_state =
   let%bind () = wait_for_high_connectivity ~logger ~network in
   match%bind
     Deferred.both
@@ -241,15 +227,13 @@ let _initialize ~logger ~network ~verifier ~trust_system ~time_controller
         ~time_controller ~proposer_transition_reader
         ~verified_transition_writer ~clear_reader ~transition_reader_ref
         ~consensus_local_state ~transition_writer_ref ~frontier_w
-        ~initialization_finish_signal ~persistent_root ~persistent_frontier
-        ~initial_root_transition
+        ~persistent_root ~persistent_frontier ~initial_root_transition
   | None, Some frontier ->
       return
       @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
            ~network ~time_controller ~proposer_transition_reader
            ~verified_transition_writer ~clear_reader ~collected_transitions:[]
-           ~transition_reader_ref ~transition_writer_ref ~frontier_w
-           ~initialization_finish_signal frontier
+           ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier
   | Some best_tip, Some frontier ->
       if
         is_transition_for_bootstrap ~logger frontier
@@ -263,16 +247,135 @@ let _initialize ~logger ~network ~verifier ~trust_system ~time_controller
           ~time_controller ~proposer_transition_reader
           ~verified_transition_writer ~clear_reader ~transition_reader_ref
           ~consensus_local_state ~transition_writer_ref ~frontier_w
-          ~initialization_finish_signal ~persistent_root ~persistent_frontier
-          ~initial_root_transition
+          ~persistent_root ~persistent_frontier ~initial_root_transition
       else
         return
         @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
              ~network ~time_controller ~proposer_transition_reader
              ~verified_transition_writer ~clear_reader
              ~collected_transitions:[best_tip] ~transition_reader_ref
-             ~transition_writer_ref ~frontier_w ~initialization_finish_signal
-             frontier
+             ~transition_writer_ref ~frontier_w frontier
+
+let wait_till_gensis ~logger ~time_controller =
+  let module Time = Coda_base.Block_time in
+  let now = Time.now time_controller in
+  try Consensus.Hooks.is_genesis now |> ignore
+  with Invalid_argument _ ->
+    let time_till_genesis =
+      Time.diff Consensus.Constants.genesis_state_timestamp now
+    in
+    Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+      ~metadata:
+        [ ( "time_till_genesis"
+          , `Int (Int64.to_int_exn (Time.Span.to_ms time_till_genesis)) ) ]
+      "Node started before genesis: waiting $time_till_genesis milliseconds \
+       before running transition router" ;
+    let seconds_to_wait = 30 in
+    let milliseconds_to_wait = Int64.of_int_exn (seconds_to_wait * 1000) in
+    let rec wait_loop tm =
+      if Int64.(tm <= zero) then ()
+      else (
+        Core.Unix.sleep seconds_to_wait ;
+        let tm_remaining = Int64.(tm - milliseconds_to_wait) in
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          "Still waiting $tm_remaining milliseconds before running transition \
+           router"
+          ~metadata:[("tm_remaining", `Int (Int64.to_int_exn tm_remaining))] ;
+        wait_loop tm_remaining )
+    in
+    wait_loop @@ Time.Span.to_ms time_till_genesis
+
+let _run ~logger ~trust_system ~verifier ~network ~time_controller
+    ~consensus_local_state ~persistent_root_location
+    ~persistent_frontier_location
+    ~frontier_broadcast_pipe:(frontier_r, frontier_w)
+    ~network_transition_reader ~proposer_transition_reader
+    ~most_recent_valid_block:( most_recent_valid_block_reader
+                             , most_recent_valid_block_writer ) =
+  let initialization_finish_signal = Ivar.create () in
+  let clear_reader, clear_writer =
+    Strict_pipe.create ~name:"clear" Synchronous
+  in
+  let verified_transition_reader, verified_transition_writer =
+    create_bufferred_pipe ~name:"verified transitions" ()
+  in
+  let transition_reader, transition_writer =
+    create_bufferred_pipe ~name:"transition pipe" ()
+  in
+  let transition_reader_ref = ref transition_reader in
+  let transition_writer_ref = ref transition_writer in
+  wait_till_gensis ~logger ~time_controller ;
+  let valid_transition_reader, valid_transition_writer =
+    create_bufferred_pipe ~name:"valid transitions" ()
+  in
+  Initial_validator.run ~logger ~trust_system ~verifier
+    ~transition_reader:network_transition_reader ~valid_transition_writer
+    ~initialization_finish_signal ;
+  let persistent_frontier =
+    Transition_frontier.Persistent_frontier.create ~logger ~verifier
+      ~time_controller ~directory:persistent_frontier_location
+  in
+  let persistent_root =
+    Transition_frontier.Persistent_root.create ~logger
+      ~directory:persistent_root_location
+  in
+  upon
+    (initialize ~logger ~network ~verifier ~trust_system ~persistent_frontier
+       ~persistent_root ~time_controller ~frontier_w
+       ~proposer_transition_reader ~clear_reader ~verified_transition_writer
+       ~transition_reader_ref ~transition_writer_ref
+       ~most_recent_valid_block_writer ~consensus_local_state) (fun () ->
+      Ivar.fill_if_empty initialization_finish_signal () ;
+      don't_wait_for
+      @@ Strict_pipe.Reader.iter valid_transition_reader
+           ~f:(fun enveloped_transition ->
+             let incoming_transition =
+               Envelope.Incoming.data enveloped_transition
+             in
+             let current_transition =
+               Broadcast_pipe.Reader.peek most_recent_valid_block_reader
+             in
+             let%bind () =
+               if
+                 Consensus.Hooks.select
+                   ~existing:
+                     (External_transition.Initial_validated.consensus_state
+                        current_transition)
+                   ~candidate:
+                     (External_transition.Initial_validated.consensus_state
+                        incoming_transition)
+                   ~logger
+                 = `Take
+               then
+                 Broadcast_pipe.Writer.write most_recent_valid_block_writer
+                   incoming_transition
+               else Deferred.unit
+             in
+             match Broadcast_pipe.Reader.peek frontier_r with
+             | Some frontier ->
+                 if
+                   is_transition_for_bootstrap ~logger frontier
+                     incoming_transition
+                 then (
+                   Strict_pipe.Writer.kill !transition_writer_ref ;
+                   let initial_root_transition =
+                     Transition_frontier.(
+                       Breadcrumb.validated_transition (root frontier))
+                   in
+                   let%bind () =
+                     Strict_pipe.Writer.write clear_writer `Clear
+                   in
+                   let%map () = Transition_frontier.close frontier in
+                   start_bootstrap_controller ~logger ~trust_system ~verifier
+                     ~network ~time_controller ~proposer_transition_reader
+                     ~verified_transition_writer ~clear_reader
+                     ~transition_reader_ref ~transition_writer_ref
+                     ~consensus_local_state ~frontier_w ~persistent_root
+                     ~persistent_frontier ~initial_root_transition )
+                 else Deferred.unit
+             | None ->
+                 Deferred.unit ) ) ;
+  verified_transition_reader
 
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~consensus_local_state ~persistent_root ~persistent_frontier
@@ -280,7 +383,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~network_transition_reader ~proposer_transition_reader
     ~most_recent_valid_block:( most_recent_valid_block_reader
                              , most_recent_valid_block_writer ) =
-  let initialization_finish_signal = ref false in
+  let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
     Strict_pipe.create ~name:"clear" Synchronous
   in
@@ -345,8 +448,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                ~verifier ~network ~time_controller ~proposer_transition_reader
                ~verified_transition_writer ~clear_reader
                ~collected_transitions:[] ~transition_reader_ref
-               ~transition_writer_ref ~frontier_w ~initialization_finish_signal
-               frontier ;
+               ~transition_writer_ref ~frontier_w frontier ;
              Deferred.unit )
            else
              let initial_root_transition =
@@ -358,8 +460,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                ~network ~time_controller ~proposer_transition_reader
                ~verified_transition_writer ~clear_reader ~transition_reader_ref
                ~consensus_local_state ~transition_writer_ref ~frontier_w
-               ~initialization_finish_signal ~persistent_root
-               ~persistent_frontier ~initial_root_transition
+               ~persistent_root ~persistent_frontier ~initial_root_transition
        | None ->
            let%map initial_root_transition =
              Persistent_frontier.(
@@ -371,8 +472,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
              ~time_controller ~proposer_transition_reader
              ~verified_transition_writer ~clear_reader ~transition_reader_ref
              ~consensus_local_state ~transition_writer_ref ~frontier_w
-             ~initialization_finish_signal ~persistent_root
-             ~persistent_frontier ~initial_root_transition
+             ~persistent_root ~persistent_frontier ~initial_root_transition
      in
      let ( valid_protocol_state_transition_reader
          , valid_protocol_state_transition_writer ) =
@@ -390,7 +490,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
           ~f:(fun enveloped_transition ->
             let transition = Envelope.Incoming.data enveloped_transition in
             let current_consensus_state =
-              External_transition.consensus_state
+              External_transition.Initial_validated.consensus_state
                 (Broadcast_pipe.Reader.peek most_recent_valid_block_reader)
             in
             if
@@ -402,7 +502,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
               = `Take
             then
               Broadcast_pipe.Writer.write most_recent_valid_block_writer
-                (External_transition.Validation.forget_validation transition)
+                transition
             else Deferred.unit )) ;
      don't_wait_for
        (Strict_pipe.Reader.iter_without_pushback
@@ -428,8 +528,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                          ~proposer_transition_reader
                          ~verified_transition_writer ~clear_reader
                          ~transition_reader_ref ~transition_writer_ref
-                         ~consensus_local_state ~frontier_w
-                         ~initialization_finish_signal ~persistent_root
+                         ~consensus_local_state ~frontier_w ~persistent_root
                          ~persistent_frontier ~initial_root_transition )
                      else Deferred.unit
                  | None ->

@@ -39,7 +39,8 @@ type components =
   ; transaction_pool: Network_pool.Transaction_pool.t
   ; snark_pool: Network_pool.Snark_pool.t
   ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
-  ; most_recent_valid_block: External_transition.t Broadcast_pipe.Reader.t }
+  ; most_recent_valid_block:
+      External_transition.Initial_validated.t Broadcast_pipe.Reader.t }
 
 type pipes =
   { validated_transitions_reader:
@@ -771,7 +772,7 @@ let create (config : Config.t) =
               =
             Broadcast_pipe.create
               ( Lazy.force External_transition.genesis
-              |> External_transition.Validation.forget_validation )
+              |> External_transition.Validated.to_initial_validated )
           in
           let valid_transitions =
             trace "transition router" (fun () ->
