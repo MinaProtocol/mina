@@ -5,14 +5,8 @@ include Intf
 module type Unsigned_intf = Unsigned.S
 
 module Extend
-    (Unsigned : Unsigned.S) (Signed : sig
-        type t [@@deriving bin_io]
-    end) (M : sig
-      val to_signed : Unsigned.t -> Signed.t
-
-      val of_signed : Signed.t -> Unsigned.t
-
-      val length : int
+    (Unsigned : Unsigned.S) (M : sig
+        val length : int
     end) : S with type t = Unsigned.t = struct
   ;;
   assert (M.length < Tick.Field.size_in_bits - 3)
@@ -35,22 +29,6 @@ module Extend
 
   include T
   include Hashable.Make (T)
-
-  include Bin_prot.Utils.Make_binable (struct
-    module Binable = Signed
-
-    type t = Unsigned.t
-
-    let to_binable = M.to_signed
-
-    let of_binable = M.of_signed
-  end)
-
-  (* Unsigned comes from an external library, so not actually versioned
-    we assert versioning here, and use tests to assure the serialization
-    doesn't change
-  *)
-  let __versioned__ = ()
 
   include (Unsigned : Unsigned_intf with type t := t)
 
@@ -75,14 +53,44 @@ module Extend
 end
 
 module UInt64 = struct
-  include Extend (Unsigned.UInt64) (Int64)
-            (struct
-              let length = 64
+  module M =
+    Extend
+      (Unsigned.UInt64)
+      (struct
+        let length = 64
+      end)
 
-              let to_signed = Unsigned.UInt64.to_int64
+  module Stable = struct
+    module V1 = struct
+      type t = Unsigned.UInt64.t [@@deriving version {of_binable}]
 
-              let of_signed = Unsigned.UInt64.of_int64
-            end)
+      (* these are defined in the Extend functor, rather than derived, so import them *)
+      [%%define_locally
+      M.
+        ( equal
+        , compare
+        , hash
+        , hash_fold_t
+        , sexp_of_t
+        , t_of_sexp
+        , to_yojson
+        , of_yojson )]
+
+      include Bin_prot.Utils.Make_binable (struct
+        module Binable = Int64
+
+        type t = Unsigned.UInt64.t
+
+        let to_binable = Unsigned.UInt64.to_int64
+
+        let of_binable = Unsigned.UInt64.of_int64
+      end)
+    end
+
+    module Latest = V1
+  end
+
+  include M
 
   let to_uint64 : t -> uint64 = Fn.id
 
@@ -90,21 +98,51 @@ module UInt64 = struct
 end
 
 module UInt32 = struct
-  include Extend (Unsigned.UInt32) (Int32)
-            (struct
-              let length = 32
+  module M =
+    Extend
+      (Unsigned.UInt32)
+      (struct
+        let length = 32
+      end)
 
-              let to_signed = Unsigned.UInt32.to_int32
+  module Stable = struct
+    module V1 = struct
+      type t = Unsigned.UInt32.t [@@deriving version {of_binable}]
 
-              let of_signed = Unsigned.UInt32.of_int32
-            end)
+      (* these are defined in the Extend functor, rather than derived, so import them *)
+      [%%define_locally
+      M.
+        ( equal
+        , compare
+        , hash
+        , hash_fold_t
+        , sexp_of_t
+        , t_of_sexp
+        , to_yojson
+        , of_yojson )]
+
+      include Bin_prot.Utils.Make_binable (struct
+        module Binable = Int32
+
+        type t = Unsigned.UInt32.t
+
+        let to_binable = Unsigned.UInt32.to_int32
+
+        let of_binable = Unsigned.UInt32.of_int32
+      end)
+    end
+
+    module Latest = V1
+  end
+
+  include M
 
   let to_uint32 : t -> uint32 = Fn.id
 
   let of_uint32 : uint32 -> t = Fn.id
 end
 
-(* since we don't have real versioning, check that serialization don't change *)
+(* check that serializations don't change *)
 let%test_module "Unsigned serializations" =
   ( module struct
     let run_test (type t) (module M : Bin_prot.Binable.S with type t = t)
@@ -115,15 +153,15 @@ let%test_module "Unsigned serializations" =
       Bin_prot.Common.blit_buf_bytes buff bytes ~len ;
       Bytes.equal bytes known_good_serialization
 
-    let%test "uint32 serialization" =
+    let%test "UInt32 V1 serialization" =
       let uint32 = UInt32.of_int 9775 in
       let known_good_serialization = Bytes.of_string "\xFE\x2F\x26" in
-      run_test (module UInt32) known_good_serialization uint32
+      run_test (module UInt32.Stable.V1) known_good_serialization uint32
 
-    let%test "uint64 serialization" =
+    let%test "UInt64 V1 serialization" =
       let uint64 = UInt64.of_int64 191797697848L in
       let known_good_serialization =
         Bytes.of_string "\xFC\x38\x9D\x08\xA8\x2C\x00\x00\x00"
       in
-      run_test (module UInt64) known_good_serialization uint64
+      run_test (module UInt64.Stable.V1) known_good_serialization uint64
   end )

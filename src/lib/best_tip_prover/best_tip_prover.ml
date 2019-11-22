@@ -5,9 +5,7 @@ open Async_kernel
 open Coda_transition
 
 module type Inputs_intf = sig
-  include Transition_frontier.Inputs_intf
-
-  module Transition_frontier : Coda_intf.Transition_frontier_intf
+  module Transition_frontier : module type of Transition_frontier
 end
 
 module Make (Inputs : Inputs_intf) :
@@ -15,7 +13,7 @@ module Make (Inputs : Inputs_intf) :
   with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
-  module Merkle_list_prover = Merkle_list_prover.Make (struct
+  module Merkle_list_prover = Merkle_list_prover.Make_ident (struct
     type value = External_transition.Validated.t
 
     type context = Transition_frontier.t
@@ -50,7 +48,8 @@ module Make (Inputs : Inputs_intf) :
     let open Option.Let_syntax in
     let%map () =
       Option.some_if
-        (Transition_frontier.best_tip_path_length_exn frontier = max_length)
+        ( Transition_frontier.best_tip_path_length_exn frontier
+        = Transition_frontier.global_max_length )
         ()
     in
     let best_tip_breadcrumb = Transition_frontier.best_tip frontier in
@@ -103,8 +102,8 @@ module Make (Inputs : Inputs_intf) :
              ( Error.of_string
              @@ sprintf
                   !"Peer should have given a proof of length %d but got %d"
-                  max_length merkle_list_length )
-           (Int.equal max_length merkle_list_length))
+                  Transition_frontier.global_max_length merkle_list_length )
+           (Int.equal Transition_frontier.global_max_length merkle_list_length))
     in
     let best_tip_with_hash =
       With_hash.of_data best_tip ~hash_data:External_transition.state_hash
@@ -131,6 +130,5 @@ module Make (Inputs : Inputs_intf) :
 end
 
 include Make (struct
-  include Transition_frontier.Inputs
   module Transition_frontier = Transition_frontier
 end)

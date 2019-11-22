@@ -39,7 +39,7 @@ module Index = struct
   end
 
   include (
-    Bits.Vector.Make (Vector) : Bits_intf.Convertable_bits with type t := t)
+    Bits.Vector.Make (Vector) : Bits_intf.Convertible_bits with type t := t)
 
   let fold_bits = fold
 
@@ -114,7 +114,7 @@ module Stable = struct
 end]
 
 (* bin_io, version omitted *)
-type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare]
+type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare, yojson]
 
 [%%define_locally
 Stable.Latest.(public_key)]

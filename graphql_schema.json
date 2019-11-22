@@ -34,19 +34,15 @@
             },
             {
               "name": "newBlock",
-              "description": "Event that triggers when a new block is created that either contains a transaction with the specified public key, or was produced by it",
+              "description": "Event that triggers when a new block is created that either contains a transaction with the specified public key, or was produced by it. If no public key is provided, then the event will trigger for every new block received",
               "args": [
                 {
                   "name": "publicKey",
                   "description": "Public key that is included in the block",
                   "type": {
-                    "kind": "NON_NULL",
-                    "name": null,
-                    "ofType": {
-                      "kind": "SCALAR",
-                      "name": "PublicKey",
-                      "ofType": null
-                    }
+                    "kind": "SCALAR",
+                    "name": "PublicKey",
+                    "ofType": null
                   },
                   "defaultValue": null
                 }
@@ -144,7 +140,7 @@
           "description": null,
           "fields": [
             {
-              "name": "wallet",
+              "name": "publicKey",
               "description": "Public key you wish to start snark-working on; null to stop doing any snark work",
               "args": [],
               "type": {
@@ -158,7 +154,7 @@
           ],
           "inputFields": [
             {
-              "name": "wallet",
+              "name": "publicKey",
               "description": "Public key you wish to start snark-working on; null to stop doing any snark work",
               "type": {
                 "kind": "SCALAR",
@@ -201,8 +197,8 @@
           "description": null,
           "fields": [
             {
-              "name": "wallets",
-              "description": "Public keys of wallets you wish to stake - these must be wallets that are in ownedWallets",
+              "name": "publicKeys",
+              "description": "Public keys of accounts you wish to stake with - these must be accounts that are in trackedAccounts",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -227,8 +223,8 @@
           ],
           "inputFields": [
             {
-              "name": "wallets",
-              "description": "Public keys of wallets you wish to stake - these must be wallets that are in ownedWallets",
+              "name": "publicKeys",
+              "description": "Public keys of accounts you wish to stake with - these must be accounts that are in trackedAccounts",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -260,7 +256,7 @@
           "fields": [
             {
               "name": "lastStaking",
-              "description": "Returns the last wallet public keys that were staking before or empty if there were none",
+              "description": "Returns the public keys that were staking funds previously",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -765,7 +761,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "ReloadWalletsPayload",
+          "name": "ReloadAccountsPayload",
           "description": null,
           "fields": [
             {
@@ -792,7 +788,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "DeleteWalletInput",
+          "name": "DeleteAccountInput",
           "description": null,
           "fields": [
             {
@@ -834,12 +830,12 @@
         },
         {
           "kind": "OBJECT",
-          "name": "DeleteWalletPayload",
+          "name": "DeleteAccountPayload",
           "description": null,
           "fields": [
             {
               "name": "publicKey",
-              "description": "Public key of the deleted wallet",
+              "description": "Public key of the deleted account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -908,7 +904,7 @@
           "fields": [
             {
               "name": "publicKey",
-              "description": "Public key of the unlocked account",
+              "description": "Public key of the locked account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -916,6 +912,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "account",
+              "description": "Details of locked account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Account",
                   "ofType": null
                 }
               },
@@ -1018,6 +1030,22 @@
                   "ofType": null
                 }
               },
+              "isDeprecated": true,
+              "deprecationReason": "use account field instead"
+            },
+            {
+              "name": "account",
+              "description": "Details of unlocked account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Account",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -1029,7 +1057,7 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "AddWalletInput",
+          "name": "AddAccountInput",
           "description": null,
           "fields": [
             {
@@ -1071,12 +1099,12 @@
         },
         {
           "kind": "OBJECT",
-          "name": "AddWalletPayload",
+          "name": "AddAccountPayload",
           "description": null,
           "fields": [
             {
               "name": "publicKey",
-              "description": "Public key of the newly-created wallet",
+              "description": "Public key of the created account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1084,6 +1112,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": true,
+              "deprecationReason": "use account field instead"
+            },
+            {
+              "name": "account",
+              "description": "Details of created account",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Account",
                   "ofType": null
                 }
               },
@@ -1113,7 +1157,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "AddWalletInput",
+                      "name": "AddAccountInput",
                       "ofType": null
                     }
                   },
@@ -1125,7 +1169,69 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "AddWalletPayload",
+                  "name": "AddAccountPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": true,
+              "deprecationReason": "use createAccount instead"
+            },
+            {
+              "name": "createAccount",
+              "description": "Create a new account - this will create a new keypair and store it in the daemon",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "AddAccountInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AddAccountPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "unlockAccount",
+              "description": "Allow transactions to be sent from the unlocked account",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "UnlockInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "UnlockPayload",
                   "ofType": null
                 }
               },
@@ -1160,6 +1266,37 @@
                   "ofType": null
                 }
               },
+              "isDeprecated": true,
+              "deprecationReason": "use unlockAccount instead"
+            },
+            {
+              "name": "lockAccount",
+              "description": "Lock an unlocked account to prevent transaction being sent from it",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "LockInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "LockPayload",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -1191,12 +1328,12 @@
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "use lockAccount instead"
             },
             {
-              "name": "deleteWallet",
-              "description": "Delete a wallet that you own based on its public key",
+              "name": "deleteAccount",
+              "description": "Delete the private key for an account that you track",
               "args": [
                 {
                   "name": "input",
@@ -1206,7 +1343,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "DeleteWalletInput",
+                      "name": "DeleteAccountInput",
                       "ofType": null
                     }
                   },
@@ -1218,7 +1355,54 @@
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "DeleteWalletPayload",
+                  "name": "DeleteAccountPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "deleteWallet",
+              "description": "Delete the private key for an account that you track",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "DeleteAccountInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "DeleteAccountPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": true,
+              "deprecationReason": "use deleteAccount instead"
+            },
+            {
+              "name": "reloadAccounts",
+              "description": "Reload tracked account information from disk",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "ReloadAccountsPayload",
                   "ofType": null
                 }
               },
@@ -1227,19 +1411,19 @@
             },
             {
               "name": "reloadWallets",
-              "description": "Reload wallet information from disk",
+              "description": "Reload tracked account information from disk",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "OBJECT",
-                  "name": "ReloadWalletsPayload",
+                  "name": "ReloadAccountsPayload",
                   "ofType": null
                 }
               },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "use reloadAccounts instead"
             },
             {
               "name": "sendPayment",
@@ -1332,7 +1516,7 @@
             },
             {
               "name": "setStaking",
-              "description": "Set keys you wish to stake with - silently fails if you pass keys not unlocked and tracked in ownedWallets",
+              "description": "Set keys you wish to stake with - silently fails if you pass keys corresponding to accounts that are either locked or in trackedAccounts",
               "args": [
                 {
                   "name": "input",
@@ -1418,6 +1602,198 @@
                   "kind": "OBJECT",
                   "name": "SetSnarkWorkFeePayload",
                   "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "ENUM",
+          "name": "sign",
+          "description": null,
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": [
+            {
+              "name": "PLUS",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "MINUS",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "SignedFee",
+          "description": "Signed fee",
+          "fields": [
+            {
+              "name": "sign",
+              "description": "+/-",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "sign",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "feeMagnitude",
+              "description": "Fee",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "WorkDescription",
+          "description": "Transition from a source ledger to a target ledger with some fee excess and increase in supply ",
+          "fields": [
+            {
+              "name": "sourceLedgerHash",
+              "description": "Base58Check-encoded hash of the source ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "targetLedgerHash",
+              "description": "Base58Check-encoded hash of the target ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "feeExcess",
+              "description": "Total transaction fee that is not accounted for in the transition from source ledger to target ledger",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "SignedFee",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "supplyIncrease",
+              "description": "Increase in total coinbase reward ",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "workId",
+              "description": "Unique identifier for a snark work",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "PendingSnarkWork",
+          "description": "Snark work bundles that are not available in the pool yet",
+          "fields": [
+            {
+              "name": "workBundle",
+              "description": "Work bundle with one or two snark work",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "WorkDescription",
+                      "ofType": null
+                    }
+                  }
                 }
               },
               "isDeprecated": false,
@@ -1818,6 +2194,22 @@
                   "ofType": null
                 }
               },
+              "isDeprecated": true,
+              "deprecationReason": "use fromAccount field instead"
+            },
+            {
+              "name": "fromAccount",
+              "description": "Account of the sender",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Account",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -1831,6 +2223,22 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "PublicKey",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": true,
+              "deprecationReason": "use toAccount field instead"
+            },
+            {
+              "name": "toAccount",
+              "description": "Account of the receiver",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Account",
                   "ofType": null
                 }
               },
@@ -1967,6 +2375,378 @@
           "possibleTypes": null
         },
         {
+          "kind": "OBJECT",
+          "name": "protocolStateProof",
+          "description": null,
+          "fields": [
+            {
+              "name": "a",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "b",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "c",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "delta_prime",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "LIST",
+                      "name": null,
+                      "ofType": {
+                        "kind": "NON_NULL",
+                        "name": null,
+                        "ofType": {
+                          "kind": "SCALAR",
+                          "name": "String",
+                          "ofType": null
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "z",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "NextEpochData",
+          "description": null,
+          "fields": [
+            {
+              "name": "ledger",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "epochLedger",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "seed",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "startCheckpoint",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lockCheckpoint",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "epochLength",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "epochLedger",
+          "description": null,
+          "fields": [
+            {
+              "name": "hash",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "totalCurrency",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "StakingEpochData",
+          "description": null,
+          "fields": [
+            {
+              "name": "ledger",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "epochLedger",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "seed",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "startCheckpoint",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lockCheckpoint",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "epochLength",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "SCALAR",
           "name": "UInt32",
           "description": "String representing a uint32 number in base 10",
@@ -1991,6 +2771,134 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "epochCount",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "minEpochLength",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lastVrfOutput",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "totalCurrency",
+              "description": "Total currency in circulation at this block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt64",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "stakingEpochData",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "StakingEpochData",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "nextEpochData",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "NextEpochData",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "hasAncestorInSameCheckpointWindow",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Boolean",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "checkpoints",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
                   "ofType": null
                 }
               },
@@ -2023,22 +2931,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "UInt32",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "totalCurrency",
-              "description": "Total currency in circulation at this block",
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "UInt64",
                   "ofType": null
                 }
               },
@@ -2187,12 +3079,44 @@
                   "ofType": null
                 }
               },
+              "isDeprecated": true,
+              "deprecationReason": "use creatorAccount field instead"
+            },
+            {
+              "name": "creatorAccount",
+              "description": "Account that produced this block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Account",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
               "name": "stateHash",
               "description": "Base58Check-encoded hash of the state after this block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "stateHashField",
+              "description": "Bigint field-element representation of stateHash",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -2216,6 +3140,22 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "ProtocolState",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "protocolStateProof",
+              "description": "Snark proof of blockchain state",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "protocolStateProof",
                   "ofType": null
                 }
               },
@@ -2420,6 +3360,22 @@
                   "ofType": null
                 }
               },
+              "isDeprecated": true,
+              "deprecationReason": "use account field instead"
+            },
+            {
+              "name": "account",
+              "description": "Account of the current snark worker",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "Account",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -2520,12 +3476,12 @@
         },
         {
           "kind": "OBJECT",
-          "name": "Wallet",
+          "name": "Account",
           "description": "An account record according to the daemon",
           "fields": [
             {
               "name": "publicKey",
-              "description": "The public identity of a wallet",
+              "description": "The public identity of the account",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -2580,6 +3536,18 @@
               "deprecationReason": null
             },
             {
+              "name": "epochDelegateAccount",
+              "description": "The account that you delegated on the staking ledger of the current block",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "Account",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "receiptChainHash",
               "description": "Top hash of the receipt chain merkle-list",
               "args": [],
@@ -2598,6 +3566,18 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "PublicKey",
+                "ofType": null
+              },
+              "isDeprecated": true,
+              "deprecationReason": "use delegateAccount instead"
+            },
+            {
+              "name": "delegateAccount",
+              "description": "The account to which you are delegating - if you are not delegating to anybody, this would return your public key",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "Account",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -2655,6 +3635,113 @@
                 "kind": "SCALAR",
                 "name": "Boolean",
                 "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "AddrsAndPorts",
+          "description": null,
+          "fields": [
+            {
+              "name": "externalIp",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "bindIp",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "discoveryPort",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "clientPort",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "libp2pPort",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "communicationPort",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -3479,6 +4566,38 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "addrsAndPorts",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AddrsAndPorts",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "libp2pPeerId",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -3495,6 +4614,24 @@
           "interfaces": null,
           "enumValues": [
             {
+              "name": "CONNECTING",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "LISTENING",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "OFFLINE",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "BOOTSTRAP",
               "description": null,
               "isDeprecated": false,
@@ -3507,19 +4644,7 @@
               "deprecationReason": null
             },
             {
-              "name": "OFFLINE",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "CONNECTING",
-              "description": null,
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "LISTENING",
+              "name": "CATCHUP",
               "description": null,
               "isDeprecated": false,
               "deprecationReason": null
@@ -3591,7 +4716,31 @@
                     "name": null,
                     "ofType": {
                       "kind": "OBJECT",
-                      "name": "Wallet",
+                      "name": "Account",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": true,
+              "deprecationReason": "use trackedAccounts instead"
+            },
+            {
+              "name": "trackedAccounts",
+              "description": "Accounts for which the daemon tracks the private key",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "Account",
                       "ofType": null
                     }
                   }
@@ -3606,7 +4755,7 @@
               "args": [
                 {
                   "name": "publicKey",
-                  "description": "Public key of wallet being retrieved",
+                  "description": "Public key of account being retrieved",
                   "type": {
                     "kind": "NON_NULL",
                     "name": null,
@@ -3621,7 +4770,34 @@
               ],
               "type": {
                 "kind": "OBJECT",
-                "name": "Wallet",
+                "name": "Account",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "account",
+              "description": "Find any account via a public key",
+              "args": [
+                {
+                  "name": "publicKey",
+                  "description": "Public key of account being retrieved",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "PublicKey",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "OBJECT",
+                "name": "Account",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -3732,7 +4908,7 @@
             },
             {
               "name": "pooledUserCommands",
-              "description": "Retrieve all the user commands submitted by the current daemon that are pending inclusion",
+              "description": "Retrieve all the scheduled user commands for a specified sender that the current daemon sees in their transaction pool. All scheduled commands are queried if no sender is specified",
               "args": [
                 {
                   "name": "publicKey",
@@ -3863,6 +5039,46 @@
                     "ofType": {
                       "kind": "OBJECT",
                       "name": "CompletedWork",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "blockchainVerificationKey",
+              "description": "Experimental: Verification key for blockchain snark",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "pendingSnarkWork",
+              "description": "List of snark works that are yet to be done",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "PendingSnarkWork",
                       "ofType": null
                     }
                   }

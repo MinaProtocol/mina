@@ -3,6 +3,14 @@ open Async
 open Signature_lib
 open Coda_base
 
+module Client = Graphql_lib.Client.Make (struct
+  let address = "graphql"
+
+  let preprocess_variables_string = Fn.id
+
+  let headers = String.Map.empty
+end)
+
 let print_rpc_error error =
   eprintf "RPC connection error: %s\n" (Error.to_string_hum error)
 
@@ -510,8 +518,9 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
       ~doc:
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
-            (default: %d)"
-           (Currency.Fee.to_int Cli_lib.Default.transaction_fee))
+            (default: %d) (minimum: %d)"
+           (Currency.Fee.to_int Cli_lib.Default.transaction_fee)
+           (Currency.Fee.to_int User_command.minimum_fee))
       (optional txn_fee)
   in
   let nonce_flag =
@@ -553,21 +562,28 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          let fee =
            Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
          in
-         let memo =
-           Option.value_map memo_opt ~default:User_command_memo.empty
-             ~f:User_command_memo.create_from_string_exn
-         in
-         let command =
-           Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp body
-         in
-         dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
-           ~success:(fun receipt_chain_hash ->
-             sprintf "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
-               label
-               (User_command.to_base58_check command)
-               (Receipt.Chain_hash.to_string receipt_chain_hash) )
-           ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e))
-           ~join_error:Or_error.join ))
+         if Currency.Fee.( < ) fee User_command.minimum_fee then (
+           printf "Fee %d is less than the minimum, %d\n%!"
+             (Currency.Fee.to_int fee)
+             (Currency.Fee.to_int User_command.minimum_fee) ;
+           exit 29 )
+         else
+           let memo =
+             Option.value_map memo_opt ~default:User_command_memo.empty
+               ~f:User_command_memo.create_from_string_exn
+           in
+           let command =
+             Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp body
+           in
+           dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
+             ~success:(fun receipt_chain_hash ->
+               sprintf
+                 "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
+                 label
+                 (User_command.to_base58_check command)
+                 (Receipt.Chain_hash.to_string receipt_chain_hash) )
+             ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e))
+             ~join_error:Or_error.join ))
 
 let send_payment =
   let body =
@@ -728,7 +744,7 @@ let cancel_transaction =
                    (Error.to_string_hum e) )
                ~join_error:Or_error.join
          | Error _e ->
-             eprintf "could not deserialize user command\n" ;
+             eprintf "Could not deserialize user command\n" ;
              exit 16 ))
 
 let cancel_transaction_graphql =
@@ -934,7 +950,10 @@ let constraint_system_digests =
 let snark_job_list =
   let open Deferred.Let_syntax in
   let open Command.Param in
-  Command.async ~summary:"List of snark jobs in the scan state in JSON format"
+  Command.async
+    ~summary:
+      "List of snark jobs in JSON format that are yet to be included in the \
+       blocks"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
          match%map
            dispatch_join_errors Daemon_rpcs.Snark_job_list.rpc () port
@@ -989,6 +1008,46 @@ let pooled_user_commands =
              @@ Array.to_list response#pooledUserCommands )
          in
          print_string (Yojson.Safe.to_string json_response) ))
+
+let to_signed_fee_exn sign magnitude =
+  let sgn = match sign with `PLUS -> Sgn.Pos | `MINUS -> Neg in
+  let magnitude = Currency.Fee.of_uint64 magnitude in
+  Currency.Fee.Signed.create ~sgn ~magnitude
+
+let pending_snark_work =
+  let open Command.Param in
+  Command.async
+    ~summary:
+      "List of snark works in JSON format that are not available in the pool \
+       yet"
+    (Cli_lib.Background_daemon.graphql_init (return ()) ~f:(fun port () ->
+         Deferred.map
+           (Graphql_client.query_exn
+              (Graphql_queries.Pending_snark_work.make ())
+              port)
+           ~f:(fun response ->
+             let lst =
+               [%to_yojson: Cli_lib.Graphql_types.Pending_snark_work.t]
+                 (Array.map
+                    ~f:(fun bundle ->
+                      Array.map bundle#workBundle ~f:(fun w ->
+                          let f = w#fee_excess in
+                          let hash_of_string =
+                            Coda_base.Frozen_ledger_hash.of_string
+                          in
+                          { Cli_lib.Graphql_types.Pending_snark_work.Work
+                            .work_id= w#work_id
+                          ; fee_excess=
+                              to_signed_fee_exn f#sign f#fee_magnitude
+                          ; supply_increase=
+                              Currency.Amount.of_uint64 w#supply_increase
+                          ; source_ledger_hash=
+                              hash_of_string w#source_ledger_hash
+                          ; target_ledger_hash=
+                              hash_of_string w#target_ledger_hash } ) )
+                    response#pendingSnarkWork)
+             in
+             print_string (Yojson.Safe.to_string lst) ) ))
 
 let start_tracing =
   let open Deferred.Let_syntax in
@@ -1419,6 +1478,7 @@ let advanced =
     ; ("snark-job-list", snark_job_list)
     ; ("pooled-user-commands", pooled_user_commands)
     ; ("snark-pool-list", snark_pool_list)
+    ; ("pending-snark-work", pending_snark_work)
     ; ("unsafe-import", unsafe_import)
     ; ("import", import_key)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)

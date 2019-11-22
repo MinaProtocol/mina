@@ -8,32 +8,25 @@ open Tick
 open Unsigned_extended
 open Snark_bits
 open Fold_lib
-open Module_version
 
 module Time = struct
   (* Milliseconds since epoch *)
+  [%%versioned
   module Stable = struct
     module V1 = struct
+      type t = UInt64.Stable.V1.t [@@deriving sexp, compare, eq, hash, yojson]
+
+      let to_latest = Fn.id
+
       module T = struct
-        type t = UInt64.t
-        [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
+        type typ = t [@@deriving sexp, compare, hash]
+
+        type t = typ [@@deriving sexp, compare, hash]
       end
 
-      include T
-      include Registration.Make_latest_version (T)
+      include Hashable.Make (T)
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "block_time"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   module Controller = struct
     [%%if
@@ -68,10 +61,7 @@ module Time = struct
     [%%endif]
   end
 
-  (* DO NOT add bin_io the deriving list *)
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
-  type t0 = t
 
   module B = Bits
 
@@ -85,29 +75,17 @@ module Time = struct
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 
   module Span = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t = UInt64.t [@@deriving bin_io, sexp, compare, version]
-        end
+        type t = UInt64.Stable.V1.t [@@deriving sexp, compare]
 
-        include T
-        include Registration.Make_latest_version (T)
+        let to_latest = Fn.id
       end
+    end]
 
-      module Latest = V1
+    type t = Stable.Latest.t [@@deriving sexp, compare]
 
-      module Module_decl = struct
-        let name = "block_time_span"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
-
-    include Stable.Latest
     module Bits = B.UInt64
     include B.Snarkable.UInt64 (Tick)
 
@@ -115,6 +93,8 @@ module Time = struct
 
     let to_time_ns_span s =
       Time_ns.Span.of_ms (Int64.to_float (UInt64.to_int64 s))
+
+    let to_string_hum s = to_time_ns_span s |> Time_ns.Span.to_string_hum
 
     let to_ms = UInt64.to_int64
 
@@ -137,9 +117,12 @@ module Time = struct
     let ( >= ) = UInt64.( >= )
 
     let min = UInt64.min
+
+    let zero = UInt64.zero
   end
 
   include Comparable.Make (Stable.Latest)
+  include Hashable.Make (Stable.Latest)
 
   let of_time t =
     UInt64.of_int64

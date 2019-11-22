@@ -45,7 +45,7 @@ module Make (Action : Action_intf) : sig
 
   (** Set up the trust system. Pass the directory to store the trust database
       in. *)
-  val create : db_dir:string -> t
+  val create : string -> t
 
   (** Get a fake trust system, for tests. *)
   val null : unit -> t

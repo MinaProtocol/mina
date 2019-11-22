@@ -127,7 +127,8 @@ end
 
 module Intf = Merkle_ledger.Intf
 
-module In_memory_kvdb : Intf.Key_value_database = struct
+module In_memory_kvdb : Intf.Key_value_database with type config := string =
+struct
   module Bigstring_frozen = struct
     module T = struct
       include Bigstring.Stable.V1
@@ -157,7 +158,7 @@ module In_memory_kvdb : Intf.Key_value_database = struct
 
   let get_uuid t = t.uuid
 
-  let create ~directory:_ =
+  let create _ =
     {uuid= Uuid_unix.create (); table= Bigstring_frozen.Table.create ()}
 
   let close _ = ()
@@ -197,20 +198,8 @@ module Key = struct
   let empty = Account.empty.public_key
 
   let gen_keys num_keys =
-    (* TODO : the Quickcheck generator for Public_key.Compressed produces duplicates
-       as a workaround, we generate extra keys, remove duplicates, and take as many as needed
-       Issue #1078 notes the problem with the generators
-     *)
-    let num_to_gen = num_keys + (num_keys / 4) in
-    let more_than_enough_keys =
-      Quickcheck.random_value
-        (Quickcheck.Generator.list_with_length num_to_gen gen)
-    in
-    let unique_keys =
-      List.dedup_and_sort ~compare:Stable.Latest.compare more_than_enough_keys
-    in
-    assert (List.length unique_keys >= num_keys) ;
-    List.take unique_keys num_keys
+    Quickcheck.random_value
+      (Quickcheck.Generator.list_with_length num_keys gen)
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)

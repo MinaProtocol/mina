@@ -60,7 +60,7 @@ let create_ledger_and_transactions num_transitions =
                 (add acc
                    (User_command.Payload.fee (t :> User_command.t).payload)) )
         in
-        Fee_transfer.One (Public_key.compress keys.(0).public_key, total_fee)
+        `One (Public_key.compress keys.(0).public_key, total_fee)
       in
       let coinbase =
         Coinbase.create ~amount:Coda_compile_config.coinbase
@@ -225,7 +225,7 @@ let run profiler num_transactions repeats preeval =
       (List.concat_map transitions ~f:(fun t ->
            match t with
            | Fee_transfer t ->
-               List.map (Fee_transfer.to_list t) ~f:(fun (pk, _) -> pk)
+               One_or_two.map t ~f:(fun (pk, _) -> pk) |> One_or_two.to_list
            | User_command t ->
                let t = (t :> User_command.t) in
                User_command.accounts_accessed t
@@ -240,6 +240,7 @@ let run profiler num_transactions repeats preeval =
 
 let main num_transactions repeats preeval () =
   Snarky.Libsnark.set_no_profiling false ;
+  Snarky.Libsnark.set_printing_off () ;
   Test_util.with_randomness 123456789 (fun () ->
       let keys = Transaction_snark.Keys.create () in
       let module T = Transaction_snark.Make (struct

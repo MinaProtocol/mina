@@ -2,9 +2,28 @@ let useActiveAccount = () => {
   let url = ReasonReact.Router.useUrl();
   switch (url.path) {
   | ["account", accountKey] => Some(PublicKey.uriDecode(accountKey))
+  | ["settings", accountKey, ..._] => Some(PublicKey.uriDecode(accountKey))
   | _ => None
   };
 };
+
+let useToast = () => {
+  let (_, setToast) = React.useContext(ToastProvider.context);
+  (toastText, toastType) => {
+    let id = Js.Global.setTimeout(() => setToast(_ => None), 2000);
+
+    setToast(currentToast => {
+      switch (currentToast) {
+      | Some(currentToast) => Js.Global.clearTimeout(currentToast.timeoutId)
+      | None => ()
+      };
+      Some({text: toastText, style: toastType, timeoutId: id});
+    });
+  };
+};
+
+[@bs.scope "window"] [@bs.val] external fileRoot: string = "fileRoot";
+let useAsset = fileName => Filename.concat(fileRoot, fileName);
 
 // Vanilla React.useReducer aren't supposed to have any effects themselves.
 // The following supports the handling of the effects.

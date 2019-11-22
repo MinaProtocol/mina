@@ -59,19 +59,20 @@ jobs:
                   name: Build bot
                   command: cd frontend/bot && yarn run build-ci
 
+    {# # Disabled until working
     build-archive:
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
-              environment: 
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+              environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
             - image: postgres:12
-              environment: 
+              environment:
                 POSTGRES_PASSWORD: codarules
                 POSTGRES_USER: admin
                 POSTGRES_DB: archiver
             - image: hasura/graphql-engine:v1.0.0-beta.6
-              environment: 
+              environment:
                 HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
                 HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
                 HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
@@ -86,12 +87,12 @@ jobs:
             - run:
                   name: Build Archive Process
                   command:  bash -c 'eval `opam config env` && make build_archive'
-            - run: 
+            - run:
                   name: Configure Hasura
-                  command: ls && ./scripts/archive/make_hasura_configurations.sh     
+                  command: ls && ./scripts/archive/make_hasura_configurations.sh #}
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run:
@@ -112,6 +113,14 @@ jobs:
             - run:
                   name: Require ppx_coda preprocessing for linting
                   command: ./scripts/require-ppx-coda.py
+    lint-opt:
+        docker:
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+        steps:
+            - checkout
+            - run:
+                  name: Compare versioned types in PR
+                  command: ./scripts/compare_pr_diff_types.sh
     update-branch-protection:
         docker:
             - image: python:3
@@ -124,11 +133,22 @@ jobs:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
+    build-auxiliary:
+        docker:
+            - image: nixos/nix
+        steps:
+            - checkout
+            - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
+
     build-macos:
-      # only run when there's a 'release' tag
-      # filters:
-      #   tags:
-      #      only: /^release.*/
         macos:
             xcode: "10.2.1"
         resource_class: large
@@ -142,19 +162,11 @@ jobs:
                 command: |
                     sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
                     df -h
-            # Attach workspace from prior linux build
-            - attach_workspace:
-                at: /tmp/workspace
-            - run:
-                name: Unpack Workspace PV Keys
-                command: |
-                    sudo mkdir -p /var/lib/coda
-                    sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
-                    sudo rm /tmp/workspace/coda*.bz2
             - checkout
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
+            ### homebrew
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
@@ -170,7 +182,7 @@ jobs:
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
-
+            ### opam
             - run:
                 name: Create opam cache signature file
                 command: |
@@ -199,6 +211,7 @@ jobs:
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
+            ### nix/cachix
             - run:
                 name: Install nix and cachix
                 command: |
@@ -206,43 +219,36 @@ jobs:
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     nix-env -iA cachix -f https://cachix.org/api/v1/install
             - run:
-                name: Build kademlia using cachix
-                command: |
-                    . ~/.nix-profile/etc/profile.d/nix.sh
-                    cachix use codaprotocol
-                    cd src/app/kademlia-haskell
-                    nix-build release2.nix
-            - run:
                 name: Build libp2p_helper using cachix
                 command: |
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     cachix use codaprotocol
                     cd src/app/libp2p_helper
                     nix-build default.nix
+            ### dune
             - run:
                 name: Build ocaml
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                 command: |
                     bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
-                no_output_timeout: 1h
+                no_output_timeout: 20m
+            ### collection
             - run:
-                name: Collect PV Keys
+                name: Collect Keys and Binaries
                 command: |
                     mkdir -p package/keys
-                    cp /var/lib/coda/* package/keys/.
-            - run:
-                name: Collect and rewrite aux binaries (kademlia + logproc)
-                command: |
-                    cp src/app/kademlia-haskell/result/bin/kademlia package/kademlia
-                    chmod +w package/kademlia
-                    ./scripts/librewrite-macos.sh package/kademlia
+                    echo 'keys'
+                    cp /tmp/s3_cache_dir/* package/keys/.
+                    echo 'coda'
+                    cp src/_build/default/app/cli/src/coda.exe package/coda
+                    echo 'libp2p_helper'
+                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
+                    chmod +w package/coda-libp2p_helper
+                    ./scripts/librewrite-macos.sh package/coda-libp2p_helper
+                    echo 'coda-logproc'
                     cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
-            - run:
-                name: Collect coda binary
-                command: |
-                    cp src/_build/default/app/cli/src/coda.exe package/coda
             - run:
                 name: Build homebrew package
                 command: |
@@ -255,27 +261,18 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             - store_artifacts:
                   path: package
-            - run:
-                name: Publish to Artifactory
-                command: ./scripts/skip_if_only_frontend.sh ./scripts/publish-macos.sh
-                when: on_success
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
-        {%- if profile in medium_curve_profiles %}
         resource_class: xlarge
-        {%- else %}
-        resource_class: large
-        {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run:
-                  name: Artifacts
+                  name: Artifacts Path
                   command: |
                       mkdir -p /tmp/artifacts
-                      touch /tmp/artifacts/coda_pvkeys_dummy
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
@@ -283,26 +280,29 @@ jobs:
                   name: Pin external packages
                   command: ./scripts/pin-external-packages.sh
             - run:
-                  name: Download candidate stable PV keys
-                  environment:
-                    DUNE_PROFILE: {{profile}}
-                  command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
+                  name: Install awscli
+                  command: sudo pip install awscli
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: {{profile}}
-                  {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
-                  {%- endif %}
+            - run:
+                  name: Upload generated PV keys
+                  command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
+            - run:
+                  name: Rebuild for pvkey changes
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                  environment:
+                    DUNE_PROFILE: {{profile}}
+                  no_output_timeout: 20m
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
                   environment:
                     DUNE_PROFILE: {{profile}}
-                  {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
-                  {%- endif %}
             - run:
                   name: Store genesis public/private keypairs
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
@@ -314,9 +314,22 @@ jobs:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             {%- if profile in medium_curve_profiles %}
-            - persist_to_workspace:
-                root: /tmp/artifacts
-                paths: coda_pvkeys*
+            - setup_remote_docker
+            - run:
+                  name: Build and Upload Docker
+                  command: |
+                    source /tmp/DOCKER_DEPLOY_ENV
+                    echo "Publishing Docker"
+                    echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
+                    set -x
+                    if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
+
+                        echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+                        ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
+                        -s coda-daemon \
+                        -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                        --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                    fi
             - store_artifacts:
                   path: /tmp/artifacts
             {%- endif %}
@@ -326,7 +339,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -367,7 +380,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -386,7 +399,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run:
@@ -405,7 +418,7 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run:
@@ -428,17 +441,16 @@ workflows:
     coda_parallel:
         jobs:
             - lint
+            - lint-opt
+            - build-auxiliary
             - update-branch-protection:
                 filters:
                   branches:
                     only: develop
             - tracetool
             - build-wallet
-            - build-archive
-            - build-macos:
-                # only run AFTER linux build
-                requires:
-                    - build-artifacts--testnet_postake_medium_curves
+            {# - build-archive #}
+            - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}

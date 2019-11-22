@@ -103,6 +103,8 @@ val base_jobs_on_latest_tree : t -> Transaction_with_witness.t list
 
 val hash : t -> Staged_ledger_hash.Aux_hash.t
 
+val target_merkle_root : t -> Frozen_ledger_hash.t option
+
 (** All the transactions in the order in which they were applied*)
 val staged_transactions : t -> Transaction.t list Or_error.t
 
@@ -128,6 +130,9 @@ val work_statements_for_new_diff :
 
 (** True if the latest tree is full and transactions would be added on to a new tree *)
 val next_on_new_tree : t -> bool
+
+(**update scan state metrics*)
+val update_metrics : t -> unit Or_error.t
 
 (** All the proof bundles for snark workers*)
 val all_work_pairs_exn :

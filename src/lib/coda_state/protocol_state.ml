@@ -172,11 +172,15 @@ let hash = hash_abstract ~hash_body:Body.hash
 
 let hash_checked ({previous_state_hash; body} : var) =
   let%bind body = Body.hash_checked body in
-  make_checked (fun () ->
-      Random_oracle.Checked.hash ~init:Hash_prefix.Random_oracle.protocol_state
-        [| Hash.var_to_hash_packed previous_state_hash
-         ; State_body_hash.var_to_hash_packed body |]
-      |> State_hash.var_of_hash_packed )
+  let%map hash =
+    make_checked (fun () ->
+        Random_oracle.Checked.hash
+          ~init:Hash_prefix.Random_oracle.protocol_state
+          [| Hash.var_to_hash_packed previous_state_hash
+           ; State_body_hash.var_to_hash_packed body |]
+        |> State_hash.var_of_hash_packed )
+  in
+  (hash, body)
 
 [%%if
 call_logger]
