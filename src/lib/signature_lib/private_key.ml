@@ -4,12 +4,13 @@
 open Core_kernel
 open Async_kernel
 open Snark_params
-open Module_version
 
-[%%versioned
+[%%versioned_asserted
 module Stable = struct
   module V1 = struct
-    type t = Tick.Inner_curve.Scalar.t [@@deriving sexp, version {asserted}]
+    type t = Tick.Inner_curve.Scalar.t [@@deriving sexp]
+
+    let to_latest = Fn.id
 
     let to_yojson t = `String (Tick.Inner_curve.Scalar.to_string t)
 
