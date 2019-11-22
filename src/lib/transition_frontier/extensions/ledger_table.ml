@@ -5,7 +5,7 @@ open Frontier_base
 module T = struct
   (* a pair of hash tables
      the first maps ledger hashes to ledgers
-     the second maps ledger hash to a reference count
+     the second maps ledger hashes to reference counts
    *)
   type t =
     {ledgers: Ledger.t Ledger_hash.Table.t; counts: int Ledger_hash.Table.t}
