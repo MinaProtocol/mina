@@ -323,8 +323,8 @@ module Blocks = struct
     let consensus_state =
       External_transition.consensus_state external_transition
     in
-    let global_slot =
-      Consensus.Data.Consensus_state.global_slot consensus_state
+    let consensus_time =
+      Consensus.Data.Consensus_state.consensus_time consensus_state
     in
     let staged_ledger_diff =
       External_transition.staged_ledger_diff external_transition
@@ -355,7 +355,9 @@ module Blocks = struct
         some @@ Ledger_hash.to_string @@ Staged_ledger_hash.ledger_hash
         @@ Blockchain_state.staged_ledger_hash blockchain_state
 
-      method global_slot = some @@ Unsigned.UInt32.to_int global_slot
+      method global_slot =
+        some @@ Unsigned.UInt32.to_int
+        @@ Consensus.Data.Consensus_time.to_uint32 consensus_time
 
       (* TODO: Need to implement *)
       method ledger_proof_nonce = some 0
