@@ -9,7 +9,10 @@ import sys
 import time
 from itertools import chain
 
-build_artifact_profiles = ['testnet_postake_medium_curves']
+build_artifact_profiles = [
+    'testnet_postake_medium_curves',
+    'net_10k'
+]
 
 unit_test_profiles = ['test_postake_snarkless_unittest', 'dev']
 
@@ -21,10 +24,14 @@ simple_tests = [
 ]
 
 integration_tests = [
-    'coda-peers-test', 'coda-transitive-peers-test',
-    'coda-block-production-test', 'coda-shared-prefix-test -who-proposes 0',
-    'coda-shared-prefix-test -who-proposes 1', 'coda-restart-node-test',
-    'coda-change-snark-worker-test', 'coda-archive-node-test'
+    'coda-peers-test',
+    'coda-transitive-peers-test',
+    'coda-block-production-test',
+    'coda-shared-prefix-test -who-proposes 0',
+    'coda-shared-prefix-test -who-proposes 1',
+    'coda-restart-node-test',
+    'coda-change-snark-worker-test',
+    'coda-archive-node-test'
 ]
 
 all_tests = simple_tests + integration_tests
@@ -44,10 +51,7 @@ small_curves_tests = {
     'test_postake_bootstrap':
     ['coda-bootstrap-test', 'coda-long-fork -num-proposers 2'],
     'test_postake_three_proposers': ['coda-txns-and-restart-non-proposers'],
-    'test_postake_holy_grail': [
-        'coda-restarts-and-txns-holy-grail -num-proposers 5',
-        'coda-long-fork -num-proposers 5'
-    ],
+    'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
     'test_postake_five_even_snarkless':
@@ -262,6 +266,7 @@ def get_required_status():
                                      for profile in build_artifact_profiles))),
                   extra_required_status_checks)))
 
+
 def required_status(args):
     print('\n'.join(get_required_status()))
 
@@ -347,8 +352,7 @@ def main():
         '-d',
         '--dry-run',
         action='store_true',
-        help=
-        'Do not perform any side effects, only print what the program would do.'
+        help='Do not perform any side effects, only print what the program would do.'
     )
     run_parser.add_argument('-b',
                             '--blacklist-pattern',

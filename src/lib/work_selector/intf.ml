@@ -115,7 +115,7 @@ module type Lib_intf = sig
   (**jobs that are not in the snark pool yet*)
   val pending_work_statements :
        snark_pool:Snark_pool.t
-    -> fee:Fee.t
+    -> fee_opt:Fee.t option
     -> staged_ledger:Staged_ledger.t
     -> Transaction_snark.Statement.t One_or_two.t list
 
@@ -153,7 +153,7 @@ module type Selection_method_intf = sig
 
   val pending_work_statements :
        snark_pool:snark_pool
-    -> fee:Currency.Fee.t
+    -> fee_opt:Currency.Fee.t option
     -> staged_ledger:staged_ledger
     -> Transaction_snark.Statement.t One_or_two.t list
 end

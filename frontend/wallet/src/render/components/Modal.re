@@ -37,6 +37,7 @@ module Styles = {
       top(`zero),
       right(`zero),
       bottom(`zero),
+      zIndex(999),
       display(`flex),
       justifyContent(`center),
       alignItems(`center),

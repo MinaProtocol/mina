@@ -1,10 +1,9 @@
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+    type t [@@deriving sexp, eq, compare, hash, yojson]
   end
-
-  module Latest = V1
-end
+end]
 
 include Coda_numbers.Nat.Intf.S_unchecked with type t = Stable.Latest.t
 
@@ -31,3 +30,5 @@ module Checked : sig
 
   val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t, _) Checked.t
 end
+
+val typ : (Checked.t, t) Snark_params.Tick.Typ.t
