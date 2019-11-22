@@ -104,6 +104,21 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
             ~transition_reader_ref ~transition_writer_ref ~frontier_w
             ~initialization_finish_signal new_frontier ) )
 
+(*
+let download_best_tip ~logger ~network ~verifier ~trust_system ~most_recent_valid_block_writer =
+  let num_peers = 8 in
+  let peers = Coda_networking.random_peers network num_peers in 
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "Requesting peers for their best tip to do initialization" ;
+  let open Deferred.Option.Let_syntax in 
+  let%map best_tip =
+    Deferred.List.fold peers ~init:None ~f:(fun acc peer ->
+      let open Deferred.Let_syntax in 
+      match%bind Coda_neetworking.get_best_tip network peer with
+      | Error e ->
+        Logger.debug logger ~module_:__MODULE__ )
+*)
+
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~consensus_local_state ~persistent_root ~persistent_frontier
     ~frontier_broadcast_pipe:(frontier_r, frontier_w)

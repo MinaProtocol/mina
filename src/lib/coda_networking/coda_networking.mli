@@ -55,9 +55,8 @@ module Rpcs : sig
     type response = unit
   end
 
-  module Get_bootstrappable_best_tip : sig
-    type query = Consensus.Data.Consensus_state.Value.t
-    [@@deriving sexp, to_yojson]
+  module Get_best_tip : sig
+    type query = unit [@@deriving sexp, to_yojson]
 
     type response =
       ( External_transition.Stable.V1.t
@@ -83,10 +82,7 @@ module Rpcs : sig
           rpc
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
-    | Get_bootstrappable_best_tip
-        : ( Get_bootstrappable_best_tip.query
-          , Get_bootstrappable_best_tip.response )
-          rpc
+    | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   include Rpc_intf.Rpc_interface_intf with type ('q, 'r) rpc := ('q, 'r) rpc
@@ -137,10 +133,9 @@ val get_ancestry :
      Proof_carrying_data.t
      Deferred.Or_error.t
 
-val get_bootstrappable_best_tip :
+val get_best_tip :
      t
   -> Network_peer.Peer.t
-  -> Consensus.Data.Consensus_state.Value.t
   -> ( External_transition.t
      , State_body_hash.t list * External_transition.t )
      Proof_carrying_data.t
@@ -223,13 +218,11 @@ val create :
                       , State_body_hash.t list * External_transition.t )
                       Proof_carrying_data.t
                       Deferred.Option.t)
-  -> get_bootstrappable_best_tip:(   Consensus.Data.Consensus_state.Value.t
-                                     Envelope.Incoming.t
-                                  -> ( External_transition.t
-                                     , State_body_hash.t list
-                                       * External_transition.t )
-                                     Proof_carrying_data.t
-                                     Deferred.Option.t)
+  -> get_best_tip:(   unit Envelope.Incoming.t
+                   -> ( External_transition.t
+                      , State_body_hash.t list * External_transition.t )
+                      Proof_carrying_data.t
+                      Deferred.Option.t)
   -> get_transition_chain_proof:(   State_hash.t Envelope.Incoming.t
                                  -> (State_hash.t * State_body_hash.t list)
                                     Deferred.Option.t)

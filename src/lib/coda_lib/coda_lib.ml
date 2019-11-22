@@ -746,11 +746,9 @@ let create (config : Config.t) =
               ~get_ancestry:
                 (handle_request "get_ancestry"
                    ~f:(Sync_handler.Root.prove ~logger:config.logger))
-              ~get_bootstrappable_best_tip:
-                (handle_request "get_bootstrappable_best_tip"
-                   ~f:
-                     (Sync_handler.Bootstrappable_best_tip.prove
-                        ~logger:config.logger))
+              ~get_best_tip:
+                (handle_request "get_best_tip" ~f:(fun ~frontier () ->
+                     Best_tip_prover.prove ~logger:config.logger frontier ))
               ~get_transition_chain_proof:
                 (handle_request "get_transition_chain_proof"
                    ~f:(fun ~frontier hash ->

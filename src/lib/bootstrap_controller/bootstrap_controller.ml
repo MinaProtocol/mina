@@ -143,8 +143,7 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
         Deferred.ignore @@ on_transition t ~sender ~root_sync_ledger transition )
       else Deferred.unit )
 
-let download_best_tip ~root_sync_ledger ~transition_graph t
-    ({With_hash.data= initial_root_transition; _}, _) =
+let download_best_tip ~root_sync_ledger ~transition_graph t (_, _) =
   let num_peers = 8 in
   let peers = Coda_networking.random_peers t.network num_peers in
   Logger.info t.logger
@@ -154,23 +153,16 @@ let download_best_tip ~root_sync_ledger ~transition_graph t
     !"Number of peers that we are sampling: %i"
     (List.length peers) ~module_:__MODULE__ ~location:__LOC__ ;
   Deferred.List.iter peers ~f:(fun peer ->
-      let initial_consensus_state =
-        External_transition.consensus_state initial_root_transition
-      in
-      match%bind
-        Coda_networking.get_bootstrappable_best_tip t.network peer
-          initial_consensus_state
-      with
+      match%bind Coda_networking.get_best_tip t.network peer with
       | Error e ->
           Logger.debug t.logger
-            !"Could not get bootstrappable best tip from peer: %{sexp:Error.t}"
+            !"Could not get best tip from peer: %{sexp:Error.t}"
             ~metadata:[("peer", Network_peer.Peer.to_yojson peer)]
             e ~location:__LOC__ ~module_:__MODULE__ ;
           Deferred.unit
       | Ok peer_best_tip -> (
           match%bind
-            Sync_handler.Bootstrappable_best_tip.verify ~logger:t.logger
-              ~verifier:t.verifier initial_consensus_state peer_best_tip
+            Best_tip_prover.verify ~verifier:t.verifier peer_best_tip
           with
           | Ok
               ( `Root root_with_validation
@@ -192,8 +184,7 @@ let download_best_tip ~root_sync_ledger ~transition_graph t
                 should_sync ~root_sync_ledger t
                 @@ External_transition.consensus_state best_tip
               then (
-                Logger.debug logger
-                  "Syncing with peer's bootstrappable best tip"
+                Logger.debug logger "Syncing with peer's best tip"
                   ~module_:__MODULE__ ~location:__LOC__ ;
                 (* TODO: Efficiently limiting the number of green threads in #1337 *)
                 Deferred.ignore
@@ -201,7 +192,7 @@ let download_best_tip ~root_sync_ledger ~transition_graph t
                      t best_tip_with_validation root_with_validation) )
               else (
                 Logger.debug logger
-                  !"Will not sync with peer's bootstrappable best tip "
+                  !"Will not sync with peer's best tip "
                   ~location:__LOC__ ~module_:__MODULE__ ;
                 Deferred.unit )
           | Error e ->
