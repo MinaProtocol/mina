@@ -6,7 +6,8 @@ module Styles = {
       background(Style.Colors.lightBlue(0.1)),
       borderRadius(`px(6)),
       textDecoration(`none),
-      padding(`rem(2.0)),
+      padding(`rem(1.43)),
+      paddingTop(`rem(1.625)),
       margin(`auto),
       height(`rem(14.25)),
       width(`rem(21.25)),
@@ -41,7 +42,6 @@ module Styles = {
     merge([
       Style.H2.basic,
       style([
-        Style.Typeface.ibmplexsans,
         fontWeight(`bold),
         color(Style.Colors.marine),
         textAlign(`left),
@@ -49,7 +49,7 @@ module Styles = {
       ]),
     ]);
 
-  let ctaBody = Style.Body.basic;
+  let ctaBody = merge([Style.Body.basic, style([marginTop(`rem(1.))])]);
 
   let ctaIcon =
     style([
@@ -60,9 +60,9 @@ module Styles = {
     ]);
   let arrow =
     style([
-      marginTop(`rem(1.0)),
+      marginTop(`rem(0.9)),
       marginLeft(`rem(1.0)),
-      SVG.fill(Style.Colors.hyperlinkAlpha(0.5)),
+      SVG.fill(Style.Colors.hyperlinkAlpha(0.3)),
     ]);
 
   let headingRow =
