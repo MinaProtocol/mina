@@ -1346,6 +1346,10 @@ module Data = struct
               ~typ:(non_null @@ uint32 ())
               ~args:Arg.[]
               ~resolve:(fun _ global_slot -> slot global_slot)
+          ; field "globalSlot"
+              ~typ:(non_null @@ uint32 ())
+              ~args:Arg.[]
+              ~resolve:(fun _ global_slot -> Global_slot.to_uint32 global_slot)
           ; field "startTime" ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:(fun _ global_slot ->

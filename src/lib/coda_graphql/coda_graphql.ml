@@ -136,7 +136,7 @@ module Types = struct
       typ =
     obj "BlockProposals" ~fields:(fun _ ->
         let of_time = Consensus.Data.Consensus_time.of_time_exn in
-        [ field "consensusTimes"
+        [ field "times"
             ~typ:
               ( non_null @@ list @@ non_null
               @@ Consensus.Data.Consensus_time.graphql_type () )
