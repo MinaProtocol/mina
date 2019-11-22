@@ -222,9 +222,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
                   ~blockchain_state:
                     (Protocol_state.blockchain_state protocol_state)
                   ~consensus_transition:consensus_transition_data
-                  ~proposer:self ~coinbase_amount
-                  ~coinbase_state_body_hash:previous_protocol_state_body_hash
-                  ()
+                  ~proposer:self ~coinbase_amount ()
               in
               let internal_transition =
                 Internal_transition.create ~snark_transition
