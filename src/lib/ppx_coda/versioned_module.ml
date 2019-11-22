@@ -297,15 +297,16 @@ let convert_module_stri ~version_option last_version stri =
 let convert_modbody ~loc ~version_option body =
   let may_convert_latest = ref None in
   let latest_version = ref None in
-  let body =
+  let body_len = List.length body in
+  (* allow unconverted modules following versioned modules *)
+  let body, unconverted =
     match version_option with
     | No_version_option ->
-        body
+        (body, [])
     | Asserted ->
-        if List.is_empty body then body
+        if List.is_empty body then (body, [])
         else
-          let len = List.length body in
-          let vns, tests = List.split_n body (len - 1) in
+          let vns, tests = List.split_n body (body_len - 1) in
           (* verify that last module is named Tests *)
           let tests_str_item = List.hd_exn tests in
           ( match tests_str_item.pstr_desc with
@@ -314,9 +315,9 @@ let convert_modbody ~loc ~version_option body =
           | _ ->
               Location.raise_errorf ~loc:tests_str_item.pstr_loc
                 "Expected a module named Tests" ) ;
-          vns
+          (vns, tests)
     | Of_binable ->
-        body
+        (body, [])
   in
   let _, rev_str, convs =
     List.fold ~init:(None, [], []) body
@@ -394,7 +395,7 @@ let convert_modbody ~loc ~version_option body =
     | _ ->
         rev_str
   in
-  List.rev rev_str
+  List.rev rev_str @ unconverted
 
 let version_module ~loc ~version_option ~path:_ modname modbody =
   Printexc.record_backtrace true ;
