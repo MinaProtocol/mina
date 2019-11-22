@@ -171,6 +171,63 @@ let _download_best_tip ~logger ~network ~verifier ~trust_system
   in
   best_tip
 
+let _load_frontier ~logger ~verifier ~time_controller
+    ~persistent_frontier_location ~persistent_root_location
+    ~consensus_local_state =
+  let persistent_frontier =
+    Transition_frontier.Persistent_frontier.create ~logger ~verifier
+      ~time_controller ~directory:persistent_frontier_location
+  in
+  let persistent_root =
+    Transition_frontier.Persistent_root.create ~logger
+      ~directory:persistent_root_location
+  in
+  match%map
+    Transition_frontier.load ~logger ~verifier ~consensus_local_state
+      ~persistent_root ~persistent_frontier ()
+  with
+  | Ok frontier ->
+      Some frontier
+  | Error `Persistent_frontier_malformed ->
+      failwith
+        "persistent frontier unexpectedly malformed -- this should not happen \
+         with retry enabled"
+  | Error `Bootstrap_required ->
+      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__ "" ;
+      None
+  | Error (`Failure e) ->
+      failwith ("failed to initialize transition frontier: " ^ e)
+
+let _wait_for_high_connectivity ~logger ~network =
+  let connectivity_time_upperbound = 60.0 in
+  let high_connectivity =
+    Coda_networking.on_first_high_connectivity network ~f:Fn.id
+  in
+  Deferred.any
+    [ high_connectivity
+    ; ( after (Time_ns.Span.of_sec connectivity_time_upperbound)
+      >>| fun () ->
+      if not @@ Deferred.is_determined high_connectivity then
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ("num peers", `Int (List.length @@ Coda_networking.peers network))
+            ; ( "max seconds to wait for high connectivity"
+              , `Float connectivity_time_upperbound ) ]
+          "Will start bootstrapping without connecting with too many peers"
+      else
+        Logger.info logger ~location:__LOC__ ~module_:__MODULE__
+          "Already connected to enough peers, start bootstrapping" ) ]
+
+(*
+let initialize ~logger ~network ~verifier ~trust_system ~frontier
+  ~time_controller ~ledger_db ~frontier_w ~proposer_transition_reader
+  ~clear_reader ~verified_transition_writer ~transition_reader_ref
+  ~transition_writer_ref ~most_recent_valid_block_writer =
+  let%bind () =
+    wait_for_high_connectivity ~logger ~network
+  in 
+*)
+
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~consensus_local_state ~persistent_root ~persistent_frontier
     ~frontier_broadcast_pipe:(frontier_r, frontier_w)
