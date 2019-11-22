@@ -104,20 +104,72 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
             ~transition_reader_ref ~transition_writer_ref ~frontier_w
             ~initialization_finish_signal new_frontier ) )
 
-(*
-let download_best_tip ~logger ~network ~verifier ~trust_system ~most_recent_valid_block_writer =
+let _download_best_tip ~logger ~network ~verifier ~trust_system
+    ~most_recent_valid_block_writer =
   let num_peers = 8 in
-  let peers = Coda_networking.random_peers network num_peers in 
+  let peers = Coda_networking.random_peers network num_peers in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Requesting peers for their best tip to do initialization" ;
-  let open Deferred.Option.Let_syntax in 
+  let open Deferred.Option.Let_syntax in
   let%map best_tip =
     Deferred.List.fold peers ~init:None ~f:(fun acc peer ->
-      let open Deferred.Let_syntax in 
-      match%bind Coda_neetworking.get_best_tip network peer with
-      | Error e ->
-        Logger.debug logger ~module_:__MODULE__ )
-*)
+        let open Deferred.Let_syntax in
+        match%bind Coda_networking.get_best_tip network peer with
+        | Error e ->
+            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("peer", Network_peer.Peer.to_yojson peer)
+                ; ("error", `String (Error.to_string_hum e)) ]
+              "Couldn't get best tip from peer: $error" ;
+            return acc
+        | Ok peer_best_tip -> (
+            match%bind Best_tip_prover.verify ~verifier peer_best_tip with
+            | Error e ->
+                Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:
+                    [ ("peer", Network_peer.Peer.to_yojson peer)
+                    ; ("error", `String (Error.to_string_hum e)) ]
+                  "Peer sent us bad proof for their best tip" ;
+                let%map () =
+                  Trust_system.(
+                    record trust_system logger peer.host
+                      Actions.
+                        ( Violated_protocol
+                        , Some ("Peer sent us bad proof for their best tip", [])
+                        ))
+                in
+                acc
+            | Ok (`Root _, `Best_tip candidate_best_tip) ->
+                let enveloped_candidate_best_tip =
+                  Envelope.Incoming.wrap ~data:candidate_best_tip
+                    ~sender:(Envelope.Sender.Remote peer.host)
+                in
+                return
+                @@ Option.merge acc
+                     (Option.return enveloped_candidate_best_tip)
+                     ~f:(fun enveloped_existing_best_tip
+                        enveloped_candidate_best_tip
+                        ->
+                       let candidate_best_tip =
+                         With_hash.data @@ fst
+                         @@ Envelope.Incoming.data enveloped_candidate_best_tip
+                       in
+                       let existing_best_tip =
+                         With_hash.data @@ fst
+                         @@ Envelope.Incoming.data enveloped_existing_best_tip
+                       in
+                       if
+                         External_transition.compare candidate_best_tip
+                           existing_best_tip
+                         > 0
+                       then (
+                         don't_wait_for
+                         @@ Broadcast_pipe.Writer.write
+                              most_recent_valid_block_writer candidate_best_tip ;
+                         enveloped_candidate_best_tip )
+                       else enveloped_existing_best_tip ) ) )
+  in
+  best_tip
 
 let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~consensus_local_state ~persistent_root ~persistent_frontier
