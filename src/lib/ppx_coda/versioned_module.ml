@@ -3,7 +3,7 @@ open Ppxlib
 open Versioned_util
 
 (* option to `deriving version' *)
-type version_option = No_version_option | Asserted | Of_binable
+type version_option = No_version_option | Asserted
 
 let parse_opt = Ast_pattern.parse ~on_error:(fun () -> None)
 
@@ -66,8 +66,6 @@ let rec add_deriving ~loc ~version_option attributes =
                   [%expr version]
               | Asserted ->
                   [%expr version {asserted}]
-              | Of_binable ->
-                  [%expr version {of_binable}]
             in
             modify_attr_payload attr
               (payload ([%expr bin_io] :: version_expr :: args))
@@ -316,8 +314,6 @@ let convert_modbody ~loc ~version_option body =
               Location.raise_errorf ~loc:tests_str_item.pstr_loc
                 "Expected a module named Tests" ) ;
           (vns, tests)
-    | Of_binable ->
-        (body, [])
   in
   let _, rev_str, convs =
     List.fold ~init:(None, [], []) body
