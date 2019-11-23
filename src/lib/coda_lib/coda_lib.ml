@@ -647,38 +647,8 @@ let create (config : Config.t) =
           let proposer_transition_reader, proposer_transition_writer =
             Strict_pipe.create Synchronous
           in
-          (* TODO: (#3053) push transition frontier ownership down into transition router
-             * (then persistent root can be owned by transition frontier only) *)
-          let persistent_frontier =
-            Transition_frontier.Persistent_frontier.create
-              ~logger:config.logger ~verifier
-              ~time_controller:config.time_controller
-              ~directory:config.persistent_frontier_location
-          in
-          let persistent_root =
-            Transition_frontier.Persistent_root.create ~logger:config.logger
-              ~directory:config.persistent_root_location
-          in
-          let%bind transition_frontier_opt =
-            Transition_frontier.load ~logger:config.logger ~verifier
-              ~consensus_local_state:config.consensus_local_state
-              ~persistent_root ~persistent_frontier ()
-            >>| function
-            | Ok frontier ->
-                Some frontier
-            | Error `Persistent_frontier_malformed ->
-                failwith
-                  "persistent frontier unexpectedly malformed -- this should \
-                   not happen with retry enabled"
-            | Error `Bootstrap_required ->
-                Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
-                  "" ;
-                None
-            | Error (`Failure err) ->
-                failwith ("failed to initialize transition frontier: " ^ err)
-          in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
-            Broadcast_pipe.create transition_frontier_opt
+            Broadcast_pipe.create None
           in
           let handle_request name ~f query_env =
             trace_recurring name (fun () ->
@@ -780,7 +750,9 @@ let create (config : Config.t) =
                   ~trust_system:config.trust_system ~verifier ~network:net
                   ~time_controller:config.time_controller
                   ~consensus_local_state:config.consensus_local_state
-                  ~persistent_root ~persistent_frontier
+                  ~persistent_root_location:config.persistent_root_location
+                  ~persistent_frontier_location:
+                    config.persistent_frontier_location
                   ~frontier_broadcast_pipe:
                     (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
                   ~network_transition_reader:

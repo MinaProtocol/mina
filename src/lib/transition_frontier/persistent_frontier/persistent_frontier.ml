@@ -144,7 +144,8 @@ module Instance = struct
          required ($current_root --> $target_root)" ;
       Error `Bootstrap_required )
 
-  let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length =
+  let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length
+      ~ignore_consensus_local_state =
     let open Deferred.Result.Let_syntax in
     let downgrade_transition transition :
         External_transition.Almost_validated.t =
@@ -198,7 +199,9 @@ module Instance = struct
         ~f:Result.return
     in
     let apply_diff diff =
-      let (`New_root _) = Full_frontier.apply_diffs frontier [diff] in
+      let (`New_root _) =
+        Full_frontier.apply_diffs frontier [diff] ~ignore_consensus_local_state
+      in
       Extensions.notify extensions ~frontier ~diffs:[diff]
       |> Deferred.map ~f:Result.return
     in

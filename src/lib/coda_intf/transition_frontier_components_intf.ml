@@ -333,8 +333,8 @@ module type Transition_router_intf = sig
     -> network:network
     -> time_controller:Block_time.Controller.t
     -> consensus_local_state:Consensus.Data.Local_state.t
-    -> persistent_root:transition_frontier_persistent_root
-    -> persistent_frontier:transition_frontier_persistent_frontier
+    -> persistent_root_location:string
+    -> persistent_frontier_location:string
     -> frontier_broadcast_pipe:transition_frontier option
                                Pipe_lib.Broadcast_pipe.Reader.t
                                * transition_frontier option
