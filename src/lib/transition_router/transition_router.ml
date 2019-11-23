@@ -249,12 +249,39 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
           ~consensus_local_state ~transition_writer_ref ~frontier_w
           ~persistent_root ~persistent_frontier ~initial_root_transition
       else
-        return
-        @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
-             ~network ~time_controller ~proposer_transition_reader
-             ~verified_transition_writer ~clear_reader
-             ~collected_transitions:[best_tip] ~transition_reader_ref
-             ~transition_writer_ref ~frontier_w frontier
+        let root = Transition_frontier.root frontier in
+        let%map () =
+          match
+            Consensus.Hooks.required_local_state_sync
+              ~consensus_state:
+                (Transition_frontier.Breadcrumb.consensus_state root)
+              ~local_state:consensus_local_state
+          with
+          | None ->
+              Deferred.unit
+          | Some sync_jobs -> (
+              match%map
+                Consensus.Hooks.sync_local_state
+                  ~local_state:consensus_local_state ~logger ~trust_system
+                  ~random_peers:(Coda_networking.random_peers network)
+                  ~query_peer:
+                    { Consensus.Hooks.Rpcs.query=
+                        (fun peer rpc query ->
+                          Coda_networking.(
+                            query_peer network peer (Rpcs.Consensus_rpc rpc)
+                              query) ) }
+                  sync_jobs
+              with
+              | Error e ->
+                  failwith ("Local state sync failed: " ^ Error.to_string_hum e)
+              | Ok () ->
+                  () )
+        in
+        start_transition_frontier_controller ~logger ~trust_system ~verifier
+          ~network ~time_controller ~proposer_transition_reader
+          ~verified_transition_writer ~clear_reader
+          ~collected_transitions:[best_tip] ~transition_reader_ref
+          ~transition_writer_ref ~frontier_w frontier
 
 let wait_till_gensis ~logger ~time_controller =
   let module Time = Coda_base.Block_time in
