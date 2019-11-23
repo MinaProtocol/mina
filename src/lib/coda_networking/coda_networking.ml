@@ -842,6 +842,9 @@ end
 let on_first_received_message {first_received_message_signal; _} ~f =
   Ivar.read first_received_message_signal >>| f
 
+let fill_first_received_message_signal {first_received_message_signal; _} =
+  Ivar.fill_if_empty first_received_message_signal ()
+
 (* TODO: Have better pushback behavior *)
 let broadcast t msg =
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__

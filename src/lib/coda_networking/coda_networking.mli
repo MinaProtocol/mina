@@ -116,6 +116,8 @@ val peers : t -> Network_peer.Peer.t list
 
 val on_first_received_message : t -> f:(unit -> 'a) -> 'a Deferred.t
 
+val fill_first_received_message_signal : t -> unit
+
 val on_first_connect : t -> f:(unit -> 'a) -> 'a Deferred.t
 
 val on_first_high_connectivity : t -> f:(unit -> 'a) -> 'a Deferred.t

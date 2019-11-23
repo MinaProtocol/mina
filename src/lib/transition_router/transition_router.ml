@@ -152,6 +152,8 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                        let existing_best_tip =
                          Envelope.Incoming.data enveloped_existing_best_tip
                        in
+                       Coda_networking.fill_first_received_message_signal
+                         network ;
                        if
                          External_transition.Initial_validated.compare
                            candidate_best_tip existing_best_tip
