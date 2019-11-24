@@ -15,7 +15,7 @@ For the purposes of this document, let's just focus on achieving 1 transaction p
 
 After some preliminary benchmarks, I believe the dominant component in TPT is SNARK verification.
 
-The time spent on SNARK verification per transaction is equal to
+The time spent on SNARK verification per transaction is roughly equal to
 
 ```
 verification time per SNARK * number of SNARKs per transaction
@@ -66,6 +66,16 @@ Most of these checks can be batched across a list of proofs.
 - The final exp can be eliminated.
 
 So at the end, the marginal time can probably be brought down to about (4.5ms + 24ms + 3ms + 28ms) = 59.5ms.
+
+### Other considerations
+
+It is worth noting that the same SNARKs are often verified at least twice.
+
+1. When that SNARK enters into our SNARK pool.
+2. When we process a block containing that SNARK during staged-ledger diff application.
+
+It may be worth caching the verification of the SNARK so that it is shared between application of the staged-ledger diff and when it enters the SNARK pool.
+Basically, there would be a hash table mapping `Transaction_snark.Statement.t * Sok_message.t` to a proof which validates against the given key.
 
 ## Priorities and recommendations
 
