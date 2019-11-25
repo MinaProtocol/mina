@@ -1,0 +1,10 @@
+[
+  {
+    "id": "recipient",
+    "defaultMessage": "recipient"
+  },
+  {
+    "id": "sender",
+    "defaultMessage": "sender"
+  }
+]

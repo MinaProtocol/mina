@@ -1,0 +1,12 @@
+[
+  {
+    "id": "recipient",
+    "defaultMessage": "recipient",
+    "message": "người nhận"
+  },
+  {
+    "id": "sender",
+    "defaultMessage": "sender",
+    "message": "người gửi"
+  }
+]
