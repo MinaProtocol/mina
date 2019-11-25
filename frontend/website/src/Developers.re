@@ -4,7 +4,6 @@ module Styles = {
     style([
       marginLeft(`auto),
       marginRight(`auto),
-      maxWidth(`rem(22.43)),
       media("(min-width: 60rem)", [maxWidth(`rem(50.66))]),
       media("(min-width: 105rem)", [maxWidth(`rem(68.))]),
     ]);
@@ -47,7 +46,8 @@ module Styles = {
       header,
       style([
         maxWidth(`px(500)),
-        marginLeft(`rem(2.1875)),
+        marginLeft(`zero),
+        media("(min-width: 60rem)", [marginLeft(`rem(2.1875))]),
         textAlign(`left),
         color(Style.Colors.midnight),
       ]),
@@ -73,6 +73,8 @@ module Styles = {
         color(white),
         padding2(~v=`px(12), ~h=`px(24)),
         textAlign(`center),
+        alignSelf(`center),
+        media("(min-width: 60rem)", [marginLeft(`rem(0.)), alignSelf(`flexStart)]),
       ]),
     ]);
 
