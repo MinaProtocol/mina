@@ -15,10 +15,8 @@ module type Transition_handler_validator_intf = sig
     -> trust_system:Trust_system.t
     -> time_controller:Block_time.Controller.t
     -> frontier:transition_frontier
-    -> transition_reader:( [ `Transition of
-                             External_transition.Initial_validated.t
-                             Envelope.Incoming.t ]
-                         * [`Time_received of Block_time.t] )
+    -> transition_reader:External_transition.Initial_validated.t
+                         Envelope.Incoming.t
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( ( External_transition.Initial_validated.t
                                    Envelope.Incoming.t
@@ -299,10 +297,8 @@ module type Bootstrap_controller_intf = sig
     -> verifier:Verifier.t
     -> network:network
     -> consensus_local_state:Consensus.Data.Local_state.t
-    -> transition_reader:( [< `Transition of
-                              External_transition.Initial_validated.t
-                              Envelope.Incoming.t ]
-                         * [< `Time_received of Block_time.t] )
+    -> transition_reader:External_transition.Initial_validated.t
+                         Envelope.Incoming.t
                          Strict_pipe.Reader.t
     -> persistent_root:persistent_root
     -> persistent_frontier:persistent_frontier
@@ -329,10 +325,8 @@ module type Transition_frontier_controller_intf = sig
                              Envelope.Incoming.t
                              list
     -> frontier:transition_frontier
-    -> network_transition_reader:( [ `Transition of
-                                     External_transition.Initial_validated.t
-                                     Envelope.Incoming.t ]
-                                 * [`Time_received of Block_time.t] )
+    -> network_transition_reader:External_transition.Initial_validated.t
+                                 Envelope.Incoming.t
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> clear_reader:[`Clear] Strict_pipe.Reader.t

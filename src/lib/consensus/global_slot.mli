@@ -31,3 +31,5 @@ module Checked : sig
 
   val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t, _) Checked.t
 end
+
+val typ : (Checked.t, t) Snark_params.Tick.Typ.t

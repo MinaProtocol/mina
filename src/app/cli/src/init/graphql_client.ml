@@ -3,7 +3,7 @@ open Async
 open Signature_lib
 open Coda_base
 
-module Client = Graphql_client_lib.Make (struct
+module Client = Graphql_lib.Client.Make (struct
   let address = "graphql"
 
   let preprocess_variables_string = Fn.id
