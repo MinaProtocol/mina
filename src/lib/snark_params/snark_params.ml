@@ -405,11 +405,6 @@ module Tick = struct
                   let params = Crypto_params.Pedersen_params.affine
                 end)
 
-      let hash_prefix (p : State.t) =
-        Section.create ~acc:(`Value p.acc)
-          ~support:
-            (Interval_union.of_interval (0, Hash_prefixes.length_in_triples))
-
       let hash_triples ts ~(init : State.t) =
         hash ts ~init:(init.triples_consumed, `Value init.acc)
 

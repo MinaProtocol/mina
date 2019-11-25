@@ -18,6 +18,8 @@ end)
 struct
   type t = N.t [@@deriving sexp, compare, hash, yojson]
 
+  let max_value = N.max_int
+
   include Comparable.Make (N)
 
   include (N : module type of N with type t := t)
@@ -39,14 +41,6 @@ struct
       with_label
         (sprintf "to_bits: %s" __LOC__)
         (make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t))
-
-    let to_triples t =
-      Checked.map (to_bits t)
-        ~f:
-          Bitstring.(
-            Fn.compose
-              (pad_to_triple_list ~default:Boolean.false_)
-              Lsb_first.to_list)
 
     let constant n =
       Integer.constant ~length:N.length_in_bits ~m
@@ -129,8 +123,6 @@ struct
   let of_bits = Bits.of_bits
 
   let fold t = Fold.group3 ~default:false (Bits.fold t)
-
-  let length_in_triples = (length_in_bits + 2) / 3
 
   let gen =
     Quickcheck.Generator.map
