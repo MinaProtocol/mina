@@ -65,31 +65,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
   trace_recurring "bootstrap controller" (fun () ->
       upon
-        (let%bind () =
-           let connectivity_time_uppperbound = 60.0 in
-           let high_connectivity_deferred =
-             Coda_networking.on_first_high_connectivity network ~f:Fn.id
-           in
-           Deferred.any
-             [ high_connectivity_deferred
-             ; ( after (Time_ns.Span.of_sec connectivity_time_uppperbound)
-               >>| fun () ->
-               if not @@ Deferred.is_determined high_connectivity_deferred then
-                 Logger.info logger
-                   !"Will start bootstrapping without connecting with too \
-                     many peers"
-                   ~metadata:
-                     [ ( "num peers"
-                       , `Int (List.length @@ Coda_networking.peers network) )
-                     ; ( "Max seconds to wait for high connectivity"
-                       , `Float connectivity_time_uppperbound ) ]
-                   ~location:__LOC__ ~module_:__MODULE__
-               else
-                 Logger.info logger ~location:__LOC__ ~module_:__MODULE__
-                   "Already connected to enough peers, start bootstrapping" )
-             ]
-         in
-         Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
+        (Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
            ~consensus_local_state ~transition_reader:!transition_reader_ref
            ~persistent_frontier ~persistent_root ~initial_root_transition)
         (fun (new_frontier, collected_transitions) ->
@@ -192,7 +168,10 @@ let wait_for_high_connectivity ~logger ~network =
     Coda_networking.on_first_high_connectivity network ~f:Fn.id
   in
   Deferred.any
-    [ high_connectivity
+    [ ( high_connectivity
+      >>| fun () ->
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Already connected to enough peers, start initialization" )
     ; ( after (Time_ns.Span.of_sec connectivity_time_upperbound)
       >>| fun () ->
       if not @@ Deferred.is_determined high_connectivity then
@@ -201,10 +180,8 @@ let wait_for_high_connectivity ~logger ~network =
             [ ("num peers", `Int (List.length @@ Coda_networking.peers network))
             ; ( "max seconds to wait for high connectivity"
               , `Float connectivity_time_upperbound ) ]
-          "Will start bootstrapping without connecting with too many peers"
-      else
-        Logger.info logger ~location:__LOC__ ~module_:__MODULE__
-          "Already connected to enough peers, start bootstrapping" ) ]
+          "Will start initialization without connecting with too many peers" )
+    ]
 
 let initialize ~logger ~network ~verifier ~trust_system ~time_controller
     ~frontier_w ~proposer_transition_reader ~clear_reader
