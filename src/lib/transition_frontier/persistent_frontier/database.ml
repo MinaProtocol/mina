@@ -232,7 +232,7 @@ let check t =
     let%bind _ =
       get t.db ~key:Frontier_hash ~error:(`Corrupt (`Not_found `Frontier_hash))
     in
-    let%bind root_transition =
+    let%bind _ =
       get t.db ~key:(Transition root.hash)
         ~error:(`Corrupt (`Not_found `Root_transition))
     in
@@ -249,7 +249,7 @@ let check t =
     in
     List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
         let%bind () = acc in
-        let%bind succ =
+        let%bind _ =
           get t.db ~key:(Transition succ_hash)
             ~error:(`Corrupt (`Not_found (`Transition succ_hash)))
         in
