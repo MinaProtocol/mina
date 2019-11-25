@@ -105,7 +105,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; me: Peer.t
       ; rpc_handlers: rpc_handler list
       ; peer_table: (Peer.Id.t, Peer.t) Hashtbl.t
-      ; initial_peers: Coda_net2.Multiaddr.t list
+      ; initial_peers: Peer.t list
       ; received_message_reader:
           Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
       ; received_message_writer:
@@ -146,9 +146,6 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let create network me rpc_handlers =
       let initial_peers = Network.get_initial_peers network me.Peer.host in
-      let initial_peer_hosts =
-        List.map initial_peers ~f:(failwith "TODO replaceme")
-      in
       let peer_table = Hashtbl.create (module Peer.Id) in
       List.iter initial_peers ~f:(fun peer ->
           Hashtbl.add_exn peer_table ~key:peer.peer_id ~data:peer ) ;
@@ -163,7 +160,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         ; me
         ; rpc_handlers
         ; peer_table
-        ; initial_peers= initial_peer_hosts
+        ; initial_peers
         ; received_message_reader
         ; received_message_writer
         ; ban_notification_reader
@@ -177,7 +174,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers {peer_table; _} = Hashtbl.data peer_table |> Deferred.return
 
-    let initial_peers {initial_peers; _} = initial_peers
+    let initial_peers t = Hashtbl.data t.peer_table |> List.map ~f:(Fn.compose Coda_net2.Multiaddr.of_string Peer.to_multiaddr_string)
 
     let random_peers t n =
       let%map peers = peers t in

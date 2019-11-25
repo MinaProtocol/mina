@@ -111,6 +111,9 @@ let to_string {host; libp2p_port; peer_id} =
     (Int.to_string libp2p_port)
     peer_id
 
+let to_multiaddr_string {host; libp2p_port; peer_id} =
+  sprintf "/ip4/%s/tcp/%d/ipfs/%s" (Unix.Inet_addr.to_string host) libp2p_port peer_id
+
 let pretty_list peers = String.concat ~sep:"," @@ List.map peers ~f:to_string
 
 module Event = struct
