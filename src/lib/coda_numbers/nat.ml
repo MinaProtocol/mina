@@ -18,6 +18,8 @@ end)
 struct
   type t = N.t [@@deriving sexp, compare, hash, yojson]
 
+  let max_value = N.max_int
+
   include Comparable.Make (N)
 
   include (N : module type of N with type t := t)

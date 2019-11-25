@@ -11,6 +11,8 @@ module type S_unchecked = sig
 
   include Hashable.S with type t := t
 
+  val max_value : t
+
   val length_in_bits : int
 
   val gen : t Quickcheck.Generator.t

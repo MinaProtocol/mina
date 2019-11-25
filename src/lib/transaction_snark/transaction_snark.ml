@@ -3,6 +3,7 @@ open Signature_lib
 open Coda_base
 open Snark_params
 open Currency
+module Global_slot = Coda_numbers.Global_slot
 
 let tick_input () =
   let open Tick in
@@ -306,6 +307,15 @@ module Base = struct
     let tag = payload.body.tag in
     let%bind is_user_command =
       Transaction_union.Tag.Checked.is_user_command tag
+    in
+    let%bind () =
+      let current_global_slot =
+        Global_slot.(Checked.constant zero)
+        (* TODO: psteckler is working on passing through the consensus state to
+           here. This should be replaced with the real value when his PR lands. *)
+      in
+      Global_slot.Checked.(current_global_slot <= payload.common.valid_until)
+      >>= Boolean.Assert.is_true
     in
     let%bind () =
       check_signature shifted ~payload ~is_user_command ~sender ~signature
@@ -1395,6 +1405,7 @@ let%test_module "transaction_snark" =
       let receiver = wallets.(j) in
       let payload : User_command.Payload.t =
         User_command.Payload.create ~fee ~nonce ~memo
+          ~valid_until:Global_slot.max_value
           ~body:
             (Payment
                { receiver= receiver.account.public_key
