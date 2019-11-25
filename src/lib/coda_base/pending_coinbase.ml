@@ -226,9 +226,9 @@ module Coinbase_stack_state_hash = struct
 
   [%%define_locally
   State_hash.
-    (fold, gen, of_hash, to_bits, raw_hash_bytes, equal_var, typ, if_, var_of_t)]
+    (gen, of_hash, to_bits, raw_hash_bytes, equal_var, typ, if_, var_of_t)]
 
-  let push (t : t) cb =
+  let push (t : t) cb : t =
     let _, _, state_body_hash = Coinbase_data.of_coinbase cb in
     (* this is the same computation for combining state hashes and state body hashes as
        `Protocol_state.hash_abstract', not available here because it would create
@@ -236,7 +236,7 @@ module Coinbase_stack_state_hash = struct
      *)
     Random_oracle.hash ~init:Hash_prefix.protocol_state
       [|(t :> Field.t); (state_body_hash :> Field.t)|]
-    |> State_hash.of_hash
+    |> of_hash
 
   let empty = State_hash.dummy
 
