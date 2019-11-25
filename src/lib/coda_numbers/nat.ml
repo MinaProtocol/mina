@@ -50,7 +50,9 @@ struct
               (pad_to_triple_list ~default:Boolean.false_)
               Lsb_first.to_list)
 
-    let constant n = Integer.constant ~m (Bignum_bigint.of_int (N.to_int n))
+    let constant n =
+      Integer.constant ~length:N.length_in_bits ~m
+        (Bignum_bigint.of_int (N.to_int n))
 
     let typ : (field Integer.t, t) Typ.t =
       let typ = Typ.list ~length:N.length_in_bits Boolean.typ in
@@ -96,6 +98,8 @@ struct
           t )
 
     let op op a b = make_checked (fun () -> op ~m a b)
+
+    let add a b = op Integer.add a b
 
     let equal a b = op Integer.equal a b
 

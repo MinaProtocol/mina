@@ -340,11 +340,8 @@ module Base = struct
     in
     let%bind () =
       let%bind correct_coinbase_stack =
-        if Coda_compile_config.pending_coinbase_hack then
-          Checked.return Boolean.true_
-        else
-          Pending_coinbase.Stack.equal_var
-            computed_pending_coinbase_stack_after pending_coinbase_after
+        Pending_coinbase.Stack.equal_var computed_pending_coinbase_stack_after
+          pending_coinbase_after
       in
       Boolean.Assert.is_true correct_coinbase_stack
     in
