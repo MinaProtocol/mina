@@ -30,18 +30,21 @@ else
     esac
 
     # only publish wanted jobs
-    if [[ "$CIRCLE_JOB" == "build-artifacts--testnet_postake_medium_curves"  ]]; then
-          cd src/_build
-          echo "Publishing debs:"
-          ls coda-*.deb
-          set -x
-          ${DEBS3} --codename ${CODENAME} --component main coda-*.deb
-          echo "Exporting Variables: "
-          # Export Variables for Downstream Steps
-          echo "export CODA_DEB_REPO=$CODENAME" >> /tmp/DOCKER_DEPLOY_ENV
-          echo "export CODA_WAS_PUBLISHED=true" >> /tmp/DOCKER_DEPLOY_ENV
-          set +x
-    else
-        echo "WARNING: Circle job: ${CIRCLE_JOB} not in publish list"
-    fi
+    case "$CIRCLE_JOB" in
+        build-artifacts--testnet_postake_medium_curves | build-artifacts--net_10k)
+            cd src/_build
+            echo "Publishing debs:"
+            ls coda-*.deb
+            set -x
+            ${DEBS3} --codename ${CODENAME} --component main coda-*.deb
+            echo "Exporting Variables: "
+            # Export Variables for Downstream Steps
+            echo "export CODA_DEB_REPO=$CODENAME" >> /tmp/DOCKER_DEPLOY_ENV
+            echo "export CODA_WAS_PUBLISHED=true" >> /tmp/DOCKER_DEPLOY_ENV
+            set +x
+            ;;
+        *)
+            echo "WARNING: Circle job: ${CIRCLE_JOB} not in publish list"
+            ;;
+    esac
 fi

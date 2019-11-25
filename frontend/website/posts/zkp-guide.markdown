@@ -59,29 +59,20 @@ author: O(1) Labs
     }
     
     a.customLink {  
-        display: inline-block;
-        font-weight:600;
-        margin-bottom:15px;
-        margin-right:-60px;
-        margin-top: 20px;
-    }
-    
-    .customLink1 {
-        display: inline-block;
+        display: inline;
         font-weight:600;
         margin-bottom:15px;
         margin-top: 20px;
-        margin-right: 0px;
-        margin-bottom: 0px;
+        border-bottom: none !important;
+        background-size: 1px 1em;
+        box-shadow:
+        inset 0 -0.01em white,
+        inset 0 -0.075em rgb(45,158,219);
+        text-shadow:
+        0px 2px white;
+        padding-bottom: 5px;
     }
     
-    .customLink2 {
-        display: inline-block;
-        font-weight:600;
-        margin-bottom:15px;
-        margin-right:-60px;
-        margin-top: 0px;
-    }
     
     main { position: relative; }
 </style>
@@ -129,9 +120,9 @@ If the video above is the 101-level starter for ZKPs, think of this as the 102-l
 <a href="https://blog.cryptographyengineering.com/2014/11/27/zero-knowledge-proofs-illustrated-primer/" class="customLink">Zero Knowledge Proofs: An illustrated primer - 1 & 2 </a>  
 Alright, now we’re getting into the good stuff! This two part series comes from Matthew Green, who has been involved with Zcash since the beginning of the project and who spends most of his time as a cryptographer and professor at Johns Hopkins University. Part one does a few things. First, it goes deeper into the origins and background of ZKPs - including a discussion of why we got interested in them in the first place. Second, it uses a set of real world examples including a telecommunications-themed version of the graph three-coloring problem to explain what makes these types of interaction “zero-knowledge.” Third, it introduces additional important concepts like commitment schemes. While part 1 is distinctly non-technical, part 2 veers into some technical territory that’s still relatively easy to follow. 
 
-<a href="https://hackernoon.com/wtf-is-zero-knowledge-proof-be5b49735f27" class="customLink1"> WTF is Zero-Knowledge Proof </a>
+<a href="https://hackernoon.com/wtf-is-zero-knowledge-proof-be5b49735f27" class="customLink"> WTF is Zero-Knowledge Proof </a>
 & 
-<a href="https://medium.com/coinmonks/introduction-to-zero-knowledge-proof-the-protocol-of-next-generation-blockchain-305b2fc7f8e5" class="customLink2">Introduction to Zero Knowledge Proof: The protocol of next generation Blockchain </a>  
+<a href="https://medium.com/coinmonks/introduction-to-zero-knowledge-proof-the-protocol-of-next-generation-blockchain-305b2fc7f8e5" class=" customLink">Introduction to Zero Knowledge Proof: The protocol of next generation Blockchain </a>  
 Now that you’ve had a chance to really wrap your head around the basic idea of zero knowledge proofs, and have been seen a number of different visual metaphors, let’s introduce a few additional concepts. Both of these pieces are very similar, and work as a pair. While they’re still very 101, they will expand your perspective to include: 1) the difference between interactive and non-interactive zero knowledge proofs and 2) zk-SNARKS. The second piece in particular does a nice job of breaking down each part of the acronym as a way to begin understanding the concepts involved. 
 
 <a href="https://www.bitrates.com/news/p/zero-knowledge-proofs-part-one-the-cryptographic-protocols-and-their-variations" class="customLink">Zero Knowledge Proofs Part One: The Cryptographic Protocols and Their Variations</a>  
