@@ -116,8 +116,6 @@ module Non_snark = struct
 
   let length_in_bits = 256
 
-  let length_in_triples = (length_in_bits + 2) / 3
-
   let digest ({ledger_hash; aux_hash; pending_coinbase_aux} : t) =
     let h = Digestif.SHA256.init () in
     let h = Digestif.SHA256.feed_string h (Ledger_hash.to_bytes ledger_hash) in
@@ -231,9 +229,6 @@ let to_input ({non_snark; pending_coinbase_hash} : t) =
     append
       (Non_snark.to_input non_snark)
       (field (pending_coinbase_hash :> Field.t)))
-
-let length_in_triples =
-  Non_snark.length_in_triples + Pending_coinbase.Hash.length_in_triples
 
 let var_to_input ({non_snark; pending_coinbase_hash} : var) =
   Random_oracle.Input.(

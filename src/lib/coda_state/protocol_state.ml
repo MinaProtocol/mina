@@ -22,7 +22,7 @@ end
 let hash_abstract ~hash_body
     ({previous_state_hash; body} : (State_hash.t, _) Poly.t) =
   let body : State_body_hash.t = hash_body body in
-  Random_oracle.hash ~init:Hash_prefix.Random_oracle.protocol_state
+  Random_oracle.hash ~init:Hash_prefix.protocol_state
     [|(previous_state_hash :> Field.t); (body :> Field.t)|]
   |> State_hash.of_hash
 
@@ -95,7 +95,7 @@ module Body = struct
     Random_oracle.Input.append blockchain_state consensus_state
 
   let hash s =
-    Random_oracle.hash ~init:Hash_prefix.Random_oracle.protocol_state_body
+    Random_oracle.hash ~init:Hash_prefix.protocol_state_body
       (Random_oracle.pack_input (to_input s))
     |> State_body_hash.of_hash
 
@@ -103,8 +103,7 @@ module Body = struct
     let%bind input = var_to_input t in
     make_checked (fun () ->
         Random_oracle.Checked.(
-          hash ~init:Hash_prefix.Random_oracle.protocol_state_body
-            (pack_input input)
+          hash ~init:Hash_prefix.protocol_state_body (pack_input input)
           |> State_body_hash.var_of_hash_packed) )
 end
 
@@ -173,7 +172,7 @@ let hash = hash_abstract ~hash_body:Body.hash
 let hash_checked ({previous_state_hash; body} : var) =
   let%bind body = Body.hash_checked body in
   make_checked (fun () ->
-      Random_oracle.Checked.hash ~init:Hash_prefix.Random_oracle.protocol_state
+      Random_oracle.Checked.hash ~init:Hash_prefix.protocol_state
         [| Hash.var_to_hash_packed previous_state_hash
          ; State_body_hash.var_to_hash_packed body |]
       |> State_hash.var_of_hash_packed )

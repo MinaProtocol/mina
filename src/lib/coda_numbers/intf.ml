@@ -13,8 +13,6 @@ module type S_unchecked = sig
 
   val length_in_bits : int
 
-  val length_in_triples : int
-
   val gen : t Quickcheck.Generator.t
 
   val zero : t
@@ -70,8 +68,6 @@ module type S_checked = sig
   val of_bits : Boolean.var Bitstring.Lsb_first.t -> t
 
   val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
-
-  val to_triples : t -> (Boolean.var Triple.t list, _) Checked.t
 
   val to_integer : t -> field Snarky_integer.Integer.t
 
