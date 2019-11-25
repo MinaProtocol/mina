@@ -14,7 +14,7 @@ module Message = struct
 
   let derive t ~private_key ~public_key:pk =
     let { User_command_payload.Poly.common=
-            {User_command_payload.Common.Poly.fee; nonce; memo}
+            {User_command_payload.Common.Poly.fee; nonce; valid_until; memo}
         ; body= {Transaction_union_payload.Body.amount; public_key; tag} } =
       Transaction_union_payload.of_user_command_payload t
     in
@@ -29,6 +29,7 @@ module Message = struct
           (Signature_lib.Public_key.compress (Inner_curve.to_affine_exn pk))
       ; Fee.to_bits fee
       ; Account_nonce.Bits.to_bits nonce
+      ; Global_slot.to_bits valid_until
       ; User_command_memo.to_bits memo
       ; Amount.to_bits amount
       ; pk_bits public_key

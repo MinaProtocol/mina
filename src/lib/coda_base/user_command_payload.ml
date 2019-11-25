@@ -94,7 +94,7 @@ module Common = struct
     let to_input ({fee; nonce; valid_until; memo} : var) =
       let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
       let%map nonce = Account_nonce.Checked.to_bits nonce
-      and valid_until = Global_slot.Checked.to_triples valid_until in
+      and valid_until = Global_slot.Checked.to_bits valid_until in
       Random_oracle.Input.bitstrings
         [| s (Currency.Fee.var_to_bits fee)
          ; s nonce
