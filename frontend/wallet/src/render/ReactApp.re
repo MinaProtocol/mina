@@ -23,9 +23,9 @@ let make = () => {
     <OnboardingProvider value=onboardingValue>
       <ProcessDispatchProvider value=dispatch>
         <ReasonApollo.Provider client=Apollo.client>
-          <ReactIntl.IntlProvider
-            locale={locale->Locale.toString}
-            messages={locale->Locale.translations->Locale.translationsToDict}>
+          // <ReactIntl.IntlProvider
+          //   locale={locale->Locale.toString}
+          //   messages={locale->Locale.translations->Locale.translationsToDict}>
             {isOnboarding
                ? <Onboarding />
                : <ToastProvider value=toastValue>
@@ -33,7 +33,7 @@ let make = () => {
                  <Main> <SideBar /> <Router /> </Main>
                  <Footer />
                </ToastProvider>}
-          </ReactIntl.IntlProvider>
+          // </ReactIntl.IntlProvider>
         </ReasonApollo.Provider>
       </ProcessDispatchProvider>
     </OnboardingProvider>

@@ -167,6 +167,14 @@ module Fs = {
     "";
 
   [@bs.val] [@bs.module "fs"]
+  external readFileSync:
+    (
+      string,
+      string,
+    ) => string =
+    "readFileSync";
+
+  [@bs.val] [@bs.module "fs"]
   external openSync: (string, string) => Stream.Writable.t = "";
 
   [@bs.val] [@bs.module "fs"]

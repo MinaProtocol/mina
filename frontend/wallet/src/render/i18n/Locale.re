@@ -1,7 +1,7 @@
-[@bs.module "./translations/vn.json"]
-external vn: array(ReactIntl.translation) = "default";
-[@bs.module "./en.json"]
-external en: array(ReactIntl.translation) = "default";
+// [@bs.module "./translations/vn.json"]
+// external vn: array(ReactIntl.translation) = "default";
+// [@bs.module "./en.json"]
+// external en: array(ReactIntl.translation) = "default";
 
 type locale =
   | En
@@ -14,10 +14,20 @@ let toString =
   | En => "en"
   | Vn => "vn";
 
+external jsonToTranslations: Js.Json.t => array(ReactIntl.translation) =
+  "%identity";
+
+[@bs.val] [@bs.scope "window"] external getTranslation: string => string = "getTranslation";
+
+let fileToReactIntl = (name) => {
+  let file = getTranslation(name);
+  jsonToTranslations(Js.Json.parseExn(file));
+};
+
 let translations =
   fun
-  | En => en
-  | Vn => vn;
+  | En => fileToReactIntl("en")
+  | Vn => fileToReactIntl("vn");
 
 // translationsToDict coerces the JSON translation files into a valid data structure
 let translationsToDict = (translations: array(ReactIntl.translation)) => {
