@@ -133,14 +133,14 @@ module Api = struct
     let%bind () = wait_for_no_rpcs () in
     Coda_process.disconnect t.workers.(i) ~logger
 
-  let run_user_command t i (sk : Private_key.t) fee ~body =
+  let run_user_command t i (sk : Private_key.t) fee valid_until ~body =
     let open Deferred.Option.Let_syntax in
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
     let%bind nonce = Coda_process.get_nonce_exn worker pk_of_sk in
     let payload =
       User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
-        ~body
+        ~valid_until ~body
     in
     let user_cmd =
       ( User_command.sign (Keypair.of_private_key_exn sk) payload
@@ -152,12 +152,12 @@ module Api = struct
     in
     user_cmd
 
-  let delegate_stake t i delegator_sk delegate_pk fee =
-    run_user_command t i delegator_sk fee
+  let delegate_stake t i delegator_sk delegate_pk fee valid_until =
+    run_user_command t i delegator_sk fee valid_until
       ~body:(Stake_delegation (Set_delegate {new_delegate= delegate_pk}))
 
-  let send_payment t i sender_sk receiver_pk amount fee =
-    run_user_command t i sender_sk fee
+  let send_payment t i sender_sk receiver_pk amount fee valid_until =
+    run_user_command t i sender_sk fee valid_until
       ~body:(Payment {receiver= receiver_pk; amount})
 
   (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
@@ -477,12 +477,13 @@ module Delegation : sig
 end = struct
   let delegate_stake ?acceptable_delay:(delay = 7) (testnet : Api.t) ~node
       ~delegator ~delegatee =
+    let valid_until = Coda_numbers.Global_slot.max_value in
     let fee = User_command.minimum_fee in
     let worker = testnet.workers.(node) in
     let%bind _ =
       let open Deferred.Option.Let_syntax in
       let%bind user_cmd =
-        Api.delegate_stake testnet node delegator delegatee fee
+        Api.delegate_stake testnet node delegator delegatee fee valid_until
       in
       let%map (all_passed_root : unit Ivar.t list) =
         let open Deferred.Let_syntax in
@@ -528,6 +529,7 @@ end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
+    let valid_until = Coda_numbers.Global_slot.max_value in
     let fee = User_command.minimum_fee in
     let%bind (_ : unit option list) =
       Deferred.List.init n ~f:(fun _ ->
@@ -544,7 +546,7 @@ end = struct
                 let worker = testnet.workers.(node) in
                 let%bind user_cmd =
                   Api.send_payment testnet node sender_sk receiver_pk amount
-                    fee
+                    fee valid_until
                 in
                 let%map (all_passed_root : unit Ivar.t list) =
                   let open Deferred.Let_syntax in
@@ -581,6 +583,7 @@ end = struct
       ~(keypairs : Keypair.t list) ~n =
     let amount = Currency.Amount.of_int 10 in
     let fee = User_command.minimum_fee in
+    let valid_until = Coda_numbers.Global_slot.max_value in
     let%bind new_payment_readers =
       Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
           let pk = Public_key.(compress @@ of_private_key_exn sender) in
@@ -594,6 +597,7 @@ end = struct
         let%bind user_command =
           let%map payment =
             Api.send_payment testnet node sender receiver_pk amount fee
+              valid_until
           in
           Option.value_exn payment
         in

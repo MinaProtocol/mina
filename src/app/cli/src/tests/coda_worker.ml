@@ -584,6 +584,7 @@ module T = struct
               in
               let payload : User_command.Payload.t =
                 User_command.Payload.create ~fee ~nonce ~memo
+                  ~valid_until:Coda_numbers.Global_slot.max_value
                   ~body:(Payment {receiver= receiver_pk; amount})
               in
               User_command.sign (Keypair.of_private_key_exn sender_sk) payload
