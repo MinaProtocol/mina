@@ -93,7 +93,7 @@ module Gen = struct
     and memo = String.quickcheck_generator in
     let%map body = create_body receiver in
     let payload : Payload.t =
-      Payload.create ~fee ~nonce
+      Payload.create ~fee ~nonce ~valid_until:Global_slot.max_value
         ~memo:(User_command_memo.create_by_digesting_string_exn memo)
         ~body
     in
@@ -233,7 +233,8 @@ module Gen = struct
           in
           let memo = User_command_memo.dummy in
           let payload =
-            Payload.create ~fee ~nonce ~memo ~body:(Payment {receiver; amount})
+            Payload.create ~fee ~valid_until:Global_slot.max_value ~nonce ~memo
+              ~body:(Payment {receiver; amount})
           in
           let sign' =
             match sign_type with `Fake -> For_tests.fake_sign | `Real -> sign

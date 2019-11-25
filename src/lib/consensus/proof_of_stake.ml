@@ -2,7 +2,9 @@ open Async_kernel
 open Core_kernel
 open Signed
 open Unsigned
+module GS = Global_slot
 open Coda_numbers
+module Global_slot = GS
 open Currency
 open Fold_lib
 open Signature_lib
@@ -1343,12 +1345,10 @@ module Data = struct
   end
 
   module Consensus_transition = struct
-    include Global_slot
-    module Value = Global_slot
+    include Coda_numbers.Global_slot
+    module Value = Coda_numbers.Global_slot
 
-    let typ = Global_slot.Checked.typ
-
-    type var = Global_slot.Checked.t
+    type var = Checked.t
 
     let genesis = zero
   end
@@ -1977,7 +1977,7 @@ module Data = struct
             ( Length.Stable.V1.t
             , Vrf.Output.Truncated.Stable.V1.t
             , Amount.Stable.V1.t
-            , Global_slot.Stable.V1.t
+            , Coda_numbers.Global_slot.Stable.V1.t
             , Epoch_data.Staking.Value.Stable.V1.t
             , Epoch_data.Next.Value.Stable.V1.t
             , bool
