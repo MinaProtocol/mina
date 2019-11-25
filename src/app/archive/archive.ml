@@ -64,17 +64,17 @@ let setup_server ~logger ~hasura_port ~server_port =
 
 let command =
   let open Command.Let_syntax in
+  let flag_with_default ~name ~default message =
+    Flag.Port.create ~name ~default message >>| Option.value ~default
+  in
   let%map_open log_json = Flag.Log.json
   and log_level = Flag.Log.level
   and server_port =
-    flag "server-port" ~doc:"PORT port to launch server for the archive server"
-    @@ Command.Param.optional_with_default Port.default_archive
-         Cli_lib.Arg_type.int16
+    flag_with_default ~name:"server-port" ~default:Port.default_archive
+      "port to launch the archive server"
   and hasura_port =
-    flag "hasura-port"
-      ~doc:"PORT port for archive process to communicate with Hasura"
-    @@ Command.Param.optional_with_default default_hasura_port
-         Cli_lib.Arg_type.int16
+    flag_with_default ~name:"hasura-port" ~default:default_hasura_port
+      "port for archive process to communicate with Hasura"
   in
   fun () ->
     let logger = Logger.create () in

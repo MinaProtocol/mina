@@ -34,17 +34,29 @@ module Port = struct
 
   open Port
 
-  let daemon =
-    create ~name:"daemon-port" ~default:default_client
-      "Client to daemon local communication"
+  module Daemon = struct
+    let client =
+      create ~name:"client-port" ~default:default_client
+        "local RPC-server for clients to interact with the daemon"
 
-  let rest =
-    create ~name:"rest-port" ~default:default_rest
-      "Client to daemon rest server"
+    let rest_server =
+      create ~name:"rest-port" ~default:default_rest
+        "local REST-server for daemon interaction"
 
-  let archive =
-    create ~name:"new-archive" ~default:default_archive
-      "Daemon to archive process communication"
+    let archive =
+      create ~name:"new-archive" ~default:default_archive
+        "Daemon to archive process communication"
+  end
+
+  module Client = struct
+    let daemon =
+      create ~name:"daemon-port" ~default:default_client
+        "Client to daemon local communication"
+
+    let rest =
+      create ~name:"rest-port" ~default:default_rest
+        "Client to local daemon rest server communication"
+  end
 end
 
 module Log = struct

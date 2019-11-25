@@ -80,9 +80,9 @@ let daemon logger =
                (default: %d)"
               Port.default_external)
          (optional int16)
-     and client_port = Flag.Port.daemon
-     and rest_server_port = Flag.Port.rest
-     and archive_process_port = Flag.Port.archive
+     and client_port = Flag.Port.Daemon.client
+     and rest_server_port = Flag.Port.Daemon.rest_server
+     and archive_process_port = Flag.Port.Daemon.archive
      and metrics_server_port =
        flag "metrics-port"
          ~doc:
