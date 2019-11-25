@@ -292,8 +292,7 @@ end
 let instance_hash wrap_vk =
   let open Coda_base in
   let init =
-    Random_oracle.update
-      ~state:Hash_prefix.Random_oracle.transition_system_snark
+    Random_oracle.update ~state:Hash_prefix.transition_system_snark
       Snark_params.Tick.Verifier.(
         let vk = vk_of_backend_vk wrap_vk in
         let g1 = Tick.Inner_curve.to_affine_exn in
