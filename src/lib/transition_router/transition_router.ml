@@ -335,6 +335,8 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       don't_wait_for
       @@ Strict_pipe.Reader.iter valid_transition_reader
            ~f:(fun enveloped_transition ->
+             Strict_pipe.Writer.write !transition_writer_ref
+               enveloped_transition ;
              let incoming_transition =
                Envelope.Incoming.data enveloped_transition
              in
