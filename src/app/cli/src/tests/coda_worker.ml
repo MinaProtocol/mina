@@ -97,6 +97,8 @@ module T = struct
         , unit
         , Coda_lib.Root_diff.t Pipe.Reader.t )
         Rpc_parallel.Function.t
+    ; initialization_signal:
+        ('worker, unit, unit Ivar.t) Rpc_parallel.Function.t
     ; prove_receipt:
         ( 'worker
         , Receipt.Chain_hash.t * Receipt.Chain_hash.t
@@ -155,6 +157,7 @@ module T = struct
            unit
         -> External_transition.Validated.Stable.V1.t Pipe.Reader.t Deferred.t
     ; coda_root_diff: unit -> Coda_lib.Root_diff.t Pipe.Reader.t Deferred.t
+    ; coda_initialization_signal: unit -> unit Ivar.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
         -> (Receipt.Chain_hash.t * User_command.t list) Deferred.t
@@ -208,6 +211,9 @@ module T = struct
 
     let root_diff_impl ~worker_state ~conn_state:() () =
       worker_state.coda_root_diff ()
+
+    let initialization_signal_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_initialization_signal ()
 
     let get_balance_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_get_balance pk
@@ -322,6 +328,10 @@ module T = struct
       C.create_pipe ~name:"root_diff" ~f:root_diff_impl ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: Coda_lib.Root_diff.Stable.V1.t] ()
 
+    let initialization_signal =
+      C.create_rpc ~name:"initialization_signal" ~f:initialization_signal_impl
+        ~bin_input:Unit.bin_t ~bin_output:[%bin_type_class: unit Ivar.t] ()
+
     let sync_status =
       C.create_pipe ~name:"sync_status" ~f:sync_status_impl
         ~bin_input:Unit.bin_t ~bin_output:Sync_status.Stable.V1.bin_t ()
@@ -366,6 +376,7 @@ module T = struct
       ; start
       ; verified_transitions
       ; root_diff
+      ; initialization_signal
       ; get_balance
       ; get_nonce
       ; root_length
@@ -658,6 +669,9 @@ module T = struct
                    Linear_pipe.write_if_open w diff )) ;
             return r.pipe
           in
+          let coda_initialization_signal () =
+            return (Coda_lib.initialization_signal coda)
+          in
           let coda_dump_tf () =
             Deferred.return
               ( Coda_lib.dump_tf coda |> Or_error.ok
@@ -707,6 +721,7 @@ module T = struct
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions
           ; coda_root_diff= with_monitor coda_root_diff
+          ; coda_initialization_signal= with_monitor coda_initialization_signal
           ; coda_get_balance= with_monitor coda_get_balance
           ; coda_get_nonce= with_monitor coda_get_nonce
           ; coda_root_length= with_monitor coda_root_length

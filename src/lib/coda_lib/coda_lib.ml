@@ -457,6 +457,16 @@ module Root_diff = struct
     {user_commands: User_command.Stable.V1.t list; root_length: int}
 end
 
+let initialization_signal t =
+  let signal = Ivar.create () in
+  don't_wait_for
+  @@ Broadcast_pipe.Reader.iter t.components.transition_frontier ~f:(function
+       | None ->
+           Deferred.unit
+       | Some _ ->
+           return @@ Ivar.fill_if_empty signal () ) ;
+  signal
+
 (* TODO: this is a bad pattern for two reasons:
  *   - uses an abstraction leak to patch new functionality instead of making a new extension
  *   - every call to this function will create a new, unique pipe with it's own thread for transfering

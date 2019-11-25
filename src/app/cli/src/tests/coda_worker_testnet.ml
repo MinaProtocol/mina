@@ -421,6 +421,14 @@ let events workers start_reader =
 let start_checks logger (workers : Coda_process.t array) start_reader testnet
     ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
+  let%bind initialization_signals =
+    Deferred.Array.map workers ~f:(fun worker ->
+        Coda_process.initialization_signal_exn worker )
+  in
+  let%map () =
+    Deferred.all_unit
+      (List.map (Array.to_list initialization_signals) ~f:Ivar.read)
+  in
   don't_wait_for
     (start_prefix_check logger workers event_reader testnet ~acceptable_delay) ;
   start_payment_check logger root_reader testnet
@@ -453,7 +461,8 @@ let test ?is_archive_node logger n proposers snark_work_public_keys
   let workers = List.to_array workers in
   let start_reader, start_writer = Linear_pipe.create () in
   let testnet = Api.create configs workers start_writer in
-  start_checks logger workers start_reader testnet ~acceptable_delay ;
+  don't_wait_for
+  @@ start_checks logger workers start_reader testnet ~acceptable_delay ;
   testnet
 
 module Delegation : sig
