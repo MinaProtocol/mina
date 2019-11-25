@@ -6,6 +6,7 @@
 open Core_kernel
 open Coda_base
 open Coda_transition
+open Network_peer
 
 module Name = struct
   let t = __MODULE__

@@ -40,7 +40,7 @@ let main () =
   Parallel.init_master () ;
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
-      ~acceptable_delay ~snark_worker_public_keys:None
+      ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~proposers:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections:None

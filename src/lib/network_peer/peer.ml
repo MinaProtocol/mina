@@ -8,13 +8,13 @@ module Id = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = string [@@deriving bin_io, compare, sexp, version]
+      type t = string [@@deriving bin_io, compare, hash, sexp, version]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t
+  type t = Stable.Latest.t [@@deriving compare, hash, sexp]
 
   (** Convert to the libp2p-defined base58 string *)
   let to_string (x : t) = x
@@ -125,7 +125,7 @@ module Display = struct
   module Stable = struct
     module V1 = struct
       type t = {host: string; libp2p_port: int; peer_id: string}
-      [@@deriving yojson, version]
+      [@@deriving yojson, version, sexp, fields]
 
       let to_latest = Fn.id
     end

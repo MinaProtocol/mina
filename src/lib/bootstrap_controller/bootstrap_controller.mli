@@ -1,6 +1,7 @@
 open Async_kernel
 open Coda_transition
 open Pipe_lib
+open Network_peer
 
 val run :
      logger:Logger.t

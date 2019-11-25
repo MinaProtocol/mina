@@ -4,7 +4,6 @@ go 1.12
 
 require (
 	cloud.google.com/go v0.43.0 // indirect
-	github.com/Kubuxu/go-os-helper v0.0.1 // indirect
 	github.com/btcsuite/btcd v0.0.0-20190629003639-c26ffa870fd8 // indirect
 	github.com/btcsuite/goleveldb v1.0.0 // indirect
 	github.com/campoy/jsonenums v0.0.0-20180221195324-eec6d38da64e
@@ -63,8 +62,6 @@ require (
 	github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
 	github.com/miekg/dns v1.1.15 // indirect
-	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect
-	github.com/modern-go/reflect2 v1.0.1 // indirect
 	github.com/mr-tron/base58 v1.1.2
 	github.com/multiformats/go-multiaddr v0.0.4
 	github.com/multiformats/go-multiaddr-dns v0.0.3 // indirect

@@ -3,6 +3,7 @@ open Core_kernel
 open Coda_base
 open Pipe_lib
 open Signature_lib
+open Network_peer
 
 (** A [Resource_pool_base_intf] is a mutable pool of resources that supports
  *  mutation via some [Resource_pool_diff_intf]. A [Resource_pool_base_intf]

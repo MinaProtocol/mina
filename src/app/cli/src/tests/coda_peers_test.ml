@@ -18,7 +18,7 @@ let main () =
   Coda_processes.init () ;
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
-      ~acceptable_delay ~snark_worker_public_keys:None
+      ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~proposers:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections:None
@@ -29,6 +29,12 @@ let main () =
   let%bind () =
     Deferred.all_unit
       (List.map2_exn workers expected_peers ~f:(fun worker expected_peers ->
+           let expected_peers =
+             List.map expected_peers ~f:(fun p ->
+                 Host_and_port.create
+                   ~host:(Unix.Inet_addr.to_string p.external_ip)
+                   ~port:p.libp2p_port )
+           in
            let%map peers = Coda_process.peers_exn worker in
            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
              !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: \

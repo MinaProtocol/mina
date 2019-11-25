@@ -4,6 +4,7 @@ open Coda_state
 open Pipe_lib
 open Coda_transition
 open O1trace
+open Network_peer
 
 let create_bufferred_pipe ?name () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
@@ -76,14 +77,14 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
            Deferred.any
              [ high_connectivity_deferred
              ; ( after (Time_ns.Span.of_sec connectivity_time_uppperbound)
-               >>| fun () ->
+               >>= fun () ->
+               let%map peers = Coda_networking.peers network in
                if not @@ Deferred.is_determined high_connectivity_deferred then
                  Logger.info logger
                    !"Will start bootstrapping without connecting with too \
                      many peers"
                    ~metadata:
-                     [ ( "num peers"
-                       , `Int (List.length @@ Coda_networking.peers network) )
+                     [ ("num peers", `Int (List.length @@ peers))
                      ; ( "Max seconds to wait for high connectivity"
                        , `Float connectivity_time_uppperbound ) ]
                    ~location:__LOC__ ~module_:__MODULE__

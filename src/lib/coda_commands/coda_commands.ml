@@ -258,8 +258,9 @@ let get_status ~flag t =
   in
   let commit_id = Coda_version.commit_id in
   let conf_dir = (Coda_lib.config t).conf_dir in
+  let%map peers = Coda_lib.peers t in
   let peers =
-    List.map (Coda_lib.peers t) ~f:(fun peer ->
+    List.map peers ~f:(fun peer ->
         Network_peer.Peer.to_discovery_host_and_port peer
         |> Host_and_port.to_string )
   in
@@ -395,15 +396,9 @@ let get_status ~flag t =
       | `Check_again time ->
           sprintf "None this epoch… checking at %s" (str time) )
   in
-  let libp2p_peer_id =
-    Option.value ~default:"<not connected to libp2p>"
-      Option.(
-        Coda_lib.net t |> Coda_networking.net2 >>= Coda_net2.me
-        >>| Coda_net2.Keypair.to_peerid >>| Coda_net2.PeerID.to_string)
-  in
   let addrs_and_ports =
     Node_addrs_and_ports.to_display
-      (Coda_lib.config t).net_config.gossip_net_params.addrs_and_ports
+      (Coda_lib.config t).gossip_net_params.addrs_and_ports
   in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
@@ -427,7 +422,6 @@ let get_status ~flag t =
   ; consensus_time_now
   ; consensus_mechanism
   ; consensus_configuration
-  ; libp2p_peer_id
   ; addrs_and_ports }
 
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t

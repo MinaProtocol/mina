@@ -70,6 +70,7 @@ const (
 	listeningAddrs
 	addPeer
 	beginAdvertising
+	findPeer
 )
 
 type envelope struct {
@@ -707,6 +708,14 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	return "beginAdvertising success", nil
 }
 
+type findPeerMsg struct {
+	PeerID string `json:"peer_id"`
+}
+
+func (ap *findPeerMsg) run(app *app) (interface{}, error) {
+	// TODO
+}
+
 var msgHandlers = map[methodIdx]func() action{
 	configure:           func() action { return &configureMsg{} },
 	listen:              func() action { return &listenMsg{} },
@@ -724,6 +733,7 @@ var msgHandlers = map[methodIdx]func() action{
 	listeningAddrs:      func() action { return &listeningAddrsMsg{} },
 	addPeer:             func() action { return &addPeerMsg{} },
 	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
+	findPeer:            func() action { return &findPeerMsg{} },
 }
 
 type errorResult struct {

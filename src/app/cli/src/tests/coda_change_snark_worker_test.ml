@@ -21,7 +21,7 @@ let main () =
     if i = snark_worker_and_proposer_id then Some largest_public_key else None
   in
   let%bind testnet =
-    Coda_worker_testnet.test logger n proposers snark_work_public_keys
+    Coda_worker_testnet.test ~name logger n proposers snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in

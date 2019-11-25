@@ -3,6 +3,7 @@ open Core_kernel
 open Coda_base
 open Coda_state
 open Coda_transition
+open Network_peer
 
 type t =
   { validated_transition: External_transition.Validated.t
@@ -59,7 +60,7 @@ let build ~logger ~verifier ~trust_system ~parent
             match sender with
             | None | Some Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote inet_addr) ->
+            | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
                 Trust_system.(
                   record trust_system logger inet_addr
                     Actions.(Gossiped_invalid_transition, Some (message, [])))
@@ -74,7 +75,7 @@ let build ~logger ~verifier ~trust_system ~parent
             match sender with
             | None | Some Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote inet_addr) ->
+            | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
                 let error_string =
                   Staged_ledger.Staged_ledger_error.to_string
                     staged_ledger_error

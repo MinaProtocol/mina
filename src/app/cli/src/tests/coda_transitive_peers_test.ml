@@ -20,7 +20,7 @@ let main () =
   let max_concurrent_connections = None in
   let configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
-      ~acceptable_delay ~snark_worker_public_keys:None
+      ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~proposers:(Fn.const None) ~work_selection_method ~trace_dir
       ~max_concurrent_connections
   in
@@ -32,10 +32,10 @@ let main () =
     List.nth_exn addrs_and_ports_list n |> Node_addrs_and_ports.to_display
   in
   Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-    !"connecting to peers %{sexp: Host_and_port.t list}\n"
+    !"connecting to peers %{sexp: Node_addrs_and_ports.t list}\n"
     peers ;
   let config =
-    Coda_process.local_config ~peers ~addrs_and_ports ~acceptable_delay
+    Coda_process.local_config ~addrs_and_ports ~acceptable_delay ~chain_id:name
       ~snark_worker_key:None ~proposer:None ~program_dir ~work_selection_method
       ~trace_dir ~offset:Time.Span.zero () ~max_concurrent_connections
       ~is_archive_node:false
@@ -44,14 +44,25 @@ let main () =
   let%bind _ = after (Time.Span.of_sec 10.) in
   let%bind peers = Coda_process.peers_exn worker in
   Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-    !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: Host_and_port.t list}\n"
+    !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: \
+      Node_addrs_and_ports.t list}\n"
     peers expected_peers ;
   let module S = Host_and_port.Set in
   assert (
     S.equal
       (S.of_list
-         (peers |> List.map ~f:Network_peer.Peer.to_discovery_host_and_port))
-      (S.of_list expected_peers) ) ;
+         ( peers
+         |> List.map ~f:(fun p ->
+                Host_and_port.create
+                  ~host:(Unix.Inet_addr.to_string p.host)
+                  ~port:p.libp2p_port ) ))
+      (S.of_list
+         (List.map
+            ~f:(fun p ->
+              Host_and_port.create
+                ~host:(Unix.Inet_addr.to_string p.external_ip)
+                ~port:p.libp2p_port )
+            expected_peers)) ) ;
   let%bind () = Coda_process.disconnect worker ~logger in
   Deferred.List.iter workers ~f:(Coda_process.disconnect ~logger)
 

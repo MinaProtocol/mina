@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Module_version
+open Network_peer
 
 module Make (Ledger_proof : sig
   type t [@@deriving bin_io, compare, sexp, to_yojson, version]

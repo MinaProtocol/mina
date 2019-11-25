@@ -8,6 +8,7 @@ open Coda_base
 open Module_version
 open Pipe_lib
 open Signature_lib
+open Network_peer
 
 (* TEMP HACK UNTIL DEFUNCTORING: transition frontier interface is simplified *)
 module type Transition_frontier_intf = sig
@@ -1230,7 +1231,9 @@ let%test_module _ =
         expected
 
     let mock_sender =
-      Envelope.Sender.Remote (Unix.Inet_addr.of_string "1.2.3.4")
+      Envelope.Sender.Remote
+        ( Unix.Inet_addr.of_string "1.2.3.4"
+        , Peer.Id.unsafe_of_string "contents should be irrelevant" )
 
     let%test_unit "rebroadcastable transaction behavior" =
       Thread_safe.block_on_async_exn (fun () ->

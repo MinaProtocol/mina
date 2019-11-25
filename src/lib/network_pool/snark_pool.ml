@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 open Pipe_lib
+open Network_peer
 
 module type S = sig
   type transition_frontier
@@ -687,7 +688,9 @@ let%test_module "random set test" =
           (Quickcheck.Generator.tuple2 Fee_with_prover.gen Fee_with_prover.gen)
       in
       let fake_sender =
-        Envelope.Sender.Remote (Unix.Inet_addr.of_string "1.2.4.8")
+        Envelope.Sender.Remote
+          ( Unix.Inet_addr.of_string "1.2.4.8"
+          , Peer.Id.unsafe_of_string "contents should be irrelevant" )
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in

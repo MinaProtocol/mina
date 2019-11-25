@@ -9,7 +9,7 @@ let main who_proposes () =
   let proposers i = if i = who_proposes then Some i else None in
   let snark_work_public_keys _ = None in
   let%bind testnet =
-    Coda_worker_testnet.test logger n proposers snark_work_public_keys
+    Coda_worker_testnet.test ~name logger n proposers snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in

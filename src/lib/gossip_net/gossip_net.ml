@@ -1,6 +1,6 @@
 include Intf
 module Any = Any
-module Real = Real
+module Libp2p = Libp2p
 module Fake = Fake
 
 module type S = sig
@@ -12,7 +12,7 @@ module type S = sig
 
   module Any : Any.S with module Rpc_intf := Rpc_intf
 
-  module Real : Real.S with module Rpc_intf := Rpc_intf
+  module Libp2p : Libp2p.S with module Rpc_intf := Rpc_intf
 
   module Fake : Fake.S with module Rpc_intf := Rpc_intf
 end
@@ -23,5 +23,5 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
   module Message = Message
   module Any = Any.Make (Rpc_intf)
   module Fake = Fake.Make (Rpc_intf)
-  module Real = Real.Make (Rpc_intf)
+  module Libp2p = Libp2p.Make (Rpc_intf)
 end

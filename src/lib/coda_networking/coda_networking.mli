@@ -4,6 +4,7 @@ open Coda_base
 open Coda_transition
 open Network_pool
 open Pipe_lib
+open Network_peer
 
 exception No_initial_peers
 
@@ -116,7 +117,7 @@ val states :
   -> (External_transition.t Envelope.Incoming.t * Block_time.t)
      Strict_pipe.Reader.t
 
-val peers : t -> Network_peer.Peer.t list
+val peers : t -> Network_peer.Peer.t list Deferred.t
 
 val on_first_received_message : t -> f:(unit -> 'a) -> 'a Deferred.t
 
@@ -126,15 +127,16 @@ val on_first_high_connectivity : t -> f:(unit -> 'a) -> 'a Deferred.t
 
 val online_status : t -> [`Online | `Offline] Broadcast_pipe.Reader.t
 
-val random_peers : t -> int -> Network_peer.Peer.t list
+val random_peers : t -> int -> Network_peer.Peer.t list Deferred.t
 
 val get_ancestry :
      t
-  -> Unix.Inet_addr.t
+  -> Peer.Id.t
   -> Consensus.Data.Consensus_state.Value.t
   -> ( External_transition.t
      , State_body_hash.t list * External_transition.t )
      Proof_carrying_data.t
+     Envelope.Incoming.t
      Deferred.Or_error.t
 
 val get_bootstrappable_best_tip :
@@ -160,7 +162,7 @@ val get_transition_chain :
 
 val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
-  -> Unix.Inet_addr.t
+  -> Peer.Id.t
   -> State_hash.t
   -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
      Deferred.Or_error.t
@@ -192,9 +194,16 @@ val glue_sync_ledger :
   -> unit
 
 val query_peer :
-  t -> Network_peer.Peer.t -> ('q, 'r) Rpcs.rpc -> 'q -> 'r Deferred.Or_error.t
+     t
+  -> Network_peer.Peer.Id.t
+  -> ('q, 'r) Rpcs.rpc
+  -> 'q
+  -> 'r Coda_base.Rpc_intf.rpc_response Deferred.t
 
-val initial_peers : t -> Host_and_port.t list
+val ip_for_peer :
+  t -> Network_peer.Peer.Id.t -> Unix.Inet_addr.t option Deferred.t
+
+val initial_peers : t -> Coda_net2.Multiaddr.t list
 
 val peers_by_ip : t -> Unix.Inet_addr.t -> Network_peer.Peer.t list
 

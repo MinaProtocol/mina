@@ -4,6 +4,7 @@ open Pipe_lib
 open Cache_lib
 open Coda_base
 open Coda_transition
+open Network_peer
 
 module type Transition_handler_validator_intf = sig
   type unprocessed_transition_cache

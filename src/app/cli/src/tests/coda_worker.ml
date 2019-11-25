@@ -17,7 +17,8 @@ module Input = struct
     ; trace_dir: string option
     ; program_dir: string
     ; acceptable_delay: Time.Span.t
-    ; peers: Host_and_port.t list
+    ; chain_id: string
+    ; peers: string list
     ; max_concurrent_connections: int option
     ; is_archive_node: bool }
   [@@deriving bin_io]
@@ -390,15 +391,16 @@ module T = struct
         ; work_selection_method
         ; conf_dir
         ; trace_dir
+        ; chain_id
         ; peers
-        ; max_concurrent_connections
+        ; max_concurrent_connections= _
         ; is_archive_node
         ; _ } =
       let logger =
         Logger.create
           ~metadata:
             [ ("host", `String addrs_and_ports.external_ip)
-            ; ("port", `Int addrs_and_ports.communication_port) ]
+            ; ("port", `Int addrs_and_ports.libp2p_port) ]
           ()
       in
       let pids = Child_processes.Termination.create_pid_table () in
@@ -466,44 +468,30 @@ module T = struct
             Consensus.Data.Local_state.create initial_propose_keys
           in
           let gossip_net_params =
-            Gossip_net.Real.Config.
+            Gossip_net.Libp2p.Config.
               { timeout= Time.Span.of_sec 3.
-              ; target_peer_count= 8
+              ; initial_peers= List.map ~f:Coda_net2.Multiaddr.of_string peers
+              ; addrs_and_ports=
+                  Node_addrs_and_ports.of_display addrs_and_ports
               ; conf_dir
-              ; initial_peers= peers
-              ; chain_id= "bogus chain id for testing"
-              ; addrs_and_ports
+              ; chain_id
               ; logger
               ; trust_system
-              ; enable_libp2p= false
-              ; disable_haskell= false
-              ; libp2p_keypair= None
-              ; libp2p_peers= []
-              ; max_concurrent_connections }
+              ; keypair= None }
           in
           let net_config =
             { Coda_networking.Config.logger
             ; trust_system
             ; time_controller
             ; consensus_local_state
-            ; gossip_net_params=
-                { Coda_networking.Gossip_net.Config.timeout= Time.Span.of_sec 3.
-                ; target_peer_count= 8
-                ; conf_dir
-                ; initial_peers= peers
-                ; chain_id= "bogus chain id for testing"
-                ; addrs_and_ports=
-                    Node_addrs_and_ports.of_display addrs_and_ports
-                ; logger
-                ; trust_system
-                ; enable_libp2p= false
-                ; libp2p_keypair= None
-                ; libp2p_peers= []
-                ; max_concurrent_connections
-                ; log_gossip_heard=
-                    { snark_pool_diff= false
-                    ; transaction_pool_diff= false
-                    ; new_state= false } } }
+            ; log_gossip_heard=
+                { snark_pool_diff= false
+                ; transaction_pool_diff= false
+                ; new_state= false }
+            ; creatable_gossip_net=
+                Coda_networking.Gossip_net.(
+                  Any.Creatable
+                    ((module Libp2p), Libp2p.create gossip_net_params)) }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
@@ -546,7 +534,7 @@ module T = struct
           in
           Logger.info logger "Worker finish setting up coda"
             ~module_:__MODULE__ ~location:__LOC__ ;
-          let coda_peers () = return (Coda_lib.peers coda) in
+          let coda_peers () = Coda_lib.peers coda in
           let coda_start () = Coda_lib.start coda in
           let coda_get_all_transitions pk =
             let external_transition_database =

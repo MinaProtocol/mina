@@ -2,6 +2,7 @@ open Core_kernel
 open Async
 open Coda_base
 open Coda_transition
+open Network_peer
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier

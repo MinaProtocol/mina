@@ -11,6 +11,7 @@ open Signature_lib
 open O1trace
 open Otp_lib
 open Module_version
+open Network_peer
 module Config = Config
 module Subscriptions = Coda_subscriptions
 module Snark_worker_lib = Snark_worker
@@ -75,7 +76,7 @@ let peek_frontier frontier_broadcast_pipe =
 
 let client_port t =
   let {Node_addrs_and_ports.client_port; _} =
-    t.config.net_config.gossip_net_params.addrs_and_ports
+    t.config.gossip_net_params.addrs_and_ports
   in
   client_port
 

@@ -1,5 +1,6 @@
 open Async_kernel
 open Pipe_lib
+open Network_peer
 
 module type S = sig
   type transition_frontier

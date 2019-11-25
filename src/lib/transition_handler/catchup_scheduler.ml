@@ -16,6 +16,7 @@ open Cache_lib
 open Otp_lib
 open Coda_base
 open Coda_transition
+open Network_peer
 
 type t =
   { logger: Logger.t
