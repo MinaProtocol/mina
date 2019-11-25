@@ -51,6 +51,7 @@ module Styles = {
       minWidth(`px(36)),
       maxHeight(`px(48)),
       flexShrink(0),
+      fontSize(`rem(2.25)),
     ]);
 };
 
