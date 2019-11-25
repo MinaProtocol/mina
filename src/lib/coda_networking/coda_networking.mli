@@ -205,8 +205,6 @@ val ip_for_peer :
 
 val initial_peers : t -> Coda_net2.Multiaddr.t list
 
-val peers_by_ip : t -> Unix.Inet_addr.t -> Network_peer.Peer.t list
-
 val net2 : t -> Coda_net2.net option
 
 val ban_notification_reader :

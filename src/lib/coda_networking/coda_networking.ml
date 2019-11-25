@@ -852,8 +852,6 @@ include struct
     (lift ip_for_peer) t peer_id >>| Option.map ~f:(fun peer -> peer.Peer.host)
 end
 
-let peers_by_ip = failwith "TODO replaceme"
-
 let on_first_received_message {first_received_message_signal; _} ~f =
   Ivar.read first_received_message_signal >>| f
 
