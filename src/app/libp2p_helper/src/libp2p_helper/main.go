@@ -10,6 +10,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strconv"
 	"sync"
 	"time"
 
@@ -71,6 +72,7 @@ const (
 	addPeer
 	beginAdvertising
 	findPeer
+	listPeers
 )
 
 type envelope struct {
@@ -562,7 +564,7 @@ func (as *addStreamHandlerMsg) run(app *app) (interface{}, error) {
 		app.writeMsg(incomingStreamUpcall{
 			Upcall:       "incomingStream",
 			RemoteAddr:   stream.Conn().RemoteMultiaddr().String(),
-			RemotePeerID: stream.Conn().RemotePeer().String(),
+			RemotePeerID: peer.IDB58Encode(stream.Conn().RemotePeer()),
 			StreamIdx:    streamIdx,
 			Protocol:     as.Protocol,
 		})
@@ -708,12 +710,88 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	return "beginAdvertising success", nil
 }
 
+type peerInfo struct {
+	Multiaddr string `json:"multiaddr"`
+	PeerID    string `json:"peer_id"`
+}
+
+type codaPeerInfo struct {
+	Libp2pPort int    `json:"libp2p_port"`
+	Host       string `json:"host"`
+	PeerID     string `json:"peer_id"`
+}
+
+func parseMultiaddrWithID(ma multiaddr.Multiaddr, id peer.ID) (*codaPeerInfo, error) {
+	ipComponent, tcpMaddr := multiaddr.SplitFirst(ma)
+	if !(ipComponent.Protocol().Code == multiaddr.P_IP4 || ipComponent.Protocol().Code == multiaddr.P_IP6) {
+		return nil, badRPC(errors.New(fmt.Sprintf("only IP connections are supported right now, how did this peer connect?: %s", ma.String())))
+	}
+
+	tcpComponent, _ := multiaddr.SplitFirst(tcpMaddr)
+	if tcpComponent.Protocol().Code != multiaddr.P_TCP {
+		return nil, badRPC(errors.New("only TCP connections are supported right now, how did this peer connect?"))
+	}
+
+	port, err := strconv.Atoi(tcpComponent.Value())
+	if err != nil {
+		return nil, err
+	}
+
+	return &codaPeerInfo{Libp2pPort: port, Host: ipComponent.Value(), PeerID: peer.IDB58Encode(id)}, nil
+}
+
 type findPeerMsg struct {
 	PeerID string `json:"peer_id"`
 }
 
 func (ap *findPeerMsg) run(app *app) (interface{}, error) {
-	// TODO
+	id, err := peer.IDB58Decode(ap.PeerID)
+	if err != nil {
+		return nil, err
+	}
+
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+
+	ctx, cancel := context.WithTimeout(app.Ctx, 15*time.Second)
+	defer cancel()
+
+	conn, err := app.P2p.Host.Network().DialPeer(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	maybePeer, err := parseMultiaddrWithID(conn.RemoteMultiaddr(), conn.RemotePeer())
+	if err != nil {
+		return nil, err
+	}
+	return *maybePeer, nil
+}
+
+type listPeersMsg struct {
+}
+
+func (lp *listPeersMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+
+	connsHere := app.P2p.Host.Network().Conns()
+
+	peerInfos := make([]codaPeerInfo, len(connsHere))
+
+	for _, conn := range connsHere {
+		maybePeer, err := parseMultiaddrWithID(conn.RemoteMultiaddr(), conn.RemotePeer())
+		if err != nil {
+			app.P2p.Logger.Warning("skipping maddr ", conn.RemoteMultiaddr().String(), " because it failed to parse: ", err.Error())
+			continue
+		}
+		peerInfos = append(peerInfos, *maybePeer)
+	}
+
+	return peerInfos, nil
 }
 
 var msgHandlers = map[methodIdx]func() action{
@@ -734,6 +812,7 @@ var msgHandlers = map[methodIdx]func() action{
 	addPeer:             func() action { return &addPeerMsg{} },
 	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
 	findPeer:            func() action { return &findPeerMsg{} },
+	listPeers:           func() action { return &listPeersMsg{} },
 }
 
 type errorResult struct {

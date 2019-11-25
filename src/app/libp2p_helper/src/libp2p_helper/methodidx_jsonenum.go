@@ -26,6 +26,7 @@ var (
 		"addPeer":             addPeer,
 		"beginAdvertising":    beginAdvertising,
 		"findPeer":            findPeer,
+		"listPeers":           listPeers,
 	}
 
 	_methodIdxValueToName = map[methodIdx]string{
@@ -46,6 +47,7 @@ var (
 		addPeer:             "addPeer",
 		beginAdvertising:    "beginAdvertising",
 		findPeer:            "findPeer",
+		listPeers:           "listPeers",
 	}
 )
 
@@ -70,6 +72,7 @@ func init() {
 			interface{}(addPeer).(fmt.Stringer).String():             addPeer,
 			interface{}(beginAdvertising).(fmt.Stringer).String():    beginAdvertising,
 			interface{}(findPeer).(fmt.Stringer).String():            findPeer,
+			interface{}(listPeers).(fmt.Stringer).String():           listPeers,
 		}
 	}
 }
