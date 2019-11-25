@@ -488,12 +488,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           (Amount.of_fee (User_command.Payload.fee payload))
       in
       let%bind () = validate_nonces (Account.Nonce.succ nonce) account.nonce in
-      let%bind () =
-        (* TODO: Put actual value here *)
-        let current_global_slot = Global_slot.zero in
-        validate_time ~valid_until:payload.common.valid_until
-          ~current_global_slot
-      in
       return
         { account with
           balance
