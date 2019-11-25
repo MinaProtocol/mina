@@ -988,31 +988,40 @@ module Types = struct
 
       let memo ~doc = arg "memo" ~typ:string ~doc
 
+      let valid_until =
+        arg "valid_until" ~typ:uint32_arg
+          ~doc:
+            "The global slot number after which this transaction cannot be \
+             applied."
+
       let nonce ~doc = arg "nonce" ~typ:uint32_arg ~doc
     end
 
     let send_payment =
       let open Fields in
       obj "SendPaymentInput"
-        ~coerce:(fun from to_ amount fee memo nonce ->
-          (from, to_, amount, fee, memo, nonce) )
+        ~coerce:(fun from to_ amount fee valid_until memo nonce ->
+          (from, to_, amount, fee, valid_until, memo, nonce) )
         ~fields:
           [ from ~doc:"Public key of recipient of payment"
           ; to_ ~doc:"Public key of sender of payment"
           ; arg "amount" ~doc:"Amount of coda to send to to receiver"
               ~typ:(non_null uint64_arg)
           ; fee ~doc:"Fee amount in order to send payment"
+          ; valid_until
           ; memo ~doc:"Short arbitrary message provided by the sender"
           ; nonce ~doc:"Desired nonce for sending a payment" ]
 
     let send_delegation =
       let open Fields in
       obj "SendDelegationInput"
-        ~coerce:(fun from to_ fee memo nonce -> (from, to_, fee, memo, nonce))
+        ~coerce:(fun from to_ fee valid_until memo nonce ->
+          (from, to_, fee, valid_until, memo, nonce) )
         ~fields:
           [ from ~doc:"Public key of recipient of a stake delegation"
           ; to_ ~doc:"Public key of sender of a stake delegation"
           ; fee ~doc:"Fee amount in order to send a stake delegation"
+          ; valid_until
           ; memo ~doc:"Short arbitrary message provided by the sender"
           ; nonce ~doc:"Desired nonce for delegating state" ]
 
@@ -1555,10 +1564,11 @@ module Mutations = struct
         in
         (ip_address, Coda_commands.reset_trust_status coda ip_address) )
 
-  let build_user_command coda nonce sender_kp memo payment_body fee =
+  let build_user_command coda nonce sender_kp memo payment_body fee valid_until
+      =
     let command =
-      Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp
-        payment_body
+      Coda_commands.setup_user_command ~fee ~nonce ~valid_until ~memo
+        ~sender_kp payment_body
     in
     match Coda_commands.send_user_command coda command with
     | `Active f -> (
@@ -1571,7 +1581,7 @@ module Mutations = struct
     | `Bootstrapping ->
         return @@ Error "Daemon is bootstrapping"
 
-  let parse_user_command_input ~kind coda from to_ fee maybe_memo =
+  let parse_user_command_input ~kind coda from to_ fee memo_opt =
     let open Result.Let_syntax in
     let%bind sender_nonce =
       match
@@ -1602,12 +1612,17 @@ module Mutations = struct
              kind)
     in
     let%map memo =
-      Option.value_map maybe_memo ~default:(Ok User_command_memo.empty)
+      Option.value_map memo_opt ~default:(Ok User_command_memo.empty)
         ~f:(fun memo ->
           result_of_exn User_command_memo.create_from_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
     (sender_nonce, sender_kp, memo, to_, fee)
+
+  let with_default_expiry =
+    Option.value_map (* TODO: We should put a more sensible default here. *)
+      ~default:Coda_numbers.Global_slot.max_value
+      ~f:Coda_numbers.Global_slot.of_uint32
 
   let send_delegation =
     io_field "sendDelegation"
@@ -1615,12 +1630,13 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.send_delegation)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.send_delegation)]
       ~resolve:
-        (fun {ctx= coda; _} () (from, to_, fee, maybe_memo, nonce_opt) ->
+        (fun {ctx= coda; _} ()
+             (from, to_, fee, valid_until_opt, memo_opt, nonce_opt) ->
         let open Deferred.Result.Let_syntax in
         let%bind sender_nonce, sender_kp, memo, new_delegate, fee =
           Deferred.return
           @@ parse_user_command_input ~kind:"stake delegation" coda from to_
-               fee maybe_memo
+               fee memo_opt
         in
         let body =
           User_command_payload.Body.Stake_delegation
@@ -1630,19 +1646,21 @@ module Mutations = struct
           Option.value_map nonce_opt ~f:Account.Nonce.of_uint32
             ~default:sender_nonce
         in
-        build_user_command coda nonce sender_kp memo body fee )
+        let valid_until = with_default_expiry valid_until_opt in
+        build_user_command coda nonce sender_kp memo body fee valid_until )
 
   let send_payment =
     io_field "sendPayment" ~doc:"Send a payment"
       ~typ:(non_null Types.Payload.send_payment)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.send_payment)]
       ~resolve:
-        (fun {ctx= coda; _} () (from, to_, amount, fee, maybe_memo, nonce_opt) ->
+        (fun {ctx= coda; _} ()
+             (from, to_, amount, fee, valid_until_opt, memo_opt, nonce_opt) ->
         let open Deferred.Result.Let_syntax in
         let%bind sender_nonce, sender_kp, memo, receiver, fee =
           Deferred.return
           @@ parse_user_command_input ~kind:"payment" coda from to_ fee
-               maybe_memo
+               memo_opt
         in
         let body =
           User_command_payload.Body.Payment
@@ -1652,7 +1670,8 @@ module Mutations = struct
           Option.value_map nonce_opt ~f:Account.Nonce.of_uint32
             ~default:sender_nonce
         in
-        build_user_command coda nonce sender_kp memo body fee )
+        let valid_until = with_default_expiry valid_until_opt in
+        build_user_command coda nonce sender_kp memo body fee valid_until )
 
   let add_payment_receipt =
     result_field "addPaymentReceipt"

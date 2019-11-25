@@ -2,7 +2,9 @@ open Async_kernel
 open Core_kernel
 open Signed
 open Unsigned
+module GS = Global_slot
 open Coda_numbers
+module Global_slot = GS
 open Currency
 open Fold_lib
 open Signature_lib
@@ -157,14 +159,14 @@ module Data = struct
 
     let update (seed : t) vrf_result =
       let open Random_oracle in
-      hash ~init:Hash_prefix_states.Random_oracle.epoch_seed
+      hash ~init:Hash_prefix_states.epoch_seed
         [|(seed :> Tick.Field.t); vrf_result|]
       |> of_hash
 
     let update_var (seed : var) vrf_result =
       let open Random_oracle.Checked in
       make_checked (fun () ->
-          hash ~init:Hash_prefix_states.Random_oracle.epoch_seed
+          hash ~init:Hash_prefix_states.epoch_seed
             [|var_to_hash_packed seed; vrf_result|]
           |> var_of_hash_packed )
 
@@ -567,9 +569,6 @@ module Data = struct
           [|Bitstring.Lsb_first.to_list (Amount.var_to_bits total_currency)|]
       }
 
-    let length_in_triples =
-      Coda_base.Frozen_ledger_hash.length_in_triples + Amount.length_in_triples
-
     let if_ cond
         ~(then_ : (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t)
         ~(else_ : (Coda_base.Frozen_ledger_hash.var, Amount.var) Poly.t) =
@@ -657,8 +656,7 @@ module Data = struct
 
       let hash_to_group msg =
         Group_map.to_group
-          (Random_oracle.hash
-             ~init:Coda_base.Hash_prefix.Random_oracle.vrf_message
+          (Random_oracle.hash ~init:Coda_base.Hash_prefix.vrf_message
              (Random_oracle.pack_input (to_input msg)))
         |> Tick.Inner_curve.of_affine
 
@@ -678,7 +676,7 @@ module Data = struct
           Tick.make_checked (fun () ->
               Group_map.Checked.to_group
                 (Random_oracle.Checked.hash
-                   ~init:Coda_base.Hash_prefix.Random_oracle.vrf_message
+                   ~init:Coda_base.Hash_prefix.vrf_message
                    (Random_oracle.Checked.pack_input input)) )
       end
 
@@ -727,8 +725,6 @@ module Data = struct
         let dummy = String.init length_in_bytes ~f:(fun _ -> '\000')
 
         let to_bits t = Fold.(to_list (string_bits t))
-
-        let length_in_triples = (length_in_bits + 2) / 3
       end
 
       open Tick
@@ -748,8 +744,7 @@ module Data = struct
             append (Message.to_input msg) (field_elements [|x; y|]))
         in
         let open Random_oracle in
-        hash ~init:Hash_prefix_states.Random_oracle.vrf_output
-          (pack_input input)
+        hash ~init:Hash_prefix_states.vrf_output (pack_input input)
 
       module Checked = struct
         let truncate x =
@@ -765,8 +760,7 @@ module Data = struct
           in
           make_checked (fun () ->
               let open Random_oracle.Checked in
-              hash ~init:Hash_prefix_states.Random_oracle.vrf_output
-                (pack_input input) )
+              hash ~init:Hash_prefix_states.vrf_output (pack_input input) )
       end
 
       let%test_unit "hash unchecked vs. checked equality" =
@@ -1097,11 +1091,6 @@ module Data = struct
       , Length.Checked.t )
       Poly.t
 
-    let length_in_triples =
-      Epoch_ledger.length_in_triples + Epoch_seed.length_in_triples
-      + Coda_base.State_hash.length_in_triples
-      + Coda_base.State_hash.length_in_triples + Length.length_in_triples
-
     let if_ cond ~(then_ : var) ~(else_ : var) =
       let open Snark_params.Tick.Checked.Let_syntax in
       let%map ledger =
@@ -1343,161 +1332,12 @@ module Data = struct
   end
 
   module Consensus_transition = struct
-    include Global_slot
-    module Value = Global_slot
+    include Coda_numbers.Global_slot
+    module Value = Coda_numbers.Global_slot
 
-    let typ = Global_slot.Checked.typ
-
-    type var = Global_slot.Checked.t
+    type var = Checked.t
 
     let genesis = zero
-  end
-
-  module Checkpoints = struct
-    module Hash = struct
-      include Coda_base.Data_hash.Make_full_size ()
-
-      module Base58_check = Codable.Make_base58_check (struct
-        include Stable.Latest
-
-        let description = "State hash"
-      end)
-
-      [%%define_locally
-      Base58_check.(to_base58_check)]
-    end
-
-    let merge (s : Coda_base.State_hash.t) (h : Hash.t) =
-      Snark_params.Tick.Pedersen.digest_fold
-        Coda_base.Hash_prefix.checkpoint_list
-        Fold.(Coda_base.State_hash.fold s +> Hash.fold h)
-      |> Hash.of_hash
-
-    let length = Constants.Checkpoint_window.per_year
-
-    module Repr = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type t =
-            { (* TODO: Make a nice way to force this to have bounded (or fixed) size for
-                   bin_io reasons *)
-              prefix: Coda_base.State_hash.Stable.V1.t Core.Fqueue.Stable.V1.t
-            ; tail: Hash.Stable.V1.t }
-          [@@deriving sexp, compare]
-
-          let to_latest = Fn.id
-
-          let digest ({prefix; tail} : t) =
-            let rec go acc p =
-              match Fqueue.dequeue p with
-              | None ->
-                  acc
-              | Some (h, p) ->
-                  go (merge h acc) p
-            in
-            go tail prefix
-
-          module Yojson = struct
-            type t =
-              { prefix: Coda_base.State_hash.Stable.V1.t list
-              ; tail: Hash.Stable.V1.t }
-            [@@deriving to_yojson]
-          end
-
-          let to_yojson ({prefix; tail} : t) =
-            Yojson.to_yojson {prefix= Fqueue.to_list prefix; tail}
-        end
-      end]
-
-      type t = Stable.Latest.t =
-        {prefix: Coda_base.State_hash.t Fqueue.t; tail: Hash.t}
-      [@@deriving sexp, hash, compare]
-
-      let to_yojson = Stable.V1.to_yojson
-    end
-
-    module Stable = struct
-      module V1 = struct
-        module T = struct
-          type t = (Repr.Stable.V1.t, Hash.Stable.V1.t) With_hash.Stable.V1.t
-          [@@deriving sexp, version, to_yojson]
-
-          let compare (t1 : t) (t2 : t) = Hash.compare t1.hash t2.hash
-
-          let equal (t1 : t) (t2 : t) = Hash.equal t1.hash t2.hash
-
-          let hash_fold_t s (t : t) = Hash.hash_fold_t s t.hash
-
-          let to_repr (t : t) = t.data
-
-          let of_repr r =
-            {With_hash.Stable.V1.data= r; hash= Repr.Stable.V1.digest r}
-
-          include Binable.Of_binable
-                    (Repr.Stable.V1)
-                    (struct
-                      type nonrec t = t
-
-                      let to_binable = to_repr
-
-                      let of_binable = of_repr
-                    end)
-        end
-
-        include T
-        include Registration.Make_latest_version (T)
-      end
-
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "checkpoints_proof_of_stake"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
-
-    type t = (Repr.t, Hash.t) With_hash.t [@@deriving sexp, to_yojson]
-
-    let empty : t =
-      let dummy = Hash.of_hash Snark_params.Tick.Field.zero in
-      {hash= dummy; data= {prefix= Fqueue.empty; tail= dummy}}
-
-    let cons sh (t : t) : t =
-      (* This kind of defeats the purpose of having a queue, but oh well. *)
-      let n = Fqueue.length t.data.prefix in
-      let hash = merge sh t.hash in
-      let {Repr.prefix; tail} = t.data in
-      if n < length then {hash; data= {prefix= Fqueue.enqueue prefix sh; tail}}
-      else
-        let sh0, prefix = Fqueue.dequeue_exn prefix in
-        {hash; data= {prefix= Fqueue.enqueue prefix sh; tail= merge sh0 tail}}
-
-    type var = Hash.var
-
-    let typ =
-      Typ.transport Hash.typ
-        ~there:(fun (t : t) -> t.hash)
-        ~back:(fun hash -> {hash; data= {prefix= Fqueue.empty; tail= hash}})
-
-    let hash (t : t) = t.hash
-
-    module Checked = struct
-      let if_ = Hash.if_
-
-      let cons sh t =
-        let open Snark_params.Tick in
-        let open Checked in
-        let%bind sh = Coda_base.State_hash.var_to_triples sh
-        and t = Hash.var_to_triples t in
-        Pedersen.Checked.digest_triples
-          ~init:Coda_base.Hash_prefix.checkpoint_list (sh @ t)
-        >>| Hash.var_of_hash_packed
-    end
   end
 
   [%%if
@@ -1919,8 +1759,7 @@ module Data = struct
                , 'global_slot
                , 'staking_epoch_data
                , 'next_epoch_data
-               , 'bool
-               , 'checkpoints )
+               , 'bool )
                t =
             { blockchain_length: 'length
             ; epoch_count: 'length
@@ -1931,8 +1770,7 @@ module Data = struct
             ; curr_global_slot: 'global_slot
             ; staking_epoch_data: 'staking_epoch_data
             ; next_epoch_data: 'next_epoch_data
-            ; has_ancestor_in_same_checkpoint_window: 'bool
-            ; checkpoints: 'checkpoints }
+            ; has_ancestor_in_same_checkpoint_window: 'bool }
           [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
         end
       end]
@@ -1943,8 +1781,7 @@ module Data = struct
            , 'global_slot
            , 'staking_epoch_data
            , 'next_epoch_data
-           , 'bool
-           , 'checkpoints )
+           , 'bool )
            t =
             ( 'length
             , 'vrf_output
@@ -1952,8 +1789,7 @@ module Data = struct
             , 'global_slot
             , 'staking_epoch_data
             , 'next_epoch_data
-            , 'bool
-            , 'checkpoints )
+            , 'bool )
             Stable.Latest.t =
         { blockchain_length: 'length
         ; epoch_count: 'length
@@ -1964,8 +1800,7 @@ module Data = struct
         ; curr_global_slot: 'global_slot
         ; staking_epoch_data: 'staking_epoch_data
         ; next_epoch_data: 'next_epoch_data
-        ; has_ancestor_in_same_checkpoint_window: 'bool
-        ; checkpoints: 'checkpoints }
+        ; has_ancestor_in_same_checkpoint_window: 'bool }
       [@@deriving sexp, compare, hash, to_yojson]
     end
 
@@ -1977,11 +1812,10 @@ module Data = struct
             ( Length.Stable.V1.t
             , Vrf.Output.Truncated.Stable.V1.t
             , Amount.Stable.V1.t
-            , Global_slot.Stable.V1.t
+            , Coda_numbers.Global_slot.Stable.V1.t
             , Epoch_data.Staking.Value.Stable.V1.t
             , Epoch_data.Next.Value.Stable.V1.t
-            , bool
-            , Checkpoints.Stable.V1.t )
+            , bool )
             Poly.Stable.V1.t
           [@@deriving sexp, bin_io, eq, compare, hash, version]
 
@@ -2003,8 +1837,7 @@ module Data = struct
               ; ( "next_epoch_data"
                 , Epoch_data.Next.Value.to_yojson t.next_epoch_data )
               ; ( "has_ancestor_in_same_checkpoint_window"
-                , `Bool t.has_ancestor_in_same_checkpoint_window )
-              ; ("checkpoints", Checkpoints.to_yojson t.checkpoints) ]
+                , `Bool t.has_ancestor_in_same_checkpoint_window ) ]
         end
       end]
 
@@ -2022,8 +1855,7 @@ module Data = struct
       , Global_slot.Checked.t
       , Epoch_data.var
       , Epoch_data.var
-      , Boolean.var
-      , Checkpoints.var )
+      , Boolean.var )
       Poly.t
 
     let to_hlist
@@ -2036,8 +1868,7 @@ module Data = struct
         ; curr_global_slot
         ; staking_epoch_data
         ; next_epoch_data
-        ; has_ancestor_in_same_checkpoint_window
-        ; checkpoints } =
+        ; has_ancestor_in_same_checkpoint_window } =
       let open Coda_base.H_list in
       [ blockchain_length
       ; epoch_count
@@ -2048,8 +1879,7 @@ module Data = struct
       ; curr_global_slot
       ; staking_epoch_data
       ; next_epoch_data
-      ; has_ancestor_in_same_checkpoint_window
-      ; checkpoints ]
+      ; has_ancestor_in_same_checkpoint_window ]
 
     let of_hlist :
            ( unit
@@ -2063,7 +1893,6 @@ module Data = struct
              -> 'staking_epoch_data
              -> 'next_epoch_data
              -> 'bool
-             -> 'checkpoints
              -> unit )
            Coda_base.H_list.t
         -> ( 'length
@@ -2072,8 +1901,7 @@ module Data = struct
            , 'global_slot
            , 'staking_epoch_data
            , 'next_epoch_data
-           , 'bool
-           , 'checkpoints )
+           , 'bool )
            Poly.t =
      fun Coda_base.H_list.
            [ blockchain_length
@@ -2085,8 +1913,7 @@ module Data = struct
            ; curr_global_slot
            ; staking_epoch_data
            ; next_epoch_data
-           ; has_ancestor_in_same_checkpoint_window
-           ; checkpoints ] ->
+           ; has_ancestor_in_same_checkpoint_window ] ->
       { blockchain_length
       ; epoch_count
       ; min_window_density
@@ -2096,8 +1923,7 @@ module Data = struct
       ; curr_global_slot
       ; staking_epoch_data
       ; next_epoch_data
-      ; has_ancestor_in_same_checkpoint_window
-      ; checkpoints }
+      ; has_ancestor_in_same_checkpoint_window }
 
     let data_spec =
       let open Snark_params.Tick.Data_spec in
@@ -2112,8 +1938,7 @@ module Data = struct
       ; Global_slot.Checked.typ
       ; Epoch_data.Staking.typ
       ; Epoch_data.Next.typ
-      ; Boolean.typ
-      ; Checkpoints.typ ]
+      ; Boolean.typ ]
 
     let typ : (var, Value.t) Typ.t =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
@@ -2130,8 +1955,7 @@ module Data = struct
          ; curr_global_slot
          ; staking_epoch_data
          ; next_epoch_data
-         ; has_ancestor_in_same_checkpoint_window
-         ; checkpoints } :
+         ; has_ancestor_in_same_checkpoint_window } :
           Value.t) =
       let input =
         { Random_oracle.Input.bitstrings=
@@ -2143,7 +1967,7 @@ module Data = struct
              ; Amount.to_bits total_currency
              ; Global_slot.Bits.to_bits curr_global_slot
              ; [has_ancestor_in_same_checkpoint_window] |]
-        ; field_elements= [|(checkpoints.hash :> Tick.Field.t)|] }
+        ; field_elements= [||] }
       in
       List.reduce_exn ~f:Random_oracle.Input.append
         [ input
@@ -2160,8 +1984,7 @@ module Data = struct
          ; curr_global_slot
          ; staking_epoch_data
          ; next_epoch_data
-         ; has_ancestor_in_same_checkpoint_window
-         ; checkpoints } :
+         ; has_ancestor_in_same_checkpoint_window } :
           var) =
       let open Tick.Checked.Let_syntax in
       let%map input =
@@ -2186,21 +2009,12 @@ module Data = struct
              ; bs (Amount.var_to_bits total_currency)
              ; curr_global_slot
              ; [has_ancestor_in_same_checkpoint_window] |]
-        ; field_elements= [|Checkpoints.Hash.var_to_hash_packed checkpoints|]
-        }
+        ; field_elements= [||] }
       and staking_epoch_data =
         Epoch_data.Staking.var_to_input staking_epoch_data
       and next_epoch_data = Epoch_data.Next.var_to_input next_epoch_data in
       List.reduce_exn ~f:Random_oracle.Input.append
         [input; staking_epoch_data; next_epoch_data]
-
-    let length_in_triples =
-      Length.length_in_triples + Length.length_in_triples
-      + Length.length_in_triples
-        * UInt32.to_int Constants.sub_windows_per_window
-      + Vrf.Output.Truncated.length_in_triples + Epoch.length_in_triples
-      + Epoch.Slot.length_in_triples + Amount.length_in_triples
-      + Epoch_data.length_in_triples + Epoch_data.length_in_triples
 
     let checkpoint_window slot =
       Global_slot.to_int slot / Constants.Checkpoint_window.size_in_slots
@@ -2250,13 +2064,6 @@ module Data = struct
           ~prev_slot ~prev_protocol_state_hash:previous_protocol_state_hash
           ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
       in
-      let checkpoints =
-        if previous_consensus_state.has_ancestor_in_same_checkpoint_window then
-          previous_consensus_state.checkpoints
-        else
-          Checkpoints.cons previous_protocol_state_hash
-            previous_consensus_state.checkpoints
-      in
       let min_window_density, sub_window_densities =
         Min_window_density.update_min_window_density
           ~prev_global_slot:previous_consensus_state.curr_global_slot
@@ -2278,8 +2085,7 @@ module Data = struct
       ; has_ancestor_in_same_checkpoint_window=
           same_checkpoint_window_unchecked
             (Global_slot.create ~epoch:prev_epoch ~slot:prev_slot)
-            (Global_slot.create ~epoch:next_epoch ~slot:next_slot)
-      ; checkpoints }
+            (Global_slot.create ~epoch:next_epoch ~slot:next_slot) }
 
     let same_checkpoint_window ~prev:(slot1 : Global_slot.Checked.t)
         ~next:(slot2 : Global_slot.Checked.t) =
@@ -2325,8 +2131,7 @@ module Data = struct
          ; curr_global_slot= Global_slot.zero
          ; staking_epoch_data= Lazy.force Epoch_data.Staking.genesis
          ; next_epoch_data= Lazy.force Epoch_data.Next.genesis
-         ; has_ancestor_in_same_checkpoint_window= false
-         ; checkpoints= Checkpoints.empty })
+         ; has_ancestor_in_same_checkpoint_window= false })
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
         ~consensus_transition : Value.t =
@@ -2390,15 +2195,6 @@ module Data = struct
       let%bind new_total_currency =
         Currency.Amount.Checked.add previous_state.total_currency
           supply_increase
-      in
-      let%bind checkpoints =
-        let%bind consed =
-          Checkpoints.Checked.cons previous_protocol_state_hash
-            previous_state.checkpoints
-        in
-        Checkpoints.Checked.if_
-          previous_state.has_ancestor_in_same_checkpoint_window
-          ~then_:previous_state.checkpoints ~else_:consed
       in
       let%bind has_ancestor_in_same_checkpoint_window =
         same_checkpoint_window ~prev:prev_global_slot ~next:next_global_slot
@@ -2475,8 +2271,7 @@ module Data = struct
           ; total_currency= new_total_currency
           ; staking_epoch_data
           ; next_epoch_data
-          ; has_ancestor_in_same_checkpoint_window
-          ; checkpoints } )
+          ; has_ancestor_in_same_checkpoint_window } )
 
     let to_lite = None
 
@@ -2562,10 +2357,6 @@ module Data = struct
               ~resolve:
                 (fun _ {Poly.has_ancestor_in_same_checkpoint_window; _} ->
                 has_ancestor_in_same_checkpoint_window )
-          ; field "checkpoints" ~typ:(non_null string)
-              ~args:Arg.[]
-              ~resolve:(fun _ {Poly.checkpoints; _} ->
-                Checkpoints.(Hash.to_base58_check @@ hash @@ checkpoints) )
           ; field "slot" ~doc:"Slot in which this block was created"
               ~typ:(non_null uint32)
               ~args:Arg.[]
@@ -3397,11 +3188,6 @@ module Hooks = struct
                 (With_hash.hash previous_protocol_state)
               ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
           in
-          let checkpoints =
-            if prev.has_ancestor_in_same_checkpoint_window then
-              prev.checkpoints
-            else Checkpoints.cons previous_protocol_state.hash prev.checkpoints
-          in
           let min_window_density, sub_window_densities =
             Min_window_density.update_min_window_density
               ~prev_global_slot:prev.curr_global_slot
@@ -3421,8 +3207,7 @@ module Hooks = struct
           ; has_ancestor_in_same_checkpoint_window=
               same_checkpoint_window_unchecked
                 (Global_slot.create ~epoch:prev_epoch ~slot:prev_slot)
-                (Global_slot.create ~epoch:curr_epoch ~slot:curr_slot)
-          ; checkpoints }
+                (Global_slot.create ~epoch:curr_epoch ~slot:curr_slot) }
     end
   end
 end
