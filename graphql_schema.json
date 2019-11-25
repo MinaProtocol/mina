@@ -2579,9 +2579,13 @@
               "description": null,
               "args": [],
               "type": {
-                "kind": "SCALAR",
-                "name": "String",
-                "ofType": null
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -3526,6 +3530,18 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "epochDelegateAccount",
+              "description": "The account that you delegated on the staking ledger of the current block",
+              "args": [],
+              "type": {
+                "kind": "OBJECT",
+                "name": "Account",
                 "ofType": null
               },
               "isDeprecated": false,

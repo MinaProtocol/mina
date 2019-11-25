@@ -11,15 +11,17 @@ module type S_unchecked = sig
 
   include Hashable.S with type t := t
 
-  val length_in_bits : int
+  val max_value : t
 
-  val length_in_triples : int
+  val length_in_bits : int
 
   val gen : t Quickcheck.Generator.t
 
   val zero : t
 
   val succ : t -> t
+
+  val add : t -> t -> t
 
   val of_int : int -> t
 
@@ -59,6 +61,8 @@ module type S_checked = sig
 
   val succ : t -> (t, _) Checked.t
 
+  val add : t -> t -> (t, _) Checked.t
+
   val is_succ : pred:t -> succ:t -> (Boolean.var, _) Checked.t
 
   val min : t -> t -> (t, _) Checked.t
@@ -66,8 +70,6 @@ module type S_checked = sig
   val of_bits : Boolean.var Bitstring.Lsb_first.t -> t
 
   val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
-
-  val to_triples : t -> (Boolean.var Triple.t list, _) Checked.t
 
   val to_integer : t -> field Snarky_integer.Integer.t
 

@@ -3,7 +3,7 @@ open Async
 open Signature_lib
 open Coda_base
 
-module Client = Graphql_client_lib.Make (struct
+module Client = Graphql_lib.Client.Make (struct
   let address = "graphql"
 
   let preprocess_variables_string = Fn.id
@@ -71,6 +71,10 @@ module Args = struct
   let zip5 arg1 arg2 arg3 arg4 arg5 =
     return (fun a b c d e -> (a, b, c, d, e))
     <*> arg1 <*> arg2 <*> arg3 <*> arg4 <*> arg5
+
+  let zip6 arg1 arg2 arg3 arg4 arg5 arg6 =
+    return (fun a b c d e f -> (a, b, c, d, e, f))
+    <*> arg1 <*> arg2 <*> arg3 <*> arg4 <*> arg5 <*> arg6
 end
 
 let or_error_str ~f_ok ~error = function
@@ -447,7 +451,11 @@ let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
 
 let batch_send_payments =
   let module Payment_info = struct
-    type t = {receiver: string; amount: Currency.Amount.t; fee: Currency.Fee.t}
+    type t =
+      { receiver: string
+      ; amount: Currency.Amount.t
+      ; fee: Currency.Fee.t
+      ; valid_until: Coda_numbers.Global_slot.t sexp_option }
     [@@deriving sexp]
   end in
   let payment_path_flag =
@@ -465,12 +473,14 @@ let batch_send_payments =
           { Payment_info.receiver=
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
+          ; valid_until= Some (Coda_numbers.Global_slot.random ())
           ; amount= Currency.Amount.of_int (Random.int 100)
           ; fee= Currency.Fee.of_int (Random.int 100) }
         in
         eprintf "Could not read payments from %s.\n" payments_path ;
         eprintf
-          "The file should be a sexp list of payments. Here is an example file:\n\
+          "The file should be a sexp list of payments with optional expiry \
+           slot number \"valid_until\". Here is an example file:\n\
            %s\n"
           (Sexp.to_string_hum
              ([%sexp_of: Payment_info.t list]
@@ -485,11 +495,15 @@ let batch_send_payments =
       get_nonce_exn ~rpc:Daemon_rpcs.Get_nonce.rpc keypair.public_key port
     in
     let _, ts =
-      List.fold_map ~init:nonce0 infos ~f:(fun nonce {receiver; amount; fee} ->
+      List.fold_map ~init:nonce0 infos
+        ~f:(fun nonce {receiver; valid_until; amount; fee} ->
           ( Account.Nonce.succ nonce
           , User_command.sign keypair
               (User_command_payload.create ~fee ~nonce
                  ~memo:User_command_memo.empty
+                 ~valid_until:
+                   (Option.value valid_until
+                      ~default:Coda_numbers.Global_slot.max_value)
                  ~body:
                    (Payment
                       { receiver=
@@ -523,6 +537,15 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            (Currency.Fee.to_int User_command.minimum_fee))
       (optional txn_fee)
   in
+  let valid_until_flag =
+    flag "valid-until"
+      ~doc:
+        "GLOBAL-SLOT The last global-slot at which this transaction will be \
+         considered valid. This makes it possible to have transactions which \
+         expire if they are not applied before this time. If omitted, the \
+         transaction will never expire."
+      (optional global_slot)
+  in
   let nonce_flag =
     flag "nonce"
       ~doc:
@@ -541,12 +564,14 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
       (optional string)
   in
   let flag =
-    Args.zip5 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
-      memo_flag
+    Args.zip6 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
+      valid_until_flag memo_flag
   in
   Command.async ~summary
     (Cli_lib.Background_daemon.rpc_init flag
-       ~f:(fun port (body, from_account, fee_opt, nonce_opt, memo_opt) ->
+       ~f:(fun port
+          (body, from_account, fee_opt, nonce_opt, valid_until_opt, memo_opt)
+          ->
          let open Deferred.Let_syntax in
          let%bind sender_kp =
            Secrets.Keypair.Terminal_stdin.read_exn from_account
@@ -572,8 +597,13 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
              Option.value_map memo_opt ~default:User_command_memo.empty
                ~f:User_command_memo.create_from_string_exn
            in
+           let valid_until =
+             Option.value valid_until_opt
+               ~default:Coda_numbers.Global_slot.max_value
+           in
            let command =
-             Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp body
+             Coda_commands.setup_user_command ~fee ~nonce ~memo ~valid_until
+               ~sender_kp body
            in
            dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
              ~success:(fun receipt_chain_hash ->
@@ -729,6 +759,7 @@ let cancel_transaction =
              let command =
                Coda_commands.setup_user_command ~fee:cancel_fee
                  ~nonce:cancelled_nonce ~memo:User_command_memo.empty
+                 ~valid_until:user_command.payload.common.valid_until
                  ~sender_kp body
              in
              dispatch_with_message Daemon_rpcs.Send_user_command.rpc command
@@ -1033,8 +1064,7 @@ let pending_snark_work =
                       Array.map bundle#workBundle ~f:(fun w ->
                           let f = w#fee_excess in
                           let hash_of_string =
-                            Coda_graphql.Types.Stringable.Frozen_ledger_hash
-                            .of_base58_check_exn
+                            Coda_base.Frozen_ledger_hash.of_string
                           in
                           { Cli_lib.Graphql_types.Pending_snark_work.Work
                             .work_id= w#work_id

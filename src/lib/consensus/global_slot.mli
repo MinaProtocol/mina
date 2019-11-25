@@ -1,11 +1,6 @@
-[%%versioned:
-module Stable : sig
-  module V1 : sig
-    type t [@@deriving sexp, eq, compare, hash, yojson]
-  end
-end]
-
-include Coda_numbers.Nat.Intf.S_unchecked with type t = Stable.Latest.t
+include
+  Coda_numbers.Nat.Intf.S_unchecked
+  with type t = Coda_numbers.Global_slot.Stable.Latest.t
 
 val ( + ) : t -> int -> t
 
@@ -24,9 +19,14 @@ val slot : t -> Slot.t
 val to_epoch_and_slot : t -> Epoch.t * Slot.t
 
 module Checked : sig
-  include Coda_numbers.Nat.Intf.S_checked with type unchecked := t
+  include
+    Coda_numbers.Nat.Intf.S_checked
+    with type unchecked := t
+     and type var = Coda_numbers.Global_slot.Checked.var
 
   open Snark_params.Tick
 
   val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t, _) Checked.t
 end
+
+val typ : (Checked.t, t) Snark_params.Tick.Typ.t
