@@ -54,6 +54,8 @@ module type S = sig
     val of_coinbase : Coinbase.t -> t
 
     val genesis : t
+
+    val var_of_t : t -> var
   end
 
   module type Data_hash_binable_intf = sig
@@ -148,18 +150,24 @@ module type S = sig
 
   val create : unit -> t Or_error.t
 
+  (** Delete the oldest stack*)
   val remove_coinbase_stack : t -> (Stack.t * t) Or_error.t
 
+  (** Root of the merkle tree that has stacks as leaves*)
   val merkle_root : t -> Hash.t
 
   val handler : t -> is_new_stack:bool -> (request -> response) Staged.t
 
+  (** Update the current working stack or if [is_new_stack] add as the new working stack*)
   val update_coinbase_stack : t -> Stack.t -> is_new_stack:bool -> t Or_error.t
 
+  (** Stack that is currently being updated. if [is_new_stack] then a new stack is returned*)
   val latest_stack : t -> is_new_stack:bool -> Stack.t Or_error.t
 
+  (** The stack that corresponds to the next ledger proof that is to be generated*)
   val oldest_stack : t -> Stack.t Or_error.t
 
+  (** Hash of the auxiliary data (everything except the merkle root (Hash.t))*)
   val hash_extra : t -> string
 
   module Checked : sig
@@ -175,22 +183,11 @@ module type S = sig
       val typ : (var, value) Typ.t
     end
 
-    module Newest_stack_info : sig
-      (* address of stack; pending coinbase previous state hash; is new stack *)
-      type t = Address.value * State_hash.t * bool
-
-      type value = t
-
-      type var = Address.var * State_hash.var * Boolean.var
-
-      val typ : (var, value) Typ.t
-    end
-
     type _ Request.t +=
       | Coinbase_stack_path : Address.value -> path Request.t
       | Get_coinbase_stack : Address.value -> (Stack.t * path) Request.t
       | Set_coinbase_stack : Address.value * Stack.t -> unit Request.t
-      | Find_index_of_newest_stack : Newest_stack_info.t Request.t
+      | Find_index_of_newest_stack : Address.value Request.t
       | Find_index_of_oldest_stack : Address.value Request.t
 
     val get : var -> Address.var -> (Stack.var, _) Tick.Checked.t
