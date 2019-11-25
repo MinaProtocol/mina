@@ -1,7 +1,5 @@
 open Core_kernel
 open Signature_lib
-open Tuple_lib
-open Fold_lib
 open Snark_params.Tick
 
 module Body : sig
@@ -67,11 +65,7 @@ module Common : sig
 
   val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
-  val fold : t -> bool Triple.t Fold.t
-
   module Checked : sig
-    val to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
-
     val to_input :
       var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
 
@@ -114,11 +108,7 @@ val create :
   -> body:Body.t
   -> t
 
-val length_in_triples : int
-
 val dummy : t
-
-val fold : t -> bool Triple.t Fold.t
 
 val fee : t -> Currency.Fee.t
 

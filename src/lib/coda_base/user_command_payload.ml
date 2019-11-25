@@ -1,6 +1,5 @@
 open Core_kernel
 open Snark_params.Tick
-open Fold_lib
 module Account_nonce = Coda_numbers.Account_nonce
 module Global_slot = Coda_numbers.Global_slot
 module Memo = User_command_memo
@@ -40,24 +39,12 @@ module Common = struct
   (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
-  let to_input ({fee; nonce; valid_until; memo} : t) : _ Random_oracle.Input.t
-      =
-    { field_elements= [||]
-    ; bitstrings=
-        [| Currency.Fee.to_bits fee
-         ; Account_nonce.Bits.to_bits nonce
-         ; Global_slot.to_bits valid_until
-         ; Memo.to_bits memo |] }
-
-  let fold ({fee; nonce; valid_until; memo} : t) =
-    Fold.(
-      Currency.Fee.fold fee +> Account_nonce.fold nonce
-      +> Global_slot.fold valid_until
-      +> Memo.fold memo)
-
-  let length_in_triples =
-    Currency.Fee.length_in_triples + Account_nonce.length_in_triples
-    + Global_slot.length_in_triples + Memo.length_in_triples
+  let to_input ({fee; nonce; valid_until; memo} : t) =
+    Random_oracle.Input.bitstrings
+      [| Currency.Fee.to_bits fee
+       ; Account_nonce.Bits.to_bits nonce
+       ; Global_slot.to_bits valid_until
+       ; Memo.to_bits memo |]
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
@@ -108,19 +95,11 @@ module Common = struct
       let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
       let%map nonce = Account_nonce.Checked.to_bits nonce
       and valid_until = Global_slot.Checked.to_bits valid_until in
-      { Random_oracle.Input.field_elements= [||]
-      ; bitstrings=
-          [| s (Currency.Fee.var_to_bits fee)
-           ; s nonce
-           ; s valid_until
-           ; Array.to_list (memo :> Boolean.var array) |] }
-
-    let to_triples ({fee; nonce; valid_until; memo} : var) =
-      let%map nonce = Account_nonce.Checked.to_triples nonce
-      and valid_until = Global_slot.Checked.to_triples valid_until in
-      Currency.Fee.var_to_triples fee
-      @ nonce @ valid_until
-      @ Memo.Checked.to_triples memo
+      Random_oracle.Input.bitstrings
+        [| s (Currency.Fee.var_to_bits fee)
+         ; s nonce
+         ; s valid_until
+         ; Array.to_list (memo :> Boolean.var array) |]
   end
 end
 
@@ -142,22 +121,7 @@ module Body = struct
     | Stake_delegation of Stake_delegation.Stable.V1.t
   [@@deriving eq, sexp, hash, yojson]
 
-  let max_variant_size =
-    List.reduce_exn ~f:Int.max
-      [Payment_payload.length_in_triples; Stake_delegation.length_in_triples]
-
   module Tag = Transaction_union_tag
-
-  let fold = function
-    | Payment p ->
-        Fold.(Tag.fold Payment +> Payment_payload.fold p)
-    | Stake_delegation d ->
-        Fold.(
-          Tag.fold Stake_delegation +> Stake_delegation.fold d
-          +> Fold.init (max_variant_size - Stake_delegation.length_in_triples)
-               ~f:(fun _ -> (false, false, false)))
-
-  let length_in_triples = Tag.length_in_triples + max_variant_size
 
   let gen ~max_amount =
     let open Quickcheck.Generator in
@@ -195,10 +159,6 @@ type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
 let create ~fee ~nonce ~valid_until ~memo ~body : t =
   {common= {fee; nonce; valid_until; memo}; body}
-
-let fold ({common; body} : t) = Fold.(Common.fold common +> Body.fold body)
-
-let length_in_triples = Common.length_in_triples + Body.length_in_triples
 
 let fee (t : t) = t.common.fee
 

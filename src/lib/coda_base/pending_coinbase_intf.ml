@@ -14,8 +14,6 @@ open Core
 open Snark_params
 open Snarky
 open Tick
-open Tuple_lib
-open Fold_lib
 open Signature_lib
 open Currency
 
@@ -78,15 +76,9 @@ module type S = sig
 
     val typ : (var, t) Typ.t
 
-    val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
-
     val var_to_hash_packed : var -> Field.Var.t
 
-    val length_in_triples : int
-
     val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
-
-    val fold : t -> bool Triple.t Fold.t
 
     val to_bytes : t -> string
 
@@ -127,19 +119,15 @@ module type S = sig
 
     val gen : t Quickcheck.Generator.t
 
-    val fold : t -> bool Triple.t Fold.t
+    val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
     val to_bits : t -> bool list
-
-    val length_in_bits : int
 
     val to_bytes : t -> string
 
     val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
 
-    val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
-
-    val length_in_triples : int
+    val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
     val empty : t
 

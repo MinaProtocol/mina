@@ -60,8 +60,6 @@ struct
 
   let () = assert (Int.(length_in_bits <= Field.size_in_bits))
 
-  let length_in_triples = bit_length_to_triple_length length_in_bits
-
   let gen : t Quickcheck.Generator.t =
     let m =
       if Int.(length_in_bits = Field.size_in_bits) then
@@ -112,12 +110,11 @@ struct
         t.bits <- Some (Bitstring.Lsb_first.of_list bits) ;
         bits
 
-  let var_to_triples t =
-    var_to_bits t >>| Bitstring.pad_to_triple_list ~default:Boolean.false_
+  let var_to_input (t : var) = Random_oracle.Input.field t.digest
 
   include Pedersen.Digest.Bits
 
-  let fold = Pedersen.Digest.fold
+  let to_input t = Random_oracle.Input.field t
 
   let assert_equal x y = Field.Checked.Assert.equal x.digest y.digest
 

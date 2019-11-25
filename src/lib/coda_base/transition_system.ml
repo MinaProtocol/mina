@@ -107,8 +107,7 @@ struct
       make_checked (fun () ->
           Random_oracle.Checked.update
             ~state:
-              (Random_oracle.State.map
-                 Hash_prefix.Random_oracle.transition_system_snark
+              (Random_oracle.State.map Hash_prefix.transition_system_snark
                  ~f:Snark_params.Tick.Field.Var.constant)
             (Verifier.Verification_key.to_field_elements vk) )
 
