@@ -226,15 +226,7 @@ module Coinbase_stack_state_hash = struct
 
   [%%define_locally
   State_hash.
-    ( fold
-    , gen
-    , of_hash
-    , to_bits
-    , raw_hash_bytes
-    , equal_var
-    , typ
-    , if_
-    , var_of_t )]
+    (fold, gen, of_hash, to_bits, raw_hash_bytes, equal_var, typ, if_, var_of_t)]
 
   let push (t : t) cb =
     let _, _, state_body_hash = Coinbase_data.of_coinbase cb in
