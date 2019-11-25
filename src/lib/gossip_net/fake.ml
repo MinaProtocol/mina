@@ -174,7 +174,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let peers {peer_table; _} = Hashtbl.data peer_table |> Deferred.return
 
-    let initial_peers t = Hashtbl.data t.peer_table |> List.map ~f:(Fn.compose Coda_net2.Multiaddr.of_string Peer.to_multiaddr_string)
+    let initial_peers t =
+      Hashtbl.data t.peer_table
+      |> List.map
+           ~f:
+             (Fn.compose Coda_net2.Multiaddr.of_string Peer.to_multiaddr_string)
 
     let random_peers t n =
       let%map peers = peers t in

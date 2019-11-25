@@ -268,7 +268,7 @@ module Helper = struct
     end
 
     module Find_peer = struct
-      type input = {peer_id:string} [@@deriving yojson]
+      type input = {peer_id: string} [@@deriving yojson]
 
       type output = peer_info [@@deriving yojson]
 
@@ -1078,8 +1078,13 @@ let begin_advertising net =
 
 let lookup_peerid net peer_id =
   match%map Helper.(do_rpc net (module Rpcs.Find_peer) {peer_id}) with
-  | Ok peer_info -> Ok (Peer.create (Unix.Inet_addr.of_string peer_info.host) ~libp2p_port:peer_info.libp2p_port ~peer_id:peer_info.peer_id)
-  | Error e -> Error e
+  | Ok peer_info ->
+      Ok
+        (Peer.create
+           (Unix.Inet_addr.of_string peer_info.host)
+           ~libp2p_port:peer_info.libp2p_port ~peer_id:peer_info.peer_id)
+  | Error e ->
+      Error e
 
 (* Create and helpers for create *)
 

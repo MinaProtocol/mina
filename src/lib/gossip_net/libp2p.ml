@@ -101,87 +101,98 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; high_connectivity_ivar: unit Ivar.t
       ; subscription: Message.msg Coda_net2.Pubsub.Subscription.t }
 
-  let create_libp2p (config : Config.t) first_peer_ivar high_connectivity_ivar =
-    let fail m = failwithf "Failed to connect to libp2p_helper process: %s" m () in
-    match%bind
-      Monitor.try_with (fun () ->
-          trace "coda_net2" (fun () ->
-              Coda_net2.create ~logger:config.logger
-                ~conf_dir:(config.conf_dir ^/ "coda_net2") ) )
-    with
-    | Ok (Ok net2) -> (
-        let open Coda_net2 in
-        (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
-        let%bind me =
-          match config.keypair with
-          | Some kp ->
-              return kp
-          | None ->
-              Keypair.random net2
-        in
-        let peerid = Keypair.to_peer_id me |> Peer.Id.to_string in
-        Logger.info config.logger "libp2p peer ID this session is $peer_id"
-          ~location:__LOC__ ~module_:__MODULE__
-          ~metadata:[("peer_id", `String peerid)] ;
-        let ctr = ref 0 in
-        let initializing_libp2p_result : unit Deferred.Or_error.t =
-          let open Deferred.Or_error.Let_syntax in
-          let%bind () =
-            configure net2 ~me ~maddrs:[]
-              ~external_maddr:
+    let create_libp2p (config : Config.t) first_peer_ivar
+        high_connectivity_ivar =
+      let fail m =
+        failwithf "Failed to connect to libp2p_helper process: %s" m ()
+      in
+      match%bind
+        Monitor.try_with (fun () ->
+            trace "coda_net2" (fun () ->
+                Coda_net2.create ~logger:config.logger
+                  ~conf_dir:(config.conf_dir ^/ "coda_net2") ) )
+      with
+      | Ok (Ok net2) -> (
+          let open Coda_net2 in
+          (* Make an ephemeral keypair for this session TODO: persist in the config dir *)
+          let%bind me =
+            match config.keypair with
+            | Some kp ->
+                return kp
+            | None ->
+                Keypair.random net2
+          in
+          let peerid = Keypair.to_peer_id me |> Peer.Id.to_string in
+          Logger.info config.logger "libp2p peer ID this session is $peer_id"
+            ~location:__LOC__ ~module_:__MODULE__
+            ~metadata:[("peer_id", `String peerid)] ;
+          let ctr = ref 0 in
+          let initializing_libp2p_result : unit Deferred.Or_error.t =
+            let open Deferred.Or_error.Let_syntax in
+            let%bind () =
+              configure net2 ~me ~maddrs:[]
+                ~external_maddr:
+                  (Multiaddr.of_string
+                     (sprintf "/ip4/%s/tcp/%d"
+                        (Unix.Inet_addr.to_string
+                           config.addrs_and_ports.external_ip)
+                        (Option.value_exn config.addrs_and_ports.peer)
+                          .libp2p_port))
+                ~network_id:config.chain_id
+                ~on_new_peer:(fun _ ->
+                  Ivar.fill_if_empty first_peer_ivar () ;
+                  if !ctr < 4 then incr ctr
+                  else Ivar.fill_if_empty high_connectivity_ivar () )
+            in
+            (* TODO: chain ID as network ID. *)
+            let%map _ =
+              listen_on net2
                 (Multiaddr.of_string
                    (sprintf "/ip4/%s/tcp/%d"
-                      (Unix.Inet_addr.to_string
-                         config.addrs_and_ports.external_ip)
-                      (Option.value_exn config.addrs_and_ports.peer).libp2p_port))
-              ~network_id:config.chain_id
-              ~on_new_peer:(fun _ -> Ivar.fill_if_empty first_peer_ivar () ; if !ctr < 4 then incr ctr else Ivar.fill_if_empty high_connectivity_ivar () )
+                      ( config.addrs_and_ports.bind_ip
+                      |> Unix.Inet_addr.to_string )
+                      (Option.value_exn config.addrs_and_ports.peer)
+                        .libp2p_port))
+            in
+            Deferred.ignore
+              (Deferred.bind
+                 ~f:(fun _ -> Coda_net2.begin_advertising net2)
+                 (* TODO: timeouts here in addition to the libp2p side? *)
+                 (Deferred.all
+                    (List.map ~f:(Coda_net2.add_peer net2) config.initial_peers)))
+            |> don't_wait_for ;
+            ()
           in
-          (* TODO: chain ID as network ID. *)
-          let%map _ =
-            listen_on net2
-              (Multiaddr.of_string
-                 (sprintf "/ip4/%s/tcp/%d"
-                    (config.addrs_and_ports.bind_ip |> Unix.Inet_addr.to_string)
-                    (Option.value_exn config.addrs_and_ports.peer).libp2p_port))
-          in
-          Deferred.ignore
-            (Deferred.bind
-               ~f:(fun _ -> Coda_net2.begin_advertising net2)
-               (* TODO: timeouts here in addition to the libp2p side? *)
-               (Deferred.all
-                  (List.map ~f:(Coda_net2.add_peer net2) config.initial_peers)))
-          |> don't_wait_for ;
-          ()
-        in
-        match%map initializing_libp2p_result with
-        | Ok () ->
-            net2
-        | Error e ->
-            fail (Error.to_string_hum e) )
-    | Ok (Error e) ->
-        fail (Error.to_string_hum e)
-    | Error e ->
-        fail (Exn.to_string e)
+          match%map initializing_libp2p_result with
+          | Ok () ->
+              net2
+          | Error e ->
+              fail (Error.to_string_hum e) )
+      | Ok (Error e) ->
+          fail (Error.to_string_hum e)
+      | Error e ->
+          fail (Exn.to_string e)
 
     let create config _rpc_handlers =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
-      let%bind net2 = create_libp2p config first_peer_ivar high_connectivity_ivar in
-      let%map subscription = Coda_net2.Pubsub.subscribe_encode net2 "coda/consensus-messages/0.0.1"
-        (* FIXME: instead of doing validation here we put the message into a
+      let%bind net2 =
+        create_libp2p config first_peer_ivar high_connectivity_ivar
+      in
+      let%map subscription =
+        Coda_net2.Pubsub.subscribe_encode net2
+          "coda/consensus-messages/0.0.1"
+          (* FIXME: instead of doing validation here we put the message into a
            queue for later potential broadcast. It will still be broadcast
            despite failing validation, that is only for automatic forwarding. 
            Instead, we should probably do "initial validation" up front here, 
            and turn should_forward_message into a filter_map instead of just a filter. *)
-        ~should_forward_message:(fun ~sender:_ ~data:_ -> Deferred.return false)
-        ~bin_prot:Message.V1.T.bin_msg
-        ~on_decode_failure:`Ignore >>| Or_error.ok_exn in
-        { config
-        ; net2= net2
-        ; first_peer_ivar
-        ; high_connectivity_ivar
-        ; subscription }
+          ~should_forward_message:(fun ~sender:_ ~data:_ ->
+            Deferred.return false )
+          ~bin_prot:Message.V1.T.bin_msg ~on_decode_failure:`Ignore
+        >>| Or_error.ok_exn
+      in
+      {config; net2; first_peer_ivar; high_connectivity_ivar; subscription}
 
     let peers t = Coda_net2.peers t.net2
 
@@ -315,17 +326,22 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         (Peer.pretty_list peers) ;
       List.map peers ~f:(fun peer -> query_peer t peer.peer_id rpc query)
 
-    let broadcast t msg = don't_wait_for (Coda_net2.Pubsub.Subscription.publish t.subscription msg)
+    let broadcast t msg =
+      don't_wait_for (Coda_net2.Pubsub.Subscription.publish t.subscription msg)
 
     let on_first_connect t ~f = Deferred.map (Ivar.read t.first_peer_ivar) ~f
 
-    let on_first_high_connectivity t ~f = Deferred.map (Ivar.read t.high_connectivity_ivar) ~f
+    let on_first_high_connectivity t ~f =
+      Deferred.map (Ivar.read t.high_connectivity_ivar) ~f
 
-    let received_message_reader t = Coda_net2.Pubsub.Subscription.message_pipe t.subscription
+    let received_message_reader t =
+      Coda_net2.Pubsub.Subscription.message_pipe t.subscription
 
     let ban_notification_reader _t = failwith "TODO"
 
-    let ip_for_peer t peer_id = Coda_net2.lookup_peerid t.net2 peer_id >>| function | Ok p -> Some p | Error _ -> None
+    let ip_for_peer t peer_id =
+      Coda_net2.lookup_peerid t.net2 peer_id
+      >>| function Ok p -> Some p | Error _ -> None
 
     let net2 t = Some t.net2
   end
