@@ -1,8 +1,7 @@
 open Unsigned
 open Core
 open Snark_params.Tick
-
-module T = Coda_numbers.Nat.Make32 ()
+module T = Coda_numbers.Global_slot
 
 include (T : module type of T with module Checked := T.Checked)
 
