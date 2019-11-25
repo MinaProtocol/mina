@@ -407,7 +407,7 @@ let events workers start_reader =
               (let ms_to_catchup =
                  (Consensus.Constants.c + Consensus.Constants.delta)
                  * Consensus.Constants.block_window_duration_ms
-                 + 60_000
+                 + 6_000
                  (* time for peer discovery *)
                  |> Float.of_int
                in
