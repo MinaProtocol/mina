@@ -22,8 +22,8 @@ module Poly = struct
   [@@deriving sexp, fields, eq, compare, hash, yojson]
 end
 
-let staged_ledger_hash, snarked_ledger_hash, timestamp =
-  Poly.(staged_ledger_hash, snarked_ledger_hash, timestamp)
+[%%define_locally
+Poly.(staged_ledger_hash, snarked_ledger_hash, timestamp)]
 
 module Value = struct
   [%%versioned
@@ -84,10 +84,6 @@ let to_input ({staged_ledger_hash; snarked_ledger_hash; timestamp} : Value.t) =
     [ Staged_ledger_hash.to_input staged_ledger_hash
     ; field (snarked_ledger_hash :> Field.t)
     ; bitstring (Block_time.Bits.to_bits timestamp) ]
-
-let length_in_triples =
-  Staged_ledger_hash.length_in_triples + Frozen_ledger_hash.length_in_triples
-  + Block_time.length_in_triples
 
 let set_timestamp t timestamp = {t with Poly.timestamp}
 

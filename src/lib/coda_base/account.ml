@@ -3,7 +3,6 @@ open Import
 open Coda_numbers
 open Snark_params
 open Tick
-open Let_syntax
 open Currency
 open Snark_bits
 open Fold_lib
@@ -78,7 +77,7 @@ module Poly = struct
     ; receipt_chain_hash: 'receipt_chain_hash
     ; delegate: 'pk
     ; voting_for: 'state_hash }
-  [@@deriving sexp, eq, compare, hash, yojson]
+  [@@deriving sexp, eq, compare, hash, yojson, fields]
 end
 
 module Key = struct
@@ -184,30 +183,23 @@ let var_of_t
   ; delegate= Public_key.Compressed.var_of_t delegate
   ; voting_for= State_hash.var_of_t voting_for }
 
-let var_to_triples
-    Poly.{public_key; balance; nonce; receipt_chain_hash; delegate; voting_for}
-    =
-  let%map public_key = Public_key.Compressed.var_to_triples public_key
-  and voting_for = State_hash.var_to_triples voting_for
-  and receipt_chain_hash = Receipt.Chain_hash.var_to_triples receipt_chain_hash
-  and delegate = Public_key.Compressed.var_to_triples delegate
-  and nonce = Nonce.Checked.to_triples nonce in
-  let balance = Balance.var_to_triples balance in
-  public_key @ balance @ nonce @ receipt_chain_hash @ delegate @ voting_for
-
-let fold
-    ({public_key; balance; nonce; receipt_chain_hash; delegate; voting_for} :
-      t) =
-  let open Fold in
-  Public_key.Compressed.fold public_key
-  +> Balance.fold balance +> Nonce.fold nonce
-  +> Receipt.Chain_hash.fold receipt_chain_hash
-  +> Public_key.Compressed.fold delegate
-  +> State_hash.fold voting_for
+let to_input (t : t) =
+  let open Random_oracle.Input in
+  let f mk acc field = mk (Core.Field.get field t) :: acc in
+  let bits conv = f (Fn.compose bitstring conv) in
+  Poly.Fields.fold ~init:[]
+    ~public_key:(f Public_key.Compressed.to_input)
+    ~balance:(bits Balance.to_bits) ~nonce:(bits Nonce.Bits.to_bits)
+    ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
+    ~delegate:(f Public_key.Compressed.to_input)
+    ~voting_for:(f State_hash.to_input)
+  |> List.reduce_exn ~f:append
 
 let crypto_hash_prefix = Hash_prefix.account
 
-let crypto_hash t = Pedersen.hash_fold crypto_hash_prefix (fold t)
+let crypto_hash t =
+  Random_oracle.hash ~init:crypto_hash_prefix
+    (Random_oracle.pack_input (to_input t))
 
 let empty =
   Poly.
@@ -218,16 +210,15 @@ let empty =
     ; delegate= Public_key.Compressed.empty
     ; voting_for= State_hash.dummy }
 
-let digest t = Pedersen.State.digest (crypto_hash t)
+let digest = crypto_hash
 
 let create public_key balance =
-  Poly.
-    { public_key
-    ; balance
-    ; nonce= Nonce.zero
-    ; receipt_chain_hash= Receipt.Chain_hash.empty
-    ; delegate= public_key
-    ; voting_for= State_hash.dummy }
+  { Poly.public_key
+  ; balance
+  ; nonce= Nonce.zero
+  ; receipt_chain_hash= Receipt.Chain_hash.empty
+  ; delegate= public_key
+  ; voting_for= State_hash.dummy }
 
 let gen =
   let open Quickcheck.Let_syntax in
@@ -236,10 +227,27 @@ let gen =
   return (create public_key balance)
 
 module Checked = struct
-  let hash t =
-    var_to_triples t >>= Pedersen.Checked.hash_triples ~init:crypto_hash_prefix
+  let to_input (t : var) =
+    let ( ! ) f x = Run.run_checked (f x) in
+    let f mk acc field = mk (Core.Field.get field t) :: acc in
+    let open Random_oracle.Input in
+    let bits conv =
+      f (fun x ->
+          bitstring (Bitstring_lib.Bitstring.Lsb_first.to_list (conv x)) )
+    in
+    List.reduce_exn ~f:append
+      (Poly.Fields.fold ~init:[]
+         ~public_key:(f Public_key.Compressed.Checked.to_input)
+         ~balance:(bits Balance.var_to_bits)
+         ~nonce:(bits !Nonce.Checked.to_bits)
+         ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
+         ~delegate:(f Public_key.Compressed.Checked.to_input)
+         ~voting_for:(f State_hash.var_to_input))
 
   let digest t =
-    var_to_triples t
-    >>= Pedersen.Checked.digest_triples ~init:crypto_hash_prefix
+    make_checked (fun () ->
+        Random_oracle.Checked.(
+          hash ~init:crypto_hash_prefix (pack_input (to_input t))) )
+
+  let to_input t = make_checked (fun () -> to_input t)
 end

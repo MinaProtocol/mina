@@ -6,12 +6,14 @@ module Identity = Identity
 module Root_history = Root_history
 module Snark_pool_refcount = Snark_pool_refcount
 module Transition_registry = Transition_registry
+module Ledger_table = Ledger_table
 
 type t =
   { root_history: Root_history.Broadcasted.t
   ; snark_pool_refcount: Snark_pool_refcount.Broadcasted.t
   ; best_tip_diff: Best_tip_diff.Broadcasted.t
   ; transition_registry: Transition_registry.Broadcasted.t
+  ; ledger_table: Ledger_table.Broadcasted.t
   ; identity: Identity.Broadcasted.t }
 [@@deriving fields]
 
@@ -29,11 +31,15 @@ let create ~logger frontier : t Deferred.t =
   let%bind transition_registry =
     Transition_registry.(Broadcasted.create (create ~logger frontier))
   in
+  let%bind ledger_table =
+    Ledger_table.(Broadcasted.create (create ~logger frontier))
+  in
   let%map identity = Identity.(Broadcasted.create (create ~logger frontier)) in
   { root_history
   ; snark_pool_refcount
   ; best_tip_diff
   ; transition_registry
+  ; ledger_table
   ; identity }
 
 (* HACK: A way to ensure that all the pipes are closed in a type-safe manner *)
@@ -49,6 +55,7 @@ let close t : unit =
     ~best_tip_diff:(close_extension (module Best_tip_diff.Broadcasted))
     ~transition_registry:
       (close_extension (module Transition_registry.Broadcasted))
+    ~ledger_table:(close_extension (module Ledger_table.Broadcasted))
     ~identity:(close_extension (module Identity.Broadcasted))
 
 let notify (t : t) ~frontier ~diffs =
@@ -62,6 +69,7 @@ let notify (t : t) ~frontier ~diffs =
        ~snark_pool_refcount:(update (module Snark_pool_refcount.Broadcasted))
        ~best_tip_diff:(update (module Best_tip_diff.Broadcasted))
        ~transition_registry:(update (module Transition_registry.Broadcasted))
+       ~ledger_table:(update (module Ledger_table.Broadcasted))
        ~identity:(update (module Identity.Broadcasted)))
 
 type ('ext, 'view) access =
@@ -71,23 +79,25 @@ type ('ext, 'view) access =
   | Best_tip_diff : (Best_tip_diff.t, Best_tip_diff.view) access
   | Transition_registry
       : (Transition_registry.t, Transition_registry.view) access
+  | Ledger_table : (Ledger_table.t, Ledger_table.view) access
   | Identity : (Identity.t, Identity.view) access
 
-type ('ext, 'view) broadcated_extension =
+type ('ext, 'view) broadcasted_extension =
   | Broadcasted_extension :
       (module Intf.Broadcasted_extension_intf
          with type t = 't
           and type extension = 'ext
           and type view = 'view)
       * 't
-      -> ('ext, 'view) broadcated_extension
+      -> ('ext, 'view) broadcasted_extension
 
 let get : type ext view.
-    t -> (ext, view) access -> (ext, view) broadcated_extension =
+    t -> (ext, view) access -> (ext, view) broadcasted_extension =
  fun { root_history
      ; snark_pool_refcount
      ; best_tip_diff
      ; transition_registry
+     ; ledger_table
      ; identity } -> function
   | Root_history ->
       Broadcasted_extension ((module Root_history.Broadcasted), root_history)
@@ -99,6 +109,8 @@ let get : type ext view.
   | Transition_registry ->
       Broadcasted_extension
         ((module Transition_registry.Broadcasted), transition_registry)
+  | Ledger_table ->
+      Broadcasted_extension ((module Ledger_table.Broadcasted), ledger_table)
   | Identity ->
       Broadcasted_extension ((module Identity.Broadcasted), identity)
 

@@ -4,8 +4,6 @@ open Tick
 open Let_syntax
 open Snark_bits
 open Bitstring_lib
-open Fold_lib
-open Tuple_lib
 
 type uint64 = Unsigned.uint64
 
@@ -22,9 +20,7 @@ module type Basic = sig
 
   include Bits_intf.Convertible_bits with type t := t
 
-  val fold : t -> bool Triple.t Fold.t
-
-  val length_in_triples : int
+  val to_input : t -> (_, bool) Random_oracle.Input.t
 
   val zero : t
 
@@ -52,7 +48,7 @@ module type Basic = sig
 
   val var_to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
 
-  val var_to_triples : var -> Boolean.var Triple.t list
+  val var_to_input : var -> (_, Boolean.var) Random_oracle.Input.t
 
   val equal_var : var -> var -> (Boolean.var, _) Checked.t
 end
@@ -93,8 +89,6 @@ module type Signed_intf = sig
 
   val gen : t Quickcheck.Generator.t
 
-  val length_in_triples : int
-
   val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed.t
 
   val sgn : t -> Sgn.t
@@ -107,9 +101,7 @@ module type Signed_intf = sig
 
   val zero : t
 
-  val fold : t -> bool Triple.t Fold.t
-
-  val to_triples : t -> bool Triple.t list
+  val to_input : t -> (_, bool) Random_oracle.Input.t
 
   val add : t -> t -> t option
 
@@ -126,7 +118,7 @@ module type Signed_intf = sig
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-    val to_triples : var -> Boolean.var Triple.t list
+    val to_input : var -> (_, Boolean.var) Random_oracle.Input.t
 
     val add : var -> var -> (var, _) Checked.t
 
@@ -205,8 +197,6 @@ end = struct
 
   let length_in_bits = M.length
 
-  let length_in_triples = (length_in_bits + 2) / 3
-
   type t = Unsigned.t [@@deriving sexp, compare, hash]
 
   module Arg = struct
@@ -259,9 +249,8 @@ end = struct
 
   let var_to_number t = Number.of_bits (var_to_bits t :> Boolean.var list)
 
-  let var_to_triples t =
-    Bitstring.pad_to_triple_list ~default:Boolean.false_
-      (var_to_bits t :> Boolean.var list)
+  let var_to_input t =
+    Random_oracle.Input.bitstring (var_to_bits t :> Boolean.var list)
 
   let var_of_bits (bits : Boolean.var Bitstring.Lsb_first.t) : var =
     let bits = (bits :> Boolean.var list) in
@@ -289,9 +278,7 @@ end = struct
 
   type magnitude = t [@@deriving sexp, hash, compare, yojson]
 
-  let fold_bits = fold
-
-  let fold t = Fold.group3 ~default:false (fold t)
+  let to_input t = Random_oracle.Input.bitstring (to_bits t)
 
   let if_ cond ~then_ ~else_ =
     Field.Checked.if_ cond ~then_:(pack_var then_) ~else_:(pack_var else_)
@@ -319,10 +306,6 @@ end = struct
 
     type nonrec var = (var, Sgn.var) Signed.t
 
-    let length_in_bits = Int.( + ) length_in_bits 1
-
-    let length_in_triples = Int.((length_in_bits + 2) / 3)
-
     let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) typ =
       Snarky.H_list.(fun [magnitude; sgn] -> {magnitude; sgn})
 
@@ -336,16 +319,9 @@ end = struct
 
     let sgn_to_bool = function Sgn.Pos -> true | Neg -> false
 
-    let fold_bits ({sgn; magnitude} : t) =
-      { Fold.fold=
-          (fun ~init ~f ->
-            let init = (fold_bits magnitude).fold ~init ~f in
-            f init (sgn_to_bool sgn) ) }
+    let to_bits ({sgn; magnitude} : t) = sgn_to_bool sgn :: to_bits magnitude
 
-    let fold t = Fold.group3 ~default:false (fold_bits t)
-
-    let to_triples t =
-      List.rev ((fold t).fold ~init:[] ~f:(fun acc x -> x :: acc))
+    let to_input t = Random_oracle.Input.bitstring (to_bits t)
 
     let add (x : t) (y : t) : t option =
       match (x.sgn, y.sgn) with
@@ -372,7 +348,9 @@ end = struct
 
     module Checked = struct
       let to_bits {magnitude; sgn} =
-        (var_to_bits magnitude :> Boolean.var list) @ [Sgn.Checked.is_pos sgn]
+        Sgn.Checked.is_pos sgn :: (var_to_bits magnitude :> Boolean.var list)
+
+      let to_input t = Random_oracle.Input.bitstring (to_bits t)
 
       let constant {magnitude; sgn} =
         {magnitude= var_of_t magnitude; sgn= Sgn.Checked.constant sgn}
@@ -385,9 +363,6 @@ end = struct
           if_ cond ~then_:then_.magnitude ~else_:else_.magnitude
         in
         {sgn; magnitude}
-
-      let to_triples t =
-        Bitstring.pad_to_triple_list ~default:Boolean.false_ (to_bits t)
 
       let to_field_var ({magnitude; sgn} : var) =
         Tick.Field.Checked.mul (pack_var magnitude) (sgn :> Field.Var.t)
