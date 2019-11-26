@@ -22,8 +22,8 @@ module Poly = struct
   [@@deriving sexp, fields, eq, compare, hash, yojson]
 end
 
-let staged_ledger_hash, snarked_ledger_hash, timestamp =
-  Poly.(staged_ledger_hash, snarked_ledger_hash, timestamp)
+[%%define_locally
+Poly.(staged_ledger_hash, snarked_ledger_hash, timestamp)]
 
 module Value = struct
   [%%versioned

@@ -35,5 +35,5 @@ module T = struct
     None
 end
 
-include T
 module Broadcasted = Functor.Make_broadcasted (T)
+include T

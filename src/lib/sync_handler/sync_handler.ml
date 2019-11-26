@@ -23,28 +23,23 @@ module Make (Inputs : Inputs_intf) :
     in
     Root_history.lookup root_history state_hash
 
-  let get_breadcrumb_ledgers frontier =
-    List.map (Transition_frontier.all_breadcrumbs frontier)
-      ~f:(fun breadcrumb ->
-        Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-        |> Staged_ledger.ledger
-        |> Ledger.Any_ledger.cast (module Ledger) )
-
   let get_ledger_by_hash ~frontier ledger_hash =
-    let ledger_breadcrumbs =
-      Sequence.of_lazy
-        (lazy (Sequence.of_list @@ get_breadcrumb_ledgers frontier))
-    in
     let root_ledger =
-      Ledger.Any_ledger.cast
-        (module Ledger.Db)
-        (Transition_frontier.root_snarked_ledger frontier)
+      Ledger.Any_ledger.cast (module Ledger.Db)
+      @@ Transition_frontier.root_snarked_ledger frontier
     in
-    Sequence.append (Sequence.singleton root_ledger) ledger_breadcrumbs
-    |> Sequence.find ~f:(fun ledger ->
-           Ledger_hash.equal
-             (Ledger.Any_ledger.M.merkle_root ledger)
-             ledger_hash )
+    if
+      Ledger_hash.equal ledger_hash
+        (Ledger.Any_ledger.M.merkle_root root_ledger)
+    then Some root_ledger
+    else
+      let open Transition_frontier.Extensions in
+      let ledger_table =
+        get_extension (Transition_frontier.extensions frontier) Ledger_table
+      in
+      Option.map
+        (Ledger_table.lookup ledger_table ledger_hash)
+        ~f:(Ledger.Any_ledger.cast (module Ledger))
 
   let answer_query :
          frontier:Inputs.Transition_frontier.t
