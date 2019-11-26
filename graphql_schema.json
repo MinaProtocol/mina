@@ -12,6 +12,23 @@
       },
       "types": [
         {
+          "kind": "ENUM",
+          "name": "ChainReorganizationStatus",
+          "description": "Status for whenever the blockchain is reorganized",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": [
+            {
+              "name": "CHANGED",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "subscription",
           "description": null,
@@ -53,6 +70,22 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "Block",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "chainReorganization",
+              "description": "Event that triggers when the best tip changes in a way that is not a trivial extension of the existing one",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "ChainReorganizationStatus",
                   "ofType": null
                 }
               },
@@ -2794,7 +2827,7 @@
               "deprecationReason": null
             },
             {
-              "name": "minEpochLength",
+              "name": "minWindowDensity",
               "description": null,
               "args": [],
               "type": {
@@ -3537,7 +3570,7 @@
             },
             {
               "name": "epochDelegateAccount",
-              "description": "The account that you delegated on the staking ledger of the current block",
+              "description": "The account that you delegated on the staking ledger of the current block's epoch",
               "args": [],
               "type": {
                 "kind": "OBJECT",

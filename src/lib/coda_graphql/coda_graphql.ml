@@ -1426,7 +1426,7 @@ module Subscriptions = struct
         Deferred.Result.return
         @@ Coda_commands.Subscriptions.reorganization coda )
 
-  let commands = [new_sync_update; new_block]
+  let commands = [new_sync_update; new_block; chain_reorganization]
 end
 
 module Mutations = struct
