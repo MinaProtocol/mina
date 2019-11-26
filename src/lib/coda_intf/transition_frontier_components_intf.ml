@@ -349,5 +349,5 @@ module type Transition_router_intf = sig
                                Broadcast_pipe.Reader.t
                                * External_transition.Initial_validated.t
                                  Broadcast_pipe.Writer.t
-    -> External_transition.Validated.t Strict_pipe.Reader.t
+    -> External_transition.Validated.t Strict_pipe.Reader.t * unit Ivar.t
 end

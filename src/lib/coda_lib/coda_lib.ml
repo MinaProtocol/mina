@@ -55,6 +55,7 @@ type t =
   { config: Config.t
   ; processes: processes
   ; components: components
+  ; initialization_signal: unit Ivar.t
   ; pipes: pipes
   ; wallets: Secrets.Wallets.t
   ; propose_keypairs:
@@ -457,15 +458,7 @@ module Root_diff = struct
     {user_commands: User_command.Stable.V1.t list; root_length: int}
 end
 
-let initialization_signal t =
-  let signal = Ivar.create () in
-  don't_wait_for
-  @@ Broadcast_pipe.Reader.iter t.components.transition_frontier ~f:(function
-       | None ->
-           Deferred.unit
-       | Some _ ->
-           return @@ Ivar.fill_if_empty signal () ) ;
-  signal
+let initialization_signal t = t.initialization_signal
 
 (* TODO: this is a bad pattern for two reasons:
  *   - uses an abstraction leak to patch new functionality instead of making a new extension
@@ -754,7 +747,7 @@ let create (config : Config.t) =
               ( Lazy.force External_transition.genesis
               |> External_transition.Validated.to_initial_validated )
           in
-          let valid_transitions =
+          let valid_transitions, initialization_signal =
             trace "transition router" (fun () ->
                 Transition_router.run ~logger:config.logger
                   ~trust_system:config.trust_system ~verifier ~network:net
@@ -913,6 +906,7 @@ let create (config : Config.t) =
             { config
             ; next_proposal= None
             ; processes= {prover; verifier; snark_worker}
+            ; initialization_signal
             ; components=
                 { net
                 ; transaction_pool

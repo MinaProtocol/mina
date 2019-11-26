@@ -383,4 +383,4 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                  else Deferred.unit
              | None ->
                  Deferred.unit ) ) ;
-  verified_transition_reader
+  (verified_transition_reader, initialization_finish_signal)
