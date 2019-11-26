@@ -17,6 +17,7 @@ RUN apt-get -y update && \
     libffi6 \
     apt-transport-https \
     ca-certificates \
+    dnsutils \
     tzdata && \
   rm -rf /var/lib/apt/lists/*
 
