@@ -4,7 +4,7 @@ open Core_kernel
 let print_hash hash =
   printf "\"" ;
   String.iter hash ~f:(fun c -> printf "\\x%02X" (Char.to_int c)) ;
-  printf "\""
+  printf "\"\n%!"
 
 (** use this function to test Bin_prot serialization of types with asserted versioning *)
 

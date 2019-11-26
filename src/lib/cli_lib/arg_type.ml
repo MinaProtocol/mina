@@ -73,6 +73,21 @@ let txn_nonce =
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
 
+let log_level =
+  Command.Arg_type.map Command.Param.string ~f:(fun log_level_str_with_case ->
+      let open Logger in
+      let log_level_str = String.lowercase log_level_str_with_case in
+      match Level.of_string log_level_str with
+      | Error _ ->
+          eprintf "Received unknown log-level %s. Expected one of: %s\n"
+            log_level_str
+            ( Level.all |> List.map ~f:Level.show
+            |> List.map ~f:String.lowercase
+            |> String.concat ~sep:", " ) ;
+          exit 14
+      | Ok ll ->
+          ll )
+
 let user_command =
   Command.Arg_type.create (fun s ->
       try Coda_base.User_command.of_base58_check_exn s
