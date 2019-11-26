@@ -5,6 +5,7 @@ open Core
 open Async
 open Network_peer
 open O1trace
+open Pipe_lib
 open Coda_base.Rpc_intf
 
 type ('q, 'r) dispatch =
@@ -99,6 +100,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; net2: Coda_net2.net
       ; first_peer_ivar: unit Ivar.t
       ; high_connectivity_ivar: unit Ivar.t
+      ; ban_notifications:
+          Intf.ban_notification Linear_pipe.Reader.t
+          * Intf.ban_notification Linear_pipe.Writer.t
       ; subscription: Message.msg Coda_net2.Pubsub.Subscription.t }
 
     let create_libp2p (config : Config.t) first_peer_ivar
@@ -193,15 +197,21 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           "coda/consensus-messages/0.0.1"
           (* FIXME: instead of doing validation here we put the message into a
            queue for later potential broadcast. It will still be broadcast
-           despite failing validation, that is only for automatic forwarding. 
-           Instead, we should probably do "initial validation" up front here, 
+           despite failing validation, that is only for automatic forwarding.
+           Instead, we should probably do "initial validation" up front here,
            and turn should_forward_message into a filter_map instead of just a filter. *)
           ~should_forward_message:(fun ~sender:_ ~data:_ ->
             Deferred.return false )
           ~bin_prot:Message.V1.T.bin_msg ~on_decode_failure:`Ignore
         >>| Or_error.ok_exn
       in
-      {config; net2; first_peer_ivar; high_connectivity_ivar; subscription}
+      let pipes = Linear_pipe.create () in
+      { config
+      ; net2
+      ; first_peer_ivar
+      ; high_connectivity_ivar
+      ; subscription
+      ; ban_notifications= pipes }
 
     let peers t = Coda_net2.peers t.net2
 
@@ -346,7 +356,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     let received_message_reader t =
       Coda_net2.Pubsub.Subscription.message_pipe t.subscription
 
-    let ban_notification_reader _t = failwith "TODO"
+    let ban_notification_reader t = fst t.ban_notifications
 
     let ip_for_peer t peer_id =
       Coda_net2.lookup_peerid t.net2 peer_id
