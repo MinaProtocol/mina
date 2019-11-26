@@ -2,7 +2,7 @@
 type action =
   | SetLocale(Locale.locale);
 
-let initialState = Locale.En;
+let initialState = Locale.Vn;
 
 let intlReducer = (_, action) =>
   switch (action) {
@@ -24,7 +24,8 @@ let make = () => {
         <ReasonApollo.Provider client=Apollo.client>
           <ReactIntl.IntlProvider
             locale={locale->Locale.toString}
-            messages={locale->Locale.translations->Locale.translationsToDict}>
+            messages={locale->Locale.translations->Locale.translationsToDict}
+            >
             {isOnboarding
                ? <Onboarding />
                : <ToastProvider value=toastValue>

@@ -20,6 +20,7 @@ external jsonToTranslations: Js.Json.t => array(ReactIntl.translation) =
 external getTranslation: string => string = "getTranslation";
 
 let fileToReactIntl = name => {
+  Js.log(name)
   let file = getTranslation(name);
   jsonToTranslations(Js.Json.parseExn(file));
 };

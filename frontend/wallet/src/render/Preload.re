@@ -25,7 +25,10 @@ let isFaker =
   == Some("faker");
 
 let getTranslation = name =>
-  Bindings.Fs.readFileSync("./i18n/translations/" ++ name ++ ".json", "utf8");
+  Bindings.Fs.readFileSync(
+    "./src/render/i18n/translations/" ++ name ++ ".json",
+    "utf8",
+  );
 
 [%bs.raw "window.isFaker = isFaker"];
 [%bs.raw "window.downloadKey = downloadKey"];
