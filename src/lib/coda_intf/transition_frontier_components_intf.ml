@@ -308,6 +308,7 @@ module type Bootstrap_controller_intf = sig
     -> persistent_frontier:persistent_frontier
     -> initial_root_transition:External_transition.Validated.t
     -> genesis_protocol_state_hash:State_hash.t
+    -> genesis_ledger:Ledger.t Lazy.t
     -> ( transition_frontier
        * External_transition.Initial_validated.t Envelope.Incoming.t list )
        Deferred.t
@@ -396,5 +397,6 @@ module type Transition_router_intf = sig
     -> most_recent_valid_block:External_transition.t Broadcast_pipe.Reader.t
                                * External_transition.t Broadcast_pipe.Writer.t
     -> genesis_protocol_state_hash:State_hash.t
+    -> genesis_ledger:Ledger.t Lazy.t
     -> External_transition.Validated.t Strict_pipe.Reader.t
 end

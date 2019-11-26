@@ -32,17 +32,19 @@ let create_with_custom_ledger ~genesis_consensus_state ~genesis_ledger =
 
 let t ~genesis_ledger_hash =
   lazy
-    (let negative_one_protocol_state_hash =
-       Protocol_state.(hash @@ Lazy.force negative_one)
+    (let state_hash_init =
+       State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
+     in
+     let negative_one_protocol_state_hash =
+       Protocol_state.(hash (Lazy.force negative_one))
+       (*TODO: generate dummy_genesis_ledger at compile time and get rid of the lazy here*)
      in
      let genesis_consensus_state =
        Consensus.Data.Consensus_state.create_genesis
          ~negative_one_protocol_state_hash ~genesis_ledger_hash
      in
      let state =
-       Protocol_state.create_value
-         ~genesis_state_hash:
-           (State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash)
+       Protocol_state.create_value ~genesis_state_hash:state_hash_init
          ~previous_state_hash:negative_one_protocol_state_hash
          ~blockchain_state:(Blockchain_state.genesis ~genesis_ledger_hash)
          ~consensus_state:genesis_consensus_state
@@ -55,11 +57,11 @@ let compile_time_genesis =
       (Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t))
 
 module For_tests = struct
-  (*TODO: USe test_ledger*)
+  (*TODO: USe test_ledger generated at compile time*)
   let genesis_protocol_state_hash =
     Lazy.force
       (t
          ~genesis_ledger_hash:
-           (Coda_base.Ledger.merkle_root (Lazy.force Genesis_ledger.t)))
+           (Coda_base.Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t)))
     |> With_hash.hash
 end

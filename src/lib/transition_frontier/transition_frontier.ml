@@ -125,6 +125,7 @@ let rec load_with_max_length :
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
     -> genesis_protocol_state_hash:State_hash.t
+    -> genesis_ledger:Ledger.t Lazy.t
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -133,7 +134,7 @@ let rec load_with_max_length :
        Deferred.Result.t =
  fun ~max_length ?(retry_with_fresh_db = true) ~logger ~verifier
      ~consensus_local_state ~persistent_root ~persistent_frontier
-     ~genesis_protocol_state_hash () ->
+     ~genesis_protocol_state_hash ~genesis_ledger () ->
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
   let continue persistent_frontier_instance =
@@ -166,7 +167,10 @@ let rec load_with_max_length :
       Persistent_frontier.reset_database_exn persistent_frontier
         ~root_data:(Lazy.force genesis_root_data)
     in
-    let%bind () = Persistent_root.reset_to_genesis_exn persistent_root in
+    let%bind () =
+      Persistent_root.reset_to_genesis_exn persistent_root ~genesis_ledger
+        ~genesis_state_hash:genesis_protocol_state_hash
+    in
     continue (Persistent_frontier.create_instance_exn persistent_frontier)
   in
   match
@@ -200,6 +204,7 @@ let rec load_with_max_length :
         load_with_max_length ~max_length ~logger ~verifier
           ~consensus_local_state ~persistent_root ~persistent_frontier
           ~retry_with_fresh_db:false () ~genesis_protocol_state_hash
+          ~genesis_ledger
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -525,6 +530,7 @@ module For_tests = struct
     ) ;
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         Persistent_root.Instance.set_root_state_hash instance
+          ~genesis_state_hash:genesis_protocol_state_hash
           (External_transition.Validated.state_hash root_data.transition) ;
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
@@ -533,7 +539,9 @@ module For_tests = struct
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false ~logger
             ~verifier ~consensus_local_state ~persistent_root
-            ~persistent_frontier ~genesis_protocol_state_hash () )
+            ~persistent_frontier ~genesis_protocol_state_hash
+            ~genesis_ledger:(lazy root_snarked_ledger)
+            () )
     in
     let frontier =
       let fail msg = failwith ("failed to load transition frontier: " ^ msg) in

@@ -31,6 +31,7 @@ val load :
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
   -> genesis_protocol_state_hash:State_hash.t
+  -> genesis_ledger:Ledger.t Lazy.t
   -> unit
   -> ( t
      , [> `Failure of string
@@ -66,6 +67,7 @@ module For_tests : sig
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
     -> genesis_protocol_state_hash:State_hash.t
+    -> genesis_ledger:Ledger.t Lazy.t
     -> unit
     -> ( t
        , [> `Failure of string

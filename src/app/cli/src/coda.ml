@@ -786,6 +786,7 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_node
                 ~work_reassignment_wait ~genesis_protocol_state_hash ())
+             ~genesis_ledger:Genesis_ledger.t
          in
          {Coda_initialization.coda; client_whitelist; rest_server_port}
        in

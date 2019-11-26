@@ -18,6 +18,7 @@ val run :
   -> persistent_frontier:Transition_frontier.Persistent_frontier.t
   -> initial_root_transition:External_transition.Validated.t
   -> genesis_protocol_state_hash:State_hash.t
+  -> genesis_ledger:Ledger.t Lazy.t
   -> ( Transition_frontier.t
      * External_transition.Initial_validated.t Envelope.Incoming.t list )
      Deferred.t

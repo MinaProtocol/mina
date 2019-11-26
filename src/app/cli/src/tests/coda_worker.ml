@@ -530,6 +530,8 @@ module T = struct
                  ~transaction_database ~external_transition_database
                  ~is_archive_node ~work_reassignment_wait:420000 ()
                  ~genesis_protocol_state_hash)
+              ~genesis_ledger:Genesis_ledger.t
+            (*TODO: use test genesis ledger*)
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger

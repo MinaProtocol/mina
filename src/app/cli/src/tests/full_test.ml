@@ -206,6 +206,8 @@ let run_test () : unit Deferred.t =
              ~genesis_protocol_state_hash:
                Coda_state.Genesis_protocol_state.For_tests
                .genesis_protocol_state_hash ())
+          ~genesis_ledger:Genesis_ledger.t
+        (*TODO test ledger*)
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
