@@ -906,8 +906,7 @@ let me (net : Helper.t) = net.me_keypair
 let list_peers net =
   match%map Helper.do_rpc net (module Helper.Rpcs.List_peers) () with
   | Ok peers ->
-      List.map peers ~f:(fun {peer_id;_} ->
-            peer_id )
+      List.map peers ~f:(fun {peer_id; _} -> peer_id)
   | Error _ ->
       []
 
