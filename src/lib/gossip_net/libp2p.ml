@@ -122,10 +122,19 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             | None ->
                 Keypair.random net2
           in
-          let peerid = Keypair.to_peer_id me |> Peer.Id.to_string in
+          let peer_id = Keypair.to_peer_id me |> Peer.Id.to_string in
+          ( match config.addrs_and_ports.peer with
+          | Some _ ->
+              ()
+          | None ->
+              config.addrs_and_ports.peer
+              <- Some
+                   (Peer.create config.addrs_and_ports.bind_ip
+                      ~libp2p_port:config.addrs_and_ports.libp2p_port ~peer_id)
+          ) ;
           Logger.info config.logger "libp2p peer ID this session is $peer_id"
             ~location:__LOC__ ~module_:__MODULE__
-            ~metadata:[("peer_id", `String peerid)] ;
+            ~metadata:[("peer_id", `String peer_id)] ;
           let ctr = ref 0 in
           let initializing_libp2p_result : unit Deferred.Or_error.t =
             let open Deferred.Or_error.Let_syntax in
