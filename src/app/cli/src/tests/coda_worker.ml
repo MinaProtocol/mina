@@ -19,7 +19,7 @@ module Input = struct
     ; acceptable_delay: Time.Span.t
     ; peers: Host_and_port.t list
     ; max_concurrent_connections: int option
-    ; is_archive_node: bool }
+    ; is_archive_rocksdb: bool }
   [@@deriving bin_io]
 end
 
@@ -392,7 +392,7 @@ module T = struct
         ; trace_dir
         ; peers
         ; max_concurrent_connections
-        ; is_archive_node
+        ; is_archive_rocksdb
         ; _ } =
       let logger =
         Logger.create
@@ -520,7 +520,7 @@ module T = struct
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ~initial_propose_keypairs ~monitor ~consensus_local_state
                  ~transaction_database ~external_transition_database
-                 ~is_archive_node ~work_reassignment_wait:420000 ())
+                 ~is_archive_rocksdb ~work_reassignment_wait:420000 ())
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger
