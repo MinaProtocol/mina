@@ -79,8 +79,10 @@ module Helper = struct
     ; topic: string
     ; idx: int
     ; mutable closed: bool
-    ; validator: string -> string -> bool Deferred.t
+    ; validator: string -> 'a -> bool Deferred.t
     ; encode: 'a -> string
+    ; on_decode_failure:
+        [`Ignore | `Call of sender:Peer.Id.t -> data:string -> Error.t -> unit]
     ; decode: string -> 'a Or_error.t
     ; write_pipe:
         ( 'a Envelope.Incoming.t
@@ -474,7 +476,8 @@ module Helper = struct
     end
 
     module Publish = struct
-      type t = {upcall: string; subscription_idx: int; data: Data.t}
+      type t =
+        {upcall: string; subscription_idx: int; sender: string; data: Data.t}
       [@@deriving yojson]
     end
 
@@ -521,6 +524,16 @@ module Helper = struct
           Or_error.errorf !"Error converting from json: %s" s
   end
 
+  let lookup_peerid net peer_id =
+    match%map do_rpc net (module Rpcs.Find_peer) {peer_id} with
+    | Ok peer_info ->
+        Ok
+          (Peer.create
+             (Unix.Inet_addr.of_string peer_info.host)
+             ~libp2p_port:peer_info.libp2p_port ~peer_id:peer_info.peer_id)
+    | Error e ->
+        Error e
+
   let handle_upcall t v =
     let open Yojson.Safe.Util in
     let open Or_error.Let_syntax in
@@ -540,13 +553,30 @@ module Helper = struct
                   (* TAKE CARE: doing anything with the return value here is UNSOUND
                 because write_pipe has a cast type. We don't remember what the
                 original 'return was. *)
-                  let _ =
-                    Strict_pipe.Writer.write sub.write_pipe
-                      (Envelope.Incoming.wrap ~data
-                         ~sender:Envelope.Sender.Local)
-                  in
-                  ()
+                  don't_wait_for
+                    Deferred.Let_syntax.(
+                      match%map lookup_peerid t m.sender with
+                      | Ok sender ->
+                          let _ =
+                            Strict_pipe.Writer.write sub.write_pipe
+                              (Envelope.Incoming.wrap_peer ~data ~sender)
+                          in
+                          ()
+                      | Error e ->
+                          Logger.error t.logger
+                            "failed to find connection info for alleged \
+                             sender $peer_id on topic $topic: $error"
+                            ~module_:__MODULE__ ~location:__LOC__
+                            ~metadata:
+                              [ ("peer_id", `String m.sender)
+                              ; ("topic", `String sub.topic)
+                              ; ("error", `String (Error.to_string_mach e)) ])
               | Error e ->
+                  ( match sub.on_decode_failure with
+                  | `Ignore ->
+                      ()
+                  | `Call f ->
+                      f ~sender:m.sender ~data e ) ;
                   Logger.error t.logger
                     "failed to decode message published on subscription \
                      $topic ($idx): $error"
@@ -574,24 +604,44 @@ module Helper = struct
         let idx = m.subscription_idx in
         let seqno = m.seqno in
         match Hashtbl.find t.subscriptions idx with
-        | Some v ->
+        | Some sub ->
             (let open Deferred.Let_syntax in
-            (let%bind is_valid = v.validator m.peer_id m.data in
-             match%map
-               do_rpc t (module Rpcs.Validation_complete) {seqno; is_valid}
-             with
-             | Ok "validationComplete success" ->
-                 ()
-             | Ok v ->
-                 failwithf
-                   "helper broke RPC protocol: validationComplete got %s" v ()
-             | Error e ->
-                 Logger.error t.logger
-                   "error during validationComplete, ignoring and continuing: \
-                    $error"
-                   ~module_:__MODULE__ ~location:__LOC__
-                   ~metadata:[("error", `String (Error.to_string_hum e))])
-            |> don't_wait_for) ;
+            let decoded = sub.decode m.data in
+            let%bind is_valid =
+              match decoded with
+              | Ok data ->
+                  sub.validator m.peer_id data
+              | Error e ->
+                  ( match sub.on_decode_failure with
+                  | `Ignore ->
+                      ()
+                  | `Call f ->
+                      f ~sender:m.peer_id ~data:m.data e ) ;
+                  Logger.error t.logger
+                    "failed to decode message published on subscription \
+                     $topic ($idx): $error"
+                    ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:
+                      [ ("topic", `String sub.topic)
+                      ; ("idx", `Int idx)
+                      ; ("error", `String (Error.to_string_hum e)) ] ;
+                  return false
+            in
+            match%map
+              do_rpc t (module Rpcs.Validation_complete) {seqno; is_valid}
+            with
+            | Ok "validationComplete success" ->
+                ()
+            | Ok v ->
+                failwithf
+                  "helper broke RPC protocol: validationComplete got %s" v ()
+            | Error e ->
+                Logger.error t.logger
+                  "error during validationComplete, ignoring and continuing: \
+                   $error"
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:[("error", `String (Error.to_string_hum e))])
+            |> don't_wait_for ;
             Ok ()
         | None ->
             Or_error.errorf
@@ -805,8 +855,11 @@ module Pubsub = struct
       ; topic: string
       ; idx: int
       ; mutable closed: bool
-      ; validator: string -> string -> bool Deferred.t
+      ; validator: string -> 'a -> bool Deferred.t
       ; encode: 'a -> string
+      ; on_decode_failure:
+          [ `Ignore
+          | `Call of sender:Peer.Id.t -> data:string -> Error.t -> unit ]
       ; decode: string -> 'a Or_error.t
       ; write_pipe:
           ( 'a Envelope.Incoming.t
@@ -837,7 +890,8 @@ module Pubsub = struct
     let message_pipe {read_pipe; _} = read_pipe
   end
 
-  let subscribe (net : net) (topic : string) ~should_forward_message =
+  let subscribe_raw (net : net) (topic : string) ~should_forward_message
+      ~encode ~decode ~on_decode_failure =
     let subscription_idx = Helper.genseq net in
     let read_pipe, write_pipe =
       Strict_pipe.create
@@ -849,8 +903,9 @@ module Pubsub = struct
       ; topic
       ; idx= subscription_idx
       ; closed= false
-      ; encode= Fn.id
-      ; decode= Or_error.return
+      ; encode
+      ; on_decode_failure
+      ; decode
       ; validator=
           (fun s d ->
             should_forward_message ~sender:(Peer.Id.unsafe_of_string s) ~data:d
@@ -896,7 +951,21 @@ module Pubsub = struct
             Strict_pipe.Writer.close write_pipe ;
             Error e )
 
-  let subscribe_encode _ = failwith "jeez"
+  let subscribe_encode net topic ~should_forward_message ~bin_prot
+      ~on_decode_failure =
+    subscribe_raw
+      ~decode:(fun msg_str ->
+        let b = Bigstring.of_string msg_str in
+        Bigstring.read_bin_prot b bin_prot.Bin_prot.Type_class.reader
+        |> Or_error.map ~f:fst )
+      ~encode:(fun msg ->
+        Bin_prot.Utils.bin_dump bin_prot.Bin_prot.Type_class.writer msg
+        |> Bigstring.to_string )
+      ~should_forward_message ~on_decode_failure net topic
+
+  let subscribe =
+    subscribe_raw ~encode:Fn.id ~decode:Or_error.return
+      ~on_decode_failure:`Ignore
 end
 
 let me (net : Helper.t) = Ivar.read net.me_keypair
@@ -1076,15 +1145,7 @@ let begin_advertising net =
   | Error e ->
       Error e
 
-let lookup_peerid net peer_id =
-  match%map Helper.(do_rpc net (module Rpcs.Find_peer) {peer_id}) with
-  | Ok peer_info ->
-      Ok
-        (Peer.create
-           (Unix.Inet_addr.of_string peer_info.host)
-           ~libp2p_port:peer_info.libp2p_port ~peer_id:peer_info.peer_id)
-  | Error e ->
-      Error e
+let lookup_peerid = Helper.lookup_peerid
 
 (* Create and helpers for create *)
 

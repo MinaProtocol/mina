@@ -249,6 +249,7 @@ type publishUpcall struct {
 	Upcall       string `json:"upcall"`
 	Subscription int    `json:"subscription_idx"`
 	Data         string `json:"data"`
+	Sender       string `json:"sender"`
 }
 
 func (s *subscribeMsg) run(app *app) (interface{}, error) {
@@ -307,6 +308,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 					Upcall:       "publish",
 					Subscription: s.Subscription,
 					Data:         data,
+					Sender:       peer.IDB58Encode(msg.ReceivedFrom),
 				})
 			} else {
 				if ctx.Err() != context.Canceled {
