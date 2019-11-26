@@ -1,7 +1,9 @@
-// [@bs.module "./translations/vn.json"]
-// external vn: array(ReactIntl.translation) = "default";
-// [@bs.module "./en.json"]
-// external en: array(ReactIntl.translation) = "default";
+external jsonToTranslations: Js.Json.t => array(ReactIntl.translation) =
+  "%identity";
+
+[@bs.val] [@bs.scope "window"]
+external getTranslation: string => string = "getTranslation";
+
 type locale =
   | En
   | Vn;
@@ -13,14 +15,8 @@ let toString =
   | En => "en"
   | Vn => "vn";
 
-external jsonToTranslations: Js.Json.t => array(ReactIntl.translation) =
-  "%identity";
-
-[@bs.val] [@bs.scope "window"]
-external getTranslation: string => string = "getTranslation";
-
+// fileToReactIntl transforms the raw json into a Reason data structure
 let fileToReactIntl = name => {
-  Js.log(name)
   let file = getTranslation(name);
   jsonToTranslations(Js.Json.parseExn(file));
 };
