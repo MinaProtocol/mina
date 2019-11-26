@@ -634,25 +634,41 @@ module Make (Message : Message_intf) : S with type msg := Message.msg = struct
                   ~module_:__MODULE__
                   ~metadata:[("peer_id", `String peerid)] ;
                 let disc_proto = "coda/0.0.1/discovery-port" in
+                let discover_peer peerid =
+                  let%bind stream =
+                    open_stream net2 ~protocol:disc_proto peerid
+                    >>| Or_error.ok_exn
+                  in
+                  let r, w = Stream.pipes stream in
+                  let%map msg = Pipe.read_all r in
+                  let them_as_peer =
+                    Queue.to_list msg |> String.concat
+                    |> Yojson.Safe.from_string |> Peer.of_yojson
+                    |> Result.ok_or_failwith
+                  in
+                  Pipe.close w ; them_as_peer
+                in
+                let rec peer_list_purge_loop () =
+                  let%bind () = after (Time.Span.of_min 2.) in
+                  let%bind peers = Coda_net2.list_peers net2 in
+                  let%bind discovered_entries =
+                    Deferred.List.map peers ~f:discover_peer
+                  in
+                  Option.iter haskell_membership
+                    ~f:Membership.Hacky_glue.forget_all ;
+                  List.iter discovered_entries ~f:(fun p ->
+                      don't_wait_for
+                        (Linear_pipe.write peer_event_writer
+                           (Peer.Event.Connect [p])) ) ;
+                  peer_list_purge_loop ()
+                in
                 let on_new_peer {id= peerid; _} =
-                  (let%bind stream =
-                     open_stream net2 ~protocol:disc_proto peerid
-                     >>| Or_error.ok_exn
-                   in
-                   let r, w = Stream.pipes stream in
-                   let%map msg = Pipe.read_all r in
-                   let them_as_peer =
-                     Queue.to_list msg |> String.concat
-                     |> Yojson.Safe.from_string |> Peer.of_yojson
-                     |> Result.ok_or_failwith
-                   in
-                   Pipe.close w ;
+                  (let%bind them_as_peer = discover_peer peerid in
                    Linear_pipe.write peer_event_writer
-                     (Peer.Event.Connect [them_as_peer])
-                   |> don't_wait_for ;
-                   ())
+                     (Peer.Event.Connect [them_as_peer]))
                   |> don't_wait_for
                 in
+                peer_list_purge_loop () |> don't_wait_for ;
                 let initializing_libp2p_result : unit Deferred.Or_error.t =
                   let open Deferred.Or_error.Let_syntax in
                   let%bind () =

@@ -36,6 +36,10 @@ type stream_state =
   | FullyClosed
       (** Streams move from [HalfClosed peer] to FullyClosed once the party that isn't peer has their "close write" event. Once a stream is FullyClosed, its resources are released. *)
 
+(** simple types for yojson to derive, later mapped into a Peer.t *)
+type peer_info = {libp2p_port: int; host: string; peer_id: string}
+[@@deriving yojson]
+
 module Helper = struct
   type t =
     { subprocess: Child_processes.t
@@ -105,6 +109,12 @@ module Helper = struct
   type ('a, 'b) rpc = (module Rpc with type input = 'a and type output = 'b)
 
   module Rpcs = struct
+    module No_input = struct
+      type input = unit
+
+      let input_to_yojson () = `Assoc []
+    end
+
     module Send_stream_msg = struct
       type input = {stream_idx: int; data: string} [@@deriving yojson]
 
@@ -244,6 +254,14 @@ module Helper = struct
       type output = string [@@deriving yojson]
 
       let name = "beginAdvertising"
+    end
+
+    module List_peers = struct
+      include No_input
+
+      type output = peer_info list [@@deriving yojson]
+
+      let name = "listPeers"
     end
   end
 
@@ -759,7 +777,7 @@ module Keypair = struct
     in
     if Or_error.is_error with_semicolon then with_comma else with_semicolon
 
-  let to_peerid {peer_id; _} = peer_id
+  let to_peerid ({peer_id; _} : t) = peer_id
 end
 
 module PeerID = struct
@@ -885,6 +903,14 @@ end
 
 let me (net : Helper.t) = net.me_keypair
 
+let list_peers net =
+  match%map Helper.do_rpc net (module Helper.Rpcs.List_peers) () with
+  | Ok peers ->
+      List.map peers ~f:(fun {peer_id;_} ->
+            peer_id )
+  | Error _ ->
+      []
+
 let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer =
   match%map
     Helper.do_rpc net
@@ -908,12 +934,6 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer =
       failwithf "helper broke RPC protocol: configure got %s" j ()
   | Error e ->
       Error e
-
-(** TODO: needs a new helper RPC.
-    What should the semantics be? Only peers we currently have open
-    connections to? Anybody in the peerbook? Only those we're gossiping to?
-    *)
-let peers _ = failwith "Coda_net2.peers not yet implemented"
 
 let listen_on net iface =
   match%map Helper.do_rpc net (module Helper.Rpcs.Listen) {iface} with

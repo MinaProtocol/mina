@@ -26,5 +26,7 @@ module Haskell : sig
 
   module Hacky_glue : sig
     val inject_event : t -> Peer.Event.t -> unit
+
+    val forget_all : t -> unit
   end
 end
