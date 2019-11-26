@@ -152,6 +152,8 @@ module Instance = struct
       External_transition.Validation.wrap transition
       |> External_transition.skip_time_received_validation
            `This_transition_was_not_received_via_gossip
+      |> External_transition.skip_genesis_protocol_state_validation
+           `This_transition_was_generated_internally
       |> External_transition.skip_proof_validation
            `This_transition_was_generated_internally
       |> External_transition.skip_delta_transition_chain_validation

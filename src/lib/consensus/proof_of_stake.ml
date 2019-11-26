@@ -1923,9 +1923,14 @@ module Data = struct
 
     (* Check that both epoch and slot are zero.
     *)
+    let is_genesis_state (t : Value.t) =
+      Global_slot.(equal zero t.curr_global_slot)
+
     let is_genesis (global_slot : Global_slot.Checked.t) =
       let open Global_slot in
       Checked.equal (Checked.constant zero) global_slot
+
+    let is_genesis_state_var (t : var) = is_genesis t.curr_global_slot
 
     let%snarkydef update_var (previous_state : var)
         (transition_data : Consensus_transition.var)
@@ -2842,7 +2847,8 @@ module Hooks = struct
 
     let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
         ~blockchain_state ~current_time ~(proposal_data : Proposal_data.t)
-        ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger =
+        ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger
+        ~genesis_protocol_state_hash =
       let previous_consensus_state =
         Protocol_state.consensus_state previous_protocol_state
       in
@@ -2863,10 +2869,13 @@ module Hooks = struct
                (Protocol_state.hash previous_protocol_state)
              ~supply_increase ~snarked_ledger_hash)
       in
+      let genesis_state_hash =
+        if Consensus_state.is_genesis_state previous_consensus_state then
+          genesis_protocol_state_hash
+        else Protocol_state.genesis_state_hash previous_protocol_state
+      in
       let protocol_state =
-        Protocol_state.create_value
-          ~genesis_state_hash:
-            (Protocol_state.genesis_state_hash previous_protocol_state)
+        Protocol_state.create_value ~genesis_state_hash
           ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
           ~blockchain_state ~consensus_state
       in

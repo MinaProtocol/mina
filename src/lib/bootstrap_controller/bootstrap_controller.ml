@@ -226,7 +226,8 @@ let download_best_tip ~root_sync_ledger ~transition_graph t
    isolation *)
 let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     ~transition_reader ~should_ask_best_tip ~persistent_root
-    ~persistent_frontier ~initial_root_transition =
+    ~persistent_frontier ~initial_root_transition ~genesis_protocol_state_hash
+    =
   let rec loop () =
     let sync_ledger_reader, sync_ledger_writer =
       create ~name:"sync ledger pipe"
@@ -422,7 +423,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               in
               Transition_frontier.load ~retry_with_fresh_db:false ~logger
                 ~verifier ~consensus_local_state ~persistent_root
-                ~persistent_frontier ()
+                ~persistent_frontier ~genesis_protocol_state_hash ()
               >>| function
               | Ok frontier ->
                   frontier

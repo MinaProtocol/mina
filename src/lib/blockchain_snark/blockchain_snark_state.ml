@@ -156,10 +156,17 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         in
         result
       in
+      let%bind genesis_state_hash =
+        let%bind is_first_block =
+          previous_state |> Protocol_state.consensus_state
+          |> Consensus.Data.Consensus_state.is_genesis_state_var
+        in
+        State_hash.if_ is_first_block
+          ~then_:(Snark_transition.genesis_protocol_state_hash transition)
+          ~else_:(Protocol_state.genesis_state_hash previous_state)
+      in
       let new_state =
-        Protocol_state.create_var ~previous_state_hash
-          ~genesis_state_hash:
-            (Protocol_state.genesis_state_hash previous_state)
+        Protocol_state.create_var ~previous_state_hash ~genesis_state_hash
           ~blockchain_state:(Snark_transition.blockchain_state transition)
           ~consensus_state
       in

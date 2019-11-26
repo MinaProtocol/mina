@@ -134,17 +134,20 @@ module Validation = struct
     module V1 = struct
       module T = struct
         type ( 'time_received
+             , 'genesis_state
              , 'proof
              , 'delta_transition_chain
              , 'frontier_dependencies
              , 'staged_ledger_diff )
              t =
           'time_received
+          * 'genesis_state
           * 'proof
           * 'delta_transition_chain
           * 'frontier_dependencies
           * 'staged_ledger_diff
           constraint 'time_received = [`Time_received] * (unit, _) Truth.t
+          constraint 'genesis_state = [`Genesis_state] * (unit, _) Truth.t
           constraint 'proof = [`Proof] * (unit, _) Truth.t
           constraint
             'delta_transition_chain =
@@ -166,12 +169,14 @@ module Validation = struct
   end
 
   type ( 'time_received
+       , 'genesis_state
        , 'proof
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff )
        t =
     ( 'time_received
+    , 'genesis_state
     , 'proof
     , 'delta_transition_chain
     , 'frontier_dependencies
@@ -180,6 +185,7 @@ module Validation = struct
 
   type fully_invalid =
     ( [`Time_received] * unit Truth.false_t
+    , [`Genesis_state] * unit Truth.false_t
     , [`Proof] * unit Truth.false_t
     , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.false_t
     , [`Frontier_dependencies] * unit Truth.false_t
@@ -188,6 +194,7 @@ module Validation = struct
 
   type fully_valid =
     ( [`Time_received] * unit Truth.true_t
+    , [`Genesis_state] * unit Truth.true_t
     , [`Proof] * unit Truth.true_t
     , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
     , [`Frontier_dependencies] * unit Truth.true_t
@@ -195,6 +202,7 @@ module Validation = struct
     t
 
   type ( 'time_received
+       , 'genesis_state
        , 'proof
        , 'delta_transition_chain
        , 'frontier_dependencies
@@ -202,6 +210,7 @@ module Validation = struct
        with_transition =
     (external_transition, State_hash.t) With_hash.t
     * ( 'time_received
+      , 'genesis_state
       , 'proof
       , 'delta_transition_chain
       , 'frontier_dependencies
@@ -210,6 +219,7 @@ module Validation = struct
 
   let fully_invalid =
     ( (`Time_received, Truth.False)
+    , (`Genesis_state, Truth.False)
     , (`Proof, Truth.False)
     , (`Delta_transition_chain, Truth.False)
     , (`Frontier_dependencies, Truth.False)
@@ -217,6 +227,7 @@ module Validation = struct
 
   type initial_valid =
     ( [`Time_received] * unit Truth.true_t
+    , [`Genesis_state] * unit Truth.true_t
     , [`Proof] * unit Truth.true_t
     , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
     , [`Frontier_dependencies] * unit Truth.false_t
@@ -225,6 +236,7 @@ module Validation = struct
 
   type almost_valid =
     ( [`Time_received] * unit Truth.true_t
+    , [`Genesis_state] * unit Truth.true_t
     , [`Proof] * unit Truth.true_t
     , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
     , [`Frontier_dependencies] * unit Truth.true_t
@@ -235,6 +247,7 @@ module Validation = struct
 
   let extract_delta_transition_chain_witness = function
     | ( _
+      , _
       , _
       , (`Delta_transition_chain, Truth.True delta_transition_chain_witness)
       , _
@@ -247,12 +260,14 @@ module Validation = struct
       =
     match validation with
     | ( time_received
+      , genesis_state
       , proof
       , delta_transition_chain
       , (`Frontier_dependencies, Truth.True ())
       , staged_ledger_diff ) ->
         ( transition_with_hash
         , ( time_received
+          , genesis_state
           , proof
           , delta_transition_chain
           , (`Frontier_dependencies, Truth.False)
@@ -263,12 +278,14 @@ module Validation = struct
   let reset_staged_ledger_diff_validation (transition_with_hash, validation) =
     match validation with
     | ( time_received
+      , genesis_state
       , proof
       , delta_transition_chain
       , frontier_dependencies
       , (`Staged_ledger_diff, Truth.True ()) ) ->
         ( transition_with_hash
         , ( time_received
+          , genesis_state
           , proof
           , delta_transition_chain
           , frontier_dependencies
@@ -281,23 +298,27 @@ module Validation = struct
   module Unsafe = struct
     let set_valid_time_received :
            ( [`Time_received] * unit Truth.false_t
+           , 'genesis_state
            , 'proof
            , 'delta_transition_chain
            , 'frontier_dependencies
            , 'staged_ledger_diff )
            t
         -> ( [`Time_received] * unit Truth.true_t
+           , 'genesis_state
            , 'proof
            , 'delta_transition_chain
            , 'frontier_dependencies
            , 'staged_ledger_diff )
            t = function
       | ( (`Time_received, Truth.False)
+        , genesis_state
         , proof
         , delta_transition_chain
         , frontier_dependencies
         , staged_ledger_diff ) ->
           ( (`Time_received, Truth.True ())
+          , genesis_state
           , proof
           , delta_transition_chain
           , frontier_dependencies
@@ -307,24 +328,58 @@ module Validation = struct
 
     let set_valid_proof :
            ( 'time_received
+           , 'genesis_state
            , [`Proof] * unit Truth.false_t
            , 'delta_transition_chain
            , 'frontier_dependencies
            , 'staged_ledger_diff )
            t
         -> ( 'time_received
+           , 'genesis_state
            , [`Proof] * unit Truth.true_t
            , 'delta_transition_chain
            , 'frontier_dependencies
            , 'staged_ledger_diff )
            t = function
       | ( time_received
+        , genesis_state
         , (`Proof, Truth.False)
         , delta_transition_chain
         , frontier_dependencies
         , staged_ledger_diff ) ->
           ( time_received
+          , genesis_state
           , (`Proof, Truth.True ())
+          , delta_transition_chain
+          , frontier_dependencies
+          , staged_ledger_diff )
+      | _ ->
+          failwith "why can't this be refuted?"
+
+    let set_valid_genesis_state :
+           ( 'time_received
+           , [`Genesis_state] * unit Truth.false_t
+           , 'proof
+           , 'delta_transition_chain
+           , 'frontier_dependencies
+           , 'staged_ledger_diff )
+           t
+        -> ( 'time_received
+           , [`Genesis_state] * unit Truth.true_t
+           , 'proof
+           , 'delta_transition_chain
+           , 'frontier_dependencies
+           , 'staged_ledger_diff )
+           t = function
+      | ( time_received
+        , (`Genesis_state, Truth.False)
+        , proof
+        , delta_transition_chain
+        , frontier_dependencies
+        , staged_ledger_diff ) ->
+          ( time_received
+          , (`Genesis_state, Truth.True ())
+          , proof
           , delta_transition_chain
           , frontier_dependencies
           , staged_ledger_diff )
@@ -333,6 +388,7 @@ module Validation = struct
 
     let set_valid_delta_transition_chain :
            ( 'time_received
+           , 'genesis_state
            , 'proof
            , [`Delta_transition_chain]
              * State_hash.t Non_empty_list.t Truth.false_t
@@ -341,6 +397,7 @@ module Validation = struct
            t
         -> State_hash.t Non_empty_list.t
         -> ( 'time_received
+           , 'genesis_state
            , 'proof
            , [`Delta_transition_chain]
              * State_hash.t Non_empty_list.t Truth.true_t
@@ -350,11 +407,13 @@ module Validation = struct
      fun validation hashes ->
       match validation with
       | ( time_received
+        , genesis_state
         , proof
         , (`Delta_transition_chain, Truth.False)
         , frontier_dependencies
         , staged_ledger_diff ) ->
           ( time_received
+          , genesis_state
           , proof
           , (`Delta_transition_chain, Truth.True hashes)
           , frontier_dependencies
@@ -364,23 +423,27 @@ module Validation = struct
 
     let set_valid_frontier_dependencies :
            ( 'time_received
+           , 'genesis_state
            , 'proof
            , 'delta_transition_chain
            , [`Frontier_dependencies] * unit Truth.false_t
            , 'staged_ledger_diff )
            t
         -> ( 'time_received
+           , 'genesis_state
            , 'proof
            , 'delta_transition_chain
            , [`Frontier_dependencies] * unit Truth.true_t
            , 'staged_ledger_diff )
            t = function
       | ( time_received
+        , genesis_state
         , proof
         , delta_transition_chain
         , (`Frontier_dependencies, Truth.False)
         , staged_ledger_diff ) ->
           ( time_received
+          , genesis_state
           , proof
           , delta_transition_chain
           , (`Frontier_dependencies, Truth.True ())
@@ -390,23 +453,27 @@ module Validation = struct
 
     let set_valid_staged_ledger_diff :
            ( 'time_received
+           , 'genesis_state
            , 'proof
            , 'delta_transition_chain
            , 'frontier_dependencies
            , [`Staged_ledger_diff] * unit Truth.false_t )
            t
         -> ( 'time_received
+           , 'genesis_state
            , 'proof
            , 'delta_transition_chain
            , 'frontier_dependencies
            , [`Staged_ledger_diff] * unit Truth.true_t )
            t = function
       | ( time_received
+        , genesis_state
         , proof
         , delta_transition_chain
         , frontier_dependencies
         , (`Staged_ledger_diff, Truth.False) ) ->
           ( time_received
+          , genesis_state
           , proof
           , delta_transition_chain
           , frontier_dependencies
@@ -419,6 +486,10 @@ end
 let skip_time_received_validation `This_transition_was_not_received_via_gossip
     (t, validation) =
   (t, Validation.Unsafe.set_valid_time_received validation)
+
+let skip_genesis_protocol_state_validation
+    `This_transition_was_generated_internally (t, validation) =
+  (t, Validation.Unsafe.set_valid_genesis_state validation)
 
 let validate_time_received (t, validation) ~time_received =
   let consensus_state =
@@ -446,6 +517,16 @@ let skip_delta_transition_chain_validation
   ( t
   , Validation.Unsafe.set_valid_delta_transition_chain validation
       (Non_empty_list.singleton previous_protocol_state_hash) )
+
+let validate_genesis_protocol_state ~genesis_protocol_state_hash (t, validation)
+    =
+  let {protocol_state= state; _} = With_hash.data t in
+  if
+    State_hash.equal
+      (Protocol_state.genesis_state_hash state)
+      genesis_protocol_state_hash
+  then Ok (t, Validation.Unsafe.set_valid_genesis_state validation)
+  else Error `Invalid_genesis_protocol_state
 
 let validate_proof (t, validation) ~verifier =
   let open Blockchain_snark.Blockchain in
@@ -544,6 +625,7 @@ module Validated = struct
         type t =
           (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
           * ( [`Time_received] * (unit, Truth.True.t) Truth.t
+            , [`Genesis_state] * (unit, Truth.True.t) Truth.t
             , [`Proof] * (unit, Truth.True.t) Truth.t
             , [`Delta_transition_chain]
               * ( State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
@@ -580,6 +662,7 @@ module Validated = struct
         let elaborate (transition_with_hash, delta_transition_chain_witness) =
           ( transition_with_hash
           , ( (`Time_received, Truth.True ())
+            , (`Genesis_state, Truth.True ())
             , (`Proof, Truth.True ())
             , ( `Delta_transition_chain
               , Truth.True delta_transition_chain_witness )
@@ -620,6 +703,8 @@ module Validated = struct
             ( Validation.wrap t
             |> skip_time_received_validation
                  `This_transition_was_not_received_via_gossip
+            |> skip_genesis_protocol_state_validation
+                 `This_transition_was_generated_internally
             |> skip_proof_validation `This_transition_was_generated_internally
             |> skip_delta_transition_chain_validation
                  `This_transition_was_not_received_via_gossip
@@ -766,6 +851,7 @@ module Staged_ledger_validation = struct
 
   let validate_staged_ledger_diff :
          ( 'time_received
+         , 'genesis_state
          , 'proof
          , 'delta_transition_chain
          , 'frontier_dependencies
@@ -778,6 +864,7 @@ module Staged_ledger_validation = struct
       -> ( [`Just_emitted_a_proof of bool]
            * [ `External_transition_with_validation of
                ( 'time_received
+               , 'genesis_state
                , 'proof
                , 'delta_transition_chain
                , 'frontier_dependencies

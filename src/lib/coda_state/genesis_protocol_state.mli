@@ -6,8 +6,12 @@ val create_with_custom_ledger :
   -> (Protocol_state.Value.t, State_hash.t) With_hash.t
 
 val t :
-     genesis_ledger:Ledger.t Lazy.t
+     genesis_ledger_hash:Ledger_hash.t
   -> (Protocol_state.Value.t, State_hash.t) With_hash.t Lazy.t
 
 val compile_time_genesis :
   (Protocol_state.Value.t, State_hash.t) With_hash.t Lazy.t
+
+module For_tests : sig
+  val genesis_protocol_state_hash : State_hash.t
+end

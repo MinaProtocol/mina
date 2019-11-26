@@ -647,7 +647,9 @@ let create (config : Config.t) =
           let%bind transition_frontier_opt =
             Transition_frontier.load ~logger:config.logger ~verifier
               ~consensus_local_state:config.consensus_local_state
-              ~persistent_root ~persistent_frontier ()
+              ~persistent_root ~persistent_frontier
+              ~genesis_protocol_state_hash:config.genesis_protocol_state_hash
+              ()
             >>| function
             | Ok frontier ->
                 Some frontier
@@ -773,7 +775,9 @@ let create (config : Config.t) =
                   ~network_transition_reader:
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
-                  ~proposer_transition_reader ~most_recent_valid_block )
+                  ~proposer_transition_reader ~most_recent_valid_block
+                  ~genesis_protocol_state_hash:
+                    config.genesis_protocol_state_hash )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

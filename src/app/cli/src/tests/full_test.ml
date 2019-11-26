@@ -202,7 +202,10 @@ let run_test () : unit Deferred.t =
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
              ~time_controller ~receipt_chain_database ~snark_work_fee
              ~consensus_local_state ~transaction_database
-             ~external_transition_database ~work_reassignment_wait:420000 ())
+             ~external_transition_database ~work_reassignment_wait:420000
+             ~genesis_protocol_state_hash:
+               Coda_state.Genesis_protocol_state.For_tests
+               .genesis_protocol_state_hash ())
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback

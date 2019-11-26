@@ -501,6 +501,14 @@ module T = struct
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
+          let genesis_protocol_state_hash =
+            (*Todo: use test genesis ledger hash*)
+            Lazy.force
+              (Coda_state.Genesis_protocol_state.t
+                 ~genesis_ledger_hash:
+                   (Coda_base.Ledger.merkle_root (Lazy.force Genesis_ledger.t)))
+            |> With_hash.hash
+          in
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
@@ -520,7 +528,8 @@ module T = struct
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ~initial_propose_keypairs ~monitor ~consensus_local_state
                  ~transaction_database ~external_transition_database
-                 ~is_archive_node ~work_reassignment_wait:420000 ())
+                 ~is_archive_node ~work_reassignment_wait:420000 ()
+                 ~genesis_protocol_state_hash)
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger

@@ -30,13 +30,10 @@ let create_with_custom_ledger ~genesis_consensus_state ~genesis_ledger =
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state
 
-let t ~genesis_ledger =
+let t ~genesis_ledger_hash =
   lazy
     (let negative_one_protocol_state_hash =
        Protocol_state.(hash @@ Lazy.force negative_one)
-     in
-     let genesis_ledger_hash =
-       Ledger.merkle_root (Lazy.force genesis_ledger)
      in
      let genesis_consensus_state =
        Consensus.Data.Consensus_state.create_genesis
@@ -52,4 +49,17 @@ let t ~genesis_ledger =
      in
      With_hash.of_data ~hash_data:Protocol_state.hash state)
 
-let compile_time_genesis = t ~genesis_ledger:Genesis_ledger.Dummy.t
+let compile_time_genesis =
+  t
+    ~genesis_ledger_hash:
+      (Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t))
+
+module For_tests = struct
+  (*TODO: USe test_ledger*)
+  let genesis_protocol_state_hash =
+    Lazy.force
+      (t
+         ~genesis_ledger_hash:
+           (Coda_base.Ledger.merkle_root (Lazy.force Genesis_ledger.t)))
+    |> With_hash.hash
+end

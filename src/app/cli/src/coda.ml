@@ -31,12 +31,9 @@ let maybe_sleep _ = Deferred.unit
 [%%endif]
 
 (*TODO: genesis ledger hash, genesis timestamp and epoch size or all the consensus constants*)
-let chain_id ~genesis_ledger =
+let chain_id ~genesis_state_hash =
   lazy
-    (let genesis_state_hash =
-       (Lazy.force (Coda_state.Genesis_protocol_state.t ~genesis_ledger)).hash
-       |> State_hash.to_base58_check
-     in
+    (let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
      let all_snark_keys =
        List.fold_left ~f:( ^ ) ~init:"" Snark_keys.key_hashes
      in
@@ -642,6 +639,13 @@ let daemon logger =
          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
+         let genesis_protocol_state_hash =
+           Lazy.force
+             (Coda_state.Genesis_protocol_state.t
+                ~genesis_ledger_hash:
+                  (Coda_base.Ledger.merkle_root (Lazy.force Genesis_ledger.t)))
+           |> With_hash.hash
+         in
          let time_controller =
            Block_time.Controller.create @@ Block_time.Controller.basic ~logger
          in
@@ -663,7 +667,9 @@ let daemon logger =
              ; logger
              ; target_peer_count= 8
              ; conf_dir
-             ; chain_id= Lazy.force (chain_id ~genesis_ledger:Genesis_ledger.t)
+             ; chain_id=
+                 Lazy.force
+                   (chain_id ~genesis_state_hash:genesis_protocol_state_hash)
              ; initial_peers= initial_peers_cleaned
              ; addrs_and_ports
              ; trust_system
@@ -779,7 +785,7 @@ let daemon logger =
                 ~time_controller ~initial_propose_keypairs ~monitor
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_node
-                ~work_reassignment_wait ())
+                ~work_reassignment_wait ~genesis_protocol_state_hash ())
          in
          {Coda_initialization.coda; client_whitelist; rest_server_port}
        in

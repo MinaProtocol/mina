@@ -30,6 +30,7 @@ val load :
   -> consensus_local_state:Consensus.Data.Local_state.t
   -> persistent_root:Persistent_root.t
   -> persistent_frontier:Persistent_frontier.t
+  -> genesis_protocol_state_hash:State_hash.t
   -> unit
   -> ( t
      , [> `Failure of string
@@ -49,6 +50,8 @@ val root_snarked_ledger : t -> Ledger.Db.t
 
 val extensions : t -> Extensions.t
 
+val genesis_protocol_state_hash : t -> State_hash.t
+
 module For_tests : sig
   open Signature_lib
 
@@ -62,6 +65,7 @@ module For_tests : sig
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
+    -> genesis_protocol_state_hash:State_hash.t
     -> unit
     -> ( t
        , [> `Failure of string
