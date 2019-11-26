@@ -165,7 +165,7 @@ let rec load_with_max_length :
     let%bind () = Persistent_root.reset_to_genesis_exn persistent_root in
     continue
       (Persistent_frontier.create_instance_exn persistent_frontier)
-      ~ignore_consensus_local_state:false
+      ~ignore_consensus_local_state:true
   in
   match
     Persistent_frontier.Instance.check_database persistent_frontier_instance
