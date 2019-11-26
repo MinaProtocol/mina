@@ -5,17 +5,18 @@ open Core
 open Async
 open Pipe_lib
 
-type t = Coda_worker.Connection.t * Coda_worker.Input.t
+type t = Coda_worker.Connection.t * Process.t * Coda_worker.Input.t
 
 let spawn_exn (config : Coda_worker.Input.t) =
-  let%bind conn =
-    Coda_worker.spawn_exn ~redirect_stdout:(`File_append "foo.log")
-      ~redirect_stderr:(`File_append "bar.log") ~env:config.env
-      ~on_failure:Error.raise ~cd:config.program_dir ~shutdown_on:Disconnect
+  let%bind conn, process =
+    Coda_worker.spawn_in_foreground_exn ~env:config.env ~on_failure:Error.raise
+      ~cd:config.program_dir ~shutdown_on:Disconnect
       ~connection_state_init_arg:() ~connection_timeout:(Time.Span.of_sec 15.)
       config
   in
-  return (conn, config)
+  File_system.dup_stdout process ;
+  File_system.dup_stderr process ;
+  return (conn, process, config)
 
 let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
     ~program_dir ~proposer ~snark_worker_key ~work_selection_method ~offset
@@ -51,42 +52,42 @@ let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
   in
   config
 
-let peers_exn (conn, _) =
+let peers_exn (conn, _, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.peers ~arg:()
 
-let get_balance_exn (conn, _) pk =
+let get_balance_exn (conn, _, _) pk =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_balance
     ~arg:pk
 
-let get_nonce_exn (conn, _) pk =
+let get_nonce_exn (conn, _, _) pk =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.get_nonce
     ~arg:pk
 
-let root_length_exn (conn, _) =
+let root_length_exn (conn, _, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.root_length
     ~arg:()
 
-let send_user_command_exn (conn, _) sk pk amount fee memo =
+let send_user_command_exn (conn, _, _) sk pk amount fee memo =
   Coda_worker.Connection.run_exn conn
     ~f:Coda_worker.functions.send_user_command
     ~arg:(sk, pk, amount, fee, memo)
 
-let process_user_command_exn (conn, _) cmd =
+let process_user_command_exn (conn, _, _) cmd =
   Coda_worker.Connection.run_exn conn
     ~f:Coda_worker.functions.process_user_command ~arg:cmd
 
-let prove_receipt_exn (conn, _) proving_receipt resulting_receipt =
+let prove_receipt_exn (conn, _, _) proving_receipt resulting_receipt =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.prove_receipt
     ~arg:(proving_receipt, resulting_receipt)
 
-let sync_status_exn (conn, _) =
+let sync_status_exn (conn, _, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.sync_status
       ~arg:()
   in
   Linear_pipe.wrap_reader r
 
-let verified_transitions_exn (conn, _) =
+let verified_transitions_exn (conn, _, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn
       ~f:Coda_worker.functions.verified_transitions ~arg:()
@@ -94,58 +95,58 @@ let verified_transitions_exn (conn, _) =
   Linear_pipe.wrap_reader r
 
 (* TODO: 2836 delete once transition_frontier extensions refactoring gets in *)
-let validated_transitions_keyswaptest_exn (conn, _) =
+let validated_transitions_keyswaptest_exn (conn, _, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn
       ~f:Coda_worker.functions.validated_transitions_keyswaptest ~arg:()
   in
   Linear_pipe.wrap_reader r
 
-let new_block_exn (conn, __) key =
+let new_block_exn (conn, _, _) key =
   let%map r =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.new_block
       ~arg:key
   in
   Linear_pipe.wrap_reader r
 
-let get_all_transitions (conn, __) key =
+let get_all_transitions (conn, _, _) key =
   Coda_worker.Connection.run_exn conn
     ~f:Coda_worker.functions.get_all_transitions ~arg:key
 
-let root_diff_exn (conn, _) =
+let root_diff_exn (conn, _, _) =
   let%map r =
     Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.root_diff
       ~arg:()
   in
   Linear_pipe.wrap_reader r
 
-let start_exn (conn, _) =
+let start_exn (conn, _, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.start ~arg:()
 
-let new_user_command_exn (conn, _) pk =
+let new_user_command_exn (conn, _, _) pk =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.new_user_command
     ~arg:pk
 
-let get_all_user_commands_exn (conn, _) pk =
+let get_all_user_commands_exn (conn, _, _) pk =
   Coda_worker.Connection.run_exn conn
     ~f:Coda_worker.functions.get_all_user_commands ~arg:pk
 
-let dump_tf (conn, _) =
+let dump_tf (conn, _, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.dump_tf ~arg:()
 
-let best_path (conn, _) =
+let best_path (conn, _, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.best_path
     ~arg:()
 
-let replace_snark_worker_key (conn, _) key =
+let replace_snark_worker_key (conn, _, _) key =
   Coda_worker.Connection.run_exn conn
     ~f:Coda_worker.functions.replace_snark_worker_key ~arg:key
 
-let stop_snark_worker (conn, _) =
+let stop_snark_worker (conn, _, _) =
   Coda_worker.Connection.run_exn conn
     ~f:Coda_worker.functions.stop_snark_worker ~arg:()
 
-let disconnect ((conn, _) as t) ~logger =
+let disconnect ((conn, _, _) as t) ~logger =
   (* This kills any straggling snark worker process *)
   let%bind () =
     match%map Monitor.try_with (fun () -> stop_snark_worker t) with
