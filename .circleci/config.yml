@@ -181,15 +181,15 @@ jobs:
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
-                    - homebrew-v7-{{ checksum "scripts/macos-setup-brew.sh" }}
-                    - homebrew-v7-
+                    - homebrew-v8-{{ checksum "scripts/macos-setup-brew.sh" }}
+                    - homebrew-v8-
             - run:
                 name: Install macos dependencies - homebrew - make macos-setup-download
                 command: |
                     ./scripts/skip_if_only_frontend.sh make macos-setup-download
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v7-{{ checksum "scripts/macos-setup-brew.sh" }}
+                key: homebrew-v8-{{ checksum "scripts/macos-setup-brew.sh" }}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
