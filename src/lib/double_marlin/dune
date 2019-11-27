@@ -1,0 +1,10 @@
+(library
+  (name double_marlin)
+  (public_name double_marlin)
+  (preprocess (pps ppx_coda ppx_jane ppx_deriving.std))
+  (libraries
+    sgn_type
+    snarky_curves
+    snarky
+    snarkette
+    core_kernel ))
