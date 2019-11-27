@@ -405,11 +405,11 @@ let events workers start_reader =
             started () ;
             don't_wait_for
               (let ms_to_catchup =
-                 (Consensus.Constants.c + Consensus.Constants.delta)
-                 * Consensus.Constants.block_window_duration_ms
-                 + 6_000
-                 (* time for peer discovery *)
-                 |> Float.of_int
+                 6_000 (* time for peer discovery *) |> Float.of_int
+               in
+               let%bind () =
+                 Coda_process.initialization_finish_signal_exn worker
+                 >>= Linear_pipe.read >>| ignore
                in
                let%map () = after (Time.Span.of_ms ms_to_catchup) in
                synced ()) ;
@@ -421,14 +421,19 @@ let events workers start_reader =
 let start_checks logger (workers : Coda_process.t array) start_reader testnet
     ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
-  let%bind initialization_signals =
+  let%bind initialization_finish_signals =
     Deferred.Array.map workers ~f:(fun worker ->
-        Coda_process.initialization_signal_exn worker )
+        Coda_process.initialization_finish_signal_exn worker )
   in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "downloaded initialization signal" ;
   let%map () =
     Deferred.all_unit
-      (List.map (Array.to_list initialization_signals) ~f:Ivar.read)
+      (List.map (Array.to_list initialization_finish_signals) ~f:(fun p ->
+           Linear_pipe.read p >>| ignore ))
   in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "initialization finishes, start check" ;
   don't_wait_for
     (start_prefix_check logger workers event_reader testnet ~acceptable_delay) ;
   start_payment_check logger root_reader testnet
