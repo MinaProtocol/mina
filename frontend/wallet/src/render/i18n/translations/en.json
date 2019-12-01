@@ -1,5 +1,13 @@
 [
   {
+    "id": "account-settings",
+    "defaultMessage": "account settings"
+  },
+  {
+    "id": "cancel",
+    "defaultMessage": "cancel"
+  },
+  {
     "id": "catching up",
     "defaultMessage": "catching up"
   },
@@ -67,5 +75,21 @@
   {
     "id": "transactions.date/amount",
     "defaultMessage": "date / amount"
+  },
+  {
+    "id": "unlock",
+    "defaultMessage": "unlock"
+  },
+  {
+    "id": "unlock-modal.please-enter-password",
+    "defaultMessage": "please enter password for"
+  },
+  {
+    "id": "unlock-modal.unlock-account",
+    "defaultMessage": "unlock account"
+  },
+  {
+    "id": "version",
+    "defaultMessage": "version"
   }
 ]

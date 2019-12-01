@@ -130,4 +130,4 @@ let make =
      | None => React.null
      }}
     <FormattedMessage id=label defaultMessage=label />
-  </button> /* {React.string(label)*/;
+  </button>;

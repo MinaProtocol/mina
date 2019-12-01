@@ -1,5 +1,15 @@
 [
   {
+    "id": "account-settings",
+    "defaultMessage": "account settings",
+    "message": "cài đặt tài khoản"
+  },
+  {
+    "id": "cancel",
+    "defaultMessage": "cancel",
+    "message": "hủy bỏ"
+  },
+  {
     "id": "close",
     "defaultMessage": "close",
     "message": "gần"
@@ -84,5 +94,25 @@
     "id": "transactions.date/amount",
     "defaultMessage": "date / amount",
     "message": "ngày / số tiền"
+  },
+  {
+    "id": "unlock",
+    "defaultMessage": "unlock",
+    "message": "thông điệp"
+  },
+  {
+    "id": "unlock-modal.please-enter-password",
+    "defaultMessage": "please enter password for",
+    "message": "vui lòng nhập mật khẩu cho"
+  },
+  {
+    "id": "unlock-modal.unlock-account",
+    "defaultMessage": "unlock account",
+    "message": "mở khoá tài khoản"
+  },
+  {
+    "id": "version",
+    "defaultMessage": "version",
+    "message": "phiên bản"
   }
 ]
