@@ -1,5 +1,5 @@
-open Tc;
 open ReactIntl;
+open Tc;
 
 module Styles = {
   open Css;
@@ -172,9 +172,12 @@ let make = () => {
         <span className=Styles.icon> <Icon kind=Icon.BentArrow /> </span>
         <FormattedMessage id="recipient" defaultMessage="recipient" />
       </span>
-      <span> {ReasonReact.string("Memo")} </span>
+      <span> <FormattedMessage id="memo" defaultMessage="memo" /> </span>
       <span className=Css.(style([textAlign(`right)]))>
-        {ReasonReact.string("Date / Amount")}
+        <FormattedMessage
+          id="transactions.date/amount"
+          defaultMessage="date / amount"
+        />
       </span>
     </div>
     {switch (activeAccount) {

@@ -1,10 +1,71 @@
 [
   {
+    "id": "catching up",
+    "defaultMessage": "catching up"
+  },
+  {
+    "id": "close",
+    "defaultMessage": "close"
+  },
+  {
+    "id": "connecting",
+    "defaultMessage": "connecting"
+  },
+  {
+    "id": "error",
+    "defaultMessage": "error"
+  },
+  {
+    "id": "footer.compress-blockchain",
+    "defaultMessage": "compress the blockchain"
+  },
+  {
+    "id": "listening",
+    "defaultMessage": "listening"
+  },
+  {
+    "id": "memo",
+    "defaultMessage": "memo"
+  },
+  {
     "id": "recipient",
     "defaultMessage": "recipient"
+  },
+
+  {
+    "id": "request",
+    "defaultMessage": "request"
+  },
+  {
+    "id": "send",
+    "defaultMessage": "send"
   },
   {
     "id": "sender",
     "defaultMessage": "sender"
+  },
+  {
+    "id": "settings",
+    "defaultMessage": "settings"
+  },
+  {
+    "id": "sidebar.new-account",
+    "defaultMessage": "+ new account"
+  },
+  {
+    "id": "string",
+    "defaultMessage": "string"
+  },
+  {
+    "id": "synced",
+    "defaultMessage": "synced"
+  },
+  {
+    "id": "syncing",
+    "defaultMessage": "syncing"
+  },
+  {
+    "id": "transactions.date/amount",
+    "defaultMessage": "date / amount"
   }
 ]

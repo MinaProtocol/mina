@@ -1,3 +1,5 @@
+open ReactIntl;
+
 module Styles = {
   open Css;
   open Theme;
@@ -53,6 +55,7 @@ module Styles = {
           borderRadius(`px(6)),
           color(Theme.Colors.slate),
         ]),
+        textTransform(`capitalize),
       ]),
     ]);
 
@@ -110,16 +113,16 @@ module SyncStatus = {
     /*     None; */
     /*   }); */
     switch ((result: SyncStatusQuery.response)) {
-    | Loading => <Alert kind=`Warning message="Connecting" />
-    | Error(_) => <Alert kind=`Danger message="Error" />
+    | Loading => <Alert kind=`Warning message="connecting" />
+    | Error(_) => <Alert kind=`Danger message="error" />
     | Data(response) =>
       switch (response##syncStatus) {
-      | `OFFLINE => <Alert kind=`Danger message="Offline" />
-      | `SYNCED => <Alert kind=`Success message="Synced" />
-      | `BOOTSTRAP => <Alert kind=`Warning message="Syncing" />
-      | `CONNECTING => <Alert kind=`Warning message="Connecting" />
-      | `CATCHUP => <Alert kind=`Warning message="Catching up" />
-      | `LISTENING => <Alert kind=`Warning message="Listening" />
+      | `OFFLINE => <Alert kind=`Danger message="offline" />
+      | `SYNCED => <Alert kind=`Success message="synced" />
+      | `BOOTSTRAP => <Alert kind=`Warning message="syncing" />
+      | `CONNECTING => <Alert kind=`Warning message="connecting" />
+      | `CATCHUP => <Alert kind=`Warning message="catching up" />
+      | `LISTENING => <Alert kind=`Warning message="listening" />
       }
     };
   };
@@ -218,12 +221,8 @@ let make = () => {
            ? <Icon kind=Icon.Cross /> : <Icon kind=Icon.Settings />}
         <Spacer width=0.25 />
         {onSettingsPage
-           ? {
-             React.string("Close");
-           }
-           : {
-             React.string("Settings");
-           }}
+           ? <FormattedMessage id="close" defaultMessage="Close" />
+           : <FormattedMessage id="settings" defaultMessage="Settings" />}
       </a>
     </div>
   </header>;

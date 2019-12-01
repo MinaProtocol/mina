@@ -1,3 +1,5 @@
+open ReactIntl;
+
 module Styles = {
   open Css;
 
@@ -15,7 +17,8 @@ module Styles = {
       ),
     ]);
 
-  let text = Theme.Text.Body.semiBold;
+  let text =
+    merge([Theme.Text.Body.semiBold, style([textTransform(`capitalize)])]);
 
   let icon = style([flexShrink(0), display(`inlineFlex)]);
 };
@@ -34,6 +37,8 @@ let make = (~kind, ~message) => {
   <div className={Styles.box(bgColor, textColor)}>
     <span className=Styles.icon> <Icon kind=iconKind /> </span>
     <Spacer width=0.25 />
-    <div className=Styles.text> {React.string(message)} </div>
+    <div className=Styles.text>
+      <FormattedMessage id=message defaultMessage=message />
+    </div>
   </div>;
 };
