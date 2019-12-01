@@ -8,18 +8,13 @@ let intlReducer = (_, action) =>
   | SetLocale(locale) => locale
   };
 
-module IntlContextType = {
-  type t = (Locale.locale, action => unit);
+// Todo: Pass setLocale down to children
+let make = (~children) => {
+  let (locale, _) = intlReducer->React.useReducer(initialState);
 
-  let initialContext = (Locale.En, _ => ());
-};
-
-// TODO Somehow insert ReactIntl.Provider here...
-
-type t = IntlContextType.t;
-include ContextProvider.Make(IntlContextType);
-
-let createContext = () => {
-  let (locale, setLocale) = intlReducer->React.useReducer(initialState);
-  (locale, setLocale);
-};
+  <ReactIntl.IntlProvider
+    locale={locale->Locale.toString}
+    messages={locale->Locale.translations->Locale.translationsToDict}>
+    ...children
+  </ReactIntl.IntlProvider>;
+} /* React.Context.provider(intlContext)*/;
