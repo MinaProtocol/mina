@@ -137,8 +137,8 @@ let rec load_with_max_length :
        Deferred.Result.t =
  fun ~max_length ?(retry_with_fresh_db = true) ~logger ~verifier
      ~consensus_local_state ~persistent_root ~persistent_frontier
-     ~genesis_protocol_state_hash ~genesis_ledger ?(base_proof = Proof.dummy)
-     () ->
+     ~genesis_protocol_state_hash ~genesis_ledger
+     ?(base_proof = Precomputed_values.base_proof) () ->
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
   let continue persistent_frontier_instance =
@@ -418,7 +418,7 @@ module For_tests = struct
         let genesis_transition =
           Lazy.force
             (External_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
-               ~base_proof:Proof.dummy)
+               ~base_proof:Precomputed_values.base_proof)
         in
         let genesis_ledger = Lazy.force Test_genesis_ledger.t in
         let genesis_staged_ledger =

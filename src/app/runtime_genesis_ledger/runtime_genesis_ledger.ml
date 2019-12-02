@@ -48,9 +48,6 @@ let generate_base_proof ~ledger =
     Lazy.force (Coda_state.Genesis_protocol_state.t ~genesis_ledger)
   in
   let base_hash = Keys.Step.instance_hash genesis_state.data in
-  Core.printf
-    !"Genesis state %{sexp: Coda_state.Protocol_state.Value.t}\n %!"
-    genesis_state.data ;
   let wrap hash proof =
     let open Snark_params in
     let module Wrap = Keys.Wrap in

@@ -52,7 +52,7 @@ let%test_module "Full_frontier tests" =
             Lazy.force
               (External_transition.genesis
                  ~genesis_ledger:Test_genesis_ledger.t
-                 ~base_proof:Coda_base.Proof.dummy)
+                 ~base_proof:Precomputed_values.base_proof)
         ; staged_ledger= Staged_ledger.create_exn ~ledger:root_ledger }
       in
       Full_frontier.create ~logger ~root_data

@@ -532,7 +532,7 @@ module T = struct
                  ~is_archive_rocksdb ~work_reassignment_wait:420000
                  ~genesis_protocol_state_hash ())
               ~genesis_ledger:Test_genesis_ledger.t
-              ~base_proof:Coda_base.Proof.dummy
+              ~base_proof:Precomputed_values.base_proof
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger
