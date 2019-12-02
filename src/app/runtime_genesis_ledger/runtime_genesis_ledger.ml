@@ -48,6 +48,9 @@ let generate_base_proof ~ledger =
     Lazy.force (Coda_state.Genesis_protocol_state.t ~genesis_ledger)
   in
   let base_hash = Keys.Step.instance_hash genesis_state.data in
+  Core.printf
+    !"Genesis state %{sexp: Coda_state.Protocol_state.Value.t}\n %!"
+    genesis_state.data ;
   let wrap hash proof =
     let open Snark_params in
     let module Wrap = Keys.Wrap in
@@ -166,17 +169,16 @@ let () =
            let open Command.Param in
            flag "accounts-file"
              ~doc:
-               "Filepath of the json file that has account data of the format \
-                [{\"pk\":public-key-string, \
+               "Filepath of the json file that has all the account data in \
+                the format: [{\"pk\":public-key-string, \
                 \"sk\":optional-secret-key-string, \"balance\":int, \
                 \"delegate\":optional-public-key-string}]"
              (required string)
          and ledger_dir =
            let open Command.Param in
-           flag "ledger-dir" ~doc:"Dir where the genesis ledger will be saved"
+           flag "ledger-dir"
+             ~doc:
+               "Dir where the genesis ledger and genesis proof will be saved"
              (required string)
          in
          fun () -> main accounts_json ledger_dir))
-
-let _load : directory_name:string -> t Lazy.t =
- fun ~directory_name -> lazy (Ledger.create ~directory_name ())

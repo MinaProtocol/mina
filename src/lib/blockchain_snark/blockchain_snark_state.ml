@@ -173,8 +173,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         |> Consensus.Data.Consensus_state.is_genesis_state_var
       in
       let%bind genesis_state_hash =
-        State_hash.if_ is_first_block
-          ~then_:(Snark_transition.genesis_protocol_state_hash transition)
+        State_hash.if_ is_first_block ~then_:previous_state_hash
           ~else_:(Protocol_state.genesis_state_hash previous_state)
       in
       let new_state =

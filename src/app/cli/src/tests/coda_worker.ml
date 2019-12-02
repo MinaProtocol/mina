@@ -505,7 +505,6 @@ module T = struct
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
           let genesis_protocol_state_hash =
-            (*Todo: use test genesis ledger hash*)
             Lazy.force
               (Coda_state.Genesis_protocol_state.t
                  ~genesis_ledger:Test_genesis_ledger.t)

@@ -33,7 +33,6 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
-(*TODO: genesis ledger hash, genesis timestamp and epoch size or all the consensus constants*)
 let chain_id ~genesis_state_hash =
   lazy
     (let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in

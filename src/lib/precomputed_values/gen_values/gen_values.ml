@@ -1,3 +1,4 @@
+(*TODO: Delete this*)
 [%%import
 "../../../config.mlh"]
 
@@ -105,10 +106,11 @@ let main () =
   let fmt = Format.formatter_of_out_channel (Out_channel.create target) in
   let loc = Ppxlib.Location.none in
   let%bind (module M) =
-    if use_dummy_values then return (module Dummy : S)
+    return (module Dummy : S)
+    (*if use_dummy_values then return (module Dummy : S)
     else
       let%map (module K) = Keys_lib.Keys.create () in
-      (module Make_real (K) : S)
+      (module Make_real (K) : S)*)
   in
   let structure =
     [%str

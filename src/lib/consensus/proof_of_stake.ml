@@ -3147,18 +3147,20 @@ module Hooks = struct
        in
        check_proposal_data ~logger proposal_data actual_global_slot) ;
       let consensus_transition = proposal_data.global_slot in
+      let previous_protocol_state_hash =
+        Protocol_state.hash previous_protocol_state
+      in
       let consensus_state =
         Or_error.ok_exn
           (Consensus_state.update ~previous_consensus_state
              ~consensus_transition
              ~proposer_vrf_result:proposal_data.Proposal_data.vrf_result
-             ~previous_protocol_state_hash:
-               (Protocol_state.hash previous_protocol_state)
-             ~supply_increase ~snarked_ledger_hash)
+             ~previous_protocol_state_hash ~supply_increase
+             ~snarked_ledger_hash)
       in
       let genesis_state_hash =
         if Consensus_state.is_genesis_state previous_consensus_state then
-          genesis_protocol_state_hash
+          previous_protocol_state_hash
         else Protocol_state.genesis_state_hash previous_protocol_state
       in
       let protocol_state =
