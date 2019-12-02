@@ -193,15 +193,9 @@ module AccountsQuery = ReasonApollo.CreateQuery(AccountsQueryString);
 let make = () => {
   <div className=Styles.container>
     <div className=Styles.headerContainer>
-      <div className=Theme.Text.Header.h3>
-        {React.string("Node Settings")}
-      </div>
-      <Version />
+      <div className=Styles.label> {React.string("Account Settings")} </div>
+     <Version />
     </div>
-    <Spacer height=1. />
-    <NetworkDropdown />
-    <Spacer height=1. />
-    <div className=Styles.label> {React.string("Account Settings")} </div>
     <Spacer height=0.5 />
     <div className=Styles.accountSettings>
       <AccountsQuery>
