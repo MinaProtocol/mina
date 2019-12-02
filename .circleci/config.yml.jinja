@@ -170,9 +170,10 @@ jobs:
                     find src/app/libp2p_helper -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ' > /tmp/sha1sig
                     HASH=$(cat /tmp/sha1sig)
                     sed -i "s/HASH/${HASH}/" package/deb/DEBIAN/control
+                    echo "------------------------------------"
                     cat package/deb/DEBIAN/control
-                    dpkg-deb --build package/deb package/coda-libp2p_helper-${HASH}.deb
-
+                    echo "------------------------------------"
+                    dpkg-deb -v --build package/deb package/coda-libp2p_helper-${HASH}.deb
             - store_artifacts:
                   path: package
 
