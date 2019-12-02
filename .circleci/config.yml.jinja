@@ -150,11 +150,12 @@ jobs:
                 name: Create package dir
                 command: mkdir -p package
             - run:
-                name: Collect and strip binaries
+                name: Collect and strip binary
                 command: |
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
-                    ./scripts/librewrite-macos.sh package/coda-libp2p_helper
+                    nix-env -i patchelf
+                    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 package/coda-libp2p_helper
             - store_artifacts:
                   path: package
 
