@@ -145,7 +145,7 @@ jobs:
                 command: |
                     cachix use codaprotocol
                     cd src/app/libp2p_helper
-                    nix-build default.nix
+                    nix-build default.nix | cachix push codaprotocol
             - run:
                 name: Create package dir
                 command: mkdir -p package
