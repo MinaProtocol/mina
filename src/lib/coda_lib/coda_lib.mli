@@ -23,6 +23,8 @@ val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
 
 val next_proposal : t -> Consensus.Hooks.proposal option
 
+val staking_ledger : t -> Sparse_ledger.t option
+
 val replace_snark_worker_key :
   t -> Public_key.Compressed.t option -> unit Deferred.t
 

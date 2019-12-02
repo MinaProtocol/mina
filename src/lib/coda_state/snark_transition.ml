@@ -9,7 +9,6 @@ module Poly = struct
            , 'consensus_transition
            , 'sok_digest
            , 'amount
-           , 'state_body_hash
            , 'proposer_pk
            , 'state_hash )
            t =
@@ -20,7 +19,6 @@ module Poly = struct
         ; ledger_proof: Proof.Stable.V1.t option
         ; proposer: 'proposer_pk
         ; coinbase_amount: 'amount
-        ; coinbase_state_body_hash: 'state_body_hash
         ; genesis_protocol_state_hash: 'state_hash }
       [@@deriving bin_io, to_yojson, sexp, fields, version]
     end
@@ -30,7 +28,6 @@ module Poly = struct
        , 'consensus_transition
        , 'sok_digest
        , 'amount
-       , 'state_body_hash
        , 'proposer_pk
        , 'state_hash )
        t =
@@ -38,7 +35,6 @@ module Poly = struct
         , 'consensus_transition
         , 'sok_digest
         , 'amount
-        , 'state_body_hash
         , 'proposer_pk
         , 'state_hash )
         Stable.Latest.t =
@@ -49,7 +45,6 @@ module Poly = struct
     ; ledger_proof: Proof.Stable.V1.t option
     ; proposer: 'proposer_pk
     ; coinbase_amount: 'amount
-    ; coinbase_state_body_hash: 'state_body_hash
     ; genesis_protocol_state_hash: 'state_hash }
   [@@deriving sexp, to_yojson, fields]
 end
@@ -63,7 +58,6 @@ module Value = struct
         , Consensus.Data.Consensus_transition.Value.Stable.V1.t
         , Sok_message.Digest.Stable.V1.t
         , Currency.Amount.Stable.V1.t
-        , State_body_hash.Stable.V1.t
         , Signature_lib.Public_key.Compressed.Stable.V1.t
         , State_hash.Stable.V1.t )
         Poly.Stable.V1.t
@@ -85,7 +79,6 @@ Poly.
   , supply_increase
   , proposer
   , coinbase_amount
-  , coinbase_state_body_hash
   , genesis_protocol_state_hash )]
 
 type value = Value.t
@@ -95,15 +88,13 @@ type var =
   , Consensus.Data.Consensus_transition.var
   , Sok_message.Digest.Checked.t
   , Currency.Amount.var
-  , State_body_hash.var
   , Signature_lib.Public_key.Compressed.var
   , State_hash.var )
   Poly.t
 
 let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
     ~supply_increase ~blockchain_state ~consensus_transition ~proposer
-    ~coinbase_amount ~coinbase_state_body_hash ~genesis_protocol_state_hash ()
-    : Value.t =
+    ~coinbase_amount ~genesis_protocol_state_hash () : Value.t =
   { blockchain_state
   ; consensus_transition
   ; ledger_proof
@@ -111,7 +102,6 @@ let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
   ; supply_increase
   ; proposer
   ; coinbase_amount
-  ; coinbase_state_body_hash
   ; genesis_protocol_state_hash }
 
 let genesis ~genesis_ledger : value lazy_t =
@@ -130,7 +120,6 @@ let genesis ~genesis_ledger : value lazy_t =
   ; ledger_proof= None
   ; proposer= Signature_lib.Public_key.Compressed.empty
   ; coinbase_amount= Currency.Amount.zero
-  ; coinbase_state_body_hash= State_body_hash.dummy
   ; genesis_protocol_state_hash=
       State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash }
 
@@ -142,7 +131,6 @@ let to_hlist
     ; ledger_proof
     ; proposer
     ; coinbase_amount
-    ; coinbase_state_body_hash
     ; genesis_protocol_state_hash } =
   Snarky.H_list.
     [ blockchain_state
@@ -152,7 +140,6 @@ let to_hlist
     ; ledger_proof
     ; proposer
     ; coinbase_amount
-    ; coinbase_state_body_hash
     ; genesis_protocol_state_hash ]
 
 let of_hlist
@@ -163,7 +150,6 @@ let of_hlist
      ; ledger_proof
      ; proposer
      ; coinbase_amount
-     ; coinbase_state_body_hash
      ; genesis_protocol_state_hash ] :
       (unit, _) Snarky.H_list.t) =
   { Poly.blockchain_state
@@ -173,7 +159,6 @@ let of_hlist
   ; ledger_proof
   ; proposer
   ; coinbase_amount
-  ; coinbase_state_body_hash
   ; genesis_protocol_state_hash }
 
 let typ =
@@ -193,5 +178,4 @@ let typ =
     ; ledger_proof
     ; Signature_lib.Public_key.Compressed.typ
     ; Currency.Amount.typ
-    ; State_body_hash.typ
     ; State_hash.typ ]

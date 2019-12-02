@@ -305,8 +305,8 @@ let add_breadcrumb_exn t breadcrumb =
   sync_result
   |> Result.map_error ~f:(fun `Sync_must_be_running ->
          Failure
-           "cannot add breadcrumb because persistent frontier sync job is not \
-            running -- this indicates that transition frontier initialization \
+           "Cannot add breadcrumb because persistent frontier sync job is not \
+            running, which indicates that transition frontier initialization \
             has not been performed correctly" )
   |> Result.ok_exn ;
   Extensions.notify t.extensions ~frontier:t.full_frontier ~diffs

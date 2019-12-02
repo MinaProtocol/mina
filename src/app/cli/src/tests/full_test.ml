@@ -278,6 +278,7 @@ let run_test () : unit Deferred.t =
             in
             let payload : User_command.Payload.t =
               User_command.Payload.create ~fee ~nonce ~memo
+                ~valid_until:Coda_numbers.Global_slot.max_value
                 ~body:(Payment {receiver= receiver_pk; amount})
             in
             (* verify memo is in the payload *)

@@ -20,6 +20,16 @@ module type S = sig
       val equal_var : var -> var -> (Boolean.var, _) Checked.t
     end
 
+    module Body_hash : sig
+      type t [@@deriving sexp]
+
+      type var
+
+      val typ : (var, t) Typ.t
+
+      val var_to_field : var -> Field.Var.t
+    end
+
     type var
 
     type value [@@deriving sexp]
@@ -27,20 +37,16 @@ module type S = sig
     val typ : (var, value) Typ.t
 
     module Checked : sig
-      val hash : var -> (Hash.var, _) Checked.t
+      val hash : var -> (Hash.var * Body_hash.var, _) Checked.t
 
       val is_base_hash : Hash.var -> (Boolean.var, _) Checked.t
 
       val update :
            logger:Logger.t
-        -> Hash.var * var
+        -> Hash.var * Body_hash.var * var
+           (*Previous state hash, previous state body hash, previous state*)
         -> Update.var
-        -> ( Hash.var
-             * var
-             * [`Success of Boolean.var]
-             * [`Is_first_block of Boolean.var]
-           , _ )
-           Checked.t
+        -> (Hash.var * var * [`Success of Boolean.var], _) Checked.t
     end
   end
 end
@@ -104,8 +110,7 @@ struct
       make_checked (fun () ->
           Random_oracle.Checked.update
             ~state:
-              (Random_oracle.State.map
-                 Hash_prefix.Random_oracle.transition_system_snark
+              (Random_oracle.State.map Hash_prefix.transition_system_snark
                  ~f:Snark_params.Tick.Field.Var.constant)
             (Verifier.Verification_key.to_field_elements vk) )
 
@@ -150,13 +155,14 @@ struct
       and genesis_state_hash =
         exists' State.Hash.typ ~f:Prover_state.genesis_state_hash
       and update = exists' Update.typ ~f:Prover_state.update in
-      let%bind prev_state_hash = State.Checked.hash prev_state in
-      let%bind ( next_state_hash
-               , _next_state
-               , `Success success
-               , `Is_first_block _is_first_block ) =
+      let%bind prev_state_hash, prev_state_body_hash =
+        State.Checked.hash prev_state
+      in
+      let%bind next_state_hash, _next_state, `Success success =
         with_label __LOC__
-          (State.Checked.update ~logger (prev_state_hash, prev_state) update)
+          (State.Checked.update ~logger
+             (prev_state_hash, prev_state_body_hash, prev_state)
+             update)
       in
       let%bind wrap_vk =
         exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
@@ -208,10 +214,7 @@ struct
         with_label __LOC__ Field.Checked.Assert.(equal next_top_hash top_hash)
       in
       let%bind prev_state_valid =
-        (*let%bind prev_state_valid =*)
         prev_state_valid wrap_vk_section wrap_vk prev_state_hash
-        (*in
-        Boolean.(prev_state_valid || is_first_block)*)
       in
       let%bind inductive_case_passed =
         with_label __LOC__ Boolean.(prev_state_valid && success)

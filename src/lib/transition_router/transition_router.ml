@@ -222,8 +222,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
      in
      don't_wait_for
        (Strict_pipe.Reader.iter valid_transition_reader
-          ~f:(fun transition_with_time ->
-            let `Transition enveloped_transition, _ = transition_with_time in
+          ~f:(fun enveloped_transition ->
             let transition = Envelope.Incoming.data enveloped_transition in
             let current_consensus_state =
               External_transition.consensus_state
@@ -243,8 +242,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
      don't_wait_for
        (Strict_pipe.Reader.iter_without_pushback
           valid_protocol_state_transition_reader
-          ~f:(fun transition_with_time ->
-            let `Transition enveloped_transition, _ = transition_with_time in
+          ~f:(fun enveloped_transition ->
             let transition = Envelope.Incoming.data enveloped_transition in
             don't_wait_for
               (let%map () =
@@ -276,5 +274,5 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                      Deferred.unit
                in
                Strict_pipe.Writer.write !transition_writer_ref
-                 transition_with_time) ))) ;
+                 enveloped_transition) ))) ;
   verified_transition_reader

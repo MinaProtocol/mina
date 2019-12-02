@@ -24,18 +24,18 @@ val hash_abstract :
 
 module Body : sig
   module Poly : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
-        type ('a, 'b, 'c) t [@@deriving bin_io, sexp, version]
+        type ('a, 'b, 'c) t [@@deriving sexp]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type ('a, 'b, 'c) t = ('a, 'b, 'c) Stable.V1.t [@@deriving sexp]
   end
 
   module Value : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type t =
@@ -43,13 +43,10 @@ module Body : sig
           , Blockchain_state.Value.Stable.V1.t
           , Consensus.Data.Consensus_state.Value.Stable.V1.t )
           Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, to_yojson, version]
+        [@@deriving sexp, to_yojson]
       end
+    end]
 
-      module Latest : module type of V1
-    end
-
-    (* bin_io omitted *)
     type t = Stable.Latest.t [@@deriving sexp, to_yojson]
   end
 
@@ -62,20 +59,20 @@ module Body : sig
   type ('a, 'b, 'c) t = ('a, 'b, 'c) Poly.t
 
   val hash : Value.t -> State_body_hash.t
+
+  val hash_checked : var -> (State_body_hash.var, _) Checked.t
 end
 
 module Value : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t =
         (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving sexp, bin_io, compare, eq, to_yojson, version]
+      [@@deriving sexp, compare, eq, to_yojson]
     end
+  end]
 
-    module Latest : module type of V1
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, compare, eq, to_yojson]
 
   include Hashable.S with type t := t
@@ -115,6 +112,6 @@ val consensus_state : (_, (_, _, 'a) Body.t) Poly.t -> 'a
 
 val negative_one : genesis_ledger:Coda_base.Ledger.t Lazy.t -> Value.t Lazy.t
 
-val hash_checked : var -> (State_hash.var, _) Checked.t
+val hash_checked : var -> (State_hash.var * State_body_hash.var, _) Checked.t
 
 val hash : Value.t -> State_hash.t
