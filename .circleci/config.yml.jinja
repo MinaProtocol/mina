@@ -156,6 +156,19 @@ jobs:
                     chmod +w package/coda-libp2p_helper
                     nix-env -i patchelf
                     patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 package/coda-libp2p_helper
+            - run:
+                name: Create deb
+                command: |
+                    mkdir -p package/deb/usr/local/sbin
+                    cp package/coda-libp2p_helper package/deb/usr/local/sbin/.
+                    mkdir -p package/deb/DEBIAN
+                    cp src/app/libp2p_helper/build/DEBIAN/control package/deb/DEBIAN/control
+                    DATE=$(date +%Y-%m-%d)
+                    sed -i "s/DATE/${DATE}/" package/deb/DEBIAN/control
+                    find src/app/libp2p_helper -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ' > /tmp/sha1sig
+                    HASH=$(cat /tmp/sha1sig)
+                    sed -i "s/HASH/${HASH}/" package/deb/DEBIAN/control
+
             - store_artifacts:
                   path: package
 
