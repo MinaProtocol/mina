@@ -8,7 +8,10 @@ module type Update_intf = sig
          logger:Logger.t
       -> State_hash.var * Protocol_state.var
       -> Snark_transition.var
-      -> ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
+      -> ( State_hash.var
+           * Protocol_state.var
+           * [`Success of Boolean.var]
+           * [`Is_first_block of Boolean.var]
          , _ )
          Checked.t
   end

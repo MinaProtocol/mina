@@ -12,7 +12,10 @@ module type Update_intf = sig
          logger:Logger.t
       -> State_hash.var * Protocol_state.var
       -> Snark_transition.var
-      -> ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
+      -> ( State_hash.var
+           * Protocol_state.var
+           * [`Success of Boolean.var]
+           * [`Is_first_block of Boolean.var]
          , _ )
          Checked.t
   end
@@ -51,7 +54,10 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         ((previous_state_hash, previous_state) :
           State_hash.var * Protocol_state.var)
         (transition : Snark_transition.var) :
-        ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
+        ( State_hash.var
+          * Protocol_state.var
+          * [`Success of Boolean.var]
+          * [`Is_first_block of Boolean.var]
         , _ )
         Tick.Checked.t =
       let supply_increase = Snark_transition.supply_increase transition in
@@ -159,11 +165,11 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         in
         result
       in
+      let%bind is_first_block =
+        previous_state |> Protocol_state.consensus_state
+        |> Consensus.Data.Consensus_state.is_genesis_state_var
+      in
       let%bind genesis_state_hash =
-        let%bind is_first_block =
-          previous_state |> Protocol_state.consensus_state
-          |> Consensus.Data.Consensus_state.is_genesis_state_var
-        in
         State_hash.if_ is_first_block
           ~then_:(Snark_transition.genesis_protocol_state_hash transition)
           ~else_:(Protocol_state.genesis_state_hash previous_state)
@@ -174,7 +180,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           ~consensus_state
       in
       let%map state_hash = Protocol_state.hash_checked new_state in
-      (state_hash, new_state, `Success success)
+      (state_hash, new_state, `Success success, `Is_first_block is_first_block)
   end
 end
 
