@@ -763,10 +763,12 @@ module Validated = struct
   include Comparable.Make (Stable.Latest)
 end
 
-let genesis =
+let genesis ~genesis_ledger =
+  (*TODO: This needs to be genesis protocol state so that when other compile time parameters change, this doesn't have to change*)
   let open Lazy.Let_syntax in
   let%map genesis_protocol_state =
-    Genesis_protocol_state.compile_time_genesis
+    Coda_state.Genesis_protocol_state.t ~genesis_ledger
+    (*Genesis_protocol_state.compile_time_genesis*)
   in
   let empty_diff =
     { Staged_ledger_diff.diff=

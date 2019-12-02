@@ -218,4 +218,4 @@ let negative_one =
         ; genesis_state_hash=
             State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
         ; consensus_state=
-            Lazy.force Consensus.Data.Consensus_state.negative_one } }
+            Lazy.force (Consensus.Data.Consensus_state.negative_one ()) } }

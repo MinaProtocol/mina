@@ -419,13 +419,13 @@ module Data = struct
           Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
       last_checked_slot_and_epoch
 
-    let create proposer_public_keys =
+    let create proposer_public_keys ~genesis_ledger =
       (* TODO: remove this duplicate of the genesis ledger *)
       let ledger =
         Coda_base.Sparse_ledger.of_any_ledger
           (Coda_base.Ledger.Any_ledger.cast
              (module Coda_base.Ledger)
-             (Lazy.force Genesis_ledger.t))
+             (Lazy.force genesis_ledger))
       in
       let delegatee_table =
         compute_delegatee_table_sparse_ledger proposer_public_keys ledger
@@ -1268,10 +1268,10 @@ module Data = struct
           ; Epoch_ledger.var_to_input ledger
           ; field (Coda_base.State_hash.var_to_hash_packed lock_checkpoint) ]
 
-      let genesis =
+      let genesis ~genesis_ledger =
         lazy
           { Poly.ledger=
-              Lazy.force (Epoch_ledger.genesis ~ledger:Genesis_ledger.Dummy.t)
+              Lazy.force (Epoch_ledger.genesis ~ledger:genesis_ledger)
               (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
           ; seed= Epoch_seed.initial
           ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
@@ -1891,35 +1891,39 @@ module Data = struct
     let same_checkpoint_window ~prev ~next =
       make_checked (fun () -> same_checkpoint_window ~prev ~next)
 
-    let negative_one : Value.t Lazy.t =
+    let negative_one ?(genesis_ledger = Genesis_ledger.t) () =
       lazy
         { Poly.blockchain_length= Length.zero
         ; epoch_count= Length.zero
         ; min_epoch_length= Length.of_int (UInt32.to_int Constants.Epoch.size)
         ; last_vrf_output= Vrf.Output.Truncated.dummy
         ; total_currency=
-            Lazy.force
-              (genesis_ledger_total_currency ~ledger:Genesis_ledger.Dummy.t)
+            Lazy.force (genesis_ledger_total_currency ~ledger:genesis_ledger)
         ; curr_global_slot= Global_slot.zero
-        ; staking_epoch_data= Lazy.force Epoch_data.Staking.genesis
-        ; next_epoch_data= Lazy.force Epoch_data.Next.genesis
+        ; staking_epoch_data=
+            Lazy.force (Epoch_data.Staking.genesis ~genesis_ledger)
+        ; next_epoch_data= Lazy.force (Epoch_data.Next.genesis ~genesis_ledger)
         ; has_ancestor_in_same_checkpoint_window= false
         ; checkpoints= Checkpoints.empty }
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
-        ~consensus_transition ~genesis_ledger_hash : Value.t =
-      Or_error.ok_exn
-        (update ~proposer_vrf_result:Vrf.Precomputed.vrf_output
-           ~previous_consensus_state:(Lazy.force negative_one)
-           ~previous_protocol_state_hash:negative_one_protocol_state_hash
-           ~consensus_transition ~supply_increase:Currency.Amount.zero
-           ~snarked_ledger_hash:
-             (Coda_base.Frozen_ledger_hash.of_ledger_hash genesis_ledger_hash))
+        ~consensus_transition ~genesis_ledger : Value.t =
+      let snarked_ledger_hash =
+        Lazy.force genesis_ledger |> Coda_base.Ledger.merkle_root
+        |> Coda_base.Frozen_ledger_hash.of_ledger_hash
+      in
+      update ~proposer_vrf_result:Vrf.Precomputed.vrf_output
+        ~previous_consensus_state:
+          (Lazy.force (negative_one ~genesis_ledger ()))
+        ~previous_protocol_state_hash:negative_one_protocol_state_hash
+        ~consensus_transition ~supply_increase:Currency.Amount.zero
+        ~snarked_ledger_hash
+      |> Or_error.ok_exn
 
-    let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger_hash :
+    let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger :
         Value.t =
       create_genesis_from_transition ~negative_one_protocol_state_hash
-        ~consensus_transition:Consensus_transition.genesis ~genesis_ledger_hash
+        ~consensus_transition:Consensus_transition.genesis ~genesis_ledger
 
     (* Check that both epoch and slot are zero.
     *)
@@ -2771,13 +2775,13 @@ module Hooks = struct
   let%test "Receive a valid consensus_state with a bit of delay" =
     let curr_epoch, curr_slot =
       Consensus_state.curr_epoch_and_slot
-        (Lazy.force Consensus_state.negative_one)
+        (Lazy.force (Consensus_state.negative_one ()))
     in
     let delay = Constants.delta / 2 |> UInt32.of_int in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time curr_epoch new_slot in
     received_at_valid_time
-      (Lazy.force Consensus_state.negative_one)
+      (Lazy.force (Consensus_state.negative_one ()))
       ~time_received:(to_unix_timestamp time_received)
     |> Result.is_ok
 
@@ -2788,13 +2792,14 @@ module Hooks = struct
       Epoch_and_slot.of_time_exn start_time
     in
     let consensus_state =
-      { (Lazy.force Consensus_state.negative_one) with
+      { (Lazy.force (Consensus_state.negative_one ())) with
         curr_global_slot= Global_slot.of_epoch_and_slot curr }
     in
     let too_early =
       (* TODO: Does this make sense? *)
       Epoch.start_time
-        (Consensus_state.curr_slot (Lazy.force Consensus_state.negative_one))
+        (Consensus_state.curr_slot
+           (Lazy.force (Consensus_state.negative_one ())))
     in
     let too_late =
       let delay = Constants.delta * 2 |> UInt32.of_int in
@@ -2984,8 +2989,7 @@ let%test_module "Proof of stake tests" =
       let previous_consensus_state =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
-          ~genesis_ledger_hash:
-            (Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t))
+          ~genesis_ledger:Genesis_ledger.Dummy.t
       in
       let global_slot =
         Core_kernel.Time.now () |> Time.of_time |> Epoch_and_slot.of_time_exn

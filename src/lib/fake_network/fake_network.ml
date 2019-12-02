@@ -121,6 +121,7 @@ module Generator = struct
   let fresh_peer ~max_frontier_length =
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
+        ~genesis_ledger:Genesis_ledger.t
     in
     let%map frontier =
       Transition_frontier.For_tests.gen ~consensus_local_state
@@ -131,6 +132,7 @@ module Generator = struct
   let peer_with_branch ~frontier_branch_size ~max_frontier_length =
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
+        ~genesis_ledger:Genesis_ledger.t
     in
     let%map frontier, branch =
       Transition_frontier.For_tests.gen_with_branch

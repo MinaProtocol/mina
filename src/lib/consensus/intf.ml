@@ -335,7 +335,10 @@ module type S = sig
     module Local_state : sig
       type t [@@deriving sexp, to_yojson]
 
-      val create : Signature_lib.Public_key.Compressed.Set.t -> t
+      val create :
+           Signature_lib.Public_key.Compressed.Set.t
+        -> genesis_ledger:Ledger.t Lazy.t
+        -> t
 
       val current_proposers : t -> Signature_lib.Public_key.Compressed.Set.t
 
@@ -467,17 +470,18 @@ module type S = sig
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
 
-      val negative_one : Value.t Lazy.t
+      val negative_one :
+        ?genesis_ledger:Ledger.t Lazy.t -> unit -> Value.t Lazy.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
-        -> genesis_ledger_hash:Ledger_hash.t
+        -> genesis_ledger:Ledger.t Lazy.t
         -> Value.t
 
       val create_genesis :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
-        -> genesis_ledger_hash:Ledger_hash.t
+        -> genesis_ledger:Ledger.t Lazy.t
         -> Value.t
 
       val length_in_triples : int

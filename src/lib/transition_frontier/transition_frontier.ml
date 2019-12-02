@@ -28,10 +28,10 @@ type t =
   ; extensions: Extensions.t
   ; genesis_protocol_state_hash: State_hash.t }
 
-let genesis_root_data =
+let genesis_root_data ~genesis_ledger =
   let open Root_data.Limited.Stable.Latest in
   let open Lazy.Let_syntax in
-  let%map transition = External_transition.genesis in
+  let%map transition = External_transition.genesis ~genesis_ledger in
   let scan_state = Staged_ledger.Scan_state.empty () in
   let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
   {transition; scan_state; pending_coinbase}
@@ -165,7 +165,7 @@ let rec load_with_max_length :
     in
     let%bind () =
       Persistent_frontier.reset_database_exn persistent_frontier
-        ~root_data:(Lazy.force genesis_root_data)
+        ~root_data:(Lazy.force (genesis_root_data ~genesis_ledger))
     in
     let%bind () =
       Persistent_root.reset_to_genesis_exn persistent_root ~genesis_ledger
@@ -411,7 +411,10 @@ module For_tests = struct
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
-        let genesis_transition = Lazy.force External_transition.genesis in
+        let genesis_transition =
+          Lazy.force
+            (External_transition.genesis ~genesis_ledger:Genesis_ledger.t)
+        in
         let genesis_ledger = Lazy.force Genesis_ledger.t in
         let genesis_staged_ledger =
           Or_error.ok_exn
@@ -483,9 +486,7 @@ module For_tests = struct
     let open Quickcheck.Generator.Let_syntax in
     let genesis_protocol_state_hash =
       Lazy.force
-        (Coda_state.Genesis_protocol_state.t
-           ~genesis_ledger_hash:
-             (Coda_base.Ledger.merkle_root (Lazy.force Genesis_ledger.t)))
+        (Coda_state.Genesis_protocol_state.t ~genesis_ledger:Genesis_ledger.t)
       |> With_hash.hash
       (*Make this Test_genesis_ledger*)
     in
@@ -504,7 +505,8 @@ module For_tests = struct
     let consensus_local_state =
       Option.value consensus_local_state
         ~default:
-          (Consensus.Data.Local_state.create Public_key.Compressed.Set.empty)
+          (Consensus.Data.Local_state.create ~genesis_ledger:Genesis_ledger.t
+             Public_key.Compressed.Set.empty)
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)

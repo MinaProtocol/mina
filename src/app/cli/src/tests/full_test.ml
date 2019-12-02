@@ -129,7 +129,7 @@ let run_test () : unit Deferred.t =
       in
       let time_controller = Block_time.Controller.(create @@ basic ~logger) in
       let consensus_local_state =
-        Consensus.Data.Local_state.create
+        Consensus.Data.Local_state.create ~genesis_ledger:Genesis_ledger.t
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in

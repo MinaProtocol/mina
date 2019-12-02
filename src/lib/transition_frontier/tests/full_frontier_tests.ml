@@ -38,6 +38,7 @@ let%test_module "Full_frontier tests" =
       let base_hash = Frontier_hash.empty in
       let consensus_local_state =
         Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
+          ~genesis_ledger:Genesis_ledger.t
       in
       let root_ledger =
         Or_error.ok_exn
@@ -47,7 +48,9 @@ let%test_module "Full_frontier tests" =
       in
       let root_data =
         let open Root_data in
-        { transition= Lazy.force External_transition.genesis
+        { transition=
+            Lazy.force
+              (External_transition.genesis ~genesis_ledger:Genesis_ledger.t)
         ; staged_ledger= Staged_ledger.create_exn ~ledger:root_ledger }
       in
       Full_frontier.create ~logger ~root_data

@@ -6,7 +6,7 @@ val create_with_custom_ledger :
   -> (Protocol_state.Value.t, State_hash.t) With_hash.t
 
 val t :
-     genesis_ledger_hash:Ledger_hash.t
+     genesis_ledger:Ledger.t Lazy.t
   -> (Protocol_state.Value.t, State_hash.t) With_hash.t Lazy.t
 
 val compile_time_genesis :

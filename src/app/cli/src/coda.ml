@@ -9,6 +9,9 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
+let genesis_ledger_dir =
+  "/home/o1labs/Documents/projects/coda-master/genesis_ledger"
+
 [%%check_ocaml_word_size
 64]
 
@@ -417,6 +420,9 @@ let daemon logger =
          type ('a, 'b, 'c) t =
            {coda: 'a; client_whitelist: 'b; rest_server_port: 'c}
        end in
+       let genesis_ledger =
+         lazy (Ledger.create ~directory_name:genesis_ledger_dir ())
+       in
        let coda_initialization_deferred () =
          let%bind config =
            match%map
@@ -640,10 +646,7 @@ let daemon logger =
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let genesis_protocol_state_hash =
-           Lazy.force
-             (Coda_state.Genesis_protocol_state.t
-                ~genesis_ledger_hash:
-                  (Coda_base.Ledger.merkle_root (Lazy.force Genesis_ledger.t)))
+           Lazy.force (Coda_state.Genesis_protocol_state.t ~genesis_ledger)
            |> With_hash.hash
          in
          let time_controller =
@@ -653,7 +656,7 @@ let daemon logger =
            propose_keypair |> Option.to_list |> Keypair.Set.of_list
          in
          let consensus_local_state =
-           Consensus.Data.Local_state.create
+           Consensus.Data.Local_state.create ~genesis_ledger
              ( Option.map propose_keypair ~f:(fun keypair ->
                    let open Keypair in
                    Public_key.compress keypair.public_key )
@@ -786,7 +789,7 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_node
                 ~work_reassignment_wait ~genesis_protocol_state_hash ())
-             ~genesis_ledger:Genesis_ledger.t
+             ~genesis_ledger
          in
          {Coda_initialization.coda; client_whitelist; rest_server_port}
        in

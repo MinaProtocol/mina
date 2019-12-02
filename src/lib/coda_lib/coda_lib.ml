@@ -760,7 +760,7 @@ let create (config : Config.t) ~genesis_ledger =
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
             Broadcast_pipe.create
-              ( Lazy.force External_transition.genesis
+              ( Lazy.force (External_transition.genesis ~genesis_ledger)
               |> External_transition.Validation.forget_validation )
           in
           let valid_transitions =
@@ -777,8 +777,7 @@ let create (config : Config.t) ~genesis_ledger =
                        ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
                   ~proposer_transition_reader ~most_recent_valid_block
                   ~genesis_protocol_state_hash:
-                    config.genesis_protocol_state_hash
-                  ~genesis_ledger:Genesis_ledger.t )
+                    config.genesis_protocol_state_hash ~genesis_ledger )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

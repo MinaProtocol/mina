@@ -56,8 +56,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         Tick.Checked.t =
       let supply_increase = Snark_transition.supply_increase transition in
       let%bind `Success updated_consensus_state, consensus_state =
-        Consensus_state_hooks.next_state_checked ~prev_state:previous_state
-          ~prev_state_hash:previous_state_hash transition supply_increase
+        with_label __LOC__
+          (Consensus_state_hooks.next_state_checked ~prev_state:previous_state
+             ~prev_state_hash:previous_state_hash transition supply_increase)
       in
       let prev_pending_coinbase_root =
         previous_state |> Protocol_state.blockchain_state
@@ -106,16 +107,18 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
             Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
         in
         let%bind correct_transaction_snark =
-          verify_complete_merge
-            (Snark_transition.sok_digest transition)
-            ( previous_state |> Protocol_state.blockchain_state
-            |> Blockchain_state.snarked_ledger_hash )
-            ( transition |> Snark_transition.blockchain_state
-            |> Blockchain_state.snarked_ledger_hash )
-            Pending_coinbase.Stack.Checked.empty deleted_stack supply_increase
-            (As_prover.return
-               (Option.value ~default:Tock.Proof.dummy
-                  (Snark_transition.ledger_proof transition)))
+          with_label __LOC__
+            (verify_complete_merge
+               (Snark_transition.sok_digest transition)
+               ( previous_state |> Protocol_state.blockchain_state
+               |> Blockchain_state.snarked_ledger_hash )
+               ( transition |> Snark_transition.blockchain_state
+               |> Blockchain_state.snarked_ledger_hash )
+               Pending_coinbase.Stack.Checked.empty deleted_stack
+               supply_increase
+               (As_prover.return
+                  (Option.value ~default:Tock.Proof.dummy
+                     (Snark_transition.ledger_proof transition))))
         in
         let%bind correct_snark =
           Boolean.(correct_transaction_snark || nothing_changed)

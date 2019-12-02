@@ -466,6 +466,7 @@ module T = struct
           in
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_propose_keys
+              ~genesis_ledger:Genesis_ledger.t
           in
           let gossip_net_params =
             Gossip_net.Real.Config.
@@ -505,8 +506,7 @@ module T = struct
             (*Todo: use test genesis ledger hash*)
             Lazy.force
               (Coda_state.Genesis_protocol_state.t
-                 ~genesis_ledger_hash:
-                   (Coda_base.Ledger.merkle_root (Lazy.force Genesis_ledger.t)))
+                 ~genesis_ledger:Genesis_ledger.t)
             |> With_hash.hash
           in
           let coda_deferred () =
