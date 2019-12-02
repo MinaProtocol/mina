@@ -65,13 +65,21 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     let prover_state =
       { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state= Lazy.force Protocol_state.negative_one
+      ; prev_state=
+          Lazy.force
+            (Protocol_state.negative_one ~genesis_ledger:Genesis_ledger.t)
+      ; genesis_state_hash=
+          (Lazy.force Genesis_protocol_state.compile_time_genesis).hash
       ; expected_next_state= None
-      ; update= Lazy.force Snark_transition.genesis }
+      ; update=
+          Lazy.force
+            (Snark_transition.genesis ~genesis_ledger:Genesis_ledger.t) }
     in
     let main x =
       Tick.handle (Keys.Step.main x)
-        (Lazy.force Consensus.Data.Prover_state.precomputed_handler)
+        (Lazy.force
+           (Consensus.Data.Prover_state.precomputed_handler
+              ~genesis_ledger:Genesis_ledger.t))
     in
     let tick =
       Tick.prove

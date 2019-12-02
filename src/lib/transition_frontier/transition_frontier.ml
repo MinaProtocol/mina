@@ -28,10 +28,12 @@ type t =
   ; extensions: Extensions.t
   ; genesis_protocol_state_hash: State_hash.t }
 
-let genesis_root_data ~genesis_ledger =
+let genesis_root_data ~genesis_ledger ~base_proof =
   let open Root_data.Limited.Stable.Latest in
   let open Lazy.Let_syntax in
-  let%map transition = External_transition.genesis ~genesis_ledger in
+  let%map transition =
+    External_transition.genesis ~genesis_ledger ~base_proof
+  in
   let scan_state = Staged_ledger.Scan_state.empty () in
   let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
   {transition; scan_state; pending_coinbase}
@@ -126,6 +128,7 @@ let rec load_with_max_length :
     -> persistent_frontier:Persistent_frontier.t
     -> genesis_protocol_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
+    -> ?base_proof:Proof.t
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -134,7 +137,8 @@ let rec load_with_max_length :
        Deferred.Result.t =
  fun ~max_length ?(retry_with_fresh_db = true) ~logger ~verifier
      ~consensus_local_state ~persistent_root ~persistent_frontier
-     ~genesis_protocol_state_hash ~genesis_ledger () ->
+     ~genesis_protocol_state_hash ~genesis_ledger ?(base_proof = Proof.dummy)
+     () ->
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
   let continue persistent_frontier_instance =
@@ -165,7 +169,7 @@ let rec load_with_max_length :
     in
     let%bind () =
       Persistent_frontier.reset_database_exn persistent_frontier
-        ~root_data:(Lazy.force (genesis_root_data ~genesis_ledger))
+        ~root_data:(Lazy.force (genesis_root_data ~genesis_ledger ~base_proof))
     in
     let%bind () =
       Persistent_root.reset_to_genesis_exn persistent_root ~genesis_ledger
@@ -204,7 +208,7 @@ let rec load_with_max_length :
         load_with_max_length ~max_length ~logger ~verifier
           ~consensus_local_state ~persistent_root ~persistent_frontier
           ~retry_with_fresh_db:false () ~genesis_protocol_state_hash
-          ~genesis_ledger
+          ~genesis_ledger ~base_proof
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -413,7 +417,8 @@ module For_tests = struct
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let genesis_transition =
           Lazy.force
-            (External_transition.genesis ~genesis_ledger:Genesis_ledger.t)
+            (External_transition.genesis ~genesis_ledger:Genesis_ledger.t
+               ~base_proof:Proof.dummy)
         in
         let genesis_ledger = Lazy.force Genesis_ledger.t in
         let genesis_staged_ledger =

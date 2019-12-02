@@ -113,7 +113,7 @@ val genesis_state_hash : (_, ('a, _, _) Body.t) Poly.t -> 'a
 
 val consensus_state : (_, (_, _, 'a) Body.t) Poly.t -> 'a
 
-val negative_one : Value.t Lazy.t
+val negative_one : genesis_ledger:Coda_base.Ledger.t Lazy.t -> Value.t Lazy.t
 
 val hash_checked : var -> (State_hash.var, _) Checked.t
 

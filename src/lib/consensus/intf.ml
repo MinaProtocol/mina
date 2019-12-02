@@ -261,6 +261,8 @@ module type State_hooks_intf = sig
        , _ )
        Snark_params.Tick.Checked.t
 
+  val genesis_winner : Public_key.Compressed.t * Private_key.t
+
   module For_tests : sig
     val gen_consensus_state :
          gen_slot_advancement:int Quickcheck.Generator.t
@@ -415,7 +417,9 @@ module type S = sig
         end
         with type V1.t = t
 
-      val precomputed_handler : Snark_params.Tick.Handler.t Lazy.t
+      val precomputed_handler :
+           genesis_ledger:Coda_base.Ledger.t Lazy.t
+        -> Snark_params.Tick.Handler.t Lazy.t
 
       val handler :
            t
@@ -470,8 +474,7 @@ module type S = sig
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
 
-      val negative_one :
-        ?genesis_ledger:Ledger.t Lazy.t -> unit -> Value.t Lazy.t
+      val negative_one : genesis_ledger:Ledger.t Lazy.t -> Value.t Lazy.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t

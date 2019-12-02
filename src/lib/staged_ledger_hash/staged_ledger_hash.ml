@@ -106,7 +106,7 @@ module Non_snark = struct
 
   type value = t [@@deriving sexp, compare, hash, yojson]
 
-  let negative_one : t Lazy.t =
+  let dummy : t Lazy.t =
     lazy
       { ledger_hash= Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t)
       ; aux_hash= Aux_hash.dummy
@@ -155,7 +155,7 @@ module Non_snark = struct
         * computations. It's useful when debugging to dump the protocol state
         * and so we can just lie here instead. *)
         printf "WARNING: improperly transporting staged-ledger-hash\n" ;
-        Lazy.force negative_one )
+        Lazy.force dummy )
 end
 
 module Poly = struct
@@ -223,11 +223,11 @@ let genesis ~genesis_ledger_hash : t =
   { non_snark= Non_snark.genesis ~genesis_ledger_hash
   ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 
-let negative_one =
+(*let negative_one ~genesis_ledger=
   lazy
     (genesis
        ~genesis_ledger_hash:
-         (Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t)))
+         (Ledger.merkle_root (Lazy.force genesis_ledger)))*)
 
 let var_of_t ({pending_coinbase_hash; non_snark} : t) : var =
   let non_snark = Non_snark.var_of_t non_snark in

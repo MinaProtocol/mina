@@ -40,8 +40,7 @@ let genesis_ledger_hash ~ledger =
     ( Coda_base.Ledger.merkle_root (Lazy.force ledger)
     |> Coda_base.Frozen_ledger_hash.of_ledger_hash )
 
-let negative_one_ledger_hash =
-  genesis_ledger_hash ~ledger:Genesis_ledger.Dummy.t
+let negative_one_ledger_hash = genesis_ledger_hash ~ledger:Genesis_ledger.t
 
 let compute_delegatee_table keys ~iter_accounts =
   let open Coda_base in
@@ -951,12 +950,17 @@ module Data = struct
     module Precomputed = struct
       let keypairs = Lazy.force Coda_base.Sample_keypairs.keypairs
 
-      let handler : Snark_params.Tick.Handler.t Lazy.t =
+      let genesis_winner = keypairs.(0)
+
+      let handler :
+             genesis_ledger:Coda_base.Ledger.t Lazy.t
+          -> Snark_params.Tick.Handler.t Lazy.t =
+       fun ~genesis_ledger ->
         lazy
-          (let pk, sk = keypairs.(0) in
+          (let pk, sk = genesis_winner in
            let dummy_sparse_ledger =
              Coda_base.Sparse_ledger.of_ledger_subset_exn
-               (Lazy.force Genesis_ledger.Dummy.t)
+               (Lazy.force genesis_ledger)
                [pk]
            in
            let empty_pending_coinbase =
@@ -992,7 +996,7 @@ module Data = struct
                          request)))
 
       let vrf_output =
-        let _, sk = keypairs.(0) in
+        let _, sk = genesis_winner in
         eval ~private_key:sk
           { Message.epoch= Epoch.zero
           ; slot= Epoch.Slot.zero
@@ -1891,7 +1895,7 @@ module Data = struct
     let same_checkpoint_window ~prev ~next =
       make_checked (fun () -> same_checkpoint_window ~prev ~next)
 
-    let negative_one ?(genesis_ledger = Genesis_ledger.t) () =
+    let negative_one ~genesis_ledger =
       lazy
         { Poly.blockchain_length= Length.zero
         ; epoch_count= Length.zero
@@ -1913,8 +1917,7 @@ module Data = struct
         |> Coda_base.Frozen_ledger_hash.of_ledger_hash
       in
       update ~proposer_vrf_result:Vrf.Precomputed.vrf_output
-        ~previous_consensus_state:
-          (Lazy.force (negative_one ~genesis_ledger ()))
+        ~previous_consensus_state:(Lazy.force (negative_one ~genesis_ledger))
         ~previous_protocol_state_hash:negative_one_protocol_state_hash
         ~consensus_transition ~supply_increase:Currency.Amount.zero
         ~snarked_ledger_hash
@@ -2775,13 +2778,15 @@ module Hooks = struct
   let%test "Receive a valid consensus_state with a bit of delay" =
     let curr_epoch, curr_slot =
       Consensus_state.curr_epoch_and_slot
-        (Lazy.force (Consensus_state.negative_one ()))
+        (Lazy.force
+           (Consensus_state.negative_one ~genesis_ledger:Genesis_ledger.t))
     in
     let delay = Constants.delta / 2 |> UInt32.of_int in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time curr_epoch new_slot in
     received_at_valid_time
-      (Lazy.force (Consensus_state.negative_one ()))
+      (Lazy.force
+         (Consensus_state.negative_one ~genesis_ledger:Genesis_ledger.t))
       ~time_received:(to_unix_timestamp time_received)
     |> Result.is_ok
 
@@ -2792,14 +2797,17 @@ module Hooks = struct
       Epoch_and_slot.of_time_exn start_time
     in
     let consensus_state =
-      { (Lazy.force (Consensus_state.negative_one ())) with
+      { (Lazy.force
+           (Consensus_state.negative_one ~genesis_ledger:Genesis_ledger.t))
+        with
         curr_global_slot= Global_slot.of_epoch_and_slot curr }
     in
     let too_early =
       (* TODO: Does this make sense? *)
       Epoch.start_time
         (Consensus_state.curr_slot
-           (Lazy.force (Consensus_state.negative_one ())))
+           (Lazy.force
+              (Consensus_state.negative_one ~genesis_ledger:Genesis_ledger.t)))
     in
     let too_late =
       let delay = Constants.delta * 2 |> UInt32.of_int in
@@ -2838,6 +2846,8 @@ module Hooks = struct
      and type protocol_state_var := Protocol_state.var
      and type snark_transition_var := Snark_transition.var = struct
     (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
+
+    let genesis_winner = Vrf.Precomputed.genesis_winner
 
     let check_proposal_data ~logger (proposal_data : Proposal_data.t)
         epoch_and_slot =

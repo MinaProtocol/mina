@@ -179,6 +179,15 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           ~blockchain_state:(Snark_transition.blockchain_state transition)
           ~consensus_state
       in
+      let%bind () =
+        as_prover
+          As_prover.(
+            Let_syntax.(
+              let%map protocol_state = read Protocol_state.typ new_state in
+              Core.printf
+                !"Genesis state: %{sexp: Coda_state.Protocol_state.value}\n%!"
+                protocol_state))
+      in
       let%map state_hash = Protocol_state.hash_checked new_state in
       (state_hash, new_state, `Success success, `Is_first_block is_first_block)
   end

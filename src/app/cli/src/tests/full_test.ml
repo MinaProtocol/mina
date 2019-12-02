@@ -206,7 +206,7 @@ let run_test () : unit Deferred.t =
              ~genesis_protocol_state_hash:
                Coda_state.Genesis_protocol_state.For_tests
                .genesis_protocol_state_hash ())
-          ~genesis_ledger:Genesis_ledger.t
+          ~genesis_ledger:Genesis_ledger.t ~base_proof:Coda_base.Proof.dummy
         (*TODO test ledger*)
       in
       don't_wait_for

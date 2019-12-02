@@ -50,7 +50,8 @@ let%test_module "Full_frontier tests" =
         let open Root_data in
         { transition=
             Lazy.force
-              (External_transition.genesis ~genesis_ledger:Genesis_ledger.t)
+              (External_transition.genesis ~genesis_ledger:Genesis_ledger.t
+                 ~base_proof:Coda_base.Proof.dummy)
         ; staged_ledger= Staged_ledger.create_exn ~ledger:root_ledger }
       in
       Full_frontier.create ~logger ~root_data

@@ -763,7 +763,7 @@ module Validated = struct
   include Comparable.Make (Stable.Latest)
 end
 
-let genesis ~genesis_ledger =
+let genesis ~genesis_ledger ~base_proof =
   (*TODO: This needs to be genesis protocol state so that when other compile time parameters change, this doesn't have to change*)
   let open Lazy.Let_syntax in
   let%map genesis_protocol_state =
@@ -785,8 +785,7 @@ let genesis ~genesis_ledger =
   let (`I_swear_this_is_safe_see_my_comment transition) =
     Validated.create_unsafe_pre_hashed
       (With_hash.map genesis_protocol_state ~f:(fun protocol_state ->
-           create ~protocol_state
-             ~protocol_state_proof:Precomputed_values.base_proof
+           create ~protocol_state ~protocol_state_proof:base_proof
              ~staged_ledger_diff:empty_diff
              ~delta_transition_chain_proof:
                (Protocol_state.previous_state_hash protocol_state, []) ))

@@ -64,7 +64,7 @@ val create_value :
 
 val length_in_triples : int
 
-val negative_one : Value.t Lazy.t
+val negative_one : genesis_ledger_hash:Ledger_hash.t -> Value.t
 
 val genesis : genesis_ledger_hash:Ledger_hash.t -> Value.t
 

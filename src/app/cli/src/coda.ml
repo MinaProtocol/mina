@@ -421,7 +421,25 @@ let daemon logger =
            {coda: 'a; client_whitelist: 'b; rest_server_port: 'c}
        end in
        let genesis_ledger =
-         lazy (Ledger.create ~directory_name:genesis_ledger_dir ())
+         lazy
+           (Ledger.create ~directory_name:(genesis_ledger_dir ^/ "ledger") ())
+       in
+       let%bind base_proof =
+         match%map
+           Monitor.try_with_or_error ~extract_exn:true (fun () ->
+               let%bind r =
+                 Reader.open_file (genesis_ledger_dir ^/ "base_proof")
+               in
+               let%map contents =
+                 Pipe.to_list (Reader.lines r) >>| String.concat
+               in
+               Sexp.of_string contents |> Proof.Stable.V1.t_of_sexp )
+         with
+         | Ok base_proof ->
+             base_proof
+         | Error e ->
+             failwithf "Error reading the base proof: %s"
+               (Error.to_string_hum e) ()
        in
        let coda_initialization_deferred () =
          let%bind config =
@@ -789,7 +807,7 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_node
                 ~work_reassignment_wait ~genesis_protocol_state_hash ())
-             ~genesis_ledger
+             ~genesis_ledger ~base_proof
          in
          {Coda_initialization.coda; client_whitelist; rest_server_port}
        in

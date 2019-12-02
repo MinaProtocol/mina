@@ -103,7 +103,11 @@ val start : t -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : Config.t -> genesis_ledger:Ledger.t Lazy.t -> t Deferred.t
+val create :
+     Config.t
+  -> genesis_ledger:Ledger.t Lazy.t
+  -> base_proof:Proof.t
+  -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 

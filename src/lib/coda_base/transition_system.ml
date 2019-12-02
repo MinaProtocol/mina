@@ -16,6 +16,8 @@ module type S = sig
       val typ : (var, t) Typ.t
 
       val var_to_field : var -> Field.Var.t
+
+      val equal_var : var -> var -> (Boolean.var, _) Checked.t
     end
 
     type var
@@ -74,6 +76,7 @@ struct
         { wrap_vk: Tock.Verification_key.t
         ; prev_proof: Tock.Proof.t
         ; prev_state: State.value
+        ; genesis_state_hash: State.Hash.t
         ; expected_next_state: State.value option
         ; update: Update.value }
       [@@deriving fields]
@@ -144,12 +147,14 @@ struct
     let%snarkydef main (logger : Logger.t) (top_hash : Digest.Tick.Packed.var)
         =
       let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
+      and genesis_state_hash =
+        exists' State.Hash.typ ~f:Prover_state.genesis_state_hash
       and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash = State.Checked.hash prev_state in
       let%bind ( next_state_hash
                , _next_state
                , `Success success
-               , `Is_first_block is_first_block ) =
+               , `Is_first_block _is_first_block ) =
         with_label __LOC__
           (State.Checked.update ~logger (prev_state_hash, prev_state) update)
       in
@@ -203,15 +208,17 @@ struct
         with_label __LOC__ Field.Checked.Assert.(equal next_top_hash top_hash)
       in
       let%bind prev_state_valid =
-        let%bind prev_state_valid =
-          prev_state_valid wrap_vk_section wrap_vk prev_state_hash
-        in
-        Boolean.(prev_state_valid || is_first_block)
+        (*let%bind prev_state_valid =*)
+        prev_state_valid wrap_vk_section wrap_vk prev_state_hash
+        (*in
+        Boolean.(prev_state_valid || is_first_block)*)
       in
       let%bind inductive_case_passed =
         with_label __LOC__ Boolean.(prev_state_valid && success)
       in
-      let%bind is_base_case = State.Checked.is_base_hash next_state_hash in
+      let%bind is_base_case =
+        State.Hash.equal_var genesis_state_hash next_state_hash
+      in
       let%bind () =
         as_prover
           As_prover.(

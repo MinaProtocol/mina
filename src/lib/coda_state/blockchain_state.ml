@@ -91,22 +91,14 @@ let length_in_triples =
 
 let set_timestamp t timestamp = {t with Poly.timestamp}
 
-let negative_one =
-  lazy
-    Poly.
-      { staged_ledger_hash= Lazy.force Staged_ledger_hash.negative_one
-      ; snarked_ledger_hash=
-          Frozen_ledger_hash.of_ledger_hash
-          @@ Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t)
-      ; timestamp= Block_time.of_time Time.epoch }
-
-(* genesis blockchain state is created when  *)
-let genesis ~genesis_ledger_hash =
+let negative_one ~genesis_ledger_hash =
   Poly.
     { staged_ledger_hash= Staged_ledger_hash.genesis ~genesis_ledger_hash
     ; snarked_ledger_hash=
         Frozen_ledger_hash.of_ledger_hash genesis_ledger_hash
     ; timestamp= Block_time.of_time Time.epoch }
+
+let genesis = negative_one
 
 type display = (string, string, string) Poly.t [@@deriving yojson]
 

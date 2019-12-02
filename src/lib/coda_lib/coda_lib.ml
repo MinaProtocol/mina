@@ -581,7 +581,7 @@ let start t =
     ~transition_writer:t.pipes.proposer_transition_writer ;
   Snark_worker.start t
 
-let create (config : Config.t) ~genesis_ledger =
+let create (config : Config.t) ~genesis_ledger ~base_proof =
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->
@@ -649,7 +649,7 @@ let create (config : Config.t) ~genesis_ledger =
               ~consensus_local_state:config.consensus_local_state
               ~persistent_root ~persistent_frontier
               ~genesis_protocol_state_hash:config.genesis_protocol_state_hash
-              ~genesis_ledger ()
+              ~genesis_ledger ~base_proof ()
             >>| function
             | Ok frontier ->
                 Some frontier
@@ -760,7 +760,8 @@ let create (config : Config.t) ~genesis_ledger =
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
             Broadcast_pipe.create
-              ( Lazy.force (External_transition.genesis ~genesis_ledger)
+              ( Lazy.force
+                  (External_transition.genesis ~genesis_ledger ~base_proof)
               |> External_transition.Validation.forget_validation )
           in
           let valid_transitions =

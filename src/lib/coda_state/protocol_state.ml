@@ -209,13 +209,18 @@ let hash s =
 
 [%%endif]
 
-let negative_one =
+let negative_one ~genesis_ledger =
   lazy
     { Poly.Stable.Latest.previous_state_hash=
         State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
     ; body=
-        { Body.Poly.blockchain_state= Lazy.force Blockchain_state.negative_one
+        { Body.Poly.blockchain_state=
+            Blockchain_state.negative_one
+              ~genesis_ledger_hash:
+                (Coda_base.Ledger.merkle_root (Lazy.force genesis_ledger))
         ; genesis_state_hash=
             State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
         ; consensus_state=
-            Lazy.force (Consensus.Data.Consensus_state.negative_one ()) } }
+            Lazy.force
+              (Consensus.Data.Consensus_state.negative_one ~genesis_ledger) }
+    }

@@ -531,6 +531,7 @@ module T = struct
                  ~is_archive_node ~work_reassignment_wait:420000 ()
                  ~genesis_protocol_state_hash)
               ~genesis_ledger:Genesis_ledger.t
+              ~base_proof:Coda_base.Proof.dummy
             (*TODO: use test genesis ledger*)
           in
           let coda_ref : Coda_lib.t option ref = ref None in

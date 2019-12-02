@@ -3,9 +3,9 @@ open Coda_base
 
 let create_with_custom_ledger ~genesis_consensus_state ~genesis_ledger =
   let negative_one_protocol_state_hash =
-    Protocol_state.(hash (Lazy.force negative_one))
+    Protocol_state.(hash (Lazy.force (negative_one ~genesis_ledger)))
   in
-  let root_ledger_hash = Ledger.merkle_root genesis_ledger in
+  let root_ledger_hash = Ledger.merkle_root (Lazy.force genesis_ledger) in
   let staged_ledger_hash =
     Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
       Staged_ledger_hash.Aux_hash.dummy root_ledger_hash
@@ -39,8 +39,7 @@ let t ~genesis_ledger =
        Ledger.merkle_root (Lazy.force genesis_ledger)
      in
      let negative_one_protocol_state_hash =
-       Protocol_state.(hash (Lazy.force negative_one))
-       (*TODO: generate dummy_genesis_ledger at compile time and get rid of the lazy here*)
+       Protocol_state.(hash (Lazy.force (negative_one ~genesis_ledger)))
      in
      let genesis_consensus_state =
        Consensus.Data.Consensus_state.create_genesis
