@@ -117,6 +117,8 @@ module Port = struct
 
   let default_libp2p = 28675
 
+  let default_hasura_port = 9000
+
   let of_raw raw =
     let open Or_error.Let_syntax in
     let%bind () =
@@ -148,6 +150,12 @@ module Port = struct
       create ~name:"discovery-port" ~default:default_libp2p
         "Daemon to archive process communication"
   end
+
+  module Archive = struct
+    let server =
+      create ~name:"server-port" ~default:default_archive
+        "port to launch the archive server"
+  end
 end
 
 module Host = struct
@@ -157,6 +165,8 @@ module Host = struct
     Option.value_map ~default:false (Unix.Host.getbyname host) ~f:(fun host ->
         Core.Unix.Host.have_address_in_common host localhost )
 end
+
+let example_host = "154.97.53.97"
 
 module Host_and_port = struct
   let parse_host_and_port raw =
@@ -178,8 +188,7 @@ module Host_and_port = struct
     else Host_and_port.to_string host_and_port
 
   let create_examples port =
-    [ Port.to_host_and_port port
-    ; Host_and_port.create ~host:"154.97.53.97" ~port ]
+    [Port.to_host_and_port port; Host_and_port.create ~host:example_host ~port]
 
   let make_doc_builder description example_port =
     Doc_builder.create ~display:to_string
@@ -232,13 +241,33 @@ module Uri = struct
           ~examples:
             [ Port.to_uri ~path:"graphql" Port.default_client
             ; Uri.of_string
-                ( "/dns4/peer1-rising-phoenix.o1test.net/graphql"
-                ^/ Int.to_string Port.default_client ) ]
+                ( "/dns4/peer1-rising-phoenix.o1test.net" ^ ":"
+                ^ Int.to_string Port.default_client
+                ^/ "graphql" ) ]
           "URI/LOCALHOST-PORT" "graphql rest server for daemon interaction"
       in
       create ~name:"rest-server" ~arg_type:(arg_type ~path:"graphql")
         doc_builder
         (Resolve_with_default (Port.to_uri ~path:"graphql" Port.default_client))
+  end
+
+  module Archive = struct
+    let hasura =
+      let doc_builder =
+        Doc_builder.create ~display:to_string
+          ~examples:
+            [ Port.to_uri ~path:"graphql" Port.default_client
+            ; Uri.of_string
+                ( example_host ^ ":"
+                ^ Int.to_string Port.default_client
+                ^/ "v1/graphql" ) ]
+          "URI/LOCALHOST-PORT" "Srchive process to communicate with Hasura"
+      in
+      create ~name:"hasura-port"
+        ~arg_type:(arg_type ~path:"v1/graphql")
+        doc_builder
+        (Resolve_with_default
+           (Port.to_uri ~path:"graphql" Port.default_hasura_port))
   end
 end
 

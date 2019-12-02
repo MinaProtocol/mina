@@ -33,6 +33,10 @@ module Uri : sig
   module Client : sig
     val rest_graphql : Uri.t Types.with_name Command.Spec.param
   end
+
+  module Archive : sig
+    val hasura : Uri.t Types.with_name Command.Spec.param
+  end
 end
 
 module Port : sig
@@ -47,6 +51,10 @@ module Port : sig
 
     val discovery :
       int Types.with_name_and_displayed_default Command.Spec.param
+  end
+
+  module Archive : sig
+    val server : int Types.with_name_and_displayed_default Command.Spec.param
   end
 end
 

@@ -14,17 +14,16 @@ module Processor = Processor.Make (struct
       ~with_:{|"constraint"|}
 end)
 
-let setup_server ~logger ~hasura_port ~server_port =
+let setup_server ~logger ~hasura_endpoint ~server_port =
   let where_to_listen =
-    Tcp.Where_to_listen.bind_to All_addresses
-      (On_port (Flag.Port.resolve server_port))
+    Tcp.Where_to_listen.bind_to All_addresses (On_port server_port)
   in
   let reader, writer = Strict_pipe.create ~name:"archive" Synchronous in
   let implementations =
     [ Async.Rpc.Rpc.implement Rpc.t (fun () archive_diff ->
           Strict_pipe.Writer.write writer archive_diff ) ]
   in
-  let processor = Processor.create hasura_port in
+  let processor = Processor.create hasura_endpoint in
   Processor.run processor reader |> don't_wait_for ;
   Deferred.ignore
   @@ Tcp.Server.create
@@ -65,19 +64,14 @@ let command =
   let open Command.Let_syntax in
   let%map_open log_json = Flag.Log.json
   and log_level = Flag.Log.level
-  and server_port =
-    Flag.Port.create ~name:"server-port" ~default:Port.default_archive
-      "port to launch the archive server"
-  and hasura_port =
-    let open Flag.Uri in
-    Flag.Uri.create ~name:"hasura-port"
-      ~default:(create_localhost_uri default_hasura_port ~path:"v1/graphql")
-      "URI or localhost port for archive process to communicate with Hasura"
-  in
+  and server_port = Flag.Port.Archive.server
+  and hasura_endpoint = Flag.Uri.Archive.hasura in
   fun () ->
     let logger = Logger.create () in
     Stdout_log.setup log_json log_level ;
-    setup_server ~logger ~hasura_port:hasura_port.value ~server_port
+    setup_server ~logger ~hasura_endpoint:hasura_endpoint.value
+      ~server_port:
+        (Option.value server_port.value ~default:server_port.default)
 
 let () =
   Command.run
