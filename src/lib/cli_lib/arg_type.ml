@@ -1,11 +1,14 @@
 open Core
 open Signature_lib
 
-let int16 =
+let validate_int16 x =
   let max_port = 1 lsl 16 in
-  Command.Arg_type.map Command.Param.int ~f:(fun x ->
-      if 0 <= x && x < max_port then x
-      else failwithf "Port not between 0 and %d" max_port () )
+  if 0 <= x && x < max_port then Ok x
+  else Or_error.errorf !"Port not between 0 and %d" max_port
+
+let int16 =
+  Command.Arg_type.map Command.Param.int
+    ~f:(Fn.compose Or_error.ok_exn validate_int16)
 
 module Key_arg_type (Key : sig
   type t
