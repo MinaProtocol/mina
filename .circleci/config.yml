@@ -146,6 +146,17 @@ jobs:
                     cachix use codaprotocol
                     cd src/app/libp2p_helper
                     nix-build default.nix
+            - run:
+                name: Create package dir
+                command: mkdir -p package
+            - run:
+                name: Collect and strip binaries
+                command: |
+                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
+                    chmod +w package/coda-libp2p_helper
+                    ./scripts/librewrite-macos.sh package/coda-libp2p_helper
+            - store_artifacts:
+                  path: package
 
     build-macos:
       # only run when there's a 'release' tag
