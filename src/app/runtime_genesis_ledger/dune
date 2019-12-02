@@ -1,0 +1,5 @@
+(executable
+  (name runtime_genesis_ledger)
+  (public_name runtime_genesis_ledger)
+  (libraries core async coda_base keys_lib coda_state snarky snark_params blockchain_snark snark_keys staged_ledger)
+  (preprocess (pps ppx_jane ppx_deriving_yojson)))

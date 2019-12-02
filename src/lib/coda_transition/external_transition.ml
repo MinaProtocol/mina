@@ -764,11 +764,9 @@ module Validated = struct
 end
 
 let genesis ~genesis_ledger ~base_proof =
-  (*TODO: This needs to be genesis protocol state so that when other compile time parameters change, this doesn't have to change*)
   let open Lazy.Let_syntax in
   let%map genesis_protocol_state =
     Coda_state.Genesis_protocol_state.t ~genesis_ledger
-    (*Genesis_protocol_state.compile_time_genesis*)
   in
   let empty_diff =
     { Staged_ledger_diff.diff=
@@ -776,7 +774,7 @@ let genesis ~genesis_ledger ~base_proof =
           ; user_commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
-    ; creator= Account.public_key (snd (List.hd_exn Genesis_ledger.accounts))
+    ; creator= fst Consensus_state_hooks.genesis_winner
     ; state_body_hash=
         Protocol_state.body (With_hash.data genesis_protocol_state)
         |> Protocol_state.Body.hash }
@@ -911,7 +909,7 @@ module Staged_ledger_validation = struct
             ~f:target_hash_of_ledger_proof
             ~default:
               (Frozen_ledger_hash.of_ledger_hash
-                 (Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t)))
+                 (Ledger.merkle_root (Lazy.force Test_genesis_ledger.Dummy.t)))
       | Some (proof, _) ->
           target_hash_of_ledger_proof proof
     in

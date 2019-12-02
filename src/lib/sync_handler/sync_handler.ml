@@ -224,7 +224,7 @@ let%test_module "Sync_handler" =
           Thread_safe.block_on_async_exn (fun () ->
               print_heartbeat hb_logger |> don't_wait_for ;
               let%bind frontier =
-                create_root_frontier ~logger ~pids Genesis_ledger.accounts
+                create_root_frontier ~logger ~pids Test_genesis_ledger.accounts
               in
               let source_ledger =
                 Transition_frontier.For_tests.root_snarked_ledger frontier
@@ -277,14 +277,14 @@ let%test_module "Sync_handler" =
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier =
-            create_root_frontier ~logger ~pids Genesis_ledger.accounts
+            create_root_frontier ~logger ~pids Test_genesis_ledger.accounts
           in
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
                 (gen_linear_breadcrumbs ~logger ~pids ~trust_system
                    ~size:num_breadcrumbs
-                   ~accounts_with_secret_keys:Genesis_ledger.accounts)
+                   ~accounts_with_secret_keys:Test_genesis_ledger.accounts)
           in
           let seen_transition =
             Transition_frontier.(
@@ -325,7 +325,7 @@ let%test_module "Sync_handler" =
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier =
-            create_root_frontier ~logger ~pids Genesis_ledger.accounts
+            create_root_frontier ~logger ~pids Test_genesis_ledger.accounts
           in
           let root_breadcrumb = Transition_frontier.root frontier in
           let root_transition =
@@ -336,7 +336,7 @@ let%test_module "Sync_handler" =
               ~gen_root_breadcrumb_builder:
                 (gen_linear_breadcrumbs ~logger ~pids ~trust_system
                    ~size:num_breadcrumbs_to_cause_bootstrap
-                   ~accounts_with_secret_keys:Genesis_ledger.accounts)
+                   ~accounts_with_secret_keys:Test_genesis_ledger.accounts)
           in
           let root_consensus_state =
             External_transition.Validated.consensus_state root_transition

@@ -40,7 +40,8 @@ let genesis_ledger_hash ~ledger =
     ( Coda_base.Ledger.merkle_root (Lazy.force ledger)
     |> Coda_base.Frozen_ledger_hash.of_ledger_hash )
 
-let negative_one_ledger_hash = genesis_ledger_hash ~ledger:Genesis_ledger.t
+let negative_one_ledger_hash =
+  genesis_ledger_hash ~ledger:Test_genesis_ledger.t
 
 let compute_delegatee_table keys ~iter_accounts =
   let open Coda_base in
@@ -2217,7 +2218,8 @@ module Hooks = struct
         include Register (T')
       end
 
-      let implementation ~logger ~local_state conn ~version:_ ledger_hash =
+      let implementation ~logger ~local_state ~genesis_ledger_hash conn
+          ~version:_ ledger_hash =
         let open Coda_base in
         let open Local_state in
         let open Snapshot in
@@ -2231,8 +2233,7 @@ module Hooks = struct
             let response =
               if
                 Ledger_hash.equal ledger_hash
-                  (Frozen_ledger_hash.to_ledger_hash
-                     (Lazy.force negative_one_ledger_hash))
+                  (Frozen_ledger_hash.to_ledger_hash genesis_ledger_hash)
               then Error "refusing to serve genesis epoch ledger"
               else
                 let candidate_snapshots =
@@ -2285,10 +2286,11 @@ module Hooks = struct
       | Get_epoch_ledger, Rpc_handler (Get_epoch_ledger, f) ->
           Some (do_ f)
 
-    let rpc_handlers ~logger ~local_state =
+    let rpc_handlers ~logger ~local_state ~genesis_ledger_hash =
       [ Rpc_handler
           ( Get_epoch_ledger
-          , Get_epoch_ledger.implementation ~logger ~local_state ) ]
+          , Get_epoch_ledger.implementation ~logger ~local_state
+              ~genesis_ledger_hash ) ]
   end
 
   let is_genesis time = Epoch.(equal (of_time_exn time) zero)
@@ -2779,14 +2781,14 @@ module Hooks = struct
     let curr_epoch, curr_slot =
       Consensus_state.curr_epoch_and_slot
         (Lazy.force
-           (Consensus_state.negative_one ~genesis_ledger:Genesis_ledger.t))
+           (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t))
     in
     let delay = Constants.delta / 2 |> UInt32.of_int in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time curr_epoch new_slot in
     received_at_valid_time
       (Lazy.force
-         (Consensus_state.negative_one ~genesis_ledger:Genesis_ledger.t))
+         (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t))
       ~time_received:(to_unix_timestamp time_received)
     |> Result.is_ok
 
@@ -2798,7 +2800,7 @@ module Hooks = struct
     in
     let consensus_state =
       { (Lazy.force
-           (Consensus_state.negative_one ~genesis_ledger:Genesis_ledger.t))
+           (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t))
         with
         curr_global_slot= Global_slot.of_epoch_and_slot curr }
     in
@@ -2807,7 +2809,8 @@ module Hooks = struct
       Epoch.start_time
         (Consensus_state.curr_slot
            (Lazy.force
-              (Consensus_state.negative_one ~genesis_ledger:Genesis_ledger.t)))
+              (Consensus_state.negative_one
+                 ~genesis_ledger:Test_genesis_ledger.t)))
     in
     let too_late =
       let delay = Constants.delta * 2 |> UInt32.of_int in
@@ -2993,13 +2996,13 @@ let%test_module "Proof of stake tests" =
       (* build pieces needed to apply "update" *)
       let snarked_ledger_hash =
         Frozen_ledger_hash.of_ledger_hash
-          (Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t))
+          (Ledger.merkle_root (Lazy.force Test_genesis_ledger.Dummy.t))
       in
       let previous_protocol_state_hash = State_hash.(of_hash zero) in
       let previous_consensus_state =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
-          ~genesis_ledger:Genesis_ledger.Dummy.t
+          ~genesis_ledger:Test_genesis_ledger.Dummy.t
       in
       let global_slot =
         Core_kernel.Time.now () |> Time.of_time |> Epoch_and_slot.of_time_exn
@@ -3010,10 +3013,10 @@ let%test_module "Proof of stake tests" =
       (* setup ledger, needed to compute proposer_vrf_result here and handler below *)
       let open Coda_base in
       (* choose largest account as most likely to propose *)
-      let ledger_data = Lazy.force Genesis_ledger.t in
+      let ledger_data = Lazy.force Test_genesis_ledger.t in
       let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
       let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
-      let maybe_sk, account = Genesis_ledger.largest_account_exn () in
+      let maybe_sk, account = Test_genesis_ledger.largest_account_exn () in
       let private_key = Option.value_exn maybe_sk in
       let public_key_compressed = Account.public_key account in
       let location =

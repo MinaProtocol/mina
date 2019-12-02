@@ -417,10 +417,10 @@ module For_tests = struct
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let genesis_transition =
           Lazy.force
-            (External_transition.genesis ~genesis_ledger:Genesis_ledger.t
+            (External_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
                ~base_proof:Proof.dummy)
         in
-        let genesis_ledger = Lazy.force Genesis_ledger.t in
+        let genesis_ledger = Lazy.force Test_genesis_ledger.t in
         let genesis_staged_ledger =
           Or_error.ok_exn
             (Async.Thread_safe.block_on_async_exn (fun () ->
@@ -485,13 +485,14 @@ module For_tests = struct
   let gen ?(logger = Logger.null ()) ?verifier ?trust_system
       ?consensus_local_state
       ?(root_ledger_and_accounts =
-        (Lazy.force Genesis_ledger.t, Genesis_ledger.accounts))
+        (Lazy.force Test_genesis_ledger.t, Test_genesis_ledger.accounts))
       ?(gen_root_breadcrumb = gen_genesis_breadcrumb ~logger ?verifier ())
       ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
     let genesis_protocol_state_hash =
       Lazy.force
-        (Coda_state.Genesis_protocol_state.t ~genesis_ledger:Genesis_ledger.t)
+        (Coda_state.Genesis_protocol_state.t
+           ~genesis_ledger:Test_genesis_ledger.t)
       |> With_hash.hash
       (*Make this Test_genesis_ledger*)
     in
@@ -510,7 +511,8 @@ module For_tests = struct
     let consensus_local_state =
       Option.value consensus_local_state
         ~default:
-          (Consensus.Data.Local_state.create ~genesis_ledger:Genesis_ledger.t
+          (Consensus.Data.Local_state.create
+             ~genesis_ledger:Test_genesis_ledger.t
              Public_key.Compressed.Set.empty)
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
@@ -569,7 +571,7 @@ module For_tests = struct
 
   let gen_with_branch ?logger ?verifier ?trust_system ?consensus_local_state
       ?(root_ledger_and_accounts =
-        (Lazy.force Genesis_ledger.t, Genesis_ledger.accounts))
+        (Lazy.force Test_genesis_ledger.t, Test_genesis_ledger.accounts))
       ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
       ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in

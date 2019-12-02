@@ -108,7 +108,7 @@ module Non_snark = struct
 
   let dummy : t Lazy.t =
     lazy
-      { ledger_hash= Ledger.merkle_root (Lazy.force Genesis_ledger.Dummy.t)
+      { ledger_hash= Ledger.merkle_root (Lazy.force Test_genesis_ledger.Dummy.t)
       ; aux_hash= Aux_hash.dummy
       ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
 

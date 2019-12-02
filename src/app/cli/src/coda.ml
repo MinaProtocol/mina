@@ -421,15 +421,13 @@ let daemon logger =
            {coda: 'a; client_whitelist: 'b; rest_server_port: 'c}
        end in
        let genesis_ledger =
-         lazy
-           (Ledger.create ~directory_name:(genesis_ledger_dir ^/ "ledger") ())
+         lazy (Ledger.create ~directory_name:genesis_ledger_dir ())
        in
        let%bind base_proof =
+         let base_proof_filename = genesis_ledger_dir ^/ "base_proof" in
          match%map
            Monitor.try_with_or_error ~extract_exn:true (fun () ->
-               let%bind r =
-                 Reader.open_file (genesis_ledger_dir ^/ "base_proof")
-               in
+               let%bind r = Reader.open_file base_proof_filename in
                let%map contents =
                  Pipe.to_list (Reader.lines r) >>| String.concat
                in
@@ -438,8 +436,8 @@ let daemon logger =
          | Ok base_proof ->
              base_proof
          | Error e ->
-             failwithf "Error reading the base proof: %s"
-               (Error.to_string_hum e) ()
+             failwithf "Error reading the base proof from %s: %s"
+               base_proof_filename (Error.to_string_hum e) ()
        in
        let coda_initialization_deferred () =
          let%bind config =
@@ -667,6 +665,9 @@ let daemon logger =
            Lazy.force (Coda_state.Genesis_protocol_state.t ~genesis_ledger)
            |> With_hash.hash
          in
+         let genesis_ledger_hash =
+           Lazy.force genesis_ledger |> Ledger.merkle_root
+         in
          let time_controller =
            Block_time.Controller.create @@ Block_time.Controller.basic ~logger
          in
@@ -706,6 +707,7 @@ let daemon logger =
            ; trust_system
            ; time_controller
            ; consensus_local_state
+           ; genesis_ledger_hash
            ; log_gossip_heard
            ; creatable_gossip_net=
                Coda_networking.Gossip_net.(

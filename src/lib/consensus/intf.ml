@@ -547,7 +547,10 @@ module type S = sig
       include Rpc_intf.Rpc_interface_intf
 
       val rpc_handlers :
-        logger:Logger.t -> local_state:Local_state.t -> rpc_handler list
+           logger:Logger.t
+        -> local_state:Local_state.t
+        -> genesis_ledger_hash:Frozen_ledger_hash.t
+        -> rpc_handler list
 
       type query =
         { query:
