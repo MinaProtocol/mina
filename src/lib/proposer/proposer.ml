@@ -103,8 +103,7 @@ end
 
 let generate_next_state ~previous_protocol_state ~time_controller
     ~staged_ledger ~transactions ~get_completed_work ~logger
-    ~(keypair : Keypair.t) ~proposal_data ~scheduled_time
-    ~genesis_protocol_state_hash =
+    ~(keypair : Keypair.t) ~proposal_data ~scheduled_time =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
   let previous_protocol_state_body_hash =
@@ -203,7 +202,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
                       .user_commands diff
                       :> User_command.t list )
                   ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
-                  ~logger ~genesis_protocol_state_hash ) )
+                  ~logger ) )
       in
       lift_sync (fun () ->
           measure "making Snark and Internal transitions" (fun () ->
@@ -223,8 +222,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
                   ~blockchain_state:
                     (Protocol_state.blockchain_state protocol_state)
                   ~consensus_transition:consensus_transition_data
-                  ~proposer:self ~coinbase_amount ~genesis_protocol_state_hash
-                  ()
+                  ~proposer:self ~coinbase_amount ()
               in
               let internal_transition =
                 Internal_transition.create ~snark_transition
@@ -261,9 +259,6 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 (Transition_frontier.extensions frontier)
                 Transition_registry
             in
-            let genesis_protocol_state_hash =
-              Transition_frontier.genesis_protocol_state_hash frontier
-            in
             let crumb = Transition_frontier.best_tip frontier in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
@@ -289,7 +284,6 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
-                ~genesis_protocol_state_hash
             in
             trace_event "next state generated" ;
             match next_state_opt with

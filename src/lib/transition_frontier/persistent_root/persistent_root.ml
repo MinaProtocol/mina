@@ -6,7 +6,6 @@ module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 
 let genesis_root_identifier ~genesis_state_hash =
   let open Root_identifier.Stable.Latest in
-  (*TODO: needs to be Genesis_protocol_state.t with the genesis ledger*)
   {state_hash= genesis_state_hash; frontier_hash= Frontier_hash.empty}
 
 let with_file ?size filename access_level ~f =

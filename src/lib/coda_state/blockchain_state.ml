@@ -94,6 +94,7 @@ let negative_one ~genesis_ledger_hash =
         Frozen_ledger_hash.of_ledger_hash genesis_ledger_hash
     ; timestamp= Block_time.of_time Time.epoch }
 
+(* negative_one and genesis blockchain states are equivalent *)
 let genesis = negative_one
 
 type display = (string, string, string) Poly.t [@@deriving yojson]

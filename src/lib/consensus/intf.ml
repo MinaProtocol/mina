@@ -192,8 +192,7 @@ module type Snark_transition_intf = sig
          , 'consensus_transition
          , 'sok_digest
          , 'amount
-         , 'public_key
-         , 'state_hash )
+         , 'public_key )
          t
     [@@deriving sexp]
   end
@@ -207,12 +206,11 @@ module type Snark_transition_intf = sig
     , consensus_transition_var
     , Sok_message.Digest.Checked.t
     , Amount.var
-    , Public_key.Compressed.var
-    , State_hash.var )
+    , Public_key.Compressed.var )
     Poly.t
 
   val consensus_transition :
-    (_, 'consensus_transition, _, _, _, _) Poly.t -> 'consensus_transition
+    (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
 end
 
 module type State_hooks_intf = sig
@@ -247,7 +245,6 @@ module type State_hooks_intf = sig
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
-    -> genesis_protocol_state_hash:Coda_base.State_hash.t
     -> protocol_state * consensus_transition
 
   (**

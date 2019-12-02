@@ -20,8 +20,6 @@ val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
 val genesis : genesis_ledger_hash:Ledger_hash.t -> t
 
-(*val negative_one : genesis_ledger:Ledger.t Lazy.t -> t Lazy.t*)
-
 module Stable : sig
   module V1 : sig
     type nonrec t = t

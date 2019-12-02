@@ -3136,8 +3136,7 @@ module Hooks = struct
 
     let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
         ~blockchain_state ~current_time ~(proposal_data : Proposal_data.t)
-        ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger
-        ~genesis_protocol_state_hash =
+        ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger =
       let previous_consensus_state =
         Protocol_state.consensus_state previous_protocol_state
       in
@@ -3264,13 +3263,13 @@ let%test_module "Proof of stake tests" =
       (* build pieces needed to apply "update" *)
       let snarked_ledger_hash =
         Frozen_ledger_hash.of_ledger_hash
-          (Ledger.merkle_root (Lazy.force Test_genesis_ledger.Dummy.t))
+          (Ledger.merkle_root (Lazy.force Test_genesis_ledger.t))
       in
       let previous_protocol_state_hash = State_hash.(of_hash zero) in
       let previous_consensus_state =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
-          ~genesis_ledger:Test_genesis_ledger.Dummy.t
+          ~genesis_ledger:Test_genesis_ledger.t
       in
       let global_slot =
         Core_kernel.Time.now () |> Time.of_time |> Epoch_and_slot.of_time_exn

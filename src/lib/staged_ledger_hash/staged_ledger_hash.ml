@@ -108,7 +108,7 @@ module Non_snark = struct
 
   let dummy : t Lazy.t =
     lazy
-      { ledger_hash= Ledger.merkle_root (Lazy.force Test_genesis_ledger.Dummy.t)
+      { ledger_hash= Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
       ; aux_hash= Aux_hash.dummy
       ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
 
@@ -220,12 +220,6 @@ let genesis ~genesis_ledger_hash : t =
   let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
   { non_snark= Non_snark.genesis ~genesis_ledger_hash
   ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
-
-(*let negative_one ~genesis_ledger=
-  lazy
-    (genesis
-       ~genesis_ledger_hash:
-         (Ledger.merkle_root (Lazy.force genesis_ledger)))*)
 
 let var_of_t ({pending_coinbase_hash; non_snark} : t) : var =
   let non_snark = Non_snark.var_of_t non_snark in

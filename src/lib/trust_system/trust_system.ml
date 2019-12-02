@@ -40,7 +40,7 @@ module Actions = struct
         (** Peer sent us something with a signature that doesn't check *)
     | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
     | Has_invalid_genesis_protocol_state
-        (**Peer gossiped a transition that has a different genesis protocol state (and genesis_ledger) from that of mine*)
+        (**Peer gossiped a transition that has a different genesis protocol state from that of mine*)
     | Sent_invalid_transition_chain_merkle_proof
         (** Peer sent us a transition chain witness that does not verify *)
     | Violated_protocol

@@ -909,7 +909,7 @@ module Staged_ledger_validation = struct
             ~f:target_hash_of_ledger_proof
             ~default:
               (Frozen_ledger_hash.of_ledger_hash
-                 (Ledger.merkle_root (Lazy.force Test_genesis_ledger.Dummy.t)))
+                 (Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)))
       | Some (proof, _) ->
           target_hash_of_ledger_proof proof
     in
