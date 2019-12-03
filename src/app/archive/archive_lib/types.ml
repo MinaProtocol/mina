@@ -132,7 +132,8 @@ module User_command = struct
     in
     let payload =
       User_command_payload.create ~fee:obj#fee ~nonce:obj#nonce ~memo:obj#memo
-        ~body
+        ~body (* TODO: We should actually be passing obj#valid_until *)
+        ~valid_until:Coda_numbers.Global_slot.max_value
     in
     ( Coda_base.{User_command.Poly.Stable.V1.payload; sender; signature= ()}
     , obj#first_seen )

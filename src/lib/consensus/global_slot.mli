@@ -1,13 +1,15 @@
 open Coda_base
 
+include
+  Coda_numbers.Nat.Intf.S_unchecked
+  with type t = Coda_numbers.Global_slot.Stable.Latest.t
+
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving sexp, eq, compare, hash, yojson]
+    type nonrec t = t [@@deriving sexp, eq, compare, hash, yojson]
   end
 end]
-
-include Coda_numbers.Nat.Intf.S_unchecked with type t = Stable.Latest.t
 
 val ( + ) : t -> int -> t
 
@@ -36,7 +38,10 @@ val of_time_exn : Block_time.t -> t
 val diff : t -> Epoch.t * Slot.t -> t
 
 module Checked : sig
-  include Coda_numbers.Nat.Intf.S_checked with type unchecked := t
+  include
+    Coda_numbers.Nat.Intf.S_checked
+    with type unchecked := t
+     and type var = Coda_numbers.Global_slot.Checked.var
 
   open Snark_params.Tick
 

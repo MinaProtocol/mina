@@ -393,8 +393,6 @@ module type S = sig
       val create_genesis :
         negative_one_protocol_state_hash:Coda_base.State_hash.t -> Value.t
 
-      val length_in_triples : int
-
       open Snark_params.Tick
 
       val var_to_input :
