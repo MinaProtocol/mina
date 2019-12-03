@@ -19,6 +19,7 @@ echo "Todo:    ${NEEDED_PACKAGES}"
 # only run if there's work to do
 if [[ $NEEDED_PACKAGES = *[![:space:]]* ]]; then
   yes | brew install $NEEDED_PACKAGES
+  brew upgrade openssl
 else
   echo 'All required brew packages have already been installed.'
 fi
