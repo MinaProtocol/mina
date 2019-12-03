@@ -30,57 +30,43 @@ module Transition_frontier = struct
 
   type t = Stable.Latest.t =
     | Breadcrumb_added of
-        { block:
-            ( External_transition.Stable.V1.t
-            , State_hash.Stable.V1.t )
-            With_hash.Stable.V1.t
+        { block: (External_transition.t, State_hash.t) With_hash.t
         ; sender_receipt_chains_from_parent_ledger:
-            (Public_key.Compressed.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t)
-            list }
-    | Root_transitioned of
-        Transition_frontier.Diff.Root_transition.Lite.Stable.V1.t
-    | Bootstrap of {lost_blocks: State_hash.Stable.V1.t list}
+            (Public_key.Compressed.t * Receipt.Chain_hash.t) list }
+    | Root_transitioned of Transition_frontier.Diff.Root_transition.Lite.t
+    | Bootstrap of {lost_blocks: State_hash.t list}
 end
 
 module Transaction_pool = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { added: (User_command.Stable.V1.t * Block_time.Stable.V1.t) list
-          ; removed: User_command.Stable.V1.t list }
-        [@@deriving bin_io, version]
-      end
+      type t =
+        { added: (User_command.Stable.V1.t * Block_time.Stable.V1.t) list
+        ; removed: User_command.Stable.V1.t list }
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t =
-    { added: (User_command.Stable.V1.t * Block_time.Stable.V1.t) list
-    ; removed: User_command.Stable.V1.t list }
+    {added: (User_command.t * Block_time.t) list; removed: User_command.t list}
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        | Transition_frontier of Transition_frontier.Stable.V1.t
-        | Transaction_pool of Transaction_pool.Stable.V1.t
-      [@@deriving bin_io, version]
-    end
+    type t =
+      | Transition_frontier of Transition_frontier.Stable.V1.t
+      | Transaction_pool of Transaction_pool.Stable.V1.t
 
-    include T
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-end
+end]
 
 type t = Stable.Latest.t =
-  | Transition_frontier of Transition_frontier.Stable.V1.t
-  | Transaction_pool of Transaction_pool.Stable.V1.t
+  | Transition_frontier of Transition_frontier.t
+  | Transaction_pool of Transaction_pool.t
 
 module Builder = struct
   let breadcrumb_added breadcrumb =
