@@ -113,8 +113,7 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
   Coda_networking.glue_sync_ledger t.network query_reader response_writer ;
-  Reader.iter sync_ledger_reader
-    ~f:(fun (`Transition incoming_transition, `Time_received _) ->
+  Reader.iter sync_ledger_reader ~f:(fun incoming_transition ->
       let ({With_hash.data= transition; hash}, _)
             : External_transition.Initial_validated.t =
         Envelope.Incoming.data incoming_transition
@@ -492,8 +491,6 @@ let%test_module "Bootstrap_controller tests" =
 
     let trust_system = Trust_system.null ()
 
-    let time_controller = Block_time.Controller.basic ~logger
-
     let pids = Child_processes.Termination.create_pid_table ()
 
     let downcast_transition transition =
@@ -531,7 +528,6 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "Bootstrap controller caches all transitions it is passed \
                    through the transition_reader" =
       let branch_size = (max_frontier_length * 2) + 2 in
-      let one_second = Block_time.Span.of_ms 1000L in
       Quickcheck.test ~trials:1
         (let open Quickcheck.Generator.Let_syntax in
         (* we only need one node for this test, but we need more than one peer so that coda_networking does not throw an error *)
@@ -567,7 +563,6 @@ let%test_module "Bootstrap_controller tests" =
               (Transition_frontier.root_snarked_ledger me.state.frontier)
               ~logger ~trust_system
           in
-          let start_time = Block_time.now time_controller in
           Async.Thread_safe.block_on_async_exn (fun () ->
               let sync_deferred =
                 sync_ledger bootstrap ~root_sync_ledger ~transition_graph
@@ -576,9 +571,7 @@ let%test_module "Bootstrap_controller tests" =
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->
                     Strict_pipe.Writer.write sync_ledger_writer
-                      ( `Transition (downcast_breadcrumb breadcrumb)
-                      , `Time_received (Block_time.add start_time one_second)
-                      ) )
+                      (downcast_breadcrumb breadcrumb) )
               in
               Strict_pipe.Writer.close sync_ledger_writer ;
               sync_deferred ) ;

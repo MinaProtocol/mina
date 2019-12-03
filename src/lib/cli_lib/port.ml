@@ -6,6 +6,8 @@ let default_external = 8302
 
 let default_rest = 0xc0d
 
+let default_archive = default_rest + 1
+
 (* This is always computed as default_external+1 *)
 let default_discovery = 8303
 
