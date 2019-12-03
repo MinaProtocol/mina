@@ -56,6 +56,12 @@ let daemon logger =
             provide both `propose-key` and `propose-public-key`. (default: \
             don't produce blocks)"
          (optional string)
+     and genesis_ledger_dir_flag =
+       flag "genesis-ledger-dir"
+         ~doc:
+           "Dir Directory that contains the genesis ledger and the genesis \
+            blockchain proof (default: <config-dir>/genesis-ledger)"
+         (optional string)
      and initial_peers_raw =
        flag "kademlia-peer"
          ~doc:
@@ -183,13 +189,7 @@ let daemon logger =
            Deferred.return conf_dir
          else Sys.home_directory () >>| compute_conf_dir
        in
-       let () =
-         match Core.Sys.file_exists conf_dir with
-         | `Yes ->
-             ()
-         | _ ->
-             Core.Unix.mkdir_p conf_dir
-       in
+       let%bind () = File_system.create_dir conf_dir in
        let () =
          if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
@@ -247,33 +247,9 @@ let daemon logger =
        (* When persistence is added back, this needs to be revisited
         * to handle persistence related files properly *)
        let%bind () =
-         let del_files dir =
-           let rec all_files dirname basename =
-             let fullname = Filename.concat dirname basename in
-             match%bind Sys.is_directory fullname with
-             | `Yes ->
-                 let%map dirs, files =
-                   Sys.ls_dir fullname
-                   >>= Deferred.List.map ~f:(all_files fullname)
-                   >>| List.unzip
-                 in
-                 let dirs =
-                   if String.equal dirname conf_dir then List.concat dirs
-                   else List.append (List.concat dirs) [fullname]
-                 in
-                 (dirs, List.concat files)
-             | _ ->
-                 Deferred.return ([], [fullname])
-           in
-           let%bind dirs, files = all_files dir "" in
-           let%bind () =
-             Deferred.List.iter files ~f:(fun file -> Sys.remove file)
-           in
-           Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
-         in
          let make_version ~wipe_dir =
            let%bind () =
-             if wipe_dir then del_files conf_dir else Deferred.unit
+             if wipe_dir then File_system.clear_dir conf_dir else Deferred.unit
            in
            let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
            Writer.write_line wr Coda_version.commit_id ;
@@ -376,13 +352,16 @@ let daemon logger =
          type ('a, 'b, 'c) t =
            {coda: 'a; client_whitelist: 'b; rest_server_port: 'c}
        end in
+       let genesis_ledger_dir =
+         Option.value
+           ~default:(genesis_ledger_dir conf_dir)
+           genesis_ledger_dir_flag
+       in
        let genesis_ledger =
-         lazy (Ledger.create ~directory_name:(genesis_ledger_dir conf_dir) ())
+         lazy (Ledger.create ~directory_name:genesis_ledger_dir ())
        in
        let%bind base_proof =
-         let base_proof_filename =
-           genesis_ledger_dir conf_dir ^/ "base_proof"
-         in
+         let base_proof_filename = genesis_ledger_dir ^/ "base_proof" in
          match%map
            Monitor.try_with_or_error ~extract_exn:true (fun () ->
                let%bind r = Reader.open_file base_proof_filename in

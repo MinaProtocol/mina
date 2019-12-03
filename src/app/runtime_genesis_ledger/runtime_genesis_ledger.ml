@@ -1,7 +1,21 @@
+[%%import
+"../../config.mlh"]
+
 open Core
 open Async
 open Coda_base
 open Signature_lib
+
+[%%if
+proof_level = "full"]
+
+let use_dummy_values = false
+
+[%%else]
+
+let use_dummy_values = true
+
+[%%endif]
 
 module Account_data = struct
   type account_data =
@@ -108,7 +122,7 @@ let commit ledger = Ledger.commit ledger
 
 let main accounts_json_file ledger_dir =
   let open Deferred.Let_syntax in
-  let%bind ledger_dir_contents = Sys.ls_dir ledger_dir in
+  let%bind () = File_system.create_dir ledger_dir ~clear_if_exists:true in
   let%bind accounts =
     match%map
       Deferred.Or_error.try_with_join (fun () ->
@@ -131,23 +145,25 @@ let main accounts_json_file ledger_dir =
   match
     Or_error.try_with_join (fun () ->
         let open Or_error.Let_syntax in
-        let%bind () =
-          if List.is_empty ledger_dir_contents then Ok ()
-          else Error (Error.of_string "Ledger directory not empty")
-        in
-        let vrf_account : Account_data.account_data =
+        let genesis_winner_account : Account_data.account_data =
           let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
           {pk; sk= None; balance= Currency.Balance.of_int 1000; delegate= None}
         in
         let%map accounts = accounts in
         let ledger =
-          create ~directory_name:ledger_dir (vrf_account :: accounts)
+          create ~directory_name:ledger_dir (genesis_winner_account :: accounts)
         in
         let () = commit ledger in
         ledger )
   with
   | Ok ledger ->
-      let%bind _base_hash, base_proof = generate_base_proof ~ledger in
+      let%bind _base_hash, base_proof =
+        if use_dummy_values then
+          return
+            ( Snark_params.Tick.Field.zero
+            , Dummy_values.Tock.Bowe_gabizon18.proof )
+        else generate_base_proof ~ledger
+      in
       let%map wr = Writer.open_file (ledger_dir ^/ "base_proof") in
       Writer.write wr (Proof.Stable.V1.sexp_of_t base_proof |> Sexp.to_string)
   | Error e ->
@@ -164,7 +180,7 @@ let () =
          let open Let_syntax in
          let%map accounts_json =
            let open Command.Param in
-           flag "accounts-file"
+           flag "account-file"
              ~doc:
                "Filepath of the json file that has all the account data in \
                 the format: [{\"pk\":public-key-string, \

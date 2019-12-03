@@ -3,5 +3,6 @@
   (public_name command_line_tests)
   (inline_tests)
   (libraries core async)
+  (preprocessor_deps ./test_accounts.json)
   (preprocess (pps ppx_coda ppx_jane ppx_deriving.eq))
   )
