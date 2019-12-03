@@ -802,13 +802,6 @@ module Data = struct
                       (Snarky.Request.Handler.run handlers
                          ["Ledger Handler"; "Pending Coinbase Handler"]
                          request)))
-
-      let vrf_output =
-        let _, sk = keypairs.(0) in
-        eval ~private_key:sk
-          { Message.global_slot= Global_slot.zero
-          ; seed= Epoch_seed.initial
-          ; delegator= 0 }
     end
 
     let check ~global_slot ~seed ~private_key ~public_key
