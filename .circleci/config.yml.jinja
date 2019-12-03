@@ -62,7 +62,7 @@ jobs:
     build-archive:
         docker:
             - image: codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98
-              environment: 
+              environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
             - image: postgres:12
@@ -173,7 +173,9 @@ jobs:
                     echo "------------------------------------"
                     cat package/deb/DEBIAN/control
                     echo "------------------------------------"
-                    dpkg-deb -v --build package/deb package/coda-libp2p_helper-${HASH}.deb
+                    find package/deb/
+                    echo "------------------------------------"
+                    dpkg-deb -v --build package/deb/ package/coda-discovery-${HASH}.deb
             - store_artifacts:
                   path: package
 
