@@ -494,7 +494,6 @@ module For_tests = struct
         (Coda_state.Genesis_protocol_state.t
            ~genesis_ledger:Test_genesis_ledger.t)
       |> With_hash.hash
-      (*Make this Test_genesis_ledger*)
     in
     let verifier =
       match verifier with

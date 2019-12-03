@@ -9,8 +9,7 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
-let genesis_ledger_dir =
-  "/home/o1labs/Documents/projects/coda-master/genesis_ledger"
+let genesis_ledger_dir config_dir = config_dir ^/ "genesis_ledger"
 
 [%%check_ocaml_word_size
 64]
@@ -378,10 +377,12 @@ let daemon logger =
            {coda: 'a; client_whitelist: 'b; rest_server_port: 'c}
        end in
        let genesis_ledger =
-         lazy (Ledger.create ~directory_name:genesis_ledger_dir ())
+         lazy (Ledger.create ~directory_name:(genesis_ledger_dir conf_dir) ())
        in
        let%bind base_proof =
-         let base_proof_filename = genesis_ledger_dir ^/ "base_proof" in
+         let base_proof_filename =
+           genesis_ledger_dir conf_dir ^/ "base_proof"
+         in
          match%map
            Monitor.try_with_or_error ~extract_exn:true (fun () ->
                let%bind r = Reader.open_file base_proof_filename in
