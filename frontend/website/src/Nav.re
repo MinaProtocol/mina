@@ -292,7 +292,7 @@ module NavWrapper = {
           style([
             position(`relative),
             width(`auto),
-            maxWidth(`rem(24.)),
+            maxWidth(px(500)),
             order(2),
             NavStyle.bottomNudgeOffset(0.5),
             media(
@@ -365,13 +365,14 @@ module SimpleButton = {
 let make = (~page) => {
   <NavWrapper keepAnnouncementBar=true>
     [|
-      <SimpleButton
-        name="Developers"
-        link="/developers"
-        activePage={page == `Developers}
-      />,
       <SimpleButton name="Blog" link="/blog" activePage={page == `Blog} />,
+      <SimpleButton name="Docs" link="/docs" activePage={page == `Docs} />,
       <SimpleButton name="Careers" link="/jobs" activePage={page == `Jobs} />,
+      <SimpleButton
+        name="GitHub"
+        link="https://github.com/CodaProtocol/coda"
+        target="_blank"
+      />,
       <SimpleButton
         name="Testnet"
         link="/testnet"
