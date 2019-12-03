@@ -105,7 +105,7 @@ When you [start the daemon](/docs/my-first-transaction/#start-up-a-node), set th
 As a snark-worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.
 
 !!! note
-    You can visualize blocks, transactions and SNARKs in the [commnuity built block explorer](https://codaexplorer.garethtdavies.com/).
+    You can visualize blocks, transactions and SNARKs in the [community built block explorer](https://codaexplorer.garethtdavies.com/).
 
 That about covers the roles and responsibilities as a Coda node operator. If you've made it to this point, congratulations on succesfully running a node! Since Coda is a permissionless peer-to-peer network, everything is managed and run in a decentralized manner by nodes all over the world, just like the one you just spun up.
 
