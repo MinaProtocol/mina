@@ -446,6 +446,18 @@
               "deprecationReason": null
             },
             {
+              "name": "valid_until",
+              "description": "The global slot number after which this transaction cannot be applied.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "fee",
               "description": "Fee amount in order to send a stake delegation",
               "args": [],
@@ -511,6 +523,16 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "valid_until",
+              "description": "The global slot number after which this transaction cannot be applied.",
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
                 "ofType": null
               },
               "defaultValue": null
@@ -619,6 +641,18 @@
               "deprecationReason": null
             },
             {
+              "name": "valid_until",
+              "description": "The global slot number after which this transaction cannot be applied.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "fee",
               "description": "Fee amount in order to send payment",
               "args": [],
@@ -700,6 +734,16 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "valid_until",
+              "description": "The global slot number after which this transaction cannot be applied.",
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
                 "ofType": null
               },
               "defaultValue": null
@@ -2906,22 +2950,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkpoints",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
                   "ofType": null
                 }
               },
