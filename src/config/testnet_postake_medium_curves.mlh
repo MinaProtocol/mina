@@ -13,7 +13,7 @@
 [%%define c 8]
 [%%define delta 3]
 
-[%%define record_async_backtraces true]
+[%%define record_async_backtraces false]
 [%%define time_offsets false]
 [%%define cache_exceptions false]
 [%%define fake_hash false]
@@ -30,6 +30,6 @@
 
 [%%define print_versioned_types false]
 
-[%%define daemon_expiry "2019-12-10 14:00:00-07:00"]
+[%%define daemon_expiry "2020-01-15 14:00:00-07:00"]
 
 [%%define pending_coinbase_hack true]
