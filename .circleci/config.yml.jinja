@@ -59,7 +59,6 @@ jobs:
                   name: Build bot
                   command: cd frontend/bot && yarn run build-ci
 
-    {# # Disabled until working
     build-archive:
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
@@ -72,6 +71,8 @@ jobs:
                 POSTGRES_USER: admin
                 POSTGRES_DB: archiver
             - image: hasura/graphql-engine:v1.0.0-beta.6
+              entrypoint: ["sh", "-c"]
+              command: ["sleep 20 && graphql-engine serve"]
               environment:
                 HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
                 HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
@@ -89,7 +90,7 @@ jobs:
                   command:  bash -c 'eval `opam config env` && make build_archive'
             - run:
                   name: Configure Hasura
-                  command: ls && ./scripts/archive/make_hasura_configurations.sh #}
+                  command: ls && ./scripts/archive/make_hasura_configurations.sh
     lint:
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
@@ -453,7 +454,7 @@ workflows:
                     only: develop
             - tracetool
             - build-wallet
-            {# - build-archive #}
+            - build-archive
             - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
