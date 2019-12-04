@@ -16,13 +16,14 @@ let formatTimeLeft = diff => {
   };
 };
 
-let sendFaucetCoda = (userId, msg, pk) => {
+let sendFaucetCoda = (userId, msg, pk, password) => {
   StringMap.set(lastRequestedMap, userId, Js.Date.now());
   Coda.sendPayment(
     ~from=Constants.faucetKey,
     ~to_=pk,
     ~amount=Constants.faucetAmount,
     ~fee=Constants.feeAmount,
+    ~password,
   )
   |> Wonka.forEach((. {ReasonUrql.Client.ClientTypes.response}) => {
        let replyText =
@@ -58,14 +59,14 @@ let msgIsFromAdmin = msg => {
   );
 };
 
-let handleMessage = (msg, pk) => {
+let handleMessage = (msg, pk, password) => {
   // Check if the user has requested recently
   let userId =
     Discord.Message.author(msg)
     |> Discord.User.id
     |> Discord.Snowflake.toString;
   switch (StringMap.get(lastRequestedMap, userId)) {
-  | None => sendFaucetCoda(userId, msg, pk)
+  | None => sendFaucetCoda(userId, msg, pk, password)
   | Some(lastRequested) =>
     // if lastRequested was recent && user not a faucet_approver, error.
     let diff = Js.Date.now() -. lastRequested;
@@ -78,7 +79,7 @@ let handleMessage = (msg, pk) => {
         ),
       );
     } else {
-      sendFaucetCoda(userId, msg, pk);
+      sendFaucetCoda(userId, msg, pk, password);
     };
   };
 };
