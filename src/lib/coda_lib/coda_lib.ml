@@ -453,7 +453,7 @@ module Root_diff = struct
   end
 
   type t = Stable.Latest.t =
-    {user_commands: User_command.Stable.V1.t list; root_length: int}
+    {user_commands: User_command.t list; root_length: int}
 end
 
 (* TODO: this is a bad pattern for two reasons:
