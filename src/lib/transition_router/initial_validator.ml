@@ -56,8 +56,7 @@ module Duplicate_proposal_detector = struct
   module Proposals = struct
     module T = struct
       (* order of fields significant, compare by epoch, then slot, then proposer *)
-      type t =
-        {epoch: int; slot: int; proposer: Public_key.Compressed.Stable.V1.t}
+      type t = {epoch: int; slot: int; proposer: Public_key.Compressed.t}
       [@@deriving sexp, compare]
     end
 
