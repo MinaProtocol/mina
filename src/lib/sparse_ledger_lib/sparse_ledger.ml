@@ -32,9 +32,7 @@ module T = struct
   end]
 
   type ('hash, 'key, 'account) t = ('hash, 'key, 'account) Stable.Latest.t =
-    { indexes: ('key * int) list
-    ; depth: int
-    ; tree: ('hash, 'account) Tree.Stable.V1.t }
+    {indexes: ('key * int) list; depth: int; tree: ('hash, 'account) Tree.t}
   [@@deriving sexp, to_yojson]
 end
 
