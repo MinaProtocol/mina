@@ -10,5 +10,5 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t = {trust: float; banned: Banned_status.Stable.V1.t}
+type t = Stable.Latest.t = {trust: float; banned: Banned_status.t}
 [@@deriving yojson]

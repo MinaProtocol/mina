@@ -202,6 +202,7 @@ module For_tests = struct
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let payload : User_command.Payload.t =
           User_command.Payload.create ~fee:Fee.zero ~nonce
+            ~valid_until:Coda_numbers.Global_slot.max_value
             ~memo:User_command_memo.dummy
             ~body:(Payment {receiver= receiver_pk; amount= send_amount})
         in
