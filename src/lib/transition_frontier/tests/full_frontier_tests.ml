@@ -30,7 +30,9 @@ let%test_module "Full_frontier tests" =
 
     let add_breadcrumb frontier breadcrumb =
       let diffs = Full_frontier.calculate_diffs frontier breadcrumb in
-      ignore (Full_frontier.apply_diffs frontier diffs)
+      ignore
+        (Full_frontier.apply_diffs frontier diffs
+           ~ignore_consensus_local_state:false)
 
     let add_breadcrumbs frontier = List.iter ~f:(add_breadcrumb frontier)
 
