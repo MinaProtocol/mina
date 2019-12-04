@@ -102,13 +102,12 @@ module Cata
           (F.pair tc tl)
 end
 
-module Binable 
-    (N : sig type t val n : t nat end)
-  : Binable.S1 with type 'a t = ('a, N.t) t
+module type Nat_intf = sig type n val n : n nat end
+
+module Binable  (N : Nat_intf)
+  : Binable.S1 with type 'a t := ('a, N.n) t
 = struct
   open Bin_prot
-  type nonrec 'a t = ('a, N.t) t
-
   module Tc = Cata( struct
     type 'a t = 'a Type_class.t
     let pair = Type_class.bin_pair
@@ -188,3 +187,25 @@ module Binable
   let __bin_read_t__ _f _buf ~pos_ref _vint =
     Common.raise_variant_wrong_type "vector" !pos_ref
 end
+
+let rec typ
+  : type f var value n.
+    (var, value, f) Snarky.Typ.t
+    -> n nat
+    -> ((var, n) t, (value, n) t, f) Snarky.Typ.t
+  =
+  let open Snarky.Typ in
+  fun elt n ->
+  match n with
+  | S n ->
+    let tl = typ elt n in
+    let there = function x :: xs -> (x, xs) in
+    let back (x, xs) = x :: xs in
+    transport (elt * tl)
+      ~there ~back
+  |> transport_var ~there ~back
+  | Z ->
+    let there [] = () in
+    let back () = [] in
+    transport (unit ()) ~there ~back
+    |> transport_var ~there ~back

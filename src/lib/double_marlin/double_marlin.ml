@@ -4,25 +4,165 @@
 open Core_kernel
 module B = Bigint
 
+module H_list = Snarky.H_list
+
 module Evals = struct
   open Vector
-  module Beta1 = Binable(struct
-      type t = z s s s s s s
+
+  module Make (N : Nat_intf) = struct
+    include N
+    type 'a t = ('a, n) Vector.t
+    include Binable(N)
+
+    let typ elt = Vector.typ elt n
+  end
+
+  module Beta1 = Make(struct
+      type n = z s s s s s s
       let n = S (S (S (S (S (S Z)))))
       let () = assert (6 = nat_to_int n)
     end)
 
-  module Beta2 =Binable(struct
-      type t = z s s 
+  module Beta2 =Make(struct
+      type n = z s s 
       let n = S (S Z)
       let () = assert (2 = nat_to_int n)
     end)
 
-  module Beta3 =Binable(struct
-      type t = z s s s s s s s s s s s
+  module Beta3 =Make(struct
+      type n = z s s s s s s s s s s s
       let n = S( S( S( S( S( S( S( S( S( S( S Z))))))))))
       let () = assert (11 = nat_to_int n)
     end)
+end
+
+type 'a abc = { a : 'a; b : 'a; c : 'a }
+type 'a matrix_evals = { row : 'a ; col: 'a; value: 'a }
+
+module Dlog_marlin_statement = struct
+  open H_list
+  (* About 10000 bits altogether *)
+  module Deferred_values = struct
+    module Kate_acc_input = struct
+      type ('fp, 'values) t =
+        { zr : 'fp
+        ; z : 'fp (* Evaluation point *) (* 128 bits *)
+        ; v :  'values (* Evaluation values *)
+        }
+
+      let to_hlist { zr; z; v } = [ zr; z; v]
+      let of_hlist ([ zr; z; v ] : (unit, _) H_list.t) = { zr; z; v}
+
+      let typ fp values =
+        Snarky.Typ.of_hlistable
+          [ fp; fp; values ]
+          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    end
+
+    type 'fp t =
+      { xi : 'fp (* 128 bits *)
+      ; beta_1 : ('fp, 'fp Evals.Beta1.t) Kate_acc_input.t
+      ; beta_2 : ('fp, 'fp Evals.Beta2.t) Kate_acc_input.t
+      ; beta_3 : ('fp, 'fp Evals.Beta3.t) Kate_acc_input.t
+      ; sigma_2 : 'fp
+      ; sigma_3 : 'fp
+      ; alpha : 'fp (* 128 bits *)
+      ; eta_A : 'fp (* 128 bits *)
+      ; eta_B : 'fp (* 128 bits *)
+      ; eta_C : 'fp (* 128 bits *)
+      }
+
+    let to_hlist 
+      { xi 
+      ; beta_1 
+      ; beta_2 
+      ; beta_3 
+      ; sigma_2 
+      ; sigma_3 
+      ; alpha 
+      ; eta_A 
+      ; eta_B 
+      ; eta_C 
+      }
+      =
+      [ xi 
+      ; beta_1 
+      ; beta_2 
+      ; beta_3 
+      ; sigma_2 
+      ; sigma_3 
+      ; alpha 
+      ; eta_A 
+      ; eta_B 
+      ; eta_C 
+      ]
+    let of_hlist 
+      ([ xi 
+      ; beta_1 
+      ; beta_2 
+      ; beta_3 
+      ; sigma_2 
+      ; sigma_3 
+      ; alpha 
+      ; eta_A 
+      ; eta_B 
+      ; eta_C 
+      ] : (unit, _) H_list.t)
+      =
+      { xi 
+      ; beta_1 
+      ; beta_2 
+      ; beta_3 
+      ; sigma_2 
+      ; sigma_3 
+      ; alpha 
+      ; eta_A 
+      ; eta_B 
+      ; eta_C 
+      }
+
+      let typ fp =
+        let acc v = Kate_acc_input.typ fp (v fp) in
+        let open Evals in
+        Snarky.Typ.of_hlistable
+          [ fp; acc Beta1.typ; acc Beta2.typ; acc Beta3.typ;
+            fp; fp; fp; fp; fp; fp ]
+          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+  end
+
+  type ('fp, 'fq, 'kpc, 'bppc, 'digest, 's) t =
+    { deferred_values : 'fp Deferred_values.t
+    ; pairing_marlin_index : 'kpc abc matrix_evals
+    ; sponge_digest : 'digest
+    ; bp_challenges_old : 'fq array (* Bullet proof challenges *)
+    ; b_challenge_old : 'fq
+    ; b_u_x_old : 'fq (* Purportedly b_{bp_challenges_old}(b_challenge_old) *)
+    (* All this could be a hash which we unhash *)
+    ; app_state: 's
+    ; g_old : 'fp * 'fp
+    ; dlog_marlin_index : 'bppc abc matrix_evals
+    }
+end
+
+module Pairing_marlin_accumulator = struct
+  type 'g t =
+    { r_f : 'g
+    ; r_pi : 'g
+    ; zr_pi : 'g
+    }
+
+  open Snarky
+  open H_list
+
+  let to_hlist { r_f; r_pi; zr_pi } = [ r_f; r_pi; zr_pi ]
+  let of_hlist ([ r_f; r_pi; zr_pi ] : (unit, _) H_list.t) = { r_f; r_pi; zr_pi }
+
+  let typ g =
+    Typ.of_hlistable [g; g; g]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 end
 
 module Pairing_marlin_proof = struct
@@ -34,15 +174,47 @@ module Pairing_marlin_proof = struct
       ; x'_hat : 'pc (* This is the commitment to the LDE of the "real input" *)
       }
     [@@deriving fields, bin_io]
+
+    open H_list
+    let to_hlist { y0 
+      ; a0
+      ; g0 
+                 ; x'_hat }
+    = [ y0 
+      ; a0
+      ; g0 
+                 ; x'_hat ]
+    let of_hlist ([ y0 
+      ; a0
+      ; g0 
+                 ; x'_hat ] : (unit, _) H_list.t)
+    = { y0 
+      ; a0
+      ; g0 
+                 ; x'_hat }
+
+  let typ pc fp =
+    Snarky.Typ.of_hlistable [fp; fp; pc; pc]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
   end
 
   module Wire = struct
     module Opening = struct
       type ('proof, 'values) t = 
-        { values : 'values
-        ; proof : 'proof
+        { proof : 'proof
+        ; values : 'values
         }
       [@@deriving fields, bin_io]
+
+      open H_list
+      let to_hlist { proof; values } =[ proof; values ]
+      let of_hlist ([ proof; values ] : (unit, _) H_list.t) ={ proof; values }
+
+      let typ proof values =
+        Snarky.Typ.of_hlistable [proof; values]
+          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
 
     module Messages = struct
@@ -56,6 +228,44 @@ module Pairing_marlin_proof = struct
         ; sigma_gh_3 : 'fp * ('pc * 'pc)
         }
       [@@deriving fields, bin_io]
+      open H_list
+
+      let to_hlist { w_hat
+        ; s
+        ; z_hat_A
+        ; z_hat_B
+        ; gh_1
+        ; sigma_gh_2
+        ; sigma_gh_3
+        }=[ w_hat
+        ; s
+        ; z_hat_A
+        ; z_hat_B
+        ; gh_1
+        ; sigma_gh_2
+        ; sigma_gh_3
+        ]
+      let of_hlist ([ w_hat
+        ; s
+        ; z_hat_A
+        ; z_hat_B
+        ; gh_1
+        ; sigma_gh_2
+        ; sigma_gh_3
+        ] : (unit, _) H_list.t)={ w_hat
+        ; s
+        ; z_hat_A
+        ; z_hat_B
+        ; gh_1
+        ; sigma_gh_2
+        ; sigma_gh_3
+        }
+
+      let typ pc fp =
+        let open Snarky.Typ in
+        of_hlistable [pc; pc; pc; pc; (pc * pc); fp * (pc * pc); fp * (pc * pc) ]
+          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
 
     module Openings
@@ -67,6 +277,37 @@ module Pairing_marlin_proof = struct
         ; beta_3 : ('proof, 'fp Beta3.t) Opening.t
         }
       [@@deriving fields, bin_io]
+
+      open H_list
+
+      let to_hlist 
+        { beta_1
+        ; beta_2
+        ; beta_3
+        }
+        =
+        [ beta_1
+        ; beta_2
+        ; beta_3
+        ]
+      let of_hlist 
+        ([ beta_1
+        ; beta_2
+        ; beta_3
+        ] : (unit, _) H_list.t)
+        =
+        { beta_1
+        ; beta_2
+        ; beta_3
+        }
+
+      let typ proof fp =
+        let op vals = Opening.typ proof (vals fp) in
+        let open Snarky.Typ in
+        of_hlistable [op Beta1.typ; op Beta2.typ; op Beta3.typ ]
+          ~var_to_hlist:to_hlist
+          ~var_of_hlist:of_hlist
+          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
 
     type ('proof, 'pc, 'fp) t =
@@ -74,6 +315,32 @@ module Pairing_marlin_proof = struct
       ; openings: ('proof, 'fp) Openings.t
       }
       [@@deriving fields, bin_io]
+
+    open H_list
+
+    let to_hlist 
+      { messages
+      ; openings
+      }
+      =
+      [ messages
+      ; openings
+      ]
+
+    let of_hlist  
+      ([ messages
+      ; openings
+      ] : (unit, _) H_list.t)
+      =
+      { messages
+      ; openings
+      }
+
+  let typ proof pc fp =
+    Snarky.Typ.of_hlistable [ Messages.typ pc fp; Openings.typ proof fp ]
+      ~var_to_hlist:to_hlist
+      ~var_of_hlist:of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
   end
 end
 
@@ -412,7 +679,7 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
 
   let rec absorb : type a. Sponge.t -> a Type.t -> a -> unit =
     fun sponge ty t ->
-      let absorb_field = Sponge.absorb_field sponge in
+      let absorb_field = Sponge.absorb sponge in
       match ty with
       | PC ->
         List.iter ~f:absorb_field (G1.to_field_elements t)
@@ -431,9 +698,6 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
   module Marlin_proof = struct
     type t = (Opening_proof.t, PC.t, Fp.Unpacked.t) Pairing_marlin_proof.Wire.t
   end
-
-  type 'a abc = { a : 'a; b : 'a; c : 'a }
-  type 'a matrix_evals = { row : 'a ; col: 'a; value: 'a }
 
   let combined_commitment ~xi (polys : _ Vector.t) =
     let p0 :: ps = polys in
@@ -481,52 +745,17 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
       r_i
       zr_i
       pi_i f_i
-      (rf_acc, rpi_acc, zrpi_acc)
+      { Pairing_marlin_accumulator.r_f; r_pi; zr_pi }
+      : _ Pairing_marlin_accumulator.t
     =
     let open G1 in
     let ( * ) s p = scale p s in
-    ( rf_acc + r_i * f_i
-    , rpi_acc + r_i * pi_i
-    , zrpi_acc + zr_i * pi_i
-    ) 
+    { r_f= r_f + r_i * f_i
+    ; r_pi=r_pi + r_i * pi_i
+    ; zr_pi=zr_pi + zr_i * pi_i
+    } 
 
   let pack_fp = Field.project
-
-  (* About 10000 bits altogether *)
-  module Deferred_values = struct
-    type ('fp, 'values) for_pairing_acc =
-      { zr : 'fp
-      ; z : 'fp (* Evaluation point *) (* 128 bits *)
-      ; v :  'values (* Evaluation values *)
-      }
-
-    type ('fp ) t =
-      { xi : 'fp (* 128 bits *)
-      ; beta_1 : ('fp, 'fp Evals.Beta1.t) for_pairing_acc
-      ; beta_2 : ('fp, 'fp Evals.Beta2.t) for_pairing_acc
-      ; beta_3 : ('fp, 'fp Evals.Beta3.t) for_pairing_acc
-      ; sigma_2 : 'fp
-      ; sigma_3 : 'fp
-      ; alpha : 'fp (* 128 bits *)
-      ; eta_A : 'fp (* 128 bits *)
-      ; eta_B : 'fp (* 128 bits *)
-      ; eta_C : 'fp (* 128 bits *)
-      }
-  end
-
-  module Statement = struct
-    type ('fp, 'digest, 's) t =
-      { deferred_values : 'fp Deferred_values.t
-      ; sponge_state : 'digest
-        (* All this could be a hash which we unhash  *)
-      ; app_state: 's
-      ; pairing_marlin_index : PC.t abc matrix_evals
-      ; g_old : 'fp * 'fp
-
-      ; x_old : Field.t array
-      ; b_u_old : Field.t
-      }
-  end
 
   let accumulate_and_defer
       ~(defer : [ `Mul of Fp.Unpacked.t * Fp.Unpacked.t ] -> Boolean.var list)
@@ -534,7 +763,7 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
     let zr_i = defer (`Mul (z_i, r_i)) in
     let acc = accumuluate_pairing_state r_i zr_i proof f_i acc in
     acc,
-    { Deferred_values.zr= zr_i
+    { Dlog_marlin_statement.Deferred_values.zr= zr_i
     ; z= z_i
     ; v= values
     }
@@ -544,9 +773,16 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
   module Requests = struct
     open Snarky.Request
 
+    module Prev = struct
+      type _ t +=
+        | Pairing_marlin_accumulator : G1.Constant.t Pairing_marlin_accumulator.t t
+        | Pairing_marlin_proof : (Opening_proof.Constant.t, PC.Constant.t, Fp.Unpacked.constant) Pairing_marlin_proof.Wire.t t
+        | Sponge_digest : Fp.Unpacked.constant t
+    end
+
     type _ t +=
-      | Fp_mul : bool list * bool list -> bool list Snarky.Request.t
-      | Mul_scalars : bool list * bool list -> bool list Snarky.Request.t
+      | Fp_mul : bool list * bool list -> bool list t
+      | Mul_scalars : bool list * bool list -> bool list t
 
     module Precomputation = struct
       type _ t +=
@@ -569,7 +805,8 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
     ~verification_key:m
     ~sponge ~public_input
     ~pairing_acc:pacc
-    ~proof:({ messages; openings=ops } : Marlin_proof.t) =
+    ~proof:({ messages; openings=ops } : Marlin_proof.t)
+    =
     let receive ty f =
       let x = f messages in
       absorb sponge ty x ;
@@ -657,7 +894,7 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
     let pacc, beta_2 = accum r2 f_2 beta_2 ops.beta_2 pacc in
     let pacc, beta_3 = accum r3 f_3 beta_3 ops.beta_3 pacc in
     pacc,
-    { Deferred_values.xi
+    { Dlog_marlin_statement.Deferred_values.xi
     ; beta_1
     ; beta_2
     ; beta_3
@@ -673,6 +910,7 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
    the polynomial commitments from the pairing-based Marlin *)
 let dlog_main
 
+(*
     pairing_marlin_vk (* F_q based *)
     next_pairing_marlin_acc (* F_q based *)
 
@@ -685,23 +923,52 @@ let dlog_main
     b_u_x_old (* F_q based *)
 
     prev_dlog_marlin_acc (* F_p based *)
-    prev_deferred_fp_arithmetic (* F_p based *)
+    prev_deferred_fp_arithmetic (* F_p based *) *)
+    { Dlog_marlin_statement.deferred_values
+    ; pairing_marlin_index
+    ; sponge_digest
+    ; bp_challenges_old
+    ; b_challenge_old
+    ; b_u_x_old
+    (* All this could be a hash which we unhash *)
+    ; app_state
+    ; g_old
+    ; dlog_marlin_index }
   =
-  let prev_pairing_marlin_acc = exists Pairing_marlin_acc
-  and prev_deferred_fq_arithmetic = exists Deferred_fq_arithmetic
+  let prev_deferred_fq_arithmetic = 
+    (* TODO
+    exists Deferred_fq_arithmetic *)
+    []
   in
-  List.iter prev_deferred_fq_arithmetic ~f:(fun a ->
-      perform a);
+  List.iter prev_deferred_fq_arithmetic ~f:(perform);
   (* This is kind of a special case of deferred fq arithmetic. *)
-  assert (b u_old x_old = b_u_x_old);
-
+  Field.Assert.equal (b bp_challenges_old b_challenge_old) b_u_x_old;
   let updated_pairing_marlin_acc, deferred_fp_arithmetic =
-    let prev_marlin_proof = exists Prev_pairing_marlin_proof in
+    let exists typ r = exists typ ~request:(fun () -> r) in
+    let open Requests in
+    let sponge =
+      let prev_sponge_digest = exists Fp.Unpacked.typ Prev.Sponge_digest in
+      Sponge.
+    let prev_marlin_proof =
+      exists
+        (Pairing_marlin_proof.Wire.typ Opening_proof.typ PC.typ Fp.Unpacked.typ)
+        Prev.Pairing_marlin_proof
+    in
     (* This performs the marlin verifier, does the incremental update of
        the polynomial commitment verification but does not perform all the
        F_p arithmetic equality checks. *)
-    Pairing_marlin.incrementally_verify_openings
-      pairing_marlin_vk
+    let prev_pairing_marlin_acc =
+      exists 
+        (Pairing_marlin_accumulator.typ G1.typ)
+        Requests.Prev.Pairing_marlin_accumulator
+    in
+    incrementally_verify_pairings
+      ~verification_key:pairing_marlin_index
+      ~sponge
+      ~proof:prev_marlin_proof
+      ~pairing_acc:prev_pairing_marlin_acc
+      ~public_input:[] (* TODO *)
+      (*
       prev_marlin_proof
       ~public_input:[
         pairing_marlin_vk; (* This may need to be passed in using the hashing trick. It could be hashed together with prev_pairing_marlin_acc since they're both just passed through anyway.  *)
@@ -712,7 +979,7 @@ let dlog_main
         prev_dlog_marlin_acc;
 
         prev_deferred_fq_arithmetic;
-      ]
+      ] *)
   in
   assert (updated_pairing_marlin_macc = next_pairing_marlin_acc);
   assert (prev_deferred_fp_arithmetic = deferred_fp_arithmetic);
