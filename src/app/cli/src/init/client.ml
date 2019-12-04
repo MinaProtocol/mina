@@ -1401,6 +1401,63 @@ let generate_libp2p_keypair =
                    ~metadata:[("err", `String (Error.to_string_hum e))] ;
                  exit 20 )) ))
 
+let whitelist_ip_flag =
+  Command.Param.(
+    flag "ip-address"
+      ~doc:"IP An IPv4 or IPv6 address for the client whitelist"
+      (required Cli_lib.Arg_type.ip_address))
+
+let whitelist_add =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  Command.async ~summary:"Add an IP to the whitelist"
+    (Cli_lib.Background_daemon.rpc_init whitelist_ip_flag
+       ~f:(fun port whitelist_ip ->
+         let whitelist_ip_string = Unix.Inet_addr.to_string whitelist_ip in
+         match%map Client.dispatch Add_whitelist.rpc whitelist_ip port with
+         | Ok (Ok ()) ->
+             printf "Added %s to client whitelist" whitelist_ip_string
+         | Ok (Error e) ->
+             eprintf "Error adding %s to client whitelist: %s"
+               whitelist_ip_string (Error.to_string_hum e)
+         | Error e ->
+             eprintf "Unknown error doing daemon RPC: %s"
+               (Error.to_string_hum e) ))
+
+let whitelist_remove =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  Command.async ~summary:"Add an IP to the whitelist"
+    (Cli_lib.Background_daemon.rpc_init whitelist_ip_flag
+       ~f:(fun port whitelist_ip ->
+         let whitelist_ip_string = Unix.Inet_addr.to_string whitelist_ip in
+         match%map Client.dispatch Remove_whitelist.rpc whitelist_ip port with
+         | Ok (Ok ()) ->
+             printf "Removed %s to client whitelist" whitelist_ip_string
+         | Ok (Error e) ->
+             eprintf "Error removing %s from client whitelist: %s"
+               whitelist_ip_string (Error.to_string_hum e)
+         | Error e ->
+             eprintf "Unknown error doing daemon RPC: %s"
+               (Error.to_string_hum e) ))
+
+let whitelist_list =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Add an IP to the whitelist"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         match%map Client.dispatch Get_whitelist.rpc () port with
+         | Ok ips ->
+             printf
+               "The following IPs are permitted to connect to the daemon \
+                control port:\n" ;
+             List.iter ips ~f:(fun ip ->
+                 printf "%s\n" (Unix.Inet_addr.to_string ip) )
+         | Error e ->
+             eprintf "Unknown error doing daemon RPC: %s"
+               (Error.to_string_hum e) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1478,9 +1535,17 @@ let command =
     ; ("stop-daemon", stop_daemon)
     ; ("status", status) ]
 
+let client_whitelist_group =
+  Command.group ~summary:"Client whitelist management"
+    ~preserve_subcommand_order:()
+    [ ("add", whitelist_add)
+    ; ("list", whitelist_list)
+    ; ("remove", whitelist_remove) ]
+
 let advanced =
   Command.group ~summary:"Advanced client commands"
     [ ("get-nonce", get_nonce_cmd)
+    ; ("client-whitelist", client_whitelist_group)
     ; ("get-trust-status", get_trust_status)
     ; ("get-trust-status-all", get_trust_status_all)
     ; ("get-public-keys", get_public_keys)
