@@ -42,10 +42,10 @@ module Schema = struct
 
   type _ t =
     | Db_version : int t
-    | Transition : State_hash.Stable.V1.t -> External_transition.Stable.V1.t t
-    | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
-    | Root : Root_data.Minimal.Stable.V1.t t
-    | Best_tip : State_hash.Stable.V1.t t
+    | Transition : State_hash.t -> External_transition.t t
+    | Arcs : State_hash.t -> State_hash.t list t
+    | Root : Root_data.Minimal.t t
+    | Best_tip : State_hash.t t
     | Frontier_hash : Frontier_hash.t t
 
   let to_string : type a. a t -> string = function

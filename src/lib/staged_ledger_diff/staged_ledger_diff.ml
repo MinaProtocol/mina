@@ -82,7 +82,7 @@ module Pre_diff_two = struct
   type ('a, 'b) t = ('a, 'b) Stable.Latest.t =
     { completed_works: 'a list
     ; user_commands: 'b list
-    ; coinbase: Ft.Stable.V1.t At_most_two.Stable.V1.t }
+    ; coinbase: Ft.t At_most_two.t }
   [@@deriving sexp, to_yojson]
 end
 
@@ -101,7 +101,7 @@ module Pre_diff_one = struct
   type ('a, 'b) t = ('a, 'b) Stable.Latest.t =
     { completed_works: 'a list
     ; user_commands: 'b list
-    ; coinbase: Ft.Stable.V1.t At_most_one.Stable.V1.t }
+    ; coinbase: Ft.t At_most_one.t }
   [@@deriving sexp, to_yojson]
 end
 
@@ -169,9 +169,9 @@ module Stable = struct
 end]
 
 type t = Stable.Latest.t =
-  { diff: Diff.Stable.V1.t
-  ; creator: Public_key.Compressed.Stable.V1.t
-  ; state_body_hash: State_body_hash.Stable.V1.t }
+  { diff: Diff.t
+  ; creator: Public_key.Compressed.t
+  ; state_body_hash: State_body_hash.t }
 [@@deriving sexp, to_yojson, fields]
 
 module With_valid_signatures_and_proofs = struct
