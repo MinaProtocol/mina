@@ -1,10 +1,90 @@
+(* TODO:
+   Start writing pairing_main so I can get a sense of how the x_hat
+   commitment and challenge is going to work. *)
 open Core_kernel
+module B = Bigint
+
+module Evals = struct
+  open Vector
+  module Beta1 = Binable(struct
+      type t = z s s s s s s
+      let n = S (S (S (S (S (S Z)))))
+      let () = assert (6 = nat_to_int n)
+    end)
+
+  module Beta2 =Binable(struct
+      type t = z s s 
+      let n = S (S Z)
+      let () = assert (2 = nat_to_int n)
+    end)
+
+  module Beta3 =Binable(struct
+      type t = z s s s s s s s s s s s
+      let n = S( S( S( S( S( S( S( S( S( S( S Z))))))))))
+      let () = assert (11 = nat_to_int n)
+    end)
+end
+
+module Pairing_marlin_proof = struct
+  module Precomputation = struct
+    type ('pc, 'fp) t =
+      { y0 : 'fp
+      ; a0: 'fp
+      ; g0 : 'pc
+      ; x'_hat : 'pc (* This is the commitment to the LDE of the "real input" *)
+      }
+    [@@deriving fields, bin_io]
+  end
+
+  module Wire = struct
+    module Opening = struct
+      type ('proof, 'values) t = 
+        { values : 'values
+        ; proof : 'proof
+        }
+      [@@deriving fields, bin_io]
+    end
+
+    module Messages = struct
+      type ('pc, 'fp) t =
+        { w_hat : 'pc
+        ; s : 'pc
+        ; z_hat_A : 'pc
+        ; z_hat_B : 'pc
+        ; gh_1 : 'pc * 'pc
+        ; sigma_gh_2 : 'fp * ('pc * 'pc)
+        ; sigma_gh_3 : 'fp * ('pc * 'pc)
+        }
+      [@@deriving fields, bin_io]
+    end
+
+    module Openings
+    = struct
+      open Evals
+      type ('proof, 'fp) t =
+        { beta_1 : ('proof, 'fp Beta1.t) Opening.t
+        ; beta_2 : ('proof, 'fp Beta2.t) Opening.t
+        ; beta_3 : ('proof, 'fp Beta3.t) Opening.t
+        }
+      [@@deriving fields, bin_io]
+    end
+
+    type ('proof, 'pc, 'fp) t =
+      { messages : ('pc, 'fp) Messages.t
+      ; openings: ('proof, 'fp) Openings.t
+      }
+      [@@deriving fields, bin_io]
+  end
+end
+
 module Intf = struct
   module Group (Impl :  Snarky.Snark_intf.Run) = struct
     open Impl
     module type S = sig
-
       type t
+
+      module Constant : sig type t end
+      val typ : (t, Constant.t) Typ.t
 
       val (+) : t -> t -> t
 
@@ -19,18 +99,26 @@ module Intf = struct
   module Sponge (Impl : Snarky.Snark_intf.Run) = struct
     open Impl
 
-    module type S = sig
+    module type S =
+      Sponge.Intf.Sponge
+      with module Field := Field
+       and module State := Sponge.State
+       and type input := Field.t
+       and type digest := length:int -> Boolean.var list
+(*
+      type t
 
-    type t
+      val create : unit -> t
 
-    val create : unit -> t
+      val absorb_field : t -> Field.t -> unit
 
-    val absorb_field : t -> Field.t -> unit
+      val absorb_bits : t -> Boolean.var list -> unit
 
-    val absorb_bits : t -> Boolean.var list -> unit
+      val squeeze_field : t -> Field.t
 
-    val squeeze : t -> Field.t
-  end
+      val squeeze_bits : t -> length:int -> Boolean.var list
+    end
+*)
   end
 
   module Precomputation (G : sig type t end) = struct
@@ -42,11 +130,7 @@ module Intf = struct
   end
 end
 
-module type Dlog_main_inputs_intf = sig
-  module Impl : Snarky.Snark_intf.Run
-  open Impl
-
-  module G1 : Intf.Group(Impl).S
+  (*
 
   module G2 : Intf.Group(Impl).S
 
@@ -59,7 +143,39 @@ module type Dlog_main_inputs_intf = sig
 
   val batch_miller_loop :
        (Sgn_type.Sgn.t * G1_precomputation.t * G2_precomputation.t) list
-    -> GT.t
+    -> GT.t *)
+
+module type Dlog_main_inputs_intf = sig
+  module Impl : Snarky.Snark_intf.Run with type prover_state = unit
+
+  module Fp_params : sig
+    val p : Bigint.t
+
+    val size_in_bits : int
+  end
+
+  module G1 : Intf.Group(Impl).S
+
+  module Sponge : Intf.Sponge(Impl).S
+end
+
+module type Pairing_main_inputs_intf = sig
+  module Impl : Snarky.Snark_intf.Run with type prover_state = unit
+
+  module Fq_params : sig
+    val q : Bigint.t
+
+    val size_in_bits : int
+  end
+
+  module G1 : Intf.Group(Impl).S
+
+  module Sponge : Intf.Sponge(Impl).S
+end
+
+module Pairing_main (Inputs : Pairing_main_inputs_intf) = struct
+  open Inputs
+  open Impl
 end
 
 module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
@@ -68,7 +184,7 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
 
   type fq = Field.t
 
-  let n = failwith "TODO"
+  let n = 1 lsl 15
   let k = Int.ceil_log2 n
 
   let product m f =
@@ -102,18 +218,195 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
      Approach 3:
      compute it directly.
      This involves 2*n non-native multiplies
+
+     Approach 2':
+     Approach 2 does not make sense as stated. Here is how it would actually work.
+
+     The pairing-marlin proof will have
+
+     public_input: (I, g0, a0, y0)
+     absorb I.hash_state;
+     g <- receive commitment from prover { LDE(I) }
+     absorb g;
+     a <- squeeze ();
+     y := eval (LDE(I)) a;
+     assert (y0 == y);
+     assert (a0 == a);
+     assert (g0 == g)
+
+     You could also write it as
+     public_input: (I, g0, a0, y0)
+     absorb I.hash_state;
+     absorb g;
+     a <- squeeze ();
+     assert (a0 == a);
+     assert (y0 = eval (LDE(I)) a);
+
+     And then in the dlog_marlin main, when verifying this previous paring marlin proof,
+     you would check that
+     - g0 opens to y0 at a
+     - g0 opens to x_hat_beta_3 at beta_3
+
+     and pass off x_hat_beta_3 to the next guy
    *)
 
-  type polynomial = G1.t
+(* Approach 3
+
+   \ell_i(x) =
+    { 1 if x == i
+    ; 0 if x != i and x in I }
+
+   \ell_i(x)
+   = (v_I(x) / (x - i)) / \prod_{j in I, j != i} (i - j)
+   = (v_I(x) / (x - i)) * C_i
+
+   \sum_i a_i \ell_i(x)
+   = \sum_i a_i C_i v_I(x) / (x - i)
+   = v_I(x) \sum_i a_i C_i / (x - i)
+
+   = v_I(x) * (\sum_i a_i C_i \prod_{j != i} (x - j) ) / v_I(x)
+*)
+
+  (*
+
+     To compute for all i (C_i / (x - i)):
+
+     Guess a result d_i. Compute the formal product r_i := (x - i) d_i.
+
+     Let s_i be a random hash.
+
+     Compute 
+      Cs_i := \sum_i s_i C_i 
+      rs_i := \sum_i s_i r_i.
+
+     Expose these two as public inputs and check they are equal the next time.
+  *)
 
 
-  (* For us, q > p *)
-  type fp = Field.t
+  (* Montgomery *)
+
+  (* A = (a0 + T a1)
+     B = (b0 + T b1)
+
+     Say I = 2^e. (e will be like 5)
+
+     Say q is N+1 bits. So we need all limbs to stay less than 2^N
+
+     a0 b0 + T (a1 b0 + b0 a1) + T^2 a1 b1
+     a0 b0 + T (a1 b0 + b0 a1) + T^2 a1 b1
+
+     Say the weight of a limbed-number is the bitsize of its largest limb.
+
+     t_i := a_i C_i / (x - i)
+     if each limb of t_i < 2^k
+     then each limb of \sum_i t_I < I 2^k = 2^{k + e}
+
+     Need k+e <= N. So need k <= N - e.
+
+     Can arrange for
+     - weightB
+    *)
+
+  (*
+     t_i := a_i C_i / (x - i)
+
+     t_i must have term bound <= N - e.
+
+     Say a_i has term bound A, C_i has term bound C.
+     (a_i 
+  *)
+
+  (* Computing division.
+     A / B = C
+     A = C * B
+
+     Consider A = a0 + a1 T + a2 T^2.
+
+     Can check A = C * B as polynomials in T.
+
+     For inversion, how many representations does 1 have as a polynomial in T?
+
+     1 = a0 + a1 T + a2 T^2
+
+     So can compute
+
+  *)
+
+  (* Trick for inversion
+
+     T := 2^t
+
+     Let's say we need to compute 1 / b_i for i < n.
+
+     Pick representations r_i of 1 and then batch verify them.
+     How to batch verify? Pick random scalars s_i,
+
+     compute \sum_i s_i and \sum_i s_i r_i
+     and expose them as public inputs.
+
+     Ok so to compute 1/b.
+
+     Let b = b0 + b1 T
+     guess c = c0 + c1 T
+
+     defer the check of "b c is a representation of 1".
+     That is, compute O = b0 c0 + T (b0 c1 + b1 c0) + T^2 b1 c1.
+
+     Compute such O_i for all the inversions one must perform.
+     Select random scalars s_i = . Compute
+
+     s_sum := \sum_i s_i
+     os_sum := \sum_i O_i s_i
+     = (bi_0 ci_0 
+     
+  *)
+
+(* Might not even need this.
+   Suppose inverting b = b0 + 
+  *)
+
+  module PC = G1
+
+  module Fp = struct
+    module Unpacked = struct
+      type t = Boolean.var list
+      type constant = bool list
+
+      let typ : (t, constant) Typ.t =
+        let typ = Typ.list ~length:Fp_params.size_in_bits
+            Boolean.typ
+        in
+        let p_msb=
+          let test_bit x i = 
+            B.( (shift_right x i) land one = one )
+          in
+          List.init Fp_params.size_in_bits
+            ~f:(test_bit Fp_params.p)
+          |> List.rev
+        in
+        let check xs_lsb = 
+          let open Bitstring_lib.Bitstring in
+          Snarky.Checked.all_unit
+            [
+          typ.check xs_lsb;
+          make_checked (fun  () ->
+          Bitstring_checked.lt_value
+            (Msb_first.of_list (List.rev xs_lsb))
+            (Msb_first.of_list p_msb) 
+        |> Boolean.Assert.is_true
+            )
+        ]
+        in
+        { typ with check }
+    end
+    (* For us, q > p, so one Field.t = fq can represent an fp *)
+    module Packed = Field
+  end
 
   module Type = struct
     type _ t =
-      | PC : polynomial t
-      | Fp : fp t
+      | PC : G1.t t
+      | Fp : Fp.Unpacked.t t
       | (::) : 'a t * 'b t -> ('a * 'b) t
   end
 
@@ -123,94 +416,20 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
       match ty with
       | PC ->
         List.iter ~f:absorb_field (G1.to_field_elements t)
-      | Fp -> absorb_field t
+      | Fp -> absorb_field (Fp.Packed.project t)
       | (ty1 :: ty2) ->
         let t1, t2 = t in
         absorb sponge ty1 t1;
         absorb sponge ty2 t2
 
-  module Opening = struct
-      type t = 
-        { value : fp
-        ; proof : G1.t
-        }
-      [@@deriving fields]
+  module Opening_proof = G1
 
+  module Opening = struct
+    type 'n t = (Opening_proof.t, (Fp.Unpacked.t, 'n) Vector.t  ) Pairing_marlin_proof.Wire.Opening.t
   end
 
-
   module Marlin_proof = struct
-    module Messages = struct
-      type t =
-      { w_hat : polynomial
-      ; s : polynomial
-      ; z_hat_A : polynomial
-      ; z_hat_B : polynomial
-      ; gh_1 : polynomial * polynomial
-      ; sigma_gh_2 : fp * (polynomial * polynomial)
-      ; sigma_gh_3 : fp * (polynomial * polynomial)
-      }
-      [@@deriving fields]
-    end
-
-    module Openings = struct
-      type 'n openings = (Opening.t, 'n) Vector.t
-
-      (*
-      module Polynomials = struct
-        type t =
-          | H_1 
-          | G_1 
-          | Z_A 
-          | Z_B 
-          | W_hat 
-          | S  
-        [@@deriving enum]
-      end
-
-      let _ = Polynomials.
-
-      type 'a beta1 =
-        { h_1 : 'a
-        ; g_1 : 'a
-        ; z_A : 'a
-        ; z_B : 'a
-        ; w_hat : 'a
-        ; s  : 'a
-        }
-      [@@deriving fields]
-
-      type 'a beta2 =
-        { h_2     : 'a
-        ; g_2 : 'a
-        }
-      [@@deriving fields]
-
-      type 'a beta3 =
-        { h_3     : 'a
-        ; row_A   : 'a
-        ; row_B   : 'a
-        ; row_C   : 'a
-        ; col_A   : 'a
-        ; col_B   : 'a
-        ; col_C   : 'a
-        ; value_A : 'a
-        ; value_B : 'a
-        ; value_C : 'a
-        }
-      [@@deriving fields] *)
-
-      type ('n1, 'n2, 'n3) t =
-        { beta_1 : 'n1 openings
-        ; beta_2 : 'n2 openings
-        ; beta_3 : 'n3 openings
-        }
-    end
-
-    type ('n1, 'n2, 'n3) t =
-      { messages : Messages.t
-      ; openings: ('n1, 'n2, 'n3) Openings.t
-      }
+    type t = (Opening_proof.t, PC.t, Fp.Unpacked.t) Pairing_marlin_proof.Wire.t
   end
 
   type 'a abc = { a : 'a; b : 'a; c : 'a }
@@ -221,22 +440,7 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
     List.fold_left (Vector.to_list ps) ~init:p0
       ~f:(fun acc p -> G1.(p + scale acc xi))
 
-(*
-
-  let combined_commitment ~xi ~sponge openings polys =
-    let values = Vector.map openings ~f:Opening.value in
-    let (o0, p0) :: ops = Vector.(zip openings polys) in
-    let poly =
-      List.fold_left (Vector.to_list polys) ~init:p0
-        ~f:(fun acc p -> G1.(p + scale acc xi))
-    in
-
-    let compute_v = `Compute_v values in
-
-    o0.proof
-*)
-
-(* Gonna do 
+(* TODO: Gonna do 
    "(acc, new) -> r * acc + new" instead of 
    "(acc, new) -> acc + r * new" *)
 
@@ -274,50 +478,107 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
      - G1 scalar multiplciation: (z_i_r_i) π_i
   *)
   let accumuluate_pairing_state
-    ~defer
       r_i
-      ((rf_acc, rpi_acc, zrpi_acc), (rv_acc, zr_acc))
-      (pi_i, f_i, z_i, v_i)
+      zr_i
+      pi_i f_i
+      (rf_acc, rpi_acc, zrpi_acc)
     =
     let open G1 in
     let ( * ) s p = scale p s in
-    let zr_i = defer (`Mul (z_i, r_i)) in
     ( rf_acc + r_i * f_i
     , rpi_acc + r_i * pi_i
     , zrpi_acc + zr_i * pi_i
-    )
+    ) 
 
-  let challenge_length = 256
+  let pack_fp = Field.project
 
-(*
-  type pairing_acc_deferred_computation =
-    { compute_v : fp list
-    ; check_zr : (fp * 
+  (* About 10000 bits altogether *)
+  module Deferred_values = struct
+    type ('fp, 'values) for_pairing_acc =
+      { zr : 'fp
+      ; z : 'fp (* Evaluation point *) (* 128 bits *)
+      ; v :  'values (* Evaluation values *)
+      }
+
+    type ('fp ) t =
+      { xi : 'fp (* 128 bits *)
+      ; beta_1 : ('fp, 'fp Evals.Beta1.t) for_pairing_acc
+      ; beta_2 : ('fp, 'fp Evals.Beta2.t) for_pairing_acc
+      ; beta_3 : ('fp, 'fp Evals.Beta3.t) for_pairing_acc
+      ; sigma_2 : 'fp
+      ; sigma_3 : 'fp
+      ; alpha : 'fp (* 128 bits *)
+      ; eta_A : 'fp (* 128 bits *)
+      ; eta_B : 'fp (* 128 bits *)
+      ; eta_C : 'fp (* 128 bits *)
+      }
+  end
+
+  module Statement = struct
+    type ('fp, 'digest, 's) t =
+      { deferred_values : 'fp Deferred_values.t
+      ; sponge_state : 'digest
+        (* All this could be a hash which we unhash  *)
+      ; app_state: 's
+      ; pairing_marlin_index : PC.t abc matrix_evals
+      ; g_old : 'fp * 'fp
+
+      ; x_old : Field.t array
+      ; b_u_old : Field.t
+      }
+  end
+
+  let accumulate_and_defer
+      ~(defer : [ `Mul of Fp.Unpacked.t * Fp.Unpacked.t ] -> Boolean.var list)
+      r_i f_i z_i ({values; proof} : _ Pairing_marlin_proof.Wire.Opening.t) acc =
+    let zr_i = defer (`Mul (z_i, r_i)) in
+    let acc = accumuluate_pairing_state r_i zr_i proof f_i acc in
+    acc,
+    { Deferred_values.zr= zr_i
+    ; z= z_i
+    ; v= values
     }
 
+  type scalar = Boolean.var list
 
-*)
-  type deferred_computations =
-    { xi : fp
-    ; beta_1 : pairing_acc_deferred_computation
-    }
+  module Requests = struct
+    open Snarky.Request
+
+    type _ t +=
+      | Fp_mul : bool list * bool list -> bool list Snarky.Request.t
+      | Mul_scalars : bool list * bool list -> bool list Snarky.Request.t
+
+    module Precomputation = struct
+      type _ t +=
+        | X'_hat : G1.Constant.t t
+        | G0 : (field * field) t
+        | Y0 : Fp.Unpacked.constant t
+        | A0 : Fp.Unpacked.constant t
+    end
+  end
+
+  module Challenge = struct
+    let length = 256
+
+    type t = Boolean.var list
+
+    let typ = Typ.list ~length Boolean.typ
+  end
 
   let incrementally_verify_pairings
-    m
-      ~sponge ~verification_key ~public_input ~proof:{ Marlin_proof.messages; openings} =
+    ~verification_key:m
+    ~sponge ~public_input
+    ~pairing_acc:pacc
+    ~proof:({ messages; openings=ops } : Marlin_proof.t) =
     let receive ty f =
       let x = f messages in
       absorb sponge ty x ;
       x
     in
-    let sample () = Sponge.squeeze sponge in
-    let sample_fp_challenge () =
-    List.take  
-      (Field.unpack ~length:Field.size_in_bits
-         (sample ()))
-      256
-    in
-    let open Marlin_proof.Messages in
+    let sample () = Sponge.squeeze sponge ~length:Challenge.length in
+    let open Pairing_marlin_proof.Wire.Messages in
+    (* No need to absorb the public input into the sponge as we've already
+       absorbed x'_hat, a0, and y0 *)
     let w_hat = receive PC w_hat in
     let s = receive PC s in
     let z_hat_A = receive PC z_hat_A in
@@ -332,20 +593,39 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
     let beta_2 = sample () in
     let (sigma_3, (g_3, h_3)) = receive (Fp :: PC :: PC) sigma_gh_3 in
     let beta_3 = sample () in
-    let open_ { Opening.proof; value } poly =
-      failwith "TODO"
+    let x_hat_beta_3 = ()
+      (*
+      check_g0_on_a0_equals_y0;
+      let x'_hat_beta3 = get_g0_eval_on_beta_3 and check =  correctness in
+      let res =
+        defer arithmetic of x'_hat_beta_3
+                            + Lagrange_{input_size + 1} g0_x
+                            + Lagrange_{input_size + 2} g0_y
+                            + Lagrange_{input_size + 3} a0
+                            + Lagrange_{input_size + 4} y0
+      in
+      res
+      (* 
+      *)
+      () *)
     in
     (* We can use the same random scalar xi for all of these opening proofs. *)
-    let xi = sample_fp_challenge () in
+    let xi = sample () in
+    let open Vector in
+    let combined_commitment (type n)
+        (_ : n s Opening.t) (ps : (_, n s) Vector.t) =
+      combined_commitment ~xi ps
+    in
     let f_1 =
-      combined_commitment ~xi
-        [ g_1; h_1; z_hat_A; z_hat_B; w_hat; s ] in
+      combined_commitment ops.beta_1
+        [ g_1; h_1; z_hat_A; z_hat_B; w_hat; s ]
+    in
     let f_2 =
-      combined_commitment ~xi
+      combined_commitment ops.beta_2
         [ g_2; h_2 ]
     in
     let f_3 =
-      combined_commitment ~xi
+      combined_commitment ops.beta_3
         [ g_3
         ; h_3
         ; m.row.a   
@@ -358,35 +638,45 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
         ; m.value.b 
         ; m.value.c  ]
     in
-    
-    let alpha = sample_fp_challenge () in
-    G1.scale
-
-    (*
-    let open Arithmetic_expression in
-    let a ~eta ~v_H_beta_1 ~v_H_beta_2 {Index.row; col; value} =
-      sum [A; B; C] (fun m ->
-          eta m
-          * !v_H_beta_2 * !v_H_beta_1
-          * ! (value m)
-          * product
-              (all_but m [A; B; C])
-              (fun n -> (!beta_2 - !(row n) )
-                        * (!beta_1 * !(col n)) ))
+    let r = sample () in
+    let defer (`Mul(x, y)) =
+      exists Fp.Unpacked.typ ~request:As_prover.(fun () ->
+          Requests.Fp_mul (read Fp.Unpacked.typ x, read Fp.Unpacked.typ y))
     in
-    let b { Index.row; col; _ } =
-      product [A; B; C] (fun m ->
-          (!beta_2 - !(row m)) * (!beta_1 - ! (col m)))
-    in  *)
+    let r2 = exists Fp.Unpacked.typ ~request:As_prover.(fun () ->
+        let r = read Fp.Unpacked.typ r in
+        Requests.Mul_scalars (r, r))
+    in
+    let r3 = exists Fp.Unpacked.typ ~request:As_prover.(fun () ->
+        let r2 = read Fp.Unpacked.typ r2 in
+        let r = read Fp.Unpacked.typ r in
+        Requests.Mul_scalars (r, r2))
+    in
+    let accum x =  accumulate_and_defer ~defer x in
+    let pacc, beta_1 = accum r f_1 beta_1 ops.beta_1 pacc in
+    let pacc, beta_2 = accum r2 f_2 beta_2 ops.beta_2 pacc in
+    let pacc, beta_3 = accum r3 f_3 beta_3 ops.beta_3 pacc in
+    pacc,
+    { Deferred_values.xi
+    ; beta_1
+    ; beta_2
+    ; beta_3
+    ; sigma_2
+    ; sigma_3
+    ; alpha
+    ; eta_A
+    ; eta_B
+    ; eta_C
+    }
 
 (* Inside here we have F_q arithmetic, so we can incrementally check
    the polynomial commitments from the pairing-based Marlin *)
 let dlog_main
-    app_state (* F_p based (passed through) *)
 
     pairing_marlin_vk (* F_q based *)
     next_pairing_marlin_acc (* F_q based *)
 
+    app_state (* F_p based (passed through) *)
     dlog_marlin_vk (* F_p based (passed through) *)
     g_old (* F_p based (passed through) *)
 
