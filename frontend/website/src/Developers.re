@@ -162,7 +162,7 @@ let make = () => {
           text={React.string(
             "Sign up for the Coda SDK waitlist to integrate digital payments into your app.",
           )}
-          href="https://docs.google.com/forms/d/e/1FAIpQLScQRGW0-xGattPmr5oT-yRb9aCkPE6yIKXSfw1LRmNx1oh6AA/viewform"
+          href="https://docs.google.com/forms/d/e/1FAIpQLSc1obbB_0ON8Ptfhc56jZ_NfwzxhmNtMuVuLNDqoO8Y46eWiw/viewform?usp=sf_link"
         />
       </div>
     </div>
