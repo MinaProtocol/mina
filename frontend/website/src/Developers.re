@@ -19,7 +19,7 @@ module Styles = {
   let heroImage =
     style([
       display(`none),
-      media("(min-width: 60rem)", [display(`flex)]),
+      media("(min-width: 60rem)", [display(`flex), marginLeft(`rem(1.))]),
     ]);
 
   let header =
@@ -47,7 +47,6 @@ module Styles = {
       style([
         maxWidth(`px(500)),
         marginLeft(`zero),
-        media("(min-width: 60rem)", [marginLeft(`rem(2.1875))]),
         textAlign(`left),
         color(Style.Colors.midnight),
       ]),
@@ -58,8 +57,13 @@ module Styles = {
   let heroCopy =
     merge([
       Style.Body.basic,
-      style([marginTop(`rem(3.)), marginBottom(`rem(3.375))]),
     ]);
+    
+  let heroH3 = 
+    merge([
+      Style.H3.basic,
+      style([textAlign(`left), fontWeight(`normal),color(Style.Colors.midnight)]),
+    ])
 
   let ctaButton =
     merge([
@@ -115,11 +119,16 @@ let make = () => {
         <h1 className=Styles.heroHeading>
           {React.string("Coda Developer Portal")}
         </h1>
+        <Spacer height=1./>
         <p className=Styles.heroCopy>
           {React.string(
-             "We're an open-source community of engineers, cryptographers, researchers, and dreamers. Help us build the first succinct blockchain.",
+            "Coda makes it dead simple for node operators, developers, and entrepreneurs to use cryptocurrencies. Deploy nodes, write code, and access your funds on full nodes that can live anywhere -- in your phone, or even in a web browser."
            )}
         </p>
+        <p className=Styles.heroCopy>
+        {React.string("Coda is 100% open-source, built for and by community members like yourself. Find resources below on how to join the network as a node operator, begin contributing code, and stay up to date on developer tooling and grants.")}
+        </p> 
+         <Spacer height=1./>
         <a href="/docs/getting-started/" className=Styles.ctaButton>
           {React.string({js| Get Started →|js})}
         </a>
