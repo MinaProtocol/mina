@@ -453,7 +453,7 @@ module Root_diff = struct
   end
 
   type t = Stable.Latest.t =
-    {user_commands: User_command.Stable.V1.t list; root_length: int}
+    {user_commands: User_command.t list; root_length: int}
 end
 
 (* TODO: this is a bad pattern for two reasons:
@@ -900,12 +900,19 @@ let create (config : Config.t) =
                 |> Keypair.And_compressed_pk.Set.of_list )
               config.initial_propose_keypairs
           in
+          Option.iter config.archive_process_port
+            ~f:(fun archive_process_port ->
+              Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+                "Communicating with the archive process at port %i"
+                archive_process_port ;
+              Archive_client.run ~logger:config.logger ~archive_process_port
+                ~frontier_broadcast_pipe:frontier_broadcast_pipe_r ) ;
           let subscriptions =
             Coda_subscriptions.create ~logger:config.logger
               ~time_controller:config.time_controller ~new_blocks ~wallets
               ~external_transition_database:config.external_transition_database
               ~transition_frontier:frontier_broadcast_pipe_r
-              ~is_storing_all:config.is_archive_node
+              ~is_storing_all:config.is_archive_rocksdb
           in
           let open Coda_incremental.Status in
           let transition_frontier_incr =

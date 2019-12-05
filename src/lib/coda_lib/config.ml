@@ -35,5 +35,6 @@ type t =
   ; external_transition_database: External_transition_database.t
   ; snark_work_fee: Currency.Fee.t
   ; consensus_local_state: Consensus.Data.Local_state.t
-  ; is_archive_node: bool [@default false] }
+  ; is_archive_rocksdb: bool [@default false]
+  ; archive_process_port: int option [@default None] }
 [@@deriving make]

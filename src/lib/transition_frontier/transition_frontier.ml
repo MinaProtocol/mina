@@ -165,7 +165,7 @@ let rec load_with_max_length :
     let%bind () = Persistent_root.reset_to_genesis_exn persistent_root in
     continue
       (Persistent_frontier.create_instance_exn persistent_frontier)
-      ~ignore_consensus_local_state:true
+      ~ignore_consensus_local_state:false
   in
   match
     Persistent_frontier.Instance.check_database persistent_frontier_instance
@@ -291,8 +291,8 @@ let add_breadcrumb_exn t breadcrumb =
   sync_result
   |> Result.map_error ~f:(fun `Sync_must_be_running ->
          Failure
-           "cannot add breadcrumb because persistent frontier sync job is not \
-            running -- this indicates that transition frontier initialization \
+           "Cannot add breadcrumb because persistent frontier sync job is not \
+            running, which indicates that transition frontier initialization \
             has not been performed correctly" )
   |> Result.ok_exn ;
   Extensions.notify t.extensions ~frontier:t.full_frontier ~diffs
