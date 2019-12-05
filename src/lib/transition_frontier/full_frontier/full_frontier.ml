@@ -286,6 +286,7 @@ let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
    * noop in the case of no ledger proof emitted between `m0` and `m1`), we must perform
    * the following operations on masks in order:
    *
+   *     0) notify consensus that root transitioned
    *     1) unattach and destroy all the garbage (to avoid unecessary trickling of
    *        invalidations from `m0` during the next step)
    *     2) commit `m1` into `m0`, making `m0` into `m1'` (same merkle root as `m1`), and
@@ -298,6 +299,14 @@ let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
    *)
   let old_root_node = Hashtbl.find_exn t.table t.root in
   let new_root_node = Hashtbl.find_exn t.table new_root_hash in
+  (* STEP 0 *)
+  if not ignore_consensus_local_state then
+    O1trace.measure "calling consensus hook frontier_root_transition"
+      (fun () ->
+        Consensus.Hooks.frontier_root_transition
+          (Breadcrumb.consensus_state old_root_node.breadcrumb)
+          (Breadcrumb.consensus_state new_root_node.breadcrumb)
+          ~local_state:t.consensus_local_state ~snarked_ledger:t.root_ledger ) ;
   let new_staged_ledger =
     let m0 = Breadcrumb.mask old_root_node.breadcrumb in
     let m1 = Breadcrumb.mask new_root_node.breadcrumb in
@@ -366,15 +375,7 @@ let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
   (* update the new root breadcrumb in the frontier *)
   Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
   (* rewrite the root pointer to the new root hash *)
-  t.root <- new_root_hash ;
-  (* notify consensus that the root transitioned *)
-  if not ignore_consensus_local_state then
-    O1trace.measure "calling consensus hook frontier_root_transition"
-      (fun () ->
-        Consensus.Hooks.frontier_root_transition
-          (Breadcrumb.consensus_state old_root_node.breadcrumb)
-          (Breadcrumb.consensus_state new_root_node.breadcrumb)
-          ~local_state:t.consensus_local_state ~snarked_ledger:t.root_ledger )
+  t.root <- new_root_hash
 
 (* calculates the diffs which need to be applied in order to add a breadcrumb to the frontier *)
 let calculate_diffs t breadcrumb =
