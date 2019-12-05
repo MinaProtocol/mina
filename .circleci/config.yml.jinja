@@ -264,11 +264,7 @@ jobs:
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
-        {%- if profile in medium_curve_profiles %}
         resource_class: xlarge
-        {%- else %}
-        resource_class: large
-        {%- endif %}
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
@@ -291,9 +287,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: {{profile}}
-                  {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
-                  {%- endif %}
             - run:
                   name: Upload generated PV keys
                   command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
@@ -302,17 +296,13 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
                   environment:
                     DUNE_PROFILE: {{profile}}
-                  {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
-                  {%- endif %}
             - run:
                   name: Build deb package with PV keys and PV key tar
                   command: ./scripts/skip_if_only_frontend.sh make deb
                   environment:
                     DUNE_PROFILE: {{profile}}
-                  {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
-                  {%- endif %}
             - run:
                   name: Store genesis public/private keypairs
                   command: ./scripts/skip_if_only_frontend.sh make genesiskeys
@@ -323,23 +313,27 @@ jobs:
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+            {%- if profile in medium_curve_profiles %}
             - setup_remote_docker
             - run:
                   name: Build and Upload Docker
                   command: |
-                    source /tmp/DOCKER_DEPLOY_ENV
-                    echo "Publishing Docker"
-                    echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
-                    set -x
-                    if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
+                    # Check if we should deploy this build
+                    FILE=/tmp/DOCKER_DEPLOY_ENV
+                    if test -f "$FILE"; then
+                        source $FILE
+                        echo "Publishing Docker"
+                        echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
+                        set -x
+                        if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
 
-                        echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                        ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
-                        -s coda-daemon \
-                        -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                        --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                              echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+                              ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
+                              -s coda-daemon \
+                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                        fi
                     fi
-            {%- if profile in medium_curve_profiles %}
             - store_artifacts:
                   path: /tmp/artifacts
             {%- endif %}

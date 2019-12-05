@@ -1,8 +1,6 @@
 open Core
 open Snark_params.Tick
 open Snark_bits
-open Fold_lib
-open Tuple_lib
 
 type uint64 = Unsigned.uint64
 
@@ -19,9 +17,7 @@ module type Basic = sig
 
   include Bits_intf.Convertible_bits with type t := t
 
-  val fold : t -> bool Triple.t Fold.t
-
-  val length_in_triples : int
+  val to_input : t -> (_, bool) Random_oracle.Input.t
 
   val zero : t
 
@@ -49,7 +45,7 @@ module type Basic = sig
 
   val var_to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
 
-  val var_to_triples : var -> Boolean.var Triple.t list
+  val var_to_input : var -> (_, Boolean.var) Random_oracle.Input.t
 
   val equal_var : var -> var -> (Boolean.var, _) Checked.t
 end
@@ -118,8 +114,6 @@ module type Signed_intf = sig
 
   val gen : t Quickcheck.Generator.t
 
-  val length_in_triples : int
-
   val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed.t
 
   val sgn : t -> Sgn.t
@@ -132,9 +126,7 @@ module type Signed_intf = sig
 
   val zero : t
 
-  val fold : t -> bool Triple.t Fold.t
-
-  val to_triples : t -> bool Triple.t list
+  val to_input : t -> (_, bool) Random_oracle.Input.t
 
   val add : t -> t -> t option
 
@@ -151,7 +143,7 @@ module type Signed_intf = sig
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-    val to_triples : var -> Boolean.var Triple.t list
+    val to_input : var -> (_, Boolean.var) Random_oracle.Input.t
 
     val add : var -> var -> (var, _) Checked.t
 

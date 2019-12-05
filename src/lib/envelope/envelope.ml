@@ -1,7 +1,7 @@
-open Core
+open Core_kernel
 
 module Sender = struct
-  type t = Local | Remote of Unix.Inet_addr.Stable.V1.t
+  type t = Local | Remote of Core.Unix.Inet_addr.Stable.V1.t
   [@@deriving sexp, compare]
 
   let equal sender1 sender2 = Int.equal (compare sender1 sender2) 0
@@ -11,14 +11,14 @@ module Sender = struct
     | Local ->
         `String "Local"
     | Remote inet_addr ->
-        `Assoc [("Remote", `String (Unix.Inet_addr.to_string inet_addr))]
+        `Assoc [("Remote", `String (Core.Unix.Inet_addr.to_string inet_addr))]
 
   let of_yojson (json : Yojson.Safe.json) : (t, string) Result.t =
     match json with
     | `String "Local" ->
         Ok Local
     | `Assoc [("Remote", `String addr)] ->
-        Ok (Remote (Unix.Inet_addr.of_string addr))
+        Ok (Remote (Core.Unix.Inet_addr.of_string addr))
     | _ ->
         Error "Expected JSON representing envelope sender"
 end

@@ -56,8 +56,7 @@ module Duplicate_proposal_detector = struct
   module Proposals = struct
     module T = struct
       (* order of fields significant, compare by epoch, then slot, then proposer *)
-      type t =
-        {epoch: int; slot: int; proposer: Public_key.Compressed.Stable.V1.t}
+      type t = {epoch: int; slot: int; proposer: Public_key.Compressed.t}
       [@@deriving sexp, compare]
     end
 
@@ -172,9 +171,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                >>= Fn.compose Deferred.return validate_delta_transition_chain)
            with
            | Ok verified_transition ->
-               ( `Transition
-                   (Envelope.Incoming.wrap ~data:verified_transition ~sender)
-               , `Time_received time_received )
+               Envelope.Incoming.wrap ~data:verified_transition ~sender
                |> Writer.write valid_transition_writer ;
                return ()
            | Error error ->
