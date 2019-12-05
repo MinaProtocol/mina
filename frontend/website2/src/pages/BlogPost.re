@@ -17,11 +17,22 @@ module Style = {
   let wrapper =
     style([maxWidth(`rem(43.)), marginLeft(`auto), marginRight(`auto)]);
 
+  let mediaMedium = media("screen and (min-width:30em)");
+  let mediaLarge = media("screen and (min-width:60em)");
+
+  let notLarge = selector(".not-large");
+  let notMobile = selector(".not-mobile");
+  let onlyLarge = selector(".large-only");
+  let onlyMobile = selector(".mobile-only");
+
   let blogContent =
     style([
+      position(`relative),
       selector("img", [width(`percent(100.))]),
       color(Theme.Colors.saville),
       Theme.Typeface.ibmplexsans,
+      /* selector(".side-footnote-container", [height(`zero)]), */
+      selector(".footnotes", [mediaLarge([display(`none)])]),
       selector(
         ".side-footnote",
         [
@@ -31,13 +42,28 @@ module Style = {
           paddingLeft(`rem(1.)),
           marginTop(`rem(-0.5)),
           fontSize(`rem(0.75)),
+          display(`none),
+          mediaLarge([display(`block)]),
         ],
       ),
+      // Visibility (based on screen width)
+      notLarge([display(`block)]),
+      onlyMobile([display(`block)]),
+      notMobile([display(`none)]),
+      onlyLarge([display(`none)]),
+      mediaMedium([
+        selector(".not-large, .not-mobile", [display(`block)]),
+        selector(".mobile-only, .large-only", [display(`none)]),
+      ]),
+      mediaLarge([
+        selector(".large-only, .not-mobile", [display(`block)]),
+        selector(".mobile-only, .not-large", [display(`none)]),
+      ]),
     ]);
 };
 
 [@react.component]
-let make = (~post: option(ContentType.post)) => {
+let make = (~post: option(ContentType.Post.t)) => {
   switch (post) {
   | None =>
     <Page>
@@ -46,7 +72,9 @@ let make = (~post: option(ContentType.post)) => {
         <a> {React.string("Check out the rest of our posts instead")} </a>
       </Next.Link>
     </Page>
-  | Some({ContentType.title, subtitle, author, date, text: content}) =>
+  | Some(
+      ({title, subtitle, author, date, text: content}: ContentType.Post.t),
+    ) =>
     <Page>
       <Next.Head> Markdown.katexStylesheet </Next.Head>
       <div className=Style.wrapper>
@@ -58,28 +86,38 @@ let make = (~post: option(ContentType.post)) => {
         <div className=Style.author> {React.string("by " ++ author)} </div>
         <div className=Style.date> {React.string(date)} </div>
         <Spacer height={`rem(2.0)} />
-        <span className=Style.blogContent> <Markdown content /> </span>
+        <div className=Style.blogContent> <Markdown content /> </div>
       </div>
     </Page>
   };
 };
 
-let postCache: Js.Dict.t(option(ContentType.post)) = Js.Dict.empty();
+let cache: Js.Dict.t(option(ContentType.Post.t)) = Js.Dict.empty();
 
 Next.injectGetInitialProps(make, ({Next.query}) => {
   switch (Js.Dict.get(query, "slug")) {
   | Some(slug) =>
-    Contentful.get(
-      ~cache=postCache,
-      ~key=slug,
-      ~query={
-        "include": 0,
-        "content_type": ContentType.post,
-        "fields.slug": slug,
-      },
-      ~fn=p =>
-      {"post": p}
-    )
+    switch (Js.Dict.get(cache, slug)) {
+    | Some(post) => Js.Promise.resolve({"post": post})
+    | None =>
+      Contentful.getEntries(
+        Lazy.force(Contentful.client),
+        {
+          "include": 0,
+          "content_type": ContentType.Post.id,
+          "fields.slug": slug,
+        },
+      )
+      |> Js.Promise.then_((entries: ContentType.Post.entries) => {
+           let post =
+             switch (entries.items) {
+             | [|item|] => Some(item.fields)
+             | _ => None
+             };
+           Js.Dict.set(cache, slug, post);
+           Js.Promise.resolve({"post": post});
+         })
+    }
   | None => Js.Promise.resolve({"post": None})
   }
 });

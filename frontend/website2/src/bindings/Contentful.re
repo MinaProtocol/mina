@@ -25,26 +25,5 @@ let client =
 
 [@bs.send]
 external getEntries:
-  (client, Js.t('args)) => Js.Promise.t(ContentType.entries('entry)) =
+  (client, Js.t('args)) => Js.Promise.t(ContentType.System.entries('entry)) =
   "getEntries";
-
-// Only to be used in getInitialProps
-let get = (~cache, ~key, ~query, ~fn) => {
-  (
-    switch (Js.Dict.get(cache, key)) {
-    | Some(post) => Js.Promise.resolve(post)
-    | None =>
-      getEntries(Lazy.force(client), query)
-      |> Js.Promise.then_((entries: ContentType.entries('a)) => {
-           let post =
-             switch (entries.items) {
-             | [|item|] => Some(item.fields)
-             | _ => None
-             };
-           Js.Dict.set(cache, key, post);
-           Js.Promise.resolve(post);
-         })
-    }
-  )
-  |> Js.Promise.then_(v => Js.Promise.resolve(fn(v)));
-};

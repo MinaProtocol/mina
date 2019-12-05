@@ -26,7 +26,10 @@ let make = (~content) => {
     ->Unified.use(remarkRehype, {"allowDangerousHTML": true})
     ->Unified.use(rehypeRaw, ())
     ->Unified.use(katex, ())
-    ->Unified.use(rehypeReact, {"createElement": createElement})
+    ->Unified.use(
+        rehypeReact,
+        {"createElement": createElement, "Fragment": ReasonReact.fragment},
+      )
     ->Unified.processSync(~content);
 
   result.contents;

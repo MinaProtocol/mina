@@ -8,8 +8,7 @@
     "clean": "bsb -clean-world",
     "build": "bsb -make-world && next build",
     "export": "yarn build && next export",
-    "start": "next start",
-    "download": "CONTENTFUL_SPACE='37811siqosrn' CONTENTFUL_TOKEN='gONaARVCc0G5FLIkoJ2m4qi9yTpT8oi7u-C6VYxQ6UQ' node download.js"
+    "start": "next start"
   },
   "license": "ISC",
   "dependencies": {
@@ -32,7 +31,6 @@
     "remark-math": "^2.0.0",
     "remark-parse": "^7.0.2",
     "remark-rehype": "^5.0.0",
-    "rimraf": "^3.0.0",
     "unified": "^8.4.2"
   },
   "devDependencies": {

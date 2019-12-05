@@ -50,7 +50,7 @@ let make = (~posts) => {
     <ul className=Style.postList>
       {React.array(
          Array.map(
-           (post: ContentType.post) => {
+           (post: ContentType.Post.t) => {
              <li key={post.slug} className=Style.postListItem>
                <Next.Link
                  href="/blog/[slug]" _as={"/blog/" ++ post.slug} passHref=true>
@@ -77,14 +77,11 @@ let make = (~posts) => {
 Next.injectGetInitialProps(make, _ => {
   Contentful.getEntries(
     Lazy.force(Contentful.client),
-    {"include": 0, "content_type": ContentType.post},
+    {"include": 0, "content_type": ContentType.Post.id},
   )
-  |> Js.Promise.then_((entries: ContentType.entries(ContentType.post)) => {
+  |> Js.Promise.then_((entries: ContentType.Post.entries) => {
        let posts =
-         Array.map(
-           (e: ContentType.entry(ContentType.post)) => e.fields,
-           entries.items,
-         );
+         Array.map((e: ContentType.Post.entry) => e.fields, entries.items);
        Js.Promise.resolve({"posts": posts});
      })
 });

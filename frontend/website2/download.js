@@ -1,3 +1,5 @@
+console.error("This script is deprecated");
+
 const fs = require('fs').promises;
 const path = require('path');
 const { promisify } = require('util');

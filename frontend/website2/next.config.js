@@ -11,22 +11,34 @@ const TOKEN = process.env.CONTENTFUL_TOKEN || 'gONaARVCc0G5FLIkoJ2m4qi9yTpT8oi7u
 const IMAGE_TOKEN = process.env.CONTENTFUL_IMAGE_TOKEN || "3B4LS4VD0c4RCsUl1rxmmX/d8ba4bd5295e3b65569cbda1329e90a6";
 
 const blogType = 'test';
+const docsPageType = 'docsPage2';
 const client = createClient({accessToken: TOKEN, space: SPACE});
 
 module.exports = withTM(withBundleAnalyzer({
   async exportPathMap() {
     let blogPosts = await client.getEntries({ include: 0, content_type: blogType});
+    let docsPages = await client.getEntries({ include: 0, content_type: docsPageType});
 
     let pages = {
       '/': { page: '/' },
       '/about': { page: '/about' },
       '/blog': { page: '/blog' },
       '/blog/': { page: '/blog' },
+      '/docs': { page: '/docs/[slug]' },
+      '/docs/': { page: '/docs/[slug]' },
     };
 
     blogPosts.items.forEach(
       ({fields: {slug}}) => {
         pages['/blog/' + slug] = {page: '/blog/[slug]', query: {slug: slug}}
+        // Add .html for backwards compatibility
+        pages['/blog/' + slug + ".html"] = {page: '/blog/[slug]', query: {slug: slug}}
+      });
+
+    docsPages.items.forEach(
+      ({fields: {slug}}) => {
+        slug = slug.replace(/\/index$/, '');
+        pages['/docs/' + slug] = {page: '/docs/[slug]', query: {slug: slug}}
       });
 
     return pages;

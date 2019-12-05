@@ -24,6 +24,19 @@ module Router = {
 
   [@bs.module "next/router"] [@bs.val]
   external useRouter: unit => t('a) = "useRouter";
+
+  [@bs.module "next/router"] [@bs.val]
+  external push:
+    (
+      {
+        .
+        "pathname": string,
+        "query": Js.t('any),
+      },
+      string
+    ) =>
+    unit =
+    "push";
 };
 
 type config = {

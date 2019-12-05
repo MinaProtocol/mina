@@ -31,7 +31,15 @@ module Transformers = {
 
   [@bs.module]
   external rehypeReact:
-    processor(html, React.element, {. "createElement": 'a}) =
+    processor(
+      html,
+      React.element,
+      {
+        .
+        "createElement": (. React.component('props), 'props) => React.element,
+        "Fragment": React.component('a),
+      },
+    ) =
     "rehype-react";
 
   // Reparse raw html after converting from markdown
