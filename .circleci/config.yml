@@ -60,6 +60,7 @@ jobs:
                   command: cd frontend/bot && yarn run build-ci
 
     build-archive:
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
               environment:
@@ -88,6 +89,8 @@ jobs:
             - run:
                   name: Build Archive Process
                   command:  bash -c 'eval `opam config env` && make build_archive'
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
             - run:
                   name: Configure Hasura
                   command: ls && ./scripts/archive/make_hasura_configurations.sh
