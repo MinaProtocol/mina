@@ -332,32 +332,41 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
        ~transition_reader_ref ~transition_writer_ref
        ~most_recent_valid_block_writer ~consensus_local_state) (fun () ->
       Ivar.fill_if_empty initialization_finish_signal () ;
+      let valid_transition_reader1, valid_transition_reader2 =
+        Strict_pipe.Reader.Fork.two valid_transition_reader
+      in
       don't_wait_for
-      @@ Strict_pipe.Reader.iter valid_transition_reader
+      @@ Strict_pipe.Reader.iter valid_transition_reader1
            ~f:(fun enveloped_transition ->
-             Strict_pipe.Writer.write !transition_writer_ref
-               enveloped_transition ;
              let incoming_transition =
                Envelope.Incoming.data enveloped_transition
              in
              let current_transition =
                Broadcast_pipe.Reader.peek most_recent_valid_block_reader
              in
-             let%bind () =
-               if
-                 Consensus.Hooks.select
-                   ~existing:
-                     (External_transition.Initial_validated.consensus_state
-                        current_transition)
-                   ~candidate:
-                     (External_transition.Initial_validated.consensus_state
-                        incoming_transition)
-                   ~logger
-                 = `Take
-               then
-                 Broadcast_pipe.Writer.write most_recent_valid_block_writer
-                   incoming_transition
-               else Deferred.unit
+             if
+               Consensus.Hooks.select
+                 ~existing:
+                   (External_transition.Initial_validated.consensus_state
+                      current_transition)
+                 ~candidate:
+                   (External_transition.Initial_validated.consensus_state
+                      incoming_transition)
+                 ~logger
+               = `Take
+             then
+               Broadcast_pipe.Writer.write most_recent_valid_block_writer
+                 incoming_transition
+             else Deferred.unit ) ;
+      don't_wait_for
+      @@ Strict_pipe.Reader.iter_without_pushback valid_transition_reader2
+           ~f:(fun enveloped_transition ->
+             Strict_pipe.Writer.write !transition_writer_ref
+               enveloped_transition ;
+             don't_wait_for
+             @@
+             let incoming_transition =
+               Envelope.Incoming.data enveloped_transition
              in
              match Broadcast_pipe.Reader.peek frontier_r with
              | Some frontier ->

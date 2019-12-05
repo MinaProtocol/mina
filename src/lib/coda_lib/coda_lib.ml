@@ -55,7 +55,7 @@ type t =
   { config: Config.t
   ; processes: processes
   ; components: components
-  ; initialization_signal: unit Ivar.t
+  ; initialization_finish_signal: unit Ivar.t
   ; pipes: pipes
   ; wallets: Secrets.Wallets.t
   ; propose_keypairs:
@@ -458,7 +458,7 @@ module Root_diff = struct
     {user_commands: User_command.t list; root_length: int}
 end
 
-let initialization_signal t = t.initialization_signal
+let initialization_finish_signal t = t.initialization_finish_signal
 
 (* TODO: this is a bad pattern for two reasons:
  *   - uses an abstraction leak to patch new functionality instead of making a new extension
@@ -747,7 +747,7 @@ let create (config : Config.t) =
               ( Lazy.force External_transition.genesis
               |> External_transition.Validated.to_initial_validated )
           in
-          let valid_transitions, initialization_signal =
+          let valid_transitions, initialization_finish_signal =
             trace "transition router" (fun () ->
                 Transition_router.run ~logger:config.logger
                   ~trust_system:config.trust_system ~verifier ~network:net
@@ -913,7 +913,7 @@ let create (config : Config.t) =
             { config
             ; next_proposal= None
             ; processes= {prover; verifier; snark_worker}
-            ; initialization_signal
+            ; initialization_finish_signal
             ; components=
                 { net
                 ; transaction_pool

@@ -127,10 +127,6 @@ let initialization_finish_signal_exn (conn, _, _) =
   in
   Linear_pipe.wrap_reader p
 
-let initialization_signal_exn (conn, _, _) =
-  Coda_worker.Connection.run_exn conn
-    ~f:Coda_worker.functions.initialization_signal ~arg:()
-
 let start_exn (conn, _proc, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.start ~arg:()
 

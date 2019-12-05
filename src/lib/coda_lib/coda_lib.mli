@@ -88,7 +88,7 @@ end
 
 val root_diff : t -> Root_diff.t Strict_pipe.Reader.t
 
-val initialization_signal : t -> unit Ivar.t
+val initialization_finish_signal : t -> unit Ivar.t
 
 val dump_tf : t -> string Or_error.t
 
