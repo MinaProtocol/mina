@@ -1,7 +1,7 @@
 ## Time-locked and time-vesting accounts
 
-Accounts may contain funds that are available to send at a certain
-time or according to a vesting schedule.
+Accounts may contain funds that are available to send according to a 
+vesting schedule.
 
 ## Motivation
 
@@ -24,44 +24,39 @@ available to send increases between those two times.
 Accounts may have no timing restrictions, have a time lock, or a
 vesting schedule. In Coda, the type `Account.t` is a record type with
 several fields.  An additional field `timing` could contain an element
-of a sum type with three alternatives: `No_timing`, `Time_locked`, and
-`Time_vested`.
+of a sum type with three alternatives: `Untimed` and `Timed`.
 
-`No_timing` means there are no time restrictions on sending funds.
+`Untimed` means there are no time restrictions on sending funds.
 
-A `Time_locked` value contains an `unlock time`, expressed as a global
-slot value, and a `locked amount`. Until the unlock time has passed, the
-account can only send funds from its balance that are in excess of the
-locked amount. Once the unlock time has passed, there are no
-restrictions on sending.
-
-A `Time_vested` value contains a `cliff` time, a `vested` time, a
-`cliff amount` and a `vested_amount`. The vested amount is strictly
-greater than the cliff amount. Until the cliff time has passed, the
-account can send only funds from its balance that are in excess of the
-cliff amount. After the cliff time has passed and until the vested
-time, more funds are available in proportion to time. During that period,
-the sending bound is:
+A `Timed` value contains an `initial_minimum_balance`, `cliff` time, 
+a `cliff amount`, a `vesting_period` time, and a `vesting_increment`.
+Until the cliff time has passed, the account can send only funds from 
+its balance that are in excess of the initial minimum balance. After the 
+cliff time has passed, more funds are available, by calculating a current 
+minimum balance which decreases over time. The minimum balance decreases
+by the vesting increment for each vesting period:
 ```
-  amount_diff = vested_amount - cliff_amount
-  time_diff = 1 - ((vested_time - current_time) / (vested_time - cliff_time))
-  spending_limit = cliff_amount + amount_diff * time_diff
+  current_minimum_balance = 
+    if global_slot < cliff_time 
+	then 
+	  initial_minimum_balance
+	else 
+	  max 0 (initial_minimum_balance - ((global_slot - cliff_time) / vesting_period) * vesting_increment))
 ```
-Once the vested time has passed, there are no restrictions on sending.
+(where / is integer division).
 
-For both time locked and vesting accounts, it's possible for the 
-account balance to be less than the spending bound. For example,
-an employee time-locked account may have a locked amount of 1M Coda.
-If the employee resigns before the unlock time, the employer could
-decide not to send 1M Coda to the account, so the employee would
-not receive that benefit.
+If a transaction amount would make the account balance less than
+the current minimum, the transaction is disallowed.
 
-Nothing prevents sending funds to time locked and vesting accounts.
-Consider the time-locked employee account just mentioned. If a
-benefactor sends 3M Coda to the employee's account, then before the
-unlock time, the employee can send 2M Coda (ignoring fee calculations
-for simplicity).  1M Coda are still locked up in the account until
-the unlock time.
+Nothing prevents sending funds to timed accounts. When timed accounts
+are created, the balance must be at least the initial minimum balance.
+The account can receive additional funds, and funds can be spent,
+as long as the minimum balance invariant is maintained.
+
+A time-locked account time, can be created by using a vesting increment 
+equal to the initial minimum balance and a vesting period of one slot.
+(In the calculation above, using a vesting period of zero would result in a 
+division by zero.)
 
 # Implementation
 
@@ -71,17 +66,10 @@ an error occurs.
 
 For the out-of-SNARK transaction, the relevant code location to
 enforce the restrictions appears to be in
-`Transaction_logic.apply_user_command_unchecked`.  In that function,
-we have the sender's account available, so we can examine the `timing`
-field. We don't currently have the current global slot information 
-available. One solution is would be to timestamp ledgers with a global
-slot in some way, indicating when it was last modified.
+`Transaction_logic.apply_user_command_unchecked`.
 
 For the in-SNARK transaction, the restriction would be enforced in
-`Transaction_snark.apply_tagged_transaction`. There, we have the `var`
-form of the proposed transaction, and of the ledger root. Again, there
-is no notion of global slot there. A timestamp added to the ledger
-could be made available as a new `Request`.
+`Transaction_snark.apply_tagged_transaction`.
 
 ## Drawbacks
 
@@ -92,10 +80,9 @@ feature to users.
 
 ## Rationale and alternatives
 
-Instead of using a global slot time, we could use block height.
-
-`Time_vested` is a generalization of `Time_locked`, so we could dispense
-with the latter.
+Instead of using a global slot time, we could use block height. The global
+slot time is available via the protocol state, which will be made available
+to transactions.
 
 ## Prior art
 
@@ -107,6 +94,6 @@ Beyond cryptocurrencies, vesting of benefits is a well-established idea in emplo
 
 ## Unresolved questions
 
-Where can the global slot be added to ledgers? Is there a better way to make a global slot available 
-when validating a transaction, other than it to ledgers? Is there a notion of time better than
-global slot for this purpose?
+Do timed accounts interact with staking in any way?
+
+
