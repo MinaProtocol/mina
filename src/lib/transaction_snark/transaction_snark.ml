@@ -399,7 +399,7 @@ module Base = struct
     let%bind () =
       let current_global_slot =
         Global_slot.(Checked.constant zero)
-        (* TODO: ihm is working on passing through the consensus state to
+        (* TODO: @deepthi is working on passing through the protocol state to
            here. This should be replaced with the real value when his PR lands. *)
       in
       Global_slot.Checked.(current_global_slot <= payload.common.valid_until)
