@@ -84,7 +84,7 @@ There are a number of things that can be done in order to reduce the memory usag
 1. Use content addressed storage to share references to memory across transaction witnesses (which potentially saves a lot of duplicate intermediate hashes from being stored).
 2. Only store scan state witnesses at the tips of the transition frontier, throwing out witnesses on scan states where there are already known successor blocks. This can also be combined with a probalistic "dead fork" algorithm which will prune witnesses from tips in the frontier which we don't think will be extended. If the tips that are pruned are extended later, we can always rebuild new witnesses.
 3. If this is not sufficient, it is possible to persist scan states that have not been accessed recently in order to free them from memory, and reload them into memory when they are accessed.
-##### Child RFC: &#x1F534;
+##### Child RFC: &#x1F7E1; [Reduce Scan State Memory Usage](https://github.com/CodaProtocol/coda/pull/3980)
 
 ### Scan State Merklization
 ##### Priority: 1
@@ -128,7 +128,7 @@ There are a number of mostly independent optimizations we can implement for stag
 2. Batch verification of included completed work proofs
 3. Cache completed work verification to avoid duplicate verification of completed work included across multiple forks
 4. If transaction signature verification cost is significant, parallelize that as well
-##### Child RFC: &#x1F534;
+##### Child RFC: &#x1F7E1; [Batch Verification](https://github.com/CodaProtocol/coda/pull/3981)
 
 ### Optimize Snarked Ledger Commit
 ##### Priority: 2
