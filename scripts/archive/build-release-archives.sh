@@ -16,9 +16,9 @@ GIT_TAG=$(git describe --abbrev=0)
 PROJECT="coda-archive"
 
 if [ "$GIT_BRANCH" == "master" ]; then
-    VERSION="${GIT_TAG}-${GIT_HASH}"
+    VERSION="${GIT_TAG}"
 else
-    VERSION="${GIT_TAG}+${CIRCLE_BUILD_NUM}-${GIT_BRANCH}-${GI_HASH}"
+    VERSION="${GIT_TAG}-${GIT_BRANCH}-${GIT_HASH}"
 fi
 
 BUILD_DIR="deb_build"
@@ -30,13 +30,13 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1
+Depends: libgomp1, libjemalloc1, libssl1.1
 License: Apache-2.0
 Homepage: https://codaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
 Description: Coda Archive Process
  Compatible with Coda Daemonn 
- Built from ${GITHASH} by ${CIRCLE_BUILD_URL}
+ Built from ${GIT_HASH} by ${CIRCLE_BUILD_URL}
 EOF
 
 echo "------------------------------------------------------------"
@@ -100,7 +100,11 @@ fi
 ###
 # Build and Publish Docker
 ###
+mkdir docker_build 
+mv coda-*.deb docker_build/.
 
-docker build -t codaprotocol/coda-archive:$VERSION -f Dockerfile . 
+echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
 
-docker push codaprotocol/$SERVICE:$VERSION
+docker build -t codaprotocol/coda-archive:$VERSION -f $SCRIPT_PATH/Dockerfile docker_build
+
+docker push codaprotocol/coda-archive:$VERSION

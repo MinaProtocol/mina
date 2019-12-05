@@ -99,6 +99,13 @@ jobs:
             - run:
                   name: Configure Hasura
                   command: ls && ./scripts/archive/make_hasura_configurations.sh
+            #- run:
+            #      name: Check Hasura Configurations
+            #      command: ls && ./scripts/archive/check_hasura_configurations.sh
+            - setup_remote_docker
+            - run: 
+                  name: Build and Release Archives
+                  command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
