@@ -200,13 +200,6 @@ Router.(
             </Page>,
         ),
         File(
-          "developers",
-          name =>
-            <Page page=`Developers name>
-              <Wrapped> <Developers /> </Wrapped>
-            </Page>,
-        ),
-        File(
           "sfbw",
           name =>
             <Page page=`Sfbw name extraHeaders={Testnet.extraHeaders()}>
