@@ -1,7 +1,13 @@
+#!/bin/bash
 # Makes a database queryable through graphql
 set -e
 
 sleep 5
+
+# Sets the default path to the directory you run the command, which is assumed to be the coda directory
+if [[ "$CODA_DIRECTORY_PATH" -eq "" ]]; then
+    CODA_DIRECTORY_PATH=$(pwd)
+fi
 
 curl -d'{"type":"replace_metadata", "args":'$(cat scripts/archive/metadata.json)'}' \
     http://localhost:$HASURA_PORT/v1/query
