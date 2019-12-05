@@ -47,6 +47,24 @@ type 'a abc = {a: 'a; b: 'a; c: 'a}
 
 type 'a matrix_evals = {row: 'a; col: 'a; value: 'a}
 
+module Pairing_marlin_accumulator = struct
+  type 'g t = {r_f: 'g; r_pi: 'g; zr_pi: 'g} [@@deriving fields]
+
+  open Snarky
+  open H_list
+
+  let to_hlist {r_f; r_pi; zr_pi} = [r_f; r_pi; zr_pi]
+
+  let of_hlist ([r_f; r_pi; zr_pi] : (unit, _) H_list.t) = {r_f; r_pi; zr_pi}
+
+  let typ g =
+    Typ.of_hlistable [g; g; g] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let assert_equal g t1 t2 =
+    List.iter ~f:(fun x -> g (x t1) (x t2)) [r_f; r_pi; zr_pi]
+end
+
 module Dlog_marlin_statement = struct
   open H_list
 
@@ -67,6 +85,10 @@ module Dlog_marlin_statement = struct
         Snarky.Typ.of_hlistable [fp; fp; values] ~var_to_hlist:to_hlist
           ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
           ~value_of_hlist:of_hlist
+
+      let assert_equal fp t1 t2 =
+        let mk t : _ list = t.zr :: t.z :: Vector.to_list t.v in
+        List.iter2_exn ~f:fp (mk t1) (mk t2)
     end
 
     type 'fp t =
@@ -80,6 +102,15 @@ module Dlog_marlin_statement = struct
       ; eta_A: 'fp (* 128 bits *)
       ; eta_B: 'fp (* 128 bits *)
       ; eta_C: 'fp (* 128 bits *) }
+    [@@deriving fields]
+
+    let assert_equal fp t1 t2 =
+      let acc x = Kate_acc_input.assert_equal fp x in
+      let check c p = c (p t1) (p t2) in
+      check acc beta_1 ;
+      check acc beta_2 ;
+      check acc beta_3 ;
+      List.iter ~f:(check fp) [xi; sigma_2; sigma_3; alpha; eta_A; eta_B; eta_C]
 
     let to_hlist
         { xi
@@ -126,33 +157,19 @@ module Dlog_marlin_statement = struct
         ~value_of_hlist:of_hlist
   end
 
-  type ('fp, 'fq, 'kpc, 'bppc, 'digest, 's) t =
+  type ('fp, 'fq, 'g1, 'kpc, 'bppc, 'digest, 's) t =
     { deferred_values: 'fp Deferred_values.t
     ; pairing_marlin_index: 'kpc abc matrix_evals
     ; sponge_digest: 'digest
     ; bp_challenges_old: 'fq array (* Bullet proof challenges *)
     ; b_challenge_old: 'fq
     ; b_u_x_old: 'fq
+    ; pairing_marlin_acc: 'g1 Pairing_marlin_accumulator.t
           (* Purportedly b_{bp_challenges_old}(b_challenge_old) *)
           (* All this could be a hash which we unhash *)
     ; app_state: 's
     ; g_old: 'fp * 'fp
     ; dlog_marlin_index: 'bppc abc matrix_evals }
-end
-
-module Pairing_marlin_accumulator = struct
-  type 'g t = {r_f: 'g; r_pi: 'g; zr_pi: 'g}
-
-  open Snarky
-  open H_list
-
-  let to_hlist {r_f; r_pi; zr_pi} = [r_f; r_pi; zr_pi]
-
-  let of_hlist ([r_f; r_pi; zr_pi] : (unit, _) H_list.t) = {r_f; r_pi; zr_pi}
-
-  let typ g =
-    Typ.of_hlistable [g; g; g] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 end
 
 module Pairing_marlin_proof = struct
@@ -355,6 +372,8 @@ module type Dlog_main_inputs_intf = sig
 
   module G1 : Intf.Group(Impl).S
 
+  val sponge_params : Impl.Field.t Sponge.Params.t
+
   module Sponge : Intf.Sponge(Impl).S
 end
 
@@ -367,7 +386,9 @@ module type Pairing_main_inputs_intf = sig
     val size_in_bits : int
   end
 
-  module G1 : Intf.Group(Impl).S
+  module G : Intf.Group(Impl).S
+
+  val sponge_params : Impl.Field.t Sponge.Params.t
 
   module Sponge : Intf.Sponge(Impl).S
 end
@@ -375,6 +396,51 @@ end
 module Pairing_main (Inputs : Pairing_main_inputs_intf) = struct
   open Inputs
   open Impl
+
+  (* Inside here we have F_p arithmetic so we can incrementally check the
+    polynomial commitments from the DLog-based marlin *)
+  let pairing_main app_state pairing_marlin_vk prev_pairing_marlin_acc
+      dlog_marlin_vk g_new u_new x_new next_dlog_marlin_acc
+      next_deferred_fq_arithmetic =
+    (* The actual computation *)
+    let prev_app_state = exists Prev_app_state in
+    let transition = exists Transition in
+    assert (transition_function prev_app_state transition = app_state) ;
+    let prev_dlog_marlin_acc = exists Dlog_marlin_acc
+    and prev_deferred_fp_arithmetic = exists Deferred_fp_arithmetic in
+    List.iter prev_deferred_fp_arithmetic ~f:perform ;
+    let (actual_g_new, actual_u_new), deferred_fq_arithmetic =
+      let g_old, x_old, u_old, b_u_old = exists G_old in
+      let ( updated_dlog_marlin_acc
+          , deferred_fq_arithmetic
+          , polynomial_evaluation_checks ) =
+        let prev_dlog_marlin_proof = exists Prev_dlog_marlin_proof in
+        Dlog_marlin.incrementally_execute_protocol dlog_marlin_vk
+          prev_dlog_marlin_proof
+          ~public_input:
+            [ prev_app_state
+            ; pairing_marlin_vk
+            ; prev_pairing_marlin_acc
+            ; dlog_marlin_vk
+            ; g_old
+            ; x_old
+            ; u_old
+            ; b_u_old_x
+            ; prev_dlog_marlin_acc
+            ; prev_deferred_fp_arithmetic ]
+      in
+      let g_new_u_new =
+        batched_inner_product_argument
+          ((g_old, x_old, b_u_old_x) :: polynomial_evaluation_checks)
+      in
+      (g_new_u_new, deferred_fq_arithmetic)
+    in
+    (* This should be sampled using the hash state at the end of 
+          "Dlog_marlin.incrementally_execute_protocol" *)
+    let x_new = sample () in
+    assert (actual_g_new = g_new) ;
+    assert (actual_u_new = u_new) ;
+    assert (actual_x_new = x_new)
 end
 
 module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
@@ -400,172 +466,12 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
     let open Field in
     product k (fun i -> u.(i) + (inv u.(i) * x_to_pow2s.(i)))
 
-  (* Approach 1:
-     compute lagrange polynomial commitment directly
-     that is, hardcode lagrange polynomials and do O(num inputs) scalar muls
-     and get an opening proof at beta_3. the additional opening proof costs
-     1 additional scalar mul and adds one deferred fp value.
-
-     Approach 2:
-     Get a commitment to the lagrange interpolated polynomial,
-     add a public inputs to the pairing marlin R1CS
-     - alpha = Hash(real public inputs)
-     - x_hat(alpha) 
-     and do an opening proof to check the commitment at alpha, AND get an opening
-     proof at beta_3
-
-     Approach 3:
-     compute it directly.
-     This involves 2*n non-native multiplies
-
-     Approach 2':
-     Approach 2 does not make sense as stated. Here is how it would actually work.
-
-     The pairing-marlin proof will have
-
-     public_input: (I, g0, a0, y0)
-     absorb I.hash_state;
-     g <- receive commitment from prover { LDE(I) }
-     absorb g;
-     a <- squeeze ();
-     y := eval (LDE(I)) a;
-     assert (y0 == y);
-     assert (a0 == a);
-     assert (g0 == g)
-
-     You could also write it as
-     public_input: (I, g0, a0, y0)
-     absorb I.hash_state;
-     absorb g;
-     a <- squeeze ();
-     assert (a0 == a);
-     assert (y0 = eval (LDE(I)) a);
-
-     And then in the dlog_marlin main, when verifying this previous paring marlin proof,
-     you would check that
-     - g0 opens to y0 at a
-     - g0 opens to x_hat_beta_3 at beta_3
-
-     and pass off x_hat_beta_3 to the next guy
-   *)
-
-  (* Approach 3
-
-   \ell_i(x) =
-    { 1 if x == i
-    ; 0 if x != i and x in I }
-
-   \ell_i(x)
-   = (v_I(x) / (x - i)) / \prod_{j in I, j != i} (i - j)
-   = (v_I(x) / (x - i)) * C_i
-
-   \sum_i a_i \ell_i(x)
-   = \sum_i a_i C_i v_I(x) / (x - i)
-   = v_I(x) \sum_i a_i C_i / (x - i)
-
-   = v_I(x) * (\sum_i a_i C_i \prod_{j != i} (x - j) ) / v_I(x)
-*)
-
-  (*
-
-     To compute for all i (C_i / (x - i)):
-
-     Guess a result d_i. Compute the formal product r_i := (x - i) d_i.
-
-     Let s_i be a random hash.
-
-     Compute 
-      Cs_i := \sum_i s_i C_i 
-      rs_i := \sum_i s_i r_i.
-
-     Expose these two as public inputs and check they are equal the next time.
-  *)
-
-  (* Montgomery *)
-
-  (* A = (a0 + T a1)
-     B = (b0 + T b1)
-
-     Say I = 2^e. (e will be like 5)
-
-     Say q is N+1 bits. So we need all limbs to stay less than 2^N
-
-     a0 b0 + T (a1 b0 + b0 a1) + T^2 a1 b1
-     a0 b0 + T (a1 b0 + b0 a1) + T^2 a1 b1
-
-     Say the weight of a limbed-number is the bitsize of its largest limb.
-
-     t_i := a_i C_i / (x - i)
-     if each limb of t_i < 2^k
-     then each limb of \sum_i t_I < I 2^k = 2^{k + e}
-
-     Need k+e <= N. So need k <= N - e.
-
-     Can arrange for
-     - weightB
-    *)
-
-  (*
-     t_i := a_i C_i / (x - i)
-
-     t_i must have term bound <= N - e.
-
-     Say a_i has term bound A, C_i has term bound C.
-     (a_i 
-  *)
-
-  (* Computing division.
-     A / B = C
-     A = C * B
-
-     Consider A = a0 + a1 T + a2 T^2.
-
-     Can check A = C * B as polynomials in T.
-
-     For inversion, how many representations does 1 have as a polynomial in T?
-
-     1 = a0 + a1 T + a2 T^2
-
-     So can compute
-
-  *)
-
-  (* Trick for inversion
-
-     T := 2^t
-
-     Let's say we need to compute 1 / b_i for i < n.
-
-     Pick representations r_i of 1 and then batch verify them.
-     How to batch verify? Pick random scalars s_i,
-
-     compute \sum_i s_i and \sum_i s_i r_i
-     and expose them as public inputs.
-
-     Ok so to compute 1/b.
-
-     Let b = b0 + b1 T
-     guess c = c0 + c1 T
-
-     defer the check of "b c is a representation of 1".
-     That is, compute O = b0 c0 + T (b0 c1 + b1 c0) + T^2 b1 c1.
-
-     Compute such O_i for all the inversions one must perform.
-     Select random scalars s_i = . Compute
-
-     s_sum := \sum_i s_i
-     os_sum := \sum_i O_i s_i
-     = (bi_0 ci_0 
-     
-  *)
-
-  (* Might not even need this.
-   Suppose inverting b = b0 + 
-  *)
-
   module PC = G1
 
   module Fp = struct
+    (* For us, q > p, so one Field.t = fq can represent an fp *)
+    module Packed = Field
+
     module Unpacked = struct
       type t = Boolean.var list
 
@@ -589,10 +495,11 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
                   |> Boolean.Assert.is_true ) ]
         in
         {typ with check}
+
+      let assert_equal t1 t2 = Field.(Assert.equal (pack t1) (pack t2))
     end
 
-    (* For us, q > p, so one Field.t = fq can represent an fp *)
-    module Packed = Field
+    let pack : Unpacked.t -> Packed.t = Packed.pack
   end
 
   module Type = struct
@@ -632,43 +539,6 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
     List.fold_left (Vector.to_list ps) ~init:p0 ~f:(fun acc p ->
         G1.(p + scale acc xi) )
 
-  (* TODO: Gonna do 
-   "(acc, new) -> r * acc + new" instead of 
-   "(acc, new) -> acc + r * new" *)
-
-  (*
-     Say we want to verify a bunch of Kate proofs
-     
-     π_i proves f_i(z_i) = v_i.
-
-     Say we sample for each a random scalar r_i.
-
-     We can check (using additive notation)
-
-     0
-     = sum_i r_i [ e(f_i - v_i G, H) - e(π_i, betaH - z_i H) ]
-     = sum_i [ e(r_i (f_i - v_i G), H) - e(r_i π_i, betaH - z_i H) ]
-     = e(sum_i r_i (f_i - v_i G), H) - sum_i e(r_i π_i, betaH - z_i H)
-     = e((sum_i r_i f_i) - (sum_i r_i v_i) G, H) - sum_i e(r_i π_i, betaH - z_i H)
-     = e((sum_i r_i f_i) - (sum_i r_i v_i) G, H) - sum_i e(r_i π_i, betaH - z_i H)
-
-     Now note that 
-     sum_i e(r_i π_i, betaH - z_i H)
-     = sum_i e(r_i π_i, betaH) - e(r_i π_i, z_i H)
-     = sum_i e(r_i π_i, betaH) - e((z_i r_i) π_i, H)
-     = e(sum_i r_i π_i, betaH) - e(sum_i (z_i r_i) π_i, H)
-
-     Which means overall we need to check
-     0
-     = e((sum_i r_i f_i) - (sum_i r_i v_i) G, H) - e(sum_i r_i π_i, betaH) - e(sum_i (z_i r_i) π_i, H)
-
-     So, we never have to do any miller loops and per incremental update we only have to do
-     - G1 scalar multiplciation: r_i f_i
-     - deferred Fp multiplication: r_i v_i
-     - G1 scalar multiplciation: r_i π_i
-     - deferred Fp multiplication: z_i r_i
-     - G1 scalar multiplciation: (z_i_r_i) π_i
-  *)
   let accumuluate_pairing_state r_i zr_i pi_i f_i
       {Pairing_marlin_accumulator.r_f; r_pi; zr_pi} :
       _ Pairing_marlin_accumulator.t =
@@ -686,7 +556,10 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
       =
     let zr_i = defer (`Mul (z_i, r_i)) in
     let acc = accumuluate_pairing_state r_i zr_i proof f_i acc in
-    (acc, {Dlog_marlin_statement.Deferred_values.zr= zr_i; z= z_i; v= values})
+    ( acc
+    , { Dlog_marlin_statement.Deferred_values.Kate_acc_input.zr= zr_i
+      ; z= z_i
+      ; v= values } )
 
   type scalar = Boolean.var list
 
@@ -837,54 +710,55 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
   (* Inside here we have F_q arithmetic, so we can incrementally check
    the polynomial commitments from the pairing-based Marlin *)
   let dlog_main
-      (*
-    pairing_marlin_vk (* F_q based *)
-    next_pairing_marlin_acc (* F_q based *)
-
-    app_state (* F_p based (passed through) *)
-    dlog_marlin_vk (* F_p based (passed through) *)
-    g_old (* F_p based (passed through) *)
-
-    x_old (* F_q based *)
-    u_old (* F_q based *)
-    b_u_x_old (* F_q based *)
-
-    prev_dlog_marlin_acc (* F_p based *)
-    prev_deferred_fp_arithmetic (* F_p based *) *)
       { Dlog_marlin_statement.deferred_values
       ; pairing_marlin_index
       ; sponge_digest
+          (* I don't think most of b stuff should be a public input for this proof,
+   it should be a public input for the pairing proof.
+
+   Specifically, the pairing proof should have as public inputs:
+
+   bp_challenges_old
+   g_old
+
+   Then, we pick a random point b_challenge,
+   evaluate b_u_x := b_{bp_challenges}(b_challenge) and
+   
+   expose in our public input: b_u_x, b_challenge, g_old. The
+   next guy is responsible for checking this evaluation (it will actually
+   need the old bp_challenges though to compute evaluations of
+   g_old on all the other challenge points for the multi-polynomial,
+   multi-point batched proof)
+*)
       ; bp_challenges_old
       ; b_challenge_old
       ; b_u_x_old (* All this could be a hash which we unhash *)
+      ; pairing_marlin_acc
       ; app_state
       ; g_old
       ; dlog_marlin_index } =
+    let open Requests in
+    let exists typ r = exists typ ~request:(fun () -> r) in
     let prev_deferred_fq_arithmetic =
-      (* TODO
-    exists Deferred_fq_arithmetic *)
+      (* TODO *)
       []
     in
     List.iter prev_deferred_fq_arithmetic ~f:perform ;
     (* This is kind of a special case of deferred fq arithmetic. *)
     Field.Assert.equal (b bp_challenges_old b_challenge_old) b_u_x_old ;
+    let prev_sponge_digest = exists Fp.Unpacked.typ Prev.Sponge_digest in
+    let sponge =
+      let sponge = Sponge.create sponge_params in
+      Sponge.absorb sponge (Fp.pack prev_sponge_digest) ;
+      sponge
+    in
     let updated_pairing_marlin_acc, deferred_fp_arithmetic =
-      let exists typ r = exists typ ~request:(fun () -> r) in
-      let open Requests in
-      let sponge =
-        let prev_sponge_digest = exists Fp.Unpacked.typ Prev.Sponge_digest in
-        failwith "TODO"
-      in
       let prev_marlin_proof =
         exists
           (Pairing_marlin_proof.Wire.typ Opening_proof.typ PC.typ
              Fp.Unpacked.typ)
           Prev.Pairing_marlin_proof
-      in
-      (* This performs the marlin verifier, does the incremental update of
-       the polynomial commitment verification but does not perform all the
-       F_p arithmetic equality checks. *)
-      let prev_pairing_marlin_acc =
+      and prev_pairing_marlin_acc =
         exists
           (Pairing_marlin_accumulator.typ G1.typ)
           Requests.Prev.Pairing_marlin_accumulator
@@ -892,7 +766,6 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
       incrementally_verify_pairings ~verification_key:pairing_marlin_index
         ~sponge ~proof:prev_marlin_proof ~pairing_acc:prev_pairing_marlin_acc
         ~public_input:[]
-      (* TODO *)
       (*
       prev_marlin_proof
       ~public_input:[
@@ -906,51 +779,16 @@ module Dlog_main (Inputs : Dlog_main_inputs_intf) = struct
         prev_deferred_fq_arithmetic;
       ] *)
     in
-    assert (updated_pairing_marlin_macc = next_pairing_marlin_acc) ;
-    assert (prev_deferred_fp_arithmetic = deferred_fp_arithmetic)
+    (* TODO: Just squeeze a field element here *)
+    let actual_sponge_digest =
+      Field.pack (Sponge.squeeze sponge ~length:128)
+    in
+    Field.Assert.equal sponge_digest actual_sponge_digest ;
+    Pairing_marlin_accumulator.assert_equal
+      (fun x y ->
+        List.iter2_exn ~f:Field.Assert.equal (G1.to_field_elements x)
+          (G1.to_field_elements y) )
+      updated_pairing_marlin_acc pairing_marlin_acc ;
+    Dlog_marlin_statement.Deferred_values.assert_equal Fp.Unpacked.assert_equal
+      deferred_values deferred_fp_arithmetic
 end
-
-(* Inside here we have F_p arithmetic so we can incrementally check the
-   polynomial commitments from the DLog-based marlin *)
-let pairing_main app_state pairing_marlin_vk prev_pairing_marlin_acc
-    dlog_marlin_vk g_new u_new x_new next_dlog_marlin_acc
-    next_deferred_fq_arithmetic =
-  (* The actual computation *)
-  let prev_app_state = exists Prev_app_state in
-  let transition = exists Transition in
-  assert (transition_function prev_app_state transition = app_state) ;
-  let prev_dlog_marlin_acc = exists Dlog_marlin_acc
-  and prev_deferred_fp_arithmetic = exists Deferred_fp_arithmetic in
-  List.iter prev_deferred_fp_arithmetic ~f:perform ;
-  let (actual_g_new, actual_u_new), deferred_fq_arithmetic =
-    let g_old, x_old, u_old, b_u_old = exists G_old in
-    let ( updated_dlog_marlin_acc
-        , deferred_fq_arithmetic
-        , polynomial_evaluation_checks ) =
-      let prev_dlog_marlin_proof = exists Prev_dlog_marlin_proof in
-      Dlog_marlin.incrementally_execute_protocol dlog_marlin_vk
-        prev_dlog_marlin_proof
-        ~public_input:
-          [ prev_app_state
-          ; pairing_marlin_vk
-          ; prev_pairing_marlin_acc
-          ; dlog_marlin_vk
-          ; g_old
-          ; x_old
-          ; u_old
-          ; b_u_old_x
-          ; prev_dlog_marlin_acc
-          ; prev_deferred_fp_arithmetic ]
-    in
-    let g_new_u_new =
-      batched_inner_product_argument
-        ((g_old, x_old, b_u_old_x) :: polynomial_evaluation_checks)
-    in
-    (g_new_u_new, deferred_fq_arithmetic)
-  in
-  (* This should be sampled using the hash state at the end of 
-        "Dlog_marlin.incrementally_execute_protocol" *)
-  let x_new = sample () in
-  assert (actual_g_new = g_new) ;
-  assert (actual_u_new = u_new) ;
-  assert (actual_x_new = x_new)
