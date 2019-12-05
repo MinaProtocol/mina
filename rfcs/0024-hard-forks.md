@@ -95,7 +95,8 @@ this process is very conservative. The timeline will be as follows:
     code change we're a little more lenient: if the fix is minor we make it and
     continue, if it's major we still drop the feature. In extreme situations,
     where disabling an individual feature is not possible or advisable, we may
-    abort the upgrade entirely.
+    abort the upgrade entirely, releasing new clients that extend the current
+    era up to the next date.
 5. One week from era start:
   * Mainnet client builds that support the new era are released and all nodes
     are expected to upgrade. If no further intervention occurs the transition
@@ -117,9 +118,9 @@ Timeline:
 1. The underlying issue is discovered and documented. The Coda team decides an
    emergency hard fork is necessary.
 2. We schedule the new era, for some time in the near future e.g. 48 hours from
-   now. We release new client versions that halt after the scheduled era starts.
-   This reduces the chance a client will be stuck on a dead network. If the fix
-   is very simple we can skip this.
+   now. We release new client versions that halt after the next scheduled era
+   starts. This reduces the chance a client will be stuck on a dead network. If
+   the fix is very simple we can skip this.
 3. We write and test the fix, then release new builds, with the new era
    programmed in.
 4. The new era begins.
