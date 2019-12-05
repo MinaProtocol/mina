@@ -92,6 +92,11 @@ jobs:
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
             - run:
+                  name: Set Up Database
+                  command: | 
+                    sudo apt-get install -y postgresql 
+                    PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
+            - run:
                   name: Configure Hasura
                   command: ls && ./scripts/archive/make_hasura_configurations.sh
     lint:
