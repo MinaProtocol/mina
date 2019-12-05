@@ -226,6 +226,14 @@ module type S = sig
     ledger -> User_command.With_valid_signature.t -> Ledger_hash.t
 
   val undo : ledger -> Undo.t -> unit Or_error.t
+
+  module For_tests : sig
+    val validate_timing :
+         account:Account.t
+      -> txn_amount:Amount.t
+      -> txn_global_slot:Global_slot.t
+      -> Account.Timing.t Or_error.t
+  end
 end
 
 module Make (L : Ledger_intf) : S with type ledger := L.t = struct
@@ -266,6 +274,73 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         expiry slot %{sexp: Global_slot.t}"
       current_global_slot valid_until
 
+  let validate_timing ~account ~txn_amount ~txn_global_slot =
+    let open Account.Poly in
+    let open Account.Timing.Poly in
+    match account.timing with
+    | Untimed ->
+        (* no time restrictions *)
+        Or_error.return Untimed
+    | Timed
+        {initial_minimum_balance; cliff_time; vesting_period; vesting_increment}
+      ->
+        let open Or_error.Let_syntax in
+        let%map curr_min_balance =
+          let account_balance = account.balance in
+          let nsf_error () =
+            Or_error.errorf
+              !"For timed account, the requested transaction for amount \
+                %{sexp: Amount.t} at global slot %{sexp: Global_slot.t}, the \
+                balance %{sexp: Balance.t} is insufficient"
+              txn_amount txn_global_slot account_balance
+          in
+          let min_balance_error min_balance =
+            Or_error.errorf
+              !"For timed account, the requested transaction for amount \
+                %{sexp: Amount.t} at global slot %{sexp: Global_slot.t}, \
+                applying the transaction would put the balance below the \
+                calculated minimum balance of %{sexp: Balance.t}"
+              txn_amount txn_global_slot min_balance
+          in
+          match Balance.(account_balance - txn_amount) with
+          | None ->
+              (* checking for sufficient funds may be redundant with a check elsewhere
+               regardless, the transaction would put the account below any calculated minimum balance
+               so don't bother with the remaining computations
+            *)
+              nsf_error ()
+          | Some proposed_new_balance ->
+              let open Unsigned in
+              let curr_min_balance =
+                if Global_slot.(txn_global_slot < cliff_time) then
+                  initial_minimum_balance
+                else
+                  (* take advantage of fact that global slots are uint32's *)
+                  let num_periods =
+                    UInt32.(
+                      Infix.((txn_global_slot - cliff_time) / vesting_period)
+                      |> to_int64 |> UInt64.of_int64)
+                  in
+                  let min_balance_decrement =
+                    UInt64.Infix.(
+                      num_periods * Amount.to_uint64 vesting_increment)
+                    |> Amount.of_uint64
+                  in
+                  match
+                    Balance.(initial_minimum_balance - min_balance_decrement)
+                  with
+                  | None ->
+                      Balance.zero
+                  | Some amt ->
+                      amt
+              in
+              if Balance.(proposed_new_balance < curr_min_balance) then
+                min_balance_error curr_min_balance
+              else Or_error.return curr_min_balance
+        in
+        (* once the calculated minimum balance becomes zero, the account becomes untimed *)
+        if Balance.(curr_min_balance > zero) then account.timing else Untimed
+
   module Undo = struct
     include Undo
 
@@ -302,19 +377,33 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         {user_command; previous_receipt_chain_hash= account.receipt_chain_hash}
       in
       let%bind () = validate_nonces nonce account.nonce in
+      (* TODO: Put actual value here *)
+      let current_global_slot = Global_slot.zero in
       let%bind () =
-        (* TODO: Put actual value here *)
-        let current_global_slot = Global_slot.zero in
         validate_time ~valid_until:payload.common.valid_until
           ~current_global_slot
+      in
+      let%map timing =
+        if User_command.Payload.is_payment payload then
+          let txn_amount =
+            match User_command.Payload.body payload with
+            | Payment {amount; _} ->
+                amount
+            | _ ->
+                failwith "Expected payment when validating transaction timing"
+          in
+          validate_timing ~txn_amount ~txn_global_slot:current_global_slot
+            ~account
+        else return account.timing
       in
       let account =
         { account with
           nonce= Account.Nonce.succ account.nonce
         ; receipt_chain_hash=
-            Receipt.Chain_hash.cons payload account.receipt_chain_hash }
+            Receipt.Chain_hash.cons payload account.receipt_chain_hash
+        ; timing }
       in
-      return ({account with balance}, common)
+      ({account with balance}, common)
     in
     match User_command.Payload.body payload with
     | Stake_delegation (Set_delegate {new_delegate}) ->
@@ -560,4 +649,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let root = merkle_root ledger in
     Or_error.ok_exn (undo_user_command ledger undo) ;
     root
+
+  module For_tests = struct
+    let validate_timing = validate_timing
+  end
 end

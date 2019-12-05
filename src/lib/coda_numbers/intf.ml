@@ -97,11 +97,16 @@ module type S_checked = sig
 end
 
 module type S = sig
+  open Bitstring_lib
+  open Snark_params.Tick
+
   include S_unchecked
 
   module Checked : S_checked with type unchecked := t
 
   val typ : (Checked.t, t) Snark_params.Tick.Typ.t
+
+  val var_to_bits : Checked.t -> Boolean.var Bitstring.Lsb_first.t
 end
 
 module type UInt32 = sig
