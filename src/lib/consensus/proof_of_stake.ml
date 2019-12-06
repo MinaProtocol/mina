@@ -2613,10 +2613,6 @@ module Hooks = struct
   let required_local_state_sync ~(consensus_state : Consensus_state.Value.t)
       ~local_state =
     let open Coda_base in
-    let epoch = Consensus_state.curr_epoch consensus_state in
-    let source, _snapshot =
-      select_epoch_snapshot ~consensus_state ~local_state ~epoch
-    in
     let required_snapshot_sync snapshot_id expected_root =
       Option.some_if
         (not
@@ -2626,25 +2622,18 @@ module Hooks = struct
                  (Local_state.get_snapshot local_state snapshot_id).ledger)))
         {snapshot_id; expected_root}
     in
-    match source with
-    | `Curr ->
-        Option.map
-          (required_snapshot_sync Next_epoch_snapshot
-             consensus_state.next_epoch_data.ledger.hash)
-          ~f:Non_empty_list.singleton
-    | `Last -> (
-      match
-        Core.List.filter_map
-          [ required_snapshot_sync Next_epoch_snapshot
-              consensus_state.next_epoch_data.ledger.hash
-          ; required_snapshot_sync Staking_epoch_snapshot
-              consensus_state.staking_epoch_data.ledger.hash ]
-          ~f:Fn.id
-      with
-      | [] ->
-          None
-      | ls ->
-          Non_empty_list.of_list_opt ls )
+    match
+      Core.List.filter_map
+        [ required_snapshot_sync Next_epoch_snapshot
+            consensus_state.next_epoch_data.ledger.hash
+        ; required_snapshot_sync Staking_epoch_snapshot
+            consensus_state.staking_epoch_data.ledger.hash ]
+        ~f:Fn.id
+    with
+    | [] ->
+        None
+    | ls ->
+        Non_empty_list.of_list_opt ls
 
   let sync_local_state ~logger ~trust_system ~local_state ~random_peers
       ~(query_peer : Rpcs.query) requested_syncs =
