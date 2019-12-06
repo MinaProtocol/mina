@@ -257,7 +257,7 @@ let calculate_root_transition_diff t heir =
   Diff.Full.E.E
     (Root_transitioned {new_root= new_root_data; garbage= Full garbage_nodes})
 
-let move_root t ~new_root_hash ~garbage =
+let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
   (* The transition frontier at this point in time has the following mask topology:
    *
    *   (`s` represents a snarked ledger, `m` represents a mask)
@@ -286,6 +286,7 @@ let move_root t ~new_root_hash ~garbage =
    * noop in the case of no ledger proof emitted between `m0` and `m1`), we must perform
    * the following operations on masks in order:
    *
+   *     0) notify consensus that root transitioned
    *     1) unattach and destroy all the garbage (to avoid unecessary trickling of
    *        invalidations from `m0` during the next step)
    *     2) commit `m1` into `m0`, making `m0` into `m1'` (same merkle root as `m1`), and
@@ -298,6 +299,14 @@ let move_root t ~new_root_hash ~garbage =
    *)
   let old_root_node = Hashtbl.find_exn t.table t.root in
   let new_root_node = Hashtbl.find_exn t.table new_root_hash in
+  (* STEP 0 *)
+  if not ignore_consensus_local_state then
+    O1trace.measure "calling consensus hook frontier_root_transition"
+      (fun () ->
+        Consensus.Hooks.frontier_root_transition
+          (Breadcrumb.consensus_state old_root_node.breadcrumb)
+          (Breadcrumb.consensus_state new_root_node.breadcrumb)
+          ~local_state:t.consensus_local_state ~snarked_ledger:t.root_ledger ) ;
   let new_staged_ledger =
     let m0 = Breadcrumb.mask old_root_node.breadcrumb in
     let m1 = Breadcrumb.mask new_root_node.breadcrumb in
@@ -366,13 +375,7 @@ let move_root t ~new_root_hash ~garbage =
   (* update the new root breadcrumb in the frontier *)
   Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
   (* rewrite the root pointer to the new root hash *)
-  t.root <- new_root_hash ;
-  (* notify consensus that the root transitioned *)
-  O1trace.measure "calling consensus hook frontier_root_transition" (fun () ->
-      Consensus.Hooks.frontier_root_transition
-        (Breadcrumb.consensus_state old_root_node.breadcrumb)
-        (Breadcrumb.consensus_state new_root_node.breadcrumb)
-        ~local_state:t.consensus_local_state ~snarked_ledger:t.root_ledger )
+  t.root <- new_root_hash
 
 (* calculates the diffs which need to be applied in order to add a breadcrumb to the frontier *)
 let calculate_diffs t breadcrumb =
@@ -410,8 +413,8 @@ let calculate_diffs t breadcrumb =
       List.rev diffs )
 
 (* TODO: refactor metrics tracking outside of apply_diff (could maybe even be an extension?) *)
-let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
-    mutant * State_hash.t option =
+let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
+    ~ignore_consensus_local_state : mutant * State_hash.t option =
   match diff with
   | New_node (Full breadcrumb) ->
       let breadcrumb_hash = Breadcrumb.state_hash breadcrumb in
@@ -434,7 +437,7 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t) :
   | Root_transitioned
       {new_root= {hash= new_root_hash; _}; garbage= Full garbage} ->
       let old_root_hash = t.root in
-      move_root t ~new_root_hash ~garbage ;
+      move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state ;
       (old_root_hash, Some new_root_hash)
   (* These are invalid inhabitants for the type signature of this function,
    * but the OCaml compiler isn't smart enough to realize this. *)
@@ -502,7 +505,7 @@ let update_metrics_with_diff (type mutant) t
   | _ ->
       ()
 
-let apply_diffs t diffs =
+let apply_diffs t diffs ~ignore_consensus_local_state =
   let open Root_identifier.Stable.Latest in
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
     "Applying %d diffs to full frontier (%s --> ?)" (List.length diffs)
@@ -515,7 +518,9 @@ let apply_diffs t diffs =
   in
   let new_root =
     List.fold diffs ~init:None ~f:(fun prev_root (Diff.Full.E.E diff) ->
-        let mutant, new_root = apply_diff t diff in
+        let mutant, new_root =
+          apply_diff t diff ~ignore_consensus_local_state
+        in
         t.hash <- Frontier_hash.merge_diff t.hash (Diff.to_lite diff) mutant ;
         update_metrics_with_diff t diff ;
         match new_root with
@@ -527,36 +532,37 @@ let apply_diffs t diffs =
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
     "Reached state %s after applying diffs to full frontier"
     (Frontier_hash.to_string t.hash) ;
-  Debug_assert.debug_assert (fun () ->
-      match
-        Consensus.Hooks.required_local_state_sync
-          ~consensus_state:
-            (Breadcrumb.consensus_state
-               (Hashtbl.find_exn t.table t.best_tip).breadcrumb)
-          ~local_state:t.consensus_local_state
-      with
-      | Some jobs ->
-          (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
-          if local_state_was_synced_at_start then (
-            Logger.fatal t.logger
-              "after lock transition, the best tip consensus state is out of \
-               sync with the local state -- bug in either \
-               required_local_state_sync or frontier_root_transition."
-              ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ( "sync_jobs"
-                  , `List
-                      ( Non_empty_list.to_list jobs
-                      |> List.map ~f:Consensus.Hooks.local_state_sync_to_yojson
-                      ) )
-                ; ( "local_state"
-                  , Consensus.Data.Local_state.to_yojson
-                      t.consensus_local_state )
-                ; ("tf_viz", `String (visualize_to_string t)) ] ;
-            failwith
-              "local state desynced after applying diffs to full frontier" )
-      | None ->
-          () ) ;
+  if not ignore_consensus_local_state then
+    Debug_assert.debug_assert (fun () ->
+        match
+          Consensus.Hooks.required_local_state_sync
+            ~consensus_state:
+              (Breadcrumb.consensus_state
+                 (Hashtbl.find_exn t.table t.best_tip).breadcrumb)
+            ~local_state:t.consensus_local_state
+        with
+        | Some jobs ->
+            (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)
+            if local_state_was_synced_at_start then (
+              Logger.fatal t.logger
+                "after lock transition, the best tip consensus state is out \
+                 of sync with the local state -- bug in either \
+                 required_local_state_sync or frontier_root_transition."
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ( "sync_jobs"
+                    , `List
+                        ( Non_empty_list.to_list jobs
+                        |> List.map
+                             ~f:Consensus.Hooks.local_state_sync_to_yojson ) )
+                  ; ( "local_state"
+                    , Consensus.Data.Local_state.to_yojson
+                        t.consensus_local_state )
+                  ; ("tf_viz", `String (visualize_to_string t)) ] ;
+              failwith
+                "local state desynced after applying diffs to full frontier" )
+        | None ->
+            () ) ;
   `New_root new_root
 
 module For_tests = struct

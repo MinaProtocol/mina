@@ -58,7 +58,7 @@ module Duplicate_proposal_detector = struct
       (* order of fields significant, compare by epoch, then slot, then proposer *)
       type t =
         { consensus_time: Consensus.Data.Consensus_time.t
-        ; proposer: Public_key.Compressed.Stable.V1.t }
+        ; proposer: Public_key.Compressed.t }
       [@@deriving sexp, compare]
     end
 
