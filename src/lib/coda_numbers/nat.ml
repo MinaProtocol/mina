@@ -115,6 +115,7 @@ struct
     let zero = zero_checked
   end
 
+  (* warning: this typ does not work correctly with the generic if_ *)
   let typ = Checked.typ
 
   module Bits = Bits

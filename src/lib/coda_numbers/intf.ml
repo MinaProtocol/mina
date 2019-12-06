@@ -77,6 +77,7 @@ module type S_checked = sig
 
   val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
 
+  (** warning: this typ does not work correctly with the generic if_ *)
   val typ : (t, unchecked) Snark_params.Tick.Typ.t
 
   val equal : t -> t -> (Boolean.var, _) Checked.t
@@ -104,6 +105,7 @@ module type S = sig
 
   module Checked : S_checked with type unchecked := t
 
+  (** warning: this typ does not work correctly with the generic if_ *)
   val typ : (Checked.t, t) Snark_params.Tick.Typ.t
 
   val var_to_bits : Checked.t -> Boolean.var Bitstring.Lsb_first.t

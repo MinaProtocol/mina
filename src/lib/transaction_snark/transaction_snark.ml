@@ -1747,13 +1747,8 @@ let%test_module "account timing check" =
       let checked_computation =
         make_checked_computation account txn_amount txn_global_slot
       in
-      try
-        let (), _checked_timing =
-          Or_error.ok_exn
-          @@ Snark_params.Tick.run_and_check checked_computation ()
-        in
-        false
-      with _ -> true
+      Or_error.is_error
+      @@ Snark_params.Tick.run_and_check checked_computation ()
 
     let%test "before_cliff_time" =
       let pk = Public_key.Compressed.empty in
