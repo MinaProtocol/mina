@@ -321,17 +321,21 @@ jobs:
             - run:
                   name: Build and Upload Docker
                   command: |
-                    source /tmp/DOCKER_DEPLOY_ENV
-                    echo "Publishing Docker"
-                    echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
-                    set -x
-                    if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
+                    # Check if we should deploy this build
+                    FILE=/tmp/DOCKER_DEPLOY_ENV
+                    if test -f "$FILE"; then
+                        source $FILE
+                        echo "Publishing Docker"
+                        echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
+                        set -x
+                        if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
 
-                        echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                        ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
-                        -s coda-daemon \
-                        -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                        --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                              echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+                              ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
+                              -s coda-daemon \
+                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                        fi
                     fi
             - store_artifacts:
                   path: /tmp/artifacts

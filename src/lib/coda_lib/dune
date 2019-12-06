@@ -8,7 +8,7 @@
   incremental secrets auxiliary_database work_selector
   coda_networking proposer sync_handler transition_router
   otp_lib snark_worker participating_state transaction_status
-  receipt_chain_database)
+  receipt_chain_database sync_status daemon_rpcs archive_lib)
  (preprocessor_deps ../../config.mlh)
  (preprocess (pps
   ppx_coda ppx_optcomp ppx_bin_prot ppx_compare ppx_hash
