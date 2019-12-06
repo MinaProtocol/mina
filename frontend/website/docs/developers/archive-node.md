@@ -16,7 +16,7 @@ coda daemon -propose-key ~/keys/my_wallet -rest 3085 -archive-port 3086
 - Coda daemon pushes diff into Archive process
 - Archive process transforms diff into [GraphQL](https://graphql.org/) query
 - Archive process sends GraphQL query to [Hasura process](https://hasura.io/)
-- Hasura transforms GraphQL query into SQL write 
+- Hasura transforms GraphQL query into SQL write
 - Hasura issues SQL write to Postgres DB
 
 **Reads**
@@ -35,61 +35,204 @@ See the <a href="/docs/archive-node/" target="_blank">archive node schema docs</
 
 ### Example Query
 
-Hypothetical query issued by a client -- get the first five blocks that a specific block producer (`creator`) created that were finalized (represented by `_eq: -1`):
-```
-query GetEarliestConfirmedBlocks {
-	blocks(
-		limit: 5,
-		order_by: {block_length: asc},
-		where: {creator: {}, status: {_eq: -1}}
-	) {
-		stateHashByStateHash {
-		      value
-		}
-	}
+Hypothetical query issued by a client -- get the first five blocks that a specific block producer (`creator: "8Sujk2UD4faWu98TzK6zaeMdo3qngi1G8CRrByULiBgEytSb3sAJudxaUPv45thdBg"`) and the number of transactions in those blocks:
+```graphql
+query GetNumTransactionOfTheOldestBlocksFromCreator {
+  blocks(limit: 5, order_by: {block_length: asc}, where: {public_key: {value: {_eq: "8Sujk2UD4faWu98TzK6zaeMdo3qngi1G8CRrByULiBgEytSb3sAJudxaUPv45thdBg"}}}) {
+    stateHashByStateHash {
+      value
+    }
+    blocks_user_commands_aggregate {
+      aggregate {
+        count
+      }
+    }
+  }
 }
+
 ```
 
 Transpiled SQL query (automatically done by Hasura):
-```
-SELECT  coalesce(json_agg("root" ORDER BY "root.pg.block_length" ASC NULLS LAST), '[]' ) AS "root" FROM  (SELECT  "_0_root.base"."block_length" AS "root.pg.block_length", row_to_json((SELECT  "_1_e"  FROM  (SELECT  "_0_root.base"."block_length" AS "block_length", "_0_root.base"."block_time" AS "block_time"       ) AS "_1_e"      ) ) AS "root" FROM  (SELECT  *  FROM "public"."blocks"  WHERE (("public"."blocks"."status") = ($2))     ) AS "_0_root.base"    ORDER BY "root.pg.block_length" ASC NULLS LAST LIMIT 5 ) AS "_2_root"
+```sql
+SELECT
+  coalesce(
+    json_agg(
+      "root"
+      ORDER BY
+        "root.pg.block_length" ASC NULLS LAST
+    ),
+    '[]'
+  ) AS "root"
+FROM
+  (
+    SELECT
+      "_1_root.base"."block_length" AS "root.pg.block_length",
+      row_to_json(
+        (
+          SELECT
+            "_8_e"
+          FROM
+            (
+              SELECT
+                "_4_root.or.stateHashByStateHash"."stateHashByStateHash" AS "stateHashByStateHash",
+                "_7_root.ar.root.blocks_user_commands_aggregate"."blocks_user_commands_aggregate" AS "blocks_user_commands_aggregate"
+            ) AS "_8_e"
+        )
+      ) AS "root"
+    FROM
+      (
+        SELECT
+          *
+        FROM
+          "public"."blocks"
+        WHERE
+          (
+            EXISTS (
+              SELECT
+                1
+              FROM
+                "public"."public_keys" AS "_0__be_0_public_public_keys"
+              WHERE
+                (
+                  (
+                    (
+                      ("_0__be_0_public_public_keys"."id") = ("public"."blocks"."creator")
+                    )
+                    AND ('true')
+                  )
+                  AND (
+                    (
+                      (
+                        (
+                          ("_0__be_0_public_public_keys"."value") = (
+                            (
+                              '8Sujk2UD4faWu98TzK6zaeMdo3qngi1G8CRrByULiBgEytSb3sAJudxaUPv45thdBg'
+                            ) :: text
+                          )
+                        )
+                        AND ('true')
+                      )
+                      AND ('true')
+                    )
+                    AND (
+                      ('true')
+                      AND ('true')
+                    )
+                  )
+                )
+            )
+          )
+      ) AS "_1_root.base"
+      LEFT OUTER JOIN LATERAL (
+        SELECT
+          row_to_json(
+            (
+              SELECT
+                "_3_e"
+              FROM
+                (
+                  SELECT
+                    "_2_root.or.stateHashByStateHash.base"."value" AS "value"
+                ) AS "_3_e"
+            )
+          ) AS "stateHashByStateHash"
+        FROM
+          (
+            SELECT
+              *
+            FROM
+              "public"."state_hashes"
+            WHERE
+              (("_1_root.base"."state_hash") = ("id"))
+          ) AS "_2_root.or.stateHashByStateHash.base"
+      ) AS "_4_root.or.stateHashByStateHash" ON ('true')
+      LEFT OUTER JOIN LATERAL (
+        SELECT
+          json_build_object(
+            'aggregate',
+            json_build_object('count', COUNT(*))
+          ) AS "blocks_user_commands_aggregate"
+        FROM
+          (
+            SELECT
+              1 AS "root.ar.root.blocks_user_commands_aggregate__one"
+            FROM
+              (
+                SELECT
+                  *
+                FROM
+                  "public"."blocks_user_commands"
+                WHERE
+                  (("_1_root.base"."state_hash") = ("block_id"))
+              ) AS "_5_root.ar.root.blocks_user_commands_aggregate.base"
+          ) AS "_6_root.ar.root.blocks_user_commands_aggregate"
+      ) AS "_7_root.ar.root.blocks_user_commands_aggregate" ON ('true')
+    ORDER BY
+      "root.pg.block_length" ASC NULLS LAST
+    LIMIT
+      5
+  ) AS "_9_root"
 ```
 
 Result from query:
-```
+```json
 {
   "data": {
     "blocks": [
       {
         "stateHashByStateHash": {
           "value": "TWogQ6hEszqvpn6mfv2Pqda8HeeRbJBWjjfsDVBgn3wBz18Z3AkaGfu4yGe9eKFR"
+        },
+        "blocks_user_commands_aggregate": {
+          "aggregate": {
+            "count": 10
+          }
         }
       },
       {
         "stateHashByStateHash": {
           "value": "TWogp1RXHWne4G4i5NJj4wLRWKetZxwgya5ByFaJPUyKdq3UW8sbdDEMLW3RNsi4"
+        },
+        "blocks_user_commands_aggregate": {
+          "aggregate": {
+            "count": 10
+          }
         }
       },
       {
         "stateHashByStateHash": {
           "value": "TWogPJdEZVKphupQ8KTtnjTLjmtSri826QLM6eBS8M9XDr6c8r6zpCfCzSRR3kHk"
+        },
+        "blocks_user_commands_aggregate": {
+          "aggregate": {
+            "count": 8
+          }
         }
       },
       {
         "stateHashByStateHash": {
           "value": "TWogfYKJ2fj2KYJLqMgynhxL9CDeZfHYvzwVRdpvcUcifLZFURB5bfLHiJto3dqx"
+        },
+        "blocks_user_commands_aggregate": {
+          "aggregate": {
+            "count": 11
+          }
         }
       },
       {
         "stateHashByStateHash": {
           "value": "TWogHxtf6aZQ2Bynrxpw5DBR8T5mZLjRCV49Uen5EstU4H6XRKkwSy6F7KgEMBPG"
+        },
+        "blocks_user_commands_aggregate": {
+          "aggregate": {
+            "count": 10
+          }
         }
       }
     ]
   }
 }
 ```
-
 
 ## Appendix
 
