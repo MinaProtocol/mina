@@ -4,7 +4,7 @@ let make = (~children) => {
     <Nav />
     <Next.Head>
       <link
-        href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:300,400&display=swap"
+        href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:300,400,700&display=swap"
         rel="stylesheet"
       />
     </Next.Head>
