@@ -132,8 +132,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         match
           List.find_map rpc_handlers ~f:(fun handler ->
               match_handler handler rpc ~do_:(fun f ->
-                  f (failwith "TODO replaceme") ~version:latest_version query
-              ) )
+                  f sender ~version:latest_version query ) )
         with
         | None ->
             failwith "fake gossip net error: rpc not implemented"
