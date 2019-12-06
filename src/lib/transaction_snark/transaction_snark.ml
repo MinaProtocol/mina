@@ -288,8 +288,8 @@ module Base = struct
         ; vesting_increment } =
       account.timing
     in
-    let%bind before_cliff =
-      Global_slot.Checked.(txn_global_slot < cliff_time)
+    let%bind before_or_at_cliff =
+      Global_slot.Checked.(txn_global_slot <= cliff_time)
     in
     let int_of_field field =
       Snarky_integer.Integer.constant ~m
@@ -298,12 +298,6 @@ module Base = struct
     let zero_int = int_of_field Field.zero in
     let balance_to_int balance =
       Snarky_integer.Integer.of_bits ~m @@ Balance.var_to_bits balance
-    in
-    let sub_min_zero int1 int2 =
-      (* actual difference, or zero *)
-      let open Snarky_integer.Integer in
-      let subtrahend = min ~m int1 int2 in
-      subtract_unpacking ~m int1 subtrahend
     in
     let txn_amount_int =
       Snarky_integer.Integer.of_bits ~m @@ Amount.var_to_bits txn_amount
@@ -321,13 +315,15 @@ module Base = struct
       let initial_minimum_balance_int =
         balance_to_int initial_minimum_balance
       in
-      if_ ~m before_cliff ~then_:initial_minimum_balance_int
+      if_ ~m before_or_at_cliff ~then_:initial_minimum_balance_int
         ~else_:
           (let txn_global_slot_int =
              Global_slot.Checked.to_integer txn_global_slot
            in
            let cliff_time_int = Global_slot.Checked.to_integer cliff_time in
-           let slot_diff = sub_min_zero txn_global_slot_int cliff_time_int in
+           let _, slot_diff =
+             subtract_unpacking_or_zero ~m txn_global_slot_int cliff_time_int
+           in
            let vesting_period_int =
              Global_slot.Checked.to_integer vesting_period
            in
@@ -338,14 +334,16 @@ module Base = struct
            let min_balance_decrement =
              mul ~m num_periods vesting_increment_int
            in
-           let diff_is_zero =
-             gte ~m min_balance_decrement initial_minimum_balance_int
+           let _, diff =
+             subtract_unpacking_or_zero ~m initial_minimum_balance_int
+               min_balance_decrement
            in
-           if_ ~m diff_is_zero ~then_:zero_int
-             ~else_:
-               (sub_min_zero initial_minimum_balance_int min_balance_decrement))
+           diff)
     in
-    let proposed_balance_int = sub_min_zero balance_int txn_amount_int in
+    let _, proposed_balance_int =
+      Snarky_integer.Integer.subtract_unpacking_or_zero ~m balance_int
+        txn_amount_int
+    in
     let%bind _ =
       with_label
         (sprintf "%s: check proposed balance against calculated min balance"
