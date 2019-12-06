@@ -2630,7 +2630,7 @@ module Hooks = struct
     | `Curr ->
         Option.map
           (required_snapshot_sync Next_epoch_snapshot
-             consensus_state.staking_epoch_data.ledger.hash)
+             consensus_state.next_epoch_data.ledger.hash)
           ~f:Non_empty_list.singleton
     | `Last -> (
       match
