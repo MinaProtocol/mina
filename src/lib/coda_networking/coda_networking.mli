@@ -106,6 +106,7 @@ module Config : sig
     ; time_controller: Block_time.Controller.t
     ; consensus_local_state: Consensus.Data.Local_state.t
     ; creatable_gossip_net: Gossip_net.Any.creatable
+    ; is_seed: bool
     ; log_gossip_heard: log_gossip_heard }
   [@@deriving make]
 end

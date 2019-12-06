@@ -57,11 +57,6 @@ let daemon logger =
             provide both `propose-key` and `propose-public-key`. (default: \
             don't produce blocks)"
          (optional string)
-     and initial_peers_raw =
-       flag "kademlia-peer"
-         ~doc:
-           "HOST:PORT TCP daemon communications (can be given multiple times)"
-         (listed peer)
      and run_snark_worker_flag =
        flag "run-snark-worker"
          ~doc:"PUBLICKEY Run the SNARK worker with this public key"
@@ -506,54 +501,6 @@ let daemon logger =
            ; transaction_pool_diff= log_transaction_pool_diff
            ; new_state= log_received_blocks }
          in
-         let initial_peers_raw =
-           List.concat
-             [ initial_peers_raw
-             ; List.map ~f:Host_and_port.of_string
-               @@ or_from_config
-                    (Fn.compose Option.some
-                       (YJ.Util.convert_each YJ.Util.to_string))
-                    "peers" None ~default:[] ]
-         in
-         if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-         let%bind initial_peers_cleaned_lists =
-           (* for each provided peer, lookup all its addresses *)
-           Deferred.List.filter_map ~how:(`Max_concurrent_jobs 8)
-             initial_peers_raw ~f:(fun addr ->
-               let host = Host_and_port.host addr in
-               match%map
-                 Monitor.try_with_or_error (fun () ->
-                     Async.Unix.Host.getbyname_exn host )
-               with
-               | Ok unix_host ->
-                   (* assume addresses is nonempty *)
-                   let addresses = Array.to_list unix_host.addresses in
-                   let port = Host_and_port.port addr in
-                   Some
-                     (List.map addresses ~f:(fun inet_addr ->
-                          Host_and_port.create
-                            ~host:(Unix.Inet_addr.to_string inet_addr)
-                            ~port ))
-               | Error e ->
-                   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                     "Error on getbyname: $error"
-                     ~metadata:[("error", `String (Error.to_string_mach e))] ;
-                   Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                     "Failed to get addresses for host $host, skipping"
-                     ~metadata:[("host", `String host)] ;
-                   None )
-         in
-         (* flatten list of lists of host-and-ports *)
-         let initial_peers_cleaned = List.concat initial_peers_cleaned_lists in
-         let%bind () =
-           if
-             List.length initial_peers_raw <> 0
-             && List.length initial_peers_cleaned = 0
-           then (
-             eprintf "Error: failed to connect to any peers\n" ;
-             exit 10 )
-           else Deferred.unit
-         in
          let%bind external_ip =
            match external_ip_opt with
            | None ->
@@ -639,14 +586,24 @@ let daemon logger =
          in
          trace_database_initialization "consensus local state" __LOC__
            trust_dir ;
+         let initial_peers =
+           List.concat
+             [ List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
+             ; List.map ~f:Coda_net2.Multiaddr.of_string
+               @@ or_from_config
+                    (Fn.compose Option.some
+                       (YJ.Util.convert_each YJ.Util.to_string))
+                    "peers" None ~default:[] ]
+         in
+         if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
+         let is_seed = List.is_empty initial_peers in
          let gossip_net_params =
            Gossip_net.Libp2p.Config.
              { timeout= Time.Span.of_sec 3.
              ; logger
              ; conf_dir
              ; chain_id= Lazy.force chain_id
-             ; initial_peers=
-                 List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
+             ; initial_peers
              ; addrs_and_ports
              ; trust_system
              ; keypair= libp2p_keypair }
@@ -657,6 +614,7 @@ let daemon logger =
            ; time_controller
            ; consensus_local_state
            ; log_gossip_heard
+           ; is_seed
            ; creatable_gossip_net=
                Coda_networking.Gossip_net.(
                  Any.Creatable

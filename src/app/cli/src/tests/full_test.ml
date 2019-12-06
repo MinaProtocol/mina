@@ -157,6 +157,7 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; time_controller
           ; consensus_local_state
+          ; is_seed= true
           ; log_gossip_heard=
               { snark_pool_diff= false
               ; transaction_pool_diff= false

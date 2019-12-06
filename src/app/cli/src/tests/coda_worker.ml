@@ -484,6 +484,7 @@ module T = struct
             ; trust_system
             ; time_controller
             ; consensus_local_state
+            ; is_seed= List.is_empty peers
             ; log_gossip_heard=
                 { snark_pool_diff= false
                 ; transaction_pool_diff= false

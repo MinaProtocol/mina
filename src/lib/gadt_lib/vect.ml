@@ -2,6 +2,12 @@ type ('el, 'n) t =
   | [] : ('el, Peano.zero) t
   | ( :: ) : 'el * ('el, 'n) t -> ('el, 'n Peano.succ) t
 
+let is_empty : type n. ('a, n) t -> bool = function
+  | [] ->
+      true
+  | _ :: _ ->
+      false
+
 let rec to_list : type n. ('a, n) t -> 'a list = function
   | [] ->
       []

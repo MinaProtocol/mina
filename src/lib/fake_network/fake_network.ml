@@ -56,6 +56,7 @@ let setup (type n) ?(logger = Logger.null ())
     ; trust_system
     ; time_controller
     ; consensus_local_state
+    ; is_seed= Vect.is_empty peers
     ; creatable_gossip_net=
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
