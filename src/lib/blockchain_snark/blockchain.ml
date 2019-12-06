@@ -12,8 +12,7 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t =
-  {state: Protocol_state.Value.Stable.V1.t; proof: Proof.Stable.V1.t}
+type t = Stable.Latest.t = {state: Protocol_state.Value.t; proof: Proof.t}
 [@@deriving fields, sexp]
 
 let create ~state ~proof = {state; proof}

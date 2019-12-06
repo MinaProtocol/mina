@@ -765,3 +765,102 @@ module Visualization = struct
         ~bin_response:Response.Stable.Latest.bin_t
   end
 end
+
+module Add_whitelist = struct
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Core.Unix.Inet_addr.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Add_whitelist" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
+end
+
+module Remove_whitelist = struct
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Core.Unix.Inet_addr.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit Core_kernel.Or_error.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Remove_whitelist" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
+end
+
+module Get_whitelist = struct
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Core.Unix.Inet_addr.Stable.V1.t list
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_whitelist" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
+end
