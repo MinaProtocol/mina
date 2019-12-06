@@ -206,7 +206,7 @@ let make = () => {
                  <div className=Styles.alertContainer>
                    <Alert
                      kind=`Info
-                     message="You don't have any transactions related to this account."
+                     defaultMessage="You don't have any transactions related to this account."
                    />
                  </div>
                | (_, _) =>
@@ -236,7 +236,7 @@ let make = () => {
      | None =>
        <div className=Styles.alertContainer>
          <Alert
-           message="Select an account from the side bar to view related transactions."
+           defaultMessage="Select an account from the side bar to view related transactions."
            kind=`Info
          />
        </div>

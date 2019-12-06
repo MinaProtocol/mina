@@ -105,7 +105,7 @@ let make = (~publicKey) => {
          {switch (result) {
           | NotCalled
           | Loading => React.null
-          | Error(err) => <Alert kind=`Danger message=err##message />
+          | Error(err) => <Alert kind=`Danger defaultMessage=err##message />
           | Data(_) =>
             goBack();
             React.null;

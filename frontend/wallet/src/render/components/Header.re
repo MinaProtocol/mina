@@ -113,16 +113,40 @@ module SyncStatus = {
     /*     None; */
     /*   }); */
     switch ((result: SyncStatusQuery.response)) {
-    | Loading => <Alert kind=`Warning message="connecting" />
-    | Error(_) => <Alert kind=`Danger message="error" />
+    | Loading =>
+      <Alert
+        kind=`Warning
+        messageID="connecting"
+        defaultMessage="Connecting"
+      />
+    | Error(_) =>
+      <Alert kind=`Danger messageID="error" defaultMessage="Error" />
     | Data(response) =>
       switch (response##syncStatus) {
-      | `OFFLINE => <Alert kind=`Danger message="offline" />
-      | `SYNCED => <Alert kind=`Success message="synced" />
-      | `BOOTSTRAP => <Alert kind=`Warning message="syncing" />
-      | `CONNECTING => <Alert kind=`Warning message="connecting" />
-      | `CATCHUP => <Alert kind=`Warning message="catching up" />
-      | `LISTENING => <Alert kind=`Warning message="listening" />
+      | `OFFLINE =>
+        <Alert kind=`Danger messageID="offline" defaultMessage="Offline" />
+      | `SYNCED =>
+        <Alert kind=`Success messageID="synced" defaultMessage="Synced" />
+      | `BOOTSTRAP =>
+        <Alert kind=`Warning messageID="syncing" defaultMessage="Syncing" />
+      | `CONNECTING =>
+        <Alert
+          kind=`Warning
+          messageID="connecting"
+          defaultMessage="Connecting"
+        />
+      | `CATCHUP =>
+        <Alert
+          kind=`Warning
+          messageID="catching up"
+          defaultMessage="Catching up"
+        />
+      | `LISTENING =>
+        <Alert
+          kind=`Warning
+          messageID="listening"
+          defaultMessage="Listening"
+        />
       }
     };
   };

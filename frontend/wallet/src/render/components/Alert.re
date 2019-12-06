@@ -24,7 +24,7 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~kind, ~message) => {
+let make = (~kind, ~messageID, ~defaultMessage) => {
   let (bgColor, textColor, iconKind) =
     Theme.Colors.(
       switch (kind) {
@@ -38,7 +38,7 @@ let make = (~kind, ~message) => {
     <span className=Styles.icon> <Icon kind=iconKind /> </span>
     <Spacer width=0.25 />
     <div className=Styles.text>
-      <FormattedMessage id=message defaultMessage=message />
+      <FormattedMessage id=messageID defaultMessage=defaultMessage />
     </div>
   </div>;
 };

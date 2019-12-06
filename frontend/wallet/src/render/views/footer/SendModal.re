@@ -129,7 +129,7 @@ module SendForm = {
       }}>
       {switch (errorOpt) {
        | None => React.null
-       | Some(err) => <Alert kind=`Danger message=err />
+       | Some(err) => <Alert kind=`Danger defaultMessage=err />
        }}
       spacer
       // Disable dropdown, only show active Account
