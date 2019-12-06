@@ -738,7 +738,7 @@ let create (config : Config.t)
          (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
          don't_wait_for
            (let%map initial_peers = Gossip_net.Any.peers gossip_net in
-            if List.is_empty initial_peers then (
+            if List.is_empty initial_peers && not config.is_seed then (
               Logger.fatal config.logger
                 "Failed to connect to any initial peers" ~module_:__MODULE__
                 ~location:__LOC__ ;
