@@ -208,7 +208,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
            Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
              ~f:(fun (addr, expiration) ->
                don't_wait_for
-                 ( after Time.(diff expiration (now ()))
+                 ( Clock.at expiration
                  >>= fun () -> Coda_net2.unban_ip net2 addr |> Deferred.ignore
                  ) ;
                Coda_net2.ban_ip net2 addr |> Deferred.ignore )
