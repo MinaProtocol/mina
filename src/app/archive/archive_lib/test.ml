@@ -11,8 +11,6 @@ let%test_module "Processor" =
       Async.Scheduler.set_record_backtraces true
 
     module Processor = Processor.Make (struct
-      let address = "v1/graphql"
-
       let headers = String.Map.of_alist_exn []
 
       let preprocess_variables_string =
@@ -22,16 +20,17 @@ let%test_module "Processor" =
 
     let logger = Logger.null ()
 
-    let port = 9000
+    let uri =
+      Uri.of_string ("http://localhost:" ^ string_of_int 9000 ^/ "v1/graphql")
 
     let try_with ~f =
       Deferred.Or_error.ok_exn
       @@ let%bind result =
-           let t = Processor.create port in
+           let t = Processor.create uri in
            Monitor.try_with_or_error ~name:"Write Processor" (fun () -> f t)
          in
          let%map clear_action =
-           Processor.Client.query (Graphql_query.Clear_data.make ()) port
+           Processor.Client.query (Graphql_query.Clear_data.make ()) uri
          in
          Or_error.all_unit
            [ result
@@ -78,7 +77,7 @@ let%test_module "Processor" =
         Processor.Client.query_exn
           (Graphql_query.User_commands.Query_participants.make
              ~hashes:(Array.of_list hashes) ())
-          t.port
+          t.hasura_endpoint
         >>| fun obj -> obj#user_commands
       in
       Array.map response ~f:(fun obj ->
@@ -148,7 +147,7 @@ let%test_module "Processor" =
               let%bind public_keys =
                 Processor.Client.query_exn
                   (Graphql_query.Public_keys.Query.make ())
-                  t.port
+                  t.hasura_endpoint
               in
               let queried_public_keys =
                 Array.map public_keys#public_keys ~f:(fun obj -> obj#value)
@@ -171,7 +170,7 @@ let%test_module "Processor" =
                 let%map query_result =
                   Processor.Client.query_exn
                     (Graphql_query.User_commands.Query.make ~hash ())
-                    t.port
+                    t.hasura_endpoint
                 in
                 let queried_user_command = query_result#user_commands.(0) in
                 Types.User_command.decode queried_user_command
@@ -304,7 +303,7 @@ let%test_module "Processor" =
                 Graphql_query.Blocks.Get_all_pending_blocks.make ()
               in
               let%map response =
-                Processor.Client.query_exn graphql t.port
+                Processor.Client.query_exn graphql t.hasura_endpoint
                 >>| (fun obj -> obj#blocks)
                 >>| Array.map ~f:(fun block ->
                         ((block#state_hash)#value, block#status) )

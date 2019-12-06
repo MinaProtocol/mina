@@ -4,32 +4,33 @@ open Signature_lib
 open Coda_base
 
 module Client = Graphql_lib.Client.Make (struct
-  let address = "graphql"
-
   let preprocess_variables_string = Fn.id
 
   let headers = String.Map.empty
 end)
 
-let run_exn ~f query_obj port =
-  match%bind f query_obj port with
+let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
+  let log_location_detail =
+    if Cli_lib.Flag.Uri.is_localhost uri.value then
+      " (in `~/.coda-config/coda.log`)"
+    else ""
+  in
+  match%bind f query_obj uri.value with
   | Ok r ->
       Deferred.return r
   | Error (`Failed_request e) ->
       eprintf
         "Error: Unable to connect to Coda daemon.\n\
-         - The daemon might not be running. See logs (in \
-         `~/.coda-config/coda.log`) for details.\n\
+         - The daemon might not be running. See logs%s for details.\n\
         \  Run `coda daemon -help` to see how to start daemon.\n\
          - If you just started the daemon, wait a minute for the GraphQL \
          server to start.\n\
          - Alternatively, the daemon may not be running the GraphQL server on \
-         port %d.\n\
-        \  If so, add flag `-rest-port` with correct port when running this \
-         command.\n\
+         %s.\n\
+        \  If so, add flag %s with correct port when running this command.\n\
          Error message: %s\n\
          %!"
-        port e ;
+        log_location_detail (Uri.to_string uri.value) uri.name e ;
       exit 17
   | Error (`Graphql_error e) ->
       eprintf "❌ Error: %s\n" e ;
