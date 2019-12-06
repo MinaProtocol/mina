@@ -40,6 +40,73 @@ let getCurrentAndSurroundingPage = (currentPath, flattenedPages) => {
   );
 };
 
+module Style = {
+  open Css;
+  let content =
+    style([
+      selector(
+        "h1, h2, h3, h4",
+        [
+          display(`flex),
+          marginTop(rem(2.)),
+          marginBottom(`rem(0.5)),
+          color(Theme.Colors.denimTwo),
+          hover([selector(".headerlink", [display(`inlineBlock)])]),
+        ],
+      ),
+      selector(
+        "h1",
+        Theme.H1.heroStyles @ [alignItems(`baseline), fontWeight(`normal)],
+      ),
+      selector("h2", Theme.H2.basicStyles @ [alignItems(`baseline)]),
+      selector(
+        "h3",
+        Theme.H3.basicStyles
+        @ [textAlign(`left), alignItems(`center), fontWeight(`medium)],
+      ),
+      selector(
+        "p",
+        [color(Theme.Colors.saville), ...Theme.Body.basicStyles],
+      ),
+      selector("a", Theme.Link.basicStylesHover),
+      selector(
+        "code",
+        [Theme.Typeface.pragmataPro, color(Theme.Colors.midnight)],
+      ),
+      selector(
+        "pre",
+        [
+          backgroundColor(Theme.Colors.slateAlpha(0.05)),
+          borderRadius(`px(9)),
+          padding2(~v=`rem(0.5), ~h=`rem(1.)),
+          overflow(`scroll),
+        ],
+      ),
+      selector(
+        "ul, ol",
+        [
+          margin2(~v=`rem(1.), ~h=`zero),
+          marginLeft(rem(1.5)),
+          padding(`zero),
+          ...Theme.Body.basicStyles,
+        ],
+      ),
+      selector(
+        "p > code, li > code",
+        [
+          boxSizing(`borderBox),
+          padding2(~v=`px(2), ~h=`px(6)),
+          backgroundColor(Theme.Colors.slateAlpha(0.05)),
+          borderRadius(`px(4)),
+        ],
+      ),
+      selector(
+        "strong",
+        [fontWeight(`num(600)), color(Theme.Colors.saville)],
+      ),
+    ]);
+};
+
 [@react.component]
 let make =
     (~docsRoot: option(ContentType.DocsFolder.t), ~currentPath="index.html") => {
@@ -63,7 +130,8 @@ let make =
          <DocsSideNav docsRoot currentFolder currentPage />
          {switch (currentPage) {
           | None => React.string("Couldn't find docs page: " ++ currentPath)
-          | Some({content}) => <Markdown content />
+          | Some({content}) =>
+            <div className=Style.content> <Markdown content /> </div>
           }}
        </div>;
      | None => React.string("Error: Couldn't retrieve docs")

@@ -125,8 +125,8 @@ module Link = {
     let basic = init;
   };
 
-  let basic =
-    merge([init, style([hover([color(Colors.hyperlinkHover)])])]);
+  let (basic, basicStylesHover) =
+    generateStyles([hover([color(Colors.hyperlinkHover)]), ...basicStyles]);
 };
 
 module H1 = {
