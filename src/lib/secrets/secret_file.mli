@@ -17,6 +17,7 @@ type password = Bytes.t Deferred.t Lazy.t
 val read :
      path:string
   -> password:password
+  -> which:string
   -> (Bytes.t, Privkey_error.t) Deferred.Result.t
 
 (** Write [contents] to [path], after wrapping it in a [Secret_box] with [password].
@@ -32,4 +33,5 @@ val write :
   -> mkdir:bool
   -> password:password
   -> plaintext:Bytes.t
+  -> which:string
   -> (unit, Privkey_error.t) Deferred.Result.t

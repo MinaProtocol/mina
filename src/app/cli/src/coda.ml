@@ -167,9 +167,9 @@ let daemon logger =
      and libp2p_keypair =
        flag "discovery-keypair" (optional string)
          ~doc:
-           "PUBKEY,PRIVKEY,PEERID Keypair (generated from `coda advanced \
+           "KEYFILE Keypair (generated from `coda advanced \
             generate-libp2p-keypair`) to use with libp2p discovery (default: \
-            generate new temporary keypair)"
+            generate per-run temporary keypair)"
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
@@ -265,16 +265,13 @@ let daemon logger =
            () ) ;
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
          "Booting may take several seconds, please wait" ;
-       let libp2p_keypair =
-         Option.map libp2p_keypair ~f:(fun s ->
-             match Coda_net2.Keypair.of_string s with
-             | Ok kp ->
-                 kp
-             | Error e ->
-                 Logger.fatal logger "failed to parse -libp2p-keypair: $err"
-                   ~module_:__MODULE__ ~location:__LOC__
-                   ~metadata:[("err", `String (Error.to_string_hum e))] ;
-                 Core.exit 19 )
+       let%bind libp2p_keypair =
+         match libp2p_keypair with
+         | None ->
+             return None
+         | Some s ->
+             Secrets.Libp2p_keypair.Terminal_stdin.read_exn s
+             |> Deferred.map ~f:Option.some
        in
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is

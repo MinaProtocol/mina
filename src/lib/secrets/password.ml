@@ -1,7 +1,5 @@
 open Core
 
-let default_password_env = "CODA_PRIVKEY_PASS"
-
 let read_hidden_line prompt : Bytes.t Async.Deferred.t =
   let open Unix in
   let open Async_unix in
@@ -35,5 +33,3 @@ let hidden_line_or_env prompt ~env : Bytes.t Async.Deferred.t =
       return (Bytes.of_string p)
   | _ ->
       read_hidden_line prompt
-
-let read prompt = hidden_line_or_env prompt ~env:default_password_env
