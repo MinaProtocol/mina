@@ -181,7 +181,7 @@ let run_test () : unit Deferred.t =
       in
       let fee = Currency.Fee.of_int in
       let snark_work_fee, transaction_fee =
-        if with_snark then (fee 0, fee 0) else (fee 21, fee 30)
+        if with_snark then (fee 0, fee 0) else (fee 1, fee 2)
       in
       let%bind coda =
         Coda_lib.create

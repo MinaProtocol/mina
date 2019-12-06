@@ -813,7 +813,13 @@ module T = struct
                 Staged_ledger_diff.At_most_two.Two
                   (Option.map (coinbase_ft w1) ~f:(fun ft ->
                        (ft, coinbase_ft w2) ))
-                (*Why add work without checking if work constraints are satisfied? If we reach here then it means that we are trying to fill the last two slots of the tree with coinbase trnasactions and if there's any work in [works] then that has to be included, either in the coinbase or as fee transfers that gets paid by the transaction fees. So having it as coinbase ft will atleast get reduce the slots occupied by fee transfers*)
+                (*Why add work without checking if work constraints are
+                satisfied? If we reach here then it means that we are trying to
+                fill the last two slots of the tree with coinbase trnasactions
+                and if there's any work in [works] then that has to be included,
+                either in the coinbase or as fee transfers that gets paid by
+                the transaction fees. So having it as coinbase ft will atleast
+                get reduce the slots occupied by fee transfers*)
               in
               (cb, diff works (Sequence.of_list [stmt w1; stmt w2]))
             else if Amount.(of_fee w1.fee <= Coda_compile_config.coinbase) then
@@ -929,7 +935,7 @@ module T = struct
           match coinbase_work t.completed_work_rev ~is_two:true with
           | None ->
               (Two None, t.completed_work_rev)
-              (*Check for work constraint needs will be done in [check_constraints_and_update]*)
+              (*Check for work constraint will be done in [check_constraints_and_update]*)
           | Some (fts', rem_cw) ->
               (fts', rem_cw) )
       in
