@@ -101,7 +101,7 @@ let daemon logger =
             need to set this if auto-discovery fails for some reason."
          (optional string)
      and bind_ip_opt =
-       flag "bind-ip" ~doc:"IP IP of network interface to use"
+       flag "bind-ip" ~doc:"IP IP of network interface to listen on"
          (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
