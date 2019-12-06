@@ -43,3 +43,21 @@ let translationsToDict = (translations: array(ReactIntl.translation)) => {
     },
   );
 };
+
+module Hooks = {
+  type action =
+    | SetLocale(locale);
+
+  let useLocale = () => {
+    let initialState = En;
+
+    let intlReducer = (_, action) =>
+      switch (action) {
+      | SetLocale(locale) => locale
+      };
+
+    let (locale, setLocale) = React.useReducer(intlReducer, initialState);
+
+    (locale, setLocale);
+  };
+};

@@ -1,14 +1,3 @@
-// TODO: Move these intl state to its own intl context and provider
-type action =
-  | SetLocale(Locale.locale);
-
-let initialState = Locale.Vn;
-
-let intlReducer = (_, action) =>
-  switch (action) {
-  | SetLocale(locale) => locale
-  };
-
 [@react.component]
 let make = () => {
   let settingsValue = AddressBookProvider.createContext();
@@ -16,7 +5,7 @@ let make = () => {
     OnboardingProvider.createContext();
   let dispatch = CodaProcess.useHook();
   let toastValue = ToastProvider.createContext();
-  let (locale, _) = React.useReducer(intlReducer, initialState);
+  let (locale, _) = Locale.Hooks.useLocale();
 
   <AddressBookProvider value=settingsValue>
     <OnboardingProvider value=onboardingValue>
