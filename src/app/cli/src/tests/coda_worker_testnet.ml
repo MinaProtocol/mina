@@ -404,13 +404,11 @@ let events workers start_reader =
             workers.(i) <- worker ;
             started () ;
             don't_wait_for
-              (let ms_to_catchup =
-                 6_000 (* time for peer discovery *) |> Float.of_int
-               in
-               let%bind () =
+              (let%bind () =
                  Coda_process.initialization_finish_signal_exn worker
                  >>= Linear_pipe.read >>| ignore
                in
+               let ms_to_catchup = 6_000 |> Float.of_int in
                let%map () = after (Time.Span.of_ms ms_to_catchup) in
                synced ()) ;
             connect_worker i worker) ;
