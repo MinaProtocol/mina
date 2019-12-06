@@ -691,6 +691,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 
 	// report dht peers
 	go func() {
+		time.Sleep(5 * time.Second)
 		for {
 			// default is to yield only 100 peers at a time. for now, always be
 			// looking... TODO: Is there a better way to use discovery? Should we only
