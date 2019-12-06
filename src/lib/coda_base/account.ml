@@ -3,24 +3,19 @@ open Import
 open Coda_numbers
 open Snark_params
 open Tick
-open Let_syntax
 open Currency
 open Snark_bits
 open Fold_lib
-open Module_version
 
 module Index = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = int [@@deriving bin_io, to_yojson, sexp, version]
-      end
+      type t = int [@@deriving to_yojson, sexp]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
@@ -42,7 +37,8 @@ module Index = struct
     let set v i b = if b then v lor (one lsl i) else v land lnot (one lsl i)
   end
 
-  include (Bits.Vector.Make (Vector) : Bits_intf.S with type t := t)
+  include (
+    Bits.Vector.Make (Vector) : Bits_intf.Convertible_bits with type t := t)
 
   let fold_bits = fold
 
@@ -54,24 +50,19 @@ end
 module Nonce = Account_nonce
 
 module Poly = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'state_hash) t =
-          { public_key: 'pk
-          ; balance: 'amount
-          ; nonce: 'nonce
-          ; receipt_chain_hash: 'receipt_chain_hash
-          ; delegate: 'pk
-          ; voting_for: 'state_hash }
-        [@@deriving sexp, bin_io, eq, compare, hash, yojson, version]
-      end
-
-      include T
+      type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'state_hash) t =
+        { public_key: 'pk
+        ; balance: 'amount
+        ; nonce: 'nonce
+        ; receipt_chain_hash: 'receipt_chain_hash
+        ; delegate: 'pk
+        ; voting_for: 'state_hash }
+      [@@deriving sexp, eq, compare, hash, yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('pk, 'amount, 'nonce, 'receipt_chain_hash, 'state_hash) t =
         ( 'pk
@@ -86,52 +77,46 @@ module Poly = struct
     ; receipt_chain_hash: 'receipt_chain_hash
     ; delegate: 'pk
     ; voting_for: 'state_hash }
-  [@@deriving sexp, eq, compare, hash, yojson]
+  [@@deriving sexp, eq, compare, hash, yojson, fields]
 end
 
+module Key = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Public_key.Compressed.Stable.V1.t
+      [@@deriving sexp, eq, hash, compare, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+end
+
+type key = Key.Stable.Latest.t [@@deriving sexp, eq, hash, compare, yojson]
+
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type key = Public_key.Compressed.Stable.V1.t
-      [@@deriving sexp, bin_io, eq, hash, compare, yojson]
+    type t =
+      ( Public_key.Compressed.Stable.V1.t
+      , Balance.Stable.V1.t
+      , Nonce.Stable.V1.t
+      , Receipt.Chain_hash.Stable.V1.t
+      , State_hash.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving sexp, eq, hash, compare, yojson]
 
-      type t =
-        ( Public_key.Compressed.Stable.V1.t
-        , Balance.Stable.V1.t
-        , Nonce.Stable.V1.t
-        , Receipt.Chain_hash.Stable.V1.t
-        , State_hash.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving sexp, bin_io, eq, hash, compare, yojson, version]
-    end
-
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
 
     let public_key (t : t) : key = t.public_key
   end
-
-  (* module version registration *)
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "coda_base_account"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 (* bin_io, version omitted *)
-type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare]
+type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare, yojson]
 
 [%%define_locally
 Stable.Latest.(public_key)]
-
-type key = Stable.Latest.key [@@deriving sexp, eq, hash, compare, yojson]
 
 type var =
   ( Public_key.Compressed.var
@@ -198,30 +183,23 @@ let var_of_t
   ; delegate= Public_key.Compressed.var_of_t delegate
   ; voting_for= State_hash.var_of_t voting_for }
 
-let var_to_triples
-    Poly.{public_key; balance; nonce; receipt_chain_hash; delegate; voting_for}
-    =
-  let%map public_key = Public_key.Compressed.var_to_triples public_key
-  and voting_for = State_hash.var_to_triples voting_for
-  and receipt_chain_hash = Receipt.Chain_hash.var_to_triples receipt_chain_hash
-  and delegate = Public_key.Compressed.var_to_triples delegate
-  and nonce = Nonce.Checked.to_triples nonce in
-  let balance = Balance.var_to_triples balance in
-  public_key @ balance @ nonce @ receipt_chain_hash @ delegate @ voting_for
-
-let fold
-    ({public_key; balance; nonce; receipt_chain_hash; delegate; voting_for} :
-      t) =
-  let open Fold in
-  Public_key.Compressed.fold public_key
-  +> Balance.fold balance +> Nonce.fold nonce
-  +> Receipt.Chain_hash.fold receipt_chain_hash
-  +> Public_key.Compressed.fold delegate
-  +> State_hash.fold voting_for
+let to_input (t : t) =
+  let open Random_oracle.Input in
+  let f mk acc field = mk (Core.Field.get field t) :: acc in
+  let bits conv = f (Fn.compose bitstring conv) in
+  Poly.Fields.fold ~init:[]
+    ~public_key:(f Public_key.Compressed.to_input)
+    ~balance:(bits Balance.to_bits) ~nonce:(bits Nonce.Bits.to_bits)
+    ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
+    ~delegate:(f Public_key.Compressed.to_input)
+    ~voting_for:(f State_hash.to_input)
+  |> List.reduce_exn ~f:append
 
 let crypto_hash_prefix = Hash_prefix.account
 
-let crypto_hash t = Pedersen.hash_fold crypto_hash_prefix (fold t)
+let crypto_hash t =
+  Random_oracle.hash ~init:crypto_hash_prefix
+    (Random_oracle.pack_input (to_input t))
 
 let empty =
   Poly.
@@ -232,16 +210,15 @@ let empty =
     ; delegate= Public_key.Compressed.empty
     ; voting_for= State_hash.dummy }
 
-let digest t = Pedersen.State.digest (crypto_hash t)
+let digest = crypto_hash
 
 let create public_key balance =
-  Poly.
-    { public_key
-    ; balance
-    ; nonce= Nonce.zero
-    ; receipt_chain_hash= Receipt.Chain_hash.empty
-    ; delegate= public_key
-    ; voting_for= State_hash.dummy }
+  { Poly.public_key
+  ; balance
+  ; nonce= Nonce.zero
+  ; receipt_chain_hash= Receipt.Chain_hash.empty
+  ; delegate= public_key
+  ; voting_for= State_hash.dummy }
 
 let gen =
   let open Quickcheck.Let_syntax in
@@ -250,10 +227,27 @@ let gen =
   return (create public_key balance)
 
 module Checked = struct
-  let hash t =
-    var_to_triples t >>= Pedersen.Checked.hash_triples ~init:crypto_hash_prefix
+  let to_input (t : var) =
+    let ( ! ) f x = Run.run_checked (f x) in
+    let f mk acc field = mk (Core.Field.get field t) :: acc in
+    let open Random_oracle.Input in
+    let bits conv =
+      f (fun x ->
+          bitstring (Bitstring_lib.Bitstring.Lsb_first.to_list (conv x)) )
+    in
+    List.reduce_exn ~f:append
+      (Poly.Fields.fold ~init:[]
+         ~public_key:(f Public_key.Compressed.Checked.to_input)
+         ~balance:(bits Balance.var_to_bits)
+         ~nonce:(bits !Nonce.Checked.to_bits)
+         ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
+         ~delegate:(f Public_key.Compressed.Checked.to_input)
+         ~voting_for:(f State_hash.var_to_input))
 
   let digest t =
-    var_to_triples t
-    >>= Pedersen.Checked.digest_triples ~init:crypto_hash_prefix
+    make_checked (fun () ->
+        Random_oracle.Checked.(
+          hash ~init:crypto_hash_prefix (pack_input (to_input t))) )
+
+  let to_input t = make_checked (fun () -> to_input t)
 end

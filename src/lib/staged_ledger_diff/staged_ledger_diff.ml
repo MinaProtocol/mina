@@ -1,21 +1,15 @@
 open Core_kernel
 open Coda_base
 open Signature_lib
-open Module_version
 
 module At_most_two = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
-        [@@deriving sexp, to_yojson, bin_io, version]
-      end
-
-      include T
+      type 'a t = Zero | One of 'a option | Two of ('a * 'a option) option
+      [@@deriving sexp, to_yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type 'a t = 'a Stable.Latest.t =
     | Zero
@@ -40,18 +34,12 @@ module At_most_two = struct
 end
 
 module At_most_one = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type 'a t = Zero | One of 'a option
-        [@@deriving sexp, to_yojson, bin_io, version]
-      end
-
-      include T
+      type 'a t = Zero | One of 'a option [@@deriving sexp, to_yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type 'a t = 'a Stable.Latest.t = Zero | One of 'a option
   [@@deriving sexp, to_yojson]
@@ -67,159 +55,123 @@ module At_most_one = struct
 end
 
 module Ft = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Fee_transfer.Single.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
-      end
+      type t = Fee_transfer.Single.Stable.V1.t [@@deriving sexp, to_yojson]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 end
 
 module Pre_diff_two = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('a, 'b) t =
-          { completed_works: 'a list
-          ; user_commands: 'b list
-          ; coinbase: Ft.Stable.V1.t At_most_two.Stable.V1.t }
-        [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
-      end
-
-      include T
+      type ('a, 'b) t =
+        { completed_works: 'a list
+        ; user_commands: 'b list
+        ; coinbase: Ft.Stable.V1.t At_most_two.Stable.V1.t }
+      [@@deriving sexp, to_yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('a, 'b) t = ('a, 'b) Stable.Latest.t =
     { completed_works: 'a list
     ; user_commands: 'b list
-    ; coinbase: Ft.Stable.V1.t At_most_two.Stable.V1.t }
+    ; coinbase: Ft.t At_most_two.t }
   [@@deriving sexp, to_yojson]
 end
 
 module Pre_diff_one = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('a, 'b) t =
-          { completed_works: 'a list
-          ; user_commands: 'b list
-          ; coinbase: Ft.Stable.V1.t At_most_one.Stable.V1.t }
-        [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
-      end
-
-      include T
+      type ('a, 'b) t =
+        { completed_works: 'a list
+        ; user_commands: 'b list
+        ; coinbase: Ft.Stable.V1.t At_most_one.Stable.V1.t }
+      [@@deriving sexp, to_yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('a, 'b) t = ('a, 'b) Stable.Latest.t =
     { completed_works: 'a list
     ; user_commands: 'b list
-    ; coinbase: Ft.Stable.V1.t At_most_one.Stable.V1.t }
+    ; coinbase: Ft.t At_most_one.t }
   [@@deriving sexp, to_yojson]
 end
 
 module Pre_diff_with_at_most_two_coinbase = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          ( Transaction_snark_work.Stable.V1.t
-          , User_command.Stable.V1.t )
-          Pre_diff_two.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
-      end
+      type t =
+        ( Transaction_snark_work.Stable.V1.t
+        , User_command.Stable.V1.t )
+        Pre_diff_two.Stable.V1.t
+      [@@deriving sexp, to_yojson]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 end
 
 module Pre_diff_with_at_most_one_coinbase = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          ( Transaction_snark_work.Stable.V1.t
-          , User_command.Stable.V1.t )
-          Pre_diff_one.Stable.V1.t
-        [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
-      end
+      type t =
+        ( Transaction_snark_work.Stable.V1.t
+        , User_command.Stable.V1.t )
+        Pre_diff_one.Stable.V1.t
+      [@@deriving sexp, to_yojson]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 end
 
 module Diff = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          Pre_diff_with_at_most_two_coinbase.Stable.V1.t
-          * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
-        [@@deriving sexp, to_yojson, bin_io, version {unnumbered}]
-      end
+      type t =
+        Pre_diff_with_at_most_two_coinbase.Stable.V1.t
+        * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
+      [@@deriving sexp, to_yojson]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        { diff: Diff.Stable.V1.t
-        ; creator: Public_key.Compressed.Stable.V1.t
-        ; state_body_hash: State_body_hash.Stable.V1.t }
-      [@@deriving sexp, to_yojson, bin_io, version]
-    end
+    type t =
+      { diff: Diff.Stable.V1.t
+      ; creator: Public_key.Compressed.Stable.V1.t
+      ; state_body_hash: State_body_hash.Stable.V1.t }
+    [@@deriving sexp, to_yojson]
 
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "staged_ledger_diff"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 type t = Stable.Latest.t =
-  { diff: Diff.Stable.V1.t
-  ; creator: Public_key.Compressed.Stable.V1.t
-  ; state_body_hash: State_body_hash.Stable.V1.t }
+  { diff: Diff.t
+  ; creator: Public_key.Compressed.t
+  ; state_body_hash: State_body_hash.t }
 [@@deriving sexp, to_yojson, fields]
 
 module With_valid_signatures_and_proofs = struct

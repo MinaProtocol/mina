@@ -86,118 +86,51 @@ val register_mask : t -> Mask.t -> Mask.Attached.t
 val commit : Mask.Attached.t -> unit
 
 module Undo : sig
+  open Transaction_logic
+
   module User_command_undo : sig
     module Common : sig
-      type t =
-        { user_command: User_command.Stable.V1.t
-        ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t }
+      type t = Undo.User_command_undo.Common.t =
+        { user_command: User_command.t
+        ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
       [@@deriving sexp]
-
-      module Stable :
-        sig
-          module V1 : sig
-            type t [@@deriving bin_io, sexp, version]
-          end
-
-          module Latest = V1
-        end
-        with type V1.t = t
     end
 
     module Body : sig
-      type t =
+      type t = Undo.User_command_undo.Body.t =
         | Payment of {previous_empty_accounts: Public_key.Compressed.t list}
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
       [@@deriving sexp]
-
-      module Stable :
-        sig
-          module V1 : sig
-            type t [@@deriving bin_io, sexp]
-          end
-        end
-        with type V1.t = t
     end
 
-    type t = {common: Common.Stable.V1.t; body: Body.Stable.V1.t}
+    type t = Undo.User_command_undo.t = {common: Common.t; body: Body.t}
     [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io]
-        end
-
-        module Latest = V1
-      end
-      with type V1.t = t
   end
 
   module Fee_transfer_undo : sig
-    type t =
-      { fee_transfer: Fee_transfer.Stable.V1.t
-      ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+    type t = Undo.Fee_transfer_undo.t =
+      { fee_transfer: Fee_transfer.t
+      ; previous_empty_accounts: Public_key.Compressed.t list }
     [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io]
-        end
-
-        module Latest = V1
-      end
-      with type V1.t = t
   end
 
   module Coinbase_undo : sig
-    type t =
-      { coinbase: Coinbase.Stable.V1.t
-      ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+    type t = Undo.Coinbase_undo.t =
+      { coinbase: Coinbase.t
+      ; previous_empty_accounts: Public_key.Compressed.t list }
     [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io]
-        end
-
-        module Latest = V1
-      end
-      with type V1.t = t
   end
 
   module Varying : sig
-    type t =
-      | User_command of User_command_undo.Stable.V1.t
-      | Fee_transfer of Fee_transfer_undo.Stable.V1.t
-      | Coinbase of Coinbase_undo.Stable.V1.t
+    type t = Undo.Varying.t =
+      | User_command of User_command_undo.t
+      | Fee_transfer of Fee_transfer_undo.t
+      | Coinbase of Coinbase_undo.t
     [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io]
-        end
-
-        module Latest = V1
-      end
-      with type V1.t = t
   end
 
-  type t =
-    {previous_hash: Ledger_hash.Stable.V1.t; varying: Varying.Stable.V1.t}
+  type t = Undo.t = {previous_hash: Ledger_hash.t; varying: Varying.t}
   [@@deriving sexp]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving bin_io, sexp, version]
-      end
-
-      module Latest = V1
-    end
-    with type V1.t = t
 
   val transaction : t -> Transaction.t Or_error.t
 end

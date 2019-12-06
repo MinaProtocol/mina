@@ -1,6 +1,6 @@
 {
   "name": "coda-wallet",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "",
   "main": "./lib/js/src/main/App.js",
   "dependencies": {
@@ -26,14 +26,14 @@
     "node": "^8.15.0"
   },
   "scripts": {
-    "fake": "graphql-faker --port 8080 -- schema.graphql",
+    "fake": "graphql-faker --port 3085 -- schema.graphql",
     "real": "./_build/coda-daemon-macos/coda.exe daemon -rest-port 8080 &> /dev/tty",
     "fake-inspector": "graphql-faker --open -- schema.graphql",
     "build": "yarn copy-schema && bsb -make-world",
     "build-ci": "yarn run query-fake && yarn run build",
     "clean": "bsb -clean-world",
     "pack": "fpack --development ./lib/js/src/render/Index.js",
-    "query": "send-introspection-query http://localhost:8080/graphql",
+    "query": "send-introspection-query http://localhost:3085/graphql",
     "query-fake": "concurrently --kill-others 'yarn run fake' 'sleep 5 && yarn run query' || true",
     "query-real": "concurrently --kill-others 'yarn run real' 'sleep 15 && yarn run query' || true",
     "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei' -print)",
@@ -51,7 +51,7 @@
       "lib"
     ],
     "directories": {
-      "buildResources": "_build"
+      "buildResources": "public/build"
     },
     "files": [
       "lib/**/*",
@@ -86,9 +86,9 @@
       ]
     },
     "linux": {
+      "executableName": "coda-wallet",
       "target": [
-        "AppImage",
-        "deb"
+        "AppImage"
       ]
     },
     "win": {

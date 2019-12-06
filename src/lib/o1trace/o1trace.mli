@@ -4,23 +4,35 @@
 *)
 val trace_event : string -> unit
 
-(** Trace a task that happens more than once.
+(** Trace some deferred work.
 
-  This is just like [trace_task], it just prepends "R&" to the name,
-  which trace-tool knows how to merge. Otherwise, each task gets its
-  own row in the trace viewer.
- *)
-val trace_recurring_task : string -> (unit -> 'a) -> 'a
-
-(** Trace a task that happens once.
-
-  [trace_task name f] makes a new [Async.Execution_context.t] with a new
+  [trace name f] makes a new [Async.Execution_context.t] with a new
   "task id", gives it [name] to show in the trace-viewer. Any deferreds
   created by [f] will inherit this task id. When the async scheduler starts
   executing a task, it logs the task id to the trace file. These show up in
   the trace-viewer as their own row, with [name] as the label.
 *)
-val trace_task : string -> (unit -> 'a) -> 'a
+val trace : string -> (unit -> 'a) -> 'a
+
+(** Trace some deferred work that happens more than once.
+
+  [trace_recurring name f] is the same as [trace ("R&" ^ name) f]. The prefix
+  collapses all the traces into a single row.
+ *)
+val trace_recurring : string -> (unit -> 'a) -> 'a
+
+(** Trace the execution of some background loop.
+
+  [trace_task name f] is the same as [don't_wait_for (trace name f)].
+
+  *)
+val trace_task : string -> (unit -> unit Async.Deferred.t) -> unit
+
+(** Trace the execution of some background loop that happens more than once.
+
+  [trace_recurring_task name f] is the same as [trace_task ("R&" ^ name) f].
+ *)
+val trace_recurring_task : string -> (unit -> unit Async.Deferred.t) -> unit
 
 (** Measure how long a function call takes.
 

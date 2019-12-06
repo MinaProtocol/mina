@@ -1,5 +1,6 @@
 type mode =
   | Blue
+  | HyperlinkBlue
   | Gray
   | Green
   | Red;
@@ -30,10 +31,21 @@ module Styles = {
       style([
         backgroundColor(Theme.Colors.marineAlpha(0.1)),
         color(Theme.Colors.marineAlpha(1.)),
-        hover([
-          backgroundColor(Theme.Colors.marineAlpha(1.)),
-          color(white),
-        ]),
+        hover([backgroundColor(Theme.Colors.marine), color(white)]),
+        focus([backgroundColor(Theme.Colors.marine), color(white)]),
+        active([backgroundColor(Theme.Colors.marine), color(white)]),
+      ]),
+    ]);
+
+  let hyperlinkBlue =
+    merge([
+      base,
+      style([
+        color(Theme.Colors.hyperlink),
+        backgroundColor(Theme.Colors.hyperlinkAlpha(0.15)),
+        hover([backgroundColor(Theme.Colors.hyperlink), color(white)]),
+        focus([backgroundColor(Theme.Colors.hyperlink), color(white)]),
+        active([backgroundColor(Theme.Colors.hyperlink), color(white)]),
       ]),
     ]);
 
@@ -44,6 +56,8 @@ module Styles = {
         backgroundColor(Theme.Colors.serpentine),
         color(white),
         hover([backgroundColor(Theme.Colors.jungle)]),
+        focus([backgroundColor(Theme.Colors.jungle)]),
+        active([backgroundColor(Theme.Colors.jungle)]),
       ]),
     ]);
 
@@ -54,6 +68,8 @@ module Styles = {
         backgroundColor(Theme.Colors.roseBud),
         color(white),
         hover([backgroundColor(Theme.Colors.yeezy)]),
+        focus([backgroundColor(Theme.Colors.yeezy)]),
+        active([backgroundColor(Theme.Colors.yeezy)]),
       ]),
     ]);
 
@@ -64,6 +80,8 @@ module Styles = {
         backgroundColor(Theme.Colors.slateAlpha(0.05)),
         color(Theme.Colors.midnight),
         hover([backgroundColor(Theme.Colors.slateAlpha(0.2))]),
+        focus([backgroundColor(Theme.Colors.slateAlpha(0.2))]),
+        active([backgroundColor(Theme.Colors.slateAlpha(0.2))]),
       ]),
     ]);
 
@@ -80,10 +98,15 @@ let make =
       ~width=10.5,
       ~height=3.,
       ~icon=?,
+      ~type_="button",
+      ~onMouseEnter=?,
+      ~onMouseLeave=?,
     ) =>
   <button
     disabled
     ?onClick
+    ?onMouseEnter
+    ?onMouseLeave
     className={Css.merge([
       disabled ? Styles.disabled : "",
       Css.style([Css.minWidth(`rem(width)), Css.height(`rem(height))]),
@@ -92,8 +115,10 @@ let make =
       | Green => Styles.green
       | Red => Styles.red
       | Gray => Styles.gray
+      | HyperlinkBlue => Styles.hyperlinkBlue
       },
-    ])}>
+    ])}
+    type_>
     {switch (icon) {
      | Some(kind) => <Icon kind />
      | None => React.null

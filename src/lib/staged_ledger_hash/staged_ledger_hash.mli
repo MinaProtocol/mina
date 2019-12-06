@@ -16,8 +16,6 @@ val typ : (var, t) Typ.t
 
 val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
-val length_in_triples : int
-
 val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
 val genesis : t Lazy.t
@@ -26,8 +24,6 @@ module Stable : sig
   module V1 : sig
     type nonrec t = t
     [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-
-    include Hashable_binable with type t := t
   end
 
   module Latest : module type of V1

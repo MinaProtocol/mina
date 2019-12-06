@@ -20,7 +20,8 @@ module Colors = {
 
   let bgColor = white;
 
-  let bgColorElectronWindow = "#00E9E9E9";
+  // Linux doesn't support transparency
+  let bgColorElectronWindow = "#FFE9E9E9";
 
   let savilleAlpha = a => `rgba((61, 88, 120, a));
   let saville = savilleAlpha(1.);
@@ -137,6 +138,13 @@ module Text = {
         fontSize(`rem(1.)),
         lineHeight(`rem(1.5)),
       ]);
+    let regularLight =
+      style([
+        Typeface.plex,
+        fontWeight(`normal),
+        fontSize(`rem(1.)),
+        lineHeight(`rem(1.5)),
+      ]);
 
     let mono =
       style([Typeface.mono, fontWeight(`medium), fontSize(`rem(0.9))]);
@@ -195,7 +203,15 @@ module Text = {
         lineHeight(`rem(1.5)),
         letterSpacing(`rem(-0.03125)),
       ]);
-
+    let h5 =
+      style([
+        Typeface.plex,
+        fontWeight(`normal),
+        fontSize(`rem(0.9345)),
+        lineHeight(`rem(1.0)),
+        letterSpacing(`rem(0.125)),
+        textTransform(`uppercase),
+      ]);
     let h6 =
       style([
         Typeface.plex,

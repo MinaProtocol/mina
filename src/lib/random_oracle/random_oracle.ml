@@ -1,5 +1,11 @@
 open Core
-module State = Array
+
+module State = struct
+  include Array
+
+  let map2 = map2_exn
+end
+
 module Input = Input
 open Curve_choice
 
@@ -25,6 +31,10 @@ let pack_input ~project {Input.field_elements; bitstrings} =
 
 module Inputs = struct
   module Field = Field
+
+  let rounds_full = 8
+
+  let rounds_partial = 33
 
   let to_the_alpha x =
     let open Field in
@@ -170,6 +180,10 @@ module Checked = struct
       let zero = constant Field.zero
     end
 
+    let rounds_full = 8
+
+    let rounds_partial = 33
+
     let to_the_alpha x =
       let open Runners.Tick.Field in
       let zero = square in
@@ -202,10 +216,11 @@ module Checked = struct
     update params ~state:(f state) (f xs) |> Array.map ~f:to_cvar
 
   let hash ?init xs =
-    hash
-      ?init:(Option.map init ~f:(State.map ~f:constant))
-      params (Array.map xs ~f:of_cvar)
-    |> to_cvar
+    O1trace.measure "Random_oracle.hash" (fun () ->
+        hash
+          ?init:(Option.map init ~f:(State.map ~f:constant))
+          params (Array.map xs ~f:of_cvar)
+        |> to_cvar )
 
   let pack_input = pack_input ~project:Runners.Tick.Field.project
 

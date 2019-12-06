@@ -1,4 +1,5 @@
 (library
   (name truth)
   (public_name truth)
-  (preprocess (pps ppx_coda)))
+  (preprocess (pps ppx_coda ppx_jane))
+  (libraries core_kernel))

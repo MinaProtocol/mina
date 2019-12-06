@@ -60,7 +60,7 @@ module Keypair : sig
   (** Securely generate a new keypair. *)
   val random : net -> t Deferred.t
 
-  (** Formats this keypair to a ;-separated list of public key, secret key, and peer_id. *)
+  (** Formats this keypair to a comma-separated list of public key, secret key, and peer_id. *)
   val to_string : t -> string
 
   (** Undo [to_string t].
@@ -81,7 +81,7 @@ end
   Some example multiaddrs:
 
   - [/ipfs/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC]
-  - [/ip4/127.0.0.1/ipfs/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC/tcp/1234]
+  - [/ip4/127.0.0.1/tcp/1234/ipfs/QmcgpsyWgH8Y8ajJz1Cu72KnS5uo2Aa2LpzU7kinSupNKC]
   - [/ip6/2601:9:4f81:9700:803e:ca65:66e8:c21]
  *)
 module Multiaddr : sig
@@ -172,6 +172,7 @@ val create : logger:Logger.t -> conf_dir:string -> net Deferred.Or_error.t
 val configure :
      net
   -> me:Keypair.t
+  -> external_maddr:Multiaddr.t
   -> maddrs:Multiaddr.t list
   -> network_id:string
   -> on_new_peer:(discovered_peer -> unit)

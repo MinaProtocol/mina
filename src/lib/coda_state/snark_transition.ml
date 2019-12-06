@@ -2,78 +2,64 @@ open Core_kernel
 open Coda_base
 
 module Poly = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ( 'blockchain_state
-             , 'consensus_transition
-             , 'sok_digest
-             , 'amount
-             , 'state_body_hash
-             , 'proposer_pk )
-             t =
-          { blockchain_state: 'blockchain_state
-          ; consensus_transition: 'consensus_transition
-          ; sok_digest: 'sok_digest
-          ; supply_increase: 'amount
-          ; ledger_proof: Proof.Stable.V1.t option
-          ; proposer: 'proposer_pk
-          ; coinbase_amount: 'amount
-          ; coinbase_state_body_hash: 'state_body_hash }
-        [@@deriving bin_io, to_yojson, sexp, fields, version]
-      end
-
-      include T
+      type ( 'blockchain_state
+           , 'consensus_transition
+           , 'sok_digest
+           , 'amount
+           , 'proposer_pk )
+           t =
+        { blockchain_state: 'blockchain_state
+        ; consensus_transition: 'consensus_transition
+        ; sok_digest: 'sok_digest
+        ; supply_increase: 'amount
+        ; ledger_proof: Proof.Stable.V1.t option
+        ; proposer: 'proposer_pk
+        ; coinbase_amount: 'amount }
+      [@@deriving bin_io, to_yojson, sexp, fields, version]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ( 'blockchain_state
        , 'consensus_transition
        , 'sok_digest
        , 'amount
-       , 'state_body_hash
        , 'proposer_pk )
        t =
         ( 'blockchain_state
         , 'consensus_transition
         , 'sok_digest
         , 'amount
-        , 'state_body_hash
         , 'proposer_pk )
         Stable.Latest.t =
     { blockchain_state: 'blockchain_state
     ; consensus_transition: 'consensus_transition
     ; sok_digest: 'sok_digest
     ; supply_increase: 'amount
-    ; ledger_proof: Proof.Stable.V1.t option
+    ; ledger_proof: Proof.t option
     ; proposer: 'proposer_pk
-    ; coinbase_amount: 'amount
-    ; coinbase_state_body_hash: 'state_body_hash }
+    ; coinbase_amount: 'amount }
   [@@deriving sexp, to_yojson, fields]
 end
 
 module Value = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          ( Blockchain_state.Value.Stable.V1.t
-          , Consensus.Data.Consensus_transition.Value.Stable.V1.t
-          , Sok_message.Digest.Stable.V1.t
-          , Currency.Amount.Stable.V1.t
-          , State_body_hash.Stable.V1.t
-          , Signature_lib.Public_key.Compressed.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
-      end
+      type t =
+        ( Blockchain_state.Value.Stable.V1.t
+        , Consensus.Data.Consensus_transition.Value.Stable.V1.t
+        , Sok_message.Digest.Stable.V1.t
+        , Currency.Amount.Stable.V1.t
+        , Signature_lib.Public_key.Compressed.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, to_yojson]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 end
@@ -86,8 +72,7 @@ Poly.
   , sok_digest
   , supply_increase
   , proposer
-  , coinbase_amount
-  , coinbase_state_body_hash )]
+  , coinbase_amount )]
 
 type value = Value.t
 
@@ -96,21 +81,19 @@ type var =
   , Consensus.Data.Consensus_transition.var
   , Sok_message.Digest.Checked.t
   , Currency.Amount.var
-  , State_body_hash.var
   , Signature_lib.Public_key.Compressed.var )
   Poly.t
 
 let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
     ~supply_increase ~blockchain_state ~consensus_transition ~proposer
-    ~coinbase_amount ~coinbase_state_body_hash () : Value.t =
+    ~coinbase_amount () : Value.t =
   { blockchain_state
   ; consensus_transition
   ; ledger_proof
   ; sok_digest
   ; supply_increase
   ; proposer
-  ; coinbase_amount
-  ; coinbase_state_body_hash }
+  ; coinbase_amount }
 
 let genesis : value lazy_t =
   lazy
@@ -125,8 +108,7 @@ let genesis : value lazy_t =
                 (List.hd_exn (Ledger.to_list (Lazy.force Genesis_ledger.t))) }
     ; ledger_proof= None
     ; proposer= Signature_lib.Public_key.Compressed.empty
-    ; coinbase_amount= Currency.Amount.zero
-    ; coinbase_state_body_hash= State_body_hash.dummy }
+    ; coinbase_amount= Currency.Amount.zero }
 
 let to_hlist
     { Poly.blockchain_state
@@ -135,8 +117,7 @@ let to_hlist
     ; supply_increase
     ; ledger_proof
     ; proposer
-    ; coinbase_amount
-    ; coinbase_state_body_hash } =
+    ; coinbase_amount } =
   Snarky.H_list.
     [ blockchain_state
     ; consensus_transition
@@ -144,8 +125,7 @@ let to_hlist
     ; supply_increase
     ; ledger_proof
     ; proposer
-    ; coinbase_amount
-    ; coinbase_state_body_hash ]
+    ; coinbase_amount ]
 
 let of_hlist
     ([ blockchain_state
@@ -154,8 +134,7 @@ let of_hlist
      ; supply_increase
      ; ledger_proof
      ; proposer
-     ; coinbase_amount
-     ; coinbase_state_body_hash ] :
+     ; coinbase_amount ] :
       (unit, _) Snarky.H_list.t) =
   { Poly.blockchain_state
   ; consensus_transition
@@ -163,8 +142,7 @@ let of_hlist
   ; supply_increase
   ; ledger_proof
   ; proposer
-  ; coinbase_amount
-  ; coinbase_state_body_hash }
+  ; coinbase_amount }
 
 let typ =
   let open Snark_params.Tick.Typ in
@@ -182,5 +160,4 @@ let typ =
     ; Currency.Amount.typ
     ; ledger_proof
     ; Signature_lib.Public_key.Compressed.typ
-    ; Currency.Amount.typ
-    ; State_body_hash.typ ]
+    ; Currency.Amount.typ ]

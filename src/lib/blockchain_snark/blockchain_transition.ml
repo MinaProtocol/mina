@@ -70,10 +70,10 @@ module Keys = struct
 
     let dummy =
       { step=
-          Tick_backend.Verification_key.dummy
+          Tick_backend.Verification_key.get_dummy
             ~input_size:Coda_base.Transition_system.step_input_size
       ; wrap=
-          Tock_backend.Bowe_gabizon.Verification_key.dummy
+          Tock_backend.Bowe_gabizon.Verification_key.get_dummy
             ~input_size:Wrap_input.size }
 
     let load ({step; wrap} : Location.t) =
@@ -149,6 +149,12 @@ module Make (T : Transaction_snark.Verification.S) = struct
         let var_to_field = var_to_hash_packed
       end
 
+      module Body_hash = struct
+        include Coda_base.State_body_hash
+
+        let var_to_field = var_to_hash_packed
+      end
+
       module Checked = struct
         include Blockchain_snark_state.Checked
         include U.Checked
@@ -216,10 +222,11 @@ module Make (T : Transaction_snark.Verification.S) = struct
         let open Tick in
         let open Cached.Let_syntax in
         let%map verification =
-          Cached.component ~label:"verification" ~f:Keypair.vk
+          Cached.component ~label:"step_verification" ~f:Keypair.vk
             (module Verification_key)
         and proving =
-          Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+          Cached.component ~label:"step_proving" ~f:Keypair.pk
+            (module Proving_key)
         in
         (verification, {proving with value= ()})
       in
@@ -227,6 +234,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
         ~autogen_path:Cache_dir.autogen_path
         ~manual_install_path:Cache_dir.manual_install_path
         ~brew_install_path:Cache_dir.brew_install_path
+        ~s3_install_path:Cache_dir.s3_install_path
         ~digest_input:
           (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
         ~create_env:Tick.Keypair.generate
@@ -235,6 +243,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
              (Step_base.main (Logger.null ())))
 
     let cached () =
+      let open Cached.Deferred_with_track_generated.Let_syntax in
       let paths = Fn.compose Cache_dir.possible_paths Filename.basename in
       let%bind step_vk, step_pk = Cached.run step_cached in
       let module Wrap = Wrap_base (struct
@@ -245,10 +254,11 @@ module Make (T : Transaction_snark.Verification.S) = struct
           let open Tock in
           let open Cached.Let_syntax in
           let%map verification =
-            Cached.component ~label:"verification" ~f:Keypair.vk
+            Cached.component ~label:"wrap_verification" ~f:Keypair.vk
               (module Verification_key)
           and proving =
-            Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+            Cached.component ~label:"wrap_proving" ~f:Keypair.pk
+              (module Proving_key)
           in
           (verification, {proving with value= ()})
         in
@@ -256,6 +266,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
           ~autogen_path:Cache_dir.autogen_path
           ~manual_install_path:Cache_dir.manual_install_path
           ~brew_install_path:Cache_dir.brew_install_path
+          ~s3_install_path:Cache_dir.s3_install_path
           ~digest_input:(fun x ->
             Md5.to_hex (Tock.R1CS_constraint_system.digest (Lazy.force x)) )
           ~input:(lazy (Tock.constraint_system ~exposing:Wrap.input Wrap.main))
@@ -281,8 +292,7 @@ end
 let instance_hash wrap_vk =
   let open Coda_base in
   let init =
-    Random_oracle.update
-      ~state:Hash_prefix.Random_oracle.transition_system_snark
+    Random_oracle.update ~state:Hash_prefix.transition_system_snark
       Snark_params.Tick.Verifier.(
         let vk = vk_of_backend_vk wrap_vk in
         let g1 = Tick.Inner_curve.to_affine_exn in

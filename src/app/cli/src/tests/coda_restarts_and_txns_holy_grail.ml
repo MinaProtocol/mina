@@ -5,6 +5,7 @@ open Coda_base
 let name = "coda-restarts-and-txns-holy-grail"
 
 let main n () =
+  let wait_time = Time.Span.of_min 2. in
   assert (n > 1) ;
   let logger = Logger.create () in
   let snark_work_public_keys =
@@ -15,7 +16,8 @@ let main n () =
   let proposers n = if n < 3 then Some n else None in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
+      Cli_lib.Arg_type.Work_selection_method.Sequence
+      ~max_concurrent_connections:None
   in
   (* SEND TXNS *)
   let keypairs =
@@ -29,27 +31,27 @@ let main n () =
   |> don't_wait_for ;
   (* RESTART NODES *)
   (* catchup *)
-  let%bind () = after (Time.Span.of_min 1.) in
+  let%bind () = after wait_time in
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger
       ~node:(random_non_proposer ())
   in
-  let%bind () = after (Time.Span.of_min 1.) in
+  let%bind () = after wait_time in
   (* bootstrap *)
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger
       ~node:(random_non_proposer ())
   in
   (* random restart *)
-  let%bind () = after (Time.Span.of_min 1.) in
+  let%bind () = after wait_time in
   let%bind () =
     Coda_worker_testnet.Restarts.restart_node testnet ~logger
       ~node:(random_proposer ())
       ~duration:(Time.Span.of_min (Random.float 3.))
   in
   (* settle for a few more min *)
-  let%bind () = after (Time.Span.of_min 1.) in
-  Coda_worker_testnet.Api.teardown testnet
+  let%bind () = after wait_time in
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   let open Command.Let_syntax in

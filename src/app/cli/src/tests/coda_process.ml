@@ -20,7 +20,7 @@ let spawn_exn (config : Coda_worker.Input.t) =
 
 let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
     ~program_dir ~proposer ~snark_worker_key ~work_selection_method ~offset
-    ~trace_dir ~max_concurrent_connections ~is_archive_node () =
+    ~trace_dir ~max_concurrent_connections ~is_archive_rocksdb () =
   let conf_dir =
     Filename.temp_dir_name
     ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
@@ -47,7 +47,7 @@ let local_config ?proposal_interval:_ ~peers ~addrs_and_ports ~acceptable_delay
     ; trace_dir
     ; program_dir
     ; acceptable_delay
-    ; is_archive_node
+    ; is_archive_rocksdb
     ; max_concurrent_connections }
   in
   config
@@ -146,12 +146,22 @@ let stop_snark_worker (conn, _, _) =
   Coda_worker.Connection.run_exn conn
     ~f:Coda_worker.functions.stop_snark_worker ~arg:()
 
-let disconnect ((conn, proc, _) as t) =
+let disconnect ((conn, proc, _) as t) ~logger =
   (* This kills any straggling snark worker process *)
-  let%bind () = stop_snark_worker t in
+  let%bind () =
+    match%map Monitor.try_with (fun () -> stop_snark_worker t) with
+    | Ok () ->
+        ()
+    | Error exn ->
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Harmless error when stopping snark worker: $exn"
+          ~metadata:[("exn", `String (Exn.to_string exn))]
+  in
   let%bind () = Coda_worker.Connection.close conn in
   match%map Monitor.try_with (fun () -> Process.wait proc) with
   | Ok _exit_or_signal ->
       ()
-  | Error _exn ->
-      ()
+  | Error exn ->
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Harmless error when stopping test node: $exn"
+        ~metadata:[("exn", `String (Exn.to_string exn))]

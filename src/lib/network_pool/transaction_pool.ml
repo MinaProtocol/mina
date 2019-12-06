@@ -9,6 +9,7 @@ open Module_version
 open Pipe_lib
 open Signature_lib
 
+(* TEMP HACK UNTIL DEFUNCTORING: transition frontier interface is simplified *)
 module type Transition_frontier_intf = sig
   type t
 
@@ -20,18 +21,14 @@ module type Transition_frontier_intf = sig
     val staged_ledger : t -> staged_ledger
   end
 
-  module Diff : sig
-    module Best_tip_diff : sig
-      type view =
-        { new_user_commands: User_command.t list
-        ; removed_user_commands: User_command.t list
-        ; reorg_best_tip: bool }
-    end
-  end
+  type best_tip_diff =
+    { new_user_commands: User_command.t list
+    ; removed_user_commands: User_command.t list
+    ; reorg_best_tip: bool }
 
   val best_tip : t -> Breadcrumb.t
 
-  val best_tip_diff_pipe : t -> Diff.Best_tip_diff.view Broadcast_pipe.Reader.t
+  val best_tip_diff_pipe : t -> best_tip_diff Broadcast_pipe.Reader.t
 end
 
 module type S = sig
@@ -57,7 +54,7 @@ module type S = sig
      and type resource_pool_diff := Resource_pool.Diff.t
      and type config := Resource_pool.Config.t
 
-  val add : t -> User_command.t -> unit Deferred.t
+  val add : t -> User_command.t list -> unit Deferred.t
 end
 
 (* Functor over user command, base ledger and transaction validator for
@@ -163,7 +160,7 @@ struct
 
     let handle_diff t frontier
         ({new_user_commands; removed_user_commands; reorg_best_tip= _} :
-          Transition_frontier.Diff.Best_tip_diff.view) =
+          Transition_frontier.best_tip_diff) =
       (* This runs whenever the best tip changes. The simple case is when the
          new best tip is an extension of the old one. There, we just remove any
          user commands that were included in it from the transaction pool.
@@ -705,7 +702,7 @@ struct
 
   (* TODO: This causes the signature to get checked twice as it is checked
      below before feeding it to add *)
-  let add t txn = apply_and_broadcast t (Envelope.Incoming.local [txn])
+  let add t txns = apply_and_broadcast t (Envelope.Incoming.local txns)
 end
 
 (* Use this one in downstream consumers *)
@@ -718,7 +715,7 @@ end)
                        with type staged_ledger := Staged_ledger.t) :
   S
   with type transition_frontier := Transition_frontier.t
-   and type best_tip_diff := Transition_frontier.Diff.Best_tip_diff.view =
+   and type best_tip_diff := Transition_frontier.best_tip_diff =
   Make0
     (Coda_base.Ledger)
     (struct
@@ -736,7 +733,20 @@ end)
     (Staged_ledger)
     (Transition_frontier)
 
-include Make (Staged_ledger) (Transition_frontier)
+(* TODO: defunctor or remove monkey patching (#3731) *)
+include Make
+          (Staged_ledger)
+          (struct
+            include Transition_frontier
+
+            type best_tip_diff = Extensions.Best_tip_diff.view =
+              { new_user_commands: User_command.t list
+              ; removed_user_commands: User_command.t list
+              ; reorg_best_tip: bool }
+
+            let best_tip_diff_pipe t =
+              Extensions.(get_view_pipe (extensions t) Best_tip_diff)
+          end)
 
 let%test_module _ =
   ( module struct
@@ -767,27 +777,20 @@ let%test_module _ =
         let staged_ledger = Fn.id
       end
 
-      module Diff = struct
-        module Best_tip_diff = struct
-          type view =
-            { new_user_commands: User_command.t list
-            ; removed_user_commands: User_command.t list
-            ; reorg_best_tip: bool }
-        end
-      end
+      type best_tip_diff =
+        { new_user_commands: User_command.t list
+        ; removed_user_commands: User_command.t list
+        ; reorg_best_tip: bool }
 
-      type t =
-        Diff.Best_tip_diff.view Broadcast_pipe.Reader.t * Breadcrumb.t ref
+      type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
 
-      let create : unit -> t * Diff.Best_tip_diff.view Broadcast_pipe.Writer.t
-          =
+      let create : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
        fun () ->
         let pipe_r, pipe_w =
           Broadcast_pipe.create
-            Diff.Best_tip_diff.
-              { new_user_commands= []
-              ; removed_user_commands= []
-              ; reorg_best_tip= false }
+            { new_user_commands= []
+            ; removed_user_commands= []
+            ; reorg_best_tip= false }
         in
         let accounts =
           List.map (Array.to_list test_keys) ~f:(fun kp ->
@@ -986,6 +989,7 @@ let%test_module _ =
       User_command.forget_check
       @@ User_command.sign test_keys.(sender_idx)
            (User_command_payload.create ~fee:(Currency.Fee.of_int fee)
+              ~valid_until:Coda_numbers.Global_slot.max_value
               ~nonce:(Account.Nonce.of_int nonce)
               ~memo:(User_command_memo.create_by_digesting_string_exn "foo")
               ~body:

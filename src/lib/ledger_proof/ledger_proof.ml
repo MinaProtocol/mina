@@ -18,7 +18,7 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
     module V1 = struct
       module T = struct
         type t = Transaction_snark.Stable.V1.t
-        [@@deriving bin_io, compare, sexp, version, yojson]
+        [@@deriving bin_io, compare, sexp, version, to_yojson]
       end
 
       include T
@@ -37,7 +37,7 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
   let statement (t : t) = Transaction_snark.statement t
 
@@ -114,6 +114,12 @@ include Prod
 include Debug
 
 [%%endif]
+
+type _ type_witness =
+  | Debug : Debug.t type_witness
+  | Prod : Prod.t type_witness
+
+type with_witness = With_witness : 't * 't type_witness -> with_witness
 
 module For_tests = struct
   let mk_dummy_proof statement =

@@ -1,6 +1,9 @@
 open BsElectron;
 open Tc;
 
+[@bs.module "electron"] [@bs.scope "shell"] [@bs.val]
+external openItem: string => unit = "openItem";
+
 let createTray = dispatch => {
   let t = AppTray.get();
   let trayItems =
@@ -24,6 +27,12 @@ let createTray = dispatch => {
         Label("Settings"),
         ~accelerator="CmdOrCtrl+,",
         ~click=() => AppWindow.deepLink({path: Route.Settings, dispatch}),
+        (),
+      ),
+      make(
+        Label("View logs"),
+        ~accelerator="CmdOrCtrl+L",
+        ~click=() => openItem(DaemonProcess.Process.logfileName),
         (),
       ),
       make(Separator, ()),
@@ -124,10 +133,7 @@ let run = () =>
       createTray(dispatch);
       createApplicationMenu();
 
-      // Attempt to start the daemon on startup.
-      dispatch(
-        Action.ControlCoda(Some(["-peer", "seared-kobe.o1test.net:8303"])),
-      );
+      DaemonProcess.CodaProcess.(start(defaultArgs)) |> ignore;
 
       AppWindow.deepLink({AppWindow.Input.path: Route.Home, dispatch});
     },

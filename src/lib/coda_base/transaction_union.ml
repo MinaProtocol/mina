@@ -52,6 +52,7 @@ let of_transaction : Transaction.t -> t = function
           { common=
               { fee= other_amount
               ; nonce= Account.Nonce.zero
+              ; valid_until= Coda_numbers.Global_slot.max_value
               ; memo= User_command_memo.empty }
           ; body= {public_key= proposer; amount; tag= Tag.Coinbase} }
       ; sender= Public_key.decompress_exn other_pk
@@ -62,6 +63,7 @@ let of_transaction : Transaction.t -> t = function
             { common=
                 { fee= fee2
                 ; nonce= Account.Nonce.zero
+                ; valid_until= Coda_numbers.Global_slot.max_value
                 ; memo= User_command_memo.empty }
             ; body=
                 { public_key= pk1
@@ -71,9 +73,9 @@ let of_transaction : Transaction.t -> t = function
         ; signature= Signature.dummy }
       in
       match tr with
-      | One (pk, fee) ->
+      | `One (pk, fee) ->
           two (pk, fee) (pk, Fee.zero)
-      | Two (t1, t2) ->
+      | `Two (t1, t2) ->
           two t1 t2 )
 
 let excess (t : t) = Transaction_union_payload.excess t.payload
