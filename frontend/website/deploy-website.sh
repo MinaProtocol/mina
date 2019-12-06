@@ -21,6 +21,7 @@ echo "*** Building"
 
 yarn clean && yarn build $1
 yarn graphql-docs
+yarn archive-node-docs
 
 
 # Deploy cdn if prod
