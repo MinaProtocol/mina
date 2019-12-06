@@ -100,9 +100,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; net2: Coda_net2.net
       ; first_peer_ivar: unit Ivar.t
       ; high_connectivity_ivar: unit Ivar.t
-      ; ban_notifications:
-          Intf.ban_notification Linear_pipe.Reader.t
-          * Intf.ban_notification Linear_pipe.Writer.t
+      ; ban_reader: Intf.ban_notification Linear_pipe.Reader.t
       ; subscription: Message.msg Coda_net2.Pubsub.Subscription.t }
 
     let create_libp2p (config : Config.t) first_peer_ivar
@@ -157,7 +155,6 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   if !ctr < 4 then incr ctr
                   else Ivar.fill_if_empty high_connectivity_ivar () )
             in
-            (* TODO: chain ID as network ID. *)
             let%map _ =
               listen_on net2
                 (Multiaddr.of_string
@@ -197,7 +194,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           "coda/consensus-messages/0.0.1"
           (* FIXME: instead of doing validation here we put the message into a
            queue for later potential broadcast. It will still be broadcast
-           despite failing validation, that is only for automatic forwarding.
+           despite failing validation, validation is only for automatic forwarding.
            Instead, we should probably do "initial validation" up front here,
            and turn should_forward_message into a filter_map instead of just a filter. *)
           ~should_forward_message:(fun ~sender:_ ~data:_ ->
@@ -205,13 +202,24 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           ~bin_prot:Message.V1.T.bin_msg ~on_decode_failure:`Ignore
         >>| Or_error.ok_exn
       in
-      let pipes = Linear_pipe.create () in
+      let ban_reader, ban_writer = Linear_pipe.create () in
+      don't_wait_for
+        (let%map () =
+           Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
+             ~f:(fun (addr, expiration) ->
+               don't_wait_for
+                 ( after Time.(diff expiration (now ()))
+                 >>= fun () -> Coda_net2.unban_ip net2 addr |> Deferred.ignore
+                 ) ;
+               Coda_net2.ban_ip net2 addr |> Deferred.ignore )
+         in
+         Linear_pipe.close ban_writer) ;
       { config
       ; net2
       ; first_peer_ivar
       ; high_connectivity_ivar
       ; subscription
-      ; ban_notifications= pipes }
+      ; ban_reader }
 
     let peers t = Coda_net2.peers t.net2
 
@@ -356,7 +364,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     let received_message_reader t =
       Coda_net2.Pubsub.Subscription.message_pipe t.subscription
 
-    let ban_notification_reader t = fst t.ban_notifications
+    let ban_notification_reader t = t.ban_reader
 
     let ip_for_peer t peer_id =
       Coda_net2.lookup_peerid t.net2 peer_id

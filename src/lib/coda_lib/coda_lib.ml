@@ -854,7 +854,8 @@ let create (config : Config.t) =
             (Strict_pipe.transfer
                (Coda_networking.states net)
                external_transitions_writer ~f:ident) ;
-          trace_task "ban notification loop" (fun () ->
+          (* TODO: augment ban_notifications with a Peer.ID so we can implement ban_notify
+           trace_task "ban notification loop" (fun () ->
               Linear_pipe.iter (Coda_networking.ban_notification_reader net)
                 ~f:(fun notification ->
                   let open Gossip_net in
@@ -864,7 +865,7 @@ let create (config : Config.t) =
                   let%map _ =
                     Coda_networking.ban_notify net peer banned_until
                   in
-                  () ) ) ;
+                  () ) ) ; *)
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system

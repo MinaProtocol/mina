@@ -40,8 +40,8 @@ asynchronous and post-hoc. In the background, once per minute it checks the
 connection count. If it is above the "high water mark", it will close
 ("trim") eligible connections until it reaches the "low water mark". All
 connections start with a "grace period" where they won't be closed. Peer IDs
-can be marked as "protected" which prevents them being trimmed. This is
-vulnerable to resource exhaustion by opening many new connections.
+can be marked as "protected" which prevents them being trimmed. cmr believes this
+is vulnerable to resource exhaustion by opening many new connections.
 
 *)
 
@@ -312,3 +312,18 @@ val begin_advertising : net -> unit Deferred.Or_error.t
 
 (** Stop listening, close all connections and subscription pipes, and kill the subprocess. *)
 val shutdown : net -> unit Deferred.t
+
+(** Ban an IP from connecting to the helper.
+
+    This ban is in place until [unban_ip] is called or the helper restarts.
+    After the deferred resolves, no new incoming streams will involve that IP.
+    TODO: does this forbid explicitly dialing them? *)
+val ban_ip :
+  net -> Unix.Inet_addr.t -> [`Ok | `Already_banned] Deferred.Or_error.t
+
+(** Unban an IP, allowing connections from it. *)
+val unban_ip :
+  net -> Unix.Inet_addr.t -> [`Ok | `Not_banned] Deferred.Or_error.t
+
+(** List of currently banned IPs. *)
+val banned_ips : net -> Unix.Inet_addr.t list Deferred.t

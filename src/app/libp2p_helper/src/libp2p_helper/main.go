@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	gonet "net"
 	"os"
 	"strconv"
 	"sync"
@@ -26,6 +27,7 @@ import (
 	protocol "github.com/libp2p/go-libp2p-core/protocol"
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
+	filter "github.com/libp2p/go-maddr-filter"
 	b58 "github.com/mr-tron/base58/base58"
 	"github.com/multiformats/go-multiaddr"
 	logging2 "github.com/whyrusleeping/go-logging"
@@ -73,6 +75,8 @@ const (
 	beginAdvertising
 	findPeer
 	listPeers
+	banIP
+	unbanIP
 )
 
 type envelope struct {
@@ -796,6 +800,63 @@ func (lp *listPeersMsg) run(app *app) (interface{}, error) {
 	return peerInfos, nil
 }
 
+type banIPMsg struct {
+	IP string `json:"ip"`
+}
+
+func (ban *banIPMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+
+	ip := gonet.ParseIP(ban.IP).To4()
+
+	if ip == nil {
+		// TODO: how to compute mask for IPv6?
+		return nil, badRPC(errors.New("unparsable IP or IPv6"))
+	}
+
+	ipnet := gonet.IPNet{Mask: ip.DefaultMask(), IP: ip}
+
+	currentAction, isFromRule := app.P2p.Filters.ActionForFilter(ipnet)
+
+	app.P2p.Filters.AddFilter(ipnet, filter.ActionDeny)
+
+	if currentAction == filter.ActionDeny && isFromRule {
+		return "banIP already banned", nil
+	}
+	return "banIP success", nil
+}
+
+type unbanIPMsg struct {
+	IP string `json:"ip"`
+}
+
+func (unban *unbanIPMsg) run(app *app) (interface{}, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+
+	ip := gonet.ParseIP(unban.IP).To4()
+
+	if ip == nil {
+		// TODO: how to compute mask for IPv6?
+		return nil, badRPC(errors.New("unparsable IP or IPv6"))
+	}
+
+	ipnet := gonet.IPNet{Mask: ip.DefaultMask(), IP: ip}
+
+	currentAction, isFromRule := app.P2p.Filters.ActionForFilter(ipnet)
+
+	if !isFromRule || currentAction == filter.ActionAccept {
+		return "unbanIP not banned", nil
+	}
+
+	app.P2p.Filters.RemoveLiteral(ipnet)
+
+	return "unbanIP success", nil
+}
+
 var msgHandlers = map[methodIdx]func() action{
 	configure:           func() action { return &configureMsg{} },
 	listen:              func() action { return &listenMsg{} },
@@ -815,6 +876,8 @@ var msgHandlers = map[methodIdx]func() action{
 	beginAdvertising:    func() action { return &beginAdvertisingMsg{} },
 	findPeer:            func() action { return &findPeerMsg{} },
 	listPeers:           func() action { return &listPeersMsg{} },
+	banIP:               func() action { return &banIPMsg{} },
+	unbanIP:             func() action { return &unbanIPMsg{} },
 }
 
 type errorResult struct {

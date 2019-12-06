@@ -70,6 +70,7 @@ module Helper = struct
     ; subscriptions: (int, erased_magic subscription) Hashtbl.t
     ; streams: (int, stream) Hashtbl.t
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
+    ; mutable banned_ips: Unix.Inet_addr.t list
     ; mutable new_peer_callback: (string -> string list -> unit) option
     ; mutable current_peers: Peer.t list
     ; mutable finished: bool }
@@ -275,6 +276,22 @@ module Helper = struct
       type output = peer_info [@@deriving yojson]
 
       let name = "findPeer"
+    end
+
+    module Ban_ip = struct
+      type input = string [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "banIP"
+    end
+
+    module Unban_ip = struct
+      type input = string [@@deriving yojson]
+
+      type output = string [@@deriving yojson]
+
+      let name = "unbanIP"
     end
   end
 
@@ -743,6 +760,7 @@ module Helper = struct
       ; outstanding_requests= Hashtbl.create (module Int)
       ; subscriptions= Hashtbl.create (module Int)
       ; streams= Hashtbl.create (module Int)
+      ; banned_ips= []
       ; new_peer_callback= None
       ; current_peers= []
       ; protocol_handlers= Hashtbl.create (module String)
@@ -1146,6 +1164,38 @@ let begin_advertising net =
       Error e
 
 let lookup_peerid = Helper.lookup_peerid
+
+let ban_ip net ip =
+  match%map
+    Helper.(do_rpc net (module Rpcs.Ban_ip) (Unix.Inet_addr.to_string ip))
+  with
+  | Ok "banIP success" ->
+      net.banned_ips <- ip :: net.banned_ips ;
+      Ok `Ok
+  | Ok "banIP already banned" ->
+      Ok `Already_banned
+  | Ok v ->
+      failwithf "helper broke RPC protocol: banIP got %s" v ()
+  | Error e ->
+      Error e
+
+let unban_ip net ip =
+  match%map
+    Helper.(do_rpc net (module Rpcs.Unban_ip) (Unix.Inet_addr.to_string ip))
+  with
+  | Ok "unbanIP success" ->
+      net.banned_ips
+      <- List.filter net.banned_ips ~f:(fun banned ->
+             not (Unix.Inet_addr.equal banned ip) ) ;
+      Ok `Ok
+  | Ok "unbanIP not banned" ->
+      Ok `Not_banned
+  | Ok v ->
+      failwithf "helper broke RPC protocol: unbanIP got %s" v ()
+  | Error e ->
+      Error e
+
+let banned_ips net = Deferred.return net.Helper.banned_ips
 
 (* Create and helpers for create *)
 

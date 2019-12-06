@@ -10,15 +10,13 @@ require (
 	github.com/coreos/etcd v3.3.13+incompatible // indirect
 	github.com/coreos/go-systemd v0.0.0-20190719114852-fd7a80b32e1f // indirect
 	github.com/davidlazar/go-crypto v0.0.0-20190522120613-62389b5e4ae0 // indirect
-	github.com/dgraph-io/badger v1.6.0 // indirect
 	github.com/go-errors/errors v1.0.1
 	github.com/go-kit/kit v0.9.0 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
 	github.com/google/pprof v0.0.0-20190723021845-34ac40c74b70 // indirect
 	github.com/grpc-ecosystem/grpc-gateway v1.9.5 // indirect
 	github.com/hashicorp/go-multierror v1.0.0 // indirect
-	github.com/ipfs/go-ds-badger v0.0.5
-	github.com/ipfs/go-ds-leveldb v0.0.2 // indirect
+	github.com/ipfs/go-ds-badger v0.0.7
 	github.com/ipfs/go-ipfs-delay v0.0.1 // indirect
 	github.com/ipfs/go-log v0.0.1
 	github.com/jbenet/go-context v0.0.0-20150711004518-d14ea06fba99 // indirect
@@ -26,7 +24,7 @@ require (
 	github.com/konsorten/go-windows-terminal-sequences v1.0.2 // indirect
 	github.com/kr/pty v1.1.8 // indirect
 	github.com/libp2p/go-conn-security v0.1.0 // indirect
-	github.com/libp2p/go-libp2p v0.3.1
+	github.com/libp2p/go-libp2p v0.4.2
 	github.com/libp2p/go-libp2p-core v0.2.4
 	github.com/libp2p/go-libp2p-crypto v0.1.0
 	github.com/libp2p/go-libp2p-discovery v0.2.0
@@ -37,19 +35,20 @@ require (
 	github.com/libp2p/go-libp2p-metrics v0.1.0 // indirect
 	github.com/libp2p/go-libp2p-net v0.1.0
 	github.com/libp2p/go-libp2p-peer v0.2.0
-	github.com/libp2p/go-libp2p-peerstore v0.1.3
+	github.com/libp2p/go-libp2p-peerstore v0.1.4
 	github.com/libp2p/go-libp2p-pnet v0.1.0
 	github.com/libp2p/go-libp2p-protocol v0.1.0
 	github.com/libp2p/go-libp2p-pubsub v0.2.3
 	github.com/libp2p/go-libp2p-record v0.1.1
 	github.com/libp2p/go-libp2p-routing v0.1.0
-	github.com/libp2p/go-libp2p-secio v0.2.0
+	github.com/libp2p/go-libp2p-secio v0.2.1
 	github.com/libp2p/go-libp2p-transport v0.1.0 // indirect
+	github.com/libp2p/go-maddr-filter v0.0.5
 	github.com/libp2p/go-mplex v0.1.0
 	github.com/libp2p/go-stream-muxer v0.1.0
 	github.com/libp2p/go-tcp-transport v0.1.1
 	github.com/libp2p/go-testutil v0.1.0 // indirect
-	github.com/libp2p/go-ws-transport v0.1.0
+	github.com/libp2p/go-ws-transport v0.1.2
 	github.com/magiconair/properties v1.8.1 // indirect
 	github.com/mailru/easyjson v0.0.0-20190626092158-b2ccc519800e // indirect
 	github.com/mattn/go-colorable v0.1.2 // indirect
