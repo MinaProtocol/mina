@@ -262,7 +262,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
           ~collected_transitions:[best_tip] ~transition_reader_ref
           ~transition_writer_ref ~frontier_w frontier
 
-let wait_till_gensis ~logger ~time_controller =
+let wait_till_genesis ~logger ~time_controller =
   let module Time = Coda_base.Block_time in
   let now = Time.now time_controller in
   try Consensus.Hooks.is_genesis now |> ignore
@@ -310,7 +310,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
   in
   let transition_reader_ref = ref transition_reader in
   let transition_writer_ref = ref transition_writer in
-  wait_till_gensis ~logger ~time_controller ;
+  wait_till_genesis ~logger ~time_controller ;
   let valid_transition_reader, valid_transition_writer =
     create_bufferred_pipe ~name:"valid transitions" ()
   in
