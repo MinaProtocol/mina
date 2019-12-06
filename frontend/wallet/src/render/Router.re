@@ -6,17 +6,17 @@ module Styles = {
   let container = style([width(`percent(100.)), overflow(`hidden)]);
 };
 
-module Wallets = [%graphql
+module Accounts = [%graphql
   {|
     query getWallets {
-      ownedWallets {
+      ownedWallets{
         publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
       }
     }
   |}
 ];
 
-module WalletQuery = ReasonApollo.CreateQuery(Wallets);
+module AccountQuery = ReasonApollo.CreateQuery(Accounts);
 
 [@react.component]
 let make = () => {
@@ -26,9 +26,13 @@ let make = () => {
      | ["settings"] => <SettingsPage />
      | ["settings", publicKey] =>
        <AccountSettings publicKey={PublicKey.uriDecode(publicKey)} />
-     | ["wallet", _pk, ..._] => <Transactions />
+     | ["settings", publicKey, "delegate"] =>
+       <DelegationSettings publicKey={PublicKey.uriDecode(publicKey)} />
+     | ["settings", publicKey, "stake"] =>
+       <StakingSettings publicKey={PublicKey.uriDecode(publicKey)} />
+     | ["account", _pk, ..._] => <Transactions />
      | _ =>
-       <WalletQuery>
+       <AccountQuery>
          (
            ({result}) =>
              switch (result) {
@@ -40,13 +44,13 @@ let make = () => {
                |> Option.map(~f=w => w##publicKey)
                |> Option.iter(~f=pk =>
                     ReasonReact.Router.push(
-                      "/wallet/" ++ PublicKey.uriEncode(pk),
+                      "/account/" ++ PublicKey.uriEncode(pk),
                     )
                   );
                <Transactions />;
              }
          )
-       </WalletQuery>
+       </AccountQuery>
      }}
   </div>;
 };

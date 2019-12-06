@@ -1,8 +1,6 @@
 open Core
 open Snark_params.Tick
 open Snark_bits
-open Fold_lib
-open Tuple_lib
 
 type uint64 = Unsigned.uint64
 
@@ -17,20 +15,9 @@ module type Basic = sig
 
   val gen : t Quickcheck.Generator.t
 
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t
-      [@@deriving bin_io, sexp, compare, eq, hash, yojson, version]
-    end
+  include Bits_intf.Convertible_bits with type t := t
 
-    module Latest = V1
-  end
-
-  include Bits_intf.Convertable_bits with type t := t
-
-  val fold : t -> bool Triple.t Fold.t
-
-  val length_in_triples : int
+  val to_input : t -> (_, bool) Random_oracle.Input.t
 
   val zero : t
 
@@ -58,7 +45,7 @@ module type Basic = sig
 
   val var_to_bits : var -> Boolean.var Bitstring_lib.Bitstring.Lsb_first.t
 
-  val var_to_triples : var -> Boolean.var Triple.t list
+  val var_to_input : var -> (_, Boolean.var) Random_oracle.Input.t
 
   val equal_var : var -> var -> (Boolean.var, _) Checked.t
 end
@@ -103,55 +90,43 @@ module type Checked_arithmetic_intf = sig
   val add_signed : var -> signed_var -> (var, _) Checked.t
 end
 
+module Signed : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type ('magnitude, 'sgn) t = {magnitude: 'magnitude; sgn: 'sgn}
+      [@@deriving sexp, hash, compare, eq, yojson]
+    end
+  end]
+
+  type ('magnitude, 'sgn) t = ('magnitude, 'sgn) Stable.Latest.t =
+    {magnitude: 'magnitude; sgn: 'sgn}
+  [@@deriving sexp, hash, compare, eq, yojson]
+end
+
 module type Signed_intf = sig
   type magnitude
 
   type magnitude_var
 
-  module Poly : sig
-    type ('magnitude, 'sgn) t
-
-    module Stable :
-      sig
-        module V1 : sig
-          type ('magnitude, 'sgn) t [@@deriving version]
-        end
-
-        module Latest = V1
-      end
-      with type ('magnitude, 'sgn) V1.t = ('magnitude, 'sgn) t
-  end
-
-  module Stable : sig
-    module V1 : sig
-      type t = (magnitude, Sgn.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, yojson]
+  type t = (magnitude, Sgn.t) Signed.t
+  [@@deriving sexp, hash, compare, eq, yojson]
 
   val gen : t Quickcheck.Generator.t
 
-  val length_in_triples : int
-
-  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Poly.t
+  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed.t
 
   val sgn : t -> Sgn.t
 
   val magnitude : t -> magnitude
 
-  type var = (magnitude_var, Sgn.var) Poly.t
+  type var = (magnitude_var, Sgn.var) Signed.t
 
   val typ : (var, t) Typ.t
 
   val zero : t
 
-  val fold : t -> bool Triple.t Fold.t
-
-  val to_triples : t -> bool Triple.t list
+  val to_input : t -> (_, bool) Random_oracle.Input.t
 
   val add : t -> t -> t option
 
@@ -168,7 +143,7 @@ module type Signed_intf = sig
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
-    val to_triples : var -> Boolean.var Triple.t list
+    val to_input : var -> (_, Boolean.var) Random_oracle.Input.t
 
     val add : var -> var -> (var, _) Checked.t
 
@@ -178,13 +153,20 @@ module type Signed_intf = sig
 
     val cswap :
          Boolean.var
-      -> (magnitude_var, Sgn.t) Poly.t * (magnitude_var, Sgn.t) Poly.t
+      -> (magnitude_var, Sgn.t) Signed.t * (magnitude_var, Sgn.t) Signed.t
       -> (var * var, _) Checked.t
   end
 end
 
 module Fee : sig
-  include Basic
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp, compare, hash, yojson, eq]
+    end
+  end]
+
+  include Basic with type t = Stable.Latest.t
 
   include Arithmetic_intf with type t := t
 
@@ -206,7 +188,14 @@ module Fee : sig
 end
 
 module Amount : sig
-  include Basic
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp, compare, hash, eq, yojson]
+    end
+  end]
+
+  include Basic with type t = Stable.Latest.t
 
   include Arithmetic_intf with type t := t
 
@@ -241,7 +230,14 @@ module Amount : sig
 end
 
 module Balance : sig
-  include Basic
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp, compare, hash, yojson, eq]
+    end
+  end]
+
+  include Basic with type t = Stable.Latest.t
 
   val to_amount : t -> Amount.t
 

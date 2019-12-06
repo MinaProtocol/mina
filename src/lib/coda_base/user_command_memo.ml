@@ -1,29 +1,34 @@
 open Core
 open Crypto_params
 
+[%%versioned
 module Stable = struct
   module V1 = struct
+    type t = string [@@deriving sexp, eq, compare, hash]
+
+    let to_latest = Fn.id
+
+    module Base58_check = Base58_check.Make (struct
+      let description = "User command memo"
+
+      let version_byte = Base58_check.Version_bytes.user_command_memo
+    end)
+
+    let to_string (memo : t) : string = Base58_check.encode memo
+
+    let of_string (s : string) : t = Base58_check.decode_exn s
+
     module T = struct
-      module Base58_check = Base58_check.Make (struct
-        let description = "User command memo"
+      type nonrec t = t
 
-        let version_byte = Base58_check.Version_bytes.user_command_memo
-      end)
+      let to_string = to_string
 
-      type t = string
-      [@@deriving bin_io, sexp, eq, compare, hash, version {unnumbered}]
-
-      let to_string (memo : t) : string = Base58_check.encode memo
-
-      let of_string (s : string) : t = Base58_check.decode_exn s
+      let of_string = of_string
     end
 
-    include T
     include Codable.Make_of_string (T)
   end
-
-  module Latest = V1
-end
+end]
 
 type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
@@ -142,9 +147,6 @@ module Checked = struct
 
   type t = Boolean.var array
 
-  let to_triples t =
-    Fold_lib.Fold.(to_list (group3 ~default:Boolean.false_ (of_array t)))
-
   let constant unchecked =
     assert (Int.(String.length (unchecked :> string) = memo_length)) ;
     Array.map
@@ -153,8 +155,6 @@ module Checked = struct
 end
 
 let length_in_bits = 8 * memo_length
-
-let length_in_triples = (length_in_bits + 2) / 3
 
 let fold_bits t =
   { Fold_lib.Fold.fold=
@@ -169,8 +169,6 @@ let fold_bits t =
         go init 0 ) }
 
 let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
-
-let fold t = Fold_lib.Fold.group3 ~default:false (fold_bits t)
 
 let typ : (Checked.t, t) Typ.t =
   Typ.transport

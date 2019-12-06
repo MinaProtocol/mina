@@ -1,8 +1,14 @@
+open Tc;
+
 module Styles = {
   open Css;
 
   let hero = style([display(`flex), width(`percent(100.))]);
-
+  let fadeIn =
+    keyframes([
+      (0, [opacity(0.), top(`px(50))]),
+      (100, [opacity(1.), top(`px(0))]),
+    ]);
   let heroLeft =
     style([
       display(`flex),
@@ -22,12 +28,14 @@ module Styles = {
       width(`percent(100.)),
       color(Theme.Colors.slateAlpha(0.4)),
     ]);
-
+  let header = {
+    merge([Theme.Text.Header.h1]);
+  };
   let heroBody =
     merge([
-      Theme.Text.Body.regular,
+      Theme.Text.Body.regularLight,
       style([
-        marginTop(`rem(2.)),
+        marginTop(`rem(1.)),
         marginBottom(`rem(2.)),
         maxWidth(`rem(24.)),
         color(Theme.Colors.midnightBlue),
@@ -61,21 +69,27 @@ let make = (~nextStep, ~prevStep) => {
   <div className=Theme.Onboarding.main>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
-        <h1 className=Theme.Text.Header.h1>
-          {React.string("Setting Up Your Node")}
-        </h1>
-        <p className=Styles.heroBody>
-          {React.string(
-             "First, let's install and configure the Coda daemon. This will allow you to connect to the Coda network and make transactions. Follow the instructions at the link below to begin.",
-           )}
-        </p>
-        <Link
-          kind=Link.Blue
-          onClick={_ =>
-            openExternal("https://codaprotocol.com/docs/getting-started/")
-          }>
-          {React.string("Getting started")}
-        </Link>
+        <FadeIn duration=500>
+          <h1 className=Styles.header>
+            {React.string("Setting Up Your Node")}
+          </h1>
+        </FadeIn>
+        <FadeIn duration=500 delay=150>
+          <p className=Styles.heroBody>
+            {React.string(
+               "First, let's install and configure the Coda daemon. This will allow you to connect to the Coda network and make transactions. Follow the instructions at the link below to begin.",
+             )}
+          </p>
+        </FadeIn>
+        <FadeIn duration=500 delay=250>
+          <Link
+            kind=Link.Blue
+            onClick={_ =>
+              openExternal("https://codaprotocol.com/docs/getting-started/")
+            }>
+            {React.string("Getting started")}
+          </Link>
+        </FadeIn>
         <Spacer height=2.0 />
         <div className=Styles.buttonRow>
           <Button
@@ -86,12 +100,18 @@ let make = (~nextStep, ~prevStep) => {
           <Spacer width=0.5 />
           <Button
             label="Continue"
+            style=Button.HyperlinkBlue
             disabled={state == Loading}
             onClick={_ => {
               dispatchToMain(
                 CodaProcess.Action.StartCoda([
-                  "-peer",
-                  "seared-kobe.o1test.net:8303",
+                  "-discovery-port",
+                  "8303",
+                  ...List.foldl(
+                       ~f=(peer, acc) => ["-peer", peer, ...acc],
+                       ~init=[],
+                       CodaProcess.defaultPeers,
+                     ),
                 ]),
               );
               setState(_ => Loading);

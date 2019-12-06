@@ -7,28 +7,22 @@ open Pipe_lib
 let rec funpow n f r = if n > 0 then funpow (n - 1) f (f r) else r
 
 module Query = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type 'addr t =
-          | What_child_hashes of 'addr
-              (** What are the hashes of the children of this address? *)
-          | What_contents of 'addr
-              (** What accounts are at this address? addr must have depth
+      type 'addr t =
+        | What_child_hashes of 'addr
+            (** What are the hashes of the children of this address? *)
+        | What_contents of 'addr
+            (** What accounts are at this address? addr must have depth
             tree_depth - account_subtree_height *)
-          | Num_accounts
-              (** How many accounts are there? Used to size data structure and
+        | Num_accounts
+            (** How many accounts are there? Used to size data structure and
             figure out what part of the tree is filled in. *)
-        [@@deriving bin_io, sexp, yojson, version]
-      end
-
-      include T
+      [@@deriving sexp, yojson]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  (* bin_io omitted intentionally *)
   type 'addr t = 'addr Stable.Latest.t =
     | What_child_hashes of 'addr
     | What_contents of 'addr
@@ -37,27 +31,21 @@ module Query = struct
 end
 
 module Answer = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('hash, 'account) t =
-          | Child_hashes_are of 'hash * 'hash
-              (** The requested address's children have these hashes **)
-          | Contents_are of 'account list
-              (** The requested address has these accounts *)
-          | Num_accounts of int * 'hash
-              (** There are this many accounts and the smallest subtree that
+      type ('hash, 'account) t =
+        | Child_hashes_are of 'hash * 'hash
+            (** The requested address's children have these hashes **)
+        | Contents_are of 'account list
+            (** The requested address has these accounts *)
+        | Num_accounts of int * 'hash
+            (** There are this many accounts and the smallest subtree that
                 contains all non-empty nodes has this hash. *)
-        [@@deriving bin_io, sexp, yojson, version]
-      end
-
-      include T
+      [@@deriving sexp, yojson]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  (* bin_io omitted intentionally *)
   type ('hash, 'account) t = ('hash, 'account) Stable.Latest.t =
     | Child_hashes_are of 'hash * 'hash
     | Contents_are of 'account list

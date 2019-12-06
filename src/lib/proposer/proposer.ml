@@ -222,9 +222,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
                   ~blockchain_state:
                     (Protocol_state.blockchain_state protocol_state)
                   ~consensus_transition:consensus_transition_data
-                  ~proposer:self ~coinbase_amount
-                  ~coinbase_state_body_hash:previous_protocol_state_body_hash
-                  ()
+                  ~proposer:self ~coinbase_amount ()
               in
               let internal_transition =
                 Internal_transition.create ~snark_transition
@@ -255,6 +253,12 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
         | None ->
             log_bootstrap_mode () ; Interruptible.return ()
         | Some frontier -> (
+            let open Transition_frontier.Extensions in
+            let transition_registry =
+              get_extension
+                (Transition_frontier.extensions frontier)
+                Transition_registry
+            in
             let crumb = Transition_frontier.best_tip frontier in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
@@ -470,8 +474,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                  inserted into frontier" ;
                               Deferred.choose
                                 [ Deferred.choice
-                                    (Transition_frontier.wait_for_transition
-                                       frontier transition_hash)
+                                    (Transition_registry.register
+                                       transition_registry transition_hash)
                                     (Fn.const `Transition_accepted)
                                 ; Deferred.choice
                                     ( Time.Timeout.create time_controller

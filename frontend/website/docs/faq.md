@@ -40,6 +40,10 @@ First, check out [Github issues](https://github.com/codaprotocol/coda/issues) to
 - You can also create Github issues: [https://github.com/codaprotocol/coda/issues](https://github.com/codaprotocol/coda/issues)
 - If you need to get in touch privately, you can email: contact@codaprotocol.org
 
+#### Is there a block explorer?
+
+Yes, check out the block explorer here: [https://codaexplorer.garethtdavies.com/](https://codaexplorer.garethtdavies.com/).
+
 ## General Questions
 
 #### What consensus algorithm does Coda use?

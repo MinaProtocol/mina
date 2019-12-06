@@ -18,10 +18,15 @@ The Coda network is secured by [Proof-of-Stake consensus](/docs/glossary/#proof-
 
 Since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can now start the daemon with the `-propose-key` flag to begin staking coda. Let's stop our current daemon process, and restart it with the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`):
 
-    coda daemon -peer seared-kobe.o1test.net:8303 -propose-key keys/my-wallet
+    coda daemon \
+        -discovery-port 8303 \
+        -peer /dns4/peer1-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs \
+        -peer /dns4/peer2-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF \
+        -peer /dns4/peer3-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7 \
+        -propose-key keys/my-wallet
 
 !!! note
-    You can provide a list of key files to turn on staking for multiple wallets at the same time
+    You can provide a list of key files to turn on staking for multiple wallets at the same time.
 
 We can always check which wallets we're currently staking with, by using the `coda client status` command:
 
@@ -51,7 +56,7 @@ We can always check which wallets we're currently staking with, by using the `co
 The `Proposers Running` field in the response above returns the number of accounts currently staking, with the associated key.
 
 !!! warning
-    Keep in mind that if you are staking independently with funds in a wallet, you need to remain connected to the network at all times to be elected as a block producer. If you need to go offline frequently, it may be better to delegate your stake.
+    Keep in mind that if you are staking independently with funds in a wallet, you need to remain connected to the network at all times to be receive coinbase rewards as a block producer. If you need to go offline frequently, it may be better to delegate your stake.
 
 ### Delegating coda
 
@@ -81,19 +86,27 @@ Delegating your stake might be useful if you're interested in:
 !!! note
     There is a waiting period of a day before this change will come into effect to prevent abuse of the network
 
-## Compressing data in the Coda network 
+## Producing SNARKs in the Coda network 
 
-The Coda protocol is unique in that it doesn't require nodes to maintain the full history of the blockchain like other cryptocurrency protocols. By recursively using cryptographic proofs, the Coda protocol effectively compresses the blockchain to constant size. We call this compression, because it reduces terabytes of data to a few kilobytes.
+The Coda protocol is unique in that it doesn't require nodes to maintain the full history of the blockchain like other cryptocurrency protocols. By recursively composing cryptographic proofs, the Coda protocol effectively compresses the blockchain to constant size. We call this compression, because it reduces terabytes of data to a few kilobytes.
 
 However, this isn't data encoding or compression in the traditional sense - rather nodes "compress" data in the network by generating cryptographic proofs. Node operators play a crucial role in this process by designating themselves as "snark-workers" that generate zk-SNARKs for transactions that have been added to blocks.
 
 When you [start the daemon](/docs/my-first-transaction/#start-up-a-node), set these extra arguments to also start a snark-worker:
 
     coda daemon \
-        -peer seared-kobe.o1test.net:8303 \
+        -discovery-port 8303 \
+        -peer /dns4/peer1-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs \
+        -peer /dns4/peer2-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF \
+        -peer /dns4/peer3-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7 \
         -run-snark-worker $CODA_PK \
         -snark-worker-fee <fee>
 
 As a snark-worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.
 
-That about covers the roles and responsibilities as a Code node operator. Since Coda is a permissionless peer-to-peer network, everything is managed and run in a decentralized manner by nodes all over the world. Similarly, the Coda project is also distributed and permissionless to join. The code is all open source, and there is much work to be done, both technical and non-technical. To learn more about how you can get involved with Coda, please check out the [Contributing to Coda section](../contributing).
+!!! note
+    You can visualize blocks, transactions and SNARKs in the [community built block explorer](https://codaexplorer.garethtdavies.com/).
+
+That about covers the roles and responsibilities as a Coda node operator. If you've made it to this point, congratulations on succesfully running a node! Since Coda is a permissionless peer-to-peer network, everything is managed and run in a decentralized manner by nodes all over the world, just like the one you just spun up.
+
+Similarly, the Coda project is also distributed and permissionless to join. The code is all open source, and there is much work to be done, both technical and non-technical. To learn more about how you can get involved with Coda, please check out the [Contributing to Coda section](../contributing).

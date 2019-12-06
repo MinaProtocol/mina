@@ -52,7 +52,17 @@ module Decoders = {
 
     // hack for supporting faker
     if (s == "<PublicKey>" && isFaker) {
-      PublicKey.ofStringExn("Co9TeE1xZduCMtisEo9wadZ81g9bBPGgVKdQUrVZ2Z");
+      let values = [
+        "Co9TeE1xZduCMtisEo9wadZ81g9bBPGgVKdQUrVZ2Z",
+        "5RSJVkduNzMensh2SS12GRy8oQpfxR9oUDr7ETvu1b",
+        "2A3Kkh68yoXAkEgAK1M52qYysJzUga6GxLrfjdv2ds",
+      ];
+      PublicKey.ofStringExn(
+        Option.withDefault(
+          ~default="",
+          List.getAt(~index=Random.int(3), values),
+        ),
+      );
     } else {
       PublicKey.ofStringExn(s);
     };

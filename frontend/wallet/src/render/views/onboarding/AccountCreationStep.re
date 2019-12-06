@@ -1,6 +1,6 @@
 let defaultName = "Primary Account";
 
-module AddWallet = [%graphql
+module AddAccount = [%graphql
   {|
      mutation addWallet($password: String!) {
          addWallet(input: {password: $password}) {
@@ -10,7 +10,7 @@ module AddWallet = [%graphql
    |}
 ];
 
-module AddWalletMutation = ReasonApollo.CreateMutation(AddWallet);
+module AddAccountMutation = ReasonApollo.CreateMutation(AddAccount);
 
 module Styles = {
   open Css;
@@ -18,6 +18,12 @@ module Styles = {
   let hero = {
     style([display(`flex), flexDirection(`row)]);
   };
+
+  let fadeIn =
+    keyframes([
+      (0, [opacity(0.), top(`px(50))]),
+      (100, [opacity(1.), top(`px(0))]),
+    ]);
 
   let heroLeft = {
     style([
@@ -29,56 +35,82 @@ module Styles = {
       marginLeft(`px(80)),
     ]);
   };
-
+  let header = {
+    merge([
+      Theme.Text.Header.h1,
+      style([animation(fadeIn, ~duration=500, ~iterationCount=`count(1))]),
+    ]);
+  };
   let heroBody = {
     merge([
-      Theme.Text.Body.regular,
-      style([maxWidth(`rem(21.5)), color(Theme.Colors.midnightBlue)]),
+      Theme.Text.Body.regularLight,
+      style([
+        opacity(0.),
+        maxWidth(`rem(21.5)),
+        color(Theme.Colors.midnightBlue),
+        animation(fadeIn, ~duration=500, ~iterationCount=`count(1)),
+        animationDelay(250),
+        animationFillMode(`forwards),
+      ]),
     ]);
   };
   let buttonRow = {
     style([display(`flex), flexDirection(`row)]);
   };
+  let textFields = {
+    style([
+      opacity(0.),
+      animation(fadeIn, ~duration=500, ~iterationCount=`count(1)),
+      animationDelay(500),
+      animationFillMode(`forwards),
+    ]);
+  };
 };
 
 [@react.component]
 let make = (~nextStep, ~prevStep) => {
-  let (walletName, setName) = React.useState(() => defaultName);
+  let (accountName, setName) = React.useState(() => defaultName);
   let (password, setPassword) = React.useState(() => "");
 
   let (_settings, updateAddressBook) =
     React.useContext(AddressBookProvider.context);
 
-  let mutationVariables = AddWallet.make(~password, ())##variables;
+  let mutationVariables = AddAccount.make(~password, ())##variables;
 
   <div className=Theme.Onboarding.main>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
-        <h1 className=Theme.Text.Header.h1>
-          {React.string("Create Your Account")}
-        </h1>
-        <Spacer height=1. />
-        <p className=Styles.heroBody>
-          {React.string(
-             "Create your first account to complete setting up Coda Wallet. Please be sure to choose a secure password.",
-           )}
-        </p>
-        <div>
-          <Spacer height=1. />
-          <TextField
-            label="Name"
-            onChange={value => setName(_ => value)}
-            value=walletName
-          />
-          <Spacer height=0.5 />
-          <TextField
-            label="Password"
-            type_="password"
-            onChange={value => setPassword(_ => value)}
-            value=password
-          />
-          <Spacer height=2. />
-        </div>
+        <FadeIn duration=500>
+          <h1 className=Styles.header>
+            {React.string("Create Your Account")}
+          </h1>
+        </FadeIn>
+        <Spacer height=0.5 />
+        <FadeIn duration=500 delay=150>
+          <p className=Styles.heroBody>
+            {React.string(
+               "Create your first account to complete setting up Coda Wallet. Please be sure to choose a secure password.",
+             )}
+          </p>
+        </FadeIn>
+        <FadeIn duration=500 delay=200>
+          <div className=Styles.textFields>
+            <Spacer height=0.5 />
+            <TextField
+              label="Name"
+              onChange={value => setName(_ => value)}
+              value=accountName
+            />
+            <Spacer height=0.5 />
+            <TextField
+              label="Password"
+              type_="password"
+              onChange={value => setPassword(_ => value)}
+              value=password
+            />
+            <Spacer height=2. />
+          </div>
+        </FadeIn>
         <div className=Styles.buttonRow>
           <Button
             style=Button.Gray
@@ -86,11 +118,12 @@ let make = (~nextStep, ~prevStep) => {
             onClick={_ => prevStep()}
           />
           <Spacer width=0.5 />
-          <AddWalletMutation>
+          <AddAccountMutation>
             {(mutation, {result}) =>
                <>
                  <Button
                    label="Create"
+                   style=Button.HyperlinkBlue
                    disabled={
                      switch (result) {
                      | Loading => true
@@ -110,22 +143,16 @@ let make = (~nextStep, ~prevStep) => {
                   | Data(data) =>
                     let key = data##addWallet##publicKey;
                     updateAddressBook(
-                      AddressBook.set(~key, ~name=walletName),
-                    );
-                    ReasonReact.Router.push(
-                      "/wallet/" ++ PublicKey.uriEncode(key),
+                      AddressBook.set(~key, ~name=accountName),
                     );
                     nextStep();
                     React.null;
                   | _ => React.null
                   }}
                </>}
-          </AddWalletMutation>
+          </AddAccountMutation>
         </div>
       </div>
-      <div
-        // Graphic goes here
-      />
     </div>
   </div>;
 };

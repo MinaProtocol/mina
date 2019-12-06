@@ -369,3 +369,6 @@ val next_on_new_tree : ('merge, 'base) State.t -> bool
 
 (** All the 'ds (in the order in which they were added) for which scan results are yet to computed*)
 val pending_data : ('merge, 'base) State.t -> 'base list
+
+(**update tree level metrics*)
+val update_metrics : ('merge, 'base) State.t -> unit Or_error.t

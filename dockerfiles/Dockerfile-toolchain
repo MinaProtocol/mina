@@ -3,6 +3,12 @@ FROM ocaml/opam2:debian-9-ocaml-4.08
 # if updated, also change in Dockerfile
 ARG OCAML_VERSION=4.07.1
 
+# location of repo used for pins and external package commits
+ARG CODA_DIR=/coda
+
+# location of external packages
+ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
+
 # don't keep sources, to force reinstall of pinned packages from Coda sources
 # and to keep Docker image reasonable size
 ARG OPAMKEEPBUILDDIR=false
@@ -34,9 +40,14 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     zlib1g-dev \
     libbz2-dev
 
-RUN sudo pip install sexpdata
+RUN sudo pip install sexpdata awscli
 
 RUN sudo gem install deb-s3
+
+RUN VER="19.03.4" && \
+    curl -L -o /tmp/docker-$VER.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$VER.tgz && \
+    tar -xz -C /tmp -f /tmp/docker-$VER.tgz && \
+    sudo mv /tmp/docker/* /usr/bin
 
 # Google Cloud tools
 RUN export CLOUD_SDK_REPO="cloud-sdk-$(lsb_release -c -s)" && \
@@ -49,22 +60,25 @@ RUN sudo git clone https://github.com/facebook/rocksdb -b v5.17.2 /rocksdb
 # This builds and installs just the static lib for us
 RUN cd /rocksdb && sudo make static_lib PORTABLE=1 -j$(nproc) && sudo cp librocksdb.a /usr/local/lib/librocksdb_coda.a && sudo rm -rf /rocksdb && sudo strip -S /usr/local/lib/librocksdb_coda.a
 
-# save commits for pinned packages, to know if they should be updated in CI
-RUN sudo git clone https://github.com/CodaProtocol/coda /coda
+# clone Coda repo to pin external package and save their commits
+RUN sudo git clone https://github.com/CodaProtocol/coda $CODA_DIR
 
-# submodules
+# use HTTPS git clone for submodules
+RUN cd $CODA_DIR && sudo sed --in-place s+git@github.com:+https://github.com/+g .gitmodules
+
+# init submodules for pinning
+RUN cd $CODA_DIR && sudo git submodule update --init --recursive
+
+# save submodule commits
 RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib rpc_parallel ; do \
       # remove leading "-" indicating uninitialized
-      cd /coda && sudo bash -c "git submodule status src/external/$pkg | awk '{print \$1}' | sed s/-// > ~opam/opam-repository/$pkg.commit" ; \
+      cd $CODA_DIR && sudo bash -c "git submodule status src/external/$pkg | awk '{print \$1}' | sed s/-// > ~opam/opam-repository/$pkg.commit" ; \
     done
 
-# use log commit for ocaml-sodium, coda_base58, which are not submodules
+# save log commits for ocaml-sodium, coda_base58, which are not submodules
 RUN for pkg in ocaml-sodium coda_base58 ; do \
-      cd /coda && sudo bash -c "git log --format=oneline -n 1 src/external/$pkg | awk '{print \$1}' > ~opam/opam-repository/$pkg.commit" ; \
+      cd $CODA_DIR && sudo bash -c "git log --format=oneline -n 1 src/external/$pkg | awk '{print \$1}' > ~opam/opam-repository/$pkg.commit" ; \
     done
-
-# repo was only needed for submodule commits, remove it
-RUN sudo rm -rf /coda
 
 # OPAM dependencies
 RUN git -C /home/opam/opam-repository pull
@@ -81,37 +95,15 @@ RUN eval $(opam env)
 ADD /src/opam.export .
 RUN ulimit -s unlimited && opam switch import opam.export
 
-# Add packages to be pinned
-
-# Source copy of ocaml-sodium (modified for static linking)
-ADD /src/external/ocaml-sodium /ocaml-sodium
-# Source copy of rpc_parallel (modified for macOS support)
-ADD /src/external/rpc_parallel /rpc_parallel
-# Source copy of ocaml-extlib (modified to remove module name conflict)
-ADD /src/external/ocaml-extlib /ocaml-extlib
-# Source copy of digestif (modified to support unpadded SHA256)
-ADD /src/external/digestif /digestif
-# Source copy of mransan version of base58 (OPAM repo has two versions with different APIs)
-ADD /src/external/coda_base58 /coda_base58
-# Source copy of async_kernel with tracing support
-ADD /src/external/async_kernel /async_kernel
-# Source copy of graphql_ppx, updated for 4.07.1/4.08.0 support
-ADD /src/external/graphql_ppx /graphql_ppx
-
 # Remove .git files for submodules
 RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib rpc_parallel ; do \
-      sudo rm -f /$pkg/.git ; \
+      sudo rm -f $EXTERNAL_PKG_DIR/$pkg/.git ; \
     done
 
 # Pin packages for spacetime compiler
-
-RUN cd /ocaml-sodium && opam pin -y add .
-RUN cd /rpc_parallel && opam pin -y add .
-RUN cd /ocaml-extlib && opam pin -y add .
-RUN cd /digestif && opam pin -y add .
-RUN cd /async_kernel && opam pin -y add .
-RUN cd /coda_base58 && opam pin -y add .
-RUN cd /graphql_ppx && opam pin -y add .
+RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda_base58 graphql_ppx ; do \
+      cd $EXTERNAL_PKG_DIR/$pkg && opam pin -y add . ; \
+    done
 
 # use vanilla OCaml compiler
 RUN opam switch $OCAML_VERSION
@@ -121,13 +113,12 @@ RUN eval $(opam env)
 RUN opam switch import opam.export ; rm opam.export
 
 # Pin packages for vanilla compiler
-RUN cd /ocaml-sodium && opam pin -y add .
-RUN cd /rpc_parallel && opam pin -y add .
-RUN cd /ocaml-extlib && opam pin -y add .
-RUN cd /digestif && opam pin -y add .
-RUN cd /async_kernel && opam pin -y add .
-RUN cd /coda_base58 && opam pin -y add .
-RUN cd /graphql_ppx && opam pin -y add .
+RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda_base58 graphql_ppx ; do \
+      cd $EXTERNAL_PKG_DIR/$pkg && opam pin -y add . ; \
+    done
+
+# repo no longer needed
+RUN sudo rm -rf /coda
 
 # Get coda-kademlia from packages repo
 RUN sudo apt-get install --yes apt-transport-https ca-certificates && \

@@ -1,33 +1,33 @@
 open Tc;
 
-module UnlockWallet = [%graphql
-  {| mutation unlock($password: String, $publicKey: PublicKey) {
+module UnlockAccount = [%graphql
+  {| mutation unlock($password: String!, $publicKey: PublicKey!) {
       unlockWallet(input: {password: $password, publicKey: $publicKey}) {
           publicKey
         }
   } |}
 ];
 
-module UnlockMutation = ReasonApollo.CreateMutation(UnlockWallet);
+module UnlockMutation = ReasonApollo.CreateMutation(UnlockAccount);
 
 type modalState = {error: option(string)};
-
 [@react.component]
-let make = (~wallet, ~onClose, ~onSuccess) => {
+let make = (~account, ~onClose, ~onSuccess) => {
   let (error, setError) = React.useState(() => None);
   let (password, setPassword) = React.useState(() => "");
   let variables =
-    UnlockWallet.make(
+    UnlockAccount.make(
       ~password,
-      ~publicKey=Apollo.Encoders.publicKey(wallet),
+      ~publicKey=Apollo.Encoders.publicKey(account),
       (),
     )##variables;
-  <Modal title="Unlock Wallet" onRequestClose=onClose>
+  <Modal title="Unlock Account" onRequestClose=onClose>
     <UnlockMutation>
       ...{(mutation, {result}) =>
         <form
           className=Modal.Styles.default
           onSubmit={event => {
+            ReactEvent.Synthetic.stopPropagation(event);
             ReactEvent.Form.preventDefault(event);
             mutation(
               ~variables,
@@ -55,7 +55,7 @@ let make = (~wallet, ~onClose, ~onSuccess) => {
            }}
           <p className=Theme.Text.Body.regular>
             {React.string("Please enter password for ")}
-            <WalletName pubkey=wallet />
+            <AccountName pubkey=account />
             {React.string(".")}
           </p>
           <Spacer height=1. />
@@ -71,7 +71,10 @@ let make = (~wallet, ~onClose, ~onSuccess) => {
             <Button
               label="Cancel"
               style=Button.Gray
-              onClick={_ => onClose()}
+              onClick={evt => {
+                ReactEvent.Synthetic.stopPropagation(evt);
+                onClose();
+              }}
             />
             <Spacer width=1. />
             <Button label="Unlock" style=Button.Green type_="submit" />

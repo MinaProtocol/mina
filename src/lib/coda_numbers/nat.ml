@@ -1,7 +1,6 @@
 open Core_kernel
 open Snark_bits
 open Fold_lib
-open Module_version
 include Intf
 module Intf = Intf
 
@@ -9,40 +8,19 @@ let zero_checked =
   Snarky_integer.Integer.constant ~m:Snark_params.Tick.m Bigint.zero
 
 module Make (N : sig
-  type t [@@deriving bin_io, sexp, compare, hash, version]
+  type t [@@deriving sexp, compare, hash]
 
   include Unsigned_extended.S with type t := t
 
   val random : unit -> t
 end)
-(Bits : Bits_intf.Convertable_bits with type t := N.t) =
+(Bits : Bits_intf.Convertible_bits with type t := N.t) =
 struct
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type t = N.t
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-      end
+  type t = N.t [@@deriving sexp, compare, hash, yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
-    end
+  let max_value = N.max_int
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = sprintf "nat_make"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
-  include Comparable.Make (Stable.Latest)
+  include Comparable.Make (N)
 
   include (N : module type of N with type t := t)
 
@@ -64,15 +42,9 @@ struct
         (sprintf "to_bits: %s" __LOC__)
         (make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t))
 
-    let to_triples t =
-      Checked.map (to_bits t)
-        ~f:
-          Bitstring.(
-            Fn.compose
-              (pad_to_triple_list ~default:Boolean.false_)
-              Lsb_first.to_list)
-
-    let constant n = Integer.constant ~m (Bignum_bigint.of_int (N.to_int n))
+    let constant n =
+      Integer.constant ~length:N.length_in_bits ~m
+        (Bignum_bigint.of_int (N.to_int n))
 
     let typ : (field Integer.t, t) Typ.t =
       let typ = Typ.list ~length:N.length_in_bits Boolean.typ in
@@ -119,6 +91,8 @@ struct
 
     let op op a b = make_checked (fun () -> op ~m a b)
 
+    let add a b = op Integer.add a b
+
     let equal a b = op Integer.equal a b
 
     let ( < ) a b = op Integer.lt a b
@@ -150,8 +124,6 @@ struct
 
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 
-  let length_in_triples = (length_in_bits + 2) / 3
-
   let gen =
     Quickcheck.Generator.map
       ~f:(fun n -> N.of_string (Bignum_bigint.to_string n))
@@ -160,8 +132,18 @@ struct
 end
 
 module Make32 () : UInt32 = struct
+  open Unsigned_extended
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = UInt32.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
   include Make (struct
-              open Unsigned_extended
               include UInt32
 
               let random () =
@@ -179,8 +161,18 @@ module Make32 () : UInt32 = struct
 end
 
 module Make64 () : UInt64 = struct
+  open Unsigned_extended
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = UInt64.Stable.V1.t [@@deriving sexp, eq, compare, hash, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
   include Make (struct
-              open Unsigned_extended
               include UInt64
 
               let random () =

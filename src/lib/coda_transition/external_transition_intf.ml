@@ -13,6 +13,8 @@ module type External_transition_common_intf = sig
 
   val blockchain_state : t -> Blockchain_state.Value.t
 
+  val blockchain_length : t -> Unsigned.UInt32.t
+
   val consensus_state : t -> Consensus.Data.Consensus_state.Value.t
 
   val staged_ledger_diff : t -> Staged_ledger_diff.t
@@ -22,6 +24,8 @@ module type External_transition_common_intf = sig
   val parent_hash : t -> State_hash.t
 
   val proposer : t -> Public_key.Compressed.t
+
+  val transactions : t -> Transaction.t list
 
   val user_commands : t -> User_command.t list
 
@@ -215,6 +219,13 @@ module type S = sig
     type t =
       (external_transition, State_hash.t) With_hash.t * Validation.fully_valid
 
+    val erase :
+         t
+      -> ( Stable.Latest.t
+         , State_hash.Stable.Latest.t )
+         With_hash.Stable.Latest.t
+         * State_hash.Stable.Latest.t Non_empty_list.Stable.Latest.t
+
     val create_unsafe :
       external_transition -> [`I_swear_this_is_safe_see_my_comment of t]
 
@@ -227,6 +238,8 @@ module type S = sig
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
     -> t
+
+  val genesis : Validated.t Lazy.t
 
   val timestamp : t -> Block_time.t
 
@@ -364,7 +377,8 @@ module type S = sig
   end
 
   val skip_frontier_dependencies_validation :
-       [`This_transition_belongs_to_a_detached_subtree]
+       [ `This_transition_belongs_to_a_detached_subtree
+       | `This_transition_was_loaded_from_persistence ]
     -> ( 'time_received
        , 'proof
        , 'delta_transition_chain

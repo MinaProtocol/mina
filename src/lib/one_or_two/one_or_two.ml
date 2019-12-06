@@ -14,7 +14,7 @@ module Stable = struct
   module Latest = V1
 end
 
-type 'a t = 'a Stable.V1.t [@@deriving compare, equal, hash, sexp, yojson]
+type 'a t = 'a Stable.Latest.t [@@deriving compare, equal, hash, sexp, yojson]
 
 let length = function `One _ -> 1 | `Two _ -> 2
 
