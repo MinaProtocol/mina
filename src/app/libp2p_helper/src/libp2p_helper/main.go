@@ -48,7 +48,6 @@ type app struct {
 	Streams    map[int]net.Stream
 	OutLock    sync.Mutex
 	Out        *bufio.Writer
-	RpcLock    sync.Mutex
 }
 
 var seqs = make(chan int)
@@ -915,7 +914,6 @@ func main() {
 		Streams:    make(map[int]net.Stream),
 		// OutLock doesn't need to be initialized
 		Out: out,
-		// RpcLock doesn't need to be initialized
 	}
 
 	for lines.Scan() {
