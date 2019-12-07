@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 module Tock298 = struct
   include Snarkette.Mnt6_80

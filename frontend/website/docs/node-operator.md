@@ -26,7 +26,7 @@ Since we have some funds in our wallet from [the previous step](/docs/my-first-t
         -propose-key keys/my-wallet
 
 !!! note
-    You can provide a list of key files to turn on staking for multiple wallets at the same time
+    You can provide a list of key files to turn on staking for multiple wallets at the same time.
 
 We can always check which wallets we're currently staking with, by using the `coda client status` command:
 
@@ -56,7 +56,7 @@ We can always check which wallets we're currently staking with, by using the `co
 The `Proposers Running` field in the response above returns the number of accounts currently staking, with the associated key.
 
 !!! warning
-    Keep in mind that if you are staking independently with funds in a wallet, you need to remain connected to the network at all times to be elected as a block producer. If you need to go offline frequently, it may be better to delegate your stake.
+    Keep in mind that if you are staking independently with funds in a wallet, you need to remain connected to the network at all times to be receive coinbase rewards as a block producer. If you need to go offline frequently, it may be better to delegate your stake.
 
 ### Delegating coda
 
@@ -86,9 +86,9 @@ Delegating your stake might be useful if you're interested in:
 !!! note
     There is a waiting period of a day before this change will come into effect to prevent abuse of the network
 
-## Compressing data in the Coda network 
+## Producing SNARKs in the Coda network 
 
-The Coda protocol is unique in that it doesn't require nodes to maintain the full history of the blockchain like other cryptocurrency protocols. By recursively using cryptographic proofs, the Coda protocol effectively compresses the blockchain to constant size. We call this compression, because it reduces terabytes of data to a few kilobytes.
+The Coda protocol is unique in that it doesn't require nodes to maintain the full history of the blockchain like other cryptocurrency protocols. By recursively composing cryptographic proofs, the Coda protocol effectively compresses the blockchain to constant size. We call this compression, because it reduces terabytes of data to a few kilobytes.
 
 However, this isn't data encoding or compression in the traditional sense - rather nodes "compress" data in the network by generating cryptographic proofs. Node operators play a crucial role in this process by designating themselves as "snark-workers" that generate zk-SNARKs for transactions that have been added to blocks.
 
@@ -104,4 +104,9 @@ When you [start the daemon](/docs/my-first-transaction/#start-up-a-node), set th
 
 As a snark-worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.
 
-That about covers the roles and responsibilities as a Code node operator. Since Coda is a permissionless peer-to-peer network, everything is managed and run in a decentralized manner by nodes all over the world. Similarly, the Coda project is also distributed and permissionless to join. The code is all open source, and there is much work to be done, both technical and non-technical. To learn more about how you can get involved with Coda, please check out the [Contributing to Coda section](../contributing).
+!!! note
+    You can visualize blocks, transactions and SNARKs in the [community built block explorer](https://codaexplorer.garethtdavies.com/).
+
+That about covers the roles and responsibilities as a Coda node operator. If you've made it to this point, congratulations on succesfully running a node! Since Coda is a permissionless peer-to-peer network, everything is managed and run in a decentralized manner by nodes all over the world, just like the one you just spun up.
+
+Similarly, the Coda project is also distributed and permissionless to join. The code is all open source, and there is much work to be done, both technical and non-technical. To learn more about how you can get involved with Coda, please check out the [Contributing to Coda section](../contributing).

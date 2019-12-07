@@ -78,6 +78,9 @@ jobs:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
             - run:
+                  name: Check ppx_optcomp preprocessor_deps
+                  command: ./scripts/lint_preprocessor_deps.sh
+            - run:
                   name: Check CODEOWNERS file format
                   command: ./scripts/lint_codeowners.sh
             - run:
@@ -211,13 +214,13 @@ jobs:
                     echo 'keys'
                     cp /tmp/s3_cache_dir/* package/keys/.
                     echo 'coda'
-                    cp src/_build/default/app/cli/src/coda.exe package/coda
+                    cp _build/default/src/app/cli/src/coda.exe package/coda
                     echo 'libp2p_helper'
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
                     ./scripts/librewrite-macos.sh package/coda-libp2p_helper
                     echo 'coda-logproc'
-                    cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
+                    cp _build/default/src/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
             - run:
                 name: Build homebrew package
@@ -285,17 +288,21 @@ jobs:
             - run:
                   name: Build and Upload Docker
                   command: |
-                    source /tmp/DOCKER_DEPLOY_ENV
-                    echo "Publishing Docker"
-                    echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
-                    set -x
-                    if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
+                    # Check if we should deploy this build
+                    FILE=/tmp/DOCKER_DEPLOY_ENV
+                    if test -f "$FILE"; then
+                        source $FILE
+                        echo "Publishing Docker"
+                        echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
+                        set -x
+                        if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
 
-                        echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                        ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
-                        -s coda-daemon \
-                        -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                        --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                              echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+                              ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
+                              -s coda-daemon \
+                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                        fi
                     fi
             - store_artifacts:
                   path: /tmp/artifacts

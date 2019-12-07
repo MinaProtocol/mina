@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"/src/config.mlh"]
 
 open Core
 open Async
@@ -67,27 +67,10 @@ let daemon logger =
            "seq|rand Choose work sequentially (seq) or randomly (rand) \
             (default: rand)"
          (optional work_selection_method)
-     and external_port =
-       flag "external-port"
-         ~doc:
-           (sprintf
-              "PORT Port to use for all libp2p communications (gossip and \
-               RPC) (default: %d)"
-              Port.default_external)
-         (optional int16)
-     and client_port =
-       flag "client-port"
-         ~doc:
-           (sprintf "PORT Client to daemon local communication (default: %d)"
-              Port.default_client)
-         (optional int16)
-     and rest_server_port =
-       flag "rest-port"
-         ~doc:
-           (sprintf
-              "PORT local REST-server for daemon interaction (default: %d)"
-              Port.default_rest)
-         (optional int16)
+     and libp2p_port = Flag.Port.Daemon.external_
+     and client_port = Flag.Port.Daemon.client
+     and rest_server_port = Flag.Port.Daemon.rest_server
+     and archive_process_location = Flag.Host_and_port.Daemon.archive
      and metrics_server_port =
        flag "metrics-port"
          ~doc:
@@ -105,14 +88,11 @@ let daemon logger =
          (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
-     and is_archive_node =
-       flag "archive" no_arg ~doc:"Archive all blocks heard"
-     and log_json =
-       flag "log-json" no_arg
-         ~doc:"Print daemon log output as JSON (default: plain text)"
-     and log_level =
-       flag "log-level" (optional string)
-         ~doc:"Set daemon log level (default: Info)"
+     and is_archive_rocksdb =
+       flag "archive-rocksdb" no_arg
+         ~doc:"Stores all the blocks heard in RocksDB"
+     and log_json = Flag.Log.json
+     and log_level = Flag.Log.level
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
@@ -177,24 +157,6 @@ let daemon logger =
        let compute_conf_dir home =
          Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
        in
-       let%bind log_level =
-         match log_level with
-         | None ->
-             Deferred.return Logger.Level.Info
-         | Some log_level_str_with_case -> (
-             let open Logger in
-             let log_level_str = String.lowercase log_level_str_with_case in
-             match Level.of_string log_level_str with
-             | Error _ ->
-                 eprintf "Received unknown log-level %s. Expected one of: %s\n"
-                   log_level_str
-                   ( Level.all |> List.map ~f:Level.show
-                   |> List.map ~f:String.lowercase
-                   |> String.concat ~sep:", " ) ;
-                 exit 14
-             | Ok ll ->
-                 Deferred.return ll )
-       in
        let%bind conf_dir =
          if is_background then
            let home = Core.Sys.home_directory () in
@@ -217,18 +179,7 @@ let daemon logger =
              ~redirect_stderr:`Dev_null () )
          else ()
        in
-       let stdout_log_processor =
-         if log_json then Logger.Processor.raw ()
-         else
-           Logger.Processor.pretty ~log_level
-             ~config:
-               { Logproc_lib.Interpolator.mode= Inline
-               ; max_interpolation_length= 50
-               ; pretty_print= true }
-       in
-       Logger.Consumer_registry.register ~id:"default"
-         ~processor:stdout_log_processor
-         ~transport:(Logger.Transport.stdout ()) ;
+       Stdout_log.setup log_json log_level ;
        (* 512MB logrotate max size = 1GB max filesystem usage *)
        let logrotate_max_size = 1024 * 1024 * 512 in
        Logger.Consumer_registry.register ~id:"default"
@@ -444,18 +395,12 @@ let daemon logger =
                  ~metadata:[("key", `String keyname)] ;
                default
          in
-         let client_port =
-           or_from_config YJ.Util.to_int_option "client-port"
-             ~default:Port.default_client client_port
+         let get_port {Flag.Types.value; default; name} =
+           or_from_config YJ.Util.to_int_option name ~default value
          in
-         let rest_server_port =
-           or_from_config YJ.Util.to_int_option "rest-port"
-             ~default:Port.default_rest rest_server_port
-         in
-         let external_port =
-           or_from_config YJ.Util.to_int_option "external-port"
-             ~default:Port.default_external external_port
-         in
+         let libp2p_port = get_port libp2p_port in
+         let rest_server_port = get_port rest_server_port in
+         let client_port = get_port client_port in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
@@ -513,11 +458,7 @@ let daemon logger =
            |> Unix.Inet_addr.of_string
          in
          let addrs_and_ports : Node_addrs_and_ports.t =
-           { external_ip
-           ; bind_ip
-           ; peer= None
-           ; client_port
-           ; libp2p_port= external_port }
+           {external_ip; bind_ip; peer= None; client_port; libp2p_port}
          in
          let%bind propose_keypair =
            match propose_key with
@@ -713,8 +654,8 @@ let daemon logger =
                 ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
                 ~time_controller ~initial_propose_keypairs ~monitor
                 ~consensus_local_state ~transaction_database
-                ~external_transition_database ~is_archive_node
-                ~work_reassignment_wait ())
+                ~external_transition_database ~is_archive_rocksdb
+                ~work_reassignment_wait ~archive_process_location ())
          in
          {Coda_initialization.coda; client_whitelist; rest_server_port}
        in

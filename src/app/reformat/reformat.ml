@@ -9,9 +9,11 @@ let dirs_whitelist =
   ; "_build"
   ; "stationary"
   ; ".un~"
+  ; "frontend"
   ; "external"
   ; "ocamlformat"
   ; "node_modules"
+  ; "tablecloth"
   ; "snarky" ]
 
 let rec fold_over_files ~path ~process_path ~init ~f =

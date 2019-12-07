@@ -1,5 +1,5 @@
 [%%import
-"../../../../config.mlh"]
+"/src/config.mlh"]
 
 open Core
 open Async
@@ -20,7 +20,7 @@ let spawn_exn (config : Coda_worker.Input.t) =
 
 let local_config ?proposal_interval:_ ~addrs_and_ports ~acceptable_delay
     ~chain_id ~program_dir ~proposer ~snark_worker_key ~work_selection_method
-    ~offset ~trace_dir ~max_concurrent_connections ~is_archive_node () =
+    ~offset ~trace_dir ~max_concurrent_connections ~is_archive_rocksdb () =
   let conf_dir =
     Filename.temp_dir_name
     ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
@@ -48,7 +48,7 @@ let local_config ?proposal_interval:_ ~addrs_and_ports ~acceptable_delay
     ; trace_dir
     ; program_dir
     ; acceptable_delay
-    ; is_archive_node
+    ; is_archive_rocksdb
     ; max_concurrent_connections }
   in
   config

@@ -1,9 +1,7 @@
 open Core
 
 module Sender = struct
-  type t =
-    | Local
-    | Remote of (Unix.Inet_addr.Stable.V1.t * Peer.Id.Stable.V1.t)
+  type t = Local | Remote of (Unix.Inet_addr.Blocking_sexp.t * Peer.Id.t)
   [@@deriving sexp, compare]
 
   let of_peer (p : Peer.t) = Remote (p.host, p.peer_id)

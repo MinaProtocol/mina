@@ -391,8 +391,6 @@ end = struct
       "Expecting content addr $address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
 
-  (* TODO #435: verify content hash matches expected and blame the peer who gave it to us *)
-
   (** Given an address and the accounts below that address, fill in the tree
       with them. *)
   let add_content :

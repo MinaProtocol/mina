@@ -8,7 +8,11 @@
   incremental secrets auxiliary_database work_selector
   coda_networking proposer sync_handler transition_router node_addrs_and_ports
   otp_lib snark_worker participating_state transaction_status
-  receipt_chain_database)
- (preprocess
-  (pps ppx_coda ppx_jane ppx_deriving.eq ppx_deriving.make bisect_ppx -- -conditional))
+  receipt_chain_database sync_status daemon_rpcs archive_lib)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps
+  ppx_coda ppx_optcomp ppx_bin_prot ppx_compare ppx_hash
+  ppx_fields_conv ppx_deriving.eq ppx_deriving.make
+  ppx_sexp_conv ppx_let ppx_custom_printf
+  ppx_inline_test bisect_ppx -- -conditional))
  (synopsis "Coda gut layer"))

@@ -18,11 +18,11 @@ let main () =
   let snark_work_public_keys i =
     if i = 0 then Some largest_account_public_key else None
   in
-  let is_archive_node i = i = 1 in
+  let is_archive_rocksdb i = i = 1 in
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n proposers snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None ~is_archive_node
+      ~max_concurrent_connections:None ~is_archive_rocksdb
   in
   let%bind new_block_pipe =
     let%map pipe =

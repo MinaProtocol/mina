@@ -36,3 +36,16 @@ let validate_module_version module_version loc =
 
 let version_of_versioned_module_name name =
   String.sub name ~pos:1 ~len:(String.length name - 1) |> int_of_string
+
+(* modules in core and core_kernel library which are not in Core, Core_kernel modules
+
+   see
+
+         https://ocaml.janestreet.com/ocaml-core/latest/doc/core/index.html
+         https://ocaml.janestreet.com/ocaml-core/latest/doc/core_kernel/index.html
+
+       add to this list as needed; but more items slows things down
+ *)
+let jane_street_library_modules = ["Uuid"]
+
+let jane_street_modules = ["Core"; "Core_kernel"] @ jane_street_library_modules

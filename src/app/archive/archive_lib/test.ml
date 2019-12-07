@@ -1,7 +1,6 @@
 open Core
 open Async
 open Pipe_lib
-open Coda_transition
 open Coda_base
 open Signature_lib
 
@@ -12,8 +11,6 @@ let%test_module "Processor" =
       Async.Scheduler.set_record_backtraces true
 
     module Processor = Processor.Make (struct
-      let address = "v1/graphql"
-
       let headers = String.Map.of_alist_exn []
 
       let preprocess_variables_string =
@@ -23,16 +20,17 @@ let%test_module "Processor" =
 
     let logger = Logger.null ()
 
-    let port = 9000
+    let uri =
+      Uri.of_string ("http://localhost:" ^ string_of_int 9000 ^/ "v1/graphql")
 
     let try_with ~f =
       Deferred.Or_error.ok_exn
       @@ let%bind result =
-           let t = Processor.create port in
+           let t = Processor.create uri in
            Monitor.try_with_or_error ~name:"Write Processor" (fun () -> f t)
          in
          let%map clear_action =
-           Processor.Client.query (Graphql_query.Clear_data.make ()) port
+           Processor.Client.query (Graphql_query.Clear_data.make ()) uri
          in
          Or_error.all_unit
            [ result
@@ -79,7 +77,7 @@ let%test_module "Processor" =
         Processor.Client.query_exn
           (Graphql_query.User_commands.Query_participants.make
              ~hashes:(Array.of_list hashes) ())
-          t.port
+          t.hasura_endpoint
         >>| fun obj -> obj#user_commands
       in
       Array.map response ~f:(fun obj ->
@@ -99,9 +97,7 @@ let%test_module "Processor" =
       in
       let processing_deferred_job = Processor.run t reader in
       Strict_pipe.Writer.write writer
-        (Transaction_pool
-           { Diff.Transaction_pool.added= user_commands
-           ; removed= User_command.Set.empty }) ;
+        (Diff.Builder.user_commands user_commands) ;
       Strict_pipe.Writer.close writer ;
       processing_deferred_job
 
@@ -142,19 +138,16 @@ let%test_module "Processor" =
               let hash2 = serialized_hash user_command2 in
               let%bind () =
                 write_transaction_pool_diff t
-                  (User_command.Map.of_alist_exn
-                     [ (user_command1, min_block_time)
-                     ; (user_command2, block_time2) ])
+                  [ (user_command1, min_block_time)
+                  ; (user_command2, block_time2) ]
               in
               let%bind () =
-                write_transaction_pool_diff t
-                  (User_command.Map.of_alist_exn
-                     [(user_command1, max_block_time)])
+                write_transaction_pool_diff t [(user_command1, max_block_time)]
               in
               let%bind public_keys =
                 Processor.Client.query_exn
                   (Graphql_query.Public_keys.Query.make ())
-                  t.port
+                  t.hasura_endpoint
               in
               let queried_public_keys =
                 Array.map public_keys#public_keys ~f:(fun obj -> obj#value)
@@ -177,7 +170,7 @@ let%test_module "Processor" =
                 let%map query_result =
                   Processor.Client.query_exn
                     (Graphql_query.User_commands.Query.make ~hash ())
-                    t.port
+                    t.hasura_endpoint
                 in
                 let queried_user_command = query_result#user_commands.(0) in
                 Types.User_command.decode queried_user_command
@@ -209,52 +202,19 @@ let%test_module "Processor" =
               let hash2 = serialized_hash user_command2 in
               let%bind () =
                 write_transaction_pool_diff t
-                  (User_command.Map.of_alist_exn
-                     [ (user_command1, block_time1)
-                     ; (user_command2, block_time2) ])
+                  [(user_command1, block_time1); (user_command2, block_time2)]
               in
               let%bind participants_map1 =
                 query_participants t [hash1; hash2]
               in
               let%bind () =
-                write_transaction_pool_diff t
-                  (User_command.Map.of_alist_exn [(user_command1, block_time2)])
+                write_transaction_pool_diff t [(user_command1, block_time2)]
               in
               let%bind participants_map2 = query_participants t [hash1] in
               let (_ : int Public_key.Compressed.Map.t) =
                 validated_merge participants_map1 participants_map2
               in
               Deferred.unit ) )
-
-    let create_added_breadcrumb_diff breadcrumb =
-      let ((block, _) as validated_block) =
-        Transition_frontier.Breadcrumb.validated_transition breadcrumb
-      in
-      let user_commands =
-        External_transition.Validated.user_commands validated_block
-      in
-      let sender_receipt_chains_from_parent_ledger =
-        let user_commands = User_command.Set.of_list user_commands in
-        let senders =
-          Public_key.Compressed.Set.map user_commands ~f:User_command.sender
-        in
-        let ledger =
-          Staged_ledger.ledger
-          @@ Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-        in
-        Set.to_map senders ~f:(fun sender ->
-            Option.value_exn
-              (let open Option.Let_syntax in
-              let%bind ledger_location =
-                Ledger.location_of_key ledger sender
-              in
-              let%map {receipt_chain_hash; _} =
-                Ledger.get ledger ledger_location
-              in
-              receipt_chain_hash) )
-      in
-      Diff.Transition_frontier.Breadcrumb_added
-        {block; sender_receipt_chains_from_parent_ledger}
 
     (* TODO: make other tests that queries components of a block by testing
        other queries, such prove_receipt_chain and block pagination *)
@@ -277,7 +237,7 @@ let%test_module "Processor" =
                     List.map
                       ~f:(fun breadcrumb ->
                         Diff.Transition_frontier
-                          (create_added_breadcrumb_diff breadcrumb) )
+                          (Diff.Builder.breadcrumb_added breadcrumb) )
                       (root_breadcrumb :: successors)
                   in
                   List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
@@ -333,7 +293,7 @@ let%test_module "Processor" =
                 List.map
                   ~f:(fun breadcrumb ->
                     Diff.Transition_frontier
-                      (create_added_breadcrumb_diff breadcrumb) )
+                      (Diff.Builder.breadcrumb_added breadcrumb) )
                   (root_breadcrumb :: successors)
               in
               List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
@@ -343,7 +303,7 @@ let%test_module "Processor" =
                 Graphql_query.Blocks.Get_all_pending_blocks.make ()
               in
               let%map response =
-                Processor.Client.query_exn graphql t.port
+                Processor.Client.query_exn graphql t.hasura_endpoint
                 >>| (fun obj -> obj#blocks)
                 >>| Array.map ~f:(fun block ->
                         ((block#state_hash)#value, block#status) )
