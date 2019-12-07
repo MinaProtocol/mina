@@ -42,17 +42,29 @@ module Style = {
 
   let navFolder =
     style([
-      display(`inlineBlock),
-      marginBottom(`rem(0.5)),
-      height(`rem(1.5)),
-      cursor(`pointer),
-      textDecoration(`none),
-      Theme.Typeface.ibmplexsans,
-      color(Theme.Colors.marine),
-      hover([color(Theme.Colors.hyperlinkHover)]),
+      display(`block),
+      flexDirection(`row),
+      justifyContent(`spaceBetween),
+      selector(
+        "a",
+        [
+          marginBottom(`rem(0.5)),
+          height(`rem(1.5)),
+          cursor(`pointer),
+          textDecoration(`none),
+          Theme.Typeface.ibmplexsans,
+          hover([color(Theme.Colors.hyperlinkHover)]),
+        ],
+      ),
     ]);
-
+  let folderLabel =
+    style([
+      display(`flex),
+      justifyContent(`spaceBetween),
+      color(Theme.Colors.marine),
+    ]);
   let childPage = style([marginLeft(`rem(1.)), listStyleType(`none)]);
+  let flip = style([transform(rotate(`deg(180.)))]);
 };
 
 let (/+) = Filename.concat;
@@ -87,14 +99,23 @@ module NavFolder = {
         setExpanded(expanded => !expanded);
       });
 
-    <li key={folder.title}>
-      <a
-        href="#"
-        className=Style.navFolder
-        onClick=toggleExpanded
-        ariaExpanded=expanded>
-        {React.string(folder.title)}
-      </a>
+    <li key={folder.title} className=Style.navFolder>
+      <div>
+        <a
+          href="#"
+          onClick=toggleExpanded
+          ariaExpanded=expanded
+          className=Style.folderLabel>
+          {React.string(folder.title)}
+          <Spacer width={`rem(1.0)} />
+          <img
+            src="/static/img/chevron-down.svg"
+            width="16"
+            height="16"
+            className={expanded ? "" : Style.flip}
+          />
+        </a>
+      </div>
       {!expanded
          ? React.null
          : <ul className=Style.childPage>

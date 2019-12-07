@@ -12,7 +12,8 @@ module Style = {
 
   let header =
     style([
-      padding2(~v=`zero, ~h=`rem(2.)),
+      padding2(~v=`zero, ~h=`rem(3.)),
+      marginTop(`rem(2.0)),
       marginBottom(`rem(1.)),
       height(`rem(2.5)),
       display(`flex),

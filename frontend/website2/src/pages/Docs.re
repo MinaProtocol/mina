@@ -44,6 +44,7 @@ module Style = {
   open Css;
   let content =
     style([
+      maxWidth(`rem(43.)),
       selector(
         "h1, h2, h3, h4",
         [
@@ -56,9 +57,12 @@ module Style = {
       ),
       selector(
         "h1",
-        Theme.H1.heroStyles @ [alignItems(`baseline), fontWeight(`normal)],
+        Theme.H1.heroStyles @ [alignItems(`baseline), fontWeight(`light)],
       ),
-      selector("h2", Theme.H2.basicStyles @ [alignItems(`baseline)]),
+      selector(
+        "h2",
+        Theme.H2.basicStyles @ [alignItems(`baseline), fontWeight(`light)],
+      ),
       selector(
         "h3",
         Theme.H3.basicStyles
@@ -66,7 +70,11 @@ module Style = {
       ),
       selector(
         "p",
-        [color(Theme.Colors.saville), ...Theme.Body.basicStyles],
+        [
+          color(Theme.Colors.saville),
+          fontWeight(`extraLight),
+          ...Theme.Body.basicStyles,
+        ],
       ),
       selector("a", Theme.Link.basicStylesHover),
       selector(
