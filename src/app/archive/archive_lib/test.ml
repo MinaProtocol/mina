@@ -82,9 +82,7 @@ let%test_module "Processor" =
       in
       Array.map response ~f:(fun obj ->
           let entry public_key = (public_key#value, public_key#id) in
-          let participants =
-            [entry obj#publicKeyByReceiver; entry obj#public_key]
-          in
+          let participants = [entry obj#receiver; entry obj#sender] in
           Public_key.Compressed.Map.of_alist_reduce participants
             ~f:(fun index1 index2 -> assert_same_index_reference index1 index2
           ) )

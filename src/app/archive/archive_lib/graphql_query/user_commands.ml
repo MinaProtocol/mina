@@ -17,11 +17,11 @@ module Query_participants =
 {|
     query query ($hashes: [String!]!) {
         user_commands(where: {hash: {_in: $hashes}} ) {
-          publicKeyByReceiver {
+          receiver {
             id
             value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
           }
-          public_key {
+          sender {
             id
             value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
           }
@@ -39,10 +39,10 @@ module Query =
             hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
             memo @bsDecoder(fn: "User_command_memo.of_string")
             nonce @bsDecoder (fn: "Base_types.Nonce.deserialize")
-            public_key {
+            sender {
                 value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
             }
-            publicKeyByReceiver {
+            receiver {
               value @bsDecoder (fn: "Public_key.Compressed.of_base58_check_exn")
             } 
             typ @bsDecoder (fn: "Base_types.User_command_type.decode")
@@ -60,7 +60,6 @@ module Insert =
     on_conflict: {constraint: user_commands_hash_key, update_columns: first_seen}
     ) {
       returning {
-        id
         hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
         first_seen @bsDecoder(fn: "Base_types.decode_optional_block_time")
       }
