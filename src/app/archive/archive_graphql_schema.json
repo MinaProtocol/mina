@@ -1196,133 +1196,6 @@
         },
         {
           "inputFields": null,
-          "kind": "SCALAR",
-          "possibleTypes": null,
-          "interfaces": null,
-          "name": "bit",
-          "enumValues": null,
-          "description": null,
-          "fields": null
-        },
-        {
-          "inputFields": [
-            {
-              "name": "_eq",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "bit",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_gt",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "bit",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_gte",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "bit",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_in",
-              "defaultValue": null,
-              "type": {
-                "kind": "LIST",
-                "name": null,
-                "ofType": {
-                  "kind": "NON_NULL",
-                  "name": null,
-                  "ofType": {
-                    "kind": "SCALAR",
-                    "name": "bit",
-                    "ofType": null
-                  }
-                }
-              },
-              "description": null
-            },
-            {
-              "name": "_is_null",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Boolean",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_lt",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "bit",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_lte",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "bit",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_neq",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "bit",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_nin",
-              "defaultValue": null,
-              "type": {
-                "kind": "LIST",
-                "name": null,
-                "ofType": {
-                  "kind": "NON_NULL",
-                  "name": null,
-                  "ofType": {
-                    "kind": "SCALAR",
-                    "name": "bit",
-                    "ofType": null
-                  }
-                }
-              },
-              "description": null
-            }
-          ],
-          "kind": "INPUT_OBJECT",
-          "possibleTypes": null,
-          "interfaces": null,
-          "name": "bit_comparison_exp",
-          "enumValues": null,
-          "description": "expression to compare columns of type bit. All fields are combined with logical 'AND'.",
-          "fields": null
-        },
-        {
-          "inputFields": null,
           "kind": "OBJECT",
           "possibleTypes": null,
           "interfaces": [],
@@ -1340,7 +1213,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -1356,7 +1229,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -1901,7 +1774,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -1911,7 +1784,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -2612,7 +2485,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -2622,7 +2495,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -3098,7 +2971,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -3108,7 +2981,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -4402,7 +4275,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -4415,7 +4288,7 @@
               "name": "first_seen",
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -4584,7 +4457,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -4594,7 +4467,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -4709,7 +4582,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -4719,7 +4592,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -5015,7 +4888,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -5025,7 +4898,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -6245,6 +6118,133 @@
               "description": "update data of the table: \"user_commands\""
             }
           ]
+        },
+        {
+          "inputFields": null,
+          "kind": "SCALAR",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "numeric",
+          "enumValues": null,
+          "description": null,
+          "fields": null
+        },
+        {
+          "inputFields": [
+            {
+              "name": "_eq",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_gt",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_gte",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_in",
+              "defaultValue": null,
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "numeric",
+                    "ofType": null
+                  }
+                }
+              },
+              "description": null
+            },
+            {
+              "name": "_is_null",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_lt",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_lte",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_neq",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_nin",
+              "defaultValue": null,
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "numeric",
+                    "ofType": null
+                  }
+                }
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "numeric_comparison_exp",
+          "enumValues": null,
+          "description": "expression to compare columns of type numeric. All fields are combined with logical 'AND'.",
+          "fields": null
         },
         {
           "inputFields": null,
@@ -9116,7 +9116,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -9294,7 +9294,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -9449,7 +9449,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -11745,7 +11745,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -11852,7 +11852,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -11865,7 +11865,7 @@
               "name": "first_seen",
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -11928,7 +11928,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -12104,7 +12104,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -12124,7 +12124,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -12134,7 +12134,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -12174,7 +12174,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -12268,7 +12268,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -12288,7 +12288,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -12298,7 +12298,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -12328,7 +12328,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -12714,7 +12714,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -12724,7 +12724,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -12734,7 +12734,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -12764,7 +12764,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
