@@ -34,8 +34,8 @@ CREATE TABLE blocks
   global_slot int NOT NULL,
   ledger_proof_nonce int NOT NULL,
   status int NOT NULL,
-  block_length bit(32) NOT NULL,
-  block_time bit(64) NOT NULL,
+  block_length numeric(10) NOT NULL,
+  block_time numeric(20) NOT NULL,
   FOREIGN KEY (creator_id) REFERENCES public_keys (id),
   FOREIGN KEY (state_hash_id) REFERENCES state_hashes (id),
   FOREIGN KEY (parent_hash_id) REFERENCES state_hashes (id)
@@ -66,13 +66,13 @@ CREATE TABLE user_commands
   id serial PRIMARY KEY,
   hash text NOT NULL,
   typ user_command_type NOT NULL,
-  nonce bit(32) NOT NULL,
+  nonce numeric(10) NOT NULL,
   sender_id int NOT NULL,
   receiver_id int NOT NULL,
-  amount bit(64) NOT NULL,
-  fee bit(64) NOT NULL,
+  amount numeric(20) NOT NULL,
+  fee numeric(20) NOT NULL,
   memo text NOT NULL,
-  first_seen bit(64),
+  first_seen numeric(20),
   FOREIGN KEY (sender_id) REFERENCES public_keys (id),
   FOREIGN KEY (receiver_id) REFERENCES public_keys (id)
 );
@@ -89,9 +89,9 @@ CREATE TABLE fee_transfers
 (
   id serial PRIMARY KEY,
   hash text NOT NULL,
-  fee bit(64) NOT NULL,
+  fee numeric(20) NOT NULL,
   receiver_id int NOT NULL,
-  first_seen bit(64),
+  first_seen numeric(20),
   FOREIGN KEY (receiver_id) REFERENCES public_keys (id)
 );
 
@@ -135,7 +135,7 @@ CREATE TABLE snark_jobs
 (
   id serial PRIMARY KEY,
   prover_id int NOT NULL,
-  fee bit(64) NOT NULL,
+  fee numeric(20) NOT NULL,
   job1 int,
   job2 int,
   FOREIGN KEY (prover_id) REFERENCES public_keys (id)

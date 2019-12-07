@@ -7,7 +7,7 @@ module Insert =
       ) {
           returning {
               hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
-              first_seen @bsDecoder(fn: "Base_types.decode_optional_block_time")
+              first_seen @bsDecoder(fn: "Base_types.deserialize_optional_block_time")
             }
         }
     }
@@ -19,7 +19,7 @@ module Query_first_seen =
     query query_first_seen ($hashes: [String!]!) {
         fee_transfers(where: {hash: {_in: $hashes}} ) {
             hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
-            first_seen @bsDecoder(fn: "Base_types.decode_optional_block_time")
+            first_seen @bsDecoder(fn: "Base_types.deserialize_optional_block_time")
         }
     }
   |}]

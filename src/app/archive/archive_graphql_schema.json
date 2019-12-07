@@ -1196,133 +1196,6 @@
         },
         {
           "inputFields": null,
-          "kind": "SCALAR",
-          "possibleTypes": null,
-          "interfaces": null,
-          "name": "bit",
-          "enumValues": null,
-          "description": null,
-          "fields": null
-        },
-        {
-          "inputFields": [
-            {
-              "name": "_eq",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "bit",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_gt",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "bit",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_gte",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "bit",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_in",
-              "defaultValue": null,
-              "type": {
-                "kind": "LIST",
-                "name": null,
-                "ofType": {
-                  "kind": "NON_NULL",
-                  "name": null,
-                  "ofType": {
-                    "kind": "SCALAR",
-                    "name": "bit",
-                    "ofType": null
-                  }
-                }
-              },
-              "description": null
-            },
-            {
-              "name": "_is_null",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "Boolean",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_lt",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "bit",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_lte",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "bit",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_neq",
-              "defaultValue": null,
-              "type": {
-                "kind": "SCALAR",
-                "name": "bit",
-                "ofType": null
-              },
-              "description": null
-            },
-            {
-              "name": "_nin",
-              "defaultValue": null,
-              "type": {
-                "kind": "LIST",
-                "name": null,
-                "ofType": {
-                  "kind": "NON_NULL",
-                  "name": null,
-                  "ofType": {
-                    "kind": "SCALAR",
-                    "name": "bit",
-                    "ofType": null
-                  }
-                }
-              },
-              "description": null
-            }
-          ],
-          "kind": "INPUT_OBJECT",
-          "possibleTypes": null,
-          "interfaces": null,
-          "name": "bit_comparison_exp",
-          "enumValues": null,
-          "description": "expression to compare columns of type bit. All fields are combined with logical 'AND'.",
-          "fields": null
-        },
-        {
-          "inputFields": null,
           "kind": "OBJECT",
           "possibleTypes": null,
           "interfaces": [],
@@ -1340,7 +1213,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -1356,7 +1229,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -2458,6 +2331,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "block_length",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_time",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "creator_id",
               "type": {
                 "kind": "SCALAR",
@@ -2530,6 +2427,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "block_length",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "block_time",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "creator_id",
               "defaultValue": null,
@@ -2644,7 +2561,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -2654,7 +2571,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -4355,7 +4272,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -4365,7 +4282,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -4502,6 +4419,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "block_length",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_time",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "creator_id",
               "type": {
                 "kind": "SCALAR",
@@ -4598,6 +4539,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "block_length",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "block_time",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "creator_id",
               "defaultValue": null,
@@ -4700,6 +4661,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "block_length",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_time",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "creator_id",
               "type": {
                 "kind": "SCALAR",
@@ -4796,6 +4781,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "block_length",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "block_time",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "creator_id",
               "defaultValue": null,
@@ -5267,7 +5272,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -5277,7 +5282,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -6836,6 +6841,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "block_length",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_time",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "creator_id",
               "type": {
                 "kind": "SCALAR",
@@ -6908,6 +6937,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "block_length",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "block_time",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "creator_id",
               "defaultValue": null,
@@ -6990,6 +7039,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "block_length",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_time",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "creator_id",
               "type": {
                 "kind": "SCALAR",
@@ -7062,6 +7135,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "block_length",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "block_time",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "creator_id",
               "defaultValue": null,
@@ -7144,6 +7237,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "block_length",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_time",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "creator_id",
               "type": {
                 "kind": "SCALAR",
@@ -7216,6 +7333,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "block_length",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "block_time",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "creator_id",
               "defaultValue": null,
@@ -7298,6 +7435,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "block_length",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_time",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "creator_id",
               "type": {
                 "kind": "SCALAR",
@@ -7370,6 +7531,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "block_length",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "block_time",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "creator_id",
               "defaultValue": null,
@@ -9287,6 +9468,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "block_length",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_time",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "creator_id",
               "type": {
                 "kind": "SCALAR",
@@ -9359,6 +9564,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "block_length",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "block_time",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "creator_id",
               "defaultValue": null,
@@ -9441,6 +9666,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "block_length",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_time",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "creator_id",
               "type": {
                 "kind": "SCALAR",
@@ -9513,6 +9762,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "block_length",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "block_time",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "creator_id",
               "defaultValue": null,
@@ -9595,6 +9864,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "block_length",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "block_time",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "creator_id",
               "type": {
                 "kind": "SCALAR",
@@ -9667,6 +9960,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "block_length",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "block_time",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "creator_id",
               "defaultValue": null,
@@ -9952,7 +10265,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -9965,7 +10278,7 @@
               "name": "first_seen",
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -10432,6 +10745,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -10456,6 +10793,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -10540,7 +10897,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -10550,7 +10907,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -10644,7 +11001,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -10654,7 +11011,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -10701,6 +11058,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "hash",
               "type": {
                 "kind": "SCALAR",
@@ -10737,6 +11118,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "hash",
               "defaultValue": null,
@@ -10789,6 +11190,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "hash",
               "type": {
                 "kind": "SCALAR",
@@ -10825,6 +11250,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "hash",
               "defaultValue": null,
@@ -11126,7 +11571,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -11136,7 +11581,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -11173,6 +11618,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -11197,6 +11666,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -11239,6 +11728,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -11263,6 +11776,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -11305,6 +11838,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -11329,6 +11886,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -11371,6 +11948,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -11395,6 +11996,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -11466,6 +12087,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -11490,6 +12135,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -11532,6 +12197,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -11556,6 +12245,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -11598,6 +12307,30 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -11622,6 +12355,26 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -12792,6 +13545,133 @@
               "description": "update data of the table: \"user_commands\""
             }
           ]
+        },
+        {
+          "inputFields": null,
+          "kind": "SCALAR",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "numeric",
+          "enumValues": null,
+          "description": null,
+          "fields": null
+        },
+        {
+          "inputFields": [
+            {
+              "name": "_eq",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_gt",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_gte",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_in",
+              "defaultValue": null,
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "numeric",
+                    "ofType": null
+                  }
+                }
+              },
+              "description": null
+            },
+            {
+              "name": "_is_null",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "Boolean",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_lt",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_lte",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_neq",
+              "defaultValue": null,
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "_nin",
+              "defaultValue": null,
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "SCALAR",
+                    "name": "numeric",
+                    "ofType": null
+                  }
+                }
+              },
+              "description": null
+            }
+          ],
+          "kind": "INPUT_OBJECT",
+          "possibleTypes": null,
+          "interfaces": null,
+          "name": "numeric_comparison_exp",
+          "enumValues": null,
+          "description": "expression to compare columns of type numeric. All fields are combined with logical 'AND'.",
+          "fields": null
         },
         {
           "inputFields": null,
@@ -19006,7 +19886,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -19482,6 +20362,18 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -19530,6 +20422,16 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -19634,7 +20536,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -19769,7 +20671,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -19826,6 +20728,18 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -19874,6 +20788,16 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -19936,6 +20860,18 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -19984,6 +20920,16 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -20295,7 +21241,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -20338,6 +21284,18 @@
           "enumValues": null,
           "description": "aggregate stddev on columns",
           "fields": [
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "args": [],
               "isDeprecated": false,
@@ -20390,6 +21348,16 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -20452,6 +21420,18 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -20500,6 +21480,16 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -20562,6 +21552,18 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -20610,6 +21612,16 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -20672,6 +21684,18 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -20720,6 +21744,16 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -20811,6 +21845,18 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -20859,6 +21905,16 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -20921,6 +21977,18 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -20969,6 +22037,16 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -21031,6 +22109,18 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
@@ -21079,6 +22169,16 @@
         },
         {
           "inputFields": [
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
             {
               "name": "id",
               "defaultValue": null,
@@ -24883,7 +25983,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -25073,7 +26173,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -25086,7 +26186,7 @@
               "name": "first_seen",
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -25149,7 +26249,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "bit",
+                  "name": "numeric",
                   "ofType": null
                 }
               },
@@ -25633,7 +26733,55 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "amount",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "nonce",
               "type": {
                 "kind": "SCALAR",
                 "name": "Float",
@@ -25670,7 +26818,47 @@
         {
           "inputFields": [
             {
+              "name": "amount",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "id",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "nonce",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
@@ -25753,7 +26941,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -25773,7 +26961,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -25783,7 +26971,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -25823,7 +27011,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "INPUT_OBJECT",
-                "name": "bit_comparison_exp",
+                "name": "numeric_comparison_exp",
                 "ofType": null
               },
               "description": null
@@ -25917,7 +27105,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -25937,7 +27125,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -25947,7 +27135,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -25977,7 +27165,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -26034,6 +27222,42 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "amount",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "hash",
               "type": {
                 "kind": "SCALAR",
@@ -26062,6 +27286,18 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "nonce",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -26095,6 +27331,36 @@
         {
           "inputFields": [
             {
+              "name": "amount",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "hash",
               "defaultValue": null,
               "type": {
@@ -26116,6 +27382,16 @@
             },
             {
               "name": "memo",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "nonce",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
@@ -26166,6 +27442,42 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "amount",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "hash",
               "type": {
                 "kind": "SCALAR",
@@ -26194,6 +27506,18 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "nonce",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -26227,6 +27551,36 @@
         {
           "inputFields": [
             {
+              "name": "amount",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "hash",
               "defaultValue": null,
               "type": {
@@ -26248,6 +27602,16 @@
             },
             {
               "name": "memo",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "nonce",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
@@ -26637,7 +28001,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -26647,7 +28011,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -26657,7 +28021,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -26687,7 +28051,7 @@
               "defaultValue": null,
               "type": {
                 "kind": "SCALAR",
-                "name": "bit",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -26724,7 +28088,55 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "amount",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "nonce",
               "type": {
                 "kind": "SCALAR",
                 "name": "Float",
@@ -26761,7 +28173,47 @@
         {
           "inputFields": [
             {
+              "name": "amount",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "id",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "nonce",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
@@ -26812,7 +28264,55 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "amount",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "nonce",
               "type": {
                 "kind": "SCALAR",
                 "name": "Float",
@@ -26849,7 +28349,47 @@
         {
           "inputFields": [
             {
+              "name": "amount",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "id",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "nonce",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
@@ -26900,7 +28440,55 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "amount",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "nonce",
               "type": {
                 "kind": "SCALAR",
                 "name": "Float",
@@ -26937,7 +28525,47 @@
         {
           "inputFields": [
             {
+              "name": "amount",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "id",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "nonce",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
@@ -26988,10 +28616,58 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "amount",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
               "type": {
                 "kind": "SCALAR",
                 "name": "Int",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "nonce",
+              "type": {
+                "kind": "SCALAR",
+                "name": "numeric",
                 "ofType": null
               },
               "description": null
@@ -27025,7 +28701,47 @@
         {
           "inputFields": [
             {
+              "name": "amount",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "id",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "nonce",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
@@ -27129,7 +28845,55 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "amount",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "nonce",
               "type": {
                 "kind": "SCALAR",
                 "name": "Float",
@@ -27166,7 +28930,47 @@
         {
           "inputFields": [
             {
+              "name": "amount",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "id",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "nonce",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
@@ -27217,7 +29021,55 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "amount",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "nonce",
               "type": {
                 "kind": "SCALAR",
                 "name": "Float",
@@ -27254,7 +29106,47 @@
         {
           "inputFields": [
             {
+              "name": "amount",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "id",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "nonce",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
@@ -27305,7 +29197,55 @@
               "args": [],
               "isDeprecated": false,
               "deprecationReason": null,
+              "name": "amount",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "fee",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "first_seen",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
               "name": "id",
+              "type": {
+                "kind": "SCALAR",
+                "name": "Float",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "args": [],
+              "isDeprecated": false,
+              "deprecationReason": null,
+              "name": "nonce",
               "type": {
                 "kind": "SCALAR",
                 "name": "Float",
@@ -27342,7 +29282,47 @@
         {
           "inputFields": [
             {
+              "name": "amount",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "fee",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "first_seen",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
               "name": "id",
+              "defaultValue": null,
+              "type": {
+                "kind": "ENUM",
+                "name": "order_by",
+                "ofType": null
+              },
+              "description": null
+            },
+            {
+              "name": "nonce",
               "defaultValue": null,
               "type": {
                 "kind": "ENUM",
