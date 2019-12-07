@@ -128,7 +128,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           (* this is assumed safe since there should always be at least one version *)
           Int.Set.max_elt (Impl.versions ()) |> Option.value_exn
         in
-        let sender = Option.value_exn (Hashtbl.find t.peer_table peer) in
+        let sender = Hashtbl.find_exn t.peer_table peer in
         match
           List.find_map rpc_handlers ~f:(fun handler ->
               match_handler handler rpc ~do_:(fun f ->
@@ -148,6 +148,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let peer_table = Hashtbl.create (module Peer.Id) in
       List.iter initial_peers ~f:(fun peer ->
           Hashtbl.add_exn peer_table ~key:peer.peer_id ~data:peer ) ;
+      Hashtbl.add_exn peer_table ~key:me.peer_id ~data:me ;
       let received_message_reader, received_message_writer =
         Strict_pipe.(create (Buffered (`Capacity 5, `Overflow Crash)))
       in
