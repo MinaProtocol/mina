@@ -28,8 +28,6 @@ module type S = sig
 
   module Hacky_glue : sig
     val inject_event : t -> Peer.Event.t -> unit
-
-    val forget_all : t -> unit
   end
 end
 
@@ -313,8 +311,6 @@ end = struct
   module Hacky_glue = struct
     let inject_event t e =
       Linear_pipe.write t.changes_writer e |> don't_wait_for
-
-    let forget_all t = Peer.Table.clear t.peers
   end
 
   module For_tests = struct

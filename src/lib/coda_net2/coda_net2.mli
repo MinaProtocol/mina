@@ -185,8 +185,8 @@ val configure :
   *)
 val me : net -> Keypair.t option
 
-(** List of all peers we are connected to. *)
-val list_peers : net -> PeerID.t list Deferred.t
+(** List of all peers we know about. *)
+val peers : net -> PeerID.t list Deferred.t
 
 (** An open stream.
 
