@@ -6,7 +6,6 @@ module Insert =
       insert_fee_transfers(objects: $fee_transfers, on_conflict: {constraint: fee_transfers_hash_key, update_columns: hash}
       ) {
           returning {
-              id
               hash @bsDecoder(fn: "Transaction_hash.of_base58_check_exn")
               first_seen @bsDecoder(fn: "Base_types.deserialize_optional_block_time")
             }
