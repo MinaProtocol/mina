@@ -31,7 +31,7 @@ coda daemon -propose-key ~/keys/my_wallet -rest 3085 -archive-port 3086
 See the <a href="/docs/archive-node/" target="_blank">archive node schema docs</a> for the full API.
 
 !!! warning
-    - The archive node GraphQL API is still in development, so these endpoints may change
+    The archive node GraphQL API is still in development, so these endpoints may change
 
 ### Example Query
 
