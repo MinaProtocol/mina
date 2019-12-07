@@ -4,8 +4,8 @@ module Styles = {
     style([
       marginLeft(`auto),
       marginRight(`auto),
-      media("(min-width: 60rem)", [maxWidth(`rem(50.66))]),
-      media("(min-width: 105rem)", [maxWidth(`rem(68.))]),
+      media(Style.MediaQuery.tablet, [maxWidth(`rem(50.66))]),
+      media(Style.MediaQuery.desktop, [maxWidth(`rem(68.))]),
     ]);
 
   let lineBreak =
@@ -19,7 +19,10 @@ module Styles = {
   let heroImage =
     style([
       display(`none),
-      media("(min-width: 60rem)", [display(`flex), marginLeft(`rem(1.))]),
+      media(
+        Style.MediaQuery.tablet,
+        [display(`flex), marginLeft(`rem(1.))],
+      ),
     ]);
 
   let header =
@@ -38,7 +41,7 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      media("(min-width: 60rem)", [flexDirection(`row)]),
+      media(Style.MediaQuery.tablet, [flexDirection(`row)]),
     ]);
 
   let heroText =
@@ -54,16 +57,17 @@ module Styles = {
 
   let heroHeading = merge([Style.H1.hero, style([marginTop(`rem(1.53))])]);
 
-  let heroCopy =
-    merge([
-      Style.Body.basic,
-    ]);
-    
-  let heroH3 = 
+  let heroCopy = merge([Style.Body.basic]);
+
+  let heroH3 =
     merge([
       Style.H3.basic,
-      style([textAlign(`left), fontWeight(`normal),color(Style.Colors.midnight)]),
-    ])
+      style([
+        textAlign(`left),
+        fontWeight(`normal),
+        color(Style.Colors.midnight),
+      ]),
+    ]);
 
   let ctaButton =
     merge([
@@ -78,7 +82,10 @@ module Styles = {
         padding2(~v=`px(12), ~h=`px(24)),
         textAlign(`center),
         alignSelf(`center),
-        media("(min-width: 60rem)", [marginLeft(`rem(0.)), alignSelf(`flexStart)]),
+        media(
+          Style.MediaQuery.tablet,
+          [marginLeft(`rem(0.)), alignSelf(`flexStart)],
+        ),
       ]),
     ]);
 
@@ -88,14 +95,14 @@ module Styles = {
       gridTemplateColumns([`repeat((`num(1), `rem(21.25)))]),
       gridTemplateRows([`repeat((`num(1), `rem(14.25)))]),
       media(
-        "(min-width: 60rem)",
+        Style.MediaQuery.tablet,
         [
           gridTemplateColumns([`repeat((`num(2), `rem(23.8)))]),
           gridTemplateRows([`repeat((`num(2), `rem(12.5)))]),
         ],
       ),
       media(
-        "(min-width: 105rem)",
+        Style.MediaQuery.desktop,
         [
           gridTemplateColumns([`repeat((`num(2), `rem(32.5)))]),
           gridTemplateRows([`repeat((`num(2), `rem(11.5)))]),
@@ -119,16 +126,18 @@ let make = () => {
         <h1 className=Styles.heroHeading>
           {React.string("Coda Developer Portal")}
         </h1>
-        <Spacer height=1./>
+        <Spacer height=1. />
         <p className=Styles.heroCopy>
           {React.string(
-            "Coda makes it dead simple for node operators, developers, and entrepreneurs to use cryptocurrencies. Deploy nodes, write code, and access your funds on full nodes that can live anywhere -- in your phone, or even in a web browser."
+             "Coda makes it dead simple for node operators, developers, and entrepreneurs to use cryptocurrencies. Deploy nodes, write code, and access your funds on full nodes that can live anywhere -- in your phone, or even in a web browser.",
            )}
         </p>
         <p className=Styles.heroCopy>
-        {React.string("Coda is 100% open-source, built for and by community members like yourself. Find resources below on how to join the network as a node operator, begin contributing code, and stay up to date on developer tooling and grants.")}
-        </p> 
-         <Spacer height=1./>
+          {React.string(
+             "Coda is 100% open-source, built for and by community members like yourself. Find resources below on how to join the network as a node operator, begin contributing code, and stay up to date on developer tooling and grants.",
+           )}
+        </p>
+        <Spacer height=1. />
         <a href="/docs/getting-started/" className=Styles.ctaButton>
           {React.string({js| Get Started →|js})}
         </a>

@@ -6,6 +6,6 @@
     "/docs",
     "/docs/**",
     "/jobs",
-    "/testnet",
+    "/testnet"
   ]
 }
