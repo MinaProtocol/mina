@@ -18,6 +18,7 @@ module Styles = {
       padding2(~v=`px(0), ~h=`rem(1.25)),
       borderBottom(`px(1), `solid, Colors.borderColor),
       borderTop(`px(1), `solid, white),
+      hover([color(Colors.marine)]),
     ]);
 
   let inactiveAccountItem =
@@ -52,8 +53,25 @@ module Styles = {
       marginBottom(`rem(0.25)),
     ]);
 
-  let lockIcon =
-    style([position(`absolute), top(`px(4)), right(`px(4))]);
+  let lockIcon = (isActive, isLocked) => {
+    let (lockColor, hoverColor) =
+      switch (isActive, isLocked) {
+      | (true, true) => (Theme.Colors.marine, Theme.Colors.marine)
+      | (true, false) => (Theme.Colors.clover, Theme.Colors.jungle)
+      | (false, true) => (Theme.Colors.slateAlpha(0.5), Theme.Colors.marine)
+      | (false, false) => (
+          Theme.Colors.cloverAlpha(0.8),
+          Theme.Colors.jungle,
+        )
+      };
+    style([
+      position(`absolute),
+      top(`px(4)),
+      right(`px(4)),
+      color(lockColor),
+      hover([color(hoverColor)]),
+    ]);
+  };
 };
 
 module LockAccount = [%graphql
@@ -75,6 +93,8 @@ let make = (~account: Account.t) => {
 
   let isLocked = Option.withDefault(~default=true, account.locked);
   let (showModal, setModalOpen) = React.useState(() => false);
+  let toast = Hooks.useToast();
+
   <div
     className={
       isActive ? Styles.activeAccountItem : Styles.inactiveAccountItem
@@ -106,15 +126,20 @@ let make = (~account: Account.t) => {
            onClick={evt => {
              ReactEvent.Synthetic.stopPropagation(evt);
              isLocked
-               ? setModalOpen(_ => true)
-               : lockAccount(
+               ? {
+                 setModalOpen(_ => true);
+               }
+               : {
+                 lockAccount(
                    ~variables,
                    ~refetchQueries=[|"getWallets", "accountLocked"|],
                    (),
                  )
                  |> ignore;
+                 toast("Account locked!", ToastProvider.Default);
+               };
            }}
-           className=Styles.lockIcon>
+           className={Styles.lockIcon(isActive, isLocked)}>
            <Icon kind={isLocked ? Icon.Locked : Icon.Unlocked} />
          </div>;
        }}
@@ -123,7 +148,10 @@ let make = (~account: Account.t) => {
        ? <UnlockModal
            account={account.publicKey}
            onClose={() => setModalOpen(_ => false)}
-           onSuccess={() => setModalOpen(_ => false)}
+           onSuccess={() => {
+             setModalOpen(_ => false);
+             toast("Account unlocked!", ToastProvider.Default);
+           }}
          />
        : React.null}
   </div>;
