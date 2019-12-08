@@ -136,7 +136,8 @@ let make = (~publicKey, ~stakingActive=false) => {
                 {switch (result) {
                  | NotCalled
                  | Loading => React.null
-                 | Error(err) => <Alert kind=`Danger defaultMessage=err##message />
+                 | Error(err) =>
+                   <Alert kind=`Danger defaultMessage=err##message />
                  | Data(_) =>
                    goBack();
                    React.null;

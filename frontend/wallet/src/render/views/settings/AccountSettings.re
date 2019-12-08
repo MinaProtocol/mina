@@ -303,7 +303,10 @@ module BlockRewards = {
                </Well>
              | (None, _) =>
                <Well>
-                 <Alert kind=`Warning defaultMessage="Wait until fully synced..." />
+                 <Alert
+                   kind=`Warning
+                   defaultMessage="Wait until fully synced..."
+                 />
                </Well>
              | (Some(delegate), _) =>
                let isDelegation =

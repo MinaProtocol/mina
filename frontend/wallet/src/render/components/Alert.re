@@ -24,7 +24,8 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~kind, ~messageID, ~defaultMessage) => {
+// messageID defaults to a truthy string to satisfy FormattedMessage's required ID prop until all text are internationalized
+let make = (~kind, ~messageID=" ", ~defaultMessage) => {
   let (bgColor, textColor, iconKind) =
     Theme.Colors.(
       switch (kind) {
@@ -38,7 +39,7 @@ let make = (~kind, ~messageID, ~defaultMessage) => {
     <span className=Styles.icon> <Icon kind=iconKind /> </span>
     <Spacer width=0.25 />
     <div className=Styles.text>
-      <FormattedMessage id=messageID defaultMessage=defaultMessage />
+      <FormattedMessage id=messageID defaultMessage />
     </div>
   </div>;
 };
