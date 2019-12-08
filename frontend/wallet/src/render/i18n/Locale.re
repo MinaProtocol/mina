@@ -1,27 +1,25 @@
 external jsonToTranslations: Js.Json.t => array(ReactIntl.translation) =
   "%identity";
-
 [@bs.val] [@bs.scope "window"]
 external getTranslation: string => string = "getTranslation";
 
+// Add a new language by assigning it a constructor and a language code
 type locale =
   | En
   | Vn;
-
-let all = [|En|];
 
 let toString =
   fun
   | En => "en"
   | Vn => "vn";
 
-// fileToReactIntl transforms the raw json into a Reason data structure
 let fileToReactIntl = name => {
   let file = getTranslation(name);
   jsonToTranslations(Js.Json.parseExn(file));
 };
 
-let translations =
+// getTranslations reads a json file and parses it into a ReactIntl data structure
+let getTranslations =
   fun
   | En => fileToReactIntl("en")
   | Vn => fileToReactIntl("vn");
@@ -44,20 +42,18 @@ let translationsToDict = (translations: array(ReactIntl.translation)) => {
   );
 };
 
-module Hooks = {
-  type action =
-    | SetLocale(locale);
+type action =
+  | SetLocale(locale);
 
-  let useLocale = () => {
-    let initialState = En;
+let useLocale = () => {
+  let initialState = En;
 
-    let intlReducer = (_, action) =>
-      switch (action) {
-      | SetLocale(locale) => locale
-      };
+  let intlReducer = (_, action) =>
+    switch (action) {
+    | SetLocale(locale) => locale
+    };
 
-    let (locale, setLocale) = React.useReducer(intlReducer, initialState);
+  let (locale, setLocale) = React.useReducer(intlReducer, initialState);
 
-    (locale, setLocale);
-  };
+  (locale, setLocale);
 };
