@@ -1,118 +1,95 @@
 [
   {
     "id": "account-settings",
-    "defaultMessage": "account settings",
     "message": "cài đặt tài khoản"
   },
   {
     "id": "cancel",
-    "defaultMessage": "cancel",
     "message": "hủy bỏ"
   },
   {
     "id": "close",
-    "defaultMessage": "close",
     "message": "gần"
   },
   {
     "id": "connecting",
-    "defaultMessage": "connecting",
     "message": "kết nối"
   },
   {
     "id": "catching up",
-    "defaultMessage": "catching up",
     "message": "bắt kịp"
   },
   {
     "id": "error",
-    "defaultMessage": "error",
     "message": "lỗi"
   },
   {
     "id": "footer.compress-blockchain",
-    "defaultMessage": "compress the blockchain",
     "message": "nén blockchain"
   },
   {
     "id": "listening",
-    "defaultMessage": "listening",
     "message": "lắng nghe"
   },
   {
     "id": "memo",
-    "defaultMessage": "memo",
     "message": "ghi nhớ"
   },
   {
     "id": "recipient",
-    "defaultMessage": "recipient",
     "message": "người nhận"
   },
 
   {
     "id": "request",
-    "defaultMessage": "request",
     "message": "yêu cầu"
   },
   {
     "id": "send",
-    "defaultMessage": "send",
     "message": "gửi"
   },
   {
     "id": "sender",
-    "defaultMessage": "sender",
     "message": "người gửi"
   },
   {
     "id": "settings",
-    "defaultMessage": "settings",
     "message": "cài đặt"
   },
   {
     "id": "sidebar.new-account",
-    "defaultMessage": "+ new account",
     "message": "+ tài khoản mới"
   },
   {
     "id": "string",
-    "defaultMessage": "string",
     "message": "chuỗi"
   },
   {
     "id": "synced",
-    "defaultMessage": "synced",
     "message": "đã đồng bộ hóa"
   },
   {
     "id": "syncing",
-    "defaultMessage": "syncing",
     "message": "đồng bộ hóa"
   },
   {
     "id": "transactions.date/amount",
-    "defaultMessage": "date / amount",
     "message": "ngày / số tiền"
   },
   {
     "id": "unlock",
-    "defaultMessage": "unlock",
     "message": "thông điệp"
   },
   {
     "id": "unlock-modal.please-enter-password",
-    "defaultMessage": "please enter password for",
     "message": "vui lòng nhập mật khẩu cho"
   },
   {
     "id": "unlock-modal.unlock-account",
-    "defaultMessage": "unlock account",
     "message": "mở khoá tài khoản"
   },
   {
     "id": "version",
-    "defaultMessage": "version",
     "message": "phiên bản"
   }
 ]
