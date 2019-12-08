@@ -1,95 +1,72 @@
 [
   {
-    "id": "account-settings",
-    "defaultMessage": "account settings"
+    "id": "account-settings"
   },
   {
-    "id": "cancel",
-    "defaultMessage": "cancel"
+    "id": "cancel"
   },
   {
-    "id": "catching up",
-    "defaultMessage": "catching up"
+    "id": "catching up"
   },
   {
-    "id": "close",
-    "defaultMessage": "close"
+    "id": "close"
   },
   {
-    "id": "connecting",
-    "defaultMessage": "connecting"
+    "id": "connecting"
   },
   {
-    "id": "error",
-    "defaultMessage": "error"
+    "id": "error"
   },
   {
-    "id": "footer.compress-blockchain",
-    "defaultMessage": "compress the blockchain"
+    "id": "footer.compress-blockchain"
   },
   {
-    "id": "listening",
-    "defaultMessage": "listening"
+    "id": "listening"
   },
   {
-    "id": "memo",
-    "defaultMessage": "memo"
+    "id": "memo"
   },
   {
-    "id": "recipient",
-    "defaultMessage": "recipient"
+    "id": "recipient"
   },
 
   {
-    "id": "request",
-    "defaultMessage": "request"
+    "id": "request"
   },
   {
-    "id": "send",
-    "defaultMessage": "send"
+    "id": "send"
   },
   {
-    "id": "sender",
-    "defaultMessage": "sender"
+    "id": "sender"
   },
   {
-    "id": "settings",
-    "defaultMessage": "settings"
+    "id": "settings"
   },
   {
-    "id": "sidebar.new-account",
-    "defaultMessage": "+ new account"
+    "id": "sidebar.new-account"
   },
   {
-    "id": "string",
-    "defaultMessage": "string"
+    "id": "string"
   },
   {
-    "id": "synced",
-    "defaultMessage": "synced"
+    "id": "synced"
   },
   {
-    "id": "syncing",
-    "defaultMessage": "syncing"
+    "id": "syncing"
   },
   {
-    "id": "transactions.date/amount",
-    "defaultMessage": "date / amount"
+    "id": "transactions.date/amount"
   },
   {
-    "id": "unlock",
-    "defaultMessage": "unlock"
+    "id": "unlock"
   },
   {
-    "id": "unlock-modal.please-enter-password",
-    "defaultMessage": "please enter password for"
+    "id": "unlock-modal.please-enter-password"
   },
   {
-    "id": "unlock-modal.unlock-account",
-    "defaultMessage": "unlock account"
+    "id": "unlock-modal.unlock-account"
   },
   {
-    "id": "version",
-    "defaultMessage": "version"
+    "id": "version"
   }
 ]
