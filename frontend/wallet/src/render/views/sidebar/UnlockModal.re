@@ -23,9 +23,6 @@ type modalState = {error: option(string)};
 let make = (~account, ~onClose, ~onSuccess) => {
   let intl = useIntl();
 
-  // TODO This string needs to be titlecased
-  // Currently cannot style modal title
-  // Larger discussion is required to settle on how translations are capitalized
   let modalTitle =
     Intl.formatMessage(
       intl,
