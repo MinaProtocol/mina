@@ -36,5 +36,7 @@ type t =
   ; snark_work_fee: Currency.Fee.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; is_archive_rocksdb: bool [@default false]
-  ; archive_process_port: int option [@default None] }
+  ; archive_process_location:
+      Core.Host_and_port.t Cli_lib.Flag.Types.with_name option
+        [@default None] }
 [@@deriving make]
