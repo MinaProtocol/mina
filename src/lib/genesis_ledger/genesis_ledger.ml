@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 [%%inject
 "ledger_depth", ledger_depth]
