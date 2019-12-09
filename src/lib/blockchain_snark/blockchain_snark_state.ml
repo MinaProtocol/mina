@@ -187,12 +187,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
 end
 
 module Checked = struct
-  let%snarkydef is_base_hash h =
-    Field.Checked.equal
-      (Field.Var.constant
-         ( (Lazy.force Genesis_protocol_state.compile_time_genesis).hash
-           :> Field.t ))
-      (State_hash.var_to_hash_packed h)
+  let%snarkydef is_base_case state =
+    Protocol_state.consensus_state state
+    |> Consensus.Data.Consensus_state.is_genesis_state_var
 
   let%snarkydef hash (t : Protocol_state.var) = Protocol_state.hash_checked t
 end

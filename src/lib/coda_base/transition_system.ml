@@ -39,7 +39,7 @@ module type S = sig
     module Checked : sig
       val hash : var -> (Hash.var * Body_hash.var, _) Checked.t
 
-      val is_base_hash : Hash.var -> (Boolean.var, _) Checked.t
+      val is_base_case : var -> (Boolean.var, _) Checked.t
 
       val update :
            logger:Logger.t
@@ -152,13 +152,11 @@ struct
     let%snarkydef main (logger : Logger.t) (top_hash : Digest.Tick.Packed.var)
         =
       let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
-      and genesis_state_hash =
-        exists' State.Hash.typ ~f:Prover_state.genesis_state_hash
       and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash, prev_state_body_hash =
         State.Checked.hash prev_state
       in
-      let%bind next_state_hash, _next_state, `Success success =
+      let%bind next_state_hash, next_state, `Success success =
         with_label __LOC__
           (State.Checked.update ~logger
              (prev_state_hash, prev_state_body_hash, prev_state)
@@ -183,7 +181,7 @@ struct
               let%bind prover_state = get_state in
               match Prover_state.expected_next_state prover_state with
               | Some expected_next_state ->
-                  let%bind in_snark_next_state = read State.typ _next_state in
+                  let%bind in_snark_next_state = read State.typ next_state in
                   let%bind next_top_hash = read Field.typ next_top_hash in
                   let%bind top_hash = read Field.typ top_hash in
                   let updated = State.sexp_of_value in_snark_next_state in
@@ -219,9 +217,7 @@ struct
       let%bind inductive_case_passed =
         with_label __LOC__ Boolean.(prev_state_valid && success)
       in
-      let%bind is_base_case =
-        State.Hash.equal_var genesis_state_hash next_state_hash
-      in
+      let%bind is_base_case = State.Checked.is_base_case next_state in
       let%bind () =
         as_prover
           As_prover.(
