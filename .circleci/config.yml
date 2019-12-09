@@ -92,6 +92,9 @@ jobs:
         steps:
             - checkout
             - run:
+                  name: Create config.mlh
+                  command: cd ./src/config/ && dune build
+            - run:
                   name: Compare versioned types in PR
                   command: ./scripts/compare_pr_diff_types.sh
     update-branch-protection:
