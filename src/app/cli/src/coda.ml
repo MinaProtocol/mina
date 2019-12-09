@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"/src/config.mlh"]
 
 open Core
 open Async
@@ -72,17 +72,10 @@ let daemon logger =
            "seq|rand Choose work sequentially (seq) or randomly (rand) \
             (default: rand)"
          (optional work_selection_method)
-     and external_port =
-       flag "external-port"
-         ~doc:
-           (sprintf
-              "PORT Base server port for daemon TCP (discovery UDP on port+1) \
-               (default: %d)"
-              Port.default_external)
-         (optional int16)
+     and external_port = Flag.Port.Daemon.external_
      and client_port = Flag.Port.Daemon.client
      and rest_server_port = Flag.Port.Daemon.rest_server
-     and archive_process_port = Flag.Port.Daemon.archive
+     and archive_process_location = Flag.Host_and_port.Daemon.archive
      and metrics_server_port =
        flag "metrics-port"
          ~doc:
@@ -153,9 +146,7 @@ let daemon logger =
          (optional bool)
      and disable_libp2p =
        flag "disable-libp2p-discovery" no_arg ~doc:"Disable libp2p discovery"
-     and discovery_port =
-       flag "discovery-port" (optional int)
-         ~doc:"PORT Port to use for peer-to-peer discovery (default: 28675)"
+     and discovery_port = Flag.Port.Daemon.discovery
      and enable_old_discovery =
        flag "enable-old-discovery" no_arg
          ~doc:"Enable the old Haskell Kademlia discovery"
@@ -418,22 +409,13 @@ let daemon logger =
                  ~metadata:[("key", `String keyname)] ;
                default
          in
-         let external_port : int =
-           or_from_config YJ.Util.to_int_option "external-port"
-             ~default:Port.default_external external_port
+         let get_port {Flag.Types.value; default; name} =
+           or_from_config YJ.Util.to_int_option name ~default value
          in
-         let client_port =
-           or_from_config YJ.Util.to_int_option "client-port"
-             ~default:Port.default_client client_port
-         in
-         let rest_server_port =
-           or_from_config YJ.Util.to_int_option "rest-port"
-             ~default:Port.default_rest rest_server_port
-         in
-         let discovery_port =
-           or_from_config YJ.Util.to_int_option "discovery-port"
-             ~default:Port.default_discovery discovery_port
-         in
+         let external_port = get_port external_port in
+         let client_port = get_port client_port in
+         let rest_server_port = get_port rest_server_port in
+         let discovery_port = get_port discovery_port in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
@@ -736,7 +718,7 @@ let daemon logger =
                 ~time_controller ~initial_propose_keypairs ~monitor
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
-                ~work_reassignment_wait ~archive_process_port ())
+                ~work_reassignment_wait ~archive_process_location ())
          in
          {Coda_initialization.coda; client_whitelist; rest_server_port}
        in
