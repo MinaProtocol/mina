@@ -48,6 +48,7 @@ module Colors = {
   let gandalf = gandalfAlpha(1.);
 
   let clover = `rgb((71, 144, 86));
+  let cloverAlpha = a => `rgba((71, 144, 86, a));
 
   let amberAlpha = a => `rgba((242, 149, 68, a));
 
