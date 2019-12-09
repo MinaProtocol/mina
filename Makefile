@@ -134,7 +134,7 @@ macos-setup:
 # push steps require auth on docker hub
 docker-toolchain:
 	@if git diff-index --quiet HEAD ; then \
-		docker build --no-cache --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
+		docker build --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
 		docker tag  codaprotocol/coda:toolchain-$(GITLONGHASH) codaprotocol/coda:toolchain-latest && \
 		docker push codaprotocol/coda:toolchain-$(GITLONGHASH) && \
 		docker push codaprotocol/coda:toolchain-latest ;\
@@ -152,14 +152,12 @@ docker-toolchain-rust:
 		echo "Repo has uncommited changes, commit first to set hash." ;\
 	fi
 
-# All in one step to build toolchain and binary for kademlia
-# TODO: Rename to docker-toolchain-discovery
-docker-toolchain-haskell:
-	@echo "Building codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG)" ;\
-    docker build --file dockerfiles/Dockerfile-toolchain-haskell --tag codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) . ;\
+docker-toolchain-discovery:
+	@echo "Building codaprotocol/coda:toolchain-discovery-$(KADEMLIA_SIG)" ;\
+    docker build --file dockerfiles/Dockerfile-toolchain-discovery --tag codaprotocol/coda:toolchain-discovery-$(KADEMLIA_SIG) . ;\
     echo  'Extracting deb package' ;\
     mkdir -p _build ;\
-    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-discovery.deb > _build/coda-discovery.deb
+    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-discovery-$(KADEMLIA_SIG) /src/coda-discovery.deb > _build/coda-discovery.deb
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
@@ -286,4 +284,4 @@ ml-docs:
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download macos-setup-compile libp2p_helper
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust docker-toolchain-discovery toolchains doc_diagrams ml-docs macos-setup macos-setup-download macos-setup-compile libp2p_helper
