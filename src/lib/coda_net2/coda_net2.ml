@@ -991,11 +991,15 @@ let me (net : Helper.t) = Ivar.read net.me_keypair
 let list_peers net =
   match%map Helper.do_rpc net (module Helper.Rpcs.List_peers) () with
   | Ok peers ->
-      List.map peers ~f:(fun {host; libp2p_port; peer_id} ->
-          Peer.create
-            (Unix.Inet_addr.of_string host)
-            ~libp2p_port
-            ~peer_id:(Peer.Id.unsafe_of_string peer_id) )
+      (* FIXME #4039: filter_map shouldn't be necessary *)
+      List.filter_map peers ~f:(fun {host; libp2p_port; peer_id} ->
+          if Int.equal libp2p_port 0 then None
+          else
+            Some
+              (Peer.create
+                 (Unix.Inet_addr.of_string host)
+                 ~libp2p_port
+                 ~peer_id:(Peer.Id.unsafe_of_string peer_id)) )
   | Error _ ->
       []
 
