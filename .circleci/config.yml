@@ -93,7 +93,7 @@ jobs:
             - checkout
             - run:
                   name: Create config.mlh
-                  command: cd ./src/config/ && dune build
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && cd ./src/config/ && dune build'
             - run:
                   name: Compare versioned types in PR
                   command: ./scripts/compare_pr_diff_types.sh
