@@ -398,7 +398,9 @@ module Base = struct
       let current_global_slot =
         Global_slot.(Checked.constant zero)
         (* TODO: @deepthi is working on passing through the protocol state to
-           here. This should be replaced with the real value when his PR lands. *)
+           here. This should be replaced with the real value when her PR lands.
+           See issue #4036.
+         *)
       in
       Global_slot.Checked.(current_global_slot <= payload.common.valid_until)
       >>= Boolean.Assert.is_true
@@ -459,7 +461,7 @@ module Base = struct
                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                  ~else_:current
              in
-             (* TODO: use actual slot *)
+             (* TODO: use actual slot. See issue #4036. *)
              let txn_global_slot = Global_slot.Checked.zero in
              let%bind timing =
                let%bind txn_amount =

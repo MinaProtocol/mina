@@ -377,7 +377,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         {user_command; previous_receipt_chain_hash= account.receipt_chain_hash}
       in
       let%bind () = validate_nonces nonce account.nonce in
-      (* TODO: Put actual value here *)
+      (* TODO: Put actual value here. See issue #4036. *)
       let current_global_slot = Global_slot.zero in
       let%bind () =
         validate_time ~valid_until:payload.common.valid_until
