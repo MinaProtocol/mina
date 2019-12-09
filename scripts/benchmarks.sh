@@ -9,7 +9,7 @@ export X_LIBRARY_INLINING=true
 
 GIT_ROOT="`git rev-parse --show-toplevel`"
 
-BENCHMARK_EXE=$GIT_ROOT/src/_build/default/app/benchmarks/main.exe
+BENCHMARK_EXE=$GIT_ROOT/_build/default/src/app/benchmarks/main.exe
 
 if [ ! -f "$BENCHMARK_EXE" ]; then
     echo "Please run 'make benchmarks' before running this script";
