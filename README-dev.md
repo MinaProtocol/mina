@@ -132,7 +132,6 @@ These are the most important `make` targets:
 * `dev`: does `docker`, `container`, and `build`
 * `test`: run the tests
 * `web`: build the website, including the state explorer
-* `libp2p_helper`: build just the helper Go program
 
 We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code.
 
