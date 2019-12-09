@@ -4,7 +4,7 @@ module Styles = {
   open Css;
   open Theme;
 
-  let accountItem = hoverColor =>
+  let accountItem = (hoverColor, textColor) =>
     style([
       position(`relative),
       flexShrink(0),
@@ -14,23 +14,25 @@ module Styles = {
       justifyContent(`center),
       height(`rem(4.5)),
       fontFamily("IBM Plex Sans, Sans-Serif"),
-      color(Colors.slateAlpha(0.5)),
+      color(textColor),
       padding2(~v=`px(0), ~h=`rem(1.25)),
       borderBottom(`px(1), `solid, Colors.borderColor),
       borderTop(`px(1), `solid, white),
       hover([selector(".lockIcon", [color(hoverColor)])]),
     ]);
 
-  let inactiveAccountItem = hoverColor =>
+  let unlocked = style([color(Colors.marine)]);
+
+  let inactiveAccountItem = (hoverColor, textColor) =>
     merge([
-      accountItem(hoverColor),
+      accountItem(hoverColor, textColor),
       style([hover([color(Colors.saville)])]),
       notText,
     ]);
 
-  let activeAccountItem = hoverColor =>
+  let activeAccountItem = (hoverColor, textColor) =>
     merge([
-      accountItem(hoverColor),
+      accountItem(hoverColor, textColor),
       style([
         color(Colors.marine),
         backgroundColor(Colors.hyperlinkAlpha(0.15)),
@@ -88,18 +90,34 @@ let make = (~account: Account.t) => {
   let isLocked = Option.withDefault(~default=true, account.locked);
   let (showModal, setModalOpen) = React.useState(() => false);
   let toast = Hooks.useToast();
-  let (lockColor, hoverColor) =
+  let (lockColor, hoverColor, textColor) =
     switch (isActive, isLocked) {
-    | (true, true) => (Theme.Colors.saville, Theme.Colors.saville)
-    | (true, false) => (Theme.Colors.jungle, Theme.Colors.jungle)
-    | (false, true) => (Theme.Colors.slateAlpha(0.5), Theme.Colors.marine)
-    | (false, false) => (Theme.Colors.cloverAlpha(0.8), Theme.Colors.jungle)
+    | (true, true) => (
+        Theme.Colors.saville,
+        Theme.Colors.saville,
+        Theme.Colors.marine,
+      )
+    | (true, false) => (
+        Theme.Colors.jungle,
+        Theme.Colors.jungle,
+        Theme.Colors.marine,
+      )
+    | (false, true) => (
+        Theme.Colors.slateAlpha(0.5),
+        Theme.Colors.marine,
+        Theme.Colors.slateAlpha(0.5),
+      )
+    | (false, false) => (
+        Theme.Colors.cloverAlpha(0.8),
+        Theme.Colors.jungle,
+        Theme.Colors.marineAlpha(0.7),
+      )
     };
   <div
     className={
       isActive
-        ? Styles.activeAccountItem(hoverColor)
-        : Styles.inactiveAccountItem(hoverColor)
+        ? Styles.activeAccountItem(hoverColor, textColor)
+        : Styles.inactiveAccountItem(hoverColor, textColor)
     }
     onClick={_ =>
       ReasonReact.Router.push(
@@ -138,7 +156,7 @@ let make = (~account: Account.t) => {
                    (),
                  )
                  |> ignore;
-                 toast("Account locked!", ToastProvider.Default);
+                 toast("Account locked", ToastProvider.Error);
                };
            }}
            className={Styles.lockIcon(lockColor, hoverColor) ++ " lockIcon"}>
@@ -152,7 +170,7 @@ let make = (~account: Account.t) => {
            onClose={() => setModalOpen(_ => false)}
            onSuccess={() => {
              setModalOpen(_ => false);
-             toast("Account unlocked!", ToastProvider.Default);
+             toast("Account unlocked", ToastProvider.Success);
            }}
          />
        : React.null}
