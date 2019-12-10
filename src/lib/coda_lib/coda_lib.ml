@@ -679,6 +679,13 @@ let create (config : Config.t) =
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create transition_frontier_opt
           in
+          Exit_handlers.register_async_shutdown_handler ~logger:config.logger
+            ~description:"Close transition frontier, if exists" (fun () ->
+              match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
+              | None ->
+                  Deferred.unit
+              | Some frontier ->
+                  Transition_frontier.close frontier ) ;
           let handle_request name ~f query_env =
             trace_recurring name (fun () ->
                 let input = Envelope.Incoming.data query_env in
