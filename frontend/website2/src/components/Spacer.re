@@ -1,9 +1,9 @@
 [@react.component]
-let make = (~width=`zero, ~height=`zero) =>
+let make = (~width=0., ~height=0.) =>
   <div
     className={Css.style([
-      Css.width(width),
-      Css.height(height),
+      Css.width(`rem(width)),
+      Css.height(`rem(height)),
       Css.flexShrink(0.),
     ])}
   />;

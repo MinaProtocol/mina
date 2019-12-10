@@ -59,7 +59,7 @@ let make = (~posts) => {
                {Util.reactMap(Js.Undefined.toOption(post.subtitle), ~f=s =>
                   <div className=Style.subtitle> {React.string(s)} </div>
                 )}
-               <Spacer height={`rem(1.5)} />
+               <Spacer height=1.5 />
                <div className=Style.author>
                  {React.string("by " ++ post.author)}
                </div>

@@ -82,10 +82,10 @@ let make = (~post: option(ContentType.Post.t)) => {
         {Util.reactMap(Js.Undefined.toOption(subtitle), ~f=s =>
            <div className=Style.subtitle> {React.string(s)} </div>
          )}
-        <Spacer height={`rem(2.0)} />
+        <Spacer height=2.0 />
         <div className=Style.author> {React.string("by " ++ author)} </div>
         <div className=Style.date> {React.string(date)} </div>
-        <Spacer height={`rem(2.0)} />
+        <Spacer height=2.0 />
         <div className=Style.blogContent> <Markdown content /> </div>
       </div>
     </Page>

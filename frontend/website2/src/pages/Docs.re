@@ -132,6 +132,7 @@ let make =
              margin(`auto),
              paddingLeft(`rem(3.)),
              paddingRight(`rem(3.)),
+             marginTop(`rem(4.)),
            ])
          )>
          <Next.Head> Markdown.katexStylesheet </Next.Head>

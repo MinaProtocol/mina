@@ -107,7 +107,7 @@ module NavFolder = {
           ariaExpanded=expanded
           className=Style.folderLabel>
           {React.string(folder.title)}
-          <Spacer width={`rem(1.0)} />
+          <Spacer width=1.0 />
           <img
             src="/static/img/chevron-down.svg"
             width="16"
