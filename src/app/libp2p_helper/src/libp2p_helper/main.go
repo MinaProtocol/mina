@@ -455,9 +455,8 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 }
 
 type openStreamResult struct {
-	StreamIdx    int    `json:"stream_idx"`
-	RemoteAddr   string `json:"remote_addr"`
-	RemotePeerID string `json:"remote_peerid"`
+	StreamIdx int          `json:"stream_idx"`
+	Peer      codaPeerInfo `json:"peer"`
 }
 
 func (o *openStreamMsg) run(app *app) (interface{}, error) {
@@ -475,6 +474,14 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	stream, err := app.P2p.Host.NewStream(app.Ctx, peer, protocol.ID(o.ProtocolID))
 
 	if err != nil {
+		stream.Reset()
+		return nil, badp2p(err)
+	}
+
+	maybePeer, err := parseMultiaddrWithID(stream.Conn().RemoteMultiaddr(), stream.Conn().RemotePeer())
+
+	if err != nil {
+		stream.Reset()
 		return nil, badp2p(err)
 	}
 
@@ -484,7 +491,7 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 		time.Sleep(250 * time.Millisecond)
 		handleStreamReads(app, stream, streamIdx)
 	}()
-	return openStreamResult{StreamIdx: streamIdx, RemoteAddr: stream.Conn().RemoteMultiaddr().String(), RemotePeerID: stream.Conn().RemotePeer().String()}, nil
+	return openStreamResult{StreamIdx: streamIdx, Peer: *maybePeer}, nil
 }
 
 type closeStreamMsg struct {
@@ -552,11 +559,10 @@ type addStreamHandlerMsg struct {
 }
 
 type incomingStreamUpcall struct {
-	Upcall       string `json:"upcall"`
-	RemoteAddr   string `json:"remote_addr"`
-	RemotePeerID string `json:"remote_peerid"`
-	StreamIdx    int    `json:"stream_idx"`
-	Protocol     string `json:"protocol"`
+	Upcall    string       `json:"upcall"`
+	Peer      codaPeerInfo `json:"peer"`
+	StreamIdx int          `json:"stream_idx"`
+	Protocol  string       `json:"protocol"`
 }
 
 func (as *addStreamHandlerMsg) run(app *app) (interface{}, error) {
@@ -564,14 +570,18 @@ func (as *addStreamHandlerMsg) run(app *app) (interface{}, error) {
 		return nil, needsConfigure()
 	}
 	app.P2p.Host.SetStreamHandler(protocol.ID(as.Protocol), func(stream net.Stream) {
+		peerinfo, err := parseMultiaddrWithID(stream.Conn().RemoteMultiaddr(), stream.Conn().RemotePeer())
+		if err != nil {
+			app.P2p.Logger.Errorf("failed to parse remote connection information, silently dropping stream: %s", err.Error())
+			return
+		}
 		streamIdx := <-seqs
 		app.Streams[streamIdx] = stream
 		app.writeMsg(incomingStreamUpcall{
-			Upcall:       "incomingStream",
-			RemoteAddr:   stream.Conn().RemoteMultiaddr().String(),
-			RemotePeerID: peer.IDB58Encode(stream.Conn().RemotePeer()),
-			StreamIdx:    streamIdx,
-			Protocol:     as.Protocol,
+			Upcall:    "incomingStream",
+			Peer:      *peerinfo,
+			StreamIdx: streamIdx,
+			Protocol:  as.Protocol,
 		})
 		handleStreamReads(app, stream, streamIdx)
 	})

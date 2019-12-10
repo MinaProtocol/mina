@@ -78,11 +78,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 let msg =
                   Envelope.(
                     Incoming.wrap ~data:msg
-                      ~sender:
-                        (Sender.Remote
-                           ( sender.host
-                           , Peer.Id.unsafe_of_string
-                               "contents should be irrelevant" )))
+                      ~sender:(Sender.Remote (sender.host, sender.peer_id)))
                 in
                 Strict_pipe.Writer.write intf.broadcast_message_writer msg ) )
 
@@ -94,7 +90,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         -> q
         -> r Coda_base.Rpc_intf.rpc_response Deferred.t =
      fun t peer_table peer_id rpc query ->
-      let peer = Option.value_exn (Hashtbl.find peer_table peer_id) in
+      let peer =
+        Option.value_exn
+          (Hashtbl.find peer_table peer_id)
+          ~error:(Error.createf "failed to find peer %s in peer_table" peer_id)
+      in
       let intf = get_interface (lookup_node t peer) in
       intf.rpc_hook.hook peer_id rpc query
   end
@@ -126,9 +126,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         let (module Impl) = implementation_of_rpc rpc in
         let latest_version =
           (* this is assumed safe since there should always be at least one version *)
-          Int.Set.max_elt (Impl.versions ()) |> Option.value_exn
+          Int.Set.max_elt (Impl.versions ())
+          |> Option.value_exn ~error:(Error.of_string "no versions?")
         in
-        let sender = Hashtbl.find_exn t.peer_table peer in
+        let sender =
+          Hashtbl.find t.peer_table peer
+          |> Option.value_exn ~error:(Error.createf "cannot find peer %s" peer)
+        in
         match
           List.find_map rpc_handlers ~f:(fun handler ->
               match_handler handler rpc ~do_:(fun f ->

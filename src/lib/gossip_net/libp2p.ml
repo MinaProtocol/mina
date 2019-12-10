@@ -108,11 +108,12 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let fail m =
         failwithf "Failed to connect to libp2p_helper process: %s" m ()
       in
+      let conf_dir = config.conf_dir ^/ "coda_net2" in
+      let%bind () = Unix.mkdir ~p:() conf_dir in
       match%bind
         Monitor.try_with (fun () ->
             trace "coda_net2" (fun () ->
-                Coda_net2.create ~logger:config.logger
-                  ~conf_dir:(config.conf_dir ^/ "coda_net2") ) )
+                Coda_net2.create ~logger:config.logger ~conf_dir ) )
       with
       | Ok (Ok net2) -> (
           let open Coda_net2 in

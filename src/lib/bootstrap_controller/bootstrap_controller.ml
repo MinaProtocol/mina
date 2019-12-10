@@ -499,7 +499,7 @@ let%test_module "Bootstrap_controller tests" =
 
     let pids = Child_processes.Termination.create_pid_table ()
 
-    let downcast_transition transition =
+    let downcast_transition ~sender transition =
       let transition =
         transition
         |> External_transition.Validation
@@ -509,11 +509,10 @@ let%test_module "Bootstrap_controller tests" =
       Envelope.Incoming.wrap ~data:transition
         ~sender:
           (Envelope.Sender.Remote
-             ( Unix.Inet_addr.localhost
-             , Peer.Id.unsafe_of_string "contents should be irrelevant" ))
+             (sender.Network_peer.Peer.host, sender.peer_id))
 
-    let downcast_breadcrumb breadcrumb =
-      downcast_transition
+    let downcast_breadcrumb ~sender breadcrumb =
+      downcast_transition ~sender
         (Transition_frontier.Breadcrumb.validated_transition breadcrumb)
 
     let make_non_running_bootstrap ~genesis_root ~network =
@@ -580,7 +579,7 @@ let%test_module "Bootstrap_controller tests" =
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->
                     Strict_pipe.Writer.write sync_ledger_writer
-                      (downcast_breadcrumb breadcrumb) )
+                      (downcast_breadcrumb ~sender:me.peer breadcrumb) )
               in
               Strict_pipe.Writer.close sync_ledger_writer ;
               sync_deferred ) ;
