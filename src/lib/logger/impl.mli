@@ -52,7 +52,7 @@ module Message : sig
   type t =
     { timestamp: Time.t
     ; level: Level.t
-    ; source: Source.t
+    ; source: Source.t option
     ; message: string
     ; metadata: Metadata.t }
   [@@deriving yojson]
@@ -81,7 +81,7 @@ module Transport : sig
     (** Dumb_logrotate is a Transport which persists logs
      *  to the file system by using 2 log files. This
      *  Transport will rotate the 2 logs, ensuring that
-     *  each log file is less than some maximum size 
+     *  each log file is less than some maximum size
      *  before writing to it. When the logs reach max
      *  size, the old log is deleted and a new log is
      *  started. *)

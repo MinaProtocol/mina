@@ -187,7 +187,9 @@ let reader_to_strict_pipe_with_logging :
                  { Logger.Message.timestamp= Time.now ()
                  ; level
                  ; source=
-                     Logger.Source.create ~module_:__MODULE__ ~location:__LOC__
+                     Some
+                       (Logger.Source.create ~module_:__MODULE__
+                          ~location:__LOC__)
                  ; message= sprintf "Output from process %s: %s" name line
                  ; metadata= Logger.metadata logger }
              in

@@ -83,9 +83,13 @@ module Message = struct
   type t =
     { timestamp: Time.t
     ; level: Level.t
-    ; source: Source.t
+    ; source: Source.t option
     ; message: string
     ; metadata: Metadata.t }
+  [@@deriving yojson]
+
+  type without_source =
+    {timestamp: Time.t; level: Level.t; message: string; metadata: Metadata.t}
   [@@deriving yojson]
 
   let escape_string str =
@@ -93,7 +97,19 @@ module Message = struct
     |> List.bind ~f:(function '"' -> ['\\'; '"'] | c -> [c])
     |> String.of_char_list
 
-  let to_yojson m = to_yojson {m with message= escape_string m.message}
+  let of_yojson json =
+    match without_source_of_yojson json with
+    | Ok {timestamp; level; message; metadata} ->
+        Ok {timestamp; level; message; metadata; source= None}
+    | Error _ ->
+        of_yojson json
+
+  let to_yojson ({timestamp; level; source; message; metadata} as m) =
+    match source with
+    | Some _ ->
+        to_yojson {m with message= escape_string m.message}
+    | None ->
+        without_source_to_yojson {timestamp; level; message; metadata}
 
   let metadata_interpolation_regex = Re2.create_exn {|\$(\[a-zA-Z_]+)|}
 
@@ -104,7 +120,7 @@ module Message = struct
     | Error _ ->
         []
 
-  let check_invariants t =
+  let check_invariants (t : t) =
     let refs = metadata_references t.message in
     List.for_all refs ~f:(Metadata.mem t.metadata)
 end
@@ -140,7 +156,7 @@ module Processor = struct
 
     let create ~log_level ~config = {log_level; config}
 
-    let process {log_level; config} msg =
+    let process {log_level; config} (msg : Message.t) =
       let open Message in
       if msg.level < log_level then None
       else
@@ -316,7 +332,7 @@ let change_id {null; metadata; id= _} ~id = {null; metadata; id}
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   { Message.timestamp= Time.now ()
   ; level
-  ; source= Source.create ~module_ ~location
+  ; source= Some (Source.create ~module_ ~location)
   ; message
   ; metadata= Metadata.extend t.metadata metadata }
 

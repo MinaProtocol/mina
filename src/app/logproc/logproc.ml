@@ -49,11 +49,17 @@ let format_msg ~interpolation_config ~timezone msg =
           bright_red err none ;
         (msg.message, [])
   in
-  printf !"%s[%s]%s: %s%s\n" (level_color msg.level)
-    (format_timestamp ~timezone msg.timestamp)
-    msg.source.module_ message Bash_colors.none ;
-  List.iter extra ~f:(fun (k, v) -> printf !"$%s = %s\n" k v) ;
-  Out_channel.(flush stdout)
+  match msg.source with
+  | Some source ->
+      printf !"%s[%s]%s: %s%s\n" (level_color msg.level)
+        (format_timestamp ~timezone msg.timestamp)
+        source.module_ message Bash_colors.none
+  | None ->
+      printf !"%s[%s]: %s%s\n" (level_color msg.level)
+        (format_timestamp ~timezone msg.timestamp)
+        message Bash_colors.none ;
+      List.iter extra ~f:(fun (k, v) -> printf !"$%s = %s\n" k v) ;
+      Out_channel.(flush stdout)
 
 let yojson_from_string_result str =
   try Ok (Yojson.Safe.from_string str) with exn -> Error (Exn.to_string exn)

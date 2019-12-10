@@ -314,8 +314,7 @@ module Helper = struct
           ; ("body", M.input_to_yojson body) ]
       in
       let rpc = Yojson.Safe.to_string actual_obj in
-      Logger.trace t.logger "sending line to libp2p_helper: $line"
-        ~module_:__MODULE__ ~location:__LOC__
+      Logger.spam t.logger "sending line to libp2p_helper: $line"
         ~metadata:[("line", `String rpc)] ;
       Writer.write_line (Child_processes.stdin t.subprocess) rpc ;
       let%map res_json = Ivar.read res in
