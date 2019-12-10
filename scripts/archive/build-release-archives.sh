@@ -7,7 +7,7 @@ set -euo pipefail
 
 # Set up variables for build
 SCRIPT_PATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPT_PATH}/../../src/_build"
+cd "${SCRIPT_PATH}/../.."
 
 GIT_HASH=$(git rev-parse --short=7 HEAD)
 GIT_BRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
@@ -35,7 +35,7 @@ License: Apache-2.0
 Homepage: https://codaprotocol.com/
 Maintainer: O(1)Labs <build@o1labs.org>
 Description: Coda Archive Process
- Compatible with Coda Daemonn 
+ Compatible with Coda Daemon
  Built from ${GIT_HASH} by ${CIRCLE_BUILD_URL}
 EOF
 
@@ -46,7 +46,9 @@ cat "${BUILD_DIR}/DEBIAN/control"
 echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILD_DIR}/usr/local/bin"
-cp ./default/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
+pwd
+ls
+cp ./_build/default/src/app/archive/archive.exe "${BUILD_DIR}/usr/local/bin/coda-archive"
 
 
 # echo contents of deb
