@@ -138,15 +138,15 @@ def filter_tests(tests,
     excludes_patterns = list(map(parse_filter, excludes_filters))
 
     def keep(profile, test):
-        includesed = all(
+        included = all(
             test_pattern(profile_pat, profile)
             and test_pattern(test_pat, test)
             for (profile_pat, test_pat) in includes_patterns)
-        excludesed = any(
+        excluded = any(
             test_pattern(profile_pat, profile)
             and test_pattern(test_pat, test)
             for (profile_pat, test_pat) in excludes_patterns)
-        return includesed and not (excludesed)
+        return included and not excluded
 
     result = collections.defaultdict(list)
     for (profile, tests) in permutations.items():
