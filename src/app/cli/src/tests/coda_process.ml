@@ -160,7 +160,8 @@ let disconnect ((conn, proc, _) as t) ~logger =
   let%bind () = Coda_worker.Connection.close conn in
   match%map Monitor.try_with (fun () -> Process.wait proc) with
   | Ok _ ->
-      ()
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Test node closed successfully"
   | Error e ->
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:[("e", `String (Exn.to_string e))]
