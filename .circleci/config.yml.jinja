@@ -73,7 +73,7 @@ jobs:
                 POSTGRES_DB: archiver
             - image: hasura/graphql-engine:v1.0.0-beta.6
               entrypoint: ["sh", "-c"]
-              command: ["sleep 20 && graphql-engine serve"]
+              command: ["sleep 10 && graphql-engine serve"]
               environment:
                 HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
                 HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
@@ -91,6 +91,9 @@ jobs:
                   command:  bash -c 'eval `opam config env` && make build_archive'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
+            # NOTE: If we were using a machine executor we would be able to mount the sql file in 
+            # as a volume for the container to seed itself, this is the workaround.
+            # Ideally this DB setup step would be handled by the archive process itself. 
             - run:
                   name: Set Up Database
                   command: | 
@@ -98,10 +101,7 @@ jobs:
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
                   name: Configure Hasura
-                  command: ls && ./scripts/archive/make_hasura_configurations.sh
-            #- run:
-            #      name: Check Hasura Configurations
-            #      command: ls && ./scripts/archive/check_hasura_configurations.sh
+                  command: ./scripts/archive/make_hasura_configurations.sh
             - setup_remote_docker
             - run: 
                   name: Build and Release Archives
