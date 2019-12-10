@@ -1,0 +1,18 @@
+[package]
+name = "snarky-bn382"
+version = "0.1.0"
+authors = ["opensource@o1labs.org"]
+description = "C exports for Bn382 fields"
+repository = "https://github.com/o1-labs/zexe"
+license = "MIT/Apache-2.0"
+edition = "2018"
+
+[lib]
+name = "snarky_bn382_stubs_stubs"
+crate-type = ["staticlib"]
+
+################################# Dependencies ################################
+
+[dependencies]
+libc = { version = "0.2.0" }
+algebra = { path = "../algebra" }

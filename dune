@@ -1,0 +1,43 @@
+(data_only_dirs src)
+
+(rule
+ (targets libsnarky_bn382_stubs_stubs.a)
+ (deps
+   ../Cargo.toml
+   Cargo.toml
+   (source_tree src)
+   (source_tree ../algebra)
+   (source_tree ../bench-utils)
+   (source_tree ../crypto-primitives)
+   (source_tree ../dpc)
+   (source_tree ../ff-fft)
+   (source_tree ../gm17)
+   (source_tree ../groth16)
+   (source_tree ../r1cs-core)
+   (source_tree ../r1cs-std))
+ (action
+  (progn
+   (run cargo build --release)
+   (run cp ../target/release/libsnarky_bn382_stubs_stubs.a .))))
+
+(rule
+ (targets snarky_bn382_generated_stubs.ml snarky_bn382.c)
+ (action
+  (run bindings_gen/snarky_bn382_ctypes_stubs.exe)))
+
+(library
+ (name snarky_bn382_stubs)
+ (modules snarky_bn382_stubs)
+ (public_name snarky_bn382.stubs)
+ (self_build_stubs_archive (snarky_bn382_stubs)))
+
+(library
+ (name snarky_bn382)
+ (no_dynlink)
+ (modules (:standard \ snarky_bn382_stubs))
+ (libraries ctypes snarky_bn382_stubs snarky_bn382_bindings)
+ (public_name snarky_bn382)
+ (c_library_flags
+  :standard
+  -lsnarky_bn382_stubs_stubs)
+ (c_names snarky_bn382))
