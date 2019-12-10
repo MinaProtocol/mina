@@ -6,6 +6,7 @@ open Import
 open Coda_numbers
 module Fee = Currency.Fee
 module Payload = User_command_payload
+module Signature_snarky = Signature.Make (Snark_params.Tick)
 
 module Poly = struct
   [%%versioned
@@ -29,7 +30,7 @@ module Stable = struct
     type t =
       ( Payload.Stable.V1.t
       , Public_key.Stable.V1.t
-      , Signature.Stable.V1.t )
+      , Signature_snarky.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving compare, sexp, hash, yojson]
 
@@ -81,7 +82,7 @@ let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
 module For_tests = struct
   (* Pretend to sign a command. Much faster than actually signing. *)
   let fake_sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
-    {payload; sender= kp.public_key; signature= Signature.dummy}
+    {payload; sender= kp.public_key; signature= Signature_snarky.dummy}
 end
 
 module Gen = struct

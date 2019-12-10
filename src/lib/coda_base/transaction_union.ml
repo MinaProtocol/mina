@@ -4,15 +4,17 @@ open Snark_params.Tick
 open Currency
 module Tag = Transaction_union_tag
 module Payload = Transaction_union_payload
+module Signature_snarky = Signature.Make (Snark_params.Tick)
 
 type ('payload, 'pk, 'signature) t_ =
   {payload: 'payload; sender: 'pk; signature: 'signature}
 [@@deriving bin_io, eq, sexp, hash]
 
 (* OK to use Latest, rather than Vn, because t is not bin_io'ed *)
-type t = (Payload.t, Public_key.Stable.Latest.t, Signature.Stable.Latest.t) t_
+type t =
+  (Payload.t, Public_key.Stable.Latest.t, Signature_snarky.Stable.Latest.t) t_
 
-type var = (Payload.var, Public_key.var, Signature.var) t_
+type var = (Payload.var, Public_key.var, Signature_snarky.var) t_
 
 let typ : (var, t) Typ.t =
   let spec = Data_spec.[Payload.typ; Public_key.typ; Schnorr.Signature.typ] in
@@ -56,7 +58,7 @@ let of_transaction : Transaction.t -> t = function
               ; memo= User_command_memo.empty }
           ; body= {public_key= proposer; amount; tag= Tag.Coinbase} }
       ; sender= Public_key.decompress_exn other_pk
-      ; signature= Signature.dummy }
+      ; signature= Signature_snarky.dummy }
   | Fee_transfer tr -> (
       let two (pk1, fee1) (pk2, fee2) : t =
         { payload=
@@ -70,7 +72,7 @@ let of_transaction : Transaction.t -> t = function
                 ; amount= Amount.of_fee fee1
                 ; tag= Tag.Fee_transfer } }
         ; sender= Public_key.decompress_exn pk2
-        ; signature= Signature.dummy }
+        ; signature= Signature_snarky.dummy }
       in
       match tr with
       | `One (pk, fee) ->

@@ -25,7 +25,7 @@ module Stable : sig
     type t =
       ( Payload.Stable.V1.t
       , Public_key.Stable.V1.t
-      , Signature.Stable.V1.t )
+      , Signature.Make(Snark_params.Tick).Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving bin_io, sexp, hash, yojson, version]
 
