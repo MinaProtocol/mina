@@ -278,17 +278,19 @@ let wait_till_genesis ~logger ~time_controller =
        before running transition router" ;
     let rec logger_loop () =
       let%bind () = after (Time_ns.Span.of_sec 30.) in
-      let tm_remaining =
-        Time.diff Consensus.Constants.genesis_state_timestamp
-          (Time.now time_controller)
-      in
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-        "Still waiting $tm_remaining milliseconds before running transition \
-         router"
-        ~metadata:
-          [ ( "tm_remaining"
-            , `Int (Int64.to_int_exn @@ Time.Span.to_ms tm_remaining) ) ] ;
-      logger_loop ()
+      let now = Time.now time_controller in
+      try Consensus.Hooks.is_genesis now |> Fn.const Deferred.unit
+      with Invalid_argument _ ->
+        let tm_remaining =
+          Time.diff Consensus.Constants.genesis_state_timestamp now
+        in
+        Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+          "Still waiting $tm_remaining milliseconds before running transition \
+           router"
+          ~metadata:
+            [ ( "tm_remaining"
+              , `Int (Int64.to_int_exn @@ Time.Span.to_ms tm_remaining) ) ] ;
+        logger_loop ()
     in
     Time.Timeout.await ~timeout_duration:time_till_genesis time_controller
       (logger_loop ())
