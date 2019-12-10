@@ -8,31 +8,28 @@ This RFC analyzes current scan state memory usage and proposes a series of optim
 
 In order to motivate these optimizations, we first need to analyze the expected memory usage of the scan state at our target TPS and slot time parameters. Below are the relevant calculations for computing the total memory usage (in bytes) of a single scan state, given 3 parameters of the scan state. `M` is the depth of each tree in the scan state, `T` is the total number of trees per scan state, and `D` is the scan state delay (we will discuss these in more detail later).
 
-![](https://latex.codecogs.com/gif.latex?NumberOfFullBranches%20%5Ctriangleq%20%5Csum_%7Bi%3D1%7D%5E%7B%5Cfrac%7BT-1%7D%7BD&plus;1%7D%7D%20%5Csum_%7Bj%3D0%7D%5E%7Bi%7D%202%5E%7BM-j%7D%20*%20%28%20D&plus;1%29)
+![](https://latex.codecogs.com/gif.latex?%5Cdpi%7B150%7D%20%5Cbegin%7Balign*%7D%20Base%20%26%5Ctriangleq%20%5Bomitted%5D%20%5C%5C%20Merge%20%26%5Ctriangleq%20%5Bomitted%5D%20%5C%5C%20FullBranch%20%26%5Ctriangleq%202%20%5Ccdot%20Merge%20&plus;%207%20%5Ccdot%20Word%20%5C%5C%20EmptyBranch%20%26%5Ctriangleq%205%20%5Ccdot%20Word%20%5C%5C%20FullLeaf%20%26%5Ctriangleq%20Base%20&plus;%205%20%5Ccdot%20Word%20%5C%5C%20EmptyLeaf%20%26%5Ctriangleq%203%20%5Ccdot%20Word%20%5C%5C%20NumberOfBranches%20%26%5Ctriangleq%20T%20%282%5E%7BM%7D-1%29%20%5C%5C%20NumberOfFullBranches%20%26%5Ctriangleq%20%5Csum_%7Bi%3D1%7D%5E%7B%5Cfrac%7BT-1%7D%7BD&plus;1%7D%7D%20%5Csum_%7Bj%3D0%7D%5E%7Bi%7D%202%5E%7BM-j%7D%20%28D&plus;1%29%20%5C%5C%20NumberOfEmptyBranches%20%26%5Ctriangleq%20NumberOfBranches%20-%20NumberOfFullBranches%20%5C%5C%20NumberOfFullLeaves%20%26%5Ctriangleq%20%28T-1%29%202%5E%7BM%7D%20%5C%5C%20NumberOfEmptyLeaves%20%26%5Ctriangleq%202%5E%7BM%7D%20%5C%5C%20TreeStructureOverhead%20%26%5Ctriangleq%20T%20%28%282M-1%29%20Word%29%20%5C%5C%20ScanState%20%26%5Ctriangleq%20TreeStructureOverhead%20%5C%5C%20%26%5Cphantom%7B%5Ctriangleq%7D&plus;%20NumberOfFullBranches%20%5Ccdot%20FullBranch%20%5C%5C%20%26%5Cphantom%7B%5Ctriangleq%7D&plus;%20NumberOfEmptyBranches%20%5Ccdot%20EmptyBranch%20%5C%5C%20%26%5Cphantom%7B%5Ctriangleq%7D&plus;%20NumberOfFullLeaves%20%5Ccdot%20FullLeaf%20%5C%5C%20%26%5Cphantom%7B%5Ctriangleq%7D&plus;%20NumberOfEmptyLeaves%20%5Ccdot%20EmptyLeaf%20%5Cend%7Balign*%7D)
 <!--
 ```latex
-NumberOfFullBranches \triangleq \sum_{i=1}^{\frac{T-1}{D+1}} \sum_{j=0}^{i} 2^{M-j} * (D+1)
-```
--->
-
-![](https://latex.codecogs.com/gif.latex?NumberOfEmptyBranches%20%5Ctriangleq%20NumberOfFullBranches%20-%20%28T-1%29*%282%5E%7BM&plus;1%7D-1%29)
-<!--
-```latex
-NumberOfEmptyBranches \triangleq NumberOfFullBranches - (T-1)*(2^{M+1}-1)
-```
--->
-
-![](https://latex.codecogs.com/gif.latex?ScanState%20%5Ctriangleq%20%5C%5C%5Cindent%5Cindent%5Cindent%20%28T-1%29%20*%20%28%282*M-1%29%20*%20Word%29%20%5Cindent%5Cindent%5Cindent%5Cindent%5Cindent%5Cindent%5Cindent%7B%5Ccolor%7Bblue%7D%5Ctextbf%7Btree%20structure%20overhead%7D%7D%20%5C%5C%5Cindent%5Cindent%20&plus;%20NumberOfFullBranches%20*%20FullBranch%20%5C%5C%5Cindent%5Cindent%20&plus;%20NumberOfEmptyBranches%20*%20EmptyBranch%20%5C%5C%5Cindent%5Cindent%20&plus;%20%28T-1%29%20*%20%282%5EM%20*%20TreeLeaf%29%20%5C%5C%5Cindent%5Cindent%20&plus;%20%282%5E%7BM&plus;1%7D-1%20&plus;%20%28M-1%29%29%20*%20Word%20%5Cindent%5Cindent%5Cindent%5Cindent%5Cindent%5Cindent%7B%5Ccolor%7Bblue%7D%5Ctextbf%7Bempty%20tree%7D%7D)
-<!--
-```latex
-ScanState \triangleq
-\\\indent\indent\indent (T-1) * ((2*M-1) * Word)
-\indent\indent\indent\indent\indent\indent\indent{\color{blue}\textbf{tree structure overhead}}
-\\\indent\indent        + NumberOfFullBranches * FullBranch
-\\\indent\indent        + NumberOfEmptyBranches * EmptyBranch
-\\\indent\indent        + (T-1) * (2^M * TreeLeaf)
-\\\indent\indent        + (2^{M+1}-1 + (M-1)) * Word
-\indent\indent\indent\indent\indent\indent{\color{blue}\textbf{empty tree}}
+\begin{align*}
+Base &\triangleq [omitted] \\
+Merge &\triangleq [omitted] \\
+FullBranch &\triangleq 2 \cdot Merge + 7 \cdot Word \\
+EmptyBranch &\triangleq 5 \cdot Word \\
+FullLeaf &\triangleq Base + 5 \cdot Word \\
+EmptyLeaf &\triangleq 3 \cdot Word \\
+NumberOfBranches &\triangleq T (2^{M}-1) \\
+NumberOfFullBranches &\triangleq \sum_{i=1}^{\frac{T-1}{D+1}} \sum_{j=0}^{i} 2^{M-j} (D+1) \\
+NumberOfEmptyBranches &\triangleq NumberOfBranches - NumberOfFullBranches \\
+NumberOfFullLeaves &\triangleq (T-1) 2^{M} \\
+NumberOfEmptyLeaves &\triangleq 2^{M} \\
+TreeStructureOverhead &\triangleq T ((2M-1) Word) \\
+ScanState &\triangleq TreeStructureOverhead \\
+  &\phantom{\triangleq}+ NumberOfFullBranches \cdot FullBranch \\
+  &\phantom{\triangleq}+ NumberOfEmptyBranches \cdot EmptyBranch \\
+  &\phantom{\triangleq}+ NumberOfFullLeaves \cdot FullLeaf \\
+  &\phantom{\triangleq}+ NumberOfEmptyLeaves \cdot EmptyLeaf
+\end{align*}
 ```
 -->
 
@@ -50,7 +47,7 @@ For convenience, the 30 second (depth 6) graph is shown alone below so that the 
 
 What these graphs show is that the dominate factor in reducing scan state memory usage is actually length of a slot time. However, the length of a slot time is, in turn, dependent on blockchain proving time. Furthermore, if slot time is reduced, but transaction proving time increases (due to, i.e., transaction snark bundling), then delay will need to be increased. Still, lowering the slot time (to reduce the scan state depth) and increasing delay is preferrable to keeping the slot time higher to have a lower delay.
 
-Still, even if we assume the best case of being able to achieve 30 second slots and only needing a scan state delay of 2, a single scan state in the current representation will take up a total of 27.57mb. This is unacceptable considering that we store a scan state at every single breadcrumb in the transition frontier. The transition frontier will always have at minimum `k` breadcrumbs (for a node that has been participating for at least `k` blocks on the network), and there exists some constant (let's call it `g` for now), which is greater than 1, that, when multiplied by `k`, gives us an average expected number of breadcrumbs in the transition frontier at any point in time. Calculating `g` is not possible until we have fully determined the consensus parameters for `f` and `Δ`, so as a dirty reason about the size of a transition frontier, we will somewhat conservatively assume `g = 2`. With this assumption, at `k = 1024` (the `k` value used by Cardano in the Ouroboros papers), all the scan states in the frontier will take up 28.23gb in the best case scenario, and 56.46gb in the average scenario. Therefore, the representation and storage rules for scan states needs to be modified in order to allow TPS to scale to a reasonable target for mainnet.
+Still, even if we assume the best case of being able to achieve 30 second slots and only needing a scan state delay of 2, a single scan state in the current representation will take up a total of 27.53mb. This is unacceptable considering that we store a scan state at every single breadcrumb in the transition frontier. The transition frontier will always have at minimum `k` breadcrumbs (for a node that has been participating for at least `k` blocks on the network), and there exists some constant (let's call it `g` for now), which is greater than 1, that, when multiplied by `k`, gives us an average expected number of breadcrumbs in the transition frontier at any point in time. Calculating `g` is not possible until we have fully determined the consensus parameters for `f` and `Δ`, so as a dirty reason about the size of a transition frontier, we will somewhat conservatively assume `g = 2`. With this assumption, at `k = 1024` (the `k` value used by Cardano in the Ouroboros papers), all the scan states in the frontier will take up 28.19gb in the best case scenario, and 56.38gb in the average scenario. Therefore, the representation and storage rules for scan states needs to be modified in order to allow TPS to scale to a reasonable target for mainnet.
 
 ## Detailed design
 [detailed-design]: #detailed-design

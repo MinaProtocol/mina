@@ -29,9 +29,13 @@ TxnStatement = 4*Hash + Amount + Fee + TxnProofType # ==> 404
 TxnWitness = 2*(2*LedgerDepth*Hash + Account) # ==> 5914
 Base = Undo + TxnStatement + TxnWitness # ==> 7102
 Merge = TxnStatement + Proof + Sok # ==> 1932
-TreeLeaf = Base + 5*Word # ==> 1228
+FullLeaf = Base + 5*Word # ==> 1228
+EmptyLeaf = 3 * Word # ==> 24
 FullBranch = 2*Merge + 7*Word # ==> 3920
 EmptyBranch = 5*Word # ==> 40
+
+def NumberOfBranches(M, T):
+    return T * (2**M - 1)
 
 def NumberOfFullBranches(M, T, D):
     acc = 0
@@ -41,16 +45,21 @@ def NumberOfFullBranches(M, T, D):
     return acc
 
 def NumberOfEmptyBranches(M, T, D):
-    # return NumberOfFullBranches(M, T, D) - (T-1) * (2**(M-1)-1) 
-    return (T-1) * (2**(M+1)-1) - NumberOfFullBranches(M, T, D)
+    return NumberOfBranches(M, T) - NumberOfFullBranches(M, T, D)
+
+def NumberOfFullLeaves(M, T):
+    return (T-1) * 2**M
+
+def NumberOfEmptyLeaves(M):
+    return 2**M
 
 def ScanState(M, T, D):
-    TreeStructureOverhead = (T-1)*((2*M-1) * Word)
+    TreeStructureOverhead = T * ((2**M-1) * Word)
     FullBranches = NumberOfFullBranches(M, T, D) * FullBranch
     EmptyBranches = NumberOfEmptyBranches(M, T, D) * EmptyBranch
-    Leaves = (T-1)*(2**M * TreeLeaf)
-    EmptyTree = (2**(M+1)-1 + (M-1)) * Word
-    return TreeStructureOverhead + FullBranches + EmptyBranches + Leaves + EmptyTree
+    FullLeaves = NumberOfFullLeaves(M, T) * FullLeaf
+    EmptyLeaves = NumberOfEmptyLeaves(M) * EmptyLeaf
+    return TreeStructureOverhead + FullBranches + EmptyBranches + FullLeaves + EmptyLeaves
 
 if __name__ == '__main__':
     if(len(sys.argv) < 3):
