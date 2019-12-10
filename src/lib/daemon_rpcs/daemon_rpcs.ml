@@ -415,25 +415,6 @@ module Get_nonce = struct
       ~bin_response:Response.Stable.Latest.bin_t
 end
 
-module Get_status = struct
-  type query = [`Performance | `None] [@@deriving bin_io]
-
-  type response = Types.Status.t [@@deriving bin_io]
-
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_status" ~version:0 ~bin_query ~bin_response
-end
-
-module Clear_hist_status = struct
-  type query = [`Performance | `None] [@@deriving bin_io]
-
-  type response = Types.Status.t [@@deriving bin_io]
-
-  let rpc : (query, response) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Clear_hist_status" ~version:0 ~bin_query
-      ~bin_response
-end
-
 module Get_public_keys_with_details = struct
   module Query = struct
     [%%versioned

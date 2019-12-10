@@ -39,7 +39,7 @@ let of_string string =
   | status ->
       Error (Error.createf !"%s is not a valid status" status)
 
-let to_yojson status = `String (to_string status)
+let of_string_exn = Fn.compose Or_error.ok_exn of_string
 
 [%%versioned
 module Stable = struct
@@ -50,13 +50,19 @@ module Stable = struct
 
     let to_latest = Fn.id
 
-    let to_yojson = to_yojson
-
     module T = struct
       type typ = t [@@deriving sexp, hash, compare, equal, enumerate]
 
       type t = typ [@@deriving sexp, hash, compare, equal, enumerate]
     end
+
+    include Codable.Make_of_string (struct
+      include T
+
+      let to_string = to_string
+
+      let of_string = of_string_exn
+    end)
 
     include Hashable.Make (T)
   end
@@ -64,6 +70,9 @@ end]
 
 type t = [`Connecting | `Listening | `Offline | `Bootstrap | `Synced | `Catchup]
 [@@deriving sexp, hash, equal, enumerate]
+
+[%%define_locally
+Stable.Latest.(to_yojson, of_yojson)]
 
 include Hashable.Make (Stable.Latest.T)
 

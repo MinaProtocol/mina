@@ -106,6 +106,8 @@ module Types = struct
 
   let uint64 = uint64 ()
 
+  let consensus_time = Consensus.Data.Consensus_time.graphql_type ()
+
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
@@ -148,7 +150,7 @@ module Types = struct
               ) ] )
 
   module DaemonStatus = struct
-    type t = Daemon_rpcs.Types.Status.t
+    type t = Daemon_status.t
 
     let interval : (_, (Time.Span.t * Time.Span.t) option) typ =
       obj "Interval" ~fields:(fun _ ->
@@ -171,7 +173,7 @@ module Types = struct
                ~intervals:(id ~typ:(non_null (list (non_null interval))))
                ~underflow:nn_int ~overflow:nn_int )
 
-    module Rpc_timings = Daemon_rpcs.Types.Status.Rpc_timings
+    module Rpc_timings = Daemon_status.Rpc_timings
     module Rpc_pair = Rpc_timings.Rpc_pair
 
     let rpc_pair : (_, Perf_histograms.Report.t option Rpc_pair.t option) typ =
@@ -187,7 +189,7 @@ module Types = struct
                ~answer_sync_ledger_query:fd ~get_ancestry:fd
                ~get_transition_chain_proof:fd ~get_transition_chain:fd )
 
-    module Histograms = Daemon_rpcs.Types.Status.Histograms
+    module Histograms = Daemon_status.Histograms
 
     let histograms : (_, Histograms.t option) typ =
       let h = Reflection.Shorthand.id ~typ:histogram in
@@ -220,35 +222,80 @@ module Types = struct
                ~discovery_port:nn_int ~client_port:nn_int ~libp2p_port:nn_int
                ~communication_port:nn_int )
 
-    let t : (_, Daemon_rpcs.Types.Status.t option) typ =
+    let start_time = Time_ns.now ()
+
+    let consensus_time_of_int64 time =
+      time |> Block_time.Span.of_ms |> Block_time.of_span_since_epoch
+      |> Consensus.Data.Consensus_time.of_time_exn
+
+    (* To compute the daemon status, we would just need the coda context and
+       the best tip. We need the best tip to be passed in because we need an
+       atomic reference for the best tip. There could be a possibility that the
+       best tip changes when performing a DaemonStatus query, which would lead
+       to inconsistent results *)
+    type best_tip = Transition_frontier.Breadcrumb.t option
+
+    let t : (Coda_lib.t, best_tip option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
-          let open Reflection.Shorthand in
-          List.rev
-          @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
-               ~next_proposal:(id ~typ:block_proposal) ~blockchain_length:int
-               ~uptime_secs:nn_int ~ledger_merkle_root:string
-               ~state_hash:string ~commit_id:nn_string ~conf_dir:nn_string
-               ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
-               ~user_commands_sent:nn_int ~snark_worker:string
-               ~snark_work_fee:nn_int
-               ~sync_status:(id ~typ:(non_null sync_status))
-               ~propose_pubkeys:
-                 (id ~typ:Schema.(non_null @@ list (non_null string)))
-               ~histograms:(id ~typ:histograms)
-               ~consensus_time_best_tip:
-                 (id ~typ:(Consensus.Data.Consensus_time.graphql_type ()))
-               ~consensus_time_now:
-                 (id
-                    ~typ:
-                      Schema.(
-                        non_null
-                          (Consensus.Data.Consensus_time.graphql_type ())))
-               ~consensus_mechanism:nn_string
-               ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
-               ~libp2p_peer_id:nn_string
-               ~consensus_configuration:
-                 (id ~typ:(non_null consensus_configuration))
-               ~highest_block_length_received:nn_int )
+          [ field "numAccounts" ~typ:int ~args:[] ~resolve:(fun {ctx= _; _} ->
+                Daemon_status.num_accounts )
+          ; field "blockchainLength" ~typ:int ~args:[]
+              ~resolve:(fun {ctx= _; _} -> Daemon_status.blockchain_length)
+          ; field "highestBlockLengthReceived" ~typ:(non_null int) ~args:[]
+              ~resolve:(fun {ctx= coda; _} _ ->
+                Daemon_status.highest_block_length_received coda )
+          ; field "uptimeSecs" ~typ:(non_null int) ~args:[]
+              ~resolve:(fun {ctx= _; _} _ -> Daemon_status.uptime_secs ())
+          ; field "ledgerMerkleRoot" ~typ:string ~args:[]
+              ~resolve:(fun {ctx= _; _} -> Daemon_status.ledger_merkle_root)
+          ; field "stateHash" ~typ:string ~args:[] ~resolve:(fun {ctx= _; _} ->
+                Daemon_status.state_hash )
+          ; field "commitID" ~typ:(non_null string) ~args:[]
+              ~resolve:(fun _ _ -> Daemon_status.commit_id)
+          ; field "confDir" ~typ:(non_null string) ~args:[]
+              ~resolve:(fun {ctx= coda; _} _ -> Daemon_status.conf_dir coda)
+          ; field "peers"
+              ~typ:(non_null @@ list @@ non_null string)
+              ~args:[]
+              ~resolve:(fun {ctx= coda; _} _ -> Daemon_status.peers coda)
+          ; field "userCommandsSent" ~typ:(non_null int) ~args:[]
+              ~resolve:(fun {ctx= _; _} _ ->
+                Daemon_status.user_commands_sent () )
+          ; field "snarkWorker" ~typ:string ~args:[]
+              ~resolve:(fun {ctx= coda; _} _ -> Daemon_status.snark_worker coda)
+          ; field "snarkWorkFee" ~typ:(non_null int) ~args:[]
+              ~resolve:(fun {ctx= coda; _} _ ->
+                Daemon_status.snark_work_fee coda )
+          ; field "syncStatus" ~typ:(non_null sync_status) ~args:[]
+              ~resolve:(fun {ctx= coda; _} _ -> Daemon_status.sync_status coda)
+          ; field "proposePublicKeys"
+              ~typ:(non_null @@ list @@ non_null public_key)
+              ~args:[]
+              ~resolve:(fun {ctx= coda; _} _ ->
+                Daemon_status.propose_public_keys coda )
+          ; field "histograms" ~typ:(non_null histograms) ~args:[]
+              ~resolve:(fun _ _ -> Daemon_status.histograms ())
+          ; field "consensusTimeBestTip" ~typ:consensus_time ~args:[]
+              ~resolve:(fun _ -> Daemon_status.consensus_time_best_tip)
+          ; field "nextProposals"
+              ~typ:(non_null @@ list @@ non_null consensus_time)
+              ~args:[]
+              ~resolve:(fun {ctx= coda; _} _ ->
+                Daemon_status.next_proposals coda )
+          ; field "consensusTimeNow" ~typ:(non_null consensus_time) ~args:[]
+              ~resolve:(fun {ctx= coda; _} _ ->
+                Daemon_status.consensus_time_now coda )
+          ; field "consensusMechanism" ~typ:(non_null string) ~args:[]
+              ~resolve:(fun _ _ -> Daemon_status.consensus_mechanism)
+          ; field "consensusConfiguration"
+              ~typ:(non_null consensus_configuration) ~args:[]
+              ~resolve:(fun _ _ -> Daemon_status.consensus_configuration)
+          ; field "addrsAndPorts" ~typ:(non_null addrs_and_ports) ~args:[]
+              ~resolve:(fun {ctx= coda; _} _ ->
+                Daemon_status.addrs_and_ports coda )
+          ; field "libp2pPeerID" ~typ:(non_null string) ~args:[]
+              ~resolve:(fun {ctx= coda; _} _ ->
+                Daemon_status.libp2p_peer_id coda ) ] )
   end
 
   let fee_transfer =
@@ -910,6 +957,12 @@ module Types = struct
       obj "SendPaymentPayload" ~fields:(fun _ ->
           [ field "payment" ~typ:(non_null user_command)
               ~doc:"Payment that was sent"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
+    let clear_histograms =
+      obj "clearHistogramPayload" ~fields:(fun _ ->
+          [ field "daemonStatus" ~typ:(non_null DaemonStatus.t)
               ~args:Arg.[]
               ~resolve:(fun _ -> Fn.id) ] )
 
@@ -1577,6 +1630,14 @@ module Mutations = struct
       ~args:Arg.[]
       ~resolve:reload_account_resolver
 
+  let clear_histograms =
+    field "clearHistograms" ~doc:"Clear performance histograms of RPCS"
+      ~typ:(non_null Types.Payload.clear_histograms)
+      ~args:Arg.[]
+      ~resolve:(fun {ctx= coda; _} _ ->
+        Perf_histograms.wipe () ;
+        Participating_state.active @@ Coda_lib.best_tip coda )
+
   let reset_trust_status =
     io_field "resetTrustStatus"
       ~doc:"Reset trust status for a given IP address"
@@ -1770,6 +1831,7 @@ module Mutations = struct
     ; delete_wallet
     ; reload_accounts
     ; reload_wallets
+    ; clear_histograms
     ; send_payment
     ; send_delegation
     ; add_payment_receipt
@@ -1817,7 +1879,7 @@ module Queries = struct
   let daemon_status =
     field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun {ctx= coda; _} () ->
-        Coda_commands.get_status ~flag:`Performance coda )
+        Participating_state.active @@ Coda_lib.best_tip coda )
 
   let trust_status =
     field "trustStatus" ~typ:Types.Payload.trust_status

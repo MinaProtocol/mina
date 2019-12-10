@@ -360,6 +360,8 @@ module type S = sig
 
       val of_time_exn : Block_time.t -> t
 
+      val to_time : t -> Block_time.t
+
       (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)
       val get_old : t -> t
 
@@ -478,6 +480,12 @@ module type S = sig
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> logger:Logger.t
       -> proposal
+
+    (**
+     * Compute the next valid time to check again for a proposal based on an 
+     * arbitrary block time.
+    *)
+    val check_again_time : Block_time.t -> Consensus_time.t
 
     (**
      * A hook for managing local state when the locked tip is updated.

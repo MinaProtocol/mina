@@ -11,6 +11,7 @@ type t =
 [@@deriving bin_io, fields]
 
 module Display = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
@@ -21,8 +22,18 @@ module Display = struct
         ; libp2p_port: int
         ; communication_port: int }
       [@@deriving fields, yojson, bin_io]
+
+      let to_latest = Fn.id
     end
-  end
+  end]
+
+  type t = Stable.Latest.t =
+    { external_ip: string
+    ; bind_ip: string
+    ; discovery_port: int
+    ; client_port: int
+    ; libp2p_port: int
+    ; communication_port: int }
 end
 
 let to_display (t : t) =

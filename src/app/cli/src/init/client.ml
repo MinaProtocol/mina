@@ -370,30 +370,20 @@ let get_nonce_cmd =
              exit 0 ))
 
 let status =
-  let open Daemon_rpcs in
-  let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
   Command.async ~summary:"Get running daemon status"
-    (Cli_lib.Background_daemon.rpc_init flag
-       ~f:(fun port (json, performance) ->
-         Daemon_rpcs.Client.dispatch_pretty_message ~json ~join_error:Fn.id
-           ~error_ctx:"Failed to get status"
-           (module Daemon_rpcs.Types.Status)
-           Get_status.rpc
-           (if performance then `Performance else `None)
-           port ))
-
-let status_clear_hist =
-  let open Daemon_rpcs in
-  let flag = Args.zip2 Cli_lib.Flag.json Cli_lib.Flag.performance in
-  Command.async ~summary:"Clear histograms reported in status"
-    (Cli_lib.Background_daemon.rpc_init flag
-       ~f:(fun port (json, performance) ->
-         Daemon_rpcs.Client.dispatch_pretty_message ~json ~join_error:Fn.id
-           ~error_ctx:"Failed to clear histograms reported in status"
-           (module Daemon_rpcs.Types.Status)
-           Clear_hist_status.rpc
-           (if performance then `Performance else `None)
-           port ))
+    (Cli_lib.Background_daemon.graphql_init Cli_lib.Flag.json
+       ~f:(fun port json ->
+         let%bind graphql_response =
+           Graphql_client.query
+             (Graphql_queries.Daemon_status.make ())
+             port.value
+           >>| Result.map_error ~f:Graphql_lib.Client.Connection_error.to_error
+           |> Deferred.Result.map ~f:(fun obj -> obj#daemonStatus)
+         in
+         Cli_lib.Render.print
+           (module Daemon_status)
+           json graphql_response ~error_ctx:"Failed to get status" ;
+         Deferred.unit ))
 
 let get_nonce_exn ~rpc public_key port =
   match%bind get_nonce ~rpc public_key port with
@@ -1551,7 +1541,6 @@ let advanced =
     ; ("get-public-keys", get_public_keys)
     ; ("reset-trust-status", reset_trust_status)
     ; ("batch-send-payments", batch_send_payments)
-    ; ("status-clear-hist", status_clear_hist)
     ; ("wrap-key", wrap_key)
     ; ("dump-keypair", dump_keypair)
     ; ("dump-ledger", dump_ledger)

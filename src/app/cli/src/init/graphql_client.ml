@@ -78,6 +78,8 @@ module Decoders = struct
 
   let optional_public_key = Option.map ~f:public_key
 
+  let list_public_key = Fn.compose Array.to_list (Array.map ~f:public_key)
+
   let uint64 json =
     Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
 
@@ -91,4 +93,26 @@ module Decoders = struct
 
   let nonce json =
     Yojson.Basic.Util.to_string json |> Coda_base.Account.Nonce.of_string
+
+  let consensus_time (obj : < value: string >) =
+    Consensus.Data.Consensus_time.of_time_exn
+    @@ Block_time.of_string_exn obj#value
+
+  let optional_consensus_time = Option.map ~f:consensus_time
+
+  let list_consensus_time =
+    Fn.compose Array.to_list (Array.map ~f:consensus_time)
+
+  module Sync_status = struct
+    include Sync_status
+
+    module Display = struct
+      type t =
+        [`BOOTSTRAP | `CATCHUP | `CONNECTING | `LISTENING | `OFFLINE | `SYNCED]
+      [@@deriving sexp]
+    end
+
+    let of_display (display : Display.t) : t =
+      of_string_exn (Sexp.to_string @@ Display.sexp_of_t display)
+  end
 end

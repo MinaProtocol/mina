@@ -186,3 +186,62 @@ query user_commands($public_key: PublicKey) {
 }
 |}]
 end
+
+module Daemon_status = struct
+  let make () = failwith "Need to implement"
+
+  (* open Consensus.Configuration
+  open Kademlia.Node_addrs_and_ports.Display.Stable.V1
+  open Daemon_status
+
+  include [%graphql
+  {|
+query daemon_status {
+  daemonStatus @bsRecord {
+    num_accounts: numAccounts
+    blockchain_length: blockchainLength
+    highest_block_length_received: highestBlockLengthReceived
+    uptime_secs: uptimeSecs
+    ledger_merkle_root: ledgerMerkleRoot
+    state_hash: stateHash
+    commit_id: commitID
+    conf_dir: confDir
+    peers: peers @bsDecoder(fn: "Core.Array.to_list")
+    user_commands_sent: userCommandsSent
+    snark_worker: snarkWorker
+    snark_work_fee : snarkWorkFee
+    sync_status: syncStatus @bsDecoder(fn : "Decoders.Sync_status.of_display")
+    propose_pubkeys: proposePublicKeys @bsDecoder(fn: "Decoders.list_public_key")
+    consensus_time_best_tip: consensusTimeBestTip @bsDecoder(fn: "Decoders.optional_consensus_time") {
+      value: startTime
+    }
+    next_proposals : nextProposals @bsDecoder(fn: "Decoders.list_consensus_time") {
+      value: startTime
+    }
+    consensus_time_now : consensusTimeNow @bsDecoder(fn: "Decoders.consensus_time") {
+      value: startTime
+    }
+    consensus_configuration: consensusConfiguration @bsRecord {
+      delta
+      k
+      c
+      c_times_k: cTimesK
+      slots_per_epoch: slotsPerEpoch
+      slot_duration: slotDuration
+      epoch_duration: epochDuration
+      acceptable_network_delay: acceptableNetworkDelay
+    }
+    addrs_and_ports: addrsAndPorts @bsRecord {
+      external_ip: externalIp
+      bind_ip: bindIp
+      discovery_port: discoveryPort
+      client_port: clientPort
+      libp2p_port: libp2pPort
+      communication_port: communicationPort
+    }
+    libp2p_peer_id : libp2pPeerID
+    consensus_mechanism: consensusMechanism
+  }
+}
+|}] *)
+end

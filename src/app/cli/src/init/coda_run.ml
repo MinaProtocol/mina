@@ -107,8 +107,7 @@ let summary exn_str =
 let coda_status coda_ref =
   Option.value_map coda_ref
     ~default:(`String "Shutdown before Coda instance was created") ~f:(fun t ->
-      Coda_commands.get_status ~flag:`Performance t
-      |> Daemon_rpcs.Types.Status.to_yojson )
+      Daemon_status.to_yojson @@ Daemon_status.create t )
 
 let make_report exn_str ~conf_dir ~top_logger coda_ref =
   let _ = remove_prev_crash_reports ~conf_dir in
@@ -174,8 +173,8 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   else Some (report_file, temp_config)
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
-let setup_local_server ?(client_whitelist = []) ?rest_server_port
-    ?(insecure_rest_server = false) coda =
+let setup_local_server ?(client_whitelist = [])
+    ?(rest_server_port : int option) ?(insecure_rest_server = false) coda =
   let client_whitelist =
     ref
       (Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist))
@@ -185,7 +184,6 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
     Rpc.Rpc.implement rpc (fun () input ->
         trace_recurring (Rpc.Rpc.name rpc) (fun () -> f () input) )
   in
-  let implement_notrace = Rpc.Rpc.implement in
   let logger =
     Logger.extend
       (Coda_lib.top_level_logger coda)
@@ -249,10 +247,6 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
             ( Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger
                 coda pk
             |> Participating_state.active_error ) )
-    ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
-          return (Coda_commands.get_status ~flag coda) )
-    ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
-          return (Coda_commands.clear_hist_status ~flag coda) )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
           Coda_lib.get_ledger coda lh )
     ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
@@ -359,10 +353,9 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                  (On_port rest_server_port))
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
-                let status flag =
+                let status =
                   Server.respond_string
-                    ( Coda_commands.get_status ~flag coda
-                    |> Daemon_rpcs.Types.Status.to_yojson
+                    ( Daemon_status.create coda |> Daemon_status.to_yojson
                     |> Yojson.Safe.pretty_to_string )
                 in
                 let lift x = `Response x in
@@ -375,9 +368,9 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                         ; ("context", `String "rest_server") ] ;
                     graphql_callback () req body
                 | "/status" ->
-                    status `None >>| lift
+                    status >>| lift
                 | "/status/performance" ->
-                    status `Performance >>| lift
+                    status >>| lift
                 | _ ->
                     Server.respond_string ~status:`Not_found "Route not found"
                     >>| lift ))

@@ -796,6 +796,13 @@ module Data = struct
                       (Snarky.Request.Handler.run handlers
                          ["Ledger Handler"; "Pending Coinbase Handler"]
                          request)))
+
+      let vrf_output =
+        let _, sk = keypairs.(0) in
+        eval ~private_key:sk
+          { Message.global_slot= Global_slot.zero
+          ; seed= Epoch_seed.initial
+          ; delegator= 0 }
     end
 
     let check ~global_slot ~seed ~private_key ~public_key
@@ -1222,6 +1229,10 @@ module Data = struct
         Global_slot.diff t (gc_width_epoch, gc_width_slot)
 
     let to_uint32 = Global_slot.to_uint32
+
+    let to_time t =
+      Coda_base.Block_time.of_int64 @@ int64_of_uint32
+      @@ Global_slot.to_uint32 t
   end
 
   [%%if
@@ -1899,6 +1910,14 @@ module Data = struct
       and next_epoch_data = Epoch_data.Next.var_to_input next_epoch_data in
       List.reduce_exn ~f:Random_oracle.Input.append
         [input; staking_epoch_data; next_epoch_data]
+
+    (* let length_in_triples =
+      Length.length_in_triples + Length.length_in_triples
+      + Length.length_in_triples
+        * UInt32.to_int Constants.sub_windows_per_window
+      + Vrf.Output.Truncated.length_in_triples + Epoch.length_in_triples
+      + Slot.length_in_triples + Amount.length_in_triples
+      + Epoch_data.length_in_triples + Epoch_data.length_in_triples *)
 
     let checkpoint_window slot =
       Global_slot.to_int slot / Constants.Checkpoint_window.size_in_slots
@@ -2869,6 +2888,11 @@ module Hooks = struct
            @%d"
           (Int64.to_int epoch_end_time) ;
         `Check_again epoch_end_time
+
+  let check_again_time (block_time : Time.t) =
+    let consensus_time = Data.Consensus_time.of_time_exn block_time in
+    let epoch, slot = Data.Consensus_time.to_epoch_and_slot consensus_time in
+    Data.Consensus_time.of_epoch_and_slot (Epoch.succ epoch, Slot.zero)
 
   let frontier_root_transition (prev : Consensus_state.Value.t)
       (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
