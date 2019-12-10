@@ -262,7 +262,7 @@ end = struct
           | Error e ->
               Logger.error (Logger.create ()) ~module_:__MODULE__
                 ~location:__LOC__
-                ~metadata:[("error", Error.to_string_hum e)]
+                ~metadata:[("error", `String (Error.to_string_hum e))]
                 "When handling What_child_hashes request, the following error \
                  happended: $error" ;
               Either.Second
