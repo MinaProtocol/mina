@@ -39,8 +39,8 @@ def NumberOfBranches(M, T):
 
 def NumberOfFullBranches(M, T, D):
     acc = 0
-    for i in range(1, ((T-1)//(D+1))+1):
-        for j in range(0, i+1):
+    for i in range(1, M+1):
+        for j in range(1, i+1):
             acc += (2**(M-j)) * (D+1)
     return acc
 
