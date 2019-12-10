@@ -12,50 +12,63 @@ module Api = struct
   type restart_type = [`Catchup | `Bootstrap]
 
   (* TODO: remove status #2336 *)
-  type t =
-    { workers: Coda_process.t Array.t
+  (*The state of workers that have the same genesis state hash*)
+  type workers_per_chain =
+    { worker_processes: Coda_process.t Array.t
     ; configs: Coda_worker.Input.t list
-    ; start_writer:
-        (int * Coda_worker.Input.t * (unit -> unit) * (unit -> unit))
-        Linear_pipe.Writer.t
     ; status:
         [`On of [`Synced of user_cmds_under_inspection | `Catchup] | `Off]
         Array.t
     ; locks: (int ref * unit Condition.t) Array.t
           (** The int counts the number of ongoing RPCs. when it is 0, it is safe to take the worker offline.
-        [stop] below will set the status to `Off, and we only try doing an RPC if the status is `On,
-        so eventually the counter _must_ become 0, ensuring progress. *)
+    [stop] below will set the status to `Off, and we only try doing an RPC if the status is `On,
+    so eventually the counter _must_ become 0, ensuring progress. *)
     ; root_lengths: int Array.t
     ; restart_signals: (restart_type * unit Ivar.t) Option.t Array.t }
 
-  let create configs workers start_writer =
-    let status =
-      Array.init (Array.length workers) ~f:(fun _ ->
-          let user_cmds_under_inspection =
-            Hashtbl.create (module User_command)
-          in
-          `On (`Synced user_cmds_under_inspection) )
-    in
-    let locks =
-      Array.init (Array.length workers) ~f:(fun _ ->
-          (ref 0, Condition.create ()) )
-    in
-    let root_lengths = Array.init (Array.length workers) ~f:(fun _ -> 0) in
-    let restart_signals =
-      Array.init (Array.length workers) ~f:(fun _ -> None)
-    in
-    { workers
-    ; configs
-    ; start_writer
-    ; status
-    ; locks
-    ; root_lengths
-    ; restart_signals }
+  (*Making multiple chains in a testnet on purpose using different genesis_ledger as opposed to forks caused because of consensus rules*)
 
-  let online t i = match t.status.(i) with `On _ -> true | `Off -> false
+  type workers = workers_per_chain Array.t
+
+  (*[`Single_chain of workers_state | `Multiple_chains of workers_state Array.t]*)
+
+  type t =
+    { workers: workers
+    ; start_writer:
+        (int * Coda_worker.Input.t * (unit -> unit) * (unit -> unit))
+        Linear_pipe.Writer.t }
+
+  let create all_configs all_workers start_writer =
+    let workers =
+      Array.map2_exn all_configs all_workers
+        ~f:(fun configs_per_chain workers_per_chain ->
+          let num_workers = Array.length workers_per_chain in
+          let status =
+            Array.init num_workers ~f:(fun _ ->
+                let user_cmds_under_inspection =
+                  Hashtbl.create (module User_command)
+                in
+                `On (`Synced user_cmds_under_inspection) )
+          in
+          let locks =
+            Array.init num_workers ~f:(fun _ -> (ref 0, Condition.create ()))
+          in
+          let root_lengths = Array.init num_workers ~f:(fun _ -> 0) in
+          let restart_signals = Array.init num_workers ~f:(fun _ -> None) in
+          { worker_processes= workers_per_chain
+          ; configs= configs_per_chain
+          ; status
+          ; locks
+          ; root_lengths
+          ; restart_signals } )
+    in
+    {workers; start_writer}
+
+  let online t i =
+    match t.workers.(0).status.(i) with `On _ -> true | `Off -> false
 
   let synced t i =
-    match t.status.(i) with
+    match t.workers.(0).status.(i) with
     | `On (`Synced _) ->
         true
     | `On `Catchup ->
@@ -64,9 +77,9 @@ module Api = struct
         false
 
   let run_online_worker ~f t i =
-    let worker = t.workers.(i) in
+    let worker = t.workers.(0).worker_processes.(i) in
     if online t i then (
-      let ongoing_rpcs, cond = t.locks.(i) in
+      let ongoing_rpcs, cond = t.workers.(0).locks.(i) in
       incr ongoing_rpcs ;
       let%map res = f worker in
       decr ongoing_rpcs ;
@@ -109,33 +122,34 @@ module Api = struct
   let start t i =
     Linear_pipe.write t.start_writer
       ( i
-      , List.nth_exn t.configs i
-      , (fun () -> t.status.(i) <- `On `Catchup)
+      , List.nth_exn t.workers.(0).configs i
+      , (fun () -> t.workers.(0).status.(i) <- `On `Catchup)
       , fun () ->
           let user_cmds_under_inspection =
             Hashtbl.create (module User_command)
           in
-          t.status.(i) <- `On (`Synced user_cmds_under_inspection) )
+          t.workers.(0).status.(i) <- `On (`Synced user_cmds_under_inspection)
+      )
 
   let stop t i ~logger =
-    ( match t.status.(i) with
+    ( match t.workers.(0).status.(i) with
     | `On (`Synced user_cmds_under_inspection) ->
         Hashtbl.iter user_cmds_under_inspection ~f:(fun {passed_root; _} ->
             Ivar.fill passed_root () )
     | _ ->
         () ) ;
-    t.status.(i) <- `Off ;
-    let ongoing_rpcs, lock = t.locks.(i) in
+    t.workers.(0).status.(i) <- `Off ;
+    let ongoing_rpcs, lock = t.workers.(0).locks.(i) in
     let rec wait_for_no_rpcs () =
       if !ongoing_rpcs = 0 then Deferred.unit
       else Deferred.bind (Condition.wait lock) ~f:wait_for_no_rpcs
     in
     let%bind () = wait_for_no_rpcs () in
-    Coda_process.disconnect t.workers.(i) ~logger
+    Coda_process.disconnect t.workers.(0).worker_processes.(i) ~logger
 
   let run_user_command t i (sk : Private_key.t) fee valid_until ~body =
     let open Deferred.Option.Let_syntax in
-    let worker = t.workers.(i) in
+    let worker = t.workers.(0).worker_processes.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
     let%bind nonce = Coda_process.get_nonce_exn worker pk_of_sk in
     let payload =
@@ -198,12 +212,12 @@ module Api = struct
 
   let setup_bootstrap_signal t i =
     let signal = Ivar.create () in
-    t.restart_signals.(i) <- Some (`Bootstrap, signal) ;
+    t.workers.(0).restart_signals.(i) <- Some (`Bootstrap, signal) ;
     signal
 
   let setup_catchup_signal t i =
     let signal = Ivar.create () in
-    t.restart_signals.(i) <- Some (`Catchup, signal) ;
+    t.workers.(0).restart_signals.(i) <- Some (`Catchup, signal) ;
     signal
 end
 
@@ -270,7 +284,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               ; ( "root_lengths"
                 , `List
                     ( List.map ~f:(fun l -> `Int l)
-                    @@ Array.to_list testnet.root_lengths ) ) ]
+                    @@ Array.to_list testnet.workers.(0).root_lengths ) ) ]
     | None ->
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
           "Empty list of online chains, OK if we're still starting the network"
@@ -283,7 +297,8 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
        let diff = Time.diff (Time.now ()) !last_time in
        let diff = Time.Span.to_sec diff in
        if
-         Array.existsi testnet.status ~f:(fun i _ -> Api.synced testnet i)
+         Array.existsi testnet.workers.(0).status ~f:(fun i _ ->
+             Api.synced testnet i )
          && not
               ( diff
               < Time.Span.to_sec acceptable_delay
@@ -324,31 +339,33 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
              ( worker_id
              , {Coda_lib.Root_diff.Stable.V1.user_commands; root_length} )
          ->
-         ( match testnet.status.(worker_id) with
+         ( match testnet.workers.(0).status.(worker_id) with
          | `On (`Synced user_cmds_under_inspection) ->
-             testnet.root_lengths.(worker_id) <- root_length ;
-             Array.iteri testnet.restart_signals ~f:(fun i -> function
+             testnet.workers.(0).root_lengths.(worker_id) <- root_length ;
+             Array.iteri testnet.workers.(0).restart_signals ~f:(fun i ->
+               function
                | None ->
                    ()
                | Some (`Bootstrap, signal) ->
                    if
-                     testnet.root_lengths.(i)
+                     testnet.workers.(0).root_lengths.(i)
                      + (2 * Consensus.Constants.k)
                      + Consensus.Constants.delta
                      < root_length - 2
                    then (
                      Ivar.fill signal () ;
-                     testnet.restart_signals.(i) <- None )
+                     testnet.workers.(0).restart_signals.(i) <- None )
                    else ()
                | Some (`Catchup, signal) ->
                    if
-                     testnet.root_lengths.(i) + (Consensus.Constants.k / 2)
+                     testnet.workers.(0).root_lengths.(i)
+                     + (Consensus.Constants.k / 2)
                      < root_length - 1
                    then (
                      Logger.info logger !"Filled catchup ivar"
                        ~module_:__MODULE__ ~location:__LOC__ ;
                      Ivar.fill signal () ;
-                     testnet.restart_signals.(i) <- None )
+                     testnet.workers.(0).restart_signals.(i) <- None )
                    else () ) ;
              let earliest_user_cmd =
                List.min_elt (Hashtbl.to_alist user_cmds_under_inspection)
@@ -431,8 +448,10 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test ?is_archive_rocksdb logger n proposers snark_work_public_keys
-    work_selection_method ~max_concurrent_connections =
+
+let test ?(genesis_ledgers = [Account_config.sample_list]) ?is_archive_rocksdb
+    logger n proposers snark_work_public_keys work_selection_method
+    ~max_concurrent_connections =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
   let acceptable_delay =
@@ -447,13 +466,16 @@ let test ?is_archive_rocksdb logger n proposers snark_work_public_keys
       ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))
       ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
-      ~max_concurrent_connections ?is_archive_rocksdb
+      ~max_concurrent_connections ?is_archive_rocksdb ~genesis_ledgers
   in
   let%map workers = Coda_processes.spawn_local_processes_exn configs in
-  let workers = List.to_array workers in
+  Core.printf
+    !"config length %d workers length %d\n%!"
+    (List.length configs) (List.length workers) ;
+  let workers = List.to_array (List.map ~f:List.to_array workers) in
   let start_reader, start_writer = Linear_pipe.create () in
-  let testnet = Api.create configs workers start_writer in
-  start_checks logger workers start_reader testnet ~acceptable_delay ;
+  let testnet = Api.create (List.to_array configs) workers start_writer in
+  start_checks logger workers.(0) start_reader testnet ~acceptable_delay ;
   testnet
 
 module Delegation : sig
@@ -469,7 +491,7 @@ end = struct
       ~delegator ~delegatee =
     let valid_until = Coda_numbers.Global_slot.max_value in
     let fee = User_command.minimum_fee in
-    let worker = testnet.workers.(node) in
+    let worker = testnet.workers.(0).worker_processes.(node) in
     let%bind _ =
       let open Deferred.Option.Let_syntax in
       let%bind user_cmd =
@@ -477,7 +499,8 @@ end = struct
       in
       let%map (all_passed_root : unit Ivar.t list) =
         let open Deferred.Let_syntax in
-        Deferred.List.filter_map (testnet.status |> Array.to_list) ~f:(function
+        Deferred.List.filter_map (testnet.workers.(0).status |> Array.to_list)
+          ~f:(function
           | `On (`Synced user_cmds_under_inspection) ->
               let%map root_length = Coda_process.root_length_exn worker in
               let passed_root = Ivar.create () in
@@ -533,15 +556,15 @@ end = struct
                 let receiver_pk =
                   receiver_keypair.public_key |> Public_key.compress
                 in
-                let worker = testnet.workers.(node) in
+                let worker = testnet.workers.(0).worker_processes.(node) in
                 let%bind user_cmd =
                   Api.send_payment testnet node sender_sk receiver_pk amount
                     fee valid_until
                 in
                 let%map (all_passed_root : unit Ivar.t list) =
                   let open Deferred.Let_syntax in
-                  Deferred.List.filter_map (testnet.status |> Array.to_list)
-                    ~f:(function
+                  Deferred.List.filter_map
+                    (testnet.workers.(0).status |> Array.to_list) ~f:(function
                     | `On (`Synced user_cmds_under_inspection) ->
                         let%map root_length =
                           Coda_process.root_length_exn worker

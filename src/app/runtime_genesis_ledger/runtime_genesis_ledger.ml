@@ -17,7 +17,7 @@ let use_dummy_values = true
 
 [%%endif]
 
-module Account_data = struct
+(*module Account_data = struct
   type account_data =
     { pk: Public_key.Compressed.t
     ; sk: Private_key.t option
@@ -26,11 +26,11 @@ module Account_data = struct
   [@@deriving yojson]
 
   type t = account_data list [@@deriving yojson]
-end
+end*)
 
 type t = Ledger.t
 
-let sample_account_data1 : Account_data.account_data =
+let sample_account_data1 : Account_config.account_data =
   let keys = Signature_lib.Keypair.create () in
   let balance = Currency.Balance.of_int 1000 in
   let delegate = None in
@@ -39,14 +39,14 @@ let sample_account_data1 : Account_data.account_data =
   ; balance
   ; delegate }
 
-let sample_account_data2 : Account_data.account_data =
+let sample_account_data2 : Account_config.account_data =
   let keys = Signature_lib.Keypair.create () in
   let balance = Currency.Balance.of_int 1000 in
   let pk = Public_key.compress keys.public_key in
   let delegate = Some pk in
   {pk; sk= Some keys.private_key; balance; delegate}
 
-let sample_account_data3 : Account_data.account_data =
+let sample_account_data3 : Account_config.account_data =
   let keys = Signature_lib.Keypair.create () in
   let balance = Currency.Balance.of_int 1000 in
   let delegate = None in
@@ -104,7 +104,7 @@ let generate_base_proof ~ledger =
   in
   (base_hash, base_proof)
 
-let create : directory_name:string -> Account_data.t -> t =
+let create : directory_name:string -> Account_config.t -> t =
  fun ~directory_name account_list ->
   let ledger = Ledger.create ~directory_name () in
   let _accounts =
@@ -128,7 +128,7 @@ let main accounts_json_file ledger_dir =
       Deferred.Or_error.try_with_join (fun () ->
           let%map accounts_str = Reader.file_contents accounts_json_file in
           let res = Yojson.Safe.from_string accounts_str in
-          match Account_data.of_yojson res with
+          match Account_config.of_yojson res with
           | Ok res ->
               Ok res
           | Error s ->
@@ -145,7 +145,7 @@ let main accounts_json_file ledger_dir =
   match
     Or_error.try_with_join (fun () ->
         let open Or_error.Let_syntax in
-        let genesis_winner_account : Account_data.account_data =
+        let genesis_winner_account : Account_config.account_data =
           let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
           {pk; sk= None; balance= Currency.Balance.of_int 1000; delegate= None}
         in

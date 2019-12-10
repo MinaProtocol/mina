@@ -5,7 +5,7 @@
     ; opam deps
     async core
     ; libs
-    coda_base coda_graphql coda_lib coda_state
+    coda_base coda_graphql coda_lib account_config coda_state
     coda_transition coda_version parallel
     transition_frontier
     ; internal deps

@@ -23,7 +23,10 @@ let main () =
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections:None
   in
-  let%bind workers = Coda_processes.spawn_local_processes_exn configs in
+  let%bind workers =
+    Coda_processes.spawn_local_processes_exn configs
+    |> Deferred.map ~f:List.hd_exn
+  in
   let _, expected_peers = Coda_processes.net_configs n in
   let%bind _ = after (Time.Span.of_sec 10.) in
   let%bind () =

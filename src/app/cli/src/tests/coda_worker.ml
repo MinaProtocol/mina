@@ -19,7 +19,8 @@ module Input = struct
     ; acceptable_delay: Time.Span.t
     ; peers: Host_and_port.t list
     ; max_concurrent_connections: int option
-    ; is_archive_rocksdb: bool }
+    ; is_archive_rocksdb: bool
+    ; accounts: Account_config.t }
   [@@deriving bin_io]
 end
 

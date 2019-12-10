@@ -45,9 +45,12 @@ let main () =
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections:None
   in
-  let%bind workers = Coda_processes.spawn_local_processes_exn configs in
+  let%bind workers =
+    Coda_processes.spawn_local_processes_exn configs
+    |> Deferred.map ~f:List.hd_exn
+  in
   let worker = List.hd_exn workers in
-  let config = List.hd_exn configs in
+  let config = List.(hd_exn @@ hd_exn configs) in
   let%bind receipt_chain_hash =
     Coda_process.send_user_command_exn worker sender_sk receiver_pk send_amount
       fee User_command_memo.dummy

@@ -48,7 +48,7 @@ let main () =
   (* zeroth account is delegatee *)
   let _, delegatee_account = List.nth_exn Test_genesis_ledger.accounts 0 in
   let delegatee_pubkey = Account.public_key delegatee_account in
-  let worker = testnet.workers.(0) in
+  let worker = testnet.workers.(0).worker_processes.(0) in
   (* setup readers for proposals by delegator, delegatee *)
   let%bind delegator_transition_reader =
     Coda_process.new_block_exn worker delegator_pubkey

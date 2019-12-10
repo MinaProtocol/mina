@@ -45,25 +45,40 @@ let offset =
         |> Coda_base.Block_time.to_time ))
 
 let local_configs ?proposal_interval ?(proposers = Fn.const None)
-    ?(is_archive_rocksdb = Fn.const false) n ~acceptable_delay ~program_dir
-    ~snark_worker_public_keys ~work_selection_method ~trace_dir
+    ?(is_archive_rocksdb = Fn.const false)
+    ?(genesis_ledgers = [Account_config.sample_list]) n ~acceptable_delay
+    ~program_dir ~snark_worker_public_keys ~work_selection_method ~trace_dir
     ~max_concurrent_connections =
   let addrs_and_ports_list, peers = net_configs n in
+  (*Peers for the first node is made empty because that's the first node to start and we don't want it to look for peer?*)
   let peers = [] :: List.drop peers 1 in
   let args = List.zip_exn addrs_and_ports_list peers in
-  let configs =
-    List.mapi args ~f:(fun i (addrs_and_ports, peers) ->
+  let genesis_ledgers = Array.of_list genesis_ledgers in
+  let genesis_ledger_count = Array.length genesis_ledgers in
+  let config_map = Hashtbl.create (module Int) in
+  let () =
+    List.iteri args ~f:(fun i (addrs_and_ports, peers) ->
+        let chain_id = i mod genesis_ledger_count in
+        Core.printf !"chain id %d\n%!" chain_id ;
+        let accounts = genesis_ledgers.(chain_id) in
         let public_key =
           Option.bind snark_worker_public_keys ~f:(fun keys ->
               List.nth_exn keys i )
         in
-        Coda_process.local_config ?proposal_interval ~addrs_and_ports ~peers
-          ~snark_worker_key:public_key ~program_dir ~acceptable_delay
-          ~proposer:(proposers i) ~work_selection_method ~trace_dir
-          ~is_archive_rocksdb:(is_archive_rocksdb i)
-          ~offset:(Lazy.force offset) ~max_concurrent_connections () )
+        let config =
+          Coda_process.local_config ?proposal_interval ~addrs_and_ports ~peers
+            ~snark_worker_key:public_key ~program_dir ~acceptable_delay
+            ~proposer:(proposers i) ~work_selection_method ~trace_dir
+            ~is_archive_rocksdb:(is_archive_rocksdb i)
+            ~offset:(Lazy.force offset) ~max_concurrent_connections ~accounts
+            ()
+        in
+        Hashtbl.update config_map chain_id
+          ~f:
+            (Option.value_map ~default:[] ~f:(fun configs -> config :: configs))
+    )
   in
-  configs
+  Hashtbl.to_alist config_map |> List.unzip |> snd
 
 let stabalize_and_start_or_timeout ?(timeout_ms = 10000.) nodes =
   let ready () =
@@ -87,17 +102,21 @@ let stabalize_and_start_or_timeout ?(timeout_ms = 10000.) nodes =
   | `Ready ->
       Deferred.List.iter nodes ~f:(fun node -> Coda_process.start_exn node)
 
-let spawn_local_processes_exn ?(first_delay = 0.0) configs =
-  match configs with
-  | [] ->
-      failwith "Configs should be non-empty"
-  | first :: rest ->
-      let%bind first_created = Coda_process.spawn_exn first in
-      let%bind () = after (Time.Span.of_sec first_delay) in
-      let%bind rest_created =
-        Deferred.List.all
-          (List.map rest ~f:(fun c -> Coda_process.spawn_exn c))
-      in
-      let all_created = first_created :: rest_created in
-      let%map () = stabalize_and_start_or_timeout all_created in
-      all_created
+let spawn_local_processes_exn ?(first_delay = 0.0)
+    (configs_list : 'a list list) =
+  let go (configs : 'a list) =
+    match configs with
+    | [] ->
+        failwith "Configs should be non-empty"
+    | first :: rest ->
+        let%bind first_created = Coda_process.spawn_exn first in
+        let%bind () = after (Time.Span.of_sec first_delay) in
+        let%bind rest_created =
+          Deferred.List.all
+            (List.map rest ~f:(fun c -> Coda_process.spawn_exn c))
+        in
+        let all_created = first_created :: rest_created in
+        let%map () = stabalize_and_start_or_timeout all_created in
+        all_created
+  in
+  Deferred.List.map configs_list ~f:go

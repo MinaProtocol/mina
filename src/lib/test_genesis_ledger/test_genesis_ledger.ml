@@ -11,6 +11,8 @@ let _ =
   if Base.Int.(fake_accounts_target > pow 2 ledger_depth) then
     failwith "Genesis_ledger: fake_accounts_target >= 2**ledger_depth"
 
+module Dummy_ledger = Dummy_ledger
+
 [%%if
 defined genesis_ledger]
 

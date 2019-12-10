@@ -24,7 +24,10 @@ let main () =
       ~proposers:(Fn.const None) ~work_selection_method ~trace_dir
       ~max_concurrent_connections
   in
-  let%bind workers = Coda_processes.spawn_local_processes_exn configs in
+  let%bind workers =
+    Coda_processes.spawn_local_processes_exn configs
+    |> Deferred.map ~f:List.hd_exn
+  in
   let addrs_and_ports_list, peers = Coda_processes.net_configs (n + 1) in
   let expected_peers = List.nth_exn peers n in
   let peers = [List.hd_exn expected_peers] in
