@@ -59,8 +59,8 @@ jobs:
                   name: Build bot
                   command: cd frontend/bot && yarn run build-ci
 
-    {# # Disabled until working
     build-archive:
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
               environment:
@@ -72,6 +72,8 @@ jobs:
                 POSTGRES_USER: admin
                 POSTGRES_DB: archiver
             - image: hasura/graphql-engine:v1.0.0-beta.6
+              entrypoint: ["sh", "-c"]
+              command: ["sleep 10 && graphql-engine serve"]
               environment:
                 HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
                 HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
@@ -87,9 +89,23 @@ jobs:
             - run:
                   name: Build Archive Process
                   command:  bash -c 'eval `opam config env` && make build_archive'
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
+            # NOTE: If we were using a machine executor we would be able to mount the sql file in 
+            # as a volume for the container to seed itself, this is the workaround.
+            # Ideally this DB setup step would be handled by the archive process itself. 
+            - run:
+                  name: Set Up Database
+                  command: | 
+                    sudo apt-get install -y postgresql 
+                    PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
                   name: Configure Hasura
-                  command: ls && ./scripts/archive/make_hasura_configurations.sh #}
+                  command: ./scripts/archive/make_hasura_configurations.sh
+            - setup_remote_docker
+            - run: 
+                  name: Build and Release Archives
+                  command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
@@ -108,6 +124,9 @@ jobs:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
             - run:
+                  name: Check ppx_optcomp preprocessor_deps
+                  command: ./scripts/lint_preprocessor_deps.sh
+            - run:
                   name: Check CODEOWNERS file format
                   command: ./scripts/lint_codeowners.sh
             - run:
@@ -118,6 +137,12 @@ jobs:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Compare versioned types in PR
                   command: ./scripts/compare_pr_diff_types.sh
@@ -241,13 +266,13 @@ jobs:
                     echo 'keys'
                     cp /tmp/s3_cache_dir/* package/keys/.
                     echo 'coda'
-                    cp src/_build/default/app/cli/src/coda.exe package/coda
+                    cp _build/default/src/app/cli/src/coda.exe package/coda
                     echo 'libp2p_helper'
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
                     ./scripts/librewrite-macos.sh package/coda-libp2p_helper
                     echo 'coda-logproc'
-                    cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
+                    cp _build/default/src/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
             - run:
                 name: Build homebrew package
@@ -453,7 +478,7 @@ workflows:
                     only: develop
             - tracetool
             - build-wallet
-            {# - build-archive #}
+            - build-archive
             - build-macos
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}

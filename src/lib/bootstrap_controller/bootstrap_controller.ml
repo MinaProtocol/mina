@@ -357,7 +357,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
                 , Some ("Received valid scan state from peer", []) ))
         in
         let consensus_state =
-          new_root |> External_transition.Validated.consensus_state
+          t.best_seen_transition
+          |> External_transition.Initial_validated.consensus_state
         in
         (* Synchronize consensus local state if necessary *)
         match%bind

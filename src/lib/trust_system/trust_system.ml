@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 (** The trust system, instantiated with Coda-specific stuff. *)
 open Core

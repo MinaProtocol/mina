@@ -40,7 +40,8 @@ let genesis_root_data ~genesis_ledger ~base_proof =
 
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
-    ~persistent_frontier_instance ~genesis_protocol_state_hash =
+    ~persistent_frontier_instance ~genesis_protocol_state_hash
+    ignore_consensus_local_state =
   let open Deferred.Result.Let_syntax in
   let root_identifier =
     match
@@ -88,7 +89,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
          persistent_frontier_instance ~max_length
          ~root_ledger:
            (Persistent_root.Instance.snarked_ledger persistent_root_instance)
-         ~consensus_local_state)
+         ~consensus_local_state ~ignore_consensus_local_state)
       ~f:
         (Result.map_error ~f:(function
           | `Sync_cannot_be_running ->
@@ -141,7 +142,7 @@ let rec load_with_max_length :
      ?(base_proof = Precomputed_values.base_proof) () ->
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
-  let continue persistent_frontier_instance =
+  let continue persistent_frontier_instance ~ignore_consensus_local_state =
     let persistent_root_instance =
       Persistent_root.create_instance_exn persistent_root
     in
@@ -149,7 +150,7 @@ let rec load_with_max_length :
       load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
         ~max_length ~persistent_root ~persistent_root_instance
         ~persistent_frontier ~persistent_frontier_instance
-        ~genesis_protocol_state_hash
+        ~genesis_protocol_state_hash ignore_consensus_local_state
     with
     | Ok _ as result ->
         return result
@@ -175,7 +176,9 @@ let rec load_with_max_length :
       Persistent_root.reset_to_genesis_exn persistent_root ~genesis_ledger
         ~genesis_state_hash:genesis_protocol_state_hash
     in
-    continue (Persistent_frontier.create_instance_exn persistent_frontier)
+    continue
+      (Persistent_frontier.create_instance_exn persistent_frontier)
+      ~ignore_consensus_local_state:false
   in
   match
     Persistent_frontier.Instance.check_database persistent_frontier_instance
@@ -218,7 +221,7 @@ let rec load_with_max_length :
                   err ) )
       else return (Error `Persistent_frontier_malformed)
   | Ok () ->
-      continue persistent_frontier_instance
+      continue persistent_frontier_instance ~ignore_consensus_local_state:true
 
 let load = load_with_max_length ~max_length:global_max_length
 
@@ -279,6 +282,7 @@ let add_breadcrumb_exn t breadcrumb =
     "Applying diffs: $diffs" ;
   let (`New_root new_root_identifier) =
     Full_frontier.apply_diffs t.full_frontier diffs
+      ~ignore_consensus_local_state:false
   in
   Option.iter new_root_identifier
     ~f:

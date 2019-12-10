@@ -8,6 +8,7 @@ node_modules
 /site
 /docs-theme
 /graphql-docs
+/archive-node-docs
 /deploy
 PragmataPro-Bold.woff*
 Essential-PragmataPro-Bold.woff*

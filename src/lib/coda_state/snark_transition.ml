@@ -38,7 +38,7 @@ module Poly = struct
     ; consensus_transition: 'consensus_transition
     ; sok_digest: 'sok_digest
     ; supply_increase: 'amount
-    ; ledger_proof: Proof.Stable.V1.t option
+    ; ledger_proof: Proof.t option
     ; proposer: 'proposer_pk
     ; coinbase_amount: 'amount }
   [@@deriving sexp, to_yojson, fields]
