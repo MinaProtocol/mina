@@ -41,7 +41,7 @@ let make = () => {
        | Error(err) => React.string(err##message)
        | Data(accounts) =>
          <BlockListener
-           refetch={response.refetch}
+           refetch={() => response.refetch(None)}
            subscribeToMore={response.subscribeToMore}>
            <div className=Styles.container>
              {React.array(

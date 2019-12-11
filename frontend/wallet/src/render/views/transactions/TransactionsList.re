@@ -40,15 +40,8 @@ let make =
       ~pending,
       ~onLoadMore: unit => Js.Promise.t('a),
       ~hasNextPage,
-      ~subscribeToMore,
     ) => {
   let (isFetchingMore, setFetchingMore) = React.useState(() => false);
-
-  let _ =
-    React.useEffect0(() => {
-      subscribeToMore();
-      None;
-    });
 
   <div className=Styles.body>
     {Array.mapi(

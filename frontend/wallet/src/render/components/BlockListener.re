@@ -46,7 +46,7 @@ let make =
         ~document=newBlockAst,
         ~updateQuery=
           (prev, _) => {
-            refetch(None) |> ignore;
+            refetch() |> ignore;
             prev;
           },
         (),
