@@ -67,22 +67,17 @@ module Style = {
   let flip = style([transform(rotate(`deg(180.)))]);
 };
 
-let (/+) = Filename.concat;
-
 module NavPage = {
   [@react.component]
-  let make = (~page: ContentType.DocsPage.t, ~currentPage) => {
+  let make = (~title, ~slug, ~currentSlug) => {
     let isCurrentPage =
-      currentPage
-      |> Option.map(c => c.ContentType.DocsPage.slug == page.slug)
+      currentSlug
+      |> Option.map(s => s == slug)
       |> Option.value(~default=false);
-    // Hack for handling the root docs page
-    let slug =
-      Js.String.replaceByRe(Js.Re.fromString("index.html$"), "", page.slug);
     <li>
-      <Next.Link href="/docs/[slug]*" _as={"/docs/" ++ slug}>
+      <Next.Link href={"/docs/" ++ slug}>
         <a className={isCurrentPage ? Style.currentPage : Style.page}>
-          {React.string(page.title)}
+          {React.string(title)}
         </a>
       </Next.Link>
     </li>;
@@ -91,7 +86,7 @@ module NavPage = {
 
 module NavFolder = {
   [@react.component]
-  let make = (~folder: ContentType.DocsFolder.t, ~inFolder, ~currentPage) => {
+  let make = (~title, ~pages, ~inFolder, ~currentSlug) => {
     let (expanded, setExpanded) = React.useState(() => inFolder);
     let toggleExpanded =
       React.useCallback(e => {
@@ -99,14 +94,14 @@ module NavFolder = {
         setExpanded(expanded => !expanded);
       });
 
-    <li key={folder.title} className=Style.navFolder>
+    <li key=title className=Style.navFolder>
       <div>
         <a
           href="#"
           onClick=toggleExpanded
           ariaExpanded=expanded
           className=Style.folderLabel>
-          {React.string(folder.title)}
+          {React.string(title)}
           <Spacer width=1.0 />
           <img
             src="/static/img/chevron-down.svg"
@@ -119,13 +114,12 @@ module NavFolder = {
       {!expanded
          ? React.null
          : <ul className=Style.childPage>
-             {folder.children
-              |> Array.map(ContentType.Docs.fromDocsChild)
-              |> Array.map((entry: ContentType.Docs.t) =>
-                   switch (entry) {
-                   | `Page(page) =>
-                     <NavPage page currentPage key={page.slug} />
-                   | `Folder(_) => React.null // Don't show nested folders
+             {pages
+              |> Array.map(entry =>
+                   switch ((entry: DocsStructure.t)) {
+                   | Page(title, slug) =>
+                     <NavPage title slug currentSlug key=slug />
+                   | Folder(_, _) => React.null // Don't show nested folders
                    }
                  )
               |> React.array}
@@ -135,27 +129,30 @@ module NavFolder = {
 };
 
 [@react.component]
-let make =
-    (
-      ~docsRoot: ContentType.DocsFolder.t,
-      ~currentFolder: option(ContentType.DocsFolder.t),
-      ~currentPage: option(ContentType.DocsPage.t),
-    ) => {
+let make = (~currentSlug=?) => {
   <aside>
     <ul className=Style.sideNav>
-      {docsRoot.children
-       |> Array.map(ContentType.Docs.fromDocsChild)
-       |> Array.map((entry: ContentType.Docs.t) =>
-            switch (entry) {
-            | `Page(page) => <NavPage page currentPage key={page.slug} />
-            | `Folder(folder) =>
+      {DocsStructure.structure
+       |> Array.map(entry =>
+            switch ((entry: DocsStructure.t)) {
+            | Page(title, slug) => <NavPage title slug currentSlug key=slug />
+            | Folder(title, children) =>
               let inFolder =
-                currentFolder
-                |> Option.map((curr: ContentType.DocsFolder.t) =>
-                     folder.title == curr.title
-                   )
-                |> Option.value(~default=false);
-              <NavFolder folder inFolder currentPage key={folder.title} />;
+                children
+                |> Array.exists(page =>
+                     switch (page: DocsStructure.t, currentSlug) {
+                     | (Page(_title, slug), Some(current)) =>
+                       slug == current
+                     | _ => false // nest folders only 1 deep
+                     }
+                   );
+              <NavFolder
+                title
+                pages=children
+                inFolder
+                currentSlug
+                key=title
+              />;
             }
           )
        |> React.array}

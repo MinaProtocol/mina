@@ -1,14 +1,5 @@
-let loadConfigValue = key => {
-  let config = Next.getConfig().Next.publicRuntimeConfig;
-  switch (Js.Dict.get(config, key)) {
-  | None => failwith("Couldn't find config entry for " ++ key)
-  | Some(s) => s
-  };
-};
-
-let imageAPIToken = loadConfigValue("CONTENTFUL_IMAGE_TOKEN");
-let spaceID = loadConfigValue("CONTENTFUL_SPACE");
-let contentAPIToken = loadConfigValue("CONTENTFUL_TOKEN");
+let spaceID = Next.Config.contentful_space;
+let contentAPIToken = Next.Config.contentful_token;
 
 type clientArgs = {
   space: string,

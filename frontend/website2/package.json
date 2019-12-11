@@ -12,6 +12,9 @@
   },
   "license": "ISC",
   "dependencies": {
+    "@mdx-js/loader": "^1.5.1",
+    "@mdx-js/react": "^1.5.1",
+    "@next/mdx": "^9.1.5",
     "babel-plugin-bucklescript": "^0.5.3",
     "bs-css": "^9.0.1",
     "bsc-stdlib-polyfill": "Schmavery/bsc-stdlib-polyfill",

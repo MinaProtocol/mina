@@ -20,32 +20,32 @@ module Head = {
 };
 
 module Router = {
-  type t('a) = {query: Js.Dict.t('a)};
+  type t('a) = {
+    query: Js.Dict.t('a),
+    route: string,
+  };
 
   [@bs.module "next/router"] [@bs.val]
   external useRouter: unit => t('a) = "useRouter";
-
-  [@bs.module "next/router"] [@bs.val]
-  external push:
-    (
-      {
-        .
-        "pathname": string,
-        "query": Js.t('any),
-      },
-      string
-    ) =>
-    unit =
-    "push";
 };
 
-type config = {
-  publicRuntimeConfig: Js.Dict.t(string),
-  serverRuntimeConfig: Js.Dict.t(string),
+module Config = {
+  [@bs.val] [@bs.scope "process.env"] external node_env: string = "NODE_ENV";
+  [@bs.val] [@bs.scope "process.env"]
+  external contentful_token: string = "CONTENTFUL_TOKEN";
+  [@bs.val] [@bs.scope "process.env"]
+  external contentful_image_token: string = "CONTENTFUL_IMAGE_TOKEN";
+  [@bs.val] [@bs.scope "process.env"]
+  external contentful_space: string = "CONTENTFUL_SPACE";
 };
 
-[@bs.module "next/config"] [@bs.val]
-external getConfig: unit => config = "default";
+module MDXProvider = {
+  [@bs.module "@mdx-js/react"] [@react.component]
+  external make:
+    (~components: Js.t(_)=?, ~scope: Js.t(_)=?, ~children: React.element) =>
+    React.element =
+    "MDXProvider";
+};
 
 type getInitialPropsArgs = {
   pathname: string,

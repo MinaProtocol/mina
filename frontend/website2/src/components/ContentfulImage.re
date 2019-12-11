@@ -7,7 +7,7 @@ let make = (~src, ~className=?, ~alt) =>
       "http://images.ctfassets.net/"
       ++ Contentful.spaceID
       ++ "/"
-      ++ Contentful.imageAPIToken
+      ++ Next.Config.contentful_image_token
       ++ "/"
       ++ src
       ++ "?fm=jpg&fl=progressive"
