@@ -386,7 +386,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
          | _ ->
              Deferred.unit ) ))
 
-let events workers start_reader =
+let events ~logger workers start_reader =
   let event_r, event_w = Linear_pipe.create () in
   let root_r, root_w = Linear_pipe.create () in
   let connect_worker i worker =
@@ -400,7 +400,13 @@ let events workers start_reader =
     (Linear_pipe.iter start_reader ~f:(fun (i, config, started, synced) ->
          don't_wait_for
            (let%bind worker = Coda_process.spawn_exn config in
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              !"test node %d spawned successfully"
+              i ;
             let%bind () = Coda_process.start_exn worker in
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              !"test node %d started successfully"
+              i ;
             workers.(i) <- worker ;
             started () ;
             don't_wait_for
@@ -420,7 +426,7 @@ let events workers start_reader =
 
 let start_checks logger (workers : Coda_process.t array) start_reader testnet
     ~acceptable_delay =
-  let event_reader, root_reader = events workers start_reader in
+  let event_reader, root_reader = events ~logger workers start_reader in
   don't_wait_for
     (start_prefix_check logger workers event_reader testnet ~acceptable_delay) ;
   start_payment_check logger root_reader testnet
