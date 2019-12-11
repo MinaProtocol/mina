@@ -32,14 +32,7 @@ module Make (Inputs : Inputs_intf) :
       Ledger_hash.equal ledger_hash
         (Ledger.Any_ledger.M.merkle_root root_ledger)
     then Some root_ledger
-    else
-      let open Transition_frontier.Extensions in
-      let ledger_table =
-        get_extension (Transition_frontier.extensions frontier) Ledger_table
-      in
-      Option.map
-        (Ledger_table.lookup ledger_table ledger_hash)
-        ~f:(Ledger.Any_ledger.cast (module Ledger))
+    else None
 
   let answer_query :
          frontier:Inputs.Transition_frontier.t
