@@ -90,3 +90,6 @@ If we are comparing Snark worker nodes with full nodes on Coda, then yes Snark w
 
 Nope -- when a new block is generated, Coda computes the proof recursively over the prior proof and the new block. This is the advantage of recursive composition -- at any given time, nodes only need to store the most recent proof. Intermediate proofs are not needed. See this talk for more clarity on how this architecture emerged: [https://www.youtube.com/watch?v=eWVGATxEB6M](https://www.youtube.com/watch?v=eWVGATxEB6M).
 
+#### How do you control or limit the number of cores Snark Workers use?
+
+See the [section on running a Snark Worker](../node-operator/#producing-snarks-in-the-coda-network) in the Node Operator docs. TLDR; You can set an environmental variable (eg. `export OMP_NUM_THREAD=4`) to limit the number of threads Snark Workers use.
