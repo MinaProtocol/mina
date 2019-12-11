@@ -162,6 +162,8 @@ pub extern fn camlsnark_bn382_fp_equal(x : *const Fp, y : *const Fp) -> bool {
     return *x_ == *y_;
 }
 
+/* Fp vector stubs */
+
 #[no_mangle]
 pub extern fn camlsnark_bn382_fp_vector_create() -> *mut Vec<Fp> {
     return Box::into_raw(Box::new(Vec::new()));
@@ -336,6 +338,8 @@ pub extern fn camlsnark_bn382_fq_equal(x : *const Fq, y : *const Fq) -> bool {
     let y_ = unsafe { &(*y) };
     return *x_ == *y_;
 }
+
+/* Fq vector stubs */
 
 #[no_mangle]
 pub extern fn camlsnark_bn382_fq_vector_create() -> *mut Vec<Fq> {
