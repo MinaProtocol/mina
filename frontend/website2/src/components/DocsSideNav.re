@@ -74,8 +74,10 @@ module NavPage = {
       currentSlug
       |> Option.map(s => s == slug)
       |> Option.value(~default=false);
+    // Special case for the docs index page
+    let href = String.length(slug) > 0 ? "/docs/" ++ slug : "/docs";
     <li>
-      <Next.Link href={"/docs/" ++ slug}>
+      <Next.Link href>
         <a className={isCurrentPage ? Style.currentPage : Style.page}>
           {React.string(title)}
         </a>
