@@ -1,6 +1,7 @@
 open Core_kernel
+open Intf
 
-module Make (Tick : Intf.Tick_S) = struct
+module Make (Tick : Tick_S) = struct
   open Tick
 
   let parity y = Bigint.(test_bit (of_field y) 0)
