@@ -427,8 +427,6 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
           { parent_node with
             successor_hashes= breadcrumb_hash :: parent_node.successor_hashes
           } ;
-      Coda_metrics.(Gauge.inc_one Transition_frontier.active_breadcrumbs) ;
-      Coda_metrics.(Counter.inc_one Transition_frontier.total_breadcrumbs) ;
       ((), None)
   | Best_tip_changed new_best_tip ->
       let old_best_tip = t.best_tip in
