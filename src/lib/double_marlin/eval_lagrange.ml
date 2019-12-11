@@ -2,7 +2,7 @@
    Start writing pairing_main so I can get a sense of how the x_hat
    commitment and challenge is going to work. *)
 open Core_kernel
-module B = Bigint
+open Import
 
 module type Field_intf = sig
   type t
@@ -47,7 +47,10 @@ module Eval_lagrange
 struct
   module Fq = Impl.Field
 
-  let root_of_unity = failwith "TODO"
+  (* TODO: Hack *)
+  let fq_size =
+    B.of_string
+      "5543634365110765627805495722742127385843376434033820803592568747918351978899288491582778380528407187068941959692289"
 
   (* Instead of evaluating lagrange interp
     = v_I(x) \sum_i a_i C_i / (x - i),
@@ -72,13 +75,13 @@ struct
     let ( * ) t1 t2 =
       assert (B.equal t1.base t2.base) ;
       let term_bound = B.(t1.term_bound * t2.term_bound) in
-      assert (B.(term_bound <= Fq.size)) ;
+      assert (B.(term_bound <= fq_size)) ;
       let top_power =
         Array.length t1.terms - 1 + (Array.length t2.terms - 1)
       in
       let res = Array.init (top_power + 1) ~f:(fun _ -> Fq.zero) in
-      for i = 0 to Array.length t1.terms do
-        for j = 0 to Array.length t2.terms do
+      for i = 0 to Array.length t1.terms - 1 do
+        for j = 0 to Array.length t2.terms - 1 do
           let k = i + j in
           res.(k) <- Fq.(res.(k) + (t1.terms.(i) * t2.terms.(j)))
         done
@@ -106,7 +109,7 @@ struct
     let ( + ) t1 t2 =
       assert (B.equal t1.base t2.base) ;
       let term_bound = B.(t1.term_bound + t2.term_bound) in
-      assert (B.(term_bound <= Fq.size)) ;
+      assert (B.(term_bound <= fq_size)) ;
       let n1 = Array.length t1.terms in
       let n2 = Array.length t2.terms in
       let terms =
@@ -136,6 +139,9 @@ struct
       !res
   end
 
+  (* TODO: *)
+  let root_of_unity = Fp.one
+
   (* Given a and x, compute 
    tweaked_lagrange a x = \sum_i a_i C_i / (x - zeta^i) 
    where 
@@ -152,10 +158,11 @@ struct
     type t = {zetas: Fp.t array; neg_zetas: Fp.t array; cs: Fp.t array}
 
     let create ~domain_size =
+      let zeta = root_of_unity in
       let zetas =
         let res = Array.init domain_size ~f:(fun _ -> Fp.one) in
         for i = 1 to domain_size - 1 do
-          res.(i) <- Fp.( * ) zeta.(i - 1) zeta
+          res.(i) <- Fp.( * ) res.(i - 1) zeta
         done ;
         res
       in
@@ -207,6 +214,7 @@ struct
     let n = Array.length a in
     let e = Int.ceil_log2 n in
     let chunk_size = (Fq.size_in_bits - e) / 2 in
+    Core.printf "chunk_size = %d\n%!" chunk_size ;
     let domain_size = 1 lsl e in
     assert (Array.length precomp.cs = domain_size) ;
     let terms, eq_checks =
