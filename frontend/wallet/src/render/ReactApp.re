@@ -5,13 +5,13 @@ let make = () => {
     OnboardingProvider.createContext();
   let dispatch = CodaProcess.useHook();
   let toastValue = ToastProvider.createContext();
-  let (locale, setLocale) = LocaleProvider.createContext();
+  let (locale, dispatchLocale) = LocaleProvider.createContext();
 
   <AddressBookProvider value=settingsValue>
     <OnboardingProvider value=onboardingValue>
       <ProcessDispatchProvider value=dispatch>
         <ReasonApollo.Provider client=Apollo.client>
-          <LocaleProvider value=(locale, setLocale)>
+          <LocaleProvider value=(locale, dispatchLocale)>
             <ReactIntl.IntlProvider
               locale={locale->Locale.toString}
               messages={

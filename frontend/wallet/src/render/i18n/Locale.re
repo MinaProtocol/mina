@@ -53,7 +53,7 @@ let useLocale = () => {
     | SetLocale(locale) => locale
     };
 
-  let (locale, setLocale) = React.useReducer(intlReducer, initialState);
+  let (locale, dispatchLocale) = React.useReducer(intlReducer, initialState);
 
-  (locale, setLocale);
+  (locale, dispatchLocale);
 };
