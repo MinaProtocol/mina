@@ -36,7 +36,7 @@ let make = () => {
   let (modalOpen, setModalOpen) = React.useState(() => false);
 
   <div className=Styles.sidebar>
-    <AccountList/>
+    <AccountList />
     <div className=Styles.footer>
       <a
         className=Styles.addAccountLink onClick={_ => setModalOpen(_ => true)}>
