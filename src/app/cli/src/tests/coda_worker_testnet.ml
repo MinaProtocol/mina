@@ -399,27 +399,30 @@ let events ~logger workers start_reader =
   don't_wait_for
     (Linear_pipe.iter start_reader ~f:(fun (i, config, started, synced) ->
          don't_wait_for
-           (let%bind worker = Coda_process.spawn_exn config in
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              !"test node %d spawned successfully"
-              i ;
-            let%bind () = Coda_process.start_exn worker in
-            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-              !"test node %d started successfully"
-              i ;
-            workers.(i) <- worker ;
-            started () ;
-            don't_wait_for
-              (let ms_to_catchup =
-                 (Consensus.Constants.c + Consensus.Constants.delta)
-                 * Consensus.Constants.block_window_duration_ms
-                 + 60_000
-                 (* time for peer discovery *)
-                 |> Float.of_int
-               in
-               let%map () = after (Time.Span.of_ms ms_to_catchup) in
-               synced ()) ;
-            connect_worker i worker) ;
+           ( Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+               !"test node %d is about to spawn"
+               i ;
+             let%bind worker = Coda_process.spawn_exn config in
+             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+               !"test node %d spawned successfully"
+               i ;
+             let%bind () = Coda_process.start_exn worker in
+             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+               !"test node %d started successfully"
+               i ;
+             workers.(i) <- worker ;
+             started () ;
+             don't_wait_for
+               (let ms_to_catchup =
+                  (Consensus.Constants.c + Consensus.Constants.delta)
+                  * Consensus.Constants.block_window_duration_ms
+                  + 60_000
+                  (* time for peer discovery *)
+                  |> Float.of_int
+                in
+                let%map () = after (Time.Span.of_ms ms_to_catchup) in
+                synced ()) ;
+             connect_worker i worker ) ;
          Deferred.unit )) ;
   Array.iteri workers ~f:(fun i w -> don't_wait_for (connect_worker i w)) ;
   (event_r, root_r)
