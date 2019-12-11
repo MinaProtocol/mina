@@ -28,21 +28,28 @@ let client = {
   let retry = createRetryLink(retryOptions);
 
   let retryLink = ApolloLinks.from([|retry, httpLink|]);
-  
-  let wsUri = "wss://localhost:3085/graphql";
-  let wsLink =
-    ApolloLinks.webSocketLink(~uri=wsUri, ~reconnect=true, ());
 
-  let combinedLink = ApolloLinks.split(
-    (operation) => {
-      let operationDefinition = ApolloUtilities.getMainDefinition(operation##query);
-      operationDefinition##kind == "OperationDefinition" && operationDefinition##operation == "subscription";
-    },
-    wsLink,
-    retryLink,
+  let wsUri = "ws://localhost:3085/graphql";
+  let wsLink = ApolloLinks.webSocketLink(~uri=wsUri, ~reconnect=true, ());
+
+  let combinedLink =
+    ApolloLinks.split(
+      operation => {
+        let operationDefinition =
+          ApolloUtilities.getMainDefinition(operation##query);
+        operationDefinition##kind == "OperationDefinition"
+        &&
+        operationDefinition##operation == "subscription";
+      },
+      wsLink,
+      retryLink,
+    );
+
+  ReasonApollo.createApolloClient(
+    ~link=combinedLink,
+    ~cache=inMemoryCache,
+    (),
   );
-
-  ReasonApollo.createApolloClient(~link=combinedLink, ~cache=inMemoryCache, ());
 };
 
 module Decoders = {
