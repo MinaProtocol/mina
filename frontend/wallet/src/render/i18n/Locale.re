@@ -21,7 +21,7 @@ let fileToReactIntl = name => {
 // getTranslations reads a json file and parses it into a ReactIntl data structure
 let getTranslations =
   fun
-  | En => fileToReactIntl("en")
+  | En => [||]
   | Vn => fileToReactIntl("vn");
 
 // translationsToDict coerces the JSON translation files into a valid data structure
