@@ -723,7 +723,7 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~genesis_protocol_state_hash ())
+                ~genesis_state_hash ())
              ~genesis_ledger ~base_proof
          in
          {Coda_initialization.coda; client_whitelist; rest_server_port}

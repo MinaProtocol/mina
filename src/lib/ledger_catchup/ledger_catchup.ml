@@ -58,9 +58,7 @@ end
 let verify_transition ~logger ~trust_system ~verifier ~frontier
     ~unprocessed_transition_cache enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
-  let genesis_protocol_state_hash =
-    Transition_frontier.genesis_protocol_state_hash frontier
-  in
+  let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let cached_initially_validated_transition_result =
     let open Deferred.Result.Let_syntax in
     let transition = Envelope.Incoming.data enveloped_transition in
@@ -70,7 +68,7 @@ let verify_transition ~logger ~trust_system ~verifier ~frontier
            `This_transition_was_not_received_via_gossip
       |> Fn.compose Deferred.return
            (External_transition.validate_genesis_protocol_state
-              ~genesis_protocol_state_hash)
+              ~genesis_state_hash)
       >>= External_transition.validate_proof ~verifier
       >>= Fn.compose Deferred.return
             External_transition.validate_delta_transition_chain

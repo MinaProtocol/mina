@@ -529,7 +529,7 @@ module T = struct
                  ~initial_propose_keypairs ~monitor ~consensus_local_state
                  ~transaction_database ~external_transition_database
                  ~is_archive_rocksdb ~work_reassignment_wait:420000
-                 ~genesis_protocol_state_hash ())
+                 ~genesis_state_hash ())
               ~genesis_ledger:Test_genesis_ledger.t
               ~base_proof:Precomputed_values.base_proof
           in

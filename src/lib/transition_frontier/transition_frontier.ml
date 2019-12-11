@@ -26,21 +26,18 @@ type t =
   ; persistent_frontier: Persistent_frontier.t
   ; persistent_frontier_instance: Persistent_frontier.Instance.t
   ; extensions: Extensions.t
-  ; genesis_protocol_state_hash: State_hash.t }
+  ; genesis_state_hash: State_hash.t }
 
 let genesis_root_data ~genesis_ledger ~base_proof =
   let open Root_data.Limited.Stable.Latest in
-  let open Lazy.Let_syntax in
-  let%map transition =
-    External_transition.genesis ~genesis_ledger ~base_proof
-  in
+  let transition = External_transition.genesis ~genesis_ledger ~base_proof in
   let scan_state = Staged_ledger.Scan_state.empty () in
   let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
   {transition; scan_state; pending_coinbase}
 
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
-    ~persistent_frontier_instance ~genesis_protocol_state_hash
+    ~persistent_frontier_instance ~genesis_state_hash
     ignore_consensus_local_state =
   let open Deferred.Result.Let_syntax in
   let root_identifier =
@@ -117,7 +114,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
   ; persistent_frontier
   ; persistent_frontier_instance
   ; extensions
-  ; genesis_protocol_state_hash }
+  ; genesis_state_hash }
 
 let rec load_with_max_length :
        max_length:int
@@ -127,7 +124,7 @@ let rec load_with_max_length :
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root:Persistent_root.t
     -> persistent_frontier:Persistent_frontier.t
-    -> genesis_protocol_state_hash:State_hash.t
+    -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
     -> ?base_proof:Proof.t
     -> unit
@@ -138,7 +135,7 @@ let rec load_with_max_length :
        Deferred.Result.t =
  fun ~max_length ?(retry_with_fresh_db = true) ~logger ~verifier
      ~consensus_local_state ~persistent_root ~persistent_frontier
-     ~genesis_protocol_state_hash ~genesis_ledger
+     ~genesis_state_hash ~genesis_ledger
      ?(base_proof = Precomputed_values.base_proof) () ->
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
@@ -149,8 +146,8 @@ let rec load_with_max_length :
     match%bind
       load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
         ~max_length ~persistent_root ~persistent_root_instance
-        ~persistent_frontier ~persistent_frontier_instance
-        ~genesis_protocol_state_hash ignore_consensus_local_state
+        ~persistent_frontier ~persistent_frontier_instance ~genesis_state_hash
+        ignore_consensus_local_state
     with
     | Ok _ as result ->
         return result
@@ -174,7 +171,7 @@ let rec load_with_max_length :
     in
     let%bind () =
       Persistent_root.reset_to_genesis_exn persistent_root ~genesis_ledger
-        ~genesis_state_hash:genesis_protocol_state_hash
+        ~genesis_state_hash
     in
     continue
       (Persistent_frontier.create_instance_exn persistent_frontier)
@@ -210,8 +207,8 @@ let rec load_with_max_length :
         in
         load_with_max_length ~max_length ~logger ~verifier
           ~consensus_local_state ~persistent_root ~persistent_frontier
-          ~retry_with_fresh_db:false () ~genesis_protocol_state_hash
-          ~genesis_ledger ~base_proof
+          ~retry_with_fresh_db:false () ~genesis_state_hash ~genesis_ledger
+          ~base_proof
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -237,7 +234,7 @@ let close
     ; persistent_frontier= _safe_to_ignore_2
     ; persistent_frontier_instance
     ; extensions
-    ; genesis_protocol_state_hash= _ } =
+    ; genesis_state_hash= _ } =
   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
     "Closing transition frontier" ;
   Full_frontier.close full_frontier ;
@@ -253,8 +250,7 @@ let persistent_frontier {persistent_frontier; _} = persistent_frontier
 
 let extensions {extensions; _} = extensions
 
-let genesis_protocol_state_hash {genesis_protocol_state_hash; _} =
-  genesis_protocol_state_hash
+let genesis_state_hash {genesis_state_hash; _} = genesis_state_hash
 
 let root_snarked_ledger {persistent_root_instance; _} =
   Persistent_root.Instance.snarked_ledger persistent_root_instance
@@ -539,7 +535,7 @@ module For_tests = struct
     ) ;
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         Persistent_root.Instance.set_root_state_hash instance
-          ~genesis_state_hash:genesis_protocol_state_hash
+          ~genesis_state_hash
           (External_transition.Validated.state_hash root_data.transition) ;
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
@@ -548,7 +544,7 @@ module For_tests = struct
       Async.Thread_safe.block_on_async_exn (fun () ->
           load_with_max_length ~max_length ~retry_with_fresh_db:false ~logger
             ~verifier ~consensus_local_state ~persistent_root
-            ~persistent_frontier ~genesis_protocol_state_hash
+            ~persistent_frontier ~genesis_state_hash
             ~genesis_ledger:(lazy root_snarked_ledger)
             () )
     in

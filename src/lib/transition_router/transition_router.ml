@@ -57,7 +57,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
     ~clear_reader ~transition_reader_ref ~transition_writer_ref
     ~consensus_local_state ~frontier_w ~initialization_finish_signal
     ~initial_root_transition ~persistent_root ~persistent_frontier
-    ~genesis_protocol_state_hash ~genesis_ledger =
+    ~genesis_state_hash ~genesis_ledger =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Starting Bootstrap Controller phase" ;
   initialization_finish_signal := false ;
@@ -97,7 +97,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
          Bootstrap_controller.run ~logger ~trust_system ~verifier ~network
            ~consensus_local_state ~transition_reader:!transition_reader_ref
            ~persistent_frontier ~persistent_root ~initial_root_transition
-           ~genesis_protocol_state_hash ~genesis_ledger)
+           ~genesis_state_hash ~genesis_ledger)
         (fun (new_frontier, collected_transitions) ->
           Strict_pipe.Writer.kill !transition_writer_ref ;
           start_transition_frontier_controller ~logger ~trust_system ~verifier
@@ -112,7 +112,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~network_transition_reader ~proposer_transition_reader
     ~most_recent_valid_block:( most_recent_valid_block_reader
                              , most_recent_valid_block_writer )
-    ~genesis_protocol_state_hash ~genesis_ledger =
+    ~genesis_state_hash ~genesis_ledger =
   let initialization_finish_signal = ref false in
   let clear_reader, clear_writer =
     Strict_pipe.create ~name:"clear" Synchronous
@@ -193,7 +193,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                ~consensus_local_state ~transition_writer_ref ~frontier_w
                ~initialization_finish_signal ~persistent_root
                ~persistent_frontier ~initial_root_transition
-               ~genesis_protocol_state_hash ~genesis_ledger
+               ~genesis_state_hash ~genesis_ledger
        | None ->
            let%map initial_root_transition =
              Persistent_frontier.(
@@ -206,8 +206,8 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
              ~verified_transition_writer ~clear_reader ~transition_reader_ref
              ~consensus_local_state ~transition_writer_ref ~frontier_w
              ~initialization_finish_signal ~persistent_root
-             ~persistent_frontier ~initial_root_transition
-             ~genesis_protocol_state_hash ~genesis_ledger
+             ~persistent_frontier ~initial_root_transition ~genesis_state_hash
+             ~genesis_ledger
      in
      let ( valid_protocol_state_transition_reader
          , valid_protocol_state_transition_writer ) =
@@ -216,7 +216,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
      Initial_validator.run ~logger ~trust_system ~verifier
        ~transition_reader:network_transition_reader
        ~valid_transition_writer:valid_protocol_state_transition_writer
-       ~initialization_finish_signal ~genesis_protocol_state_hash ;
+       ~initialization_finish_signal ~genesis_state_hash ;
      let valid_protocol_state_transition_reader, valid_transition_reader =
        Strict_pipe.Reader.Fork.two valid_protocol_state_transition_reader
      in
@@ -268,7 +268,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                          ~consensus_local_state ~frontier_w
                          ~initialization_finish_signal ~persistent_root
                          ~persistent_frontier ~initial_root_transition
-                         ~genesis_protocol_state_hash ~genesis_ledger )
+                         ~genesis_state_hash ~genesis_ledger )
                      else Deferred.unit
                  | None ->
                      Deferred.unit

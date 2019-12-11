@@ -518,13 +518,12 @@ let skip_delta_transition_chain_validation
   , Validation.Unsafe.set_valid_delta_transition_chain validation
       (Non_empty_list.singleton previous_protocol_state_hash) )
 
-let validate_genesis_protocol_state ~genesis_protocol_state_hash (t, validation)
-    =
+let validate_genesis_protocol_state ~genesis_state_hash (t, validation) =
   let {protocol_state= state; _} = With_hash.data t in
   if
     State_hash.equal
       (Protocol_state.genesis_state_hash state)
-      genesis_protocol_state_hash
+      genesis_state_hash
   then Ok (t, Validation.Unsafe.set_valid_genesis_state validation)
   else Error `Invalid_genesis_protocol_state
 

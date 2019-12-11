@@ -51,7 +51,7 @@ let t ~genesis_ledger =
 let compile_time_genesis = t ~genesis_ledger:Test_genesis_ledger.t
 
 module For_tests = struct
-  (*TODO: Use test_ledger generated at compile time*)
+  (*Use test_ledger generated at compile time*)
   let genesis_state_hash =
     t ~genesis_ledger:Test_genesis_ledger.t |> With_hash.hash
 end

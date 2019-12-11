@@ -135,8 +135,8 @@ module Duplicate_proposal_detector = struct
 end
 
 let run ~logger ~trust_system ~verifier ~transition_reader
-    ~valid_transition_writer ~initialization_finish_signal
-    ~genesis_protocol_state_hash =
+    ~valid_transition_writer ~initialization_finish_signal ~genesis_state_hash
+    =
   let open Deferred.Let_syntax in
   let duplicate_checker = Duplicate_proposal_detector.create () in
   don't_wait_for
@@ -161,9 +161,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
              External_transition.(
                Validation.wrap transition_with_hash
                |> defer (validate_time_received ~time_received)
-               >>= defer
-                     (validate_genesis_protocol_state
-                        ~genesis_protocol_state_hash)
+               >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
                >>= validate_proof ~verifier
                >>= defer validate_delta_transition_chain)
            with

@@ -303,7 +303,7 @@ module type Bootstrap_controller_intf = sig
     -> persistent_root:persistent_root
     -> persistent_frontier:persistent_frontier
     -> initial_root_transition:External_transition.Validated.t
-    -> genesis_protocol_state_hash:State_hash.t
+    -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
     -> ( transition_frontier
        * External_transition.Initial_validated.t Envelope.Incoming.t list )
@@ -354,7 +354,7 @@ module type Initial_validator_intf = sig
                                , Strict_pipe.crash Strict_pipe.buffered
                                , unit )
                                Strict_pipe.Writer.t
-    -> genesis_protocol_state_hash:State_hash.t
+    -> genesis_state_hash:State_hash.t
     -> unit
 end
 
@@ -390,7 +390,7 @@ module type Transition_router_intf = sig
     -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:External_transition.t Broadcast_pipe.Reader.t
                                * External_transition.t Broadcast_pipe.Writer.t
-    -> genesis_protocol_state_hash:State_hash.t
+    -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
     -> External_transition.Validated.t Strict_pipe.Reader.t
 end

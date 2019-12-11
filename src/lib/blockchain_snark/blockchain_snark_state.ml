@@ -169,10 +169,12 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         result
       in
       let%bind is_first_block =
+        (*if previous state was in global_slot = 0 then this is the first block*)
         previous_state |> Protocol_state.consensus_state
         |> Consensus.Data.Consensus_state.is_genesis_state_var
       in
       let%bind genesis_state_hash =
+        (*get the genesis state hash from previous state unless previous state is the genesis state itslef*)
         State_hash.if_ is_first_block ~then_:previous_state_hash
           ~else_:(Protocol_state.genesis_state_hash previous_state)
       in

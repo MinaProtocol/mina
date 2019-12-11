@@ -225,7 +225,7 @@ let download_best_tip ~root_sync_ledger ~transition_graph t
    isolation *)
 let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     ~transition_reader ~should_ask_best_tip ~persistent_root
-    ~persistent_frontier ~initial_root_transition ~genesis_protocol_state_hash
+    ~persistent_frontier ~initial_root_transition ~genesis_state_hash
     ~genesis_ledger =
   let rec loop () =
     let sync_ledger_reader, sync_ledger_writer =
@@ -413,8 +413,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
             Transition_frontier.Persistent_root.(
               with_instance_exn persistent_root ~f:(fun instance ->
-                  Instance.set_root_state_hash instance
-                    ~genesis_state_hash:genesis_protocol_state_hash
+                  Instance.set_root_state_hash instance ~genesis_state_hash
                     (External_transition.Validated.state_hash new_root) )) ;
             let%map new_frontier =
               let fail msg =
@@ -424,8 +423,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               in
               Transition_frontier.load ~retry_with_fresh_db:false ~logger
                 ~verifier ~consensus_local_state ~persistent_root
-                ~persistent_frontier ~genesis_protocol_state_hash
-                ~genesis_ledger ()
+                ~persistent_frontier ~genesis_state_hash ~genesis_ledger ()
               >>| function
               | Ok frontier ->
                   frontier

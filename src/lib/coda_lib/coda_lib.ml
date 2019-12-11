@@ -662,8 +662,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
             Transition_frontier.load ~logger:config.logger ~verifier
               ~consensus_local_state:config.consensus_local_state
               ~persistent_root ~persistent_frontier
-              ~genesis_protocol_state_hash:config.genesis_protocol_state_hash
-              ~genesis_ledger ~base_proof ()
+              ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
+              ~base_proof ()
             >>| function
             | Ok frontier ->
                 Some frontier
@@ -797,8 +797,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
                   ~proposer_transition_reader ~most_recent_valid_block
-                  ~genesis_protocol_state_hash:
-                    config.genesis_protocol_state_hash ~genesis_ledger )
+                  ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
+            )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

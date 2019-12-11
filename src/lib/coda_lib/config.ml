@@ -39,5 +39,5 @@ type t =
   ; archive_process_location:
       Core.Host_and_port.t Cli_lib.Flag.Types.with_name option
         [@default None]
-  ; genesis_protocol_state_hash: State_hash.t }
+  ; genesis_state_hash: State_hash.t }
 [@@deriving make]

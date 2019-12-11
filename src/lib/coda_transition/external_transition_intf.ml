@@ -350,7 +350,7 @@ module type S = sig
        Validation.with_transition
 
   val validate_genesis_protocol_state :
-       genesis_protocol_state_hash:State_hash.t
+       genesis_state_hash:State_hash.t
     -> ( 'time_received
        , [`Genesis_state] * unit Truth.false_t
        , 'proof
