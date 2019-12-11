@@ -1,6 +1,12 @@
 module Style = {
   open Css;
-  let page = style([maxWidth(`rem(60.)), margin(`auto)]);
+  let page =
+    style([
+      maxWidth(`rem(60.)),
+      paddingLeft(`rem(1.25)),
+      paddingRight(`rem(1.25)),
+      margin(`auto),
+    ]);
   let careersGallery =
     style([
       display(`flex),
@@ -10,6 +16,8 @@ module Style = {
     ]);
   let galleryRow =
     style([
+      display(`none),
+      media(Theme.MediaQuery.notSmallMobile, [display(`inherit_)]),
       selector(
         "*",
         [
@@ -21,11 +29,31 @@ module Style = {
       ),
     ]);
 
+  let galleryRowMobile =
+    style([media(Theme.MediaQuery.notSmallMobile, [display(`none)])]);
+
   let text = style([maxWidth(`rem(50.)), margin(`auto)]);
   let h2 =
     merge([
       Theme.H2.basic,
-      style([fontWeight(`light), color(Theme.Colors.teal)]),
+      style([
+        fontWeight(`light),
+        color(Theme.Colors.teal),
+        fontSize(`rem(1.5)),
+        lineHeight(`rem(2.25)),
+        media(
+          Theme.MediaQuery.notSmallMobile,
+          [fontSize(`rem(2.25)), lineHeight(`rem(3.0))],
+        ),
+      ]),
+    ]);
+  let headingItem =
+    style([
+      display(`block),
+      media(
+        Theme.MediaQuery.notSmallMobile,
+        [display(`flex), justifyContent(`spaceBetween)],
+      ),
     ]);
   let heading =
     merge([
@@ -36,6 +64,18 @@ module Style = {
         marginBottom(`zero),
       ]),
     ]);
+  let headingItemText =
+    merge([
+      Theme.Body.basic,
+      style([
+        marginTop(`rem(1.)),
+        marginBottom(`zero),
+        media(
+          Theme.MediaQuery.notSmallMobile,
+          [width(`percent(65.)), marginTop(`zero)],
+        ),
+      ]),
+    ]);
   let hr =
     style([
       height(`px(2)),
@@ -44,36 +84,97 @@ module Style = {
     ]);
 
   let flexBetween = style([display(`flex), justifyContent(`spaceBetween)]);
-  let benefitsListItems =
-    style([listStyleType(`none), width(`percent(70.))]);
-  let benefitsList =
+
+  let benefits =
+    style([
+      display(`block),
+      media(
+        Theme.MediaQuery.notSmallMobile,
+        [display(`flex), justifyContent(`spaceBetween)],
+      ),
+    ]);
+
+  let benefitsList = style([marginTop(`rem(1.0)), flexDirection(`column)]);
+  let benefitTitle =
     merge([
-      flexBetween,
+      Theme.H3.basic,
       style([
-        marginTop(`rem(1.0)),
-        width(`percent(70.)),
-        flexDirection(`column),
+        color(Theme.Colors.saville),
+        marginTop(`zero),
+        marginBottom(`zero),
+        width(`percent(30.)),
+        fontSize(`rem(1.)),
+        textAlign(`right),
+        paddingRight(`rem(2.)),
       ]),
     ]);
-  let jobListItems = style([listStyleType(`none), width(`percent(50.))]);
+  let benefitsListItems =
+    style([listStyleType(`none), width(`percent(70.))]);
+  let benefitDetails =
+    merge([
+      Theme.Body.basic,
+      style([marginTop(`zero), marginBottom(`zero)]),
+    ]);
+  let jobsList =
+    style([
+      display(`block),
+      media(
+        Theme.MediaQuery.notSmallMobile,
+        [display(`flex), justifyContent(`spaceBetween)],
+      ),
+    ]);
+  let applyHeading = merge([heading, style([width(`percent(50.))])]);
+  let jobListItems =
+    style([
+      listStyleType(`none),
+      width(`percent(50.)),
+      marginTop(`rem(2.0)),
+      media(Theme.MediaQuery.notSmallMobile, [marginTop(`zero)]),
+    ]);
 };
-
+module ImageGallery = {
+  [@react.component]
+  let make = () => {
+    <div className=Style.careersGallery>
+      <div className=Style.galleryRow>
+        <img
+          src="/static/img/careers/group-outside.jpg"
+          className=Css.(style([width(`percent(35.))]))
+        />
+        <img
+          src="/static/img/careers/group-in-house.jpg"
+          className=Css.(style([width(`percent(65.))]))
+        />
+      </div>
+      <div className=Style.galleryRow>
+        <img
+          src="/static/img/careers/nacera-outside.jpg"
+          className=Css.(style([width(`percent(30.))]))
+        />
+        <img
+          src="/static/img/careers/john-cooking.jpg"
+          className=Css.(style([width(`percent(37.))]))
+        />
+        <img
+          src="/static/img/careers/vanishree-talking.jpg"
+          className=Css.(style([width(`percent(33.))]))
+        />
+      </div>
+      <div className=Style.galleryRowMobile>
+        <img
+          src="/static/img/careers/group-outside.jpg"
+          className=Css.(style([width(`percent(100.))]))
+        />
+      </div>
+    </div>;
+  };
+};
 module HeadingItem = {
   [@react.component]
   let make = (~h2, ~p, ~linkText=?, ~url=?) => {
-    <div className=Style.flexBetween>
+    <div className=Style.headingItem>
       <h2 className=Style.heading> {React.string(h2)} </h2>
-      <p
-        className=Css.(
-          merge([
-            Theme.Body.basic,
-            style([
-              width(`percent(65.)),
-              marginTop(`zero),
-              marginBottom(`zero),
-            ]),
-          ])
-        )>
+      <p className=Style.headingItemText>
         {React.string(p)}
         {switch (linkText, url) {
          | (Some(linkText), Some(url)) =>
@@ -100,7 +201,7 @@ module ValuesSection = {
       <Spacer height=3.5 />
       <HeadingItem
         h2="Collaboration"
-        p="The problems we face are nobel and challenging. We take them on as a team."
+        p="The problems we face are novel and challenging. We take them on as a team."
       />
       <Spacer height=3.5 />
       <HeadingItem
@@ -118,36 +219,12 @@ module BenefitItem = {
       className=Css.(
         merge([Style.flexBetween, style([marginBottom(`rem(1.5))])])
       )>
-      <h3
-        className=Css.(
-          merge([
-            Theme.H3.basic,
-            style([
-              color(Theme.Colors.saville),
-              marginTop(`zero),
-              marginBottom(`zero),
-              width(`percent(30.)),
-              fontSize(`rem(1.)),
-              textAlign(`right),
-              paddingRight(`rem(2.)),
-            ]),
-          ])
-        )>
-        {React.string(title)}
-      </h3>
+      <h3 className=Style.benefitTitle> {React.string(title)} </h3>
       <ul className=Style.benefitsListItems>
         {React.array(
            Array.map(
              item =>
-               <li
-                 className=Css.(
-                   merge([
-                     Theme.Body.basic,
-                     style([marginTop(`zero), marginBottom(`zero)]),
-                   ])
-                 )>
-                 {React.string(item)}
-               </li>,
+               <li className=Style.benefitDetails> {React.string(item)} </li>,
              details,
            ),
          )}
@@ -158,7 +235,7 @@ module BenefitItem = {
 module BenefitsSection = {
   [@react.component]
   let make = () => {
-    <div className=Style.flexBetween>
+    <div className=Style.benefits>
       <h2 className=Style.heading> {React.string("Benefits")} </h2>
       <div className=Style.benefitsList>
         <BenefitItem
@@ -215,13 +292,8 @@ module BenefitsSection = {
 module ApplySection = {
   [@react.component]
   let make = () => {
-    <div className=Style.flexBetween>
-      <h2
-        className=Css.(
-          merge([Style.heading, style([width(`percent(50.))])])
-        )>
-        {React.string("Apply")}
-      </h2>
+    <div className=Style.jobsList>
+      <h2 className=Style.applyHeading> {React.string("Apply")} </h2>
       <ul className=Style.jobListItems>
         <li>
           <a
@@ -235,55 +307,35 @@ module ApplySection = {
   };
 };
 
+module CareersSpacer = {
+  [@react.component]
+  let make = () => {
+    <>
+      <Spacer height=3.5 />
+      <hr className=Style.hr />
+      <Spacer height=3.5 />
+    </>;
+  };
+};
+
 [@react.component]
 let make = () => {
   <Page>
     <div className=Style.page>
       <h1 className=Theme.H3.wings> {React.string("Work with us!")} </h1>
       <Spacer height=2.0 />
-      <div className=Style.careersGallery>
-        <div className=Style.galleryRow>
-          <img
-            src="/static/img/careers/group-outside.jpg"
-            className=Css.(style([width(`percent(35.))]))
-          />
-          <img
-            src="/static/img/careers/group-in-house.jpg"
-            className=Css.(style([width(`percent(65.))]))
-          />
-        </div>
-        <div className=Style.galleryRow>
-          <img
-            src="/static/img/careers/nacera-outside.jpg"
-            className=Css.(style([width(`percent(30.))]))
-          />
-          <img
-            src="/static/img/careers/john-cooking.jpg"
-            className=Css.(style([width(`percent(37.))]))
-          />
-          <img
-            src="/static/img/careers/vanishree-talking.jpg"
-            className=Css.(style([width(`percent(33.))]))
-          />
-        </div>
-      </div>
+      <ImageGallery />
       <div className=Style.text>
         <h1 className=Style.h2>
           {React.string(
              {js|We're using cryptography and cryptocurrency to build computing systems that put people back in control of their digital\u00A0lives.|js},
            )}
         </h1>
-        <Spacer height=3.5 />
-        <hr className=Style.hr />
-        <Spacer height=3.5 />
+        <CareersSpacer />
         <ValuesSection />
-        <Spacer height=3.5 />
-        <hr className=Style.hr />
-        <Spacer height=3.5 />
+        <CareersSpacer />
         <BenefitsSection />
-        <Spacer height=3.5 />
-        <hr className=Style.hr />
-        <Spacer height=3.5 />
+        <CareersSpacer />
         <ApplySection />
         <Spacer height=3.5 />
       </div>
