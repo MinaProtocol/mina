@@ -58,9 +58,7 @@ let sample_list =
 let generate_base_proof ~ledger =
   let%map (module Keys) = Keys_lib.Keys.create () in
   let genesis_ledger = lazy ledger in
-  let genesis_state =
-    Lazy.force (Coda_state.Genesis_protocol_state.t ~genesis_ledger)
-  in
+  let genesis_state = Coda_state.Genesis_protocol_state.t ~genesis_ledger in
   let base_hash = Keys.Step.instance_hash genesis_state.data in
   let wrap hash proof =
     let open Snark_params in
@@ -79,17 +77,14 @@ let generate_base_proof ~ledger =
     let prover_state =
       { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state=
-          Lazy.force (Coda_state.Protocol_state.negative_one ~genesis_ledger)
+      ; prev_state= Coda_state.Protocol_state.negative_one ~genesis_ledger
       ; genesis_state_hash= genesis_state.hash
       ; expected_next_state= None
-      ; update=
-          Lazy.force (Coda_state.Snark_transition.genesis ~genesis_ledger) }
+      ; update= Coda_state.Snark_transition.genesis ~genesis_ledger }
     in
     let main x =
       Tick.handle (Keys.Step.main x)
-        (Lazy.force
-           (Consensus.Data.Prover_state.precomputed_handler ~genesis_ledger))
+        (Consensus.Data.Prover_state.precomputed_handler ~genesis_ledger)
     in
     let tick =
       Tick.prove

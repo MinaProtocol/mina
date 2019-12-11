@@ -95,9 +95,8 @@ let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
   ; proposer
   ; coinbase_amount }
 
-let genesis ~genesis_ledger : value lazy_t =
-  let open Lazy.Let_syntax in
-  let%map genesis_ledger = genesis_ledger in
+let genesis ~genesis_ledger : value =
+  let genesis_ledger = Lazy.force genesis_ledger in
   { Poly.blockchain_state=
       Blockchain_state.genesis
         ~genesis_ledger_hash:(Ledger.merkle_root genesis_ledger)

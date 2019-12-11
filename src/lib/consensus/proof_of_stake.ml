@@ -25,20 +25,18 @@ let make_checked t =
 let name = "proof_of_stake"
 
 let genesis_ledger_total_currency ~ledger =
-  lazy
-    ( Coda_base.Ledger.to_list (Lazy.force ledger)
-    |> List.fold_left ~init:Balance.zero ~f:(fun sum account ->
-           Balance.add_amount sum
-             (Balance.to_amount @@ account.Coda_base.Account.Poly.balance)
-           |> Option.value_exn ?here:None ?error:None
-                ~message:"failed to calculate total currency in genesis ledger"
-       )
-    |> Balance.to_amount )
+  Coda_base.Ledger.to_list (Lazy.force ledger)
+  |> List.fold_left ~init:Balance.zero ~f:(fun sum account ->
+         Balance.add_amount sum
+           (Balance.to_amount @@ account.Coda_base.Account.Poly.balance)
+         |> Option.value_exn ?here:None ?error:None
+              ~message:"failed to calculate total currency in genesis ledger"
+     )
+  |> Balance.to_amount
 
 let genesis_ledger_hash ~ledger =
-  lazy
-    ( Coda_base.Ledger.merkle_root (Lazy.force ledger)
-    |> Coda_base.Frozen_ledger_hash.of_ledger_hash )
+  Coda_base.Ledger.merkle_root (Lazy.force ledger)
+  |> Coda_base.Frozen_ledger_hash.of_ledger_hash
 
 let compute_delegatee_table keys ~iter_accounts =
   let open Coda_base in
@@ -406,9 +404,8 @@ module Data = struct
       {Poly.hash; total_currency}
 
     let genesis ~ledger =
-      lazy
-        { Poly.hash= Lazy.force (genesis_ledger_hash ~ledger)
-        ; total_currency= Lazy.force (genesis_ledger_total_currency ~ledger) }
+      { Poly.hash= genesis_ledger_hash ~ledger
+      ; total_currency= genesis_ledger_total_currency ~ledger }
   end
 
   module Vrf = struct
@@ -761,46 +758,45 @@ module Data = struct
 
       let handler :
              genesis_ledger:Coda_base.Ledger.t Lazy.t
-          -> Snark_params.Tick.Handler.t Lazy.t =
+          -> Snark_params.Tick.Handler.t =
        fun ~genesis_ledger ->
-        lazy
-          (let pk, sk = genesis_winner in
-           let dummy_sparse_ledger =
-             Coda_base.Sparse_ledger.of_ledger_subset_exn
-               (Lazy.force genesis_ledger)
-               [pk]
-           in
-           let empty_pending_coinbase =
-             Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
-           in
-           let ledger_handler =
-             unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
-           in
-           let pending_coinbase_handler =
-             unstage
-               (Coda_base.Pending_coinbase.handler empty_pending_coinbase
-                  ~is_new_stack:false)
-           in
-           let handlers =
-             Snarky.Request.Handler.(
-               push
-                 (push fail (create_single pending_coinbase_handler))
-                 (create_single ledger_handler))
-           in
-           fun (With {request; respond}) ->
-             match request with
-             | Winner_address ->
-                 respond (Provide 0)
-             | Private_key ->
-                 respond (Provide sk)
-             | Public_key ->
-                 respond (Provide (Public_key.decompress_exn pk))
-             | _ ->
-                 respond
-                   (Provide
-                      (Snarky.Request.Handler.run handlers
-                         ["Ledger Handler"; "Pending Coinbase Handler"]
-                         request)))
+        let pk, sk = genesis_winner in
+        let dummy_sparse_ledger =
+          Coda_base.Sparse_ledger.of_ledger_subset_exn
+            (Lazy.force genesis_ledger)
+            [pk]
+        in
+        let empty_pending_coinbase =
+          Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
+        in
+        let ledger_handler =
+          unstage (Coda_base.Sparse_ledger.handler dummy_sparse_ledger)
+        in
+        let pending_coinbase_handler =
+          unstage
+            (Coda_base.Pending_coinbase.handler empty_pending_coinbase
+               ~is_new_stack:false)
+        in
+        let handlers =
+          Snarky.Request.Handler.(
+            push
+              (push fail (create_single pending_coinbase_handler))
+              (create_single ledger_handler))
+        in
+        fun (With {request; respond}) ->
+          match request with
+          | Winner_address ->
+              respond (Provide 0)
+          | Private_key ->
+              respond (Provide sk)
+          | Public_key ->
+              respond (Provide (Public_key.decompress_exn pk))
+          | _ ->
+              respond
+                (Provide
+                   (Snarky.Request.Handler.run handlers
+                      ["Ledger Handler"; "Pending Coinbase Handler"]
+                      request))
     end
 
     let check ~global_slot ~seed ~private_key ~public_key
@@ -1088,14 +1084,13 @@ module Data = struct
           ; field (Coda_base.State_hash.var_to_hash_packed lock_checkpoint) ]
 
       let genesis ~genesis_ledger =
-        lazy
-          { Poly.ledger=
-              Lazy.force (Epoch_ledger.genesis ~ledger:genesis_ledger)
-              (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
-          ; seed= Epoch_seed.initial
-          ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
-          ; lock_checkpoint= Lock_checkpoint.null
-          ; epoch_length= Length.of_int 1 }
+        { Poly.ledger=
+            Epoch_ledger.genesis ~ledger:genesis_ledger
+            (* TODO: epoch_seed needs to be non-determinable by o1-labs before mainnet launch *)
+        ; seed= Epoch_seed.initial
+        ; start_checkpoint= Coda_base.State_hash.(of_hash zero)
+        ; lock_checkpoint= Lock_checkpoint.null
+        ; epoch_length= Length.of_int 1 }
     end
 
     module T = struct
@@ -2000,30 +1995,26 @@ module Data = struct
       make_checked (fun () -> same_checkpoint_window ~prev ~next)
 
     let negative_one ~genesis_ledger =
-      lazy
-        (let max_sub_window_density =
-           Length.of_int (UInt32.to_int Constants.slots_per_sub_window)
-         in
-         let max_window_density =
-           Length.of_int (UInt32.to_int Constants.slots_per_window)
-         in
-         { Poly.blockchain_length= Length.zero
-         ; epoch_count= Length.zero
-         ; min_window_density= max_window_density
-         ; sub_window_densities=
-             Length.zero
-             :: List.init
-                  (UInt32.to_int Constants.sub_windows_per_window - 1)
-                  ~f:(Fn.const max_sub_window_density)
-         ; last_vrf_output= Vrf.Output.Truncated.dummy
-         ; total_currency=
-             Lazy.force (genesis_ledger_total_currency ~ledger:genesis_ledger)
-         ; curr_global_slot= Global_slot.zero
-         ; staking_epoch_data=
-             Lazy.force (Epoch_data.Staking.genesis ~genesis_ledger)
-         ; next_epoch_data=
-             Lazy.force (Epoch_data.Next.genesis ~genesis_ledger)
-         ; has_ancestor_in_same_checkpoint_window= false })
+      let max_sub_window_density =
+        Length.of_int (UInt32.to_int Constants.slots_per_sub_window)
+      in
+      let max_window_density =
+        Length.of_int (UInt32.to_int Constants.slots_per_window)
+      in
+      { Poly.blockchain_length= Length.zero
+      ; epoch_count= Length.zero
+      ; min_window_density= max_window_density
+      ; sub_window_densities=
+          Length.zero
+          :: List.init
+               (UInt32.to_int Constants.sub_windows_per_window - 1)
+               ~f:(Fn.const max_sub_window_density)
+      ; last_vrf_output= Vrf.Output.Truncated.dummy
+      ; total_currency= genesis_ledger_total_currency ~ledger:genesis_ledger
+      ; curr_global_slot= Global_slot.zero
+      ; staking_epoch_data= Epoch_data.Staking.genesis ~genesis_ledger
+      ; next_epoch_data= Epoch_data.Next.genesis ~genesis_ledger
+      ; has_ancestor_in_same_checkpoint_window= false }
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
         ~consensus_transition ~genesis_ledger : Value.t =
@@ -2040,8 +2031,7 @@ module Data = struct
       in
       Or_error.ok_exn
         (update ~proposer_vrf_result
-           ~previous_consensus_state:
-             (Lazy.force (negative_one ~genesis_ledger))
+           ~previous_consensus_state:(negative_one ~genesis_ledger)
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
            ~consensus_transition ~supply_increase:Currency.Amount.zero
            ~snarked_ledger_hash)
@@ -2933,15 +2923,13 @@ module Hooks = struct
   let%test "Receive a valid consensus_state with a bit of delay" =
     let curr_epoch, curr_slot =
       Consensus_state.curr_epoch_and_slot
-        (Lazy.force
-           (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t))
+        (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t)
     in
     let delay = Constants.delta / 2 |> UInt32.of_int in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time curr_epoch new_slot in
     received_at_valid_time
-      (Lazy.force
-         (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t))
+      (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t)
       ~time_received:(to_unix_timestamp time_received)
     |> Result.is_ok
 
@@ -2952,18 +2940,14 @@ module Hooks = struct
       Epoch_and_slot.of_time_exn start_time
     in
     let consensus_state =
-      { (Lazy.force
-           (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t))
-        with
+      { (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t) with
         curr_global_slot= Global_slot.of_epoch_and_slot curr }
     in
     let too_early =
       (* TODO: Does this make sense? *)
       Epoch.start_time
         (Consensus_state.curr_slot
-           (Lazy.force
-              (Consensus_state.negative_one
-                 ~genesis_ledger:Test_genesis_ledger.t)))
+           (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t))
     in
     let too_late =
       let delay = Constants.delta * 2 |> UInt32.of_int in

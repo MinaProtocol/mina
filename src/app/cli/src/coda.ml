@@ -33,13 +33,10 @@ let maybe_sleep _ = Deferred.unit
 [%%endif]
 
 let chain_id ~genesis_state_hash =
-  lazy
-    (let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
-     let all_snark_keys =
-       List.fold_left ~f:( ^ ) ~init:"" Snark_keys.key_hashes
-     in
-     let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
-     Blake2.to_hex b2)
+  let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
+  let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
+  let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
+  Blake2.to_hex b2
 
 [%%inject
 "daemon_expiry", daemon_expiry]
@@ -580,8 +577,8 @@ let daemon logger =
          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
-         let genesis_protocol_state_hash =
-           Lazy.force (Coda_state.Genesis_protocol_state.t ~genesis_ledger)
+         let genesis_state_hash =
+           Coda_state.Genesis_protocol_state.t ~genesis_ledger
            |> With_hash.hash
          in
          let genesis_ledger_hash =
@@ -608,9 +605,7 @@ let daemon logger =
              ; logger
              ; target_peer_count= 8
              ; conf_dir
-             ; chain_id=
-                 Lazy.force
-                   (chain_id ~genesis_state_hash:genesis_protocol_state_hash)
+             ; chain_id= chain_id ~genesis_state_hash
              ; initial_peers= initial_peers_cleaned
              ; addrs_and_ports
              ; trust_system

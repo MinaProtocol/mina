@@ -764,8 +764,7 @@ module Validated = struct
 end
 
 let genesis ~genesis_ledger ~base_proof =
-  let open Lazy.Let_syntax in
-  let%map genesis_protocol_state =
+  let genesis_protocol_state =
     Coda_state.Genesis_protocol_state.t ~genesis_ledger
   in
   let empty_diff =

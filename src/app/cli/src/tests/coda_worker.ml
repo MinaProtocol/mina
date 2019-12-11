@@ -504,10 +504,9 @@ module T = struct
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
-          let genesis_protocol_state_hash =
-            Lazy.force
-              (Coda_state.Genesis_protocol_state.t
-                 ~genesis_ledger:Test_genesis_ledger.t)
+          let genesis_state_hash =
+            Coda_state.Genesis_protocol_state.t
+              ~genesis_ledger:Test_genesis_ledger.t
             |> With_hash.hash
           in
           let coda_deferred () =

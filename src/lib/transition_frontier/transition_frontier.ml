@@ -170,7 +170,7 @@ let rec load_with_max_length :
     in
     let%bind () =
       Persistent_frontier.reset_database_exn persistent_frontier
-        ~root_data:(Lazy.force (genesis_root_data ~genesis_ledger ~base_proof))
+        ~root_data:(genesis_root_data ~genesis_ledger ~base_proof)
     in
     let%bind () =
       Persistent_root.reset_to_genesis_exn persistent_root ~genesis_ledger
@@ -420,9 +420,8 @@ module For_tests = struct
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let genesis_transition =
-          Lazy.force
-            (External_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
-               ~base_proof:Precomputed_values.base_proof)
+          External_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
+            ~base_proof:Precomputed_values.base_proof
         in
         let genesis_ledger = Lazy.force Test_genesis_ledger.t in
         let genesis_staged_ledger =
@@ -493,10 +492,8 @@ module For_tests = struct
       ?(gen_root_breadcrumb = gen_genesis_breadcrumb ~logger ?verifier ())
       ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
-    let genesis_protocol_state_hash =
-      Lazy.force
-        (Coda_state.Genesis_protocol_state.t
-           ~genesis_ledger:Test_genesis_ledger.t)
+    let genesis_state_hash =
+      Coda_state.Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
       |> With_hash.hash
     in
     let verifier =

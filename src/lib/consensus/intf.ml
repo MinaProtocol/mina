@@ -335,8 +335,7 @@ module type S = sig
       type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
       val precomputed_handler :
-           genesis_ledger:Coda_base.Ledger.t Lazy.t
-        -> Snark_params.Tick.Handler.t Lazy.t
+        genesis_ledger:Coda_base.Ledger.t Lazy.t -> Snark_params.Tick.Handler.t
 
       val handler :
            t
@@ -400,7 +399,7 @@ module type S = sig
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
 
-      val negative_one : genesis_ledger:Ledger.t Lazy.t -> Value.t Lazy.t
+      val negative_one : genesis_ledger:Ledger.t Lazy.t -> Value.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t

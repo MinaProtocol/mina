@@ -781,8 +781,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
             Broadcast_pipe.create
-              ( Lazy.force
-                  (External_transition.genesis ~genesis_ledger ~base_proof)
+              ( External_transition.genesis ~genesis_ledger ~base_proof
               |> External_transition.Validation.forget_validation )
           in
           let valid_transitions =

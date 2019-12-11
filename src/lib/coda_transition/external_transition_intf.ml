@@ -257,7 +257,7 @@ module type S = sig
     -> t
 
   val genesis :
-    genesis_ledger:Ledger.t Lazy.t -> base_proof:Proof.t -> Validated.t Lazy.t
+    genesis_ledger:Ledger.t Lazy.t -> base_proof:Proof.t -> Validated.t
 
   val timestamp : t -> Block_time.t
 
