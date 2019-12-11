@@ -6,6 +6,8 @@ open Coda_transition
 open Frontier_base
 module Database = Database
 
+exception Invalid_genesis_state_hash of External_transition.Validated.t
+
 let construct_staged_ledger_at_root ~logger ~verifier ~root_ledger
     ~root_transition ~root =
   let open Deferred.Or_error.Let_syntax in
@@ -147,16 +149,21 @@ module Instance = struct
   let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length
       ~ignore_consensus_local_state =
     let open Deferred.Result.Let_syntax in
-    let downgrade_transition transition :
-        External_transition.Almost_validated.t =
+    let downgrade_transition transition genesis_state_hash :
+        ( External_transition.Almost_validated.t
+        , [`Invalid_genesis_protocol_state] )
+        Result.t =
+      let open Result.Let_syntax in
       let transition, _ = External_transition.Validated.erase transition in
-      External_transition.Validation.wrap transition
-      |> External_transition.skip_time_received_validation
-           `This_transition_was_not_received_via_gossip
-      |> External_transition.skip_genesis_protocol_state_validation
-           `This_transition_was_generated_internally
-      |> External_transition.skip_proof_validation
-           `This_transition_was_generated_internally
+      let%map t =
+        External_transition.Validation.wrap transition
+        |> External_transition.skip_time_received_validation
+             `This_transition_was_not_received_via_gossip
+        |> External_transition.validate_genesis_protocol_state
+             ~genesis_state_hash
+      in
+      External_transition.skip_proof_validation
+        `This_transition_was_generated_internally t
       |> External_transition.skip_delta_transition_chain_validation
            `This_transition_was_not_received_via_gossip
       |> External_transition.skip_frontier_dependencies_validation
@@ -174,6 +181,10 @@ module Instance = struct
       |> Result.map_error ~f:(fun err ->
              `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
+    in
+    let root_genesis_state_hash =
+      External_transition.Validated.protocol_state root_transition
+      |> Protocol_state.genesis_state_hash
     in
     (* construct the root staged ledger in memory *)
     let%bind root_staged_ledger =
@@ -212,11 +223,20 @@ module Instance = struct
       Deferred.map
         (Database.crawl_successors t.db root.hash
            ~init:(Full_frontier.root frontier) ~f:(fun parent transition ->
+             let%bind transition =
+               match
+                 downgrade_transition transition root_genesis_state_hash
+               with
+               | Ok t ->
+                   Deferred.Result.return t
+               | Error `Invalid_genesis_protocol_state ->
+                   Error (`Fatal_error (Invalid_genesis_state_hash transition))
+                   |> Deferred.return
+             in
              let%bind breadcrumb =
                Breadcrumb.build ~logger:t.factory.logger
                  ~verifier:t.factory.verifier
-                 ~trust_system:(Trust_system.null ()) ~parent
-                 ~transition:(downgrade_transition transition)
+                 ~trust_system:(Trust_system.null ()) ~parent ~transition
                  ~sender:None
              in
              let%map () = apply_diff Diff.(E (New_node (Full breadcrumb))) in
