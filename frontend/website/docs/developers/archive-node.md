@@ -2,16 +2,30 @@
 
 ## Background
 
-Since Coda nodes are by default succinct, if you need to preserve historical state, you'll want to run an `archive node`. Start the daemon using this command to run an archive process reachable at port `3086`:
+Since Coda nodes are by default succinct, if you need to preserve historical state, you'll want to run an `archive node`. The easiest way to run the `archive node` is by the prod archive node docker-compose file.
+
+Here are required steps to achieve this:
+
+1. Clone the coda repository:
+    `git clone https://github.com/CodaProtocol/coda.git`
+2. Install `docker-compose`. You can find installation instructions for `docker-compose` on [the docker website] (https://docs.docker.com/compose/install/).
+3. Ensure that ports 3085, 3086, 9000 and 5432 are open. These ports correspond to ports for the daemon, archive, Hasura and Postgres servers to run.
+
+Start the daemon using this command to run an archive process:
+
+
+```bash
+docker-compose -f scripts/archive/docker-compose.prod.yml
 ```
-coda daemon -propose-key ~/keys/my_wallet -rest 3085 -archive-port 3086
-```
+
+### Note
+Running the archive node may not be compatible with the current testnet as the deployment configurations of the archive node is on a unstable develop branch.
 
 ## Architecture
 
 <img width="100%" src="https://cdn.codaprotocol.com/website/static/img/archive-node-diagram-c5424a1f7a6993488f3337f81b7b929ae2cfeb9d2656413106606f7ecc804e06.png" alt="Coda archive node architecture diagram" />
 
-**Writes:**
+**Writes**
 
 - Coda daemon pushes diff into Archive process
 - Archive process transforms diff into [GraphQL](https://graphql.org/) query

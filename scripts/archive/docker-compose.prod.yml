@@ -1,0 +1,38 @@
+version: '3.3'
+services:
+  postgres: 
+    image: postgres:12
+    environment: 
+      POSTGRES_PASSWORD: codarules
+      POSTGRES_USER: admin
+      POSTGRES_DB: archiver
+    volumes:
+    - /var/lib/postgresql/data
+    - ../../src/app/archive/create_schema.sql:/docker-entrypoint-initdb.d/create_schema.sql
+    ports: 
+    - "5432:5432"
+  hasura: 
+    image: hasura/graphql-engine:v1.0.0-beta.6
+    environment: 
+      HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@postgres:5432/archiver
+      HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+      HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
+    ports: 
+    - "9000:8080"
+    depends_on:
+    - "postgres"
+    restart: always
+  archive:
+    image: codaprotocol/coda-archive:0.0.11-beta1-develop-354b5f4
+    ports:
+    - "3086:3086"
+    command: coda-archive -hasura-port 9000 -server-port 3086
+    depends_on:
+    - "hasura"
+  coda:
+    image: codaprotocol/coda-daemon:0.0.11-beta1-develop-2070464
+    ports:
+    - "3085:3085"
+    depends_on:
+    - "archive"
+    entrypoint: /usr/bin/dumb-init coda daemon -rest-port 3085 -archive-port 3086
