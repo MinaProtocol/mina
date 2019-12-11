@@ -260,13 +260,6 @@ jobs:
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     nix-env -iA cachix -f https://cachix.org/api/v1/install
             - run:
-                name: Build kademlia using cachix
-                command: |
-                    . ~/.nix-profile/etc/profile.d/nix.sh
-                    cachix use codaprotocol
-                    cd src/app/kademlia-haskell
-                    nix-build release2.nix
-            - run:
                 name: Build libp2p_helper using cachix
                 command: |
                     . ~/.nix-profile/etc/profile.d/nix.sh
@@ -288,9 +281,6 @@ jobs:
             - run:
                 name: Collect and rewrite aux binaries (kademlia + libp2p_helper + logproc)
                 command: |
-                    cp src/app/kademlia-haskell/result/bin/kademlia package/kademlia
-                    chmod +w package/kademlia
-                    ./scripts/librewrite-macos.sh package/kademlia
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
                     ./scripts/librewrite-macos.sh package/coda-libp2p_helper
