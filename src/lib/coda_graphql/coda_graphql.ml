@@ -1463,6 +1463,7 @@ module Mutations = struct
     let%map pk =
       Coda_lib.wallets t |> Secrets.Wallets.generate_new ~password
     in
+    Coda_lib.subscriptions t |> Coda_lib.Subscriptions.add_new_subscription ~pk ;
     Result.return pk
 
   let add_wallet =
