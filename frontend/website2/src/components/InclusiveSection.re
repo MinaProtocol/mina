@@ -116,10 +116,6 @@ module Figure = {
     <figure
       className=Css.(
         style([
-          unsafe("margin-block-start", "0"),
-          unsafe("margin-block-end", "0"),
-          unsafe("margin-inline-start", "0"),
-          unsafe("margin-inline-end", "0"),
           marginTop(`rem(2.0)),
           display(`flex),
           flexDirection(`column),

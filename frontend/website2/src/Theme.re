@@ -362,7 +362,7 @@ Css.global(
 
 // Reset padding that appears only on some browsers
 Css.global(
-  "h1,h2,h3,h4,h5,fieldset,ul,li,p",
+  "h1,h2,h3,h4,h5,fieldset,ul,li,p,figure",
   Css.[
     unsafe("paddingInlineStart", "0"),
     unsafe("paddingInlineEnd", "0"),
