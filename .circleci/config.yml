@@ -60,6 +60,7 @@ jobs:
                   command: cd frontend/bot && yarn run build-ci
 
     build-archive:
+        resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
               environment:
@@ -71,6 +72,8 @@ jobs:
                 POSTGRES_USER: admin
                 POSTGRES_DB: archiver
             - image: hasura/graphql-engine:v1.0.0-beta.6
+              entrypoint: ["sh", "-c"]
+              command: ["sleep 10 && graphql-engine serve"]
               environment:
                 HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
                 HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
@@ -86,9 +89,23 @@ jobs:
             - run:
                   name: Build Archive Process
                   command:  bash -c 'eval `opam config env` && make build_archive'
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
+            # NOTE: If we were using a machine executor we would be able to mount the sql file in 
+            # as a volume for the container to seed itself, this is the workaround.
+            # Ideally this DB setup step would be handled by the archive process itself. 
+            - run:
+                  name: Set Up Database
+                  command: | 
+                    sudo apt-get install -y postgresql 
+                    PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
                   name: Configure Hasura
-                  command: ls && ./scripts/archive/make_hasura_configurations.sh
+                  command: ./scripts/archive/make_hasura_configurations.sh
+            - setup_remote_docker
+            - run: 
+                  name: Build and Release Archives
+                  command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
@@ -107,6 +124,9 @@ jobs:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
             - run:
+                  name: Check ppx_optcomp preprocessor_deps
+                  command: ./scripts/lint_preprocessor_deps.sh
+            - run:
                   name: Check CODEOWNERS file format
                   command: ./scripts/lint_codeowners.sh
             - run:
@@ -117,6 +137,12 @@ jobs:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Compare versioned types in PR
                   command: ./scripts/compare_pr_diff_types.sh
@@ -138,6 +164,9 @@ jobs:
         steps:
             - checkout
             - run:
+                name: Install tools
+                command: apk add patchelf dpkg tar
+            - run:
                 name: Install cachix
                 command: nix-env -iA cachix -f https://cachix.org/api/v1/install
             - run:
@@ -145,7 +174,36 @@ jobs:
                 command: |
                     cachix use codaprotocol
                     cd src/app/libp2p_helper
-                    nix-build default.nix
+                    nix-build default.nix | cachix push codaprotocol
+            - run:
+                name: Create package dir
+                command: mkdir -p package
+            - run:
+                name: Collect and strip binary
+                command: |
+                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
+                    chmod +w package/coda-libp2p_helper
+                    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 package/coda-libp2p_helper
+            - run:
+                name: Create deb
+                command: |
+                    mkdir -p package/deb/usr/local/sbin
+                    cp package/coda-libp2p_helper package/deb/usr/local/sbin/.
+                    mkdir -p package/deb/DEBIAN
+                    cp src/app/libp2p_helper/build/DEBIAN/control package/deb/DEBIAN/control
+                    DATE=$(date +%Y-%m-%d)
+                    sed -i "s/DATE/${DATE}/" package/deb/DEBIAN/control
+                    find src/app/libp2p_helper -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ' > /tmp/sha1sig
+                    HASH=$(cat /tmp/sha1sig)
+                    sed -i "s/HASH/${HASH}/" package/deb/DEBIAN/control
+                    echo "------------------------------------"
+                    cat package/deb/DEBIAN/control
+                    echo "------------------------------------"
+                    find package/deb/
+                    echo "------------------------------------"
+                    dpkg-deb -v --build package/deb/ package/coda-discovery-${HASH}.deb
+            - store_artifacts:
+                  path: package
 
     build-macos:
         macos:
@@ -240,13 +298,13 @@ jobs:
                     echo 'keys'
                     cp /tmp/s3_cache_dir/* package/keys/.
                     echo 'coda'
-                    cp src/_build/default/app/cli/src/coda.exe package/coda
+                    cp _build/default/src/app/cli/src/coda.exe package/coda
                     echo 'libp2p_helper'
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
                     ./scripts/librewrite-macos.sh package/coda-libp2p_helper
                     echo 'coda-logproc'
-                    cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
+                    cp _build/default/src/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
             - run:
                 name: Build homebrew package
@@ -314,20 +372,74 @@ jobs:
             - run:
                   name: Build and Upload Docker
                   command: |
-                    source /tmp/DOCKER_DEPLOY_ENV
-                    echo "Publishing Docker"
-                    echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
-                    set -x
-                    if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
+                    # Check if we should deploy this build
+                    FILE=/tmp/DOCKER_DEPLOY_ENV
+                    if test -f "$FILE"; then
+                        source $FILE
+                        echo "Publishing Docker"
+                        echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
+                        set -x
+                        if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
 
-                        echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
-                        ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
-                        -s coda-daemon \
-                        -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
-                        --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                              echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+                              ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
+                              -s coda-daemon \
+                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                        fi
                     fi
             - store_artifacts:
                   path: /tmp/artifacts
+    build-artifacts--net_10k:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+        steps:
+            - checkout
+            - run:
+                  name: Artifacts Path
+                  command: |
+                      mkdir -p /tmp/artifacts
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
+            - run:
+                  name: Install awscli
+                  command: sudo pip install awscli
+            - run:
+                  name: Build OCaml
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  environment:
+                    DUNE_PROFILE: net_10k
+                  no_output_timeout: 20m
+            - run:
+                  name: Upload generated PV keys
+                  command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
+            - run:
+                  name: Rebuild for pvkey changes
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                  environment:
+                    DUNE_PROFILE: net_10k
+                  no_output_timeout: 20m
+            - run:
+                  name: Build deb package with PV keys and PV key tar
+                  command: ./scripts/skip_if_only_frontend.sh make deb
+                  environment:
+                    DUNE_PROFILE: net_10k
+                  no_output_timeout: 20m
+            - run:
+                  name: Store genesis public/private keypairs
+                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
+            - run:
+                  name: Upload deb to repo
+                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
+                  no_output_timeout: 20m
+            - run:
+                  name: Copy artifacts to cloud
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
     test-unit--test_postake_snarkless_unittest:
         resource_class: xlarge
         docker:
@@ -536,9 +648,6 @@ jobs:
             - run:
                   name: Running test -- test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5"'
-            - run:
-                  name: Running test -- test_postake_holy_grail:coda-long-fork -num-proposers 5
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_holy_grail:coda-long-fork -num-proposers 5"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_snarkless:
@@ -705,6 +814,7 @@ workflows:
             - build-archive
             - build-macos
             - build-artifacts--testnet_postake_medium_curves
+            - build-artifacts--net_10k
             - test-unit--test_postake_snarkless_unittest
             - test-unit--dev
             - test--fake_hash

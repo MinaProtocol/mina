@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 open Core_kernel
 open Async
@@ -453,7 +453,7 @@ module Root_diff = struct
   end
 
   type t = Stable.Latest.t =
-    {user_commands: User_command.Stable.V1.t list; root_length: int}
+    {user_commands: User_command.t list; root_length: int}
 end
 
 (* TODO: this is a bad pattern for two reasons:
@@ -567,6 +567,18 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
 
 let next_proposal t = t.next_proposal
 
+let staking_ledger t =
+  let open Option.Let_syntax in
+  let%map transition_frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let consensus_state =
+    Transition_frontier.Breadcrumb.consensus_state
+      (Transition_frontier.best_tip transition_frontier)
+  in
+  let local_state = t.config.consensus_local_state in
+  Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
+
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier
     ~set_next_proposal:(fun p -> t.next_proposal <- Some p)
@@ -667,6 +679,13 @@ let create (config : Config.t) =
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
             Broadcast_pipe.create transition_frontier_opt
           in
+          Exit_handlers.register_async_shutdown_handler ~logger:config.logger
+            ~description:"Close transition frontier, if exists" (fun () ->
+              match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
+              | None ->
+                  Deferred.unit
+              | Some frontier ->
+                  Transition_frontier.close frontier ) ;
           let handle_request name ~f query_env =
             trace_recurring name (fun () ->
                 let input = Envelope.Incoming.data query_env in
@@ -881,12 +900,25 @@ let create (config : Config.t) =
                 |> Keypair.And_compressed_pk.Set.of_list )
               config.initial_propose_keypairs
           in
+          Option.iter config.archive_process_location
+            ~f:(fun archive_process_port ->
+              Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
+                "Communicating with the archive process"
+                ~metadata:
+                  [ ( "Host"
+                    , `String (Host_and_port.host archive_process_port.value)
+                    )
+                  ; ( "Port"
+                    , `Int (Host_and_port.port archive_process_port.value) ) ] ;
+              Archive_client.run ~logger:config.logger
+                ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+                archive_process_port ) ;
           let subscriptions =
             Coda_subscriptions.create ~logger:config.logger
               ~time_controller:config.time_controller ~new_blocks ~wallets
               ~external_transition_database:config.external_transition_database
               ~transition_frontier:frontier_broadcast_pipe_r
-              ~is_storing_all:config.is_archive_node
+              ~is_storing_all:config.is_archive_rocksdb
           in
           let open Coda_incremental.Status in
           let transition_frontier_incr =

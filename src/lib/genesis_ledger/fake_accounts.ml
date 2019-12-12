@@ -6,7 +6,7 @@ open Signature_lib
 let make_account pk balance =
   Functor.Without_private.{pk; balance; delegate= None}
 
-let balance_gen = Quickcheck.Generator.of_list (List.range 100 20000)
+let balance_gen = Quickcheck.Generator.of_list (List.range 10 500)
 
 let gen =
   let open Quickcheck.Let_syntax in

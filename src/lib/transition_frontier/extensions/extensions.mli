@@ -17,6 +17,8 @@ module Identity = Identity
 module Root_history = Root_history
 module Snark_pool_refcount = Snark_pool_refcount
 module Transition_registry = Transition_registry
+module New_breadcrumbs = New_breadcrumbs
+module Ledger_table = Ledger_table
 
 type t
 
@@ -34,7 +36,9 @@ type ('ext, 'view) access =
   | Best_tip_diff : (Best_tip_diff.t, Best_tip_diff.view) access
   | Transition_registry
       : (Transition_registry.t, Transition_registry.view) access
+  | Ledger_table : (Ledger_table.t, Ledger_table.view) access
   | Identity : (Identity.t, Identity.view) access
+  | New_breadcrumbs : (New_breadcrumbs.t, New_breadcrumbs.view) access
 
 val get_extension : t -> ('ext, _) access -> 'ext
 

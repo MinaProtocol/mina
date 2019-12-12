@@ -42,10 +42,10 @@ module Schema = struct
 
   type _ t =
     | Db_version : int t
-    | Transition : State_hash.Stable.V1.t -> External_transition.Stable.V1.t t
-    | Arcs : State_hash.Stable.V1.t -> State_hash.Stable.V1.t list t
-    | Root : Root_data.Minimal.Stable.V1.t t
-    | Best_tip : State_hash.Stable.V1.t t
+    | Transition : State_hash.t -> External_transition.t t
+    | Arcs : State_hash.t -> State_hash.t list t
+    | Root : Root_data.Minimal.t t
+    | Best_tip : State_hash.t t
     | Frontier_hash : Frontier_hash.t t
 
   let to_string : type a. a t -> string = function
@@ -211,34 +211,53 @@ let get_if_exists db ~default ~key =
 let get db ~key ~error =
   match get db ~key with Some x -> Ok x | None -> Error error
 
-(* TODO: batch reads might be nice *)
+(* TODO: check that best tip is connected to root *)
+(* TODO: check for garbage *)
 let check t =
-  match get_if_exists t.db ~key:Db_version ~default:0 with
-  | 0 ->
-      Error `Not_initialized
-  | v when v = version ->
-      let%bind root =
-        get t.db ~key:Root ~error:(`Corrupt (`Not_found `Root))
-      in
-      let%bind best_tip =
-        get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
-      in
-      let%bind _ =
-        get t.db ~key:Frontier_hash
-          ~error:(`Corrupt (`Not_found `Frontier_hash))
-      in
-      let%bind _ =
-        get t.db ~key:(Transition root.hash)
-          ~error:(`Corrupt (`Not_found `Root_transition))
-      in
-      let%map _ =
-        get t.db ~key:(Transition best_tip)
-          ~error:(`Corrupt (`Not_found `Best_tip_transition))
-      in
-      (* TODO: crawl from root and validate tree structure is not malformed (#3737) *)
-      ()
-  | _ ->
-      Error `Invalid_version
+  let check_version () =
+    match get_if_exists t.db ~key:Db_version ~default:0 with
+    | 0 ->
+        Error `Not_initialized
+    | v when v = version ->
+        Ok ()
+    | _ ->
+        Error `Invalid_version
+  in
+  (* checks the pointers, frontier hash, and checks pointer references *)
+  let check_base () =
+    let%bind root = get t.db ~key:Root ~error:(`Corrupt (`Not_found `Root)) in
+    let%bind best_tip =
+      get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
+    in
+    let%bind _ =
+      get t.db ~key:Frontier_hash ~error:(`Corrupt (`Not_found `Frontier_hash))
+    in
+    let%bind _ =
+      get t.db ~key:(Transition root.hash)
+        ~error:(`Corrupt (`Not_found `Root_transition))
+    in
+    let%map _ =
+      get t.db ~key:(Transition best_tip)
+        ~error:(`Corrupt (`Not_found `Best_tip_transition))
+    in
+    root.hash
+  in
+  let rec check_arcs pred_hash =
+    let%bind successors =
+      get t.db ~key:(Arcs pred_hash)
+        ~error:(`Corrupt (`Not_found (`Arcs pred_hash)))
+    in
+    List.fold successors ~init:(Ok ()) ~f:(fun acc succ_hash ->
+        let%bind () = acc in
+        let%bind _ =
+          get t.db ~key:(Transition succ_hash)
+            ~error:(`Corrupt (`Not_found (`Transition succ_hash)))
+        in
+        check_arcs succ_hash )
+  in
+  let%bind () = check_version () in
+  let%bind root_hash = check_base () in
+  check_arcs root_hash
 
 let initialize t ~root_data ~base_hash =
   let open Root_data.Limited.Stable.Latest in
@@ -261,14 +280,17 @@ let add t ~transition =
   let {With_hash.hash; data= raw_transition}, _ =
     External_transition.Validated.erase transition
   in
-  let%map () =
+  let%bind () =
     Result.ok_if_true
       (mem t.db ~key:(Transition parent_hash))
       ~error:(`Not_found `Parent_transition)
   in
-  let parent_arcs = get_if_exists t.db ~key:(Arcs parent_hash) ~default:[] in
+  let%map parent_arcs =
+    get t.db ~key:(Arcs parent_hash) ~error:(`Not_found (`Arcs parent_hash))
+  in
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:(Transition hash) ~data:raw_transition ;
+      Batch.set batch ~key:(Arcs hash) ~data:[] ;
       Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs) )
 
 let move_root t ~new_root ~garbage =
