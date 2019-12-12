@@ -49,9 +49,7 @@ function startLeaderboard() {
       if (values.length) {
         const headers = values.shift();
         const currentWeekElem = document.getElementById("leaderboard-current-week");
-        const currentWeekChallenge = document.getElementById("challenges-current-week");
         currentWeekElem.textContent = headers[values[0].length - 1];
-        currentWeekChallenge.textContent = headers[values[0].length - 1];
       }
       // Sort values by latest week
       values.sort((a, b) => {
@@ -75,7 +73,7 @@ function startLeaderboard() {
 function startChallenges() {
   return gapi.client.request({
     path:
-      "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/Challenges!B:AZ"
+      "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/Challenges!A:AZ"
   }).then(
     function (response) {
       const {
@@ -83,12 +81,15 @@ function startChallenges() {
           values,
         }
       } = response;
-      const parentElem = document.getElementById("challenges-list");
       const latestChallenges = values[values.length - 1];
+      // Set name of challenges header
+      const currentWeekChallenge = document.getElementById("challenges-current-week");
+      currentWeekChallenge.textContent = latestChallenges.shift();
       // Pop extra challenge name if description is missing
       if (latestChallenges.length % 2 !== 0) {
         latestChallenges.pop();
       }
+      const parentElem = document.getElementById("challenges-list");
       for (let i = 0; i < latestChallenges.length; i += 2) {
         const challenge = {
           name: latestChallenges[i],
