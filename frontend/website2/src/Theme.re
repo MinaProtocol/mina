@@ -4,8 +4,8 @@ module Colors = {
     | `rgb(r, g, b) => Printf.sprintf("rgb(%d,%d,%d)", r, g, b)
     | `rgba(r, g, b, a) => Printf.sprintf("rgba(%d,%d,%d,%f)", r, g, b, a)
     | `hsl(h, s, l) => Printf.sprintf("hsl(%d,%d%%,%d%%)", h, s, l)
-    | `hsla(h, s, l, a) =>
-      Printf.sprintf("hsla(%d,%d%%,%d%%,%f)", h, s, l, a);
+    | `hsla(`deg(h), `percent(s), `percent(l), `num(a)) =>
+      Printf.sprintf("hsla(%f,%f%%,%f%%,%f)", h, s, l, a);
 
   let fadedBlue = `rgb((111, 167, 197));
   let white = Css.white;
