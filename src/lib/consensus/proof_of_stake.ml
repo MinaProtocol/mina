@@ -3024,9 +3024,9 @@ module Hooks = struct
              ~snarked_ledger_hash)
       in
       let genesis_state_hash =
-        if Consensus_state.is_genesis_state previous_consensus_state then
-          previous_protocol_state_hash
-        else Protocol_state.genesis_state_hash previous_protocol_state
+        Protocol_state.genesis_state_hash
+          ~state_hash:(Some previous_protocol_state_hash)
+          previous_protocol_state
       in
       let protocol_state =
         Protocol_state.create_value ~genesis_state_hash

@@ -173,10 +173,6 @@ let consensus_state {Poly.Stable.Latest.body= {Body.Poly.consensus_state; _}; _}
     =
   consensus_state
 
-let genesis_state_hash
-    {Poly.Stable.Latest.body= {Body.Poly.genesis_state_hash; _}; _} =
-  genesis_state_hash
-
 let to_hlist {Poly.Stable.Latest.previous_state_hash; body} =
   H_list.[previous_state_hash; body]
 
@@ -201,6 +197,23 @@ let hash_checked ({previous_state_hash; body} : var) =
         |> State_hash.var_of_hash_packed )
   in
   (hash, body)
+
+let genesis_state_hash ?(state_hash = None) state =
+  (*If this is gthe genesis state then simply return its hash
+    otherwise return its the genesis_state_hash*)
+  if Consensus.Data.Consensus_state.is_genesis_state (consensus_state state)
+  then match state_hash with None -> hash state | Some hash -> hash
+  else state.body.genesis_state_hash
+
+let genesis_state_hash_checked ~state_hash state =
+  let%bind is_genesis =
+    (*if state is in global_slot = 0 then this is the genesis state*)
+    Consensus.Data.Consensus_state.is_genesis_state_var (consensus_state state)
+  in
+  (*get the genesis state hash from this state unless the state itself is the
+    genesis state*)
+  State_hash.if_ is_genesis ~then_:state_hash
+    ~else_:state.body.genesis_state_hash
 
 [%%if
 call_logger]

@@ -106,7 +106,11 @@ val body : (_, 'a) Poly.t -> 'a
 
 val blockchain_state : (_, (_, 'a, _) Body.t) Poly.t -> 'a
 
-val genesis_state_hash : (_, ('a, _, _) Body.t) Poly.t -> 'a
+val genesis_state_hash :
+  ?state_hash:State_hash.t option -> Value.t -> State_hash.t
+
+val genesis_state_hash_checked :
+  state_hash:State_hash.var -> var -> (State_hash.var, _) Checked.t
 
 val consensus_state : (_, (_, _, 'a) Body.t) Poly.t -> 'a
 

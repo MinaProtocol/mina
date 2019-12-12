@@ -174,7 +174,7 @@ module type Protocol_state = sig
     (_, (_, 'blockchain_state, _) Body.Poly.t) Poly.t -> 'blockchain_state
 
   val genesis_state_hash :
-    (_, ('genesis_state_hash, _, _) Body.Poly.t) Poly.t -> 'genesis_state_hash
+    ?state_hash:State_hash.t option -> Value.t -> State_hash.t
 
   val consensus_state :
     (_, (_, _, 'consensus_state) Body.Poly.t) Poly.t -> 'consensus_state

@@ -364,11 +364,13 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       let transition_hash =
                         Protocol_state.hash protocol_state
                       in
+                      let previous_state_hash =
+                        Protocol_state.hash previous_protocol_state
+                      in
                       let delta_transition_chain_proof =
                         Transition_chain_prover.prove
                           ~length:(Consensus.Constants.delta - 1)
-                          ~frontier
-                          (Protocol_state.hash previous_protocol_state)
+                          ~frontier previous_state_hash
                         |> Option.value_exn
                       in
                       let error_msg_prefix = "Validation failed: " in
@@ -392,6 +394,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                              .validate_genesis_protocol_state
                                ~genesis_state_hash:
                                  (Protocol_state.genesis_state_hash
+                                    ~state_hash:(Some previous_state_hash)
                                     previous_protocol_state)
                         in
                         External_transition.skip_proof_validation
