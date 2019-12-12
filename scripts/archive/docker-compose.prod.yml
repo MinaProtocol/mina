@@ -35,4 +35,4 @@ services:
     - "3085:3085"
     depends_on:
     - "archive"
-    entrypoint: /usr/bin/dumb-init coda daemon -rest-port 3085 -archive-port 3086
+    entrypoint: /usr/bin/dumb-init coda daemon -rest-port 3085 -archive-port archive:3086
