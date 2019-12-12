@@ -127,9 +127,12 @@ module Style = {
   let jobListItems =
     style([
       listStyleType(`none),
-      width(`percent(50.)),
+      width(`percent(100.)),
       marginTop(`rem(2.0)),
-      media(Theme.MediaQuery.notSmallMobile, [marginTop(`zero)]),
+      media(
+        Theme.MediaQuery.notSmallMobile,
+        [marginTop(`zero), width(`percent(50.))],
+      ),
     ]);
 };
 module ImageGallery = {

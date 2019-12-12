@@ -6,6 +6,7 @@ module Style = {
   let content =
     style([
       maxWidth(`rem(43.)),
+      marginLeft(`rem(1.)),
       selector(
         "p > code, li > code",
         [
@@ -19,11 +20,13 @@ module Style = {
 
   let page =
     style([
-      display(`flex),
+      display(`block),
       justifyContent(`center),
       margin(`auto),
       paddingLeft(`rem(3.)),
       paddingRight(`rem(3.)),
+      marginTop(`rem(4.)),
+      media(Theme.MediaQuery.full, [display(`flex)]),
     ]);
 };
 
