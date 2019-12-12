@@ -4,7 +4,9 @@
 open Core
 open Async
 open Coda_base
-open Signature_lib
+
+[%%inject
+"ledger_depth", ledger_depth]
 
 [%%if
 proof_level = "full"]
@@ -17,43 +19,7 @@ let use_dummy_values = true
 
 [%%endif]
 
-module Account_data = struct
-  type account_data =
-    { pk: Public_key.Compressed.t
-    ; sk: Private_key.t option
-    ; balance: Currency.Balance.t
-    ; delegate: Public_key.Compressed.t option }
-  [@@deriving yojson]
-
-  type t = account_data list [@@deriving yojson]
-end
-
 type t = Ledger.t
-
-let sample_account_data1 : Account_data.account_data =
-  let keys = Signature_lib.Keypair.create () in
-  let balance = Currency.Balance.of_int 1000 in
-  let delegate = None in
-  { pk= Public_key.compress keys.public_key
-  ; sk= Some keys.private_key
-  ; balance
-  ; delegate }
-
-let sample_account_data2 : Account_data.account_data =
-  let keys = Signature_lib.Keypair.create () in
-  let balance = Currency.Balance.of_int 1000 in
-  let pk = Public_key.compress keys.public_key in
-  let delegate = Some pk in
-  {pk; sk= Some keys.private_key; balance; delegate}
-
-let sample_account_data3 : Account_data.account_data =
-  let keys = Signature_lib.Keypair.create () in
-  let balance = Currency.Balance.of_int 1000 in
-  let delegate = None in
-  {pk= Public_key.compress keys.public_key; sk= None; balance; delegate}
-
-let sample_list =
-  [sample_account_data1; sample_account_data2; sample_account_data3]
 
 let generate_base_proof ~ledger =
   let%map (module Keys) = Keys_lib.Keys.create () in
@@ -99,23 +65,24 @@ let generate_base_proof ~ledger =
   in
   (base_hash, base_proof)
 
-let create : directory_name:string -> Account_data.t -> t =
- fun ~directory_name account_list ->
+let create : directory_name:string -> Account_config.t -> int -> t =
+ fun ~directory_name real_accounts n ->
   let ledger = Ledger.create ~directory_name () in
-  let _accounts =
-    List.fold ~init:[] account_list ~f:(fun acc {pk; sk; balance; delegate} ->
-        let account =
-          let base_acct = Account.create pk balance in
-          {base_acct with delegate= Option.value ~default:pk delegate}
-        in
-        Ledger.create_new_account_exn ledger account.public_key account ;
-        (sk, account) :: acc )
+  let fake_accounts =
+    Account_config.Fake_accounts.generate (n - List.length real_accounts)
   in
+  List.iter (real_accounts @ fake_accounts)
+    ~f:(fun {pk; balance; delegate; _} ->
+      let account =
+        let base_acct = Account.create pk balance in
+        {base_acct with delegate= Option.value ~default:pk delegate}
+      in
+      Ledger.create_new_account_exn ledger account.public_key account ) ;
   ledger
 
 let commit ledger = Ledger.commit ledger
 
-let main accounts_json_file ledger_dir =
+let main accounts_json_file ledger_dir n =
   let open Deferred.Let_syntax in
   let%bind () = File_system.create_dir ledger_dir ~clear_if_exists:true in
   let%bind accounts =
@@ -123,13 +90,13 @@ let main accounts_json_file ledger_dir =
       Deferred.Or_error.try_with_join (fun () ->
           let%map accounts_str = Reader.file_contents accounts_json_file in
           let res = Yojson.Safe.from_string accounts_str in
-          match Account_data.of_yojson res with
+          match Account_config.of_yojson res with
           | Ok res ->
               Ok res
           | Error s ->
               Error
                 (Error.of_string
-                   (sprintf "Account_data.of_yojson failed: %s" s)) )
+                   (sprintf "Account_config.of_yojson failed: %s" s)) )
     with
     | Ok res ->
         Ok res
@@ -140,13 +107,15 @@ let main accounts_json_file ledger_dir =
   match
     Or_error.try_with_join (fun () ->
         let open Or_error.Let_syntax in
-        let genesis_winner_account : Account_data.account_data =
+        let genesis_winner_account : Account_config.account_data =
           let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
           {pk; sk= None; balance= Currency.Balance.of_int 1000; delegate= None}
         in
         let%map accounts = accounts in
         let ledger =
-          create ~directory_name:ledger_dir (genesis_winner_account :: accounts)
+          create ~directory_name:ledger_dir
+            (genesis_winner_account :: accounts)
+            n
         in
         let () = commit ledger in
         ledger )
@@ -173,8 +142,8 @@ let () =
           delegates "
        Command.(
          let open Let_syntax in
+         let open Command.Param in
          let%map accounts_json =
-           let open Command.Param in
            flag "account-file"
              ~doc:
                "Filepath of the json file that has all the account data in \
@@ -183,10 +152,23 @@ let () =
                 \"delegate\":optional-public-key-string}]"
              (required string)
          and ledger_dir =
-           let open Command.Param in
            flag "ledger-dir"
              ~doc:
                "Dir where the genesis ledger and genesis proof will be saved"
              (required string)
+         and n =
+           flag "n"
+             ~doc:
+               (sprintf
+                  "Int Total number of accounts in the ledger (Maximum: %d). \
+                   If the number of accounts in the account file, say x, is \
+                   less than n then the tool will generate (n-x) fake \
+                   accounts (default: x)."
+                  (Int.pow 2 ledger_depth))
+             (optional int)
          in
-         fun () -> main accounts_json ledger_dir))
+         fun () ->
+           let max = Int.pow 2 ledger_depth in
+           if Option.value ~default:0 n >= max then
+             failwith (sprintf "Invalid value for n (0 <= n <= %d)" max)
+           else main accounts_json ledger_dir (Option.value ~default:0 n)))
