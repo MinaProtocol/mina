@@ -52,7 +52,7 @@ let () =
     Format.printf "Testing Fp@." ;
     let open Fp in
     Format.printf "size(bits): %i@." (size_in_bits ()) ;
-    Format.printf "size: " ;
+    Format.printf "size:@." ;
     let s = size () in
     Bigint.print s ;
     let s_ = of_bigint s in
@@ -108,7 +108,7 @@ let () =
     print h ;
     Format.printf "i = to_bigint a@." ;
     let i = to_bigint a in
-    Bigint.print a ;
+    Bigint.print i ;
     Format.printf "j = of_bigint i@." ;
     let j = of_bigint i in
     print j ;
@@ -119,7 +119,7 @@ let () =
     Format.printf "Testing Fq@." ;
     let open Fp in
     Format.printf "size(bits): %i@." (size_in_bits ()) ;
-    Format.printf "size: " ;
+    Format.printf "size:@." ;
     let s = size () in
     Bigint.print s ;
     let s_ = of_bigint s in
@@ -175,7 +175,7 @@ let () =
     print h ;
     Format.printf "i = to_bigint a@." ;
     let i = to_bigint a in
-    Bigint.print a ;
+    Bigint.print i ;
     Format.printf "j = of_bigint i@." ;
     let j = of_bigint i in
     print j ;

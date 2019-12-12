@@ -124,7 +124,7 @@ pub extern fn camlsnark_bn382_bigint_delete(x : *mut BigInteger384) {
 #[no_mangle]
 pub extern fn camlsnark_bn382_bigint_print(x : *const BigInteger384) {
     let x_ = unsafe { &(*x) };
-    println!("{}", x_);
+    println!("{}", *x_);
 }
 
 #[no_mangle]
@@ -274,7 +274,7 @@ pub extern fn camlsnark_bn382_fp_delete(x : *mut Fp) {
 #[no_mangle]
 pub extern fn camlsnark_bn382_fp_print(x : *const Fp) {
     let x_ = unsafe { &(*x) };
-    println!("{}", x_);
+    println!("{}", *x_);
 }
 
 #[no_mangle]
