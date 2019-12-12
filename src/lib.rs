@@ -39,9 +39,6 @@ fn biginteger_of_bigint(x : &BigUint) -> BigInteger384 {
     let mut bytes = x.to_bytes_le();
     bytes.resize(BIGINT_NUM_BYTES, 0);
     let limbs = bytes.as_ptr();
-    /* Take a pointer to the pointer. */
-    let limbs : *const *const u8 = &limbs;
-    /* Convert the pointer to the pointer to be a pointer to an array. */
     let limbs = limbs as *const [u64; BIGINT_NUM_LIMBS as usize];
     let limbs = unsafe { &(*limbs) };
     BigInteger384(*limbs)
