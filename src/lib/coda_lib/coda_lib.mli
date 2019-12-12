@@ -119,6 +119,8 @@ val receipt_chain_database : t -> Receipt_chain_database.t
 
 val wallets : t -> Secrets.Wallets.t
 
+val subscriptions : t -> Coda_subscriptions.t
+
 val most_recent_valid_transition :
   t -> External_transition.t Broadcast_pipe.Reader.t
 
