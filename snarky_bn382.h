@@ -1,5 +1,33 @@
 // Defines bool
 #include <stdbool.h>
+// Defines size_t
+#include <stddef.h>
+
+// Bigint
+
+void *camlsnark_bn382_bigint_of_decimal_string(char *);
+
+int camlsnark_bn382_bigint_num_limbs();
+
+char *camlsnark_bn382_bigint_to_data(void *);
+
+void *camlsnark_bn382_bigint_of_data(char *);
+
+int camlsnark_bn382_bigint_bytes_per_limb();
+
+void *camlsnark_bn382_bigint_div(void *, void *);
+
+void *camlsnark_bn382_bigint_of_numeral(char *, int, int);
+
+bool camlsnark_bn382_bigint_compare(void *, void *);
+
+bool camlsnark_bn382_bigint_test_bit(void *, int);
+
+void camlsnark_bn382_bigint_delete(void *);
+
+void camlsnark_bn382_bigint_print(void *);
+
+void *camlsnark_bn382_bigint_find_wnaf(size_t, void *);
 
 // Fp
 
@@ -40,6 +68,10 @@ void camlsnark_bn382_fp_delete(void *);
 void camlsnark_bn382_fp_print(void *);
 
 bool camlsnark_bn382_fp_equal(void *, void *);
+
+void *camlsnark_bn382_fp_to_bigint(void *);
+
+void *camlsnark_bn382_fp_of_bigint(void *);
 
 // Fp vector
 
@@ -92,6 +124,10 @@ void camlsnark_bn382_fq_delete(void *);
 void camlsnark_bn382_fq_print(void *);
 
 bool camlsnark_bn382_fq_equal(void *, void *);
+
+void *camlsnark_bn382_fq_to_bigint(void *);
+
+void *camlsnark_bn382_fq_of_bigint(void *);
 
 // Fq vector
 

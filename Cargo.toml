@@ -17,3 +17,4 @@ crate-type = ["staticlib"]
 libc = { version = "0.2.0" }
 algebra = { path = "../algebra" }
 rand = { version = "0.7" }
+num-bigint = { version = "0.2.3" }
