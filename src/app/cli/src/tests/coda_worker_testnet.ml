@@ -408,8 +408,11 @@ let events workers start_reader =
                  Coda_process.initialization_finish_signal_exn worker
                  >>= Linear_pipe.read >>| ignore
                in
-               let ms_to_catchup = 6_000 |> Float.of_int in
-               let%map () = after (Time.Span.of_ms ms_to_catchup) in
+               let ms_to_sync =
+                 Consensus.Constants.(delta * block_window_duration_ms) + 6_000
+                 |> Float.of_int
+               in
+               let%map () = after (Time.Span.of_ms ms_to_sync) in
                synced ()) ;
             connect_worker i worker) ;
          Deferred.unit )) ;
