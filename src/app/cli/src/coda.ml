@@ -9,18 +9,22 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
-let retrieve_genesis_state dir_opt : (Ledger.t lazy_t * Proof.t) Deferred.t =
+let retrieve_genesis_state dir_opt ~logger :
+    (Ledger.t lazy_t * Proof.t) Deferred.t =
   let open Cache_dir in
   let s3_bucket_prefix =
     "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
   in
   let retrieve dir =
+    Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+      "Retrieving genesis ledger and genesis proof from $path"
+      ~metadata:[("path", `String dir)] ;
     let ledger_dir = dir ^/ "ledger" in
     let proof_file = dir ^/ "base_proof" in
     if
       Core.Sys.file_exists ledger_dir = `Yes
       && Core.Sys.file_exists proof_file = `Yes
-    then
+    then (
       let genesis_ledger =
         lazy (Ledger.create ~directory_name:ledger_dir ())
       in
@@ -39,7 +43,10 @@ let retrieve_genesis_state dir_opt : (Ledger.t lazy_t * Proof.t) Deferred.t =
             failwithf "Error reading the base proof from %s: %s" proof_file
               (Error.to_string_hum e) ()
       in
-      Some (genesis_ledger, base_proof)
+      Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+        "Successfully retrieved genesis ledger and genesis proof from $path"
+        ~metadata:[("path", `String dir)] ;
+      Some (genesis_ledger, base_proof) )
     else Deferred.return None
   in
   let res_or_fail dir_str = function
@@ -409,7 +416,7 @@ let daemon logger =
        end in
        let coda_initialization_deferred () =
          let%bind genesis_ledger, base_proof =
-           retrieve_genesis_state genesis_ledger_dir_flag
+           retrieve_genesis_state genesis_ledger_dir_flag ~logger
          in
          let%bind config =
            match%map

@@ -117,7 +117,7 @@ let get_accounts accounts_json_file genesis_dir n =
       {pk; sk= None; balance= Currency.Balance.of_int 1000; delegate= None}
     in
     if
-      List.exists accounts (fun acc ->
+      List.exists accounts ~f:(fun acc ->
           Signature_lib.Public_key.Compressed.equal acc.pk
             genesis_winner_account.pk )
     then accounts
@@ -131,7 +131,7 @@ let get_accounts accounts_json_file genesis_dir n =
     real_accounts @ fake_accounts
   in
   (*the accounts file that can be edited later*)
-  Out_channel.with_file (genesis_dir ^/ "accounts.json") ~f:(fun json_file ->
+  Out_channel.with_file "accounts.json" ~f:(fun json_file ->
       Yojson.Safe.pretty_to_channel json_file
         (Account_config.to_yojson all_accounts) ) ;
   all_accounts
