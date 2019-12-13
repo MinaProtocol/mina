@@ -104,25 +104,31 @@ let get_accounts accounts_json_file genesis_dir n =
                        (sprintf "Account_config.of_yojson failed: %s" s)) )
         with
         | Ok res ->
-            let genesis_winner_account : Account_config.account_data =
-              let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
-              { pk
-              ; sk= None
-              ; balance= Currency.Balance.of_int 1000
-              ; delegate= None }
-            in
-            Ok (genesis_winner_account :: res)
+            Ok res
         | Error e ->
             Or_error.errorf "Could not read accounts from file:%s\n%s" file
               (Error.to_string_hum e) )
     | None ->
         Deferred.return (Ok (compiled_accounts_json ()))
   in
+  let real_accounts =
+    let genesis_winner_account : Account_config.account_data =
+      let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
+      {pk; sk= None; balance= Currency.Balance.of_int 1000; delegate= None}
+    in
+    if
+      List.exists accounts (fun acc ->
+          Signature_lib.Public_key.Compressed.equal acc.pk
+            genesis_winner_account.pk )
+    then accounts
+    else genesis_winner_account :: accounts
+  in
   let all_accounts =
     let fake_accounts =
-      Account_config.Fake_accounts.generate (n - List.length accounts)
+      Account_config.Fake_accounts.generate
+        (max (n - List.length real_accounts) 0)
     in
-    accounts @ fake_accounts
+    real_accounts @ fake_accounts
   in
   (*the accounts file that can be edited later*)
   Out_channel.with_file (genesis_dir ^/ "accounts.json") ~f:(fun json_file ->
@@ -133,16 +139,12 @@ let get_accounts accounts_json_file genesis_dir n =
 let main accounts_json_file genesis_dir n =
   let open Deferred.Let_syntax in
   let%bind genesis_dir =
-    match genesis_dir with
-    | Some dir ->
-        let%map () = File_system.create_dir dir ~clear_if_exists:true in
-        dir
-    | None ->
-        let genesis_dir = Cache_dir.autogen_path ^/ "genesis" in
-        let%map () =
-          File_system.create_dir genesis_dir ~clear_if_exists:true
-        in
-        genesis_dir
+    let dir =
+      Option.value ~default:Cache_dir.autogen_path genesis_dir
+      |> Cache_dir.genesis_state_path
+    in
+    let%map () = File_system.create_dir dir ~clear_if_exists:true in
+    dir
   in
   let%bind accounts = get_accounts accounts_json_file genesis_dir n in
   match

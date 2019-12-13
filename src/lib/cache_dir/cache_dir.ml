@@ -7,6 +7,8 @@ let s3_install_path = "/tmp/s3_cache_dir"
 
 let manual_install_path = "/var/lib/coda"
 
+let genesis_state_path dir = dir ^/ "genesis"
+
 let brew_install_path =
   match
     let p = Core.Unix.open_process_in "brew --prefix 2>/dev/null" in
