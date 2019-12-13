@@ -5,7 +5,7 @@ let name = "coda-peers-test"
 
 let main () =
   let%bind program_dir = Unix.getcwd () in
-  let n = 3 in
+  let n = 1 in
   let logger = Logger.create () in
   let proposal_interval = Consensus.Constants.block_window_duration_ms in
   let acceptable_delay =
