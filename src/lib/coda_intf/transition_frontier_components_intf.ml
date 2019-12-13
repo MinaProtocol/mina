@@ -230,46 +230,6 @@ module type Sync_handler_intf = sig
   module Root :
     Consensus_best_tip_prover_intf
     with type transition_frontier := transition_frontier
-
-  (** Allows a node to ask peers for their best tip in order to help them
-      bootstrap *)
-  module Bootstrappable_best_tip : sig
-    include
-      Consensus_best_tip_prover_intf
-      with type transition_frontier := transition_frontier
-
-    module For_tests : sig
-      val prove :
-           logger:Logger.t
-        -> should_select_tip:(   existing:Consensus.Data.Consensus_state.Value.t
-                              -> candidate:Consensus.Data.Consensus_state.Value
-                                           .t
-                              -> logger:Logger.t
-                              -> bool)
-        -> frontier:transition_frontier
-        -> Consensus.Data.Consensus_state.Value.t
-        -> ( External_transition.t
-           , State_body_hash.t list * External_transition.t )
-           Proof_carrying_data.t
-           option
-
-      val verify :
-           logger:Logger.t
-        -> should_select_tip:(   existing:Consensus.Data.Consensus_state.Value.t
-                              -> candidate:Consensus.Data.Consensus_state.Value
-                                           .t
-                              -> logger:Logger.t
-                              -> bool)
-        -> verifier:Verifier.t
-        -> Consensus.Data.Consensus_state.Value.t
-        -> ( External_transition.t
-           , State_body_hash.t list * External_transition.t )
-           Proof_carrying_data.t
-        -> ( [`Root of External_transition.Initial_validated.t]
-           * [`Best_tip of External_transition.Initial_validated.t] )
-           Deferred.Or_error.t
-    end
-  end
 end
 
 module type Transition_chain_prover_intf = sig
@@ -373,8 +333,8 @@ module type Transition_router_intf = sig
     -> network:network
     -> time_controller:Block_time.Controller.t
     -> consensus_local_state:Consensus.Data.Local_state.t
-    -> persistent_root:transition_frontier_persistent_root
-    -> persistent_frontier:transition_frontier_persistent_frontier
+    -> persistent_root_location:string
+    -> persistent_frontier_location:string
     -> frontier_broadcast_pipe:transition_frontier option
                                Pipe_lib.Broadcast_pipe.Reader.t
                                * transition_frontier option
@@ -385,7 +345,9 @@ module type Transition_router_intf = sig
                                  * [`Time_received of Block_time.t] )
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
-    -> most_recent_valid_block:External_transition.t Broadcast_pipe.Reader.t
-                               * External_transition.t Broadcast_pipe.Writer.t
-    -> External_transition.Validated.t Strict_pipe.Reader.t
+    -> most_recent_valid_block:External_transition.Initial_validated.t
+                               Broadcast_pipe.Reader.t
+                               * External_transition.Initial_validated.t
+                                 Broadcast_pipe.Writer.t
+    -> External_transition.Validated.t Strict_pipe.Reader.t * unit Ivar.t
 end
