@@ -599,27 +599,6 @@ let create (config : Config.t) =
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->
-          let%bind verifier =
-            Logger.info config.logger
-              !"Trying to create verifier"
-              ~module_:__MODULE__ ~location:__LOC__ ;
-            Monitor.try_with
-              ~rest:
-                (`Call
-                  (fun exn ->
-                    Logger.warn config.logger
-                      "unhandled exception from daemon-side verifier server: \
-                       $exn"
-                      ~module_:__MODULE__ ~location:__LOC__
-                      ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
-              (fun () ->
-                trace "verifier" (fun () ->
-                    Verifier.create ~logger:config.logger ~pids:config.pids
-                      ~conf_dir:(Some config.conf_dir) ) )
-            >>| Result.ok_exn
-          in
-          Logger.info config.logger !"Trying to create prover"
-            ~module_:__MODULE__ ~location:__LOC__ ;
           let%bind prover =
             Monitor.try_with
               ~rest:
@@ -633,6 +612,22 @@ let create (config : Config.t) =
                 trace "prover" (fun () ->
                     Prover.create ~logger:config.logger ~pids:config.pids
                       ~conf_dir:config.conf_dir ) )
+            >>| Result.ok_exn
+          in
+          let%bind verifier =
+            Monitor.try_with
+              ~rest:
+                (`Call
+                  (fun exn ->
+                    Logger.warn config.logger
+                      "unhandled exception from daemon-side verifier server: \
+                       $exn"
+                      ~module_:__MODULE__ ~location:__LOC__
+                      ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
+              (fun () ->
+                trace "verifier" (fun () ->
+                    Verifier.create ~logger:config.logger ~pids:config.pids
+                      ~conf_dir:(Some config.conf_dir) ) )
             >>| Result.ok_exn
           in
           let snark_worker =

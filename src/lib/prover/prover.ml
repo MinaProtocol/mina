@@ -56,8 +56,6 @@ module Worker_state = struct
   type t = (module S) Deferred.t
 
   let create {logger; _} : t Deferred.t =
-    Logger.info logger "Creating worker_state in prover" ~module_:__MODULE__
-      ~location:__LOC__ ;
     Deferred.return
       (let%map (module Keys) = Keys_lib.Keys.create () in
        let module Transaction_snark =
@@ -195,9 +193,7 @@ module Functions = struct
 
   let initialized =
     create bin_unit [%bin_type_class: [`Initialized]] (fun w () ->
-        printf !"Running Initialized in Prover\n" ;
         let%map (module W) = Worker_state.get w in
-        printf !"Got worker state\n" ;
         `Initialized )
 
   let extend_blockchain =
@@ -279,7 +275,7 @@ let create ~logger ~pids ~conf_dir =
   in
   let%map connection, process =
     (* HACK: Need to make connection_timeout long since creating a prover can take a long time*)
-    Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_sec 60.)
+    Worker.spawn_in_foreground_exn ~connection_timeout:(Time.Span.of_min 1.)
       ~on_failure ~shutdown_on:Disconnect ~connection_state_init_arg:()
       {conf_dir; logger}
   in
