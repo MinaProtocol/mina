@@ -65,14 +65,17 @@ let generate_base_proof ~ledger =
   in
   (base_hash, base_proof)
 
-let create : directory_name:string -> Account_config.t -> int -> t =
- fun ~directory_name real_accounts n ->
+let compiled_accounts_json () : Account_config.t =
+  List.map Test_genesis_ledger.accounts ~f:(fun (sk_opt, acc) ->
+      { Account_config.pk= acc.public_key
+      ; sk= sk_opt
+      ; balance= acc.balance
+      ; delegate= Some acc.delegate } )
+
+let create : directory_name:string -> Account_config.t -> t =
+ fun ~directory_name accounts ->
   let ledger = Ledger.create ~directory_name () in
-  let fake_accounts =
-    Account_config.Fake_accounts.generate (n - List.length real_accounts)
-  in
-  List.iter (real_accounts @ fake_accounts)
-    ~f:(fun {pk; balance; delegate; _} ->
+  List.iter accounts ~f:(fun {pk; balance; delegate; _} ->
       let account =
         let base_acct = Account.create pk balance in
         {base_acct with delegate= Option.value ~default:pk delegate}
@@ -82,40 +85,72 @@ let create : directory_name:string -> Account_config.t -> int -> t =
 
 let commit ledger = Ledger.commit ledger
 
-let main accounts_json_file ledger_dir n =
-  let open Deferred.Let_syntax in
-  let%bind () = File_system.create_dir ledger_dir ~clear_if_exists:true in
-  let%bind accounts =
-    match%map
-      Deferred.Or_error.try_with_join (fun () ->
-          let%map accounts_str = Reader.file_contents accounts_json_file in
-          let res = Yojson.Safe.from_string accounts_str in
-          match Account_config.of_yojson res with
-          | Ok res ->
-              Ok res
-          | Error s ->
-              Error
-                (Error.of_string
-                   (sprintf "Account_config.of_yojson failed: %s" s)) )
-    with
-    | Ok res ->
-        Ok res
-    | Error e ->
-        Or_error.errorf "Could not read accounts from file:%s\n%s"
-          accounts_json_file (Error.to_string_hum e)
+let get_accounts accounts_json_file genesis_dir n =
+  let open Deferred.Or_error.Let_syntax in
+  let%map accounts =
+    match accounts_json_file with
+    | Some file -> (
+        let open Deferred.Let_syntax in
+        match%map
+          Deferred.Or_error.try_with_join (fun () ->
+              let%map accounts_str = Reader.file_contents file in
+              let res = Yojson.Safe.from_string accounts_str in
+              match Account_config.of_yojson res with
+              | Ok res ->
+                  Ok res
+              | Error s ->
+                  Error
+                    (Error.of_string
+                       (sprintf "Account_config.of_yojson failed: %s" s)) )
+        with
+        | Ok res ->
+            let genesis_winner_account : Account_config.account_data =
+              let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
+              { pk
+              ; sk= None
+              ; balance= Currency.Balance.of_int 1000
+              ; delegate= None }
+            in
+            Ok (genesis_winner_account :: res)
+        | Error e ->
+            Or_error.errorf "Could not read accounts from file:%s\n%s" file
+              (Error.to_string_hum e) )
+    | None ->
+        Deferred.return (Ok (compiled_accounts_json ()))
   in
+  let all_accounts =
+    let fake_accounts =
+      Account_config.Fake_accounts.generate (n - List.length accounts)
+    in
+    accounts @ fake_accounts
+  in
+  (*the accounts file that can be edited later*)
+  Out_channel.with_file (genesis_dir ^/ "accounts.json") ~f:(fun json_file ->
+      Yojson.Safe.pretty_to_channel json_file
+        (Account_config.to_yojson all_accounts) ) ;
+  all_accounts
+
+let main accounts_json_file genesis_dir n =
+  let open Deferred.Let_syntax in
+  let%bind genesis_dir =
+    match genesis_dir with
+    | Some dir ->
+        let%map () = File_system.create_dir dir ~clear_if_exists:true in
+        dir
+    | None ->
+        let genesis_dir = Cache_dir.autogen_path ^/ "genesis" in
+        let%map () =
+          File_system.create_dir genesis_dir ~clear_if_exists:true
+        in
+        genesis_dir
+  in
+  let%bind accounts = get_accounts accounts_json_file genesis_dir n in
   match
     Or_error.try_with_join (fun () ->
         let open Or_error.Let_syntax in
-        let genesis_winner_account : Account_config.account_data =
-          let pk, _ = Coda_state.Consensus_state_hooks.genesis_winner in
-          {pk; sk= None; balance= Currency.Balance.of_int 1000; delegate= None}
-        in
         let%map accounts = accounts in
         let ledger =
-          create ~directory_name:ledger_dir
-            (genesis_winner_account :: accounts)
-            n
+          create ~directory_name:(genesis_dir ^/ "ledger") accounts
         in
         let () = commit ledger in
         ledger )
@@ -128,7 +163,7 @@ let main accounts_json_file ledger_dir n =
             , Dummy_values.Tock.Bowe_gabizon18.proof )
         else generate_base_proof ~ledger
       in
-      let%map wr = Writer.open_file (ledger_dir ^/ "base_proof") in
+      let%map wr = Writer.open_file (genesis_dir ^/ "base_proof") in
       Writer.write wr (Proof.Stable.V1.sexp_of_t base_proof |> Sexp.to_string)
   | Error e ->
       failwithf "Failed to create genesis ledger\n%s" (Error.to_string_hum e)
@@ -150,12 +185,12 @@ let () =
                 the format: [{\"pk\":public-key-string, \
                 \"sk\":optional-secret-key-string, \"balance\":int, \
                 \"delegate\":optional-public-key-string}]"
-             (required string)
-         and ledger_dir =
-           flag "ledger-dir"
+             (optional string)
+         and genesis_dir =
+           flag "genesis-dir"
              ~doc:
-               "Dir where the genesis ledger and genesis proof will be saved"
-             (required string)
+               "Dir where the genesis ledger and genesis proof is to be saved"
+             (optional string)
          and n =
            flag "n"
              ~doc:
@@ -171,4 +206,4 @@ let () =
            let max = Int.pow 2 ledger_depth in
            if Option.value ~default:0 n >= max then
              failwith (sprintf "Invalid value for n (0 <= n <= %d)" max)
-           else main accounts_json ledger_dir (Option.value ~default:0 n)))
+           else main accounts_json genesis_dir (Option.value ~default:0 n)))

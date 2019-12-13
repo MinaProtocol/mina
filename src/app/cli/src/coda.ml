@@ -9,7 +9,73 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
-let genesis_ledger_dir config_dir = config_dir ^/ "genesis_ledger"
+let retrieve_genesis_state dir_opt : (Ledger.t lazy_t * Proof.t) Deferred.t =
+  let open Cache_dir in
+  let s3_bucket_prefix =
+    "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
+  in
+  let retrieve dir =
+    let ledger_dir = dir ^/ "ledger" in
+    let proof_file = dir ^/ "base_proof" in
+    if
+      Core.Sys.file_exists ledger_dir = `Yes
+      && Core.Sys.file_exists proof_file = `Yes
+    then
+      let genesis_ledger =
+        lazy (Ledger.create ~directory_name:ledger_dir ())
+      in
+      let%map base_proof =
+        match%map
+          Monitor.try_with_or_error ~extract_exn:true (fun () ->
+              let%bind r = Reader.open_file proof_file in
+              let%map contents =
+                Pipe.to_list (Reader.lines r) >>| String.concat
+              in
+              Sexp.of_string contents |> Proof.Stable.V1.t_of_sexp )
+        with
+        | Ok base_proof ->
+            base_proof
+        | Error e ->
+            failwithf "Error reading the base proof from %s: %s" proof_file
+              (Error.to_string_hum e) ()
+      in
+      Some (genesis_ledger, base_proof)
+    else Deferred.return None
+  in
+  let res_or_fail dir_str = function
+    | Some res ->
+        res
+    | None ->
+        failwith
+          (sprintf
+             "Could not retrieve genesis ledger and genesis proof from %s"
+             dir_str)
+  in
+  match dir_opt with
+  | Some dir ->
+      let%map res = retrieve dir in
+      res_or_fail dir res
+  | None -> (
+      let directories =
+        [autogen_path; manual_install_path; brew_install_path]
+      in
+      match%bind
+        Deferred.List.fold directories ~init:None ~f:(fun acc dir ->
+            if is_some acc then Deferred.return acc else retrieve dir )
+      with
+      | Some res ->
+          Deferred.return res
+      | None ->
+          let s3_install_path = Cache_dir.s3_install_path ^/ "genesis" in
+          let%bind () =
+            Deferred.map
+              (Cache_dir.load_from_s3 [s3_bucket_prefix] [s3_install_path])
+              ~f:Or_error.ok_exn
+          in
+          let%map res = retrieve s3_install_path in
+          res_or_fail
+            (String.concat ~sep:"," (s3_install_path :: directories))
+            res )
 
 [%%check_ocaml_word_size
 64]
@@ -340,31 +406,10 @@ let daemon logger =
          type ('a, 'b, 'c) t =
            {coda: 'a; client_whitelist: 'b; rest_server_port: 'c}
        end in
-       let genesis_ledger_dir =
-         Option.value
-           ~default:(genesis_ledger_dir conf_dir)
-           genesis_ledger_dir_flag
-       in
-       let genesis_ledger =
-         lazy (Ledger.create ~directory_name:genesis_ledger_dir ())
-       in
-       let%bind base_proof =
-         let base_proof_filename = genesis_ledger_dir ^/ "base_proof" in
-         match%map
-           Monitor.try_with_or_error ~extract_exn:true (fun () ->
-               let%bind r = Reader.open_file base_proof_filename in
-               let%map contents =
-                 Pipe.to_list (Reader.lines r) >>| String.concat
-               in
-               Sexp.of_string contents |> Proof.Stable.V1.t_of_sexp )
-         with
-         | Ok base_proof ->
-             base_proof
-         | Error e ->
-             failwithf "Error reading the base proof from %s: %s"
-               base_proof_filename (Error.to_string_hum e) ()
-       in
        let coda_initialization_deferred () =
+         let%bind genesis_ledger, base_proof =
+           retrieve_genesis_state genesis_ledger_dir_flag
+         in
          let%bind config =
            match%map
              Monitor.try_with_or_error ~extract_exn:true (fun () ->
