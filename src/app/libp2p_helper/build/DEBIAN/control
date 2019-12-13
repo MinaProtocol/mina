@@ -1,9 +1,9 @@
-Package: coda-libp2p-helper
+Package: coda-discovery
 Version: 0.1.DATE-HASH
 Section: base
 Priority: optional
 Architecture: amd64
 Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
-Description: Coda Protocol libp2p
- Coda Protocol libp2p
+Description: Coda Protocol Discovery libp2p
+ Coda Protocol Discovery libp2p
