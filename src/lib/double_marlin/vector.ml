@@ -4,6 +4,59 @@ type _ s = S
 
 type _ nat = Z : z nat | S : 'n nat -> 'n s nat
 
+module type Nat_intf = sig
+  type n
+
+  val n : n nat
+end
+
+module Nat = struct
+  type 'a t = 'a nat
+
+  module S (N : Nat_intf) : Nat_intf with type n = N.n s = struct
+    type n = N.n s
+
+    let n = S N.n
+  end
+
+  module N0 = struct
+    type n = z
+
+    let n = Z
+  end
+
+  module N1 = S (N0)
+  module N2 = S (N1)
+  module N3 = S (N2)
+  module N4 = S (N3)
+  module N5 = S (N4)
+  module N6 = S (N5)
+  module N7 = S (N6)
+  module N8 = S (N7)
+  module N9 = S (N8)
+  module N10 = S (N9)
+  module N11 = S (N10)
+  module N12 = S (N11)
+  module N13 = S (N12)
+  module N14 = S (N13)
+  module N15 = S (N14)
+  module N16 = S (N15)
+  module N17 = S (N16)
+  module N18 = S (N17)
+  module N19 = S (N18)
+  module N20 = S (N19)
+  module N21 = S (N20)
+  module N22 = S (N21)
+  module N23 = S (N22)
+  module N24 = S (N23)
+  module N25 = S (N24)
+  module N26 = S (N25)
+  module N27 = S (N26)
+  module N28 = S (N27)
+  module N29 = S (N28)
+  module N30 = S (N29)
+end
+
 let nat_to_int : type n. n nat -> int =
   let rec go : type n. int -> n nat -> int =
    fun acc n -> match n with Z -> acc | S n -> go (acc + 1) n
@@ -93,12 +146,6 @@ struct
           (function x :: xs -> (x, xs))
           (fun (x, xs) -> x :: xs)
           (F.pair tc tl)
-end
-
-module type Nat_intf = sig
-  type n
-
-  val n : n nat
 end
 
 module Binable (N : Nat_intf) : Binable.S1 with type 'a t := ('a, N.n) t =

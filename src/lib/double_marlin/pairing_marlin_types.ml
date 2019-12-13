@@ -14,29 +14,9 @@ module Evals = struct
     let typ elt = Vector.typ elt n
   end
 
-  module Beta1 = Make (struct
-    type n = z s s s s s s
-
-    let n = S (S (S (S (S (S Z)))))
-
-    let () = assert (6 = nat_to_int n)
-  end)
-
-  module Beta2 = Make (struct
-    type n = z s s
-
-    let n = S (S Z)
-
-    let () = assert (2 = nat_to_int n)
-  end)
-
-  module Beta3 = Make (struct
-    type n = z s s s s s s s s s s s
-
-    let n = S (S (S (S (S (S (S (S (S (S (S Z))))))))))
-
-    let () = assert (11 = nat_to_int n)
-  end)
+  module Beta1 = Make (Nat.N6)
+  module Beta2 = Make (Nat.N2)
+  module Beta3 = Make (Nat.N11)
 end
 
 module Typ = Snarky.Typ
@@ -140,18 +120,19 @@ module Messages = struct
 end
 
 module Proof = struct
-  type ('proof, 'pc, 'fp) t =
-    {messages: ('pc, 'fp) Messages.t; openings: ('proof, 'fp) Openings.t}
-  [@@deriving fields, bin_io]
+  type ('pc, 'fp, 'openings) t =
+    {messages: ('pc, 'fp) Messages.t; openings: 'openings}
+  [@@(* ('proof, 'fp) Openings.t} *)
+    deriving fields, bin_io]
 
   let to_hlist {messages; openings} = H_list.[messages; openings]
 
   let of_hlist ([messages; openings] : (unit, _) H_list.t) =
     {messages; openings}
 
-  let typ proof pc fp =
+  let typ pc fp openings =
     Snarky.Typ.of_hlistable
-      [Messages.typ pc fp; Openings.typ proof fp]
+      [Messages.typ pc fp; openings]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end

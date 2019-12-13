@@ -104,6 +104,8 @@ module Group (Impl : Snarky.Snark_intf.Run) = struct
     val negate : t -> t
 
     val to_field_elements : t -> Field.t list
+
+    val if_ : Boolean.var -> then_:t -> else_:t -> t
   end
 end
 
@@ -146,10 +148,40 @@ module Pairing_main_inputs = struct
       val size_in_bits : int
     end
 
-    module G : Group(Impl).S
+    module G : sig
+      include Group(Impl).S
+
+      val scale_by_quadratic_nonresidue : t -> t
+
+      val scale_by_quadratic_nonresidue_inv : t -> t
+    end
+
+    module Generators : sig
+      val g : G.t
+
+      val h : G.t
+    end
 
     val sponge_params : Impl.Field.t Sponge_lib.Params.t
 
-    module Sponge : Sponge(Impl).S
+    module Sponge :
+      Sponge_lib.Intf.Sponge
+      with module Field := Impl.Field
+       and module State := Sponge_lib.State
+       and type input :=
+                  [`Field of Impl.Field.t | `Bits of Impl.Boolean.var list]
+       and type digest := length:int -> Impl.Boolean.var list
+
+    module App_state : sig
+      type t
+
+      module Constant : sig
+        type t
+      end
+
+      val typ : (t, Constant.t) Impl.Typ.t
+
+      val check_update : t -> t -> unit
+    end
   end
 end

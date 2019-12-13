@@ -1,7 +1,7 @@
 open Import
 open H_list
 
-type 'a t = {a: 'a; b: 'a; c: 'a}
+type 'a t = {a: 'a; b: 'a; c: 'a} [@@deriving fields]
 
 let to_hlist {a; b; c} = [a; b; c]
 

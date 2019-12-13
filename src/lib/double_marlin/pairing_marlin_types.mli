@@ -60,8 +60,8 @@ module Messages : sig
 end
 
 module Proof : sig
-  type ('proof, 'pc, 'fp) t =
-    {messages: ('pc, 'fp) Messages.t; openings: ('proof, 'fp) Openings.t}
+  type ('pc, 'fp, 'openings) t =
+    {messages: ('pc, 'fp) Messages.t; openings: 'openings}
   [@@deriving fields, bin_io]
 
   include Intf.Snarkable.S3 with type ('a, 'b, 'c) t := ('a, 'b, 'c) t

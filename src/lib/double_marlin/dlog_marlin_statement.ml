@@ -7,15 +7,15 @@ module Deferred_values = struct
 
   type ('challenge, 'fp) t =
     { xi: 'challenge (* 128 bits *)
-    ; beta_1: ('challenge, 'fp, 'fp Evals.Beta1.t) Accumulator.Input.t
-    ; beta_2: ('challenge, 'fp, 'fp Evals.Beta2.t) Accumulator.Input.t
-    ; beta_3: ('challenge, 'fp, 'fp Evals.Beta3.t) Accumulator.Input.t
     ; sigma_2: 'fp
     ; sigma_3: 'fp
     ; alpha: 'challenge (* 128 bits *)
     ; eta_A: 'challenge (* 128 bits *)
     ; eta_B: 'challenge (* 128 bits *)
-    ; eta_C: 'challenge (* 128 bits *) }
+    ; eta_C: 'challenge (* 128 bits *)
+    ; beta_1: ('challenge, 'fp, 'fp Evals.Beta1.t) Accumulator.Input.t
+    ; beta_2: ('challenge, 'fp, 'fp Evals.Beta2.t) Accumulator.Input.t
+    ; beta_3: ('challenge, 'fp, 'fp Evals.Beta3.t) Accumulator.Input.t }
   [@@deriving fields]
 
   let assert_equal fp t1 t2 =

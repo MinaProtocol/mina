@@ -3,51 +3,11 @@
    commitment and challenge is going to work. *)
 open Core_kernel
 open Import
-
-let rec absorb : type a g1 f scalar.
-       absorb_field:(f -> unit)
-    -> g1_to_field_elements:(g1 -> f list)
-    -> pack_scalar:(scalar -> f)
-    -> (a, < scalar: scalar ; g1: g1 >) Type.t
-    -> a
-    -> unit =
- fun ~absorb_field ~g1_to_field_elements ~pack_scalar ty t ->
-  match ty with
-  | PC ->
-      List.iter ~f:absorb_field (g1_to_field_elements t)
-  | Scalar ->
-      absorb_field (pack_scalar t)
-  | ty1 :: ty2 ->
-      let absorb t =
-        absorb t ~absorb_field ~g1_to_field_elements ~pack_scalar
-      in
-      let t1, t2 = t in
-      absorb ty1 t1 ; absorb ty2 t2
+open Util
 
 module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
   open Inputs
   open Impl
-
-  type fq = Field.t
-
-  let n = 1 lsl 15
-
-  let k = Int.ceil_log2 n
-
-  let product m f = List.reduce_exn (List.init m ~f) ~f:Field.( * )
-
-  let b (u : fq array) (x : fq) : fq =
-    let x_to_pow2s =
-      let res = Array.create ~len:k x in
-      for i = 1 to k - 1 do
-        res.(i) <- Field.square res.(i - 1)
-      done ;
-      res
-    in
-    let open Field in
-    product k (fun i -> u.(i) + (inv u.(i) * x_to_pow2s.(i)))
-
-  module PC = G1
 
   module Fp = struct
     (* For us, q > p, so one Field.t = fq can represent an fp *)
@@ -83,12 +43,8 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
     let pack : Unpacked.t -> Packed.t = Packed.project
   end
 
-  let absorb sponge ty t =
-    absorb ~absorb_field:(Sponge.absorb sponge)
-      ~g1_to_field_elements:G1.to_field_elements ~pack_scalar:Fp.Packed.project
-      ty t
-
   module Opening_proof = G1
+  module PC = G1
 
   module Opening = struct
     type 'n t =
@@ -99,11 +55,38 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   module Marlin_proof = struct
     type t =
-      (Opening_proof.t, PC.t, Fp.Unpacked.t) Pairing_marlin_types.Proof.t
+      ( PC.t
+      , Fp.Unpacked.t
+      , (Opening_proof.t, Fp.Unpacked.t) Pairing_marlin_types.Openings.t )
+      Pairing_marlin_types.Proof.t
   end
 
   module Accumulator = Pairing_marlin_types.Accumulator
   module Proof = Pairing_marlin_types.Proof
+
+  type fq = Field.t
+
+  let n = 1 lsl 15
+
+  let k = Int.ceil_log2 n
+
+  let product m f = List.reduce_exn (List.init m ~f) ~f:Field.( * )
+
+  let b (u : fq array) (x : fq) : fq =
+    let x_to_pow2s =
+      let res = Array.create ~len:k x in
+      for i = 1 to k - 1 do
+        res.(i) <- Field.square res.(i - 1)
+      done ;
+      res
+    in
+    let open Field in
+    product k (fun i -> u.(i) + (inv u.(i) * x_to_pow2s.(i)))
+
+  let absorb sponge ty t =
+    absorb ~absorb_field:(Sponge.absorb sponge)
+      ~g1_to_field_elements:G1.to_field_elements ~pack_scalar:Fp.Packed.project
+      ty t
 
   let combined_commitment ~xi (polys : _ Vector.t) =
     ksprintf with_label "combined_commitment %s" __LOC__ (fun () ->
@@ -138,9 +121,11 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
       type _ t +=
         | Pairing_marlin_accumulator : G1.Constant.t Accumulator.t t
         | Pairing_marlin_proof :
-            ( Opening_proof.Constant.t
-            , PC.Constant.t
-            , Fp.Unpacked.constant )
+            ( PC.Constant.t
+            , Fp.Unpacked.constant
+            , ( Opening_proof.Constant.t
+              , Fp.Unpacked.constant )
+              Pairing_marlin_types.Openings.t )
             Proof.t
             t
         | Sponge_digest : Fp.Unpacked.constant t
@@ -220,20 +205,6 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
            ~domain_size:(L.Precomputation.domain_size input_size))
         public_input
         (L.Fp_repr.of_bits ~chunk_size:124 beta_3)
-      (*
-      check_g0_on_a0_equals_y0;
-      let x'_hat_beta3 = get_g0_eval_on_beta_3 and check =  correctness in
-      let res =
-        defer arithmetic of x'_hat_beta_3
-                            + Lagrange_{input_size + 1} g0_x
-                            + Lagrange_{input_size + 2} g0_y
-                            + Lagrange_{input_size + 3} a0
-                            + Lagrange_{input_size + 4} y0
-      in
-      res
-      (* 
-      *)
-      () *)
     in
     (* We can use the same random scalar xi for all of these opening proofs. *)
     let xi = sample () in
@@ -349,7 +320,9 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
     let updated_pairing_marlin_acc, deferred_fp_arithmetic =
       let prev_marlin_proof =
         exists
-          (Proof.typ Opening_proof.typ PC.typ Fp.Unpacked.typ)
+          (Proof.typ PC.typ Fp.Unpacked.typ
+             (Pairing_marlin_types.Openings.typ Opening_proof.typ
+                Fp.Unpacked.typ))
           Prev.Pairing_marlin_proof
       and prev_pairing_marlin_acc =
         exists (Accumulator.typ G1.typ)
