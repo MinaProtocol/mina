@@ -67,15 +67,50 @@ module Style = {
   let flip = style([transform(rotate(`deg(180.)))]);
 };
 
-module NavPage = {
+module CurrentSlugProvider = {
+  let context = React.createContext("");
+  let make = context->React.Context.provider;
+  [@bs.obj]
+  external makeProps:
+    (~value: string, ~children: React.element, unit) =>
+    {
+      .
+      "value": string,
+      "children": React.element,
+    } =
+    "";
+};
+
+module FolderSlugProvider = {
+  let context = React.createContext(None);
+  let make = context->React.Context.provider;
+  [@bs.obj]
+  external makeProps:
+    (~value: option(string), ~children: React.element, unit) =>
+    {
+      .
+      "value": option(string),
+      "children": React.element,
+    } =
+    "";
+};
+
+let slugConcat = (n1, n2) => {
+  String.length(n2) > 0 ? n1 ++ "/" ++ n2 : n1;
+};
+
+module Page = {
   [@react.component]
-  let make = (~title, ~slug, ~currentSlug) => {
-    let isCurrentPage =
-      currentSlug
-      |> Option.map(s => s == slug)
-      |> Option.value(~default=false);
-    // Special case for the docs index page
-    let href = String.length(slug) > 0 ? "/docs/" ++ slug : "/docs";
+  let make = (~title, ~slug) => {
+    let currentSlug = React.useContext(CurrentSlugProvider.context);
+    let folderSlug = React.useContext(FolderSlugProvider.context);
+    let fullSlug =
+      switch (folderSlug) {
+      | Some(fs) => slugConcat(fs, slug)
+      | None => slug
+      };
+    let isCurrentPage = currentSlug == fullSlug;
+    let href = slugConcat("/docs", fullSlug);
     <li>
       <Next.Link href>
         <a className={isCurrentPage ? Style.currentPage : Style.page}>
@@ -86,10 +121,29 @@ module NavPage = {
   };
 };
 
-module NavFolder = {
+module Folder = {
+  // props obviously isn't always a Js.Dict.t(string) but it works here
+  [@bs.val] [@bs.module "react"] [@bs.scope "Children"]
+  external forEachChildren:
+    (React.element, (. {. "props": Js.Dict.t(string)}) => 'a) => unit =
+    "forEach";
+
   [@react.component]
-  let make = (~title, ~pages, ~inFolder, ~currentSlug) => {
-    let (expanded, setExpanded) = React.useState(() => inFolder);
+  let make = (~title, ~slug, ~children) => {
+    let currentSlug = React.useContext(CurrentSlugProvider.context);
+    let hasCurrentSlug = ref(false);
+
+    // Check if the children's props contain the current slug
+    forEachChildren(children, (. child) => {
+      switch (Js.Dict.get(child##props, "slug")) {
+      | Some(childSlug) when slugConcat(slug, childSlug) == currentSlug =>
+        hasCurrentSlug := true
+      | _ => ()
+      }
+    });
+
+    let (expanded, setExpanded) = React.useState(() => hasCurrentSlug^);
+
     let toggleExpanded =
       React.useCallback(e => {
         ReactEvent.Mouse.preventDefault(e);
@@ -115,49 +169,50 @@ module NavFolder = {
       </div>
       {!expanded
          ? React.null
-         : <ul className=Style.childPage>
-             {pages
-              |> Array.map(entry =>
-                   switch ((entry: DocsStructure.t)) {
-                   | Page(title, slug) =>
-                     <NavPage title slug currentSlug key=slug />
-                   | Folder(_, _) => React.null // Don't show nested folders
-                   }
-                 )
-              |> React.array}
-           </ul>}
+         : <FolderSlugProvider value={Some(slug)}>
+             <ul className=Style.childPage> children </ul>
+           </FolderSlugProvider>}
     </li>;
   };
 };
 
 [@react.component]
-let make = (~currentSlug=?) => {
+let make = (~currentSlug) => {
   <aside>
-    <ul className=Style.sideNav>
-      {DocsStructure.structure
-       |> Array.map(entry =>
-            switch ((entry: DocsStructure.t)) {
-            | Page(title, slug) => <NavPage title slug currentSlug key=slug />
-            | Folder(title, children) =>
-              let inFolder =
-                children
-                |> Array.exists(page =>
-                     switch (page: DocsStructure.t, currentSlug) {
-                     | (Page(_title, slug), Some(current)) =>
-                       slug == current
-                     | _ => false // nest folders only 1 deep
-                     }
-                   );
-              <NavFolder
-                title
-                pages=children
-                inFolder
-                currentSlug
-                key=title
-              />;
-            }
-          )
-       |> React.array}
-    </ul>
+    <CurrentSlugProvider value=currentSlug>
+      <ul className=Style.sideNav>
+        <Page title="Overview" slug="" />
+        <Page title="Getting Started" slug="getting-started" />
+        <Page title="My First Transaction" slug="my-first-transaction" />
+        <Page title="Become a Node Operator" slug="node-operator" />
+        <Page title="Contributing to Coda" slug="contributing" />
+        <Folder title="Developers" slug="developers">
+          <Page title="Developers Overview" slug="" />
+          <Page title="Codebase Overview" slug="codebase-overview" />
+          <Page title="Repository Structure" slug="directory-structure" />
+          <Page title="Code Reviews" slug="code-reviews" />
+          <Page title="Style Guide" slug="style-guide" />
+          <Page title="GraphQL API" slug="graphql-api" />
+        </Folder>
+        <Folder title="Coda Protocol Architecture" slug="architecture">
+          <Page title="Coda Overview" slug="" />
+          <Page title="Lifecycle of a Payment" slug="lifecycle-payment" />
+          <Page title="Consensus" slug="consensus" />
+          <Page title="Proof of Stake" slug="proof-of-stake" />
+        </Folder>
+        <Folder title="SNARKs" slug="snarks">
+          <Page title="SNARKs Overview" slug="" />
+          <Page title="Getting started using SNARKs" slug="snarky" />
+          <Page title="Which SNARK is right for me?" slug="constructions" />
+          <Page title="The snarkyjs-crypto library" slug="snarkyjs-crypto" />
+          <Page title="The snarky-universe library" slug="snarky-universe" />
+        </Folder>
+        <Page title="GUI Wallet" slug="gui-wallet" />
+        <Page title="CLI Reference" slug="cli-reference" />
+        <Page title="Troubleshooting" slug="troubleshooting" />
+        <Page title="FAQ" slug="faq" />
+        <Page title="Glossary" slug="glossary" />
+      </ul>
+    </CurrentSlugProvider>
   </aside>;
 };

@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 module Footer = {
   module Link = {
     let footerStyle =
@@ -123,6 +122,7 @@ let make = (~children, ~footerColor=Theme.Colors.white) => {
         rel="stylesheet"
       />
     </Next.Head>
+    <Nav />
     <div> children </div>
     <Footer bgcolor=footerColor />
   </>;
