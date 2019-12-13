@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 module Footer = {
   module Link = {
     let footerStyle =
@@ -116,10 +117,9 @@ module Footer = {
 [@react.component]
 let make = (~children, ~footerColor=Theme.Colors.white) => {
   <>
-    <Nav />
     <Next.Head>
       <link
-        href="https://fonts.googleapis.com/css?family=IBM+Plex+Sans:300,400,500,700&display=swap"
+        href="https://cdn.jsdelivr.net/npm/@ibm/plex@4.0.2/css/ibm-plex.min.css"
         rel="stylesheet"
       />
     </Next.Head>
