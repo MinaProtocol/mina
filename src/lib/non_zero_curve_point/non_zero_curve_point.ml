@@ -42,9 +42,14 @@ module Compressed = struct
       type t = (Snark_params.Tick.Field.t, bool) Poly.Stable.V1.t
       [@@deriving eq, compare, hash]
 
+      (* dummy type for inserting constraint
+         adding constraint to t produces "unused rec" error
+       *)
+      type unused = unit constraint t = Arg.Stable.V1.t
+
       let to_latest = Fn.id
 
-      module Base58 = Codable.Make_base58_check (Arg.Stable.Latest)
+      module Base58 = Codable.Make_base58_check (Arg.Stable.V1)
       include Base58
 
       (* sexp representation is a Base58Check string, like the yojson representation *)
