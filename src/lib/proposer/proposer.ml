@@ -229,7 +229,6 @@ let generate_next_state ~previous_protocol_state ~time_controller
                     | `Other pk ->
                         pk )
                   ~coinbase_amount
-                  ~coinbase_state_body_hash:previous_protocol_state_body_hash
                   ()
               in
               let internal_transition =

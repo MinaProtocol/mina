@@ -1,6 +1,7 @@
 open Core
 open Currency
 open Signature_lib
+module Global_slot = Coda_numbers.Global_slot
 
 module type Ledger_intf = sig
   type t
@@ -248,13 +249,22 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let sub_amount balance amount =
     error_opt "insufficient funds" (Balance.sub_amount balance amount)
 
+  let check b =
+    ksprintf (fun s -> if b then Ok () else Or_error.error_string s)
+
   let validate_nonces txn_nonce account_nonce =
-    if Account.Nonce.equal account_nonce txn_nonce then Or_error.return ()
-    else
-      Or_error.errorf
-        !"Nonce in account %{sexp: Account.Nonce.t} different from nonce in \
-          transaction %{sexp: Account.Nonce.t}"
-        account_nonce txn_nonce
+    check
+      (Account.Nonce.equal account_nonce txn_nonce)
+      !"Nonce in account %{sexp: Account.Nonce.t} different from nonce in \
+        transaction %{sexp: Account.Nonce.t}"
+      account_nonce txn_nonce
+
+  let validate_time ~valid_until ~current_global_slot =
+    check
+      Global_slot.(current_global_slot <= valid_until)
+      !"Current global slot %{sexp: Global_slot.t} greater than transaction \
+        expiry slot %{sexp: Global_slot.t}"
+      current_global_slot valid_until
 
   module Undo = struct
     include Undo
@@ -292,6 +302,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         {user_command; previous_receipt_chain_hash= account.receipt_chain_hash}
       in
       let%bind () = validate_nonces nonce account.nonce in
+      let%bind () =
+        (* TODO: Put actual value here *)
+        let current_global_slot = Global_slot.zero in
+        validate_time ~valid_until:payload.common.valid_until
+          ~current_global_slot
+      in
       let account =
         { account with
           nonce= Account.Nonce.succ account.nonce

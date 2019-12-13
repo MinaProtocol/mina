@@ -7,9 +7,9 @@ open Coda_base
 
 (** Constants are defined with a single letter (latin or greek) based on
  * their usage in the Ouroboros suite of papers *)
-module type Constants_intf = sig
+module type Constants = sig
   (** The timestamp for the genesis block *)
-  val genesis_state_timestamp : Coda_base.Block_time.t
+  val genesis_state_timestamp : Block_time.t
 
   (** [k] is the number of blocks required to reach finality *)
   val k : int
@@ -21,7 +21,7 @@ module type Constants_intf = sig
   val block_window_duration_ms : int
 
   (** The window duration in which blocks are created *)
-  val block_window_duration : Coda_base.Block_time.Span.t
+  val block_window_duration : Block_time.Span.t
 
   (** [delta] is the number of slots in the valid window for receiving blocks over the network *)
   val delta : int
@@ -42,7 +42,7 @@ module type Constants_intf = sig
   val slots_per_epoch : Unsigned.UInt32.t
 end
 
-module type Blockchain_state_intf = sig
+module type Blockchain_state = sig
   module Poly : sig
     [%%versioned:
     module Stable : sig
@@ -91,7 +91,7 @@ module type Blockchain_state_intf = sig
   val timestamp : (_, _, 'time) Poly.t -> 'time
 end
 
-module type Protocol_state_intf = sig
+module type Protocol_state = sig
   type blockchain_state
 
   type blockchain_state_var
@@ -172,7 +172,7 @@ module type Protocol_state_intf = sig
   val hash : Value.t -> State_hash.t
 end
 
-module type Snark_transition_intf = sig
+module type Snark_transition = sig
   type blockchain_state_var
 
   type consensus_transition_var
@@ -182,7 +182,6 @@ module type Snark_transition_intf = sig
          , 'consensus_transition
          , 'sok_digest
          , 'amount
-         , 'state_body_hash
          , 'public_key )
          t
     [@@deriving sexp]
@@ -197,15 +196,14 @@ module type Snark_transition_intf = sig
     , consensus_transition_var
     , Sok_message.Digest.Checked.t
     , Amount.var
-    , State_body_hash.var
     , Public_key.Compressed.var )
     Poly.t
 
   val consensus_transition :
-    (_, 'consensus_transition, _, _, _, _) Poly.t -> 'consensus_transition
+    (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
 end
 
-module type State_hooks_intf = sig
+module type State_hooks = sig
   type consensus_state
 
   type consensus_state_var
@@ -274,7 +272,7 @@ module type S = sig
   *)
   val time_hum : Coda_base.Block_time.t -> string
 
-  module Constants : Constants_intf
+  module Constants : Constants
 
   (** from postake *)
   val epoch_size : int
@@ -346,6 +344,28 @@ module type S = sig
       val genesis : Value.t
     end
 
+    module Consensus_time : sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t [@@deriving compare, sexp, yojson]
+        end
+      end]
+
+      type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
+
+      val graphql_type : unit -> ('ctx, t option) Graphql_async.Schema.typ
+
+      val to_string_hum : t -> string
+
+      val of_time_exn : Block_time.t -> t
+
+      (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)
+      val get_old : t -> t
+
+      val to_uint32 : t -> Unsigned.UInt32.t
+    end
+
     module Consensus_state : sig
       module Value : sig
         [%%versioned:
@@ -373,8 +393,6 @@ module type S = sig
       val create_genesis :
         negative_one_protocol_state_hash:Coda_base.State_hash.t -> Value.t
 
-      val length_in_triples : int
-
       open Snark_params.Tick
 
       val var_to_input :
@@ -382,19 +400,13 @@ module type S = sig
 
       val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
-      val time_hum : Value.t -> string
-
       val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
       val display : Value.t -> display
 
       val network_delay : Configuration.t -> int
 
-      val curr_slot : Value.t -> Slot.t
-
-      val curr_epoch : Value.t -> Epoch.t
-
-      val global_slot : Value.t -> Unsigned.uint32
+      val consensus_time : Value.t -> Consensus_time.t
 
       val blockchain_length : Value.t -> Length.t
 
@@ -514,31 +526,28 @@ module type S = sig
       -> local_state_sync Non_empty_list.t
       -> unit Deferred.Or_error.t
 
-    module type State_hooks_intf =
-      State_hooks_intf
-      with type consensus_state := Consensus_state.Value.t
-       and type consensus_state_var := Consensus_state.var
-       and type consensus_transition := Consensus_transition.Value.t
-       and type proposal_data := Proposal_data.t
-
     module Make_state_hooks
-        (Blockchain_state : Blockchain_state_intf)
-        (Protocol_state : Protocol_state_intf
+        (Blockchain_state : Blockchain_state)
+        (Protocol_state : Protocol_state
                           with type blockchain_state :=
                                       Blockchain_state.Value.t
                            and type blockchain_state_var :=
                                       Blockchain_state.var
                            and type consensus_state := Consensus_state.Value.t
                            and type consensus_state_var := Consensus_state.var)
-        (Snark_transition : Snark_transition_intf
+        (Snark_transition : Snark_transition
                             with type blockchain_state_var :=
                                         Blockchain_state.var
                              and type consensus_transition_var :=
                                         Consensus_transition.var) :
-      State_hooks_intf
+      State_hooks
       with type blockchain_state := Blockchain_state.Value.t
        and type protocol_state := Protocol_state.Value.t
        and type protocol_state_var := Protocol_state.var
        and type snark_transition_var := Snark_transition.var
+       and type consensus_state := Consensus_state.Value.t
+       and type consensus_state_var := Consensus_state.var
+       and type consensus_transition := Consensus_transition.Value.t
+       and type proposal_data := Proposal_data.t
   end
 end

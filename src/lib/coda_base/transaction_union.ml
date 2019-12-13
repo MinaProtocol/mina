@@ -52,6 +52,7 @@ let of_transaction : Transaction.t -> t = function
           { common=
               { fee= other_amount
               ; nonce= Account.Nonce.zero
+              ; valid_until= Coda_numbers.Global_slot.max_value
               ; memo= User_command_memo.empty }
           ; body= {public_key= receiver; amount; tag= Tag.Coinbase} }
       ; sender= Public_key.decompress_exn other_pk
@@ -62,6 +63,7 @@ let of_transaction : Transaction.t -> t = function
             { common=
                 { fee= fee2
                 ; nonce= Account.Nonce.zero
+                ; valid_until= Coda_numbers.Global_slot.max_value
                 ; memo= User_command_memo.empty }
             ; body=
                 { public_key= pk1

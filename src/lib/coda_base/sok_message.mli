@@ -1,8 +1,6 @@
 open Core
 open Snark_params
 open Tick
-open Fold_lib
-open Tuple_lib
 open Import
 
 module Stable : sig
@@ -36,14 +34,12 @@ module Digest : sig
   module Checked : sig
     type t
 
-    val to_triples : t -> Boolean.var Triple.t list
+    val to_input : t -> (_, Boolean.var) Random_oracle.Input.t
   end
 
-  val fold : t -> bool Triple.t Fold.t
+  val to_input : t -> (_, bool) Random_oracle.Input.t
 
   val typ : (Checked.t, t) Typ.t
-
-  val length_in_triples : int
 
   val default : t
 end
