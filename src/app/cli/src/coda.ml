@@ -74,6 +74,7 @@ let retrieve_genesis_state dir_opt ~logger :
       | Some res ->
           Deferred.return res
       | None ->
+          (*Check if it's in s3*)
           let s3_install_path = Cache_dir.s3_install_path ^/ "genesis" in
           let%bind () =
             Deferred.map
