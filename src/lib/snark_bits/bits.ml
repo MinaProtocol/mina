@@ -148,7 +148,7 @@ end
 
 module Snarkable = struct
   module Small_bit_vector
-      (Impl : Snarky.Snark_intf.S) (V : sig
+      (Tick : Tick_intf.S) (V : sig
           type t
 
           val empty : t
@@ -160,17 +160,17 @@ module Snarkable = struct
           val set : t -> int -> bool -> t
       end) :
     Bits_intf.Snarkable.Small
-    with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
-     and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
-     and type boolean_var := Impl.Boolean.var
-     and type field_var := Impl.Field.Var.t
-     and type Packed.var = Impl.Field.Var.t
+    with type ('a, 'b) typ := ('a, 'b) Tick.Typ.t
+     and type ('a, 'b) checked := ('a, 'b) Tick.Checked.t
+     and type boolean_var := Tick.Boolean.var
+     and type field_var := Tick.Field.Var.t
+     and type Packed.var = Tick.Field.Var.t
      and type Packed.value = V.t
-     and type Unpacked.var = Impl.Boolean.var list
+     and type Unpacked.var = Tick.Boolean.var list
      and type Unpacked.value = V.t
-     and type comparison_result := Impl.Field.Checked.comparison_result =
+     and type comparison_result := Tick.Field.Checked.comparison_result =
   struct
-    open Impl
+    open Tick
 
     let bit_length = V.length
 
@@ -188,10 +188,9 @@ module Snarkable = struct
       type value = V.t
 
       let typ : (var, value) Typ.t =
-        let open Typ in
         let read v =
-          let open Read.Let_syntax in
-          let%map x = Read.read v in
+          let open Typ.Read.Let_syntax in
+          let%map x = Typ.Read.read v in
           let n = Bigint.of_field x in
           init ~f:(fun i -> Bigint.test_bit n i)
         in
@@ -204,11 +203,11 @@ module Snarkable = struct
               in
               go (Field.add two_to_the_i two_to_the_i) (i + 1) acc
           in
-          Store.store (go Field.one 0 Field.zero)
+          Typ.Store.store (go Field.one 0 Field.zero)
         in
-        let alloc = Alloc.alloc in
+        let alloc = Typ.Alloc.alloc in
         let check _ = Checked.return () in
-        {read; store; alloc; check}
+        Typ.{read; store; alloc; check}
     end
 
     let v_to_list n v =
@@ -243,7 +242,7 @@ module Snarkable = struct
         List.init V.length ~f:(fun i -> Boolean.var_of_value (V.get v i))
     end
 
-    let unpack_var x = Impl.Field.Checked.unpack x ~length:bit_length
+    let unpack_var x = Field.Checked.unpack x ~length:bit_length
 
     let var_of_field = unpack_var
 
@@ -252,19 +251,18 @@ module Snarkable = struct
     let unpack_value (x : Packed.value) : Unpacked.value = x
 
     let compare_var x y =
-      Impl.Field.Checked.compare ~bit_length:V.length (pack_var x) (pack_var y)
+      Field.Checked.compare ~bit_length:V.length (pack_var x) (pack_var y)
 
     let%snarkydef increment_if_var bs (b : Boolean.var) =
-      let open Impl in
       let v = Field.Var.pack bs in
       let v' = Field.Var.add v (b :> Field.Var.t) in
       Field.Checked.unpack v' ~length:V.length
 
-    let%snarkydef increment_var bs =
-      let open Impl in
+    let%snarkydef increment_var (bs : Unpacked.var) =
       let v = Field.Var.pack bs in
       let v' = Field.Var.add v (Field.Var.constant Field.one) in
-      Field.Checked.unpack v' ~length:V.length
+      ( Field.Checked.unpack v' ~length:V.length
+        : (Unpacked.var, _, Field.t) Snarky.Checked.t )
 
     let%snarkydef equal_var (n : Unpacked.var) (n' : Unpacked.var) =
       Field.Checked.equal (pack_var n) (pack_var n')

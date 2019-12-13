@@ -2,10 +2,14 @@ open Core
 open Snark_params.Tick
 open Snark_bits
 
+module Sgn : module type of Sgn.Functor.Make (Snark_params.Tick)
+
 type uint64 = Unsigned.uint64
 
 module type Basic = sig
   type t [@@deriving sexp, compare, hash, yojson]
+
+  type magnitude = t [@@deriving sexp, compare]
 
   val max_int : t
 
