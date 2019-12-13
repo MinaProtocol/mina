@@ -4,22 +4,38 @@ module Styles = {
     style([
       display(`block),
       justifyContent(`center),
-      // margin(`auto),
-      paddingLeft(`rem(3.)),
-      paddingRight(`rem(3.)),
       marginTop(`rem(4.)),
     ]);
 };
 
 [@react.component]
 let make = () => {
-  <Page>
+  <Page footerColor=Theme.Colors.navyBlue>
     <div className=Styles.page>
-      <HeroSection />
-      <CryptoAppsSection />
-      <InclusiveSection />
-      <SustainableSection />
-      <GetInvolvedSection />
+      <section
+        className=Css.(
+          style([
+            marginTop(`rem(-0.3125)),
+            media(Theme.MediaQuery.full, [marginTop(`rem(-0.25))]),
+          ])
+        )>
+        <Wrapped>
+          <HeroSection />
+          <CryptoAppsSection />
+          <InclusiveSection />
+          <SustainableSection />
+          <GetInvolvedSection />
+        </Wrapped>
+        <div
+          className=Css.(
+            style([
+              backgroundColor(Theme.Colors.navyBlue),
+              marginTop(`rem(13.)),
+            ])
+          )>
+          <Wrapped> <TeamSection /> <InvestorsSection /> </Wrapped>
+        </div>
+      </section>
     </div>
   </Page>;
 };

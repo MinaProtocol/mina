@@ -212,12 +212,12 @@ let make = () => {
         flexWrap(`wrap),
         maxWidth(`rem(73.0)),
         media(
-          Theme.MediaQuery.somewhatLarge,
-          [marginLeft(`px(80)), marginRight(`px(80))],
-        ),
-        media(
           Theme.MediaQuery.full,
           [flexWrap(`nowrap), justifyContent(`spaceBetween)],
+        ),
+        media(
+          Theme.MediaQuery.somewhatLarge,
+          [marginLeft(`px(80)), marginRight(`px(80))],
         ),
       ])
     )>

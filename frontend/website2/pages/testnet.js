@@ -1,1 +1,1 @@
-export {make as default} from '@reason/pages/About'
+export { make as default } from '@reason/pages/Testnet'

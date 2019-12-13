@@ -2,7 +2,7 @@
   "name": "with-reasonml",
   "version": "1.0.0",
   "scripts": {
-    "dev": "concurrently \"bsb -clean-world -make-world -w\" \"next dev\"",
+    "dev": "concurrently \"bsb -clean-world -make-world -w\" \"next dev -p 8000\"",
     "dev:reason": "bsb -clean-world -make-world -w",
     "dev:next": "next dev",
     "clean": "bsb -clean-world",

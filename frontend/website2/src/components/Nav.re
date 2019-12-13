@@ -1,5 +1,19 @@
 module Style = {
   open Css;
+  let header =
+    style([
+      padding2(~v=`zero, ~h=`rem(1.25)),
+      marginTop(`rem(1.0)),
+      media(
+        Theme.MediaQuery.notSmallMobile,
+        [padding2(~v=`zero, ~h=`rem(3.)), marginTop(`rem(2.0))],
+      ),
+      marginBottom(`rem(1.)),
+      height(`rem(2.5)),
+      display(`flex),
+      justifyContent(`spaceBetween),
+      alignItems(`center),
+    ]);
   let link =
     style([
       marginRight(`rem(2.)),
@@ -9,20 +23,12 @@ module Style = {
       color(Theme.Colors.saville),
       hover([color(Theme.Colors.hyperlink)]),
     ]);
-
-  let header =
-    style([
-      padding2(~v=`zero, ~h=`rem(3.)),
-      marginTop(`rem(2.0)),
-      marginBottom(`rem(1.)),
-      height(`rem(2.5)),
-      display(`flex),
-      justifyContent(`spaceBetween),
-      alignItems(`center),
-    ]);
-
   let nav = style([display(`flex), alignItems(`center)]);
-
+  let announcementBar =
+    style([
+      display(`none),
+      media(Theme.MediaQuery.somewhatLarge, [display(`block)]),
+    ]);
   let logo = style([height(`px(20))]);
 };
 
@@ -38,6 +44,7 @@ let make = () => {
         />
       </a>
     </Next.Link>
+    <div className=Style.announcementBar> <AnnouncementBar /> </div>
     <nav>
       <Next.Link href="/blog">
         <a className=Style.link> {React.string("Blog")} </a>
