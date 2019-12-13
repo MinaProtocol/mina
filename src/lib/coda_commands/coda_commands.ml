@@ -318,7 +318,7 @@ let get_status ~flag t =
   in
   let highest_block_length_received =
     Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
-    @@ Coda_transition.External_transition.consensus_state
+    @@ Coda_transition.External_transition.Initial_validated.consensus_state
     @@ Pipe_lib.Broadcast_pipe.Reader.peek
          (Coda_lib.most_recent_valid_transition t)
   in
