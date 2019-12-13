@@ -2,10 +2,10 @@ open Core
 open Signature_lib
 open Coda_base
 open Snark_params
-module Sgn' = Sgn (* shadowing Sgn in Currency lacks Stable module *)
-
-open Currency
 module Global_slot = Coda_numbers.Global_slot
+module Amount = Currency.Amount
+module Balance = Currency.Balance
+module Fee = Currency.Fee
 
 let tick_input () =
   let open Tick in
@@ -64,7 +64,7 @@ module Statement = struct
             Pending_coinbase_stack_state.Stable.V1.t
         ; fee_excess:
             ( Currency.Fee.Stable.V1.t
-            , Sgn'.Stable.V1.t )
+            , Sgn.Stable.V1.t )
             Currency.Signed.Stable.V1.t
         ; proof_type: Proof_type.Stable.V1.t }
       [@@deriving compare, equal, hash, sexp, yojson]
@@ -136,7 +136,7 @@ module Stable = struct
       ; supply_increase: Amount.Stable.V1.t
       ; pending_coinbase_stack_state: Pending_coinbase_stack_state.Stable.V1.t
       ; fee_excess:
-          (Amount.Stable.V1.t, Sgn'.Stable.V1.t) Currency.Signed.Stable.V1.t
+          (Amount.Stable.V1.t, Sgn.Stable.V1.t) Currency.Signed.Stable.V1.t
       ; sok_digest: Sok_message.Digest.Stable.V1.t
       ; proof: Proof.Stable.V1.t }
     [@@deriving compare, fields, sexp, version]
