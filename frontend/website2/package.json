@@ -2,20 +2,19 @@
   "name": "with-reasonml",
   "version": "1.0.0",
   "scripts": {
-    "dev": "concurrently \"bsb -clean-world -make-world -w\" \"next dev -p 8000\"",
+    "dev": "concurrently 'yarn dev:reason' 'yarn dev:next'",
     "dev:reason": "bsb -clean-world -make-world -w",
-    "dev:next": "next dev",
+    "dev:next": "next dev -p 8000",
     "clean": "bsb -clean-world",
     "build": "bsb -make-world && next build",
     "export": "yarn build && next export",
-    "start": "next start"
+    "start": "next start -p 8000"
   },
   "license": "ISC",
   "dependencies": {
     "@mdx-js/loader": "^1.5.1",
     "@mdx-js/react": "^1.5.1",
     "@next/mdx": "^9.1.5",
-    "babel-plugin-bucklescript": "^0.5.3",
     "bs-css": "^9.0.1",
     "bsc-stdlib-polyfill": "Schmavery/bsc-stdlib-polyfill",
     "contentful": "^7.10.0",

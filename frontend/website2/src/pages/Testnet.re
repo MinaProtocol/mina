@@ -378,24 +378,22 @@ let make = () => {
                )}
             </p>
           </div>
-          <div id="termynal" className=Styles.termynal>
-            <RunScript>
-              {|var termynal = new Termynal('#termynal', {
-            typeDelay: 40,
-            lineDelay: 700,
-            lineData: [
-              { type: 'input', prompt: '>', value: 'coda daemon -peer ...' },
-              { type: 'progress' },
-              { value:  'Daemon ready. Clients can now connect!'},
-              { type: 'input', prompt: '>', value: 'coda client status' },
-              { delay: '0', value:  'Max observed block length: 120'},
-              { delay: '0', value:  'Peers: 23'},
-              { delay: '0', value:  'Consensus time now: epoch=1, slot=13'},
-              { delay: '0', value:  'Sync status: Synced'},
-            ]
-          });|}
-            </RunScript>
-          </div>
+          <Terminal.Wrapper lineDelay=2000>
+            <Terminal.Line prompt=">" value="coda daemon -peer ..." />
+            <Terminal.Progress />
+            <Terminal.MultiLine
+              values=[|"Daemon ready. Clients can now connect!"|]
+            />
+            <Terminal.Line prompt=">" value="coda client status" />
+            <Terminal.MultiLine
+              values=[|
+                "Max observed block length: 120",
+                "Peers: 23",
+                "Consensus time now: epoch=1, slot=13",
+                "Sync status: Synced",
+              |]
+            />
+          </Terminal.Wrapper>
         </div>
         <div>
           <div className=Styles.buttonRow>

@@ -67,32 +67,13 @@ module Style = {
   let flip = style([transform(rotate(`deg(180.)))]);
 };
 
+
 module CurrentSlugProvider = {
-  let context = React.createContext("");
-  let make = context->React.Context.provider;
-  [@bs.obj]
-  external makeProps:
-    (~value: string, ~children: React.element, unit) =>
-    {
-      .
-      "value": string,
-      "children": React.element,
-    } =
-    "";
+  let (context, make, makeProps) = ReactUtils.createContext("");
 };
 
 module FolderSlugProvider = {
-  let context = React.createContext(None);
-  let make = context->React.Context.provider;
-  [@bs.obj]
-  external makeProps:
-    (~value: option(string), ~children: React.element, unit) =>
-    {
-      .
-      "value": option(string),
-      "children": React.element,
-    } =
-    "";
+  let (context, make, makeProps) = ReactUtils.createContext(None);
 };
 
 let slugConcat = (n1, n2) => {

@@ -56,7 +56,7 @@ let make = (~posts) => {
                  href="/blog/[slug]" _as={"/blog/" ++ post.slug} passHref=true>
                  <a className=Style.title> {React.string(post.title)} </a>
                </Next.Link>
-               {Util.reactMap(Js.Undefined.toOption(post.subtitle), ~f=s =>
+               {ReactUtils.fromOpt(Js.Undefined.toOption(post.subtitle), ~f=s =>
                   <div className=Style.subtitle> {React.string(s)} </div>
                 )}
                <Spacer height=1.5 />
