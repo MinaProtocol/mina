@@ -334,7 +334,7 @@ module T = struct
             Option.value_map c.fee_transfer ~default:[] ~f:(fun ft ->
                 Fee_transfer.receivers (`One ft) |> One_or_two.to_list )
           in
-          c.proposer :: ft_receivers
+          c.producer :: ft_receivers
     in
     let ledger_witness =
       measure "sparse ledger" (fun () ->
@@ -1312,8 +1312,8 @@ let%test_module "test" =
 
     (* Assert the given staged ledger is in the correct state after applying
          the first n user commands passed to the given base ledger. Checks the
-         states of the proposer account and user accounts but ignores snark
-         workers for simplicity. *)
+         states of the block producer account and user accounts but ignores
+         snark workers for simplicity. *)
     let assert_ledger :
            Ledger.t
         -> Sl.t
@@ -1322,7 +1322,7 @@ let%test_module "test" =
         -> Public_key.Compressed.t list
         -> unit =
      fun test_ledger staged_ledger cmds_all cmds_used pks_to_check ->
-      let old_proposer_balance =
+      let old_producer_balance =
         Option.value_map
           (Option.bind
              (Ledger.location_of_key test_ledger self_pk)
@@ -1352,12 +1352,13 @@ let%test_module "test" =
           let expect = get_account_exn test_ledger pk in
           let actual = get_account_exn (Sl.ledger staged_ledger) pk in
           [%test_result: Account.t] ~expect actual ) ;
-      (* We only test that the proposer got any reward here, since calculating
-         the exact correct amount depends on the snark fees and tx fees. *)
-      let new_proposer_balance =
+      (* We only test that the block producer got any reward here, since
+         calculating the exact correct amount depends on the snark fees and tx
+         fees. *)
+      let new_producer_balance =
         (get_account_exn (Sl.ledger staged_ledger) self_pk).balance
       in
-      assert (Currency.Balance.(new_proposer_balance > old_proposer_balance))
+      assert (Currency.Balance.(new_producer_balance > old_producer_balance))
 
     (* Deterministically compute a prover public key from a snark work statement. *)
     let stmt_to_prover :
@@ -1948,7 +1949,7 @@ let%test_module "test" =
       let coinbase_data =
         let create amount fee_transfer =
           Coinbase.create ~amount
-            ~proposer:(Staged_ledger_diff.creator diff)
+            ~producer:(Staged_ledger_diff.creator diff)
             ~fee_transfer ~state_body_hash
           |> Or_error.ok_exn
         in

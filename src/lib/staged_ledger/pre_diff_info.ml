@@ -90,7 +90,7 @@ type t =
     example, when there are three slots and maximum number of provers), in which case,
     we simply add one coinbase as part of the second prediff.
   *)
-let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t)
+let create_coinbase coinbase_parts (producer : Public_key.Compressed.t)
     (state_body_hash : State_body_hash.t) =
   let open Result.Let_syntax in
   let coinbase = Coda_compile_config.coinbase in
@@ -121,11 +121,11 @@ let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t)
     in
     let%bind cb1 =
       coinbase_or_error
-        (Coinbase.create ~amount:amt ~proposer ~fee_transfer:ft1
+        (Coinbase.create ~amount:amt ~producer ~fee_transfer:ft1
            ~state_body_hash)
     in
     let%map cb2 =
-      Coinbase.create ~amount:rem_coinbase ~proposer ~fee_transfer:ft2
+      Coinbase.create ~amount:rem_coinbase ~producer ~fee_transfer:ft2
         ~state_body_hash
       |> coinbase_or_error
     in
@@ -136,7 +136,7 @@ let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t)
       return []
   | `One x ->
       let%map cb =
-        Coinbase.create ~amount:coinbase ~proposer ~fee_transfer:x
+        Coinbase.create ~amount:coinbase ~producer ~fee_transfer:x
           ~state_body_hash
         |> coinbase_or_error
       in
@@ -213,12 +213,12 @@ let create_fee_transfers completed_works delta public_key coinbase_fts =
       |> One_or_two.group_list )
   |> to_staged_ledger_or_error
 
-let get_individual_info coinbase_parts proposer user_commands completed_works
+let get_individual_info coinbase_parts producer user_commands completed_works
     state_body_hash =
   let open Result.Let_syntax in
   let%bind coinbase_parts =
     O1trace.measure "create_coinbase" (fun () ->
-        create_coinbase coinbase_parts proposer state_body_hash )
+        create_coinbase coinbase_parts producer state_body_hash )
   in
   let coinbase_fts =
     List.concat_map coinbase_parts ~f:(fun cb ->
@@ -227,13 +227,13 @@ let get_individual_info coinbase_parts proposer user_commands completed_works
   let coinbase_work_fees = sum_fees coinbase_fts ~f:snd |> Or_error.ok_exn in
   let txn_works_others =
     List.filter completed_works ~f:(fun {Transaction_snark_work.prover; _} ->
-        not (Public_key.Compressed.equal proposer prover) )
+        not (Public_key.Compressed.equal producer prover) )
   in
   let%bind delta =
     fee_remainder user_commands txn_works_others coinbase_work_fees
   in
   let%map fee_transfers =
-    create_fee_transfers txn_works_others delta proposer coinbase_fts
+    create_fee_transfers txn_works_others delta producer coinbase_fts
   in
   let transactions =
     List.map user_commands ~f:(fun t -> Transaction.User_command t)

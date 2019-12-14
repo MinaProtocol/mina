@@ -390,7 +390,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let apply_coinbase t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
-      ({proposer; fee_transfer; amount= coinbase_amount; state_body_hash= _} as
+      ({producer; fee_transfer; amount= coinbase_amount; state_body_hash= _} as
        cb :
         Coinbase.t) =
     let get_or_initialize pk =
@@ -402,14 +402,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           (location, Option.value_exn (get t location), [])
     in
     let open Or_error.Let_syntax in
-    let%bind proposer_reward, emptys1, receiver_update =
+    let%bind producer_reward, emptys1, receiver_update =
       match fee_transfer with
       | None ->
           return (coinbase_amount, [], None)
       | Some (receiver, fee) ->
-          assert (not @@ Public_key.Compressed.equal receiver proposer) ;
+          assert (not @@ Public_key.Compressed.equal receiver producer) ;
           let fee = Amount.of_fee fee in
-          let%bind proposer_reward =
+          let%bind producer_reward =
             error_opt "Coinbase fee transfer too large"
               (Amount.sub coinbase_amount fee)
           in
@@ -417,15 +417,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             get_or_initialize receiver
           in
           let%map balance = add_amount receiver_account.balance fee in
-          ( proposer_reward
+          ( producer_reward
           , emptys
           , Some (receiver_location, {receiver_account with balance}) )
     in
-    let proposer_location, proposer_account, emptys2 =
-      get_or_initialize proposer
+    let producer_location, producer_account, emptys2 =
+      get_or_initialize producer
     in
-    let%map balance = add_amount proposer_account.balance proposer_reward in
-    set t proposer_location {proposer_account with balance} ;
+    let%map balance = add_amount producer_account.balance producer_reward in
+    set t producer_location {producer_account with balance} ;
     Option.iter receiver_update ~f:(fun (l, a) -> set t l a) ;
     Undo.Coinbase_undo.
       {coinbase= cb; previous_empty_accounts= emptys1 @ emptys2}
@@ -435,12 +435,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let undo_coinbase t
       Undo.Coinbase_undo.
         { coinbase=
-            { proposer
+            { producer
             ; fee_transfer
             ; amount= coinbase_amount
             ; state_body_hash= _ }
         ; previous_empty_accounts } =
-    let proposer_reward =
+    let producer_reward =
       match fee_transfer with
       | None ->
           coinbase_amount
@@ -459,17 +459,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   (Balance.sub_amount receiver_account.balance fee) } ;
           Option.value_exn (Amount.sub coinbase_amount fee)
     in
-    let proposer_location =
-      Or_error.ok_exn (location_of_key' t "receiver" proposer)
+    let producer_location =
+      Or_error.ok_exn (location_of_key' t "receiver" producer)
     in
-    let proposer_account =
-      Or_error.ok_exn (get' t "proposer" proposer_location)
+    let producer_account =
+      Or_error.ok_exn (get' t "producer" producer_location)
     in
-    set t proposer_location
-      { proposer_account with
+    set t producer_location
+      { producer_account with
         balance=
           Option.value_exn
-            (Balance.sub_amount proposer_account.balance proposer_reward) } ;
+            (Balance.sub_amount producer_account.balance producer_reward) } ;
     remove_accounts_exn t previous_empty_accounts
 
   let undo_user_command ledger

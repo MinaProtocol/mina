@@ -165,7 +165,7 @@ let apply_fee_transfer_exn =
   fun t transfer -> One_or_two.fold transfer ~f:apply_single ~init:t
 
 let apply_coinbase_exn t
-    ({proposer; fee_transfer; amount= coinbase_amount; state_body_hash= _} :
+    ({producer; fee_transfer; amount= coinbase_amount; state_body_hash= _} :
       Coinbase.t) =
   let open Currency in
   let add_to_balance t pk amount =
@@ -174,7 +174,7 @@ let apply_coinbase_exn t
     set_exn t idx
       {a with balance= Option.value_exn (Balance.add_amount a.balance amount)}
   in
-  let proposer_reward, t =
+  let producer_reward, t =
     match fee_transfer with
     | None ->
         (coinbase_amount, t)
@@ -186,7 +186,7 @@ let apply_coinbase_exn t
         in
         (reward, add_to_balance t receiver fee)
   in
-  add_to_balance t proposer proposer_reward
+  add_to_balance t producer producer_reward
 
 let apply_transaction_exn t (transition : Transaction.t) =
   match transition with
