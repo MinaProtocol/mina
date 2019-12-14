@@ -2,7 +2,7 @@ open Core
 open Async
 open Signature_lib
 
-let name = "coda-shared-prefix-multiproposer-test"
+let name = "coda-shared-prefix-multiproducer-test"
 
 let main n enable_payments () =
   let logger = Logger.create () in
@@ -29,10 +29,10 @@ let main n enable_payments () =
 let command =
   let open Command.Let_syntax in
   Command.async ~summary:"Test that workers share prefixes"
-    (let%map_open num_proposers =
-       flag "num-proposers" ~doc:"NUM number of proposers to have"
+    (let%map_open num_block_producers =
+       flag "num-block-producers" ~doc:"NUM number of block producers to have"
          (required int)
      and enable_payments =
        flag "payments" no_arg ~doc:"enable the payment check"
      in
-     main num_proposers enable_payments)
+     main num_block_producers enable_payments)

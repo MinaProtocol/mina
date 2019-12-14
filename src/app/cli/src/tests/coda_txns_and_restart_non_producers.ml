@@ -2,7 +2,7 @@ open Core
 open Async
 open Coda_base
 
-let name = "coda-txns-and-restart-non-proposers"
+let name = "coda-txns-and-restart-non-producers"
 
 let main () =
   let wait_time = Time.Span.of_min 2. in
@@ -12,9 +12,9 @@ let main () =
     @@ Some
          (List.nth_exn Genesis_ledger.accounts 5 |> snd |> Account.public_key)
   in
-  let proposers n = if n < 3 then Some n else None in
+  let producers n = if n < 3 then Some n else None in
   let%bind testnet =
-    Coda_worker_testnet.test logger 5 proposers snark_work_public_keys
+    Coda_worker_testnet.test logger 5 producers snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in
@@ -27,24 +27,24 @@ let main () =
   Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~keypairs
     ~n:10
   |> don't_wait_for ;
-  (* restart non-proposers *)
-  let random_non_proposer () = Random.int 2 + 3 in
+  (* restart non-producers *)
+  let random_non_producer () = Random.int 2 + 3 in
   (* catchup *)
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_catchup testnet ~logger
-      ~node:(random_non_proposer ())
+      ~node:(random_non_producer ())
   in
   let%bind () = after wait_time in
   (* bootstrap *)
   let%bind () =
     Coda_worker_testnet.Restarts.trigger_bootstrap testnet ~logger
-      ~node:(random_non_proposer ())
+      ~node:(random_non_producer ())
   in
   (* random restart *)
   let%bind () = after wait_time in
   let%bind () =
     Coda_worker_testnet.Restarts.restart_node testnet ~logger
-      ~node:(random_non_proposer ())
+      ~node:(random_non_producer ())
       ~duration:(Time.Span.of_min (Random.float 3. +. 1.))
   in
   (* settle for a few more min *)
@@ -52,5 +52,5 @@ let main () =
   Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
-  Command.async ~summary:"only restart non-proposers"
+  Command.async ~summary:"only restart non-block-producers"
     (Command.Param.return main)

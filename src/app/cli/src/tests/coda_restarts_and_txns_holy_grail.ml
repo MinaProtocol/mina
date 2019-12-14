@@ -59,8 +59,8 @@ let command =
     ~summary:
       "Test the holy grail for n nodes: All sorts of restarts and \
        transactions work"
-    (let%map_open num_proposers =
-       flag "num-proposers" ~doc:"NUM number of proposers to have"
+    (let%map_open num_block_producers =
+       flag "num-block-producers" ~doc:"NUM number of block producers to have"
          (required int)
      in
-     main num_proposers)
+     main num_block_producers)

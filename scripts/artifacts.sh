@@ -47,7 +47,7 @@ do_copy () {
 
 case $CIRCLE_JOB in
     "build-artifacts--testnet_postake_medium_curves") do_copy;;
-    "build-artifacts--testnet_postake_many_proposers_medium_curves") do_copy;;
+    "build-artifacts--testnet_postake_many_producers_medium_curves") do_copy;;
     "build-macos") do_copy;;
     *) echo "Not an active testnet job (${CIRCLE_JOB}), stopping." ; exit 0 ;;
 esac
