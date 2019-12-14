@@ -85,7 +85,7 @@ let create : directory_name:string -> Account_config.t -> t =
 
 let commit ledger = Ledger.commit ledger
 
-let get_accounts accounts_json_file genesis_dir n =
+let get_accounts accounts_json_file n =
   let open Deferred.Or_error.Let_syntax in
   let%map accounts =
     match accounts_json_file with
@@ -146,7 +146,7 @@ let main accounts_json_file genesis_dir n =
     let%map () = File_system.create_dir dir ~clear_if_exists:true in
     dir
   in
-  let%bind accounts = get_accounts accounts_json_file genesis_dir n in
+  let%bind accounts = get_accounts accounts_json_file n in
   match
     Or_error.try_with_join (fun () ->
         let open Or_error.Let_syntax in
