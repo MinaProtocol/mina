@@ -120,6 +120,13 @@ let root_diff_exn (conn, _, _) =
   in
   Linear_pipe.wrap_reader r
 
+let initialization_finish_signal_exn (conn, _, _) =
+  let%map p =
+    Coda_worker.Connection.run_exn conn
+      ~f:Coda_worker.functions.initialization_finish_signal ~arg:()
+  in
+  Linear_pipe.wrap_reader p
+
 let start_exn (conn, _, _) =
   Coda_worker.Connection.run_exn conn ~f:Coda_worker.functions.start ~arg:()
 
