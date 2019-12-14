@@ -69,7 +69,7 @@ let retrieve_genesis_state dir_opt ~logger :
       match%bind
         Deferred.List.fold directories ~init:None ~f:(fun acc dir ->
             if is_some acc then Deferred.return acc
-            else retrieve (Cache_dir.genesis_state_path dir) )
+            else retrieve (Cache_dir.genesis_ledger_path dir) )
       with
       | Some res ->
           Deferred.return res

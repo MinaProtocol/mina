@@ -141,7 +141,7 @@ let main accounts_json_file genesis_dir n =
   let%bind genesis_dir =
     let dir =
       Option.value ~default:Cache_dir.autogen_path genesis_dir
-      |> Cache_dir.genesis_state_path
+      |> Cache_dir.genesis_ledger_path
     in
     let%map () = File_system.create_dir dir ~clear_if_exists:true in
     dir
@@ -186,12 +186,16 @@ let () =
                "Filepath of the json file that has all the account data in \
                 the format: [{\"pk\":public-key-string, \
                 \"sk\":optional-secret-key-string, \"balance\":int, \
-                \"delegate\":optional-public-key-string}]"
+                \"delegate\":optional-public-key-string}] (default: \
+                Compile-time generated accounts)"
              (optional string)
          and genesis_dir =
            flag "genesis-dir"
              ~doc:
-               "Dir where the genesis ledger and genesis proof is to be saved"
+               (sprintf
+                  "Dir where the genesis ledger and genesis proof is to be \
+                   saved (default: %s)"
+                  Cache_dir.autogen_path)
              (optional string)
          and n =
            flag "n"

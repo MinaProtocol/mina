@@ -7,7 +7,7 @@ let s3_install_path = "/tmp/s3_cache_dir"
 
 let manual_install_path = "/var/lib/coda"
 
-let genesis_state_path dir = dir ^/ "genesis"
+let genesis_ledger_path dir = dir ^/ "genesis"
 
 let brew_install_path =
   match

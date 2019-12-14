@@ -31,7 +31,7 @@ let%test_module "Command line tests" =
       let%map _ =
         match%map
           Process.run ~prog:runtime_genesis_ledger_exe
-            ~args:["-account-file"; accounts_file; "-ledger-dir"; dir]
+            ~args:["-account-file"; accounts_file; "-genesis-dir"; dir]
             ()
         with
         | Ok s ->
@@ -55,7 +55,7 @@ let%test_module "Command line tests" =
               ; "-config-directory"
               ; config_dir
               ; "-genesis-ledger-dir"
-              ; genesis_ledger_dir ]
+              ; Cache_dir.genesis_ledger_path genesis_ledger_dir ]
             ()
         with
         | Ok s ->
