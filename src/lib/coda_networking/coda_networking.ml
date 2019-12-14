@@ -359,13 +359,12 @@ module Rpcs = struct
     end
   end
 
-  module Get_bootstrappable_best_tip = struct
+  module Get_best_tip = struct
     module Master = struct
-      let name = "get_bootstrappable_best_tip"
+      let name = "get_best_tip"
 
       module T = struct
-        type query = Consensus.Data.Consensus_state.Value.t
-        [@@deriving sexp, to_yojson]
+        type query = unit [@@deriving sexp, to_yojson]
 
         type response =
           ( External_transition.t
@@ -389,8 +388,7 @@ module Rpcs = struct
 
     module V1 = struct
       module T = struct
-        type query = Consensus.Data.Consensus_state.Value.Stable.V1.t
-        [@@deriving bin_io, sexp, version {rpc}]
+        type query = unit [@@deriving bin_io, sexp, version {rpc}]
 
         type response =
           ( External_transition.Stable.V1.t
@@ -438,10 +436,7 @@ module Rpcs = struct
           rpc
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
-    | Get_bootstrappable_best_tip
-        : ( Get_bootstrappable_best_tip.query
-          , Get_bootstrappable_best_tip.response )
-          rpc
+    | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   type rpc_handler =
@@ -461,8 +456,8 @@ module Rpcs = struct
         (module Get_ancestry)
     | Ban_notify ->
         (module Ban_notify)
-    | Get_bootstrappable_best_tip ->
-        (module Get_bootstrappable_best_tip)
+    | Get_best_tip ->
+        (module Get_best_tip)
     | Consensus_rpc rpc ->
         Consensus.Hooks.Rpcs.implementation_of_rpc rpc
 
@@ -488,8 +483,7 @@ module Rpcs = struct
         Some (do_ f)
     | Ban_notify, Rpc_handler (Ban_notify, f) ->
         Some (do_ f)
-    | Get_bootstrappable_best_tip, Rpc_handler (Get_bootstrappable_best_tip, f)
-      ->
+    | Get_best_tip, Rpc_handler (Get_best_tip, f) ->
         Some (do_ f)
     | Consensus_rpc rpc_a, Rpc_handler (Consensus_rpc rpc_b, f) ->
         Consensus.Hooks.Rpcs.match_handler (Rpc_handler (rpc_b, f)) rpc_a ~do_
@@ -573,8 +567,8 @@ let create (config : Config.t)
           , State_body_hash.t list * External_transition.t )
           Proof_carrying_data.t
           Deferred.Option.t)
-    ~(get_bootstrappable_best_tip :
-          Consensus.Data.Consensus_state.Value.t Envelope.Incoming.t
+    ~(get_best_tip :
+          unit Envelope.Incoming.t
        -> ( External_transition.t
           , State_body_hash.t list * External_transition.t )
           Proof_carrying_data.t
@@ -660,16 +654,13 @@ let create (config : Config.t)
     in
     record_unknown_item result sender action_msg msg_args
   in
-  let get_bootstrappable_best_tip_rpc conn ~version:_ query =
+  let get_best_tip_rpc conn ~version:_ query =
     Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
       "Sending best_tip to peer with IP %s" conn.Host_and_port.host ;
-    let action_msg = "Get_bootstrappable_best_ti. query: $query" in
-    let msg_args =
-      [("query", Rpcs.Get_bootstrappable_best_tip.query_to_yojson query)]
-    in
+    let action_msg = "Get_best_tip. query: $query" in
+    let msg_args = [("query", Rpcs.Get_best_tip.query_to_yojson query)] in
     let%bind result, sender =
-      run_for_rpc_result conn query ~f:get_bootstrappable_best_tip action_msg
-        msg_args
+      run_for_rpc_result conn query ~f:get_best_tip action_msg msg_args
     in
     record_unknown_item result sender action_msg msg_args
   in
@@ -716,7 +707,7 @@ let create (config : Config.t)
         ( Get_staged_ledger_aux_and_pending_coinbases_at_hash
         , get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc )
     ; Rpc_handler (Answer_sync_ledger_query, answer_sync_ledger_query_rpc)
-    ; Rpc_handler (Get_bootstrappable_best_tip, get_bootstrappable_best_tip_rpc)
+    ; Rpc_handler (Get_best_tip, get_best_tip_rpc)
     ; Rpc_handler (Get_ancestry, get_ancestry_rpc)
     ; Rpc_handler (Get_transition_chain, get_transition_chain_rpc)
     ; Rpc_handler (Get_transition_chain_proof, get_transition_chain_proof_rpc)
@@ -851,6 +842,9 @@ end
 let on_first_received_message {first_received_message_signal; _} ~f =
   Ivar.read first_received_message_signal >>| f
 
+let fill_first_received_message_signal {first_received_message_signal; _} =
+  Ivar.fill_if_empty first_received_message_signal ()
+
 (* TODO: Have better pushback behavior *)
 let broadcast t msg =
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
@@ -917,8 +911,8 @@ let get_transition_chain_proof =
 let get_transition_chain =
   make_rpc_request ~rpc:Rpcs.Get_transition_chain ~label:"chain of transitions"
 
-let get_bootstrappable_best_tip =
-  make_rpc_request ~rpc:Rpcs.Get_bootstrappable_best_tip ~label:"best tip"
+let get_best_tip t peer =
+  make_rpc_request ~rpc:Rpcs.Get_best_tip ~label:"best tip" t peer ()
 
 let ban_notify t peer banned_until =
   query_peer t peer Rpcs.Ban_notify banned_until
