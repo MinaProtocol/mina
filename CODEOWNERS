@@ -80,7 +80,7 @@
 /src/lib/ppx_coda/ @psteckler @mrmr1993
 /src/lib/ppx_util/ @mrmr1993 @psteckler
 /src/lib/precomputed_values/ @cmr @bkase @mrmr1993 @imeckler
-/src/lib/proposer/ @nholland94 @cmr @bkase @ghost-not-in-the-shell
+/src/lib/block_producer/ @nholland94 @cmr @bkase @ghost-not-in-the-shell
 /src/lib/prover/ @nholland94 @bkase @imeckler @mrmr1993
 /src/lib/quickcheck_lib/ @nholland94 @ghost-not-in-the-shell @enolan
 /src/lib/random_oracle/ @cmr @imeckler @mrmr1993

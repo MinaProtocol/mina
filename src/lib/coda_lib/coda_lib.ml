@@ -584,7 +584,7 @@ let staking_ledger t =
   Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
 
 let start t =
-  Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier
+  Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
     ~set_next_proposal:(fun p -> t.next_proposal <- Some p)
     ~prover:t.processes.prover ~trust_system:t.config.trust_system
     ~transaction_resource_pool:
