@@ -343,6 +343,7 @@ module Pairing_based = struct
         { marlin: ('challenge, 'fq) Marlin.t
         ; combined_inner_product: 'fq
         ; xi: 'challenge (* 128 bits *)
+        ; r: 'challenge (* 128 bits *)
         ; bulletproof_challenges:
             ('challenge, 'bool) Bulletproof_challenge.t array
         ; a_hat: 'fq }
@@ -350,18 +351,25 @@ module Pairing_based = struct
       open Snarky.H_list
 
       let to_hlist
-          {marlin; combined_inner_product; xi; bulletproof_challenges; a_hat} =
-        [marlin; combined_inner_product; xi; bulletproof_challenges; a_hat]
+          {marlin; combined_inner_product; xi; r; bulletproof_challenges; a_hat}
+          =
+        [marlin; combined_inner_product; xi; r; bulletproof_challenges; a_hat]
 
       let of_hlist
-          ([marlin; combined_inner_product; xi; bulletproof_challenges; a_hat] :
+          ([ marlin
+           ; combined_inner_product
+           ; xi
+           ; r
+           ; bulletproof_challenges
+           ; a_hat ] :
             (unit, _) t) =
-        {marlin; combined_inner_product; xi; bulletproof_challenges; a_hat}
+        {marlin; combined_inner_product; xi; r; bulletproof_challenges; a_hat}
 
       let typ chal fq bool ~length =
         Snarky.Typ.of_hlistable
           [ Marlin.typ chal fq
           ; fq
+          ; chal
           ; chal
           ; Snarky.Typ.array (Bulletproof_challenge.typ chal bool) ~length
           ; fq ]
@@ -403,6 +411,7 @@ module Pairing_based = struct
         { proof_state=
             { deferred_values=
                 { xi
+                ; r
                 ; bulletproof_challenges
                 ; a_hat
                 ; combined_inner_product
@@ -422,7 +431,7 @@ module Pairing_based = struct
       let open Vector in
       let fq = [sigma_2; sigma_3; combined_inner_product; a_hat] in
       let challenge =
-        [alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3; xi]
+        [alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3; xi; r]
       in
       let digest = [sponge_digest_before_evaluations; me_only; pass_through] in
       (fq, digest, challenge, bulletproof_challenges)
@@ -430,13 +439,14 @@ module Pairing_based = struct
     let of_data (fq, digest, challenge, bulletproof_challenges) =
       let open Vector in
       let [sigma_2; sigma_3; combined_inner_product; a_hat] = fq in
-      let [alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3; xi] =
+      let [alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3; xi; r] =
         challenge
       in
       let [sponge_digest_before_evaluations; me_only; pass_through] = digest in
       { proof_state=
           { deferred_values=
               { xi
+              ; r
               ; bulletproof_challenges
               ; a_hat
               ; combined_inner_product

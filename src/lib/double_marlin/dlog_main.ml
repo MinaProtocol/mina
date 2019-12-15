@@ -13,6 +13,27 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
   open Inputs
   open Impl
 
+  module Data = struct
+    type t = Field.t list * Boolean.var list
+
+    let bits bs = ([], bs)
+
+    let append (x1, b1) (x2, b2) = (x1 @ x2, b1 @ b2)
+
+    let concat : t list -> t = List.reduce_exn ~f:append
+
+    let pack_bits bs =
+      List.groupi bs ~break:(fun i _ _ -> i mod (Field.size_in_bits - 1) = 0)
+      |> List.map ~f:Field.pack
+
+    let pack (x, b) = x @ pack_bits b
+
+    let assert_equal t1 t2 =
+      List.iter2_exn (pack t1) (pack t2) ~f:Field.Assert.equal
+
+    let ( @ ) = append
+  end
+
   module Fp = struct
     (* For us, q > p, so one Field.t = fq can represent an fp *)
     module Packed = Field
@@ -89,8 +110,7 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   let absorb sponge ty t =
     absorb ~absorb_field:(Sponge.absorb sponge)
-      ~g1_to_field_elements:G1.to_field_elements ~pack_scalar:Fp.Packed.project
-      ty t
+      ~g1_to_field_elements:G1.to_field_elements ~pack_scalar:Fn.id ty t
 
   let combined_commitment ~xi (polys : _ Vector.t) =
     ksprintf with_label "combined_commitment %s" __LOC__ (fun () ->
@@ -272,7 +292,9 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
 
     type _ t +=
       | Prev_evals : Field.Constant.t Pairing_marlin_types.Evals.t t
-      | Prev_messages : (PC.t, Fp.Packed.t) Pairing_marlin_types.Messages.t t
+      | Prev_messages :
+          (PC.Constant.t, Fp.Packed.Constant.t) Pairing_marlin_types.Messages.t
+          t
       | Prev_openings_proof : G1.Constant.t Tuple_lib.Triple.t t
       | Me_only : G1.Constant.t Types.Dlog_based.Proof_state.Me_only.t t
       | Prev_proof_state :
@@ -283,6 +305,7 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
           , Digest.Unpacked.Constant.t )
           Types.Pairing_based.Proof_state.t
           t
+      | Prev_pairing_acc : G1.Constant.t Accumulator.t t
   end
 
   module Fp_constant = struct
@@ -402,7 +425,7 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
       ; beta_2
       ; beta_3 }
     in
-    (pairing_acc, digest_before_evaluations, deferred)
+    (digest_before_evaluations, pairing_acc, deferred)
 
   let combined_evaluation ~xi Vector.(eval0 :: evals) =
     List.fold_left (Vector.to_list evals) ~init:eval0 ~f:(fun acc eval ->
@@ -539,8 +562,15 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   let prod xs f = List.reduce_exn (List.map xs ~f) ~f:Fq.( * )
 
-  let finalize_other_proof ~domain_k ~domain_h ~sponge ~r
+  let check_bulletproof_challenges chals =
+    Array.iter chals
+      ~f:(fun { Types.Pairing_based.Bulletproof_challenge.prechallenge
+              ; is_square }
+         -> Boolean.Assert.( = ) is_square (Fq.is_square prechallenge) )
+
+  let finalize_other_proof ~domain_k ~domain_h ~sponge
       ({ xi
+       ; r
        ; combined_inner_product
        ; bulletproof_challenges
        ; a_hat
@@ -555,6 +585,7 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
            ; beta_2
            ; beta_3 } } :
         _ Types.Pairing_based.Proof_state.Deferred_values.t) =
+    check_bulletproof_challenges bulletproof_challenges ;
     let open Vector in
     (* As a proof size optimization, we can probably rig each polynomial
        to vanish on the previous challenges.
@@ -666,13 +697,43 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   let bulletproofs_challenges = 15
 
+  let map_challenges
+      { Types.Pairing_based.Proof_state.Deferred_values.marlin
+      ; combined_inner_product
+      ; xi
+      ; r
+      ; bulletproof_challenges
+      ; a_hat } ~f =
+    { Types.Pairing_based.Proof_state.Deferred_values.marlin=
+        Types.Pairing_based.Proof_state.Deferred_values.Marlin.map_challenges
+          marlin ~f
+    ; combined_inner_product
+    ; bulletproof_challenges=
+        Array.map bulletproof_challenges ~f:(fun r ->
+            {r with prechallenge= f r.prechallenge} )
+    ; xi= f xi
+    ; r= f r
+    ; a_hat }
+
+  (* TODO: The way this handles fq elts and bulletproof challenges is wrong. Fix. *)
+  let pack_data (fq, digest, challenge, bulletproof_challenges) =
+    Array.concat
+      [ Array.of_list_map (Vector.to_list fq) ~f:(fun x ->
+            Bitstring_lib.Bitstring.Lsb_first.to_list (Fq.unpack_full x) )
+      ; Vector.to_array challenge
+      ; Vector.to_array digest
+      ; Array.map bulletproof_challenges
+          ~f:(fun { Types.Pairing_based.Bulletproof_challenge.prechallenge
+                  ; is_square }
+             -> is_square :: prechallenge ) ]
+
   let main
       ({ proof_state=
            { deferred_values= {marlin; xi; r; r_xi_sum}
            ; sponge_digest_before_evaluations
            ; me_only= me_only_digest }
        ; pass_through } :
-        _ Types.Dlog_based.Statement.t) =
+        (Challenge.t, _, _, _, _) Types.Dlog_based.Statement.t) =
     let { Types.Dlog_based.Proof_state.Me_only.pairing_marlin_acc
         ; pairing_marlin_index } =
       decompress_me_only me_only_digest
@@ -687,62 +748,57 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
              ~length:bulletproofs_challenges) ~request:(fun () ->
             Requests.Prev_proof_state )
       in
-      ( Types.Pairing_based.Proof_state.Deferred_values.map_challenges
-          ~f:Fp.pack state.deferred_values
-      , Fp.pack state.sponge_digest_before_evaluations
+      ( map_challenges ~f:Fq.pack state.deferred_values
+      , Fq.pack state.sponge_digest_before_evaluations
       , state )
     in
-    let prev_app_state =
-      exists App_state.typ ~request:(fun () -> Requests.Prev_app_state)
+    let prev_pairing_acc =
+      exists (Accumulator.typ G1.typ) ~request:(fun () ->
+          Requests.Prev_pairing_acc )
     in
-    let sg_old = exists G.typ ~request:(fun () -> Requests.Prev_sg) in
     let prev_statement =
       (* TODO: A lot of repeated hashing happening here on the dlog_marlin_index *)
       let prev_me_only =
-        hash_me_only {app_state= prev_app_state; dlog_marlin_index; sg= sg_old}
+        hash_me_only
+          {pairing_marlin_acc= prev_pairing_acc; pairing_marlin_index}
       in
-      { Types.Dlog_based.Statement.pass_through= prev_me_only
+      { Types.Pairing_based.Statement.pass_through= prev_me_only
       ; proof_state= prev_proof_state }
     in
     let sponge =
       let s = Sponge.create sponge_params in
-      Sponge.absorb s (`Field prev_sponge_digest_before_evaluations) ;
+      Sponge.absorb s prev_sponge_digest_before_evaluations ;
       s
     in
     finalize_other_proof ~domain_k ~domain_h ~sponge prev_deferred_values ;
-    App_state.check_update prev_app_state app_state ;
-    let sponge =
-      let s = Sponge.create sponge_params in
-      Array.iter (App_state.to_field_elements app_state) ~f:(fun x ->
-          Sponge.absorb s (`Field x) ) ;
-      s
-    in
     let ( sponge_digest_before_evaluations_actual
-        , bulletproof_challenges_actual
+        , pairing_acc_actual
         , marlin_actual ) =
       let messages =
-        exists (Pairing_marlin_types.Messages.typ PC.typ Fq.typ)
+        exists (Pairing_marlin_types.Messages.typ PC.typ Fp.Packed.typ)
           ~request:(fun () -> Requests.Prev_messages)
       in
-      let openings_proof =
-        exists
-          (Types.Pairing_based.Openings.Bulletproof.typ Fq.typ G.typ
-             ~length:(Array.length bulletproof_challenges))
-          ~request:(fun () -> Requests.Prev_openings_proof)
+      let opening_proofs =
+        exists (Typ.tuple3 G1.typ G1.typ G1.typ) ~request:(fun () ->
+            Requests.Prev_openings_proof )
       in
-      incrementally_verify_proof ~xi ~verification_key:dlog_marlin_index
-        ~sponge
+      incrementally_verify_pairings ~pairing_acc:pairing_marlin_acc ~xi ~r
+        ~r_xi_sum ~verification_key:pairing_marlin_index ~sponge
         ~public_input:
-          (pack_data (Types.Dlog_based.Statement.to_data prev_statement))
-        ~sg_old ~combined_inner_product ~advice:{a_hat; sg} ~messages
-        ~openings_proof
+          (pack_data (Types.Pairing_based.Statement.to_data prev_statement))
+        ~messages ~opening_proofs
     in
     Field.Assert.equal sponge_digest_before_evaluations
-      (Field.pack sponge_digest_before_evaluations_actual) ;
+      (Field.pack sponge_digest_before_evaluations_actual)
+
+  (* TODO
     Data.(
       assert_equal
-        (chals_data bulletproof_challenges @ marlin_data marlin)
-        (chals_data bulletproof_challenges_actual @ marlin_data marlin_actual))
+        (marlin_data marlin)
+        (marlin_data marlin_actual))
+       *)
+
+  let main t = main (Types.Dlog_based.Statement.of_data t)
 
   (*
 

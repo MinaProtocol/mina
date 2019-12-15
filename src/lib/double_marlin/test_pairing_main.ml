@@ -260,9 +260,53 @@ let%test_unit "pairing-main" =
           (Inputs.Impl.exists
              (Snarky.Typ.tuple4 (typ M.Fq.typ Nat.N4.n)
                 (typ Inputs.Impl.Field.typ Nat.N3.n)
-                (typ M.Challenge.typ Nat.N8.n)
+                (typ M.Challenge.typ Nat.N9.n)
                 (Snarky.Typ.array ~length:16
                    (Types.Pairing_based.Bulletproof_challenge.typ
                       M.Challenge.typ Inputs.Impl.Boolean.typ)))) )
   in
-  Core.printf "%d\n%!" n
+  Core.printf "pairing-main: %d\n%!" n
+
+module Dlog_inputs : Intf.Dlog_main_inputs.S = struct
+  open Inputs
+  module Impl = Impl
+  module G1 = G
+  module Input_domain = Input_domain
+
+  let domain_k = domain_k
+
+  let domain_h = domain_h
+
+  module Generators = Generators
+
+  let sponge_params = sponge_params
+
+  module Fp_params = struct
+    let size_in_bits = 382
+
+    let p =
+      Bigint.of_string
+        "5543634365110765627805495722742127385843376434033820803590214255538854698464778703795540858859767700241957783601153"
+  end
+
+  module Sponge = struct
+    include Sponge
+
+    let absorb t x = absorb t (`Field x)
+  end
+end
+
+let%test_unit "dlog-main" =
+  let module Inputs = Dlog_inputs in
+  let module M = Dlog_main.Dlog_main (Inputs) in
+  let n =
+    let open Vector in
+    Inputs.Impl.constraint_count (fun () ->
+        M.main
+          (Inputs.Impl.exists
+             (Snarky.Typ.tuple3
+                (typ M.Fp.Unpacked.typ Nat.N3.n)
+                (typ M.Challenge.typ Nat.N9.n)
+                (typ Inputs.Impl.Field.typ Nat.N3.n))) )
+  in
+  Core.printf "dlog-main: %d\n%!" n

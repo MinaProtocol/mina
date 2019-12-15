@@ -1,10 +1,14 @@
 (library
+  (inline_tests)
   (name double_marlin)
   (public_name double_marlin)
+  (flags -warn-error -27)
   (preprocess (pps ppx_coda ppx_jane ppx_deriving.std))
   (libraries
+  snarky_log
     sgn_type
-    snarky_curves
+    sponge
+    snarky_curve
     snarky
     snarkette
     core_kernel ))
