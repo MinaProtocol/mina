@@ -7,6 +7,7 @@ let to_hlist {a; b; c} = [a; b; c]
 
 let of_hlist ([a; b; c] : (unit, _) H_list.t) = {a; b; c}
 
-let typ g =
+let typ (type a b f) (g : (a, b, f) Snarky.Typ.t) : (a t, b t, f) Snarky.Typ.t
+    =
   Snarky.Typ.of_hlistable [g; g; g] ~var_to_hlist:to_hlist
     ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist

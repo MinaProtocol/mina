@@ -79,6 +79,8 @@ module Evals = struct
   module type S = sig
     type n
 
+    val n : n Vector.nat
+
     include Binable.S1 with type 'a t = ('a, n) Vector.t
 
     include Snarkable.S1 with type 'a t := 'a t
@@ -104,8 +106,6 @@ module Group (Impl : Snarky.Snark_intf.Run) = struct
     val negate : t -> t
 
     val to_field_elements : t -> Field.t list
-
-    val if_ : Boolean.var -> then_:t -> else_:t -> t
   end
 end
 
@@ -132,6 +132,20 @@ module Dlog_main_inputs = struct
 
     module G1 : Group(Impl).S
 
+    module Generators : sig
+      val g : G1.t
+    end
+
+    val domain_h : Domain.t
+
+    val domain_k : Domain.t
+
+    module Input_domain : sig
+      val domain : Domain.t
+
+      val lagrange_commitments : G1.t array
+    end
+
     val sponge_params : Impl.Field.t Sponge_lib.Params.t
 
     module Sponge : Sponge(Impl).S
@@ -142,14 +156,20 @@ module Pairing_main_inputs = struct
   module type S = sig
     module Impl : Snarky.Snark_intf.Run with type prover_state = unit
 
-    module Fq_params : sig
-      val q : Bigint.t
+    module Fq_constant : sig
+      type t
 
       val size_in_bits : int
     end
 
     module G : sig
+      open Impl
+
       include Group(Impl).S
+
+      val if_ : Boolean.var -> then_:t -> else_:t -> t
+
+      val scale_inv : t -> Boolean.var list -> t
 
       val scale_by_quadratic_nonresidue : t -> t
 
@@ -160,6 +180,16 @@ module Pairing_main_inputs = struct
       val g : G.t
 
       val h : G.t
+    end
+
+    val domain_h : Domain.t
+
+    val domain_k : Domain.t
+
+    module Input_domain : sig
+      val domain : Domain.t
+
+      val lagrange_commitments : G.t array
     end
 
     val sponge_params : Impl.Field.t Sponge_lib.Params.t
@@ -178,6 +208,9 @@ module Pairing_main_inputs = struct
       module Constant : sig
         type t
       end
+
+      (* This function should be collision resistant. *)
+      val to_field_elements : t -> Impl.Field.t array
 
       val typ : (t, Constant.t) Impl.Typ.t
 

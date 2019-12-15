@@ -65,6 +65,9 @@ let nat_to_int : type n. n nat -> int =
 
 type ('a, _) t = [] : ('a, z) t | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n s) t
 
+let rec iter : type a n. (a, n) t -> f:(a -> unit) -> unit =
+ fun t ~f -> match t with [] -> () | x :: xs -> f x ; iter xs ~f
+
 let rec map2 : type a b c n.
     (a, n) t -> (b, n) t -> f:(a -> b -> c) -> (c, n) t =
  fun t1 t2 ~f ->
@@ -78,6 +81,8 @@ let zip xs ys = map2 xs ys ~f:(fun x y -> (x, y))
 
 let rec to_list : type a n. (a, n) t -> a list =
  fun t -> match t with [] -> [] | x :: xs -> x :: to_list xs
+
+let to_array t = Array.of_list (to_list t)
 
 let rec length : type a n. (a, n) t -> n nat = function
   | [] ->

@@ -1,6 +1,14 @@
 open Core_kernel
 open Import
 
+type m = A | B | C
+
+let ms = [A; B; C]
+
+let abc a b c = function A -> a | B -> b | C -> c
+
+let all_but m = List.filter ms ~f:(( <> ) m)
+
 let rec absorb : type a g1 f scalar.
        absorb_field:(f -> unit)
     -> g1_to_field_elements:(g1 -> f list)
