@@ -13,7 +13,7 @@ let main who_proposes () =
       Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in
-  let%bind () = after (Time.Span.of_sec 30.) in
+  let%bind () = after (Time.Span.of_sec 60.) in
   Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
