@@ -25,7 +25,7 @@ let possible_paths base =
     [manual_install_path; brew_install_path; s3_install_path; autogen_path]
     ~f:(fun d -> d ^/ base)
 
-let load_from_s3 s3_bucket_prefix s3_install_path =
+let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
   Deferred.map ~f:Result.join
   @@ Monitor.try_with (fun () ->
          let each_uri (uri_string, file_path) =
@@ -35,7 +35,12 @@ let load_from_s3 s3_bucket_prefix s3_install_path =
                ~args:["-o"; file_path; uri_string]
                ()
            in
-           Core_kernel.printf !"Curl finished: %s\n" result ;
+           Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
+             "Curl finished"
+             ~metadata:
+               [ ("url", `String uri_string)
+               ; ("local_file_path", `String file_path)
+               ; ("result", `String result) ] ;
            Result.return ()
          in
          Deferred.List.map ~f:each_uri

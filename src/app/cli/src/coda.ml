@@ -17,19 +17,32 @@ let retrieve_genesis_state dir_opt ~logger :
     "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net" ^/ tar_filename
   in
   let extract dir =
-    let tar_file = dir ^/ Cache_dir.genesis_dir_name ^ ".tar.gz" in
-    let tar_command = sprintf "tar -C %s --file=%s -xz" dir tar_file in
-    let exit = Core.Sys.command tar_command in
-    if exit = 2 then
-      Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
-        "Error extracting genesis ledger and proof from the tar file $tar_file."
-        ~metadata:[("tar_file", `String tar_file); ("exit_code", `Int exit)]
+    match%map
+      Monitor.try_with_or_error ~extract_exn:true (fun () ->
+          let genesis_dir = dir ^/ Cache_dir.genesis_dir_name in
+          if Core.Sys.file_exists genesis_dir = `Yes then Deferred.return ()
+          else
+            (*Look for the tar and extract*)
+            let tar_file = genesis_dir ^ ".tar.gz" in
+            let%map _result =
+              Process.run_exn ~prog:"tar"
+                ~args:["-C"; dir; "-xzf"; tar_file]
+                ()
+            in
+            () )
+    with
+    | Ok () ->
+        ()
+    | Error e ->
+        Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
+          "Error extracting genesis ledger and proof : $error"
+          ~metadata:[("error", `String (Error.to_string_hum e))]
   in
   let retrieve dir =
-    Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+    Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
       "Retrieving genesis ledger and genesis proof from $path"
       ~metadata:[("path", `String dir)] ;
-    let () = extract dir in
+    let%bind () = extract dir in
     let dir = dir ^/ Cache_dir.genesis_dir_name in
     let ledger_dir = dir ^/ "ledger" in
     let proof_file = dir ^/ "genesis_proof" in
@@ -80,7 +93,10 @@ let retrieve_genesis_state dir_opt ~logger :
       res_or_fail dir res
   | None -> (
       let directories =
-        [autogen_path; manual_install_path; brew_install_path]
+        [ manual_install_path
+        ; brew_install_path
+        ; Cache_dir.s3_install_path
+        ; autogen_path ]
       in
       match%bind
         Deferred.List.fold directories ~init:None ~f:(fun acc dir ->
@@ -93,16 +109,16 @@ let retrieve_genesis_state dir_opt ~logger :
           let local_path = Cache_dir.s3_install_path ^/ tar_filename in
           let%bind () =
             match%map
-              Cache_dir.load_from_s3 [s3_bucket_prefix] [local_path]
+              Cache_dir.load_from_s3 [s3_bucket_prefix] [local_path] ~logger
             with
             | Ok () ->
                 ()
             | Error e ->
                 Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
-                  "Could not retrieve genesis ledger and genesis proof from \
-                   $path: $error"
+                  "Could not curl genesis ledger and genesis proof from $uri: \
+                   $error"
                   ~metadata:
-                    [ ("path", `String s3_install_path)
+                    [ ("path", `String s3_bucket_prefix)
                     ; ("error", `String (Error.to_string_hum e)) ]
           in
           let%map res = retrieve Cache_dir.s3_install_path in

@@ -260,6 +260,7 @@ let run
           Cache_dir.load_from_s3
             (full_paths s3_bucket_prefix)
             (full_paths s3_install_path)
+            ~logger:(Logger.create ())
         in
         With_components.load load ~base_path:(base_path s3_install_path)
       with

@@ -139,10 +139,8 @@ let get_accounts accounts_json_file n =
 let create_tar top_dir =
   let tar_file = top_dir ^/ Cache_dir.genesis_dir_name ^ ".tar.gz" in
   let tar_command =
-    sprintf "tar -C %s -cvvzf %s %s" top_dir tar_file
-      Cache_dir.genesis_dir_name
+    sprintf "tar -C %s -czf %s %s" top_dir tar_file Cache_dir.genesis_dir_name
   in
-  Core.printf "command:%s \n%!" tar_command ;
   let exit = Core.Sys.command tar_command in
   if exit = 2 then
     failwith
@@ -177,8 +175,9 @@ let main accounts_json_file dir n =
               , Dummy_values.Tock.Bowe_gabizon18.proof )
           else generate_base_proof ~ledger
         in
-        let%map wr = Writer.open_file proof_path in
-        Writer.write wr (Proof.Stable.V1.sexp_of_t base_proof |> Sexp.to_string)
+        let%bind wr = Writer.open_file proof_path in
+        Writer.write wr (Proof.Stable.V1.sexp_of_t base_proof |> Sexp.to_string) ;
+        Writer.close wr
     | Error e ->
         failwithf "Failed to create genesis ledger\n%s" (Error.to_string_hum e)
           ()
