@@ -232,7 +232,7 @@ module Types = struct
                ~user_commands_sent:nn_int ~snark_worker:string
                ~snark_work_fee:nn_int
                ~sync_status:(id ~typ:(non_null sync_status))
-               ~propose_pubkeys:
+               ~block_production_keys:
                  (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms)
                ~consensus_time_best_tip:
@@ -488,12 +488,12 @@ module Types = struct
       ; path: string }
 
     let lift coda pk account =
-      let propose_public_keys = Coda_lib.propose_public_keys coda in
+      let block_production_pubkeys = Coda_lib.block_production_pubkeys coda in
       let accounts = Coda_lib.wallets coda in
       { account
       ; locked= Secrets.Wallets.check_locked accounts ~needle:pk
       ; is_actively_staking=
-          Public_key.Compressed.Set.mem propose_public_keys pk
+          Public_key.Compressed.Set.mem block_production_pubkeys pk
       ; path= Secrets.Wallets.get_path accounts pk }
 
     let get_best_ledger_account coda pk =
@@ -1731,9 +1731,11 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.set_staking)
       ~resolve:(fun {ctx= coda; _} () pks ->
         (* TODO: Handle errors like: duplicates, etc *)
-        let old_propose_keys = Coda_lib.propose_public_keys coda in
+        let old_block_production_keys =
+          Coda_lib.block_production_pubkeys coda
+        in
         ignore @@ Coda_commands.replace_proposers coda pks ;
-        Public_key.Compressed.Set.to_list old_propose_keys )
+        Public_key.Compressed.Set.to_list old_block_production_keys )
 
   let set_snark_worker =
     io_field "setSnarkWorker"
@@ -1855,14 +1857,14 @@ module Queries = struct
 
   let tracked_accounts_resolver {ctx= coda; _} () =
     let wallets = Coda_lib.wallets coda in
-    let propose_public_keys = Coda_lib.propose_public_keys coda in
+    let block_production_pubkeys = Coda_lib.block_production_pubkeys coda in
     wallets |> Secrets.Wallets.pks
     |> List.map ~f:(fun pk ->
            { Types.AccountObj.account=
                Types.AccountObj.Partial_account.of_pk coda pk
            ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
            ; is_actively_staking=
-               Public_key.Compressed.Set.mem propose_public_keys pk
+               Public_key.Compressed.Set.mem block_production_pubkeys pk
            ; path= Secrets.Wallets.get_path wallets pk } )
 
   let owned_wallets =
@@ -1881,13 +1883,13 @@ module Queries = struct
       ~resolve:tracked_accounts_resolver
 
   let account_resolver {ctx= coda; _} () pk =
-    let propose_public_keys = Coda_lib.propose_public_keys coda in
+    let block_production_pubkeys = Coda_lib.block_production_pubkeys coda in
     let wallets = Coda_lib.wallets coda in
     Some
       { Types.AccountObj.account= Types.AccountObj.Partial_account.of_pk coda pk
       ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
       ; is_actively_staking=
-          Public_key.Compressed.Set.mem propose_public_keys pk
+          Public_key.Compressed.Set.mem block_production_pubkeys pk
       ; path= Secrets.Wallets.get_path wallets pk }
 
   let wallet =

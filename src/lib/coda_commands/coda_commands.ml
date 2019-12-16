@@ -272,7 +272,7 @@ let get_status ~flag t =
       ~f:Public_key.Compressed.to_base58_check
   in
   let snark_work_fee = Currency.Fee.to_int @@ Coda_lib.snark_work_fee t in
-  let propose_pubkeys = Coda_lib.propose_public_keys t in
+  let block_production_keys = Coda_lib.block_production_pubkeys t in
   let consensus_mechanism = Consensus.name in
   let time_controller = (Coda_lib.config t).time_controller in
   let consensus_time_now =
@@ -415,8 +415,8 @@ let get_status ~flag t =
   ; user_commands_sent
   ; snark_worker
   ; snark_work_fee
-  ; propose_pubkeys=
-      Public_key.Compressed.Set.to_list propose_pubkeys
+  ; block_production_keys=
+      Public_key.Compressed.Set.to_list block_production_keys
       |> List.map ~f:Public_key.Compressed.to_base58_check
   ; histograms
   ; next_proposal

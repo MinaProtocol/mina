@@ -220,7 +220,8 @@ module Status = struct
 
     let sync_status = map_entry "Sync status" ~f:Sync_status.to_string
 
-    let propose_pubkeys = list_entry "Block producers running" ~to_string:Fn.id
+    let block_production_keys =
+      list_entry "Block producers running" ~to_string:Fn.id
 
     let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
@@ -310,7 +311,7 @@ module Status = struct
     ; snark_worker: string option
     ; snark_work_fee: int
     ; sync_status: Sync_status.Stable.V1.t
-    ; propose_pubkeys: string list
+    ; block_production_keys: string list
     ; histograms: Histograms.t option
     ; consensus_time_best_tip: Consensus.Data.Consensus_time.Stable.V1.t option
     ; next_proposal:
@@ -335,9 +336,9 @@ module Status = struct
     Fields.to_list ~sync_status ~num_accounts ~blockchain_length
       ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
       ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent ~snark_worker
-      ~propose_pubkeys ~histograms ~consensus_time_best_tip ~consensus_time_now
-      ~consensus_mechanism ~consensus_configuration ~next_proposal
-      ~snark_work_fee ~addrs_and_ports ~libp2p_peer_id
+      ~block_production_keys ~histograms ~consensus_time_best_tip
+      ~consensus_time_now ~consensus_mechanism ~consensus_configuration
+      ~next_proposal ~snark_work_fee ~addrs_and_ports ~libp2p_peer_id
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

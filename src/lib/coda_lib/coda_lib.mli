@@ -17,7 +17,7 @@ exception Snark_worker_signal_interrupt of Signal.t
 val subscription : t -> Coda_subscriptions.t
 
 (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
-val propose_public_keys : t -> Public_key.Compressed.Set.t
+val block_production_pubkeys : t -> Public_key.Compressed.Set.t
 
 val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
 

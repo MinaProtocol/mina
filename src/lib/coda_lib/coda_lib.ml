@@ -82,7 +82,7 @@ let client_port t =
   client_port
 
 (* Get the most recently set public keys  *)
-let propose_public_keys t : Public_key.Compressed.Set.t =
+let block_production_pubkeys t : Public_key.Compressed.Set.t =
   let public_keys, _ = Agent.get t.propose_keypairs in
   Public_key.Compressed.Set.map public_keys ~f:snd
 
