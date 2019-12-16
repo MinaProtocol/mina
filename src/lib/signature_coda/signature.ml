@@ -45,7 +45,7 @@ module Stable = struct
     [%%if
     curve_size = 298]
 
-    let%test "signature serialization v1" =
+    let%test "signature serialization v1 (curve_size=298)" =
       let signature =
         Quickcheck.random_value
           ~seed:(`Deterministic "signature serialization") V1.gen
@@ -58,7 +58,7 @@ module Stable = struct
     [%%elif
     curve_size = 753]
 
-    let%test "signature serialization v1" =
+    let%test "signature serialization v1 (curve_size=753)" =
       let signature =
         Quickcheck.random_value
           ~seed:(`Deterministic "signature serialization") V1.gen
