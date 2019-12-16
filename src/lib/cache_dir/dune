@@ -1,5 +1,5 @@
 (library
  (name cache_dir)
  (public_name cache_dir)
- (libraries core async)
+ (libraries core async coda_version)
  (preprocess (pps ppx_coda ppx_let ppx_custom_printf)))

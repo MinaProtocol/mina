@@ -55,7 +55,7 @@ let%test_module "Command line tests" =
               ; "-config-directory"
               ; config_dir
               ; "-genesis-ledger-dir"
-              ; Cache_dir.genesis_ledger_path genesis_ledger_dir ]
+              ; genesis_ledger_dir ^/ Cache_dir.genesis_dir_name ]
             ()
         with
         | Ok s ->

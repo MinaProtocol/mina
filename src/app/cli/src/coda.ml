@@ -15,12 +15,23 @@ let retrieve_genesis_state dir_opt ~logger :
   let s3_bucket_prefix =
     "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
   in
+  let extract dir =
+    let tar_file = dir ^/ Cache_dir.genesis_dir_name ^ ".tar.gz" in
+    let tar_command = sprintf "tar -C %s --file=%s -xz" dir tar_file in
+    let exit = Core.Sys.command tar_command in
+    if exit = 2 then
+      Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
+        "Error extracting genesis ledger and proof from the tar file $tar_file."
+        ~metadata:[("tar_file", `String tar_file); ("exit_code", `Int exit)]
+  in
   let retrieve dir =
     Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
       "Retrieving genesis ledger and genesis proof from $path"
       ~metadata:[("path", `String dir)] ;
+    let () = extract dir in
+    let dir = dir ^/ Cache_dir.genesis_dir_name in
     let ledger_dir = dir ^/ "ledger" in
-    let proof_file = dir ^/ "base_proof" in
+    let proof_file = dir ^/ "genesis_proof" in
     if
       Core.Sys.file_exists ledger_dir = `Yes
       && Core.Sys.file_exists proof_file = `Yes
@@ -47,7 +58,11 @@ let retrieve_genesis_state dir_opt ~logger :
         "Successfully retrieved genesis ledger and genesis proof from $path"
         ~metadata:[("path", `String dir)] ;
       Some (genesis_ledger, base_proof) )
-    else Deferred.return None
+    else (
+      Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
+        "Error retrieving genesis ledger and genesis proof from $path"
+        ~metadata:[("path", `String dir)] ;
+      Deferred.return None )
   in
   let res_or_fail dir_str = function
     | Some res ->
@@ -68,8 +83,7 @@ let retrieve_genesis_state dir_opt ~logger :
       in
       match%bind
         Deferred.List.fold directories ~init:None ~f:(fun acc dir ->
-            if is_some acc then Deferred.return acc
-            else retrieve (Cache_dir.genesis_ledger_path dir) )
+            if is_some acc then Deferred.return acc else retrieve dir )
       with
       | Some res ->
           Deferred.return res
@@ -77,9 +91,18 @@ let retrieve_genesis_state dir_opt ~logger :
           (*Check if it's in s3*)
           let s3_install_path = Cache_dir.s3_install_path ^/ "genesis" in
           let%bind () =
-            Deferred.map
-              (Cache_dir.load_from_s3 [s3_bucket_prefix] [s3_install_path])
-              ~f:Or_error.ok_exn
+            match%map
+              Cache_dir.load_from_s3 [s3_bucket_prefix] [s3_install_path]
+            with
+            | Ok () ->
+                ()
+            | Error e ->
+                Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
+                  "Could not retrieve genesis ledger and genesis proof from \
+                   $path: $error"
+                  ~metadata:
+                    [ ("path", `String s3_install_path)
+                    ; ("error", `String (Error.to_string_hum e)) ]
           in
           let%map res = retrieve s3_install_path in
           res_or_fail
