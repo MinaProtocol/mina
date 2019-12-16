@@ -99,8 +99,7 @@ let setup (type n) ?(logger = Logger.null ())
                   Deferred.return
                     (Sync_handler.Root.prove ~logger ~frontier
                        (Envelope.Incoming.data query_env)) )
-                ~get_bootstrappable_best_tip:(fun _ ->
-                  failwith "Get_bootstrappable_best_tip unimplemented" )
+                ~get_best_tip:(fun _ -> failwith "Get_best_tip unimplemented")
                 ~get_transition_chain_proof:(fun query_env ->
                   Deferred.return
                     (Transition_chain_prover.prove ~frontier

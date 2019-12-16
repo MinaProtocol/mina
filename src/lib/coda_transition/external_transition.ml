@@ -574,6 +574,8 @@ let skip_staged_ledger_diff_validation
   (t, Validation.Unsafe.set_valid_staged_ledger_diff validation)
 
 module With_validation = struct
+  let compare (t1, _) (t2, _) = compare (With_hash.data t1) (With_hash.data t2)
+
   let state_hash (t, _) = With_hash.hash t
 
   let lift f (t, _) = With_hash.data t |> f
@@ -690,9 +692,6 @@ module Validated = struct
                     let to_binable = erase
                   end)
 
-        let compare (t1, _) (t2, _) =
-          compare (With_hash.data t1) (With_hash.data t2)
-
         let to_yojson (transition_with_hash, _) =
           With_hash.to_yojson to_yojson State_hash.to_yojson
             transition_with_hash
@@ -760,6 +759,10 @@ module Validated = struct
     , to_yojson )]
 
   include Comparable.Make (Stable.Latest)
+
+  let to_initial_validated t =
+    t |> Validation.reset_frontier_dependencies_validation
+    |> Validation.reset_staged_ledger_diff_validation
 end
 
 let genesis ~genesis_ledger ~base_proof =

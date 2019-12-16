@@ -141,7 +141,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
   let duplicate_checker = Duplicate_proposal_detector.create () in
   don't_wait_for
     (Reader.iter transition_reader ~f:(fun network_transition ->
-         if !initialization_finish_signal then (
+         if Ivar.is_full initialization_finish_signal then (
            let `Transition transition_env, `Time_received time_received =
              network_transition
            in
