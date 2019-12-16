@@ -2,7 +2,6 @@ open Core_kernel
 open Snark_bits
 open Bitstring_lib
 open Intf
-open Signed_poly
 
 module Make (Tick : Tick_S) = struct
   open Tick
@@ -77,19 +76,19 @@ module Make (Tick : Tick_S) = struct
 
     type magnitude_var
 
-    type t = (magnitude, Sgn.t) Signed.t
+    type t = (magnitude, Sgn.t) Signed_poly.t
     [@@deriving sexp, hash, compare, eq, yojson]
 
     val gen : t Quickcheck.Generator.t
 
     val create :
-      magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed.t
+      magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed_poly.t
 
     val sgn : t -> Sgn.t
 
     val magnitude : t -> magnitude
 
-    type var = (magnitude_var, Sgn.var) Signed.t
+    type var = (magnitude_var, Sgn.var) Signed_poly.t
 
     val typ : (var, t) Typ.t
 
@@ -122,7 +121,8 @@ module Make (Tick : Tick_S) = struct
 
       val cswap :
            Boolean.var
-        -> (magnitude_var, Sgn.t) Signed.t * (magnitude_var, Sgn.t) Signed.t
+        -> (magnitude_var, Sgn.t) Signed_poly.t
+           * (magnitude_var, Sgn.t) Signed_poly.t
         -> (var * var, _) Checked.t
     end
   end
@@ -279,11 +279,11 @@ module Make (Tick : Tick_S) = struct
       >>= unpack_var
 
     module Signed = struct
-      type ('magnitude, 'sgn) typ = ('magnitude, 'sgn) Signed.t =
+      type ('magnitude, 'sgn) typ = ('magnitude, 'sgn) Signed_poly.t =
         {magnitude: 'magnitude; sgn: 'sgn}
       [@@deriving sexp, hash, compare, yojson]
 
-      type t = (Unsigned.t, Sgn.t) Signed.t
+      type t = (Unsigned.t, Sgn.t) Signed_poly.t
       [@@deriving sexp, hash, compare, eq, yojson]
 
       type magnitude = Unsigned.t [@@deriving sexp, compare]
@@ -300,7 +300,7 @@ module Make (Tick : Tick_S) = struct
         Quickcheck.Generator.map2 gen Sgn.gen ~f:(fun magnitude sgn ->
             create ~magnitude ~sgn )
 
-      type nonrec var = (var, Sgn.var) Signed.t
+      type nonrec var = (var, Sgn.var) Signed_poly.t
 
       let of_hlist : (unit, 'a -> 'b -> unit) Snarky.H_list.t -> ('a, 'b) typ =
         Snarky.H_list.(fun [magnitude; sgn] -> {magnitude; sgn})

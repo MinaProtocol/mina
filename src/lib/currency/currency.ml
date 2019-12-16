@@ -1,6 +1,6 @@
 open Core_kernel
 module Tick = Snark_params.Tick
-module Signed = Signed_poly.Signed
+module Signed_poly = Signed_poly
 include Functor.Make (Tick)
 
 let currency_length = 64

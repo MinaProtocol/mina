@@ -65,7 +65,7 @@ module Statement = struct
         ; fee_excess:
             ( Currency.Fee.Stable.V1.t
             , Sgn.Stable.V1.t )
-            Currency.Signed.Stable.V1.t
+            Currency.Signed_poly.Stable.V1.t
         ; proof_type: Proof_type.Stable.V1.t }
       [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -136,7 +136,9 @@ module Stable = struct
       ; supply_increase: Amount.Stable.V1.t
       ; pending_coinbase_stack_state: Pending_coinbase_stack_state.Stable.V1.t
       ; fee_excess:
-          (Amount.Stable.V1.t, Sgn.Stable.V1.t) Currency.Signed.Stable.V1.t
+          ( Amount.Stable.V1.t
+          , Sgn.Stable.V1.t )
+          Currency.Signed_poly.Stable.V1.t
       ; sok_digest: Sok_message.Digest.Stable.V1.t
       ; proof: Proof.Stable.V1.t }
     [@@deriving compare, fields, sexp, version]
@@ -164,7 +166,7 @@ type t = Stable.Latest.t =
   ; proof_type: Proof_type.t
   ; supply_increase: Amount.t
   ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-  ; fee_excess: (Amount.t, Sgn.t) Currency.Signed.t
+  ; fee_excess: (Amount.t, Sgn.t) Currency.Signed_poly.t
   ; sok_digest: Sok_message.Digest.t
   ; proof: Proof.t }
 [@@deriving fields, sexp]

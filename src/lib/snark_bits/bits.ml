@@ -148,7 +148,7 @@ end
 
 module Snarkable = struct
   module Small_bit_vector
-      (Tick : Tick_intf.S) (V : sig
+      (Impl : Snarky_intf.S) (V : sig
           type t
 
           val empty : t
@@ -160,17 +160,17 @@ module Snarkable = struct
           val set : t -> int -> bool -> t
       end) :
     Bits_intf.Snarkable.Small
-    with type ('a, 'b) typ := ('a, 'b) Tick.Typ.t
-     and type ('a, 'b) checked := ('a, 'b) Tick.Checked.t
-     and type boolean_var := Tick.Boolean.var
-     and type field_var := Tick.Field.Var.t
-     and type Packed.var = Tick.Field.Var.t
+    with type ('a, 'b) typ := ('a, 'b) Impl.Typ.t
+     and type ('a, 'b) checked := ('a, 'b) Impl.Checked.t
+     and type boolean_var := Impl.Boolean.var
+     and type field_var := Impl.Field.Var.t
+     and type Packed.var = Impl.Field.Var.t
      and type Packed.value = V.t
-     and type Unpacked.var = Tick.Boolean.var list
+     and type Unpacked.var = Impl.Boolean.var list
      and type Unpacked.value = V.t
-     and type comparison_result := Tick.Field.Checked.comparison_result =
+     and type comparison_result := Impl.Field.Checked.comparison_result =
   struct
-    open Tick
+    open Impl
 
     let bit_length = V.length
 
