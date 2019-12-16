@@ -232,6 +232,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       List.fold_left (Vector.to_list polynomials) ~init:sg_old ~f:(fun acc p ->
           p + scale acc xi )
     in
+    (* TODO: Absorb challenges into the sponge and expose it as another input *)
     let gamma_prod, challenges = bullet_reduce sponge proof.gammas in
     let gamma0 =
       let tau = scale g (Fq.to_bits combined_inner_product) in
@@ -266,6 +267,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         Could be worse!
     *)
     let x_hat =
+      (* TODO: This won't properly handle inputs that are zero. *)
       Array.mapi public_input ~f:(fun i input ->
           G.scale Input_domain.lagrange_commitments.(i) input )
       |> Array.reduce_exn ~f:G.( + )

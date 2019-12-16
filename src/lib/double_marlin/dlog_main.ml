@@ -348,6 +348,7 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
     let sample () = Sponge.squeeze sponge ~length:Challenge.length in
     let open Pairing_marlin_types.Messages in
     let x_hat =
+      (* TODO: This won't properly handle inputs that are zero. *)
       Array.mapi public_input ~f:(fun i input ->
           G1.scale Input_domain.lagrange_commitments.(i) input )
       |> Array.reduce_exn ~f:G1.( + )
@@ -562,13 +563,43 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   let prod xs f = List.reduce_exn (List.map xs ~f) ~f:Fq.( * )
 
-  let check_bulletproof_challenges chals =
-    Array.iter chals
-      ~f:(fun { Types.Pairing_based.Bulletproof_challenge.prechallenge
-              ; is_square }
-         -> Boolean.Assert.( = ) is_square (Fq.is_square prechallenge) )
+  (* TODO: Put this in the functor argument. *)
+  let nonresidue = Fq.of_int 5
 
-  let finalize_other_proof ~domain_k ~domain_h ~sponge
+  let pow_two_pows x k =
+    let res = Array.init k ~f:(fun _ -> x) in
+    for i = 1 to k - 1 do
+      res.(i) <- Fq.square res.(i - 1)
+    done ;
+    res
+
+  let prod k f =
+    let r = ref (f 0) in
+    for i = 1 to k - 1 do
+      r := Fq.(f i * !r)
+    done ;
+    !r
+
+  let check_bulletproof_challenges chals ~sg_challenge_point ~sg_evaluation =
+    let chals =
+      Array.map chals
+        ~f:(fun { Types.Pairing_based.Bulletproof_challenge.prechallenge
+                ; is_square }
+           ->
+          let sq =
+            Fq.if_ is_square ~then_:prechallenge
+              ~else_:Fq.(nonresidue * prechallenge)
+          in
+          Fq.sqrt sq )
+    in
+    let k = Array.length chals in
+    let chal_invs = Array.map chals ~f:Fq.inv in
+    let pows = pow_two_pows sg_challenge_point k in
+    prod k (fun i -> Fq.(chals.(i) + (chal_invs.(i) * pows.(i))))
+
+  (* TODO: Check a_hat! *)
+  let finalize_other_proof ~domain_k ~domain_h ~sponge ~sg_challenge_point
+      ~sg_evaluation
       ({ xi
        ; r
        ; combined_inner_product
@@ -585,7 +616,8 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
            ; beta_2
            ; beta_3 } } :
         _ Types.Pairing_based.Proof_state.Deferred_values.t) =
-    check_bulletproof_challenges bulletproof_challenges ;
+    check_bulletproof_challenges bulletproof_challenges ~sg_challenge_point
+      ~sg_evaluation ;
     let open Vector in
     (* As a proof size optimization, we can probably rig each polynomial
        to vanish on the previous challenges.
@@ -729,11 +761,12 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   let main
       ({ proof_state=
-           { deferred_values= {marlin; xi; r; r_xi_sum}
+           { deferred_values=
+               {marlin; xi; r; r_xi_sum; sg_evaluation; sg_challenge_point}
            ; sponge_digest_before_evaluations
            ; me_only= me_only_digest }
        ; pass_through } :
-        (Challenge.t, _, _, _, _) Types.Dlog_based.Statement.t) =
+        (Challenge.t, _, _, _, _, _, _) Types.Dlog_based.Statement.t) =
     let { Types.Dlog_based.Proof_state.Me_only.pairing_marlin_acc
         ; pairing_marlin_index } =
       decompress_me_only me_only_digest
@@ -770,7 +803,8 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
       Sponge.absorb s prev_sponge_digest_before_evaluations ;
       s
     in
-    finalize_other_proof ~domain_k ~domain_h ~sponge prev_deferred_values ;
+    finalize_other_proof ~domain_k ~domain_h ~sponge prev_deferred_values
+      ~sg_challenge_point ~sg_evaluation ;
     let ( sponge_digest_before_evaluations_actual
         , pairing_acc_actual
         , marlin_actual ) =

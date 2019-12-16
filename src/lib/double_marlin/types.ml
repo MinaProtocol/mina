@@ -72,25 +72,38 @@ module Dlog_based = struct
             ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
       end
 
-      type ('challenge, 'fp) t =
+      type ('challenge, 'fp, 'fq_challenge, 'fq) t =
         { xi: 'challenge
         ; r: 'challenge
         ; r_xi_sum: 'fp
-        ; marlin: ('challenge, 'fp) Marlin.t }
+        ; marlin: ('challenge, 'fp) Marlin.t
+              (* We could reuse marlin.beta_1 or something instead of this. *)
+        ; sg_challenge_point: 'fq_challenge
+        ; sg_evaluation: 'fq }
 
-      let map_challenges {xi; r; r_xi_sum; marlin} ~f =
-        {xi= f xi; r= f r; r_xi_sum; marlin= Marlin.map_challenges marlin ~f}
+      let map_challenges
+          {xi; r; r_xi_sum; marlin; sg_challenge_point; sg_evaluation} ~f =
+        { xi= f xi
+        ; r= f r
+        ; r_xi_sum
+        ; marlin= Marlin.map_challenges marlin ~f
+        ; sg_challenge_point
+        ; sg_evaluation }
 
       open Snarky.H_list
 
-      let to_hlist {xi; r; r_xi_sum; marlin} = [xi; r; r_xi_sum; marlin]
+      let to_hlist {xi; r; r_xi_sum; marlin; sg_challenge_point; sg_evaluation}
+          =
+        [xi; r; r_xi_sum; marlin; sg_challenge_point; sg_evaluation]
 
-      let of_hlist ([xi; r; r_xi_sum; marlin] : (unit, _) t) =
-        {xi; r; r_xi_sum; marlin}
+      let of_hlist
+          ([xi; r; r_xi_sum; marlin; sg_challenge_point; sg_evaluation] :
+            (unit, _) t) =
+        {xi; r; r_xi_sum; marlin; sg_challenge_point; sg_evaluation}
 
-      let typ chal fp =
+      let typ chal fp fq =
         Snarky.Typ.of_hlistable
-          [chal; chal; fp; Marlin.typ chal fp]
+          [chal; chal; fp; Marlin.typ chal fp; chal; fq]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
@@ -116,8 +129,8 @@ module Dlog_based = struct
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
 
-    type ('challenge, 'fp, 'me_only, 'digest) t =
-      { deferred_values: ('challenge, 'fp) Deferred_values.t
+    type ('challenge, 'fp, 'fq_challenge, 'fq, 'me_only, 'digest) t =
+      { deferred_values: ('challenge, 'fp, 'fq_challenge, 'fq) Deferred_values.t
       ; sponge_digest_before_evaluations: 'digest
             (* Not needed by other proof system *)
       ; me_only: 'me_only }
@@ -132,9 +145,9 @@ module Dlog_based = struct
           (unit, _) t) =
       {deferred_values; sponge_digest_before_evaluations; me_only}
 
-    let typ chal fp me_only digest =
+    let typ chal fp fq me_only digest =
       Snarky.Typ.of_hlistable
-        [Deferred_values.typ chal fp; digest; me_only]
+        [Deferred_values.typ chal fp fq; digest; me_only]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
@@ -159,8 +172,22 @@ module Dlog_based = struct
   end
 
   module Statement = struct
-    type ('challenge, 'fp, 'me_only, 'digest, 'pass_through) t =
-      { proof_state: ('challenge, 'fp, 'me_only, 'digest) Proof_state.t
+    type ( 'challenge
+         , 'fp
+         , 'fq_challenge
+         , 'fq
+         , 'me_only
+         , 'digest
+         , 'pass_through )
+         t =
+      { proof_state:
+          ( 'challenge
+          , 'fp
+          , 'fq_challenge
+          , 'fq
+          , 'me_only
+          , 'digest )
+          Proof_state.t
       ; pass_through: 'pass_through }
 
     (*
@@ -201,6 +228,8 @@ module Dlog_based = struct
                 { xi
                 ; r
                 ; r_xi_sum
+                ; sg_challenge_point
+                ; sg_evaluation
                 ; marlin=
                     { sigma_2
                     ; sigma_3
@@ -217,21 +246,43 @@ module Dlog_based = struct
       let open Vector in
       let fp = [sigma_2; sigma_3; r_xi_sum] in
       let challenge =
-        [xi; r; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3]
+        [ xi
+        ; r
+        ; alpha
+        ; eta_a
+        ; eta_b
+        ; eta_c
+        ; beta_1
+        ; beta_2
+        ; beta_3
+        ; sg_challenge_point ]
       in
+      let fq = [sg_evaluation] in
       let digest = [sponge_digest_before_evaluations; me_only; pass_through] in
-      (fp, challenge, digest)
+      (fp, fq, challenge, digest)
 
-    let of_data (fp, challenge, digest) =
+    let of_data (fp, fq, challenge, digest) =
       let open Vector in
       let [sigma_2; sigma_3; r_xi_sum] = fp in
-      let [xi; r; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3] =
+      let [ xi
+          ; r
+          ; alpha
+          ; eta_a
+          ; eta_b
+          ; eta_c
+          ; beta_1
+          ; beta_2
+          ; beta_3
+          ; sg_challenge_point ] =
         challenge
       in
+      let [sg_evaluation] = fq in
       let [sponge_digest_before_evaluations; me_only; pass_through] = digest in
       { proof_state=
           { deferred_values=
               { xi
+              ; sg_evaluation
+              ; sg_challenge_point
               ; r
               ; r_xi_sum
               ; marlin=

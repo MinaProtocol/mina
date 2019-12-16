@@ -31,6 +31,51 @@ module Snarkable = struct
          Snarky.Typ.t
   end
 
+  module type S4 = sig
+    type (_, _, _, _) t
+
+    val typ :
+         ('var1, 'value1, 'f) Snarky.Typ.t
+      -> ('var2, 'value2, 'f) Snarky.Typ.t
+      -> ('var3, 'value3, 'f) Snarky.Typ.t
+      -> ('var4, 'value4, 'f) Snarky.Typ.t
+      -> ( ('var1, 'var2, 'var3, 'var4) t
+         , ('value1, 'value2, 'value3, 'value4) t
+         , 'f )
+         Snarky.Typ.t
+  end
+
+  module type S5 = sig
+    type (_, _, _, _, _) t
+
+    val typ :
+         ('var1, 'value1, 'f) Snarky.Typ.t
+      -> ('var2, 'value2, 'f) Snarky.Typ.t
+      -> ('var3, 'value3, 'f) Snarky.Typ.t
+      -> ('var4, 'value4, 'f) Snarky.Typ.t
+      -> ('var5, 'value5, 'f) Snarky.Typ.t
+      -> ( ('var1, 'var2, 'var3, 'var4, 'var5) t
+         , ('value1, 'value2, 'value3, 'value4, 'value5) t
+         , 'f )
+         Snarky.Typ.t
+  end
+
+  module type S6 = sig
+    type (_, _, _, _, _, _) t
+
+    val typ :
+         ('var1, 'value1, 'f) Snarky.Typ.t
+      -> ('var2, 'value2, 'f) Snarky.Typ.t
+      -> ('var3, 'value3, 'f) Snarky.Typ.t
+      -> ('var4, 'value4, 'f) Snarky.Typ.t
+      -> ('var5, 'value5, 'f) Snarky.Typ.t
+      -> ('var6, 'value6, 'f) Snarky.Typ.t
+      -> ( ('var1, 'var2, 'var3, 'var4, 'var5, 'var6) t
+         , ('value1, 'value2, 'value3, 'value4, 'value5, 'value6) t
+         , 'f )
+         Snarky.Typ.t
+  end
+
   module type S7 = sig
     type (_, _, _, _, _, _, _) t
 
