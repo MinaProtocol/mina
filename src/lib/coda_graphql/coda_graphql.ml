@@ -129,6 +129,24 @@ module Types = struct
                 "The transaction has either been snarked, reached finality \
                  through consensus or has been dropped" ]
 
+  let block_proposal :
+      ( _
+      , [`Check_again of Block_time.t | `Propose of Block_time.t | `Propose_now]
+        option )
+      typ =
+    obj "BlockProposals" ~fields:(fun _ ->
+        let of_time = Consensus.Data.Consensus_time.of_time_exn in
+        [ field "times"
+            ~typ:
+              ( non_null @@ list @@ non_null
+              @@ Consensus.Data.Consensus_time.graphql_type () )
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} -> function `Check_again _time -> []
+              | `Propose time -> [of_time time] | `Propose_now ->
+                  [ of_time
+                    @@ Block_time.now (Coda_lib.config coda).time_controller ]
+              ) ] )
+
   module DaemonStatus = struct
     type t = Daemon_rpcs.Types.Status.t
 
@@ -207,17 +225,25 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
-               ~next_proposal:string ~blockchain_length:int ~uptime_secs:nn_int
-               ~ledger_merkle_root:string ~state_hash:string
-               ~commit_id:nn_string ~conf_dir:nn_string
+               ~next_proposal:(id ~typ:block_proposal) ~blockchain_length:int
+               ~uptime_secs:nn_int ~ledger_merkle_root:string
+               ~state_hash:string ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
                ~user_commands_sent:nn_int ~snark_worker:string
                ~snark_work_fee:nn_int
                ~sync_status:(id ~typ:(non_null sync_status))
                ~propose_pubkeys:
                  (id ~typ:Schema.(non_null @@ list (non_null string)))
-               ~histograms:(id ~typ:histograms) ~consensus_time_best_tip:string
-               ~consensus_time_now:nn_string ~consensus_mechanism:nn_string
+               ~histograms:(id ~typ:histograms)
+               ~consensus_time_best_tip:
+                 (id ~typ:(Consensus.Data.Consensus_time.graphql_type ()))
+               ~consensus_time_now:
+                 (id
+                    ~typ:
+                      Schema.(
+                        non_null
+                          (Consensus.Data.Consensus_time.graphql_type ())))
+               ~consensus_mechanism:nn_string
                ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
                ~libp2p_peer_id:nn_string
                ~consensus_configuration:
@@ -1437,6 +1463,7 @@ module Mutations = struct
     let%map pk =
       Coda_lib.wallets t |> Secrets.Wallets.generate_new ~password
     in
+    Coda_lib.subscriptions t |> Coda_lib.Subscriptions.add_new_subscription ~pk ;
     Result.return pk
 
   let add_wallet =

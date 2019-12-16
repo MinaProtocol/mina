@@ -427,8 +427,6 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
           { parent_node with
             successor_hashes= breadcrumb_hash :: parent_node.successor_hashes
           } ;
-      Coda_metrics.(Gauge.inc_one Transition_frontier.active_breadcrumbs) ;
-      Coda_metrics.(Counter.inc_one Transition_frontier.total_breadcrumbs) ;
       ((), None)
   | Best_tip_changed new_best_tip ->
       let old_best_tip = t.best_tip in
@@ -461,8 +459,9 @@ let update_metrics_with_diff (type mutant) t
           |> Coda_numbers.Length.to_int )
       in
       let global_slot =
-        Consensus.Data.Consensus_state.global_slot consensus_state
-        |> Unsigned.UInt32.to_int |> Float.of_int
+        Consensus.Data.Consensus_state.consensus_time consensus_state
+        |> Consensus.Data.Consensus_time.to_uint32 |> Unsigned.UInt32.to_int
+        |> Float.of_int
       in
       Coda_metrics.(
         let num_breadcrumbs_removed =

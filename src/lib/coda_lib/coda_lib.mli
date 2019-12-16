@@ -88,6 +88,8 @@ end
 
 val root_diff : t -> Root_diff.t Strict_pipe.Reader.t
 
+val initialization_finish_signal : t -> unit Ivar.t
+
 val dump_tf : t -> string Or_error.t
 
 val best_path : t -> State_hash.t list option
@@ -119,8 +121,10 @@ val receipt_chain_database : t -> Receipt_chain_database.t
 
 val wallets : t -> Secrets.Wallets.t
 
+val subscriptions : t -> Coda_subscriptions.t
+
 val most_recent_valid_transition :
-  t -> External_transition.t Broadcast_pipe.Reader.t
+  t -> External_transition.Initial_validated.t Broadcast_pipe.Reader.t
 
 val top_level_logger : t -> Logger.t
 

@@ -56,7 +56,9 @@ module Duplicate_proposal_detector = struct
   module Proposals = struct
     module T = struct
       (* order of fields significant, compare by epoch, then slot, then proposer *)
-      type t = {epoch: int; slot: int; proposer: Public_key.Compressed.t}
+      type t =
+        { consensus_time: Consensus.Data.Consensus_time.t
+        ; proposer: Public_key.Compressed.t }
       [@@deriving sexp, compare]
     end
 
@@ -83,23 +85,11 @@ module Duplicate_proposal_detector = struct
   let gc_count = ref 0
 
   (* create dummy proposal to split map on *)
-  let make_splitting_proposal (proposal : Proposals.t) : Proposals.t =
+  let make_splitting_proposal ({consensus_time; proposer= _} : Proposals.t) :
+      Proposals.t =
     let proposer = Public_key.Compressed.empty in
-    if
-      [%compare: int * int]
-        (proposal.epoch, proposal.slot)
-        (gc_width_epoch, gc_width_slot)
-      < 0
-    then (* proposal not beyond gc_width *)
-      {epoch= 0; slot= 0; proposer}
-    else
-      let open Int in
-      (* subtract epoch, slot components of gc_width *)
-      { epoch=
-          ( proposal.epoch - gc_width_epoch
-          - if gc_width_slot > proposal.slot then 1 else 0 )
-      ; slot= (proposal.slot - gc_width_slot) % Consensus.epoch_size
-      ; proposer }
+    { consensus_time= Consensus.Data.Consensus_time.get_old consensus_time
+    ; proposer }
 
   (* every gc_interval proposals seen, discard proposals more than gc_width ago *)
   let table_gc t proposal =
@@ -118,10 +108,9 @@ module Duplicate_proposal_detector = struct
     let consensus_state =
       External_transition.consensus_state external_transition
     in
-    let epoch = curr_epoch consensus_state |> Unsigned.UInt32.to_int in
-    let slot = curr_slot consensus_state |> Unsigned.UInt32.to_int in
+    let consensus_time = consensus_time consensus_state in
     let proposer = External_transition.proposer external_transition in
-    let proposal = Proposals.{epoch; slot; proposer} in
+    let proposal = Proposals.{consensus_time; proposer} in
     (* try table GC *)
     table_gc t proposal ;
     match Map.find t.table proposal with
@@ -132,13 +121,14 @@ module Duplicate_proposal_detector = struct
           Logger.error logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
               [ ("block_producer", Public_key.Compressed.to_yojson proposer)
-              ; ("slot", `Int slot)
+              ; ( "consensus_time"
+                , Consensus.Data.Consensus_time.to_yojson consensus_time )
               ; ("hash", State_hash.to_yojson hash)
               ; ( "current_protocol_state_hash"
                 , State_hash.to_yojson protocol_state_hash ) ]
-            "Duplicate producer and slot: producer = $block_producer, slot = \
-             $slot, previous protocol state hash = $hash, current protocol \
-             state hash = $current_protocol_state_hash"
+            "Duplicate producer and slot: producer = $block_producer, \
+             consensus_time = $consensus_time, previous protocol state hash = \
+             $hash, current protocol state hash = $current_protocol_state_hash"
 end
 
 let run ~logger ~trust_system ~verifier ~transition_reader
@@ -147,7 +137,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
   let duplicate_checker = Duplicate_proposal_detector.create () in
   don't_wait_for
     (Reader.iter transition_reader ~f:(fun network_transition ->
-         if !initialization_finish_signal then (
+         if Ivar.is_full initialization_finish_signal then (
            let `Transition transition_env, `Time_received time_received =
              network_transition
            in

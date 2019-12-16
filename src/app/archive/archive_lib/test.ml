@@ -82,9 +82,7 @@ let%test_module "Processor" =
       in
       Array.map response ~f:(fun obj ->
           let entry public_key = (public_key#value, public_key#id) in
-          let participants =
-            [entry obj#publicKeyByReceiver; entry obj#public_key]
-          in
+          let participants = [entry obj#receiver; entry obj#sender] in
           Public_key.Compressed.Map.of_alist_reduce participants
             ~f:(fun index1 index2 -> assert_same_index_reference index1 index2
           ) )
@@ -112,8 +110,15 @@ let%test_module "Processor" =
       User_command.Gen.payment_with_random_participants ~keys ~max_amount:10000
         ~max_fee:1000 ()
 
+    (* HACK: We are going to parse a json number. There are cases that the
+       number can be greater than Int32.max, which would lead to an overflow
+       error. Bounding the generated numbers between 0 and Int32.max would
+       prevent this issue *)
     let gen_user_command_with_time =
-      Quickcheck.Generator.both user_command_gen Block_time.gen
+      Quickcheck.Generator.both user_command_gen
+        (Block_time.gen_incl
+           (Block_time.of_int64 Int64.zero)
+           (Block_time.of_int64 (Int64.of_int32 Int32.max_value)))
 
     let%test_unit "Process multiple user commands from Transaction_pool diff \
                    (including a duplicate)" =
