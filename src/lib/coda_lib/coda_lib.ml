@@ -61,7 +61,7 @@ type t =
   ; propose_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
-  ; mutable next_proposal: Consensus.Hooks.proposal option
+  ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
 [@@deriving fields]
@@ -569,7 +569,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Network_pool.Snark_pool.add_completed_work (snark_pool t) work
 
-let next_proposal t = t.next_proposal
+let next_producer_timing t = t.next_producer_timing
 
 let staking_ledger t =
   let open Option.Let_syntax in
@@ -585,7 +585,7 @@ let staking_ledger t =
 
 let start t =
   Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
-    ~set_next_proposal:(fun p -> t.next_proposal <- Some p)
+    ~set_next_proposal:(fun p -> t.next_producer_timing <- Some p)
     ~prover:t.processes.prover ~trust_system:t.config.trust_system
     ~transaction_resource_pool:
       (Network_pool.Transaction_pool.resource_pool
@@ -924,7 +924,7 @@ let create (config : Config.t) =
           in
           Deferred.return
             { config
-            ; next_proposal= None
+            ; next_producer_timing= None
             ; processes= {prover; verifier; snark_worker}
             ; initialization_finish_signal
             ; components=

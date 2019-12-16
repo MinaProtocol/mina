@@ -2745,12 +2745,12 @@ module Hooks = struct
     log_choice ~precondition_msg ~choice_msg choice ;
     choice
 
-  type proposal =
+  type block_producer_timing =
     [ `Check_again of Unix_timestamp.t
-    | `Propose_now of Signature_lib.Keypair.t * Block_data.t
-    | `Propose of Unix_timestamp.t * Signature_lib.Keypair.t * Block_data.t ]
+    | `Produce_now of Signature_lib.Keypair.t * Block_data.t
+    | `Produce of Unix_timestamp.t * Signature_lib.Keypair.t * Block_data.t ]
 
-  let next_proposal now (state : Consensus_state.Value.t) ~local_state
+  let next_producer_timing now (state : Consensus_state.Value.t) ~local_state
       ~keypairs ~logger =
     let info_if_proposing =
       if Keypair.And_compressed_pk.Set.is_empty keypairs then Logger.debug
@@ -2854,9 +2854,9 @@ module Hooks = struct
         info_if_proposing logger ~module_:__MODULE__ ~location:__LOC__
           "Producing block in %d slots"
           (Slot.to_int next_slot - Slot.to_int slot) ;
-        if Slot.equal curr_slot next_slot then `Propose_now (keypair, data)
+        if Slot.equal curr_slot next_slot then `Produce_now (keypair, data)
         else
-          `Propose
+          `Produce
             ( Epoch.slot_start_time epoch next_slot
               |> Time.to_span_since_epoch |> Time.Span.to_ms
             , keypair

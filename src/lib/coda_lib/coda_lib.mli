@@ -21,7 +21,7 @@ val propose_public_keys : t -> Public_key.Compressed.Set.t
 
 val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
 
-val next_proposal : t -> Consensus.Hooks.proposal option
+val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
 
 val staking_ledger : t -> Sparse_ledger.t option
 

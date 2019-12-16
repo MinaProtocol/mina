@@ -383,10 +383,10 @@ let get_status ~flag t =
   in
   let next_proposal =
     let open Block_time in
-    Option.map (Coda_lib.next_proposal t) ~f:(function
-      | `Propose_now _ ->
+    Option.map (Coda_lib.next_producer_timing t) ~f:(function
+      | `Produce_now _ ->
           `Propose_now
-      | `Propose (time, _, _) ->
+      | `Produce (time, _, _) ->
           `Propose (time |> Span.of_ms |> of_span_since_epoch)
       | `Check_again time ->
           `Check_again (time |> Span.of_ms |> of_span_since_epoch) )

@@ -458,26 +458,26 @@ module type S = sig
       -> logger:Logger.t
       -> [`Keep | `Take]
 
-    type proposal =
+    type block_producer_timing =
       [ `Check_again of Unix_timestamp.t
-      | `Propose_now of Signature_lib.Keypair.t * Block_data.t
-      | `Propose of Unix_timestamp.t * Signature_lib.Keypair.t * Block_data.t
+      | `Produce_now of Signature_lib.Keypair.t * Block_data.t
+      | `Produce of Unix_timestamp.t * Signature_lib.Keypair.t * Block_data.t
       ]
 
     (**
-     * Determine if and when to perform the next transition proposal. Either
-     * informs the callee to check again at some time in the future, or to
-     * schedule a proposal with some particular keypair at some time in the
-     * future, or to propose now with some keypair and check again some time in
-     * the future.
+     * Determine if and when to next produce a block. Either informs the callee
+     * to check again at some time in the future, or to schedule block
+     * production with some particular keypair at some time in the future, or to
+     * produce a block now with some keypair and check again some time in the
+     * future.
     *)
-    val next_proposal :
+    val next_producer_timing :
          Unix_timestamp.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> logger:Logger.t
-      -> proposal
+      -> block_producer_timing
 
     (**
      * A hook for managing local state when the locked tip is updated.

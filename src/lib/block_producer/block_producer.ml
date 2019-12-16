@@ -547,7 +547,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 let now = Time.now time_controller in
                 let next_proposal =
                   measure "asking conensus what to do" (fun () ->
-                      Consensus.Hooks.next_proposal (time_to_ms now)
+                      Consensus.Hooks.next_producer_timing (time_to_ms now)
                         consensus_state ~local_state:consensus_local_state
                         ~keypairs ~logger )
                 in
@@ -556,14 +556,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 | `Check_again time ->
                     Singleton_scheduler.schedule scheduler (time_of_ms time)
                       ~f:check_for_proposal
-                | `Propose_now (keypair, data) ->
+                | `Produce_now (keypair, data) ->
                     Coda_metrics.(Counter.inc_one Proposer.slots_won) ;
                     Interruptible.finally
                       (Singleton_supervisor.dispatch proposal_supervisor
                          (keypair, now, data))
                       ~f:check_for_proposal
                     |> ignore
-                | `Propose (time, keypair, data) ->
+                | `Produce (time, keypair, data) ->
                     Coda_metrics.(Counter.inc_one Proposer.slots_won) ;
                     let scheduled_time = time_of_ms time in
                     Singleton_scheduler.schedule scheduler scheduled_time
