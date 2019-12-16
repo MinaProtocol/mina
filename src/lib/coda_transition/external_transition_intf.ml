@@ -204,6 +204,7 @@ module type S = sig
     type t =
       (external_transition, State_hash.t) With_hash.t
       * Validation.initial_valid
+    [@@deriving compare]
 
     include External_transition_common_intf with type t := t
   end
@@ -211,6 +212,7 @@ module type S = sig
   module Almost_validated : sig
     type t =
       (external_transition, State_hash.t) With_hash.t * Validation.almost_valid
+    [@@deriving compare]
 
     include External_transition_common_intf with type t := t
   end
@@ -218,6 +220,7 @@ module type S = sig
   module Validated : sig
     type t =
       (external_transition, State_hash.t) With_hash.t * Validation.fully_valid
+    [@@deriving compare]
 
     val erase :
          t
@@ -230,6 +233,8 @@ module type S = sig
       external_transition -> [`I_swear_this_is_safe_see_my_comment of t]
 
     include External_transition_base_intf with type t := t
+
+    val to_initial_validated : t -> Initial_validated.t
   end
 
   val create :
