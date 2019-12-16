@@ -1,4 +1,4 @@
-open Intf
+open Tick_intf
 
 module Make (Tick : Tick_S) = struct
   open Tick
