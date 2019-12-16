@@ -25,13 +25,17 @@ let%test_module "Command line tests" =
     let runtime_genesis_ledger_exe =
       "../../app/runtime_genesis_ledger/runtime_genesis_ledger.exe"
 
-    let accounts_file = "./test_accounts.json"
-
     let generate_genesis_state dir =
+      let all_accounts = Account_config.Fake_accounts.generate 5 in
+      let _ =
+        Out_channel.with_file (dir ^/ "accounts.json") ~f:(fun json_file ->
+            Yojson.Safe.pretty_to_channel json_file
+              (Account_config.to_yojson all_accounts) )
+      in
       let%map _ =
         match%map
           Process.run ~prog:runtime_genesis_ledger_exe
-            ~args:["-account-file"; accounts_file; "-genesis-dir"; dir]
+            ~args:["-account-file"; dir ^/ "accounts.json"; "-genesis-dir"; dir]
             ()
         with
         | Ok s ->
