@@ -31,7 +31,6 @@
     random_oracle
     rocksdb
     sexp_diff_kernel
-    signature_coda
     signature_lib
     snark_bits
     snark_params

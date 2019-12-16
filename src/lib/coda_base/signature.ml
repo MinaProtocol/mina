@@ -1,7 +1,7 @@
 [%%import
 "/src/config.mlh"]
 
-open Core_kernel
+open Core
 open Module_version
 open Snark_params.Tick
 
