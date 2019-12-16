@@ -381,13 +381,13 @@ let get_status ~flag t =
           ; state_hash= None
           ; consensus_time_best_tip= None } )
   in
-  let next_proposal =
+  let next_block_production =
     let open Block_time in
     Option.map (Coda_lib.next_producer_timing t) ~f:(function
       | `Produce_now _ ->
-          `Propose_now
+          `Produce_now
       | `Produce (time, _, _) ->
-          `Propose (time |> Span.of_ms |> of_span_since_epoch)
+          `Produce (time |> Span.of_ms |> of_span_since_epoch)
       | `Check_again time ->
           `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
   in
@@ -419,7 +419,7 @@ let get_status ~flag t =
       Public_key.Compressed.Set.to_list block_production_keys
       |> List.map ~f:Public_key.Compressed.to_base58_check
   ; histograms
-  ; next_proposal
+  ; next_block_production
   ; consensus_time_now
   ; consensus_mechanism
   ; consensus_configuration

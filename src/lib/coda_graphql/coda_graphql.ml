@@ -129,12 +129,12 @@ module Types = struct
                 "The transaction has either been snarked, reached finality \
                  through consensus or has been dropped" ]
 
-  let block_proposal :
+  let block_producer_timing :
       ( _
-      , [`Check_again of Block_time.t | `Propose of Block_time.t | `Propose_now]
+      , [`Check_again of Block_time.t | `Produce of Block_time.t | `Produce_now]
         option )
       typ =
-    obj "BlockProposals" ~fields:(fun _ ->
+    obj "BlockProducerTimings" ~fields:(fun _ ->
         let of_time = Consensus.Data.Consensus_time.of_time_exn in
         [ field "times"
             ~typ:
@@ -142,7 +142,7 @@ module Types = struct
               @@ Consensus.Data.Consensus_time.graphql_type () )
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} -> function `Check_again _time -> []
-              | `Propose time -> [of_time time] | `Propose_now ->
+              | `Produce time -> [of_time time] | `Produce_now ->
                   [ of_time
                     @@ Block_time.now (Coda_lib.config coda).time_controller ]
               ) ] )
@@ -225,9 +225,10 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
-               ~next_proposal:(id ~typ:block_proposal) ~blockchain_length:int
-               ~uptime_secs:nn_int ~ledger_merkle_root:string
-               ~state_hash:string ~commit_id:nn_string ~conf_dir:nn_string
+               ~next_block_production:(id ~typ:block_producer_timing)
+               ~blockchain_length:int ~uptime_secs:nn_int
+               ~ledger_merkle_root:string ~state_hash:string
+               ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
                ~user_commands_sent:nn_int ~snark_worker:string
                ~snark_work_fee:nn_int
