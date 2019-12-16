@@ -139,7 +139,7 @@ let get_accounts accounts_json_file n =
 let create_tar top_dir =
   let tar_file = top_dir ^/ Cache_dir.genesis_dir_name ^ ".tar.gz" in
   let tar_command =
-    sprintf "tar -C %s --file=%s -cvvz %s" top_dir tar_file
+    sprintf "tar -C %s -cvvzf %s %s" top_dir tar_file
       Cache_dir.genesis_dir_name
   in
   Core.printf "command:%s \n%!" tar_command ;

@@ -12,8 +12,9 @@ module YJ = Yojson.Safe
 let retrieve_genesis_state dir_opt ~logger :
     (Ledger.t lazy_t * Proof.t) Deferred.t =
   let open Cache_dir in
+  let tar_filename = Cache_dir.genesis_dir_name ^ ".tar.gz" in
   let s3_bucket_prefix =
-    "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net"
+    "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net" ^/ tar_filename
   in
   let extract dir =
     let tar_file = dir ^/ Cache_dir.genesis_dir_name ^ ".tar.gz" in
@@ -89,10 +90,10 @@ let retrieve_genesis_state dir_opt ~logger :
           Deferred.return res
       | None ->
           (*Check if it's in s3*)
-          let s3_install_path = Cache_dir.s3_install_path ^/ "genesis" in
+          let local_path = Cache_dir.s3_install_path ^/ tar_filename in
           let%bind () =
             match%map
-              Cache_dir.load_from_s3 [s3_bucket_prefix] [s3_install_path]
+              Cache_dir.load_from_s3 [s3_bucket_prefix] [local_path]
             with
             | Ok () ->
                 ()
@@ -104,7 +105,7 @@ let retrieve_genesis_state dir_opt ~logger :
                     [ ("path", `String s3_install_path)
                     ; ("error", `String (Error.to_string_hum e)) ]
           in
-          let%map res = retrieve s3_install_path in
+          let%map res = retrieve Cache_dir.s3_install_path in
           res_or_fail
             (String.concat ~sep:"," (s3_install_path :: directories))
             res )
