@@ -14,8 +14,8 @@ module type Constants = sig
   (** [k] is the number of blocks required to reach finality *)
   val k : int
 
-  (** The amount of money minted and given to the proposer whenever a block
-   * is created *)
+  (** The amount of money minted and given to the block producer whenever a
+      block is created *)
   val coinbase : Currency.Amount.t
 
   val block_window_duration_ms : int
@@ -210,7 +210,7 @@ module type State_hooks = sig
 
   type consensus_transition
 
-  type proposal_data
+  type block_data
 
   type blockchain_state
 
@@ -222,15 +222,15 @@ module type State_hooks = sig
 
   (**
    * Generate a new protocol state and consensus specific transition data
-   * for a new transition. Called from the proposer in order to generate
-   * a new transition to propose to the network. Returns `None` if a new
+   * for a new transition. Called from the block producer in order to generate
+   * a new transition to broadcast to the network. Returns `None` if a new
    * transition cannot be generated.
   *)
   val generate_transition :
        previous_protocol_state:protocol_state
     -> blockchain_state:blockchain_state
     -> current_time:Unix_timestamp.t
-    -> proposal_data:proposal_data
+    -> block_data:block_data
     -> transactions:Coda_base.User_command.t list
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
@@ -414,7 +414,7 @@ module type S = sig
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
     end
 
-    module Proposal_data : sig
+    module Block_data : sig
       type t
 
       val prover_state : t -> Prover_state.t
@@ -460,9 +460,9 @@ module type S = sig
 
     type proposal =
       [ `Check_again of Unix_timestamp.t
-      | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
-      | `Propose of
-        Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t ]
+      | `Propose_now of Signature_lib.Keypair.t * Block_data.t
+      | `Propose of Unix_timestamp.t * Signature_lib.Keypair.t * Block_data.t
+      ]
 
     (**
      * Determine if and when to perform the next transition proposal. Either
@@ -548,6 +548,6 @@ module type S = sig
        and type consensus_state := Consensus_state.Value.t
        and type consensus_state_var := Consensus_state.var
        and type consensus_transition := Consensus_transition.Value.t
-       and type proposal_data := Proposal_data.t
+       and type block_data := Block_data.t
   end
 end

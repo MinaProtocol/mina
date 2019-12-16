@@ -103,7 +103,7 @@ end
 
 let generate_next_state ~previous_protocol_state ~time_controller
     ~staged_ledger ~transactions ~get_completed_work ~logger
-    ~(keypair : Keypair.t) ~proposal_data ~scheduled_time =
+    ~(keypair : Keypair.t) ~block_data ~scheduled_time =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
   let previous_protocol_state_body_hash =
@@ -196,7 +196,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
             measure "consensus generate_transition" (fun () ->
                 Consensus_state_hooks.generate_transition
                   ~previous_protocol_state ~blockchain_state ~current_time
-                  ~proposal_data
+                  ~block_data
                   ~transactions:
                     ( Staged_ledger_diff.With_valid_signatures_and_proofs
                       .user_commands diff
@@ -227,7 +227,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
               let internal_transition =
                 Internal_transition.create ~snark_transition
                   ~prover_state:
-                    (Consensus.Data.Proposal_data.prover_state proposal_data)
+                    (Consensus.Data.Block_data.prover_state block_data)
                   ~staged_ledger_diff:(Staged_ledger_diff.forget diff)
               in
               let witness =
@@ -247,7 +247,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
           "Pausing block production while bootstrapping"
       in
       let module Breadcrumb = Transition_frontier.Breadcrumb in
-      let propose ivar (keypair, scheduled_time, proposal_data) =
+      let propose ivar (keypair, scheduled_time, block_data) =
         let open Interruptible.Let_syntax in
         match Broadcast_pipe.Reader.peek frontier_reader with
         | None ->
@@ -280,7 +280,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
             in
             let%bind next_state_opt =
-              generate_next_state ~scheduled_time ~proposal_data
+              generate_next_state ~scheduled_time ~block_data
                 ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair

@@ -146,7 +146,7 @@ module Data = struct
       (epoch, slot)
   end
 
-  module Proposal_data = struct
+  module Block_data = struct
     type t =
       { stake_proof: Stake_proof.t
       ; global_slot: Global_slot.t
@@ -840,7 +840,7 @@ module Data = struct
               then
                 return
                   (Some
-                     { Proposal_data.stake_proof=
+                     { Block_data.stake_proof=
                          { private_key
                          ; public_key
                          ; delegator
@@ -2747,9 +2747,8 @@ module Hooks = struct
 
   type proposal =
     [ `Check_again of Unix_timestamp.t
-    | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
-    | `Propose of Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t
-    ]
+    | `Propose_now of Signature_lib.Keypair.t * Block_data.t
+    | `Propose of Unix_timestamp.t * Signature_lib.Keypair.t * Block_data.t ]
 
   let next_proposal now (state : Consensus_state.Value.t) ~local_state
       ~keypairs ~logger =
@@ -2810,7 +2809,7 @@ module Hooks = struct
           (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ;
         snapshot
       in
-      let proposal_data unseen_pks slot =
+      let block_data unseen_pks slot =
         (* Try vrfs for all keypairs that are unseen within this slot until one wins or all lose *)
         (* TODO: Don't do this, and instead pick the one that has the highest
          * chance of winning. See #2573 *)
@@ -2841,7 +2840,7 @@ module Hooks = struct
           | `All_seen ->
               find_winning_slot (Slot.succ slot)
           | `Unseen pks -> (
-            match proposal_data pks slot with
+            match block_data pks slot with
             | None ->
                 find_winning_slot (Slot.succ slot)
             | Some (keypair, data) ->
@@ -2955,7 +2954,7 @@ module Hooks = struct
     with type consensus_state := Consensus_state.Value.t
      and type consensus_state_var := Consensus_state.var
      and type consensus_transition := Consensus_transition.t
-     and type proposal_data := Proposal_data.t
+     and type block_data := Block_data.t
 
   module Make_state_hooks
       (Blockchain_state : Intf.Blockchain_state)
@@ -2976,19 +2975,18 @@ module Hooks = struct
      and type snark_transition_var := Snark_transition.var = struct
     (* TODO: only track total currency from accounts > 1% of the currency using transactions *)
 
-    let check_proposal_data ~logger (proposal_data : Proposal_data.t)
-        global_slot =
-      if not (Global_slot.equal global_slot proposal_data.global_slot) then
+    let check_block_data ~logger (block_data : Block_data.t) global_slot =
+      if not (Global_slot.equal global_slot block_data.global_slot) then
         Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
           !"VRF was evaluated at (epoch, slot) %{sexp:Epoch_and_slot.t} but \
             the corresponding proposal happened at a time corresponding to \
             %{sexp:Epoch_and_slot.t}. This means that generating the proposal \
             took more time than expected."
-          (Global_slot.to_epoch_and_slot proposal_data.global_slot)
+          (Global_slot.to_epoch_and_slot block_data.global_slot)
           (Global_slot.to_epoch_and_slot global_slot)
 
     let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
-        ~blockchain_state ~current_time ~(proposal_data : Proposal_data.t)
+        ~blockchain_state ~current_time ~(block_data : Block_data.t)
         ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger =
       let previous_consensus_state =
         Protocol_state.consensus_state previous_protocol_state
@@ -2997,13 +2995,13 @@ module Hooks = struct
          let time = Time.of_span_since_epoch (Time.Span.of_ms current_time) in
          Global_slot.of_epoch_and_slot (Epoch_and_slot.of_time_exn time)
        in
-       check_proposal_data ~logger proposal_data actual_global_slot) ;
-      let consensus_transition = proposal_data.global_slot in
+       check_block_data ~logger block_data actual_global_slot) ;
+      let consensus_transition = block_data.global_slot in
       let consensus_state =
         Or_error.ok_exn
           (Consensus_state.update ~previous_consensus_state
              ~consensus_transition
-             ~proposer_vrf_result:proposal_data.Proposal_data.vrf_result
+             ~proposer_vrf_result:block_data.Block_data.vrf_result
              ~previous_protocol_state_hash:
                (Protocol_state.hash previous_protocol_state)
              ~supply_increase ~snarked_ledger_hash)
