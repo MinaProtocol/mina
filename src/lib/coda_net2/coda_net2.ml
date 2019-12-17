@@ -621,7 +621,7 @@ module Helper = struct
                 (* TODO: add sender to Publish.t and include it here. *)
                 (* TODO: think about exposing the PeerID of the originator as well? *) )
               else
-                Logger.info t.logger
+                Logger.debug t.logger
                   "received msg for subscription $sub after unsubscribe, was \
                    it still in the stdout pipe?"
                   ~module_:__MODULE__ ~location:__LOC__
