@@ -26,9 +26,9 @@ let worth_getting_root t candidate =
         |> External_transition.Initial_validated.consensus_state )
       ~candidate
 
-let received_bad_proof t sender_host e =
+let received_bad_proof t host e =
   Trust_system.(
-    record t.trust_system t.logger sender_host
+    record t.trust_system t.logger host
       Actions.
         ( Violated_protocol
         , Some
@@ -42,11 +42,11 @@ let should_sync ~root_sync_ledger t candidate_state =
   (not @@ done_syncing_root root_sync_ledger)
   && worth_getting_root t candidate_state
 
-let start_sync_job_with_peer ~sender ~sender_ip ~root_sync_ledger t
-    peer_best_tip peer_root =
+let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip
+    peer_root =
   let%bind () =
     Trust_system.(
-      record t.trust_system t.logger sender_ip
+      record t.trust_system t.logger (fst sender)
         Actions.
           ( Fulfilled_request
           , Some ("Received verified peer root and best tip", []) ))
@@ -80,7 +80,7 @@ let start_sync_job_with_peer ~sender ~sender_ip ~root_sync_ledger t
   | `Repeat ->
       `Ignored
 
-let on_transition t ~sender ~root_sync_ledger
+let on_transition t ~sender:(host, peer_id) ~root_sync_ledger
     (candidate_transition : External_transition.t) =
   let candidate_state =
     External_transition.consensus_state candidate_transition
@@ -89,7 +89,7 @@ let on_transition t ~sender ~root_sync_ledger
     Deferred.return `Ignored
   else
     match%bind
-      Coda_networking.get_ancestry t.network sender candidate_state
+      Coda_networking.get_ancestry t.network peer_id candidate_state
     with
     | Error e ->
         Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
@@ -98,9 +98,6 @@ let on_transition t ~sender ~root_sync_ledger
             $error" ;
         Deferred.return `Ignored
     | Ok peer_root_with_proof -> (
-        let sender_ip =
-          Envelope.Incoming.remote_sender_exn peer_root_with_proof |> fst
-        in
         match%bind
           Sync_handler.Root.verify ~logger:t.logger ~verifier:t.verifier
             candidate_state peer_root_with_proof.data
@@ -108,10 +105,10 @@ let on_transition t ~sender ~root_sync_ledger
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
             else
-              start_sync_job_with_peer ~sender ~sender_ip ~root_sync_ledger t
-                best_tip root
+              start_sync_job_with_peer ~sender:(host, peer_id)
+                ~root_sync_ledger t best_tip root
         | Error e ->
-            return (received_bad_proof t sender_ip e |> Fn.const `Ignored) )
+            return (received_bad_proof t host e |> Fn.const `Ignored) )
 
 let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
@@ -123,15 +120,7 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
         Envelope.Incoming.data incoming_transition
       in
       let previous_state_hash = External_transition.parent_hash transition in
-      let sender =
-        match Envelope.Incoming.sender incoming_transition with
-        | Envelope.Sender.Local ->
-            failwith
-              "Unexpected, we should be syncing only to remote nodes in sync \
-               ledger"
-        | Envelope.Sender.Remote (_inet_addr, peer_id) ->
-            peer_id
-      in
+      let sender = Envelope.Incoming.remote_sender_exn incoming_transition in
       Transition_cache.add transition_graph ~parent:previous_state_hash
         incoming_transition ;
       (* TODO: Efficiently limiting the number of green threads in #1337 *)
@@ -202,9 +191,9 @@ let download_best_tip ~root_sync_ledger ~transition_graph t
                   ~module_:__MODULE__ ~location:__LOC__ ;
                 (* TODO: Efficiently limiting the number of green threads in #1337 *)
                 Deferred.ignore
-                  (start_sync_job_with_peer ~sender:peer.peer_id
-                     ~sender_ip:peer.host ~root_sync_ledger t
-                     best_tip_with_validation root_with_validation) )
+                  (start_sync_job_with_peer ~sender:(peer.host, peer.peer_id)
+                     ~root_sync_ledger t best_tip_with_validation
+                     root_with_validation) )
               else (
                 Logger.debug logger
                   !"Will not sync with peer's bootstrappable best tip "
@@ -261,7 +250,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       Transition_frontier.Persistent_root.Instance.snarked_ledger
         temp_persistent_root_instance
     in
-    let%bind hash, sender, expected_staged_ledger_hash =
+    let%bind hash, (sender_host, sender_peer_id), expected_staged_ledger_hash =
       let root_sync_ledger =
         Sync_ledger.Db.create temp_snarked_ledger ~logger:t.logger
           ~trust_system
@@ -285,7 +274,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       let open Deferred.Or_error.Let_syntax in
       let%bind scan_state, expected_merkle_root, pending_coinbases =
         Coda_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
-          t.network sender hash
+          t.network sender_peer_id hash
       in
       let received_staged_ledger_hash =
         Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
@@ -330,20 +319,18 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     in
     Transition_frontier.Persistent_root.Instance.destroy
       temp_persistent_root_instance ;
-    (*let%bind sender_ip = Coda_networking.ip_for_peer t.network sender in
-    let sender_ip = Option.value_exn sender_ip in*)
     match staged_ledger_aux_result with
     | Error e ->
-        (*let%bind () =
+        let%bind () =
           Trust_system.(
-            record t.trust_system t.logger sender_ip
+            record t.trust_system t.logger sender_host
               Actions.
                 ( Violated_protocol
                 , Some
                     ( "Can't find scan state from the peer or received faulty \
                        scan state from the peer."
                     , [] ) ))
-        in*)
+        in
         Logger.error logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [ ("error", `String (Error.to_string_hum e))
@@ -356,13 +343,13 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         Writer.close sync_ledger_writer ;
         loop ()
     | Ok (scan_state, pending_coinbase, new_root) -> (
-        (*let%bind () =
+        let%bind () =
           Trust_system.(
-            record t.trust_system t.logger sender_ip
+            record t.trust_system t.logger sender_host
               Actions.
                 ( Fulfilled_request
                 , Some ("Received valid scan state from peer", []) ))
-        in*)
+        in
         let consensus_state =
           new_root |> External_transition.Validated.consensus_state
         in
