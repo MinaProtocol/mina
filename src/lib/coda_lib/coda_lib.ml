@@ -45,7 +45,7 @@ type components =
 type pipes =
   { validated_transitions_reader:
       External_transition.Validated.t Strict_pipe.Reader.t
-  ; proposer_transition_writer:
+  ; producer_transition_writer:
       (Transition_frontier.Breadcrumb.t, synchronous, unit Deferred.t) Writer.t
   ; external_transitions_writer:
       (External_transition.t Envelope.Incoming.t * Block_time.t) Pipe.Writer.t
@@ -597,7 +597,7 @@ let start t =
     ~keypairs:(Agent.read_only t.block_production_keypairs)
     ~consensus_local_state:t.config.consensus_local_state
     ~frontier_reader:t.components.transition_frontier
-    ~transition_writer:t.pipes.proposer_transition_writer ;
+    ~transition_writer:t.pipes.producer_transition_writer ;
   Snark_worker.start t
 
 let create (config : Config.t) =
@@ -648,7 +648,7 @@ let create (config : Config.t) =
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
           in
-          let proposer_transition_reader, proposer_transition_writer =
+          let producer_transition_reader, producer_transition_writer =
             Strict_pipe.create Synchronous
           in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
@@ -769,7 +769,7 @@ let create (config : Config.t) =
                   ~network_transition_reader:
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
-                  ~proposer_transition_reader ~most_recent_valid_block )
+                  ~producer_transition_reader ~most_recent_valid_block )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -936,7 +936,7 @@ let create (config : Config.t) =
                 ; most_recent_valid_block= most_recent_valid_block_reader }
             ; pipes=
                 { validated_transitions_reader= valid_transitions_for_api
-                ; proposer_transition_writer
+                ; producer_transition_writer
                 ; external_transitions_writer=
                     Strict_pipe.Writer.to_linear_pipe
                       external_transitions_writer }

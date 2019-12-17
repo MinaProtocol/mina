@@ -189,7 +189,7 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
        , State_hash.t )
        Cached.t
        Reader.t)
-    ~(proposer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
+    ~(producer_transition_reader : Transition_frontier.Breadcrumb.t Reader.t)
     ~(clean_up_catchup_scheduler : unit Ivar.t)
     ~(catchup_job_writer :
        ( State_hash.t
@@ -232,7 +232,7 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
           * case, and the external case (where we received an identical external
           * transition from the network) can happen iff there is another node
           * with the exact same private key and view of the transaction pool. *)
-       [ Reader.map proposer_transition_reader ~f:(fun breadcrumb ->
+       [ Reader.map producer_transition_reader ~f:(fun breadcrumb ->
              Coda_metrics.(
                Gauge.inc_one
                  Transition_frontier_controller.transitions_being_processed) ;
@@ -357,7 +357,7 @@ let%test_module "Transition_handler.Processor tests" =
                   Strict_pipe.create
                     (Buffered (`Capacity branch_size, `Overflow Drop_head))
                 in
-                let proposer_transition_reader, _ =
+                let producer_transition_reader, _ =
                   Strict_pipe.create
                     (Buffered (`Capacity branch_size, `Overflow Drop_head))
                 in
@@ -376,7 +376,7 @@ let%test_module "Transition_handler.Processor tests" =
                 run ~logger ~time_controller ~verifier ~trust_system
                   ~clean_up_catchup_scheduler ~frontier
                   ~primary_transition_reader:valid_transition_reader
-                  ~proposer_transition_reader ~catchup_job_writer
+                  ~producer_transition_reader ~catchup_job_writer
                   ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
                   ~processed_transition_writer ;
                 List.iter branch ~f:(fun breadcrumb ->
