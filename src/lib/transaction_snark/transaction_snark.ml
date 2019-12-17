@@ -307,8 +307,11 @@ module Base = struct
     let%bind () =
       with_label
         (sprintf "%s: check balance for transaction" __LOC__)
-        (Boolean.Assert.is_true
-           (Snarky_integer.Integer.gte ~m balance_int txn_amount_int))
+        (let%bind sufficient_balance =
+           make_checked (fun () ->
+               Snarky_integer.Integer.gte ~m balance_int txn_amount_int )
+         in
+         Boolean.Assert.is_true sufficient_balance)
     in
     let curr_min_balance =
       let open Snarky_integer.Integer in
