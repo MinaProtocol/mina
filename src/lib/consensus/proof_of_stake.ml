@@ -52,11 +52,10 @@ let compute_delegatee_table keys ~iter_accounts =
           | Some table ->
               Account.Index.Table.add_exn table ~key:i ~data:acct.balance ;
               table ) ) ;
-  (* TODO: this metric tracking currently assumes that the
-   * result of compute_delegatee_table is called with the
-   * full set of proposer keypairs every time the set
-   * changes, which is true right now, but this should be
-   * control flow should be refactored to make this clearer *)
+  (* TODO: this metric tracking currently assumes that the result of
+     compute_delegatee_table is called with the full set of block production
+     keypairs every time the set changes, which is true right now, but this
+     should be control flow should be refactored to make this clearer *)
   let num_delegators =
     Public_key.Compressed.Table.fold outer_table ~init:0
       ~f:(fun ~key:_ ~data sum -> sum + Account.Index.Table.length data)
@@ -188,7 +187,7 @@ module Data = struct
     end
 
     module Data = struct
-      (* Invariant: Snapshot's delegators are taken from accounts in proposer_public_keys *)
+      (* Invariant: Snapshot's delegators are taken from accounts in block_production_pubkeys *)
       type t =
         { mutable staking_epoch_snapshot: Snapshot.t
         ; mutable next_epoch_snapshot: Snapshot.t
@@ -230,7 +229,7 @@ module Data = struct
           Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
       last_checked_slot_and_epoch
 
-    let create proposer_public_keys =
+    let create block_production_pubkeys =
       (* TODO: remove this duplicate of the genesis ledger *)
       let ledger =
         Coda_base.Sparse_ledger.of_any_ledger
@@ -239,7 +238,7 @@ module Data = struct
              (Lazy.force Genesis_ledger.t))
       in
       let delegatee_table =
-        compute_delegatee_table_sparse_ledger proposer_public_keys ledger
+        compute_delegatee_table_sparse_ledger block_production_pubkeys ledger
       in
       let genesis_epoch_snapshot = {Snapshot.delegatee_table; ledger} in
       ref
@@ -249,15 +248,15 @@ module Data = struct
         ; last_checked_slot_and_epoch=
             make_last_checked_slot_and_epoch_table
               (Public_key.Compressed.Table.create ())
-              proposer_public_keys ~default:(Epoch.zero, Slot.zero) }
+              block_production_pubkeys ~default:(Epoch.zero, Slot.zero) }
 
-    let block_production_keys_swap t proposer_public_keys now =
+    let block_production_keys_swap t block_production_pubkeys now =
       let old : Data.t = !t in
       let s {Snapshot.ledger; delegatee_table= _} =
         { Snapshot.ledger
         ; delegatee_table=
-            compute_delegatee_table_sparse_ledger proposer_public_keys ledger
-        }
+            compute_delegatee_table_sparse_ledger block_production_pubkeys
+              ledger }
       in
       t :=
         { Data.staking_epoch_snapshot= s old.staking_epoch_snapshot
@@ -268,7 +267,7 @@ module Data = struct
          * slots or epochs *)
         ; last_checked_slot_and_epoch=
             make_last_checked_slot_and_epoch_table
-              !t.Data.last_checked_slot_and_epoch proposer_public_keys
+              !t.Data.last_checked_slot_and_epoch block_production_pubkeys
               ~default:
                 ((* TODO: Be smarter so that we don't have to look at the slot before again *)
                  let epoch, slot = Epoch_and_slot.of_time_exn now in
@@ -1118,7 +1117,7 @@ module Data = struct
     let update_pair
         ((staking_data, next_data) : Staking.Value.t * Next.Value.t)
         epoch_count ~prev_epoch ~next_epoch ~prev_slot
-        ~prev_protocol_state_hash ~proposer_vrf_result ~snarked_ledger_hash
+        ~prev_protocol_state_hash ~producer_vrf_result ~snarked_ledger_hash
         ~total_currency =
       let staking_data', next_data', epoch_count' =
         if next_epoch > prev_epoch then
@@ -1141,7 +1140,7 @@ module Data = struct
       in
       let curr_seed, curr_lock_checkpoint =
         if Slot.in_seed_update_range prev_slot then
-          ( Epoch_seed.update next_data'.seed proposer_vrf_result
+          ( Epoch_seed.update next_data'.seed producer_vrf_result
           , prev_protocol_state_hash )
         else (next_data'.seed, next_data'.lock_checkpoint)
       in
@@ -1209,12 +1208,12 @@ module Data = struct
 
     let gc_interval : UInt32.t = gc_width
 
-    (* create dummy proposal to split map on *)
+    (* create dummy block to split map on *)
     let get_old (t : Global_slot.t) : Global_slot.t =
       if
         Global_slot.(
           t < Global_slot.of_epoch_and_slot (gc_width_epoch, gc_width_slot))
-      then (* proposal not beyond gc_width *)
+      then (* block not beyond gc_width *)
         Global_slot.zero
       else
         let open Int in
@@ -1915,7 +1914,7 @@ module Data = struct
         ~(previous_protocol_state_hash : Coda_base.State_hash.t)
         ~(supply_increase : Currency.Amount.t)
         ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
-        ~(proposer_vrf_result : Random_oracle.Digest.t) : Value.t Or_error.t =
+        ~(producer_vrf_result : Random_oracle.Digest.t) : Value.t Or_error.t =
       let open Or_error.Let_syntax in
       let prev_epoch, prev_slot =
         Global_slot.to_epoch_and_slot previous_consensus_state.curr_global_slot
@@ -1946,7 +1945,7 @@ module Data = struct
           , previous_consensus_state.next_epoch_data )
           previous_consensus_state.epoch_count ~prev_epoch ~next_epoch
           ~prev_slot ~prev_protocol_state_hash:previous_protocol_state_hash
-          ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
+          ~producer_vrf_result ~snarked_ledger_hash ~total_currency
       in
       let min_window_density, sub_window_densities =
         Min_window_density.update_min_window_density
@@ -1961,7 +1960,7 @@ module Data = struct
       ; epoch_count
       ; min_window_density
       ; sub_window_densities
-      ; last_vrf_output= Vrf.Output.truncate proposer_vrf_result
+      ; last_vrf_output= Vrf.Output.truncate producer_vrf_result
       ; total_currency
       ; curr_global_slot= consensus_transition
       ; staking_epoch_data
@@ -2019,7 +2018,7 @@ module Data = struct
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
         ~consensus_transition : Value.t =
-      let proposer_vrf_result =
+      let producer_vrf_result =
         let _, sk = Vrf.Precomputed.keypairs.(0) in
         Vrf.eval ~private_key:sk
           { Vrf.Message.global_slot= consensus_transition
@@ -2027,7 +2026,7 @@ module Data = struct
           ; delegator= 0 }
       in
       Or_error.ok_exn
-        (update ~proposer_vrf_result
+        (update ~producer_vrf_result
            ~previous_consensus_state:(Lazy.force negative_one)
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
            ~consensus_transition ~supply_increase:Currency.Amount.zero
@@ -2752,11 +2751,11 @@ module Hooks = struct
 
   let next_producer_timing now (state : Consensus_state.Value.t) ~local_state
       ~keypairs ~logger =
-    let info_if_proposing =
+    let info_if_producing =
       if Keypair.And_compressed_pk.Set.is_empty keypairs then Logger.debug
       else Logger.info
     in
-    info_if_proposing logger ~module_:__MODULE__ ~location:__LOC__
+    info_if_producing logger ~module_:__MODULE__ ~location:__LOC__
       "Determining next slot to produce block" ;
     let curr_epoch, curr_slot =
       Epoch.epoch_and_slot_of_time_exn
@@ -2851,7 +2850,7 @@ module Hooks = struct
     let ms_since_epoch = Fn.compose Time.Span.to_ms Time.to_span_since_epoch in
     match next_slot with
     | Some (next_slot, keypair, data) ->
-        info_if_proposing logger ~module_:__MODULE__ ~location:__LOC__
+        info_if_producing logger ~module_:__MODULE__ ~location:__LOC__
           "Producing block in %d slots"
           (Slot.to_int next_slot - Slot.to_int slot) ;
         if Slot.equal curr_slot next_slot then `Produce_now (keypair, data)
@@ -2863,7 +2862,7 @@ module Hooks = struct
             , data )
     | None ->
         let epoch_end_time = Epoch.end_time epoch |> ms_since_epoch in
-        info_if_proposing logger ~module_:__MODULE__ ~location:__LOC__
+        info_if_producing logger ~module_:__MODULE__ ~location:__LOC__
           "No slots won in this epoch. Waiting for next epoch to check again, \
            @%d"
           (Int64.to_int epoch_end_time) ;
@@ -2980,8 +2979,8 @@ module Hooks = struct
       if not (Global_slot.equal global_slot block_data.global_slot) then
         Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
           !"VRF was evaluated at (epoch, slot) %{sexp:Epoch_and_slot.t} but \
-            the corresponding proposal happened at a time corresponding to \
-            %{sexp:Epoch_and_slot.t}. This means that generating the proposal \
+            the corresponding block was produced at a time corresponding to \
+            %{sexp:Epoch_and_slot.t}. This means that generating the block \
             took more time than expected."
           (Global_slot.to_epoch_and_slot block_data.global_slot)
           (Global_slot.to_epoch_and_slot global_slot)
@@ -3002,7 +3001,7 @@ module Hooks = struct
         Or_error.ok_exn
           (Consensus_state.update ~previous_consensus_state
              ~consensus_transition
-             ~proposer_vrf_result:block_data.Block_data.vrf_result
+             ~producer_vrf_result:block_data.Block_data.vrf_result
              ~previous_protocol_state_hash:
                (Protocol_state.hash previous_protocol_state)
              ~supply_increase ~snarked_ledger_hash)
@@ -3039,7 +3038,7 @@ module Hooks = struct
         let open Consensus_state in
         let open Quickcheck.Let_syntax in
         let%bind slot_advancement = gen_slot_advancement in
-        let%map proposer_vrf_result = Vrf.Output.gen in
+        let%map producer_vrf_result = Vrf.Output.gen in
         fun ~(previous_protocol_state :
                (Protocol_state.Value.t, Coda_base.State_hash.t) With_hash.t)
             ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t) ->
@@ -3067,7 +3066,7 @@ module Hooks = struct
               prev.epoch_count ~prev_epoch ~next_epoch:curr_epoch ~prev_slot
               ~prev_protocol_state_hash:
                 (With_hash.hash previous_protocol_state)
-              ~proposer_vrf_result ~snarked_ledger_hash ~total_currency
+              ~producer_vrf_result ~snarked_ledger_hash ~total_currency
           in
           let min_window_density, sub_window_densities =
             Min_window_density.update_min_window_density
@@ -3080,7 +3079,7 @@ module Hooks = struct
           ; epoch_count
           ; min_window_density
           ; sub_window_densities
-          ; last_vrf_output= Vrf.Output.truncate proposer_vrf_result
+          ; last_vrf_output= Vrf.Output.truncate producer_vrf_result
           ; total_currency
           ; curr_global_slot
           ; staking_epoch_data
@@ -3120,9 +3119,9 @@ let%test_module "Proof of stake tests" =
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
       in
       let supply_increase = Currency.Amount.of_int 42 in
-      (* setup ledger, needed to compute proposer_vrf_result here and handler below *)
+      (* setup ledger, needed to compute producer_vrf_result here and handler below *)
       let open Coda_base in
-      (* choose largest account as most likely to propose *)
+      (* choose largest account as most likely to win a slot *)
       let ledger_data = Lazy.force Genesis_ledger.t in
       let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
       let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
@@ -3136,7 +3135,7 @@ let%test_module "Proof of stake tests" =
         Option.value_exn location |> Ledger.Any_ledger.M.Location.to_path_exn
         |> Ledger.Addr.to_int
       in
-      let proposer_vrf_result =
+      let producer_vrf_result =
         let seed =
           let next_epoch, _ = Global_slot.to_epoch_and_slot global_slot in
           let prev_epoch, _ =
@@ -3152,7 +3151,7 @@ let%test_module "Proof of stake tests" =
       let next_consensus_state =
         update ~previous_consensus_state ~consensus_transition
           ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
-          ~proposer_vrf_result
+          ~producer_vrf_result
         |> Or_error.ok_exn
       in
       (* build pieces needed to apply "update_var" *)
