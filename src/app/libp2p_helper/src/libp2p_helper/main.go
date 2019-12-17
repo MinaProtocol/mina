@@ -699,9 +699,17 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 		}
 	}()
 
+	if err := app.P2p.Dht.Bootstrap(app.Ctx); err != nil {
+		return nil, badp2p(err)
+	}
+
+	discovery.Advertise(app.Ctx, routingDiscovery, app.P2p.Rendezvous)
+
 	// report dht peers
 	go func() {
+		// wait a bit for our advertisement to go out and get some responses
 		time.Sleep(5 * time.Second)
+
 		for {
 			// default is to yield only 100 peers at a time. for now, always be
 			// looking... TODO: Is there a better way to use discovery? Should we only
@@ -716,12 +724,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			time.Sleep(5 * time.Minute)
 		}
 	}()
-
-	if err := app.P2p.Dht.Bootstrap(app.Ctx); err != nil {
-		return nil, badp2p(err)
-	}
-
-	discovery.Advertise(app.Ctx, routingDiscovery, app.P2p.Rendezvous)
 
 	return "beginAdvertising success", nil
 }
