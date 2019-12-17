@@ -51,11 +51,11 @@ let daemon logger =
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir = Cli_lib.Flag.conf_dir
      and block_production_key =
-       flag "propose-key"
+       flag "block-producer-key"
          ~doc:
            "KEYFILE Private key file for the block producer. You cannot \
-            provide both `propose-key` and `propose-public-key`. (default: \
-            don't produce blocks)"
+            provide both `block-producer-key` and `block-producer-pubkey`. \
+            (default: don't produce blocks)"
          (optional string)
      and initial_peers_raw =
        flag "kademlia-peer"

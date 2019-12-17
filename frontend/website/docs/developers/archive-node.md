@@ -4,7 +4,7 @@
 
 Since Coda nodes are by default succinct, if you need to preserve historical state, you'll want to run an `archive node`. Start the daemon using this command to run an archive process reachable at port `3086`:
 ```
-coda daemon -propose-key ~/keys/my_wallet -rest 3085 -archive-port 3086
+coda daemon -block-producer-key ~/keys/my_wallet -rest 3085 -archive-port 3086
 ```
 
 ## Architecture
