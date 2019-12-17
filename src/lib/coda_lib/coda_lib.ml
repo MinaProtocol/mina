@@ -586,7 +586,7 @@ let staking_ledger t =
 
 let start t =
   Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
-    ~set_next_proposal:(fun p -> t.next_producer_timing <- Some p)
+    ~set_next_producer_timing:(fun p -> t.next_producer_timing <- Some p)
     ~prover:t.processes.prover ~trust_system:t.config.trust_system
     ~transaction_resource_pool:
       (Network_pool.Transaction_pool.resource_pool

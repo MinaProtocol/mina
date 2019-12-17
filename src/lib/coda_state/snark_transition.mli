@@ -6,14 +6,14 @@ module Poly : sig
        , 'consensus_transition
        , 'sok_digest
        , 'amount
-       , 'proposer_pk )
+       , 'producer_pk )
        t =
     { blockchain_state: 'blockchain_state
     ; consensus_transition: 'consensus_transition
     ; sok_digest: 'sok_digest
     ; supply_increase: 'amount
     ; ledger_proof: Proof.Stable.V1.t option
-    ; proposer: 'proposer_pk
+    ; producer: 'producer_pk
     ; coinbase_amount: 'amount }
   [@@deriving sexp, fields]
 
@@ -24,7 +24,7 @@ module Poly : sig
              , 'consensus_transition
              , 'sok_digest
              , 'amount
-             , 'proposer_pk )
+             , 'producer_pk )
              t
         [@@deriving bin_io, sexp, version]
       end
@@ -35,13 +35,13 @@ module Poly : sig
               , 'consensus_transition
               , 'sok_digest
               , 'amount
-              , 'proposer_pk )
+              , 'producer_pk )
               V1.t =
                 ( 'blockchain_state
                 , 'consensus_transition
                 , 'sok_digest
                 , 'amount
-                , 'proposer_pk )
+                , 'producer_pk )
                 t
 end
 
@@ -83,7 +83,7 @@ val create_value :
   -> supply_increase:Currency.Amount.t
   -> blockchain_state:Blockchain_state.Value.t
   -> consensus_transition:Consensus.Data.Consensus_transition.Value.Stable.V1.t
-  -> proposer:Signature_lib.Public_key.Compressed.t
+  -> producer:Signature_lib.Public_key.Compressed.t
   -> coinbase_amount:Currency.Amount.t
   -> unit
   -> Value.t
@@ -104,4 +104,4 @@ val coinbase_amount : (_, _, _, 'amount, _) Poly.t -> 'amount
 
 val ledger_proof : _ Poly.t -> Proof.t option
 
-val proposer : (_, _, _, _, 'proposer_pk) Poly.t -> 'proposer_pk
+val producer : (_, _, _, _, 'producer_pk) Poly.t -> 'producer_pk
