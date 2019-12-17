@@ -43,8 +43,7 @@ module Pending_coinbase_stack_state = struct
   end]
 
   type t = Stable.Latest.t =
-    { source: Pending_coinbase.Stack.Stable.V1.t
-    ; target: Pending_coinbase.Stack.Stable.V1.t }
+    {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
   [@@deriving sexp, hash, compare, yojson]
 
   include Hashable.Make_binable (Stable.Latest)
@@ -222,6 +221,7 @@ let merge_top_hash wrap_vk_bits =
   construct_input ~proof_type:(`Merge wrap_vk_bits)
 
 module Verification_keys = struct
+  (* TODO : version *)
   type t =
     { base: Tick.Verification_key.t
     ; wrap: Tock.Verification_key.t
@@ -313,56 +313,62 @@ module Base = struct
          in
          Boolean.Assert.is_true sufficient_balance)
     in
-    let curr_min_balance =
+    let%bind curr_min_balance =
       let open Snarky_integer.Integer in
       let initial_minimum_balance_int =
         balance_to_int initial_minimum_balance
       in
-      if_ ~m before_or_at_cliff ~then_:initial_minimum_balance_int
-        ~else_:
-          (let txn_global_slot_int =
-             Global_slot.Checked.to_integer txn_global_slot
-           in
-           let cliff_time_int = Global_slot.Checked.to_integer cliff_time in
-           let _, slot_diff =
-             subtract_unpacking_or_zero ~m txn_global_slot_int cliff_time_int
-           in
-           let vesting_period_int =
-             Global_slot.Checked.to_integer vesting_period
-           in
-           let num_periods, _ = div_mod ~m slot_diff vesting_period_int in
-           let vesting_increment_int =
-             Amount.var_to_bits vesting_increment |> of_bits ~m
-           in
-           let min_balance_decrement =
-             mul ~m num_periods vesting_increment_int
-           in
-           let _, diff =
-             subtract_unpacking_or_zero ~m initial_minimum_balance_int
-               min_balance_decrement
-           in
-           diff)
+      make_checked (fun () ->
+          if_ ~m before_or_at_cliff ~then_:initial_minimum_balance_int
+            ~else_:
+              (let txn_global_slot_int =
+                 Global_slot.Checked.to_integer txn_global_slot
+               in
+               let cliff_time_int =
+                 Global_slot.Checked.to_integer cliff_time
+               in
+               let _, slot_diff =
+                 subtract_unpacking_or_zero ~m txn_global_slot_int
+                   cliff_time_int
+               in
+               let vesting_period_int =
+                 Global_slot.Checked.to_integer vesting_period
+               in
+               let num_periods, _ = div_mod ~m slot_diff vesting_period_int in
+               let vesting_increment_int =
+                 Amount.var_to_bits vesting_increment |> of_bits ~m
+               in
+               let min_balance_decrement =
+                 mul ~m num_periods vesting_increment_int
+               in
+               let _, min_balance_less_decrement =
+                 subtract_unpacking_or_zero ~m initial_minimum_balance_int
+                   min_balance_decrement
+               in
+               min_balance_less_decrement) )
     in
-    let _, proposed_balance_int =
-      Snarky_integer.Integer.subtract_unpacking_or_zero ~m balance_int
-        txn_amount_int
+    let%bind _, proposed_balance_int =
+      make_checked (fun () ->
+          Snarky_integer.Integer.subtract_unpacking_or_zero ~m balance_int
+            txn_amount_int )
+    in
+    let%bind sufficient_timed_balance =
+      make_checked (fun () ->
+          Snarky_integer.Integer.(gte ~m proposed_balance_int curr_min_balance)
+      )
     in
     let%bind _ =
       with_label
         (sprintf "%s: check proposed balance against calculated min balance"
            __LOC__)
-        Boolean.(
-          Assert.any
-            [ not is_timed
-            ; Snarky_integer.Integer.(
-                gte ~m proposed_balance_int curr_min_balance) ])
+        Boolean.(Assert.any [not is_timed; sufficient_timed_balance])
+    in
+    let%bind is_timed_balance_zero =
+      make_checked (fun () ->
+          Snarky_integer.Integer.equal ~m curr_min_balance zero_int )
     in
     (* if current min balance is zero, then timing becomes untimed *)
-    let%bind is_untimed =
-      Boolean.(
-        (not is_timed)
-        || Snarky_integer.Integer.equal ~m curr_min_balance zero_int)
-    in
+    let%bind is_untimed = Boolean.((not is_timed) || is_timed_balance_zero) in
     Account.Timing.if_ is_untimed ~then_:Account.Timing.untimed_var
       ~else_:account.timing
 

@@ -98,7 +98,7 @@ module type S = sig
   end
 
   and Stack : sig
-    type t [@@deriving yojson, sexp, eq]
+    type t [@@deriving yojson, sexp, eq, compare, hash]
 
     module Stable : sig
       module V1 : sig
