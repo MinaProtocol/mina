@@ -68,7 +68,6 @@ module Helper = struct
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
     ; mutable banned_ips: Unix.Inet_addr.t list
     ; mutable new_peer_callback: (string -> string list -> unit) option
-    ; mutable current_peers: Peer.t list
     ; mutable finished: bool }
 
   and 'a subscription =
@@ -986,10 +985,6 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer =
       net.new_peer_callback
       <- Some
            (fun peer_id peer_addrs ->
-             (* FIXME: incremental peer list sync instead of fetching the whole thing anew each time *)
-             don't_wait_for
-               Deferred.(
-                 list_peers net >>| fun peers -> net.current_peers <- peers) ;
              on_new_peer
                { id= Peer.Id.unsafe_of_string peer_id
                ; maddrs= List.map ~f:Multiaddr.of_string peer_addrs } ) ;
@@ -1202,7 +1197,6 @@ let create ~logger ~conf_dir =
         ; conf_dir
         ; logger
         ; banned_ips= []
-        ; current_peers= []
         ; me_keypair= Ivar.create ()
         ; outstanding_requests
         ; subscriptions= Hashtbl.create (module Int)
