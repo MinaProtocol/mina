@@ -18,7 +18,9 @@ module Arg = struct
       let version_byte = Base58_check.Version_bytes.signature
     end
 
-    module Tests = struct end
+    module Tests = struct
+      (* actual tests in Stable below *)
+    end
   end]
 end
 
