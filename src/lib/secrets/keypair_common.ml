@@ -7,8 +7,6 @@ let error_raise e ~error_ctx =
     Error.(
       to_exn (of_string (sprintf !"%s\n%s" error_ctx (Error.to_string_hum e))))
 
-(** Writes a keypair to [privkey_path] and [privkey_path ^ ".pub"] using [Secret_file] *)
-
 module Make_terminal_stdin (KP : sig
   type t
 
