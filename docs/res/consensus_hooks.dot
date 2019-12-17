@@ -14,7 +14,7 @@ digraph G {
   Transition_frontier_controller -> Consensus [label="frontier_root_transition"];
 
   Block_producer -> Consensus [label="generate_transition"];
-  Block_producer -> Consensus [label="next_proposal"];
+  Block_producer -> Consensus [label="next_producer_timing"];
   Block_producer -> Blockchain_snark [label="prove"];
 
   Blockchain_snark -> Consensus [label="next_state_checked"];
