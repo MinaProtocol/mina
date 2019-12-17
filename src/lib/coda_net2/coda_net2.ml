@@ -116,6 +116,35 @@ module Helper = struct
 
   type ('a, 'b) rpc = (module Rpc with type input = 'a and type output = 'b)
 
+  module Data : sig
+    type t [@@deriving yojson]
+
+    val pack_data : string -> t
+
+    val to_string : t -> string
+  end = struct
+    type t = string
+
+    let encode_string t =
+      B58.encode alphabet (Bytes.of_string t) |> Bytes.to_string
+
+    let decode_string s =
+      Bytes.of_string s |> B58.decode alphabet |> Bytes.to_string
+
+    let to_yojson s = `String (encode_string s)
+
+    let of_yojson = function
+      | `String s -> (
+        try Ok (decode_string s)
+        with exn -> Error Error.(to_string_hum (of_exn exn)) )
+      | _ ->
+          Error "expected a string"
+
+    let pack_data s = s
+
+    let to_string s = s
+  end
+
   module Rpcs = struct
     module No_input = struct
       type input = unit
@@ -157,7 +186,7 @@ module Helper = struct
     end
 
     module Publish = struct
-      type input = {topic: string; data: string} [@@deriving yojson]
+      type input = {topic: string; data: Data.t} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -466,27 +495,6 @@ module Helper = struct
     An upcall is like an RPC from the helper to us.*)
 
   module Upcall = struct
-    module Data : sig
-      type t = string [@@deriving yojson]
-    end = struct
-      type t = string
-
-      let to_string t =
-        B58.encode alphabet (Bytes.of_string t) |> Bytes.to_string
-
-      let of_string s =
-        Bytes.of_string s |> B58.decode alphabet |> Bytes.to_string
-
-      let to_yojson s = `String (to_string s)
-
-      let of_yojson = function
-        | `String s -> (
-          try Ok (of_string s)
-          with exn -> Error Error.(to_string_hum (of_exn exn)) )
-        | _ ->
-            Error "expected a string"
-    end
-
     module Publish = struct
       type t =
         {upcall: string; subscription_idx: int; sender: string; data: Data.t}
@@ -618,7 +626,8 @@ module Helper = struct
         match Hashtbl.find t.subscriptions idx with
         | Some sub ->
             (let open Deferred.Let_syntax in
-            let decoded = sub.decode m.data in
+            let raw_data = Data.to_string m.data in
+            let decoded = sub.decode raw_data in
             let%bind is_valid =
               match decoded with
               | Ok data ->
@@ -628,7 +637,7 @@ module Helper = struct
                   | `Ignore ->
                       ()
                   | `Call f ->
-                      f ~sender:m.peer_id ~data:m.data e ) ;
+                      f ~sender:m.peer_id ~data:raw_data e ) ;
                   Logger.error t.logger
                     "failed to decode message published on subscription \
                      $topic ($idx): $error"
@@ -715,7 +724,7 @@ module Helper = struct
         let%bind m = Incoming_stream_msg.of_yojson v |> or_error in
         match Hashtbl.find t.streams m.stream_idx with
         | Some {incoming_w; _} ->
-            don't_wait_for (Pipe.write incoming_w m.data) ;
+            don't_wait_for (Pipe.write incoming_w (Data.to_string m.data)) ;
             Ok ()
         | None ->
             Or_error.errorf
@@ -805,7 +814,7 @@ module Pubsub = struct
     match%map
       Helper.do_rpc net
         (module Helper.Rpcs.Publish)
-        {topic; data= to_b58_data data}
+        {topic; data= Helper.Data.pack_data data}
       |> Deferred.Or_error.ok_exn
     with
     | "publish success" ->
@@ -977,7 +986,7 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer =
   | Error e ->
       Error e
 
-let peers (net : net) = Deferred.return net.current_peers
+let peers (net : net) = list_peers net
 
 (** List of all peers we are currently connected to. *)
 let listen_on net iface =
