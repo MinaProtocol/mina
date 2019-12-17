@@ -169,7 +169,7 @@ let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let trust_system = config.trust_system in
   Trust_system.reset trust_system ip_address
 
-let replace_proposers keys pks =
+let replace_block_production_keys keys pks =
   let kps =
     List.filter_map pks ~f:(fun pk ->
         let open Option.Let_syntax in

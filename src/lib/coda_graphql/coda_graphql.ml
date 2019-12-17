@@ -1735,7 +1735,7 @@ module Mutations = struct
         let old_block_production_keys =
           Coda_lib.block_production_pubkeys coda
         in
-        ignore @@ Coda_commands.replace_proposers coda pks ;
+        ignore @@ Coda_commands.replace_block_production_keys coda pks ;
         Public_key.Compressed.Set.to_list old_block_production_keys )
 
   let set_snark_worker =
