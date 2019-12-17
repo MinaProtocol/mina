@@ -596,6 +596,29 @@ let send_payment =
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
 
+let print_payment =
+  let open Command.Param in
+  let open Cli_lib.Arg_type in
+  let receiver_flag =
+    flag "receiver" ~doc:".." (required public_key_compressed)
+  and sender_flag = flag "sender" ~doc:".." (required public_key_compressed)
+  and amount = flag "amount" ~doc:".." (required txn_amount) in
+  Command.async ~summary:"Print a payment in json"
+    (Command.Param.map3 receiver_flag sender_flag amount
+       ~f:(fun receiver sender amount () ->
+         Core.print_endline @@ Yojson.Safe.to_string
+         @@ Graphql_client.User_command.to_yojson
+              Graphql_client.User_command.
+                { id= "abc"
+                ; isDelegation= false
+                ; nonce= 0
+                ; from= sender
+                ; to_= receiver
+                ; amount
+                ; fee= User_command.minimum_fee
+                ; memo= User_command_memo.empty } ;
+         Deferred.unit ))
+
 let send_payment_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
@@ -1524,6 +1547,7 @@ let command =
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
+    ; ("print-payment", print_payment)
     ; ("generate-keypair", generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("cancel-transaction", cancel_transaction)
