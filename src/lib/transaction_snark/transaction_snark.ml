@@ -1434,19 +1434,6 @@ let%test_module "transaction_snark" =
       of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack
         user_command handler
 
-    (*
-                ~proposer:
-                  { x=
-                      Snark_params.Tick.Field.of_string
-                        "39876046544032071884326965137489542106804584544160987424424979200505499184903744868114140"
-                  ; is_odd= true }
-                ~fee_transfer:
-                  (Some
-                     ( { x=
-                           Snark_params.Tick.Field.of_string
-                             "221715137372156378645114069225806158618712943627692160064142985953895666487801880947288786"
-                       ; is_odd= true }
-       *)
     let%test_unit "coinbase" =
       Test_util.with_randomness 123456789 (fun () ->
           let mk_pubkey () =
