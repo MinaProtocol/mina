@@ -209,12 +209,32 @@ module Coinbase_stack_data = struct
   end
 end
 
-module Coinbase_stack_state_hash = struct
+module Stack_hash = struct
+  include Data_hash_binable
+
+  let dummy = of_hash Outside_pedersen_image.t
+end
+
+module Coinbase_stack_state = struct
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type 'stack_hash t = {init: 'stack_hash; curr: 'stack_hash}
+        [@@deriving sexp, eq, compare, hash, yojson]
+      end
+    end]
+
+    type 'stack_hash t = 'stack_hash Stable.Latest.t =
+      {init: 'stack_hash; curr: 'stack_hash}
+    [@@deriving sexp, eq, compare, hash, yojson]
+  end
+
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = State_hash.Stable.V1.t
-      [@@deriving sexp, eq, compare, hash, yojson, version]
+      type t = Stack_hash.Stable.V1.t Poly.Stable.V1.t
+      [@@deriving sexp, eq, compare, hash, yojson]
 
       let to_latest = Fn.id
     end
@@ -222,33 +242,89 @@ module Coinbase_stack_state_hash = struct
 
   type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
 
-  type var = State_hash.var
+  type var = Stack_hash.var Poly.t
 
-  [%%define_locally
+  let create ~init : t = {init; curr= init}
+
+  let gen : t Quickcheck.Generator.t =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map init, curr =
+      Quickcheck.Generator.tuple2 Stack_hash.gen Stack_hash.gen
+    in
+    {Poly.init; curr}
+
+  let to_input (t : t) =
+    Random_oracle.Input.append
+      (Stack_hash.to_input t.init)
+      (Stack_hash.to_input t.curr)
+
+  let var_to_input (t : var) =
+    Random_oracle.Input.append
+      (Stack_hash.var_to_input t.init)
+      (Stack_hash.var_to_input t.curr)
+
+  let var_of_t (t : t) =
+    {Poly.init= Stack_hash.var_of_t t.init; curr= Stack_hash.var_of_t t.curr}
+
+  let to_hlist {Poly.init; curr} = H_list.[init; curr]
+
+  let of_hlist :
+      (unit, 'state_hash -> 'state_hash -> unit) H_list.t -> 'state_hash Poly.t
+      =
+   fun H_list.[init; curr] -> {init; curr}
+
+  let data_spec = Snark_params.Tick.Data_spec.[Stack_hash.typ; Stack_hash.typ]
+
+  let typ : (var, t) Typ.t =
+    Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
+      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let to_bits (t : t) = Stack_hash.to_bits t.init @ Stack_hash.to_bits t.curr
+
+  let to_bytes (t : t) =
+    Stack_hash.to_bytes t.init ^ Stack_hash.to_bytes t.curr
+
+  let equal_var (v1 : var) (v2 : var) =
+    let open Tick.Checked.Let_syntax in
+    let%bind b1 = Stack_hash.equal_var v1.init v2.init in
+    let%bind b2 = Stack_hash.equal_var v1.curr v2.curr in
+    Boolean.(b1 && b2)
+
+  let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
+      (var, 'a) Tick0.Checked.t =
+    let%bind init = Stack_hash.if_ cond ~then_:then_.init ~else_:else_.init in
+    let%map curr = Stack_hash.if_ cond ~then_:then_.curr ~else_:else_.curr in
+    {Poly.init; curr}
+
+  (*[%%define_locally
   State_hash.
-    (gen, of_hash, to_bits, raw_hash_bytes, equal_var, typ, if_, var_of_t)]
+    (gen, of_hash, to_bits, raw_hash_bytes, equal_var, typ, if_, var_of_t)]*)
 
-  let push (t : t) cb : t =
-    let _, _, state_body_hash = Coinbase_data.of_coinbase cb in
+  let push (t : t) (state_body_hash : State_body_hash.t) : t =
     (* this is the same computation for combining state hashes and state body hashes as
        `Protocol_state.hash_abstract', not available here because it would create
        a module dependency cycle
      *)
-    Random_oracle.hash ~init:Hash_prefix.protocol_state
-      [|(t :> Field.t); (state_body_hash :> Field.t)|]
-    |> of_hash
+    { t with
+      curr=
+        Random_oracle.hash ~init:Hash_prefix.protocol_state
+          [|(t.curr :> Field.t); (state_body_hash :> Field.t)|]
+        |> Stack_hash.of_hash }
 
-  let empty = State_hash.dummy
+  let empty : t = {Poly.init= Stack_hash.dummy; curr= Stack_hash.dummy}
 
   module Checked = struct
     type t = var
 
-    let push (t : t) ((_, _, state_body_hash) : Coinbase_data.var) =
+    let push (t : t) (state_body_hash : State_body_hash.var) =
       make_checked (fun () ->
-          Random_oracle.Checked.hash ~init:Hash_prefix.protocol_state
-            [| State_hash.var_to_hash_packed t
-             ; State_body_hash.var_to_hash_packed state_body_hash |]
-          |> State_hash.var_of_hash_packed )
+          let curr =
+            Random_oracle.Checked.hash ~init:Hash_prefix.protocol_state
+              [| Stack_hash.var_to_hash_packed t.curr
+               ; State_body_hash.var_to_hash_packed state_body_hash |]
+            |> Stack_hash.var_of_hash_packed
+          in
+          {t with curr} )
   end
 end
 
@@ -288,17 +364,20 @@ struct
   let max_coinbase_stack_count = Int.pow 2 depth
 
   module Stack = struct
+    (*TODO: init and curr should be here and not in coimnbase_stack_state*)
     module Poly = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
-          type ('data, 'state_hash) t = {data: 'data; state_hash: 'state_hash}
+          type ('data_stack, 'state_stack) t =
+            {data: 'data_stack; state: 'state_stack}
           [@@deriving eq, yojson, hash, sexp, compare]
         end
       end]
 
-      type ('data, 'state_hash) t = ('data, 'state_hash) Stable.Latest.t =
-        {data: 'data; state_hash: 'state_hash}
+      type ('data_stack, 'state_stack) t =
+            ('data_stack, 'state_stack) Stable.Latest.t =
+        {data: 'data_stack; state: 'state_stack}
       [@@deriving yojson, hash, sexp, compare]
     end
 
@@ -307,7 +386,7 @@ struct
       module V1 = struct
         type t =
           ( Coinbase_stack_data.Stable.V1.t
-          , Coinbase_stack_state_hash.Stable.V1.t )
+          , Coinbase_stack_state.Stable.V1.t )
           Poly.Stable.V1.t
         [@@deriving eq, yojson, hash, sexp, compare]
 
@@ -318,22 +397,22 @@ struct
     (* bin_io, version omitted *)
     type t = Stable.Latest.t [@@deriving yojson, eq, compare, sexp, hash]
 
-    type var = (Coinbase_stack_data.var, Coinbase_stack_state_hash.var) Poly.t
+    type var = (Coinbase_stack_data.var, Coinbase_stack_state.var) Poly.t
 
-    let to_input ({data; state_hash} : t) =
+    let to_input ({data; state} : t) =
       Random_oracle.Input.append
         (Coinbase_stack_data.to_input data)
-        (State_hash.to_input state_hash)
+        (Coinbase_stack_state.to_input state)
 
     let data_hash t =
       Random_oracle.(
         hash ~init:Hash_prefix_states.coinbase_stack (pack_input (to_input t)))
       |> Hash_builder.of_digest
 
-    let var_to_input ({data; state_hash} : var) =
+    let var_to_input ({data; state} : var) =
       Random_oracle.Input.append
         (Coinbase_stack_data.var_to_input data)
-        (State_hash.var_to_input state_hash)
+        (Coinbase_stack_state.var_to_input state)
 
     let hash_var (t : var) =
       make_checked (fun () ->
@@ -343,24 +422,24 @@ struct
 
     let var_of_t t =
       { Poly.data= Coinbase_stack_data.var_of_t t.Poly.data
-      ; state_hash= Coinbase_stack_state_hash.var_of_t t.state_hash }
+      ; state= Coinbase_stack_state.var_of_t t.state }
 
     let gen =
       let open Base_quickcheck.Generator.Let_syntax in
       let%bind data = Coinbase_stack_data.gen in
-      let%map state_hash = Coinbase_stack_state_hash.gen in
-      {Poly.data; state_hash}
+      let%map state = Coinbase_stack_state.gen in
+      {Poly.data; state}
 
-    let to_hlist {Poly.data; state_hash} = H_list.[data; state_hash]
+    let to_hlist {Poly.data; state} = H_list.[data; state]
 
     let of_hlist :
            (unit, 'data -> 'state_hash -> unit) H_list.t
         -> ('data, 'state_hash) Poly.t =
-     fun H_list.[data; state_hash] -> {data; state_hash}
+     fun H_list.[data; state] -> {data; state}
 
     let data_spec =
       Snark_params.Tick.Data_spec.
-        [Coinbase_stack_data.typ; Coinbase_stack_state_hash.typ]
+        [Coinbase_stack_data.typ; Coinbase_stack_state.typ]
 
     let typ : (var, t) Typ.t =
       Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
@@ -377,11 +456,13 @@ struct
     let to_bits t =
       Coinbase_stack_data.to_bits t.Poly.data
       @ pad_bits
-      @ Coinbase_stack_state_hash.to_bits t.Poly.state_hash
+      @ Coinbase_stack_state.to_bits t.Poly.state
 
     let to_bytes t =
       Coinbase_stack_data.to_bytes t.Poly.data
-      ^ Coinbase_stack_state_hash.raw_hash_bytes t.Poly.state_hash
+      ^ Coinbase_stack_state.to_bytes t.Poly.state
+
+    (*raw_hash_bytes?*)
 
     let equal_var var1 var2 =
       let open Tick.Checked.Let_syntax in
@@ -389,25 +470,25 @@ struct
         Coinbase_stack_data.equal_var var1.Poly.data var2.Poly.data
       in
       let%bind b2 =
-        Coinbase_stack_state_hash.equal_var var1.Poly.state_hash
-          var2.Poly.state_hash
+        Coinbase_stack_state.equal_var var1.Poly.state var2.Poly.state
       in
       let open Tick0.Boolean in
       b1 && b2
 
     let empty =
-      { Poly.data= Coinbase_stack_data.empty
-      ; state_hash= Coinbase_stack_state_hash.empty }
+      {Poly.data= Coinbase_stack_data.empty; state= Coinbase_stack_state.empty}
 
     let equal_data t1 t2 = Coinbase_stack_data.equal t1.Poly.data t2.Poly.data
 
-    let equal_state_hash t1 t2 =
-      State_hash.equal t1.Poly.state_hash t2.Poly.state_hash
+    let equal_state_hash t1 t2 = State_hash.equal t1.Poly.state t2.Poly.state
 
-    let push t (cb : Coinbase.t) =
+    let push_coinbase t (cb : Coinbase.t) =
       let data = Coinbase_stack_data.push t.Poly.data cb in
-      let state_hash = Coinbase_stack_state_hash.push t.Poly.state_hash cb in
-      {Poly.data; state_hash}
+      (*let state_hash = Coinbase_stack_state_hash.push t.Poly.state_hash cb in*)
+      {t with data}
+
+    let push_state (t : t) (state_body_hash : State_body_hash.t) =
+      {t with state= Coinbase_stack_state.push t.state state_body_hash}
 
     let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
         (var, 'a) Tick0.Checked.t =
@@ -415,22 +496,27 @@ struct
         Coinbase_stack_data.Checked.if_ cond ~then_:then_.data
           ~else_:else_.data
       in
-      let%map state_hash =
-        Coinbase_stack_state_hash.if_ cond ~then_:then_.state_hash
-          ~else_:else_.state_hash
+      let%map state =
+        Coinbase_stack_state.if_ cond ~then_:then_.state ~else_:else_.state
       in
-      {Poly.data; state_hash}
+      {Poly.data; state}
 
     module Checked = struct
       type t = var
 
-      let push (t : t) (coinbase : Coinbase_data.var) : (t, 'a) Tick0.Checked.t
-          =
-        let%bind data = Coinbase_stack_data.Checked.push t.data coinbase in
-        let%map state_hash =
+      let push_coinbase (t : t) (coinbase : Coinbase_data.var) :
+          (t, 'a) Tick0.Checked.t =
+        let%map data = Coinbase_stack_data.Checked.push t.data coinbase in
+        (*let%map state_hash =
           Coinbase_stack_state_hash.Checked.push t.state_hash coinbase
+        in*)
+        {t with data}
+
+      let push_state (t : t) (state_body_hash : State_body_hash.var) =
+        let%map state =
+          Coinbase_stack_state.Checked.push t.state state_body_hash
         in
-        {Poly.data; state_hash}
+        {t with state}
 
       let empty = var_of_t empty
 
@@ -571,6 +657,8 @@ struct
         reraise_merkle_requests
 
     let%snarkydef add_coinbase t (pk, amount, state_body_hash) =
+      (* Question: Do the transaction have the current protocol state? Which means that both the stacks should be updated with the curr (or previous) body hash without the coinbase?) 
+    *)
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_newest_stack))
@@ -607,6 +695,8 @@ struct
       >>| Hash.var_of_hash_packed
 
     let%snarkydef pop_coinbases t ~proof_emitted =
+      (*when popping stack, if there are no new stacks then update the next stack with this stack (if it is empty) so that we don't lose that infomation while having it constrained. As opposed to storing the stack at the top level of pending coinbase and requesting for that information when adding a coinbase.*)
+      (* This will cause two merkle updates one for deleting the current stack and the next updating the next stack with this deleted stack*)
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
