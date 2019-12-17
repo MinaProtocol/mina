@@ -1,5 +1,6 @@
 open Core_kernel
 open Async
+open Coda_base
 
 module Git_sha = struct
   [%%versioned
@@ -223,11 +224,36 @@ module Status = struct
 
     let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
-    let consensus_time_best_tip = string_option_entry "Best tip consensus time"
+    let next_proposal =
+      option_entry "Next proposal" ~f:(fun proposal_status ->
+          let str time =
+            let open Block_time in
+            let current_time =
+              (* TODO: We will temporarily have to create a time controller 
+                  until the inversion relationship between GraphQL and the RPC code inverts *)
+              Block_time.now
+              @@ Block_time.Controller.basic ~logger:(Logger.create ())
+            in
+            let diff = diff time current_time in
+            if Span.(zero < diff) then
+              sprintf "in %s" (Span.to_string_hum diff)
+            else "Proposing now..."
+          in
+          match proposal_status with
+          | `Check_again proposing_time ->
+              sprintf "None this epoch… checking at %s" (str proposing_time)
+          | `Propose proposing_time ->
+              str proposing_time
+          | `Propose_now ->
+              "Now" )
 
-    let next_proposal = string_option_entry "Next proposal"
+    let consensus_time_best_tip =
+      option_entry "Best tip consensus time"
+        ~f:Consensus.Data.Consensus_time.to_string_hum
 
-    let consensus_time_now = string_entry "Consensus time now"
+    let consensus_time_now =
+      map_entry "Consensus time now"
+        ~f:Consensus.Data.Consensus_time.to_string_hum
 
     let consensus_mechanism = string_entry "Consensus mechanism"
 
@@ -290,9 +316,13 @@ module Status = struct
     ; sync_status: Sync_status.Stable.V1.t
     ; propose_pubkeys: string list
     ; histograms: Histograms.t option
-    ; consensus_time_best_tip: string option
-    ; next_proposal: string option
-    ; consensus_time_now: string
+    ; consensus_time_best_tip: Consensus.Data.Consensus_time.Stable.V1.t option
+    ; next_proposal:
+        [ `Check_again of Block_time.Stable.V1.t
+        | `Propose of Block_time.Stable.V1.t
+        | `Propose_now ]
+        option
+    ; consensus_time_now: Consensus.Data.Consensus_time.Stable.V1.t
     ; consensus_mechanism: string
     ; consensus_configuration: Consensus.Configuration.t
     ; addrs_and_ports: Node_addrs_and_ports.Display.Stable.V1.t }

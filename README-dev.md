@@ -131,6 +131,7 @@ These are the most important `make` targets:
 * `container`: restart the development container (or start it if it's not yet)
 * `dev`: does `docker`, `container`, and `build`
 * `test`: run the tests
+* `libp2p_helper`: build the libp2p helper
 * `web`: build the website, including the state explorer
 
 We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code.

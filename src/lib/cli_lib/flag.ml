@@ -230,16 +230,16 @@ module Uri = struct
       let doc_builder =
         Doc_builder.create ~display:to_string
           ~examples:
-            [ Port.to_uri ~path:"graphql" Port.default_client
+            [ Port.to_uri ~path:"graphql" Port.default_rest
             ; Uri.of_string
                 ( "/dns4/peer1-rising-phoenix.o1test.net" ^ ":"
-                ^ Int.to_string Port.default_client
+                ^ Int.to_string Port.default_rest
                 ^/ "graphql" ) ]
           "URI/LOCALHOST-PORT" "graphql rest server for daemon interaction"
       in
       create ~name:"rest-server" ~arg_type:(arg_type ~path:"graphql")
         doc_builder
-        (Resolve_with_default (Port.to_uri ~path:"graphql" Port.default_client))
+        (Resolve_with_default (Port.to_uri ~path:"graphql" Port.default_rest))
   end
 
   module Archive = struct

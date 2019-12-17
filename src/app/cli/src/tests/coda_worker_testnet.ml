@@ -404,14 +404,15 @@ let events workers start_reader =
             workers.(i) <- worker ;
             started () ;
             don't_wait_for
-              (let ms_to_catchup =
-                 (Consensus.Constants.c + Consensus.Constants.delta)
-                 * Consensus.Constants.block_window_duration_ms
-                 + 60_000
-                 (* time for peer discovery *)
+              (let%bind () =
+                 Coda_process.initialization_finish_signal_exn worker
+                 >>= Linear_pipe.read >>| ignore
+               in
+               let ms_to_sync =
+                 Consensus.Constants.(delta * block_window_duration_ms) + 6_000
                  |> Float.of_int
                in
-               let%map () = after (Time.Span.of_ms ms_to_catchup) in
+               let%map () = after (Time.Span.of_ms ms_to_sync) in
                synced ()) ;
             connect_worker i worker) ;
          Deferred.unit )) ;
@@ -421,6 +422,19 @@ let events workers start_reader =
 let start_checks logger (workers : Coda_process.t array) start_reader testnet
     ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
+  let%bind initialization_finish_signals =
+    Deferred.Array.map workers ~f:(fun worker ->
+        Coda_process.initialization_finish_signal_exn worker )
+  in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "downloaded initialization signal" ;
+  let%map () =
+    Deferred.all_unit
+      (List.map (Array.to_list initialization_finish_signals) ~f:(fun p ->
+           Linear_pipe.read p >>| ignore ))
+  in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "initialization finishes, start check" ;
   don't_wait_for
     (start_prefix_check logger workers event_reader testnet ~acceptable_delay) ;
   start_payment_check logger root_reader testnet
@@ -449,11 +463,13 @@ let test ?is_archive_rocksdb ~name logger n proposers snark_work_public_keys
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections ?is_archive_rocksdb
   in
-  let%map workers = Coda_processes.spawn_local_processes_exn configs in
+  let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let workers = List.to_array workers in
   let start_reader, start_writer = Linear_pipe.create () in
   let testnet = Api.create configs workers start_writer in
-  start_checks logger workers start_reader testnet ~acceptable_delay ;
+  let%map () =
+    start_checks logger workers start_reader testnet ~acceptable_delay
+  in
   testnet
 
 module Delegation : sig

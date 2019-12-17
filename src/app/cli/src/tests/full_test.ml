@@ -201,6 +201,7 @@ let run_test () : unit Deferred.t =
         (Strict_pipe.Reader.iter_without_pushback
            (Coda_lib.validated_transitions coda)
            ~f:ignore) ;
+      let%bind () = Ivar.read @@ Coda_lib.initialization_finish_signal coda in
       let wait_until_cond ~(f : Coda_lib.t -> bool) ~(timeout : Float.t) =
         let rec go () =
           if f coda then return ()
