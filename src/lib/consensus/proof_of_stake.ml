@@ -2201,6 +2201,12 @@ module Data = struct
       obj "ConsensusState" ~fields:(fun _ ->
           [ field "blockchainLength" ~typ:(non_null uint32)
               ~doc:"Length of the blockchain at this block"
+              ~deprecated:(Deprecated (Some "use blockHeight instead"))
+              ~args:Arg.[]
+              ~resolve:(fun _ {Poly.blockchain_length; _} ->
+                Coda_numbers.Length.to_uint32 blockchain_length )
+          ; field "blockHeight" ~typ:(non_null uint32)
+              ~doc:"Height of the blockchain at this block"
               ~args:Arg.[]
               ~resolve:(fun _ {Poly.blockchain_length; _} ->
                 Coda_numbers.Length.to_uint32 blockchain_length )
