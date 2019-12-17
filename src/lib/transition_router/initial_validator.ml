@@ -51,11 +51,11 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash
            , [("slot_diff", `String (Int64.to_string slot_diff))] ))
 
 module Duplicate_block_detector = struct
-  (* maintain a map from proposer, epoch, slot to state hashes *)
+  (* maintain a map from block producer key, epoch, slot to state hashes *)
 
   module Blocks = struct
     module T = struct
-      (* order of fields significant, compare by epoch, then slot, then proposer *)
+      (* order of fields significant, compare by epoch, then slot, then producer *)
       type t =
         { consensus_time: Consensus.Data.Consensus_time.t
         ; block_producer: Public_key.Compressed.t }
@@ -83,19 +83,19 @@ module Duplicate_block_detector = struct
 
   let gc_count = ref 0
 
-  (* create dummy proposal to split map on *)
-  let make_splitting_proposal ({consensus_time; block_producer= _} : Blocks.t)
-      : Blocks.t =
+  (* create dummy block to split map on *)
+  let make_splitting_block ({consensus_time; block_producer= _} : Blocks.t) :
+      Blocks.t =
     let block_producer = Public_key.Compressed.empty in
     { consensus_time= Consensus.Data.Consensus_time.get_old consensus_time
     ; block_producer }
 
-  (* every gc_interval proposals seen, discard proposals more than gc_width ago *)
-  let table_gc t proposal =
+  (* every gc_interval blocks seen, discard blocks more than gc_width ago *)
+  let table_gc t block =
     gc_count := (!gc_count + 1) mod gc_interval ;
     if Int.equal !gc_count 0 then
-      let splitting_proposal = make_splitting_proposal proposal in
-      let _, _, gt_map = Map.split t.table splitting_proposal in
+      let splitting_block = make_splitting_block block in
+      let _, _, gt_map = Map.split t.table splitting_block in
       t.table <- gt_map
 
   let create () = {table= Map.empty (module Blocks); latest_epoch= 0}

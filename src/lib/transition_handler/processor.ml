@@ -2,8 +2,8 @@
  *  the thread in which transitions are attached the to the transition frontier.
  *
  *  Two types of data are handled by the transition processor: validated external transitions
- *  with precomputed state hashes (via the proposer and validator pipes) and breadcrumb rose
- *  trees (via the catchup pipe).
+ *  with precomputed state hashes (via the block producer and validator pipes)
+ *  and breadcrumb rose trees (via the catchup pipe).
  *)
 
 open Core_kernel
@@ -227,16 +227,17 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
   in
   ignore
     (Reader.Merge.iter
-       (* It is fine to skip the cache layer on propose transitions because it
-          * is extradornarily unlikely we would write an internal bug triggering this
-          * case, and the external case (where we received an identical external
-          * transition from the network) can happen iff there is another node
-          * with the exact same private key and view of the transaction pool. *)
+       (* It is fine to skip the cache layer on blocks produced by this node
+        * because it is extradornarily unlikely we would write an internal bug
+        * triggering this case, and the external case (where we received an
+        * identical external transition from the network) can happen iff there
+        * is another node with the exact same private key and view of the
+        * transaction pool. *)
        [ Reader.map producer_transition_reader ~f:(fun breadcrumb ->
              Coda_metrics.(
                Gauge.inc_one
                  Transition_frontier_controller.transitions_being_processed) ;
-             `Proposed_breadcrumb (Cached.pure breadcrumb) )
+             `Local_breadcrumb (Cached.pure breadcrumb) )
        ; Reader.map catchup_breadcrumbs_reader
            ~f:(fun (cb, catchup_breadcrumbs_callback) ->
              `Catchup_breadcrumbs (cb, catchup_breadcrumbs_callback) )
@@ -278,7 +279,7 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
                      Ivar.fill decrement_signal ()
                  | `Catchup_scheduler ->
                      () )
-             | `Proposed_breadcrumb breadcrumb ->
+             | `Local_breadcrumb breadcrumb ->
                  let transition_time =
                    Transition_frontier.Breadcrumb.validated_transition
                      (Cached.peek breadcrumb)
@@ -302,7 +303,7 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
                          ~location:__LOC__
                          ~metadata:
                            [("error", `String (Error.to_string_hum err))]
-                         "Error, failed to attach proposed breadcrumb to \
+                         "Error, failed to attach produced breadcrumb to \
                           transition frontier: $error" ;
                        let (_ : Transition_frontier.Breadcrumb.t) =
                          Cached.invalidate_with_failure breadcrumb
