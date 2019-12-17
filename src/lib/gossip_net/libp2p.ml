@@ -200,7 +200,28 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
            and turn should_forward_message into a filter_map instead of just a filter. *)
           ~should_forward_message:(fun ~sender:_ ~data:_ ->
             Deferred.return false )
-          ~bin_prot:Message.V1.T.bin_msg ~on_decode_failure:`Ignore
+          ~bin_prot:Message.V1.T.bin_msg
+          ~on_decode_failure:
+            (`Call
+              (fun ~sender ~data:_ err ->
+                let metadata =
+                  [ ("sender_peer_id", `String sender)
+                  ; ("error", `String (Error.to_string_hum err)) ]
+                in
+                don't_wait_for
+                  ( match%bind Coda_net2.lookup_peerid net2 sender with
+                  | Ok p ->
+                      Trust_system.(
+                        record config.trust_system config.logger p.host
+                          Actions.
+                            ( Violated_protocol
+                            , Some ("failed to decode gossip message", metadata)
+                            ))
+                  | Error _ ->
+                      Logger.warn config.logger
+                        "could not find IP of peer who sent invalid gossip"
+                        ~module_:__MODULE__ ~location:__LOC__ ~metadata ;
+                      Deferred.unit ) ))
         >>| Or_error.ok_exn
       in
       let ban_reader, ban_writer = Linear_pipe.create () in
