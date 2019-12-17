@@ -30,6 +30,7 @@ module.exports = withTM(withBundleAnalyzer(withMDX({
       '/jobs/': {
         page: '/jobs'
       },
+      '/developers': { page: '/developers' },
     };
 
     blogPosts.items.forEach(
