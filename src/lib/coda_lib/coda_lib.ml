@@ -583,6 +583,13 @@ let staking_ledger t =
   let local_state = t.config.consensus_local_state in
   Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
 
+let delegatee_table t =
+  let open Option.Let_syntax in
+  let%map transition_frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  Consensus.Data.Local_state.delegatee_tables t.config.consensus_local_state
+
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier
     ~set_next_proposal:(fun p -> t.next_proposal <- Some p)

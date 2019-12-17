@@ -194,7 +194,11 @@ module Data = struct
         ; mutable next_epoch_snapshot: Snapshot.t
         ; last_checked_slot_and_epoch:
             (Epoch.t * Slot.t) Public_key.Compressed.Table.t
-        ; genesis_epoch_snapshot: Snapshot.t }
+        ; genesis_epoch_snapshot: Snapshot.t
+        ; mutable last_epoch_delegatee_table:
+            Currency.Balance.t Coda_base.Account.Index.Table.t
+            Public_key.Compressed.Table.t
+            Option.t }
       [@@deriving sexp]
 
       let to_yojson t =
@@ -216,6 +220,10 @@ module Data = struct
 
     (* The outer ref changes whenever we swap in new staker set; all the snapshots are recomputed *)
     type t = Data.t ref [@@deriving sexp, to_yojson]
+
+    let delegatee_tables ~(local_state : t) =
+      ( `Current !local_state.staking_epoch_snapshot.delegatee_table
+      , `Last !local_state.last_epoch_delegatee_table )
 
     let current_proposers t =
       Public_key.Compressed.Table.keys !t.Data.last_checked_slot_and_epoch
@@ -249,7 +257,8 @@ module Data = struct
         ; last_checked_slot_and_epoch=
             make_last_checked_slot_and_epoch_table
               (Public_key.Compressed.Table.create ())
-              proposer_public_keys ~default:(Epoch.zero, Slot.zero) }
+              proposer_public_keys ~default:(Epoch.zero, Slot.zero)
+        ; last_epoch_delegatee_table= None }
 
     let proposer_swap t proposer_public_keys now =
       let old : Data.t = !t in
@@ -273,7 +282,7 @@ module Data = struct
                 ((* TODO: Be smarter so that we don't have to look at the slot before again *)
                  let epoch, slot = Epoch_and_slot.of_time_exn now in
                  (epoch, UInt32.(if slot > zero then sub slot one else slot)))
-        }
+        ; last_epoch_delegatee_table= None }
 
     type snapshot_identifier = Staking_epoch_snapshot | Next_epoch_snapshot
     [@@deriving to_yojson]
@@ -2885,6 +2894,8 @@ module Hooks = struct
       in
       let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
       let epoch_snapshot = {Local_state.Snapshot.delegatee_table; ledger} in
+      !local_state.last_epoch_delegatee_table
+      <- Some !local_state.staking_epoch_snapshot.delegatee_table ;
       !local_state.staking_epoch_snapshot <- !local_state.next_epoch_snapshot ;
       !local_state.next_epoch_snapshot <- epoch_snapshot )
 
