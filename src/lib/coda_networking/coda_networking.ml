@@ -965,6 +965,10 @@ let try_non_preferred_peers (type b) t input peers ~rpc :
 
 let rpc_peer_then_random (type b) t peer_id input ~rpc :
     b Envelope.Incoming.t Deferred.Or_error.t =
+  let retry () =
+    let%bind peers = random_peers t 8 in
+    try_non_preferred_peers t input peers ~rpc
+  in
   match%bind query_peer t peer_id rpc input with
   | Connected {data= Ok (Some response); sender} ->
       let%bind () =
@@ -992,15 +996,26 @@ let rpc_peer_then_random (type b) t peer_id input ~rpc :
         | Local ->
             return ()
       in
-      let%bind peers = random_peers t 8 in
-      try_non_preferred_peers t input peers ~rpc
-  | _ ->
-      (* TODO: determine what punishments apply here *)
-      Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-        !"get error from %{sexp: Peer.Id.t}"
-        peer_id ;
-      let%bind peers = random_peers t 8 in
-      try_non_preferred_peers t input peers ~rpc
+      retry ()
+  | Connected {data= Error e; sender} ->
+      (* FIXME #4094: determine if more specific actions apply here *)
+      let%bind () =
+        match sender with
+        | Remote (sender, _) ->
+            Trust_system.(
+              record t.trust_system t.logger sender
+                Actions.
+                  ( Outgoing_connection_error
+                  , Some
+                      ( "Error while doing RPC"
+                      , [("error", `String (Error.to_string_hum e))] ) ))
+        | Local ->
+            return ()
+      in
+      retry ()
+  | Failed_to_connect _ ->
+      (* Since we couldn't connect, we have no IP to ban. *)
+      retry ()
 
 let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
   rpc_peer_then_random t inet_addr input
