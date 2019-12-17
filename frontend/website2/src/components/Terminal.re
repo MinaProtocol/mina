@@ -10,6 +10,7 @@ module Style = {
       justifyContent(`flexStart),
       width(containerWidth),
       height(`rem(22.)),
+      maxWidth(`percent(100.)),
       backgroundColor(Theme.Colors.midnight),
       color(Theme.Colors.offWhite),
       padding(`rem(2.)),

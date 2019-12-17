@@ -15,7 +15,13 @@ module Style = {
   let date = Blog.Style.date;
 
   let wrapper =
-    style([maxWidth(`rem(43.)), marginLeft(`auto), marginRight(`auto)]);
+    style([
+      padding2(~v=`rem(1.), ~h=`rem(1.)),
+      media(
+        Theme.MediaQuery.notMobile,
+        [maxWidth(`rem(43.)), marginLeft(`auto), marginRight(`auto)],
+      ),
+    ]);
 
   let mediaMedium = media("screen and (min-width:30em)");
   let mediaLarge = media("screen and (min-width:60em)");
@@ -33,6 +39,8 @@ module Style = {
       Theme.Typeface.ibmplexsans,
       /* selector(".side-footnote-container", [height(`zero)]), */
       selector(".footnotes", [mediaLarge([display(`none)])]),
+      selector("a", Theme.Link.basicStyles),
+      selector("a.footnote-ref", [fontSize(`rem(0.5))]),
       selector(
         ".side-footnote",
         [

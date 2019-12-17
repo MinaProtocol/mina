@@ -2,17 +2,21 @@ module Style = {
   open Css;
   let header =
     style([
+      display(`flex),
+      justifyContent(`spaceBetween),
+      alignItems(`center),
       padding2(~v=`zero, ~h=`rem(1.25)),
       marginTop(`rem(1.0)),
+      marginBottom(`rem(2.)),
+      height(`rem(2.5)),
       media(
         Theme.MediaQuery.notSmallMobile,
         [padding2(~v=`zero, ~h=`rem(3.)), marginTop(`rem(2.0))],
       ),
-      marginBottom(`rem(1.)),
-      height(`rem(2.5)),
-      display(`flex),
-      justifyContent(`spaceBetween),
-      alignItems(`center),
+      media(
+        Theme.MediaQuery.full,
+        [maxWidth(`rem(89.)), marginLeft(`auto), marginRight(`auto)],
+      ),
     ]);
   let link =
     style([
@@ -52,7 +56,7 @@ let make = () => {
       <Next.Link href="/docs">
         <a className=Style.link> {React.string("Docs")} </a>
       </Next.Link>
-      <Next.Link href="/careers">
+      <Next.Link href="/jobs">
         <a className=Style.link> {React.string("Careers")} </a>
       </Next.Link>
       <a

@@ -85,13 +85,13 @@ module Footer = {
             <Link link="https://t.me/codaprotocol" name="telegram">
               {React.string("Telegram")}
             </Link>
-            <Link link="/tos.html" name="tos">
+            <Link link="/tos" name="tos">
               {React.string("Terms of service")}
             </Link>
-            <Link link="/privacy.html" name="privacy">
+            <Link link="/privacy" name="privacy">
               {React.string("Privacy Policy")}
             </Link>
-            <Link link="/jobs.html" name="hiring">
+            <Link link="/jobs" name="hiring">
               {React.string("We're Hiring")}
             </Link>
             <Link link="/static/presskit.zip" name="presskit" last=true>
@@ -121,6 +121,7 @@ let make = (~children, ~footerColor=Theme.Colors.white) => {
         href="https://cdn.jsdelivr.net/npm/@ibm/plex@4.0.2/css/ibm-plex.min.css"
         rel="stylesheet"
       />
+      <link href="https://use.typekit.net/mta7mwm.css" rel="stylesheet" />
     </Next.Head>
     <Nav />
     <div> children </div>

@@ -20,12 +20,24 @@ module Post = {
   let id = "test";
   type t = {
     title: string,
+    snippet: string,
     slug: string,
     subtitle: Js.Undefined.t(string),
     author: string,
     authorWebsite: Js.Undefined.t(string),
     date: string,
     text: string,
+  };
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};
+
+module JobPost = {
+  let id = "jobPost";
+  type t = {
+    title: string,
+    jobDescription: string,
+    slug: string,
   };
   type entry = System.entry(t);
   type entries = System.entries(t);

@@ -1,16 +1,3 @@
-let extraHeaders = () =>
-  <>
-    <script src="https://apis.google.com/js/api.js" />
-    <script src="public/static/js/leaderboard.js" />
-    <script
-      src="https://cdnjs.cloudflare.com/ajax/libs/marked/0.7.0/marked.min.js"
-      integrity="sha256-0Ed5s/n37LIeAWApZmZUhY9icm932KvYkTVdJzUBiI4="
-      // crossOrigin="anonymous"
-    />
-    <script src="public/static/js/termynal.js" />
-    <link rel="stylesheet" href="public/static/css/termynal.css" />
-  </>;
-
 module Styles = {
   open Css;
 
@@ -80,12 +67,12 @@ module Styles = {
   let rowStyles = [
     display(`grid),
     gridColumnGap(rem(1.5)),
-    gridTemplateColumns([rem(1.), rem(5.5), rem(5.5), rem(2.5)]),
+    gridTemplateColumns([rem(1.), rem(5.5), rem(5.5), rem(3.5)]),
     media(
       Theme.MediaQuery.notMobile,
       [
         width(`percent(100.)),
-        gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(2.5)]),
+        gridTemplateColumns([rem(2.5), `auto, rem(6.), rem(3.5)]),
       ],
     ),
   ];

@@ -294,17 +294,27 @@ module BenefitsSection = {
 
 module ApplySection = {
   [@react.component]
-  let make = () => {
+  let make = (~posts) => {
     <div className=Style.jobsList>
       <h2 className=Style.applyHeading> {React.string("Apply")} </h2>
       <ul className=Style.jobListItems>
-        <li>
-          <a
-            href="https://codaprotocol.com/jobs/engineering-manager.html"
-            className=Theme.Link.basic>
-            {React.string("Engineering Manager (San Francisco)")}
-          </a>
-        </li>
+        {React.array(
+           Array.map(
+             (post: ContentType.JobPost.t) => {
+               <li key={post.slug}>
+                 <Next.Link
+                   href="/jobs/[slug]"
+                   _as={"/jobs/" ++ post.slug}
+                   passHref=true>
+                   <a className=Theme.Link.basic>
+                     {React.string(post.title)}
+                   </a>
+                 </Next.Link>
+               </li>
+             },
+             posts,
+           ),
+         )}
       </ul>
     </div>;
   };
@@ -322,7 +332,7 @@ module CareersSpacer = {
 };
 
 [@react.component]
-let make = () => {
+let make = (~posts) => {
   <Page>
     <div className=Style.page>
       <h1 className=Theme.H3.wings> {React.string("Work with us!")} </h1>
@@ -339,9 +349,24 @@ let make = () => {
         <CareersSpacer />
         <BenefitsSection />
         <CareersSpacer />
-        <ApplySection />
+        <ApplySection posts />
         <Spacer height=3.5 />
       </div>
     </div>
   </Page>;
 };
+
+Next.injectGetInitialProps(make, _ => {
+  Contentful.getEntries(
+    Lazy.force(Contentful.client),
+    {"include": 0, "content_type": ContentType.JobPost.id},
+  )
+  |> Js.Promise.then_((entries: ContentType.JobPost.entries) => {
+       let posts =
+         Array.map(
+           (e: ContentType.JobPost.entry) => e.fields,
+           entries.items,
+         );
+       Js.Promise.resolve({"posts": posts});
+     })
+});

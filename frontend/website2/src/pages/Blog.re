@@ -5,9 +5,10 @@ module Style = {
       color(Theme.Colors.saville),
       fontSize(`rem(2.25)),
       letterSpacing(`rem(-0.0625)),
-      fontWeight(`bold),
+      fontWeight(`semiBold),
       textDecoration(`none),
       Theme.Typeface.ibmplexsans,
+      media(Theme.MediaQuery.notMobile, [fontSize(`rem(3.))]),
     ]);
 
   let subtitle =
@@ -27,7 +28,7 @@ module Style = {
     style([
       Theme.Typeface.ibmplexsans,
       fontSize(`rem(0.75)),
-      letterSpacing(`rem(0.3125)),
+      letterSpacing(`rem(0.0875)),
       fontWeight(`normal),
       color(Theme.Colors.slateAlpha(0.5)),
     ]);
@@ -36,7 +37,7 @@ module Style = {
     style([
       Theme.Typeface.ibmplexsans,
       fontSize(`rem(0.75)),
-      letterSpacing(`rem(0.3125)),
+      letterSpacing(`rem(0.0875)),
       fontWeight(`normal),
       color(Theme.Colors.slate),
       textTransform(`uppercase),
