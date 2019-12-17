@@ -178,7 +178,7 @@ let replace_proposers keys pks =
         in
         (kps, pk) )
   in
-  Coda_lib.replace_propose_keypairs keys
+  Coda_lib.replace_block_production_keypairs keys
     (Keypair.And_compressed_pk.Set.of_list kps) ;
   kps |> List.map ~f:snd
 

@@ -19,7 +19,8 @@ val subscription : t -> Coda_subscriptions.t
 (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
 val block_production_pubkeys : t -> Public_key.Compressed.Set.t
 
-val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
+val replace_block_production_keypairs :
+  t -> Keypair.And_compressed_pk.Set.t -> unit
 
 val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
 

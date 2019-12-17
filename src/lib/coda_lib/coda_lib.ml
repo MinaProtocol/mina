@@ -58,7 +58,7 @@ type t =
   ; initialization_finish_signal: unit Ivar.t
   ; pipes: pipes
   ; wallets: Secrets.Wallets.t
-  ; propose_keypairs:
+  ; block_production_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
   ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
@@ -83,10 +83,11 @@ let client_port t =
 
 (* Get the most recently set public keys  *)
 let block_production_pubkeys t : Public_key.Compressed.Set.t =
-  let public_keys, _ = Agent.get t.propose_keypairs in
+  let public_keys, _ = Agent.get t.block_production_keypairs in
   Public_key.Compressed.Set.map public_keys ~f:snd
 
-let replace_propose_keypairs t kps = Agent.update t.propose_keypairs kps
+let replace_block_production_keypairs t kps =
+  Agent.update t.block_production_keypairs kps
 
 module Snark_worker = struct
   let run_process ~logger client_port kill_ivar =
@@ -593,7 +594,7 @@ let start t =
     ~get_completed_work:
       (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
     ~time_controller:t.config.time_controller
-    ~keypairs:(Agent.read_only t.propose_keypairs)
+    ~keypairs:(Agent.read_only t.block_production_keypairs)
     ~consensus_local_state:t.config.consensus_local_state
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.proposer_transition_writer ;
@@ -865,14 +866,14 @@ let create (config : Config.t) =
                 ~f:(fun x ->
                   Coda_networking.broadcast_snark_pool_diff net x ;
                   Deferred.unit ) ) ;
-          let propose_keypairs =
+          let block_production_keypairs =
             Agent.create
               ~f:(fun kps ->
                 Keypair.Set.to_list kps
                 |> List.map ~f:(fun kp ->
                        (kp, Public_key.compress kp.Keypair.public_key) )
                 |> Keypair.And_compressed_pk.Set.of_list )
-              config.initial_propose_keypairs
+              config.initial_block_production_keypairs
           in
           Option.iter config.archive_process_location
             ~f:(fun archive_process_port ->
@@ -940,7 +941,7 @@ let create (config : Config.t) =
                     Strict_pipe.Writer.to_linear_pipe
                       external_transitions_writer }
             ; wallets
-            ; propose_keypairs
+            ; block_production_keypairs
             ; seen_jobs=
                 Work_selector.State.init
                   ~reassignment_wait:config.work_reassignment_wait

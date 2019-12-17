@@ -189,7 +189,7 @@ let run_test () : unit Deferred.t =
              ~conf_dir:temp_conf_dir ~gossip_net_params
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
-             ~initial_propose_keypairs:(Keypair.Set.singleton keypair)
+             ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
              ~snark_worker_config:
                Coda_lib.Config.Snark_worker_config.
                  { initial_snark_worker_key=
