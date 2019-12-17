@@ -56,7 +56,8 @@ module Style = {
     ]);
 };
 
-let useIncrement = (~amount, ~setAmount, ~total, ~increment, ~delay) => {
+let useIncrement = (~initial, ~total, ~increment, ~delay) => {
+  let (amount, setAmount) = React.useState(() => initial);
   React.useEffect1(
     () =>
       if (total > amount) {
@@ -71,6 +72,7 @@ let useIncrement = (~amount, ~setAmount, ~total, ~increment, ~delay) => {
       },
     [|amount|],
   );
+  amount;
 };
 
 module Wrapper = {
@@ -81,15 +83,13 @@ module Wrapper = {
   let make = (~lineDelay, ~children) => {
     let arr = toArrayChildren(children);
     let total = Array.length(arr);
-    let (numDisplayed, setNumDisplayed) =
-      React.useState(() => min(total, 1));
-    useIncrement(
-      ~amount=numDisplayed,
-      ~setAmount=setNumDisplayed,
-      ~total,
-      ~increment=1,
-      ~delay=lineDelay,
-    );
+    let numDisplayed =
+      useIncrement(
+        ~initial=min(total, 1),
+        ~total,
+        ~increment=1,
+        ~delay=lineDelay,
+      );
     <div className=Style.wrapper>
       <div className=Style.header>
         <div className=Style.headerText> {React.string("bash")} </div>
@@ -109,15 +109,13 @@ module Wrapper = {
 module Line = {
   [@react.component]
   let make = (~delay=75, ~prompt=?, ~value) => {
-    let (numDisplayed, setNumDisplayed) =
-      React.useState(() => delay == 0 ? String.length(value) : 0);
-    useIncrement(
-      ~amount=numDisplayed,
-      ~setAmount=setNumDisplayed,
-      ~total=String.length(value),
-      ~increment=1,
-      ~delay,
-    );
+    let numDisplayed =
+      useIncrement(
+        ~initial=delay == 0 ? String.length(value) : 0,
+        ~total=String.length(value),
+        ~increment=1,
+        ~delay,
+      );
     let displayed = String.sub(value, 0, numDisplayed);
     <div className=Style.item>
       {ReactUtils.fromOpt(
@@ -148,15 +146,7 @@ module Progress = {
   [@react.component]
   let make = (~delay=4, ~char={js|█|js}) => {
     let total = 100;
-    let (numDisplayed, setNumDisplayed) = React.useState(() => 0);
-    useIncrement(
-      ~amount=numDisplayed,
-      ~setAmount=setNumDisplayed,
-      ~total,
-      ~increment=1,
-      ~delay,
-    );
-
+    let numDisplayed = useIncrement(~initial=0, ~total, ~increment=1, ~delay);
     let numChars = numDisplayed / 3;
     let displayed = String.concat("", List.init(numChars, _ => char));
     <div className=Style.item>
