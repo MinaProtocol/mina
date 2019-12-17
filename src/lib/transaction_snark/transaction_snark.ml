@@ -303,16 +303,6 @@ module Base = struct
       Snarky_integer.Integer.of_bits ~m @@ Amount.var_to_bits txn_amount
     in
     let balance_int = balance_to_int account.balance in
-    (* fail early if insufficient balance *)
-    let%bind () =
-      with_label
-        (sprintf "%s: check balance for transaction" __LOC__)
-        (let%bind sufficient_balance =
-           make_checked (fun () ->
-               Snarky_integer.Integer.gte ~m balance_int txn_amount_int )
-         in
-         Boolean.Assert.is_true sufficient_balance)
-    in
     let%bind curr_min_balance =
       let open Snarky_integer.Integer in
       let initial_minimum_balance_int =
@@ -347,11 +337,13 @@ module Base = struct
                in
                min_balance_less_decrement) )
     in
-    let%bind _, proposed_balance_int =
+    let%bind `Underflow underflow, proposed_balance_int =
       make_checked (fun () ->
           Snarky_integer.Integer.subtract_unpacking_or_zero ~m balance_int
             txn_amount_int )
     in
+    (* underflow indicates insufficient balance *)
+    let%bind () = Boolean.(Assert.is_true @@ not underflow) in
     let%bind sufficient_timed_balance =
       make_checked (fun () ->
           Snarky_integer.Integer.(gte ~m proposed_balance_int curr_min_balance)
