@@ -995,9 +995,9 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer =
   | Error e ->
       Error e
 
+(** List of all peers we are currently connected to. *)
 let peers (net : net) = list_peers net
 
-(** List of all peers we are currently connected to. *)
 let listen_on net iface =
   match%map Helper.do_rpc net (module Helper.Rpcs.Listen) {iface} with
   | Ok maddrs ->
