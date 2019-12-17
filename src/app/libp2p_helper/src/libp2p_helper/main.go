@@ -828,7 +828,7 @@ func (ban *banIPMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(errors.New("unparsable IP or IPv6"))
 	}
 
-	ipnet := gonet.IPNet{Mask: ip.DefaultMask(), IP: ip}
+	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: ip}
 
 	currentAction, isFromRule := app.P2p.Filters.ActionForFilter(ipnet)
 
@@ -856,7 +856,7 @@ func (unban *unbanIPMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(errors.New("unparsable IP or IPv6"))
 	}
 
-	ipnet := gonet.IPNet{Mask: ip.DefaultMask(), IP: ip}
+	ipnet := gonet.IPNet{Mask: gonet.IPv4Mask(255, 255, 255, 255), IP: ip}
 
 	currentAction, isFromRule := app.P2p.Filters.ActionForFilter(ipnet)
 
