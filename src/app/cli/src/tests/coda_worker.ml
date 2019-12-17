@@ -11,7 +11,7 @@ module Input = struct
     { addrs_and_ports: Kademlia.Node_addrs_and_ports.t
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
-    ; proposer: int option
+    ; block_production_key: int option
     ; work_selection_method: Cli_lib.Arg_type.Work_selection_method.Stable.V1.t
     ; conf_dir: string
     ; trace_dir: string option
@@ -397,7 +397,7 @@ module T = struct
 
     let init_worker_state
         { addrs_and_ports
-        ; proposer
+        ; block_production_key
         ; snark_worker_key
         ; work_selection_method
         ; conf_dir
@@ -462,7 +462,7 @@ module T = struct
             Block_time.Controller.create (Block_time.Controller.basic ~logger)
           in
           let block_production_keypair =
-            Option.map proposer ~f:(fun i ->
+            Option.map block_production_key ~f:(fun i ->
                 List.nth_exn Genesis_ledger.accounts i
                 |> Genesis_ledger.keypair_of_account_record_exn )
           in
