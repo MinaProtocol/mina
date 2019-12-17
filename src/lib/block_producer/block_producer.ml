@@ -516,7 +516,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               match Agent.get keypairs with
               | keypairs, `Different ->
                   (* Perform proposer swap since we have new keypairs *)
-                  Consensus.Data.Local_state.proposer_swap
+                  Consensus.Data.Local_state.block_production_keys_swap
                     consensus_local_state
                     ( Keypair.And_compressed_pk.Set.to_list keypairs
                     |> List.map ~f:snd |> Public_key.Compressed.Set.of_list )

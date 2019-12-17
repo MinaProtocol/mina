@@ -298,11 +298,12 @@ module type S = sig
 
       val create : Signature_lib.Public_key.Compressed.Set.t -> t
 
-      val current_proposers : t -> Signature_lib.Public_key.Compressed.Set.t
+      val current_block_production_keys :
+        t -> Signature_lib.Public_key.Compressed.Set.t
 
-      (** Swap in a new set of proposers and invalidate and/or recompute cached
-       * data *)
-      val proposer_swap :
+      (** Swap in a new set of block production keys and invalidate and/or
+          recompute cached data *)
+      val block_production_keys_swap :
            t
         -> Signature_lib.Public_key.Compressed.Set.t
         -> Coda_base.Block_time.t

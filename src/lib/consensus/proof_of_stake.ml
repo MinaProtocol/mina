@@ -217,7 +217,7 @@ module Data = struct
     (* The outer ref changes whenever we swap in new staker set; all the snapshots are recomputed *)
     type t = Data.t ref [@@deriving sexp, to_yojson]
 
-    let current_proposers t =
+    let current_block_production_keys t =
       Public_key.Compressed.Table.keys !t.Data.last_checked_slot_and_epoch
       |> Public_key.Compressed.Set.of_list
 
@@ -251,7 +251,7 @@ module Data = struct
               (Public_key.Compressed.Table.create ())
               proposer_public_keys ~default:(Epoch.zero, Slot.zero) }
 
-    let proposer_swap t proposer_public_keys now =
+    let block_production_keys_swap t proposer_public_keys now =
       let old : Data.t = !t in
       let s {Snapshot.ledger; delegatee_table= _} =
         { Snapshot.ledger
@@ -2574,7 +2574,7 @@ module Hooks = struct
                 in
                 let delegatee_table =
                   compute_delegatee_table_sparse_ledger
-                    (Local_state.current_proposers local_state)
+                    (Local_state.current_block_production_keys local_state)
                     snapshot_ledger
                 in
                 set_snapshot local_state snapshot_id
@@ -2878,7 +2878,8 @@ module Hooks = struct
            (Consensus_state.curr_epoch next))
     then (
       let delegatee_table =
-        compute_delegatee_table (Local_state.current_proposers local_state)
+        compute_delegatee_table
+          (Local_state.current_block_production_keys local_state)
           ~iter_accounts:(fun f ->
             Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
       in
