@@ -62,7 +62,7 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None)
   in
   configs
 
-let stabalize_and_start_or_timeout ?(timeout_ms = 10000.) nodes =
+let stabalize_and_start_or_timeout ?(timeout_ms = 15000.) nodes =
   let ready () =
     let check_ready node =
       let%map peers = Coda_process.peers_exn node in
