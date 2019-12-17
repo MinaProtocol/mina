@@ -562,62 +562,75 @@ module Helper = struct
     (* Message published on one of our subscriptions *)
     | "publish" -> (
         let%bind m = Publish.of_yojson v |> or_error in
-        let idx = m.subscription_idx in
-        let data = m.data in
-        match Hashtbl.find t.subscriptions idx with
-        | Some sub ->
-            if not sub.closed then (
-              let decoded = sub.decode data in
-              match decoded with
-              | Ok data ->
-                  (* TAKE CARE: doing anything with the return value here is UNSOUND
-                because write_pipe has a cast type. We don't remember what the
-                original 'return was. *)
-                  don't_wait_for
-                    Deferred.Let_syntax.(
-                      match%map lookup_peerid t m.sender with
-                      | Ok sender ->
-                          let _ =
-                            Strict_pipe.Writer.write sub.write_pipe
-                              (Envelope.Incoming.wrap_peer ~data ~sender)
-                          in
-                          ()
-                      | Error e ->
-                          Logger.error t.logger
-                            "failed to find connection info for alleged \
-                             sender $peer_id on topic $topic: $error"
-                            ~module_:__MODULE__ ~location:__LOC__
-                            ~metadata:
-                              [ ("peer_id", `String m.sender)
-                              ; ("topic", `String sub.topic)
-                              ; ("error", `String (Error.to_string_mach e)) ])
-              | Error e ->
-                  ( match sub.on_decode_failure with
-                  | `Ignore ->
-                      ()
-                  | `Call f ->
-                      f ~sender:m.sender ~data e ) ;
-                  Logger.error t.logger
-                    "failed to decode message published on subscription \
-                     $topic ($idx): $error"
-                    ~module_:__MODULE__ ~location:__LOC__
-                    ~metadata:
-                      [ ("topic", `String sub.topic)
-                      ; ("idx", `Int idx)
-                      ; ("error", `String (Error.to_string_hum e)) ] ;
-                  ()
-              (* TODO: add sender to Publish.t and include it here. *)
-              (* TODO: think about exposing the PeerID of the originator as well? *) )
-            else
-              Logger.info t.logger
-                "received msg for subscription $sub after unsubscribe, was it \
-                 still in the stdout pipe?"
-                ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:[("sub", `Int idx)] ;
-            Ok ()
-        | None ->
-            Or_error.errorf
-              "message published with inactive subsubscription %d" idx )
+        let me =
+          Ivar.peek t.me_keypair
+          |> Option.value_exn
+               ~message:
+                 "How did we receive pubsub before configuring our keypair?"
+        in
+        if Peer.Id.equal m.sender me.peer_id then
+          (* elide messages that we sent *) return ()
+        else
+          let idx = m.subscription_idx in
+          let data = m.data in
+          match Hashtbl.find t.subscriptions idx with
+          | Some sub ->
+              if not sub.closed then (
+                let raw_data = Data.to_string data in
+                let decoded = sub.decode raw_data in
+                match decoded with
+                | Ok data ->
+                    don't_wait_for
+                      Deferred.Let_syntax.(
+                        let finish sender =
+                          (* TAKE CARE: doing anything with the return
+                          value here except ignore is UNSOUND because
+                          write_pipe has a cast type. We don't remember
+                          what the original 'return was. *)
+                          Strict_pipe.Writer.write sub.write_pipe
+                            (Envelope.Incoming.wrap_peer ~data ~sender)
+                          |> ignore
+                        in
+                        match%map lookup_peerid t m.sender with
+                        | Ok sender ->
+                            finish sender
+                        | Error e ->
+                            Logger.error t.logger
+                              "failed to find connection info for alleged \
+                               sender $peer_id on topic $topic: $error"
+                              ~module_:__MODULE__ ~location:__LOC__
+                              ~metadata:
+                                [ ("peer_id", `String m.sender)
+                                ; ("topic", `String sub.topic)
+                                ; ("error", `String (Error.to_string_mach e))
+                                ])
+                | Error e ->
+                    ( match sub.on_decode_failure with
+                    | `Ignore ->
+                        ()
+                    | `Call f ->
+                        f ~sender:m.sender ~data:raw_data e ) ;
+                    Logger.error t.logger
+                      "failed to decode message published on subscription \
+                       $topic ($idx): $error"
+                      ~module_:__MODULE__ ~location:__LOC__
+                      ~metadata:
+                        [ ("topic", `String sub.topic)
+                        ; ("idx", `Int idx)
+                        ; ("error", `String (Error.to_string_hum e)) ] ;
+                    ()
+                (* TODO: add sender to Publish.t and include it here. *)
+                (* TODO: think about exposing the PeerID of the originator as well? *) )
+              else
+                Logger.info t.logger
+                  "received msg for subscription $sub after unsubscribe, was \
+                   it still in the stdout pipe?"
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:[("sub", `Int idx)] ;
+              Ok ()
+          | None ->
+              Or_error.errorf
+                "message published with inactive subsubscription %d" idx )
     (* Validate a message received on a subscription *)
     | "validate" -> (
         let%bind m = Validate.of_yojson v |> or_error in
@@ -1308,40 +1321,72 @@ let%test_module "coda network tests" =
       | `Ok a ->
           Envelope.Incoming.data a
 
-    let three_str_eq a b c = assert (String.equal a b && String.equal b c)
+    module type Pubsub_config = sig
+      type msg [@@deriving equal, compare, sexp, bin_io]
 
-    let%test_unit "pubsub" =
+      val subscribe :
+        net -> string -> msg Pubsub.Subscription.t Deferred.Or_error.t
+
+      val a_sent : msg
+
+      val b_sent : msg
+    end
+
+    let make_pubsub_test name (module M : Pubsub_config) =
+      let open Deferred.Let_syntax in
+      let%bind a, b, shutdown = setup_two_nodes ("test_pubsub_" ^ name) in
+      (* Give the libp2p helpers time to see each other. *)
+      let%bind a_sub = M.subscribe a "test" |> Deferred.Or_error.ok_exn in
+      let%bind b_sub = M.subscribe b "test" |> Deferred.Or_error.ok_exn in
+      let a_r = Pubsub.Subscription.message_pipe a_sub in
+      let b_r = Pubsub.Subscription.message_pipe b_sub in
+      (* Give the subscriptions time to propagate *)
+      let%bind () = after (sec 0.5) in
+      let%bind () = Pubsub.Subscription.publish a_sub M.a_sent in
+      (* Give the publish time to propagate *)
+      let%bind () = after (sec 0.5) in
+      let%bind b_recv = Strict_pipe.Reader.read b_r in
+      [%test_eq: M.msg] M.a_sent (unwrap_eof b_recv) ;
+      let%bind () = Pubsub.Subscription.publish b_sub M.b_sent in
+      (* Give the publish time to propagate *)
+      let%bind () = after (sec 0.5) in
+      let%bind a_recv = Strict_pipe.Reader.read a_r in
+      [%test_eq: M.msg] M.b_sent (unwrap_eof a_recv) ;
+      shutdown ()
+
+    let should_forward_message ~sender:_ ~data:_ = return true
+
+    let%test_unit "pubsub_raw" =
       let test_def =
-        let open Deferred.Let_syntax in
-        let%bind a, b, shutdown = setup_two_nodes "test_pubsub" in
-        let should_forward_message ~sender:_ ~data:_ = return true in
-        (* Give the libp2p helpers time to see each other. *)
-        let%bind a_sub =
-          Pubsub.subscribe a "test" ~should_forward_message
-          |> Deferred.Or_error.ok_exn
-        in
-        let%bind b_sub =
-          Pubsub.subscribe b "test" ~should_forward_message
-          |> Deferred.Or_error.ok_exn
-        in
-        let a_r = Pubsub.Subscription.message_pipe a_sub in
-        let b_r = Pubsub.Subscription.message_pipe b_sub in
-        (* Give the subscriptions time to propagate *)
-        let%bind () = after (sec 0.5) in
-        let%bind () = Pubsub.Subscription.publish a_sub "msg from a" in
-        (* Give the publish time to propagate *)
-        let%bind () = after (sec 0.5) in
-        (* FIXME: a shouldn't be receiving its own messages? *)
-        let%bind a_msg = Strict_pipe.Reader.read a_r in
-        let%bind b_msg = Strict_pipe.Reader.read b_r in
-        three_str_eq "msg from a" (unwrap_eof a_msg) (unwrap_eof b_msg) ;
-        let%bind () = Pubsub.Subscription.publish b_sub "msg from b" in
-        (* Give the publish time to propagate *)
-        let%bind () = after (sec 0.5) in
-        let%bind a_msg = Strict_pipe.Reader.read a_r in
-        let%bind b_msg = Strict_pipe.Reader.read b_r in
-        three_str_eq "msg from b" (unwrap_eof a_msg) (unwrap_eof b_msg) ;
-        shutdown ()
+        make_pubsub_test "raw"
+          ( module struct
+            type msg = string [@@deriving equal, compare, sexp, bin_io]
+
+            let subscribe net topic =
+              Pubsub.subscribe ~should_forward_message net topic
+
+            let a_sent = "msg from a"
+
+            let b_sent = "msg from b"
+          end )
+      in
+      Async.Thread_safe.block_on_async_exn (fun () -> test_def)
+
+    let%test_unit "pubsub_bin_prot" =
+      let test_def =
+        make_pubsub_test "bin_prot"
+          ( module struct
+            type msg = {a: int; b: string option}
+            [@@deriving bin_io, equal, sexp, compare]
+
+            let subscribe net topic =
+              Pubsub.subscribe_encode ~should_forward_message ~bin_prot:bin_msg
+                ~on_decode_failure:`Ignore net topic
+
+            let a_sent = {a= 0; b= None}
+
+            let b_sent = {a= 1; b= Some "foo"}
+          end )
       in
       Async.Thread_safe.block_on_async_exn (fun () -> test_def)
   end )
