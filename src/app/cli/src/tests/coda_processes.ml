@@ -70,7 +70,7 @@ let stabalize_and_start_or_timeout ?(timeout_ms = 10000.) nodes =
     in
     let rec go () =
       if%bind Deferred.List.for_all nodes ~f:check_ready then return ()
-      else go ()
+      else after (Time.Span.of_ms 100.) >>= go
     in
     go ()
   in
