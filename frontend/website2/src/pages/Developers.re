@@ -140,7 +140,7 @@ let make = () => {
                )}
             </p>
             <Spacer height=1. />
-            <a href="/docs/getting-started/" className=Styles.ctaButton>
+            <a href="/docs/getting-started" className=Styles.ctaButton>
               {React.string({js| Get Started →|js})}
             </a>
           </div>
@@ -160,7 +160,7 @@ let make = () => {
               text={React.string(
                 "Learn how to install Coda and connect to the network.",
               )}
-              href="/docs/getting-started/"
+              href="/docs/getting-started"
             />
             <HoverCard
               heading={React.string({js| Grants |js})}
@@ -174,7 +174,7 @@ let make = () => {
               text={React.string(
                 "Contribute to Coda source code and core products.",
               )}
-              href="/docs/developers/"
+              href="/docs/developers"
             />
             // TODO: Put SDK waitlist link here
             <HoverCard

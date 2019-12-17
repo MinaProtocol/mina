@@ -60,11 +60,15 @@ let make = (~posts) => {
                {ReactUtils.fromOpt(Js.Undefined.toOption(post.subtitle), ~f=s =>
                   <div className=Style.subtitle> {React.string(s)} </div>
                 )}
-               <Spacer height=1.5 />
+               <Spacer height=1. />
                <div className=Style.author>
                  {React.string("by " ++ post.author)}
                </div>
                <div className=Style.date> {React.string(post.date)} </div>
+               <Spacer height=1.5 />
+               <div className=Theme.Body.basic>
+                 {React.string(post.snippet)}
+               </div>
              </li>
            },
            posts,

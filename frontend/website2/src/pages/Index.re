@@ -1,11 +1,6 @@
 module Styles = {
   open Css;
-  let page =
-    style([
-      display(`block),
-      justifyContent(`center),
-      marginTop(`rem(4.)),
-    ]);
+  let page = style([display(`block), justifyContent(`center)]);
 };
 
 [@react.component]

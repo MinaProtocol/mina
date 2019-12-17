@@ -367,8 +367,8 @@ module SimpleButton = {
 let make = () => {
   <NavWrapper keepAnnouncementBar=true>
     [|
+      <SimpleButton name="Developers" link="/developers" />,
       <SimpleButton name="Blog" link="/blog" />,
-      <SimpleButton name="Docs" link="/docs" />,
       <SimpleButton name="Careers" link="/jobs" />,
       <SimpleButton name="Testnet" link="/testnet" />,
     |]

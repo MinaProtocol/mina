@@ -349,7 +349,7 @@ let make = () => {
             ),
           ])
         )>
-        <NewsletterWidget />
+        <NewsletterWidget center=true />
       </div>
       <div
         className=Css.(
