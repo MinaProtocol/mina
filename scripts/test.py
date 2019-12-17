@@ -175,8 +175,8 @@ def run(args):
 
     logproc_filter = '.level in ["Warn", "Error", "Fatal", "Faulty_peer"]'
     coda_build_path = './_build/default'
+    coda_app_path = 'src/app'
 
-    coda_app_path = 'app' if os.path.exists('dune-project') else 'src/app'
     coda_exe_path = os.path.join(coda_app_path, 'cli/src/coda.exe')
     coda_exe = os.path.join(coda_build_path, coda_exe_path)
 
