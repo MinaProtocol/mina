@@ -142,7 +142,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let%bind subscription =
         Coda_net2.Pubsub.subscribe_encode net2
           "coda/consensus-messages/0.0.1"
-          (* FIXME: instead of doing validation here we put the message into a
+          (* FIXME #4097: instead of doing validation here we put the message into a
            queue for later potential broadcast. It will still be broadcast
            despite failing validation, validation is only for automatic forwarding.
            Instead, we should probably do "initial validation" up front here,
