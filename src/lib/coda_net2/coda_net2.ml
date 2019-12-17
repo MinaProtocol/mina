@@ -1015,8 +1015,7 @@ let listening_addrs net =
 (** TODO: graceful shutdown. Reset all our streams, sync the databases, then
 shutdown. Replace kill invocation with an RPC. *)
 let shutdown (net : net) =
-  let%map _ = Child_processes.kill net.subprocess in
-  ()
+  Deferred.ignore (Child_processes.kill net.subprocess)
 
 module Stream = struct
   type t = Helper.stream
