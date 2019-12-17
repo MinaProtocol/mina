@@ -854,7 +854,7 @@ let create (config : Config.t) =
             (Strict_pipe.transfer
                (Coda_networking.states net)
                external_transitions_writer ~f:ident) ;
-          (* TODO: augment ban_notifications with a Peer.ID so we can implement ban_notify
+          (* FIXME #4093: augment ban_notifications with a Peer.ID so we can implement ban_notify
            trace_task "ban notification loop" (fun () ->
               Linear_pipe.iter (Coda_networking.ban_notification_reader net)
                 ~f:(fun notification ->
