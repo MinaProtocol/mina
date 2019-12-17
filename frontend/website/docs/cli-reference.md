@@ -1,5 +1,8 @@
 # CLI Reference
 
+!!! warning
+    this document is out of date. Refer to the CLI help built into the executable.
+
 The Coda CLI (command-line interface) is the primary way for users to interact with the Coda network. It provides standard client functionality to create accounts, send transactions, and participate in consensus. There are also advanced client and daemon commands for power users.
 
 The CLI is installed as part of the Coda bundle, and can be accessed from a shell by beginning a statement with `coda`. 
