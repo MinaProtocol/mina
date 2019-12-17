@@ -945,7 +945,7 @@ module Pubsub = struct
         Bigstring.read_bin_prot b bin_prot.Bin_prot.Type_class.reader
         |> Or_error.map ~f:fst )
       ~encode:(fun msg ->
-        Bin_prot.Utils.bin_dump bin_prot.Bin_prot.Type_class.writer msg
+        Bin_prot.Utils.bin_dump ~header:true bin_prot.Bin_prot.Type_class.writer msg
         |> Bigstring.to_string )
       ~should_forward_message ~on_decode_failure net topic
 
