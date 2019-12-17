@@ -6,8 +6,7 @@ open Coda_transition
 open Frontier_base
 module Database = Database
 
-let construct_staged_ledger_at_root ~logger ~verifier ~root_ledger
-    ~root_transition ~root =
+let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root =
   let open Deferred.Or_error.Let_syntax in
   let open Root_data.Minimal.Stable.Latest in
   let snarked_ledger_hash =
@@ -27,7 +26,7 @@ let construct_staged_ledger_at_root ~logger ~verifier ~root_ledger
            let%map _ = Ledger.apply_transaction mask txn in
            () ))
   in
-  Staged_ledger.of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash
+  Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash
     ~ledger:mask ~scan_state:root.scan_state
     ~pending_coinbase_collection:root.pending_coinbase
 
@@ -177,8 +176,7 @@ module Instance = struct
     let%bind root_staged_ledger =
       let open Deferred.Let_syntax in
       match%map
-        construct_staged_ledger_at_root ~logger:t.factory.logger
-          ~verifier:t.factory.verifier ~root_ledger ~root_transition ~root
+        construct_staged_ledger_at_root ~root_ledger ~root_transition ~root
       with
       | Error err ->
           Error (`Failure (Error.to_string_hum err))
