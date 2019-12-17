@@ -139,7 +139,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let%bind net2 =
         create_libp2p config first_peer_ivar high_connectivity_ivar
       in
-      let%map subscription =
+      let%bind subscription =
         Coda_net2.Pubsub.subscribe_encode net2
           "coda/consensus-messages/0.0.1"
           (* FIXME: instead of doing validation here we put the message into a
@@ -173,16 +173,28 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       Deferred.unit ) ))
         >>| Or_error.ok_exn
       in
+      let do_ban (addr, expiration) =
+        don't_wait_for
+          ( Clock.at expiration
+          >>= fun () -> Coda_net2.unban_ip net2 addr |> Deferred.ignore ) ;
+        Coda_net2.ban_ip net2 addr |> Deferred.ignore
+      in
+      let%map () =
+        Deferred.List.iter (Trust_system.peer_statuses config.trust_system)
+          ~f:(function
+          | ( addr
+            , {banned= Trust_system.Banned_status.Banned_until expiration; _} )
+            ->
+              do_ban (addr, expiration)
+          | _ ->
+              Deferred.unit )
+      in
       let ban_reader, ban_writer = Linear_pipe.create () in
       don't_wait_for
         (let%map () =
-           Strict_pipe.Reader.iter (Trust_system.ban_pipe config.trust_system)
-             ~f:(fun (addr, expiration) ->
-               don't_wait_for
-                 ( Clock.at expiration
-                 >>= fun () -> Coda_net2.unban_ip net2 addr |> Deferred.ignore
-                 ) ;
-               Coda_net2.ban_ip net2 addr |> Deferred.ignore )
+           Strict_pipe.Reader.iter
+             (Trust_system.ban_pipe config.trust_system)
+             ~f:do_ban
          in
          Linear_pipe.close ban_writer) ;
       { config
