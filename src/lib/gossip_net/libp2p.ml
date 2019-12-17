@@ -11,57 +11,6 @@ open Coda_base.Rpc_intf
 type ('q, 'r) dispatch =
   Versioned_rpc.Connection_with_menu.t -> 'q -> 'r Deferred.Or_error.t
 
-module Get_chain_id = struct
-  module Master = struct
-    let name = "get_chain_id"
-
-    module T = struct
-      (* "master" types, do not change *)
-      type query = unit
-
-      type response = string
-    end
-
-    module Caller = T
-    module Callee = T
-  end
-
-  include Master.T
-  module M = Versioned_rpc.Both_convert.Plain.Make (Master)
-  include M
-
-  include Perf_histograms.Rpc.Plain.Extend (struct
-    include M
-    include Master
-  end)
-
-  module V1 = struct
-    module T = struct
-      type query = unit [@@deriving bin_io, version {rpc}]
-
-      type response = string [@@deriving bin_io, version {rpc}]
-
-      let query_of_caller_model = Fn.id
-
-      let callee_model_of_query = Fn.id
-
-      let response_of_callee_model = Fn.id
-
-      let caller_model_of_response = Fn.id
-    end
-
-    module T' =
-      Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
-          include M
-          include Master
-        end)
-        (T)
-
-    include T'
-    include Register (T')
-  end
-end
-
 module Connection_with_state = struct
   type t = Banned | Allowed of Rpc.Connection.t Ivar.t
 
