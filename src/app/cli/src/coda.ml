@@ -150,7 +150,7 @@ let daemon logger =
        flag "peer"
          ~doc:
            "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
-            libp2p discovery"
+            discovery"
          (listed string)
      in
      fun () ->
