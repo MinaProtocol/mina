@@ -30,4 +30,4 @@
 
 [%%define print_versioned_types false]
 
-[%%define daemon_expiry "2019-12-10 14:00:00-07:00"]
+[%%define daemon_expiry "2021-12-10 14:00:00-07:00"]
