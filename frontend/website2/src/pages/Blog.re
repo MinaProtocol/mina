@@ -9,6 +9,7 @@ module Style = {
       textDecoration(`none),
       Theme.Typeface.ibmplexsans,
       media(Theme.MediaQuery.notMobile, [fontSize(`rem(3.))]),
+      hover([color(Theme.Colors.hyperlinkHover)]),
     ]);
 
   let subtitle =
@@ -68,6 +69,20 @@ let make = (~posts) => {
                <Spacer height=1.5 />
                <div className=Theme.Body.basic>
                  {React.string(post.snippet)}
+               </div>
+               <div
+                 className=Css.(
+                   style([
+                     marginTop(`rem(1.)),
+                     Theme.Typeface.ibmplexsans,
+                     fontWeight(`medium),
+                     fontSize(`rem(1.)),
+                     letterSpacing(`rem(-0.0125)),
+                     color(Theme.Colors.hyperlink),
+                     hover([color(Theme.Colors.hyperlinkHover)]),
+                   ])
+                 )>
+                 {React.string({js|Read more →|js})}
                </div>
              </li>
            },
