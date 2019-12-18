@@ -39,7 +39,8 @@ type components =
   ; transaction_pool: Network_pool.Transaction_pool.t
   ; snark_pool: Network_pool.Snark_pool.t
   ; transition_frontier: Transition_frontier.t option Broadcast_pipe.Reader.t
-  ; most_recent_valid_block: External_transition.t Broadcast_pipe.Reader.t }
+  ; most_recent_valid_block:
+      External_transition.Initial_validated.t Broadcast_pipe.Reader.t }
 
 type pipes =
   { validated_transitions_reader:
@@ -54,6 +55,7 @@ type t =
   { config: Config.t
   ; processes: processes
   ; components: components
+  ; initialization_finish_signal: unit Ivar.t
   ; pipes: pipes
   ; wallets: Secrets.Wallets.t
   ; propose_keypairs:
@@ -456,6 +458,8 @@ module Root_diff = struct
     {user_commands: User_command.t list; root_length: int}
 end
 
+let initialization_finish_signal t = t.initialization_finish_signal
+
 (* TODO: this is a bad pattern for two reasons:
  *   - uses an abstraction leak to patch new functionality instead of making a new extension
  *   - every call to this function will create a new, unique pipe with it's own thread for transfering
@@ -646,38 +650,8 @@ let create (config : Config.t) =
           let proposer_transition_reader, proposer_transition_writer =
             Strict_pipe.create Synchronous
           in
-          (* TODO: (#3053) push transition frontier ownership down into transition router
-             * (then persistent root can be owned by transition frontier only) *)
-          let persistent_frontier =
-            Transition_frontier.Persistent_frontier.create
-              ~logger:config.logger ~verifier
-              ~time_controller:config.time_controller
-              ~directory:config.persistent_frontier_location
-          in
-          let persistent_root =
-            Transition_frontier.Persistent_root.create ~logger:config.logger
-              ~directory:config.persistent_root_location
-          in
-          let%bind transition_frontier_opt =
-            Transition_frontier.load ~logger:config.logger ~verifier
-              ~consensus_local_state:config.consensus_local_state
-              ~persistent_root ~persistent_frontier ()
-            >>| function
-            | Ok frontier ->
-                Some frontier
-            | Error `Persistent_frontier_malformed ->
-                failwith
-                  "persistent frontier unexpectedly malformed -- this should \
-                   not happen with retry enabled"
-            | Error `Bootstrap_required ->
-                Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
-                  "" ;
-                None
-            | Error (`Failure err) ->
-                failwith ("failed to initialize transition frontier: " ^ err)
-          in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
-            Broadcast_pipe.create transition_frontier_opt
+            Broadcast_pipe.create None
           in
           Exit_handlers.register_async_shutdown_handler ~logger:config.logger
             ~description:"Close transition frontier, if exists" (fun () ->
@@ -753,11 +727,9 @@ let create (config : Config.t) =
               ~get_ancestry:
                 (handle_request "get_ancestry"
                    ~f:(Sync_handler.Root.prove ~logger:config.logger))
-              ~get_bootstrappable_best_tip:
-                (handle_request "get_bootstrappable_best_tip"
-                   ~f:
-                     (Sync_handler.Bootstrappable_best_tip.prove
-                        ~logger:config.logger))
+              ~get_best_tip:
+                (handle_request "get_best_tip" ~f:(fun ~frontier () ->
+                     Best_tip_prover.prove ~logger:config.logger frontier ))
               ~get_transition_chain_proof:
                 (handle_request "get_transition_chain_proof"
                    ~f:(fun ~frontier hash ->
@@ -780,15 +752,17 @@ let create (config : Config.t) =
               =
             Broadcast_pipe.create
               ( Lazy.force External_transition.genesis
-              |> External_transition.Validation.forget_validation )
+              |> External_transition.Validated.to_initial_validated )
           in
-          let valid_transitions =
+          let valid_transitions, initialization_finish_signal =
             trace "transition router" (fun () ->
                 Transition_router.run ~logger:config.logger
                   ~trust_system:config.trust_system ~verifier ~network:net
                   ~time_controller:config.time_controller
                   ~consensus_local_state:config.consensus_local_state
-                  ~persistent_root ~persistent_frontier
+                  ~persistent_root_location:config.persistent_root_location
+                  ~persistent_frontier_location:
+                    config.persistent_frontier_location
                   ~frontier_broadcast_pipe:
                     (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
                   ~network_transition_reader:
@@ -952,6 +926,7 @@ let create (config : Config.t) =
             { config
             ; next_proposal= None
             ; processes= {prover; verifier; snark_worker}
+            ; initialization_finish_signal
             ; components=
                 { net
                 ; transaction_pool
