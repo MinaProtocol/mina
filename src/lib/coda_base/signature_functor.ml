@@ -1,7 +1,7 @@
-open Tick_intf
+open Snarky_intf
 
-module Make (Tick : Tick_S) = struct
-  open Tick
+module Make (Impl : Tick_S) = struct
+  open Impl
 
   type t = Field.t * Inner_curve.Scalar.t [@@deriving sexp, eq, compare, hash]
 
