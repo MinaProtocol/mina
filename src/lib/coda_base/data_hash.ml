@@ -9,33 +9,22 @@ module type Full_size =
 module type Small = Data_hash_functor.Make_sigs(Snark_params.Tick).Small
 
 module Data_hash_type = struct
-  module Arg = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = Pedersen.Digest.Stable.V1.t
-        [@@deriving sexp, compare, hash, yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Pedersen.Digest.Stable.V1.t
-      [@@deriving sexp, compare, hash, yojson]
+      module T = struct
+        type t = Pedersen.Digest.Stable.V1.t
+        [@@deriving sexp, compare, hash, yojson]
+      end
 
       let to_latest = Fn.id
 
-      type _unused = unit
-        constraint t = Crypto_params.Tick0.field constraint t = Arg.Stable.V1.t
+      type _unused = unit constraint t = Crypto_params.Tick0.field
 
       let version_byte = Base58_check.Version_bytes.data_hash
 
-      include Comparable.Make (Arg.Stable.V1)
-      include Hashable.Make_binable (Arg.Stable.V1)
+      include Comparable.Make (T)
+      include Hashable.Make_binable (T)
     end
   end]
 
