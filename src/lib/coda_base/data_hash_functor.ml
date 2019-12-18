@@ -6,8 +6,8 @@ open Core
 open Util
 open Bitstring_lib
 open Fold_lib
-open Snark_bits
 open Snarky_intf
+open Snark_bits
 
 (* functor for parameterizing signatures of functors created by Make below *)
 
