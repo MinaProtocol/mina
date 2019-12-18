@@ -265,5 +265,7 @@ module Balance : sig
     val ( + ) : var -> Amount.var -> (var, _) Checked.t
 
     val ( - ) : var -> Amount.var -> (var, _) Checked.t
+
+    val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
   end
 end
