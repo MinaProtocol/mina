@@ -2,10 +2,14 @@ open Core
 open Snark_params.Tick
 open Snark_bits
 
+module Sgn : module type of Sgn.Functor.Make (Snark_params.Tick)
+
 type uint64 = Unsigned.uint64
 
 module type Basic = sig
   type t [@@deriving sexp, compare, hash, yojson]
+
+  type magnitude = t [@@deriving sexp, compare]
 
   val max_int : t
 
@@ -90,7 +94,7 @@ module type Checked_arithmetic_intf = sig
   val add_signed : var -> signed_var -> (var, _) Checked.t
 end
 
-module Signed : sig
+module Signed_poly : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
@@ -109,18 +113,19 @@ module type Signed_intf = sig
 
   type magnitude_var
 
-  type t = (magnitude, Sgn.t) Signed.t
+  type t = (magnitude, Sgn.t) Signed_poly.t
   [@@deriving sexp, hash, compare, eq, yojson]
 
   val gen : t Quickcheck.Generator.t
 
-  val create : magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed.t
+  val create :
+    magnitude:'magnitude -> sgn:'sgn -> ('magnitude, 'sgn) Signed_poly.t
 
   val sgn : t -> Sgn.t
 
   val magnitude : t -> magnitude
 
-  type var = (magnitude_var, Sgn.var) Signed.t
+  type var = (magnitude_var, Sgn.var) Signed_poly.t
 
   val typ : (var, t) Typ.t
 
@@ -153,7 +158,8 @@ module type Signed_intf = sig
 
     val cswap :
          Boolean.var
-      -> (magnitude_var, Sgn.t) Signed.t * (magnitude_var, Sgn.t) Signed.t
+      -> (magnitude_var, Sgn.t) Signed_poly.t
+         * (magnitude_var, Sgn.t) Signed_poly.t
       -> (var * var, _) Checked.t
   end
 end
@@ -259,5 +265,7 @@ module Balance : sig
     val ( + ) : var -> Amount.var -> (var, _) Checked.t
 
     val ( - ) : var -> Amount.var -> (var, _) Checked.t
+
+    val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
   end
 end

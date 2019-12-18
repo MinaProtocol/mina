@@ -410,19 +410,22 @@ module Types = struct
           ; balance
           ; receipt_chain_hash
           ; delegate
-          ; voting_for } =
+          ; voting_for
+          ; timing } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
         let%bind nonce = nonce in
         let%bind receipt_chain_hash = receipt_chain_hash in
         let%bind delegate = delegate in
-        let%map voting_for = voting_for in
+        let%bind voting_for = voting_for in
+        let%map timing = timing in
         { Account.Poly.public_key
         ; nonce
         ; balance
         ; receipt_chain_hash
         ; delegate
-        ; voting_for }
+        ; voting_for
+        ; timing }
 
       let of_full_account
           { Account.Poly.public_key
@@ -430,13 +433,15 @@ module Types = struct
           ; balance
           ; receipt_chain_hash
           ; delegate
-          ; voting_for } =
+          ; voting_for
+          ; timing } =
         { Account.Poly.public_key= Some public_key
         ; nonce= Some nonce
         ; balance= {AnnotatedBalance.total= balance; unknown= balance}
         ; receipt_chain_hash= Some receipt_chain_hash
         ; delegate= Some delegate
-        ; voting_for= Some voting_for }
+        ; voting_for= Some voting_for
+        ; timing }
 
       let of_pk coda pk =
         let account =
@@ -452,21 +457,25 @@ module Types = struct
             ; balance
             ; receipt_chain_hash
             ; delegate
-            ; voting_for } ->
+            ; voting_for
+            ; timing } ->
             { Account.Poly.public_key= Some public_key
             ; nonce= Some nonce
             ; delegate= Some delegate
             ; balance= {AnnotatedBalance.total= balance; unknown= balance}
             ; receipt_chain_hash= Some receipt_chain_hash
-            ; voting_for= Some voting_for }
+            ; voting_for= Some voting_for
+            ; timing }
         | None ->
-            { Account.Poly.public_key= Some pk
-            ; nonce= None
-            ; delegate= None
-            ; balance=
-                {AnnotatedBalance.total= Balance.zero; unknown= Balance.zero}
-            ; receipt_chain_hash= None
-            ; voting_for= None }
+            Account.
+              { Poly.public_key= Some pk
+              ; nonce= None
+              ; delegate= None
+              ; balance=
+                  {AnnotatedBalance.total= Balance.zero; unknown= Balance.zero}
+              ; receipt_chain_hash= None
+              ; voting_for= None
+              ; timing= Timing.Untimed }
     end
 
     (** Hack: Account.Poly.t is only parameterized over 'pk once and so, in
@@ -480,7 +489,8 @@ module Types = struct
           , AnnotatedBalance.t
           , Account.Nonce.t option
           , Receipt.Chain_hash.t option
-          , State_hash.t option )
+          , State_hash.t option
+          , Account.Timing.t )
           Account.Poly.t
       ; locked: bool option
       ; is_actively_staking: bool
