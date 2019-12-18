@@ -98,16 +98,14 @@ module type S = sig
   end
 
   and Stack : sig
-    type t [@@deriving yojson, sexp, eq, compare, hash]
-
+    [%%versioned:
     module Stable : sig
       module V1 : sig
-        type nonrec t = t
-        [@@deriving bin_io, sexp, compare, eq, yojson, version, hash]
+        type t [@@deriving sexp, compare, eq, yojson, hash]
       end
+    end]
 
-      module Latest = V1
-    end
+    type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson, hash]
 
     type var
 
