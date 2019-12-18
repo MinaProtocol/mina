@@ -31,7 +31,7 @@ While the frontier is active, there is a single "thread" (chain of deferreds) wh
 
 #### Full/Partial Breadcrumbs + Any Refs
 
-The new synchronization cycle addresses synchronization issues between the state of the full frontier datastructure, the persistent root database, and the transition frontier extensions, but there is still a remaining synchronization issue regarding breadcrumbs. Reading breadcrumbs from the transition frontier is synchronized within the new synchronization cycle, but staged ledger mask accesses cannot be sanely synchonized within that same cycle. In order to address this issue, breadcrumbs are now separated into two types: full breadcrumbs (which contain staged ledger's with masks attached to the frontier's persistent root, directly or indirectly) and partial breadcrumbs (which only contain the staged ledger's scan state and not the full data structure with the mask). Reading a breadcrumb from the frontier will return neither a full or partial breadcrumb, but instead will return a `Breadcrumb.Any.ref`, which is a reference to either a full or partial breadcrumb. This value can be safely passed back from outside the `'a Transition_frontier.Read.t` monad and the "staged state" (either the staged ledger or scan state depending on the status of the breadcrumb) can be safely queried at an arbitrary time in the future. The downside of this technique is that only immediate (and synchronous) reads from the breadcrumb's staged ledger mask are safe under this interface, disallowing certain actions. For instance, under this system, it is not safe to use a breacrumb's staged ledger mask as a target for the syncable ledger (which probably isn't safe anyway for other reasons).
+The new synchronization cycle addresses synchronization issues between the state of the full frontier datastructure, the persistent root database, and the transition frontier extensions, but there is still a remaining synchronization issue regarding breadcrumbs. Reading breadcrumbs from the transition frontier is synchronized within the new synchronization cycle, but staged ledger mask accesses cannot be sanely synchonized within that same cycle. In order to address this issue, breadcrumbs are now separated into two types: full breadcrumbs (which contain staged ledger's with masks attached to the frontier's persistent root, directly or indirectly) and partial breadcrumbs (which only contain the staged ledger's scan state and not the full data structure with the mask). Reading a breadcrumb from the frontier will return neither a full or partial breadcrumb, but instead will return a `Breadcrumb.Any.Ref.t`, which is a reference to either a full or partial breadcrumb. This value can be safely passed back from outside the `'a Transition_frontier.Read.t` monad and the "staged state" (either the staged ledger or scan state depending on the status of the breadcrumb) can be safely queried at an arbitrary time in the future. The downside of this technique is that only immediate (and synchronous) reads from the breadcrumb's staged ledger mask are safe under this interface, disallowing certain actions. For instance, under this system, it is not safe to use a breacrumb's staged ledger mask as a target for the syncable ledger (which probably isn't safe anyway for other reasons).
 
 #### Detached Mask State Management
 
@@ -74,13 +74,24 @@ module Transition_frontier : sig
 
     module Any : sig
       type t = T : _ breadcrumb -> t
-      type ref = t ref
+      type any = t
+
       val wrap : _ breadcrumb -> t
-      val external_transition : t -> External_transition.Validated.t
-      val staged_state :
-           t
-        -> [ `Staged_ledger of Staged_ledger.t
-           | `Scan_state of Transaction_snark_scan_state.t ]
+
+      module Ref : sig
+        (* intentionally left abstract to enforce synchronous access *)
+        type t
+
+        val wrap : any -> t
+        (* downgrades a full to a partial; returns error if already a partial *)
+        val downgrade : t -> unit Or_error.t
+
+        val external_transition : t -> External_transition.Validated.t
+        val staged_state :
+             t
+          -> [ `Staged_ledger of Staged_ledger.t
+             | `Scan_state of Transaction_snark_scan_state.t ]
+      end
     end
   end
 
@@ -96,7 +107,7 @@ module Transition_frontier : sig
     (* to wrap computations in the monad *)
     val deferred : 'a Deferred.t -> 'a t
 
-    val find : State_hash.t -> Breadcrumb.Any.ref option t
+    val find : State_hash.t -> Breadcrumb.Any.Ref.t option t
 
     (* necessary extension access will be provided here, Extensions.t will not be directly accessible here *)
 
