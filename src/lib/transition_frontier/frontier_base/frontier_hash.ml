@@ -10,11 +10,22 @@ module Stable = struct
     module T = struct
       type t = Digestif.SHA256.t [@@deriving version {asserted}]
 
-      let to_yojson hash = [%derive.to_yojson: string] (to_raw_string hash)
+      module Base58_check = Base58_check.Make (struct
+        let description = "Frontier hash"
+
+        let version_byte = Base58_check.Version_bytes.frontier_hash
+      end)
+
+      let to_yojson hash =
+        [%derive.to_yojson: string] (Base58_check.encode (to_raw_string hash))
 
       let of_yojson json =
         let open Result.Let_syntax in
-        let%bind str = [%derive.of_yojson: string] json in
+        let%bind raw_str = [%derive.of_yojson: string] json in
+        let%bind str =
+          Base58_check.decode raw_str
+          |> Result.map_error ~f:Error.to_string_hum
+        in
         match of_raw_string_opt str with
         | Some hash ->
             Ok hash
