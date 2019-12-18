@@ -303,10 +303,10 @@ module type S = sig
       val delegatee_tables :
            local_state:t
         -> [ `Current of
-             Currency.Balance.t Coda_base.Account.Index.Table.t
+             Coda_base.Account.t Coda_base.Account.Index.Table.t
              Public_key.Compressed.Table.t ]
            * [ `Last of
-               Currency.Balance.t Coda_base.Account.Index.Table.t
+               Coda_base.Account.t Coda_base.Account.Index.Table.t
                Public_key.Compressed.Table.t
                Option.t ]
 

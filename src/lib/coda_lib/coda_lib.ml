@@ -583,12 +583,26 @@ let staking_ledger t =
   let local_state = t.config.consensus_local_state in
   Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
 
-let delegatee_table t =
+let delegatees t ~pk =
   let open Option.Let_syntax in
-  let%map transition_frontier =
+  let%map _transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
-  Consensus.Data.Local_state.delegatee_tables t.config.consensus_local_state
+  let `Current current_delegatee_table, `Last last_delegatee_table =
+    Consensus.Data.Local_state.delegatee_tables
+      ~local_state:t.config.consensus_local_state
+  in
+  let find_delegatees table pk =
+    Option.value_map
+      (Public_key.Compressed.Table.find table pk)
+      ~default:[] ~f:Coda_base.Account.Index.Table.data
+  in
+  let current_delegatees = find_delegatees current_delegatee_table pk in
+  let last_delegatees =
+    Option.map last_delegatee_table ~f:(fun last_delegatee_tables ->
+        find_delegatees last_delegatee_tables pk )
+  in
+  (`Current current_delegatees, `Last last_delegatees)
 
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier

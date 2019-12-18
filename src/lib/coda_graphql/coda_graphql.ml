@@ -590,6 +590,48 @@ module Types = struct
                    Option.map
                      ~f:(get_best_ledger_account coda)
                      account.Account.Poly.delegate )
+             ; field "delegatees"
+                 ~typ:(list @@ non_null @@ Lazy.force account)
+                 ~doc:
+                   "The list of accounts which are delegating to you (note \
+                    that the info is recorded in the last epoch so it might \
+                    not be up to date with the current account status)"
+                 ~args:Arg.[]
+                 ~resolve:(fun {ctx= coda; _} {account; _} ->
+                   let open Option.Let_syntax in
+                   let%bind pk = account.Account.Poly.public_key in
+                   let%map `Current c, `Last _ =
+                     Coda_lib.delegatees coda ~pk
+                   in
+                   List.map
+                     ~f:(fun a ->
+                       { account= Partial_account.of_full_account a
+                       ; locked= None
+                       ; is_actively_staking= true
+                       ; path= "" } )
+                     c )
+             ; field "lastEpochDelegatees"
+                 ~typ:(list @@ non_null @@ Lazy.force account)
+                 ~doc:
+                   "The list of accounts which are delegating to you in the \
+                    last epoch (note that the info is recorded in the one \
+                    before last epoch epoch so it might not be up to date \
+                    with the current account status)"
+                 ~args:Arg.[]
+                 ~resolve:(fun {ctx= coda; _} {account; _} ->
+                   let open Option.Let_syntax in
+                   let%bind pk = account.Account.Poly.public_key in
+                   let%bind `Current _, `Last l =
+                     Coda_lib.delegatees coda ~pk
+                   in
+                   let%map l = l in
+                   List.map
+                     ~f:(fun a ->
+                       { account= Partial_account.of_full_account a
+                       ; locked= None
+                       ; is_actively_staking= true
+                       ; path= "" } )
+                     l )
              ; field "votingFor" ~typ:string
                  ~doc:
                    "The previous epoch lock hash of the chain which you are \

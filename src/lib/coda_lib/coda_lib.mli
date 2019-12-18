@@ -25,6 +25,13 @@ val next_proposal : t -> Consensus.Hooks.proposal option
 
 val staking_ledger : t -> Sparse_ledger.t option
 
+val delegatees :
+     t
+  -> pk:Public_key.Compressed.t
+  -> ( [`Current of Coda_base.Account.t List.t]
+     * [`Last of Coda_base.Account.t List.t Option.t] )
+     option
+
 val replace_snark_worker_key :
   t -> Public_key.Compressed.t option -> unit Deferred.t
 
