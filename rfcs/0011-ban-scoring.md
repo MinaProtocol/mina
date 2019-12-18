@@ -1,7 +1,7 @@
 ## Summary
 
 We propose a regime for ban scoring to supplement the ban mechanism
-proposed in RFC 0001-blacklisting. We take Bitcoin's scoring mechanism
+proposed in RFC 0001-banlisting. We take Bitcoin's scoring mechanism
 as a starting point, since the Bitcoin network is subject to many of the
 same transgressions as the Coda network.
 
@@ -19,8 +19,8 @@ allowing honest nodes to remain active in the network.
 
 In Bitcoin, certain kinds of misbehavior increase a node's ban score.
 If a nodes score exceeds a threshold, by default equal to 100, the
-node is banned from the network. A node can be whitelisted, exempting
-it from such banning.  A node can also be manually blacklisted even in
+node is banned from the network. A node can be trustlisted, exempting
+it from such banning.  A node can also be manually banlisted even in
 the absence of observable misbehavior.
 
 In the Bitcoin C++ implementation, there's an API "Misbehaving" to
@@ -82,7 +82,7 @@ datatype:
         | Trivial
   end
 ```
-A slightly finer gradation could be used, if desired. The blacklisting system
+A slightly finer gradation could be used, if desired. The banlisting system
 could translate these constructors into numerical scores. Let's call these
 constructors SEV, MOD, and TRV.
 
@@ -107,7 +107,7 @@ them with suggested constructors:
 - in `ledger_catchup.ml`, a transition could not be validated (SEV)
 - in `transaction_pool.ml`, a payment check fails (SEV)
 
-At these points in the code, the blacklist API would be called with these constructors. The
+At these points in the code, the banlist API would be called with these constructors. The
 API should take a severity argument and a string indicating the nature of the
 bad behavior.
 
@@ -139,7 +139,7 @@ locations where punishment is warranted.
 
 In the current code, there are often calls to the logger where
 punishment is mentioned in a `TODO`.  There could be an API that calls
-the logger and the blacklist API, to guarantee there's an inspectible
+the logger and the banlist API, to guarantee there's an inspectible
 history leading to a ban score.
 
 ## Prior art
