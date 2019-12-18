@@ -1759,7 +1759,8 @@ module Queries = struct
         Arg.
           [ arg "stateHash" ~doc:"State hash of the block"
               ~typ:(non_null string) ]
-      ~doc:"Get information about the current snark worker"
+      ~doc:
+        "Get information about a single block or null if no block can be found"
       ~resolve:(fun {ctx= coda; _} () state_hash_str ->
         let db = Coda_lib.external_transition_database coda in
         Deferred.return
@@ -1769,9 +1770,8 @@ module Queries = struct
               (State_hash.of_base58_check state_hash_str)
               ~error:"Invalid state hash"
           in
-          Some
-            (Auxiliary_database.External_transition_database.get_value db
-               state_hash)) )
+          Auxiliary_database.External_transition_database.get_value db
+            state_hash) )
 
   let initial_peers =
     field "initialPeers"
