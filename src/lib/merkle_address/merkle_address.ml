@@ -354,7 +354,7 @@ end) : S = struct
   end
 
   let%test "Bitstring bin_io serialization does not change" =
-    (* Bitstring.t is whitelisted as a versioned type. This test assures that serializations of that type haven't changed *)
+    (* Bitstring.t is trustlisted as a versioned type. This test assures that serializations of that type haven't changed *)
     let buff = Bin_prot.Common.create_buf 256 in
     let text =
       "Contrary to popular belief, Lorem Ipsum is not simply random text. It \
