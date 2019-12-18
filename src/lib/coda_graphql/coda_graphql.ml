@@ -4,7 +4,6 @@ open Graphql_async
 open Coda_base
 open Signature_lib
 open Currency
-open Auxiliary_database
 
 let result_of_exn f v ~error = try Ok (f v) with _ -> Error error
 
@@ -358,7 +357,7 @@ module Types = struct
               @@ Staged_ledger_hash.ledger_hash staged_ledger_hash ) ] )
 
   let protocol_state =
-    let open Filtered_external_transition.Protocol_state in
+    let open Auxiliary_database.Filtered_external_transition.Protocol_state in
     obj "ProtocolState" ~fields:(fun _ ->
         [ field "previousStateHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the previous state"
@@ -710,7 +709,7 @@ module Types = struct
               |> User_command_memo.to_string ) ] )
 
   let transactions =
-    let open Filtered_external_transition.Transactions in
+    let open Auxiliary_database.Filtered_external_transition.Transactions in
     obj "Transactions" ~doc:"Different types of transactions in a block"
       ~fields:(fun _ ->
         [ field "userCommands"
@@ -770,9 +769,12 @@ module Types = struct
 
   let block :
       ( Coda_lib.t
-      , (Filtered_external_transition.t, State_hash.t) With_hash.t option )
+      , ( Auxiliary_database.Filtered_external_transition.t
+        , State_hash.t )
+        With_hash.t
+        option )
       typ =
-    let open Filtered_external_transition in
+    let open Auxiliary_database.Filtered_external_transition in
     obj "Block" ~fields:(fun _ ->
         [ field "creator" ~typ:(non_null public_key)
             ~doc:"Public key of account that produced this block"
@@ -1144,198 +1146,6 @@ module Types = struct
   end
 
   module Pagination = struct
-    module Page_info = struct
-      type t =
-        { has_previous_page: bool
-        ; has_next_page: bool
-        ; first_cursor: string option
-        ; last_cursor: string option }
-
-      let obj =
-        obj "PageInfo"
-          ~doc:"PageInfo object as described by the Relay connections spec"
-          ~fields:(fun _ ->
-            [ field "hasPreviousPage" ~typ:(non_null bool)
-                ~args:Arg.[]
-                ~resolve:(fun _ {has_previous_page; _} -> has_previous_page)
-            ; field "hasNextPage" ~typ:(non_null bool)
-                ~args:Arg.[]
-                ~resolve:(fun _ {has_next_page; _} -> has_next_page)
-            ; field "firstCursor" ~typ:string
-                ~args:Arg.[]
-                ~resolve:(fun _ {first_cursor; _} -> first_cursor)
-            ; field "lastCursor" ~typ:string
-                ~args:Arg.[]
-                ~resolve:(fun _ {last_cursor; _} -> last_cursor) ] )
-    end
-
-    module Edge = struct
-      type 'a t = {node: 'a; cursor: string}
-    end
-
-    module Connection = struct
-      type 'a t =
-        {edges: 'a Edge.t list; total_count: int; page_info: Page_info.t}
-    end
-
-    module type Inputs_intf = sig
-      module Type : sig
-        type t
-
-        val typ : (Coda_lib.t, t option) typ
-
-        val name : string
-      end
-
-      module Cursor : sig
-        type t
-
-        val serialize : t -> string
-
-        val deserialize : ?error:string -> string -> (t, string) result
-
-        val doc : string
-      end
-
-      module Pagination_database :
-        Intf.Pagination
-        with type value := Type.t
-         and type cursor := Cursor.t
-         and type time := Block_time.Time.Stable.V1.t
-
-      val get_database : Coda_lib.t -> Pagination_database.t
-
-      val filter_argument : Account.key option Schema.Arg.arg_typ
-
-      val query_name : string
-
-      val to_cursor : Type.t -> Cursor.t
-    end
-
-    module Make (Inputs : Inputs_intf) = struct
-      open Inputs
-
-      let edge : (Coda_lib.t, Type.t Edge.t option) typ =
-        obj (Type.name ^ "Edge")
-          ~doc:"Connection Edge as described by the Relay connections spec"
-          ~fields:(fun _ ->
-            [ field "cursor" ~typ:(non_null string) ~doc:Cursor.doc
-                ~args:Arg.[]
-                ~resolve:(fun _ {Edge.cursor; _} -> cursor)
-            ; field "node" ~typ:(non_null Type.typ)
-                ~args:Arg.[]
-                ~resolve:(fun _ {Edge.node; _} -> node) ] )
-
-      let connection : (Coda_lib.t, Type.t Connection.t option) typ =
-        obj (Type.name ^ "Connection")
-          ~doc:"Connection as described by the Relay connections spec"
-          ~fields:(fun _ ->
-            [ field "edges"
-                ~typ:(non_null @@ list @@ non_null edge)
-                ~args:Arg.[]
-                ~resolve:(fun _ {Connection.edges; _} -> edges)
-            ; field "nodes"
-                ~typ:(non_null @@ list @@ non_null Type.typ)
-                ~args:Arg.[]
-                ~resolve:(fun _ {Connection.edges; _} ->
-                  List.map edges ~f:(fun {Edge.node; _} -> node) )
-            ; field "totalCount" ~typ:(non_null int)
-                ~args:Arg.[]
-                ~resolve:(fun _ {Connection.total_count; _} -> total_count)
-            ; field "pageInfo" ~typ:(non_null Page_info.obj)
-                ~args:Arg.[]
-                ~resolve:(fun _ {Connection.page_info; _} -> page_info) ] )
-
-      let build_connection
-          ( queried_transactions
-          , `Has_earlier_page has_previous_page
-          , `Has_later_page has_next_page ) total_count =
-        let first_cursor =
-          Option.map ~f:(fun {Edge.cursor; _} -> cursor)
-          @@ List.hd queried_transactions
-        in
-        let last_cursor =
-          Option.map ~f:(fun {Edge.cursor; _} -> cursor)
-          @@ List.last queried_transactions
-        in
-        let page_info =
-          { Page_info.has_previous_page
-          ; has_next_page
-          ; first_cursor
-          ; last_cursor }
-        in
-        {Connection.edges= queried_transactions; page_info; total_count}
-
-      let query =
-        io_field query_name
-          ~args:
-            Arg.
-              [ arg "filter" ~typ:filter_argument
-              ; arg "first" ~doc:"Returns the first _n_ elements from the list"
-                  ~typ:int
-              ; arg "after"
-                  ~doc:
-                    "Returns the elements in the list that come after the \
-                     specified cursor"
-                  ~typ:string
-              ; arg "last" ~doc:"Returns the last _n_ elements from the list"
-                  ~typ:int
-              ; arg "before"
-                  ~doc:
-                    "Returns the elements in the list that come before the \
-                     specified cursor"
-                  ~typ:string ]
-          ~typ:(non_null connection)
-          ~resolve:(fun {ctx= coda; _} () public_key first after last before ->
-            let open Deferred.Result.Let_syntax in
-            let%map result, total_counts =
-              let database = get_database coda in
-              let resolve_cursor = function
-                | None ->
-                    Ok None
-                | Some data ->
-                    let open Result.Let_syntax in
-                    let%map decoded = Cursor.deserialize data in
-                    Some decoded
-              in
-              let value_filter_specification =
-                Option.value_map public_key ~default:`All ~f:(fun public_key ->
-                    `User_only public_key )
-              in
-              let%map ( (queried_nodes, has_earlier_page, has_later_page)
-                      , total_counts ) =
-                Deferred.return
-                @@
-                match (first, after, last, before) with
-                | Some _n_queries_before, _, Some _n_queries_after, _ ->
-                    Error
-                      "Illegal query: first and last must not be non-null \
-                       value at the same time"
-                | num_items, cursor, None, _ ->
-                    let open Result.Let_syntax in
-                    let%map cursor = resolve_cursor cursor in
-                    ( Pagination_database.query database ~navigation:`Earlier
-                        ~value_filter_specification ~cursor ~num_items
-                    , Pagination_database.get_total_values database public_key
-                    )
-                | None, _, num_items, cursor ->
-                    let open Result.Let_syntax in
-                    let%map cursor = resolve_cursor cursor in
-                    ( Pagination_database.query database ~navigation:`Later
-                        ~value_filter_specification ~cursor ~num_items
-                    , Pagination_database.get_total_values database public_key
-                    )
-              in
-              ( ( List.map queried_nodes ~f:(fun node ->
-                      {Edge.node; cursor= Cursor.serialize @@ to_cursor node}
-                  )
-                , has_earlier_page
-                , has_later_page )
-              , Option.value ~default:0 total_counts )
-            in
-            build_connection result total_counts )
-    end
-
     module User_command = struct
       module Inputs = struct
         module Type = struct
@@ -1359,7 +1169,7 @@ module Types = struct
           let doc = Doc.bin_prot "Opaque pagination cursor for a user command"
         end
 
-        module Pagination_database = Transaction_database
+        module Pagination_database = Auxiliary_database.Transaction_database
 
         let get_database = Coda_lib.transaction_database
 
@@ -1370,13 +1180,16 @@ module Types = struct
         let to_cursor = Fn.id
       end
 
-      include Make (Inputs)
+      include Pagination.Make (Inputs)
     end
 
     module Blocks = struct
       module Inputs = struct
         module Type = struct
-          type t = (Filtered_external_transition.t, State_hash.t) With_hash.t
+          type t =
+            ( Auxiliary_database.Filtered_external_transition.t
+            , State_hash.t )
+            With_hash.t
 
           let typ = block
 
@@ -1396,7 +1209,8 @@ module Types = struct
           let doc = Doc.bin_prot "Opaque pagination cursor for a block"
         end
 
-        module Pagination_database = External_transition_database
+        module Pagination_database =
+          Auxiliary_database.External_transition_database
 
         let get_database = Coda_lib.external_transition_database
 
@@ -1407,7 +1221,7 @@ module Types = struct
         let to_cursor {With_hash.hash; _} = hash
       end
 
-      include Make (Inputs)
+      include Pagination.Make (Inputs)
     end
   end
 end
@@ -1718,7 +1532,8 @@ module Mutations = struct
             ~error:"Invaid `payment` provided" payment
         in
         let transaction_database = Coda_lib.transaction_database coda in
-        Transaction_database.add transaction_database payment added_time ;
+        Auxiliary_database.Transaction_database.add transaction_database
+          payment added_time ;
         Some payment )
 
   let set_staking =
@@ -1893,6 +1708,7 @@ module Queries = struct
   let wallet =
     field "wallet" ~doc:"Find any wallet via a public key"
       ~typ:Types.AccountObj.account
+      ~deprecated:(Deprecated (Some "use account instead"))
       ~args:
         Arg.
           [ arg "publicKey" ~doc:"Public key of account being retrieved"
@@ -1936,6 +1752,26 @@ module Queries = struct
   let user_command = Types.Pagination.User_command.query
 
   let blocks = Types.Pagination.Blocks.query
+
+  let block =
+    io_field "block" ~typ:Types.block
+      ~args:
+        Arg.
+          [ arg "stateHash" ~doc:"State hash of the block"
+              ~typ:(non_null string) ]
+      ~doc:"Get information about the current snark worker"
+      ~resolve:(fun {ctx= coda; _} () state_hash_str ->
+        let db = Coda_lib.external_transition_database coda in
+        Deferred.return
+          (let open Result.Let_syntax in
+          let%map state_hash =
+            result_of_or_error
+              (State_hash.of_base58_check state_hash_str)
+              ~error:"Invalid state hash"
+          in
+          Some
+            (Auxiliary_database.External_transition_database.get_value db
+               state_hash)) )
 
   let initial_peers =
     field "initialPeers"
@@ -1985,6 +1821,7 @@ module Queries = struct
     ; account
     ; current_snark_worker
     ; blocks
+    ; block
     ; initial_peers
     ; pooled_user_commands
     ; transaction_status

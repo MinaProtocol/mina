@@ -72,6 +72,8 @@ let add {database; pagination; logger}
 
 let get_total_values {pagination; _} = Pagination.get_total_values pagination
 
+let get_value {pagination; _} cursor = Pagination.get_value pagination cursor
+
 let get_all_values {pagination; _} = Pagination.get_all_values pagination
 
 let query {pagination; _} = Pagination.query pagination
