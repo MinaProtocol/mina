@@ -482,12 +482,12 @@ struct
 
     let equal_state_hash t1 t2 = State_hash.equal t1.Poly.state t2.Poly.state
 
-    let push_coinbase t (cb : Coinbase.t) =
+    let push_coinbase (cb : Coinbase.t) t =
       let data = Coinbase_stack_data.push t.Poly.data cb in
       (*let state_hash = Coinbase_stack_state_hash.push t.Poly.state_hash cb in*)
       {t with data}
 
-    let push_state (t : t) (state_body_hash : State_body_hash.t) =
+    let push_state (state_body_hash : State_body_hash.t) (t : t) =
       {t with state= Coinbase_stack_state.push t.state state_body_hash}
 
     let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
@@ -504,7 +504,7 @@ struct
     module Checked = struct
       type t = var
 
-      let push_coinbase (t : t) (coinbase : Coinbase_data.var) :
+      let push_coinbase (coinbase : Coinbase_data.var) (t : t) :
           (t, 'a) Tick0.Checked.t =
         let%map data = Coinbase_stack_data.Checked.push t.data coinbase in
         (*let%map state_hash =
@@ -656,7 +656,7 @@ struct
         (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
-    let%snarkydef add_coinbase t (pk, amount, state_body_hash) =
+    let%snarkydef add_coinbase t (pk, amount, state_body_hash) ~push_state =
       (* Question: Do the transaction have the current protocol state? Which means that both the stacks should be updated with the curr (or previous) body hash without the coinbase?) 
     *)
       let%bind addr =
@@ -671,6 +671,12 @@ struct
       handle
         (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
            ~f:(fun stack0 ->
+             let%bind stack =
+               let%bind updated_stack =
+                 Stack.Checked.push_state stack0 state_body_hash
+               in
+               Stack.Checked.if_ push_state ~then_:updated_stack ~else_:stack0
+             in
              let total_coinbase_amount =
                Currency.Amount.var_of_t Coda_compile_config.coinbase
              in
@@ -679,15 +685,28 @@ struct
              in
              let%bind amount1_equal_to_zero = equal_to_zero amount in
              let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
+             let%bind () =
+               (*TODO: Add xnor in snarky*)
+               (*state is pushed only if there's atleast one transaction in the transition. So, if it is false then coinbase amount has to be zero and if it's true then coinbase amount should be non-zero because we prioritize coinbase over user commands when creating a diff. But maybe this is too restricted?*)
+               let%bind both_true =
+                 Boolean.(push_state && not amount1_equal_to_zero)
+               in
+               let%bind both_false =
+                 Boolean.((not push_state) && amount1_equal_to_zero)
+               in
+               let%bind valid = Boolean.any [both_true; both_false] in
+               Boolean.Assert.is_true valid
+             in
              (* TODO: Optimize here since we are pushing twice to the same stack *)
              let%bind stack_with_amount1 =
-               Stack.Checked.push stack0 (pk, amount, state_body_hash)
+               Stack.Checked.push_coinbase (pk, amount, state_body_hash) stack
              in
              let%bind stack_with_amount2 =
-               Stack.Checked.push stack_with_amount1
+               Stack.Checked.push_coinbase
                  (pk, rem_amount, state_body_hash)
+                 stack_with_amount1
              in
-             chain Stack.if_ amount1_equal_to_zero ~then_:(return stack0)
+             chain Stack.if_ amount1_equal_to_zero ~then_:(return stack)
                ~else_:
                  (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
                     ~else_:stack_with_amount2) ))
@@ -695,8 +714,8 @@ struct
       >>| Hash.var_of_hash_packed
 
     let%snarkydef pop_coinbases t ~proof_emitted =
-      (*when popping stack, if there are no new stacks then update the next stack with this stack (if it is empty) so that we don't lose that infomation while having it constrained. As opposed to storing the stack at the top level of pending coinbase and requesting for that information when adding a coinbase.*)
-      (* This will cause two merkle updates one for deleting the current stack and the next updating the next stack with this deleted stack*)
+      (*TODO: after popping stack, if there are no new stacks (merkle root of an empty tree) then update the next stack with this stack (if it is empty) so that we don't lose that infomation while having it constrained. As opposed to storing the stack at the top level of pending coinbase and requesting for that information when adding a coinbase.*)
+      (* This will cause two merkle updates one for deleting the current stack and the next updating the next stack with this deleted stack.*)
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
@@ -857,15 +876,21 @@ struct
     let%bind index = find_index t key in
     get_stack t index
 
-  let add_coinbase t ~coinbase ~is_new_stack =
+  let update_stack t ~(f : Stack.t -> Stack.t) ~is_new_stack =
     let open Or_error.Let_syntax in
     let%bind key = latest_stack_id t ~is_new_stack in
     let%bind stack_index = find_index t key in
     let%bind stack_before = get_stack t stack_index in
-    let stack_after = Stack.push stack_before coinbase in
+    let stack_after = f stack_before in
     let%bind t' = incr_index t ~is_new_stack in
     (* state hash in "after" stack becomes previous state hash at top level *)
     set_stack t' stack_index stack_after
+
+  let add_coinbase t ~coinbase ~is_new_stack =
+    update_stack t ~f:(Stack.push_coinbase coinbase) ~is_new_stack
+
+  let add_state t state_body_hash ~is_new_stack =
+    update_stack t ~f:(Stack.push_state state_body_hash) ~is_new_stack
 
   let update_coinbase_stack (t : t) stack ~is_new_stack =
     let open Or_error.Let_syntax in
@@ -974,6 +999,8 @@ module type Pending_coinbase_intf = sig
 
   val add_coinbase :
     t -> coinbase:Coinbase.t -> is_new_stack:bool -> t Or_error.t
+
+  val add_state : t -> State_body_hash.t -> is_new_stack:bool -> t Or_error.t
 end
 
 let add_coinbase_with_zero_checks (type t)
@@ -991,8 +1018,11 @@ let add_coinbase_with_zero_checks (type t)
         ~state_body_hash:coinbase.state_body_hash
       |> Or_error.ok_exn
     in
+    let t_with_state =
+      T.add_state t coinbase.state_body_hash ~is_new_stack |> Or_error.ok_exn
+    in
     let interim_tree =
-      T.add_coinbase t ~coinbase ~is_new_stack |> Or_error.ok_exn
+      T.add_coinbase t_with_state ~coinbase ~is_new_stack |> Or_error.ok_exn
     in
     if Amount.equal coinbase'.amount Amount.zero then interim_tree
     else
@@ -1004,12 +1034,14 @@ let%test_unit "Checked_stack = Unchecked_stack" =
   test ~trials:20 (Generator.tuple2 Stack.gen Coinbase.gen)
     ~f:(fun (base, cb) ->
       let coinbase_data = Coinbase_data.of_coinbase cb in
-      let unchecked = Stack.push base cb in
+      let unchecked = Stack.push_coinbase cb base in
       let checked =
         let comp =
           let open Snark_params.Tick in
           let cb_var = Coinbase_data.(var_of_t coinbase_data) in
-          let%map res = Stack.Checked.push (Stack.var_of_t base) cb_var in
+          let%map res =
+            Stack.Checked.push_coinbase cb_var (Stack.var_of_t base)
+          in
           As_prover.read Stack.typ res
         in
         let (), x = Or_error.ok_exn (run_and_check comp ()) in
@@ -1037,7 +1069,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 coinbase_var)
+                 coinbase_var ~push_state:Boolean.true_)
               (unstage (handler pending_coinbases ~is_new_stack:true))
           in
           As_prover.read Hash.typ result
@@ -1068,7 +1100,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 coinbase_var)
+                 coinbase_var ~push_state:Boolean.true_)
               (unstage (handler pending_coinbases ~is_new_stack:true))
           in
           As_prover.read Hash.typ result
