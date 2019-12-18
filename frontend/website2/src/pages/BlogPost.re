@@ -81,9 +81,7 @@ let make = (~post: option(ContentType.Post.t)) => {
       </Next.Link>
     </Page>
   | Some(
-      (
-        {title, snippet, subtitle, author, date, text: content}: ContentType.Post.t
-      ),
+      ({title, subtitle, author, date, text: content}: ContentType.Post.t),
     ) =>
     <Page>
       <Next.Head> Markdown.katexStylesheet </Next.Head>
@@ -92,9 +90,6 @@ let make = (~post: option(ContentType.Post.t)) => {
         {ReactUtils.fromOpt(Js.Undefined.toOption(subtitle), ~f=s =>
            <div className=Style.subtitle> {React.string(s)} </div>
          )}
-        <div className=Theme.Body.basic_semibold>
-          {React.string(snippet)}
-        </div>
         <Spacer height=2.0 />
         <div className=Style.author> {React.string("by " ++ author)} </div>
         <div className=Style.date> {React.string(date)} </div>
