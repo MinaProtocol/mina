@@ -1,5 +1,5 @@
 (library
   (name frontier_base)
   (public_name transition_frontier_base)
-  (libraries core_kernel coda_base coda_state coda_transition staged_ledger)
+  (libraries core_kernel coda_base coda_state coda_transition staged_ledger base58_check)
   (preprocess (pps ppx_jane ppx_coda -lint-version-syntax-warnings ppx_deriving.std ppx_deriving_yojson)))
