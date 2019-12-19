@@ -1,4 +1,4 @@
-(* tick_intf.ml -- enough of an interface to allow the data_hash functor to work *)
+(* snarky_intf.ml -- enough of an interface to allow the data_hash functor to work *)
 
 open Core_kernel
 
