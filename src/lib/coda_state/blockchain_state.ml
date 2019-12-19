@@ -87,14 +87,12 @@ let to_input ({staged_ledger_hash; snarked_ledger_hash; timestamp} : Value.t) =
 
 let set_timestamp t timestamp = {t with Poly.timestamp}
 
-let negative_one =
-  lazy
-    Poly.
-      { staged_ledger_hash= Lazy.force Staged_ledger_hash.genesis
-      ; snarked_ledger_hash=
-          Frozen_ledger_hash.of_ledger_hash
-          @@ Ledger.merkle_root (Lazy.force Genesis_ledger.t)
-      ; timestamp= Block_time.of_time Time.epoch }
+let negative_one ~genesis_ledger_hash =
+  Poly.
+    { staged_ledger_hash= Staged_ledger_hash.genesis ~genesis_ledger_hash
+    ; snarked_ledger_hash=
+        Frozen_ledger_hash.of_ledger_hash genesis_ledger_hash
+    ; timestamp= Block_time.of_time Time.epoch }
 
 (* negative_one and genesis blockchain states are equivalent *)
 let genesis = negative_one
