@@ -26,13 +26,14 @@ let make = (~post: option(ContentType.JobPost.t)) => {
     </Page>
   | Some(({title, jobDescription: content}: ContentType.JobPost.t)) =>
     <Page>
+      <Next.Head> Markdown.katexStylesheet </Next.Head>
       <div className=Style.wrapper>
         <div className=Style.title> {React.string(title)} </div>
         <Spacer height=2.0 />
         <div className=Style.blogContent>
           <Markdown content />
           <Spacer height=1.0 />
-          <h2 className=Theme.H2.basic> {React.string("About Us")} </h2>
+          <h2> {React.string("About Us")} </h2>
           <p>
             {React.string(
                "O(1) Labs is aiming to develop the first cryptocurrency protocol that can deliver on the promise of supporting real-world applications and widespread use. Our team is based in San Francisco, and we are funded by top investors (including Polychain, Metastable, Max Levchin, and Naval Ravikant).",
