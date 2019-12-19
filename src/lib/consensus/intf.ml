@@ -117,12 +117,13 @@ module type Protocol_state = sig
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type ('blockchain_state, 'consensus_state) t [@@deriving sexp]
+          type ('state_hash, 'blockchain_state, 'consensus_state) t
+          [@@deriving sexp]
         end
       end]
 
-      type ('blockchain_state, 'consensus_state) t =
-        ('blockchain_state, 'consensus_state) Stable.Latest.t
+      type ('state_hash, 'blockchain_state, 'consensus_state) t =
+        ('state_hash, 'blockchain_state, 'consensus_state) Stable.Latest.t
       [@@deriving sexp]
     end
 
@@ -130,13 +131,18 @@ module type Protocol_state = sig
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type t = (blockchain_state, consensus_state) Poly.Stable.V1.t
+          type t =
+            (State_hash.t, blockchain_state, consensus_state) Poly.Stable.V1.t
           [@@deriving sexp, to_yojson]
         end
       end]
     end
 
-    type var = (blockchain_state_var, consensus_state_var) Poly.Stable.Latest.t
+    type var =
+      ( State_hash.var
+      , blockchain_state_var
+      , consensus_state_var )
+      Poly.Stable.Latest.t
   end
 
   module Value : sig
@@ -155,6 +161,7 @@ module type Protocol_state = sig
 
   val create_value :
        previous_state_hash:State_hash.t
+    -> genesis_state_hash:State_hash.t
     -> blockchain_state:blockchain_state
     -> consensus_state:consensus_state
     -> Value.t
@@ -164,10 +171,13 @@ module type Protocol_state = sig
   val body : (_, 'body) Poly.t -> 'body
 
   val blockchain_state :
-    (_, ('blockchain_state, _) Body.Poly.t) Poly.t -> 'blockchain_state
+    (_, (_, 'blockchain_state, _) Body.Poly.t) Poly.t -> 'blockchain_state
+
+  val genesis_state_hash :
+    ?state_hash:State_hash.t option -> Value.t -> State_hash.t
 
   val consensus_state :
-    (_, (_, 'consensus_state) Body.Poly.t) Poly.t -> 'consensus_state
+    (_, (_, _, 'consensus_state) Body.Poly.t) Poly.t -> 'consensus_state
 
   val hash : Value.t -> State_hash.t
 end
@@ -250,6 +260,8 @@ module type State_hooks = sig
        , _ )
        Snark_params.Tick.Checked.t
 
+  val genesis_winner : Public_key.Compressed.t * Private_key.t
+
   module For_tests : sig
     val gen_consensus_state :
          gen_slot_advancement:int Quickcheck.Generator.t
@@ -296,7 +308,10 @@ module type S = sig
     module Local_state : sig
       type t [@@deriving sexp, to_yojson]
 
-      val create : Signature_lib.Public_key.Compressed.Set.t -> t
+      val create :
+           Signature_lib.Public_key.Compressed.Set.t
+        -> genesis_ledger:Ledger.t Lazy.t
+        -> t
 
       val current_proposers : t -> Signature_lib.Public_key.Compressed.Set.t
 
@@ -330,7 +345,8 @@ module type S = sig
 
       type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
-      val precomputed_handler : Snark_params.Tick.Handler.t Lazy.t
+      val precomputed_handler :
+        genesis_ledger:Coda_base.Ledger.t Lazy.t -> Snark_params.Tick.Handler.t
 
       val handler :
            t
@@ -394,15 +410,18 @@ module type S = sig
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
 
-      val negative_one : Value.t Lazy.t
+      val negative_one : genesis_ledger:Ledger.t Lazy.t -> Value.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
+        -> genesis_ledger:Ledger.t Lazy.t
         -> Value.t
 
       val create_genesis :
-        negative_one_protocol_state_hash:Coda_base.State_hash.t -> Value.t
+           negative_one_protocol_state_hash:Coda_base.State_hash.t
+        -> genesis_ledger:Ledger.t Lazy.t
+        -> Value.t
 
       open Snark_params.Tick
 
@@ -423,6 +442,12 @@ module type S = sig
 
       val graphql_type :
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
+
+      val curr_slot : Value.t -> Slot.t
+
+      val is_genesis_state : Value.t -> bool
+
+      val is_genesis_state_var : var -> (Boolean.var, _) Checked.t
     end
 
     module Proposal_data : sig
@@ -439,7 +464,10 @@ module type S = sig
       include Rpc_intf.Rpc_interface_intf
 
       val rpc_handlers :
-        logger:Logger.t -> local_state:Local_state.t -> rpc_handler list
+           logger:Logger.t
+        -> local_state:Local_state.t
+        -> genesis_ledger_hash:Frozen_ledger_hash.t
+        -> rpc_handler list
 
       type query =
         { query:

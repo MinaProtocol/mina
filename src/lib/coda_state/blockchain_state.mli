@@ -61,9 +61,9 @@ val create_value :
   -> timestamp:Block_time.t
   -> Value.t
 
-val negative_one : Value.t Lazy.t
+val negative_one : genesis_ledger_hash:Ledger_hash.t -> Value.t
 
-val genesis : Value.t Lazy.t
+val genesis : genesis_ledger_hash:Ledger_hash.t -> Value.t
 
 val set_timestamp : ('a, 'b, 'c) Poly.t -> 'c -> ('a, 'b, 'c) Poly.t
 
