@@ -15,7 +15,7 @@ let%test_module "Root_history and Transition_frontier" =
 
     let breadcrumbs_path = Transition_frontier.root_history_path_map ~f:Fn.id
 
-    let accounts_with_secret_keys = Genesis_ledger.accounts
+    let accounts_with_secret_keys = Test_genesis_ledger.accounts
 
     let create_root_frontier = create_root_frontier accounts_with_secret_keys
 
