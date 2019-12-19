@@ -148,7 +148,7 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
    isolation *)
 let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     ~transition_reader ~persistent_root ~persistent_frontier
-    ~initial_root_transition =
+    ~initial_root_transition ~genesis_state_hash ~genesis_ledger =
   let rec loop () =
     let sync_ledger_reader, sync_ledger_writer =
       create ~name:"sync ledger pipe"
@@ -329,7 +329,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
             Transition_frontier.Persistent_root.(
               with_instance_exn persistent_root ~f:(fun instance ->
-                  Instance.set_root_state_hash instance
+                  Instance.set_root_state_hash instance ~genesis_state_hash
                     (External_transition.Validated.state_hash new_root) )) ;
             let%map new_frontier =
               let fail msg =
@@ -339,7 +339,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               in
               Transition_frontier.load ~retry_with_fresh_db:false ~logger
                 ~verifier ~consensus_local_state ~persistent_root
-                ~persistent_frontier ()
+                ~persistent_frontier ~genesis_state_hash ~genesis_ledger ()
               >>| function
               | Ok frontier ->
                   frontier
@@ -455,7 +455,7 @@ let%test_module "Bootstrap_controller tests" =
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq
-            ~accounts_with_secret_keys:Genesis_ledger.accounts branch_size
+            ~accounts_with_secret_keys:Test_genesis_ledger.accounts branch_size
         in
         let [me; _] = fake_network.peer_networks in
         let branch =
@@ -580,7 +580,7 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "reconstruct staged_ledgers using of_scan_state_and_snarked_ledger" =
       let pids = Child_processes.Termination.create_pid_table () in
       let num_breadcrumbs = 10 in
-      let accounts = Genesis_ledger.accounts in
+      let accounts = Test_genesis_ledger.accounts in
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
@@ -634,8 +634,8 @@ let%test_module "Bootstrap_controller tests" =
           let%bind syncing_frontier, peer, network =
             Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
               ~num_breadcrumbs
-              ~source_accounts:[List.hd_exn Genesis_ledger.accounts]
-              ~target_accounts:Genesis_ledger.accounts
+              ~source_accounts:[List.hd_exn Test_genesis_ledger.accounts]
+              ~target_accounts:Test_genesis_ledger.accounts
           in
           let transition_reader, _ = make_transition_pipe () in
           let ledger_db =
@@ -665,11 +665,11 @@ let%test_module "Bootstrap_controller tests" =
       let pids = Child_processes.Termination.create_pid_table () in
       let unsynced_peer_num_breadcrumbs = 6 in
       let unsynced_peers_accounts =
-        List.take Genesis_ledger.accounts
-          (List.length Genesis_ledger.accounts / 2)
+        List.take Test_genesis_ledger.accounts
+          (List.length Test_genesis_ledger.accounts / 2)
       in
       let synced_peer_num_breadcrumbs = unsynced_peer_num_breadcrumbs * 2 in
-      let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
+      let source_accounts = [List.hd_exn Test_genesis_ledger.accounts] in
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
           let%bind {me; peers; network} =
@@ -677,7 +677,7 @@ let%test_module "Bootstrap_controller tests" =
               [ { num_breadcrumbs= unsynced_peer_num_breadcrumbs
                 ; accounts= unsynced_peers_accounts }
               ; { num_breadcrumbs= synced_peer_num_breadcrumbs
-                ; accounts= Genesis_ledger.accounts } ]
+                ; accounts= Test_genesis_ledger.accounts } ]
           in
           let transition_reader, _ = make_transition_pipe () in
           let ledger_db =
@@ -711,14 +711,14 @@ let%test_module "Bootstrap_controller tests" =
       let pids = Child_processes.Termination.create_pid_table () in
       let small_peer_num_breadcrumbs = 6 in
       let large_peer_num_breadcrumbs = small_peer_num_breadcrumbs * 2 in
-      let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
+      let source_accounts = [List.hd_exn Test_genesis_ledger.accounts] in
       let small_peer_accounts =
-        List.take Genesis_ledger.accounts
-          (List.length Genesis_ledger.accounts / 2)
+        List.take Test_genesis_ledger.accounts
+          (List.length Test_genesis_ledger.accounts / 2)
       in
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
-          let large_peer_accounts = Genesis_ledger.accounts in
+          let large_peer_accounts = Test_genesis_ledger.accounts in
           let%bind {me; peers; network} =
             Network_builder.setup ~source_accounts ~logger ~pids ~trust_system
               [ { num_breadcrumbs= small_peer_num_breadcrumbs
@@ -771,8 +771,8 @@ let%test_module "Bootstrap_controller tests" =
           print_heartbeat hb_logger |> don't_wait_for ;
           let%bind syncing_frontier, peer_with_frontier, network =
             Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
-              ~num_breadcrumbs ~source_accounts:Genesis_ledger.accounts
-              ~target_accounts:Genesis_ledger.accounts
+              ~num_breadcrumbs ~source_accounts:Test_genesis_ledger.accounts
+              ~target_accounts:Test_genesis_ledger.accounts
           in
           let root_sync_ledger =
             Root_sync_ledger.create
