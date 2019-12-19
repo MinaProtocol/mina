@@ -26,7 +26,7 @@ let isFaker =
 
 let getTranslation = name =>
   Bindings.Fs.readFileSync(
-    "./src/render/i18n/translations/" ++ name ++ ".json",
+    "./public/translations/" ++ name ++ ".json",
     "utf8",
   );
 
