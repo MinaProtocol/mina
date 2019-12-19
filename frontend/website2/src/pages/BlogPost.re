@@ -86,15 +86,21 @@ let make = (~post: option(ContentType.Post.t)) => {
     <Page>
       <Next.Head> Markdown.katexStylesheet </Next.Head>
       <div className=Style.wrapper>
-        <div className=Style.title> {React.string(title)} </div>
+        <div className=Style.title id="title"> {React.string(title)} </div>
         {ReactUtils.fromOpt(Js.Undefined.toOption(subtitle), ~f=s =>
-           <div className=Style.subtitle> {React.string(s)} </div>
+           <div className=Style.subtitle id="subtitle">
+             {React.string(s)}
+           </div>
          )}
         <Spacer height=2.0 />
-        <div className=Style.author> {React.string("by " ++ author)} </div>
-        <div className=Style.date> {React.string(date)} </div>
+        <div className=Style.author id="author">
+          {React.string("by " ++ author)}
+        </div>
+        <div className=Style.date id="date"> {React.string(date)} </div>
         <Spacer height=2.0 />
-        <div className=Style.blogContent> <Markdown content /> </div>
+        <div className=Style.blogContent id="content">
+          <Markdown content />
+        </div>
       </div>
     </Page>
   };
