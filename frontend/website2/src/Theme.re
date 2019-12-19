@@ -112,7 +112,7 @@ let generateStyles = rules => (Css.style(rules), rules);
 module Link = {
   open Css;
 
-  let (init, basicStyles) =
+  let (init, basicStylesNoHover) =
     generateStyles([
       Typeface.ibmplexsans,
       color(Colors.hyperlink),
@@ -127,8 +127,11 @@ module Link = {
     let basic = init;
   };
 
-  let (basic, basicStylesHover) =
-    generateStyles([hover([color(Colors.hyperlinkHover)]), ...basicStyles]);
+  let (basic, basicStyles) =
+    generateStyles([
+      hover([color(Colors.hyperlinkHover)]),
+      ...basicStylesNoHover,
+    ]);
 };
 
 module H1 = {
