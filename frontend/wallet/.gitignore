@@ -18,3 +18,4 @@ app.js
 *.log
 coda-daemon-macos.zip
 package-lock.json
+.env
