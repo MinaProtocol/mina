@@ -46,6 +46,7 @@ struct
       Integer.constant ~length:N.length_in_bits ~m
         (Bignum_bigint.of_int (N.to_int n))
 
+    (* warning: this typ does not work correctly with the generic if_ *)
     let typ : (field Integer.t, t) Typ.t =
       let typ = Typ.list ~length:N.length_in_bits Boolean.typ in
       let of_bits bs = of_bits (Bitstring.Lsb_first.of_list bs) in
@@ -114,6 +115,7 @@ struct
     let zero = zero_checked
   end
 
+  (* warning: this typ does not work correctly with the generic if_ *)
   let typ = Checked.typ
 
   module Bits = Bits
@@ -121,6 +123,10 @@ struct
   let to_bits = Bits.to_bits
 
   let of_bits = Bits.of_bits
+
+  let var_to_bits var =
+    Snarky_integer.Integer.to_bits ~length:N.length_in_bits
+      ~m:Snark_params.Tick.m var
 
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 
