@@ -300,15 +300,16 @@ module type S = sig
 
       val current_proposers : t -> Signature_lib.Public_key.Compressed.Set.t
 
-      val delegatee_tables :
+      val current_epoch_delegatee_table :
            local_state:t
-        -> [ `Current of
-             Coda_base.Account.t Coda_base.Account.Index.Table.t
-             Public_key.Compressed.Table.t ]
-           * [ `Last of
-               Coda_base.Account.t Coda_base.Account.Index.Table.t
-               Public_key.Compressed.Table.t
-               Option.t ]
+        -> Coda_base.Account.t Coda_base.Account.Index.Table.t
+           Public_key.Compressed.Table.t
+
+      val last_epoch_delegatee_table :
+           local_state:t
+        -> Coda_base.Account.t Coda_base.Account.Index.Table.t
+           Public_key.Compressed.Table.t
+           option
 
       (** Swap in a new set of proposers and invalidate and/or recompute cached
        * data *)

@@ -583,26 +583,32 @@ let staking_ledger t =
   let local_state = t.config.consensus_local_state in
   Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
 
-let delegatees t ~pk =
+let find_delegators table pk =
+  Option.value_map
+    (Public_key.Compressed.Table.find table pk)
+    ~default:[] ~f:Coda_base.Account.Index.Table.data
+
+let current_epoch_delegators t ~pk =
   let open Option.Let_syntax in
   let%map _transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
-  let `Current current_delegatee_table, `Last last_delegatee_table =
-    Consensus.Data.Local_state.delegatee_tables
+  let current_epoch_delegatee_table =
+    Consensus.Data.Local_state.current_epoch_delegatee_table
       ~local_state:t.config.consensus_local_state
   in
-  let find_delegatees table pk =
-    Option.value_map
-      (Public_key.Compressed.Table.find table pk)
-      ~default:[] ~f:Coda_base.Account.Index.Table.data
+  find_delegators current_epoch_delegatee_table pk
+
+let last_epoch_delegators t ~pk =
+  let open Option.Let_syntax in
+  let%bind _transition_frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
-  let current_delegatees = find_delegatees current_delegatee_table pk in
-  let last_delegatees =
-    Option.map last_delegatee_table ~f:(fun last_delegatee_tables ->
-        find_delegatees last_delegatee_tables pk )
+  let%map last_epoch_delegatee_table =
+    Consensus.Data.Local_state.last_epoch_delegatee_table
+      ~local_state:t.config.consensus_local_state
   in
-  (`Current current_delegatees, `Last last_delegatees)
+  find_delegators last_epoch_delegatee_table pk
 
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier

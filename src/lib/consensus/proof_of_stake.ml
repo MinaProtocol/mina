@@ -221,9 +221,11 @@ module Data = struct
     (* The outer ref changes whenever we swap in new staker set; all the snapshots are recomputed *)
     type t = Data.t ref [@@deriving sexp, to_yojson]
 
-    let delegatee_tables ~(local_state : t) =
-      ( `Current !local_state.staking_epoch_snapshot.delegatee_table
-      , `Last !local_state.last_epoch_delegatee_table )
+    let current_epoch_delegatee_table ~(local_state : t) =
+      !local_state.staking_epoch_snapshot.delegatee_table
+
+    let last_epoch_delegatee_table ~(local_state : t) =
+      !local_state.last_epoch_delegatee_table
 
     let current_proposers t =
       Public_key.Compressed.Table.keys !t.Data.last_checked_slot_and_epoch
@@ -258,7 +260,7 @@ module Data = struct
             make_last_checked_slot_and_epoch_table
               (Public_key.Compressed.Table.create ())
               proposer_public_keys ~default:(Epoch.zero, Slot.zero)
-        ; last_epoch_delegatee_table= None }
+        ; last_epoch_delegatee_table= Some delegatee_table }
 
     let proposer_swap t proposer_public_keys now =
       let old : Data.t = !t in

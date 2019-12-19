@@ -590,7 +590,7 @@ module Types = struct
                    Option.map
                      ~f:(get_best_ledger_account coda)
                      account.Account.Poly.delegate )
-             ; field "delegatees"
+             ; field "delegators"
                  ~typ:(list @@ non_null @@ Lazy.force account)
                  ~doc:
                    "The list of accounts which are delegating to you (note \
@@ -600,8 +600,8 @@ module Types = struct
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
                    let open Option.Let_syntax in
                    let%bind pk = account.Account.Poly.public_key in
-                   let%map `Current c, `Last _ =
-                     Coda_lib.delegatees coda ~pk
+                   let%map delegators =
+                     Coda_lib.current_epoch_delegators coda ~pk
                    in
                    List.map
                      ~f:(fun a ->
@@ -609,8 +609,8 @@ module Types = struct
                        ; locked= None
                        ; is_actively_staking= true
                        ; path= "" } )
-                     c )
-             ; field "lastEpochDelegatees"
+                     delegators )
+             ; field "lastEpochDelegators"
                  ~typ:(list @@ non_null @@ Lazy.force account)
                  ~doc:
                    "The list of accounts which are delegating to you in the \
@@ -621,17 +621,16 @@ module Types = struct
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
                    let open Option.Let_syntax in
                    let%bind pk = account.Account.Poly.public_key in
-                   let%bind `Current _, `Last l =
-                     Coda_lib.delegatees coda ~pk
+                   let%map delegators =
+                     Coda_lib.last_epoch_delegators coda ~pk
                    in
-                   let%map l = l in
                    List.map
                      ~f:(fun a ->
                        { account= Partial_account.of_full_account a
                        ; locked= None
                        ; is_actively_staking= true
                        ; path= "" } )
-                     l )
+                     delegators )
              ; field "votingFor" ~typ:string
                  ~doc:
                    "The previous epoch lock hash of the chain which you are \
