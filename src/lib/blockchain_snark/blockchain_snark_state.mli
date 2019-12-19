@@ -20,5 +20,5 @@ module Checked : sig
   val hash :
     Protocol_state.var -> (State_hash.var * State_body_hash.var, _) Checked.t
 
-  val is_base_hash : State_hash.var -> (Boolean.var, _) Checked.t
+  val is_base_case : Protocol_state.var -> (Boolean.var, _) Checked.t
 end

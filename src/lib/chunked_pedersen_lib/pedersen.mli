@@ -17,15 +17,12 @@ module type S = sig
   module Digest : sig
     type t [@@deriving sexp, eq, hash, compare, yojson]
 
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, compare, hash, eq, version, yojson]
-        end
-
-        module Latest = V1
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type nonrec t = t [@@deriving sexp, compare, hash, eq, yojson]
       end
-      with type V1.t = t
+    end]
 
     val size_in_bits : int
 
