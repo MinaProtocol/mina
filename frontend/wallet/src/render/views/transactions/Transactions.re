@@ -197,35 +197,41 @@ let make = () => {
                    ~default="",
                    data##blocks##pageInfo##lastCursor,
                  );
-               switch (Array.length(transactions), Array.length(pending)) {
-               | (0, 0) =>
-                 <div className=Styles.alertContainer>
-                   <Alert
-                     kind=`Info
-                     message="You don't have any transactions related to this account."
-                   />
-                 </div>
-               | (_, _) =>
-                 <TransactionsList
-                   pending
-                   transactions
-                   hasNextPage=data##blocks##pageInfo##hasNextPage
-                   onLoadMore={() => {
-                     let moreTransactions =
-                       TransactionsQueryString.make(
-                         ~publicKey=Apollo.Encoders.publicKey(pubkey),
-                         ~after=lastCursor,
-                         (),
-                       );
+               <BlockListener
+                 refetch={() =>
+                   response.refetch(Some(transactionQuery##variables))
+                 }
+                 subscribeToMore={response.subscribeToMore}>
+                 {switch (Array.length(transactions), Array.length(pending)) {
+                  | (0, 0) =>
+                    <div className=Styles.alertContainer>
+                      <Alert
+                        kind=`Info
+                        message="You don't have any transactions related to this account."
+                      />
+                    </div>
+                  | (_, _) =>
+                    <TransactionsList
+                      pending
+                      transactions
+                      hasNextPage=data##blocks##pageInfo##hasNextPage
+                      onLoadMore={() => {
+                        let moreTransactions =
+                          TransactionsQueryString.make(
+                            ~publicKey=Apollo.Encoders.publicKey(pubkey),
+                            ~after=lastCursor,
+                            (),
+                          );
 
-                     response.fetchMore(
-                       ~variables=moreTransactions##variables,
-                       ~updateQuery,
-                       (),
-                     );
-                   }}
-                 />
-               };
+                        response.fetchMore(
+                          ~variables=moreTransactions##variables,
+                          ~updateQuery,
+                          (),
+                        );
+                      }}
+                    />
+                  }}
+               </BlockListener>;
              }
          )
        </TransactionsQuery>;

@@ -85,7 +85,7 @@ let run_test () : unit Deferred.t =
   Parallel.init_master () ;
   File_system.with_temp_dir (Filename.temp_dir_name ^/ "full_test_config")
     ~f:(fun temp_conf_dir ->
-      let keypair = Genesis_ledger.largest_account_keypair_exn () in
+      let keypair = Test_genesis_ledger.largest_account_keypair_exn () in
       let%bind () =
         match Unix.getenv "CODA_TRACING" with
         | Some trace_dir ->
@@ -129,7 +129,7 @@ let run_test () : unit Deferred.t =
       in
       let time_controller = Block_time.Controller.(create @@ basic ~logger) in
       let consensus_local_state =
-        Consensus.Data.Local_state.create
+        Consensus.Data.Local_state.create ~genesis_ledger:Test_genesis_ledger.t
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
@@ -165,6 +165,8 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; time_controller
           ; consensus_local_state
+          ; genesis_ledger_hash=
+              Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
           ; log_gossip_heard=
               { snark_pool_diff= false
               ; transaction_pool_diff= false
@@ -177,7 +179,7 @@ let run_test () : unit Deferred.t =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
       let largest_account_keypair =
-        Genesis_ledger.largest_account_keypair_exn ()
+        Test_genesis_ledger.largest_account_keypair_exn ()
       in
       let fee = Currency.Fee.of_int in
       let snark_work_fee, transaction_fee =
@@ -202,12 +204,18 @@ let run_test () : unit Deferred.t =
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
              ~time_controller ~receipt_chain_database ~snark_work_fee
              ~consensus_local_state ~transaction_database
-             ~external_transition_database ~work_reassignment_wait:420000 ())
+             ~external_transition_database ~work_reassignment_wait:420000
+             ~genesis_state_hash:
+               Coda_state.Genesis_protocol_state.For_tests.genesis_state_hash
+             ())
+          ~genesis_ledger:Test_genesis_ledger.t
+          ~base_proof:Precomputed_values.base_proof
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
            (Coda_lib.validated_transitions coda)
            ~f:ignore) ;
+      let%bind () = Ivar.read @@ Coda_lib.initialization_finish_signal coda in
       let wait_until_cond ~(f : Coda_lib.t -> bool) ~(timeout : Float.t) =
         let rec go () =
           if f coda then return ()
@@ -401,20 +409,20 @@ let run_test () : unit Deferred.t =
         sending multiple payments*)
       let receiver_keypair =
         let receiver =
-          Genesis_ledger.find_new_account_record_exn
+          Test_genesis_ledger.find_new_account_record_exn
             [largest_account_keypair.public_key]
         in
-        Genesis_ledger.keypair_of_account_record_exn receiver
+        Test_genesis_ledger.keypair_of_account_record_exn receiver
       in
       let sender_keypair =
         let sender =
-          Genesis_ledger.find_new_account_record_exn
+          Test_genesis_ledger.find_new_account_record_exn
             [largest_account_keypair.public_key; receiver_keypair.public_key]
         in
-        Genesis_ledger.keypair_of_account_record_exn sender
+        Test_genesis_ledger.keypair_of_account_record_exn sender
       in
       let other_accounts =
-        List.filter Genesis_ledger.accounts ~f:(fun (_, account) ->
+        List.filter Test_genesis_ledger.accounts ~f:(fun (_, account) ->
             let reserved_public_keys =
               [ largest_account_keypair.public_key
               ; receiver_keypair.public_key
@@ -426,7 +434,7 @@ let run_test () : unit Deferred.t =
                      (Public_key.decompress_exn @@ Account.public_key account)
                )) )
         |> List.map ~f:(fun (sk, account) ->
-               ( Genesis_ledger.keypair_of_account_record_exn (sk, account)
+               ( Test_genesis_ledger.keypair_of_account_record_exn (sk, account)
                , account ) )
       in
       let timeout_mins =

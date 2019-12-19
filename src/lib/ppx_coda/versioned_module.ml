@@ -25,10 +25,17 @@ let rec add_deriving ~loc ~version_option attributes =
     let payload = Ast_builder.(pstr_eval (pexp_tuple idents) []) in
     PStr [payload]
   in
+  let version_expr =
+    match version_option with
+    | No_version_option ->
+        [%expr version]
+    | Asserted ->
+        [%expr version {asserted}]
+  in
   match attributes with
   | [] ->
       let attr_name = mk_loc ~loc "deriving" in
-      let attr_payload = payload [[%expr bin_io]; [%expr version]] in
+      let attr_payload = payload [[%expr bin_io]; version_expr] in
       [create_attr ~loc attr_name attr_payload]
   | attr :: attributes -> (
       let idents =
@@ -60,13 +67,6 @@ let rec add_deriving ~loc ~version_option attributes =
             modify_attr_payload attr (payload ([%expr bin_io] :: args))
             :: attributes
           else
-            let version_expr =
-              match version_option with
-              | No_version_option ->
-                  [%expr version]
-              | Asserted ->
-                  [%expr version {asserted}]
-            in
             modify_attr_payload attr
               (payload ([%expr bin_io] :: version_expr :: args))
             :: attributes )
