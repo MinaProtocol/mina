@@ -1,8 +1,35 @@
+(* functor.ml -- functor to produce Curve_size *)
+
+[%%import
+"/src/config.mlh"]
+
+[%%if
+curve_size = 298]
+
 module type Cycle_S = sig
   module Mnt4 : module type of Snarky.Libsnark.Mnt4
 
   module Mnt6 : module type of Snarky.Libsnark.Mnt6
 end
+
+[%%elif
+curve_size = 753]
+
+module type Cycle_S = sig
+  module Mnt4 : module type of Snarky.Libsnark.Mnt4753
+
+  module Mnt6 : module type of Snarky.Libsnark.Mnt6753
+end
+
+[%%else]
+
+[%%show
+curve_size]
+
+[%%error
+"invalid value for \"curve_size\""]
+
+[%%endif]
 
 module Make (Cycle : Cycle_S) = struct
   module Tick_full = Cycle.Mnt4
