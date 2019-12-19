@@ -201,6 +201,19 @@ module T = struct
     in
     return t
 
+  let of_scan_state_and_ledger_unchecked ~snarked_ledger_hash ~ledger
+      ~scan_state ~pending_coinbase_collection =
+    let open Deferred.Or_error.Let_syntax in
+    let t = {ledger; scan_state; pending_coinbase_collection} in
+    let%bind () =
+      Statement_scanner.check_invariants scan_state ~verifier:()
+        ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
+        ~ledger_hash_end:
+          (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
+        ~ledger_hash_begin:(Some snarked_ledger_hash)
+    in
+    return t
+
   let of_scan_state_pending_coinbases_and_snarked_ledger ~logger ~verifier
       ~scan_state ~snarked_ledger ~expected_merkle_root ~pending_coinbases =
     let open Deferred.Or_error.Let_syntax in

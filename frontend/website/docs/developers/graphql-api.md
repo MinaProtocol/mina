@@ -10,3 +10,8 @@
 2. Connect your GraphQL client to `http://localhost:3085/graphql` or open it in your browser to use [GraphiQL](https://github.com/graphql/graphiql)
 3. [Optional] If you want to use an existing keypair with GraphQL, first import it from the command line using the following: `coda advanced import -privkey-path <keyfile>`.
 4. Look at the <a href="/docs/graphql/" target="_blank">GraphQL schema docs</a>
+
+### Resources:
+
+- [First steps with the Coda GraphQL API](https://garethtdavies.com/crypto/first-steps-with-coda-graphql-api.html)
+- [Introduction to GraphQL](https://graphql.org/learn/)
