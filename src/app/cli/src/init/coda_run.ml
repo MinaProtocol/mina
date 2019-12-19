@@ -436,22 +436,22 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                               ] ;
                           Deferred.unit )) ) )))
 
+let no_report exn_str coda_ref =
+  sprintf
+    "include the last 20 lines from .coda-config/coda.log and then paste the \
+     following:\n\
+     Summary:\n\
+     %s\n\
+     Status:\n\
+     %s\n"
+    (Yojson.Safe.to_string (coda_status !coda_ref))
+    (Yojson.Safe.to_string (summary exn_str))
+
 let handle_crash e ~conf_dir ~top_logger coda_ref =
   let exn_str = Exn.to_string e in
   Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
     "Unhandled top-level exception: $exn\nGenerating crash report"
     ~metadata:[("exn", `String exn_str)] ;
-  let no_report () =
-    sprintf
-      "include the last 20 lines from .coda-config/coda.log and then paste \
-       the following:\n\
-       Summary:\n\
-       %s\n\
-       Status:\n\
-       %s\n"
-      (Yojson.Safe.to_string (coda_status !coda_ref))
-      (Yojson.Safe.to_string (summary exn_str))
-  in
   let action_string =
     match
       try Ok (make_report exn_str ~conf_dir coda_ref ~top_logger)
@@ -463,12 +463,12 @@ let handle_crash e ~conf_dir ~top_logger coda_ref =
         sprintf "attach the crash report %s" report_file
     | Ok None ->
         (*TODO: tar failed, should we ask people to zip the temp directory themselves?*)
-        no_report ()
+        no_report exn_str coda_ref
     | Error e ->
         Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
           "Exception when generating crash report: $exn"
           ~metadata:[("exn", `String (Error.to_string_hum e))] ;
-        no_report ()
+        no_report exn_str coda_ref
   in
   Core.eprintf
     !{err|
@@ -494,6 +494,17 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
 
 You might be trying to connect to a different network version, or need to troubleshoot your configuration. See https://codaprotocol.com/docs/troubleshooting/ for details.
 
+%!|err}
+      | Genesis_ledger_helper.Genesis_state_initialization_error ->
+          Core.eprintf
+            !{err|
+
+  ☠  Coda Daemon failed to initialize the genesis state. The Coda Protocol developers would like to know why!
+
+  Please:
+  Open an issue:
+    <https://github.com/CodaProtocol/coda/issues/new>
+  and include the last 50 lines from .coda-config/coda.log
 %!|err}
       | _ ->
           handle_crash exn ~conf_dir ~top_logger coda_ref ) ;
