@@ -453,7 +453,7 @@ let daemon logger =
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
          type ('a, 'b, 'c) t =
-           {coda: 'a; client_whitelist: 'b; rest_server_port: 'c}
+           {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
        end in
        let coda_initialization_deferred () =
          let%bind genesis_ledger, base_proof =
@@ -627,9 +627,9 @@ let daemon logger =
            | None ->
                return None
          in
-         let%bind client_whitelist =
+         let%bind client_trustlist =
            Reader.load_sexp
-             (conf_dir ^/ "client_whitelist")
+             (conf_dir ^/ "client_trustlist")
              [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
            >>| Or_error.ok
          in
@@ -820,14 +820,14 @@ let daemon logger =
                 ~genesis_state_hash ())
              ~genesis_ledger ~base_proof
          in
-         {Coda_initialization.coda; client_whitelist; rest_server_port}
+         {Coda_initialization.coda; client_trustlist; rest_server_port}
        in
        (* Breaks a dependency cycle with monitor initilization and coda *)
        let coda_ref : Coda_lib.t option ref = ref None in
        Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
-       let%bind {Coda_initialization.coda; client_whitelist; rest_server_port}
+       let%bind {Coda_initialization.coda; client_trustlist; rest_server_port}
            =
          coda_initialization_deferred ()
        in
@@ -835,7 +835,7 @@ let daemon logger =
        let%bind () = maybe_sleep 3. in
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
-       Coda_run.setup_local_server ?client_whitelist ~rest_server_port
+       Coda_run.setup_local_server ?client_trustlist ~rest_server_port
          ~insecure_rest_server coda ;
        let%bind () = Coda_lib.start coda in
        let%bind () =
