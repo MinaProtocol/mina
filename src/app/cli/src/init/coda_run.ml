@@ -102,7 +102,9 @@ let summary exn_str =
     ; ("Machine", `String (Core.Unix.Utsname.machine uname))
     ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
     ; ("Exception", `String exn_str)
-    ; ("Command", `String daemon_command) ]
+    ; ("Command", `String daemon_command)
+    ; ("Coda_branch", `String Coda_version.branch)
+    ; ("Coda_commit", `String Coda_version.commit_id) ]
 
 let coda_status coda_ref =
   Option.value_map coda_ref
