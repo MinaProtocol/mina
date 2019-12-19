@@ -6,7 +6,6 @@ module Styles = {
       selector(
         "a",
         [
-          hover([color(Theme.Colors.hyperlinkHover)]),
           cursor(`pointer),
           ...Theme.Link.basicStyles,
         ],
@@ -162,7 +161,7 @@ module Styles = {
   let dashboard =
     style([
       width(`percent(100.)),
-      height(`rem(30.)),
+      height(`rem(70.)),
       border(`px(0), `solid, white),
       borderRadius(px(3)),
     ]);
@@ -492,7 +491,7 @@ let make = () => {
             </a>
           </div>
           <iframe
-            src="https://o1testnet.grafana.net/d-solo/PeI0mtKWk/live-dashboard-for-website?orgId=1&panelId=2"
+            src="https://o1testnet.grafana.net/d/qx4y6dfWz/network-overview?orgId=1&refresh=1m"
             className=Styles.dashboard
           />
         </div>
