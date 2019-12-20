@@ -639,7 +639,9 @@ module Types = struct
                    in
                    List.map
                      ~f:(fun a ->
-                       { account= Partial_account.of_full_account a
+                       { account=
+                           Partial_account.of_full_account a
+                             Unsigned.UInt32.zero
                        ; locked= None
                        ; is_actively_staking= true
                        ; path= "" } )
@@ -660,7 +662,9 @@ module Types = struct
                    in
                    List.map
                      ~f:(fun a ->
-                       { account= Partial_account.of_full_account a
+                       { account=
+                           Partial_account.of_full_account a
+                             Unsigned.UInt32.zero
                        ; locked= None
                        ; is_actively_staking= true
                        ; path= "" } )
