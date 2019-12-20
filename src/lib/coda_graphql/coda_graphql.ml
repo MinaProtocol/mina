@@ -105,6 +105,8 @@ module Types = struct
 
   let uint64 = uint64 ()
 
+  let uint32 = uint32 ()
+
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
@@ -384,7 +386,10 @@ module Types = struct
 
   module AccountObj = struct
     module AnnotatedBalance = struct
-      type t = {total: Balance.t; unknown: Balance.t}
+      type t =
+        { total: Balance.t
+        ; unknown: Balance.t
+        ; blockchain_length: Unsigned.uint32 }
 
       let obj =
         obj "AnnotatedBalance"
@@ -399,8 +404,13 @@ module Types = struct
                 ~doc:
                   "The amount of coda owned by the account whose origin is \
                    currently unknown"
+                ~deprecated:(Deprecated None)
                 ~args:Arg.[]
-                ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.unknown) ] )
+                ~resolve:(fun _ (b : t) -> Balance.to_uint64 b.unknown)
+            ; field "blockHeight" ~typ:(non_null uint32)
+                ~doc:"Block height at which balance was measured"
+                ~args:Arg.[]
+                ~resolve:(fun _ (b : t) -> b.blockchain_length) ] )
     end
 
     module Partial_account = struct
@@ -434,10 +444,13 @@ module Types = struct
           ; receipt_chain_hash
           ; delegate
           ; voting_for
-          ; timing } =
+          ; timing } blockchain_length =
         { Account.Poly.public_key= Some public_key
         ; nonce= Some nonce
-        ; balance= {AnnotatedBalance.total= balance; unknown= balance}
+        ; balance=
+            { AnnotatedBalance.total= balance
+            ; unknown= balance
+            ; blockchain_length }
         ; receipt_chain_hash= Some receipt_chain_hash
         ; delegate= Some delegate
         ; voting_for= Some voting_for
@@ -445,24 +458,36 @@ module Types = struct
 
       let of_pk coda pk =
         let account =
-          Coda_lib.best_ledger coda |> Participating_state.active
-          |> Option.bind ~f:(fun ledger ->
+          coda |> Coda_lib.best_tip |> Participating_state.active
+          |> Option.bind ~f:(fun tip ->
+                 let ledger =
+                   Transition_frontier.Breadcrumb.staged_ledger tip
+                   |> Staged_ledger.ledger
+                 in
                  Ledger.location_of_key ledger pk
-                 |> Option.bind ~f:(Ledger.get ledger) )
+                 |> Option.bind ~f:(Ledger.get ledger)
+                 |> Option.map ~f:(fun account ->
+                        ( account
+                        , Transition_frontier.Breadcrumb.blockchain_length tip
+                        ) ) )
         in
         match account with
         | Some
-            { Account.Poly.public_key
-            ; nonce
-            ; balance
-            ; receipt_chain_hash
-            ; delegate
-            ; voting_for
-            ; timing } ->
+            ( { Account.Poly.public_key
+              ; nonce
+              ; balance
+              ; receipt_chain_hash
+              ; delegate
+              ; voting_for
+              ; timing }
+            , blockchain_length ) ->
             { Account.Poly.public_key= Some public_key
             ; nonce= Some nonce
             ; delegate= Some delegate
-            ; balance= {AnnotatedBalance.total= balance; unknown= balance}
+            ; balance=
+                { AnnotatedBalance.total= balance
+                ; unknown= balance
+                ; blockchain_length }
             ; receipt_chain_hash= Some receipt_chain_hash
             ; voting_for= Some voting_for
             ; timing }
@@ -472,7 +497,9 @@ module Types = struct
               ; nonce= None
               ; delegate= None
               ; balance=
-                  {AnnotatedBalance.total= Balance.zero; unknown= Balance.zero}
+                  { AnnotatedBalance.total= Balance.zero
+                  ; unknown= Balance.zero
+                  ; blockchain_length= Unsigned.UInt32.zero }
               ; receipt_chain_hash= None
               ; voting_for= None
               ; timing= Timing.Untimed }
@@ -565,9 +592,7 @@ module Types = struct
                        Sparse_ledger.get_exn staking_ledger index
                      in
                      let delegate_key = delegate_account.public_key in
-                     Some
-                       ( lift coda delegate_key
-                       @@ Partial_account.of_full_account delegate_account )
+                     Some (get_best_ledger_account coda delegate_key)
                    with e ->
                      Logger.warn
                        (Coda_lib.top_level_logger coda)
@@ -844,7 +869,8 @@ module Types = struct
             ~resolve:(fun _ {With_hash.hash; _} ->
               State_hash.to_base58_check hash )
         ; field "stateHashField" ~typ:(non_null string)
-            ~doc:"Bigint field-element representation of stateHash"
+            ~doc:
+              "Experimental: Bigint field-element representation of stateHash"
             ~args:Arg.[]
             ~resolve:(fun _ {With_hash.hash; _} ->
               State_hash.to_decimal_string hash )
