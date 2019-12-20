@@ -23,10 +23,10 @@ module Style = {
       display(`block),
       justifyContent(`center),
       margin(`auto),
-      paddingLeft(`rem(3.)),
-      paddingRight(`rem(3.)),
       marginTop(`rem(4.)),
+      padding2(~v=`zero, ~h=`rem(2.)),
       media(Theme.MediaQuery.full, [display(`flex)]),
+      media(Theme.MediaQuery.notMobile, [padding2(~v=`zero, ~h=`rem(3.))]),
     ]);
 };
 

@@ -212,7 +212,7 @@ module NavWrapper = {
           padding2(~v=`zero, ~h=`rem(1.25)),
           marginTop(`rem(2.0)),
           media(
-            Theme.MediaQuery.notSmallMobile,
+            Theme.MediaQuery.notMobile,
             [padding2(~v=`zero, ~h=`rem(3.)), marginTop(`rem(2.0))],
           ),
           media(

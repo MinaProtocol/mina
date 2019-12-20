@@ -17,7 +17,7 @@ module Style = {
   let galleryRow =
     style([
       display(`none),
-      media(Theme.MediaQuery.notSmallMobile, [display(`inherit_)]),
+      media(Theme.MediaQuery.notMobile, [display(`inherit_)]),
       selector(
         "*",
         [
@@ -30,7 +30,7 @@ module Style = {
     ]);
 
   let galleryRowMobile =
-    style([media(Theme.MediaQuery.notSmallMobile, [display(`none)])]);
+    style([media(Theme.MediaQuery.notMobile, [display(`none)])]);
 
   let text = style([maxWidth(`rem(50.)), margin(`auto)]);
   let h2 =
@@ -42,7 +42,7 @@ module Style = {
         fontSize(`rem(1.5)),
         lineHeight(`rem(2.25)),
         media(
-          Theme.MediaQuery.notSmallMobile,
+          Theme.MediaQuery.notMobile,
           [fontSize(`rem(2.25)), lineHeight(`rem(3.0))],
         ),
       ]),
@@ -51,7 +51,7 @@ module Style = {
     style([
       display(`block),
       media(
-        Theme.MediaQuery.notSmallMobile,
+        Theme.MediaQuery.notMobile,
         [display(`flex), justifyContent(`spaceBetween)],
       ),
     ]);
@@ -71,7 +71,7 @@ module Style = {
         marginTop(`rem(1.)),
         marginBottom(`zero),
         media(
-          Theme.MediaQuery.notSmallMobile,
+          Theme.MediaQuery.notMobile,
           [width(`percent(65.)), marginTop(`zero)],
         ),
       ]),
@@ -89,7 +89,7 @@ module Style = {
     style([
       display(`block),
       media(
-        Theme.MediaQuery.notSmallMobile,
+        Theme.MediaQuery.notMobile,
         [display(`flex), justifyContent(`spaceBetween)],
       ),
     ]);
@@ -118,9 +118,14 @@ module Style = {
   let jobsList =
     style([
       display(`block),
+      padding2(~v=`zero, ~h=`rem(0.75)),
       media(
-        Theme.MediaQuery.notSmallMobile,
-        [display(`flex), justifyContent(`spaceBetween)],
+        Theme.MediaQuery.notMobile,
+        [
+          display(`flex),
+          justifyContent(`spaceBetween),
+          padding2(~v=`zero, ~h=`zero),
+        ],
       ),
     ]);
   let applyHeading = merge([heading, style([width(`percent(50.))])]);
@@ -130,7 +135,7 @@ module Style = {
       width(`percent(100.)),
       marginTop(`rem(2.0)),
       media(
-        Theme.MediaQuery.notSmallMobile,
+        Theme.MediaQuery.notMobile,
         [marginTop(`zero), width(`percent(50.))],
       ),
     ]);

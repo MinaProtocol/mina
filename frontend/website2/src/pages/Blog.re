@@ -48,48 +48,53 @@ module Style = {
 [@react.component]
 let make = (~posts) => {
   <Page>
-    <Next.Head> Markdown.katexStylesheet </Next.Head>
-    <ul className=Style.postList>
-      {React.array(
-         Array.map(
-           (post: ContentType.Post.t) => {
-             <li key={post.slug} className=Style.postListItem>
-               <Next.Link
-                 href="/blog/[slug]" _as={"/blog/" ++ post.slug} passHref=true>
-                 <a className=Style.title> {React.string(post.title)} </a>
-               </Next.Link>
-               {ReactUtils.fromOpt(Js.Undefined.toOption(post.subtitle), ~f=s =>
-                  <div className=Style.subtitle> {React.string(s)} </div>
-                )}
-               <Spacer height=1. />
-               <div className=Style.author>
-                 {React.string("by " ++ post.author)}
-               </div>
-               <div className=Style.date> {React.string(post.date)} </div>
-               <Spacer height=1.5 />
-               <div className=Theme.Body.basic>
-                 {React.string(post.snippet)}
-               </div>
-               <div
-                 className=Css.(
-                   style([
-                     marginTop(`rem(1.)),
-                     Theme.Typeface.ibmplexsans,
-                     fontWeight(`medium),
-                     fontSize(`rem(1.)),
-                     letterSpacing(`rem(-0.0125)),
-                     color(Theme.Colors.hyperlink),
-                     hover([color(Theme.Colors.hyperlinkHover)]),
-                   ])
-                 )>
-                 {React.string({js|Read more →|js})}
-               </div>
-             </li>
-           },
-           posts,
-         ),
-       )}
-    </ul>
+    <Wrapped>
+      <Next.Head> Markdown.katexStylesheet </Next.Head>
+      <ul className=Style.postList>
+        {React.array(
+           Array.map(
+             (post: ContentType.Post.t) => {
+               <li key={post.slug} className=Style.postListItem>
+                 <Next.Link
+                   href="/blog/[slug]"
+                   _as={"/blog/" ++ post.slug}
+                   passHref=true>
+                   <a className=Style.title> {React.string(post.title)} </a>
+                 </Next.Link>
+                 {ReactUtils.fromOpt(
+                    Js.Undefined.toOption(post.subtitle), ~f=s =>
+                    <div className=Style.subtitle> {React.string(s)} </div>
+                  )}
+                 <Spacer height=1. />
+                 <div className=Style.author>
+                   {React.string("by " ++ post.author)}
+                 </div>
+                 <div className=Style.date> {React.string(post.date)} </div>
+                 <Spacer height=1.5 />
+                 <div className=Theme.Body.basic>
+                   {React.string(post.snippet)}
+                 </div>
+                 <div
+                   className=Css.(
+                     style([
+                       marginTop(`rem(1.)),
+                       Theme.Typeface.ibmplexsans,
+                       fontWeight(`medium),
+                       fontSize(`rem(1.)),
+                       letterSpacing(`rem(-0.0125)),
+                       color(Theme.Colors.hyperlink),
+                       hover([color(Theme.Colors.hyperlinkHover)]),
+                     ])
+                   )>
+                   {React.string({js|Read more →|js})}
+                 </div>
+               </li>
+             },
+             posts,
+           ),
+         )}
+      </ul>
+    </Wrapped>
   </Page>;
 };
 
