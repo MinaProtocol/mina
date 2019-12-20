@@ -128,7 +128,7 @@ There are a number of mostly independent optimizations we can implement for stag
 2. Batch verification of included completed work proofs
 3. Cache completed work verification to avoid duplicate verification of completed work included across multiple forks
 4. If transaction signature verification cost is significant, parallelize that as well
-##### Child RFC: &#x1F7E1; [Batch Verification](https://github.com/CodaProtocol/coda/pull/3981)
+##### Child RFC: &#x1F7E1; [Transaction SNARK Bundling](https://github.com/CodaProtocol/coda/pull/3981)
 
 ### Optimize Snarked Ledger Commit
 ##### Priority: 2
