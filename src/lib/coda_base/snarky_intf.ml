@@ -274,6 +274,14 @@ module type Tick_S = sig
   module Inner_curve : sig
     type t
 
+    module Scalar : sig
+      type t [@@deriving sexp, compare, hash, eq]
+
+      type var
+
+      val one : t
+    end
+
     module Affine : sig
       type t = field * field
     end
