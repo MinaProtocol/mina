@@ -54,17 +54,20 @@ module Style = {
           mediaLarge([display(`block)]),
         ],
       ),
-      selector("ul", [marginLeft(`rem(-1.0))]),
-      selector("ul > li", [paddingLeft(`rem(1.0))]),
-      selector("ul > li > ul", [marginLeft(`rem(1.))]),
       // Visibility (based on screen width)
       notLarge([display(`block)]),
       onlyMobile([display(`block)]),
       notMobile([display(`none)]),
       onlyLarge([display(`none)]),
+      selector("ul", [paddingLeft(`rem(1.))]),
+      selector("ul > li", [paddingLeft(`rem(0.5))]),
+      selector("ul > li > ul", [marginLeft(`rem(1.))]),
       mediaMedium([
         selector(".not-large, .not-mobile", [display(`block)]),
         selector(".mobile-only, .large-only", [display(`none)]),
+        selector("ul", [marginLeft(`rem(-1.0)), paddingLeft(`rem(0.))]),
+        selector("ul > li", [paddingLeft(`rem(1.0))]),
+        selector("ul > li > ul", [marginLeft(`rem(1.))]),
       ]),
       mediaLarge([
         selector(".large-only, .not-mobile", [display(`block)]),

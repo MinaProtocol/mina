@@ -74,20 +74,15 @@ let make = (~posts) => {
                  <div className=Theme.Body.basic>
                    {React.string(post.snippet)}
                  </div>
-                 <div
-                   className=Css.(
-                     style([
-                       marginTop(`rem(1.)),
-                       Theme.Typeface.ibmplexsans,
-                       fontWeight(`medium),
-                       fontSize(`rem(1.)),
-                       letterSpacing(`rem(-0.0125)),
-                       color(Theme.Colors.hyperlink),
-                       hover([color(Theme.Colors.hyperlinkHover)]),
-                     ])
-                   )>
-                   {React.string({js|Read more →|js})}
-                 </div>
+                 <Spacer height=1. />
+                 <Next.Link
+                   href="/blog/[slug]"
+                   _as={"/blog/" ++ post.slug}
+                   passHref=true>
+                   <a className=Theme.Link.basic>
+                     {React.string({js|Read more →|js})}
+                   </a>
+                 </Next.Link>
                </li>
              },
              posts,
