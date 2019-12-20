@@ -1,4 +1,4 @@
-(* intf.ml -- enough of an interface to allow the functor to work *)
+(* snarky_intf.ml -- enough of an interface to allow the functor to work *)
 
 open Core_kernel
 

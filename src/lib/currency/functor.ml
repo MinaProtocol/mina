@@ -1,7 +1,7 @@
 open Core_kernel
+open Snarky_intf
 open Snark_bits
 open Bitstring_lib
-open Intf
 
 module Make_sig (Impl : Tick_S) = struct
   open Impl

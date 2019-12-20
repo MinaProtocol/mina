@@ -3,21 +3,20 @@ open Snark_params.Tick
 open Import
 
 module Poly : sig
-  type ('pk, 'amount) t = {receiver: 'pk; amount: 'amount}
-  [@@deriving eq, sexp, hash, yojson]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type nonrec ('pk, 'amount) t
-        [@@deriving bin_io, eq, sexp, hash, yojson, version]
-      end
-
-      module Latest = V1
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type ('pk, 'amount) t = {receiver: 'pk; amount: 'amount}
+      [@@deriving eq, sexp, hash, yojson]
     end
-    with type ('pk, 'amount) V1.t = ('pk, 'amount) t
+  end]
+
+  type ('pk, 'amount) t = ('pk, 'amount) Stable.Latest.t =
+    {receiver: 'pk; amount: 'amount}
+  [@@deriving eq, sexp, hash, yojson]
 end
 
+[%%versioned:
 module Stable : sig
   module V1 : sig
     type t =
@@ -26,11 +25,11 @@ module Stable : sig
       Poly.Stable.V1.t
     [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
   end
+end]
 
-  module Latest = V1
-end
-
-type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
+type t = Stable.Latest.t
+  constraint t = (Public_key.Compressed.t, Currency.Amount.t) Poly.t
+[@@deriving eq, sexp, hash, yojson]
 
 val dummy : t
 

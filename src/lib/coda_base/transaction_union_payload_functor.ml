@@ -1,7 +1,7 @@
 open Core_kernel
+open Snarky_intf
 open Signature_lib
 open Currency
-open Snarky_intf
 
 module Make
     (Impl : Tick_S)
@@ -10,15 +10,15 @@ module Make
 struct
   open Impl
   module Tag = Transaction_union_tag_functor.Make (Impl)
+  module Amount = Currency.Amount
 
   module Body = struct
     type ('tag, 'pk, 'amount) t_ = {tag: 'tag; public_key: 'pk; amount: 'amount}
     [@@deriving sexp]
 
-    type var = (Tag.var, Public_key.Compressed.var, Currency.Amount.var) t_
+    type var = (Tag.var, Public_key.Compressed.var, Amount.var) t_
 
-    type t = (Tag.t, Public_key.Compressed.t, Currency.Amount.t) t_
-    [@@deriving sexp]
+    type t = (Tag.t, Public_key.Compressed.t, Amount.t) t_ [@@deriving sexp]
 
     let to_input ~tag ~amount t =
       let t1, t2 = tag t.tag in
@@ -54,17 +54,8 @@ struct
 
     let to_hlist {tag; public_key; amount} = H_list.[tag; public_key; amount]
 
-    let spec :
-        ( 'a
-        , 'b
-        ,    Boolean.var * Boolean.var
-          -> Public_key.Compressed.var (* -> Amount.var *)
-          -> 'a
-        , Tag.t -> Public_key.Compressed.t (*-> Amount.t*) -> 'b
-        , field
-        , (unit, unit) Impl.Checked.t )
-        Impl.Data_spec.data_spec =
-      Data_spec.[Tag.typ; Public_key.Compressed.typ (* ; Currency.Amount.typ*)]
+    let spec : (unit, unit, _, _) Data_spec.t =
+      Data_spec.[Tag.typ; Public_key.Compressed.typ; Amount.typ]
 
     let typ =
       Typ.of_hlistable spec ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
@@ -73,27 +64,29 @@ struct
         ~value_of_hlist:(fun H_list.[tag; public_key; amount] ->
           {tag; public_key; amount} )
 
-    let of_user_command_payload_body = function
+    let of_user_command_payload_body body :
+        (Tag.t, Import.Public_key.Compressed.t, Amount.t) t_ =
+      match body with
+      (* TODO!!! parameterize User_command_payload *)
       | User_command_payload.Body.Payment {receiver; amount} ->
           {tag= Tag.Payment; public_key= receiver; amount}
       | Stake_delegation (Set_delegate {new_delegate}) ->
           { tag= Tag.Stake_delegation
           ; public_key= new_delegate
-          ; amount= Currency.Amount.zero }
+          ; amount= Amount.zero }
 
     module Checked = struct
       let constant ({tag; public_key; amount} : t) : var =
         { tag= Tag.Checked.constant tag
         ; public_key= Public_key.Compressed.var_of_t public_key
-        ; amount= Currency.Amount.var_of_t amount }
+        ; amount= Amount.var_of_t amount }
 
       let to_input t =
         to_input t ~tag:Fn.id ~amount:(fun x ->
-            (Currency.Amount.var_to_bits x :> Boolean.var list) )
+            (Amount.var_to_bits x :> Boolean.var list) )
     end
 
-    let to_input (t : t) =
-      to_input t ~tag:Tag.to_bits ~amount:Currency.Amount.to_bits
+    let to_input (t : t) = to_input t ~tag:Tag.to_bits ~amount:Amount.to_bits
   end
 
   type t = (User_command_payload.Common.t, Body.t) User_command_payload.Poly.t

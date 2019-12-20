@@ -3,18 +3,20 @@ open Signature_lib
 open Snark_params.Tick
 
 module Body : sig
-  type t =
-    | Payment of Payment_payload.Stable.V1.t
-    | Stake_delegation of Stake_delegation.Stable.V1.t
-  [@@deriving eq, sexp, hash, yojson]
-
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, eq, sexp, hash, yojson]
+      type t =
+        | Payment of Payment_payload.Stable.V1.t
+        | Stake_delegation of Stake_delegation.Stable.V1.t
+      [@@deriving eq, sexp, hash, yojson]
     end
+  end]
 
-    module Latest = V1
-  end
+  type t = Stable.Latest.t =
+    | Payment of Payment_payload.t
+    | Stake_delegation of Stake_delegation.t
+  [@@deriving eq, sexp, hash, yojson]
 end
 
 module Common : sig
