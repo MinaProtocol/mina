@@ -8,17 +8,26 @@ module Style = {
       flexDirection(`column),
       alignItems(`flexStart),
       justifyContent(`flexStart),
-      width(containerWidth),
-      height(`rem(22.)),
+      width(`rem(18.)),
+      height(`rem(15.)),
       maxWidth(`percent(100.)),
       backgroundColor(Theme.Colors.midnight),
       color(Theme.Colors.offWhite),
-      padding(`rem(2.)),
+      padding(`rem(1.)),
       Theme.Typeface.ibmplexmono,
       borderBottomLeftRadius(`px(5)),
       borderBottomRightRadius(`px(5)),
+      media(
+        Theme.MediaQuery.notMobile,
+        [width(containerWidth), height(`rem(22.)), padding(`rem(2.))],
+      ),
     ]);
-  let item = style([marginBottom(`rem(0.5))]);
+  let item =
+    style([
+      marginBottom(`rem(0.5)),
+      fontSize(`rem(0.7)),
+      media(Theme.MediaQuery.notMobile, [fontSize(`rem(1.2))]),
+    ]);
   let prompt = style([color(Theme.Colors.grey), marginRight(`rem(1.))]);
   let header =
     style([
