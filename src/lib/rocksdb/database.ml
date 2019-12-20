@@ -15,11 +15,9 @@ let create directory =
   Rocks.Options.set_create_if_missing opts true ;
   {uuid= Uuid_unix.create (); db= Rocks.open_db ~opts directory}
 
-(*
 let create_checkpoint t directory buffer_size =
   Rocks.flush t.db ;
   Rocks.checkpoint_create t.db directory buffer_size
-*)
 
 let get_uuid t = t.uuid
 
@@ -102,7 +100,6 @@ let%test_unit "to_alist (of_alist l) = l" =
           Async.Deferred.unit )
       |> Async.don't_wait_for )
 
-(*
 let%test_unit "checkpoint read test" =
   Quickcheck.test
     Quickcheck.Generator.(
@@ -125,4 +122,3 @@ let%test_unit "checkpoint read test" =
       [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
       close db ;
       close cp )
-*)
