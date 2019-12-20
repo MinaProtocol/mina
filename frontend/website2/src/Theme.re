@@ -221,8 +221,8 @@ module H3 = {
     merge([
       wide,
       style([
-        before([marginRight(`rem(2.0)), ...wing]),
-        after([marginLeft(`rem(2.0)), ...wing]),
+        before([marginRight(`rem(1.0)), ...wing]),
+        after([marginLeft(`rem(1.0)), ...wing]),
       ]),
     ]);
   };
