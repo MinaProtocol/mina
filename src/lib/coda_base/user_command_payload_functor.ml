@@ -1,0 +1,150 @@
+open Core_kernel
+open Snarky_intf
+
+module Make
+    (Impl : Tick_S)
+    (User_command_memo : User_command_memo_functor.Make_sig(Impl).S)
+    (Currency : Currency.Functor.Make_sig(Impl).S) =
+struct
+  open Impl
+  module Account_nonce = Coda_numbers.Account_nonce
+  module Global_slot = Coda_numbers.Global_slot
+  module Memo = User_command_memo
+
+  module Common = struct
+    module Poly = struct
+      type ('fee, 'nonce, 'global_slot, 'memo) t =
+        {fee: 'fee; nonce: 'nonce; valid_until: 'global_slot; memo: 'memo}
+      [@@deriving eq, compare, sexp, hash, yojson]
+    end
+
+    type t = (Currency.Fee.t, Account_nonce.t, Global_slot.t, Memo.t) Poly.t
+    [@@deriving compare, eq, sexp, hash, yojson]
+
+    let to_input ({fee; nonce; valid_until; memo} : t) =
+      Random_oracle.Input.bitstrings
+        [| Currency.Fee.to_bits fee
+         ; Account_nonce.Bits.to_bits nonce
+         ; Global_slot.to_bits valid_until
+         ; Memo.to_bits memo |]
+
+    let gen : t Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map fee = Currency.Fee.gen
+      and nonce = Account_nonce.gen
+      and valid_until = Global_slot.gen
+      and memo =
+        let%bind is_digest = Bool.quickcheck_generator in
+        if is_digest then
+          String.gen_with_length Memo.max_digestible_string_length
+            Char.quickcheck_generator
+          >>| Memo.create_by_digesting_string_exn
+        else
+          String.gen_with_length Memo.max_input_length
+            Char.quickcheck_generator
+          >>| Memo.create_from_string_exn
+      in
+      Poly.{fee; nonce; valid_until; memo}
+
+    type var =
+      ( Currency.Fee.var
+      , Account_nonce.Checked.t
+      , Global_slot.Checked.t
+      , Memo.Checked.t )
+      Poly.t
+
+    let to_hlist Poly.{fee; nonce; valid_until; memo} =
+      H_list.[fee; nonce; valid_until; memo]
+
+    let of_hlist : type fee nonce memo global_slot.
+           (unit, fee -> nonce -> global_slot -> memo -> unit) H_list.t
+        -> (fee, nonce, global_slot, memo) Poly.t =
+     fun H_list.[fee; nonce; valid_until; memo] ->
+      {fee; nonce; valid_until; memo}
+
+    let typ =
+      Typ.of_hlistable
+        [Currency.Fee.typ; Account_nonce.typ; Global_slot.typ; Memo.typ]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    module Checked = struct
+      let constant ({fee; nonce; valid_until; memo} : t) : var =
+        { fee= Currency.Fee.var_of_t fee
+        ; nonce= Account_nonce.Checked.constant nonce
+        ; memo= Memo.Checked.constant memo
+        ; valid_until= Global_slot.Checked.constant valid_until }
+
+      let to_input ({fee; nonce; valid_until; memo} : var) =
+        let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
+        let%map nonce = Account_nonce.Checked.to_bits nonce
+        and valid_until = Global_slot.Checked.to_bits valid_until in
+        Random_oracle.Input.bitstrings
+          [| s (Currency.Fee.var_to_bits fee)
+           ; s nonce
+           ; s valid_until
+           ; Array.to_list (memo :> Boolean.var array) |]
+    end
+  end
+
+  module Body = struct
+    type t =
+      | Payment of Payment_payload.Stable.V1.t
+      | Stake_delegation of Stake_delegation.Stable.V1.t
+    [@@deriving eq, sexp, hash, yojson]
+
+    module Tag = Transaction_union_tag
+
+    let gen ~max_amount =
+      let open Quickcheck.Generator in
+      map
+        (variant2 (Payment_payload.gen ~max_amount) Stake_delegation.gen)
+        ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
+  end
+
+  module Poly = struct
+    type t = (Common.t, Body.t) Poly.t
+    [@@deriving compare, eq, sexp, hash, yojson]
+
+    let create ~fee ~nonce ~valid_until ~memo ~body : t =
+      {common= {fee; nonce; valid_until; memo}; body}
+
+    let fee (t : t) = t.common.fee
+
+    let nonce (t : t) = t.common.nonce
+
+    let valid_until (t : t) = t.common.valid_until
+
+    let memo (t : t) = t.common.memo
+
+    let body (t : t) = t.body
+
+    let is_payment (t : t) =
+      match t.body with Payment _ -> true | Stake_delegation _ -> false
+
+    let accounts_accessed (t : t) =
+      match t.body with
+      | Payment payload ->
+          [payload.receiver]
+      | Stake_delegation _ ->
+          []
+
+    let dummy : t =
+      { common=
+          { fee= Currency.Fee.zero
+          ; nonce= Account_nonce.zero
+          ; valid_until= Global_slot.max_value
+          ; memo= Memo.dummy }
+      ; body= Payment Payment_payload.dummy }
+
+    let gen =
+      let open Quickcheck.Generator.Let_syntax in
+      let%bind common = Common.gen in
+      let max_amount =
+        Currency.Amount.(sub max_int (of_fee common.fee))
+        |> Option.value_exn ?here:None ?error:None ?message:None
+      in
+      let%map body = Body.gen ~max_amount in
+      Poly.{common; body}
+  end
+end

@@ -2,7 +2,6 @@ open Core_kernel
 open Signature_lib
 open Snark_params.Tick
 open Currency
-module Foo = Snark_params.Tick.Data_spec
 module Tag = Transaction_union_tag
 
 module Body = struct
