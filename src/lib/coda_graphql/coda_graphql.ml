@@ -624,6 +624,51 @@ module Types = struct
                    Option.map
                      ~f:(get_best_ledger_account coda)
                      account.Account.Poly.delegate )
+             ; field "delegators"
+                 ~typ:(list @@ non_null @@ Lazy.force account)
+                 ~doc:
+                   "The list of accounts which are delegating to you (note \
+                    that the info is recorded in the last epoch so it might \
+                    not be up to date with the current account status)"
+                 ~args:Arg.[]
+                 ~resolve:(fun {ctx= coda; _} {account; _} ->
+                   let open Option.Let_syntax in
+                   let%bind pk = account.Account.Poly.public_key in
+                   let%map delegators =
+                     Coda_lib.current_epoch_delegators coda ~pk
+                   in
+                   List.map
+                     ~f:(fun a ->
+                       { account=
+                           Partial_account.of_full_account a
+                             Unsigned.UInt32.zero
+                       ; locked= None
+                       ; is_actively_staking= true
+                       ; path= "" } )
+                     delegators )
+             ; field "lastEpochDelegators"
+                 ~typ:(list @@ non_null @@ Lazy.force account)
+                 ~doc:
+                   "The list of accounts which are delegating to you in the \
+                    last epoch (note that the info is recorded in the one \
+                    before last epoch epoch so it might not be up to date \
+                    with the current account status)"
+                 ~args:Arg.[]
+                 ~resolve:(fun {ctx= coda; _} {account; _} ->
+                   let open Option.Let_syntax in
+                   let%bind pk = account.Account.Poly.public_key in
+                   let%map delegators =
+                     Coda_lib.last_epoch_delegators coda ~pk
+                   in
+                   List.map
+                     ~f:(fun a ->
+                       { account=
+                           Partial_account.of_full_account a
+                             Unsigned.UInt32.zero
+                       ; locked= None
+                       ; is_actively_staking= true
+                       ; path= "" } )
+                     delegators )
              ; field "votingFor" ~typ:string
                  ~doc:
                    "The previous epoch lock hash of the chain which you are \
