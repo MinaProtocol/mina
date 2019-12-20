@@ -1,60 +1,44 @@
 open Core
 open Coda_base
 open Fold_lib
-open Tuple_lib
 open Snark_params.Tick
 open Coda_digestif
-open Module_version
 
 module Aux_hash = struct
   let length_in_bits = 256
 
   let length_in_bytes = length_in_bits / 8
 
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
+      type t = string [@@deriving sexp, eq, compare, hash]
 
-        module Base58_check = Base58_check.Make (struct
-          let description = "Aux hash"
+      let to_latest = Fn.id
 
-          let version_byte =
-            Base58_check.Version_bytes.staged_ledger_hash_aux_hash
-        end)
+      module Base58_check = Base58_check.Make (struct
+        let description = "Aux hash"
 
-        let to_yojson s = `String (Base58_check.encode s)
+        let version_byte =
+          Base58_check.Version_bytes.staged_ledger_hash_aux_hash
+      end)
 
-        let of_yojson = function
-          | `String s -> (
-            match Base58_check.decode s with
-            | Error e ->
-                Error
-                  (sprintf "Aux_hash.of_yojson, bad Base58Check:%s"
-                     (Error.to_string_hum e))
-            | Ok x ->
-                Ok x )
-          | _ ->
-              Error "Aux_hash.of_yojson expected `String"
-      end
+      let to_yojson s = `String (Base58_check.encode s)
 
-      include T
-      include Registration.Make_latest_version (T)
+      let of_yojson = function
+        | `String s -> (
+          match Base58_check.decode s with
+          | Error e ->
+              Error
+                (sprintf "Aux_hash.of_yojson, bad Base58Check:%s"
+                   (Error.to_string_hum e))
+          | Ok x ->
+              Ok x )
+        | _ ->
+            Error "Aux_hash.of_yojson expected `String"
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "staged_ledger_hash_aux_hash"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   let of_bytes = Fn.id
@@ -69,98 +53,73 @@ module Pending_coinbase_aux = struct
 
   let length_in_bytes = length_in_bits / 8
 
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = string [@@deriving bin_io, sexp, eq, compare, hash, version]
+      type t = string [@@deriving sexp, eq, compare, hash]
 
-        module Base58_check = Base58_check.Make (struct
-          let description = "Pending coinbase aux"
+      let to_latest = Fn.id
 
-          let version_byte =
-            Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
-        end)
+      module Base58_check = Base58_check.Make (struct
+        let description = "Pending coinbase aux"
 
-        let to_yojson s = `String (Base58_check.encode s)
+        let version_byte =
+          Base58_check.Version_bytes.staged_ledger_hash_pending_coinbase_aux
+      end)
 
-        let of_yojson = function
-          | `String s -> (
-            match Base58_check.decode s with
-            | Ok x ->
-                Ok x
-            | Error e ->
-                Error
-                  (sprintf "Pending_coinbase_aux.of_yojson, bad Base58Check:%s"
-                     (Error.to_string_hum e)) )
-          | _ ->
-              Error "Pending_coinbase_aux.of_yojson expected `String"
-      end
+      let to_yojson s = `String (Base58_check.encode s)
 
-      include T
-      include Registration.Make_latest_version (T)
+      let of_yojson = function
+        | `String s -> (
+          match Base58_check.decode s with
+          | Ok x ->
+              Ok x
+          | Error e ->
+              Error
+                (sprintf "Pending_coinbase_aux.of_yojson, bad Base58Check:%s"
+                   (Error.to_string_hum e)) )
+        | _ ->
+            Error "Pending_coinbase_aux.of_yojson expected `String"
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "staged_ledger_hash_pending_coinbase_state_hash"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   let dummy : t = String.init length_in_bytes ~f:(fun _ -> '\000')
 end
 
 module Non_snark = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { ledger_hash: Ledger_hash.Stable.V1.t
-          ; aux_hash: Aux_hash.Stable.V1.t
-          ; pending_coinbase_aux: Pending_coinbase_aux.Stable.V1.t }
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-      end
+      type t =
+        { ledger_hash: Ledger_hash.Stable.V1.t
+        ; aux_hash: Aux_hash.Stable.V1.t
+        ; pending_coinbase_aux: Pending_coinbase_aux.Stable.V1.t }
+      [@@deriving sexp, eq, compare, hash, yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "staged_ledger_hash_pending_coinbase_state_hash"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   type value = t [@@deriving sexp, compare, hash, yojson]
 
   let dummy : t Lazy.t =
     lazy
-      { ledger_hash= Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+      { ledger_hash= Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
       ; aux_hash= Aux_hash.dummy
       ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
 
-  type var = Boolean.var Triple.t list
+  let genesis ~genesis_ledger_hash : t =
+    { ledger_hash= genesis_ledger_hash
+    ; aux_hash= Aux_hash.dummy
+    ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
+
+  type var = Boolean.var list
 
   let length_in_bits = 256
-
-  let length_in_triples = (length_in_bits + 2) / 3
 
   let digest ({ledger_hash; aux_hash; pending_coinbase_aux} : t) =
     let h = Digestif.SHA256.init () in
@@ -169,7 +128,9 @@ module Non_snark = struct
     let h = Digestif.SHA256.feed_string h pending_coinbase_aux in
     Digestif.SHA256.(get h |> to_raw_string)
 
-  let fold t = Fold.string_triples (digest t)
+  let fold t = Fold.string_bits (digest t)
+
+  let to_input t = Random_oracle.Input.bitstring (Fold.to_list (fold t))
 
   let ledger_hash ({ledger_hash; _} : t) = ledger_hash
 
@@ -179,21 +140,14 @@ module Non_snark = struct
       =
     {aux_hash; ledger_hash; pending_coinbase_aux}
 
-  let var_to_triples = Checked.return
+  let var_to_input = Random_oracle.Input.bitstring
 
   let var_of_t t : var =
-    List.map
-      (Fold.to_list @@ fold t)
-      ~f:(fun (x, y, z) ->
-        let g = Boolean.var_of_value in
-        (g x, g y, g z) )
+    List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
 
   let typ : (var, value) Typ.t =
-    let triple t = Typ.tuple3 t t t in
-    Typ.transport
-      (Typ.list ~length:length_in_triples (triple Boolean.typ))
-      ~there:(Fn.compose Fold.to_list fold)
-      ~back:(fun _ ->
+    Typ.transport (Typ.list ~length:length_in_bits Boolean.typ)
+      ~there:(Fn.compose Fold.to_list fold) ~back:(fun _ ->
         (* If we put a failwith here, we lose the ability to printf-inspect
         * anything that uses staged-ledger-hashes from within Checked
         * computations. It's useful when debugging to dump the protocol state
@@ -202,64 +156,43 @@ module Non_snark = struct
         Lazy.force dummy )
 end
 
-module Stable = struct
-  module Poly = struct
-    module Stable = struct
-      module V1 = struct
-        module T = struct
-          type ('non_snark, 'pending_coinbase_hash) t =
-            { non_snark: 'non_snark
-            ; pending_coinbase_hash: 'pending_coinbase_hash }
-          [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-        end
-
-        include T
-      end
-
-      module Latest = V1
+module Poly = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type ('non_snark, 'pending_coinbase_hash) t =
+        {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
+      [@@deriving sexp, eq, compare, hash, yojson]
     end
+  end]
 
-    type ('non_snark, 'pending_coinbase_hash) t =
-          ('non_snark, 'pending_coinbase_hash) Stable.Latest.t =
-      {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
-    [@@deriving sexp, compare, hash, yojson]
-  end
+  type ('non_snark, 'pending_coinbase_hash) t =
+        ('non_snark, 'pending_coinbase_hash) Stable.Latest.t =
+    {non_snark: 'non_snark; pending_coinbase_hash: 'pending_coinbase_hash}
+  [@@deriving sexp, compare, hash, yojson]
+end
 
+[%%versioned
+module Stable = struct
   module V1 = struct
-    module T = struct
-      (** Staged ledger hash has two parts
+    (** Staged ledger hash has two parts
       1) merkle root of the pending coinbases
       2) ledger hash, aux hash, and the FIFO order of the coinbase stacks(Non snark).
       Only part 1 is required for blockchain snark computation and therefore the remaining fields of the staged ledger are grouped together as "Non_snark"
       *)
-      type t =
-        ( Non_snark.Stable.V1.t
-        , Pending_coinbase.Hash.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-    end
+    type t =
+      ( Non_snark.Stable.V1.t
+      , Pending_coinbase.Hash.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving sexp, eq, compare, hash, yojson]
 
-    include T
-    include Registration.Make_latest_version (T)
-    include Hashable.Make_binable (T)
+    let to_latest = Fn.id
   end
+end]
 
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "staged_ledger_hash"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
-
-(* bin_io, version omitted *)
 type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
-type ('a, 'b) t_ = ('a, 'b) Stable.Poly.t
+type ('a, 'b) t_ = ('a, 'b) Poly.t
 
 type value = t [@@deriving sexp, eq, compare, hash]
 
@@ -283,11 +216,10 @@ let of_aux_ledger_and_coinbase_hash aux_hash ledger_hash pending_coinbase : t =
         (Pending_coinbase.hash_extra pending_coinbase)
   ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 
-let genesis : t Lazy.t =
-  lazy
-    (let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
-     { non_snark= Lazy.force Non_snark.dummy
-     ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase })
+let genesis ~genesis_ledger_hash : t =
+  let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
+  { non_snark= Non_snark.genesis ~genesis_ledger_hash
+  ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 
 let var_of_t ({pending_coinbase_hash; non_snark} : t) : var =
   let non_snark = Non_snark.var_of_t non_snark in
@@ -296,20 +228,17 @@ let var_of_t ({pending_coinbase_hash; non_snark} : t) : var =
   in
   {non_snark; pending_coinbase_hash}
 
-let fold (t : t) =
-  Fold.(
-    Non_snark.fold t.non_snark
-    +> Pending_coinbase.Hash.fold t.pending_coinbase_hash)
+let to_input ({non_snark; pending_coinbase_hash} : t) =
+  Random_oracle.Input.(
+    append
+      (Non_snark.to_input non_snark)
+      (field (pending_coinbase_hash :> Field.t)))
 
-let length_in_triples =
-  Non_snark.length_in_triples + Pending_coinbase.Hash.length_in_triples
-
-let var_to_triples (t : var) =
-  let%map non_snark_triples = Non_snark.var_to_triples t.non_snark
-  and pending_coinbase_hash_triples =
-    Pending_coinbase.Hash.var_to_triples t.pending_coinbase_hash
-  in
-  non_snark_triples @ pending_coinbase_hash_triples
+let var_to_input ({non_snark; pending_coinbase_hash} : var) =
+  Random_oracle.Input.(
+    append
+      (Non_snark.var_to_input non_snark)
+      (field (Pending_coinbase.Hash.var_to_hash_packed pending_coinbase_hash)))
 
 let to_hlist : ('lx, 'ph) t_ -> (unit, 'lx -> 'ph -> unit) H_list.t =
  fun {non_snark; pending_coinbase_hash} ->

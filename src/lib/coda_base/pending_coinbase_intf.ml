@@ -14,8 +14,6 @@ open Core
 open Snark_params
 open Snarky
 open Tick
-open Tuple_lib
-open Fold_lib
 open Signature_lib
 open Currency
 
@@ -31,11 +29,23 @@ module type S = sig
   end
 
   module Coinbase_data : sig
-    type t = Public_key.Compressed.t * Amount.t [@@deriving bin_io, sexp]
+    module Stable : sig
+      module V1 : sig
+        type t =
+          Public_key.Compressed.Stable.V1.t
+          * Amount.Stable.V1.t
+          * State_body_hash.Stable.V1.t
+        [@@deriving sexp, bin_io]
+      end
 
-    type value [@@deriving bin_io, sexp]
+      module Latest = V1
+    end
 
-    type var = Public_key.Compressed.var * Amount.var
+    type t = Stable.Latest.t
+
+    type value [@@deriving sexp]
+
+    type var = Public_key.Compressed.var * Amount.var * State_body_hash.var
 
     val typ : (var, t) Typ.t
 
@@ -44,10 +54,12 @@ module type S = sig
     val of_coinbase : Coinbase.t -> t
 
     val genesis : t
+
+    val var_of_t : t -> var
   end
 
   module type Data_hash_binable_intf = sig
-    type t [@@deriving sexp, compare, eq, yojson, hash]
+    type t = private Field.t [@@deriving sexp, compare, eq, yojson, hash]
 
     module Stable : sig
       module V1 : sig
@@ -64,13 +76,9 @@ module type S = sig
 
     val typ : (var, t) Typ.t
 
-    val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
-
-    val length_in_triples : int
+    val var_to_hash_packed : var -> Field.Var.t
 
     val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
-
-    val fold : t -> bool Triple.t Fold.t
 
     val to_bytes : t -> string
 
@@ -90,13 +98,42 @@ module type S = sig
   end
 
   and Stack : sig
-    include Data_hash_binable_intf
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t [@@deriving sexp, compare, eq, yojson, hash]
+      end
+    end]
+
+    type t = Stable.Latest.t [@@deriving sexp, compare, eq, yojson, hash]
+
+    type var
 
     val data_hash : t -> Hash.t
 
-    val push : t -> Coinbase.t -> t
+    val var_of_t : t -> var
+
+    val typ : (var, t) Typ.t
+
+    val gen : t Quickcheck.Generator.t
+
+    val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+
+    val to_bits : t -> bool list
+
+    val to_bytes : t -> string
+
+    val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
+
+    val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
     val empty : t
+
+    val equal_data : t -> t -> bool
+
+    val equal_state_hash : t -> t -> bool
+
+    val push : t -> Coinbase.t -> t
 
     module Checked : sig
       type t = var
@@ -111,18 +148,24 @@ module type S = sig
 
   val create : unit -> t Or_error.t
 
+  (** Delete the oldest stack*)
   val remove_coinbase_stack : t -> (Stack.t * t) Or_error.t
 
+  (** Root of the merkle tree that has stacks as leaves*)
   val merkle_root : t -> Hash.t
 
   val handler : t -> is_new_stack:bool -> (request -> response) Staged.t
 
+  (** Update the current working stack or if [is_new_stack] add as the new working stack*)
   val update_coinbase_stack : t -> Stack.t -> is_new_stack:bool -> t Or_error.t
 
+  (** Stack that is currently being updated. if [is_new_stack] then a new stack is returned*)
   val latest_stack : t -> is_new_stack:bool -> Stack.t Or_error.t
 
+  (** The stack that corresponds to the next ledger proof that is to be generated*)
   val oldest_stack : t -> Stack.t Or_error.t
 
+  (** Hash of the auxiliary data (everything except the merkle root (Hash.t))*)
   val hash_extra : t -> string
 
   module Checked : sig
@@ -148,7 +191,7 @@ module type S = sig
     val get : var -> Address.var -> (Stack.var, _) Tick.Checked.t
 
     (**
-       [update_stack t ~is_new_stack updtaed_stack] implements the following spec:
+       [update_stack t ~is_new_stack updated_stack] implements the following spec:
        - gets the address[addr] of the latest stack or a new stack
        - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
        - returns a root [t'] of the tree

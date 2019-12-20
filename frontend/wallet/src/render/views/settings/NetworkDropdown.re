@@ -101,7 +101,7 @@ module InnerDropdown = {
              <TextField
                value=customValue
                label="URL"
-               placeholder="my.network.com"
+               placeholder="testnet-name.o1test.net:8303"
                onChange={s => setNetworkValue(_ => Custom(s))}
                button={
                  <TextField.Button

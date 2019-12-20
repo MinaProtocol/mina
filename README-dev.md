@@ -57,7 +57,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-6b64dedbb6e27f0cc57228f1b44aaa87da489e83`
+`docker pull codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e`
 
 * Create local builder image
 
@@ -66,6 +66,10 @@ of the repo.
 * Start developer container
 
 `make containerstart`
+
+* Update OPAM packages
+
+`make USEDOCKER=TRUE update-opam`
 
 * Start a build (go stretch your arms)
 
@@ -122,7 +126,7 @@ You should probably use `USEDOCKER=TRUE` unless you've done the [building withou
 
 These are the most important `make` targets:
 
-* `kademlia`: build the kademlia helper
+* `libp2p_helper`: build the libp2p helper
 * `build`: build everything
 * `docker`: build the container
 * `container`: restart the development container (or start it if it's not yet)
@@ -144,15 +148,7 @@ install them all in the container. To get all the opam dependencies
 you need, you run `opam switch import src/opam.export`.
 
 Some of our dependencies aren't taken from `opam`, and aren't integrated
-with `dune`, so you need to add them manually:
-
-* `opam pin add src/external/digestif`
-* `opam pin add src/external/async_kernel`
-* `opam pin add src/external/ocaml-sodium`
-* `opam pin add src/external/rpc_parallel`
-* `opam pin add src/external/ocaml-extlib`
-* `opam pin add src/external/coda_base58`
-* `opam pin add src/external/graphql_ppx`
+with `dune`, so you need to add them manually, by running `scripts/pin-external-packages.sh`.
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,
@@ -161,21 +157,30 @@ installed via the script `src/external/ocaml-rocksdb/install_rocksdb.sh`.
 
 ## Steps for adding a new dependency
 
-Rarely, you may edit one of our forked opam pacakages, or add a new system
-dependency (like libsodium).
+Rarely, you may edit one of our forked opam-pinned packages, or add a new system
+dependency (like libsodium). Some of the pinned packages are git submodules,
+others inhabit the git Coda repository.
 
-In that case, you must do all of the following:
+If an existing pinned package is updated, either in the Coda repository or in the
+the submodule's repository, it will be automatically re-pinned in CI.
 
-1. Update [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) as required
+If you add a new package in the Coda repository or as a submodule, you must do all of the following:
+
+1. Update [`Dockerfile-toolchain`](/dockerfiles/Dockerfile-toolchain) as required; there are
+    comments that distinguish the treatment of submodules from other packages
 2. Update [`scripts/macos-setup.sh`](scripts/macos-setup.sh) with the required commands for Darwin systems
 3. Bust the circle-ci Darwin cache by incrementing the version number in the cache keys as required inside [`.circleci/config.yml.jinja`](.circleci/config.yml.jinja)
 4. Commit your changes
-5. Re-render the jinja template and recreate the docker toolchains `make update-deps`
+5. Rebuild the container with `make docker-toolchain`.
+5. Re-render the jinja template `make update-deps`
 6. Commit your changes again
 
 Rebuilding the docker toolchain will take a long time. Running circleci for
 macos once you've busted the cache will also take a long time. However, only
 you have to do the waiting and all other developers will get the fast path.
+
+The automatic re-pinning of modified packages does take some CI time, so eventually,
+you'll want to rebuild the Docker toolchain to save that time.
 
 ## Common dune tasks
 

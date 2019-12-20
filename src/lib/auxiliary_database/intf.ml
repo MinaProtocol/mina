@@ -9,41 +9,46 @@ module type Pagination = sig
 
   type t
 
-  val get_total_values : t -> Public_key.Compressed.t -> int option
+  (** [get_total_values t public_key] returns all values that pertains to
+      [public_key] if [public_key] is some value. Otherwise, it will return
+      all values in the pagination data structure if none are provided *)
+  val get_all_values : t -> Public_key.Compressed.t option -> value list
 
-  (** [get_values t pk] queries all the values involving [pk] as a
-      participant. *)
-  val get_values : t -> Public_key.Compressed.t -> value list
+  (** [get_total_values t public_key] returns the number of values that
+      pertains to [public_key] if [public_key] is some value. Otherwise, it
+      will return the number of total values in the pagination data structure
+      if none are provided *)
+  val get_total_values : t -> Public_key.Compressed.t option -> int option
 
-  (** [get_all_values t] queries all the values that are in the database  *)
-  val get_all_values : t -> value list
+  (** [get_value t cursor] returns the value corresponding with the provided
+      cursor, if it can be found *)
+  val get_value : t -> cursor -> value option
 
-  (** [get_earlier_values t pk cursor n] queries [n] values (or all if n is
-      None) involving peer, [pk], added before the value corresponding to
-      [cursor] (exclusively) if [cursor] is non-null. Otherwise, it queries the
-      [n] latest values. It indicates if there are any earlier values added
-      before the earliest value in the query. It also indicates any values that
-      occurred after [cursor]. It outputs an empty list of values if there are
-      no values related to [pk] in the database *)
-  val get_earlier_values :
+  (** [query t pk cursor n] makes a pagination query based on different inputs.
+      If [cursor] is some value and the underlying pagination data structure
+      contains the value, the pagination queries are offset by [cursor]. If
+      [cursor] is none, then the offset will be the earliest value, if
+      [navigation]=`Earlier. Otherwise, the offset will be the latest value.
+
+      [query] will query the latest values that occurs before the offset if
+      [navigation]=`Earlier. Otherwise, [query] will query the earliest values
+      that occur after the offset if [navigation]=`Later.
+
+      The pagination can paginate on all the values if
+      [value_filter_specification]=`All or it will paginate just some user A value
+      if [value_filter_specification]=[`User_only A]
+
+      The number of values that the pagination request contains is based on the
+      value of [num_items]. If [num_items] is None, then it will return all
+      values that occurred after the cursor offset if [navigation]=`Later is
+      specified, otherwise it will return all values that occurred before the
+      cursor offset if [navigation]=`Earlier *)
+  val query :
        t
-    -> Public_key.Compressed.t
-    -> cursor option
-    -> int option
-    -> value list * [`Has_earlier_page of bool] * [`Has_later_page of bool]
-
-  (** [get_later_values t pk cursor n] queries [n] values (or all if n is None)
-      involving peer, [pk], added after the value corresponding to [cursor],
-      (exclusively) if [cursor] is non-null. Otherwise, it queries the [n]
-      earliest values. It would indicate if there are any later values added
-      after the latest value in the query. It also indicates any values that
-      occurred before [cursor]. It would output an empty list of values if
-      there are no values related to [pk] in the database *)
-  val get_later_values :
-       t
-    -> Public_key.Compressed.t
-    -> cursor option
-    -> int option
+    -> navigation:[`Earlier | `Later]
+    -> cursor:cursor option
+    -> value_filter_specification:[`All | `User_only of Public_key.Compressed.t]
+    -> num_items:int option
     -> value list * [`Has_earlier_page of bool] * [`Has_later_page of bool]
 end
 

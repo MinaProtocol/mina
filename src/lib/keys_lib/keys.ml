@@ -1,7 +1,6 @@
 open Core
 open Snark_params
 open Coda_state
-open Fold_lib
 
 module type S = sig
   module Step_prover_state : sig
@@ -9,6 +8,7 @@ module type S = sig
       { wrap_vk: Tock.Verification_key.t
       ; prev_proof: Tock.Proof.t
       ; prev_state: Protocol_state.value
+      ; genesis_state_hash: Coda_base.State_hash.t
       ; expected_next_state: Protocol_state.value option
       ; update: Snark_transition.value }
   end
@@ -89,6 +89,7 @@ let create () : (module S) Async.Deferred.t =
             { wrap_vk: Tock.Verification_key.t
             ; prev_proof: Tock.Proof.t
             ; prev_state: Protocol_state.value
+            ; genesis_state_hash: Coda_base.State_hash.t
             ; expected_next_state: Protocol_state.value option
             ; update: Snark_transition.value }
         end
@@ -109,29 +110,22 @@ let create () : (module S) Async.Deferred.t =
           end
 
           let instance_hash =
-            let open Coda_base in
-            let s =
-              let wrap_vk = Tock.Keypair.vk Wrap.keys in
-              Tick.Pedersen.State.update_fold
-                Hash_prefix.transition_system_snark
-                Fold.(
-                  Verification_key.to_bool_list wrap_vk
-                  |> of_list |> group3 ~default:false)
-            in
-            fun state ->
-              Tick.Pedersen.digest_fold s
-                (State_hash.fold (Protocol_state.hash state))
+            unstage
+              (Blockchain_snark.Blockchain_transition.instance_hash
+                 (Tock.Keypair.vk Wrap.keys))
 
           let main x =
             let there
                 { Prover_state.wrap_vk
                 ; prev_proof
                 ; prev_state
+                ; genesis_state_hash
                 ; update
                 ; expected_next_state } =
               { Step.Prover_state.wrap_vk
               ; prev_proof
               ; prev_state
+              ; genesis_state_hash
               ; update
               ; expected_next_state }
             in
@@ -139,11 +133,13 @@ let create () : (module S) Async.Deferred.t =
                 { Step.Prover_state.wrap_vk
                 ; prev_proof
                 ; prev_state
+                ; genesis_state_hash
                 ; update
                 ; expected_next_state } =
               { Prover_state.wrap_vk
               ; prev_proof
               ; prev_state
+              ; genesis_state_hash
               ; update
               ; expected_next_state }
             in

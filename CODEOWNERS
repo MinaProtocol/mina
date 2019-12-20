@@ -15,13 +15,16 @@
 
 /src/external/ @cmr @bkase @psteckler @imeckler
 
+/src/app/archive @wu-s-john @bkase @schmavery
 /src/app/cli/src/tests @cmr @bkase @wu-s-john @ghost-not-in-the-shell @deepthiskumar
 /src/app/cli/src/coda.ml @nholland94 @bkase @cmr @imeckler
 /src/app/cli/src/init @nholland94 @bkase @cmr @imeckler
 /src/app/kademlia-haskell/ @bkase @enolan @cmr @psteckler
+/src/app/libp2p_helper @cmr @enolan @bkase
 /src/app/reformat/ @bkase
 /src/app/trace-tool/ @cmr @mrmr1993
 /src/app/website/ @bkase @schmavery @figitaki
+/src/app/runtime_genesis_ledger/ @cmr @psteckler @deepthiskumar
 
 /src/lib/best_tip_prover/ @wu-s-john @nholland94
 /src/lib/blake2/ @rbkhmrcr @vanishreerao @imeckler
@@ -44,7 +47,7 @@
 /src/lib/daemon_rpcs/ @wu-s-john @bkase @schmavery
 /src/lib/debug_assert/ @nholland94 @bkase @cmr
 /src/lib/dummy_values/ @bkase @imeckler @mrmr1993
-/src/lib/genesis_ledger/ @nholland94 @bkase @cmr @jkrauska @yourbuddyconner
+/src/lib/test_genesis_ledger/ @nholland94 @bkase @cmr @jkrauska @yourbuddyconner
 /src/lib/gossip_net/ @cmr @enolan @bkase
 /src/lib/group_map/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/hash_prefixes/ @rbkhmrcr @vanishreerao @imeckler
@@ -66,7 +69,7 @@
 /src/lib/merkle_list_verifier/ @wu-s-john @cmr @psteckler @nholland94 @ghost-not-in-the-shell
 /src/lib/merkle_mask/ @nholland94 @psteckler
 /src/lib/module_version/ @psteckler @mrmr1993
-/src/lib/network_pool/ @enolan @nholland94
+/src/lib/network_pool/ @enolan @nholland94 @deepthiskumar
 /src/lib/non_zero_curve_point/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/o1trace/ @cmr @mrmr1993
 /src/lib/otp_lib/ @nholland94 @bkase
@@ -82,7 +85,7 @@
 /src/lib/prover/ @nholland94 @bkase @imeckler @mrmr1993
 /src/lib/quickcheck_lib/ @nholland94 @ghost-not-in-the-shell @enolan
 /src/lib/random_oracle/ @cmr @imeckler @mrmr1993
-/src/lib/receipt_chain_database_lib/ @wu-s-john @bkase
+/src/lib/receipt_chain_database/ @wu-s-john @bkase
 /src/lib/rocksdb/ @psteckler @nholland94 @wu-s-john
 /src/lib/transition_chain_prover/ @ghost-not-in-the-shell @nholland94
 /src/lib/transition_chain_verifier/ @ghost-not-in-the-shell @nholland94
@@ -95,7 +98,6 @@
 /src/lib/snark_bits/ @bkase @mrmr1993 @imeckler
 /src/lib/snark_worker/ @cmr @nholland94 @imeckler
 /src/lib/snark_keys/ @mrmr1993 @imeckler
-/src/lib/snarkette/ @bkase @imeckler @mrmr1993
 /src/lib/snarky/ @mrmr1993 @imeckler
 /src/lib/snarky_blake2/ @rbkhmrcr @vanishreerao @imeckler @mrmr1993
 /src/lib/snarky_curves/ @rbkhmrcr @vanishreerao @imeckler @mrmr1993
@@ -116,7 +118,6 @@
 /src/lib/transaction_snark_work/ @deepthiskumar @cmr @imeckler
 /src/lib/transition_frontier/ @nholland94 @wu-s-john
 /src/lib/transition_frontier_controller/ @nholland94 @ghost-not-in-the-shell
-/src/lib/transition_frontier_persistence/ @nholland94
 /src/lib/transition_handler/ @wu-s-john @nholland94 @ghost-not-in-the-shell
 /src/lib/transition_router/ @wu-s-john @nholland94 @ghost-not-in-the-shell
 /src/lib/trust_system/ @enolan @nholland94

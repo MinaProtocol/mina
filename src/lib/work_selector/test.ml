@@ -33,7 +33,7 @@ struct
               let stuff, seen =
                 Selection_method.work ~snark_pool ~fee sl seen ~logger
               in
-              match stuff with [] -> return () | _ -> go (i + 1) seen
+              match stuff with None -> return () | _ -> go (i + 1) seen
             in
             go 0 (Lib.State.init ~reassignment_wait) ) )
 
@@ -48,10 +48,10 @@ struct
           Selection_method.work ~snark_pool ~fee sl seen ~logger
         in
         match stuff with
-        | [] ->
+        | None ->
             (all_work, seen)
-        | _ ->
-            go seen (stuff @ all_work)
+        | Some work ->
+            go seen (One_or_two.to_list work @ all_work)
       in
       go seen []
     in
@@ -68,7 +68,8 @@ struct
             let work_sent_again, _seen = send_work sl seen in
             assert (List.length work_sent = List.length work_sent_again) ) )
 
-  let gen_snark_pool works fee =
+  let gen_snark_pool (works : ('a, 'b, 'c) Lib.Work_spec.t One_or_two.t list)
+      fee =
     let open Quickcheck.Generator.Let_syntax in
     let cheap_work_fee = Option.value_exn Fee.(sub fee one) in
     let expensive_work_fee = Option.value_exn Fee.(add fee one) in
@@ -83,12 +84,9 @@ struct
           T.Snark_pool.add_snark snark_pool ~work ~fee ;
           add_works rest
     in
-    let pair_to_list : 'a * 'a option -> 'b list =
-      Snark_work_lib.Work.Single.Spec.(
-        function
-        | a, Some b -> [statement a; statement b] | a, None -> [statement a])
+    let%map () =
+      add_works (List.map ~f:(One_or_two.map ~f:Lib.Work_spec.statement) works)
     in
-    let%map () = add_works (List.map ~f:pair_to_list works) in
     snark_pool
 
   let%test_unit "selector shouldn't get work that it cannot outbid" =
@@ -122,9 +120,9 @@ struct
                 Selection_method.work ~snark_pool ~fee:my_fee sl seen ~logger
               in
               match work with
-              | [] ->
+              | None ->
                   return ()
-              | job ->
+              | Some job ->
                   [%test_result: Bool.t]
                     ~message:"Should not get any cheap jobs" ~expect:true
                     (Lib.For_tests.does_not_have_better_fee ~snark_pool

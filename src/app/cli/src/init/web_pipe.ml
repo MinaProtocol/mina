@@ -1,24 +1,9 @@
 open Core
 open Async
-open Coda_base
-open Coda_transition
 open Signature_lib
 open Pipe_lib
 
 let request_service_name = "CODA_WEB_CLIENT_SERVICE"
-
-module type Intf = sig
-  type t
-
-  val get_lite_chain :
-    (t -> Signature_lib.Public_key.Compressed.t list -> Lite_base.Lite_chain.t)
-    option
-
-  val validated_transitions :
-       t
-    -> (External_transition.Validated.t, State_hash.t) With_hash.t
-       Strict_pipe.Reader.t
-end
 
 module Base58_check = Base58_check.Make (struct
   let description = "CODA_WEB_CLIENT_SERVICE"
@@ -39,7 +24,7 @@ module Make_broadcaster (Put_request : Web_request.Intf.S) = struct
     let open Keypair in
     let get_lite_chain_exn = Option.value_exn Coda_run.get_lite_chain in
     (* HACK: we are just passing in the proposer path for this demo *)
-    let keypair = Genesis_ledger.largest_account_keypair_exn () in
+    let keypair = Test_genesis_ledger.largest_account_keypair_exn () in
     let keys = [Public_key.compress keypair.public_key] in
     get_lite_chain_exn coda keys
 
@@ -119,7 +104,7 @@ let copy ~src ~dst =
 let project_directory = "CODA_PROJECT_DIR"
 
 let run_service coda ~conf_dir ~logger =
-  O1trace.trace_task "web pipe" (fun () -> function
+  O1trace.trace "web pipe" (fun () -> function
     | `None ->
         Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
           "Not running a web client pipe" ;
@@ -136,7 +121,7 @@ let run_service coda ~conf_dir ~logger =
             >>| Or_error.return )
         |> don't_wait_for ;
         let get_lite_chain = Option.value_exn Coda_run.get_lite_chain in
-        let keypair = Genesis_ledger.largest_account_keypair_exn () in
+        let keypair = Test_genesis_ledger.largest_account_keypair_exn () in
         Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda)
           ~f:(fun _ ->
             Writer.save (path ^/ "chain")

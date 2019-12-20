@@ -1,31 +1,29 @@
 open Core_kernel
 open Coda_base
-open Fold_lib
-open Tuple_lib
-open Snark_params
 open Snark_params.Tick
 
 module Poly : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
+        { staged_ledger_hash: 'staged_ledger_hash
+        ; snarked_ledger_hash: 'snarked_ledger_hash
+        ; timestamp: 'time }
+      [@@deriving sexp, eq, compare, yojson]
+    end
+  end]
+
   type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
+        ('staged_ledger_hash, 'snarked_ledger_hash, 'time) Stable.Latest.t =
     { staged_ledger_hash: 'staged_ledger_hash
     ; snarked_ledger_hash: 'snarked_ledger_hash
     ; timestamp: 'time }
   [@@deriving sexp, eq, compare, fields, yojson]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t
-        [@@deriving bin_io, sexp, eq, compare, yojson, version]
-      end
-
-      module Latest : module type of V1
-    end
-    with type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) V1.t =
-                ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t
 end
 
 module Value : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t =
@@ -33,11 +31,9 @@ module Value : sig
         , Frozen_ledger_hash.Stable.V1.t
         , Block_time.Stable.V1.t )
         Poly.Stable.V1.t
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+      [@@deriving sexp, eq, compare, hash, yojson]
     end
-
-    module Latest : module type of V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 end
@@ -65,39 +61,16 @@ val create_value :
   -> timestamp:Block_time.t
   -> Value.t
 
-val length_in_triples : int
+val negative_one : genesis_ledger_hash:Ledger_hash.t -> Value.t
 
-val negative_one : Value.t Lazy.t
-
-val genesis : Value.t Lazy.t
+val genesis : genesis_ledger_hash:Ledger_hash.t -> Value.t
 
 val set_timestamp : ('a, 'b, 'c) Poly.t -> 'c -> ('a, 'b, 'c) Poly.t
 
-val fold : Value.t -> bool Triple.t Fold.t
+val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
 
-val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
 type display = (string, string, string) Poly.t [@@deriving yojson]
 
 val display : Value.t -> display
-
-module Message :
-  Signature_lib.Checked.Message_intf
-  with type ('a, 'b) checked := ('a, 'b) Tick.Checked.t
-   and type boolean_var := Tick.Boolean.var
-   and type curve_scalar := Inner_curve.Scalar.t
-   and type curve_scalar_var := Inner_curve.Scalar.var
-   and type t = Value.t
-   and type var = var
-
-open Tick
-
-module Signature :
-  Signature_lib.Checked.S
-  with module Impl := Tick
-   and type curve := Inner_curve.t
-   and type curve_var := Inner_curve.var
-   and type curve_scalar := Inner_curve.Scalar.t
-   and type curve_scalar_var := Inner_curve.Scalar.var
-   and module Message := Message
-   and module Shifted := Snark_params.Tick.Inner_curve.Checked.Shifted

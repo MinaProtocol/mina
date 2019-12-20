@@ -12,28 +12,35 @@ module Input = struct
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
     ; proposer: int option
-    ; work_selection_method: Cli_lib.Arg_type.work_selection_method
+    ; work_selection_method: Cli_lib.Arg_type.Work_selection_method.Stable.V1.t
     ; conf_dir: string
     ; trace_dir: string option
     ; program_dir: string
     ; acceptable_delay: Time.Span.t
     ; peers: Host_and_port.t list
     ; max_concurrent_connections: int option
-    ; is_archive_node: bool }
+    ; is_archive_rocksdb: bool }
   [@@deriving bin_io]
 end
 
 open Input
 
 module Send_payment_input = struct
-  (* TODO : version *)
-  type t =
-    Private_key.Stable.V1.t
-    * Public_key.Compressed.Stable.V1.t
-    * Currency.Amount.Stable.V1.t
-    * Currency.Fee.Stable.V1.t
-    * User_command_memo.Stable.V1.t
-  [@@deriving bin_io]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        Private_key.Stable.V1.t
+        * Public_key.Compressed.Stable.V1.t
+        * Currency.Amount.Stable.V1.t
+        * Currency.Fee.Stable.V1.t
+        * User_command_memo.Stable.V1.t
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t
 end
 
 module T = struct
@@ -88,12 +95,14 @@ module T = struct
     ; root_diff:
         ( 'worker
         , unit
-        , Transition_frontier.Diff.Root_diff.view Pipe.Reader.t )
+        , Coda_lib.Root_diff.t Pipe.Reader.t )
         Rpc_parallel.Function.t
+    ; initialization_finish_signal:
+        ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t
     ; prove_receipt:
         ( 'worker
         , Receipt.Chain_hash.t * Receipt.Chain_hash.t
-        , Payment_proof.t )
+        , Receipt.Chain_hash.t * User_command.t list )
         Rpc_parallel.Function.t
     ; new_block:
         ( 'worker
@@ -111,6 +120,7 @@ module T = struct
         Rpc_parallel.Function.t
     ; replace_snark_worker_key:
         ('worker, Public_key.Compressed.t option, unit) Rpc_parallel.Function.t
+    ; stop_snark_worker: ('worker, unit, unit) Rpc_parallel.Function.t
     ; validated_transitions_keyswaptest:
         ( 'worker
         , unit
@@ -142,15 +152,15 @@ module T = struct
         -> User_command.Stable.V1.t list Deferred.t
     ; coda_replace_snark_worker_key:
         Public_key.Compressed.Stable.V1.t option -> unit Deferred.t
+    ; coda_stop_snark_worker: unit -> unit Deferred.t
     ; coda_validated_transitions_keyswaptest:
            unit
         -> External_transition.Validated.Stable.V1.t Pipe.Reader.t Deferred.t
-    ; coda_root_diff:
-           unit
-        -> Transition_frontier.Diff.Root_diff.view Pipe.Reader.t Deferred.t
+    ; coda_root_diff: unit -> Coda_lib.Root_diff.t Pipe.Reader.t Deferred.t
+    ; coda_initialization_finish_signal: unit -> unit Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
-        -> Payment_proof.t Deferred.t
+        -> (Receipt.Chain_hash.t * User_command.t list) Deferred.t
     ; coda_get_all_transitions:
            Public_key.Compressed.t
         -> ( Auxiliary_database.Filtered_external_transition.t
@@ -202,6 +212,9 @@ module T = struct
     let root_diff_impl ~worker_state ~conn_state:() () =
       worker_state.coda_root_diff ()
 
+    let initialization_finish_signal_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_initialization_finish_signal ()
+
     let get_balance_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_get_balance pk
 
@@ -230,6 +243,9 @@ module T = struct
 
     let best_path_impl ~worker_state ~conn_state:() () =
       worker_state.coda_best_path ()
+
+    let stop_snark_worker_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_stop_snark_worker ()
 
     let replace_snark_worker_key_impl ~worker_state ~conn_state:() key =
       worker_state.coda_replace_snark_worker_key key
@@ -278,11 +294,13 @@ module T = struct
         ~bin_input:
           [%bin_type_class:
             Receipt.Chain_hash.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t]
-        ~bin_output:Payment_proof.bin_t ()
+        ~bin_output:
+          [%bin_type_class:
+            Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list] ()
 
     let new_block =
       C.create_pipe ~f:new_block_impl ~name:"new_block"
-        ~bin_input:[%bin_type_class: Account.Stable.V1.key]
+        ~bin_input:[%bin_type_class: Account.Key.Stable.V1.t]
         ~bin_output:
           [%bin_type_class:
             ( Auxiliary_database.Filtered_external_transition.Stable.V1.t
@@ -291,7 +309,7 @@ module T = struct
 
     let send_user_command =
       C.create_rpc ~name:"send_user_command" ~f:send_payment_impl
-        ~bin_input:Send_payment_input.bin_t
+        ~bin_input:Send_payment_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
 
@@ -308,8 +326,12 @@ module T = struct
 
     let root_diff =
       C.create_pipe ~name:"root_diff" ~f:root_diff_impl ~bin_input:Unit.bin_t
-        ~bin_output:[%bin_type_class: Transition_frontier.Diff.Root_diff.view]
-        ()
+        ~bin_output:[%bin_type_class: Coda_lib.Root_diff.Stable.V1.t] ()
+
+    let initialization_finish_signal =
+      C.create_pipe ~name:"initialization_finish_signal"
+        ~f:initialization_finish_signal_impl ~bin_input:Unit.bin_t
+        ~bin_output:Unit.bin_t ()
 
     let sync_status =
       C.create_pipe ~name:"sync_status" ~f:sync_status_impl
@@ -346,11 +368,16 @@ module T = struct
           [%bin_type_class: Public_key.Compressed.Stable.Latest.t option]
         ~bin_output:Unit.bin_t ()
 
+    let stop_snark_worker =
+      C.create_rpc ~name:"stop_snark_worker" ~f:stop_snark_worker_impl
+        ~bin_input:Unit.bin_t ~bin_output:Unit.bin_t ()
+
     let functions =
       { peers
       ; start
       ; verified_transitions
       ; root_diff
+      ; initialization_finish_signal
       ; get_balance
       ; get_nonce
       ; root_length
@@ -364,6 +391,7 @@ module T = struct
       ; new_user_command
       ; get_all_user_commands
       ; replace_snark_worker_key
+      ; stop_snark_worker
       ; validated_transitions_keyswaptest
       ; get_all_transitions }
 
@@ -376,7 +404,7 @@ module T = struct
         ; trace_dir
         ; peers
         ; max_concurrent_connections
-        ; is_archive_node
+        ; is_archive_rocksdb
         ; _ } =
       let logger =
         Logger.create
@@ -387,6 +415,7 @@ module T = struct
             ; ("port", `Int addrs_and_ports.communication_port) ]
           ()
       in
+      let pids = Child_processes.Termination.create_pid_table () in
       let%bind () =
         Option.value_map trace_dir
           ~f:(fun d ->
@@ -395,7 +424,7 @@ module T = struct
           ~default:Deferred.unit
       in
       let%bind () = File_system.create_dir conf_dir in
-      O1trace.trace_task "worker_main" (fun () ->
+      O1trace.trace "worker_main" (fun () ->
           let%bind receipt_chain_dir_name =
             Unix.mkdtemp @@ conf_dir ^/ "receipt_chain"
           in
@@ -411,12 +440,11 @@ module T = struct
               ~location typ
           in
           let receipt_chain_database =
-            Coda_base.Receipt_chain_database.create
-              ~directory:receipt_chain_dir_name
+            Receipt_chain_database.create receipt_chain_dir_name
           in
           trace_database_initialization "receipt_chain_database" __LOC__
             receipt_chain_dir_name ;
-          let trust_system = Trust_system.create ~db_dir:trust_dir in
+          let trust_system = Trust_system.create trust_dir in
           trace_database_initialization "trust_system" __LOC__ trust_dir ;
           let transaction_database =
             Auxiliary_database.Transaction_database.create ~logger
@@ -431,12 +459,12 @@ module T = struct
           trace_database_initialization "external_transition_database" __LOC__
             external_transition_database_dir ;
           let time_controller =
-            Block_time.Controller.create Block_time.Controller.basic
+            Block_time.Controller.create (Block_time.Controller.basic ~logger)
           in
           let propose_keypair =
             Option.map proposer ~f:(fun i ->
-                List.nth_exn Genesis_ledger.accounts i
-                |> Genesis_ledger.keypair_of_account_record_exn )
+                List.nth_exn Test_genesis_ledger.accounts i
+                |> Test_genesis_ledger.keypair_of_account_record_exn )
           in
           let initial_propose_keypairs =
             Keypair.Set.of_list (propose_keypair |> Option.to_list)
@@ -450,34 +478,53 @@ module T = struct
           in
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_propose_keys
+              ~genesis_ledger:Test_genesis_ledger.t
+          in
+          let gossip_net_params =
+            Gossip_net.Real.Config.
+              { timeout= Time.Span.of_sec 3.
+              ; target_peer_count= 8
+              ; conf_dir
+              ; initial_peers= peers
+              ; chain_id= "bogus chain id for testing"
+              ; addrs_and_ports
+              ; logger
+              ; trust_system
+              ; enable_libp2p= false
+              ; disable_haskell= false
+              ; libp2p_keypair= None
+              ; libp2p_peers= []
+              ; max_concurrent_connections }
           in
           let net_config =
             { Coda_networking.Config.logger
             ; trust_system
             ; time_controller
             ; consensus_local_state
-            ; gossip_net_params=
-                { Coda_networking.Gossip_net.Config.timeout= Time.Span.of_sec 3.
-                ; target_peer_count= 8
-                ; conf_dir
-                ; initial_peers= peers
-                ; chain_id= "bogus chain id for testing"
-                ; addrs_and_ports
-                ; logger
-                ; trust_system
-                ; max_concurrent_connections
-                ; log_gossip_heard=
-                    { snark_pool_diff= false
-                    ; transaction_pool_diff= false
-                    ; new_state= false } } }
+            ; genesis_ledger_hash=
+                Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
+            ; log_gossip_heard=
+                { snark_pool_diff= false
+                ; transaction_pool_diff= false
+                ; new_state= false }
+            ; creatable_gossip_net=
+                Coda_networking.Gossip_net.(
+                  Any.Creatable ((module Real), Real.create gossip_net_params))
+            }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
+          let genesis_state_hash =
+            Coda_state.Genesis_protocol_state.t
+              ~genesis_ledger:Test_genesis_ledger.t
+            |> With_hash.hash
+          in
           let coda_deferred () =
             Coda_lib.create
-              (Coda_lib.Config.make ~logger ~trust_system ~conf_dir ~net_config
+              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
+                 ~net_config ~gossip_net_params
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
@@ -486,12 +533,17 @@ module T = struct
                      { initial_snark_worker_key= snark_worker_key
                      ; shutdown_on_disconnect= true }
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
+                 ~persistent_root_location:(conf_dir ^/ "root")
+                 ~persistent_frontier_location:(conf_dir ^/ "frontier")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ~initial_propose_keypairs ~monitor ~consensus_local_state
                  ~transaction_database ~external_transition_database
-                 ~is_archive_node ~work_reassignment_wait:420000 ())
+                 ~is_archive_rocksdb ~work_reassignment_wait:420000
+                 ~genesis_state_hash ())
+              ~genesis_ledger:Test_genesis_ledger.t
+              ~base_proof:Precomputed_values.base_proof
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger
@@ -515,8 +567,8 @@ module T = struct
             let external_transition_database =
               Coda_lib.external_transition_database coda
             in
-            Auxiliary_database.External_transition_database.get_values
-              external_transition_database pk
+            Auxiliary_database.External_transition_database.get_all_values
+              external_transition_database (Some pk)
             |> Deferred.return
           in
           let coda_get_balance pk =
@@ -544,21 +596,20 @@ module T = struct
               in
               let payload : User_command.Payload.t =
                 User_command.Payload.create ~fee ~nonce ~memo
+                  ~valid_until:Coda_numbers.Global_slot.max_value
                   ~body:(Payment {receiver= receiver_pk; amount})
               in
               User_command.sign (Keypair.of_private_key_exn sender_sk) payload
             in
             let payment = build_txn amount sk pk fee in
-            let%map receipt =
-              Coda_commands.send_user_command coda (payment :> User_command.t)
-            in
-            receipt |> Participating_state.active_exn
+            Coda_commands.send_user_command coda (payment :> User_command.t)
+            |> Participating_state.to_deferred_or_error
+            |> Deferred.map ~f:Or_error.join
           in
           let coda_process_user_command cmd =
-            let%map receipt =
-              Coda_commands.send_user_command coda (cmd :> User_command.t)
-            in
-            receipt |> Participating_state.active_exn
+            Coda_commands.send_user_command coda (cmd :> User_command.t)
+            |> Participating_state.to_deferred_or_error
+            |> Deferred.map ~f:Or_error.join
           in
           let coda_prove_receipt (proving_receipt, resulting_receipt) =
             match%map
@@ -580,8 +631,12 @@ module T = struct
           let coda_replace_snark_worker_key =
             Coda_lib.replace_snark_worker_key coda
           in
+          let coda_stop_snark_worker () =
+            Coda_lib.stop_snark_worker ~should_wait_kill:true coda
+          in
           let coda_new_block key =
-            Deferred.return @@ Coda_commands.Subscriptions.new_block coda key
+            Deferred.return
+            @@ Coda_commands.Subscriptions.new_block coda (Some key)
           in
           (* TODO: #2836 Remove validated_transitions_keyswaptest once the refactoring of broadcast pipe enters the code base *)
           let ( validated_transitions_keyswaptest_reader
@@ -625,6 +680,13 @@ module T = struct
                        "[coda_root_diff] why is this w pipe closed? did \
                         someone close the reader end? dropping this write..." ;
                    Linear_pipe.write_if_open w diff )) ;
+            return r.pipe
+          in
+          let coda_initialization_finish_signal () =
+            let r, w = Linear_pipe.create () in
+            upon
+              (Ivar.read @@ Coda_lib.initialization_finish_signal coda)
+              (fun () -> don't_wait_for @@ Linear_pipe.write_if_open w ()) ;
             return r.pipe
           in
           let coda_dump_tf () =
@@ -676,6 +738,8 @@ module T = struct
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions
           ; coda_root_diff= with_monitor coda_root_diff
+          ; coda_initialization_finish_signal=
+              with_monitor coda_initialization_finish_signal
           ; coda_get_balance= with_monitor coda_get_balance
           ; coda_get_nonce= with_monitor coda_get_nonce
           ; coda_root_length= with_monitor coda_root_length
@@ -693,8 +757,8 @@ module T = struct
               with_monitor coda_validated_transitions_keyswaptest
           ; coda_replace_snark_worker_key=
               with_monitor coda_replace_snark_worker_key
-          ; coda_get_all_transitions= with_monitor coda_get_all_transitions }
-      )
+          ; coda_get_all_transitions= with_monitor coda_get_all_transitions
+          ; coda_stop_snark_worker= with_monitor coda_stop_snark_worker } )
 
     let init_connection_state ~connection:_ ~worker_state:_ = return
   end

@@ -18,8 +18,15 @@ module Styles = {
 
   let container =
     style([
-      height(`percent(100.)),
-      padding(`rem(2.)),
+      position(`absolute),
+      top(`rem(4.)),
+      left(`zero),
+      right(`zero),
+      bottom(`zero),
+      zIndex(99),
+      background(`url("bg-texture.png")),
+      backgroundColor(`hex("f2f2f2")),
+      padding2(~v=`rem(2.), ~h=`rem(12.)),
       borderTop(`px(1), `solid, white),
       borderLeft(`px(1), `solid, white),
       overflow(`scroll),
@@ -34,7 +41,15 @@ module Styles = {
       ]),
     ]);
 
-  let walletItemContainer =
+  let emptyAccountSettings =
+    style([
+      display(`flex),
+      alignItems(`center),
+      justifyContent(`center),
+      padding(rem(1.)),
+    ]);
+
+  let accountSettings =
     style([
       display(`flex),
       flexDirection(`column),
@@ -44,7 +59,7 @@ module Styles = {
       width(`rem(28.)),
     ]);
 
-  let walletItem =
+  let accountItem =
     merge([
       Theme.Text.Body.regular,
       style([
@@ -61,12 +76,15 @@ module Styles = {
       ]),
     ]);
 
-  let walletName = style([width(`rem(12.5)), color(Theme.Colors.marine)]);
+  let accountName = style([width(`rem(12.5)), color(Theme.Colors.marine)]);
 
-  let walletKey =
-    merge([Theme.Text.Body.mono, style([color(Theme.Colors.midnightAlpha(0.7))])]);
+  let accountKey =
+    merge([
+      Theme.Text.Body.mono,
+      style([color(Theme.Colors.midnightAlpha(0.7))]),
+    ]);
 
-  let walletChevron =
+  let accountChevron =
     style([display(`inlineFlex), color(Theme.Colors.tealAlpha(0.5))]);
 };
 
@@ -111,69 +129,87 @@ module Version = {
   };
 };
 
-module WalletSettingsItem = {
+type ownedAccounts =
+  Account.t = {
+    locked: option(bool),
+    publicKey: PublicKey.t,
+    balance: {. "total": int64},
+  };
+
+module AccountSettingsItem = {
   [@react.component]
-  let make = (~publicKey) => {
-    let keyStr = PublicKey.toString(publicKey);
+  let make = (~account) => {
+    let keyStr = PublicKey.toString(account##publicKey);
     let route = "/settings/" ++ Js.Global.encodeURIComponent(keyStr);
+    let isLocked = Option.withDefault(~default=true, account##locked);
+    let (showModal, setModalOpen) = React.useState(() => false);
     <div
-      className=Styles.walletItem
-      onClick={_ => ReasonReact.Router.push(route)}>
-      <div className=Styles.walletName> <WalletName pubkey=publicKey /> </div>
-      <span className=Styles.walletKey>
-        <Pill> {React.string(PublicKey.prettyPrint(publicKey))} </Pill>
+      className=Styles.accountItem
+      onClick={_ =>
+        isLocked ? setModalOpen(_ => true) : ReasonReact.Router.push(route)
+      }>
+      <div className=Styles.accountName>
+        <AccountName pubkey=account##publicKey />
+      </div>
+      <span className=Styles.accountKey>
+        <Pill>
+          {React.string(PublicKey.prettyPrint(account##publicKey))}
+        </Pill>
       </span>
       <Spacer width=5.0 />
-      <span className=Styles.walletChevron>
+      <span className=Styles.accountChevron>
         <Icon kind=Icon.EmptyChevronRight />
       </span>
+      {showModal
+         ? <UnlockModal
+             account={
+               account##publicKey;
+             }
+             onClose={() => setModalOpen(_ => false)}
+             onSuccess={() => {
+               setModalOpen(_ => false);
+               ReasonReact.Router.push(route);
+             }}
+           />
+         : React.null}
     </div>;
   };
 };
 
-module WalletsQueryString = [%graphql
+module AccountsQueryString = [%graphql
   {|
     query getWallets {
       ownedWallets {
+        locked
         publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
       }
     }
   |}
 ];
 
-module WalletsQuery = ReasonApollo.CreateQuery(WalletsQueryString);
+module AccountsQuery = ReasonApollo.CreateQuery(AccountsQueryString);
 
 [@react.component]
 let make = () => {
   <div className=Styles.container>
     <div className=Styles.headerContainer>
-      <div className=Theme.Text.Header.h3>
-        {React.string("Node Settings")}
-      </div>
-      <Version />
+      <div className=Styles.label> {React.string("Account Settings")} </div>
+     <Version />
     </div>
-    <Spacer height=1. />
-    <NetworkDropdown />
-    <Spacer height=1. />
-    <div className=Styles.label> {React.string("Wallet Settings")} </div>
     <Spacer height=0.5 />
-    <div className=Styles.walletItemContainer>
-      <WalletsQuery>
+    <div className=Styles.accountSettings>
+      <AccountsQuery>
         {({result}) =>
            switch (result) {
-           | Loading
+           | Loading =>
+             <div className=Styles.emptyAccountSettings> <Loader /> </div>
            | Error(_) => React.null
            | Data(data) =>
              data##ownedWallets
-             |> Array.map(~f=w =>
-                  <WalletSettingsItem
-                    key={PublicKey.toString(w##publicKey)}
-                    publicKey=w##publicKey
-                  />
-                )
+             |> Array.map(~f=account => <AccountSettingsItem account />)
              |> React.array
            }}
-      </WalletsQuery>
+      </AccountsQuery>
     </div>
   </div>;
 };

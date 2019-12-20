@@ -80,20 +80,24 @@ module type S = sig
   val of_int_exn : int -> t
 end
 
-module Make (Input : sig
-  val depth : int
-end) : S = struct
-  let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
-
-  let path_byte_count = byte_count_of_bits Input.depth
-
+module T = struct
   let depth = bitstring_length
 
-  let height path = Input.depth - depth path
-
-  let get = get
+  let add_padding path =
+    let length = depth path in
+    if length mod 8 = 0 then path
+    else concat [path; zeroes_bitstring (8 - (length mod 8))]
 
   let slice = subbitstring
+
+  let to_string path : string =
+    let len = depth path in
+    let bytes = Bytes.create len in
+    for i = 0 to len - 1 do
+      let ch = if is_clear path i then '0' else '1' in
+      Bytes.set bytes i ch
+    done ;
+    Bytes.to_string bytes
 
   let of_directions dirs =
     let path = create_bitstring (List.length dirs) in
@@ -106,32 +110,17 @@ end) : S = struct
     in
     loop 0 dirs ; path
 
-  let to_string path : string =
-    let len = depth path in
-    let bytes = Bytes.create len in
-    for i = 0 to len - 1 do
-      let ch = if is_clear path i then '0' else '1' in
-      Bytes.set bytes i ch
-    done ;
-    Bytes.to_string bytes
-
-  let add_padding path =
-    let length = depth path in
-    if length mod 8 = 0 then path
-    else concat [path; zeroes_bitstring (8 - (length mod 8))]
-
   let to_yojson t = `String (to_string t)
+
+  let to_tuple path =
+    let length = depth path in
+    let padded_bitstring = add_padding path in
+    (length, string_of_bitstring padded_bitstring)
+
+  let of_tuple (length, string) = slice (bitstring_of_string string) 0 length
 
   module Stable = struct
     module V1 = struct
-      let to_tuple path =
-        let length = depth path in
-        let padded_bitstring = add_padding path in
-        (length, string_of_bitstring padded_bitstring)
-
-      let of_tuple (length, string) =
-        slice (bitstring_of_string string) 0 length
-
       module T = struct
         type t = Bitstring.t [@@deriving version]
 
@@ -183,6 +172,22 @@ end) : S = struct
     module Registrar = Registration.Make (Module_decl)
     module Registered_V1 = Registrar.Register (V1)
   end
+end
+
+module Stable = T.Stable
+
+module Make (Input : sig
+  val depth : int
+end) : S = struct
+  include T
+
+  let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
+
+  let path_byte_count = byte_count_of_bits Input.depth
+
+  let height path = Input.depth - depth path
+
+  let get = get
 
   type t = Stable.Latest.t
 
@@ -349,7 +354,7 @@ end) : S = struct
   end
 
   let%test "Bitstring bin_io serialization does not change" =
-    (* Bitstring.t is whitelisted as a versioned type. This test assures that serializations of that type haven't changed *)
+    (* Bitstring.t is trustlisted as a versioned type. This test assures that serializations of that type haven't changed *)
     let buff = Bin_prot.Common.create_buf 256 in
     let text =
       "Contrary to popular belief, Lorem Ipsum is not simply random text. It \

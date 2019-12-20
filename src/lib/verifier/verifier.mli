@@ -1,12 +1,10 @@
 [%%import "../../config.mlh"]
 
-module Prod :
-  Coda_intf.Verifier_intf with type ledger_proof = Ledger_proof.Prod.t
+module Dummy : module type of Dummy
 
-module Dummy :
-  Coda_intf.Verifier_intf
-  with type t = unit
-   and type ledger_proof = Ledger_proof.Debug.t
+module Prod : module type of Prod
+
+module Any : Verifier_intf.Any.S
 
 [%%if proof_level = "full"]
 

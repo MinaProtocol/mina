@@ -26,6 +26,19 @@ let titleColor = c => Css.unsafe("--title-color", Style.Colors.string(c));
 let readMoreColor = c =>
   Css.unsafe("--read-more-color", Style.Colors.string(c));
 
+// Truncate HTML
+let rec truncate = (index, counter, html) =>
+  if (counter == 0) {
+    Js.String.substring(~from=0, html, ~to_=index + 4);
+  } else {
+    let indexOf = Js.String.indexOfFrom("</p>", index, html);
+    if (indexOf !== (-1)) {
+      truncate(indexOf + 1, counter - 1, html);
+    } else {
+      html;
+    };
+  };
+
 // Need to dangerouslySetInnerHTML to handle html entities in the markdown
 let createPostHeader = metadata =>
   <div className={Css.style([Css.width(`percent(100.))])}>
@@ -132,7 +145,7 @@ let createPostFadedContents = html =>
                ])
              )
         }
-        dangerouslySetInnerHTML={"__html": html}
+        dangerouslySetInnerHTML={"__html": truncate(0, 5, html)} //set to truncated html to save rendering time
       />
     </div>
   </div>;

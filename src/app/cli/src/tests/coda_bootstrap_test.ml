@@ -7,7 +7,7 @@ let name = "coda-bootstrap-test"
 let main () =
   let logger = Logger.create () in
   let largest_account_keypair =
-    Genesis_ledger.largest_account_keypair_exn ()
+    Test_genesis_ledger.largest_account_keypair_exn ()
   in
   let n = 2 in
   let proposers i = Some i in
@@ -17,7 +17,8 @@ let main () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
+      Cli_lib.Arg_type.Work_selection_method.Sequence
+      ~max_concurrent_connections:None
   in
   let previous_status = Sync_status.Hash_set.create () in
   let bootstrapping_node = 1 in
@@ -40,7 +41,7 @@ let main () =
   (* TODO: one of the previous_statuses should be `Bootstrap. The broadcast pip 
     coda.transition_frontier never gets set to None *)
   assert (Hash_set.mem previous_status `Synced) ;
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async ~summary:"Test that triggers bootstrap once"

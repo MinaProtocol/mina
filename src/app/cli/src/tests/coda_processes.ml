@@ -1,10 +1,12 @@
 [%%import
-"../../../../config.mlh"]
+"/src/config.mlh"]
 
 open Core
 open Async
 
 let init () = Parallel.init_master ()
+
+type ports = {communication_port: int; discovery_port: int; libp2p_port: int}
 
 let net_configs n =
   let ips =
@@ -13,15 +15,17 @@ let net_configs n =
   in
   let addrs_and_ports_list =
     List.mapi ips ~f:(fun i ip ->
-        let communication_port = 23000 + (i * 2) in
-        let discovery_port = 23000 + 1 + (i * 2) in
+        let base = 23000 + (i * 3) in
+        let communication_port = base in
+        let discovery_port = base + 1 in
+        let libp2p_port = base + 2 in
         let client_port = 20000 + i in
-        Kademlia.Node_addrs_and_ports.
-          { external_ip= ip
-          ; bind_ip= ip
-          ; discovery_port
-          ; communication_port
-          ; client_port } )
+        { Kademlia.Node_addrs_and_ports.external_ip= ip
+        ; bind_ip= ip
+        ; discovery_port
+        ; communication_port
+        ; libp2p_port
+        ; client_port } )
   in
   let all_peers =
     List.map addrs_and_ports_list
@@ -41,7 +45,7 @@ let offset =
         |> Coda_base.Block_time.to_time ))
 
 let local_configs ?proposal_interval ?(proposers = Fn.const None)
-    ?(is_archive_node = Fn.const false) n ~acceptable_delay ~program_dir
+    ?(is_archive_rocksdb = Fn.const false) n ~acceptable_delay ~program_dir
     ~snark_worker_public_keys ~work_selection_method ~trace_dir
     ~max_concurrent_connections =
   let addrs_and_ports_list, peers = net_configs n in
@@ -56,12 +60,12 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None)
         Coda_process.local_config ?proposal_interval ~addrs_and_ports ~peers
           ~snark_worker_key:public_key ~program_dir ~acceptable_delay
           ~proposer:(proposers i) ~work_selection_method ~trace_dir
-          ~is_archive_node:(is_archive_node i) ~offset:(Lazy.force offset)
-          ~max_concurrent_connections () )
+          ~is_archive_rocksdb:(is_archive_rocksdb i)
+          ~offset:(Lazy.force offset) ~max_concurrent_connections () )
   in
   configs
 
-let stabalize_and_start_or_timeout ?(timeout_ms = 2000.) nodes =
+let stabalize_and_start_or_timeout ?(timeout_ms = 10000.) nodes =
   let ready () =
     let check_ready node =
       let%map peers = Coda_process.peers_exn node in

@@ -1,7 +1,6 @@
 open Core
 open Snark_params
 open Tick
-open Tuple_lib
 
 exception Too_long_user_memo_input
 
@@ -23,12 +22,12 @@ module Checked : sig
 
   type t = private Boolean.var array
 
-  val to_triples : t -> Boolean.var Triple.t list
-
   val constant : unchecked -> t
 end
 
 val dummy : t
+
+val empty : t
 
 val to_string : t -> string
 
@@ -76,13 +75,9 @@ val create_from_string_exn : string -> t
  *)
 val create_from_string : string -> t Or_error.t
 
-(** convert a memo to a fold of boolean triples
+(** convert a memo to a list of bools
  *)
-val fold : t -> bool Tuple_lib.Triple.t Fold_lib.Fold.t
-
-(** number of triples to represent a memo
- *)
-val length_in_triples : int
+val to_bits : t -> bool list
 
 (** typ representation *)
 val typ : (Checked.t, t) Curve_choice.Tick0.Typ.t

@@ -13,37 +13,64 @@ module Ledger_inner = struct
 
   module Location_at_depth = Location0
 
-  module Kvdb : Intf.Key_value_database = Rocksdb.Database
+  module Kvdb : Intf.Key_value_database with type config := string =
+    Rocksdb.Database
 
   module Storage_locations : Intf.Storage_locations = struct
     let key_value_db_dir = "coda_key_value_db"
   end
 
   module Hash = struct
-    (* TODO : version *)
-    module T = struct
-      type t = Ledger_hash.Stable.V1.t
-      [@@deriving bin_io, sexp, compare, hash, eq, yojson]
-    end
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Ledger_hash.Stable.V1.t
+        [@@deriving sexp, compare, hash, eq, yojson]
 
-    include T
-    include Hashable.Make_binable (T)
+        let to_latest = Fn.id
 
-    let merge = Ledger_hash.merge
+        (* TODO: move T outside V1 when %%versioned ppx allows it *)
+        module T = struct
+          type typ = t [@@deriving sexp, compare, hash, bin_io]
 
-    let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+          type t = typ [@@deriving sexp, compare, hash, bin_io]
+        end
 
-    let empty_account = hash_account Account.empty
+        include Hashable.Make_binable (T) [@@deriving
+                                            sexp, compare, hash, eq, yojson]
+
+        let to_string = Ledger_hash.to_string
+
+        let merge = Ledger_hash.merge
+
+        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+
+        let empty_account = hash_account Account.empty
+      end
+    end]
+
+    type t = Stable.Latest.t
   end
 
   module Account = struct
-    type t = Account.Stable.V1.t [@@deriving bin_io, eq, compare, sexp]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Account.Stable.V1.t [@@deriving eq, compare, sexp]
 
-    let empty = Account.empty
+        let to_latest = Fn.id
 
-    let public_key = Account.public_key
+        let public_key = Account.public_key
 
-    let balance Account.Poly.{balance; _} = balance
+        let balance Account.Poly.{balance; _} = balance
+
+        let empty = Account.empty
+      end
+    end]
+
+    type t = Stable.Latest.t
+
+    let empty = Stable.Latest.empty
 
     let initialize = Account.initialize
   end
@@ -51,8 +78,8 @@ module Ledger_inner = struct
   module Inputs = struct
     module Key = Public_key.Compressed
     module Balance = Currency.Balance
-    module Account = Account
-    module Hash = Hash
+    module Account = Account.Stable.Latest
+    module Hash = Hash.Stable.Latest
     module Depth = Depth
     module Kvdb = Kvdb
     module Location = Location_at_depth
@@ -159,7 +186,8 @@ module Ledger_inner = struct
       result
     with exn ->
       let (_ : Mask.t) =
-        Maskable.unregister_mask_exn base_ledger masked_ledger
+        Maskable.unregister_mask_exn ~grandchildren:`Recursive base_ledger
+          masked_ledger
       in
       raise exn
 
@@ -253,7 +281,7 @@ let gen_initial_ledger_state :
   let%bind keypairs = Quickcheck_lib.replicate_gen Keypair.gen n_accounts in
   let%bind balances =
     Quickcheck_lib.replicate_gen
-      Currency.Amount.(gen_incl (of_int 200_000) (of_int 100_000_000))
+      Currency.Amount.(gen_incl (of_int 500_000_000) (of_int 1_000_000_000))
       n_accounts
   in
   let%bind nonces =

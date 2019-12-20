@@ -144,7 +144,7 @@ let extractTransactions: Js.t('a) => extractedResponse =
 
 [@react.component]
 let make = () => {
-  let activeWallet = Hooks.useActiveWallet();
+  let activeAccount = Hooks.useActiveAccount();
 
   let updateQuery: ReasonApolloQuery.updateQueryT = [%bs.raw
     {| function (prevResult, { fetchMoreResult }) {
@@ -176,7 +176,7 @@ let make = () => {
         {ReasonReact.string("Date / Amount")}
       </span>
     </div>
-    {switch (activeWallet) {
+    {switch (activeAccount) {
      | Some(pubkey) =>
        let transactionQuery =
          TransactionsQueryString.make(
@@ -197,42 +197,48 @@ let make = () => {
                    ~default="",
                    data##blocks##pageInfo##lastCursor,
                  );
-               switch (Array.length(transactions), Array.length(pending)) {
-               | (0, 0) =>
-                 <div className=Styles.alertContainer>
-                   <Alert
-                     kind=`Info
-                     message="You don't have any coda in this wallet."
-                   />
-                 </div>
-               | (_, _) =>
-                 <TransactionsList
-                   pending
-                   transactions
-                   hasNextPage=data##blocks##pageInfo##hasNextPage
-                   onLoadMore={() => {
-                     let moreTransactions =
-                       TransactionsQueryString.make(
-                         ~publicKey=Apollo.Encoders.publicKey(pubkey),
-                         ~after=lastCursor,
-                         (),
-                       );
+               <BlockListener
+                 refetch={() =>
+                   response.refetch(Some(transactionQuery##variables))
+                 }
+                 subscribeToMore={response.subscribeToMore}>
+                 {switch (Array.length(transactions), Array.length(pending)) {
+                  | (0, 0) =>
+                    <div className=Styles.alertContainer>
+                      <Alert
+                        kind=`Info
+                        message="You don't have any transactions related to this account."
+                      />
+                    </div>
+                  | (_, _) =>
+                    <TransactionsList
+                      pending
+                      transactions
+                      hasNextPage=data##blocks##pageInfo##hasNextPage
+                      onLoadMore={() => {
+                        let moreTransactions =
+                          TransactionsQueryString.make(
+                            ~publicKey=Apollo.Encoders.publicKey(pubkey),
+                            ~after=lastCursor,
+                            (),
+                          );
 
-                     response.fetchMore(
-                       ~variables=moreTransactions##variables,
-                       ~updateQuery,
-                       (),
-                     );
-                   }}
-                 />
-               };
+                        response.fetchMore(
+                          ~variables=moreTransactions##variables,
+                          ~updateQuery,
+                          (),
+                        );
+                      }}
+                    />
+                  }}
+               </BlockListener>;
              }
          )
        </TransactionsQuery>;
      | None =>
        <div className=Styles.alertContainer>
          <Alert
-           message="Select a wallet from the side bar to view related transactions."
+           message="Select an account from the side bar to view related transactions."
            kind=`Info
          />
        </div>

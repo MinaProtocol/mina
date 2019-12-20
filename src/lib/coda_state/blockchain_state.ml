@@ -1,26 +1,18 @@
 open Core_kernel
 open Coda_base
-open Bitstring_lib
-open Fold_lib
-open Snark_params
 open Snark_params.Tick
 
 module Poly = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
-          { staged_ledger_hash: 'staged_ledger_hash
-          ; snarked_ledger_hash: 'snarked_ledger_hash
-          ; timestamp: 'time }
-        [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson, version]
-      end
-
-      include T
+      type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
+        { staged_ledger_hash: 'staged_ledger_hash
+        ; snarked_ledger_hash: 'snarked_ledger_hash
+        ; timestamp: 'time }
+      [@@deriving bin_io, sexp, fields, eq, compare, hash, yojson, version]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('staged_ledger_hash, 'snarked_ledger_hash, 'time) t =
         ('staged_ledger_hash, 'snarked_ledger_hash, 'time) Stable.Latest.t =
@@ -30,38 +22,24 @@ module Poly = struct
   [@@deriving sexp, fields, eq, compare, hash, yojson]
 end
 
-let staged_ledger_hash, snarked_ledger_hash, timestamp =
-  Poly.(staged_ledger_hash, snarked_ledger_hash, timestamp)
+[%%define_locally
+Poly.(staged_ledger_hash, snarked_ledger_hash, timestamp)]
 
 module Value = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          ( Staged_ledger_hash.Stable.V1.t
-          , Frozen_ledger_hash.Stable.V1.t
-          , Block_time.Stable.V1.t )
-          Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-      end
+      type t =
+        ( Staged_ledger_hash.Stable.V1.t
+        , Frozen_ledger_hash.Stable.V1.t
+        , Block_time.Stable.V1.t )
+        Poly.Stable.V1.t
+      [@@deriving sexp, eq, compare, hash, yojson]
 
-      include T
-      include Module_version.Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "coda_base_blockchain_state"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Module_version.Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 end
 
@@ -91,36 +69,30 @@ let typ : (var, Value.t) Typ.t =
   Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let var_to_triples ({staged_ledger_hash; snarked_ledger_hash; timestamp} : var)
-    =
-  let%map ledger_hash_triples =
-    Frozen_ledger_hash.var_to_triples snarked_ledger_hash
-  and staged_ledger_hash_triples =
-    Staged_ledger_hash.var_to_triples staged_ledger_hash
-  in
-  staged_ledger_hash_triples @ ledger_hash_triples
-  @ Block_time.Unpacked.var_to_triples timestamp
+let var_to_input ({staged_ledger_hash; snarked_ledger_hash; timestamp} : var) =
+  let open Random_oracle.Input in
+  List.reduce_exn ~f:append
+    [ Staged_ledger_hash.var_to_input staged_ledger_hash
+    ; field (Frozen_ledger_hash.var_to_hash_packed snarked_ledger_hash)
+    ; bitstring
+        (Bitstring_lib.Bitstring.Lsb_first.to_list
+           (Block_time.Unpacked.var_to_bits timestamp)) ]
 
-let fold ({staged_ledger_hash; snarked_ledger_hash; timestamp} : Value.t) =
-  Fold.(
-    Staged_ledger_hash.fold staged_ledger_hash
-    +> Frozen_ledger_hash.fold snarked_ledger_hash
-    +> Block_time.fold timestamp)
-
-let length_in_triples =
-  Staged_ledger_hash.length_in_triples + Frozen_ledger_hash.length_in_triples
-  + Block_time.length_in_triples
+let to_input ({staged_ledger_hash; snarked_ledger_hash; timestamp} : Value.t) =
+  let open Random_oracle.Input in
+  List.reduce_exn ~f:append
+    [ Staged_ledger_hash.to_input staged_ledger_hash
+    ; field (snarked_ledger_hash :> Field.t)
+    ; bitstring (Block_time.Bits.to_bits timestamp) ]
 
 let set_timestamp t timestamp = {t with Poly.timestamp}
 
-let negative_one =
-  lazy
-    Poly.
-      { staged_ledger_hash= Lazy.force Staged_ledger_hash.genesis
-      ; snarked_ledger_hash=
-          Frozen_ledger_hash.of_ledger_hash
-          @@ Ledger.merkle_root (Lazy.force Genesis_ledger.t)
-      ; timestamp= Block_time.of_time Time.epoch }
+let negative_one ~genesis_ledger_hash =
+  Poly.
+    { staged_ledger_hash= Staged_ledger_hash.genesis ~genesis_ledger_hash
+    ; snarked_ledger_hash=
+        Frozen_ledger_hash.of_ledger_hash genesis_ledger_hash
+    ; timestamp= Block_time.of_time Time.epoch }
 
 (* negative_one and genesis blockchain states are equivalent *)
 let genesis = negative_one
@@ -129,42 +101,11 @@ type display = (string, string, string) Poly.t [@@deriving yojson]
 
 let display Poly.{staged_ledger_hash; snarked_ledger_hash; timestamp} =
   { Poly.staged_ledger_hash=
-      Visualization.display_short_sexp (module Ledger_hash)
+      Visualization.display_prefix_of_string @@ Ledger_hash.to_string
       @@ Staged_ledger_hash.ledger_hash staged_ledger_hash
   ; snarked_ledger_hash=
-      Visualization.display_short_sexp
-        (module Frozen_ledger_hash)
-        snarked_ledger_hash
+      Visualization.display_prefix_of_string
+      @@ Frozen_ledger_hash.to_string snarked_ledger_hash
   ; timestamp=
       Time.to_string_trimmed ~zone:Time.Zone.utc (Block_time.to_time timestamp)
   }
-
-module Message = struct
-  open Tick
-
-  type t = Value.t
-
-  type nonrec var = var
-
-  let hash t ~nonce =
-    let d =
-      Pedersen.digest_fold Hash_prefix.signature
-        Fold.(fold t +> Fold.(of_list nonce))
-    in
-    List.take (Field.unpack d) Inner_curve.Scalar.length_in_bits
-    |> Inner_curve.Scalar.of_bits
-
-  let%snarkydef hash_checked t ~nonce =
-    let%bind trips = var_to_triples t in
-    let%bind hash =
-      Pedersen.Checked.digest_triples ~init:Hash_prefix.signature
-        (trips @ nonce)
-    in
-    let%map bs = Pedersen.Checked.Digest.choose_preimage hash in
-    Bitstring.Lsb_first.of_list
-      (List.take (bs :> Boolean.var list) Inner_curve.Scalar.length_in_bits)
-end
-
-module Signature =
-  Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve)
-    (Message)

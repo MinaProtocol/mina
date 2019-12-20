@@ -28,7 +28,7 @@ The Coda testnet's goal is to improve Coda's stability, improve the software thr
 
 #### Where can I try out the testnet?
 
-Head over to the [testnet landing page](/docs/coda-testnet/) to learn more and get started.
+Head over to the [testnet landing page](/testnet.html) to learn more and get started.
 
 #### My  daemon crashed -- where should I share the error log?
 
@@ -39,6 +39,10 @@ First, check out [Github issues](https://github.com/codaprotocol/coda/issues) to
 - The Coda community's live discussion channel is the Discord server: [https://discord.gg/ShKhA7J](https://discord.gg/ShKhA7J)
 - You can also create Github issues: [https://github.com/codaprotocol/coda/issues](https://github.com/codaprotocol/coda/issues)
 - If you need to get in touch privately, you can email: contact@codaprotocol.org
+
+#### Is there a block explorer?
+
+Yes, check out the block explorer here: [https://codaexplorer.garethtdavies.com/](https://codaexplorer.garethtdavies.com/).
 
 ## General Questions
 

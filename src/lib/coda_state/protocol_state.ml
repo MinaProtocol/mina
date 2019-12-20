@@ -1,165 +1,141 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 open Core_kernel
 open Coda_base
-open Module_version
 open Snark_params.Tick
-open Fold_lib
 
 module Poly = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type ('state_hash, 'body) t =
-          {previous_state_hash: 'state_hash; body: 'body}
-        [@@deriving eq, ord, bin_io, hash, sexp, to_yojson, version]
-      end
-
-      include T
+      type ('state_hash, 'body) t =
+        {previous_state_hash: 'state_hash; body: 'body}
+      [@@deriving eq, ord, hash, sexp, to_yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t
   [@@deriving sexp]
 end
 
-let fold_abstract ~fold_body {Poly.Stable.Latest.previous_state_hash; body} =
-  let open Fold in
-  State_hash.fold previous_state_hash +> fold_body body
-
-let hash_abstract ~hash_body t =
-  Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state
-    (fold_abstract ~fold_body:(Fn.compose State_body_hash.fold hash_body) t)
+let hash_abstract ~hash_body
+    ({previous_state_hash; body} : (State_hash.t, _) Poly.t) =
+  let body : State_body_hash.t = hash_body body in
+  Random_oracle.hash ~init:Hash_prefix.protocol_state
+    [|(previous_state_hash :> Field.t); (body :> Field.t)|]
   |> State_hash.of_hash
 
 module Body = struct
   module Poly = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type ('blockchain_state, 'consensus_state) t =
-            { blockchain_state: 'blockchain_state
-            ; consensus_state: 'consensus_state }
-          [@@deriving bin_io, sexp, eq, compare, to_yojson, hash, version]
-        end
-
-        include T
+        type ('state_hash, 'blockchain_state, 'consensus_state) t =
+          { genesis_state_hash: 'state_hash
+          ; blockchain_state: 'blockchain_state
+          ; consensus_state: 'consensus_state }
+        [@@deriving bin_io, sexp, eq, compare, to_yojson, hash, version]
       end
+    end]
 
-      module Latest = V1
-    end
-
-    type ('blockchain_state, 'consensus_state) t =
-          ('blockchain_state, 'consensus_state) Stable.Latest.t =
-      {blockchain_state: 'blockchain_state; consensus_state: 'consensus_state}
+    type ('state_hash, 'blockchain_state, 'consensus_state) t =
+          ('state_hash, 'blockchain_state, 'consensus_state) Stable.Latest.t =
+      { genesis_state_hash: 'state_hash
+      ; blockchain_state: 'blockchain_state
+      ; consensus_state: 'consensus_state }
     [@@deriving sexp]
   end
 
   module Value = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t =
-            ( Blockchain_state.Value.Stable.V1.t
-            , Consensus.Data.Consensus_state.Value.Stable.V1.t )
-            Poly.Stable.V1.t
-          [@@deriving eq, ord, bin_io, hash, sexp, to_yojson, version]
-        end
+        type t =
+          ( State_hash.Stable.V1.t
+          , Blockchain_state.Value.Stable.V1.t
+          , Consensus.Data.Consensus_state.Value.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving eq, ord, bin_io, hash, sexp, to_yojson, version]
 
-        include T
-        include Registration.Make_latest_version (T)
+        let to_latest = Fn.id
       end
-
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "protocol_state_body"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
+    end]
 
     type t = Stable.Latest.t [@@deriving sexp, to_yojson]
   end
 
-  type ('blockchain_state, 'consensus_state) t =
-    ('blockchain_state, 'consensus_state) Poly.t
+  type ('state_hash, 'blockchain_state, 'consensus_state) t =
+    ('state_hash, 'blockchain_state, 'consensus_state) Poly.t
 
   type value = Value.t [@@deriving sexp, to_yojson]
 
-  type var = (Blockchain_state.var, Consensus.Data.Consensus_state.var) Poly.t
+  type var =
+    ( State_hash.var
+    , Blockchain_state.var
+    , Consensus.Data.Consensus_state.var )
+    Poly.t
 
-  let to_hlist {Poly.blockchain_state; consensus_state} =
-    H_list.[blockchain_state; consensus_state]
+  let to_hlist {Poly.genesis_state_hash; blockchain_state; consensus_state} =
+    H_list.[genesis_state_hash; blockchain_state; consensus_state]
 
-  let of_hlist : (unit, 'bs -> 'cs -> unit) H_list.t -> ('bs, 'cs) Poly.t =
-   fun H_list.[blockchain_state; consensus_state] ->
-    {blockchain_state; consensus_state}
+  let of_hlist :
+      (unit, 'sh -> 'bs -> 'cs -> unit) H_list.t -> ('sh, 'bs, 'cs) Poly.t =
+   fun H_list.[genesis_state_hash; blockchain_state; consensus_state] ->
+    {genesis_state_hash; blockchain_state; consensus_state}
 
   let data_spec =
-    Data_spec.[Blockchain_state.typ; Consensus.Data.Consensus_state.typ]
+    Data_spec.
+      [State_hash.typ; Blockchain_state.typ; Consensus.Data.Consensus_state.typ]
 
   let typ =
     Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let fold {Poly.blockchain_state; consensus_state} =
-    let open Fold in
-    Blockchain_state.fold blockchain_state
-    +> Consensus.Data.Consensus_state.fold consensus_state
+  let to_input
+      {Poly.genesis_state_hash: State_hash.t; blockchain_state; consensus_state}
+      =
+    Random_oracle.Input.(
+      append
+        (Blockchain_state.to_input blockchain_state)
+        (Consensus.Data.Consensus_state.to_input consensus_state)
+      |> append (field (genesis_state_hash :> Field.t)))
+
+  let var_to_input {Poly.genesis_state_hash; blockchain_state; consensus_state}
+      =
+    let blockchain_state = Blockchain_state.var_to_input blockchain_state in
+    let%map consensus_state =
+      Consensus.Data.Consensus_state.var_to_input consensus_state
+    in
+    Random_oracle.Input.(
+      append blockchain_state consensus_state
+      |> append (field (State_hash.var_to_hash_packed genesis_state_hash)))
 
   let hash s =
-    Snark_params.Tick.Pedersen.digest_fold Hash_prefix.protocol_state_body
-      (fold s)
+    Random_oracle.hash ~init:Hash_prefix.protocol_state_body
+      (Random_oracle.pack_input (to_input s))
     |> State_body_hash.of_hash
 
-  let var_to_triples {Poly.blockchain_state; consensus_state} =
-    let%map blockchain_state = Blockchain_state.var_to_triples blockchain_state
-    and consensus_state =
-      Consensus.Data.Consensus_state.var_to_triples consensus_state
-    in
-    blockchain_state @ consensus_state
-
   let hash_checked (t : var) =
-    let open Let_syntax in
-    var_to_triples t
-    >>= Snark_params.Tick.Pedersen.Checked.digest_triples
-          ~init:Hash_prefix.protocol_state_body
-    >>| State_body_hash.var_of_hash_packed
+    let%bind input = var_to_input t in
+    make_checked (fun () ->
+        Random_oracle.Checked.(
+          hash ~init:Hash_prefix.protocol_state_body (pack_input input)
+          |> State_body_hash.var_of_hash_packed) )
 end
 
 module Value = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, hash, compare, eq, to_yojson, version]
-      end
+      type t =
+        (State_hash.Stable.V1.t, Body.Value.Stable.V1.t) Poly.Stable.V1.t
+      [@@deriving sexp, hash, compare, eq, to_yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "protocol_state_value"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving sexp, hash, compare, eq, to_yojson]
 
   include Hashable.Make (Stable.Latest)
@@ -175,9 +151,10 @@ module Hash = State_hash
 let create ~previous_state_hash ~body =
   {Poly.Stable.Latest.previous_state_hash; body}
 
-let create' ~previous_state_hash ~blockchain_state ~consensus_state =
+let create' ~previous_state_hash ~genesis_state_hash ~blockchain_state
+    ~consensus_state =
   { Poly.Stable.Latest.previous_state_hash
-  ; body= {Body.Poly.blockchain_state; consensus_state} }
+  ; body= {Body.Poly.genesis_state_hash; blockchain_state; consensus_state} }
 
 let create_value = create'
 
@@ -208,13 +185,35 @@ let typ =
   Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let var_to_triples {Poly.Stable.Latest.previous_state_hash; body} =
-  let open Let_syntax in
-  let%map previous_state_hash = State_hash.var_to_triples previous_state_hash
-  and body_hash = Body.hash_checked body >>= State_body_hash.var_to_triples in
-  previous_state_hash @ body_hash
-
 let hash = hash_abstract ~hash_body:Body.hash
+
+let hash_checked ({previous_state_hash; body} : var) =
+  let%bind body = Body.hash_checked body in
+  let%map hash =
+    make_checked (fun () ->
+        Random_oracle.Checked.hash ~init:Hash_prefix.protocol_state
+          [| Hash.var_to_hash_packed previous_state_hash
+           ; State_body_hash.var_to_hash_packed body |]
+        |> State_hash.var_of_hash_packed )
+  in
+  (hash, body)
+
+let genesis_state_hash ?(state_hash = None) state =
+  (*If this is gthe genesis state then simply return its hash
+    otherwise return its the genesis_state_hash*)
+  if Consensus.Data.Consensus_state.is_genesis_state (consensus_state state)
+  then match state_hash with None -> hash state | Some hash -> hash
+  else state.body.genesis_state_hash
+
+let genesis_state_hash_checked ~state_hash state =
+  let%bind is_genesis =
+    (*if state is in global_slot = 0 then this is the genesis state*)
+    Consensus.Data.Consensus_state.is_genesis_state_var (consensus_state state)
+  in
+  (*get the genesis state hash from this state unless the state itself is the
+    genesis state*)
+  State_hash.if_ is_genesis ~then_:state_hash
+    ~else_:state.body.genesis_state_hash
 
 [%%if
 call_logger]
@@ -225,11 +224,15 @@ let hash s =
 
 [%%endif]
 
-let negative_one =
-  lazy
-    { Poly.Stable.Latest.previous_state_hash=
-        State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
-    ; body=
-        { Body.Poly.blockchain_state= Lazy.force Blockchain_state.negative_one
-        ; consensus_state=
-            Lazy.force Consensus.Data.Consensus_state.negative_one } }
+let negative_one ~genesis_ledger =
+  { Poly.Stable.Latest.previous_state_hash=
+      State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
+  ; body=
+      { Body.Poly.blockchain_state=
+          Blockchain_state.negative_one
+            ~genesis_ledger_hash:
+              (Coda_base.Ledger.merkle_root (Lazy.force genesis_ledger))
+      ; genesis_state_hash=
+          State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
+      ; consensus_state=
+          Consensus.Data.Consensus_state.negative_one ~genesis_ledger } }

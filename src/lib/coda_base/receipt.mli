@@ -1,9 +1,12 @@
 open Snark_params.Tick
+open Core
 
 module Chain_hash : sig
   include Data_hash.Full_size
 
   include Codable.S with type t := t
+
+  val gen : t Quickcheck.Generator.t
 
   val to_string : t -> string
 
@@ -20,6 +23,6 @@ module Chain_hash : sig
 
     val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
 
-    val cons : payload:Pedersen.Checked.Section.t -> t -> (t, _) Checked.t
+    val cons : payload:Transaction_union_payload.var -> t -> (t, _) Checked.t
   end
 end

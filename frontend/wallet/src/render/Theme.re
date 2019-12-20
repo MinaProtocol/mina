@@ -20,7 +20,8 @@ module Colors = {
 
   let bgColor = white;
 
-  let bgColorElectronWindow = "#00E9E9E9";
+  // Linux doesn't support transparency
+  let bgColorElectronWindow = "#FFE9E9E9";
 
   let savilleAlpha = a => `rgba((61, 88, 120, a));
   let saville = savilleAlpha(1.);
@@ -47,6 +48,7 @@ module Colors = {
   let gandalf = gandalfAlpha(1.);
 
   let clover = `rgb((71, 144, 86));
+  let cloverAlpha = a => `rgba((71, 144, 86, a));
 
   let amberAlpha = a => `rgba((242, 149, 68, a));
 
@@ -59,6 +61,8 @@ module Colors = {
 
   let midnightAlpha = a => `rgba((31, 45, 61, a));
   let midnight = midnightAlpha(1.0);
+
+  let midnightBlue = `rgb((52, 75, 101));
 
   let jungle = `hex("2BAC46");
   let sage = `hex("65906e");
@@ -135,6 +139,13 @@ module Text = {
         fontSize(`rem(1.)),
         lineHeight(`rem(1.5)),
       ]);
+    let regularLight =
+      style([
+        Typeface.plex,
+        fontWeight(`normal),
+        fontSize(`rem(1.)),
+        lineHeight(`rem(1.5)),
+      ]);
 
     let mono =
       style([Typeface.mono, fontWeight(`medium), fontSize(`rem(0.9))]);
@@ -145,6 +156,7 @@ module Text = {
         fontWeight(`normal),
         fontSize(`rem(0.8125)),
         lineHeight(`rem(1.25)),
+        color(Colors.midnight),
       ]);
 
     let semiBold =
@@ -155,9 +167,35 @@ module Text = {
         lineHeight(`rem(1.5)),
         letterSpacing(`rem(-0.0125)),
       ]);
+
+    let smallCaps =
+      style([
+        Typeface.plex,
+        fontWeight(`semiBold),
+        fontSize(`rem(0.75)),
+        lineHeight(`rem(1.0)),
+        letterSpacing(`rem(0.0875)),
+        textTransform(`uppercase),
+      ]);
+    let error =
+      style([
+        Typeface.plex,
+        fontWeight(`semiBold),
+        fontSize(`rem(1.)),
+        letterSpacing(`rem(-0.0125)),
+        color(Colors.roseBud),
+      ]);
   };
 
   module Header = {
+    let h1 =
+      style([
+        Typeface.plex,
+        color(Colors.saville),
+        fontSize(`rem(2.79)),
+        fontWeight(`num(300)),
+        lineHeight(`rem(3.73)),
+      ]);
     let h3 =
       style([
         Typeface.plex,
@@ -166,7 +204,15 @@ module Text = {
         lineHeight(`rem(1.5)),
         letterSpacing(`rem(-0.03125)),
       ]);
-
+    let h5 =
+      style([
+        Typeface.plex,
+        fontWeight(`normal),
+        fontSize(`rem(0.9345)),
+        lineHeight(`rem(1.0)),
+        letterSpacing(`rem(0.125)),
+        textTransform(`uppercase),
+      ]);
     let h6 =
       style([
         Typeface.plex,
@@ -210,3 +256,23 @@ let codaLogoCurrent =
     backgroundColor(`hex("516679")),
     margin(`em(0.5)),
   ]);
+
+module Onboarding = {
+  let main =
+    merge([
+      style([
+        position(`absolute),
+        top(`zero),
+        left(`zero),
+        background(white),
+        zIndex(100),
+        display(`flex),
+        flexDirection(`row),
+        paddingTop(Spacing.headerHeight),
+        paddingBottom(Spacing.footerHeight),
+        height(`vh(100.)),
+        width(`vw(100.)),
+      ]),
+      Window.Styles.bg,
+    ]);
+};

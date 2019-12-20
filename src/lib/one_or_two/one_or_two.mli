@@ -22,6 +22,8 @@ val group_sequence : 'a Sequence.t -> 'a t Sequence.t
 
 val group_list : 'a list -> 'a t list
 
+val zip : 'a t -> 'b t -> ('a * 'b) t Or_error.t
+
 val zip_exn : 'a t -> 'b t -> ('a * 'b) t
 
 val map : 'a t -> f:('a -> 'b) -> 'b t
@@ -36,6 +38,9 @@ val fold_until :
   -> finish:('b -> 'final)
   -> 'a t
   -> 'final
+
+module Deferred_result :
+  Intfs.Monadic2 with type ('a, 'e) m := ('a, 'e) Result.t Deferred.t
 
 module Deferred : Intfs.Monadic with type 'a m := 'a Deferred.t
 

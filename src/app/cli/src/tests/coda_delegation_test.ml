@@ -5,37 +5,26 @@ open Signature_lib
 
 let name = "coda-delegation-test"
 
-let heartbeat_flag = ref true
-
-let print_heartbeat logger =
-  let rec loop () =
-    if !heartbeat_flag then (
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-        "Heartbeat for CI" ;
-      let%bind () = after (Time.Span.of_min 1.) in
-      loop () )
-    else return ()
-  in
-  loop ()
+include Heartbeat.Make ()
 
 let main () =
   let logger = Logger.create () in
   let num_proposers = 3 in
   let snark_work_public_keys ndx =
-    List.nth_exn Genesis_ledger.accounts ndx
+    List.nth_exn Test_genesis_ledger.accounts ndx
     |> fun (_, acct) -> Some (Account.public_key acct)
   in
   let%bind testnet =
     Coda_worker_testnet.test logger num_proposers Option.some
-      snark_work_public_keys Cli_lib.Arg_type.Sequence
+      snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Started test net" ;
   (* keep CI alive *)
   Deferred.don't_wait_for (print_heartbeat logger) ;
   (* dump account info to log *)
-  List.iteri Genesis_ledger.accounts ~f:(fun ndx ((_, acct) as record) ->
-      let keypair = Genesis_ledger.keypair_of_account_record_exn record in
+  List.iteri Test_genesis_ledger.accounts ~f:(fun ndx ((_, acct) as record) ->
+      let keypair = Test_genesis_ledger.keypair_of_account_record_exn record in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Account: $account_number"
         ~metadata:
@@ -50,14 +39,14 @@ let main () =
           ; ("balance", `Int (Currency.Balance.to_int acct.balance)) ] ) ;
   (* second account is delegator; see genesis_ledger/test_delegation_ledger.ml *)
   let ((_, delegator_account) as delegator) =
-    List.nth_exn Genesis_ledger.accounts 2
+    List.nth_exn Test_genesis_ledger.accounts 2
   in
   let delegator_pubkey = Account.public_key delegator_account in
   let delegator_keypair =
-    Genesis_ledger.keypair_of_account_record_exn delegator
+    Test_genesis_ledger.keypair_of_account_record_exn delegator
   in
   (* zeroth account is delegatee *)
-  let _, delegatee_account = List.nth_exn Genesis_ledger.accounts 0 in
+  let _, delegatee_account = List.nth_exn Test_genesis_ledger.accounts 0 in
   let delegatee_pubkey = Account.public_key delegatee_account in
   let worker = testnet.workers.(0) in
   (* setup readers for proposals by delegator, delegatee *)
@@ -137,7 +126,7 @@ let main () =
     "Saw $delegatee_proposal_count blocks proposed by delegatee"
     ~metadata:[("delegatee_proposal_count", `Int !delegatee_proposal_count)] ;
   heartbeat_flag := false ;
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async

@@ -10,6 +10,7 @@ DOCKERNAME = codabuilder-$(MYUID)
 
 # Unique signature of kademlia code tree
 KADEMLIA_SIG = $(shell cd src/app/kademlia-haskell ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
+LIBP2P_HELPER_SIG = $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
@@ -18,7 +19,7 @@ endif
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
- WRAPSRC = docker exec --workdir /home/opam/app/src -t $(DOCKERNAME)
+ WRAPAPP = docker exec --workdir /home/opam/app -t $(DOCKERNAME)
 else
  $(info INFO Not using Docker)
  WRAP =
@@ -55,27 +56,39 @@ all: clean codabuilder containerstart build
 
 clean:
 	$(info Removing previous build artifacts)
-	@rm -rf src/_build
+	@rm -rf _build
 	@rm -rf src/$(COVERAGE_DIR)
 
 kademlia:
 	@# FIXME: Bash wrap here is awkward but required to get nix-env
 	bash -c "source ~/.profile && cd src/app/kademlia-haskell && nix-build release2.nix"
 
+libp2p_helper:
+	bash -c "source ~/.profile && cd src/app/libp2p_helper && nix-build default.nix"
+
 # Alias
-dht: kademlia
+dht: kademlia libp2p_helper
 
 build: git_hooks reformat-diff
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && cd src && $(WRAPSRC) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build app/logproc/logproc.exe app/cli/src/coda.exe  --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE) && dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+	$(info Build complete)
+
+build_archive: git_hooks reformat-diff
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/archive/archive.exe --profile=$(DUNE_PROFILE)
 	$(info Build complete)
 
 dev: codabuilder containerstart build
 
+# update OPAM, pinned packages in Docker
+update-opam:
+	$(WRAPAPP) ./scripts/update-opam-in-docker.sh
+
 macos-portable:
 	@rm -rf _build/coda-daemon-macos/
 	@rm -rf _build/coda-daemon-macos.zip
-	@./scripts/macos-portable.sh src/_build/default/app/cli/src/coda.exe src/app/kademlia-haskell/result/bin/kademlia _build/coda-daemon-macos
+	@./scripts/macos-portable.sh src/_build/default/src/app/cli/src/coda.exe src/app/kademlia-haskell/result/bin/kademlia _build/coda-daemon-macos
 	@zip -r _build/coda-daemon-macos.zip _build/coda-daemon-macos/
 	@echo Find coda-daemon-macos.zip inside _build/
 
@@ -87,13 +100,13 @@ update-graphql:
 ## Lint
 
 reformat: git_hooks
-	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path .
+	$(WRAPAPP) dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path .
 
 reformat-diff:
 	ocamlformat --doc-comments=before --inplace $(shell git status -s | cut -c 4- | grep '\.mli\?$$' | while IFS= read -r f; do stat "$$f" >/dev/null 2>&1 && echo "$$f"; done) || true
 
 check-format:
-	cd src; $(WRAPSRC) dune exec --profile=$(DUNE_PROFILE) app/reformat/reformat.exe -- -path . -check
+	$(WRAPAPP) dune exec --profile=$(DUNE_PROFILE) src/app/reformat/reformat.exe -- -path . -check
 
 check-snarky-submodule:
 	./scripts/check-snarky-submodule.sh
@@ -148,17 +161,20 @@ docker-toolchain-rust:
 	fi
 
 # All in one step to build toolchain and binary for kademlia
+# TODO: Rename to docker-toolchain-discovery
 docker-toolchain-haskell:
 	@echo "Building codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG)" ;\
     docker build --file dockerfiles/Dockerfile-toolchain-haskell --tag codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) . ;\
     echo  'Extracting deb package' ;\
-    mkdir -p src/_build ;\
-    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-kademlia.deb > src/_build/coda-kademlia.deb
-
-toolchains: docker-toolchain docker-toolchain-rust docker-toolchain-haskell
+    mkdir -p _build ;\
+    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-discovery.deb > _build/coda-discovery.deb
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
+	make render-circleci
+
+update-rust-deps:
+	./scripts/update-rust-toolchain-references.sh $(GITLONGHASH)
 	make render-circleci
 
 # Local 'codabuilder' docker image (based off docker-toolchain)
@@ -178,8 +194,8 @@ publish-macos:
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
 	@mkdir -p /tmp/artifacts
-	@cp src/_build/coda*.deb /tmp/artifacts/.
-	@cp src/_build/coda_pvkeys_* /tmp/artifacts/.
+	@cp _build/coda*.deb /tmp/artifacts/.
+	@cp _build/coda_pvkeys_* /tmp/artifacts/.
 
 publish_deb:
 	@./scripts/publish-deb.sh
@@ -188,12 +204,12 @@ publish_debs: publish_deb
 
 genesiskeys:
 	@mkdir -p /tmp/artifacts
-	@cp src/_build/default/lib/coda_base/sample_keypairs.ml /tmp/artifacts/.
-	@cp src/_build/default/lib/coda_base/sample_keypairs.json /tmp/artifacts/.
+	@cp _build/default/src/lib/coda_base/sample_keypairs.ml /tmp/artifacts/.
+	@cp _build/default/src/lib/coda_base/sample_keypairs.json /tmp/artifacts/.
 
 codaslim:
 	@# FIXME: Could not reference .deb file in the sub-dir in the docker build
-	@cp src/_build/coda.deb .
+	@cp _build/coda.deb .
 	@./scripts/rebuild-docker.sh codaslim dockerfiles/Dockerfile-codaslim
 	@rm coda.deb
 
@@ -220,7 +236,7 @@ web:
 ## Benchmarks
 
 benchmarks:
-	cd src && dune build app/benchmarks/main.exe
+	dune build app/benchmarks/main.exe
 
 
 ########################################
@@ -228,28 +244,28 @@ benchmarks:
 
 test-coverage: SHELL := /bin/bash
 test-coverage:
-	source scripts/test_all.sh ; cd src ; run_unit_tests_with_coverage
+	source scripts/test_all.sh ; run_unit_tests_with_coverage
 
 # we don't depend on test-coverage, which forces a run of all unit tests
 coverage-html:
-ifeq ($(shell find src/_build/default -name bisect\*.out),"")
+ifeq ($(shell find _build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	cd src && bisect-ppx-report -I _build/default/ -html $(COVERAGE_DIR) `find . -name bisect\*.out`
+	bisect-ppx-report -I _build/default/ -html $(COVERAGE_DIR) `find . -name bisect\*.out`
 endif
 
 coverage-text:
-ifeq ($(shell find src/_build/default -name bisect\*.out),"")
+ifeq ($(shell find _build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	cd src && bisect-ppx-report -I _build/default/ -text $(COVERAGE_DIR)/coverage.txt `find . -name bisect\*.out`
+	bisect-ppx-report -I _build/default/ -text $(COVERAGE_DIR)/coverage.txt `find . -name bisect\*.out`
 endif
 
 coverage-coveralls:
-ifeq ($(shell find src/_build/default -name bisect\*.out),"")
+ifeq ($(shell find _build/default -name bisect\*.out),"")
 	echo "No coverage output; run make test-coverage"
 else
-	cd src && bisect-ppx-report -I _build/default/ -coveralls $(COVERAGE_DIR)/coveralls.json `find . -name bisect\*.out`
+	bisect-ppx-report -I _build/default/ -coveralls $(COVERAGE_DIR)/coveralls.json `find . -name bisect\*.out`
 endif
 
 ########################################
@@ -271,7 +287,7 @@ doc_diagrams: $(addsuffix .png,$(wildcard docs/res/*.tex) $(wildcard docs/res/*.
 # Generate odoc documentation
 
 ml-docs:
-	cd src; $(WRAPSRC) dune build --profile=$(DUNE_PROFILE) @doc
+	$(WRAPAPP) dune build --profile=$(DUNE_PROFILE) @doc
 
 ########################################
 # To avoid unintended conflicts with file names, always add to .PHONY

@@ -6,7 +6,7 @@ open Coda_transition
 open Coda_state
 open O1trace
 module Graphql_cohttp_async =
-  Graphql_cohttp.Make (Graphql_async.Schema) (Cohttp_async.Io)
+  Graphql_internal.Make (Graphql_async.Schema) (Cohttp_async.Io)
     (Cohttp_async.Body)
 
 let snark_job_list_json t =
@@ -102,7 +102,9 @@ let summary exn_str =
     ; ("Machine", `String (Core.Unix.Utsname.machine uname))
     ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
     ; ("Exception", `String exn_str)
-    ; ("Command", `String daemon_command) ]
+    ; ("Command", `String daemon_command)
+    ; ("Coda_branch", `String Coda_version.branch)
+    ; ("Coda_commit", `String Coda_version.commit_id) ]
 
 let coda_status coda_ref =
   Option.value_map coda_ref
@@ -174,15 +176,16 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   else Some (report_file, temp_config)
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
-let setup_local_server ?(client_whitelist = []) ?rest_server_port
+let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ?(insecure_rest_server = false) coda =
-  let client_whitelist =
-    Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
+  let client_trustlist =
+    ref
+      (Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_trustlist))
   in
   (* Setup RPC server for client interactions *)
   let implement rpc f =
     Rpc.Rpc.implement rpc (fun () input ->
-        trace_recurring_task (Rpc.Rpc.name rpc) (fun () -> f () input) )
+        trace_recurring (Rpc.Rpc.name rpc) (fun () -> f () input) )
   in
   let implement_notrace = Rpc.Rpc.implement in
   let logger =
@@ -192,12 +195,13 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
   in
   let client_impls =
     [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
-          let%map result = Coda_commands.send_user_command coda tx in
-          result |> Participating_state.active_error |> Or_error.join )
+          Deferred.map
+            ( Coda_commands.send_user_command coda tx
+            |> Participating_state.to_deferred_or_error )
+            ~f:Or_error.join )
     ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-          return
-            ( Coda_commands.schedule_user_commands coda ts
-            |> Participating_state.active_error ) )
+          Coda_commands.schedule_user_commands coda ts
+          |> Participating_state.to_deferred_or_error )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
           return
             ( Coda_commands.get_balance coda pk
@@ -279,7 +283,26 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
           in
           Coda_lib.replace_propose_keypairs coda
             (Keypair.And_compressed_pk.Set.of_list keypair_and_compressed_key) ;
-          Deferred.unit ) ]
+          Deferred.unit )
+    ; implement Daemon_rpcs.Add_trustlist.rpc (fun () ip ->
+          return
+            (let ip_str = Unix.Inet_addr.to_string ip in
+             if Unix.Inet_addr.Set.mem !client_trustlist ip then
+               Or_error.errorf "%s already present in trustlist" ip_str
+             else (
+               client_trustlist := Unix.Inet_addr.Set.add !client_trustlist ip ;
+               Ok () )) )
+    ; implement Daemon_rpcs.Remove_trustlist.rpc (fun () ip ->
+          return
+            (let ip_str = Unix.Inet_addr.to_string ip in
+             if not @@ Unix.Inet_addr.Set.mem !client_trustlist ip then
+               Or_error.errorf "%s not present in trustlist" ip_str
+             else (
+               client_trustlist :=
+                 Unix.Inet_addr.Set.remove !client_trustlist ip ;
+               Ok () )) )
+    ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
+          return (Set.to_list !client_trustlist) ) ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
@@ -306,7 +329,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                 , `String
                     (sprintf !"%{sexp:Snark_worker.Work.Spec.t}" work.spec) )
               ] ;
-          List.iter work.metrics ~f:(fun (total, tag) ->
+          One_or_two.iter work.metrics ~f:(fun (total, tag) ->
               match tag with
               | `Merge ->
                   Perf_histograms.add_span ~name:"snark_worker_merge_time"
@@ -314,8 +337,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
               | `Transition ->
                   Perf_histograms.add_span ~name:"snark_worker_transition_time"
                     total ) ;
-          Network_pool.Snark_pool.add_completed_work (Coda_lib.snark_pool coda)
-            work ) ]
+          Coda_lib.add_work coda work ) ]
   in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       trace_task "REST server" (fun () ->
@@ -348,6 +370,11 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                 let lift x = `Response x in
                 match Uri.path uri with
                 | "/graphql" ->
+                    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                      "Received graphql request. Uri: $uri"
+                      ~metadata:
+                        [ ("uri", `String (Uri.to_string uri))
+                        ; ("context", `String "rest_server") ] ;
                     graphql_callback () req body
                 | "/status" ->
                     status `None >>| lift
@@ -360,51 +387,54 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                  Logger.info logger
                    !"Created GraphQL server and status endpoints at port : %i"
                    rest_server_port ~module_:__MODULE__ ~location:__LOC__ ) )
-      |> ignore ) ;
+  ) ;
   let where_to_listen =
     Tcp.Where_to_listen.bind_to All_addresses
       (On_port (Coda_lib.client_port coda))
   in
-  trace_task "client RPC handling" (fun () ->
-      Tcp.Server.create
-        ~on_handler_error:
-          (`Call
-            (fun _net exn ->
-              Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                "Exception while handling TCP server request: $error"
-                ~metadata:
-                  [ ("error", `String (Exn.to_string_mach exn))
-                  ; ("context", `String "rpc_tcp_server") ] ))
-        where_to_listen
-        (fun address reader writer ->
-          let address = Socket.Address.Inet.addr address in
-          if not (Set.mem client_whitelist address) then (
-            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-              !"Rejecting client connection from $address, it is not present \
-                in the whitelist."
-              ~metadata:
-                [("$address", `String (Unix.Inet_addr.to_string address))] ;
-            Deferred.unit )
-          else
-            Rpc.Connection.server_with_close reader writer
-              ~implementations:
-                (Rpc.Implementations.create_exn
-                   ~implementations:(client_impls @ snark_worker_impls)
-                   ~on_unknown_rpc:`Raise)
-              ~connection_state:(fun _ -> ())
-              ~on_handshake_error:
+  don't_wait_for
+    (Deferred.ignore
+       (trace "client RPC handling" (fun () ->
+            Tcp.Server.create
+              ~on_handler_error:
                 (`Call
-                  (fun exn ->
+                  (fun _net exn ->
                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                      "Exception while handling RPC server request from \
-                       $address: $error"
+                      "Exception while handling TCP server request: $error"
                       ~metadata:
                         [ ("error", `String (Exn.to_string_mach exn))
-                        ; ("context", `String "rpc_server")
-                        ; ( "address"
-                          , `String (Unix.Inet_addr.to_string address) ) ] ;
-                    Deferred.unit )) ) )
-  |> ignore
+                        ; ("context", `String "rpc_tcp_server") ] ))
+              where_to_listen
+              (fun address reader writer ->
+                let address = Socket.Address.Inet.addr address in
+                if not (Set.mem !client_trustlist address) then (
+                  Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                    !"Rejecting client connection from $address, it is not \
+                      present in the trustlist."
+                    ~metadata:
+                      [("$address", `String (Unix.Inet_addr.to_string address))] ;
+                  Deferred.unit )
+                else
+                  Rpc.Connection.server_with_close reader writer
+                    ~implementations:
+                      (Rpc.Implementations.create_exn
+                         ~implementations:(client_impls @ snark_worker_impls)
+                         ~on_unknown_rpc:`Raise)
+                    ~connection_state:(fun _ -> ())
+                    ~on_handshake_error:
+                      (`Call
+                        (fun exn ->
+                          Logger.error logger ~module_:__MODULE__
+                            ~location:__LOC__
+                            "Exception while handling RPC server request from \
+                             $address: $error"
+                            ~metadata:
+                              [ ("error", `String (Exn.to_string_mach exn))
+                              ; ("context", `String "rpc_server")
+                              ; ( "address"
+                                , `String (Unix.Inet_addr.to_string address) )
+                              ] ;
+                          Deferred.unit )) ) )))
 
 let handle_crash e ~conf_dir ~top_logger coda_ref =
   let exn_str = Exn.to_string e in
@@ -465,7 +495,7 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
 You might be trying to connect to a different network version, or need to troubleshoot your configuration. See https://codaprotocol.com/docs/troubleshooting/ for details.
 
 %!|err}
-      | exn ->
+      | _ ->
           handle_crash exn ~conf_dir ~top_logger coda_ref ) ;
       Stdlib.exit 1 ) ;
   Async_unix.Signal.(
@@ -478,4 +508,5 @@ You might be trying to connect to a different network version, or need to troubl
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           !"Coda process was interrupted by $signal"
           ~metadata:[("signal", `String (to_string signal))] ;
-        Stdlib.exit 130 ))
+        (* causes async shutdown and at_exit handlers to run *)
+        Async.shutdown 130 ))

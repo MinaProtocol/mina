@@ -4,21 +4,17 @@ open Coda_transition
 open Signature_lib
 
 module Transactions = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { user_commands: User_command.Stable.V1.t list
-          ; fee_transfers: Fee_transfer.Single.Stable.V1.t list
-          ; coinbase: Currency.Amount.Stable.V1.t }
-        [@@deriving bin_io, version {unnumbered}]
-      end
+      type t =
+        { user_commands: User_command.Stable.V1.t list
+        ; fee_transfers: Fee_transfer.Single.Stable.V1.t list
+        ; coinbase: Currency.Amount.Stable.V1.t }
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t =
     { user_commands: User_command.t list
@@ -27,48 +23,44 @@ module Transactions = struct
 end
 
 module Protocol_state = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { previous_state_hash: State_hash.Stable.V1.t
-          ; blockchain_state: Coda_state.Blockchain_state.Value.Stable.V1.t }
-        [@@deriving bin_io, version {unnumbered}]
-      end
+      type t =
+        { previous_state_hash: State_hash.Stable.V1.t
+        ; blockchain_state: Coda_state.Blockchain_state.Value.Stable.V1.t
+        ; consensus_state: Consensus.Data.Consensus_state.Value.Stable.V1.t }
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t =
     { previous_state_hash: State_hash.t
-    ; blockchain_state: Coda_state.Blockchain_state.Value.t }
+    ; blockchain_state: Coda_state.Blockchain_state.Value.t
+    ; consensus_state: Consensus.Data.Consensus_state.Value.t }
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        { creator: Public_key.Compressed.Stable.V1.t
-        ; protocol_state: Protocol_state.Stable.V1.t
-        ; transactions: Transactions.Stable.V1.t
-        ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list }
-      [@@deriving bin_io, version {unnumbered}]
-    end
+    type t =
+      { creator: Public_key.Compressed.Stable.V1.t
+      ; protocol_state: Protocol_state.Stable.V1.t
+      ; transactions: Transactions.Stable.V1.t
+      ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list
+      ; proof: Proof.Stable.V1.t }
 
-    include T
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-end
+end]
 
 type t = Stable.Latest.t =
   { creator: Public_key.Compressed.t
   ; protocol_state: Protocol_state.t
   ; transactions: Transactions.t
-  ; snark_jobs: Transaction_snark_work.Info.t list }
+  ; snark_jobs: Transaction_snark_work.Info.t list
+  ; proof: Proof.t }
 
 let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
     =
@@ -85,19 +77,22 @@ let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
 let user_commands {transactions= {Transactions.user_commands; _}; _} =
   user_commands
 
-let of_transition tracked_participants external_transition =
+let validate_transactions external_transition =
+  let staged_ledger_diff =
+    External_transition.Validated.staged_ledger_diff external_transition
+  in
+  Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff
+
+let of_transition external_transition tracked_participants
+    (calculated_transactions : Transaction.t list) =
   let open External_transition.Validated in
   let creator = proposer external_transition in
   let protocol_state =
     { Protocol_state.previous_state_hash= parent_hash external_transition
     ; blockchain_state=
-        Coda_state.Protocol_state.blockchain_state
-        @@ protocol_state external_transition }
-  in
-  let open Result.Let_syntax in
-  let staged_ledger_diff = staged_ledger_diff external_transition in
-  let%map calculated_transactions =
-    Staged_ledger.Pre_diff_info.get_transactions staged_ledger_diff
+        External_transition.Validated.blockchain_state external_transition
+    ; consensus_state=
+        External_transition.Validated.consensus_state external_transition }
   in
   let transactions =
     List.fold calculated_transactions
@@ -123,13 +118,7 @@ let of_transition tracked_participants external_transition =
                 user_commands= user_command :: acc_transactions.user_commands
               } )
       | Fee_transfer fee_transfer ->
-          let fee_transfer_list =
-            match fee_transfer with
-            | One fee_transfer1 ->
-                [fee_transfer1]
-            | Two (fee_transfer1, fee_transfer2) ->
-                [fee_transfer1; fee_transfer2]
-          in
+          let fee_transfer_list = One_or_two.to_list fee_transfer in
           let fee_transfers =
             match tracked_participants with
             | `All ->
@@ -150,7 +139,12 @@ let of_transition tracked_participants external_transition =
   in
   let snark_jobs =
     List.map
-      (Staged_ledger_diff.completed_works staged_ledger_diff)
+      ( Staged_ledger_diff.completed_works
+      @@ External_transition.Validated.staged_ledger_diff external_transition
+      )
       ~f:Transaction_snark_work.info
   in
-  {creator; protocol_state; transactions; snark_jobs}
+  let proof =
+    External_transition.Validated.protocol_state_proof external_transition
+  in
+  {creator; protocol_state; transactions; snark_jobs; proof}

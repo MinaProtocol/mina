@@ -34,12 +34,12 @@ end
 
 module Statement : sig
   type t =
-    { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
-    ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
-    ; supply_increase: Currency.Amount.Stable.V1.t
+    { source: Coda_base.Frozen_ledger_hash.t
+    ; target: Coda_base.Frozen_ledger_hash.t
+    ; supply_increase: Currency.Amount.t
     ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-    ; fee_excess: Currency.Fee.Signed.Stable.V1.t
-    ; proof_type: Proof_type.Stable.V1.t }
+    ; fee_excess: Currency.Fee.Signed.t
+    ; proof_type: Proof_type.t }
   [@@deriving compare, equal, hash, sexp, yojson]
 
   module Stable :
@@ -50,7 +50,10 @@ module Statement : sig
           ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
           ; supply_increase: Currency.Amount.Stable.V1.t
           ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-          ; fee_excess: Currency.Fee.Signed.Stable.V1.t
+          ; fee_excess:
+              ( Currency.Fee.Stable.V1.t
+              , Sgn.Stable.V1.t )
+              Currency.Signed_poly.Stable.V1.t
           ; proof_type: Proof_type.Stable.V1.t }
         [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
       end
@@ -68,12 +71,12 @@ module Statement : sig
   include Comparable.S with type t := t
 end
 
-type t [@@deriving sexp, yojson]
+type t [@@deriving sexp, to_yojson]
 
 module Stable :
   sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, yojson, version]
+      type t [@@deriving bin_io, compare, sexp, version, to_yojson]
     end
 
     module Latest = V1
@@ -141,7 +144,9 @@ module Keys : sig
   val create : unit -> t
 
   val cached :
-    unit -> (Location.t * Verification.t * Checksum.t) Async.Deferred.t
+       unit
+    -> (Location.t * Verification.t * Checksum.t)
+       Cached.Deferred_with_track_generated.t
 end
 
 module Verification : sig

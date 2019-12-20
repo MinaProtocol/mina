@@ -5,17 +5,30 @@
 set -euo pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPTPATH}/../src/_build"
+cd "${SCRIPTPATH}/../_build"
 
-GITHASH=$(git rev-parse --short=8 HEAD)
+GITHASH=$(git rev-parse --short=7 HEAD)
 GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
+GITTAG=$(git describe --abbrev=0)
 
 # Identify All Artifacts by Branch and Git Hash
 set +u
-PVKEYHASH=$(./default/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
+PVKEYHASH=$(./default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
 PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
-VERSION="${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+
+if [ "$GITBRANCH" == "master" ]; then
+    VERSION="${GITTAG}-${GITHASH}"
+else
+    VERSION="${GITTAG}+${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+fi
+
+# Export variables for use with downstream steps
+echo "export CODA_DEB_VERSION=$VERSION" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_PROJECT=$PROJECT" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_HASH=$GITHASH" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_BRANCH=$GITBRANCH" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_TAG=$GITTAG" >> /tmp/DOCKER_DEPLOY_ENV
 
 BUILDDIR="deb_build"
 
@@ -26,7 +39,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1, miniupnpc, coda-kademlia
+Depends: coda-discovery, libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
 License: Apache-2.0
 Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
@@ -42,31 +55,47 @@ cat "${BUILDDIR}/DEBIAN/control"
 echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
-cp ./default/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
-cp ./default/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
+cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
+cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
 
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
-cp ../config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
-rsync -Huav ../config/* "${BUILDDIR}/etc/coda/build_config/."
+cp ../src/config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
+rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
 # Keys
 # Identify actual keys used in build
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
-compile_keys=$(./default/app/cli/src/coda.exe internal snark-hashes)
+compile_keys=$(./default/src/app/cli/src/coda.exe internal snark-hashes)
 for key in $compile_keys
 do
     echo -n "Looking for keys matching: ${key} -- "
-    if [ -f "/var/lib/coda/${key}_proving" ]; then
-        echo " [OK] found key in stable key set"
-        cp /var/lib/coda/${key}* "${BUILDDIR}/var/lib/coda/."
-    elif [ -f "/tmp/coda_cache_dir/${key}_proving" ]; then
-        echo " [WARN] found key in compile-time set"
-        cp /tmp/coda_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
-    else
-        echo "Key not found!"
-    fi
+
+    # Awkward, you can't do a filetest on a wildcard - use loops
+    for f in  /tmp/s3_cache_dir/${key}*; do
+        if [ -e "$f" ]; then
+            echo " [OK] found key in s3 key set"
+            cp /tmp/s3_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
+            break
+        fi
+    done
+
+    for f in  /var/lib/coda/${key}*; do
+        if [ -e "$f" ]; then
+            echo " [OK] found key in stable key set"
+            cp /var/lib/coda/${key}* "${BUILDDIR}/var/lib/coda/."
+            break
+        fi
+    done
+
+    for f in  /tmp/coda_cache_dir/${key}*; do
+        if [ -e "$f" ]; then
+            echo " [WARN] found key in compile-time set"
+            cp /tmp/coda_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
+            break
+        fi
+    done
 done
 
 # Bash autocompletion
@@ -110,7 +139,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libssl1.1, libprocps6, libgmp10, libffi6, libgomp1, miniupnpc, coda-kademlia
+Depends: coda-discovery, libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
 License: Apache-2.0
 Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>

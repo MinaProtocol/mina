@@ -1,33 +1,31 @@
 open Async_kernel
-open Core_kernel
 open Pipe_lib
-open Signature_lib
 
 module type S = sig
-  type ledger_proof
-
-  type transaction_snark_statement
-
-  type transaction_snark_work_statement
-
-  type transaction_snark_work_checked
-
   type transition_frontier
 
   module Resource_pool : sig
     include
       Intf.Snark_resource_pool_intf
-      with type ledger_proof := ledger_proof
-       and type work := transaction_snark_work_statement
+      with type ledger_proof := Ledger_proof.t
+       and type work := Transaction_snark_work.Statement.t
        and type transition_frontier := transition_frontier
+       and type work_info := Transaction_snark_work.Info.t
 
-    val remove_solved_work : t -> transaction_snark_work_statement -> unit
+    val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
     module Diff :
       Intf.Snark_pool_diff_intf
-      with type ledger_proof := ledger_proof
-       and type work := transaction_snark_work_statement
+      with type ledger_proof := Ledger_proof.t
+       and type work := Transaction_snark_work.Statement.t
        and type resource_pool := t
+  end
+
+  module For_tests : sig
+    val get_rebroadcastable :
+         Resource_pool.t
+      -> is_expired:(Core.Time.t -> [`Expired | `Ok])
+      -> Resource_pool.Diff.t list
   end
 
   include
@@ -35,15 +33,16 @@ module type S = sig
     with type resource_pool := Resource_pool.t
      and type resource_pool_diff := Resource_pool.Diff.t
      and type transition_frontier := transition_frontier
+     and type config := Resource_pool.Config.t
 
   val get_completed_work :
        t
-    -> transaction_snark_work_statement
-    -> transaction_snark_work_checked option
+    -> Transaction_snark_work.Statement.t
+    -> Transaction_snark_work.Checked.t option
 
   val load :
-       logger:Logger.t
-    -> trust_system:Trust_system.t
+       config:Resource_pool.Config.t
+    -> logger:Logger.t
     -> disk_location:string
     -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
                       Linear_pipe.Reader.t
@@ -55,87 +54,21 @@ module type S = sig
        t
     -> ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
          Snark_work_lib.Work.Spec.t
-       , ledger_proof )
+       , Ledger_proof.t )
        Snark_work_lib.Work.Result.t
     -> unit Deferred.t
 end
 
 module type Transition_frontier_intf = sig
-  type work
-
   type t
 
-  module Extensions : sig
-    module Work : sig
-      type t = work [@@deriving sexp]
-
-      module Stable : sig
-        module V1 : sig
-          type nonrec t = t [@@deriving sexp, bin_io]
-
-          include Hashable.S_binable with type t := t
-        end
-      end
-
-      include Hashable.S with type t := t
-    end
-  end
-
   val snark_pool_refcount_pipe :
-    t -> (int * int Extensions.Work.Table.t) Pipe_lib.Broadcast_pipe.Reader.t
+       t
+    -> (int * int Transaction_snark_work.Statement.Table.t)
+       Pipe_lib.Broadcast_pipe.Reader.t
 end
 
-module Make (Ledger_proof : sig
-  type t [@@deriving bin_io, sexp, yojson, version]
-end) (Transaction_snark_work : sig
-  type t =
-    { fee: Currency.Fee.t
-    ; proofs: Ledger_proof.t list
-    ; prover: Public_key.Compressed.t }
+module Make (Transition_frontier : Transition_frontier_intf) :
+  S with type transition_frontier := Transition_frontier.t
 
-  module Statement : sig
-    type t = Transaction_snark.Statement.t list [@@deriving sexp]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, yojson, version]
-
-          include Hashable.S_binable with type t := t
-
-          val compact_json : t -> Yojson.Safe.json
-        end
-      end
-      with type V1.t = t
-
-    include Hashable.S with type t := t
-  end
-
-  module Checked :
-    sig
-      type unchecked
-
-      type t
-
-      val create_unsafe : unchecked -> t
-    end
-    with type unchecked := t
-end)
-(Transition_frontier : Transition_frontier_intf
-                       with type work := Transaction_snark_work.Statement.t) :
-  S
-  with type transaction_snark_statement := Transaction_snark.Statement.t
-   and type transaction_snark_work_statement :=
-              Transaction_snark_work.Statement.t
-   and type transaction_snark_work_checked := Transaction_snark_work.Checked.t
-   and type transition_frontier := Transition_frontier.t
-   and type ledger_proof := Ledger_proof.t
-
-include
-  S
-  with type transaction_snark_statement := Transaction_snark.Statement.t
-   and type transaction_snark_work_statement :=
-              Transaction_snark_work.Statement.t
-   and type transaction_snark_work_checked := Transaction_snark_work.Checked.t
-   and type transition_frontier := Transition_frontier.t
-   and type ledger_proof := Ledger_proof.t
+include S with type transition_frontier := Transition_frontier.t

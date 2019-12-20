@@ -14,7 +14,7 @@ let main () =
     if i = snark_worker_and_proposer_id then Some i else None
   in
   let largest_public_key =
-    let _, account = Genesis_ledger.largest_account_exn () in
+    let _, account = Test_genesis_ledger.largest_account_exn () in
     Account.public_key account
   in
   let snark_work_public_keys i =
@@ -22,7 +22,8 @@ let main () =
   in
   let%bind testnet =
     Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
+      Cli_lib.Arg_type.Work_selection_method.Sequence
+      ~max_concurrent_connections:None
   in
   let%bind new_block_pipe1, new_block_pipe2 =
     let%map pipe =
@@ -65,7 +66,7 @@ let main () =
     wait_for_snark_worker_proof new_block_pipe1 largest_public_key
   in
   let new_snark_worker =
-    List.find_map_exn Genesis_ledger.accounts ~f:(fun (_, account) ->
+    List.find_map_exn Test_genesis_ledger.accounts ~f:(fun (_, account) ->
         let public_key = Account.public_key account in
         Option.some_if
           (not @@ Public_key.Compressed.equal largest_public_key public_key)
@@ -94,7 +95,7 @@ let main () =
     Option.value_exn opt
   in
   let%bind () = after (Time.Span.of_sec 30.) in
-  Coda_worker_testnet.Api.teardown testnet
+  Coda_worker_testnet.Api.teardown testnet ~logger
 
 let command =
   Command.async

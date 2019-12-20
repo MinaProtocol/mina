@@ -19,8 +19,7 @@ module Tock_backend = struct
 
   module Bowe_gabizon = struct
     let bg_salt =
-      lazy
-        (Tick_pedersen.State.salt (Hash_prefixes.bowe_gabizon_hash :> string))
+      lazy (Random_oracle.salt (Hash_prefixes.bowe_gabizon_hash :> string))
 
     let bg_params =
       Group_map.Params.create
@@ -31,16 +30,7 @@ module Tock_backend = struct
     include Snarky.Libsnark.Make_bowe_gabizon
               (Full)
               (Bowe_gabizon_hash.Make (struct
-                module Bigint = Tick0.Bigint
-
-                (* TODO: Rename pack/project to to_bits/of_bits *)
-                module Field = struct
-                  include Tick0.Field
-
-                  let to_bits = unpack
-
-                  let of_bits = project
-                end
+                module Field = Tick0.Field
 
                 module Fqe = struct
                   type t = Full.Fqe.t
@@ -53,10 +43,10 @@ module Tock_backend = struct
                 module G1 = Full.G1
                 module G2 = Full.G2
 
-                let params = bg_params
+                let group_map =
+                  Group_map.to_group (module Field) ~params:bg_params
 
-                let pedersen x =
-                  Tick_pedersen.digest_fold (Lazy.force bg_salt) x
+                let hash xs = Random_oracle.hash ~init:(Lazy.force bg_salt) xs
               end))
 
     module Field = Full.Field

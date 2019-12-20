@@ -11,24 +11,17 @@ module type S_unchecked = sig
 
   include Hashable.S with type t := t
 
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
-    end
-
-    module Latest = V1
-  end
+  val max_value : t
 
   val length_in_bits : int
-
-  val length_in_triples : int
 
   val gen : t Quickcheck.Generator.t
 
   val zero : t
 
   val succ : t -> t
+
+  val add : t -> t -> t
 
   val of_int : int -> t
 
@@ -43,7 +36,11 @@ module type S_unchecked = sig
 
   val to_string : t -> string
 
-  module Bits : Bits_intf.S with type t := t
+  module Bits : Bits_intf.Convertible_bits with type t := t
+
+  val to_bits : t -> bool list
+
+  val of_bits : bool list -> t
 
   val fold : t -> bool Triple.t Fold.t
 end
@@ -64,6 +61,8 @@ module type S_checked = sig
 
   val succ : t -> (t, _) Checked.t
 
+  val add : t -> t -> (t, _) Checked.t
+
   val is_succ : pred:t -> succ:t -> (Boolean.var, _) Checked.t
 
   val min : t -> t -> (t, _) Checked.t
@@ -72,14 +71,13 @@ module type S_checked = sig
 
   val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
 
-  val to_triples : t -> (Boolean.var Triple.t list, _) Checked.t
-
   val to_integer : t -> field Snarky_integer.Integer.t
 
   val succ_if : t -> Boolean.var -> (t, _) Checked.t
 
   val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
 
+  (** warning: this typ does not work correctly with the generic if_ *)
   val typ : (t, unchecked) Snark_params.Tick.Typ.t
 
   val equal : t -> t -> (Boolean.var, _) Checked.t
@@ -100,15 +98,29 @@ module type S_checked = sig
 end
 
 module type S = sig
+  open Bitstring_lib
+  open Snark_params.Tick
+
   include S_unchecked
 
   module Checked : S_checked with type unchecked := t
 
+  (** warning: this typ does not work correctly with the generic if_ *)
   val typ : (Checked.t, t) Snark_params.Tick.Typ.t
+
+  val var_to_bits : Checked.t -> Boolean.var Bitstring.Lsb_first.t
 end
 
 module type UInt32 = sig
-  include S with type t = Unsigned_extended.UInt32.t
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = Unsigned_extended.UInt32.t
+      [@@deriving sexp, eq, compare, hash, yojson]
+    end
+  end]
+
+  include S with type t = Stable.Latest.t
 
   val to_uint32 : t -> uint32
 
@@ -116,7 +128,15 @@ module type UInt32 = sig
 end
 
 module type UInt64 = sig
-  include S with type t = Unsigned_extended.UInt64.t
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = Unsigned_extended.UInt64.t
+      [@@deriving sexp, eq, compare, hash, yojson]
+    end
+  end]
+
+  include S with type t = Stable.Latest.t
 
   val to_uint64 : t -> uint64
 
@@ -132,5 +152,5 @@ module type F = functor
 
       val random : unit -> t
     end)
-  (Bits : Bits_intf.S with type t := N.t)
+  (Bits : Bits_intf.Convertible_bits with type t := N.t)
   -> S with type t := N.t and module Bits := Bits

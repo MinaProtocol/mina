@@ -1,60 +1,34 @@
 open Core_kernel
 open Coda_base
-open Module_version
 
 module Input = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = {descendant: State_hash.Stable.V1.t; generations: int}
-        [@@deriving sexp, bin_io, version]
-      end
+      type t = {descendant: State_hash.Stable.V1.t; generations: int}
+      [@@deriving sexp]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "ancestor"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  include Stable.Latest
+  type t = Stable.Latest.t = {descendant: State_hash.t; generations: int}
+  [@@deriving sexp]
 end
 
 module Output = State_hash
 
 module Proof = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = State_body_hash.Stable.V1.t list [@@deriving bin_io, version]
-      end
+      type t = State_body_hash.Stable.V1.t list
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "ancestor_proof"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  include Stable.Latest
+  type t = Stable.Latest.t
 end
 
 let verify =

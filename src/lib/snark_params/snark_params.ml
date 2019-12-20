@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 open Core_kernel
 open Bitstring_lib
@@ -8,6 +8,7 @@ module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 module Snarkette_tick = Crypto_params.Snarkette_tick
 module Snarkette_tock = Crypto_params.Snarkette_tock
+module Scan_state_constants = Scan_state_constants
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -324,7 +325,7 @@ module Tock = struct
       {Proof.a= a p; b= conv_g2 (b p); c= c p}
 
     let vk_of_backend_vk vk =
-      let open Tick_backend.Full.Groth16_verification_key_accessors in
+      let open Tick_backend.Full.Groth16.Verification_key in
       let open Inner_curve.Vector in
       let q = query vk in
       { Verification_key.query_base= get q 0
@@ -403,11 +404,6 @@ module Tick = struct
                 (struct
                   let params = Crypto_params.Pedersen_params.affine
                 end)
-
-      let hash_prefix (p : State.t) =
-        Section.create ~acc:(`Value p.acc)
-          ~support:
-            (Interval_union.of_interval (0, Hash_prefixes.length_in_triples))
 
       let hash_triples ts ~(init : State.t) =
         hash ts ~init:(init.triples_consumed, `Value init.acc)
@@ -672,7 +668,7 @@ module Tick = struct
     let final_exponentiation = FE.final_exponentiation6
   end
 
-  module Run = Snarky.Snark.Run.Make (Tick_backend) (Unit)
+  module Run = Crypto_params.Runners.Tick
 
   let m : Run.field Snarky.Snark.m = (module Run)
 
@@ -682,21 +678,36 @@ module Tick = struct
     include Snarky_verifier.Bowe_gabizon.Make (struct
       include Pairing
 
-      module H =
-        Snarky_bowe_gabizon_hash.Make (Run) (Tick0)
-          (struct
-            module Fqe = Pairing.Fqe
+      module H = Bowe_gabizon_hash.Make (struct
+        open Run
+        module Field = Field
+        module Fqe = Pairing.Fqe
 
-            let init =
-              Pedersen.State.salt (Hash_prefixes.bowe_gabizon_hash :> string)
+        module G1 = struct
+          type t = Field.t * Field.t
 
-            let pedersen x =
-              Pedersen.Checked.digest_triples ~init (Fold_lib.Fold.to_list x)
+          let to_affine_exn = Fn.id
 
-            let params = Tock_backend.bg_params
-          end)
+          let of_affine = Fn.id
+        end
 
-      let hash = H.hash
+        module G2 = struct
+          type t = Fqe.t * Fqe.t
+
+          let to_affine_exn = Fn.id
+        end
+
+        let hash xs =
+          Random_oracle.Checked.hash ~init:(Lazy.force Tock_backend.bg_salt) xs
+
+        let group_map =
+          Snarky_group_map.Checked.to_group
+            (module Run)
+            ~params:Tock_backend.bg_params
+      end)
+
+      let hash ?message ~a ~b ~c ~delta_prime =
+        make_checked (fun () -> H.hash ?message ~a ~b ~c ~delta_prime)
     end)
 
     let conv_fqe v =
@@ -766,11 +777,10 @@ let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
 [%%inject
 "ledger_depth", ledger_depth]
 
-[%%inject
-"scan_state_transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
+let scan_state_transaction_capacity_log_2 =
+  Scan_state_constants.transaction_capacity_log_2
 
-[%%inject
-"scan_state_work_delay", scan_state_work_delay]
+let scan_state_work_delay = Scan_state_constants.work_delay
 
 (*Log of maximum number of trees in the parallel scan state*)
 let pending_coinbase_depth =
@@ -792,3 +802,15 @@ let pending_coinbase_depth =
 let target_bit_length = Tick.Field.size_in_bits - 8
 
 module type Snark_intf = Snark_intf.S
+
+module Group_map = struct
+  let to_group =
+    Group_map.to_group (module Tick.Field) ~params:Tock_backend.bg_params
+
+  module Checked = struct
+    let to_group =
+      Snarky_group_map.Checked.to_group
+        (module Tick.Run)
+        ~params:Tock_backend.bg_params
+  end
+end

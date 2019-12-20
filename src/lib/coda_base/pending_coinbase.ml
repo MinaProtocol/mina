@@ -1,53 +1,100 @@
 open Core_kernel
 open Import
 open Snarky
+module Coda_base_util = Util
 open Snark_params
 open Snark_params.Tick
-open Tuple_lib
 open Let_syntax
 open Currency
 open Fold_lib
-open Module_version
+
+(* A pending coinbase is basically a Merkle tree of "stacks", each of which contains two hashes. The first hash
+   is computed from the components in the coinbase via a "push" operation. The second hash, a protocol
+   state hash, is computed from the state *body* hash in the coinbase.
+   The "add_coinbase" operation takes a coinbase, retrieves the latest stack, or creates a new one, and does
+   a push.
+
+   A pending coinbase also contains a stack id, used to determine the chronology of stacks, so we can know
+   which is the oldest, and which is the newest stack.
+
+   The name "stack" here is a misnomer: see issue #3226
+ *)
 
 module Coinbase_data = struct
-  type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
-  [@@deriving bin_io, sexp]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        Public_key.Compressed.Stable.V1.t
+        * Amount.Stable.V1.t
+        * State_body_hash.Stable.V1.t
+      [@@deriving sexp]
 
-  let of_coinbase (cb : Coinbase.t) : t = (cb.proposer, cb.amount)
+      let to_latest = Fn.id
+    end
+  end]
 
-  type var = Public_key.Compressed.var * Amount.var
+  type t = Stable.Latest.t
 
-  type value = t [@@deriving bin_io, sexp]
+  let of_coinbase (cb : Coinbase.t) : t =
+    (cb.proposer, cb.amount, cb.state_body_hash)
 
-  let length_in_triples =
-    Public_key.Compressed.length_in_triples + Amount.length_in_triples
+  type var = Public_key.Compressed.var * Amount.var * State_body_hash.var
 
-  let var_of_t ((public_key, amount) : value) =
-    (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
+  type value = Stable.Latest.t [@@deriving sexp]
 
-  let var_to_triples (public_key, amount) =
-    let%map public_key = Public_key.Compressed.var_to_triples public_key in
-    let amount = Amount.var_to_triples amount in
-    public_key @ amount
+  let var_of_t ((public_key, amount, state_body_hash) : value) =
+    ( Public_key.Compressed.var_of_t public_key
+    , Amount.var_of_t amount
+    , State_body_hash.var_of_t state_body_hash )
 
-  let fold ((public_key, amount) : t) =
-    let open Fold in
-    Public_key.Compressed.fold public_key +> Amount.fold amount
+  let to_input (pk, amount, state_body_hash) =
+    let open Random_oracle.Input in
+    List.reduce_exn ~f:append
+      [ Public_key.Compressed.to_input pk
+      ; bitstring (Amount.to_bits amount)
+      ; State_body_hash.to_input state_body_hash ]
+
+  module Checked = struct
+    let _constant ((public_key, amount, state_body_hash) : value) =
+      ( Public_key.Compressed.var_of_t public_key
+      , Amount.var_of_t amount
+      , State_body_hash.var_of_t state_body_hash )
+
+    let to_input (public_key, amount, state_body_hash) =
+      let open Random_oracle.Input in
+      List.reduce_exn ~f:append
+        [ Public_key.Compressed.Checked.to_input public_key
+        ; bitstring
+            (Bitstring_lib.Bitstring.Lsb_first.to_list
+               (Amount.var_to_bits amount))
+        ; State_body_hash.var_to_input state_body_hash ]
+  end
 
   let typ : (var, value) Typ.t =
     let spec =
       let open Data_spec in
-      [Public_key.Compressed.typ; Amount.typ]
+      [Public_key.Compressed.typ; Amount.typ; State_body_hash.typ]
     in
-    let of_hlist : 'a 'b. (unit, 'a -> 'b -> unit) H_list.t -> 'a * 'b =
+    let of_hlist
+          : 'public_key 'amount 'state_body_hash.    ( unit
+                                                     ,    'public_key
+                                                       -> 'amount
+                                                       -> 'state_body_hash
+                                                       -> unit )
+                                                     H_list.t
+            -> 'public_key * 'amount * 'state_body_hash =
       let open H_list in
-      fun [public_key; amount] -> (public_key, amount)
+      fun [public_key; amount; state_body_hash] ->
+        (public_key, amount, state_body_hash)
     in
-    let to_hlist (public_key, amount) = H_list.[public_key; amount] in
+    let to_hlist (public_key, amount, state_body_hash) =
+      H_list.[public_key; amount; state_body_hash]
+    in
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let empty = (Public_key.Compressed.empty, Amount.zero)
+  let empty = (Public_key.Compressed.empty, Amount.zero, State_body_hash.dummy)
 
   let genesis = empty
 end
@@ -55,14 +102,14 @@ end
 module Stack_id : sig
   module Stable : sig
     module V1 : sig
-      type t [@@deriving bin_io, sexp, to_yojson, compare, eq, version]
+      type t [@@deriving bin_io, sexp, to_yojson, compare, version]
     end
 
     module Latest = V1
   end
 
   (* bin_io, version omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, compare, eq]
+  type t = Stable.Latest.t [@@deriving sexp, compare, eq, to_yojson]
 
   val of_int : int -> t
 
@@ -76,32 +123,19 @@ module Stack_id : sig
 
   val ( > ) : t -> t -> bool
 end = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = int [@@deriving sexp, to_yojson, compare, eq, bin_io, version]
-      end
+      type t = int [@@deriving sexp, to_yojson, compare]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
+  type t = Stable.Latest.t [@@deriving sexp, compare, to_yojson]
 
-    module Module_decl = struct
-      let name = "pending_coinbase_stack_id"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, compare]
-
-  let ( > ), to_string, zero, to_int, of_int, equal =
-    Int.(( > ), to_string, zero, to_int, of_int, equal)
+  [%%define_locally
+  Int.(( > ), to_string, zero, to_int, of_int, equal)]
 
   let incr_by_one t1 =
     let t2 = t1 + 1 in
@@ -109,7 +143,7 @@ end = struct
 end
 
 module type Data_hash_binable_intf = sig
-  type t [@@deriving sexp, compare, eq, yojson, hash]
+  type t = private Field.t [@@deriving sexp, compare, eq, yojson, hash]
 
   module Stable : sig
     module V1 : sig
@@ -126,13 +160,9 @@ module type Data_hash_binable_intf = sig
 
   val typ : (var, t) Typ.t
 
-  val var_to_triples : var -> (Boolean.var Triple.t list, _) Tick.Checked.t
-
-  val length_in_triples : int
+  val var_to_hash_packed : var -> Field.Var.t
 
   val equal_var : var -> var -> (Boolean.var, _) Tick.Checked.t
-
-  val fold : t -> bool Triple.t Fold.t
 
   val to_bytes : t -> string
 
@@ -145,53 +175,80 @@ module Data_hash_binable = struct
   include Data_hash.Make_full_size ()
 end
 
-module Coinbase_stack = struct
-  module Stack = struct
-    include Data_hash_binable
+(* a coinbase stack has two components, data and a state_hash
+   we create modules for each component
+*)
 
-    let push (h : t) cb =
-      let coinbase = Coinbase_data.of_coinbase cb in
-      Pedersen.digest_fold Hash_prefix.coinbase_stack
-        Fold.(Coinbase_data.fold coinbase +> fold h)
-      |> of_hash
+module Coinbase_stack_data = struct
+  include Data_hash_binable
 
-    let empty =
-      of_hash (Pedersen.(State.salt "CoinbaseStack") |> Pedersen.State.digest)
+  let push (h : t) cb =
+    let coinbase = Coinbase_data.of_coinbase cb in
+    let open Random_oracle in
+    hash ~init:Hash_prefix.coinbase_stack
+      (pack_input (Input.append (Coinbase_data.to_input coinbase) (to_input h)))
+    |> of_hash
 
-    module Checked = struct
-      type t = var
+  let empty =
+    of_hash (Pedersen.(State.salt "CoinbaseStack") |> Pedersen.State.digest)
 
-      let push (t : t) (coinbase : Coinbase_data.var) =
-        (*Prefix+Coinbase+Current-stack*)
-        let init =
-          Pedersen.Checked.Section.create
-            ~acc:(`Value Hash_prefix.coinbase_stack.acc)
-            ~support:
-              (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
-        in
-        let%bind coinbase_section =
-          let%bind bs = Coinbase_data.var_to_triples coinbase in
-          Pedersen.Checked.Section.extend init bs
-            ~start:Hash_prefix.length_in_triples
-        in
-        let%bind with_t =
-          let%bind bs = var_to_triples t in
-          Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty bs
-            ~start:
-              (Hash_prefix.length_in_triples + Coinbase_data.length_in_triples)
-        in
-        let%map s =
-          Pedersen.Checked.Section.disjoint_union_exn coinbase_section with_t
-        in
-        let digest, _ =
-          Pedersen.Checked.Section.to_initial_segment_digest_exn s
-        in
-        var_of_hash_packed digest
+  module Checked = struct
+    type t = var
 
-      let if_ = if_
+    let push (h : t) (cb : Coinbase_data.var) =
+      let open Random_oracle.Checked in
+      make_checked (fun () ->
+          hash ~init:Hash_prefix.coinbase_stack
+            (pack_input
+               (Random_oracle.Input.append
+                  (Coinbase_data.Checked.to_input cb)
+                  (var_to_input h)))
+          |> var_of_hash_packed )
 
-      let empty = var_of_t empty
+    let if_ = if_
+  end
+end
+
+module Coinbase_stack_state_hash = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = State_hash.Stable.V1.t
+      [@@deriving sexp, eq, compare, hash, yojson, version]
+
+      let to_latest = Fn.id
     end
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
+
+  type var = State_hash.var
+
+  [%%define_locally
+  State_hash.
+    (gen, of_hash, to_bits, raw_hash_bytes, equal_var, typ, if_, var_of_t)]
+
+  let push (t : t) cb : t =
+    let _, _, state_body_hash = Coinbase_data.of_coinbase cb in
+    (* this is the same computation for combining state hashes and state body hashes as
+       `Protocol_state.hash_abstract', not available here because it would create
+       a module dependency cycle
+     *)
+    Random_oracle.hash ~init:Hash_prefix.protocol_state
+      [|(t :> Field.t); (state_body_hash :> Field.t)|]
+    |> of_hash
+
+  let empty = State_hash.dummy
+
+  module Checked = struct
+    type t = var
+
+    let push (t : t) ((_, _, state_body_hash) : Coinbase_data.var) =
+      make_checked (fun () ->
+          Random_oracle.Checked.hash ~init:Hash_prefix.protocol_state
+            [| State_hash.var_to_hash_packed t
+             ; State_body_hash.var_to_hash_packed state_body_hash |]
+          |> State_hash.var_of_hash_packed )
   end
 end
 
@@ -200,11 +257,9 @@ module Hash_builder = struct
   include Data_hash_binable
 
   let merge ~height (h1 : t) (h2 : t) =
-    let open Tick.Pedersen in
-    State.digest
-      (hash_fold
-         Hash_prefix.coinbase_merkle_tree.(height)
-         Fold.(Digest.fold (h1 :> field) +> Digest.fold (h2 :> field)))
+    Random_oracle.hash
+      ~init:Hash_prefix.coinbase_merkle_tree.(height)
+      [|(h1 :> field); (h2 :> field)|]
     |> of_hash
 
   let empty_hash =
@@ -215,8 +270,6 @@ module Hash_builder = struct
 
   let of_digest = Fn.compose Fn.id of_hash
 end
-
-module Stack_builder = Coinbase_stack.Stack
 
 (* Sparse_ledger.Make is applied more than once in the code, so
    it can't make assumptions about the internal structure of its module
@@ -235,85 +288,171 @@ struct
   let max_coinbase_stack_count = Int.pow 2 depth
 
   module Stack = struct
-    module Stable = struct
-      module V1 = struct
-        module T = struct
-          type t = Stack_builder.Stable.V1.t
-          [@@deriving bin_io, eq, yojson, hash, sexp, compare, version]
+    module Poly = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type ('data, 'state_hash) t = {data: 'data; state_hash: 'state_hash}
+          [@@deriving eq, yojson, hash, sexp, compare]
         end
+      end]
 
-        include T
-        include Registration.Make_latest_version (T)
-
-        let data_hash (t : t) = Hash_builder.of_digest (t :> field)
-      end
-
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "pending_coinbase_stack"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
+      type ('data, 'state_hash) t = ('data, 'state_hash) Stable.Latest.t =
+        {data: 'data; state_hash: 'state_hash}
+      [@@deriving yojson, hash, sexp, compare]
     end
 
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Coinbase_stack_data.Stable.V1.t
+          , Coinbase_stack_state_hash.Stable.V1.t )
+          Poly.Stable.V1.t
+        [@@deriving eq, yojson, hash, sexp, compare]
+
+        let to_latest = Fn.id
+      end
+    end]
+
     (* bin_io, version omitted *)
-    type t = Stable.Latest.t [@@deriving eq, yojson, compare, sexp, hash]
+    type t = Stable.Latest.t [@@deriving yojson, eq, compare, sexp, hash]
 
-    type var = Stack_builder.var
+    type var = (Coinbase_stack_data.var, Coinbase_stack_state_hash.var) Poly.t
 
-    let data_hash = Stable.Latest.data_hash
+    let to_input ({data; state_hash} : t) =
+      Random_oracle.Input.append
+        (Coinbase_stack_data.to_input data)
+        (State_hash.to_input state_hash)
 
-    [%%define_locally
-    Stack_builder.
-      ( to_bits
-      , to_bytes
-      , fold
-      , equal_var
-      , length_in_triples
-      , var_to_triples
-      , hash_fold_t
-      , empty
-      , push
-      , gen
-      , var_of_t
-      , typ )]
+    let data_hash t =
+      Random_oracle.(
+        hash ~init:Hash_prefix_states.coinbase_stack (pack_input (to_input t)))
+      |> Hash_builder.of_digest
 
-    module Checked = Stack_builder.Checked
+    let var_to_input ({data; state_hash} : var) =
+      Random_oracle.Input.append
+        (Coinbase_stack_data.var_to_input data)
+        (State_hash.var_to_input state_hash)
+
+    let hash_var (t : var) =
+      make_checked (fun () ->
+          Random_oracle.Checked.(
+            hash ~init:Hash_prefix_states.coinbase_stack
+              (pack_input (var_to_input t))) )
+
+    let var_of_t t =
+      { Poly.data= Coinbase_stack_data.var_of_t t.Poly.data
+      ; state_hash= Coinbase_stack_state_hash.var_of_t t.state_hash }
+
+    let gen =
+      let open Base_quickcheck.Generator.Let_syntax in
+      let%bind data = Coinbase_stack_data.gen in
+      let%map state_hash = Coinbase_stack_state_hash.gen in
+      {Poly.data; state_hash}
+
+    let to_hlist {Poly.data; state_hash} = H_list.[data; state_hash]
+
+    let of_hlist :
+           (unit, 'data -> 'state_hash -> unit) H_list.t
+        -> ('data, 'state_hash) Poly.t =
+     fun H_list.[data; state_hash] -> {data; state_hash}
+
+    let data_spec =
+      Snark_params.Tick.Data_spec.
+        [Coinbase_stack_data.typ; Coinbase_stack_state_hash.typ]
+
+    let typ : (var, t) Typ.t =
+      Snark_params.Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
+        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    let num_pad_bits =
+      let len = List.length Coinbase_stack_data.(to_bits empty) in
+      (3 - (len mod 3)) mod 3
+
+    (* pad to match the triple representation *)
+    let pad_bits = List.init num_pad_bits ~f:(fun _ -> false)
+
+    let to_bits t =
+      Coinbase_stack_data.to_bits t.Poly.data
+      @ pad_bits
+      @ Coinbase_stack_state_hash.to_bits t.Poly.state_hash
+
+    let to_bytes t =
+      Coinbase_stack_data.to_bytes t.Poly.data
+      ^ Coinbase_stack_state_hash.raw_hash_bytes t.Poly.state_hash
+
+    let equal_var var1 var2 =
+      let open Tick.Checked.Let_syntax in
+      let%bind b1 =
+        Coinbase_stack_data.equal_var var1.Poly.data var2.Poly.data
+      in
+      let%bind b2 =
+        Coinbase_stack_state_hash.equal_var var1.Poly.state_hash
+          var2.Poly.state_hash
+      in
+      let open Tick0.Boolean in
+      b1 && b2
+
+    let empty =
+      { Poly.data= Coinbase_stack_data.empty
+      ; state_hash= Coinbase_stack_state_hash.empty }
+
+    let equal_data t1 t2 = Coinbase_stack_data.equal t1.Poly.data t2.Poly.data
+
+    let equal_state_hash t1 t2 =
+      State_hash.equal t1.Poly.state_hash t2.Poly.state_hash
+
+    let push t (cb : Coinbase.t) =
+      let data = Coinbase_stack_data.push t.Poly.data cb in
+      let state_hash = Coinbase_stack_state_hash.push t.Poly.state_hash cb in
+      {Poly.data; state_hash}
+
+    let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
+        (var, 'a) Tick0.Checked.t =
+      let%bind data =
+        Coinbase_stack_data.Checked.if_ cond ~then_:then_.data
+          ~else_:else_.data
+      in
+      let%map state_hash =
+        Coinbase_stack_state_hash.if_ cond ~then_:then_.state_hash
+          ~else_:else_.state_hash
+      in
+      {Poly.data; state_hash}
+
+    module Checked = struct
+      type t = var
+
+      let push (t : t) (coinbase : Coinbase_data.var) : (t, 'a) Tick0.Checked.t
+          =
+        let%bind data = Coinbase_stack_data.Checked.push t.data coinbase in
+        let%map state_hash =
+          Coinbase_stack_state_hash.Checked.push t.state_hash coinbase
+        in
+        {Poly.data; state_hash}
+
+      let empty = var_of_t empty
+
+      let if_ = if_
+    end
   end
 
   module Hash = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t = Hash_builder.Stable.V1.t
-          [@@deriving bin_io, eq, compare, sexp, version, yojson, hash]
-        end
-
-        include T
-        include Registration.Make_latest_version (T)
+        type t = Hash_builder.Stable.V1.t
+        [@@deriving eq, compare, sexp, yojson, hash]
 
         type var = Hash_builder.var
 
+        let to_latest = Fn.id
+
         let merge = Hash_builder.merge
       end
+    end]
 
-      module Latest = V1
-
-      module Module_decl = struct
-        let name = "pending_coinbase_hash"
-
-        type latest = Latest.t
-      end
-
-      module Registrar = Registration.Make (Module_decl)
-      module Registered_V1 = Registrar.Register (V1)
-    end
-
-    (* bin_io, version omitted *)
     type t = Stable.Latest.t [@@deriving eq, compare, sexp, yojson, hash]
 
     type var = Stable.Latest.var
@@ -328,10 +467,7 @@ struct
       , gen
       , to_bits
       , to_bytes
-      , fold
       , equal_var
-      , length_in_triples
-      , var_to_triples
       , var_of_t
       , var_of_hash_packed
       , var_to_hash_packed
@@ -342,28 +478,25 @@ struct
      versions yields a version of the result
    *)
 
-  module V1_make =
-    Sparse_ledger_lib.Sparse_ledger.Make (Hash.Stable.V1) (Stack_id.Stable.V1)
-      (Stack.Stable.V1)
-
   module Merkle_tree = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t = V1_make.Stable.V1.t
-          [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
-        end
+        type t =
+          ( Hash.Stable.V1.t
+          , Stack_id.Stable.V1.t
+          , Stack.Stable.V1.t )
+          Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
+        [@@deriving sexp, to_yojson]
 
-        include T
+        let to_latest = Fn.id
       end
+    end]
 
-      module Latest = V1
-    end
-
-    module Latest_make = V1_make
+    module M = Sparse_ledger_lib.Sparse_ledger.Make (Hash) (Stack_id) (Stack)
 
     [%%define_locally
-    Latest_make.
+    M.
       ( of_hash
       , get_exn
       , path_exn
@@ -374,31 +507,23 @@ struct
   end
 
   module Checked = struct
-    open Coinbase_stack
-
     type var = Hash.Stable.V1.var
 
     module Merkle_tree =
       Snarky.Merkle_tree.Checked
         (Tick)
         (struct
-          type value = Pedersen.Checked.Digest.t
+          type value = Field.t
 
-          type var = Pedersen.Checked.Digest.var
+          type var = Field.Var.t
 
-          let typ = Pedersen.Checked.Digest.typ
+          let typ = Field.typ
 
           let merge ~height h1 h2 =
-            let to_triples (bs : Pedersen.Checked.Digest.Unpacked.var) =
-              Bitstring_lib.Bitstring.pad_to_triple_list
-                ~default:Boolean.false_
-                (bs :> Boolean.var list)
-            in
-            let%bind h1 = Pedersen.Checked.Digest.choose_preimage h1
-            and h2 = Pedersen.Checked.Digest.choose_preimage h2 in
-            Pedersen.Checked.digest_triples
-              ~init:Hash_prefix.coinbase_merkle_tree.(height)
-              (to_triples h1 @ to_triples h2)
+            Tick.make_checked (fun () ->
+                Random_oracle.Checked.hash
+                  ~init:Hash_prefix.coinbase_merkle_tree.(height)
+                  [|h1; h2|] )
 
           let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 
@@ -409,7 +534,7 @@ struct
 
           type value = t [@@deriving sexp]
 
-          let hash (t : var) = return (var_to_hash_packed t)
+          let hash var = hash_var var
         end)
 
     module Path = Merkle_tree.Path
@@ -445,7 +570,7 @@ struct
         (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
-    let%snarkydef add_coinbase t (pk, amount) =
+    let%snarkydef add_coinbase t (pk, amount, state_body_hash) =
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_newest_stack))
@@ -457,7 +582,7 @@ struct
       in
       handle
         (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
-           ~f:(fun stack ->
+           ~f:(fun stack0 ->
              let total_coinbase_amount =
                Currency.Amount.var_of_t Coda_compile_config.coinbase
              in
@@ -466,15 +591,15 @@ struct
              in
              let%bind amount1_equal_to_zero = equal_to_zero amount in
              let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
-             (*TODO:Optimize here since we are pushing twice to the same stack*)
+             (* TODO: Optimize here since we are pushing twice to the same stack *)
              let%bind stack_with_amount1 =
-               Coinbase_stack.Stack.Checked.push stack (pk, amount)
+               Stack.Checked.push stack0 (pk, amount, state_body_hash)
              in
              let%bind stack_with_amount2 =
-               Coinbase_stack.Stack.Checked.push stack_with_amount1
-                 (pk, rem_amount)
+               Stack.Checked.push stack_with_amount1
+                 (pk, rem_amount, state_body_hash)
              in
-             chain Stack.if_ amount1_equal_to_zero ~then_:(return stack)
+             chain Stack.if_ amount1_equal_to_zero ~then_:(return stack0)
                ~else_:
                  (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
                     ~else_:stack_with_amount2) ))
@@ -492,8 +617,8 @@ struct
           As_prover.(
             map (read Address.typ addr) ~f:(fun a -> Get_coinbase_stack a))
       in
-      let stack_hash = Stack.var_to_hash_packed in
-      let prev_entry_hash = stack_hash prev in
+      let stack_hash = Stack.hash_var in
+      let%bind prev_entry_hash = stack_hash prev in
       let%bind () =
         Merkle_tree.implied_root prev_entry_hash addr prev_path
         >>= Field.Checked.Assert.equal (Hash.var_to_hash_packed t)
@@ -501,7 +626,7 @@ struct
       let%bind next =
         Stack.if_ proof_emitted ~then_:Stack.Checked.empty ~else_:prev
       in
-      let next_entry_hash = stack_hash next in
+      let%bind next_entry_hash = stack_hash next in
       let%bind () =
         perform
           (let open As_prover in
@@ -517,52 +642,45 @@ struct
   end
 
   module Poly = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type ('tree, 'stack_id) t =
-            {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
-          [@@deriving bin_io, sexp, to_yojson, version]
-        end
-
-        include T
+        type ('tree, 'stack_id) t =
+          {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
+        [@@deriving sexp, to_yojson]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type ('tree, 'stack_id) t = ('tree, 'stack_id) Stable.Latest.t =
       {tree: 'tree; pos_list: 'stack_id list; new_pos: 'stack_id}
   end
 
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          (Merkle_tree.Stable.V1.t, Stack_id.Stable.V1.t) Poly.Stable.V1.t
-        [@@deriving bin_io, sexp, to_yojson, version {unnumbered}]
-      end
+      type t = (Merkle_tree.Stable.V1.t, Stack_id.Stable.V1.t) Poly.Stable.V1.t
+      [@@deriving sexp, to_yojson]
 
-      include T
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
+  let init_hash = Stack.data_hash Stack.empty
+
+  (* this calculation doesn't depend on any inputs *)
+  let hash_on_level, root_hash =
+    List.fold
+      (List.init depth ~f:(fun i -> i + 1))
+      ~init:([(0, init_hash)], init_hash)
+      ~f:(fun (hashes, (cur_hash : Data_hash_binable.t)) height ->
+        let (merged : Hash.t) =
+          Hash.merge ~height:(height - 1) cur_hash cur_hash
+        in
+        ((height, merged) :: hashes, merged) )
+
   let create_exn' () =
-    let init_hash = Stack.data_hash Stack.empty in
-    let hash_on_level, root_hash =
-      List.fold
-        (List.init depth ~f:(fun i -> i + 1))
-        ~init:([(0, init_hash)], init_hash)
-        ~f:(fun (hashes, (cur_hash : Stack.t)) height ->
-          let (merged : Stack.t) =
-            Hash.merge ~height:(height - 1) cur_hash cur_hash
-          in
-          ((height, merged) :: hashes, merged) )
-    in
     let rec create_path height path key =
       if height < 0 then path
       else
@@ -574,21 +692,22 @@ struct
           ((if key mod 2 = 0 then `Left hash else `Right hash) :: path)
           (key / 2)
     in
-    let rec go t key =
+    let rec make_tree t key =
       if Stack_id.( > ) key (Stack_id.of_int @@ (Int.pow 2 depth - 1)) then t
       else
         let path = create_path (depth - 1) [] (Stack_id.to_int key) in
-        go
+        make_tree
           (Merkle_tree.add_path t path key Stack.empty)
           (Or_error.ok_exn (Stack_id.incr_by_one key))
     in
-    { Poly.tree= go (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
+    { Poly.tree= make_tree (Merkle_tree.of_hash ~depth root_hash) Stack_id.zero
     ; pos_list= []
     ; new_pos= Stack_id.zero }
 
-  let create () = Or_error.try_with (fun () -> create_exn' ())
+  [%%define_locally
+  Or_error.(try_with)]
 
-  let try_with = Or_error.try_with
+  let create () = try_with (fun () -> create_exn' ())
 
   let merkle_root (t : t) = Merkle_tree.merkle_root t.tree
 
@@ -638,7 +757,7 @@ struct
   let remove_oldest_stack_id t =
     match List.rev t with
     | [] ->
-        Or_error.error_string "No coinbase stack to pop"
+        Or_error.error_string "No coinbase stack-with-state-hash to pop"
     | x :: xs ->
         Ok (x, List.rev xs)
 
@@ -655,9 +774,10 @@ struct
     let%bind stack_before = get_stack t stack_index in
     let stack_after = Stack.push stack_before coinbase in
     let%bind t' = incr_index t ~is_new_stack in
+    (* state hash in "after" stack becomes previous state hash at top level *)
     set_stack t' stack_index stack_after
 
-  let update_coinbase_stack t stack ~is_new_stack =
+  let update_coinbase_stack (t : t) stack ~is_new_stack =
     let open Or_error.Let_syntax in
     let%bind key = latest_stack_id t ~is_new_stack in
     let%bind stack_index = find_index t key in
@@ -715,7 +835,7 @@ struct
             let index =
               find_index !pending_coinbase stack_id |> Or_error.ok_exn
             in
-            respond (Provide index)
+            respond @@ Provide index
         | Checked.Get_coinbase_stack idx ->
             let elt = get_stack !pending_coinbase idx |> Or_error.ok_exn in
             let path =
@@ -730,24 +850,26 @@ struct
             unhandled )
 end
 
-include Make (struct
+module T = Make (struct
   let depth = Snark_params.pending_coinbase_depth
 end)
+
+include T
 
 let%test_unit "add stack + remove stack = initial tree " =
   let pending_coinbases = ref (create () |> Or_error.ok_exn) in
   let coinbases_gen = Quickcheck.Generator.list_non_empty Coinbase.gen in
   Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let is_new = ref true in
+          let is_new_stack = ref true in
           let init = merkle_root !pending_coinbases in
           let after_adding =
             List.fold cbs ~init:!pending_coinbases ~f:(fun acc coinbase ->
                 let t =
-                  add_coinbase acc ~coinbase ~is_new_stack:!is_new
+                  add_coinbase acc ~coinbase ~is_new_stack:!is_new_stack
                   |> Or_error.ok_exn
                 in
-                is_new := false ;
+                is_new_stack := false ;
                 t )
           in
           let _, after_del =
@@ -756,6 +878,36 @@ let%test_unit "add stack + remove stack = initial tree " =
           pending_coinbases := after_del ;
           assert (Hash.equal (merkle_root after_del) init) ;
           Async.Deferred.return () ) )
+
+module type Pending_coinbase_intf = sig
+  type t
+
+  val add_coinbase :
+    t -> coinbase:Coinbase.t -> is_new_stack:bool -> t Or_error.t
+end
+
+let add_coinbase_with_zero_checks (type t)
+    (module T : Pending_coinbase_intf with type t = t) (t : t) ~coinbase
+    ~is_new_stack =
+  if Amount.equal coinbase.Coinbase.amount Amount.zero then t
+  else
+    let max_coinbase_amount = Coda_compile_config.coinbase in
+    let coinbase' =
+      Coinbase.create
+        ~amount:
+          ( Amount.sub max_coinbase_amount coinbase.amount
+          |> Option.value_exn ?here:None ?message:None ?error:None )
+        ~proposer:coinbase.proposer ~fee_transfer:None
+        ~state_body_hash:coinbase.state_body_hash
+      |> Or_error.ok_exn
+    in
+    let interim_tree =
+      T.add_coinbase t ~coinbase ~is_new_stack |> Or_error.ok_exn
+    in
+    if Amount.equal coinbase'.amount Amount.zero then interim_tree
+    else
+      T.add_coinbase interim_tree ~coinbase:coinbase' ~is_new_stack:false
+      |> Or_error.ok_exn
 
 let%test_unit "Checked_stack = Unchecked_stack" =
   let open Quickcheck in
@@ -779,50 +931,86 @@ let%test_unit "Checked_tree = Unchecked_tree" =
   let open Quickcheck in
   let pending_coinbases = create () |> Or_error.ok_exn in
   test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
-      let max_coinbase_amount = Coda_compile_config.coinbase in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
-      let coinbase2 =
-        Coinbase.create
-          ~amount:
-            ( Amount.sub max_coinbase_amount coinbase.amount
-            |> Option.value_exn ?here:None ?message:None ?error:None )
-          ~proposer:coinbase.proposer ~fee_transfer:None
-        |> Or_error.ok_exn
-      in
       let unchecked =
-        if Amount.equal coinbase.amount Amount.zero then pending_coinbases
-        else
-          let interim_tree =
-            add_coinbase pending_coinbases ~coinbase ~is_new_stack:true
-            |> Or_error.ok_exn
-          in
-          if Amount.equal coinbase2.amount Amount.zero then interim_tree
-          else
-            add_coinbase interim_tree ~coinbase:coinbase2 ~is_new_stack:false
-            |> Or_error.ok_exn
+        add_coinbase_with_zero_checks
+          (module T)
+          pending_coinbases ~coinbase ~is_new_stack:true
       in
+      (* inside the `open' below, Checked means something else, so define this function *)
       let f_add_coinbase = Checked.add_coinbase in
-      let checked =
+      let checked_merkle_root =
         let comp =
           let open Snark_params.Tick in
           let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
-          let%map res =
+          let%map result =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 (fst coinbase_var, Amount.var_of_t coinbase.amount))
+                 coinbase_var)
               (unstage (handler pending_coinbases ~is_new_stack:true))
           in
-          As_prover.read Hash.typ res
+          As_prover.read Hash.typ result
         in
         let (), x = Or_error.ok_exn (run_and_check comp ()) in
         x
       in
-      assert (Hash.equal (merkle_root unchecked) checked) )
+      assert (Hash.equal (merkle_root unchecked) checked_merkle_root) )
+
+let%test_unit "Checked_tree = Unchecked_tree after pop" =
+  let open Quickcheck in
+  test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
+      let pending_coinbases = create () |> Or_error.ok_exn in
+      let coinbase_data = Coinbase_data.of_coinbase coinbase in
+      let unchecked =
+        add_coinbase_with_zero_checks
+          (module T)
+          pending_coinbases ~coinbase ~is_new_stack:true
+      in
+      (* inside the `open' below, Checked means something else, so define these functions *)
+      let f_add_coinbase = Checked.add_coinbase in
+      let f_pop_coinbase = Checked.pop_coinbases in
+      let checked_merkle_root =
+        let comp =
+          let open Snark_params.Tick in
+          let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
+          let%map result =
+            handle
+              (f_add_coinbase
+                 (Hash.var_of_t (merkle_root pending_coinbases))
+                 coinbase_var)
+              (unstage (handler pending_coinbases ~is_new_stack:true))
+          in
+          As_prover.read Hash.typ result
+        in
+        let (), x = Or_error.ok_exn (run_and_check comp ()) in
+        x
+      in
+      assert (Hash.equal (merkle_root unchecked) checked_merkle_root) ;
+      let _, unchecked_after_pop =
+        remove_coinbase_stack unchecked |> Or_error.ok_exn
+      in
+      let checked_merkle_root_after_pop =
+        let comp =
+          let open Snark_params.Tick in
+          let%map current, _previous =
+            handle
+              (f_pop_coinbase ~proof_emitted:Boolean.true_
+                 (Hash.var_of_t checked_merkle_root))
+              (unstage (handler unchecked ~is_new_stack:false))
+          in
+          As_prover.read Hash.typ current
+        in
+        let (), x = Or_error.ok_exn (run_and_check comp ()) in
+        x
+      in
+      assert (
+        Hash.equal
+          (merkle_root unchecked_after_pop)
+          checked_merkle_root_after_pop ) )
 
 let%test_unit "push and pop multiple stacks" =
   let open Quickcheck in
-  let max_coinbase_amount = Coda_compile_config.coinbase in
   let module Pending_coinbase = Make (struct
     let depth = 3
   end) in
@@ -841,27 +1029,9 @@ let%test_unit "push and pop multiple stacks" =
         let updated =
           List.fold coinbases ~init:t'
             ~f:(fun pending_coinbases (coinbase : Coinbase.t) ->
-              let coinbase2 =
-                Coinbase.create
-                  ~amount:
-                    ( Amount.sub max_coinbase_amount coinbase.amount
-                    |> Option.value_exn ?here:None ?message:None ?error:None )
-                  ~proposer:coinbase.proposer ~fee_transfer:None
-                |> Or_error.ok_exn
-              in
-              if Amount.equal coinbase.amount Amount.zero then
-                pending_coinbases
-              else
-                let interim_tree =
-                  Pending_coinbase.add_coinbase pending_coinbases ~coinbase
-                    ~is_new_stack:false
-                  |> Or_error.ok_exn
-                in
-                if Amount.equal coinbase2.amount Amount.zero then interim_tree
-                else
-                  Pending_coinbase.add_coinbase interim_tree
-                    ~coinbase:coinbase2 ~is_new_stack:false
-                  |> Or_error.ok_exn )
+              add_coinbase_with_zero_checks
+                (module Pending_coinbase)
+                pending_coinbases ~coinbase ~is_new_stack:false )
         in
         let new_stack =
           Or_error.ok_exn
@@ -869,19 +1039,19 @@ let%test_unit "push and pop multiple stacks" =
         in
         (new_stack, updated)
   in
-  (*Create pending coinbase stacks from coinbase lists and add it to the pending coinbase merkle tree*)
+  (* Create pending coinbase stacks from coinbase lists and add it to the pending coinbase merkle tree *)
   let add coinbase_lists pending_coinbases =
     List.fold ~init:([], pending_coinbases) coinbase_lists
       ~f:(fun (stacks, pc) coinbases ->
         let new_stack, pc = t_of_coinbases pc coinbases in
         (new_stack :: stacks, pc) )
   in
-  (*remove the oldest stack and check if that's the expected one *)
+  (* remove the oldest stack and check if that's the expected one *)
   let remove_check t expected_stack =
     let popped_stack, updated_pending_coinbases =
       Pending_coinbase.remove_coinbase_stack t |> Or_error.ok_exn
     in
-    assert (Pending_coinbase.Stack.equal popped_stack expected_stack) ;
+    assert (Pending_coinbase.Stack.equal_data popped_stack expected_stack) ;
     updated_pending_coinbases
   in
   let add_remove_check coinbase_lists =

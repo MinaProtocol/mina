@@ -6,9 +6,13 @@ In this section, we'll make our first transaction on the Coda network. After [in
 
 Run the following command to start up a Coda node instance and connect to the network:
 
-    coda daemon -peer something-snarky.o1test.net:8303
+    coda daemon \
+        -discovery-port 8303 \
+        -peer /dns4/peer1-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs \
+        -peer /dns4/peer2-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF \
+        -peer /dns4/peer3-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7
 
-The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8302 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>`.
+The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8303 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>`.
 
 !!!note
     The daemon process needs to be running whenever you issue commands from `coda client`, so make sure you don't kill it by accident.
@@ -76,23 +80,20 @@ While you're waiting take a look at your daemon logs for new blocks being genera
 
 ## Make a payment
 
-Finally we get to the good stuff, sending our first transaction! For testing purposes, there's already an [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo-service) set up that will immediately refund your payment minus the transaction fees.
-
-!!! warning
-    Currently, there is a known issue with the echo service that prevents it from sending multiple transactions within the same 5 minute window. As such, it may not return funds currently, but you will still receive Testnet Points[\*](#disclaimer) for completing the challenge.
+Finally we get to the good stuff, sending our first transaction! For testing purposes, there is an Echo Service offered as part of the official [Discord Faucet](https://github.com/CodaProtocol/coda/tree/develop/frontend/bot) that will immediately refund your payment minus the transaction fees.
 
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
     coda client send-payment \
       -amount 20 \
-      -receiver tNciB5atiEC8k4poyYQX64WPZzSTt1pLYwujjiQeQtw9xaTPY5ZqVdcc6aP3MUVUVm8QTP7vcGPtGqZmDmozkjpZZKiMppMc4D6Dq8JScuPw5D9oCjAoYq431Ka8Ch2povNMJE7TYusPM3 \
+      -receiver tdNE67M9Snd4KF2Y3xgCQ8Res8LQxckx5xpraAAfa9uv1P6GUy8a6QkXbLnN8PknuKDknEerRCYGujScean4D88v5sJcTqiuqnr2666Csc8QhpUW6MeXq7MgEha7S6ttxB3bY9MMVrDNBB \
       -fee 5 \
       -privkey-path keys/my-wallet
 
 If you're wondering what we passed in to the commands above:
 
 - For `amount`, we're sending a test value of `20` coda
-- The `receiver` is the public key of the [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo-service)
+- The `receiver` is the public key of the [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo)
 - For `fee`, let's use the current market rate of `5` coda
 - The `privkey-path` is the private key file path of the private key we generated the `keys` folder
 

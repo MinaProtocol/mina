@@ -198,7 +198,9 @@ module MediaQuery = {
   let veryVeryLarge = "(min-width: 77rem)";
   let veryLarge = "(min-width: 70.8125rem)";
   let somewhatLarge = "(min-width: 65.5rem)";
-  let full = "(min-width: 48rem)";
+  let tablet = "(min-width:60rem)";
+  let desktop = "(min-width:105rem)";
+  let full = "(min-width: 54rem)";
   let notMobile = "(min-width: 32rem)";
   let notSmallMobile = "(min-width: 25rem)";
   let statusLiftAlways = "(min-width: 38rem)";
@@ -380,9 +382,8 @@ module H4 = {
       color(Colors.greyishBrown),
     ]);
 
-  let wide =
-    style([
-      whiteSpace(`nowrap),
+  let (wide, wideStyles) =
+    generateStyles([
       fontSize(`rem(0.75)),
       letterSpacing(`rem(0.125)),
       Typeface.aktivgrotesk,
@@ -390,6 +391,7 @@ module H4 = {
       fontStyle(`normal),
       textAlign(`center),
       textTransform(`uppercase),
+      media(MediaQuery.notMobile, [whiteSpace(`nowrap)]),
     ]);
 };
 
@@ -428,10 +430,19 @@ module Body = {
   let (basic, basicStyles) =
     generateStyles([
       Typeface.ibmplexsans,
-      color(Colors.metallicBlue),
-      fontSize(`rem(1.0)),
-      lineHeight(`rem(1.5)),
+      color(Colors.saville),
+      fontSize(`rem(1.125)),
+      lineHeight(`rem(1.625)),
       fontWeight(`normal),
+      letterSpacing(`rem(0.016)),
+      media(
+        MediaQuery.notMobile,
+        [
+          fontSize(`rem(1.0)),
+          lineHeight(`rem(1.5)),
+          letterSpacing(`rem(0.01)),
+        ],
+      ),
     ]);
 
   let basic_semibold = merge([basic, style([fontWeight(`semiBold)])]);

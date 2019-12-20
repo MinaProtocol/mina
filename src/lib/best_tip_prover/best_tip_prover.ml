@@ -2,37 +2,18 @@ open Core_kernel
 open Coda_base
 open Coda_state
 open Async_kernel
+open Coda_transition
 
 module type Inputs_intf = sig
-  include Transition_frontier.Inputs_intf
-
-  module Transition_frontier :
-    Coda_intf.Transition_frontier_intf
-    with type external_transition_validated := External_transition.Validated.t
-     and type mostly_validated_external_transition :=
-                ( [`Time_received] * unit Truth.true_t
-                , [`Proof] * unit Truth.true_t
-                , [`Delta_transition_chain]
-                  * State_hash.t Non_empty_list.t Truth.true_t
-                , [`Frontier_dependencies] * unit Truth.true_t
-                , [`Staged_ledger_diff] * unit Truth.false_t )
-                External_transition.Validation.with_transition
-     and type transaction_snark_scan_state := Staged_ledger.Scan_state.t
-     and type staged_ledger_diff := Staged_ledger_diff.t
-     and type staged_ledger := Staged_ledger.t
-     and type verifier := Verifier.t
+  module Transition_frontier : module type of Transition_frontier
 end
 
 module Make (Inputs : Inputs_intf) :
   Coda_intf.Best_tip_prover_intf
-  with type transition_frontier := Inputs.Transition_frontier.t
-   and type external_transition := Inputs.External_transition.t
-   and type external_transition_with_initial_validation :=
-              Inputs.External_transition.with_initial_validation
-   and type verifier := Inputs.Verifier.t = struct
+  with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
 
-  module Merkle_list_prover = Merkle_list_prover.Make (struct
+  module Merkle_list_prover = Merkle_list_prover.Make_ident (struct
     type value = External_transition.Validated.t
 
     type context = Transition_frontier.t
@@ -67,7 +48,8 @@ module Make (Inputs : Inputs_intf) :
     let open Option.Let_syntax in
     let%map () =
       Option.some_if
-        (Transition_frontier.best_tip_path_length_exn frontier = max_length)
+        ( Transition_frontier.best_tip_path_length_exn frontier
+        = Transition_frontier.global_max_length )
         ()
     in
     let best_tip_breadcrumb = Transition_frontier.best_tip frontier in
@@ -101,6 +83,8 @@ module Make (Inputs : Inputs_intf) :
       Validation.wrap transition_with_hash
       |> skip_time_received_validation
            `This_transition_was_not_received_via_gossip
+      |> skip_genesis_protocol_state_validation
+           `This_transition_was_generated_internally
       |> validate_proof ~verifier
       >>= Fn.compose Deferred.Result.return
             (skip_delta_transition_chain_validation
@@ -120,8 +104,8 @@ module Make (Inputs : Inputs_intf) :
              ( Error.of_string
              @@ sprintf
                   !"Peer should have given a proof of length %d but got %d"
-                  max_length merkle_list_length )
-           (Int.equal max_length merkle_list_length))
+                  Transition_frontier.global_max_length merkle_list_length )
+           (Int.equal Transition_frontier.global_max_length merkle_list_length))
     in
     let best_tip_with_hash =
       With_hash.of_data best_tip ~hash_data:External_transition.state_hash
@@ -148,6 +132,5 @@ module Make (Inputs : Inputs_intf) :
 end
 
 include Make (struct
-  include Transition_frontier.Inputs
   module Transition_frontier = Transition_frontier
 end)

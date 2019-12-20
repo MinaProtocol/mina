@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"/src/config.mlh"]
 
 open Ppxlib
 open Asttypes
@@ -172,31 +172,46 @@ let location_expr key_location =
                 key_location)])]
 
 let gen_keys () =
-  let%bind tx_keys_location, tx_keys, tx_keys_checksum =
-    Transaction_snark.Keys.cached ()
+  let open Async_kernel in
+  let%bind {Cached.With_track_generated.data= acc; dirty} =
+    let open Cached.Deferred_with_track_generated.Let_syntax in
+    let%bind tx_keys_location, tx_keys, tx_keys_checksum =
+      Transaction_snark.Keys.cached ()
+    in
+    let module M =
+    (* TODO make toplevel library to encapsulate consensus params *)
+    Blockchain_snark.Blockchain_transition.Make (Transaction_snark.Verification
+                                                 .Make
+                                                   (struct
+      let keys = tx_keys
+    end)) in
+    let%map bc_keys_location, _bc_keys, bc_keys_checksum = M.Keys.cached () in
+    ( Blockchain_snark_keys.Proving.load_expr ~loc bc_keys_location.proving
+        bc_keys_checksum.proving
+    , Blockchain_snark_keys.Proving.key_location ~loc bc_keys_location.proving
+    , Blockchain_snark_keys.Verification.load_expr ~loc
+        bc_keys_location.verification bc_keys_checksum.verification
+    , Blockchain_snark_keys.Verification.key_location ~loc
+        bc_keys_location.verification
+    , Transaction_snark_keys.Proving.load_expr ~loc tx_keys_location.proving
+        tx_keys_checksum.proving
+    , Transaction_snark_keys.Proving.key_location ~loc tx_keys_location.proving
+    , Transaction_snark_keys.Verification.load_expr ~loc
+        tx_keys_location.verification tx_keys_checksum.verification
+    , Transaction_snark_keys.Verification.key_location ~loc
+        tx_keys_location.verification )
   in
-  let module M =
-  (* TODO make toplevel library to encapsulate consensus params *)
-  Blockchain_snark.Blockchain_transition.Make (Transaction_snark.Verification
-                                               .Make
-                                                 (struct
-    let keys = tx_keys
-  end)) in
-  let%map bc_keys_location, _bc_keys, bc_keys_checksum = M.Keys.cached () in
-  ( Blockchain_snark_keys.Proving.load_expr ~loc bc_keys_location.proving
-      bc_keys_checksum.proving
-  , Blockchain_snark_keys.Proving.key_location ~loc bc_keys_location.proving
-  , Blockchain_snark_keys.Verification.load_expr ~loc
-      bc_keys_location.verification bc_keys_checksum.verification
-  , Blockchain_snark_keys.Verification.key_location ~loc
-      bc_keys_location.verification
-  , Transaction_snark_keys.Proving.load_expr ~loc tx_keys_location.proving
-      tx_keys_checksum.proving
-  , Transaction_snark_keys.Proving.key_location ~loc tx_keys_location.proving
-  , Transaction_snark_keys.Verification.load_expr ~loc
-      tx_keys_location.verification tx_keys_checksum.verification
-  , Transaction_snark_keys.Verification.key_location ~loc
-      tx_keys_location.verification )
+  match dirty with
+  | `Generated_something -> (
+    (* TODO: Check if circleci and die *)
+    match (Sys.getenv "CI", Sys.getenv "DUNE_PROFILE") with
+    | Some _, Some profile
+      when String.is_substring ~substring:"testnet" profile ->
+        exit 0xc1 (* exit with code 0xc1, get it "CI" *)
+    | Some _, Some _ | _, None | None, _ ->
+        return acc )
+  | `Cache_hit ->
+      return acc
 
 [%%else]
 

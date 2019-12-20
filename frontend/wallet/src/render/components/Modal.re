@@ -37,12 +37,23 @@ module Styles = {
       top(`zero),
       right(`zero),
       bottom(`zero),
+      zIndex(999),
       display(`flex),
       justifyContent(`center),
       alignItems(`center),
       width(`percent(100.)),
       height(`percent(100.)),
       backgroundColor(Theme.Colors.modalDisableBgAlpha(0.67)),
+    ]);
+
+  let default =
+    style([
+      margin(`auto),
+      width(`rem(22.)),
+      display(`flex),
+      flexDirection(`column),
+      alignItems(`center),
+      justifyContent(`center),
     ]);
 };
 
