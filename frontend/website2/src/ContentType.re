@@ -43,6 +43,21 @@ module JobPost = {
   type entries = System.entries(t);
 };
 
+module KnowledgeBase = {
+  let id = "knowledgeBase";
+  type link = {
+    title: string,
+    url: string,
+  };
+  type links = {
+    articles: array(link),
+    videos: array(link),
+  };
+  type t = {links};
+  type entry = System.entry(t);
+  type entries = System.entries(t);
+};
+
 module DocsPage = {
   let id = "docsPage2";
   type t = {

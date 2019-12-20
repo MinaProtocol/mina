@@ -1,213 +1,198 @@
-// module KnowledgeBase = {
-//   module SubSection = {
-//     [@react.component]
-//     let make = (~className="", ~title, ~content) => {
-//       let items =
-//         content
-//         |> Array.mapi((i, {Links.Named.name: (copy, machineName), link}) =>
-//              <li
-//                key={string_of_int(i)}
-//                className=Css.(
-//                  style([
-//                    marginBottom(`rem(0.5)),
-//                    color(Style.Colors.hyperlink),
-//                    listStyle(`none, `inside, `none),
-//                    marginLeft(`rem(1.5)),
-//                    marginRight(`rem(1.)),
-//                    before([
-//                      contentRule({js|*|js}),
-//                      color(Style.Colors.hyperlink),
-//                      display(`inlineBlock),
-//                      marginLeft(`rem(-1.)),
-//                      marginRight(`rem(0.6)),
-//                      verticalAlign(`bottom),
-//                    ]),
-//                  ])
-//                )>
-//                <A
-//                  name=machineName
-//                  href=link
-//                  className=Css.(
-//                    merge([Style.Link.basic, style([cursor(`pointer)])])
-//                  )
-//                  innerHtml=copy
-//                />
-//              </li>
-//            )
-//         |> React.array;
+module KnowledgeBase = {
+  module SubSection = {
+    [@react.component]
+    let make = (~className="", ~title, ~content) => {
+      let items =
+        content
+        |> Array.mapi((i, {title, url}: ContentType.KnowledgeBase.link) =>
+             <li
+               key={string_of_int(i)}
+               className=Css.(
+                 style([
+                   marginBottom(`rem(0.5)),
+                   color(Theme.Colors.hyperlink),
+                   listStyle(`none, `inside, `none),
+                   marginLeft(`rem(1.5)),
+                   marginRight(`rem(1.)),
+                   before([
+                     contentRule({js|*|js}),
+                     color(Theme.Colors.hyperlink),
+                     display(`inlineBlock),
+                     marginLeft(`rem(-1.)),
+                     marginRight(`rem(0.6)),
+                     verticalAlign(`bottom),
+                   ]),
+                 ])
+               )>
+               <a
+                 href=url
+                 className=Css.(
+                   merge([Theme.Link.basic, style([cursor(`pointer)])])
+                 )>
+                 {React.string(title)}
+               </a>
+             </li>
+           )
+        |> React.array;
 
-//       <div className>
-//         <h5
-//           className=Css.(
-//             merge([
-//               Style.H5.basic,
-//               style([
-//                 marginLeft(`zero),
-//                 color(Style.Colors.slate),
-//                 marginRight(`zero),
-//                 marginTop(`rem(1.)),
-//                 marginBottom(`rem(0.75)),
-//                 media(
-//                   Style.MediaQuery.notMobile,
-//                   [marginTop(`rem(1.)), marginLeft(`rem(0.5))],
-//                 ),
-//               ]),
-//             ])
-//           )>
-//           {React.string(title)}
-//         </h5>
-//         <ul
-//           className=Css.(
-//             style([
-//               marginRight(`zero),
-//               paddingBottom(`zero),
-//               paddingLeft(`zero),
-//               paddingRight(`zero),
-//               marginBottom(`zero),
-//               maxWidth(`rem(24.5)),
-//             ])
-//           )>
-//           items
-//         </ul>
-//       </div>;
-//     };
-//   };
+      <div className>
+        <h5
+          className=Css.(
+            merge([
+              Theme.H5.basic,
+              style([
+                marginLeft(`zero),
+                color(Theme.Colors.slate),
+                marginRight(`zero),
+                marginTop(`rem(1.)),
+                marginBottom(`rem(0.75)),
+                media(
+                  Theme.MediaQuery.notMobile,
+                  [marginTop(`rem(1.)), marginLeft(`rem(0.5))],
+                ),
+              ]),
+            ])
+          )>
+          {React.string(title)}
+        </h5>
+        <ul
+          className=Css.(
+            style([
+              marginRight(`zero),
+              paddingBottom(`zero),
+              paddingLeft(`zero),
+              paddingRight(`zero),
+              marginBottom(`zero),
+              maxWidth(`rem(24.5)),
+            ])
+          )>
+          items
+        </ul>
+      </div>;
+    };
+  };
 
-//   [@react.component]
-//   let make = (~posts) => {
-//     <fieldset
-//       className=Css.(
-//         style([
-//           textAlign(`center),
-//           Style.Typeface.ibmplexserif,
-//           display(`block),
-//           border(`px(1), `solid, Style.Colors.hyperlinkAlpha(0.3)),
-//           borderRadius(`px(18)),
-//           maxWidth(`rem(58.625)),
-//           marginLeft(`auto),
-//           marginRight(`auto),
-//           unsafe("min-width", "min-content"),
-//           paddingBottom(`rem(1.)),
-//           media(Style.MediaQuery.notMobile, [paddingBottom(`rem(2.))]),
-//         ])
-//       )>
-//       {ReactDOMRe.createElement(
-//          "legend",
-//          ~props=
-//            ReactDOMRe.objToDOMProps({
-//              "align": "center",
-//              "className":
-//                Css.(
-//                  style([
-//                    textAlign(`center),
-//                    marginTop(`zero),
-//                    marginBottom(`zero),
-//                  ])
-//                ),
-//            }),
-//          [|
-//            <h4
-//              className=Css.(
-//                style([
-//                  textAlign(`center),
-//                  letterSpacing(`rem(0.1875)),
-//                  border(`px(1), `solid, Style.Colors.saville),
-//                  paddingLeft(`rem(1.25)),
-//                  paddingRight(`rem(1.25)),
-//                  paddingTop(`rem(0.25)),
-//                  paddingBottom(`rem(0.25)),
-//                  textTransform(`uppercase),
-//                  fontWeight(`medium),
-//                  color(Style.Colors.midnight),
-//                ])
-//              )>
-//              {React.string("Knowledge base")}
-//            </h4>,
-//          |],
-//        )}
-//       <input
-//         id="expand-knowledge-base"
-//         type_="checkbox"
-//         className=Css.(
-//           style([
-//             display(`none),
-//             selector(
-//               ":checked + div",
-//               [height(`auto), after([display(`none)])],
-//             ),
-//             selector(":checked ~ label", [display(`none)]),
-//           ])
-//         )
-//       />
-//       <div
-//         className=Css.(
-//           style([
-//             position(`relative),
-//             display(`flex),
-//             justifyContent(`spaceAround),
-//             flexWrap(`wrap),
-//             textAlign(`left),
-//             paddingLeft(`rem(1.0)),
-//             paddingRight(`rem(1.0)),
-//             paddingTop(`rem(1.5)),
-//             paddingBottom(`rem(1.5)),
-//             height(`rem(15.)),
-//             overflow(`hidden),
-//             after([
-//               contentRule(""),
-//               position(`absolute),
-//               bottom(`zero),
-//               left(`zero),
-//               height(`rem(2.)),
-//               width(`percent(100.)),
-//               pointerEvents(`none),
-//               backgroundImage(
-//                 `linearGradient((
-//                   `deg(0),
-//                   [
-//                     (0, Style.Colors.white),
-//                     (100, Style.Colors.whiteAlpha(0.0)),
-//                   ],
-//                 )),
-//               ),
-//             ]),
-//           ])
-//         )>
-//         <SubSection
-//           title="Articles"
-//           content={Array.of_list(Links.Lists.articles(posts))}
-//         />
-//         <SubSection
-//           title="Videos & Podcasts"
-//           content={Array.of_list(Links.Lists.richMedia)}
-//         />
-//       </div>
-//       <label
-//         className=Css.(
-//           merge([
-//             Style.Link.basic,
-//             style([
-//               color(Style.Colors.hyperlink),
-//               marginTop(`rem(1.0)),
-//               marginLeft(`auto),
-//               marginRight(`auto),
-//               marginBottom(`rem(-1.0)),
-//               width(`rem(10.)),
-//               height(`rem(2.5)),
-//               display(`block),
-//               cursor(`pointer),
-//             ]),
-//           ])
-//         )
-//         htmlFor="expand-knowledge-base">
-//         {React.string({js|View all ↓|js})}
-//       </label>
-//       <RunScript>
-//         {|document.getElementById("expand-knowledge-base").checked = false;|}
-//       </RunScript>
-//     </fieldset>;
-//   };
-// };
+  [@react.component]
+  let make = (~links) => {
+    let (baseOpen, setOpen) = React.useState(() => false);
+    <fieldset
+      className=Css.(
+        style([
+          textAlign(`center),
+          Theme.Typeface.ibmplexserif,
+          display(`block),
+          border(`px(1), `solid, Theme.Colors.hyperlinkAlpha(0.3)),
+          borderRadius(`px(18)),
+          maxWidth(`rem(58.625)),
+          marginLeft(`auto),
+          marginRight(`auto),
+          unsafe("min-width", "min-content"),
+          paddingBottom(`rem(1.)),
+          media(Theme.MediaQuery.notMobile, [paddingBottom(`rem(2.))]),
+        ])
+      )>
+      {ReactDOMRe.createElement(
+         "legend",
+         ~props=
+           ReactDOMRe.objToDOMProps({
+             "align": "center",
+             "className":
+               Css.(
+                 style([
+                   textAlign(`center),
+                   marginTop(`zero),
+                   marginBottom(`zero),
+                 ])
+               ),
+           }),
+         [|
+           <h4
+             className=Css.(
+               style([
+                 textAlign(`center),
+                 letterSpacing(`rem(0.1875)),
+                 border(`px(1), `solid, Theme.Colors.saville),
+                 paddingLeft(`rem(1.25)),
+                 paddingRight(`rem(1.25)),
+                 paddingTop(`rem(0.25)),
+                 paddingBottom(`rem(0.25)),
+                 textTransform(`uppercase),
+                 fontWeight(`medium),
+                 color(Theme.Colors.midnight),
+               ])
+             )>
+             {React.string("Knowledge base")}
+           </h4>,
+         |],
+       )}
+      <div
+        className=Css.(
+          style([
+            position(`relative),
+            display(`flex),
+            justifyContent(`spaceAround),
+            flexWrap(`wrap),
+            textAlign(`left),
+            paddingLeft(`rem(1.0)),
+            paddingRight(`rem(1.0)),
+            paddingTop(`rem(1.5)),
+            paddingBottom(`rem(1.5)),
+            height(baseOpen ? auto : `rem(15.)),
+            overflow(`hidden),
+            after([
+              contentRule(""),
+              position(`absolute),
+              bottom(`zero),
+              left(`zero),
+              height(`rem(2.)),
+              width(`percent(100.)),
+              pointerEvents(`none),
+              backgroundImage(
+                `linearGradient((
+                  `deg(0.),
+                  [
+                    (`zero, Theme.Colors.white),
+                    (`percent(100.), Theme.Colors.whiteAlpha(0.0)),
+                  ],
+                )),
+              ),
+            ]),
+          ])
+        )>
+        <SubSection
+          title="Articles"
+          content={links.ContentType.KnowledgeBase.articles}
+        />
+        <SubSection
+          title="Videos & Podcasts"
+          content={links.ContentType.KnowledgeBase.videos}
+        />
+      </div>
+      {baseOpen
+         ? React.null
+         : <label
+             className=Css.(
+               merge([
+                 Theme.Link.basic,
+                 style([
+                   color(Theme.Colors.hyperlink),
+                   marginTop(`rem(1.0)),
+                   marginLeft(`auto),
+                   marginRight(`auto),
+                   marginBottom(`rem(-1.0)),
+                   width(`rem(10.)),
+                   height(`rem(2.5)),
+                   display(`block),
+                   cursor(`pointer),
+                 ]),
+               ])
+             )
+             onClick={_ => {setOpen(_ => !baseOpen)}}>
+             {React.string({js|View all ↓|js})}
+           </label>}
+    </fieldset>;
+  };
+};
 module SocialLink = {
   let colorVarName = "--svg-color-social";
   [@react.component]
@@ -315,73 +300,72 @@ module Svg = {
 };
 
 [@react.component]
-let make = () => {
+let make = (~links) => {
   <div>
-
-      <h1
-        className=Css.(
-          merge([
-            Theme.H1.hero,
-            style([
-              color(Theme.Colors.denimTwo),
-              marginTop(`rem(6.)),
-              marginBottom(`rem(1.5)),
-              media(Theme.MediaQuery.notMobile, [textAlign(`center)]),
-            ]),
-          ])
-        )>
-        {React.string("Get involved")}
-      </h1>
-      <div
-        className=Css.(
+    <h1
+      className=Css.(
+        merge([
+          Theme.H1.hero,
           style([
-            display(`flex),
-            justifyContent(`center),
-            flexWrap(`wrap),
-            alignItems(`flexStart),
-            maxWidth(`rem(46.0)),
-            media(
-              Theme.MediaQuery.notMobile,
-              [
-                justifyContent(`center),
-                margin3(~top=`zero, ~h=`auto, ~bottom=`rem(2.)),
-              ],
-            ),
-          ])
-        )>
-        <NewsletterWidget center=true />
-      </div>
-      <div
-        className=Css.(
-          style([
-            media(Theme.MediaQuery.notMobile, [marginBottom(`rem(2.4))]),
-            display(`flex),
-            flexWrap(`wrap),
-            justifyContent(`spaceAround),
-            alignItems(`center),
-            marginTop(`rem(1.0)),
-            marginBottom(`rem(1.25)),
-            maxWidth(`rem(63.)),
-            marginLeft(`auto),
-            marginRight(`auto),
-          ])
-        )>
-        <SocialLink
-          link="https://twitter.com/codaprotocol"
-          name="Twitter"
-          svg=Svg.twitter
-        />
-        <SocialLink
-          link="https://bit.ly/CodaDiscord"
-          name="Discord"
-          svg=Svg.discord
-        />
-        <SocialLink
-          link="https://t.me/codaprotocol"
-          name="Telegram"
-          svg=Svg.telegram
-        />
-      </div>
-    </div>;
-    // <KnowledgeBase posts />
+            color(Theme.Colors.denimTwo),
+            marginTop(`rem(6.)),
+            marginBottom(`rem(1.5)),
+            media(Theme.MediaQuery.notMobile, [textAlign(`center)]),
+          ]),
+        ])
+      )>
+      {React.string("Get involved")}
+    </h1>
+    <div
+      className=Css.(
+        style([
+          display(`flex),
+          justifyContent(`center),
+          flexWrap(`wrap),
+          alignItems(`flexStart),
+          maxWidth(`rem(46.0)),
+          media(
+            Theme.MediaQuery.notMobile,
+            [
+              justifyContent(`center),
+              margin3(~top=`zero, ~h=`auto, ~bottom=`rem(2.)),
+            ],
+          ),
+        ])
+      )>
+      <NewsletterWidget center=true />
+    </div>
+    <div
+      className=Css.(
+        style([
+          media(Theme.MediaQuery.notMobile, [marginBottom(`rem(2.4))]),
+          display(`flex),
+          flexWrap(`wrap),
+          justifyContent(`spaceAround),
+          alignItems(`center),
+          marginTop(`rem(1.0)),
+          marginBottom(`rem(1.25)),
+          maxWidth(`rem(63.)),
+          marginLeft(`auto),
+          marginRight(`auto),
+        ])
+      )>
+      <SocialLink
+        link="https://twitter.com/codaprotocol"
+        name="Twitter"
+        svg=Svg.twitter
+      />
+      <SocialLink
+        link="https://bit.ly/CodaDiscord"
+        name="Discord"
+        svg=Svg.discord
+      />
+      <SocialLink
+        link="https://t.me/codaprotocol"
+        name="Telegram"
+        svg=Svg.telegram
+      />
+    </div>
+    <KnowledgeBase links />
+  </div>;
 };

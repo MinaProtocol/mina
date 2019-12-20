@@ -4,7 +4,7 @@ module Styles = {
 };
 
 [@react.component]
-let make = () => {
+let make = (~links) => {
   <Page footerColor=Theme.Colors.navyBlue>
     <div className=Styles.page>
       <section
@@ -19,7 +19,7 @@ let make = () => {
           <CryptoAppsSection />
           <InclusiveSection />
           <SustainableSection />
-          <GetInvolvedSection />
+          <GetInvolvedSection links />
         </Wrapped>
         <div
           className=Css.(
@@ -34,3 +34,17 @@ let make = () => {
     </div>
   </Page>;
 };
+
+Next.injectGetInitialProps(make, _ => {
+  Contentful.getEntries(
+    Lazy.force(Contentful.client),
+    {"include": 0, "sys.id": "15yfHjBude059Ak1YXgW9w"} // Entry ID of Knowledge Base file
+  )
+  |> Js.Promise.then_((entries: ContentType.KnowledgeBase.entries) => {
+       let links = Array.map(
+                     (e: ContentType.KnowledgeBase.entry) => e.fields.links,
+                     entries.items,
+                   )[0];
+       Js.Promise.resolve({"links": links});
+     })
+});
