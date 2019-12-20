@@ -54,6 +54,9 @@ module Style = {
           mediaLarge([display(`block)]),
         ],
       ),
+      selector("ul", [marginLeft(`rem(-1.0))]),
+      selector("ul > li", [paddingLeft(`rem(1.0))]),
+      selector("ul > li > ul", [marginLeft(`rem(1.))]),
       // Visibility (based on screen width)
       notLarge([display(`block)]),
       onlyMobile([display(`block)]),
