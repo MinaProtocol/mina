@@ -57,6 +57,7 @@ echo "------------------------------------------------------------"
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
+cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
 
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
@@ -68,6 +69,7 @@ rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
 compile_keys=$(./default/src/app/cli/src/coda.exe internal snark-hashes)
+compile_keys+="coda_genesis_${GITHASH}.tar.gz"
 for key in $compile_keys
 do
     echo -n "Looking for keys matching: ${key} -- "

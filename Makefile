@@ -196,6 +196,7 @@ deb:
 	@mkdir -p /tmp/artifacts
 	@cp _build/coda*.deb /tmp/artifacts/.
 	@cp _build/coda_pvkeys_* /tmp/artifacts/.
+	@cp _build/coda_genesis_* /tmp/artifacts/.
 
 publish_deb:
 	@./scripts/publish-deb.sh
