@@ -8,6 +8,7 @@ SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
 cd "${SCRIPTPATH}/../_build"
 
 GITHASH=$(git rev-parse --short=7 HEAD)
+GITHASHLONG=$(git rev-parse HEAD)
 GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
 GITTAG=$(git describe --abbrev=0)
 
@@ -69,7 +70,7 @@ rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
 compile_keys=$(./default/src/app/cli/src/coda.exe internal snark-hashes)
-compile_keys+="coda_genesis_${GITHASH}.tar.gz"
+compile_keys+="coda_genesis_${GITHASHLONG}.tar.gz"
 for key in $compile_keys
 do
     echo -n "Looking for keys matching: ${key} -- "
