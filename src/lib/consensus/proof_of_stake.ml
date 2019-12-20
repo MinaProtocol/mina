@@ -46,9 +46,9 @@ let compute_delegatee_table keys ~iter_accounts =
         Public_key.Compressed.Table.update outer_table acct.delegate
           ~f:(function
           | None ->
-              Account.Index.Table.of_alist_exn [(i, acct.balance)]
+              Account.Index.Table.of_alist_exn [(i, acct)]
           | Some table ->
-              Account.Index.Table.add_exn table ~key:i ~data:acct.balance ;
+              Account.Index.Table.add_exn table ~key:i ~data:acct ;
               table ) ) ;
   (* TODO: this metric tracking currently assumes that the
    * result of compute_delegatee_table is called with the
@@ -158,7 +158,7 @@ module Data = struct
       type t =
         { ledger: Coda_base.Sparse_ledger.t
         ; delegatee_table:
-            Currency.Balance.t Coda_base.Account.Index.Table.t
+            Coda_base.Account.t Coda_base.Account.Index.Table.t
             Public_key.Compressed.Table.t }
       [@@deriving sexp]
 
@@ -177,10 +177,10 @@ module Data = struct
                        ( Public_key.Compressed.to_string key
                        , `Assoc
                            ( Hashtbl.to_alist delegators
-                           |> List.map ~f:(fun (account, balance) ->
-                                  ( Int.to_string account
-                                  , `Int (Currency.Balance.to_int balance) ) )
-                           ) ) ) ) ) ]
+                           |> List.map ~f:(fun (addr, account) ->
+                                  ( Int.to_string addr
+                                  , Coda_base.Account.to_yojson account ) ) )
+                       ) ) ) ) ]
 
       let ledger t = t.ledger
     end
@@ -192,7 +192,11 @@ module Data = struct
         ; mutable next_epoch_snapshot: Snapshot.t
         ; last_checked_slot_and_epoch:
             (Epoch.t * Slot.t) Public_key.Compressed.Table.t
-        ; genesis_epoch_snapshot: Snapshot.t }
+        ; genesis_epoch_snapshot: Snapshot.t
+        ; mutable last_epoch_delegatee_table:
+            Coda_base.Account.t Coda_base.Account.Index.Table.t
+            Public_key.Compressed.Table.t
+            Option.t }
       [@@deriving sexp]
 
       let to_yojson t =
@@ -214,6 +218,12 @@ module Data = struct
 
     (* The outer ref changes whenever we swap in new staker set; all the snapshots are recomputed *)
     type t = Data.t ref [@@deriving sexp, to_yojson]
+
+    let current_epoch_delegatee_table ~(local_state : t) =
+      !local_state.staking_epoch_snapshot.delegatee_table
+
+    let last_epoch_delegatee_table ~(local_state : t) =
+      !local_state.last_epoch_delegatee_table
 
     let current_proposers t =
       Public_key.Compressed.Table.keys !t.Data.last_checked_slot_and_epoch
@@ -247,7 +257,8 @@ module Data = struct
         ; last_checked_slot_and_epoch=
             make_last_checked_slot_and_epoch_table
               (Public_key.Compressed.Table.create ())
-              proposer_public_keys ~default:(Epoch.zero, Slot.zero) }
+              proposer_public_keys ~default:(Epoch.zero, Slot.zero)
+        ; last_epoch_delegatee_table= Some delegatee_table }
 
     let proposer_swap t proposer_public_keys now =
       let old : Data.t = !t in
@@ -271,7 +282,7 @@ module Data = struct
                 ((* TODO: Be smarter so that we don't have to look at the slot before again *)
                  let epoch, slot = Epoch_and_slot.of_time_exn now in
                  (epoch, UInt32.(if slot > zero then sub slot one else slot)))
-        }
+        ; last_epoch_delegatee_table= None }
 
     type snapshot_identifier = Staking_epoch_snapshot | Next_epoch_snapshot
     [@@deriving to_yojson]
@@ -814,7 +825,7 @@ module Data = struct
           Hashtbl.iteri
             ( Snapshot.delegators epoch_snapshot public_key_compressed
             |> Option.value ~default:(Core_kernel.Int.Table.create ()) )
-            ~f:(fun ~key:delegator ~data:balance ->
+            ~f:(fun ~key:delegator ~data:account ->
               let vrf_result =
                 T.eval ~private_key {global_slot; seed; delegator}
               in
@@ -825,7 +836,7 @@ module Data = struct
                 ~metadata:
                   [ ( "delegator"
                     , `Int (Coda_base.Account.Index.to_int delegator) )
-                  ; ("balance", `Int (Balance.to_int balance))
+                  ; ("balance", `Int (Balance.to_int account.balance))
                   ; ("amount", `Int (Amount.to_int total_stake))
                   ; ( "result"
                     , `String
@@ -836,7 +847,7 @@ module Data = struct
               Coda_metrics.Counter.inc_one
                 Coda_metrics.Consensus.vrf_evaluations ;
               if
-                Threshold.is_satisfied ~my_stake:balance ~total_stake
+                Threshold.is_satisfied ~my_stake:account.balance ~total_stake
                   truncated_vrf_result
               then
                 return
@@ -2901,6 +2912,8 @@ module Hooks = struct
       in
       let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
       let epoch_snapshot = {Local_state.Snapshot.delegatee_table; ledger} in
+      !local_state.last_epoch_delegatee_table
+      <- Some !local_state.staking_epoch_snapshot.delegatee_table ;
       !local_state.staking_epoch_snapshot <- !local_state.next_epoch_snapshot ;
       !local_state.next_epoch_snapshot <- epoch_snapshot )
 
