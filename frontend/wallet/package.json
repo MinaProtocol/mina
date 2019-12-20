@@ -1,6 +1,6 @@
 {
   "name": "coda-wallet",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "",
   "main": "./lib/js/src/main/App.js",
   "dependencies": {
@@ -20,7 +20,8 @@
   },
   "devDependencies": {
     "concurrently": "^4.1.0",
-    "electron-builder": "^20.39.0",
+    "electron-builder": "^21.2.0",
+    "electron-notarize": "^0.2.1",
     "fastpack": "^0.8.4",
     "graphql-faker": "^1.9.0",
     "node": "^8.15.0"
@@ -38,7 +39,7 @@
     "query-real": "concurrently --kill-others 'yarn run real' 'sleep 15 && yarn run query' || true",
     "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei' -print)",
     "test": "yarn run build && jest lib/js/",
-    "dist": "yarn run build && yarn run pack && build",
+    "dist": "yarn run build && yarn run pack && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
     "dev-real": "yarn run copy-schema && concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/render/Index.js' 'electron ./lib/js/src/main/App.js'",
     "dev": "yarn gen-sdl && GRAPHQL_BACKEND=faker yarn dev-real",
     "copy-schema": "cp ../../graphql_schema.json graphql_schema.json",
@@ -46,6 +47,7 @@
     "regen-sdl": "node generate-schema.js http://localhost:8080/graphql > schema.graphql"
   },
   "build": {
+    "afterSign": "scripts/notarize.js",
     "appId": "org.codaprotocol.wallet",
     "asarUnpack": [
       "lib"
@@ -83,13 +85,19 @@
           "type": "link",
           "path": "/Applications"
         }
-      ]
+      ],
+      "sign": false
     },
     "linux": {
       "executableName": "coda-wallet",
       "target": [
         "AppImage"
       ]
+    },
+    "mac": {
+      "hardenedRuntime": true,
+      "entitlements": "public/build/entitlements.mac.plist",
+      "entitlementsInherit": "public/build/entitlements.mac.plist"
     },
     "win": {
       "target": "NSIS"
