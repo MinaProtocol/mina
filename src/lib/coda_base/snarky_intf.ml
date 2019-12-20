@@ -21,11 +21,6 @@ module type Tick_S = sig
     end
   end
 
-  module Data_spec : sig
-    type ('r_var, 'r_value, 'k_var, 'k_value) t =
-      ('r_var, 'r_value, 'k_var, 'k_value, field) Snarky.Typ.Data_spec.t
-  end
-
   module rec Field : sig
     type t = field [@@deriving eq, compare, hash]
 
@@ -249,6 +244,24 @@ module type Tick_S = sig
     module Assert : sig
       val ( = ) : var -> var -> (unit, _) Checked.t
     end
+  end
+
+  and Data_spec : sig
+    type ('r_var, 'r_value, 'k_var, 'k_value) t =
+      ('r_var, 'r_value, 'k_var, 'k_value, field) Snarky.Typ.Data_spec.t
+
+    type ('r_var, 'r_value, 'k_var, 'k_value, 'f, 'checked) data_spec =
+      | ( :: ) :
+          ('var, 'value, 'f, 'checked) Typ.typ
+          * ('r_var, 'r_value, 'k_var, 'k_value, 'f, 'checked) data_spec
+          -> ( 'r_var
+             , 'r_value
+             , 'var -> 'k_var
+             , 'value -> 'k_value
+             , 'f
+             , 'checked )
+             data_spec
+      | [] : ('r_var, 'r_value, 'r_var, 'r_value, 'f, 'checked) data_spec
   end
 
   module Number : sig

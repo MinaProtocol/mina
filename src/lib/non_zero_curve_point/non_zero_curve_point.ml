@@ -4,6 +4,7 @@
 open Core_kernel
 open Module_version
 module T = Functor.Make (Snark_params.Tick)
+module Poly = Compressed_poly.Poly
 
 (* the Make functor does not supply any bin_prot functions, so 
    we define them here. The base58 and yojson definitions 
@@ -11,8 +12,6 @@ module T = Functor.Make (Snark_params.Tick)
  *)
 
 module Compressed = struct
-  open Compressed_poly
-
   module Arg = struct
     (* module with same type t as Stable below, to give as functor argument *)
     [%%versioned_asserted
