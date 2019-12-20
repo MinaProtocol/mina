@@ -70,7 +70,8 @@ rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
 compile_keys=$(./default/src/app/cli/src/coda.exe internal snark-hashes)
-compile_keys+="coda_genesis_${GITHASHLONG}.tar.gz"
+genesis_file="coda_genesis_${GITHASHLONG}.tar.gz"
+compile_keys=("$genesis_file $compile_keys")
 for key in $compile_keys
 do
     echo -n "Looking for keys matching: ${key} -- "
