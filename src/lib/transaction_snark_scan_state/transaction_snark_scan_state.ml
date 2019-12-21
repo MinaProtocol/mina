@@ -196,11 +196,17 @@ let create_expected_statement
     statement.pending_coinbase_stack_state.source
   in
   let pending_coinbase_after =
+    let pending_coinbase_with_state =
+      Option.value_map witness.state_body_hash
+        ~f:(fun sbh ->
+          Pending_coinbase.Stack.push_state sbh pending_coinbase_before )
+        ~default:pending_coinbase_before
+    in
     match transaction with
     | Coinbase c ->
-        Pending_coinbase.Stack.push pending_coinbase_before c
+        Pending_coinbase.Stack.push_coinbase c pending_coinbase_with_state
     | _ ->
-        pending_coinbase_before
+        pending_coinbase_with_state
   in
   let%bind fee_excess = Transaction.fee_excess transaction in
   let%map supply_increase = Transaction.supply_increase transaction in

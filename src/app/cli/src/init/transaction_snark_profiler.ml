@@ -116,7 +116,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let coinbase_stack_target =
           match t with
           | Coinbase c ->
-              Pending_coinbase.Stack.push coinbase_stack_source c
+              Pending_coinbase.Stack.push_coinbase c coinbase_stack_source
           | _ ->
               coinbase_stack_source
         in
@@ -168,7 +168,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
         let coinbase_stack_target =
           match t with
           | Coinbase c ->
-              Pending_coinbase.(Stack.push Stack.empty c)
+              Pending_coinbase.(Stack.push_coinbase c Stack.empty)
           | _ ->
               Pending_coinbase.Stack.empty
         in
@@ -201,7 +201,7 @@ let generate_base_snarks_witness sparse_ledger0
         let coinbase_stack_target =
           match t with
           | Coinbase c ->
-              Pending_coinbase.(Stack.push Stack.empty c)
+              Pending_coinbase.(Stack.push_coinbase c Stack.empty)
           | _ ->
               Pending_coinbase.Stack.empty
         in

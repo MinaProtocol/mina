@@ -95,7 +95,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
               (Pending_coinbase.Checked.add_coinbase root_after_delete
                  ( Snark_transition.proposer transition
                  , Snark_transition.coinbase_amount transition
-                 , previous_state_body_hash ))
+                 , previous_state_body_hash )
+                 ~push_state:Boolean.true_)
+            (*TODO: get push_state boolean if there was any transaction in this block*)
           in
           (new_root, deleted_stack, no_coinbases_popped)
         in

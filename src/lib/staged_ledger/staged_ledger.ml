@@ -289,14 +289,20 @@ module T = struct
     to_staged_ledger_or_error
       (Pending_coinbase.latest_stack pending_coinbase_collection ~is_new_stack)
 
-  let push_coinbase_and_get_new_collection current_stack (t : Transaction.t) =
+  let push_coinbase_and_get_new_collection current_stack (t : Transaction.t)
+      state_body_hash_opt =
+    let stack_with_state =
+      Option.value_map state_body_hash_opt ~default:current_stack
+        ~f:(fun sbh -> Pending_coinbase.Stack.push_state sbh current_stack)
+    in
     match t with
     | Coinbase c ->
-        Pending_coinbase.Stack.push current_stack c
+        Pending_coinbase.Stack.push_coinbase c stack_with_state
     | _ ->
-        current_stack
+        stack_with_state
 
-  let apply_transaction_and_get_statement ledger current_stack s =
+  let apply_transaction_and_get_statement ledger current_stack s
+      state_body_hash_opt =
     let open Result.Let_syntax in
     let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
     and supply_increase =
@@ -306,7 +312,7 @@ module T = struct
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
     let pending_coinbase_after =
-      push_coinbase_and_get_new_collection current_stack s
+      push_coinbase_and_get_new_collection current_stack s state_body_hash_opt
     in
     let%map undo =
       Ledger.apply_transaction ledger s |> to_staged_ledger_or_error
@@ -321,7 +327,8 @@ module T = struct
       ; proof_type= `Base }
     , pending_coinbase_after )
 
-  let apply_transaction_and_get_witness ledger current_stack s =
+  let apply_transaction_and_get_witness ledger current_stack s
+      state_body_hash_opt =
     let open Deferred.Let_syntax in
     let public_keys = function
       | Transaction.Fee_transfer t ->
@@ -343,31 +350,35 @@ module T = struct
     let%bind () = Async.Scheduler.yield () in
     let r =
       measure "apply+stmt" (fun () ->
-          apply_transaction_and_get_statement ledger current_stack s )
+          apply_transaction_and_get_statement ledger current_stack s
+            state_body_hash_opt )
     in
     let%map () = Async.Scheduler.yield () in
     let open Result.Let_syntax in
     let%map undo, statement, updated_coinbase_stack = r in
     ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
-      ; witness= {ledger= ledger_witness}
+      ; witness= {ledger= ledger_witness; state_body_hash= state_body_hash_opt}
       ; statement }
     , updated_coinbase_stack )
 
-  let update_ledger_and_get_statements ledger current_stack ts =
+  let update_ledger_and_get_statements ledger current_stack ts state_body_hash
+      =
     let open Deferred.Let_syntax in
-    let rec go coinbase_stack acc = function
+    let rec go coinbase_stack state_body_hash_opt acc = function
       | [] ->
           return (Ok (List.rev acc, coinbase_stack))
       | t :: ts -> (
           match%bind
             apply_transaction_and_get_witness ledger coinbase_stack t
+              state_body_hash_opt
           with
           | Ok (res, updated_coinbase_stack) ->
-              go updated_coinbase_stack (res :: acc) ts
+              (*Push the state body hash to the pending coinbase stack once per diff*)
+              go updated_coinbase_stack None (res :: acc) ts
           | Error e ->
               return (Error e) )
     in
-    go current_stack [] ts
+    go current_stack state_body_hash [] ts
 
   let check_completed_works ~logger ~verifier scan_state
       (completed_works : Transaction_snark_work.t list) =
@@ -432,7 +443,7 @@ module T = struct
       partitions.second
 
   let update_coinbase_stack_and_get_data scan_state ledger
-      pending_coinbase_collection transactions =
+      pending_coinbase_collection transactions state_body_hash =
     let open Deferred.Result.Let_syntax in
     let coinbase_exists txns =
       List.fold_until ~init:false txns
@@ -460,6 +471,7 @@ module T = struct
           in
           let%map data, updated_stack =
             update_ledger_and_get_statements ledger working_stack transactions
+              (Some state_body_hash)
           in
           (is_new_stack, data, `Update_one updated_stack)
       | Some _ ->
@@ -479,16 +491,17 @@ module T = struct
           in
           let%bind data1, updated_stack1 =
             update_ledger_and_get_statements ledger working_stack1
-              txns_for_partition1
+              txns_for_partition1 (Some state_body_hash)
           in
           let txns_for_partition2 = List.drop transactions slots in
           let%bind working_stack2 =
             working_stack pending_coinbase_collection ~is_new_stack:true
             |> Deferred.return
           in
+          (*Push the state body hash to the pending coinbase stack once per diff*)
           let%map data2, updated_stack2 =
             update_ledger_and_get_statements ledger working_stack2
-              txns_for_partition2
+              txns_for_partition2 None
           in
           let second_has_data = List.length txns_for_partition2 > 0 in
           let new_stack_in_snark, stack_update =
@@ -577,7 +590,7 @@ module T = struct
           (Staged_ledger_error.Pre_diff
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts"))
 
-  let apply_diff ~logger t pre_diff_info =
+  let apply_diff ~logger t pre_diff_info ~state_body_hash =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2
@@ -593,7 +606,7 @@ module T = struct
     let transactions, works, user_commands_count, coinbases = pre_diff_info in
     let%bind is_new_stack, data, stack_update =
       update_coinbase_stack_and_get_data t.scan_state new_ledger
-        t.pending_coinbase_collection transactions
+        t.pending_coinbase_collection transactions state_body_hash
     in
     let slots = List.length data in
     let work_count = List.length works in
@@ -705,6 +718,7 @@ module T = struct
     in
     let%map ((_, _, `Staged_ledger new_staged_ledger, __) as res) =
       apply_diff t prediff ~logger
+        ~state_body_hash:(Staged_ledger_diff.state_body_hash witness)
     in
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
@@ -725,6 +739,7 @@ module T = struct
       |> Deferred.return
     in
     apply_diff t prediff ~logger:(Logger.null ())
+      ~state_body_hash:sl_diff.state_body_hash
 
   module Resources = struct
     module Discarded = struct
@@ -1967,6 +1982,8 @@ let%test_module "test" =
         in
         let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
         Pending_coinbase.Checked.add_coinbase root_after_popping coinbase_var
+          ~push_state:Boolean.true_
+        (*TODO: this should be if there are no transactions in the diff*)
       in
       let checked_root_after_update =
         let open Snark_params.Tick in

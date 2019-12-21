@@ -329,11 +329,12 @@ module Base = struct
     let%bind sender_compressed = Public_key.compress_var sender in
     let proposer = payload.body.public_key in
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
+    (*TODO: push state for any transaction*)
     let%bind computed_pending_coinbase_stack_after =
       let coinbase = (proposer, payload.body.amount, state_body_hash) in
       let%bind stack' =
-        Pending_coinbase.Stack.Checked.push pending_coinbase_stack_before
-          coinbase
+        Pending_coinbase.Stack.Checked.push_coinbase coinbase
+          pending_coinbase_stack_before
       in
       Pending_coinbase.Stack.Checked.if_ is_coinbase ~then_:stack'
         ~else_:pending_coinbase_stack_before
@@ -1484,8 +1485,8 @@ let%test_module "transaction_snark" =
                 ~pending_coinbase_stack_state:
                   { source= pending_coinbase_init
                   ; target=
-                      Pending_coinbase.Stack.push pending_coinbase_init cb } )
-      )
+                      Pending_coinbase.Stack.push_coinbase cb
+                        pending_coinbase_init } ) )
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->

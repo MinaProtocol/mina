@@ -135,14 +135,16 @@ module type S = sig
 
     val equal_state_hash : t -> t -> bool
 
-    val push_coinbase : t -> Coinbase.t -> t
+    val push_coinbase : Coinbase.t -> t -> t
 
-    val push_state : t -> State_body_hash.t -> t
+    val push_state : State_body_hash.t -> t -> t
 
     module Checked : sig
       type t = var
 
-      val push : t -> Coinbase_data.var -> (t, 'a) Tick.Checked.t
+      val push_coinbase : Coinbase_data.var -> t -> (t, 'a) Tick.Checked.t
+
+      val push_state : State_body_hash.var -> t -> (t, 'a) Tick.Checked.t
 
       val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Tick.Checked.t
 
@@ -200,7 +202,11 @@ module type S = sig
        - finds a coinbase stack in [t] at path [addr] and pushes the coinbase_data on to the stack
        - returns a root [t'] of the tree
     *)
-    val add_coinbase : var -> Coinbase_data.var -> (var, 's) Tick.Checked.t
+    val add_coinbase :
+         var
+      -> Coinbase_data.var
+      -> push_state:Boolean.var
+      -> (var, 's) Tick.Checked.t
 
     (**
        [pop_coinbases t pk updated_stack] implements the following spec:

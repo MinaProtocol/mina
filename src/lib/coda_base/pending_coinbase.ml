@@ -227,7 +227,7 @@ module Coinbase_stack_state = struct
 
     type 'stack_hash t = 'stack_hash Stable.Latest.t =
       {init: 'stack_hash; curr: 'stack_hash}
-    [@@deriving sexp, eq, compare, hash, yojson]
+    [@@deriving sexp, compare, hash, yojson]
   end
 
   [%%versioned
@@ -240,11 +240,9 @@ module Coinbase_stack_state = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash]
+  type t = Stable.Latest.t [@@deriving sexp, compare, yojson, hash, eq]
 
   type var = Stack_hash.var Poly.t
-
-  let create ~init : t = {init; curr= init}
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Generator.Let_syntax in
@@ -312,6 +310,8 @@ module Coinbase_stack_state = struct
         |> Stack_hash.of_hash }
 
   let empty : t = {Poly.init= Stack_hash.dummy; curr= Stack_hash.dummy}
+
+  let create ~init : t = {Poly.init; curr= init}
 
   module Checked = struct
     type t = var
@@ -478,9 +478,13 @@ struct
     let empty =
       {Poly.data= Coinbase_stack_data.empty; state= Coinbase_stack_state.empty}
 
-    let equal_data t1 t2 = Coinbase_stack_data.equal t1.Poly.data t2.Poly.data
+    let _init (state_stack : Coinbase_stack_state.t) =
+      {empty with state= Coinbase_stack_state.create ~init:state_stack.curr}
 
-    let equal_state_hash t1 t2 = State_hash.equal t1.Poly.state t2.Poly.state
+    let equal_state_hash t1 t2 =
+      Coinbase_stack_state.equal t1.Poly.state t2.Poly.state
+
+    let equal_data t1 t2 = Coinbase_stack_data.equal t1.Poly.data t2.Poly.data
 
     let push_coinbase (cb : Coinbase.t) t =
       let data = Coinbase_stack_data.push t.Poly.data cb in
@@ -512,7 +516,7 @@ struct
         in*)
         {t with data}
 
-      let push_state (t : t) (state_body_hash : State_body_hash.var) =
+      let push_state (state_body_hash : State_body_hash.var) (t : t) =
         let%map state =
           Coinbase_stack_state.Checked.push t.state state_body_hash
         in
@@ -673,7 +677,7 @@ struct
            ~f:(fun stack0 ->
              let%bind stack =
                let%bind updated_stack =
-                 Stack.Checked.push_state stack0 state_body_hash
+                 Stack.Checked.push_state state_body_hash stack0
                in
                Stack.Checked.if_ push_state ~then_:updated_stack ~else_:stack0
              in
@@ -854,12 +858,27 @@ struct
       | None ->
           Or_error.error_string "No Stack_id for the latest stack"
 
+  let curr_stack_id (t : t) = List.hd t.pos_list
+
   let latest_stack (t : t) ~is_new_stack =
     let open Or_error.Let_syntax in
     let%bind key = latest_stack_id t ~is_new_stack in
-    Or_error.try_with (fun () ->
-        let index = Merkle_tree.find_index_exn t.tree key in
-        Merkle_tree.get_exn t.tree index )
+    let%bind res =
+      Or_error.try_with (fun () ->
+          let index = Merkle_tree.find_index_exn t.tree key in
+          Merkle_tree.get_exn t.tree index )
+    in
+    if is_new_stack then
+      let prev_stack_id =
+        Option.value ~default:Stack_id.zero (curr_stack_id t)
+      in
+      let%map prev_stack =
+        Or_error.try_with (fun () ->
+            let index = Merkle_tree.find_index_exn t.tree prev_stack_id in
+            Merkle_tree.get_exn t.tree index )
+      in
+      {res with state= Coinbase_stack_state.create ~init:prev_stack.state.curr}
+    else Ok res
 
   let oldest_stack_id (t : t) = List.last t.pos_list
 
