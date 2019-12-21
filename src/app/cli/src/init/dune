@@ -9,6 +9,8 @@
   (libraries
     ; opam deps
     async cohttp core
+    ; virtual libs
+    snark_params_snarky
     ; libs
     snarky_log
     cli_lib

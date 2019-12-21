@@ -4,6 +4,8 @@
      async
      core
      crypto_params
+     ; virtual library
+     snark_params_snarky
      snarky
      snarkette
      ppxlib

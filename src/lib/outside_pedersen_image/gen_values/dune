@@ -1,6 +1,6 @@
 (executable
   (name gen_values)
-  (libraries async core snark_params
+  (libraries async core snark_params_snarky
              ppxlib ppx_util)
   (preprocess
     (pps ppx_jane ppxlib.metaquot))

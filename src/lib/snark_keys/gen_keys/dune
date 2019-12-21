@@ -1,7 +1,8 @@
 (executable
  (name gen_keys)
  (libraries ppxlib cache_dir remove_snark_keys_trigger cached coda_base
-   transaction_snark blockchain_snark async core)
+  snark_params_snarky
+  transaction_snark blockchain_snark async core)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
   (pps ppx_optcomp ppx_let ppxlib.metaquot ppxlib.runner))

@@ -6,6 +6,7 @@ open Tick
 open Currency
 open Snark_bits
 open Fold_lib
+module Foo = Crypto_params
 
 module Index = struct
   [%%versioned
