@@ -1,5 +1,6 @@
 open Snarky
 open Snark
+open Snarky_integer
 
 type 'f t
 
@@ -27,6 +28,6 @@ val of_bits : m:'f m -> 'f Cvar.t Boolean.t list -> precision:int -> 'f t
 
 val precision : _ t -> int
 
-val to_bignum : m:'f m -> 'f t -> (Bignum.t, 'f, _) As_prover.t
+val to_bignum : m:'f m -> 'f t -> unit -> Bignum.t
 
 val le : m:'f m -> 'f t -> 'f t -> 'f Cvar.t Boolean.t

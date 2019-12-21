@@ -1,0 +1,9 @@
+(library
+  (name coda_commands)
+  (public_name coda_commands)
+  (libraries 
+    ; opam deps
+    core
+    ; libs
+    coda_base coda_lib coda_version daemon_rpcs)
+  (preprocess (pps ppx_coda ppx_jane)))

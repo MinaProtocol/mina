@@ -1,14 +1,14 @@
 open Core
+open Snark_params.Tick
 
-type t = Snark_params.Tock.Field.t * Snark_params.Tock.Field.t
-[@@deriving sexp, eq, bin_io, compare, hash]
+type t = Field.t * Inner_curve.Scalar.t [@@deriving sexp, eq, compare, hash]
 
 include Codable.S with type t := t
 
 module Stable : sig
   module V1 : sig
-    type t = Snark_params.Tock.Field.t * Snark_params.Tock.Field.t
-    [@@deriving sexp, eq, bin_io, compare, hash]
+    type t = Field.t * Inner_curve.Scalar.t
+    [@@deriving sexp, eq, bin_io, compare, hash, version]
 
     include Codable.S with type t := t
   end
@@ -16,12 +16,8 @@ module Stable : sig
   module Latest = V1
 end
 
-open Snark_params.Tick
+type var = Field.Var.t * Inner_curve.Scalar.var
 
-type var = Inner_curve.Scalar.var * Inner_curve.Scalar.var
-
-val to_base64 : t -> string
-
-val of_base64_exn : string -> t
+include Codable.Base58_check_base_intf with type t := t
 
 val dummy : t

@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 open Core_kernel
 module Intf = Intf
@@ -17,7 +17,9 @@ include Impl.Make (struct
   [%%else]
 
   let handle_unconsumed_cache_item ~logger ~cache_name =
-    Logger.error logger "%s" (msg cache_name)
+    Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+      "Unconsumed item in cache: $cache"
+      ~metadata:[("cache", `String (msg cache_name))]
 
   [%%endif]
 end)

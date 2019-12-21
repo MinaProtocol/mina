@@ -5,9 +5,42 @@ module Context = struct
   [@@deriving sexp]
 end
 
+module Evaluation = struct
+  module Discrete_log_equality = struct
+    module Poly = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type 'scalar t = {c: 'scalar; s: 'scalar} [@@deriving sexp]
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      type 'scalar t = 'scalar Stable.Latest.t = {c: 'scalar; s: 'scalar}
+      [@@deriving sexp]
+    end
+  end
+
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('group, 'dleq) t =
+          {discrete_log_equality: 'dleq; scaled_message_hash: 'group}
+        [@@deriving sexp]
+      end
+    end]
+
+    type ('group, 'dleq) t = ('group, 'dleq) Stable.Latest.t =
+      {discrete_log_equality: 'dleq; scaled_message_hash: 'group}
+    [@@deriving sexp]
+  end
+end
+
 module Make
     (Impl : Snarky.Snark_intf.S) (Scalar : sig
-        type t [@@deriving eq, sexp, bin_io]
+        type t [@@deriving eq, sexp]
 
         val random : unit -> t
 
@@ -29,7 +62,7 @@ module Make
           end
         end
     end) (Group : sig
-      type t [@@deriving sexp, bin_io]
+      type t [@@deriving sexp]
 
       val add : t -> t -> t
 
@@ -112,7 +145,11 @@ module Make
   end
 
   module Evaluation : sig
-    type t [@@deriving sexp, bin_io]
+    type t =
+      ( Group.t
+      , Scalar.t Evaluation.Discrete_log_equality.Poly.t )
+      Evaluation.Poly.t
+    [@@deriving sexp]
 
     type var
 
@@ -154,9 +191,11 @@ end = struct
 
   module Evaluation = struct
     module Discrete_log_equality = struct
-      type 'scalar t_ = {c: 'scalar; s: 'scalar} [@@deriving sexp, bin_io]
+      type 'scalar t_ = 'scalar Evaluation.Discrete_log_equality.Poly.t =
+        {c: 'scalar; s: 'scalar}
+      [@@deriving sexp]
 
-      type t = Scalar.t t_ [@@deriving sexp, bin_io]
+      type t = Scalar.t t_ [@@deriving sexp]
 
       type var = Scalar.var t_
 
@@ -171,11 +210,11 @@ end = struct
           ~value_of_hlist:(fun [c; s] -> {c; s})
     end
 
-    type ('group, 'dleq) t_ =
+    type ('group, 'dleq) t_ = ('group, 'dleq) Evaluation.Poly.t =
       {discrete_log_equality: 'dleq; scaled_message_hash: 'group}
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp]
 
-    type t = (Group.t, Discrete_log_equality.t) t_ [@@deriving sexp, bin_io]
+    type t = (Group.t, Discrete_log_equality.t) t_ [@@deriving sexp]
 
     type var = (Group.var, Discrete_log_equality.var) t_
 
@@ -407,9 +446,9 @@ let%test_module "vrf-test" =
                   (struct
                     type t = Curve.t
 
-                    let to_sexpable = Curve.to_affine_coordinates
+                    let to_sexpable = Curve.to_affine_exn
 
-                    let of_sexpable = Curve.of_affine_coordinates
+                    let of_sexpable = Curve.of_affine
                   end)
       end
 
@@ -433,7 +472,7 @@ let%test_module "vrf-test" =
       let typ = Curve.typ
 
       let to_bits (t : t) =
-        let x, y = Curve.to_affine_coordinates t in
+        let x, y = Curve.to_affine_exn t in
         List.hd_exn (Field.unpack y) :: Field.unpack x
 
       let gen =
@@ -481,7 +520,10 @@ let%test_module "vrf-test" =
     module Pedersen =
       Snarky.Pedersen.Make (Impl) (Curve)
         (struct
-          let params = params
+          let params =
+            Array.map
+              ~f:(Tuple_lib.Quadruple.map ~f:Curve.to_affine_exn)
+              params
         end)
 
     module Message = struct
@@ -495,9 +537,9 @@ let%test_module "vrf-test" =
                 (struct
                   type t = Curve.t
 
-                  let to_sexpable = Curve.to_affine_coordinates
+                  let to_sexpable = Curve.to_affine_exn
 
-                  let of_sexpable = Curve.of_affine_coordinates
+                  let of_sexpable = Curve.of_affine
                 end)
 
       type var = Curve.var
@@ -512,10 +554,14 @@ let%test_module "vrf-test" =
     end
 
     let rec bits_to_triples ~default = function
-      | b0 :: b1 :: b2 :: bs -> (b0, b1, b2) :: bits_to_triples ~default bs
-      | [] -> []
-      | [b] -> [(b, default, default)]
-      | [b1; b2] -> [(b1, b2, default)]
+      | b0 :: b1 :: b2 :: bs ->
+          (b0, b1, b2) :: bits_to_triples ~default bs
+      | [] ->
+          []
+      | [b] ->
+          [(b, default, default)]
+      | [b1; b2] ->
+          [(b1, b2, default)]
 
     let hash_bits bits =
       List.foldi ~init:Curve.zero (bits_to_triples ~default:false bits)
@@ -523,7 +569,7 @@ let%test_module "vrf-test" =
           Curve.add acc
             (Snarky.Pedersen.local_function ~negate:Curve.negate params.(i)
                triple) )
-      |> Curve.to_affine_coordinates |> fst
+      |> Curve.to_affine_exn |> fst
 
     let hash_bits_checked bits =
       let open Impl.Checked in

@@ -8,6 +8,9 @@ module Rpc : sig
        and type callee_response := Rpc.Callee.response
        and type caller_query := Rpc.Caller.query
        and type caller_response := Rpc.Caller.response
+
+    module Decorate_bin_io (M : Intf.Rpc.S) (Rpc : Intf.Versioned_rpc(M).S) :
+      Intf.Versioned_rpc(M).S
   end
 end
 
@@ -17,7 +20,7 @@ module Report : sig
     ; intervals: (Time.Span.t * Time.Span.t) list
     ; underflow: int
     ; overflow: int }
-  [@@deriving yojson, bin_io]
+  [@@deriving yojson, bin_io, fields]
 end
 
 val add_span : name:string -> Time.Span.t -> unit

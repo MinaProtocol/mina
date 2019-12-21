@@ -10,8 +10,7 @@ let seed = "Coda_sample_keypairs"
 
 let random_bool = Crs.create ~seed
 
-module Group = Crypto_params_init.Tick_backend.Inner_curve
-open Tuple_lib
+module Group = Curve_choice.Tick_backend.Inner_curve
 
 let bigint_of_bits bits =
   List.foldi bits ~init:Bigint.zero ~f:(fun i acc b ->
@@ -27,10 +26,16 @@ let rec random_scalar () =
   else random_scalar ()
 
 let keypairs =
-  let n = 40 in
-  List.init n ~f:(fun _ ->
-      let pk = random_scalar () in
-      Keypair.of_private_key_exn pk )
+  let n = 120 in
+  List.cons
+    (* FIXME #2936: remove this "precomputed VRF keypair" *)
+    (* This key is also at the start of all the release ledgers. It's needed to generate a valid genesis transition *)
+    (Keypair.of_private_key_exn
+       (Private_key.of_base58_check_exn
+          "6BnSKU5GQjgvEPbM45Qzazsf6M8eCrQdpL7x4jAvA4sr8Ga3FAx8AxdgWcqN7uNGu1SthMgDeMSUvEbkY9a56UxwmJpTzhzVUjfgfFsjJSVp9H1yWHt6H5couPNpF7L7e5u7NBGYnDMhx"))
+    (List.init n ~f:(fun _ ->
+         let sk = random_scalar () in
+         Keypair.of_private_key_exn sk ))
 
 let expr ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
@@ -42,13 +47,21 @@ let expr ~loc =
       (List.map keypairs ~f:(fun {public_key; private_key} ->
            E.pexp_tuple
              [ estring
-                 (Public_key.Compressed.to_base64
+                 (Binable.to_string
+                    (module Public_key.Compressed.Stable.Latest)
                     (Public_key.compress public_key))
-             ; estring (Private_key.to_base64 private_key) ] ))
+             ; estring
+                 (Binable.to_string
+                    (module Private_key.Stable.Latest)
+                    private_key) ] ))
   in
   let%expr conv (pk, sk) =
-    ( Signature_lib.Public_key.Compressed.of_base64_exn pk
-    , Signature_lib.Private_key.of_base64_exn sk )
+    ( Core_kernel.Binable.of_string
+        (module Signature_lib.Public_key.Compressed.Stable.Latest)
+        pk
+    , Core_kernel.Binable.of_string
+        (module Signature_lib.Private_key.Stable.Latest)
+        sk )
   in
   Array.map conv [%e earray]
 
@@ -57,7 +70,7 @@ let structure ~loc =
     let loc = loc
   end) in
   let open E in
-  [%str let keypairs = [%e expr ~loc]]
+  [%str let keypairs = lazy [%e expr ~loc]]
 
 let json =
   `List
@@ -65,9 +78,10 @@ let json =
          `Assoc
            [ ( "public_key"
              , `String
-                 Public_key.(Compressed.to_base64 (compress kp.public_key)) )
-           ; ("private_key", `String (Private_key.to_base64 kp.private_key)) ]
-     ))
+                 Public_key.(
+                   Compressed.to_base58_check (compress kp.public_key)) )
+           ; ( "private_key"
+             , `String (Private_key.to_base58_check kp.private_key) ) ] ))
 
 let main () =
   Out_channel.with_file "sample_keypairs.ml" ~f:(fun ml_file ->

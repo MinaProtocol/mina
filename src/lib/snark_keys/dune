@@ -1,10 +1,9 @@
 (library
  (name snark_keys)
  (public_name snark_keys)
- (flags :standard -short-paths -warn-error -58)
  (libraries async transaction_snark dummy_values blockchain_snark core)
  (preprocess
-  (pps ppx_jane ppxlib.runner)))
+  (pps ppx_coda ppx_jane ppxlib.runner ppx_deriving_yojson)))
 
 (rule
  (targets snark_keys.ml)

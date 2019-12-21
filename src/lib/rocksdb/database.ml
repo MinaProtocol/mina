@@ -3,12 +3,17 @@
 open Core
 
 (* Uuid.t deprecates sexp functions; use Uuid.Stable.V1 *)
-type t = {uuid: Uuid.Stable.V1.t; db: Rocks.t sexp_opaque} [@@deriving sexp]
 
-let create ~directory =
+module T = struct
+  type t = {uuid: Uuid.Stable.V1.t; db: Rocks.t sexp_opaque} [@@deriving sexp]
+end
+
+include T
+
+let create directory =
   let opts = Rocks.Options.create () in
   Rocks.Options.set_create_if_missing opts true ;
-  {uuid= Uuid.create (); db= Rocks.open_db ~opts directory}
+  {uuid= Uuid_unix.create (); db= Rocks.open_db ~opts directory}
 
 let get_uuid t = t.uuid
 
@@ -21,13 +26,29 @@ let set t ~(key : Bigstring.t) ~(data : Bigstring.t) : unit =
   Rocks.put ?key_pos:None ?key_len:None ?value_pos:None ?value_len:None
     ?opts:None t.db key data
 
-let set_batch t ~(key_data_pairs : (Bigstring.t * Bigstring.t) list) : unit =
+let set_batch t ?(remove_keys = [])
+    ~(key_data_pairs : (Bigstring.t * Bigstring.t) list) : unit =
   let batch = Rocks.WriteBatch.create () in
   (* write to batch *)
   List.iter key_data_pairs ~f:(fun (key, data) ->
       Rocks.WriteBatch.put batch key data ) ;
+  (* Delete any key pairs *)
+  List.iter remove_keys ~f:(fun key -> Rocks.WriteBatch.delete batch key) ;
   (* commit batch *)
   Rocks.write t.db batch
+
+module Batch = struct
+  type t = Rocks.WriteBatch.t
+
+  let remove t ~key = Rocks.WriteBatch.delete t key
+
+  let set t ~key ~data = Rocks.WriteBatch.put t key data
+
+  let with_batch t ~f =
+    let batch = Rocks.WriteBatch.create () in
+    let result = f batch in
+    Rocks.write t.db batch ; result
+end
 
 let copy _t = failwith "copy: not implemented"
 
@@ -56,7 +77,8 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
 
 let%test_unit "to_alist (of_alist l) = l" =
   Quickcheck.test
-    Quickcheck.Generator.(tuple2 String.gen String.gen |> list)
+    Quickcheck.Generator.(
+      tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
       File_system.with_temp_dir "/tmp/coda-test" ~f:(fun directory ->
           let s = Bigstring.of_string in
@@ -64,7 +86,7 @@ let%test_unit "to_alist (of_alist l) = l" =
             List.sort kvs ~compare:[%compare: string * string]
             |> List.map ~f:(fun (k, v) -> (s k, s v))
           in
-          let db = create ~directory in
+          let db = create directory in
           List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
           let alist =
             List.sort (to_alist db)

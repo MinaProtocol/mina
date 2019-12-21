@@ -31,7 +31,7 @@ let%test_module "test functor on in memory databases" =
       let%test_unit "getting a non existing account returns None" =
         Test.with_instance (fun mdb ->
             Quickcheck.test MT.For_tests.gen_account_location
-              ~f:(fun location -> assert (MT.get mdb location = None) ) )
+              ~f:(fun location -> assert (MT.get mdb location = None)) )
 
       let create_new_account_exn mdb account =
         let public_key = Account.public_key account in
@@ -39,8 +39,10 @@ let%test_module "test functor on in memory databases" =
           MT.get_or_create_account_exn mdb public_key account
         in
         match action with
-        | `Existed -> failwith "Expected to allocate a new account"
-        | `Added -> location
+        | `Existed ->
+            failwith "Expected to allocate a new account"
+        | `Added ->
+            location
 
       let%test "add and retrieve an account" =
         Test.with_instance (fun mdb ->
@@ -60,8 +62,10 @@ let%test_module "test functor on in memory databases" =
             MT.Location.equal location location'
             &&
             match (MT.get mdb location, MT.get mdb location') with
-            | Some acct, Some acct' -> Account.equal acct acct'
-            | _, _ -> false )
+            | Some acct, Some acct' ->
+                Account.equal acct acct'
+            | _, _ ->
+                false )
 
       let dedup_accounts accounts =
         List.dedup_and_sort accounts ~compare:(fun account1 account2 ->
@@ -161,8 +165,10 @@ let%test_module "test functor on in memory databases" =
                    account
                in
                match action with
-               | `Added -> ()
-               | `Existed -> MT.set mdb location account )
+               | `Added ->
+                   ()
+               | `Existed ->
+                   MT.set mdb location account )
 
       let%test_unit "If the entire database is full, let \
                      addresses_and_accounts = \
@@ -227,7 +233,7 @@ let%test_module "test functor on in memory databases" =
                   if
                     not
                     @@ List.equal
-                         ~equal:(fun (addr1, account1) (addr2, account2) ->
+                         (fun (addr1, account1) (addr2, account2) ->
                            MT.Addr.equal addr1 addr2
                            && Account.equal account1 account2 )
                          old_addresses_and_accounts new_addresses_and_accounts
@@ -310,7 +316,7 @@ let%test_module "test functor on in memory databases" =
                   List.map ~f:snd
                   @@ MT.get_all_accounts_rooted_at_exn mdb address
                 in
-                assert (List.equal ~equal:Account.equal accounts result) ) )
+                assert (List.equal Account.equal accounts result) ) )
 
       let%test_unit "create_empty doesn't modify the hash" =
         Test.with_instance (fun ledger ->
@@ -321,8 +327,8 @@ let%test_module "test functor on in memory databases" =
             | `Existed, _ ->
                 failwith
                   "create_empty with empty ledger somehow already has that key?"
-            | `Added, _ -> [%test_eq: Hash.t] start_hash (merkle_root ledger)
-        )
+            | `Added, _ ->
+                [%test_eq: Hash.t] start_hash (merkle_root ledger) )
 
       let%test "get_at_index_exn t (index_of_key_exn t public_key) = account" =
         Test.with_instance (fun mdb ->
@@ -405,9 +411,7 @@ let%test_module "test functor on in memory databases" =
                 @@ MT.get_all_accounts_rooted_at_exn mdb (MT.Addr.root ())
               in
               assert (List.length accounts = List.length retrieved_accounts) ;
-              assert (
-                List.equal ~equal:Account.equal accounts retrieved_accounts )
-          )
+              assert (List.equal Account.equal accounts retrieved_accounts) )
 
       let%test_unit "removing accounts restores Merkle root" =
         Test.with_instance (fun mdb ->

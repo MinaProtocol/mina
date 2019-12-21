@@ -12,8 +12,10 @@ module Example = struct
     in
     let left, right =
       match image_positioning with
-      | Image_positioning.Left -> (image, info)
-      | Right -> (info, image)
+      | Image_positioning.Left ->
+          (image, info)
+      | Right ->
+          (info, image)
     in
     let html =
       Mobile_switch.create
@@ -40,15 +42,21 @@ module Important_title = struct
 
   let position title =
     match title with
-    | `Left _ -> ["tc tl-ns mt0 mr0 ml0"]
-    | `Center _ -> ["tc center mt0"]
-    | `Right _ -> ["tc tr-ns mt0 mr0 ml0"]
+    | `Left _ ->
+        ["tc tl-ns mt0 mr0 ml0"]
+    | `Center _ ->
+        ["tc center mt0"]
+    | `Right _ ->
+        ["tc tr-ns mt0 mr0 ml0"]
 
   let wrap title =
     match title with
-    | `Left _ -> Fn.id
-    | `Center _ -> center
-    | `Right _ -> Fn.id
+    | `Left _ ->
+        Fn.id
+    | `Center _ ->
+        center
+    | `Right _ ->
+        Fn.id
 
   let style title =
     Style.(of_class "dib mw6 m-none lh-copy f2 mb3 mb4-ns" + position title)
@@ -131,20 +139,25 @@ module Link_list = struct
     let title_style = Style.(Styles.heading_style + of_class "black f4 tl") in
     let heading =
       match orientation with
-      | `Horizontal -> span [class_ "dn"] []
-      | `Vertical -> text named
+      | `Horizontal ->
+          span [class_ "dn"] []
+      | `Vertical ->
+          text named
     in
     let maybe_vert_centering_style, orientation_style =
       match orientation with
       | `Horizontal ->
           let open Style in
           (of_class "flex items-center", of_class "flex justify-around w-100")
-      | `Vertical -> Style.(empty, empty)
+      | `Vertical ->
+          Style.(empty, empty)
     in
     let inline_block_maybe =
       match orientation with
-      | `Horizontal -> Style.of_class "dib-ns"
-      | `Vertical -> Style.empty
+      | `Horizontal ->
+          Style.of_class "dib-ns"
+      | `Vertical ->
+          Style.empty
     in
     div [class_ "w-100"]
       [ h2 [Style.(render title_style)] [heading]
@@ -163,7 +176,8 @@ module Link_list = struct
                in
                let link, maybe_second_link =
                  match link with
-                 | `One s -> (s, fun style -> span [class_ "dn"] [])
+                 | `One s ->
+                     (s, fun style -> span [class_ "dn"] [])
                  | `Two (next_name, s1, s2) ->
                      ( s1
                      , fun style ->
@@ -175,10 +189,14 @@ module Link_list = struct
                  match name with
                  | `Icon n ->
                      [icon (String.lowercase n); span [] [text (" " ^ n)]]
-                 | `Read n -> [Html.text ("📖 " ^ n)]
-                 | `Watch n -> [Html.text ("🎥 " ^ n)]
-                 | `Listen n -> [Html.text ("🎙️ " ^ n)]
-                 | `Event n -> [Html.text n]
+                 | `Read n ->
+                     [Html.text ("📖 " ^ n)]
+                 | `Watch n ->
+                     [Html.text ("🎥 " ^ n)]
+                 | `Listen n ->
+                     [Html.text ("🎙️ " ^ n)]
+                 | `Event n ->
+                     [Html.text n]
                in
                let link_style =
                  let open Style in
@@ -440,15 +458,20 @@ let positions =
   ; ("Community Manager", "community-manager")
   ; ("Senior Frontend Engineer", "senior-frontend-engineer")
   ; ("Product Manager", "product-manager")
-  ; ("Engineering Manager", "engineering-manager") ]
+  ; ("Engineering Manager", "engineering-manager")
+  ; ("Director of Business Developement", "director-of-business-development")
+  ; ("Developer Advocate", "developer-advocate") ]
 
 let testnet () =
   let comic ~title ~content ~alt_content ~img () =
     let image =
       match img with
-      | `None -> None
-      | `Placeholder -> Some (Image.placeholder 400 400)
-      | `Custom elem -> Some elem
+      | `None ->
+          None
+      | `Placeholder ->
+          Some (Image.placeholder 400 400)
+      | `Custom elem ->
+          Some elem
       | `Real s ->
           Some
             (Image.draw
@@ -555,8 +578,10 @@ let main ~dst ~working_directory () =
   let%bind () = Sys.chdir working_directory in
   let%bind () =
     match%bind Sys.file_exists dst with
-    | `Yes -> Process.run_expect_no_output_exn ~prog:"rm" ~args:["-r"; dst] ()
-    | `No | `Unknown -> return ()
+    | `Yes ->
+        Process.run_expect_no_output_exn ~prog:"rm" ~args:["-r"; dst] ()
+    | `No | `Unknown ->
+        return ()
   in
   let%bind site = site () in
   Site.build ~dst site
@@ -565,7 +590,7 @@ let () =
   Command.async ~summary:"build site"
     (let open Command.Param in
     let open Command.Let_syntax in
-    let%map dst = anon ("BUILD-DIR" %: file)
+    let%map dst = anon ("BUILD-DIR" %: string)
     and working_directory =
       flag "working-directory"
         ~doc:"Working directory relative to executing filesystem commands"

@@ -1,3 +1,11 @@
 open Core_kernel
 
-type t = Pos | Neg [@@deriving sexp, bin_io, hash, compare, eq, to_yojson]
+[%%versioned:
+module Stable : sig
+  module V1 : sig
+    type t = Pos | Neg [@@deriving sexp, hash, compare, eq, yojson]
+  end
+end]
+
+type t = Stable.Latest.t = Pos | Neg
+[@@deriving sexp, hash, compare, eq, yojson]

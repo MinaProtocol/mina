@@ -1,6 +1,0 @@
-(library
-  (name snarkette)
-  (public_name snarkette)
-  (libraries tuple_lib fold_lib num core_kernel )
-  (preprocess (pps ppx_jane ppx_deriving.eq ))
-  (js_of_ocaml (flags +nat.js)))

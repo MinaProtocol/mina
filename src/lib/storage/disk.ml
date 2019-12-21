@@ -7,10 +7,9 @@ type location = Location.t [@@deriving sexp]
 include Checked_data
 
 module Controller = struct
-  type nonrec 'a t = {log: Logger.t; tc: 'a Binable.m}
+  type nonrec 'a t = {logger: Logger.t; tc: 'a Binable.m}
 
-  let create ~parent_log tc =
-    {log= Logger.child parent_log "storage.with_checksum.memory"; tc}
+  let create ~logger tc = {logger; tc}
 end
 
 let load_with_checksum (type a) (c : a Controller.t) location =
@@ -18,7 +17,7 @@ let load_with_checksum (type a) (c : a Controller.t) location =
   | `Yes -> (
       match%map
         Reader.load_bin_prot
-          ~max_len:(1000 * 1024 * 1024)
+          ~max_len:(5 * 512 * 1024 * 1024 (* 2.5 GB *))
           location
           (bin_reader_t String.bin_reader_t)
       with
@@ -26,8 +25,10 @@ let load_with_checksum (type a) (c : a Controller.t) location =
           if valid t then
             Ok {checksum= t.checksum; data= Binable.of_string c.tc t.data}
           else Error `Checksum_no_match
-      | Error e -> Error (`IO_error e) )
-  | `No | `Unknown -> return (Error `No_exist)
+      | Error e ->
+          Error (`IO_error e) )
+  | `No | `Unknown ->
+      return (Error `No_exist)
 
 let load c location =
   Deferred.Result.map (load_with_checksum c location) ~f:(fun t -> t.data)

@@ -27,6 +27,8 @@ let write_if_open = Pipe.write_if_open
 
 let write_without_pushback = Pipe.write_without_pushback
 
+let write_without_pushback_if_open = Pipe.write_without_pushback_if_open
+
 exception Overflow
 
 let write_or_exn ~capacity writer reader x =
@@ -56,14 +58,15 @@ let set_has_reader (reader : 'a Reader.t) =
   if reader.has_reader then multiple_reads_error ()
   else reader.has_reader <- true
 
-let iter ?consumer ?continue_on_error reader ~f =
-  bracket reader (Pipe.iter reader.Reader.pipe ?consumer ?continue_on_error ~f)
+let iter ?flushed ?continue_on_error reader ~f =
+  bracket reader (Pipe.iter reader.Reader.pipe ?flushed ?continue_on_error ~f)
 
 let iter_unordered ?consumer ~max_concurrency reader ~f =
   bracket reader
     (let rec run_reader () =
        match%bind Pipe.read ?consumer reader.Reader.pipe with
-       | `Eof -> return ()
+       | `Eof ->
+           return ()
        | `Ok v ->
            let%bind () = f v in
            run_reader ()
@@ -89,7 +92,8 @@ let scan reader ~init ~f =
   let r, w = Pipe.create () in
   let rec loop b =
     match Pipe.read_now reader.Reader.pipe with
-    | `Eof -> return (Pipe.close w)
+    | `Eof ->
+        return (Pipe.close w)
     | `Ok v ->
         let%bind next = f b v in
         let%bind () = Pipe.write w next in
@@ -155,21 +159,27 @@ let fork4 reader =
 
 let fork5 reader =
   match fork reader 5 with
-  | [x; y; z; w; v] -> (x, y, z, w, v)
-  | _ -> assert false
+  | [x; y; z; w; v] ->
+      (x, y, z, w, v)
+  | _ ->
+      assert false
 
 let fork6 reader =
   match fork reader 6 with
-  | [x; y; z; w; v; u] -> (x, y, z, w, v, u)
-  | _ -> assert false
+  | [x; y; z; w; v; u] ->
+      (x, y, z, w, v, u)
+  | _ ->
+      assert false
 
 let partition_map2 reader ~f =
   let (reader_a, writer_a), (reader_b, writer_b) = (create (), create ()) in
   don't_wait_for
     (iter reader ~f:(fun x ->
          match f x with
-         | `Fst x -> Pipe.write writer_a x
-         | `Snd x -> Pipe.write writer_b x )) ;
+         | `Fst x ->
+             Pipe.write writer_a x
+         | `Snd x ->
+             Pipe.write writer_b x )) ;
   don't_wait_for
     (let%map () = closed reader_a and () = closed reader_b in
      close_read reader) ;
@@ -182,9 +192,12 @@ let partition_map3 reader ~f =
   don't_wait_for
     (iter reader ~f:(fun x ->
          match f x with
-         | `Fst x -> Pipe.write writer_a x
-         | `Snd x -> Pipe.write writer_b x
-         | `Trd x -> Pipe.write writer_c x )) ;
+         | `Fst x ->
+             Pipe.write writer_a x
+         | `Snd x ->
+             Pipe.write writer_b x
+         | `Trd x ->
+             Pipe.write writer_c x )) ;
   don't_wait_for
     (let%map () = closed reader_a
      and () = closed reader_b
@@ -197,8 +210,10 @@ let filter_map_unordered ~max_concurrency t ~f =
   don't_wait_for
     (iter_unordered ~max_concurrency t ~f:(fun x ->
          match%bind f x with
-         | Some y -> Pipe.write writer y
-         | None -> return () )) ;
+         | Some y ->
+             Pipe.write writer y
+         | None ->
+             return () )) ;
   don't_wait_for
     (let%map () = closed reader in
      close_read t) ;
@@ -230,5 +245,7 @@ let read ({pipe; _} : 'a Reader.t) = Pipe.read pipe
 
 let read_exn reader =
   match%map read reader with
-  | `Eof -> failwith "Expecting a value from reader"
-  | `Ok value -> value
+  | `Eof ->
+      failwith "Expecting a value from reader"
+  | `Ok value ->
+      value

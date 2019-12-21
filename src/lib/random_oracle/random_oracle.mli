@@ -1,48 +1,26 @@
-open Core_kernel
-open Snark_params
+open Curve_choice.Tick0
+module Input = Input
 
-module Digest : sig
-  type t = private string [@@deriving sexp, bin_io, compare, hash, yojson]
+module State : sig
+  type 'a t [@@deriving eq, sexp, compare]
 
-  include Comparable.S with type t := t
+  val map : 'a t -> f:('a -> 'b) -> 'b t
 
-  val gen : t Quickcheck.Generator.t
-
-  val fold_bits : t -> bool Fold_lib.Fold.t
-
-  val fold : t -> bool Tuple_lib.Triple.t Fold_lib.Fold.t
-
-  val length_in_bits : int
-
-  val length_in_bytes : int
-
-  val length_in_triples : int
-
-  val of_string : string -> t
-
-  val to_bits : t -> bool list
-
-  module Checked : sig
-    type unchecked = t
-
-    type t = private Tick.Boolean.var array
-
-    val to_triples : t -> Tick.Boolean.var Tuple_lib.Triple.t list
-
-    val constant : unchecked -> t
-  end
-
-  val typ : (Checked.t, t) Tick.Typ.t
+  val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
 end
 
-val digest_string : string -> Digest.t
+include
+  Intf.S
+  with type field := Field.t
+   and type field_constant := Field.t
+   and type bool := bool
+   and module State := State
 
-val digest_field : Tick.Field.t -> Digest.t
+val salt : string -> Field.t State.t
 
-module Checked : sig
-  open Tick
-
-  val digest_bits : Boolean.var list -> (Digest.Checked.t, _) Checked.t
-
-  val digest_field : Field.Var.t -> (Digest.Checked.t, _) Checked.t
-end
+module Checked :
+  Intf.S
+  with type field := Field.Var.t
+   and type field_constant := Field.t
+   and type bool := Boolean.var
+   and module State := State

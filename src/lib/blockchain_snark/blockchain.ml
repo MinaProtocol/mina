@@ -1,43 +1,18 @@
-module State = Blockchain_state
 open Core_kernel
 open Coda_base
-open Module_version
+open Coda_state
 
-module type S = sig
-  type t = {state: Consensus.Protocol_state.value; proof: Proof.Stable.V1.t}
-  [@@deriving bin_io, fields]
-
-  val create :
-    state:Consensus.Protocol_state.value -> proof:Proof.Stable.V1.t -> t
-end
-
-module Protocol_state = Consensus.Protocol_state
-
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      let version = 1
+    type t = {state: Protocol_state.Value.Stable.V1.t; proof: Proof.Stable.V1.t}
+    [@@deriving fields, sexp]
 
-      type t = {state: Protocol_state.value; proof: Proof.Stable.V1.t}
-      [@@deriving bin_io, fields]
-    end
-
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
   end
+end]
 
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "blockchain"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
-
-include Stable.Latest
+type t = Stable.Latest.t = {state: Protocol_state.Value.t; proof: Proof.t}
+[@@deriving fields, sexp]
 
 let create ~state ~proof = {state; proof}

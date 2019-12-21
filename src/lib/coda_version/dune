@@ -1,0 +1,9 @@
+(library
+ (name coda_version)
+ (preprocess (pps ppx_coda))
+ (public_name coda_version))
+
+(rule
+ (targets coda_version.ml)
+ (deps (:< gen.sh) (universe))
+ (action (run %{<} %{targets})))

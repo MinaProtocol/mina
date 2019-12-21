@@ -33,8 +33,8 @@ module type S = sig
      and type path = Path.t
      and type t := t
 
-  val to_list : t -> account list
   (** list of accounts, in increasing order of their storage locations *)
+  val to_list : t -> account list
 
   val foldi_with_ignored_keys :
        t
@@ -57,8 +57,8 @@ module type S = sig
     -> finish:('accum -> 'stop)
     -> 'stop
 
-  val keys : t -> key_set
   (** set of public keys associated with accounts *)
+  val keys : t -> key_set
 
   val location_of_key : t -> key -> Location.t option
 

@@ -1,53 +1,43 @@
-open Core_kernel
+open Intf
 
-type uint64 = Unsigned.uint64
+type nonrec uint64 = uint64
 
-module type S = sig
-  type t [@@deriving bin_io, sexp, hash, compare, eq]
+type nonrec uint32 = uint32
 
-  val length_in_bits : int
+module type S = S
 
-  include Hashable.S with type t := t
+module Extend : F
 
-  include Unsigned.S with type t := t
+module UInt64 : sig
+  module Stable : sig
+    module V1 : sig
+      type t = Unsigned.UInt64.t
+      [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
+    end
+
+    module Latest = V1
+  end
+
+  include S with type t = Stable.Latest.t
 
   val to_uint64 : t -> uint64
 
   val of_uint64 : uint64 -> t
-
-  val ( < ) : t -> t -> bool
-
-  val ( > ) : t -> t -> bool
-
-  val ( = ) : t -> t -> bool
-
-  val ( <= ) : t -> t -> bool
-
-  val ( >= ) : t -> t -> bool
 end
 
-module type F = functor
-  (Unsigned : Unsigned.S)
-  (Signed :sig
-           
-           type t [@@deriving bin_io]
-         end)
-  (M :sig
-      
-      val to_signed : Unsigned.t -> Signed.t
+module UInt32 : sig
+  module Stable : sig
+    module V1 : sig
+      type t = Unsigned.UInt32.t
+      [@@deriving bin_io, sexp, hash, compare, eq, yojson, version]
+    end
 
-      val of_signed : Signed.t -> Unsigned.t
+    module Latest = V1
+  end
 
-      val to_uint64 : Unsigned.t -> uint64
+  include S with type t = Stable.Latest.t
 
-      val of_uint64 : uint64 -> Unsigned.t
+  val to_uint32 : t -> uint32
 
-      val length : int
-    end)
-  -> S with type t = Unsigned.t
-
-module Extend : F
-
-module UInt64 : S with type t = Unsigned.UInt64.t
-
-module UInt32 : S with type t = Unsigned.UInt32.t
+  val of_uint32 : uint32 -> t
+end

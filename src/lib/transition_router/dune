@@ -1,7 +1,7 @@
 (library
   (name transition_router)
   (public_name transition_router)
-  (preprocess (pps ppx_jane ppx_deriving.eq))
+  (preprocess (pps ppx_coda ppx_jane ppx_deriving.eq))
   (libraries
     core
     async
@@ -9,5 +9,4 @@
     transition_frontier
     transition_frontier_controller
     bootstrap_controller
-    protocol_state_validator
-    ))
+    coda_networking))

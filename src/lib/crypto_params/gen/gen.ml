@@ -1,21 +1,19 @@
 [%%import
-"../../../config.mlh"]
+"/src/config.mlh"]
 
 open Ppxlib
 open Asttypes
 open Parsetree
 open Longident
 open Core
-open Fold_lib
 open Chunked_triples
 
 let seed = "CodaPedersenParams"
 
 let random_bool = Crs.create ~seed
 
-module Impl = Crypto_params_init.Tick0
-module Group = Crypto_params_init.Tick_backend.Inner_curve
-open Tuple_lib
+module Impl = Curve_choice.Tick0
+module Group = Curve_choice.Tick_backend.Inner_curve
 
 let bigint_of_bits bits =
   List.foldi bits ~init:Bigint.zero ~f:(fun i acc b ->
@@ -41,57 +39,103 @@ let rec random_point () =
   let x = random_field_element () in
   let y2 =
     let open Impl.Field in
-    let open Infix in
     (x * square x)
-    + (Crypto_params_init.Tick_backend.Inner_curve.Coefficients.a * x)
-    + Crypto_params_init.Tick_backend.Inner_curve.Coefficients.b
+    + (Curve_choice.Tick_backend.Inner_curve.Coefficients.a * x)
+    + Curve_choice.Tick_backend.Inner_curve.Coefficients.b
   in
   if Impl.Field.is_square y2 then
     let a, b = sqrt y2 in
     if random_bool () then (x, a) else (x, b)
   else random_point ()
 
-let max_input_size = 20000
+let scalar_size_in_triples = Curve_choice.Tock_full.Field.size_in_bits / 4
+
+let max_input_size_in_bits = 20000
+
+let base_params =
+  List.init
+    (max_input_size_in_bits / (3 * scalar_size_in_triples))
+    ~f:(fun _i -> Group.of_affine (random_point ()))
+
+let sixteen_times x =
+  x |> Group.double |> Group.double |> Group.double |> Group.double
 
 let params =
-  List.init (max_input_size / 4) ~f:(fun i ->
-      let t = Group.of_affine_coordinates (random_point ()) in
-      let tt = Group.double t in
-      (t, tt, Group.add t tt, Group.double tt) )
+  let powers g =
+    let gg = Group.double g in
+    (g, gg, Group.add g gg, Group.double gg)
+  in
+  let open Sequence in
+  concat_map (of_list base_params) ~f:(fun x ->
+      unfold ~init:x ~f:(fun g -> Some (powers g, sixteen_times g))
+      |> Fn.flip take scalar_size_in_triples )
+  |> to_list
 
 let params_array = Array.of_list params
 
-let params_ast ~loc =
+let affine_params_ast ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
   let open E in
-  let earray =
+  let arr =
     E.pexp_array
       (List.map params ~f:(fun (g1, g2, g3, g4) ->
            E.pexp_tuple
              (List.map [g1; g2; g3; g4] ~f:(fun g ->
-                  let x, y = Group.to_affine_coordinates g in
+                  (* g is a random point so this is safe. *)
+                  let x, y = Group.to_affine_exn g in
                   E.pexp_tuple
                     [ estring (Impl.Field.to_string x)
                     ; estring (Impl.Field.to_string y) ] )) ))
   in
-  let%expr conv (x, y) =
-    Tick_backend.Inner_curve.of_affine_coordinates
-      (Tick0.Field.of_string x, Tick0.Field.of_string y)
-  in
+  let%expr conv (x, y) = (Tick0.Field.of_string x, Tick0.Field.of_string y) in
   Array.map
     (fun (g1, g2, g3, g4) -> (conv g1, conv g2, conv g3, conv g4))
-    [%e earray]
+    [%e arr]
+
+let params_ast affine_params ~loc =
+  let%expr conv = Tick_backend.Inner_curve.of_affine in
+  Array.map
+    (fun (g1, g2, g3, g4) -> (conv g1, conv g2, conv g3, conv g4))
+    [%e affine_params]
+
+let group_map_params =
+  Group_map.Params.create
+    (module Curve_choice.Tick0.Field)
+    ~a:Curve_choice.Tick_backend.Inner_curve.Coefficients.a
+    ~b:Curve_choice.Tick_backend.Inner_curve.Coefficients.b
+
+let group_map_params_structure ~loc =
+  let module T = struct
+    type t = Curve_choice.Tick_backend.Field.t Group_map.Params.t
+    [@@deriving bin_io]
+  end in
+  let module E = Ppxlib.Ast_builder.Make (struct
+    let loc = loc
+  end) in
+  let open E in
+  [%str
+    let params =
+      let module T = struct
+        type t = Curve_choice.Tick_backend.Field.t Group_map.Params.t
+        [@@deriving bin_io]
+      end in
+      Binable.of_string
+        (module T)
+        [%e estring (Binable.to_string (module T) group_map_params)]]
 
 let params_structure ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
   let open E in
-  [%str open Crypto_params_init
+  [%str
+    open Curve_choice
 
-        let params = [%e params_ast ~loc]]
+    let affine = [%e affine_params_ast ~loc]
+
+    let params = [%e params_ast [%expr affine] ~loc]]
 
 (* for the reversed chunk with value n, compute its curve value
    start is the starting parameter position of the chunk, based
@@ -167,30 +211,13 @@ let chunk_table_structure ~loc =
   let open E in
   [%str
     open Core
-    module Group = Crypto_params_init.Tick_backend.Inner_curve
+    module Group = Curve_choice.Tick_backend.Inner_curve
 
-    let chunk_table_string_opt_ref = ref (Some [%e chunk_table_ast ~loc])
-
-    (** dummy empty table before deserialization *)
-    let chunk_table_ref : Chunk_table.t ref = ref (Chunk_table.create [||])
-
-    let deserialized = ref false
-
-    let deserialize () =
-      if not !deserialized then (
-        let chunk_table_string =
-          Option.value_exn !chunk_table_string_opt_ref
-        in
-        let result =
-          Binable.of_string (module Chunk_table) chunk_table_string
-        in
-        (* allow string to be GCed *)
-        chunk_table_string_opt_ref := None ;
-        chunk_table_ref := result ;
-        deserialized := true )
-
-    (** returns valid chunk table *)
-    let get_chunk_table () = deserialize () ; !chunk_table_ref.table_data]
+    let chunk_table =
+      lazy
+        (let s = [%e chunk_table_ast ~loc] in
+         let t = Binable.of_string (module Chunk_table) s in
+         t.table_data)]
 
 let generate_ml_file filename structure =
   let fmt = Format.formatter_of_out_channel (Out_channel.create filename) in
@@ -199,4 +226,5 @@ let generate_ml_file filename structure =
 let () =
   generate_ml_file "pedersen_params.ml" params_structure ;
   generate_ml_file "pedersen_chunk_table.ml" chunk_table_structure ;
+  generate_ml_file "group_map_params.ml" group_map_params_structure ;
   ignore (exit 0)

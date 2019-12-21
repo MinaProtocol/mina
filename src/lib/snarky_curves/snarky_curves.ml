@@ -128,9 +128,9 @@ module Make_weierstrass_checked
 
       val random : unit -> t
 
-      val to_affine_coordinates : t -> F.Unchecked.t * F.Unchecked.t
+      val to_affine_exn : t -> F.Unchecked.t * F.Unchecked.t
 
-      val of_affine_coordinates : F.Unchecked.t * F.Unchecked.t -> t
+      val of_affine : F.Unchecked.t * F.Unchecked.t -> t
 
       val double : t -> t
 
@@ -160,14 +160,14 @@ module Make_weierstrass_checked
     let unchecked =
       Typ.transport
         Typ.(tuple2 F.typ F.typ)
-        ~there:Curve.to_affine_coordinates ~back:Curve.of_affine_coordinates
+        ~there:Curve.to_affine_exn ~back:Curve.of_affine
     in
     {unchecked with check= assert_on_curve}
 
   let negate ((x, y) : t) : t = (x, F.negate y)
 
   let constant (t : Curve.t) : t =
-    let x, y = Curve.to_affine_coordinates t in
+    let x, y = Curve.to_affine_exn t in
     F.(constant x, constant y)
 
   let assert_equal (x1, y1) (x2, y2) =
@@ -309,13 +309,13 @@ module Make_weierstrass_checked
     (bx, by)
 
   let if_value (cond : Boolean.var) ~then_ ~else_ =
-    let x1, y1 = Curve.to_affine_coordinates then_ in
-    let x2, y2 = Curve.to_affine_coordinates else_ in
+    let x1, y1 = Curve.to_affine_exn then_ in
+    let x2, y2 = Curve.to_affine_exn else_ in
     let cond = (cond :> Field.Var.t) in
     let choose a1 a2 =
       let open Field.Checked in
       F.map2_ a1 a2 ~f:(fun a1 a2 ->
-          Infix.((a1 * cond) + (a2 * (Field.Var.constant Field.one - cond))) )
+          (a1 * cond) + (a2 * (Field.Var.constant Field.one - cond)) )
     in
     (choose x1 x2, choose y1 y2)
 
@@ -327,7 +327,8 @@ module Make_weierstrass_checked
     let open Let_syntax in
     let rec go i bs0 acc pt =
       match bs0 with
-      | [] -> return acc
+      | [] ->
+          return acc
       | b :: bs ->
           let%bind acc' =
             with_label (sprintf "acc_%d" i)
@@ -354,10 +355,10 @@ module Make_weierstrass_checked
       +^ ((a3 - a1) * (b1 :> Field.Var.t))
       +^ ((a4 + a1 - a2 - a3) * (b0_and_b1 :> Field.Var.t))
     in
-    let x1, y1 = Curve.to_affine_coordinates t1
-    and x2, y2 = Curve.to_affine_coordinates t2
-    and x3, y3 = Curve.to_affine_coordinates t3
-    and x4, y4 = Curve.to_affine_coordinates t4 in
+    let x1, y1 = Curve.to_affine_exn t1
+    and x2, y2 = Curve.to_affine_exn t2
+    and x3, y3 = Curve.to_affine_exn t3
+    and x4, y4 = Curve.to_affine_exn t4 in
     (lookup_one (x1, x2, x3, x4), lookup_one (y1, y2, y3, y4))
 
   (* Similar to the above, but doing lookup in a size 1 table *)
@@ -367,8 +368,7 @@ module Make_weierstrass_checked
       constant a1
       + map_ Unchecked.(a2 - a1) ~f:(Field.Var.scale (b :> Field.Var.t))
     in
-    let x1, y1 = Curve.to_affine_coordinates t1
-    and x2, y2 = Curve.to_affine_coordinates t2 in
+    let x1, y1 = Curve.to_affine_exn t1 and x2, y2 = Curve.to_affine_exn t2 in
     (lookup_one (x1, x2), lookup_one (y1, y2))
 
   let scale_known (type shifted)
@@ -430,7 +430,8 @@ module Make_weierstrass_checked
         Can get away with using an unsafe add if we modify this a bit. *)
     let rec go acc two_to_the_i bits =
       match bits with
-      | [] -> return acc
+      | [] ->
+          return acc
       | [b_i] ->
           let term =
             lookup_single_bit b_i (sigma, Curve.(sigma + two_to_the_i))
@@ -453,18 +454,21 @@ module Make_weierstrass_checked
   let to_constant (x, y) =
     let open Option.Let_syntax in
     let%map x = F.to_constant x and y = F.to_constant y in
-    Curve.of_affine_coordinates (x, y)
+    Curve.of_affine (x, y)
 
   let scale m t c ~init =
     match to_constant t with
-    | Some t -> scale_known m t c ~init
-    | None -> scale m t c ~init
+    | Some t ->
+        scale_known m t c ~init
+    | None ->
+        scale m t c ~init
 
   let sum (type shifted) (module Shifted : Shifted.S with type t = shifted) xs
       ~init =
     let open Let_syntax in
     let rec go acc = function
-      | [] -> return acc
+      | [] ->
+          return acc
       | t :: ts ->
           let%bind acc' = Shifted.add acc t in
           go acc' ts

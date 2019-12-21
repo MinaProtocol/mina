@@ -1,7 +1,5 @@
 let length_in_bytes = 20
 
-let length_in_triples = ((8 * length_in_bytes) + 2) / 3
-
 module T : sig
   type t = private string
 
@@ -30,7 +28,7 @@ let account = create "CodaAccount"
 
 let merkle_tree i = create (Printf.sprintf "CodaMklTree%03d" i)
 
-let proof_of_work = create "CodaPoW"
+let coinbase_merkle_tree i = create (Printf.sprintf "CodaCbMklTree%03d" i)
 
 let merge_snark = create "CodaMergeSnark"
 
@@ -47,3 +45,18 @@ let epoch_seed = create "CodaEpochSeed"
 let vrf_message = create "CodaVrfMessage"
 
 let vrf_output = create "CodaVrfOutput"
+
+let pending_coinbases = create "PendingCoinbases"
+
+let coinbase_stack_data = create "CoinbaseStackData"
+
+(* length is limited, so we drop some characters here *)
+let coinbase_stack_state_hash = create "CoinbaseStackStaHash"
+
+let coinbase_stack = create "CoinbaseStack"
+
+let coinbase = create "Coinbase"
+
+let checkpoint_list = create "CodaCheckpoints"
+
+let bowe_gabizon_hash = create "CodaTockBGHash"

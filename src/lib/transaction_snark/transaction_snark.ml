@@ -2,98 +2,192 @@ open Core
 open Signature_lib
 open Coda_base
 open Snark_params
-open Currency
-open Fold_lib
-
-let state_hash_size_in_triples = Tick.Field.size_in_triples
+module Global_slot = Coda_numbers.Global_slot
+module Amount = Currency.Amount
+module Balance = Currency.Balance
+module Fee = Currency.Fee
 
 let tick_input () =
-  let open Tick.Groth16 in
+  let open Tick in
   Data_spec.[Field.typ]
 
 let wrap_input = Tock.Data_spec.[Wrap_input.typ]
 
 let exists' typ ~f = Tick.(exists typ ~compute:As_prover.(map get_state ~f))
 
-module Input = struct
-  type t =
-    { source: Frozen_ledger_hash.Stable.V1.t
-    ; target: Frozen_ledger_hash.Stable.V1.t
-    ; fee_excess: Currency.Amount.Signed.t }
-  [@@deriving bin_io]
-end
-
 module Proof_type = struct
-  type t = [`Merge | `Base] [@@deriving bin_io, sexp, hash, compare]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = [`Base | `Merge] [@@deriving compare, equal, hash, sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
 
   let is_base = function `Base -> true | `Merge -> false
 end
 
+module Pending_coinbase_stack_state = struct
+  (* State of the coinbase stack for the current transaction snark *)
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { source: Pending_coinbase.Stack.Stable.V1.t
+        ; target: Pending_coinbase.Stack.Stable.V1.t }
+      [@@deriving sexp, hash, compare, eq, fields, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t =
+    {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
+  [@@deriving sexp, hash, compare, yojson]
+
+  include Hashable.Make_binable (Stable.Latest)
+  include Comparable.Make (Stable.Latest)
+end
+
 module Statement = struct
-  module T = struct
-    type t =
-      { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
-      ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
-      ; supply_increase: Currency.Amount.Stable.V1.t
-      ; fee_excess: Currency.Fee.Signed.Stable.V1.t
-      ; proof_type: Proof_type.t }
-    [@@deriving sexp, bin_io, hash, compare, fields]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { source: Frozen_ledger_hash.Stable.V1.t
+        ; target: Frozen_ledger_hash.Stable.V1.t
+        ; supply_increase: Currency.Amount.Stable.V1.t
+        ; pending_coinbase_stack_state:
+            Pending_coinbase_stack_state.Stable.V1.t
+        ; fee_excess:
+            ( Currency.Fee.Stable.V1.t
+            , Sgn.Stable.V1.t )
+            Currency.Signed_poly.Stable.V1.t
+        ; proof_type: Proof_type.Stable.V1.t }
+      [@@deriving compare, equal, hash, sexp, yojson]
 
-    let option lab =
-      Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
+      let to_latest = Fn.id
+    end
+  end]
 
-    let merge s1 s2 =
-      let open Or_error.Let_syntax in
-      let%map fee_excess =
-        Currency.Fee.Signed.add s1.fee_excess s2.fee_excess
-        |> option "Error adding fees"
-      and supply_increase =
-        Currency.Amount.add s1.supply_increase s2.supply_increase
-        |> option "Error adding supply_increase"
-      in
-      { source= s1.source
-      ; target= s2.target
-      ; fee_excess
-      ; proof_type= `Merge
-      ; supply_increase }
-  end
+  type t = Stable.Latest.t =
+    { source: Frozen_ledger_hash.t
+    ; target: Frozen_ledger_hash.t
+    ; supply_increase: Currency.Amount.t
+    ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
+    ; fee_excess: Currency.Fee.Signed.t
+    ; proof_type: Proof_type.t }
+  [@@deriving sexp, hash, compare, yojson]
 
-  include T
-  include Hashable.Make_binable (T)
-  include Comparable.Make (T)
+  let option lab =
+    Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
+
+  let merge s1 s2 =
+    let open Or_error.Let_syntax in
+    let%map fee_excess =
+      Currency.Fee.Signed.add s1.fee_excess s2.fee_excess
+      |> option "Error adding fees"
+    and supply_increase =
+      Currency.Amount.add s1.supply_increase s2.supply_increase
+      |> option "Error adding supply_increase"
+    in
+    { source= s1.source
+    ; target= s2.target
+    ; fee_excess
+    ; proof_type= `Merge
+    ; supply_increase
+    ; pending_coinbase_stack_state=
+        { source= s1.pending_coinbase_stack_state.source
+        ; target= s2.pending_coinbase_stack_state.target } }
+
+  include Hashable.Make_binable (Stable.Latest)
+  include Comparable.Make (Stable.Latest)
 
   let gen =
     let open Quickcheck.Generator.Let_syntax in
-    let%map source = Coda_base.Frozen_ledger_hash.gen
-    and target = Coda_base.Frozen_ledger_hash.gen
+    let%map source = Frozen_ledger_hash.gen
+    and target = Frozen_ledger_hash.gen
     and fee_excess = Currency.Fee.Signed.gen
     and supply_increase = Currency.Amount.gen
-    and proof_type = Bool.gen >>| fun b -> if b then `Merge else `Base in
-    {source; target; fee_excess; proof_type; supply_increase}
-end
-
-type t =
-  { source: Frozen_ledger_hash.Stable.V1.t
-  ; target: Frozen_ledger_hash.Stable.V1.t
-  ; proof_type: Proof_type.t
-  ; supply_increase: Amount.Stable.V1.t
-  ; fee_excess: Amount.Signed.Stable.V1.t
-  ; sok_digest: Sok_message.Digest.Stable.V1.t
-  ; proof: Proof.Stable.V1.t }
-[@@deriving fields, sexp, bin_io]
-
-let statement
+    and pending_coinbase_before = Pending_coinbase.Stack.gen
+    and pending_coinbase_after = Pending_coinbase.Stack.gen
+    and proof_type =
+      Bool.quickcheck_generator >>| fun b -> if b then `Merge else `Base
+    in
     { source
     ; target
-    ; proof_type
     ; fee_excess
+    ; proof_type
     ; supply_increase
-    ; sok_digest= _
-    ; proof= _ } =
-  { Statement.source
+    ; pending_coinbase_stack_state=
+        {source= pending_coinbase_before; target= pending_coinbase_after} }
+end
+
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t =
+      { source: Frozen_ledger_hash.Stable.V1.t
+      ; target: Frozen_ledger_hash.Stable.V1.t
+      ; proof_type: Proof_type.Stable.V1.t
+      ; supply_increase: Amount.Stable.V1.t
+      ; pending_coinbase_stack_state: Pending_coinbase_stack_state.Stable.V1.t
+      ; fee_excess:
+          ( Amount.Stable.V1.t
+          , Sgn.Stable.V1.t )
+          Currency.Signed_poly.Stable.V1.t
+      ; sok_digest: Sok_message.Digest.Stable.V1.t
+      ; proof: Proof.Stable.V1.t }
+    [@@deriving compare, fields, sexp, version]
+
+    let to_yojson t =
+      `Assoc
+        [ ("source", Frozen_ledger_hash.to_yojson t.source)
+        ; ("target", Frozen_ledger_hash.to_yojson t.target)
+        ; ("proof_type", Proof_type.to_yojson t.proof_type)
+        ; ("supply_increase", Amount.to_yojson t.supply_increase)
+        ; ( "pending_coinbase_stack_state"
+          , Pending_coinbase_stack_state.to_yojson
+              t.pending_coinbase_stack_state )
+        ; ("fee_excess", Amount.Signed.to_yojson t.fee_excess)
+        ; ("sok_digest", `String "<opaque>")
+        ; ("proof", Proof.to_yojson t.proof) ]
+
+    let to_latest = Fn.id
+  end
+end]
+
+type t = Stable.Latest.t =
+  { source: Frozen_ledger_hash.t
+  ; target: Frozen_ledger_hash.t
+  ; proof_type: Proof_type.t
+  ; supply_increase: Amount.t
+  ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
+  ; fee_excess: (Amount.t, Sgn.t) Currency.Signed_poly.t
+  ; sok_digest: Sok_message.Digest.t
+  ; proof: Proof.t }
+[@@deriving fields, sexp]
+
+let to_yojson = Stable.Latest.to_yojson
+
+let statement
+    ({ source
+     ; target
+     ; proof_type
+     ; fee_excess
+     ; supply_increase
+     ; pending_coinbase_stack_state
+     ; sok_digest= _
+     ; proof= _ } :
+      t) =
+  { Statement.Stable.V1.source
   ; target
   ; proof_type
   ; supply_increase
+  ; pending_coinbase_stack_state
   ; fee_excess=
       Currency.Fee.Signed.create
         ~magnitude:Currency.Amount.(to_fee (Signed.magnitude fee_excess))
@@ -102,20 +196,28 @@ let statement
 let create = Fields.create
 
 let construct_input ~proof_type ~sok_digest ~state1 ~state2 ~supply_increase
-    ~fee_excess =
-  let fold =
-    let open Fold in
-    Sok_message.Digest.fold sok_digest
-    +> Frozen_ledger_hash.fold state1
-    +> Frozen_ledger_hash.fold state2
-    +> Amount.fold supply_increase
-    +> Amount.Signed.fold fee_excess
+    ~fee_excess
+    ~(pending_coinbase_stack_state : Pending_coinbase_stack_state.t) =
+  let open Random_oracle in
+  let input =
+    let open Input in
+    List.reduce_exn ~f:append
+      [ Sok_message.Digest.to_input sok_digest
+      ; Frozen_ledger_hash.to_input state1
+      ; Frozen_ledger_hash.to_input state2
+      ; Pending_coinbase.Stack.to_input pending_coinbase_stack_state.source
+      ; Pending_coinbase.Stack.to_input pending_coinbase_stack_state.target
+      ; bitstring (Amount.to_bits supply_increase)
+      ; Amount.Signed.to_input fee_excess ]
   in
-  match proof_type with
-  | `Base -> Tick.Pedersen.digest_fold Hash_prefix.base_snark fold
-  | `Merge wrap_vk_bits ->
-      Tick.Pedersen.digest_fold Hash_prefix.merge_snark
-        Fold.(fold +> group3 ~default:false (of_list wrap_vk_bits))
+  let init =
+    match proof_type with
+    | `Base ->
+        Hash_prefix.base_snark
+    | `Merge wrap_vk_state ->
+        wrap_vk_state
+  in
+  Random_oracle.hash ~init (pack_input input)
 
 let base_top_hash = construct_input ~proof_type:`Base
 
@@ -123,16 +225,22 @@ let merge_top_hash wrap_vk_bits =
   construct_input ~proof_type:(`Merge wrap_vk_bits)
 
 module Verification_keys = struct
+  (* TODO : version *)
   type t =
-    { base: Tick.Groth16.Verification_key.t
+    { base: Tick.Verification_key.t
     ; wrap: Tock.Verification_key.t
-    ; merge: Tick.Groth16.Verification_key.t }
+    ; merge: Tick.Verification_key.t }
   [@@deriving bin_io]
 
   let dummy : t =
-    { merge= Dummy_values.Tick.Groth16.verification_key
-    ; base= Dummy_values.Tick.Groth16.verification_key
-    ; wrap= Dummy_values.Tock.GrothMaller17.verification_key }
+    let groth16 =
+      Tick_backend.Verification_key.get_dummy
+        ~input_size:(Tick.Data_spec.size (tick_input ()))
+    in
+    { merge= groth16
+    ; base= groth16
+    ; wrap= Tock_backend.Verification_key.get_dummy ~input_size:Wrap_input.size
+    }
 end
 
 module Keys0 = struct
@@ -140,15 +248,14 @@ module Keys0 = struct
 
   module Proving = struct
     type t =
-      { base: Tick.Groth16.Proving_key.t
+      { base: Tick.Proving_key.t
       ; wrap: Tock.Proving_key.t
-      ; merge: Tick.Groth16.Proving_key.t }
-    [@@deriving bin_io]
+      ; merge: Tick.Proving_key.t }
 
     let dummy =
       { merge= Dummy_values.Tick.Groth16.proving_key
       ; base= Dummy_values.Tick.Groth16.proving_key
-      ; wrap= Dummy_values.Tock.GrothMaller17.proving_key }
+      ; wrap= Dummy_values.Tock.Bowe_gabizon18.proving_key }
   end
 
   module T = struct
@@ -167,12 +274,99 @@ module Base = struct
   open Tick
   open Let_syntax
 
-  let%snarkydef check_signature shifted ~payload_section ~is_user_command
-      ~sender ~signature =
+  let%snarkydef check_signature shifted ~payload ~is_user_command ~sender
+      ~signature =
     let%bind verifies =
-      Schnorr.Checked.verifies shifted signature sender payload_section
+      Schnorr.Checked.verifies shifted signature sender payload
     in
     Boolean.Assert.any [Boolean.not is_user_command; verifies]
+
+  let check_timing ~account ~txn_amount ~txn_global_slot =
+    (* calculations should track Transaction_logic.validate_timing *)
+    let open Account.Poly in
+    let open Account.Timing.As_record in
+    let { is_timed
+        ; initial_minimum_balance
+        ; cliff_time
+        ; vesting_period
+        ; vesting_increment } =
+      account.timing
+    in
+    let%bind before_or_at_cliff =
+      Global_slot.Checked.(txn_global_slot <= cliff_time)
+    in
+    let int_of_field field =
+      Snarky_integer.Integer.constant ~m
+        (Bigint.of_field field |> Bigint.to_bignum_bigint)
+    in
+    let zero_int = int_of_field Field.zero in
+    let balance_to_int balance =
+      Snarky_integer.Integer.of_bits ~m @@ Balance.var_to_bits balance
+    in
+    let txn_amount_int =
+      Snarky_integer.Integer.of_bits ~m @@ Amount.var_to_bits txn_amount
+    in
+    let balance_int = balance_to_int account.balance in
+    let%bind curr_min_balance =
+      let open Snarky_integer.Integer in
+      let initial_minimum_balance_int =
+        balance_to_int initial_minimum_balance
+      in
+      make_checked (fun () ->
+          if_ ~m before_or_at_cliff ~then_:initial_minimum_balance_int
+            ~else_:
+              (let txn_global_slot_int =
+                 Global_slot.Checked.to_integer txn_global_slot
+               in
+               let cliff_time_int =
+                 Global_slot.Checked.to_integer cliff_time
+               in
+               let _, slot_diff =
+                 subtract_unpacking_or_zero ~m txn_global_slot_int
+                   cliff_time_int
+               in
+               let vesting_period_int =
+                 Global_slot.Checked.to_integer vesting_period
+               in
+               let num_periods, _ = div_mod ~m slot_diff vesting_period_int in
+               let vesting_increment_int =
+                 Amount.var_to_bits vesting_increment |> of_bits ~m
+               in
+               let min_balance_decrement =
+                 mul ~m num_periods vesting_increment_int
+               in
+               let _, min_balance_less_decrement =
+                 subtract_unpacking_or_zero ~m initial_minimum_balance_int
+                   min_balance_decrement
+               in
+               min_balance_less_decrement) )
+    in
+    let%bind `Underflow underflow, proposed_balance_int =
+      make_checked (fun () ->
+          Snarky_integer.Integer.subtract_unpacking_or_zero ~m balance_int
+            txn_amount_int )
+    in
+    (* underflow indicates insufficient balance *)
+    let%bind () = Boolean.(Assert.is_true @@ not underflow) in
+    let%bind sufficient_timed_balance =
+      make_checked (fun () ->
+          Snarky_integer.Integer.(gte ~m proposed_balance_int curr_min_balance)
+      )
+    in
+    let%bind _ =
+      with_label
+        (sprintf "%s: check proposed balance against calculated min balance"
+           __LOC__)
+        Boolean.(Assert.any [not is_timed; sufficient_timed_balance])
+    in
+    let%bind is_timed_balance_zero =
+      make_checked (fun () ->
+          Snarky_integer.Integer.equal ~m curr_min_balance zero_int )
+    in
+    (* if current min balance is zero, then timing becomes untimed *)
+    let%bind is_untimed = Boolean.((not is_timed) || is_timed_balance_zero) in
+    Account.Timing.if_ is_untimed ~then_:Account.Timing.untimed_var
+      ~else_:account.timing
 
   let chain if_ b ~then_ ~else_ =
     let%bind then_ = then_ and else_ = else_ in
@@ -186,26 +380,38 @@ module Base = struct
           - merkle tree [root'] where the sender balance is decremented by
             [payload.amount] and the receiver balance is incremented by [payload.amount].
           - fee excess = +fee.
+          -if coinbase, then push it to the stack [pending_coinbase_stack_before]
 
      - if tag = Fee_transfer
         - return:
           - merkle tree [root'] where the sender balance is incremented by
             fee and the receiver balance is incremented by amount
           - fee excess = -(amount + fee)
+
   *)
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
   let%snarkydef apply_tagged_transaction (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
-      root ({sender; signature; payload} : Transaction_union.var) =
+      root pending_coinbase_stack_before pending_coinbase_after state_body_hash
+      ({sender; signature; payload} : Transaction_union.var) =
     let nonce = payload.common.nonce in
     let tag = payload.body.tag in
-    let%bind payload_section = Schnorr.Message.var_of_payload payload in
     let%bind is_user_command =
       Transaction_union.Tag.Checked.is_user_command tag
     in
     let%bind () =
-      check_signature shifted ~payload_section ~is_user_command ~sender
-        ~signature
+      let current_global_slot =
+        Global_slot.(Checked.constant zero)
+        (* TODO: @deepthi is working on passing through the protocol state to
+           here. This should be replaced with the real value when her PR lands.
+           See issue #4036.
+         *)
+      in
+      Global_slot.Checked.(current_global_slot <= payload.common.valid_until)
+      >>= Boolean.Assert.is_true
+    in
+    let%bind () =
+      check_signature shifted ~payload ~is_user_command ~sender ~signature
     in
     let%bind {excess; sender_delta; supply_increase; receiver_increase} =
       Transaction_union_payload.Changes.Checked.of_payload payload
@@ -213,33 +419,62 @@ module Base = struct
     let%bind is_stake_delegation =
       Transaction_union.Tag.Checked.is_stake_delegation tag
     in
+    let%bind is_payment = Transaction_union.Tag.Checked.is_payment tag in
     let%bind sender_compressed = Public_key.compress_var sender in
-    let%bind root =
-      let%bind is_fee_transfer =
-        Transaction_union.Tag.Checked.is_fee_transfer tag
+    let proposer = payload.body.public_key in
+    let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
+    let%bind computed_pending_coinbase_stack_after =
+      let coinbase = (proposer, payload.body.amount, state_body_hash) in
+      let%bind stack' =
+        Pending_coinbase.Stack.Checked.push pending_coinbase_stack_before
+          coinbase
       in
-      Frozen_ledger_hash.modify_account_send root ~is_fee_transfer
+      Pending_coinbase.Stack.Checked.if_ is_coinbase ~then_:stack'
+        ~else_:pending_coinbase_stack_before
+    in
+    let%bind () =
+      let%bind correct_coinbase_stack =
+        Pending_coinbase.Stack.equal_var computed_pending_coinbase_stack_after
+          pending_coinbase_after
+      in
+      Boolean.Assert.is_true correct_coinbase_stack
+    in
+    let%bind root =
+      let%bind is_writeable =
+        let%bind is_fee_transfer =
+          Transaction_union.Tag.Checked.is_fee_transfer tag
+        in
+        Boolean.any [is_fee_transfer; is_coinbase]
+      in
+      Frozen_ledger_hash.modify_account_send root ~is_writeable
         sender_compressed ~f:(fun ~is_empty_and_writeable account ->
           with_label __LOC__
             (let%bind next_nonce =
-               Account.Nonce.increment_if_var account.nonce is_user_command
+               Account.Nonce.Checked.succ_if account.nonce is_user_command
              in
              let%bind () =
                with_label __LOC__
                  (let%bind nonce_matches =
-                    Account.Nonce.equal_var nonce account.nonce
+                    Account.Nonce.Checked.equal nonce account.nonce
                   in
                   Boolean.Assert.any
                     [Boolean.not is_user_command; nonce_matches])
              in
              let%bind receipt_chain_hash =
                let current = account.receipt_chain_hash in
-               let%bind r =
-                 Receipt.Chain_hash.Checked.cons ~payload:payload_section
-                   current
-               in
+               let%bind r = Receipt.Chain_hash.Checked.cons ~payload current in
                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                  ~else_:current
+             in
+             (* TODO: use actual slot. See issue #4036. *)
+             let txn_global_slot = Global_slot.Checked.zero in
+             let%bind timing =
+               let%bind txn_amount =
+                 (* if not a payment, allow check_timing to pass, regardless of account balance *)
+                 if_ is_payment ~typ:Amount.typ ~then_:payload.body.amount
+                   ~else_:Amount.(var_of_t zero)
+               in
+               check_timing ~account ~txn_amount ~txn_global_slot
              in
              let%bind delegate =
                let if_ = chain Public_key.Compressed.Checked.if_ in
@@ -252,12 +487,13 @@ module Base = struct
              let%map balance =
                Balance.Checked.add_signed_amount account.balance sender_delta
              in
-             { Account.balance
+             { Account.Poly.balance
              ; public_key= sender_compressed
              ; nonce= next_nonce
              ; receipt_chain_hash
              ; delegate
-             ; participated= account.participated }) )
+             ; voting_for= account.voting_for
+             ; timing }) )
     in
     let%bind receiver =
       (* A stake delegation only uses the sender *)
@@ -290,8 +526,10 @@ module Base = struct
   module Prover_state = struct
     type t =
       { transaction: Transaction_union.t
+      ; state_body_hash: State_body_hash.t
       ; state1: Frozen_ledger_hash.t
       ; state2: Frozen_ledger_hash.t
+      ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
       ; sok_digest: Sok_message.Digest.t }
     [@@deriving fields]
   end
@@ -303,9 +541,10 @@ module Base = struct
       l2 : Frozen_ledger_hash.t,
       fee_excess : Amount.Signed.t,
       supply_increase : Amount.t
+      pending_coinbase_stack_state: Pending_coinbase_stack_state.t
       t : Tagged_transaction.t
    such that
-   H(l1, l2, fee_excess, supply_increase) = top_hash,
+   H(l1, l2, pending_coinbase_stack_state.source, pending_coinbase_stack_state.target, fee_excess, supply_increase) = top_hash,
    applying [t] to ledger with merkle hash [l1] results in ledger with merkle hash [l2]. *)
   let%snarkydef main top_hash =
     let%bind (module Shifted) = Tick.Inner_curve.Checked.Shifted.create () in
@@ -316,62 +555,93 @@ module Base = struct
       with_label __LOC__
         (exists' Transaction_union.typ ~f:Prover_state.transaction)
     in
+    let%bind pending_coinbase_before =
+      exists' Pending_coinbase.Stack.typ ~f:(fun s ->
+          (Prover_state.pending_coinbase_stack_state s).source )
+    in
+    let%bind pending_coinbase_after =
+      exists' Pending_coinbase.Stack.typ ~f:(fun s ->
+          (Prover_state.pending_coinbase_stack_state s).target )
+    in
+    let%bind state_body_hash =
+      exists' State_body_hash.typ ~f:Prover_state.state_body_hash
+    in
     let%bind root_after, fee_excess, supply_increase =
-      apply_tagged_transaction (module Shifted) root_before t
+      apply_tagged_transaction
+        (module Shifted)
+        root_before pending_coinbase_before pending_coinbase_after
+        state_body_hash t
     in
     let%map () =
       with_label __LOC__
-        (let%bind b1 = Frozen_ledger_hash.var_to_triples root_before
-         and b2 = Frozen_ledger_hash.var_to_triples root_after
-         and sok_digest =
+        (let%bind sok_digest =
            exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
          in
-         let fee_excess = Amount.Signed.Checked.to_triples fee_excess in
-         let supply_increase = Amount.var_to_triples supply_increase in
-         let triples =
-           Sok_message.Digest.Checked.to_triples sok_digest
-           @ b1 @ b2 @ supply_increase @ fee_excess
+         let input =
+           let open Random_oracle.Input in
+           List.reduce_exn ~f:append
+             [ Sok_message.Digest.Checked.to_input sok_digest
+             ; Frozen_ledger_hash.var_to_input root_before
+             ; Frozen_ledger_hash.var_to_input root_after
+             ; Pending_coinbase.Stack.var_to_input pending_coinbase_before
+             ; Pending_coinbase.Stack.var_to_input pending_coinbase_after
+             ; Amount.var_to_input supply_increase
+             ; Amount.Signed.Checked.to_input fee_excess ]
          in
-         Pedersen.Checked.digest_triples ~init:Hash_prefix.base_snark triples
+         make_checked (fun () ->
+             Random_oracle.Checked.(
+               hash ~init:Hash_prefix.base_snark (pack_input input)) )
          >>= Field.Checked.Assert.equal top_hash)
     in
     ()
 
-  let create_keys () = Groth16.generate_keypair main ~exposing:(tick_input ())
+  let create_keys () = generate_keypair main ~exposing:(tick_input ())
 
-  let transaction_union_proof ~proving_key sok_digest state1 state2
-      (transaction : Transaction_union.t) handler =
+  let transaction_union_proof ?(preeval = false) ~proving_key sok_digest state1
+      state2 pending_coinbase_stack_state (transaction : Transaction_union.t)
+      state_body_hash handler =
     let prover_state : Prover_state.t =
-      {state1; state2; transaction; sok_digest}
+      { transaction
+      ; state_body_hash
+      ; state1
+      ; state2
+      ; sok_digest
+      ; pending_coinbase_stack_state }
+    in
+    let main =
+      if preeval then failwith "preeval currently disabled" else main
     in
     let main top_hash = handle (main top_hash) handler in
     let top_hash =
       base_top_hash ~sok_digest ~state1 ~state2
         ~fee_excess:(Transaction_union.excess transaction)
         ~supply_increase:(Transaction_union.supply_increase transaction)
+        ~pending_coinbase_stack_state
     in
-    ( top_hash
-    , Groth16.prove proving_key (tick_input ()) prover_state main top_hash )
+    (top_hash, prove proving_key (tick_input ()) prover_state main top_hash)
 
   let cached =
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Groth16.Keypair.vk
-          (module Groth16.Verification_key)
+        Cached.component ~label:"transaction_snark_base_verification"
+          ~f:Keypair.vk
+          (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Groth16.Keypair.pk
-          (module Groth16.Proving_key)
+        Cached.component ~label:"transaction_snark_base_proving" ~f:Keypair.pk
+          (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
     Cached.Spec.create ~load ~name:"transaction-snark base keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
+      ~brew_install_path:Cache_dir.brew_install_path
+      ~s3_install_path:Cache_dir.s3_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
-      ~input:(lazy (Groth16.constraint_system ~exposing:(tick_input ()) main))
-      ~create_env:(fun x -> Groth16.Keypair.generate (Lazy.force x))
+      ~input:(lazy (constraint_system ~exposing:(tick_input ()) main))
+      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
 end
 
 module Transition_data = struct
@@ -379,7 +649,8 @@ module Transition_data = struct
     { proof: Proof_type.t * Tock_backend.Proof.t
     ; supply_increase: Amount.t
     ; fee_excess: Amount.Signed.t
-    ; sok_digest: Sok_message.Digest.t }
+    ; sok_digest: Sok_message.Digest.t
+    ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t }
   [@@deriving fields]
 end
 
@@ -391,11 +662,14 @@ module Merge = struct
     type t =
       { tock_vk: Tock_backend.Verification_key.t
       ; sok_digest: Sok_message.Digest.t
-      ; ledger_hash1: bool list
-      ; ledger_hash2: bool list
+      ; ledger_hash1: Frozen_ledger_hash.t
+      ; ledger_hash2: Frozen_ledger_hash.t
       ; transition12: Transition_data.t
-      ; ledger_hash3: bool list
-      ; transition23: Transition_data.t }
+      ; ledger_hash3: Frozen_ledger_hash.t
+      ; transition23: Transition_data.t
+      ; pending_coinbase_stack1: Pending_coinbase.Stack.t
+      ; pending_coinbase_stack2: Pending_coinbase.Stack.t
+      ; pending_coinbase_stack3: Pending_coinbase.Stack.t }
     [@@deriving fields]
   end
 
@@ -403,56 +677,41 @@ module Merge = struct
 
   let wrap_input_size = Tock.Data_spec.size wrap_input
 
-  let wrap_input_typ = Typ.list ~length:Tock.Field.size_in_bits Boolean.typ
+  module Verifier = Tick.Verifier
 
-  (* TODO: When we switch to the weierstrass curve use the shifted
-   add-many function *)
-  let disjoint_union_sections = function
-    | [] -> failwith "empty list"
-    | s :: ss ->
-        Checked.List.fold
-          ~f:(fun acc x -> Pedersen.Checked.Section.disjoint_union_exn acc x)
-          ~init:s ss
-
-  module Verifier = Tick.Groth_maller_verifier
-
-  let vk_input_offset =
-    Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
-    + (2 * state_hash_size_in_triples)
-    + Amount.length_in_triples + Amount.Signed.length_in_triples
-
-  let construct_input_checked ~prefix
-      ~(sok_digest : Sok_message.Digest.Checked.t) ~state1 ~state2
-      ~supply_increase ~fee_excess ?tock_vk () =
-    let prefix_section =
-      Pedersen.Checked.Section.create ~acc:prefix
-        ~support:
-          (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
+  let construct_input_checked ~prefix ~sok_digest ~state1 ~state2
+      ~supply_increase ~fee_excess ~pending_coinbase_stack1
+      ~pending_coinbase_stack2 =
+    let open Random_oracle in
+    let input =
+      let open Input in
+      List.reduce_exn ~f:append
+        [ Sok_message.Digest.Checked.to_input sok_digest
+        ; Frozen_ledger_hash.var_to_input state1
+        ; Frozen_ledger_hash.var_to_input state2
+        ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack1
+        ; Pending_coinbase.Stack.var_to_input pending_coinbase_stack2
+        ; bitstring
+            (Bitstring_lib.Bitstring.Lsb_first.to_list
+               (Amount.var_to_bits supply_increase))
+        ; Amount.Signed.Checked.to_input fee_excess ]
     in
-    let%bind prefix_and_sok_digest =
-      Pedersen.Checked.Section.extend prefix_section
-        (Sok_message.Digest.Checked.to_triples sok_digest)
-        ~start:Hash_prefix.length_in_triples
-    in
-    let%bind prefix_and_sok_digest_and_supply_increase_and_fee =
-      let open Pedersen.Checked.Section in
-      extend prefix_and_sok_digest
-        ~start:
-          ( Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
-          + state_hash_size_in_triples + state_hash_size_in_triples )
-        ( Amount.var_to_triples supply_increase
-        @ Amount.Signed.Checked.to_triples fee_excess )
-    in
-    disjoint_union_sections
-      ( [prefix_and_sok_digest_and_supply_increase_and_fee; state1; state2]
-      @ Option.to_list tock_vk )
+    make_checked (fun () ->
+        Random_oracle.Checked.(
+          digest (update ~state:prefix (pack_input input))) )
+
+  let hash_state_if b ~then_ ~else_ =
+    make_checked (fun () ->
+        Random_oracle.State.map2 then_ else_ ~f:(fun then_ else_ ->
+            Run.Field.if_ b ~then_ ~else_ ) )
 
   (* spec for [verify_transition tock_vk proof_field s1 s2]:
      returns a bool which is true iff
      there is a snark proving making tock_vk
      accept on one of [ H(s1, s2, excess); H(s1, s2, excess, tock_vk) ] *)
-  let verify_transition tock_vk tock_vk_precomp tock_vk_section
-      get_transition_data s1 s2 supply_increase fee_excess =
+  let verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
+      get_transition_data s1 s2 ~pending_coinbase_stack1
+      ~pending_coinbase_stack2 supply_increase fee_excess =
     let%bind is_base =
       let get_type s = get_transition_data s |> Transition_data.proof |> fst in
       with_label __LOC__
@@ -462,31 +721,17 @@ module Merge = struct
       exists' Sok_message.Digest.typ
         ~f:(Fn.compose Transition_data.sok_digest get_transition_data)
     in
-    let%bind all_but_vk_top_hash =
-      let prefix =
-        `Var
-          (Inner_curve.Checked.if_value is_base
-             ~then_:Hash_prefix.base_snark.acc
-             ~else_:Hash_prefix.merge_snark.acc)
-      in
-      construct_input_checked ~prefix ~sok_digest ~state1:s1 ~state2:s2
-        ~supply_increase ~fee_excess ()
-    in
-    let%bind with_vk_top_hash =
-      with_label __LOC__
-        (Pedersen.Checked.Section.disjoint_union_exn tock_vk_section
-           all_but_vk_top_hash)
-      >>| Pedersen.Checked.Section.to_initial_segment_digest_exn >>| fst
+    let%bind top_hash_init =
+      hash_state_if is_base
+        ~then_:
+          (Random_oracle.State.map ~f:Run.Field.constant Hash_prefix.base_snark)
+        ~else_:wrap_vk_hash_state
     in
     let%bind input =
-      with_label __LOC__
-        ( Field.Checked.if_ is_base
-            ~then_:
-              ( all_but_vk_top_hash
-              |> Pedersen.Checked.Section.to_initial_segment_digest_exn |> fst
-              )
-            ~else_:with_vk_top_hash
-        >>= Wrap_input.Checked.tick_field_to_scalars )
+      construct_input_checked ~prefix:top_hash_init ~sok_digest ~state1:s1
+        ~state2:s2 ~pending_coinbase_stack1 ~pending_coinbase_stack2
+        ~supply_increase ~fee_excess
+      >>= Wrap_input.Checked.tick_field_to_scalars
     in
     let%bind proof =
       exists Verifier.Proof.typ
@@ -498,26 +743,21 @@ module Merge = struct
     in
     Verifier.verify tock_vk tock_vk_precomp input proof
 
-  let state1_offset =
-    Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
-
-  let state2_offset = state1_offset + state_hash_size_in_triples
-
   (* spec for [main top_hash]:
      constraints pass iff
-     there exist digest, s1, s3, tock_vk such that
-     H(digest,s1, s3, tock_vk) = top_hash,
-     verify_transition tock_vk _ s1 s2 is true
-     verify_transition tock_vk _ s2 s3 is true
+     there exist digest, s1, s3, fee_excess, supply_increase pending_coinbase_stack12.source, pending_coinbase_stack23.target, tock_vk such that
+     H(digest,s1, s3, pending_coinbase_stack12.source, pending_coinbase_stack23.target, fee_excess, supply_increase, tock_vk) = top_hash,
+     verify_transition tock_vk _ s1 s2 pending_coinbase_stack12.source, pending_coinbase_stack12.target is true
+     verify_transition tock_vk _ s2 s3 pending_coinbase_stack23.source, pending_coinbase_stack23.target is true
   *)
   let%snarkydef main (top_hash : Pedersen.Checked.Digest.var) =
     let%bind tock_vk =
       exists' (Verifier.Verification_key.typ ~input_size:wrap_input_size)
         ~f:(fun {Prover_state.tock_vk; _} -> Verifier.vk_of_backend_vk tock_vk
       )
-    and s1 = exists' wrap_input_typ ~f:Prover_state.ledger_hash1
-    and s2 = exists' wrap_input_typ ~f:Prover_state.ledger_hash2
-    and s3 = exists' wrap_input_typ ~f:Prover_state.ledger_hash3
+    and s1 = exists' Frozen_ledger_hash.typ ~f:Prover_state.ledger_hash1
+    and s2 = exists' Frozen_ledger_hash.typ ~f:Prover_state.ledger_hash2
+    and s3 = exists' Frozen_ledger_hash.typ ~f:Prover_state.ledger_hash3
     and fee_excess12 =
       exists' Amount.Signed.typ
         ~f:(Fn.compose Transition_data.fee_excess Prover_state.transition12)
@@ -532,24 +772,23 @@ module Merge = struct
       exists' Amount.typ
         ~f:
           (Fn.compose Transition_data.supply_increase Prover_state.transition23)
+    and pending_coinbase1 =
+      exists' Pending_coinbase.Stack.typ
+        ~f:Prover_state.pending_coinbase_stack1
+    and pending_coinbase2 =
+      exists' Pending_coinbase.Stack.typ
+        ~f:Prover_state.pending_coinbase_stack2
+    and pending_coinbase3 =
+      exists' Pending_coinbase.Stack.typ
+        ~f:Prover_state.pending_coinbase_stack3
     in
-    let bits_to_triples bits =
-      Fold.(to_list (group3 ~default:Boolean.false_ (of_list bits)))
-    in
-    let%bind s1_section =
-      let open Pedersen.Checked.Section in
-      extend empty ~start:state1_offset (bits_to_triples s1)
-    in
-    let%bind s3_section =
-      let open Pedersen.Checked.Section in
-      extend empty ~start:state2_offset (bits_to_triples s3)
-    in
-    let%bind tock_vk_section =
-      let%bind bs =
-        Verifier.Verification_key.(summary (summary_input tock_vk))
-      in
-      Pedersen.Checked.Section.extend Pedersen.Checked.Section.empty
-        ~start:vk_input_offset (bits_to_triples bs)
+    let%bind wrap_vk_hash_state =
+      make_checked (fun () ->
+          Random_oracle.(
+            Checked.update
+              ~state:
+                (State.map Hash_prefix_states.merge_snark ~f:Run.Field.constant)
+              (Verifier.Verification_key.to_field_elements tock_vk)) )
     in
     let%bind tock_vk_precomp =
       Verifier.Verification_key.Precomputation.create tock_vk
@@ -565,52 +804,51 @@ module Merge = struct
         let%bind sok_digest =
           exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
         in
-        construct_input_checked ~prefix:(`Value Hash_prefix.merge_snark.acc)
-          ~sok_digest ~state1:s1_section ~state2:s3_section ~supply_increase
-          ~fee_excess:total_fees ~tock_vk:tock_vk_section ()
-        >>| Pedersen.Checked.Section.to_initial_segment_digest_exn >>| fst
+        construct_input_checked ~prefix:wrap_vk_hash_state ~sok_digest
+          ~state1:s1 ~state2:s3 ~pending_coinbase_stack1:pending_coinbase1
+          ~pending_coinbase_stack2:pending_coinbase3 ~supply_increase
+          ~fee_excess:total_fees
       in
       Field.Checked.Assert.equal top_hash input
     and verify_12 =
-      let%bind s2_section =
-        let open Pedersen.Checked.Section in
-        extend empty ~start:state2_offset (bits_to_triples s2)
-      in
-      verify_transition tock_vk tock_vk_precomp tock_vk_section
-        Prover_state.transition12 s1_section s2_section supply_increase12
+      verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
+        Prover_state.transition12 s1 s2
+        ~pending_coinbase_stack1:pending_coinbase1
+        ~pending_coinbase_stack2:pending_coinbase2 supply_increase12
         fee_excess12
     and verify_23 =
-      let%bind s2_section =
-        let open Pedersen.Checked.Section in
-        extend empty ~start:state1_offset (bits_to_triples s2)
-      in
-      verify_transition tock_vk tock_vk_precomp tock_vk_section
-        Prover_state.transition23 s2_section s3_section supply_increase23
+      verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
+        Prover_state.transition23 s2 s3
+        ~pending_coinbase_stack1:pending_coinbase2
+        ~pending_coinbase_stack2:pending_coinbase3 supply_increase23
         fee_excess23
     in
     Boolean.Assert.all [verify_12; verify_23]
 
-  let create_keys () = Groth16.generate_keypair ~exposing:(input ()) main
+  let create_keys () = generate_keypair ~exposing:(input ()) main
 
   let cached =
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Groth16.Keypair.vk
-          (module Groth16.Verification_key)
+        Cached.component ~label:"transaction_snark_merge_verification"
+          ~f:Keypair.vk
+          (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Groth16.Keypair.pk
-          (module Groth16.Proving_key)
+        Cached.component ~label:"transaction_snark_merge_proving" ~f:Keypair.pk
+          (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
     Cached.Spec.create ~load ~name:"transaction-snark merge keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
+      ~brew_install_path:Cache_dir.brew_install_path
+      ~s3_install_path:Cache_dir.s3_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
-      ~input:(lazy (Groth16.constraint_system ~exposing:(input ()) main))
-      ~create_env:(fun x -> Groth16.Keypair.generate (Lazy.force x))
+      ~input:(lazy (constraint_system ~exposing:(input ()) main))
+      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
 end
 
 module Verification = struct
@@ -625,6 +863,8 @@ module Verification = struct
          Sok_message.Digest.Checked.t
       -> Frozen_ledger_hash.var
       -> Frozen_ledger_hash.var
+      -> Pending_coinbase.Stack.var
+      -> Pending_coinbase.Stack.var
       -> Currency.Amount.var
       -> (Tock.Proof.t, 's) Tick.As_prover.t
       -> (Tick.Boolean.var, 's) Tick.Checked.t
@@ -636,7 +876,17 @@ module Verification = struct
   struct
     open K
 
-    let wrap_vk_bits = Snark_params.tock_vk_to_bool_list keys.wrap
+    let wrap_vk_state =
+      Random_oracle.update ~state:Hash_prefix.merge_snark
+        Snark_params.Tick.Verifier.(
+          let vk = vk_of_backend_vk keys.wrap in
+          let g1 = Tick.Inner_curve.to_affine_exn in
+          let g2 = Tick.Pairing.G2.Unchecked.to_affine_exn in
+          Verification_key.to_field_elements
+            { vk with
+              query_base= g1 vk.query_base
+            ; query= List.map ~f:g1 vk.query
+            ; delta= g2 vk.delta })
 
     (* someday: Reorganize this module so that the inputs are separated from the proof. *)
     let verify_against_digest
@@ -646,49 +896,23 @@ module Verification = struct
         ; proof_type
         ; fee_excess
         ; sok_digest
-        ; supply_increase } =
+        ; supply_increase
+        ; pending_coinbase_stack_state } =
       let input =
         match proof_type with
         | `Base ->
-            base_top_hash ~sok_digest ~state1:source ~state2:target ~fee_excess
-              ~supply_increase
+            base_top_hash ~sok_digest ~state1:source ~state2:target
+              ~pending_coinbase_stack_state ~fee_excess ~supply_increase
         | `Merge ->
-            merge_top_hash ~sok_digest wrap_vk_bits ~state1:source
-              ~state2:target ~fee_excess ~supply_increase
+            merge_top_hash ~sok_digest wrap_vk_state ~state1:source
+              ~state2:target ~pending_coinbase_stack_state ~fee_excess
+              ~supply_increase
       in
       Tock.verify proof keys.wrap wrap_input (Wrap_input.of_tick_field input)
 
     let verify t ~message =
       Sok_message.Digest.equal t.sok_digest (Sok_message.digest message)
       && verify_against_digest t
-
-    (* The curve pt corresponding to
-       H(merge_prefix, _digest, _, _, _, Amount.Signed.zero, wrap_vk)
-    (with starting point shifted over by 2 * digest_size so that
-    this can then be used to compute H(merge_prefix, digest, s1, s2, Amount.Signed.zero, wrap_vk) *)
-    let merge_prefix_and_zero_and_vk_curve_pt =
-      let open Tick in
-      let excess_begin =
-        Hash_prefix.length_in_triples + Sok_message.Digest.length_in_triples
-        + (2 * state_hash_size_in_triples)
-        + Amount.length_in_triples
-      in
-      let s = {Hash_prefix.merge_snark with triples_consumed= excess_begin} in
-      let s =
-        Pedersen.State.update_fold s
-          Fold.(
-            Amount.Signed.(fold zero)
-            +> group3 ~default:false (of_list wrap_vk_bits))
-      in
-      let prefix_interval = (0, Hash_prefix.length_in_triples) in
-      let excess_end = excess_begin + Amount.Signed.length_in_triples in
-      let excess_interval = (excess_begin, excess_end) in
-      let vk_length_in_triples = (2 + List.length wrap_vk_bits) / 3 in
-      let vk_interval = (excess_end, excess_end + vk_length_in_triples) in
-      Tick.Pedersen.Checked.Section.create ~acc:(`Value s.acc)
-        ~support:
-          (Interval_union.of_intervals_exn
-             [prefix_interval; excess_interval; vk_interval])
 
     (* spec for [verify_merge s1 s2 _]:
       Returns a boolean which is true if there exists a tock proof proving
@@ -707,52 +931,19 @@ module Verification = struct
         Verification_key.Precomputation.create_constant
           (vk_of_backend_vk keys.wrap))
 
-    let verify_complete_merge sok_digest s1 s2 supply_increase get_proof =
+    let verify_complete_merge sok_digest s1 s2
+        (pending_coinbase_stack1 : Pending_coinbase.Stack.var)
+        (pending_coinbase_stack2 : Pending_coinbase.Stack.var) supply_increase
+        get_proof =
       let open Tick in
-      let%bind s1 = Frozen_ledger_hash.var_to_triples s1
-      and s2 = Frozen_ledger_hash.var_to_triples s2 in
-      let%bind top_hash_section =
-        Pedersen.Checked.Section.extend merge_prefix_and_zero_and_vk_curve_pt
-          ~start:Hash_prefix.length_in_triples
-          ( Sok_message.Digest.Checked.to_triples sok_digest
-          @ s1 @ s2
-          @ Amount.var_to_triples supply_increase )
+      let%bind top_hash =
+        Merge.construct_input_checked
+          ~prefix:(Random_oracle.State.map wrap_vk_state ~f:Run.Field.constant)
+          ~state1:s1 ~state2:s2 ~pending_coinbase_stack1
+          ~pending_coinbase_stack2 ~sok_digest ~supply_increase
+          ~fee_excess:Amount.Signed.(Checked.constant zero)
       in
-      let digest =
-        let digest, `Length_in_triples n =
-          Pedersen.Checked.Section.to_initial_segment_digest_exn
-            top_hash_section
-        in
-        if
-          n
-          = Hash_prefix.length_in_triples
-            + Sok_message.Digest.length_in_triples
-            + (2 * Frozen_ledger_hash.length_in_triples)
-            + Amount.length_in_triples + Amount.Signed.length_in_triples
-            + Coda_base.Util.bit_length_to_triple_length
-                (List.length wrap_vk_bits)
-        then digest
-        else
-          failwithf
-            !"%d = Hash_prefix.length_in_triples aka %d\n\
-             \            + Sok_message.Digest.length_in_triples aka %d\n\
-              + (2 * Frozen_ledger_hash.length_in_triples) aka %d \n\
-             \            + Amount.length aka %d + Amount.Signed.length aka \
-              %d + List.length wrap_vk_triples aka %d ) aka %d"
-            n Hash_prefix.length_in_triples
-            Sok_message.Digest.length_in_triples
-            (2 * Frozen_ledger_hash.length_in_triples)
-            Amount.length_in_triples Amount.Signed.length_in_triples
-            (Coda_base.Util.bit_length_to_triple_length
-               (List.length wrap_vk_bits))
-            ( Hash_prefix.length_in_triples
-            + (2 * Frozen_ledger_hash.length_in_triples)
-            + Amount.length_in_triples + Amount.Signed.length_in_triples
-            + Coda_base.Util.bit_length_to_triple_length
-                (List.length wrap_vk_bits) )
-            ()
-      in
-      let%bind input = Wrap_input.Checked.tick_field_to_scalars digest in
+      let%bind input = Wrap_input.Checked.tick_field_to_scalars top_hash in
       let%map result =
         let%bind proof =
           exists Merge.Verifier.Proof.typ
@@ -766,9 +957,9 @@ module Verification = struct
 end
 
 module Wrap (Vk : sig
-  val merge : Tick.Groth16.Verification_key.t
+  val merge : Tick.Verification_key.t
 
-  val base : Tick.Groth16.Verification_key.t
+  val base : Tick.Verification_key.t
 end) =
 struct
   open Tock
@@ -785,7 +976,7 @@ struct
     Verifier.Verification_key.Precomputation.create_constant base_vk
 
   module Prover_state = struct
-    type t = {proof_type: Proof_type.t; proof: Tick.Groth16.Proof.t}
+    type t = {proof_type: Proof_type.t; proof: Tick.Proof.t}
     [@@deriving fields]
   end
 
@@ -834,28 +1025,35 @@ struct
     let load =
       let open Cached.Let_syntax in
       let%map verification =
-        Cached.component ~label:"verification" ~f:Keypair.vk
+        Cached.component ~label:"transaction_snark_wrap_verification"
+          ~f:Keypair.vk
           (module Verification_key)
       and proving =
-        Cached.component ~label:"proving" ~f:Keypair.pk (module Proving_key)
+        Cached.component ~label:"transaction_snark_wrap_proving" ~f:Keypair.pk
+          (module Proving_key)
       in
       (verification, {proving with value= ()})
     in
     Cached.Spec.create ~load ~name:"transaction-snark wrap keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
-      ~digest_input:(Fn.compose Md5.to_hex R1CS_constraint_system.digest)
-      ~input:(constraint_system ~exposing:wrap_input main)
-      ~create_env:Keypair.generate
+      ~brew_install_path:Cache_dir.brew_install_path
+      ~s3_install_path:Cache_dir.s3_install_path
+      ~digest_input:(fun x ->
+        Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
+      ~input:(lazy (constraint_system ~exposing:wrap_input main))
+      ~create_env:(fun x -> Keypair.generate (Lazy.force x))
 end
 
 module type S = sig
   include Verification.S
 
   val of_transaction :
-       sok_digest:Sok_message.Digest.t
+       ?preeval:bool
+    -> sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
+    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> Transaction.t
     -> Tick.Handler.t
     -> t
@@ -864,6 +1062,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
+    -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> User_command.With_valid_signature.t
     -> Tick.Handler.t
     -> t
@@ -872,6 +1071,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
+    -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> Fee_transfer.t
     -> Tick.Handler.t
     -> t
@@ -879,34 +1079,85 @@ module type S = sig
   val merge : t -> t -> sok_digest:Sok_message.Digest.t -> t Or_error.t
 end
 
-let check_transaction_union sok_message source target transaction handler =
+let check_transaction_union ?(preeval = false) sok_message source target
+    pending_coinbase_stack_state transaction state_body_hash handler =
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
-    {state1= source; state2= target; transaction; sok_digest}
+    { transaction
+    ; state_body_hash
+    ; state1= source
+    ; state2= target
+    ; sok_digest
+    ; pending_coinbase_stack_state }
   in
   let top_hash =
     base_top_hash ~sok_digest ~state1:source ~state2:target
+      ~pending_coinbase_stack_state
       ~fee_excess:(Transaction_union.excess transaction)
       ~supply_increase:(Transaction_union.supply_increase transaction)
   in
   let open Tick in
   let main =
+    if preeval then failwith "preeval currently disabled" else Base.main
+  in
+  let main =
     handle
-      (Checked.map
-         (Base.main (Field.Var.constant top_hash))
-         ~f:As_prover.return)
+      (Checked.map (main (Field.Var.constant top_hash)) ~f:As_prover.return)
       handler
   in
   Or_error.ok_exn (run_and_check main prover_state) |> ignore
 
-let check_transaction ~sok_message ~source ~target (t : Transaction.t) handler
-    =
-  check_transaction_union sok_message source target
-    (Transaction_union.of_transaction t)
-    handler
+let state_body_hash_of_transaction =
+  let open Transaction in
+  function
+  | Coinbase cb -> cb.Coinbase.state_body_hash | _ -> State_body_hash.dummy
 
-let check_user_command ~sok_message ~source ~target t handler =
-  check_transaction ~sok_message ~source ~target (User_command t) handler
+let check_transaction ?preeval ~sok_message ~source ~target
+    ~pending_coinbase_stack_state (transaction : Transaction.t) handler =
+  let state_body_hash = state_body_hash_of_transaction transaction in
+  check_transaction_union ?preeval sok_message source target
+    pending_coinbase_stack_state
+    (Transaction_union.of_transaction transaction)
+    state_body_hash handler
+
+let check_user_command ~sok_message ~source ~target pending_coinbase_stack t
+    handler =
+  check_transaction ~sok_message ~source ~target
+    ~pending_coinbase_stack_state:
+      Pending_coinbase_stack_state.Stable.Latest.
+        {source= pending_coinbase_stack; target= pending_coinbase_stack}
+    (User_command t) handler
+
+let generate_transaction_union_witness ?(preeval = false) sok_message source
+    target transaction pending_coinbase_stack_state state_body_hash handler =
+  let sok_digest = Sok_message.digest sok_message in
+  let prover_state : Base.Prover_state.t =
+    { transaction
+    ; state_body_hash
+    ; state1= source
+    ; state2= target
+    ; sok_digest
+    ; pending_coinbase_stack_state }
+  in
+  let top_hash =
+    base_top_hash ~sok_digest ~state1:source ~state2:target
+      ~fee_excess:(Transaction_union.excess transaction)
+      ~supply_increase:(Transaction_union.supply_increase transaction)
+      ~pending_coinbase_stack_state
+  in
+  let open Tick in
+  let main =
+    if preeval then failwith "preeval currently disabled" else Base.main
+  in
+  let main x = handle (main x) handler in
+  generate_auxiliary_input (tick_input ()) prover_state main top_hash
+
+let generate_transaction_witness ?preeval ~sok_message ~source ~target
+    pending_coinbase_stack_state (transaction : Transaction.t) handler =
+  let state_body_hash = state_body_hash_of_transaction transaction in
+  generate_transaction_union_witness ?preeval sok_message source target
+    (Transaction_union.of_transaction transaction)
+    pending_coinbase_stack_state state_body_hash handler
 
 let verification_keys_of_keys {Keys0.verification; _} = verification
 
@@ -943,47 +1194,72 @@ struct
       |> Option.value_exn
     in
     let top_hash =
-      merge_top_hash wrap_vk_bits ~sok_digest ~state1:ledger_hash1
-        ~state2:ledger_hash3 ~fee_excess ~supply_increase
+      merge_top_hash wrap_vk_state ~sok_digest ~state1:ledger_hash1
+        ~state2:ledger_hash3
+        ~pending_coinbase_stack_state:
+          Pending_coinbase_stack_state.Stable.Latest.
+            { source= transition12.pending_coinbase_stack_state.source
+            ; target= transition23.pending_coinbase_stack_state.target }
+        ~fee_excess ~supply_increase
     in
     let prover_state =
-      let to_bits = Frozen_ledger_hash.to_bits in
       { Merge.Prover_state.sok_digest
-      ; ledger_hash1= to_bits ledger_hash1
-      ; ledger_hash2= to_bits ledger_hash2
-      ; ledger_hash3= to_bits ledger_hash3
+      ; ledger_hash1
+      ; ledger_hash2
+      ; ledger_hash3
+      ; pending_coinbase_stack1=
+          transition12.pending_coinbase_stack_state.source
+      ; pending_coinbase_stack2=
+          transition12.pending_coinbase_stack_state.target
+      ; pending_coinbase_stack3=
+          transition23.pending_coinbase_stack_state.target
       ; transition12
       ; transition23
       ; tock_vk= keys.verification.wrap }
     in
     ( top_hash
-    , Tick.Groth16.prove keys.proving.merge (tick_input ()) prover_state
-        Merge.main top_hash )
+    , Tick.prove keys.proving.merge (tick_input ()) prover_state Merge.main
+        top_hash )
 
-  let of_transaction_union sok_digest source target transaction handler =
+  let of_transaction_union ?preeval sok_digest source target
+      ~pending_coinbase_stack_state transaction state_body_hash handler =
     let top_hash, proof =
-      Base.transaction_union_proof sok_digest ~proving_key:keys.proving.base
-        source target transaction handler
+      Base.transaction_union_proof ?preeval sok_digest
+        ~proving_key:keys.proving.base source target
+        pending_coinbase_stack_state transaction state_body_hash handler
     in
     { source
     ; sok_digest
     ; target
     ; proof_type= `Base
     ; fee_excess= Transaction_union.excess transaction
+    ; pending_coinbase_stack_state
     ; supply_increase= Transaction_union.supply_increase transaction
     ; proof= wrap `Base proof top_hash }
 
-  let of_transaction ~sok_digest ~source ~target transition handler =
-    of_transaction_union sok_digest source target
-      (Transaction_union.of_transaction transition)
-      handler
+  let of_transaction ?preeval ~sok_digest ~source ~target
+      ~pending_coinbase_stack_state transaction handler =
+    let state_body_hash = state_body_hash_of_transaction transaction in
+    of_transaction_union ?preeval sok_digest source target
+      ~pending_coinbase_stack_state
+      (Transaction_union.of_transaction transaction)
+      state_body_hash handler
 
-  let of_user_command ~sok_digest ~source ~target user_command handler =
-    of_transaction ~sok_digest ~source ~target (User_command user_command)
-      handler
+  let of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack
+      user_command handler =
+    of_transaction ~sok_digest ~source ~target
+      ~pending_coinbase_stack_state:
+        Pending_coinbase_stack_state.Stable.Latest.
+          {source= pending_coinbase_stack; target= pending_coinbase_stack}
+      (User_command user_command) handler
 
-  let of_fee_transfer ~sok_digest ~source ~target transfer handler =
-    of_transaction ~sok_digest ~source ~target (Fee_transfer transfer) handler
+  let of_fee_transfer ~sok_digest ~source ~target ~pending_coinbase_stack
+      transfer handler =
+    of_transaction ~sok_digest ~source ~target
+      ~pending_coinbase_stack_state:
+        Pending_coinbase_stack_state.Stable.Latest.
+          {source= pending_coinbase_stack; target= pending_coinbase_stack}
+      (Fee_transfer transfer) handler
 
   let merge t1 t2 ~sok_digest =
     if not (Frozen_ledger_hash.( = ) t1.target t2.source) then
@@ -996,11 +1272,13 @@ struct
         { Transition_data.proof= (t1.proof_type, t1.proof)
         ; fee_excess= t1.fee_excess
         ; supply_increase= t1.supply_increase
-        ; sok_digest= t1.sok_digest }
+        ; sok_digest= t1.sok_digest
+        ; pending_coinbase_stack_state= t1.pending_coinbase_stack_state }
         { Transition_data.proof= (t2.proof_type, t2.proof)
         ; fee_excess= t2.fee_excess
         ; supply_increase= t2.supply_increase
-        ; sok_digest= t2.sok_digest }
+        ; sok_digest= t2.sok_digest
+        ; pending_coinbase_stack_state= t2.pending_coinbase_stack_state }
     in
     let open Or_error.Let_syntax in
     let%map fee_excess =
@@ -1020,6 +1298,9 @@ struct
     ; sok_digest
     ; fee_excess
     ; supply_increase
+    ; pending_coinbase_stack_state=
+        { source= t1.pending_coinbase_stack_state.source
+        ; target= t2.pending_coinbase_stack_state.target }
     ; proof_type= `Merge
     ; proof= wrap `Merge proof input }
 end
@@ -1050,21 +1331,22 @@ module Keys = struct
     module Location = Per_snark_location
 
     let checksum ~base ~merge ~wrap =
-      checksum ~prefix:"verification" ~base ~merge ~wrap
+      checksum ~prefix:"transaction_snark_verification" ~base ~merge ~wrap
 
     let load ({merge; base; wrap} : Location.t) =
       let open Storage in
-      let parent_log = Logger.create () in
+      let logger = Logger.create () in
       let tick_controller =
-        Controller.create ~parent_log (module Tick.Groth16.Verification_key)
+        Controller.create ~logger (module Tick.Verification_key)
       in
       let tock_controller =
-        Controller.create ~parent_log (module Tock.Verification_key)
+        Controller.create ~logger (module Tock.Verification_key)
       in
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
-        | Ok x -> x
+        | Ok x ->
+            x
         | Error _e ->
             failwithf
               !"Transaction_snark: load failed on %{sexp:Storage.location}"
@@ -1084,21 +1366,22 @@ module Keys = struct
     module Location = Per_snark_location
 
     let checksum ~base ~merge ~wrap =
-      checksum ~prefix:"proving" ~base ~merge ~wrap
+      checksum ~prefix:"transaction_snark_proving" ~base ~merge ~wrap
 
     let load ({merge; base; wrap} : Location.t) =
       let open Storage in
-      let parent_log = Logger.create () in
+      let logger = Logger.create () in
       let tick_controller =
-        Controller.create ~parent_log (module Tick.Groth16.Proving_key)
+        Controller.create ~logger (module Tick.Proving_key)
       in
       let tock_controller =
-        Controller.create ~parent_log (module Tock.Proving_key)
+        Controller.create ~logger (module Tock.Proving_key)
       in
       let open Async in
       let load c p =
         match%map load_with_checksum c p with
-        | Ok x -> x
+        | Ok x ->
+            x
         | Error _e ->
             failwithf
               !"Transaction_snark: load failed on %{sexp:Storage.location}"
@@ -1135,24 +1418,24 @@ module Keys = struct
     let merge = Merge.create_keys () in
     let wrap =
       let module Wrap = Wrap (struct
-        let base = Tick.Groth16.Keypair.vk base
+        let base = Tick.Keypair.vk base
 
-        let merge = Tick.Groth16.Keypair.vk merge
+        let merge = Tick.Keypair.vk merge
       end) in
       Wrap.create_keys ()
     in
     { proving=
-        { base= Tick.Groth16.Keypair.pk base
-        ; merge= Tick.Groth16.Keypair.pk merge
+        { base= Tick.Keypair.pk base
+        ; merge= Tick.Keypair.pk merge
         ; wrap= Tock.Keypair.pk wrap }
     ; verification=
-        { base= Tick.Groth16.Keypair.vk base
-        ; merge= Tick.Groth16.Keypair.vk merge
+        { base= Tick.Keypair.vk base
+        ; merge= Tick.Keypair.vk merge
         ; wrap= Tock.Keypair.vk wrap } }
 
   let cached () =
     let paths path = Cache_dir.possible_paths (Filename.basename path) in
-    let open Async in
+    let open Cached.Deferred_with_track_generated.Let_syntax in
     let%bind base_vk, base_pk = Cached.run Base.cached in
     let%bind merge_vk, merge_pk = Cached.run Merge.cached in
     let%map wrap_vk, wrap_pk =
@@ -1227,6 +1510,7 @@ let%test_module "transaction_snark" =
       let receiver = wallets.(j) in
       let payload : User_command.Payload.t =
         User_command.Payload.create ~fee ~nonce ~memo
+          ~valid_until:Global_slot.max_value
           ~body:
             (Payment
                { receiver= receiver.account.public_key
@@ -1234,9 +1518,10 @@ let%test_module "transaction_snark" =
       in
       let signature = Schnorr.sign sender.private_key payload in
       User_command.check
-        { User_command.payload
-        ; sender= Public_key.of_private_key_exn sender.private_key
-        ; signature }
+        User_command.Poly.Stable.Latest.
+          { payload
+          ; sender= Public_key.of_private_key_exn sender.private_key
+          ; signature }
       |> Option.value_exn
 
     let keys = Keys.create ()
@@ -1245,12 +1530,67 @@ let%test_module "transaction_snark" =
       let keys = keys
     end)
 
-    let of_user_command' sok_digest ledger user_command handler =
+    let of_user_command' sok_digest ledger user_command pending_coinbase_stack
+        handler =
       let source = Ledger.merkle_root ledger in
       let target =
         Ledger.merkle_root_after_user_command_exn ledger user_command
       in
-      of_user_command ~sok_digest ~source ~target user_command handler
+      of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack
+        user_command handler
+
+    (*
+                ~proposer:
+                  { x=
+                      Snark_params.Tick.Field.of_string
+                        "39876046544032071884326965137489542106804584544160987424424979200505499184903744868114140"
+                  ; is_odd= true }
+                ~fee_transfer:
+                  (Some
+                     ( { x=
+                           Snark_params.Tick.Field.of_string
+                             "221715137372156378645114069225806158618712943627692160064142985953895666487801880947288786"
+                       ; is_odd= true }
+       *)
+    let%test_unit "coinbase" =
+      Test_util.with_randomness 123456789 (fun () ->
+          let mk_pubkey () =
+            Public_key.(compress (of_private_key_exn (Private_key.create ())))
+          in
+          let proposer = mk_pubkey () in
+          let other = mk_pubkey () in
+          let pending_coinbase_init = Pending_coinbase.Stack.empty in
+          let state_body_hash = State_body_hash.dummy in
+          let cb =
+            Coinbase.create
+              ~amount:(Currency.Amount.of_int 10)
+              ~proposer
+              ~fee_transfer:(Some (other, Currency.Fee.of_int 1))
+              ~state_body_hash
+            |> Or_error.ok_exn
+          in
+          let transaction = Transaction.Coinbase cb in
+          Ledger.with_ledger ~f:(fun ledger ->
+              Ledger.create_new_account_exn ledger proposer
+              @@ Account.create proposer Balance.zero ;
+              let sparse_ledger =
+                Sparse_ledger.of_ledger_subset_exn ledger [proposer; other]
+              in
+              check_transaction transaction
+                (unstage (Sparse_ledger.handler sparse_ledger))
+                ~sok_message:
+                  (Coda_base.Sok_message.create ~fee:Currency.Fee.zero
+                     ~prover:Public_key.Compressed.empty)
+                ~source:(Sparse_ledger.merkle_root sparse_ledger)
+                ~target:
+                  Sparse_ledger.(
+                    merkle_root
+                      (apply_transaction_exn sparse_ledger transaction))
+                ~pending_coinbase_stack_state:
+                  { source= pending_coinbase_init
+                  ; target=
+                      Pending_coinbase.Stack.push pending_coinbase_init cb } )
+      )
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -1265,9 +1605,9 @@ let%test_module "transaction_snark" =
                 user_command wallets 1 0 8
                   (Fee.of_int (Random.int 20))
                   Account.Nonce.zero
-                  (User_command_memo.create_exn
+                  (User_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_size_in_bytes))
+                        ~len:User_command_memo.max_digestible_string_length))
               in
               let target =
                 Ledger.merkle_root_after_user_command_exn ledger t1
@@ -1282,9 +1622,10 @@ let%test_module "transaction_snark" =
                 Sok_message.create ~fee:Fee.zero
                   ~prover:wallets.(1).account.public_key
               in
+              let pending_coinbase_stack = Pending_coinbase.Stack.empty in
               check_user_command ~sok_message
                 ~source:(Ledger.merkle_root ledger)
-                ~target t1
+                ~target pending_coinbase_stack t1
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let%test "base_and_merge" =
@@ -1298,17 +1639,22 @@ let%test_module "transaction_snark" =
                 user_command wallets 0 1 8
                   (Fee.of_int (Random.int 20))
                   Account.Nonce.zero
-                  (User_command_memo.create_exn
+                  (User_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_size_in_bytes))
+                        ~len:User_command_memo.max_digestible_string_length))
               in
               let t2 =
                 user_command wallets 1 2 3
                   (Fee.of_int (Random.int 20))
                   Account.Nonce.zero
-                  (User_command_memo.create_exn
+                  (User_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
-                        ~len:User_command_memo.max_size_in_bytes))
+                        ~len:User_command_memo.max_digestible_string_length))
+              in
+              let pending_coinbase_stack_state =
+                Pending_coinbase_stack_state.Stable.Latest.
+                  { source= Pending_coinbase.Stack.empty
+                  ; target= Pending_coinbase.Stack.empty }
               in
               let sok_digest =
                 Sok_message.create ~fee:Fee.zero
@@ -1325,6 +1671,7 @@ let%test_module "transaction_snark" =
               in
               let proof12 =
                 of_user_command' sok_digest ledger t1
+                  Pending_coinbase.Stack.empty
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
@@ -1337,6 +1684,7 @@ let%test_module "transaction_snark" =
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23 =
                 of_user_command' sok_digest ledger t2
+                  Pending_coinbase.Stack.empty
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
@@ -1366,22 +1714,202 @@ let%test_module "transaction_snark" =
                 (Wrap_input.of_tick_field
                    (merge_top_hash ~sok_digest ~state1 ~state2:state3
                       ~supply_increase:Amount.zero ~fee_excess:total_fees
-                      wrap_vk_bits)) ) )
+                      ~pending_coinbase_stack_state wrap_vk_state)) ) )
+  end )
+
+let%test_module "account timing check" =
+  ( module struct
+    open Core_kernel
+    open Coda_numbers
+    open Currency
+    open Transaction_validator.For_tests
+
+    (* test that unchecked and checked calculations for timing agree *)
+
+    let make_checked_computation account txn_amount txn_global_slot =
+      let account = Account.var_of_t account in
+      let txn_amount = Amount.var_of_t txn_amount in
+      let txn_global_slot = Global_slot.Checked.constant txn_global_slot in
+      let open Snarky.Checked.Let_syntax in
+      let%map timing =
+        Base.check_timing ~account ~txn_amount ~txn_global_slot
+      in
+      Snarky.As_prover.read Account.Timing.typ timing
+
+    let run_checked_timing_and_compare account txn_amount txn_global_slot
+        unchecked_timing =
+      let checked_computation =
+        make_checked_computation account txn_amount txn_global_slot
+      in
+      let (), checked_timing =
+        Or_error.ok_exn
+        @@ Snark_params.Tick.run_and_check checked_computation ()
+      in
+      Account.Timing.equal checked_timing unchecked_timing
+
+    (* confirm the checked computation fails *)
+    let checked_timing_should_fail account txn_amount txn_global_slot =
+      let checked_computation =
+        make_checked_computation account txn_amount txn_global_slot
+      in
+      Or_error.is_error
+      @@ Snark_params.Tick.run_and_check checked_computation ()
+
+    let%test "before_cliff_time" =
+      let pk = Public_key.Compressed.empty in
+      let balance = Balance.of_int 100_000 in
+      let initial_minimum_balance = Balance.of_int 80_000 in
+      let cliff_time = Global_slot.of_int 1000 in
+      let vesting_period = Global_slot.of_int 10 in
+      let vesting_increment = Amount.of_int 1 in
+      let txn_amount = Currency.Amount.of_int 100 in
+      let txn_global_slot = Global_slot.of_int 45 in
+      let account =
+        Or_error.ok_exn
+        @@ Account.create_timed pk balance ~initial_minimum_balance ~cliff_time
+             ~vesting_period ~vesting_increment
+      in
+      let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
+      match timing with
+      | Ok (Timed _ as unchecked_timing) ->
+          run_checked_timing_and_compare account txn_amount txn_global_slot
+            unchecked_timing
+      | _ ->
+          false
+
+    let%test "positive min balance" =
+      let pk = Public_key.Compressed.empty in
+      let balance = Balance.of_int 100_000 in
+      let initial_minimum_balance = Balance.of_int 10_000 in
+      let cliff_time = Global_slot.of_int 1000 in
+      let vesting_period = Global_slot.of_int 10 in
+      let vesting_increment = Amount.of_int 100 in
+      let account =
+        Or_error.ok_exn
+        @@ Account.create_timed pk balance ~initial_minimum_balance ~cliff_time
+             ~vesting_period ~vesting_increment
+      in
+      let txn_amount = Currency.Amount.of_int 100 in
+      let txn_global_slot = Coda_numbers.Global_slot.of_int 1900 in
+      let timing =
+        validate_timing ~account
+          ~txn_amount:(Currency.Amount.of_int 100)
+          ~txn_global_slot:(Coda_numbers.Global_slot.of_int 1900)
+      in
+      (* we're 900 slots past the cliff, which is 90 vesting periods
+          subtract 90 * 100 = 9,000 from init min balance of 10,000 to get 1000
+          so we should still be timed
+        *)
+      match timing with
+      | Ok (Timed _ as unchecked_timing) ->
+          run_checked_timing_and_compare account txn_amount txn_global_slot
+            unchecked_timing
+      | _ ->
+          false
+
+    let%test "curr min balance of zero" =
+      let pk = Public_key.Compressed.empty in
+      let balance = Balance.of_int 100_000 in
+      let initial_minimum_balance = Balance.of_int 10_000 in
+      let cliff_time = Global_slot.of_int 1_000 in
+      let vesting_period = Global_slot.of_int 10 in
+      let vesting_increment = Amount.of_int 100 in
+      let account =
+        Or_error.ok_exn
+        @@ Account.create_timed pk balance ~initial_minimum_balance ~cliff_time
+             ~vesting_period ~vesting_increment
+      in
+      let txn_amount = Currency.Amount.of_int 100 in
+      let txn_global_slot = Coda_numbers.Global_slot.of_int 2_000 in
+      let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
+      (* we're 1000 slots past the cliff, which is 100 vesting periods
+          subtract 100 * 100 = 10,000 from init min balance of 10,000 to get zero
+          so we should be untimed now
+        *)
+      match timing with
+      | Ok (Untimed as unchecked_timing) ->
+          run_checked_timing_and_compare account txn_amount txn_global_slot
+            unchecked_timing
+      | _ ->
+          false
+
+    let%test "below calculated min balance" =
+      let pk = Public_key.Compressed.empty in
+      let balance = Balance.of_int 10_000 in
+      let initial_minimum_balance = Balance.of_int 10_000 in
+      let cliff_time = Global_slot.of_int 1_000 in
+      let vesting_period = Global_slot.of_int 10 in
+      let vesting_increment = Amount.of_int 100 in
+      let account =
+        Or_error.ok_exn
+        @@ Account.create_timed pk balance ~initial_minimum_balance ~cliff_time
+             ~vesting_period ~vesting_increment
+      in
+      let txn_amount = Currency.Amount.of_int 101 in
+      let txn_global_slot = Coda_numbers.Global_slot.of_int 1_010 in
+      let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
+      match timing with
+      | Error _ ->
+          checked_timing_should_fail account txn_amount txn_global_slot
+      | _ ->
+          false
+
+    let%test "insufficient balance" =
+      let pk = Public_key.Compressed.empty in
+      let balance = Balance.of_int 100_000 in
+      let initial_minimum_balance = Balance.of_int 10_000 in
+      let cliff_time = Global_slot.of_int 1000 in
+      let vesting_period = Global_slot.of_int 10 in
+      let vesting_increment = Amount.of_int 100 in
+      let account =
+        Or_error.ok_exn
+        @@ Account.create_timed pk balance ~initial_minimum_balance ~cliff_time
+             ~vesting_period ~vesting_increment
+      in
+      let txn_amount = Currency.Amount.of_int 100_001 in
+      let txn_global_slot = Coda_numbers.Global_slot.of_int 2000 in
+      let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
+      match timing with
+      | Error _ ->
+          checked_timing_should_fail account txn_amount txn_global_slot
+      | _ ->
+          false
+
+    let%test "past full vesting" =
+      let pk = Public_key.Compressed.empty in
+      let balance = Balance.of_int 100_000 in
+      let initial_minimum_balance = Balance.of_int 10_000 in
+      let cliff_time = Global_slot.of_int 1000 in
+      let vesting_period = Global_slot.of_int 10 in
+      let vesting_increment = Amount.of_int 100 in
+      let account =
+        Or_error.ok_exn
+        @@ Account.create_timed pk balance ~initial_minimum_balance ~cliff_time
+             ~vesting_period ~vesting_increment
+      in
+      (* fully vested, curr min balance = 0, so we can spend the whole balance *)
+      let txn_amount = Currency.Amount.of_int 100_000 in
+      let txn_global_slot = Coda_numbers.Global_slot.of_int 3000 in
+      let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
+      match timing with
+      | Ok (Untimed as unchecked_timing) ->
+          run_checked_timing_and_compare account txn_amount txn_global_slot
+            unchecked_timing
+      | _ ->
+          false
   end )
 
 let constraint_system_digests () =
   let module W = Wrap (struct
-    let merge = Dummy_values.Tick.Groth16.verification_key
+    let merge = Verification_keys.dummy.merge
 
-    let base = Dummy_values.Tick.Groth16.verification_key
+    let base = Verification_keys.dummy.base
   end) in
   let digest = Tick.R1CS_constraint_system.digest in
   let digest' = Tock.R1CS_constraint_system.digest in
   [ ( "transaction-merge"
-    , digest Merge.(Tick.Groth16.constraint_system ~exposing:(input ()) main)
-    )
+    , digest Merge.(Tick.constraint_system ~exposing:(input ()) main) )
   ; ( "transaction-base"
-    , digest
-        Base.(Tick.Groth16.constraint_system ~exposing:(tick_input ()) main) )
+    , digest Base.(Tick.constraint_system ~exposing:(tick_input ()) main) )
   ; ( "transaction-wrap"
     , digest' W.(Tock.constraint_system ~exposing:wrap_input main) ) ]

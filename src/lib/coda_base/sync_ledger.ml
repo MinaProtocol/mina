@@ -1,7 +1,11 @@
 open Core_kernel
 
 module Hash = struct
-  include Ledger_hash
+  include Ledger_hash.Stable.V1
+
+  let to_string = Ledger_hash.to_string
+
+  let merge = Ledger_hash.merge
 
   let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
 
@@ -22,7 +26,17 @@ module Mask = Syncable_ledger.Make (struct
   module Hash = Hash
   module Root_hash = Root_hash
 
-  let subtree_height = 3
+  let account_subtree_height = 3
+end)
+
+module Any_ledger = Syncable_ledger.Make (struct
+  module Addr = Ledger.Location.Addr
+  module MT = Ledger.Any_ledger.M
+  module Account = Account.Stable.V1
+  module Hash = Hash
+  module Root_hash = Root_hash
+
+  let account_subtree_height = 3
 end)
 
 module Db = Syncable_ledger.Make (struct
@@ -32,15 +46,38 @@ module Db = Syncable_ledger.Make (struct
   module Hash = Hash
   module Root_hash = Root_hash
 
-  let subtree_height = 3
+  let account_subtree_height = 3
 end)
 
-type answer =
-  ( Ledger.Location.Addr.t
-  , Ledger_hash.t
-  , Account.Stable.V1.t )
-  Syncable_ledger.answer
-[@@deriving bin_io, sexp]
+module Answer = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( Ledger_hash.Stable.V1.t
+        , Account.Stable.V1.t )
+        Syncable_ledger.Answer.Stable.V1.t
+      [@@deriving sexp]
 
-type query = Ledger.Location.Addr.t Syncable_ledger.query
-[@@deriving bin_io, sexp]
+      let to_latest = Fn.id
+    end
+  end]
+
+  (* bin_io omitted from deriving list *)
+  type t = Stable.Latest.t [@@deriving sexp]
+end
+
+module Query = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        Ledger.Location.Addr.Stable.V1.t Syncable_ledger.Query.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+end

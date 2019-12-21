@@ -1,15 +1,9 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
-module Constants = Constants
-include Intf
+module Intf = Intf
 
 [%%if
-consensus_mechanism = "proof_of_signature"]
-
-include Proof_of_signature
-
-[%%elif
 consensus_mechanism = "proof_of_stake"]
 
 include Proof_of_stake

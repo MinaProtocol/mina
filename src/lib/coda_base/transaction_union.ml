@@ -38,26 +38,24 @@ let typ : (var, t) Typ.t =
 *)
 let of_transaction : Transaction.t -> t = function
   | User_command cmd ->
-      let {User_command.sender; payload; signature} =
+      let User_command.Poly.Stable.Latest.{sender; payload; signature} =
         (cmd :> User_command.t)
       in
       { payload= Transaction_union_payload.of_user_command_payload payload
       ; sender
       ; signature }
-  | Coinbase {proposer; fee_transfer; amount} ->
+  | Coinbase {proposer; fee_transfer; amount; state_body_hash= _} ->
       let other_pk, other_amount =
         Option.value ~default:(proposer, Fee.zero) fee_transfer
       in
       { payload=
           { common=
-              { fee= Amount.to_fee amount
+              { fee= other_amount
               ; nonce= Account.Nonce.zero
-              ; memo= User_command_memo.dummy }
-          ; body=
-              { public_key= other_pk
-              ; amount= Amount.of_fee other_amount
-              ; tag= Tag.Coinbase } }
-      ; sender= Public_key.decompress_exn proposer
+              ; valid_until= Coda_numbers.Global_slot.max_value
+              ; memo= User_command_memo.empty }
+          ; body= {public_key= proposer; amount; tag= Tag.Coinbase} }
+      ; sender= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
   | Fee_transfer tr -> (
       let two (pk1, fee1) (pk2, fee2) : t =
@@ -65,7 +63,8 @@ let of_transaction : Transaction.t -> t = function
             { common=
                 { fee= fee2
                 ; nonce= Account.Nonce.zero
-                ; memo= User_command_memo.dummy }
+                ; valid_until= Coda_numbers.Global_slot.max_value
+                ; memo= User_command_memo.empty }
             ; body=
                 { public_key= pk1
                 ; amount= Amount.of_fee fee1
@@ -74,8 +73,10 @@ let of_transaction : Transaction.t -> t = function
         ; signature= Signature.dummy }
       in
       match tr with
-      | One (pk, fee) -> two (pk, fee) (pk, Fee.zero)
-      | Two (t1, t2) -> two t1 t2 )
+      | `One (pk, fee) ->
+          two (pk, fee) (pk, Fee.zero)
+      | `Two (t1, t2) ->
+          two t1 t2 )
 
 let excess (t : t) = Transaction_union_payload.excess t.payload
 

@@ -22,7 +22,7 @@ annotation on types.
 ### Explicit versioning
 
 The `bin_io` representation and associated `bin_prot` library are
-claimed to be type-safe when used in OCaml (see 
+claimed to be type-safe when used in OCaml (see
 [Jane Street bin\_prot](https://github.com/janestreet/bin_prot/).
 Moreover, other programming languages don't appear to be able to
 produce or consume this representation. Therefore, type and versioning
@@ -63,7 +63,7 @@ module Some_data = struct
       type latest = t
 
       let to_latest t = t
-	  
+
 	  include Make_version (T)
     end
 
@@ -140,7 +140,7 @@ module Some_data = struct
       type latest = Latest.t (* changed, was t *)
 
       let to_latest = ...    (* changed, was the identity *)
-	  
+
 	  include Make_version (T)
     end
 
@@ -181,7 +181,7 @@ also be used in the query, response, and message types used for
 RPC. In that case, if a new version of a module is created, the
 RPC version should be updated at the same time.
 
-### Embracing this discipline
+### Embracing this discipline; static enforcement
 
 As of this writing, there are over 600 type definitions with `deriving
 bin_io` in the Coda codebase, even more with `sexp`. Only about 60
@@ -191,6 +191,17 @@ embrace this discipline fully will take some effort.
 
 We can make awareness of the existing recommendation, or the extended
 discipline suggested here a checklist item for Github pull requests.
+
+In some critical situations, such as when using versioned RPC (RFC 0012),
+we'd like static assurance that types are versioned. By writing a suitable
+ppx, we can add an annotation `versioned` to type `deriving` lists.
+That ppx will generate a definition, perhaps called `__versioned`,
+if all types contributing to a type also have the annotation. It
+can also check that the type is named `t`, and occurs in the
+module hierarchy `Stable.Vn.T` (or in the module hierarchy for
+versioned RPC types). The functors `Make_version` and `Make_latest_version`
+can also require their argument to have the annotation, to localize
+the error when the annotation is omitted.
 
 ### Using versioned types in other versioned types
 
@@ -237,7 +248,7 @@ The file `docs/style-guide.md` mentions versioning of stable module
 types.
 
 PR #1645, already merged, partially implements a module registration
-mechanism.  That implementation deals only with the `bin_io` 
+mechanism.  That implementation deals only with the `bin_io`
 representation, not `yojson` or `sexp`.
 
 PR #1653, already merged, more completely implements a module

@@ -1,3 +1,6 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
 open Snark_params
 open Snark_bits
@@ -6,10 +9,11 @@ open Module_version
 module Stable = struct
   module V1 = struct
     module T = struct
-      let version = 1
-
-      type t = Tick.Field.t [@@deriving bin_io, sexp, eq, compare]
+      type t = Tick.Field.t
+      [@@deriving bin_io, sexp, eq, compare, version {asserted}]
     end
+
+    let gen = Tick.Field.gen
 
     include T
     include Registration.Make_latest_version (T)
@@ -25,9 +29,45 @@ module Stable = struct
 
   module Registrar = Registration.Make (Module_decl)
   module Registered_V1 = Registrar.Register (V1)
+
+  (* see lib/module_version/README-version-asserted.md *)
+  module For_tests = struct
+    [%%if
+    curve_size = 298]
+
+    let%test "target serialization v1" =
+      let target =
+        Quickcheck.random_value ~seed:(`Deterministic "target serialization")
+          V1.gen
+      in
+      let known_good_hash =
+        "\x37\xD5\xCC\x43\xEC\x44\xCB\x67\x2D\x85\x25\xC7\x61\xBD\x93\xD1\x57\x30\x95\x82\xBF\x1C\x1D\x08\x73\xA0\x8E\x4D\x7C\x25\x5B\x22"
+      in
+      Serialization.check_serialization (module V1) target known_good_hash
+
+    [%%elif
+    curve_size = 753]
+
+    let%test "target serialization v1" =
+      let target =
+        Quickcheck.random_value ~seed:(`Deterministic "target serialization")
+          V1.gen
+      in
+      let known_good_hash =
+        "\x15\x32\x2E\x00\x93\xA0\x40\x03\xF3\x4F\xF0\x70\xAA\xA4\x71\x25\x57\x89\xE7\x42\x51\x3B\x14\x6E\xCE\x35\x3B\x40\xF8\x35\xA0\x2C"
+      in
+      Serialization.check_serialization (module V1) target known_good_hash
+
+    [%%else]
+
+    let%test "target serialization v1" = failwith "No test for this curve size"
+
+    [%%endif]
+  end
 end
 
-include Stable.Latest
+type t = Stable.Latest.t [@@deriving sexp, eq, compare]
+
 module Field = Tick.Field
 module Bigint = Tick_backend.Bigint.R
 

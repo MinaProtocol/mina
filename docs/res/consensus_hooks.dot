@@ -11,7 +11,7 @@ digraph G {
   Transition_router -> Consensus [label="should_bootstrap"];
 
   Transition_frontier_controller -> Consensus [label="select"];
-  Transition_frontier_controller -> Consensus [label="lock_transition"];
+  Transition_frontier_controller -> Consensus [label="frontier_root_transition"];
 
   Proposer -> Consensus [label="generate_transition"];
   Proposer -> Consensus [label="next_proposal"];

@@ -1,55 +1,58 @@
 (library
  (name coda_base)
  (public_name coda_base)
- (flags :standard -short-paths -warn-error -35-32-9-27-34-58-39)
  (inline_tests)
  (library_flags -linkall)
  (libraries
-    lite_base
-    linked_tree
-    hash_prefixes
-    syncable_ledger
-    base64
-    signature_lib
-    test_util
-    random_oracle
-    coda_digestif
-    snark_bits
-    currency
-    snark_params
-    unsigned_extended
-    sparse_ledger_lib
-    protocols
-    core
-    dummy_values
-    o1trace
-    merkle_ledger
-    module_version
-    snarky crypto_params
     async
     async_extra
+    base58_check
     bignum_bigint
+    coda_compile_config
+    coda_digestif
     coda_numbers
-    debug_assert
-    merkle_mask
-    banlist_lib
-    peer_trust
-    receipt_chain_database_lib
-    storage
-    yojson
     codable
+    core
+    currency
+    debug_assert
+    dummy_values
+    fold_lib
+    hash_prefix_states
+    hash_prefixes
+    linked_tree
+    lite_base
+    merkle_ledger
+    merkle_mask
+    module_version
+    one_or_two
+    o1trace
+    outside_pedersen_image
+    quickcheck_lib
+    random_oracle
     rocksdb
+    sexp_diff_kernel
+    signature_lib
+    snark_bits
+    snark_params
+    snarky crypto_params
+    sparse_ledger_lib
+    storage
+    syncable_ledger
+    test_util
+    trust_system
+    unsigned_extended
     visualization
-    coda_compile_config)
+    yojson
+    )
  (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_snarky ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord
-    ppx_base ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test 
+  (pps ppx_snarky ppx_coda -lint-version-syntax-warnings ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord
+    ppx_base ppx_bench ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test
     bisect_ppx -- -conditional))
  (synopsis "Snarks and friends necessary for keypair generation"))
 
 (rule
- (targets sample_keypairs.ml)
+ (targets sample_keypairs.ml sample_keypairs.json)
  (deps
   (:< gen/gen.exe))
  (action

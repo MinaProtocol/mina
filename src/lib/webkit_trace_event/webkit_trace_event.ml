@@ -44,15 +44,24 @@ module Output = struct
     let emitk ~buf (k : event_kind) pos =
       let num =
         match k with
-        | New_thread -> 0
-        | Thread_switch -> 1
-        | Cycle_start -> 2
-        | Cycle_end -> 3
-        | Pid_is -> 4
-        | Event -> 5
-        | Measure_start -> 6
-        | Measure_end -> 7
-        | Trace_end -> 8
+        | New_thread ->
+            0
+        | Thread_switch ->
+            1
+        | Cycle_start ->
+            2
+        | Cycle_end ->
+            3
+        | Pid_is ->
+            4
+        | Event ->
+            5
+        | Measure_start ->
+            6
+        | Measure_end ->
+            7
+        | Trace_end ->
+            8
       in
       Bigstring.set_uint8 buf ~pos num ;
       pos + 1
@@ -79,11 +88,13 @@ module Output = struct
       | Thread_switch ->
           emitk ~buf Thread_switch 0 |> emiti ~buf event.timestamp
           |> emiti ~buf event.tid |> finish ~buf wr
-      | Cycle_start -> ()
+      | Cycle_start ->
+          ()
       | Cycle_end ->
           emitk ~buf Cycle_end 0 |> emiti ~buf event.timestamp
           |> finish ~buf wr
-      | Pid_is -> emitk ~buf Pid_is 0 |> emiti ~buf event.pid |> finish ~buf wr
+      | Pid_is ->
+          emitk ~buf Pid_is 0 |> emiti ~buf event.pid |> finish ~buf wr
       | Event ->
           emitk ~buf Event 0 |> emiti ~buf event.timestamp
           |> emits ~buf event.name |> finish ~buf wr
@@ -105,14 +116,22 @@ module Output = struct
         This library deliberately avoid including Yojson here to avoid bloating
         the dependency tree of its downstream users.*)
     let phase_of_kind = function
-      | New_thread | Pid_is -> `String "M" (* Meta-events *)
-      | Cycle_start -> `String "b" (* Async event start *)
-      | Cycle_end -> `String "e" (* Async event end *)
-      | Thread_switch -> `String "X"
-      | Event -> `String "i"
-      | Measure_start -> `String "B"
-      | Measure_end -> `String "E"
-      | Trace_end -> `String "e"
+      | New_thread | Pid_is ->
+          `String "M" (* Meta-events *)
+      | Cycle_start ->
+          `String "b" (* Async event start *)
+      | Cycle_end ->
+          `String "e" (* Async event end *)
+      | Thread_switch ->
+          `String "X"
+      | Event ->
+          `String "i"
+      | Measure_start ->
+          `String "B"
+      | Measure_end ->
+          `String "E"
+      | Trace_end ->
+          `String "e"
 
     let json_of_event {name; categories; phase; timestamp; pid; tid} =
       let categories = String.concat ~sep:"," categories in

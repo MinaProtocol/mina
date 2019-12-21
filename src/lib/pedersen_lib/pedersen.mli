@@ -6,7 +6,7 @@ module type S = sig
   type curve
 
   module Digest : sig
-    type t [@@deriving bin_io, sexp, eq, compare]
+    type t [@@deriving bin_io, sexp, eq, compare, yojson]
 
     val fold_bits : t -> bool Fold.t
 
@@ -39,13 +39,15 @@ end
 module Make (Field : sig
   type t [@@deriving sexp, bin_io, eq, compare]
 
+  include Stringable.S with type t := t
+
   val fold_bits : t -> bool Fold.t
 
   val fold : t -> bool Triple.t Fold.t
 end) (Curve : sig
   type t [@@deriving sexp]
 
-  val to_affine_coordinates : t -> Field.t * Field.t
+  val to_affine_exn : t -> Field.t * Field.t
 
   val zero : t
 

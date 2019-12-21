@@ -15,6 +15,12 @@ module type S = sig
   val to_bits : t -> bool list
 end
 
+module type Convertible_bits = sig
+  include S
+
+  val of_bits : bool list -> t
+end
+
 module Snarkable = struct
   module type Basic = sig
     type (_, _) typ
@@ -39,6 +45,8 @@ module Snarkable = struct
       val typ : (var, value) typ
 
       val var_to_bits : var -> boolean_var Bitstring_lib.Bitstring.Lsb_first.t
+
+      val var_of_bits : boolean_var Bitstring_lib.Bitstring.Lsb_first.t -> var
 
       val var_to_triples : var -> boolean_var Triple.t list
 
@@ -90,6 +98,8 @@ module Snarkable = struct
     val equal_var : Unpacked.var -> Unpacked.var -> (boolean_var, _) checked
 
     val var_of_field : field_var -> (Unpacked.var, _) checked
+
+    val var_of_field_unsafe : field_var -> Packed.var
 
     val if_ :
          boolean_var

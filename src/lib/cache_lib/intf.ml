@@ -1,6 +1,8 @@
 open Async_kernel
 open Core_kernel
 
+type 'a final_state = [`Failed | `Success of 'a] Ivar.t
+
 (** [Constant.S] is a helper signature for passing constant values
  *  to functors.
  *)
@@ -9,6 +11,20 @@ module Constant = struct
     type t
 
     val t : t
+  end
+end
+
+(** A [Registry] module will receive events whenever items
+ *  are removed from the cache, whether by invalidation
+ *  or garbage collection *)
+module Registry = struct
+  module type S = sig
+    type element
+
+    val element_added : element -> unit
+
+    val element_removed :
+      [`Consumed | `Unconsumed | `Failure] -> element -> unit
   end
 end
 
@@ -27,52 +43,60 @@ module Cached = struct
   module type S = sig
     type ('t, 'cache_t) t
 
-    val pure : 't -> ('t, _) t
     (** [pure v] returns a pure cached object with
      *  the value of [v]. Pure cached objects are used
-     *  for unifying values with the [Cached.t] type for 
+     *  for unifying values with the [Cached.t] type for
      *  convenience. Pure cached objects are not stored
      *  in a cache and cannot be consumed.
      *)
+    val pure : 't -> ('t, _) t
 
-    val peek : ('t, _) t -> 't
+    val is_pure : (_, _) t -> bool
+
+    val original : (_, 'b) t -> 'b
+
     (** [peek c] inspects the value of [c] without consuming
      *  [c].
      *)
+    val peek : ('t, _) t -> 't
 
-    val invalidate : ('t, _) t -> 't Or_error.t
+    val final_state : ('t1, 't2) t -> 't2 final_state
+
     (** [invalidate c] removes the underlying cached value
      *  of [c] from its cache. [invalidate] will return an
      *  [Error] if the underlying cached value was not
      *  present in the cache.
      *)
+    val invalidate_with_failure : ('t, _) t -> 't
+
+    val invalidate_with_success : ('t, _) t -> 't
 
     val was_consumed : (_, _) t -> bool
 
-    val transform : ('t0, 'cache_t) t -> f:('t0 -> 't1) -> ('t1, 'cache_t) t
     (** [transform c ~f ~logger] maps the value of [c] over
      *  [f], consuming [c]. *)
+    val transform : ('t0, 'cache_t) t -> f:('t0 -> 't1) -> ('t1, 'cache_t) t
 
-    val sequence_deferred :
-      ('t Deferred.t, 'cache_t) t -> ('t, 'cache_t) t Deferred.t
     (** [sequence_deferred c] lifts a deferred value from
      *  [c], returning a non deferred cached object in a
      *  deferred context. [c] is consumed.
      *)
+    val sequence_deferred :
+      ('t Deferred.t, 'cache_t) t -> ('t, 'cache_t) t Deferred.t
 
-    val sequence_result :
-      (('t, 'e) Result.t, 'cache_t) t -> (('t, 'cache_t) t, 'e) Result.t
     (** [sequence_result] lifts a result value from
      *  [c], returning a result containing the raw
      *  cached value if the value of [c] was [Ok].
      *  Otherwise, an [Error] is returned and [c]
      *  is invalidated from the cache
      *)
+    val sequence_result :
+      (('t, 'e) Result.t, 'cache_t) t -> (('t, 'cache_t) t, 'e) Result.t
   end
 end
 
 (**
- *  A ['a Cache.t] is a [Hash_set.t] baked cache abstraction which
+ *  A ['a Cache.t] is a [Hashtbl.t] baked cache abstraction which
  *  registers [('a, 'a) Cached.t] values.
  *)
 module Cache = struct
@@ -86,17 +110,21 @@ module Cache = struct
     val create :
          name:string
       -> logger:Logger.t
-      -> (module Hash_set.Elt_plain with type t = 'elt)
+      -> on_add:('elt -> unit)
+      -> on_remove:([`Consumed | `Unconsumed | `Failure] -> 'elt -> unit)
+      -> (module Hashtbl.Key_plain with type t = 'elt)
       -> 'elt t
 
-    val register : 'elt t -> 'elt -> ('elt, 'elt) Cached.t Or_error.t
     (** [register cache elt] add [elt] to [cache]. If [elt]
      *  already existed in [cache], an [Error] is returned.
      *  Otherwise, [Ok] is returned with a [Cached]
      *  representation of [elt].
      *)
+    val register_exn : 'elt t -> 'elt -> ('elt, 'elt) Cached.t
 
     val mem : 'elt t -> 'elt -> bool
+
+    val final_state : 'elt t -> 'elt -> 'elt final_state Option.t
 
     val to_list : 'elt t -> 'elt list
   end
@@ -137,7 +165,9 @@ module Transmuter_cache = struct
 
     val create : logger:Logger.t -> t
 
-    val register : t -> source -> (source, target) Cached.t Or_error.t
+    val register_exn : t -> source -> (source, target) Cached.t
+
+    val final_state : t -> source -> target final_state Option.t
 
     val mem : t -> source -> bool
   end
@@ -149,6 +179,7 @@ module Transmuter_cache = struct
 
     module Make
         (Transmuter : Transmuter.S)
+        (Registry : Registry.S with type element := Transmuter.Target.t)
         (Name : Constant.S with type t := string) :
       S
       with module Cached := Cached

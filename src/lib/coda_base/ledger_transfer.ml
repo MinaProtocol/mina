@@ -9,10 +9,9 @@ module type Base_ledger_intf =
    and type hash := Ledger_hash.t
    and type root_hash := Ledger_hash.t
 
-module Make (Source : Base_ledger_intf) (Dest : Base_ledger_intf) :
-  Protocols.Coda_pow.Ledger_transfer_intf
-  with type src := Source.t
-   and type dest := Dest.t = struct
+module Make (Source : Base_ledger_intf) (Dest : Base_ledger_intf) : sig
+  val transfer_accounts : src:Source.t -> dest:Dest.t -> Dest.t Or_error.t
+end = struct
   let transfer_accounts ~src ~dest =
     let sorted =
       Source.foldi src ~init:[] ~f:(fun addr acc account ->
@@ -23,7 +22,12 @@ module Make (Source : Base_ledger_intf) (Dest : Base_ledger_intf) :
     List.iter sorted ~f:(fun (_addr, account) ->
         let key = Account.public_key account in
         ignore (Dest.get_or_create_account_exn dest key account) ) ;
-    [%test_result: Ledger_hash.t] ~message:"Merkle roots differ after transfer"
-      ~expect:(Source.merkle_root src) (Dest.merkle_root dest) ;
-    dest
+    let src_hash = Source.merkle_root src in
+    let dest_hash = Dest.merkle_root dest in
+    if not (Ledger_hash.equal src_hash dest_hash) then
+      Or_error.errorf
+        "Merkle roots differ after transfer: expected %s, actual %s"
+        (Ledger_hash.to_string src_hash)
+        (Ledger_hash.to_string dest_hash)
+    else Ok dest
 end

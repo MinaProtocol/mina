@@ -115,8 +115,10 @@ module Make (Inputs : Inputs_intf) = struct
           let%bind a = f p c q.q in
           let%map acc =
             match (sgn : Sgn.t) with
-            | Pos -> Fqk.special_mul acc a
-            | Neg -> Fqk.special_div acc a
+            | Pos ->
+                Fqk.special_mul acc a
+            | Neg ->
+                Fqk.special_div acc a
             (* TODO: Use an unsafe div here if appropriate. I think it should be fine
              since py_twisted is py (a curve y-coorindate, guaranteed to be non-zero)
              times a constant.

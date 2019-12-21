@@ -18,8 +18,10 @@ struct
     let rec go (list : Hash.t list) num_nodes =
       if num_nodes = 1 then
         match list with
-        | head :: next_nodes -> (Leaf head, next_nodes, 0)
-        | [] -> failwith "Expected to recurse on a non-empty list"
+        | head :: next_nodes ->
+            (Leaf head, next_nodes, 0)
+        | [] ->
+            failwith "Expected to recurse on a non-empty list"
       else
         let left_tree, right_list, left_height = go list (num_nodes / 2) in
         let right_tree, remaining_nodes, right_height =
@@ -51,7 +53,10 @@ struct
         | [] -> hash | _ :: _ -> failwith "Could not traverse beyond a leaf" )
     | Node {hash; left; right} -> (
         function
-        | [] -> hash
-        | Direction.Left :: xs -> get_inner_hash_at_addr_exn left xs
-        | Direction.Right :: xs -> get_inner_hash_at_addr_exn right xs )
+        | [] ->
+            hash
+        | Direction.Left :: xs ->
+            get_inner_hash_at_addr_exn left xs
+        | Direction.Right :: xs ->
+            get_inner_hash_at_addr_exn right xs )
 end

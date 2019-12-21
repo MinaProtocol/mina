@@ -1,6 +1,6 @@
 # Care and feeding of your Coda daemon
 
-Right now the default config directory is hardcoded to `~/.coda-config`. 
+Right now the default config directory is hardcoded to `~/.coda-config`.
 This will be fixed eventually. In the meantime, you can pass `-config-directory`
 to the daemon to look there.
 

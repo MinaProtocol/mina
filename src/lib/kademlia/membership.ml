@@ -1,6 +1,5 @@
 open Async_kernel
 open Core
-open Coda_base
 open Pipe_lib
 open Network_peer
 
@@ -13,8 +12,8 @@ module type S = sig
 
   val connect :
        initial_peers:Host_and_port.t list
-    -> me:Peer.t
-    -> parent_log:Logger.t
+    -> node_addrs_and_ports:Node_addrs_and_ports.t
+    -> logger:Logger.t
     -> conf_dir:string
     -> trust_system:trust_system
     -> t Deferred.Or_error.t
@@ -26,6 +25,10 @@ module type S = sig
   val changes : t -> Peer.Event.t Linear_pipe.Reader.t
 
   val stop : t -> unit Deferred.t
+
+  module Hacky_glue : sig
+    val inject_event : t -> Peer.Event.t -> unit
+  end
 end
 
 module type Process_intf = sig
@@ -35,188 +38,115 @@ module type Process_intf = sig
 
   val create :
        initial_peers:Host_and_port.t list
-    -> me:Peer.t
-    -> log:Logger.t
+    -> node_addrs_and_ports:Node_addrs_and_ports.t
+    -> logger:Logger.t
     -> conf_dir:string
     -> t Deferred.Or_error.t
 
-  val output : t -> log:Logger.t -> string list Pipe.Reader.t
+  (* TODO this doesn't need to be a list, it's always singleton *)
+  val output : t -> logger:Logger.t -> string list Strict_pipe.Reader.t
 end
-
-(* Unfortunately, `dune runtest` runs in a pwd deep inside the build
- * directory. This hack finds the project root by recursively looking for the
-   dune-project file. *)
-let get_project_root () =
-  let open Filename in
-  let rec go dir =
-    if Sys.file_exists_exn @@ dir ^/ "src/dune-project" then Some dir
-    else if String.equal dir "/" then None
-    else go @@ fst @@ split dir
-  in
-  go @@ realpath current_dir_name
-
-let lock_file = "kademlia.lock"
-
-let write_lock_file lock_path pid =
-  Async.Writer.save lock_path ~contents:(Pid.to_string pid)
-
-let keep_trying :
-    f:('a -> 'b Deferred.Or_error.t) -> 'a list -> 'b Deferred.Or_error.t =
- fun ~f xs ->
-  let open Deferred.Let_syntax in
-  let rec go e xs : 'b Deferred.Or_error.t =
-    match xs with
-    | [] -> return e
-    | x :: xs -> (
-        match%bind f x with
-        | Ok r -> return (Ok r)
-        | Error e -> go (Error e) xs )
-  in
-  go (Or_error.error_string "empty input") xs
 
 module Haskell_process = struct
   open Async
 
-  type t =
-    { failure_response: [`Die | `Ignore] ref
-    ; process: Process.t
-    ; lock_path: string }
+  type t = {process: Child_processes.t; logger: Logger.t}
 
-  let kill {failure_response; process; lock_path} =
-    failure_response := `Ignore ;
-    let%bind _ =
-      Process.run_exn ~prog:"kill"
-        ~args:[Pid.to_string (Process.pid process)]
-        ()
-    in
-    let%bind _ = Process.wait process in
-    Sys.remove lock_path
+  let kill {process; logger; _} =
+    Deferred.bind (Child_processes.kill process) ~f:(function
+      | Ok _ ->
+          Deferred.unit
+      | Error err ->
+          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+            "Failed to kill kademlia helper: $err"
+            ~metadata:[("err", `String (Error.to_string_hum err))] ;
+          Deferred.unit )
 
-  let cli_format (peer : Peer.t) : string =
-    (* assertion for discovery_port = external_port - 1 *)
-    assert (Int.equal (peer.Peer.discovery_port - 1) peer.communication_port) ;
+  let cli_format : Unix.Inet_addr.t -> int -> string =
+   fun host discovery_port ->
     Printf.sprintf "(\"%s\", %d)"
-      (Unix.Inet_addr.to_string peer.host)
-      peer.discovery_port
+      (Unix.Inet_addr.to_string host)
+      discovery_port
 
   let cli_format_initial_peer (addr : Host_and_port.t) : string =
     Printf.sprintf "(\"%s\", %d)" (Host_and_port.host addr)
       (Host_and_port.port addr)
 
-  let filter_initial_peers (initial_peers : Host_and_port.t list) (me : Peer.t)
-      =
-    let me_host_and_discovery_port = Peer.to_discovery_host_and_port me in
+  let filter_initial_peers (initial_peers : Host_and_port.t list)
+      (me : Node_addrs_and_ports.t) =
+    let external_host_and_port =
+      Host_and_port.create
+        ~host:(Unix.Inet_addr.to_string me.external_ip)
+        ~port:me.discovery_port
+    in
     List.filter initial_peers ~f:(fun peer ->
-        not (Host_and_port.equal peer me_host_and_discovery_port) )
+        not (Host_and_port.equal peer external_host_and_port) )
 
   let%test "filter_initial_peers_test" =
+    let ip1 = Unix.Inet_addr.of_string "1.1.1.1" in
     let me =
-      Peer.create
-        (Unix.Inet_addr.of_string "1.1.1.1")
-        ~discovery_port:8000 ~communication_port:8001
+      Node_addrs_and_ports.
+        { external_ip= ip1
+        ; bind_ip= ip1
+        ; discovery_port= 8000
+        ; communication_port= 8001
+        ; client_port= 3000
+        ; libp2p_port= 8002 }
     in
+    let me_discovery = Host_and_port.create ~host:"1.1.1.1" ~port:8000 in
     let other = Host_and_port.create ~host:"1.1.1.2" ~port:8000 in
-    filter_initial_peers [Peer.to_discovery_host_and_port me; other] me
-    = [other]
+    filter_initial_peers [me_discovery; other] me = [other]
 
-  let create ~(initial_peers : Host_and_port.t list) ~(me : Peer.t) ~log
-      ~conf_dir =
-    let lock_path = Filename.concat conf_dir lock_file in
-    let filtered_initial_peers = filter_initial_peers initial_peers me in
-    let run_kademlia () =
-      let args =
-        ["test"; cli_format me]
-        @ List.map filtered_initial_peers ~f:cli_format_initial_peer
-      in
-      Logger.debug log "Args: %s\n"
-        (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
-      (* This is where nix dumps the haskell artifact *)
-      let kademlia_binary = "src/app/kademlia-haskell/result/bin/kademlia" in
-      (* This is where you'd manually install kademlia *)
-      let coda_kademlia = "coda-kademlia" in
-      let open Deferred.Let_syntax in
-      match%map
-        keep_trying
-          ( ( Unix.getenv "CODA_KADEMLIA_PATH"
-            |> Option.value ~default:coda_kademlia )
-          ::
-          ( match get_project_root () with
-          | Some path -> [path ^/ kademlia_binary]
-          | None -> [] ) )
-          ~f:(fun prog -> Process.create ~prog ~args ())
-        |> Deferred.Or_error.map ~f:(fun process ->
-               {failure_response= ref `Die; process; lock_path} )
-      with
-      | Ok p ->
-          (* If the Kademlia process dies, kill the parent daemon process. Fix
-         * for #550 *)
-          Deferred.upon (Process.wait p.process) (fun code ->
-              match (!(p.failure_response), code) with
-              | `Ignore, _ | _, Ok () -> ()
-              | `Die, Error e ->
-                  Logger.fatal log
-                    !"Kademlia process died: %{sexp: \
-                      Unix.Exit_or_signal.error}%!"
-                    e ;
-                  raise Child_died ) ;
-          Ok p
-      | Error e ->
-          Or_error.error_string
-            ( "If you are a dev, did you forget to `make kademlia` and set \
-               CODA_KADEMLIA_PATH? Try \
-               CODA_KADEMLIA_PATH=$PWD/src/app/kademlia-haskell/result/bin/kademlia "
-            ^ Error.to_string_hum e )
+  let create :
+         initial_peers:Host_and_port.t list
+      -> node_addrs_and_ports:Node_addrs_and_ports.t
+      -> logger:Logger.t
+      -> conf_dir:string
+      -> t Deferred.Or_error.t =
+   fun ~initial_peers
+       ~node_addrs_and_ports:( {discovery_port; bind_ip; external_ip; _} as
+                             node_addrs_and_ports ) ~logger ~conf_dir ->
+    let filtered_initial_peers =
+      filter_initial_peers initial_peers node_addrs_and_ports
     in
-    let kill_locked_process ~log =
-      match%bind Sys.file_exists lock_path with
-      | `Yes -> (
-          let%bind p = Reader.file_contents lock_path in
-          match%bind Process.run ~prog:"kill" ~args:[p] () with
-          | Ok _ ->
-              Logger.debug log "Killing Dead Kademlia Process %s" p ;
-              let%map () = Sys.remove lock_path in
-              Ok ()
-          | Error _ ->
-              Logger.debug log
-                "Process %s does not exists and will not be killed" p ;
-              return @@ Ok () )
-      | _ -> return @@ Ok ()
-    in
-    let open Deferred.Or_error.Let_syntax in
     let args =
-      ["test"; cli_format me]
-      @ List.map initial_peers ~f:cli_format_initial_peer
+      [ "test"
+      ; Unix.Inet_addr.to_string bind_ip
+      ; cli_format external_ip discovery_port ]
+      @ List.map filtered_initial_peers ~f:cli_format_initial_peer
     in
-    Logger.debug log "Args: %s\n"
-      (List.sexp_of_t String.sexp_of_t args |> Sexp.to_string_hum) ;
-    let%bind () = kill_locked_process ~log in
-    match%bind
-      Sys.is_directory conf_dir |> Deferred.map ~f:Or_error.return
+    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+      "Kademlia command-line arguments: $argv"
+      ~metadata:[("argv", `List (List.map args ~f:(fun arg -> `String arg)))] ;
+    match%map
+      Child_processes.start_custom
+        ~logger:(Logger.extend logger [("helper-process", `String "kademlia")])
+        ~name:"kademlia"
+        ~git_root_relative_path:"src/app/kademlia-haskell/result/bin/kademlia"
+        ~conf_dir ~args
+        ~stdout:(`Log Logger.Level.Trace, `Pipe)
+        ~stderr:(`Log Logger.Level.Error, `No_pipe)
+        ~termination:`Always_raise
     with
-    | `Yes ->
-        let%bind t = run_kademlia () in
-        let {failure_response= _; process; lock_path} = t in
-        let%map () =
-          write_lock_file lock_path (Process.pid process)
-          |> Deferred.map ~f:Or_error.return
-        in
-        don't_wait_for
-          (Pipe.iter_without_pushback
-             (Reader.pipe (Process.stderr process))
-             ~f:(fun str -> Logger.error log "%s" str)) ;
-        t
-    | _ -> Deferred.Or_error.errorf "Config directory (%s) must exist" conf_dir
+    | Ok process ->
+        Or_error.return {process; logger}
+    | Error e ->
+        Or_error.error_string
+          ( "If you are a dev, did you forget to `make kademlia` and set \
+             CODA_KADEMLIA_PATH? Try \
+             CODA_KADEMLIA_PATH=$PWD/src/app/kademlia-haskell/result/bin/kademlia "
+          ^ Error.to_string_hum e )
 
-  let output {process; _} ~log =
-    Pipe.filter_map
-      (Reader.lines (Process.stdout process))
+  let output {process; _} ~logger =
+    Strict_pipe.Reader.filter_map (Child_processes.stdout_lines process)
       ~f:(fun line ->
         let prefix_name_size = 4 in
         let prefix_size = prefix_name_size + 2 in
         (* a colon and a space *)
         let prefix = String.prefix line prefix_name_size in
         let pass_through () =
-          Logger.warn log "Unexpected output from Kademlia Haskell: %s" line ;
+          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+            "Unexpected Kademlia output: %s" line ;
           None
         in
         if String.length line < prefix_size then pass_through ()
@@ -225,35 +155,29 @@ module Haskell_process = struct
             String.slice line prefix_size (String.length line)
           in
           match prefix with
-          | "DBUG" ->
-              Logger.debug log "%s" line_no_prefix ;
-              None
-          | "TRAC" -> (* trace is 99% ping/pong checks, omit *)
-                      None
-          | "EROR" ->
-              Logger.error log "%s" line_no_prefix ;
+          (* These will be logged by the process library so we can ignore them
+             here. *)
+          | "DBUG" | "EROR" | "TRAC" ->
               None
           | "DATA" ->
-              Logger.info log "%s" line_no_prefix ;
               Some [line_no_prefix]
-          | _ -> pass_through () )
+          | _ ->
+              pass_through () )
 end
 
 module Make
     (P : Process_intf) (Trust_system : sig
         type t
 
-        (* TODO punish peers from kad? *)
-        (* val record : t -> Logger.t -> Unix.Inet_addr.Blocking_sexp.t -> Trust_system.Actions.t -> unit Deferred.t *)
         val lookup :
-          t -> Unix.Inet_addr.Blocking_sexp.t -> Peer_trust.Peer_status.t
+          t -> Unix.Inet_addr.Blocking_sexp.t -> Trust_system.Peer_status.t
     end) : sig
   include S with type trust_system := Trust_system.t
 
   module For_tests : sig
     val node :
-         Peer.t
-      -> Host_and_port.t sexp_list
+         Node_addrs_and_ports.t
+      -> Host_and_port.t list
       -> string
       -> Trust_system.t
       -> t Deferred.t
@@ -274,8 +198,10 @@ end = struct
 
   let is_banned trust_system (peer : Host_and_port.t) =
     match Trust_system.lookup trust_system (host_and_port_to_addr peer) with
-    | {banned= Banned_until _; _} -> true
-    | _ -> false
+    | {banned= Banned_until _; _} ->
+        true
+    | _ ->
+        false
 
   let live t (lives : (Peer.t * string) list) =
     let unbanned_lives =
@@ -284,8 +210,7 @@ end = struct
       )
     in
     List.iter unbanned_lives ~f:(fun (peer, kkey) ->
-        let _ = Peer.Table.add ~key:peer ~data:kkey t.peers in
-        () ) ;
+        Peer.Table.set ~key:peer ~data:kkey t.peers ) ;
     if List.length unbanned_lives > 0 then
       Linear_pipe.write t.changes_writer
         (Peer.Event.Connect (List.map unbanned_lives ~f:fst))
@@ -297,14 +222,17 @@ end = struct
       Linear_pipe.write t.changes_writer (Peer.Event.Disconnect deads)
     else Deferred.unit
 
-  let connect ~(initial_peers : Host_and_port.t list) ~(me : Peer.t)
-      ~parent_log ~conf_dir ~trust_system =
+  let connect ~(initial_peers : Host_and_port.t list)
+      ~(node_addrs_and_ports : Node_addrs_and_ports.t) ~logger ~conf_dir
+      ~trust_system =
     let open Deferred.Or_error.Let_syntax in
-    let log = Logger.child parent_log "membership" in
     let filtered_peers =
       List.filter initial_peers ~f:(Fn.compose not (is_banned trust_system))
     in
-    let%map p = P.create ~initial_peers:filtered_peers ~me ~log ~conf_dir in
+    let%map p =
+      P.create ~initial_peers:filtered_peers ~node_addrs_and_ports ~logger
+        ~conf_dir
+    in
     let peers = Peer.Table.create () in
     let changes_reader, changes_writer = Linear_pipe.create () in
     let first_peers_ivar = ref None in
@@ -315,7 +243,7 @@ end = struct
       {p; peers; changes_reader; changes_writer; first_peers; trust_system}
     in
     don't_wait_for
-      (Pipe.iter (P.output p ~log) ~f:(fun lines ->
+      (Strict_pipe.Reader.iter (P.output p ~logger) ~f:(fun lines ->
            let lives, deads =
              List.partition_map lines ~f:(fun line ->
                  match String.split ~on:' ' line with
@@ -339,8 +267,8 @@ end = struct
                          ~communication_port:(discovery_port - 1)
                      in
                      `Snd peer
-                 | _ -> failwith (Printf.sprintf "Unexpected line %s\n" line)
-             )
+                 | _ ->
+                     failwith (Printf.sprintf "Unexpected line %s\n" line) )
            in
            let open Deferred.Let_syntax in
            let () =
@@ -357,7 +285,8 @@ end = struct
 
   let peers t =
     let rec split ~f = function
-      | [] -> ([], [])
+      | [] ->
+          ([], [])
       | x :: xs ->
           let true_subresult, false_subresult = split ~f xs in
           if f x then (x :: true_subresult, false_subresult)
@@ -379,11 +308,16 @@ end = struct
 
   let stop t = P.kill t.p
 
+  module Hacky_glue = struct
+    let inject_event t e =
+      Linear_pipe.write t.changes_writer e |> don't_wait_for
+  end
+
   module For_tests = struct
-    let node (me : Peer.t) (peers : Host_and_port.t list) conf_dir trust_system
-        =
-      connect ~initial_peers:peers ~me ~parent_log:(Logger.null ()) ~conf_dir
-        ~trust_system
+    let node node_addrs_and_ports (peers : Host_and_port.t list) conf_dir
+        trust_system =
+      connect ~initial_peers:peers ~node_addrs_and_ports
+        ~logger:(Logger.null ()) ~conf_dir ~trust_system
       >>| Or_error.ok_exn
   end
 end
@@ -398,7 +332,7 @@ let%test_module "Tests" =
       type t = unit
 
       let lookup (_ : t) (_ : Unix.Inet_addr.t) =
-        Peer_trust.Peer_status.{trust= 0.0; banned= Unbanned}
+        Trust_system.Peer_status.{trust= 0.0; banned= Unbanned}
     end
 
     module type S_test = sig
@@ -406,8 +340,8 @@ let%test_module "Tests" =
 
       val connect :
            initial_peers:Host_and_port.t list
-        -> me:Peer.t
-        -> parent_log:Logger.t
+        -> node_addrs_and_ports:Node_addrs_and_ports.t
+        -> logger:Logger.t
         -> conf_dir:string
         -> t Deferred.Or_error.t
     end
@@ -418,28 +352,34 @@ let%test_module "Tests" =
       let connect = connect ~trust_system:()
     end
 
+    let conf_dir = Filename.temp_dir_name ^/ ".kademlia-test-"
+
     let fold_membership (module M : S_test) :
         init:'b -> f:('b -> 'a -> 'b) -> 'b =
      fun ~init ~f ->
       Async.Thread_safe.block_on_async_exn (fun () ->
-          match%bind
-            M.connect ~initial_peers:[]
-              ~me:
-                (Peer.create Unix.Inet_addr.localhost ~discovery_port:3001
-                   ~communication_port:3000)
-              ~parent_log:(Logger.null ())
-              ~conf_dir:(Filename.temp_dir_name ^/ "membership-test")
-          with
-          | Ok t ->
-              let acc = ref init in
-              don't_wait_for
-                (Linear_pipe.iter (M.changes t) ~f:(fun e ->
-                     return (acc := f !acc e) )) ;
-              let%bind () = Async.after (Time.Span.of_sec 3.) in
-              let%map () = M.stop t in
-              !acc
-          | Error e -> failwith (Printf.sprintf "%s" (Error.to_string_hum e))
-      )
+          File_system.with_temp_dir conf_dir ~f:(fun temp_conf_dir ->
+              match%bind
+                M.connect ~initial_peers:[]
+                  ~node_addrs_and_ports:
+                    { external_ip= Unix.Inet_addr.localhost
+                    ; bind_ip= Unix.Inet_addr.localhost
+                    ; discovery_port= 3001
+                    ; communication_port= 3000
+                    ; client_port= 2000
+                    ; libp2p_port= 3002 }
+                  ~logger:(Logger.null ()) ~conf_dir:temp_conf_dir
+              with
+              | Ok t ->
+                  let acc = ref init in
+                  don't_wait_for
+                    (Linear_pipe.iter (M.changes t) ~f:(fun e ->
+                         return (acc := f !acc e) )) ;
+                  let%bind () = Async.after (Time.Span.of_sec 3.) in
+                  let%map () = M.stop t in
+                  !acc
+              | Error e ->
+                  failwith (Printf.sprintf "%s" (Error.to_string_hum e)) ) )
 
     module Scripted_process (Script : sig
       val s : [`On of int | `Off of int] list
@@ -449,7 +389,8 @@ let%test_module "Tests" =
 
       let kill _ = return ()
 
-      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
+      let create ~initial_peers:_ ~node_addrs_and_ports:_ ~logger:_ ~conf_dir:_
+          =
         let on p = Printf.sprintf "127.0.0.1:%d key on" p in
         let off p = Printf.sprintf "127.0.0.1:%d key off" p in
         let render cmds =
@@ -457,33 +398,34 @@ let%test_module "Tests" =
         in
         Deferred.Or_error.return (render Script.s)
 
-      let output t ~log:_log =
-        let r, w = Pipe.create () in
-        List.iter t ~f:(fun line -> Pipe.write_without_pushback w [line]) ;
+      let output t ~logger:_logger =
+        let r, w =
+          Strict_pipe.create
+            (Strict_pipe.Buffered (`Capacity 100, `Overflow Crash))
+        in
+        List.iter t ~f:(fun line -> Strict_pipe.Writer.write w [line]) ;
         r
     end
 
     module Dummy_process = struct
       open Async
 
-      type t = Process.t
+      type t = Child_processes.t
 
       let kill t =
-        let%map _ =
-          Process.run_exn ~prog:"kill" ~args:[Pid.to_string (Process.pid t)] ()
-        in
-        ()
+        Child_processes.kill t
+        |> Deferred.map ~f:Or_error.ok_exn
+        |> Deferred.ignore
 
-      let create ~initial_peers:_ ~me:_ ~log:_ ~conf_dir:_ =
-        Process.create
-          ~prog:
-            ( match get_project_root () with
-            | Some path -> path ^/ "src/dummy.sh"
-            | None -> failwith "Can't run tests outside of source tree." )
-          ~args:[] ()
+      let create ~initial_peers:_ ~node_addrs_and_ports:_ ~logger ~conf_dir =
+        Child_processes.start_custom ~logger ~name:"dummy.sh"
+          ~git_root_relative_path:"src/dummy.sh" ~conf_dir ~args:[]
+          ~stdout:(`Don't_log, `Pipe)
+          ~stderr:(`Don't_log, `No_pipe)
+          ~termination:`Always_raise
 
-      let output t ~log:_log =
-        Pipe.map (Reader.pipe (Process.stdout t)) ~f:String.split_lines
+      let output t ~logger:_ =
+        Child_processes.stdout_lines t |> Strict_pipe.Reader.map ~f:List.return
     end
 
     let%test_module "Mock Events" =
@@ -530,11 +472,15 @@ let%test_module "Tests" =
       (* Just make sure the dummy is outputting things *)
       fold_membership (module M) ~init:false ~f:(fun b _e -> b || true)
 
-    let peer_of_int i =
-      Peer.create Unix.Inet_addr.localhost ~discovery_port:(3006 + i)
-        ~communication_port:(3005 + i)
-
-    let conf_dir = Filename.temp_dir_name ^/ ".kademlia-test-"
+    let node_addrs_and_ports_of_int i =
+      let base = 3005 + (i * 3) in
+      Node_addrs_and_ports.
+        { external_ip= Unix.Inet_addr.localhost
+        ; bind_ip= Unix.Inet_addr.localhost
+        ; communication_port= base
+        ; discovery_port= base + 1
+        ; libp2p_port= base + 2
+        ; client_port= 1000 + i }
 
     let retry n f =
       let rec go i =
@@ -551,25 +497,28 @@ let%test_module "Tests" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               File_system.with_temp_dir (conf_dir ^ "1") ~f:(fun conf_dir_1 ->
                   File_system.with_temp_dir (conf_dir ^ "2")
-                    ~f:(fun conf_dir_2 -> f conf_dir_1 conf_dir_2 ) ) ) )
+                    ~f:(fun conf_dir_2 -> f conf_dir_1 conf_dir_2) ) ) )
 
     let get_temp_dir () =
       let tmpdir = Filename.temp_dir "test_trust_db" "" in
       at_exit (fun () -> Sys.command_exn @@ "rm -rf '" ^ tmpdir ^ "'") ;
       tmpdir
 
-    let create_trust_system () = Trust_system.create ~db_dir:(get_temp_dir ())
+    let create_trust_system () = Trust_system.create (get_temp_dir ())
 
     let%test_unit "connect" =
       (* This flakes 1 in 20 times, so try a couple times if it fails *)
       run_connection_test ~f:(fun conf_dir_1 conf_dir_2 ->
           let open Deferred.Let_syntax in
           let%bind n0 =
-            Haskell.For_tests.node (peer_of_int 0) [] conf_dir_1
-              (create_trust_system ())
+            Haskell.For_tests.node
+              (node_addrs_and_ports_of_int 0)
+              [] conf_dir_1 (create_trust_system ())
           and n1 =
-            Haskell.For_tests.node (peer_of_int 1)
-              [Peer.to_discovery_host_and_port (peer_of_int 0)]
+            Haskell.For_tests.node
+              (node_addrs_and_ports_of_int 1)
+              [ node_addrs_and_ports_of_int 0
+                |> Node_addrs_and_ports.to_discovery_host_and_port ]
               conf_dir_2 (create_trust_system ())
           in
           let%bind n0_peers =
@@ -585,8 +534,11 @@ let%test_module "Tests" =
           in
           assert (List.length n1_peers <> 0) ;
           assert (
-            List.hd_exn n0_peers = peer_of_int 1
-            && List.hd_exn n1_peers = peer_of_int 0 ) ;
+            List.hd_exn n0_peers
+            = (node_addrs_and_ports_of_int 1 |> Node_addrs_and_ports.to_peer)
+            && List.hd_exn n1_peers
+               = (node_addrs_and_ports_of_int 0 |> Node_addrs_and_ports.to_peer)
+          ) ;
           let%bind () = Haskell.stop n0 and () = Haskell.stop n1 in
           Deferred.unit )
 
@@ -628,8 +580,8 @@ let%test_module "Tests" =
         let%test_unit "connect with ban logic" =
             (* This flakes 1 in 20 times, so try a couple times if it fails *)
             run_connection_test ~f:(fun banner_conf_dir normal_conf_dir ->
-                let banner_addr = peer_of_int 0 in
-                let normal_addr = peer_of_int 1 in
+                let banner_addr = node_addrs_and_ports_of_int 0 in
+                let normal_addr = node_addrs_and_ports_of_int 1 in
                 let normal_peer = Peer.to_discovery_host_and_port normal_addr in
                 let trust_system = Trust_system.create () in
                 let%bind banner_node =
@@ -666,7 +618,7 @@ let%test_module "Tests" =
                       Deferred.return
                       @@ Option.is_some
                         (List.find peers_after_reconnect ~f:(fun p ->
-                             p = peer_of_int 1 )) )
+                             p = node_addrs_and_ports_of_int 1 )) )
                 in
                 assert is_reconnecting_to_banned_peer ;
                 let%bind () = Haskell_trust.stop new_banner_node
@@ -674,20 +626,4 @@ let%test_module "Tests" =
                 Deferred.unit ) *)
       
       end )
-
-    let%test_unit "lockfile does not exist after connection calling stop" =
-      Async.Thread_safe.block_on_async_exn (fun () ->
-          let open Async in
-          let open Deferred.Let_syntax in
-          File_system.with_temp_dir conf_dir ~f:(fun temp_dir ->
-              let%bind n =
-                Haskell.For_tests.node (peer_of_int 1) [] temp_dir
-                  (create_trust_system ())
-              in
-              let lock_path = Filename.concat temp_dir lock_file in
-              let%bind yes_result = Sys.file_exists lock_path in
-              assert (`Yes = yes_result) ;
-              let%bind () = Haskell.stop n in
-              let%map no_result = Sys.file_exists lock_path in
-              assert (`No = no_result) ) )
   end )

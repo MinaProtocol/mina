@@ -33,6 +33,7 @@ module Make (Inputs : Inputs_intf) = struct
 
   let exponentiate elt power =
     let naf = Snarkette.Fields.find_wnaf (module N) 1 power in
+    let%bind elt_inv = Fqk.inv_exn elt in
     let rec go i found_nonzero acc =
       if i < 0 then return acc
       else
@@ -41,8 +42,7 @@ module Make (Inputs : Inputs_intf) = struct
         in
         let%bind acc =
           if naf.(i) > 0 then Fqk.(acc * elt)
-          else if naf.(i) < 0 then Fqk.div_unsafe acc elt
-            (* TODO: Confirm that this is ok. Alternatively can just compute the inverse (or the unitary inverse) once at the top. *)
+          else if naf.(i) < 0 then Fqk.(acc * elt_inv)
           else return acc
         in
         go (i - 1) (found_nonzero || naf.(i) <> 0) acc

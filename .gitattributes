@@ -1,5 +1,15 @@
 # Ignore vendored code when calculating repo code %s
 # libsnark is lots of c++
 src/lib/snarky/src/camlsnark_c/libsnark-caml/* linguist-vendored
+# PragmataPro requires a license and costs $$, let's protect it with password
+# protected zip file
+frontend/website/static/font/PragmataPro.zip filter=lfs diff=lfs merge=lfs -text
+frontend/website/static/presskit.zip filter=lfs diff=lfs merge=lfs -text
 *.png filter=lfs diff=lfs merge=lfs -text
-
+*.jpg filter=lfs diff=lfs merge=lfs -text
+*.svg filter=lfs diff=lfs merge=lfs -text
+*.woff filter=lfs diff=lfs merge=lfs -text
+*.woff2 filter=lfs diff=lfs merge=lfs -text
+frontend/website/static/*.bc.js filter=lfs diff=lfs merge=lfs -text
+src/app/kademlia-haskell/packages.nix linguist-generated=true
+src/app/archive/archive_graphql_schema.json linguist-generated=true

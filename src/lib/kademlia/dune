@@ -1,11 +1,10 @@
 (library
  (name kademlia)
  (public_name kademlia)
- (flags :standard -short-paths -warn-error -58)
  (library_flags -linkall)
  (inline_tests)
- (libraries core logger pipe_lib async async_extra file_system banlist_lib
-   network_peer coda_base)
+ (libraries core child_processes logger pipe_lib async async_extra file_system
+   network_peer trust_system)
  (preprocess
-  (pps ppx_jane bisect_ppx -- -conditional))
- (synopsis "Kademlia DHT -- only being used for it's membership"))
+  (pps ppx_coda -lint-version-syntax-warnings ppx_jane ppx_deriving_yojson bisect_ppx -- -conditional))
+ (synopsis "Kademlia DHT -- only being used for its membership"))

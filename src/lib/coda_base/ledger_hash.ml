@@ -10,23 +10,17 @@ module Merkle_tree =
   Snarky.Merkle_tree.Checked
     (Tick)
     (struct
-      type value = Pedersen.Checked.Digest.t
+      type value = Field.t
 
-      type var = Pedersen.Checked.Digest.var
+      type var = Field.Var.t
 
-      let typ = Pedersen.Checked.Digest.typ
+      let typ = Field.typ
 
-      let hash ~height h1 h2 =
-        let to_triples (bs : Pedersen.Checked.Digest.Unpacked.var) =
-          Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_
-            (bs :> Boolean.var list)
-        in
-        (* TODO: Think about if choose_preimage_var is ok *)
-        let%bind h1 = Pedersen.Checked.Digest.choose_preimage h1
-        and h2 = Pedersen.Checked.Digest.choose_preimage h2 in
-        Pedersen.Checked.digest_triples
-          ~init:Hash_prefix.merkle_tree.(height)
-          (to_triples h1 @ to_triples h2)
+      let merge ~height h1 h2 =
+        Tick.make_checked (fun () ->
+            Random_oracle.Checked.hash
+              ~init:Hash_prefix.merkle_tree.(height)
+              [|h1; h2|] )
 
       let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
 
@@ -42,21 +36,34 @@ let depth = Snark_params.ledger_depth
 
 include Data_hash.Make_full_size ()
 
+module T = struct
+  type t = Stable.Latest.t [@@deriving bin_io]
+
+  let description = "Ledger hash"
+
+  let version_byte = Base58_check.Version_bytes.ledger_hash
+end
+
+module Base58_check = Codable.Make_base58_check (T)
+
+let to_string t = Base58_check.String_ops.to_string t
+
+let of_string s = Base58_check.String_ops.of_string s
+
 let merge ~height (h1 : t) (h2 : t) =
-  let open Tick.Pedersen in
-  State.digest
-    (hash_fold
-       Hash_prefix.merkle_tree.(height)
-       Fold.(Digest.fold (h1 :> field) +> Digest.fold (h2 :> field)))
+  Random_oracle.hash
+    ~init:Hash_prefix.merkle_tree.(height)
+    [|(h1 :> field); (h2 :> field)|]
   |> of_hash
 
 (* TODO: @ihm cryptography review *)
 let empty_hash =
   let open Tick.Pedersen in
-  digest_fold
-    (State.create params ~get_chunk_table)
-    (Fold.string_triples "nothing up my sleeve")
+  digest_fold (State.create ()) (Fold.string_triples "nothing up my sleeve")
   |> of_hash
+
+let%bench "Ledger_hash.merge ~height:1 empty_hash empty_hash" =
+  merge ~height:1 empty_hash empty_hash
 
 let of_digest = Fn.compose Fn.id of_hash
 
@@ -70,10 +77,14 @@ type _ Request.t +=
 
 let reraise_merkle_requests (With {request; respond}) =
   match request with
-  | Merkle_tree.Get_path addr -> respond (Delegate (Get_path addr))
-  | Merkle_tree.Set (addr, account) -> respond (Delegate (Set (addr, account)))
-  | Merkle_tree.Get_element addr -> respond (Delegate (Get_element addr))
-  | _ -> unhandled
+  | Merkle_tree.Get_path addr ->
+      respond (Delegate (Get_path addr))
+  | Merkle_tree.Set (addr, account) ->
+      respond (Delegate (Set (addr, account)))
+  | Merkle_tree.Get_element addr ->
+      respond (Delegate (Get_element addr))
+  | _ ->
+      unhandled
 
 let get t addr =
   handle
@@ -111,7 +122,7 @@ let%snarkydef modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let modify_account_send t pk ~is_fee_transfer ~f =
+let%snarkydef modify_account_send t pk ~is_writeable ~f =
   modify_account t pk
     ~filter:(fun account ->
       let%bind account_already_there =
@@ -121,9 +132,13 @@ let modify_account_send t pk ~is_fee_transfer ~f =
         Public_key.Compressed.Checked.equal account.public_key
           Public_key.Compressed.(var_of_t empty)
       in
-      let%bind fee_transfer = Boolean.(account_not_there && is_fee_transfer) in
-      let%bind () = Boolean.Assert.any [account_already_there; fee_transfer] in
-      return fee_transfer )
+      let%bind not_there_but_writeable =
+        Boolean.(account_not_there && is_writeable)
+      in
+      let%bind () =
+        Boolean.Assert.any [account_already_there; not_there_but_writeable]
+      in
+      return not_there_but_writeable )
     ~f:(fun is_empty_and_writeable x -> f ~is_empty_and_writeable x)
 
 (*
@@ -133,7 +148,7 @@ let modify_account_send t pk ~is_fee_transfer ~f =
    - returns a root [t'] of a tree of depth [depth]
    which is [t] but with the account [f account] at path [addr].
 *)
-let modify_account_recv t pk ~f =
+let%snarkydef modify_account_recv t pk ~f =
   modify_account t pk
     ~filter:(fun account ->
       let%bind account_already_there =

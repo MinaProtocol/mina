@@ -1,12 +1,21 @@
+open Core_kernel
+
 module Hashless_ledger : Transaction_logic.Ledger_intf
 
-include
-  Protocols.Coda_pow.Transaction_validator_intf
-  with type ledger = Hashless_ledger.t
-   and type transaction := Transaction.t
-   and type user_command_with_valid_signature :=
-              User_command.With_valid_signature.t
-   and type ledger_hash := Ledger_hash.t
-   and type outer_ledger := Ledger.t
-
 val create : Ledger.t -> Hashless_ledger.t
+
+val apply_user_command :
+  Hashless_ledger.t -> User_command.With_valid_signature.t -> unit Or_error.t
+
+val apply_transaction : Hashless_ledger.t -> Transaction.t -> unit Or_error.t
+
+module For_tests : sig
+  open Currency
+  open Coda_numbers
+
+  val validate_timing :
+       account:Account.t
+    -> txn_amount:Amount.t
+    -> txn_global_slot:Global_slot.t
+    -> Account.Timing.t Or_error.t
+end

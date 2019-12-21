@@ -6,7 +6,8 @@ module type S = sig
   type curve
 
   module Digest : sig
-    type t [@@deriving bin_io, sexp, eq, compare]
+    (* TODO: version *)
+    type t [@@deriving bin_io, sexp, eq, compare, yojson]
 
     val fold_bits : t -> bool Fold.t
 
@@ -39,13 +40,15 @@ end
 module Make (Field : sig
   type t [@@deriving sexp, bin_io, eq, compare]
 
+  include Stringable.S with type t := t
+
   val fold_bits : t -> bool Fold.t
 
   val fold : t -> bool Triple.t Fold.t
 end) (Curve : sig
   type t [@@deriving sexp]
 
-  val to_affine_coordinates : t -> Field.t * Field.t
+  val to_affine_exn : t -> Field.t * Field.t
 
   val zero : t
 
@@ -55,6 +58,15 @@ end) (Curve : sig
 end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
   module Digest = struct
     type t = Field.t [@@deriving sexp, bin_io, eq, compare]
+
+    let to_yojson t = `String (Field.to_string t)
+
+    let of_yojson = function
+      | `String s -> (
+        try Ok (Field.of_string s)
+        with exn -> Error Error.(to_string_hum (of_exn exn)) )
+      | _ ->
+          Error "expected string"
 
     let fold_bits = Field.fold_bits
 
@@ -78,9 +90,12 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       let a0, a1, sign = triple in
       let res =
         match (a0, a1) with
-        | false, false -> g
-        | true, false -> Curve.(g + g)
-        | false, true -> Curve.(g + g + g)
+        | false, false ->
+            g
+        | true, false ->
+            Curve.(g + g)
+        | false, true ->
+            Curve.(g + g + g)
         | true, true ->
             let gg = Curve.(g + g) in
             Curve.(gg + gg)
@@ -97,7 +112,8 @@ end) : S with type curve := Curve.t and type Digest.t = Field.t = struct
       {t with acc; triples_consumed}
 
     let digest t =
-      let x, _y = Curve.to_affine_coordinates t.acc in
+      assert (t.triples_consumed > 0) ;
+      let x, _y = Curve.to_affine_exn t.acc in
       x
 
     let salt params s = update_fold (create params) (Fold.string_triples s)

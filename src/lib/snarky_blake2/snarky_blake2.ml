@@ -1,35 +1,5 @@
 open Core_kernel
 
-(* Little endian *)
-let bits_to_string bits =
-  let n = Array.length bits in
-  let rec make_byte offset acc i =
-    let finished = i = 8 || offset + i >= n in
-    if finished then Char.of_int_exn acc
-    else
-      let acc = if bits.(offset + i) then acc lor (1 lsl i) else acc in
-      make_byte offset acc (i + 1)
-  in
-  let len = (n + 7) / 8 in
-  String.init len ~f:(fun i -> make_byte (8 * i) 0 0)
-
-let%test_unit "bits_to_string" =
-  [%test_eq: string]
-    (bits_to_string [|true; false|])
-    (String.of_char_list [Char.of_int_exn 1])
-
-let string_to_bits s =
-  Array.init
-    (8 * String.length s)
-    ~f:(fun i ->
-      let c = Char.to_int s.[i / 8] in
-      let j = i mod 8 in
-      (c lsr j) land 1 = 1 )
-
-let%test_unit "string to bits" =
-  Quickcheck.test ~trials:5 String.gen ~f:(fun s ->
-      [%test_eq: string] s (bits_to_string (string_to_bits s)) )
-
 module type S = sig
   module Impl : Snarky.Snark_intf.S
 
@@ -187,8 +157,7 @@ module Make (Impl : Snarky.Snark_intf.S) : S with module Impl := Impl = struct
          personalization = personalization *)
       Array.map
         ~f:(Fn.compose UInt32.constant UInt32.Unchecked.of_int)
-        [| 0x6A09E667 lxor 0x01010000 (* depth = 1, fanout = 1 *)
-           lxor 32
+        [| 0x6A09E667 lxor 0x01010000 (* depth = 1, fanout = 1 *) lxor 32
            (* digest_length = 32 *)
          ; 0xBB67AE85
          ; 0x3C6EF372
@@ -257,10 +226,9 @@ let%test_module "blake2-equality test" =
       let compare_a x y = if equal x y then 0 else 1 in
       [%test_eq: a] checked_result (unchecked input)
 
-    module B = (val Digestif.module_of (Digestif.blake2s digest_length_in_bits))
-
     let blake2_unchecked s =
-      string_to_bits (B.digest_string (bits_to_string s) :> string)
+      Blake2.string_to_bits
+        Blake2.(digest_string (Blake2.bits_to_string s) |> to_raw_string)
 
     let to_bitstring bits =
       String.init (Array.length bits) ~f:(fun i ->
@@ -282,8 +250,8 @@ let%test_module "blake2-equality test" =
       let input =
         let open Quickcheck.Let_syntax in
         let%bind n = Int.gen_incl 0 (1024 / 8) in
-        let%map x = String.gen_with_length n Char.gen in
-        (n, string_to_bits x)
+        let%map x = String.gen_with_length n Char.quickcheck_generator in
+        (n, Blake2.string_to_bits x)
       in
       let output_typ =
         Impl.Typ.array ~length:digest_length_in_bits Impl.Boolean.typ

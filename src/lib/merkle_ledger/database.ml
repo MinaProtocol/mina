@@ -5,7 +5,7 @@ module type Inputs_intf = sig
 
   module Location : Location_intf.S
 
-  module Kvdb : Intf.Key_value_database
+  module Kvdb : Intf.Key_value_database with type config := string
 
   module Storage_locations : Intf.Storage_locations
 end
@@ -48,16 +48,19 @@ module Make (Inputs : Inputs_intf) :
   let get_uuid t = t.uuid
 
   let create ?directory_name () =
-    let uuid = Uuid.create () in
+    let uuid = Uuid_unix.create () in
     let directory =
       match directory_name with
-      | None -> Uuid.to_string uuid
-      | Some name -> name
+      | None ->
+          Uuid.to_string uuid
+      | Some name ->
+          name
     in
-    let kvdb = Kvdb.create ~directory in
+    Unix.mkdir_p directory ;
+    let kvdb = Kvdb.create directory in
     {uuid; kvdb}
 
-  let close {uuid= _; kvdb} = Kvdb.close kvdb
+  let close {kvdb; uuid= _} = Kvdb.close kvdb
 
   let with_ledger ~f =
     let t = create () in
@@ -73,7 +76,8 @@ module Make (Inputs : Inputs_intf) :
     Kvdb.get kvdb ~key:(Location.serialize location)
 
   let get_bin mdb location bin_read =
-    get_raw mdb location |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
+    get_raw mdb location
+    |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
 
   let delete_raw {kvdb; _} location =
     Kvdb.remove kvdb ~key:(Location.serialize location)
@@ -85,8 +89,10 @@ module Make (Inputs : Inputs_intf) :
   let get_hash mdb location =
     assert (Location.is_hash location) ;
     match get_bin mdb location Hash.bin_read_t with
-    | Some hash -> hash
-    | None -> Immutable_array.get empty_hashes (Location.height location)
+    | Some hash ->
+        hash
+    | None ->
+        Immutable_array.get empty_hashes (Location.height location)
 
   let account_list_bin {kvdb; _} account_bin_read : Account.t list =
     let all_keys_values = Kvdb.to_alist kvdb in
@@ -128,7 +134,7 @@ module Make (Inputs : Inputs_intf) :
       (loc, buf)
     in
     let locs_bufs = List.map locations_vs ~f:create_buf in
-    set_raw_batch mdb locs_bufs
+    set_raw_batch ~remove_keys:[] mdb locs_bufs
 
   let get_inner_hash_at_addr_exn mdb address =
     assert (Addr.depth address <= Depth.depth) ;
@@ -153,7 +159,8 @@ module Make (Inputs : Inputs_intf) :
 
     let get mdb key =
       match get_generic mdb (build_location key) with
-      | None -> Error Db_error.Account_location_not_found
+      | None ->
+          Error Db_error.Account_location_not_found
       | Some location_bin ->
           let result =
             Location.parse location_bin
@@ -189,7 +196,8 @@ module Make (Inputs : Inputs_intf) :
           Result.return first_location
       | Some prev_location -> (
         match Location.parse prev_location with
-        | Error () -> Error Db_error.Malformed_database
+        | Error () ->
+            Error Db_error.Malformed_database
         | Ok prev_account_location ->
             Location.next prev_account_location
             |> Result.of_option ~error:Db_error.Out_of_leaves
@@ -208,22 +216,28 @@ module Make (Inputs : Inputs_intf) :
         last_location_key () |> get_raw mdb |> Result.of_option ~error:()
         |> Result.bind ~f:Location.parse
       with
-      | Error () -> None
-      | Ok parsed_location -> Some (Location.to_path_exn parsed_location)
+      | Error () ->
+          None
+      | Ok parsed_location ->
+          Some (Location.to_path_exn parsed_location)
 
     let last_location mdb =
       match
         last_location_key () |> get_raw mdb |> Result.of_option ~error:()
         |> Result.bind ~f:Location.parse
       with
-      | Error () -> None
-      | Ok parsed_location -> Some parsed_location
+      | Error () ->
+          None
+      | Ok parsed_location ->
+          Some parsed_location
   end
 
   let location_of_key t key =
     match Account_location.get t key with
-    | Error _ -> None
-    | Ok location -> Some location
+    | Error _ ->
+        None
+    | Ok location ->
+        Some location
 
   let last_filled t = Account_location.last_location t
 
@@ -256,7 +270,7 @@ module Make (Inputs : Inputs_intf) :
       let last_location_key_value =
         (Account_location.last_location_key (), last_location)
       in
-      Account_location.set_batch mdb
+      Account_location.set_batch ~remove_keys:[] mdb
         ( Non_empty_list.cons last_location_key_value
             (Non_empty_list.map key_to_location_list ~f:(fun (key, location) ->
                  (Account_location.build_location key, location) ))
@@ -313,7 +327,8 @@ module Make (Inputs : Inputs_intf) :
           Error (Error.create "get_or_create_account" err Db_error.sexp_of_t) )
     | Error err ->
         Error (Error.create "get_or_create_account" err Db_error.sexp_of_t)
-    | Ok location -> Ok (`Existed, location)
+    | Ok location ->
+        Ok (`Existed, location)
 
   let get_or_create_account_exn mdb key account =
     get_or_create_account mdb key account
@@ -322,12 +337,15 @@ module Make (Inputs : Inputs_intf) :
 
   let num_accounts t =
     match Account_location.last_location_address t with
-    | None -> 0
-    | Some addr -> Addr.to_int addr + 1
+    | None ->
+        0
+    | Some addr ->
+        Addr.to_int addr + 1
 
   let iteri t ~f =
     match Account_location.last_location_address t with
-    | None -> ()
+    | None ->
+        ()
     | Some last_addr ->
         Sequence.range ~stop:`inclusive 0 (Addr.to_int last_addr)
         |> Sequence.iter ~f:(fun i -> f i (get_at_index_exn t i))
@@ -338,7 +356,8 @@ module Make (Inputs : Inputs_intf) :
   let foldi_with_ignored_keys t ignored_keys ~init ~f =
     let f' index accum account = f (Addr.of_int_exn index) accum account in
     match Account_location.last_location_address t with
-    | None -> init
+    | None ->
+        init
     | Some last_addr ->
         let ignored_indices =
           Int.Set.map ignored_keys ~f:(fun key ->
@@ -365,6 +384,9 @@ module Make (Inputs : Inputs_intf) :
       foldi t ~init ~f:f'
 
     let iter = `Define_using_fold
+
+    (* Use num_accounts instead? *)
+    let length = `Define_using_fold
   end)
 
   let fold_until = C.fold_until
@@ -376,11 +398,14 @@ module Make (Inputs : Inputs_intf) :
       (* if we don't have a location for all keys, raise an exception *)
       let rec loop keys accum =
         match keys with
-        | [] -> accum (* no need to reverse *)
+        | [] ->
+            accum (* no need to reverse *)
         | key :: rest -> (
           match Account_location.get t key with
-          | Ok loc -> loop rest (loc :: accum)
-          | Error err -> raise (Db_error.Db_exception err) )
+          | Ok loc ->
+              loop rest (loc :: accum)
+          | Error err ->
+              raise (Db_error.Db_exception err) )
       in
       loop keys []
     in

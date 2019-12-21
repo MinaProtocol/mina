@@ -1,7 +1,15 @@
 open Core_kernel
 
 (* A non-empty list is a tuple of the head and the rest (as a list) *)
-type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash, bin_io]
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type 'a t = 'a * 'a list [@@deriving sexp, compare, eq, hash]
+  end
+end]
+
+(* bin_io omitted intentionally *)
+type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, eq, hash]
 
 let init x xs = (x, xs)
 
@@ -33,13 +41,15 @@ module C = Container.Make (struct
   let fold (x, xs) ~init ~f = List.fold xs ~init:(f init x) ~f
 
   let iter = `Custom (fun (x, xs) ~f -> f x ; List.iter xs ~f)
+
+  let length = `Define_using_fold
 end)
 
 let find = C.find
 
 let find_map = C.find_map
 
-let fold = C.fold
+let fold (x, xs) ~init ~f = List.fold xs ~init:(init x) ~f
 
 let iter = C.iter
 
@@ -50,9 +60,12 @@ let to_list (x, xs) = x :: xs
 let append (x, xs) ys = (x, xs @ to_list ys)
 
 let take (x, xs) = function
-  | 0 -> None
-  | 1 -> Some (x, [])
-  | n -> Some (x, List.take xs (n - 1))
+  | 0 ->
+      None
+  | 1 ->
+      Some (x, [])
+  | n ->
+      Some (x, List.take xs (n - 1))
 
 let min_elt ~compare (x, xs) =
   Option.value_map ~default:x (List.min_elt ~compare xs) ~f:(fun mininum ->
@@ -61,3 +74,8 @@ let min_elt ~compare (x, xs) =
 let max_elt ~compare (x, xs) =
   Option.value_map ~default:x (List.max_elt ~compare xs) ~f:(fun maximum ->
       if compare x maximum > 0 then x else maximum )
+
+let rec iter_deferred (x, xs) ~f =
+  let open Async_kernel in
+  let%bind () = f x in
+  match xs with [] -> return () | h :: t -> iter_deferred (h, t) ~f

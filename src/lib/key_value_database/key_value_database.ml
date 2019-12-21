@@ -1,40 +1,88 @@
 open Core_kernel
 
-module type S = sig
-  type t
+module Monad = struct
+  module type S = sig
+    type 'a t
 
-  type key
+    include Monad.S with type 'a t := 'a t
 
-  type value
+    module Result : sig
+      val lift : 'value t -> ('value, 'err) Result.t t
 
-  val create : directory:string -> t
+      type nonrec ('value, 'err) t = ('value, 'err) Result.t t
 
-  val close : t -> unit
+      include Monad.S2 with type ('value, 'err) t := ('value, 'err) t
+    end
 
-  val get : t -> key:key -> value option
+    module Option : sig
+      type nonrec 'a t = 'a option t
 
-  val set : t -> key:key -> data:value -> unit
+      include Monad.S with type 'a t := 'a t
+    end
+  end
 
-  val remove : t -> key:key -> unit
+  module Ident = struct
+    include Monad.Ident
+
+    module Result = struct
+      let lift = Result.return
+
+      include Result
+    end
+
+    module Option = Option
+  end
 end
 
-module type Mock_intf = sig
-  include S
+module Intf = struct
+  module type S = sig
+    type t
 
-  val random_key : t -> key option
+    type key
 
-  val to_sexp :
-    t -> key_sexp:(key -> Sexp.t) -> value_sexp:(value -> Sexp.t) -> Sexp.t
+    type value
+
+    type config
+
+    module M : Monad.S
+
+    val create : config -> t
+
+    val close : t -> unit
+
+    val get : t -> key:key -> value option M.t
+
+    val set : t -> key:key -> data:value -> unit M.t
+
+    val remove : t -> key:key -> unit M.t
+
+    val set_batch :
+      t -> ?remove_keys:key list -> update_pairs:(key * value) list -> unit M.t
+
+    val to_alist : t -> (key * value) list M.t
+  end
+
+  module type Ident = S with module M := Monad.Ident
+
+  module type Mock = sig
+    include Ident
+
+    val random_key : t -> key option
+
+    val to_sexp :
+      t -> key_sexp:(key -> Sexp.t) -> value_sexp:(value -> Sexp.t) -> Sexp.t
+  end
 end
 
 module Make_mock
     (Key : Hashable.S) (Value : sig
         type t
     end) :
-  Mock_intf
+  Intf.Mock
   with type t = Value.t Key.Table.t
-  with type key := Key.t
-   and type value := Value.t = struct
+   and type key := Key.t
+   and type value := Value.t
+   and type config := unit = struct
   type t = Value.t Key.Table.t
 
   let to_sexp t ~key_sexp ~value_sexp =
@@ -43,7 +91,7 @@ module Make_mock
            [%sexp_of: Sexp.t * Sexp.t] (key_sexp key, value_sexp value) )
     |> [%sexp_of: Sexp.t list]
 
-  let create ~directory:_ = Key.Table.create ()
+  let create _ = Key.Table.create ()
 
   let get t ~key = Key.Table.find t key
 
@@ -56,4 +104,10 @@ module Make_mock
   let random_key t =
     let keys = Key.Table.keys t in
     List.random_element keys
+
+  let set_batch t ?(remove_keys = []) ~update_pairs =
+    List.iter update_pairs ~f:(fun (key, data) -> set t ~key ~data) ;
+    List.iter remove_keys ~f:(fun key -> remove t ~key)
+
+  let to_alist = Key.Table.to_alist
 end

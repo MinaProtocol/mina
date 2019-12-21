@@ -1,41 +1,47 @@
 open Core
-open Fold_lib
-open Tuple_lib
 open Snark_params.Tick
 open Import
 
-type ('pk, 'amount) t_ = {receiver: 'pk; amount: 'amount}
-[@@deriving bin_io, eq, sexp, hash, yojson]
+module Poly : sig
+  type ('pk, 'amount) t = {receiver: 'pk; amount: 'amount}
+  [@@deriving eq, sexp, hash, yojson]
 
-type t = (Public_key.Compressed.t, Currency.Amount.t) t_
-[@@deriving bin_io, eq, sexp, hash, yojson]
+  module Stable :
+    sig
+      module V1 : sig
+        type nonrec ('pk, 'amount) t
+        [@@deriving bin_io, eq, sexp, hash, yojson, version]
+      end
+
+      module Latest = V1
+    end
+    with type ('pk, 'amount) V1.t = ('pk, 'amount) t
+end
+
+module Stable : sig
+  module V1 : sig
+    type t =
+      ( Public_key.Compressed.Stable.V1.t
+      , Currency.Amount.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
+  end
+
+  module Latest = V1
+end
+
+type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
 val dummy : t
 
 val gen : max_amount:Currency.Amount.t -> t Quickcheck.Generator.t
 
-module Stable : sig
-  module V1 : sig
-    type nonrec ('pk, 'amount) t_ = ('pk, 'amount) t_ =
-      {receiver: 'pk; amount: 'amount}
-    [@@deriving bin_io, eq, sexp, hash, yojson]
-
-    type t =
-      (Public_key.Compressed.Stable.V1.t, Currency.Amount.Stable.V1.t) t_
-    [@@deriving bin_io, eq, sexp, hash, yojson]
-  end
-end
-
-type var = (Public_key.Compressed.var, Currency.Amount.var) t_
-
-val length_in_triples : int
+type var = (Public_key.Compressed.var, Currency.Amount.var) Poly.t
 
 val typ : (var, t) Typ.t
 
-val to_triples : t -> bool Triple.t list
+val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
-val fold : t -> bool Triple.t Fold.t
-
-val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
 val var_of_t : t -> var

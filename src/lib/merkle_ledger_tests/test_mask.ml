@@ -45,6 +45,8 @@ module type Test_intf = sig
 
   val with_instances : (Base.t -> Mask.t -> 'a) -> 'a
 
+  (** Here we provide a base ledger and two layers of attached masks
+          * one ontop another *)
   val with_chain :
        (   Base.t
         -> mask:Mask.Attached.t
@@ -52,8 +54,6 @@ module type Test_intf = sig
         -> mask2:Mask.Attached.t
         -> 'a)
     -> 'a
-  (** Here we provide a base ledger and two layers of attached masks
-          * one ontop another *)
 end
 
 module Make (Test : Test_intf) = struct
@@ -81,8 +81,10 @@ module Make (Test : Test_intf) = struct
       Mask.Attached.get_or_create_account_exn mask public_key account
     in
     match action with
-    | `Existed -> failwith "Expected to allocate a new account"
-    | `Added -> location
+    | `Existed ->
+        failwith "Expected to allocate a new account"
+    | `Added ->
+        location
 
   let create_existing_account_exn mask account =
     let public_key = Account.public_key account in
@@ -93,7 +95,8 @@ module Make (Test : Test_intf) = struct
     | `Existed ->
         Mask.Attached.set mask location account ;
         location
-    | `Added -> failwith "Expected to re-use an existing account"
+    | `Added ->
+        failwith "Expected to re-use an existing account"
 
   let parent_create_new_account_exn parent account =
     let public_key = Account.public_key account in
@@ -101,8 +104,10 @@ module Make (Test : Test_intf) = struct
       Maskable.get_or_create_account_exn parent public_key account
     in
     match action with
-    | `Existed -> failwith "Expected to allocate a new account"
-    | `Added -> location
+    | `Existed ->
+        failwith "Expected to allocate a new account"
+    | `Added ->
+        location
 
   let%test "parent, mask agree on set" =
     Test.with_instances (fun maskable mask ->
@@ -352,8 +357,7 @@ module Make (Test : Test_intf) = struct
                  (Mask.Addr.root ())
           in
           assert (List.length accounts = List.length retrieved_accounts) ;
-          assert (List.equal ~equal:Account.equal accounts retrieved_accounts)
-      )
+          assert (List.equal Account.equal accounts retrieved_accounts) )
 
   let%test_unit "get_all_accounts should preserve the ordering of accounts by \
                  location with noncontiguous updates of accounts on the mask" =
@@ -410,9 +414,8 @@ module Make (Test : Test_intf) = struct
             Int.equal
               (List.length base_accounts)
               (List.length retrieved_accounts) ) ;
-          assert (
-            List.equal ~equal:Account.equal expected_accounts
-              retrieved_accounts ) )
+          assert (List.equal Account.equal expected_accounts retrieved_accounts)
+      )
 
   let%test_unit "removing accounts from mask restores Merkle root" =
     Test.with_instances (fun maskable mask ->
@@ -686,7 +689,7 @@ module Make (Test : Test_intf) = struct
             Mask.Attached.commit m1 ;
             [%test_result: Account.t option] ~message:"a2 is in base"
               ~expect:(Some a2) (Test.Base.get base loc2) ;
-            Maskable.remove_and_reparent_exn mask_as_base m1 ~children:[m2] ;
+            Maskable.remove_and_reparent_exn mask_as_base m1 ;
             [%test_result: Account.t option] ~message:"a1 is in base"
               ~expect:(Some a1) (Test.Base.get base loc1) ;
             [%test_result: Account.t option] ~message:"a2 is in base"
@@ -696,7 +699,8 @@ module Make (Test : Test_intf) = struct
                 [%test_result: Account.t option]
                   ~message:"All accounts are accessible from m2"
                   ~expect:(Some a) (Mask.Attached.get m2 loc) )
-        | _ -> failwith "unexpected" )
+        | _ ->
+            failwith "unexpected" )
 
   let%test_unit "setting an account in the parent doesn't remove the masked \
                  copy if the mask is still dirty for that account" =
@@ -778,6 +782,8 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
     include Inputs
     module Base = Base
     module Mask = Mask
+
+    let mask_to_base m = Any_base.cast (module Mask.Attached) m
   end)
 
   (* test runner *)

@@ -1,39 +1,48 @@
 (** A non-empty list that is safe by construction. *)
 
-type 'a t [@@deriving sexp, compare, eq, hash, bin_io]
+module Stable : sig
+  module V1 : sig
+    type 'a t [@@deriving sexp, compare, eq, hash, bin_io, version]
+  end
 
-val init : 'a -> 'a list -> 'a t
+  module Latest = V1
+end
+
+(* no bin_io on purpose *)
+type 'a t = 'a Stable.Latest.t [@@deriving sexp, compare, eq, hash]
+
 (** Create a non-empty list by proving you have a head element *)
+val init : 'a -> 'a list -> 'a t
 
-val singleton : 'a -> 'a t
 (** Create a non-empty list with a single element *)
+val singleton : 'a -> 'a t
 
-val uncons : 'a t -> 'a * 'a list
 (** Deconstruct a non-empty list into the head and tail *)
+val uncons : 'a t -> 'a * 'a list
 
-val cons : 'a -> 'a t -> 'a t
 (** Prepend a new element *)
+val cons : 'a -> 'a t -> 'a t
 
-val head : 'a t -> 'a
 (** The first element of the container *)
+val head : 'a t -> 'a
 
-val tail : 'a t -> 'a list
 (** The zero or more tail elements of the container *)
+val tail : 'a t -> 'a list
 
 val last : 'a t -> 'a
 
-val rev : 'a t -> 'a t
 (** The reverse ordered list *)
+val rev : 'a t -> 'a t
 
-val of_list_opt : 'a list -> 'a t option
 (** Convert a list into a non-empty-list, returning [None] if the list is
  * empty *)
+val of_list_opt : 'a list -> 'a t option
 
-val tail_opt : 'a t -> 'a t option
 (** Get the tail as a non-empty-list *)
+val tail_opt : 'a t -> 'a t option
 
-val map : 'a t -> f:('a -> 'b) -> 'b t
 (** Apply a function to each element of the non empty list *)
+val map : 'a t -> f:('a -> 'b) -> 'b t
 
 (* The following functions are computed from {!module:Base.Container.Make}. See
  * {!modtype:Base.Container_intf} for more information *)
@@ -42,14 +51,14 @@ val find : 'a t -> f:('a -> bool) -> 'a option
 
 val find_map : 'a t -> f:('a -> 'b option) -> 'b option
 
-val fold : 'a t -> init:'accum -> f:('accum -> 'a -> 'accum) -> 'accum
+val fold : 'a t -> init:('a -> 'accum) -> f:('accum -> 'a -> 'accum) -> 'accum
 
 val iter : 'a t -> f:('a -> unit) -> unit
 
 val length : 'a t -> int
 
-val to_list : 'a t -> 'a list
 (** Note: This is O(1) not O(n) like on most container *)
+val to_list : 'a t -> 'a list
 
 val append : 'a t -> 'a t -> 'a t
 
@@ -58,3 +67,8 @@ val take : 'a t -> int -> 'a t option
 val min_elt : compare:('a -> 'a -> int) -> 'a t -> 'a
 
 val max_elt : compare:('a -> 'a -> int) -> 'a t -> 'a
+
+val iter_deferred :
+     'a t
+  -> f:('a -> unit Async_kernel.Deferred.t)
+  -> unit Async_kernel.Deferred.t

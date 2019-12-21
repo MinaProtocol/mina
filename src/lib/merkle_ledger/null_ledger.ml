@@ -21,7 +21,7 @@ module Make (Inputs : Inputs_intf) : sig
 end = struct
   open Inputs
 
-  type t = Core.Uuid.t [@@deriving sexp_of]
+  type t = Uuid.t [@@deriving sexp_of]
 
   let t_of_sexp _ = failwith "t_of_sexp unimplemented"
 
@@ -34,10 +34,11 @@ end = struct
 
   module Addr = Location.Addr
 
-  let create () = Core.Uuid.create ()
+  let create () = Uuid_unix.create ()
 
-  let remove_accounts_exn _t =
-    failwith "remove_accounts_exn: null ledgers cannot be mutated"
+  let remove_accounts_exn _t keys =
+    if List.is_empty keys then ()
+    else failwith "remove_accounts_exn: null ledgers cannot be mutated"
 
   let empty_hash_at_heights depth =
     let empty_hash_at_heights =

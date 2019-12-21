@@ -1,70 +1,126 @@
-module type Input_intf = sig
-  type t [@@deriving bin_io, eq, sexp, compare]
+module Make (Type : sig
+  type t [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
+end)
+(Impl : sig
+          type t
 
-  include Base.Stringable.S with type t := t
+          include Base.Stringable.S with type t := t
 
-  val length_in_bits : int
+          val length_in_bits : int
 
-  val one : t
+          val one : t
 
-  val zero : t
+          val logand : t -> t -> t
 
-  val logand : t -> t -> t
+          val shift_right_logical : t -> int -> t
+        end
+        with type t := Type.t) =
+struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Type.t
+        [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
+      end
 
-  val shift_right_logical : t -> int -> t
-end
+      include T
+    end
 
-module Make (M : Input_intf) = struct
-  include M
+    module Latest = V1
+  end
 
-  let length_in_triples = (M.length_in_bits + 2) / 3
+  type t = Stable.Latest.t [@@deriving eq, sexp, to_yojson, compare]
+
+  let length_in_triples = (Impl.length_in_bits + 2) / 3
 
   let fold t : bool Fold_lib.Fold.t =
     { fold=
         (fun ~init ~f ->
           let rec go acc pt i =
-            if i = M.length_in_bits then acc
+            if i = Impl.length_in_bits then acc
             else
-              let b = M.(equal (logand one pt) one) in
-              go (f acc b) (M.shift_right_logical pt 1) (i + 1)
+              let b = Impl.(equal (logand one pt) one) in
+              go (f acc b) (Impl.shift_right_logical pt 1) (i + 1)
           in
           go init t 0 ) }
 
   let fold t = Fold_lib.Fold.group3 ~default:false (fold t)
+
+  module Impl = struct
+    type t = Stable.Latest.t [@@deriving eq, sexp, compare]
+
+    let length_in_triples, fold = (length_in_triples, fold)
+  end
 end
 
-module Make32 () = Make (struct
-  type t = Core_kernel.Int32.t [@@deriving bin_io, eq, sexp, compare]
+module Input_32 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        open Core_kernel
 
-  let to_string = Int32.to_string
+        type t = int32
+        [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
+      end
 
-  let of_string = Int32.of_string
+      include T
+    end
+  end
 
-  let logand = Int32.logand
+  module Impl = struct
+    let to_string = Int32.to_string
 
-  let one = Int32.one
+    let of_string = Int32.of_string
 
-  let zero = Int32.zero
+    let logand = Int32.logand
 
-  let shift_right_logical = Int32.shift_right_logical
+    let one = Int32.one
 
-  let length_in_bits = 32
-end)
+    let zero = Int32.zero
 
-module Make64 () = Make (struct
-  type t = Core_kernel.Int64.t [@@deriving bin_io, eq, sexp, compare]
+    let shift_right_logical = Int32.shift_right_logical
 
-  let to_string = Int64.to_string
+    let length_in_bits = 32
+  end
+end
 
-  let of_string = Int64.of_string
+module Make32 () = struct
+  module Stable = struct
+    module V1 = Make (Input_32.Stable.V1) (Input_32.Impl)
+  end
+end
 
-  let logand = Int64.logand
+module Inputs_64 = struct
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        open Core_kernel
 
-  let one = Int64.one
+        type t = int64
+        [@@deriving bin_io, eq, sexp, to_yojson, compare, version]
+      end
 
-  let zero = Int64.zero
+      include T
+    end
+  end
 
-  let shift_right_logical = Int64.shift_right_logical
+  module Impl = struct
+    let to_string = Int64.to_string
 
-  let length_in_bits = 64
-end)
+    let of_string = Int64.of_string
+
+    let logand = Int64.logand
+
+    let one = Int64.one
+
+    let shift_right_logical = Int64.shift_right_logical
+
+    let length_in_bits = 64
+  end
+end
+
+module Make64 () = struct
+  module Stable = struct
+    module V1 = Make (Inputs_64.Stable.V1) (Inputs_64.Impl)
+  end
+end

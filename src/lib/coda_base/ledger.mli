@@ -58,16 +58,15 @@ include
    and type attached_mask = Mask.Attached.t
    and type unattached_mask = Mask.t
 
+(* We override the type of unregister_mask_exn that comes from
+   Merkle_mask.Maskable_merkle_tree_intf.S because at this level callers aren't
+   doing reparenting and shouldn't be able to turn off the check parameter.
+*)
+val unregister_mask_exn : Mask.Attached.t -> Mask.Attached.t -> Mask.t
+
 (* The maskable ledger is t = Mask.Attached.t because register/unregister
  * work off of this type *)
 type maskable_ledger = t
-
-(* TODO: Actually implement serializable properly #1206 *)
-include
-  Protocols.Coda_pow.Mask_serializable_intf
-  with type serializable = int
-   and type t := t
-   and type unattached_mask := unattached_mask
 
 val with_ledger : f:(t -> 'a) -> 'a
 
@@ -79,48 +78,59 @@ val create_ephemeral : unit -> t
 
 val of_database : Db.t -> t
 
-val copy : t -> t
 (** This is not _really_ copy, merely a stop-gap until we remove usages of copy in our codebase. What this actually does is creates a new empty mask on top of the current ledger *)
+val copy : t -> t
 
 val register_mask : t -> Mask.t -> Mask.Attached.t
 
 val commit : Mask.Attached.t -> unit
 
 module Undo : sig
-  module User_command : sig
+  open Transaction_logic
+
+  module User_command_undo : sig
     module Common : sig
-      type t =
+      type t = Undo.User_command_undo.Common.t =
         { user_command: User_command.t
         ; previous_receipt_chain_hash: Receipt.Chain_hash.t }
+      [@@deriving sexp]
     end
 
     module Body : sig
-      type t =
+      type t = Undo.User_command_undo.Body.t =
         | Payment of {previous_empty_accounts: Public_key.Compressed.t list}
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+      [@@deriving sexp]
     end
 
-    type t = {common: Common.t; body: Body.t} [@@deriving sexp, bin_io]
+    type t = Undo.User_command_undo.t = {common: Common.t; body: Body.t}
+    [@@deriving sexp]
   end
 
-  type fee_transfer =
-    { fee_transfer: Fee_transfer.t
-    ; previous_empty_accounts: Public_key.Compressed.t list }
-  [@@deriving sexp, bin_io]
+  module Fee_transfer_undo : sig
+    type t = Undo.Fee_transfer_undo.t =
+      { fee_transfer: Fee_transfer.t
+      ; previous_empty_accounts: Public_key.Compressed.t list }
+    [@@deriving sexp]
+  end
 
-  type coinbase =
-    { coinbase: Coinbase.t
-    ; previous_empty_accounts: Public_key.Compressed.t list }
-  [@@deriving sexp, bin_io]
+  module Coinbase_undo : sig
+    type t = Undo.Coinbase_undo.t =
+      { coinbase: Coinbase.t
+      ; previous_empty_accounts: Public_key.Compressed.t list }
+    [@@deriving sexp]
+  end
 
-  type varying =
-    | User_command of User_command.t
-    | Fee_transfer of fee_transfer
-    | Coinbase of coinbase
-  [@@deriving sexp, bin_io]
+  module Varying : sig
+    type t = Undo.Varying.t =
+      | User_command of User_command_undo.t
+      | Fee_transfer of Fee_transfer_undo.t
+      | Coinbase of Coinbase_undo.t
+    [@@deriving sexp]
+  end
 
-  type t = {previous_hash: Ledger_hash.t; varying: varying}
-  [@@deriving sexp, bin_io]
+  type t = Undo.t = {previous_hash: Ledger_hash.t; varying: Varying.t}
+  [@@deriving sexp]
 
   val transaction : t -> Transaction.t Or_error.t
 end
@@ -128,7 +138,9 @@ end
 val create_new_account_exn : t -> Public_key.Compressed.t -> Account.t -> unit
 
 val apply_user_command :
-  t -> User_command.With_valid_signature.t -> Undo.User_command.t Or_error.t
+     t
+  -> User_command.With_valid_signature.t
+  -> Undo.User_command_undo.t Or_error.t
 
 val apply_transaction : t -> Transaction.t -> Undo.t Or_error.t
 
@@ -140,3 +152,19 @@ val merkle_root_after_user_command_exn :
 val create_empty : t -> Public_key.Compressed.t -> Path.t * Account.t
 
 val num_accounts : t -> int
+
+(** Generate an initial ledger state. There can't be a regular Quickcheck
+    generator for this type because you need to detach a mask from it's parent
+    when you're done with it - the GC doesn't take care of that. *)
+val gen_initial_ledger_state :
+  (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
+  array
+  Quickcheck.Generator.t
+
+type init_state =
+  (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
+  array
+[@@deriving sexp_of]
+
+(** Apply a generated state to a blank, concrete ledger. *)
+val apply_initial_ledger_state : t -> init_state -> unit

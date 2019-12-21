@@ -1,6 +1,5 @@
 open Core_kernel
 open Snark_params
-open Fold_lib
 open Signature_lib
 
 module Scalar = struct
@@ -35,7 +34,7 @@ module Message = struct
 
   let of_hlist :
       (unit, 'state_hash -> unit) Coda_base.H_list.t -> 'state_hash t =
-   fun Coda_base.H_list.([state_hash]) -> {state_hash}
+   fun Coda_base.H_list.[state_hash] -> {state_hash}
 
   let data_spec = Tick.Data_spec.[Coda_base.State_hash.typ]
 
@@ -43,7 +42,8 @@ module Message = struct
     Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let fold {state_hash} = Coda_base.State_hash.fold state_hash
+  let fold {state_hash} =
+    Fold_lib.Fold.group3 ~default:false (Coda_base.State_hash.fold state_hash)
 
   let gen =
     let open Quickcheck.Let_syntax in
@@ -52,55 +52,44 @@ module Message = struct
 
   let hash_to_group msg =
     let msg_hash_state =
-      Snark_params.Tick.Pedersen.hash_fold Coda_base.Hash_prefix.vrf_message
+      Snark_params.Tick.Pedersen.hash_fold
+        (Snark_params.Tick.Pedersen.State.create ())
         (fold msg)
     in
     msg_hash_state.acc
 
   module Checked = struct
     let var_to_triples {state_hash} =
-      Coda_base.State_hash.var_to_triples state_hash
+      let open Snark_params.Tick in
+      let%map bits = Coda_base.State_hash.var_to_bits state_hash in
+      Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bits
 
     let hash_to_group msg =
       let open Snark_params.Tick in
       let%bind msg_triples = var_to_triples msg in
-      Pedersen.Checked.hash_triples ~init:Coda_base.Hash_prefix.vrf_message
+      Pedersen.Checked.hash_triples
+        ~init:(Snark_params.Tick.Pedersen.State.create ())
         msg_triples
   end
 end
 
 module Output_hash = struct
-  type value = Random_oracle.Digest.t [@@deriving eq, sexp]
+  type value = Snark_params.Tick.Field.t [@@deriving eq, sexp]
 
-  type var = Random_oracle.Digest.Checked.t
+  type var = Random_oracle.Checked.Digest.t
 
-  let typ : (var, value) Snark_params.Tick.Typ.t = Random_oracle.Digest.typ
+  let typ : (var, value) Snark_params.Tick.Typ.t = Snark_params.Tick.Field.typ
 
-  let hash msg g =
-    let open Fold in
-    let compressed_g =
-      Non_zero_curve_point.(g |> of_inner_curve_exn |> compress)
-    in
-    let digest =
-      Snark_params.Tick.Pedersen.digest_fold Coda_base.Hash_prefix.vrf_output
-        (Message.fold msg +> Non_zero_curve_point.Compressed.fold compressed_g)
-    in
-    Random_oracle.digest_field digest
+  let hash ({Message.state_hash} : Message.value) g =
+    let x, y = Snark_params.Tick.Inner_curve.to_affine_exn g in
+    Random_oracle.hash [|(state_hash :> Snark_params.Tick.Field.t); x; y|]
 
   module Checked = struct
-    let hash msg g =
-      let open Snark_params.Tick.Checked in
-      let%bind msg_triples = Message.Checked.var_to_triples msg in
-      let%bind g_triples =
-        Non_zero_curve_point.(compress_var g >>= Compressed.var_to_triples)
-      in
-      let%bind pedersen_digest =
-        Snark_params.Tick.Pedersen.Checked.digest_triples
-          ~init:Coda_base.Hash_prefix.vrf_output (msg_triples @ g_triples)
-        >>= Snark_params.Tick.Pedersen.Checked.Digest.choose_preimage
-      in
-      Random_oracle.Checked.digest_bits
-        (pedersen_digest :> Snark_params.Tick.Boolean.var list)
+    let hash ({state_hash} : Message.var) g =
+      Snark_params.Tick.make_checked (fun () ->
+          let x, y = g in
+          Random_oracle.Checked.hash
+            [|Coda_base.State_hash.var_to_hash_packed state_hash; x; y|] )
   end
 end
 
@@ -124,3 +113,27 @@ let%test_unit "eval unchecked vs. checked equality" =
            let%bind (module Shifted) = Group.Checked.Shifted.create () in
            Vrf.Checked.eval (module Shifted) ~private_key msg )
          (fun (private_key, msg) -> Vrf.eval ~private_key msg))
+
+let%bench_module "vrf bench module" =
+  ( module struct
+    let gen =
+      let open Quickcheck.Let_syntax in
+      let%map pk = Private_key.gen and msg = Message.gen in
+      (pk, msg)
+
+    let%bench_fun "vrf eval unchecked" =
+      let private_key, msg = Quickcheck.random_value gen in
+      fun () -> Vrf.eval ~private_key msg
+
+    let%bench_fun "vrf eval checked" =
+      let private_key, msg = Quickcheck.random_value gen in
+      fun () ->
+        Tick.Test.checked_to_unchecked
+          Tick.Typ.(Scalar.typ * Message.typ)
+          Output_hash.typ
+          (fun (private_key, msg) ->
+            let open Tick.Checked in
+            let%bind (module Shifted) = Group.Checked.Shifted.create () in
+            Vrf.Checked.eval (module Shifted) ~private_key msg )
+          (private_key, msg)
+  end )

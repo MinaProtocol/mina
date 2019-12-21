@@ -34,7 +34,7 @@ module Type_equality = struct
     val f : a -> unit
     val g : b -> unit
   end
-  
+
   module Inline (X : X.S) : S with type a = X.a and type b = X.b
   (* return signature becomes:
    * sig
@@ -44,7 +44,7 @@ module Type_equality = struct
    *   val g : b -> unit
    * end
    *)
-   
+
   module Replace (X : X.S) : S with type x := X.a and type b := X.b
   (* return signature becomes:
    * sig
@@ -59,7 +59,7 @@ module Module_equality = struct
     module X : X.S
     val f : X.t -> unit
   end
-  
+
   module Inline (X : X.S) : S with module X = X
   (* return signature becomes:
    * sig
@@ -68,7 +68,7 @@ module Module_equality = struct
    *   val g : X.b -> unit
    * end
    *)
-  
+
   module Replace (X : X.S) : S with module X := X
   (* return signature becomes:
    * sig

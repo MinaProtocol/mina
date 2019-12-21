@@ -13,48 +13,73 @@ module Ledger_inner = struct
 
   module Location_at_depth = Location0
 
-  module Kvdb : Intf.Key_value_database = Rocksdb.Database
+  module Kvdb : Intf.Key_value_database with type config := string =
+    Rocksdb.Database
 
   module Storage_locations : Intf.Storage_locations = struct
-    let stack_db_file = "coda_stack_db"
-
     let key_value_db_dir = "coda_key_value_db"
   end
 
   module Hash = struct
-    module T = struct
-      type t = Ledger_hash.t [@@deriving bin_io, sexp, compare, hash, eq]
-    end
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Ledger_hash.Stable.V1.t
+        [@@deriving sexp, compare, hash, eq, yojson]
 
-    include T
-    include Hashable.Make_binable (T)
+        let to_latest = Fn.id
 
-    let merge = Ledger_hash.merge
+        (* TODO: move T outside V1 when %%versioned ppx allows it *)
+        module T = struct
+          type typ = t [@@deriving sexp, compare, hash, bin_io]
 
-    let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+          type t = typ [@@deriving sexp, compare, hash, bin_io]
+        end
 
-    let empty_account = hash_account Account.empty
+        include Hashable.Make_binable (T) [@@deriving
+                                            sexp, compare, hash, eq, yojson]
+
+        let to_string = Ledger_hash.to_string
+
+        let merge = Ledger_hash.merge
+
+        let hash_account = Fn.compose Ledger_hash.of_digest Account.digest
+
+        let empty_account = hash_account Account.empty
+      end
+    end]
+
+    type t = Stable.Latest.t
   end
 
   module Account = struct
-    type t = Account.Stable.V1.t [@@deriving bin_io, eq, compare, sexp]
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Account.Stable.V1.t [@@deriving eq, compare, sexp]
 
-    let empty = Account.empty
+        let to_latest = Fn.id
 
-    let public_key = Account.public_key
+        let public_key = Account.public_key
 
-    let balance = Account.balance
+        let balance Account.Poly.{balance; _} = balance
+
+        let empty = Account.empty
+      end
+    end]
+
+    type t = Stable.Latest.t
+
+    let empty = Stable.Latest.empty
 
     let initialize = Account.initialize
-
-    let balance = Account.balance
   end
 
   module Inputs = struct
     module Key = Public_key.Compressed
     module Balance = Currency.Balance
-    module Account = Account
-    module Hash = Hash
+    module Account = Account.Stable.Latest
+    module Hash = Hash.Stable.Latest
     module Depth = Depth
     module Kvdb = Kvdb
     module Location = Location_at_depth
@@ -114,6 +139,8 @@ module Ledger_inner = struct
     include Inputs
     module Base = Any_ledger.M
     module Mask = Mask
+
+    let mask_to_base m = Any_ledger.cast (module Mask.Attached) m
   end)
 
   include Mask.Attached
@@ -152,13 +179,15 @@ module Ledger_inner = struct
     let base_ledger, masked_ledger = create_ephemeral_with_base () in
     try
       let result = f masked_ledger in
-      let _ : Mask.t =
-        Maskable.unregister_mask_exn base_ledger masked_ledger
+      let (_ : Mask.t) =
+        Maskable.unregister_mask_exn ~grandchildren:`Recursive base_ledger
+          masked_ledger
       in
       result
     with exn ->
-      let _ : Mask.t =
-        Maskable.unregister_mask_exn base_ledger masked_ledger
+      let (_ : Mask.t) =
+        Maskable.unregister_mask_exn ~grandchildren:`Recursive base_ledger
+          masked_ledger
       in
       raise exn
 
@@ -168,15 +197,8 @@ module Ledger_inner = struct
 
   let unregister_mask_exn t mask = Maskable.unregister_mask_exn (packed t) mask
 
-  let remove_and_reparent_exn t t_as_mask ~children =
-    Maskable.remove_and_reparent_exn (packed t) t_as_mask ~children
-
-  (* TODO: Implement the serialization/deserialization *)
-  let unattached_mask_of_serializable _ = failwith "unimplmented"
-
-  let serializable_of_t _ = failwith "unimplented"
-
-  type serializable = int [@@deriving bin_io]
+  let remove_and_reparent_exn t t_as_mask =
+    Maskable.remove_and_reparent_exn (packed t) t_as_mask
 
   type unattached_mask = Mask.t
 
@@ -202,20 +224,96 @@ module Ledger_inner = struct
   let get_or_create ledger key =
     let key, loc =
       match get_or_create_account_exn ledger key (Account.initialize key) with
-      | `Existed, loc -> ([], loc)
-      | `Added, loc -> ([key], loc)
+      | `Existed, loc ->
+          ([], loc)
+      | `Added, loc ->
+          ([key], loc)
     in
     (key, Option.value_exn (get ledger loc), loc)
 
   let create_empty ledger key =
     let start_hash = merkle_root ledger in
     match get_or_create_account_exn ledger key Account.empty with
-    | `Existed, _ -> failwith "create_empty for a key already present"
+    | `Existed, _ ->
+        failwith "create_empty for a key already present"
     | `Added, new_loc ->
         Debug_assert.debug_assert (fun () ->
             [%test_eq: Ledger_hash.t] start_hash (merkle_root ledger) ) ;
         (merkle_path ledger new_loc, Account.empty)
+
+  let _handler t =
+    let open Snark_params.Tick in
+    let path_exn idx =
+      List.map (merkle_path_at_index_exn t idx) ~f:(function
+        | `Left h ->
+            h
+        | `Right h ->
+            h )
+    in
+    stage (fun (With {request; respond}) ->
+        match request with
+        | Ledger_hash.Get_element idx ->
+            let elt = get_at_index_exn t idx in
+            let path = (path_exn idx :> Pedersen.Digest.t list) in
+            respond (Provide (elt, path))
+        | Ledger_hash.Get_path idx ->
+            let path = (path_exn idx :> Pedersen.Digest.t list) in
+            respond (Provide path)
+        | Ledger_hash.Set (idx, account) ->
+            set_at_index_exn t idx account ;
+            respond (Provide ())
+        | Ledger_hash.Find_index pk ->
+            let index = index_of_key_exn t pk in
+            respond (Provide index)
+        | _ ->
+            unhandled )
 end
 
 include Ledger_inner
 include Transaction_logic.Make (Ledger_inner)
+
+let gen_initial_ledger_state :
+    (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
+    array
+    Quickcheck.Generator.t =
+  let open Quickcheck.Generator.Let_syntax in
+  let%bind n_accounts = Int.gen_incl 2 10 in
+  let%bind keypairs = Quickcheck_lib.replicate_gen Keypair.gen n_accounts in
+  let%bind balances =
+    Quickcheck_lib.replicate_gen
+      Currency.Amount.(gen_incl (of_int 500_000_000) (of_int 1_000_000_000))
+      n_accounts
+  in
+  let%bind nonces =
+    Quickcheck_lib.replicate_gen
+      ( Quickcheck.Generator.map ~f:Coda_numbers.Account_nonce.of_int
+      @@ Int.gen_incl 0 1000 )
+      n_accounts
+  in
+  let rec zip3_exn a b c =
+    match (a, b, c) with
+    | [], [], [] ->
+        []
+    | x :: xs, y :: ys, z :: zs ->
+        (x, y, z) :: zip3_exn xs ys zs
+    | _ ->
+        failwith "zip3 unequal lengths"
+  in
+  return @@ Array.of_list @@ zip3_exn keypairs balances nonces
+
+type init_state =
+  (Signature_lib.Keypair.t * Currency.Amount.t * Coda_numbers.Account_nonce.t)
+  array
+[@@deriving sexp_of]
+
+let apply_initial_ledger_state : t -> init_state -> unit =
+ fun t accounts ->
+  Array.iter accounts ~f:(fun (kp, balance, nonce) ->
+      let pk_compressed = Public_key.compress kp.public_key in
+      let account = Account.initialize pk_compressed in
+      let account' =
+        { account with
+          balance= Currency.Balance.of_int (Currency.Amount.to_int balance)
+        ; nonce }
+      in
+      create_new_account_exn t pk_compressed account' )

@@ -1,6 +1,6 @@
 (* registration.ml -- register module versions *)
 
-(* see RFC 0014 for design discussion; see tests below for usage
+(* see RFC 0015 for design discussion; see tests below for usage
  *)
 
 open Core_kernel
@@ -26,9 +26,7 @@ module type Versioned_module_intf = sig
 end
 
 module type Version_intf = sig
-  type t [@@deriving bin_io]
-
-  val version : int
+  type t [@@deriving bin_io, version {numbered}]
 end
 
 (* functor to create a registrar that can
@@ -86,7 +84,7 @@ module Make (Module_decl : Module_decl_intf) = struct
       registered := (module Versioned_module) :: !registered
 
     module With_version = struct
-      type nonrec t = {version: int; t: Versioned_module.t} [@@deriving bin_io]
+      type t = {version: int; t: Versioned_module.t} [@@deriving bin_io]
 
       let create t = {version; t}
     end
@@ -96,7 +94,7 @@ end
 (* functor to generate With_version and bin_io boilerplate *)
 module Make_version (Version : Version_intf) = struct
   module With_version = struct
-    type nonrec t = {version: int; t: Version.t} [@@deriving bin_io]
+    type t = {version: int; t: Version.t} [@@deriving bin_io]
 
     let create t = {version= Version.version; t}
   end
@@ -108,19 +106,25 @@ module Make_version (Version : Version_intf) = struct
 
      deserializing gives back just t, without the version
 
-     that allows use of a type from a versioned module in data structures 
+     that allows use of a type from a versioned module in data structures
        that themselves derive bin_io
    *)
 
   let bin_read_t buf ~pos_ref =
-    let With_version.({version= read_version; t}) =
+    let With_version.{version= read_version; t} =
       With_version.bin_read_t buf ~pos_ref
     in
     (* sanity check *)
     assert (Int.equal read_version Version.version) ;
     t
 
-  let __bin_read_t__ = With_version.__bin_read_t__
+  let __bin_read_t__ buf ~pos_ref i =
+    let With_version.{version= read_version; t} =
+      With_version.__bin_read_t__ buf ~pos_ref i
+    in
+    (* sanity check *)
+    assert (Int.equal read_version Version.version) ;
+    t
 
   let bin_reader_t =
     Bin_prot.Type_class.{read= bin_read_t; vtag_read= __bin_read_t__}
@@ -155,10 +159,8 @@ let%test_module "Test versioned modules" =
 
       module V2 = struct
         module T = struct
-          let version = 2
-
           (* string, int swapped in tuple from V1's t *)
-          type t = string * int [@@deriving bin_io]
+          type t = string * int [@@deriving bin_io, version]
         end
 
         include T
@@ -169,9 +171,7 @@ let%test_module "Test versioned modules" =
 
       module V1 = struct
         module T = struct
-          let version = 1
-
-          type t = int * string [@@deriving bin_io]
+          type t = int * string [@@deriving bin_io, version]
         end
 
         include T
@@ -206,8 +206,10 @@ let%test_module "Test versioned modules" =
       let buf = Bin_prot.Common.create_buf sz in
       ignore (Latest.bin_write_t buf ~pos:0 t) ;
       match Registrar.deserialize_binary_opt buf with
-      | None -> false
-      | Some (s', n') -> String.equal s s' && Int.equal n n'
+      | None ->
+          false
+      | Some (s', n') ->
+          String.equal s s' && Int.equal n n'
 
     let%test "serialize with older version, deserialize to latest version" =
       let ((n, s) as t) = (42, "hello, world") in
@@ -217,8 +219,10 @@ let%test_module "Test versioned modules" =
       ignore (V1.bin_write_t buf ~pos:0 t) ;
       (* but deserialized to Latest.t *)
       match Registrar.deserialize_binary_opt buf with
-      | None -> false
-      | Some (s', n') -> String.equal s s' && Int.equal n n'
+      | None ->
+          false
+      | Some (s', n') ->
+          String.equal s s' && Int.equal n n'
 
     module Client = struct
       type t = {number: int; some: Latest.t} [@@deriving bin_io]

@@ -1,2 +1,7 @@
-_build
-src/_build
+*
+!src/opam.export
+!coda.deb
+!src/external/**/*
+!src/app/kademlia-haskell
+!src/app/libp2p_helper
+!src/app/trace-tool

@@ -5,6 +5,11 @@ When starting a daemon with `-tracing` or using `coda client start-tracing`,
 it will write `*.trace` files into its config directory. They can grow
 quite fast, but for the most part they grow no faster than 5MB/minute.
 
+Most of the integration tests (including full-test) support a `CODA_TRACING`
+environment variable that specifies the directory the integration tests
+will put their trace files in. If you leave it empty, no tracing will
+occur.
+
 Once you have a `.trace` file, it needs to be turned into JSON for the
 Chrome trace-viewer to view. You can do this with `src/app/trace-tool`.
 Using it is simple if you have Rust installed: `cd src/app/trace-tool; cargo run --release /path/to/1234.trace > trace.json`.

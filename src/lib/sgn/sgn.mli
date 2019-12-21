@@ -1,8 +1,17 @@
 open Core_kernel
 open Snark_params.Tick
+module Functor = Functor
 
-type t = Sgn_type.Sgn.t = Pos | Neg
-[@@deriving sexp, bin_io, hash, compare, eq, to_yojson]
+[%%versioned:
+module Stable : sig
+  module V1 : sig
+    type t = Sgn_type.Sgn.Stable.V1.t = Pos | Neg
+    [@@deriving sexp, hash, compare, eq, yojson]
+  end
+end]
+
+type t = Stable.Latest.t = Pos | Neg
+[@@deriving sexp, hash, compare, eq, yojson]
 
 val to_field : t -> Field.t
 

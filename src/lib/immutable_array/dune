@@ -1,6 +1,6 @@
 (library
  (name immutable_array)
  (public_name immutable_array)
- (flags :standard -short-paths -warn-error -58)
+ (preprocess (pps ppx_coda))
  (library_flags -linkall)
  (synopsis "Access only array utility"))

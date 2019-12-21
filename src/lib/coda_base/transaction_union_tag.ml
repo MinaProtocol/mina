@@ -1,6 +1,4 @@
 open Core_kernel
-open Fold_lib
-open Tuple_lib
 open Snark_params.Tick
 
 type t = Payment | Stake_delegation | Fee_transfer | Coinbase
@@ -13,32 +11,32 @@ let gen =
 type var = Boolean.var * Boolean.var
 
 let to_bits = function
-  | Payment -> (false, false)
-  | Stake_delegation -> (true, false)
-  | Fee_transfer -> (false, true)
-  | Coinbase -> (true, true)
+  | Payment ->
+      (false, false)
+  | Stake_delegation ->
+      (true, false)
+  | Fee_transfer ->
+      (false, true)
+  | Coinbase ->
+      (true, true)
 
 let of_bits = function
-  | false, false -> Payment
-  | true, false -> Stake_delegation
-  | false, true -> Fee_transfer
-  | true, true -> Coinbase
+  | false, false ->
+      Payment
+  | true, false ->
+      Stake_delegation
+  | false, true ->
+      Fee_transfer
+  | true, true ->
+      Coinbase
 
 let%test_unit "to_bool of_bool inv" =
   let open Quickcheck in
-  test (Generator.tuple2 Bool.gen Bool.gen) ~f:(fun b ->
-      assert (b = to_bits (of_bits b)) )
+  test (Generator.tuple2 Bool.quickcheck_generator Bool.quickcheck_generator)
+    ~f:(fun b -> assert (b = to_bits (of_bits b)))
 
 let typ =
   Typ.transport Typ.(Boolean.typ * Boolean.typ) ~there:to_bits ~back:of_bits
-
-let fold (t : t) : bool Triple.t Fold.t =
-  { fold=
-      (fun ~init ~f ->
-        let b0, b1 = to_bits t in
-        f init (b0, b1, false) ) }
-
-let length_in_triples = 1
 
 module Checked = struct
   open Let_syntax
@@ -46,8 +44,6 @@ module Checked = struct
   let constant t =
     let x, y = to_bits t in
     Boolean.(var_of_value x, var_of_value y)
-
-  let to_triples ((x, y) : var) = [(x, y, Boolean.false_)]
 
   (* someday: Make these all cached *)
 

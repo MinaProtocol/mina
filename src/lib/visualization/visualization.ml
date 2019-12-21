@@ -12,23 +12,29 @@ let display_short_sexp (type t) (module M : Sexpable.S with type t = t)
 (* converts a json structure into a presentable node in a dot file *)
 let rec to_dot (json : Yojson.Safe.json) =
   match json with
-  | `Int value -> Int.to_string value
-  | `String value | `Intlit value -> value
+  | `Int value ->
+      Int.to_string value
+  | `String value | `Intlit value ->
+      value
   | `Assoc values ->
       List.map values ~f:(fun (key, value) ->
           match value with
           | `Assoc subvalues ->
               sprintf !"{%s|{%s}}" key @@ to_dot (`Assoc subvalues)
-          | subvalue -> sprintf !"%s:%s" key (to_dot subvalue) )
+          | subvalue ->
+              sprintf !"%s:%s" key (to_dot subvalue) )
       |> String.concat ~sep:"|"
   | `List values | `Tuple values ->
       List.map values ~f:(fun value -> to_dot value) |> String.concat ~sep:"|"
-  | `Float value -> Float.to_string value
-  | `Bool value -> Bool.to_string value
+  | `Float value ->
+      Float.to_string value
+  | `Bool value ->
+      Bool.to_string value
   | `Variant (key, value) ->
       Option.value_map value ~default:key ~f:(fun some_value ->
           sprintf !"%s:%s" key (to_dot some_value) )
-  | `Null -> "null"
+  | `Null ->
+      "null"
 
 module type Node_intf = sig
   type t

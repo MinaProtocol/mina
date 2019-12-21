@@ -29,6 +29,6 @@ struct
     let _, y = p in
     let twist_squared = Fqe.Unchecked.square Params.twist in
     { p
-    ; py_twist_squared= Fqe.map_ twist_squared ~f:(fun c -> Field.Var.scale y c)
-    }
+    ; py_twist_squared=
+        Fqe.map_ twist_squared ~f:(fun c -> Field.Var.scale y c) }
 end

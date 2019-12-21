@@ -4,157 +4,497 @@ version: 3
 jobs:
     tracetool:
         docker:
-            - image: codaprotocol/coda:toolchain-rust-b2e9fa0d25f2f9b7c7f01d6f8727e2c6c7690712
+            - image: codaprotocol/coda:toolchain-rust-e855336d087a679f76f2dd2bbdc3fdfea9303be3
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
             - run:
                   name: Build trace-tool
                   command: cd src/app/trace-tool && cargo build --frozen
 
     build-wallet:
         macos:
-            xcode: "10.1.0"
+            xcode: "10.2.0"
         steps:
             - checkout
-            - run: cd frontend/wallet && npm install
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run: cd frontend/wallet && yarn
             - run:
                   name: Lint wallet
-                  command: cd frontend/wallet && npm run reformat && git diff --exit-code src
+                  command: cd frontend/wallet && yarn run reformat && git diff --exit-code src
             - run:
                   name: Build wallet
-                  command: cd frontend/wallet && npm run build
+                  command: cd frontend/wallet && yarn run build-ci
+            - run:
+                  name: Test wallet
+                  command: cd frontend/wallet && yarn test
+            - run:
+                  name: Build dist wallet
+                  command: cd frontend/wallet && yarn run dist
+            - run:
+                  name: Publish dist wallet
+                  command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
+            - run: cd frontend/website && yarn install
+            - run:
+                  name: Decrypt PragmataPro font
+                  command: cd frontend/website && yarn run decrypt-ci
+            - run:
+                  name: Lint website
+                  command: cd frontend/website && yarn run reformat && git diff --exit-code src
+            - run:
+                  name: Build website
+                  command: cd frontend/website && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && pip install mkdocs && yarn run build
+            - run:
+                  name: Deploy staging
+                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "develop" ]; then yarn run deploy-ci; fi)
+            - run: cd frontend/bot && yarn
+            - run:
+                  name: Lint bot
+                  command: cd frontend/bot && yarn run reformat && git diff --exit-code src
+            - run:
+                  name: Build bot
+                  command: cd frontend/bot && yarn run build-ci
 
-    lint:
+    build-archive:
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+              environment:
+                CODA_DOCKER: true
+                HASURA_PORT: 8080
+            - image: postgres:12
+              environment:
+                POSTGRES_PASSWORD: codarules
+                POSTGRES_USER: admin
+                POSTGRES_DB: archiver
+            - image: hasura/graphql-engine:v1.0.0-beta.6
+              entrypoint: ["sh", "-c"]
+              command: ["sleep 10 && graphql-engine serve"]
+              environment:
+                HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
+                HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+                HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Build Archive Process
+                  command:  bash -c 'eval `opam config env` && make build_archive'
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
+            # NOTE: If we were using a machine executor we would be able to mount the sql file in 
+            # as a volume for the container to seed itself, this is the workaround.
+            # Ideally this DB setup step would be handled by the archive process itself. 
+            - run:
+                  name: Set Up Database
+                  command: | 
+                    sudo apt-get install -y postgresql 
+                    PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
+            - run:
+                  name: Configure Hasura
+                  command: ./scripts/archive/make_hasura_configurations.sh
+            - setup_remote_docker
+            - run: 
+                  name: Build and Release Archives
+                  command: ./scripts/archive/build-release-archives.sh
+    lint:
+        docker:
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+        steps:
+            - checkout
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Check circle CI configuration rendering
+                  command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
                   command: eval `opam config env` && make check-format
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
                   command: make check-snarky-submodule
+            - run:
+                  name: Check ppx_optcomp preprocessor_deps
+                  command: ./scripts/lint_preprocessor_deps.sh
+            - run:
+                  name: Check CODEOWNERS file format
+                  command: ./scripts/lint_codeowners.sh
+            - run:
+                  name: Require ppx_coda preprocessing for linting
+                  command: ./scripts/require-ppx-coda.py
+    lint-opt:
+        docker:
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+        steps:
+            - checkout
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Compare versioned types in PR
+                  command: ./scripts/compare_pr_diff_types.sh
+    update-branch-protection:
+        docker:
+            - image: python:3
+        steps:
+            - run:
+                name: Install dependencies
+                command: pip install --user requests jinja2
+            - checkout
+            - run:
+                  name: Update branch protection rule from test configuration
+                  command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
+
+    build-auxiliary:
+        docker:
+            - image: nixos/nix
+        steps:
+            - checkout
+            - run:
+                name: Install tools
+                command: apk add patchelf dpkg tar
+            - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix | cachix push codaprotocol
+            - run:
+                name: Create package dir
+                command: mkdir -p package
+            - run:
+                name: Collect and strip binary
+                command: |
+                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
+                    chmod +w package/coda-libp2p_helper
+                    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 package/coda-libp2p_helper
+            - run:
+                name: Create deb
+                command: |
+                    mkdir -p package/deb/usr/local/sbin
+                    cp package/coda-libp2p_helper package/deb/usr/local/sbin/.
+                    mkdir -p package/deb/DEBIAN
+                    cp src/app/libp2p_helper/build/DEBIAN/control package/deb/DEBIAN/control
+                    DATE=$(date +%Y-%m-%d)
+                    sed -i "s/DATE/${DATE}/" package/deb/DEBIAN/control
+                    find src/app/libp2p_helper -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ' > /tmp/sha1sig
+                    HASH=$(cat /tmp/sha1sig)
+                    sed -i "s/HASH/${HASH}/" package/deb/DEBIAN/control
+                    echo "------------------------------------"
+                    cat package/deb/DEBIAN/control
+                    echo "------------------------------------"
+                    find package/deb/
+                    echo "------------------------------------"
+                    dpkg-deb -v --build package/deb/ package/coda-discovery-${HASH}.deb
+            - store_artifacts:
+                  path: package
 
     build-macos:
         macos:
-            xcode: "10.1.0"
+            xcode: "10.2.1"
+        resource_class: large
         working_directory: /Users/distiller/coda
         environment:
             HOMEBREW_LOGS: /Users/distiller/homebrew.log
             OPAMYES: 1
         steps:
             - run:
-                name: Make /nix paths
+                name: Delete xcode simulators (Free 10GB - unused)
                 command: |
-                    sudo mkdir /nix
-                    sudo chown distiller /nix
+                    sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
+                    df -h
             - checkout
+            - run:
+                  name: Update submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            ### homebrew
             - restore_cache:
-                  keys:
-                      - homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
-                      - homebrew-v1-
+                name: Restore cache - homebrew
+                keys:
+                    - homebrew-v6-{{'{{'}} checksum "scripts/macos-setup-brew.sh" {{'}}'}}
+                    - homebrew-v5-
+            - run:
+                name: Install macos dependencies - homebrew - make macos-setup-download
+                command: |
+                    ./scripts/skip_if_only_frontend.sh make macos-setup-download
+            - save_cache:
+                name: Save cache - homebrew
+                key: homebrew-v6-{{'{{'}} checksum "scripts/macos-setup-brew.sh" {{'}}'}}
+                paths:
+                    - "/usr/local/Homebrew"
+                    - "/Users/distiller/Library/Caches/Homebrew"
+            ### opam
+            - run:
+                name: Create opam cache signature file
+                command: |
+                    cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
+                    cat src/opam.export >> opam_ci_cache.sig
             - restore_cache:
-                  keys:
-                      - opam-v2-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-                      - opam-v2-
-            - run: git submodule sync && git submodule update --init --recursive
+                name: Restore cache - opam
+                keys:
+                    - opam-v6-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+                    - opam-v5-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                    - opam-v4-{{'{{'}} checksum "src/opam.export" {{'}}'}}
+                    - opam-v3-{{'{{'}} checksum "src/opam.export" {{'}}'}}
             - run:
-                  name: Download Deps -- make macos-setup-download
-                  command: make macos-setup-download
+                name: Ensure/Fix opam permisssions
+                command: |
+                    set +e
+                    sudo mkdir -p /Users/distiller/.opam
+                    sudo chown -R distiller /Users/distiller/.opam | true
+                    sudo chmod -R u+w /Users/distiller/.opam | true
             - run:
-                  name: Compile Deps -- make macos-setup-compile
-                  command: make macos-setup-compile
+                name: Install macos dependencies - opam -- make macos-setup-compile
+                command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
-                  key: homebrew-v1-{{'{{'}} checksum "scripts/macos-setup.sh" {{'}}'}}
-                  paths:
-                      - "/usr/local/Homebrew"
-                      - "/Users/distiller/Library/Caches/Homebrew"
-            - save_cache:
-                  key: opam-v2-{{'{{'}} checksum "src/opam.export" {{'}}'}}
-                  paths:
-                      - "/Users/distiller/.opam"
+                name: Save cache - opam
+                key: opam-v6-{{'{{'}} checksum "opam_ci_cache.sig" {{'}}'}}
+                paths:
+                    - "/Users/distiller/.opam"
+                no_output_timeout: 1h
+            ### nix/cachix
             - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log
+                name: Install nix and cachix
+                command: |
+                    curl https://nixos.org/nix/install | sh
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    nix-env -iA cachix -f https://cachix.org/api/v1/install
             - run:
-                  name: Record Constraint System Digests
-                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/constraint-system-digests.log
+                name: Build libp2p_helper using cachix
+                command: |
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    nix-build default.nix
+            ### dune
             - run:
-                  name: Run all tests (on master)
-                  command: echo "FIXME Tests not yet working on mac"
+                name: Build ocaml
+                environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
+                command: |
+                    bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                no_output_timeout: 20m
+            ### collection
+            - run:
+                name: Collect Keys and Binaries
+                command: |
+                    mkdir -p package/keys
+                    echo 'keys'
+                    cp /tmp/s3_cache_dir/* package/keys/.
+                    echo 'coda'
+                    cp _build/default/src/app/cli/src/coda.exe package/coda
+                    echo 'libp2p_helper'
+                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
+                    chmod +w package/coda-libp2p_helper
+                    ./scripts/librewrite-macos.sh package/coda-libp2p_helper
+                    echo 'coda-logproc'
+                    cp _build/default/src/app/logproc/logproc.exe package/coda-logproc
+                    chmod +wx package/coda-logproc
+            - run:
+                name: Build homebrew package
+                command: |
+                    tar czvf homebrew-coda.tar.gz package
+                    openssl dgst -sha256 homebrew-coda.tar.gz > homebrew-coda.tar.gz.sha256
+                    cp homebrew-coda.tar.gz* package/.
+            - run:
+                  name: Copy artifacts to cloud
+                  bsckground: true
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+            - store_artifacts:
+                  path: package
 
-    {%- for profile in build_profiles %}
-    build_{{profile}}:
-        resource_class: large
+    {%- for profile in build_artifact_profiles %}
+    build-artifacts--{{profile}}:
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
-        environment:
-            DUNE_PROFILE: {{profile}}
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
-            - run: mkdir -p /tmp/artifacts
-            - run: git submodule sync && git submodule update --init --recursive
             - run:
-                  name: Download Stable Proving Keys
-                  command: scripts/getkeys.sh
+                  name: Artifacts Path
+                  command: |
+                      mkdir -p /tmp/artifacts
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
+            - run:
+                  name: Install awscli
+                  command: sudo pip install awscli
             - run:
                   name: Build OCaml
-                  command: eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  environment:
+                    DUNE_PROFILE: {{profile}}
+                  no_output_timeout: 20m
             - run:
-                  name: Build deb Package with keys
-                  command: make deb
+                  name: Upload generated PV keys
+                  command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
             - run:
-                  name: Store Generated Proving and Verifying Keys
-                  command: make provingkeys
+                  name: Rebuild for pvkey changes
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                  environment:
+                    DUNE_PROFILE: {{profile}}
+                  no_output_timeout: 20m
             - run:
-                  name: Store Genesis Public/Private Keypairs
-                  command: make genesiskeys
+                  name: Build deb package with PV keys and PV key tar
+                  command: ./scripts/skip_if_only_frontend.sh make deb
+                  environment:
+                    DUNE_PROFILE: {{profile}}
+                  no_output_timeout: 20m
+            - run:
+                  name: Store genesis public/private keypairs
+                  command: ./scripts/skip_if_only_frontend.sh make genesiskeys
             - run:
                   name: Upload deb to repo
-                  command: make publish_deb
+                  command: ./scripts/skip_if_only_frontend.sh make publish_deb
+                  no_output_timeout: 20m
             - run:
-                  name: Record Constraint System Digests
-                  command: src/_build/default/app/cli/src/coda.exe client constraint-system-digests | tee /tmp/artifacts/constraint-system-digests.log
+                  name: Copy artifacts to cloud
+                  command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+            {%- if profile in medium_curve_profiles %}
+            - setup_remote_docker
+            - run:
+                  name: Build and Upload Docker
+                  command: |
+                    # Check if we should deploy this build
+                    FILE=/tmp/DOCKER_DEPLOY_ENV
+                    if test -f "$FILE"; then
+                        source $FILE
+                        echo "Publishing Docker"
+                        echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
+                        set -x
+                        if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
+
+                              echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+                              ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
+                              -s coda-daemon \
+                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                        fi
+                    fi
             - store_artifacts:
                   path: /tmp/artifacts
-            - run:
-                  name: Copy artifacts to Google Cloud
-                  command: scripts/artifacts.sh
+            {%- endif %}
     {%- endfor %}
 
-    test-unit-test:
-        resource_class: large
+    {%- for profile in unit_test_profiles %}
+    test-unit--{{profile}}:
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run: ulimit -c unlimited
             - run:
-                  name: Test make test-runtest
-                  command: source ~/.profile && DUNE_PROFILE=test_posig_snarkless MYPROCS=8 make test-runtest
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+          # Uncomment if you want to try debugging why this install breaks
+          # some unit tests:
+          # 1. The command_line_tests
+          # 2. Kademlia tests
+          #
+             #I'm sorry for the mess, but somehow this actually works
+             #Derived from: https://github.com/NixOS/nix/issues/971
+            #- run:
+                #name: Install nix and cachix
+                #command: |
+                     #Make a nix user
+                    #sudo addgroup --system nixbld && sudo adduser --home /home/nix --disabled-password --gecos "" --shell /bin/bash nix && sudo adduser nix nixbld && sudo mkdir -m 0755 /nix && sudo chown nix /nix && sudo mkdir -p /etc/nix && sudo bash -c 'echo "sandbox = false" > /etc/nix/nix.conf'
+                     #Install nix and cachix with that user
+                    #sudo -H -u nix bash -c 'cd /home/nix && touch ~/.bash_profile && (curl https://nixos.org/nix/install | sh) && cd /home/nix && . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install'
 
-    {%-for test in tests%}
-    test-{{test.name}}:
-        resource_class: large
+            #- run:
+                #name: Build libp2p_helper using cachix
+                #command: |
+                     #Make sure our nix user can write to libp2p_helper dir
+                    #chmod -R 777 src/app/libp2p_helper
+                     #Do the build
+                    #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
+            - run:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest src/lib --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 30m
+            - store_artifacts:
+                path: core_dumps
+    {%- endfor %}
+
+    {%- for profile in unit_test_profiles_medium_curves %}
+    test-unit--{{profile}}:
+        resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-0c5f0ad97e6a7a4c50ef6c47b75924a24fa6e05f
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
-            - run: git submodule sync && git submodule update --init --recursive
+            - run: ulimit -c unlimited
             - run:
-                  name: Check .circleci Render
-                  command: make check-render-circleci
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
-                  name: Build OCaml
-                  command: eval `opam config env` && DUNE_PROFILE={{test.config}} make build 2>&1 | tee /tmp/buildocaml.log
-            {%- for action in test.actions %}
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest src/lib --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 1h
+            - store_artifacts:
+                path: core_dumps
+    {%- endfor %}
+
+    {%- for profile in small_curves_tests.keys() | sort %}
+    test--{{profile}}:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+        steps:
+            - checkout
             - run:
-                  name: Running test - {{ test.friendly }} | {{ action }}
-                  command: source ~/.profile && export DUNE_PROFILE={{test.config}} && source scripts/test_all.sh && cd src/ && 'run_integration_test' '{{ action }}'
-            {% endfor %}
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            {%- for test in small_curves_tests[profile] %}
+            - run:
+                  name: Running test -- {{profile}}:{{test}}
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+            {%- endfor %}
+            - store_artifacts:
+                  path: test_logs
+    {%- endfor %}
+
+    {%- for profile in medium_curves_tests.keys() | sort %}
+    test--{{profile}}:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+        steps:
+            - checkout
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            {%- for test in medium_curves_tests[profile] %}
+            - run:
+                  name: Running test -- {{profile}}:{{test}}
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+                  {%- if profile in medium_curve_profiles %}
+                  no_output_timeout: 20m
+                  {%- endif %}
+            {%- endfor %}
+            - store_artifacts:
+                  path: test_logs
     {%- endfor %}
 
 workflows:
@@ -162,13 +502,39 @@ workflows:
     coda_parallel:
         jobs:
             - lint
-            - build-macos
-            {%- for profile in build_profiles %}
-            - build_{{profile}}
-            {%- endfor %}
-            {%- for test in tests %}
-            - test-{{test.name}}
-            {%- endfor %}
-            - test-unit-test
+            - lint-opt
+            - build-auxiliary
+            - update-branch-protection:
+                filters:
+                  branches:
+                    only: develop
             - tracetool
             - build-wallet
+            - build-archive
+            - build-macos
+            {%- for profile in build_artifact_profiles %}
+            - build-artifacts--{{profile}}
+            {%- endfor %}
+            {%- for profile in unit_test_profiles %}
+            - test-unit--{{profile}}
+            {%- endfor %}
+            {%- for profile in small_curves_tests.keys() | sort %}
+            - test--{{profile}}
+            {%- endfor %}
+
+    daily:
+        triggers:
+          - schedule:
+              cron: "0 12 * * *"
+              filters:
+                branches:
+                  only:
+                    - develop
+                    - /release\/.*/
+        jobs:
+          {%- for profile in unit_test_profiles_medium_curves %}
+          - test-unit--{{profile}}
+          {%- endfor %}
+          {%- for profile in medium_curves_tests.keys() | sort %}
+          - test--{{profile}}
+          {%- endfor %}

@@ -1,3 +1,13 @@
 open Core_kernel
 
-type t = Pos | Neg [@@deriving sexp, bin_io, hash, compare, eq, to_yojson]
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t = Pos | Neg [@@deriving sexp, hash, compare, eq, yojson]
+
+    let to_latest = Fn.id
+  end
+end]
+
+type t = Stable.Latest.t = Pos | Neg
+[@@deriving sexp, hash, compare, eq, yojson]

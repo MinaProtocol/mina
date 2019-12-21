@@ -29,8 +29,10 @@ module T = struct
             [ t.interruption_signal
             ; ( maybe_sig_d
               >>= function
-              | Ok (interruption_signal, _) -> interruption_signal
-              | Error e -> Deferred.return e ) ]
+              | Ok (interruption_signal, _) ->
+                  interruption_signal
+              | Error e ->
+                  Deferred.return e ) ]
         in
         let d' =
           Deferred.any
@@ -38,8 +40,10 @@ module T = struct
             ; ( maybe_sig_d
               >>= fun m ->
               match m with
-              | Ok (_, d) -> d
-              | Error e -> Deferred.return (Error e) ) ]
+              | Ok (_, d) ->
+                  d
+              | Error e ->
+                  Deferred.return (Error e) ) ]
         in
         {interruption_signal= interruption_signal'; d= d'}
     | Some (Ok a) ->
@@ -47,7 +51,8 @@ module T = struct
         { interruption_signal=
             Deferred.any [t'.interruption_signal; t.interruption_signal]
         ; d= t'.d }
-    | Some (Error e) -> {t with d= Deferred.return (Error e)}
+    | Some (Error e) ->
+        {t with d= Deferred.return (Error e)}
 
   let return a =
     {interruption_signal= Deferred.never (); d= Deferred.Result.return a}

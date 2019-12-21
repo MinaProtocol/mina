@@ -1,46 +1,81 @@
+[%%import
+"/src/config.mlh"]
+
 open Core
 open Module_version
-
-module Stable = struct
-  module V1 = struct
-    module T = struct
-      let version = 1
-
-      type t = Snark_params.Tock.Field.t * Snark_params.Tock.Field.t
-      [@@deriving sexp, eq, compare, hash, bin_io]
-    end
-
-    let to_base64 t = Binable.to_string (module T) t |> Base64.encode_string
-
-    let of_base64_exn s = Base64.decode_exn s |> Binable.of_string (module T)
-
-    include T
-    include Registration.Make_latest_version (T)
-
-    include Codable.Make_of_string (struct
-      type nonrec t = t
-
-      let to_string = to_base64
-
-      let of_string = of_base64_exn
-    end)
-  end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "signature"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
-
-include Stable.Latest
 open Snark_params.Tick
 
-type var = Inner_curve.Scalar.var * Inner_curve.Scalar.var
+module Arg = struct
+  [%%versioned_asserted
+  module Stable = struct
+    module V1 = struct
+      type t = (Field.t, Inner_curve.Scalar.t) Signature_poly.Stable.V1.t
 
-let dummy : t = Inner_curve.Scalar.(one, one)
+      let to_latest = Fn.id
+
+      let description = "Signature"
+
+      let version_byte = Base58_check.Version_bytes.signature
+    end
+
+    module Tests = struct
+      (* actual tests in Stable below *)
+    end
+  end]
+end
+
+[%%versioned_asserted
+module Stable = struct
+  module V1 = struct
+    type t = (Field.t, Inner_curve.Scalar.t) Signature_poly.Stable.V1.t
+    [@@deriving sexp, compare, eq, hash]
+
+    type _unused = unit constraint t = Arg.Stable.V1.t
+
+    include Codable.Make_base58_check (Arg.Stable.V1)
+
+    let to_latest = Fn.id
+
+    let gen = Quickcheck.Generator.tuple2 Field.gen Inner_curve.Scalar.gen
+  end
+
+  module Tests = struct
+    [%%if
+    curve_size = 298]
+
+    let%test "signature serialization v1 (curve_size=298)" =
+      let signature =
+        Quickcheck.random_value
+          ~seed:(`Deterministic "signature serialization") V1.gen
+      in
+      let known_good_hash =
+        "\xAB\x7E\xE6\x52\xB9\xF4\x6C\xEE\x7B\xAB\x77\x3E\x25\x49\x84\xF5\xD0\x6E\x27\xB7\x2B\xCB\x76\x6B\xE5\xAC\x74\xAB\x8A\xC6\x27\x42"
+      in
+      Serialization.check_serialization (module V1) signature known_good_hash
+
+    [%%elif
+    curve_size = 753]
+
+    let%test "signature serialization v1 (curve_size=753)" =
+      let signature =
+        Quickcheck.random_value
+          ~seed:(`Deterministic "signature serialization") V1.gen
+      in
+      let known_good_hash =
+        "\xFE\x32\x2E\x97\x30\xE8\x41\xA5\x8E\xC3\xCD\x85\xB1\x12\x8D\x41\x82\x99\xB5\x43\x00\x42\xDF\x10\xD6\xF0\xEC\x33\x38\x77\x2B\x50"
+      in
+      Serialization.check_serialization (module V1) signature known_good_hash
+
+    [%%else]
+
+    let%test "signature serialization v1" =
+      failwith "No test for this curve size"
+
+    [%%endif]
+  end
+end]
+
+[%%define_locally
+Stable.Latest.(of_base58_check_exn, of_base58_check, of_yojson, to_yojson)]
+
+include Signature_functor.Make (Snark_params.Tick)

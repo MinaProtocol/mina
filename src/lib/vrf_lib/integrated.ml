@@ -15,7 +15,7 @@ module Make
       module Checked : sig
         module Shifted : sig
           module type S =
-            Snarky.Curves.Shifted_intf
+            Snarky_curves.Shifted_intf
             with type ('a, 'b) checked := ('a, 'b) Checked.t
              and type boolean_var := Boolean.var
              and type curve_var := var
@@ -99,11 +99,12 @@ end = struct
         ((module Shifted) : shifted Group.Checked.Shifted.m) ~private_key
         ~public_key message =
       let%bind () =
-        let%bind public_key_shifted = Shifted.(add zero public_key) in
-        Group.Checked.scale_generator
-          (module Shifted)
-          private_key ~init:Shifted.zero
-        >>= Shifted.Assert.equal public_key_shifted
+        with_label __LOC__
+          (let%bind public_key_shifted = Shifted.(add zero public_key) in
+           Group.Checked.scale_generator
+             (module Shifted)
+             private_key ~init:Shifted.zero
+           >>= Shifted.Assert.equal public_key_shifted)
       in
       eval (module Shifted) ~private_key message
   end

@@ -23,7 +23,8 @@ let load path =
       let kvs =
         List.map (String.split_lines kv_str) ~f:(fun line ->
             match split_kv line with
-            | Some (k, v) -> (String.strip k, String.strip v)
+            | Some (k, v) ->
+                (String.strip k, String.strip v)
             | None ->
                 failwithf
                   "Markdown_post.load: There must be exactly one `key: value` \

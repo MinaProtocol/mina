@@ -122,8 +122,10 @@ let keypair = generate_keypair check_winner ~exposing:(exposed ())
 let winner (ballots : Ballot.Opened.t array) =
   let pepperoni_votes =
     Array.count ballots ~f:(function
-      | _, Pepperoni -> true
-      | _, Mushroom -> false )
+      | _, Pepperoni ->
+          true
+      | _, Mushroom ->
+          false )
   in
   if pepperoni_votes > Array.length ballots / 2 then Vote.Pepperoni
   else Mushroom
@@ -135,8 +137,10 @@ let handled_check (ballots : Ballot.Opened.t array) commitments claimed_winner
   handle (check_winner commitments claimed_winner)
     (fun (With {request; respond}) ->
       match request with
-      | Open_ballot i -> respond (Provide ballots.(i))
-      | _ -> unhandled )
+      | Open_ballot i ->
+          respond (Provide ballots.(i))
+      | _ ->
+          unhandled )
 
 let tally_and_prove (ballots : Ballot.Opened.t array) =
   let commitments =

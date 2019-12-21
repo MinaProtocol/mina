@@ -1,32 +1,24 @@
 open Core_kernel
 
-module Make (Inputs : Inputs.Inputs_intf) :
-  Test.Work_selector_with_tests_intf
-  with type staged_ledger := Inputs.Staged_ledger.t
-   and type work :=
-              ( Inputs.Ledger_proof_statement.t
-              , Inputs.Transaction.t
-              , Inputs.Sparse_ledger.t
-              , Inputs.Ledger_proof.t )
-              Snark_work_lib.Work.Single.Spec.t
-   and type snark_pool := Inputs.Snark_pool.t
-   and type fee := Inputs.Fee.t = struct
-  module Helper = Work_lib.Make (Inputs)
-  module State = Helper.State
+module Make
+    (Inputs : Intf.Inputs_intf)
+    (Lib : Intf.Lib_intf with module Inputs := Inputs) =
+struct
+  let work ~snark_pool ~fee ~logger (staged_ledger : Inputs.Staged_ledger.t)
+      (state : Lib.State.t) =
+    let state = Lib.State.remove_old_assignments state ~logger in
+    let unseen_jobs = Lib.all_unseen_works staged_ledger state in
+    match Lib.get_expensive_work ~snark_pool ~fee unseen_jobs with
+    | [] ->
+        (None, state)
+    | expensive_work ->
+        let i = Random.int (List.length expensive_work) in
+        let x = List.nth_exn expensive_work i in
+        (Some x, Lib.State.set state x)
 
-  module For_tests = struct
-    let does_not_have_better_fee = Helper.For_tests.does_not_have_better_fee
-  end
+  let remove = Lib.State.remove
 
-  let work ~snark_pool ~fee (staged_ledger : Inputs.Staged_ledger.t)
-      (state : State.t) =
-    let unseen_jobs = Helper.all_works staged_ledger state in
-    match Helper.get_expensive_work ~snark_pool ~fee unseen_jobs with
-    | [] -> ([], state)
-    | _ ->
-        let i = Random.int (List.length unseen_jobs) in
-        let x = List.nth_exn unseen_jobs i in
-        (Helper.pair_to_list x, State.set state x)
+  let pending_work_statements = Lib.pending_work_statements
 end
 
 let%test_module "test" =

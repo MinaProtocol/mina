@@ -1,0 +1,8 @@
+(library
+ (name sync_status)
+ (public_name sync_status)
+ (inline_tests)
+ (libraries core_kernel currency signature_lib)
+ (preprocess
+  (pps ppx_jane ppx_coda ppx_deriving_yojson ppx_enumerate))
+ (synopsis "Different kinds of status for Coda "))

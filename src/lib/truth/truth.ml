@@ -1,9 +1,21 @@
-type true_ = unit
+include Core_kernel
 
-type false_ = unit
+module True = struct
+  type t = unit
+end
 
-type _ t = True : true_ t | False : false_ t
+module False = struct
+  type t = unit
+end
 
-type true_t = true_ t
+type true_ = True.t
 
-type false_t = false_ t
+type false_ = False.t
+
+type ('witness, 'b) t =
+  | True : 'witness -> ('witness, true_) t
+  | False : ('witness, false_) t
+
+type 'witness true_t = ('witness, true_) t
+
+type 'witness false_t = ('witness, false_) t

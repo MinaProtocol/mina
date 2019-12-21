@@ -1,29 +1,12 @@
 open Core
-open Network_peer
 
 module Sender : sig
-  module Stable : sig
-    module V1 : sig
-      type t = Local | Remote of Peer.t [@@deriving sexp, bin_io]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t = Local | Remote of Peer.t [@@deriving sexp]
+  type t = Local | Remote of Unix.Inet_addr.Stable.V1.t
+  [@@deriving sexp, eq, yojson]
 end
 
 module Incoming : sig
-  module Stable : sig
-    module V1 : sig
-      type 'a t = {data: 'a; sender: Sender.Stable.V1.t}
-      [@@deriving sexp, bin_io]
-    end
-
-    module Latest = V1
-  end
-
-  type 'a t = 'a Stable.Latest.t [@@deriving sexp]
+  type 'a t = {data: 'a; sender: Sender.t} [@@deriving eq, sexp, yojson]
 
   val sender : 'a t -> Sender.t
 

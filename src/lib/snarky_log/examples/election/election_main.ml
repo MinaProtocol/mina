@@ -44,7 +44,7 @@ let () =
   let commitments, winner, proof = tally_and_prove received_ballots in
   let log_events =
     Constraints.log_func ~input:(exposed ()) (handled_check received_ballots)
-      ~apply_args:(fun c -> c commitments winner )
+      ~apply_args:(fun c -> c commitments winner)
   in
   Snarky_log.to_file "output.json" log_events ;
   assert (verify proof (Keypair.vk keypair) (exposed ()) commitments winner)
