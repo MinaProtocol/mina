@@ -117,6 +117,18 @@ Additionally, the usage of "work" in snark worker can be misconstrued as a conne
 **Alternatives:**
 - Fee transfers - current usage, confusing to unfamiliar users.
 
+### Block Hash
+**Concept:** A hash that serves as an identifier for a specific block in the blockchain.
+
+**Rationale:** Most major cryptocurrency protocols use the term block hash, and it is helpful to align with existing terms when possible.
+
+**Downsides:** This didn't make sense when blocks were referred to as external transitions. Now that blocks is the accepted terminology, it should follow that the updated name for the reference is block hash.
+
+**Usage:** Each block contains a unique block hash that is used as an indentifier.
+
+**Alternatives:**
+- State hash - the previous term -- perhaps more accurate, but doesn't conform to broader industry terms.
+
 ## Drawbacks
 [drawbacks]: #drawbacks
 
