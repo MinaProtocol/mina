@@ -104,7 +104,6 @@ Additionally, the usage of "work" in snark worker can be misconstrued as a conne
 **Alternatives:**
 - User command - this term is confusing, especially in  docs, as it can be conflated with a CLI command that a user issues.
 
-
 ### Protocol Transaction
 **Concept:** A transaction issued by the protocol that does not have a "from" field - currently a fee transfer or coinbase (both are structurally identical).
 
