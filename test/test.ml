@@ -26,9 +26,9 @@ let () =
     Fp.print zp ;
     let zq = Fq.of_bigint z in
     Fq.print zq ;
-    Format.printf "z < z = %b@." (compare z z) ;
-    Format.printf "x < y = %b@." (compare x y) ;
-    Format.printf "y < x = %b@." (compare y x) ;
+    Format.printf "compare z z = %d@." (Unsigned.UInt8.to_int (compare z z)) ;
+    Format.printf "compare x y = %d@." (Unsigned.UInt8.to_int (compare x y)) ;
+    Format.printf "compare y x = %d@." (Unsigned.UInt8.to_int (compare y x)) ;
     Format.printf "a = x / y@." ;
     let a = div x y in
     print a ;
@@ -46,7 +46,7 @@ let () =
     Format.printf "True? %b False? %b@." (test_bit b 1) (test_bit x 2) ;
     List.iter delete [x; y; z; a; b] ;
     List.iter Fp.delete [xp; yp; zp; ap; bp] ;
-    List.iter Fq.delete [xq; yq; zq; aq; bq] ;
+    List.iter Fq.delete [xq; yq; zq; aq; bq]
   in
   let () =
     Format.printf "Testing Fp@." ;
