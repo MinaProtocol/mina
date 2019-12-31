@@ -123,7 +123,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
           ( `Hash_after_applying next_staged_ledger_hash
           , `Ledger_proof ledger_proof_opt
           , `Staged_ledger transitioned_staged_ledger
-          , `Pending_coinbase_data (is_new_stack, coinbase_amount) ) ->
+          , `Pending_coinbase_data (is_new_stack, coinbase_amount, _) ) ->
           (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
           ignore
           @@ Ledger.unregister_mask_exn

@@ -311,7 +311,7 @@ module Coinbase_stack_state = struct
 
   let empty : t = {Poly.init= Stack_hash.dummy; curr= Stack_hash.dummy}
 
-  let create ~init : t = {Poly.init; curr= init}
+  let create ~init = {Poly.init; curr= init}
 
   module Checked = struct
     type t = var
@@ -347,6 +347,88 @@ module Hash_builder = struct
   let of_digest = Fn.compose Fn.id of_hash
 end
 
+module Update = struct
+  module Action = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          | Update_none
+          | Update_one
+          | Update_two_coinbase_in_first
+          | Update_two_coinbase_in_second
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t =
+      | Update_none
+      | Update_one
+      | Update_two_coinbase_in_first
+      | Update_two_coinbase_in_second
+    [@@deriving sexp]
+
+    type var = Boolean.var * Boolean.var
+
+    let to_bits = function
+      | Update_none ->
+          (false, false)
+      | Update_one ->
+          (true, false)
+      | Update_two_coinbase_in_first ->
+          (false, true)
+      | Update_two_coinbase_in_second ->
+          (true, true)
+
+    let of_bits = function
+      | false, false ->
+          Update_none
+      | true, false ->
+          Update_one
+      | false, true ->
+          Update_two_coinbase_in_first
+      | true, true ->
+          Update_two_coinbase_in_second
+
+    let var_of_t t =
+      let x, y = to_bits t in
+      Boolean.(var_of_value x, var_of_value y)
+
+    let typ =
+      Typ.transport
+        Typ.(Boolean.typ * Boolean.typ)
+        ~there:to_bits ~back:of_bits
+
+    module Checked = struct
+      let no_update (b0, b1) = Boolean.((not b0) && not b1)
+
+      let update_two_stacks_coinbase_in_first (b0, b1) =
+        Boolean.((not b0) && b1)
+
+      let update_two_stacks_coinbase_in_second (b0, b1) = Boolean.(b0 && b1)
+
+      let _update_one_stack (b0, b1) = Boolean.(b0 && not b1)
+    end
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Action.Stable.V1.t * Coinbase_data.Stable.V1.t [@@deriving sexp]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t
+
+  type var = Action.var * Coinbase_data.var
+
+  let var_of_t (a, c) = (Action.var_of_t a, Coinbase_data.var_of_t c)
+end
+
 (* Sparse_ledger.Make is applied more than once in the code, so
    it can't make assumptions about the internal structure of its module
    arguments. Therefore, for modules with a bin_io type passed to the functor,
@@ -364,7 +446,6 @@ struct
   let max_coinbase_stack_count = Int.pow 2 depth
 
   module Stack = struct
-    (*TODO: init and curr should be here and not in coimnbase_stack_state*)
     module Poly = struct
       [%%versioned
       module Stable = struct
@@ -478,8 +559,8 @@ struct
     let empty =
       {Poly.data= Coinbase_stack_data.empty; state= Coinbase_stack_state.empty}
 
-    let _init (state_stack : Coinbase_stack_state.t) =
-      {empty with state= Coinbase_stack_state.create ~init:state_stack.curr}
+    let create_with (t : t) =
+      {empty with state= Coinbase_stack_state.create ~init:t.state.curr}
 
     let equal_state_hash t1 t2 =
       Coinbase_stack_state.equal t1.Poly.state t2.Poly.state
@@ -492,7 +573,13 @@ struct
       {t with data}
 
     let push_state (state_body_hash : State_body_hash.t) (t : t) =
-      {t with state= Coinbase_stack_state.push t.state state_body_hash}
+      let res =
+        {t with state= Coinbase_stack_state.push t.state state_body_hash}
+      in
+      Core.printf
+        !"outside snark Push state before %{sexp: t} after  %{sexp: t} \n%!"
+        t res ;
+      res
 
     let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
         (var, 'a) Tick0.Checked.t =
@@ -517,10 +604,24 @@ struct
         {t with data}
 
       let push_state (state_body_hash : State_body_hash.var) (t : t) =
-        let%map state =
+        let%bind state =
           Coinbase_stack_state.Checked.push t.state state_body_hash
         in
-        {t with state}
+        let res = {t with state} in
+        let%map () =
+          as_prover
+            As_prover.(
+              Let_syntax.(
+                let%map before = read Coinbase_stack_state.typ t.state
+                and after = read Coinbase_stack_state.typ state in
+                Core.printf
+                  !"in snark Push state before %{sexp: \
+                    Coinbase_stack_state.t} after  %{sexp: \
+                    Coinbase_stack_state.t} \n\
+                    %!"
+                  before after))
+        in
+        res
 
       let empty = var_of_t empty
 
@@ -641,8 +742,12 @@ struct
       | Coinbase_stack_path : Address.value -> path Request.t
       | Get_coinbase_stack : Address.value -> (Stack.t * path) Request.t
       | Set_coinbase_stack : Address.value * Stack.t -> unit Request.t
-      | Find_index_of_newest_stack : Address.value Request.t
+      | Set_oldest_coinbase_stack : Address.value * Stack.t -> unit Request.t
+      | Find_index_of_newest_stacks :
+          Update.Action.t
+          -> (Address.value * Address.value) Request.t
       | Find_index_of_oldest_stack : Address.value Request.t
+      | Get_previous_stack : Coinbase_stack_state.t Request.t
 
     let reraise_merkle_requests (With {request; respond}) =
       match request with
@@ -660,60 +765,142 @@ struct
         (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
-    let%snarkydef add_coinbase t (pk, amount, state_body_hash) ~push_state =
+    let%snarkydef add_coinbase t
+        ((action : Update.Action.var), (pk, amount, state_body_hash)) =
       (* Question: Do the transaction have the current protocol state? Which means that both the stacks should be updated with the curr (or previous) body hash without the coinbase?) 
     *)
-      let%bind addr =
-        request_witness Address.typ
-          As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_newest_stack))
+      let%bind addr1, addr2 =
+        request_witness
+          Typ.(Address.typ * Address.typ)
+          As_prover.(
+            map (read Update.Action.typ action) ~f:(fun act ->
+                Find_index_of_newest_stacks act ))
       in
       let equal_to_zero x = Amount.(equal_var x (var_of_t zero)) in
       let chain if_ b ~then_ ~else_ =
         let%bind then_ = then_ and else_ = else_ in
         if_ b ~then_ ~else_
       in
+      let%bind no_update = Update.Action.Checked.no_update action in
+      let update_state_stack (stack : Stack.var) =
+        let%bind previous_state_stack =
+          request_witness Coinbase_stack_state.typ
+            As_prover.(map (return ()) ~f:(fun () -> Get_previous_stack))
+        in
+        let stack_initialized = {stack with state= previous_state_stack} in
+        let%bind stack_with_state_hash =
+          Stack.Checked.push_state state_body_hash stack_initialized
+        in
+        Stack.Checked.if_ no_update ~then_:stack ~else_:stack_with_state_hash
+      in
+      let f1 stack0 =
+        let%bind stack = update_state_stack stack0 in
+        let total_coinbase_amount =
+          Currency.Amount.var_of_t Coda_compile_config.coinbase
+        in
+        let%bind rem_amount =
+          Currency.Amount.Checked.sub total_coinbase_amount amount
+        in
+        let%bind no_coinbase_in_this_stack =
+          Update.Action.Checked.update_two_stacks_coinbase_in_second action
+        in
+        let%bind amount1_equal_to_zero = equal_to_zero amount in
+        let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
+        let%bind () =
+          let%bind check1 = Boolean.equal no_update amount1_equal_to_zero in
+          (*let%bind coinbase_split = Update.Action.Checked.update_two_stacks_coinbase_in_first action in
+              let%bind coinbase_not_split =  Update.Action.Checked.update_one_stack action in
+              let%bind check2 = Boolean.(equal amount2_equal_to_zero (not coinbase_split)) in
+              let%bind check3 = 
+                (*Second stack will never have the coinbase split*)
+                let%bind amount2_can_be_zero = Boolean.(no_coinbase_in_this_stack || coinbase_not_split)
+                in
+                Boolean.(equal amount2_equal_to_zero amount2_can_be_zero) 
+              in 
+              let%bind () =
+                as_prover As_prover.(Let_syntax.(
+                  let%map check1 = read Boolean.typ check1
+                   and check2 = read Boolean.typ check2
+                   and check3 = read Boolean.typ check3 
+                  in
+                  Core.printf !"check1 %b check2 %b check3 %b\n%!" check1 check2 check3
+                )
+                )
+              in*)
+          Boolean.Assert.all [check1]
+          (*; check2; check3] *)
+        in
+        (*TODO: Add xnor in snarky*)
+        (*state is pushed only if there's atleast one transaction in the transition. So, if it is false then coinbase amount has to be zero and if it's true then coinbase amount should be non-zero because we prioritize coinbase over user commands when creating a diff. But maybe this is too restricted?*)
+        let%bind no_coinbase =
+          let%bind no_update = Boolean.(no_update && amount1_equal_to_zero) in
+          Boolean.(no_update || no_coinbase_in_this_stack)
+        in
+        (* TODO: Optimize here since we are pushing twice to the same stack *)
+        let%bind stack_with_amount1 =
+          Stack.Checked.push_coinbase (pk, amount, state_body_hash) stack
+        in
+        let%bind stack_with_amount2 =
+          Stack.Checked.push_coinbase
+            (pk, rem_amount, state_body_hash)
+            stack_with_amount1
+        in
+        chain Stack.if_ no_coinbase ~then_:(return stack)
+          ~else_:
+            (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
+               ~else_:stack_with_amount2)
+      in
+      let f2 (init_stack : Stack.var) stack0 =
+        let%bind add_coinbase =
+          Update.Action.Checked.update_two_stacks_coinbase_in_second action
+        in
+        let%bind update_state =
+          let%bind update_second_stack =
+            Update.Action.Checked.update_two_stacks_coinbase_in_first action
+          in
+          Boolean.(update_second_stack || add_coinbase)
+        in
+        let%bind stack =
+          Stack.if_ update_state
+            ~then_:
+              { stack0 with
+                state=
+                  Coinbase_stack_state.create
+                    ~init:init_stack.Stack.Poly.state.curr }
+            ~else_:stack0
+        in
+        let%bind stack_with_coinbase =
+          Stack.Checked.push_coinbase (pk, amount, state_body_hash) stack
+        in
+        Stack.if_ add_coinbase ~then_:stack_with_coinbase ~else_:stack
+      in
+      let f stack1 stack2 =
+        let%bind updated_stack1 = with_label __LOC__ (f1 stack1) in
+        let%bind updated_stack2 = f2 updated_stack1 stack2 in
+        let%map () =
+          as_prover
+            As_prover.(
+              Let_syntax.(
+                let%map updated_stack1 = read Stack.typ updated_stack1
+                and updated_stack2 = read Stack.typ updated_stack2
+                and stack1 = read Stack.typ stack1
+                and state_body_hash =
+                  read State_body_hash.typ state_body_hash
+                in
+                Core.printf
+                  !"in Snark stack1 %{sexp: Stack.t} \n\
+                    state body hash %{sexp: State_body_hash.t} \n\
+                    updated_stack1 %{sexp:Stack.t} \n\
+                    updated_stack2 %{sexp: Stack.t} \n\
+                    %!"
+                  stack1 state_body_hash updated_stack1 updated_stack2))
+        in
+        (updated_stack1, updated_stack2)
+      in
       handle
-        (Merkle_tree.modify_req ~depth (Hash.var_to_hash_packed t) addr
-           ~f:(fun stack0 ->
-             let%bind stack =
-               let%bind updated_stack =
-                 Stack.Checked.push_state state_body_hash stack0
-               in
-               Stack.Checked.if_ push_state ~then_:updated_stack ~else_:stack0
-             in
-             let total_coinbase_amount =
-               Currency.Amount.var_of_t Coda_compile_config.coinbase
-             in
-             let%bind rem_amount =
-               Currency.Amount.Checked.sub total_coinbase_amount amount
-             in
-             let%bind amount1_equal_to_zero = equal_to_zero amount in
-             let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
-             let%bind () =
-               (*TODO: Add xnor in snarky*)
-               (*state is pushed only if there's atleast one transaction in the transition. So, if it is false then coinbase amount has to be zero and if it's true then coinbase amount should be non-zero because we prioritize coinbase over user commands when creating a diff. But maybe this is too restricted?*)
-               let%bind both_true =
-                 Boolean.(push_state && not amount1_equal_to_zero)
-               in
-               let%bind both_false =
-                 Boolean.((not push_state) && amount1_equal_to_zero)
-               in
-               let%bind valid = Boolean.any [both_true; both_false] in
-               Boolean.Assert.is_true valid
-             in
-             (* TODO: Optimize here since we are pushing twice to the same stack *)
-             let%bind stack_with_amount1 =
-               Stack.Checked.push_coinbase (pk, amount, state_body_hash) stack
-             in
-             let%bind stack_with_amount2 =
-               Stack.Checked.push_coinbase
-                 (pk, rem_amount, state_body_hash)
-                 stack_with_amount1
-             in
-             chain Stack.if_ amount1_equal_to_zero ~then_:(return stack)
-               ~else_:
-                 (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
-                    ~else_:stack_with_amount2) ))
+        (Merkle_tree.pair_of_modify_reqs ~depth
+           (Hash.var_to_hash_packed t)
+           (addr1, addr2) ~f)
         reraise_merkle_requests
       >>| Hash.var_of_hash_packed
 
@@ -746,7 +933,7 @@ struct
           let open Let_syntax in
           let%map addr = read Address.typ addr
           and next = read Stack.typ next in
-          Set_coinbase_stack (addr, next))
+          Set_oldest_coinbase_stack (addr, next))
       in
       let%map new_root =
         Merkle_tree.implied_root next_entry_hash addr prev_path
@@ -830,24 +1017,31 @@ struct
   let path (t : t) index =
     try_with (fun () -> Merkle_tree.path_exn t.tree index)
 
-  let set_stack (t : t) index stack =
-    try_with (fun () -> {t with tree= Merkle_tree.set_exn t.tree index stack})
-
   let find_index (t : t) key =
     try_with (fun () -> Merkle_tree.find_index_exn t.tree key)
+
+  let next_index (t : t) =
+    if
+      Stack_id.equal t.new_pos (Stack_id.of_int (max_coinbase_stack_count - 1))
+    then Ok Stack_id.zero
+    else Stack_id.incr_by_one t.new_pos
+
+  let next_stack_id t ~is_new_stack =
+    if is_new_stack then next_index t else Ok t.new_pos
 
   let incr_index (t : t) ~is_new_stack =
     let open Or_error.Let_syntax in
     if is_new_stack then
-      let%map new_pos =
-        if
-          Stack_id.equal t.new_pos
-            (Stack_id.of_int (max_coinbase_stack_count - 1))
-        then Ok Stack_id.zero
-        else Stack_id.incr_by_one t.new_pos
-      in
+      let%map new_pos = next_index t in
       {t with pos_list= t.new_pos :: t.pos_list; new_pos}
     else Ok t
+
+  let set_stack (t : t) index stack ~is_new_stack =
+    let open Or_error.Let_syntax in
+    let%bind tree =
+      try_with (fun () -> Merkle_tree.set_exn t.tree index stack)
+    in
+    incr_index {t with tree} ~is_new_stack
 
   let latest_stack_id (t : t) ~is_new_stack =
     if is_new_stack then Ok t.new_pos
@@ -860,6 +1054,14 @@ struct
 
   let curr_stack_id (t : t) = List.hd t.pos_list
 
+  let previous_stack t =
+    let prev_stack_id =
+      Option.value ~default:Stack_id.zero (curr_stack_id t)
+    in
+    Or_error.try_with (fun () ->
+        let index = Merkle_tree.find_index_exn t.tree prev_stack_id in
+        Merkle_tree.get_exn t.tree index )
+
   let latest_stack (t : t) ~is_new_stack =
     let open Or_error.Let_syntax in
     let%bind key = latest_stack_id t ~is_new_stack in
@@ -869,14 +1071,7 @@ struct
           Merkle_tree.get_exn t.tree index )
     in
     if is_new_stack then
-      let prev_stack_id =
-        Option.value ~default:Stack_id.zero (curr_stack_id t)
-      in
-      let%map prev_stack =
-        Or_error.try_with (fun () ->
-            let index = Merkle_tree.find_index_exn t.tree prev_stack_id in
-            Merkle_tree.get_exn t.tree index )
-      in
+      let%map prev_stack = previous_stack t in
       {res with state= Coinbase_stack_state.create ~init:prev_stack.state.curr}
     else Ok res
 
@@ -901,9 +1096,8 @@ struct
     let%bind stack_index = find_index t key in
     let%bind stack_before = get_stack t stack_index in
     let stack_after = f stack_before in
-    let%bind t' = incr_index t ~is_new_stack in
     (* state hash in "after" stack becomes previous state hash at top level *)
-    set_stack t' stack_index stack_after
+    set_stack t stack_index stack_after ~is_new_stack
 
   let add_coinbase t ~coinbase ~is_new_stack =
     update_stack t ~f:(Stack.push_coinbase coinbase) ~is_new_stack
@@ -915,15 +1109,16 @@ struct
     let open Or_error.Let_syntax in
     let%bind key = latest_stack_id t ~is_new_stack in
     let%bind stack_index = find_index t key in
-    let%bind t' = incr_index t ~is_new_stack in
-    set_stack t' stack_index stack
+    let%map res = set_stack t stack_index stack ~is_new_stack in
+    Core.printf !"after update outside snark %{sexp: t} \n%!" res ;
+    res
 
   let remove_coinbase_stack (t : t) =
     let open Or_error.Let_syntax in
     let%bind oldest_stack, remaining = remove_oldest_stack_id t.pos_list in
     let%bind stack_index = find_index t oldest_stack in
     let%bind stack = get_stack t stack_index in
-    let%map t' = set_stack t stack_index Stack.empty in
+    let%map t' = set_stack t stack_index Stack.empty ~is_new_stack:false in
     (stack, {t' with pos_list= remaining})
 
   let hash_extra ({pos_list; new_pos; _} : t) =
@@ -958,18 +1153,29 @@ struct
               find_index !pending_coinbase stack_id |> Or_error.ok_exn
             in
             respond (Provide index)
-        | Checked.Find_index_of_newest_stack ->
-            let stack_id =
-              match latest_stack_id !pending_coinbase ~is_new_stack with
-              | Ok id ->
-                  id
-              | _ ->
-                  Stack_id.zero
-            in
-            let index =
+        | Checked.Find_index_of_newest_stacks _action ->
+            let index1 =
+              let stack_id =
+                match latest_stack_id !pending_coinbase ~is_new_stack with
+                | Ok id ->
+                    id
+                | _ ->
+                    Stack_id.zero
+              in
               find_index !pending_coinbase stack_id |> Or_error.ok_exn
             in
-            respond @@ Provide index
+            let index2 =
+              let stack_id =
+                match next_stack_id !pending_coinbase ~is_new_stack with
+                | Ok id ->
+                    id
+                | _ ->
+                    Stack_id.zero
+              in
+              find_index !pending_coinbase stack_id |> Or_error.ok_exn
+            in
+            Core.printf !"indices %d %d \n%!" index1 index2 ;
+            respond @@ Provide (index1, index2)
         | Checked.Get_coinbase_stack idx ->
             let elt = get_stack !pending_coinbase idx |> Or_error.ok_exn in
             let path =
@@ -978,8 +1184,44 @@ struct
             respond (Provide (elt, path))
         | Checked.Set_coinbase_stack (idx, stack) ->
             pending_coinbase :=
-              set_stack !pending_coinbase idx stack |> Or_error.ok_exn ;
+              set_stack !pending_coinbase idx stack ~is_new_stack
+              |> Or_error.ok_exn ;
+            Core.printf
+              !"after update inside snark %{sexp: t} \n%!"
+              !pending_coinbase ;
             respond (Provide ())
+        | Checked.Set_oldest_coinbase_stack (idx, stack) ->
+            pending_coinbase :=
+              set_stack !pending_coinbase idx stack ~is_new_stack:false
+              |> Or_error.ok_exn ;
+            Core.printf
+              !"after update inside snark %{sexp: t} \n%!"
+              !pending_coinbase ;
+            respond (Provide ())
+        | Checked.Get_previous_stack ->
+            let prev_state =
+              if is_new_stack then (
+                let stack =
+                  previous_stack !pending_coinbase |> Or_error.ok_exn
+                in
+                Core.printf
+                  !"Prev stack (getting curr) %{sexp: Coinbase_stack_state.t}\n\
+                    %!"
+                  stack.state ;
+                { Coinbase_stack_state.Poly.init= stack.state.curr
+                ; curr= stack.state.curr } )
+              else
+                let stack =
+                  latest_stack !pending_coinbase ~is_new_stack
+                  |> Or_error.ok_exn
+                in
+                Core.printf
+                  !"Prev stack (getting init) %{sexp: Coinbase_stack_state.t}\n\
+                    %!"
+                  stack.state ;
+                stack.state
+            in
+            respond (Provide prev_state)
         | _ ->
             unhandled )
 end
@@ -1073,6 +1315,13 @@ let%test_unit "Checked_tree = Unchecked_tree" =
   let pending_coinbases = create () |> Or_error.ok_exn in
   test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
+      let action =
+        Currency.Amount.(
+          if equal coinbase.amount zero then Update.Action.Update_none
+          else if coinbase.amount < Coda_compile_config.coinbase then
+            Update_two_coinbase_in_first
+          else Update_one)
+      in
       let unchecked =
         add_coinbase_with_zero_checks
           (module T)
@@ -1084,11 +1333,12 @@ let%test_unit "Checked_tree = Unchecked_tree" =
         let comp =
           let open Snark_params.Tick in
           let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
+          let action_var = Update.Action.var_of_t action in
           let%map result =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 coinbase_var ~push_state:Boolean.true_)
+                 (action_var, coinbase_var))
               (unstage (handler pending_coinbases ~is_new_stack:true))
           in
           As_prover.read Hash.typ result
@@ -1103,6 +1353,13 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
   test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
       let pending_coinbases = create () |> Or_error.ok_exn in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
+      let action =
+        Currency.Amount.(
+          if equal coinbase.amount zero then Update.Action.Update_none
+          else if coinbase.amount < Coda_compile_config.coinbase then
+            Update_two_coinbase_in_first
+          else Update_one)
+      in
       let unchecked =
         add_coinbase_with_zero_checks
           (module T)
@@ -1115,11 +1372,12 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
         let comp =
           let open Snark_params.Tick in
           let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
+          let action_var = Update.Action.(var_of_t action) in
           let%map result =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 coinbase_var ~push_state:Boolean.true_)
+                 (action_var, coinbase_var))
               (unstage (handler pending_coinbases ~is_new_stack:true))
           in
           As_prover.read Hash.typ result
