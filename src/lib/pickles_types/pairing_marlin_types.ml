@@ -1,5 +1,5 @@
 open Core_kernel
-open Import
+module H_list = Snarky.H_list
 module Typ = Snarky.Typ
 
 module Evals = struct
@@ -16,6 +16,7 @@ module Evals = struct
   end
 
   module Beta1 = Make (Nat.N7)
+  module Beta1_wire = Make (Nat.N6)
   module Beta2 = Make (Nat.N2)
   module Beta3 = Make (Nat.N11)
 
@@ -72,6 +73,7 @@ module Accumulator = struct
 end *)
 
 module Accumulator = struct
+  (* TODO: zr_pi can be merged with r_f_plus_r_v *)
   type 'g t = {r_f_plus_r_v: 'g; r_pi: 'g; zr_pi: 'g} [@@deriving fields]
 
   let to_hlist {r_f_plus_r_v; r_pi; zr_pi} = H_list.[r_f_plus_r_v; r_pi; zr_pi]
@@ -85,6 +87,9 @@ module Accumulator = struct
 
   let assert_equal g t1 t2 =
     List.iter ~f:(fun x -> g (x t1) (x t2)) [r_f_plus_r_v; r_pi; zr_pi]
+
+  let map {r_f_plus_r_v; r_pi; zr_pi} ~f =
+    {r_f_plus_r_v= f r_f_plus_r_v; r_pi= f r_pi; zr_pi= f zr_pi}
 end
 
 module Opening = struct
@@ -103,11 +108,24 @@ end
 module Openings = struct
   open Evals
 
-  type ('proof, 'fp) t =
-    { beta_1: ('proof, 'fp Beta1.t) Opening.t
-    ; beta_2: ('proof, 'fp Beta2.t) Opening.t
-    ; beta_3: ('proof, 'fp Beta3.t) Opening.t }
+  type ('b1, 'b2, 'b3) t_ = {beta_1: 'b1; beta_2: 'b2; beta_3: 'b3}
   [@@deriving fields, bin_io]
+
+  module Wire = struct
+    type ('proof, 'fp) t =
+      ( ('proof, 'fp Beta1_wire.t) Opening.t
+      , ('proof, 'fp Beta2.t) Opening.t
+      , ('proof, 'fp Beta3.t) Opening.t )
+      t_
+    [@@deriving bin_io]
+  end
+
+  type ('proof, 'fp) t =
+    ( ('proof, 'fp Beta1.t) Opening.t
+    , ('proof, 'fp Beta2.t) Opening.t
+    , ('proof, 'fp Beta3.t) Opening.t )
+    t_
+  [@@deriving bin_io]
 
   let to_hlist {beta_1; beta_2; beta_3} = H_list.[beta_1; beta_2; beta_3]
 
@@ -124,14 +142,16 @@ module Openings = struct
 end
 
 module Messages = struct
+  type 'pc degree_bounded = 'pc * 'pc [@@deriving bin_io]
+
   type ('pc, 'fp) t =
     { w_hat: 'pc
     ; s: 'pc
     ; z_hat_a: 'pc
     ; z_hat_b: 'pc
-    ; gh_1: 'pc * 'pc
-    ; sigma_gh_2: 'fp * ('pc * 'pc)
-    ; sigma_gh_3: 'fp * ('pc * 'pc) }
+    ; gh_1: 'pc degree_bounded * 'pc
+    ; sigma_gh_2: 'fp * ('pc degree_bounded * 'pc)
+    ; sigma_gh_3: 'fp * ('pc degree_bounded * 'pc) }
   [@@deriving fields, bin_io]
 
   let to_hlist {w_hat; s; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3} =
@@ -144,8 +164,9 @@ module Messages = struct
 
   let typ pc fp =
     let open Snarky.Typ in
+    let db = pc * pc in
     of_hlistable
-      [pc; pc; pc; pc; pc * pc; fp * (pc * pc); fp * (pc * pc)]
+      [pc; pc; pc; pc; db * pc; fp * (db * pc); fp * (db * pc)]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
