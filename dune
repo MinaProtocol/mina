@@ -6,6 +6,7 @@
    ../Cargo.toml
    Cargo.toml
    (source_tree src)
+   (source_tree ../../marlin)
    (source_tree ../algebra)
    (source_tree ../bench-utils)
    (source_tree ../crypto-primitives)
