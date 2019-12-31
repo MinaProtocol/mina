@@ -1,4 +1,5 @@
 open Core_kernel
+open Pickles_types
 module Sponge_lib = Sponge
 
 module Snarkable = struct
@@ -140,6 +141,10 @@ module Group (Impl : Snarky.Snark_intf.Run) = struct
 
     module Constant : sig
       type t
+
+      val to_affine_exn : t -> Field.Constant.t * Field.Constant.t
+
+      val of_affine : Field.Constant.t * Field.Constant.t -> t
     end
 
     val typ : (t, Constant.t) Typ.t
@@ -151,6 +156,15 @@ module Group (Impl : Snarky.Snark_intf.Run) = struct
     val negate : t -> t
 
     val to_field_elements : t -> Field.t list
+
+    module Scaling_precomputation : sig
+      type t
+
+      val create : Constant.t -> t
+    end
+
+    val multiscale_known :
+      (Boolean.var list * Scaling_precomputation.t) array -> t
   end
 end
 
@@ -167,6 +181,8 @@ end
 
 module Dlog_main_inputs = struct
   module type S = sig
+    val crs_max_degree : int
+
     module Impl : Snarky.Snark_intf.Run with type prover_state = unit
 
     module Fp_params : sig
@@ -234,7 +250,7 @@ module Pairing_main_inputs = struct
     module Input_domain : sig
       val domain : Domain.t
 
-      val lagrange_commitments : G.t array
+      val lagrange_commitments : G.Constant.t array
     end
 
     val sponge_params : Impl.Field.t Sponge_lib.Params.t
@@ -259,7 +275,9 @@ module Pairing_main_inputs = struct
 
       val typ : (t, Constant.t) Impl.Typ.t
 
-      val check_update : t -> t -> unit
+      val check_update : t -> t -> Impl.Boolean.var
+
+      val is_base_case : t -> Impl.Boolean.var
     end
   end
 end

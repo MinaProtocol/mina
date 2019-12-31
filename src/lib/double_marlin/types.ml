@@ -1,3 +1,6 @@
+open Pickles_types
+open Core_kernel
+
 module Dlog_based = struct
   module Proof_state = struct
     module Deferred_values = struct
@@ -113,6 +116,17 @@ module Dlog_based = struct
         { pairing_marlin_index: 'g1 Abc.t Matrix_evals.t
         ; pairing_marlin_acc: 'g1 Pairing_marlin_types.Accumulator.t }
 
+      let to_field_elements
+          { pairing_marlin_acc= {r_f_plus_r_v; r_pi; zr_pi}
+          ; pairing_marlin_index= {row; col; value} } ~g1:g1_to_field_elements
+          =
+        Array.append
+          (Array.concat_map [|r_f_plus_r_v; r_pi; zr_pi|] ~f:(fun g ->
+               Array.of_list (g1_to_field_elements g) ))
+          (Array.concat_map [|row; col; value|] ~f:(fun {a; b; c} ->
+               Array.concat_map [|a; b; c|] ~f:(fun g ->
+                   Array.of_list (g1_to_field_elements g) ) ))
+
       open Snarky.H_list
 
       let to_hlist {pairing_marlin_index; pairing_marlin_acc} =
@@ -155,6 +169,14 @@ module Dlog_based = struct
   module Pass_through = struct
     type ('g, 's) t =
       {app_state: 's; dlog_marlin_index: 'g Abc.t Matrix_evals.t; sg: 'g}
+
+    let to_field_elements {app_state; dlog_marlin_index= {row; col; value}}
+        ~app_state:app_state_to_field_elements ~g:g_to_field_elements =
+      Array.append
+        (app_state_to_field_elements app_state)
+        (Array.concat_map [|row; col; value|] ~f:(fun {a; b; c} ->
+             Array.concat_map [|a; b; c|] ~f:(fun g ->
+                 Array.of_list (g_to_field_elements g) ) ))
 
     open Snarky.H_list
 
@@ -246,37 +268,21 @@ module Dlog_based = struct
       let open Vector in
       let fp = [sigma_2; sigma_3; r_xi_sum] in
       let challenge =
-        [ xi
-        ; r
-        ; alpha
-        ; eta_a
-        ; eta_b
-        ; eta_c
-        ; beta_1
-        ; beta_2
-        ; beta_3
-        ; sg_challenge_point ]
+        [xi; r; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3]
       in
+      let fq_challenge = [sg_challenge_point] in
       let fq = [sg_evaluation] in
       let digest = [sponge_digest_before_evaluations; me_only; pass_through] in
-      (fp, fq, challenge, digest)
+      (fp, fq, challenge, fq_challenge, digest)
 
-    let of_data (fp, fq, challenge, digest) =
+    let of_data (fp, fq, challenge, fq_challenge, digest) =
       let open Vector in
       let [sigma_2; sigma_3; r_xi_sum] = fp in
-      let [ xi
-          ; r
-          ; alpha
-          ; eta_a
-          ; eta_b
-          ; eta_c
-          ; beta_1
-          ; beta_2
-          ; beta_3
-          ; sg_challenge_point ] =
+      let [xi; r; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3] =
         challenge
       in
       let [sg_evaluation] = fq in
+      let [sg_challenge_point] = fq_challenge in
       let [sponge_digest_before_evaluations; me_only; pass_through] = digest in
       { proof_state=
           { deferred_values=
@@ -307,15 +313,23 @@ module Pairing_based = struct
   module Bulletproof_challenge = struct
     type ('challenge, 'bool) t = {prechallenge: 'challenge; is_square: 'bool}
 
+    let pack {prechallenge; is_square} = is_square :: prechallenge
+
+    let unpack = function
+      | is_square :: prechallenge ->
+          {is_square; prechallenge}
+      | _ ->
+          failwith "Bulletproof_challenge.unpack"
+
     open Snarky.H_list
 
-    let to_hlist {prechallenge; is_square} = [prechallenge; is_square]
+    let to_hlist {prechallenge; is_square} = [is_square; prechallenge]
 
-    let of_hlist ([prechallenge; is_square] : (unit, _) t) =
+    let of_hlist ([is_square; prechallenge] : (unit, _) t) =
       {prechallenge; is_square}
 
     let typ chal bool =
-      Snarky.Typ.of_hlistable [chal; bool] ~var_to_hlist:to_hlist
+      Snarky.Typ.of_hlistable [bool; chal] ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
@@ -390,13 +404,12 @@ module Pairing_based = struct
     module Deferred_values = struct
       module Marlin = Dlog_based.Proof_state.Deferred_values.Marlin
 
-      type ('challenge, 'fq, 'bool) t =
+      type ('challenge, 'fq, 'bulletproof_challenge) t =
         { marlin: ('challenge, 'fq) Marlin.t
         ; combined_inner_product: 'fq
         ; xi: 'challenge (* 128 bits *)
         ; r: 'challenge (* 128 bits *)
-        ; bulletproof_challenges:
-            ('challenge, 'bool) Bulletproof_challenge.t array
+        ; bulletproof_challenges: 'bulletproof_challenge array
         ; a_hat: 'fq }
 
       open Snarky.H_list
@@ -431,31 +444,61 @@ module Pairing_based = struct
     module Pass_through = Dlog_based.Proof_state.Me_only
     module Me_only = Dlog_based.Pass_through
 
-    type ('challenge, 'fq, 'bool, 'me_only, 'digest) t =
-      { deferred_values: ('challenge, 'fq, 'bool) Deferred_values.t
+    type ('challenge, 'fq, 'bool, 'bulletproof_challenge, 'me_only, 'digest) t =
+      { deferred_values:
+          ('challenge, 'fq, 'bulletproof_challenge) Deferred_values.t
+      ; was_base_case: 'bool
       ; sponge_digest_before_evaluations: 'digest
       ; me_only: 'me_only }
 
     open Snarky.H_list
 
     let of_hlist
-        ([deferred_values; sponge_digest_before_evaluations; me_only] :
+        ([ deferred_values
+         ; was_base_case
+         ; sponge_digest_before_evaluations
+         ; me_only ] :
           (unit, _) t) =
-      {deferred_values; sponge_digest_before_evaluations; me_only}
+      { deferred_values
+      ; was_base_case
+      ; sponge_digest_before_evaluations
+      ; me_only }
 
-    let to_hlist {deferred_values; sponge_digest_before_evaluations; me_only} =
-      [deferred_values; sponge_digest_before_evaluations; me_only]
+    let to_hlist
+        { deferred_values
+        ; was_base_case
+        ; sponge_digest_before_evaluations
+        ; me_only } =
+      [ deferred_values
+      ; was_base_case
+      ; sponge_digest_before_evaluations
+      ; me_only ]
 
     let typ challenge fq bool me_only digest ~length =
       Snarky.Typ.of_hlistable
-        [Deferred_values.typ challenge fq bool ~length; digest; me_only]
+        [Deferred_values.typ challenge fq bool ~length; bool; digest; me_only]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
 
   module Statement = struct
-    type ('challenge, 'fq, 'bool, 'me_only, 'pass_through, 'digest, 's) t =
-      { proof_state: ('challenge, 'fq, 'bool, 'me_only, 'digest) Proof_state.t
+    type ( 'challenge
+         , 'fq
+         , 'bool
+         , 'bulletproof_challenge
+         , 'me_only
+         , 'pass_through
+         , 'digest
+         , 's )
+         t =
+      { proof_state:
+          ( 'challenge
+          , 'fq
+          , 'bool
+          , 'bulletproof_challenge
+          , 'me_only
+          , 'digest )
+          Proof_state.t
       ; pass_through: 'pass_through }
 
     let to_data
@@ -476,19 +519,22 @@ module Pairing_based = struct
                     ; beta_1
                     ; beta_2
                     ; beta_3 } }
+            ; was_base_case
             ; sponge_digest_before_evaluations
             ; me_only }
         ; pass_through } =
       let open Vector in
+      let bool = [was_base_case] in
       let fq = [sigma_2; sigma_3; combined_inner_product; a_hat] in
       let challenge =
         [alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3; xi; r]
       in
       let digest = [sponge_digest_before_evaluations; me_only; pass_through] in
-      (fq, digest, challenge, bulletproof_challenges)
+      (bool, fq, digest, challenge, bulletproof_challenges)
 
-    let of_data (fq, digest, challenge, bulletproof_challenges) =
+    let of_data (bool, fq, digest, challenge, bulletproof_challenges) =
       let open Vector in
+      let [was_base_case] = bool in
       let [sigma_2; sigma_3; combined_inner_product; a_hat] = fq in
       let [alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3; xi; r] =
         challenge
@@ -511,6 +557,7 @@ module Pairing_based = struct
                   ; beta_1
                   ; beta_2
                   ; beta_3 } }
+          ; was_base_case
           ; sponge_digest_before_evaluations
           ; me_only }
       ; pass_through }

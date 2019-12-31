@@ -1,38 +1,17 @@
 (* TODO:
    Start writing pairing_main so I can get a sense of how the x_hat
    commitment and challenge is going to work. *)
+module D = Digest
 open Core_kernel
 open Import
 open Util
-
-let digest_length = 256
-
+open Pickles_types
+open Dlog_marlin_types
 module Accumulator = Pairing_marlin_types.Accumulator
 
 module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
   open Inputs
   open Impl
-
-  module Data = struct
-    type t = Field.t list * Boolean.var list
-
-    let bits bs = ([], bs)
-
-    let append (x1, b1) (x2, b2) = (x1 @ x2, b1 @ b2)
-
-    let concat : t list -> t = List.reduce_exn ~f:append
-
-    let pack_bits bs =
-      List.groupi bs ~break:(fun i _ _ -> i mod (Field.size_in_bits - 1) = 0)
-      |> List.map ~f:Field.pack
-
-    let pack (x, b) = x @ pack_bits b
-
-    let assert_equal t1 t2 =
-      List.iter2_exn (pack t1) (pack t2) ~f:Field.Assert.equal
-
-    let ( @ ) = append
-  end
 
   module Fp = struct
     (* For us, q > p, so one Field.t = fq can represent an fp *)
@@ -70,26 +49,9 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   module Opening_proof = G1
   module PC = G1
-
-  module Opening = struct
-    type 'n t =
-      ( Opening_proof.t
-      , (Fp.Unpacked.t, 'n) Vector.t )
-      Pairing_marlin_types.Opening.t
-  end
-
-  module Marlin_proof = struct
-    type t =
-      ( PC.t
-      , Fp.Unpacked.t
-      , (Opening_proof.t, Fp.Unpacked.t) Pairing_marlin_types.Openings.t )
-      Pairing_marlin_types.Proof.t
-  end
-
-  (*   module Accumulator = Pairing_marlin_types.Accumulator *)
-  module Proof = Pairing_marlin_types.Proof
-
-  type fq = Field.t
+  module Fq = Field
+  module Challenge = Challenge.Make (Impl)
+  module Digest = D.Make (Impl)
 
   let n = 1 lsl 15
 
@@ -97,7 +59,7 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   let product m f = List.reduce_exn (List.init m ~f) ~f:Field.( * )
 
-  let b (u : fq array) (x : fq) : fq =
+  let b (u : Fq.t array) (x : Fq.t) : Fq.t =
     let x_to_pow2s =
       let res = Array.create ~len:k x in
       for i = 1 to k - 1 do
@@ -113,81 +75,10 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
       ~g1_to_field_elements:G1.to_field_elements ~pack_scalar:Fn.id ty t
 
   let combined_commitment ~xi (polys : _ Vector.t) =
-    ksprintf with_label "combined_commitment %s" __LOC__ (fun () ->
-        let (p0 :: ps) = polys in
-        List.fold_left (Vector.to_list ps) ~init:p0 ~f:(fun acc p ->
-            G1.(p + scale acc xi) ) )
+    let (p0 :: ps) = polys in
+    List.fold_left (Vector.to_list ps) ~init:p0 ~f:(fun acc p ->
+        G1.(p + scale acc xi) )
 
-  (* TODO: Could save 3 scalar muls at the cost of
-     (I think) 3 more public inputs here by witnessing
-
-     vr_i == value_i * randomness_i.
-
-     Actually can avoid both!
-  *)
-
-  (*
-  module Accumulation_deferred_values = struct
-    type t =
-      {
-      }
-  end *)
-  (* I think we need to absorb the evaluations to sample r properly.
-
-     OTOH -- the evaluations are completely determined subject to the proof verifying...
-  *)
-
-  (* The xi sum scheme HAS to be
-
-     say v_0 : Fq
-
-     // let xi = witness() // == Fq_friendly_hash(sponge_digest_at_this_moment, v_0, ..., v_n)
-     let c = witness(); // sum_i xi^i v_i
-
-     expose c := sum_i 
-  *)
-
-  (* Accumulate
-
-     sum_{i=1}^3 r^i f_i
-     = f_1 + r * (f_2 + r * f_3)
-
-     sum_{i=1}^3 r^i v_i g
-
-     Option 1:
-      compute
-      
-      f_1 - v_1 * g + r * (f_2 - v_2 * g + r * (f_3 - v_3 g))
-
-     cost:
-      3 fixed base scalar muls
-      3 variable base scalar muls
-
-     public inputs:
-      v_1, v_2, v_3
-
-     Option 2:
-     compute
-      f_1 + r * (f_2 + r * f_3)
-      and
-      (sum_{i=1}^3 r^i v_i) g
-
-     cost:
-      1 fixed base scalar mul
-      3 variable base
-
-     public inputs:
-        s := (sum_{i=1}^3 r^i v_i), digest_at_that_point
-
-        in the other snark do:
-          let evals = exists()
-          sponge = sponge(digest_at_that_point);
-          sponge.absorb(evals);
-          let xi = squeeze();
-          let r = squeeze();
-          let v_j = sum_i xi^i evals.beta_j[i] 
-          assert (s == sum_{j=1}^3 sum_i xi^i evals.beta_j[i])
-  *)
   let accumulate_pairing_state ~r (* r should be exposed. *)
       ~r_xi_sum (* s should be exposed *)
       {Accumulator.r_f_plus_r_v; r_pi; zr_pi} (f_1, beta_1, pi_1)
@@ -213,80 +104,6 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
     in
     {Accumulator.r_f_plus_r_v; r_pi= r_pi + pi_term; zr_pi= zr_pi + zr_pi_term}
 
-  let pack_fp = Field.project
-
-  (*
-  let accumulate_and_defer
-      ~(defer : [`Mul of Fp.Unpacked.t * Fp.Unpacked.t] -> Boolean.var list)
-      r_i f_i z_i ({values; proof} : _ Opening.t) acc
-    =
-    let zr_i = defer (`Mul (z_i, r_i)) in
-    let acc = accumuluate_pairing_state r_i zr_i proof f_i acc in
-    (acc, {Accumulator.Input.zr= zr_i; z= z_i; v= values})
-
-*)
-  type scalar = Boolean.var list
-
-  (*
-  module Requests = struct
-    open Snarky.Request
-
-    module Prev = struct
-      type _ t +=
-        | Pairing_marlin_accumulator : G1.Constant.t Accumulator.t t
-        | Pairing_marlin_proof :
-            ( PC.Constant.t
-            , Fp.Unpacked.constant
-            , ( Opening_proof.Constant.t
-              , Fp.Unpacked.constant )
-              Pairing_marlin_types.Openings.t )
-            Proof.t
-            t
-        | Sponge_digest : Fp.Unpacked.constant t
-    end
-
-    type _ t +=
-      | Fp_mul : bool list * bool list -> bool list t
-      | Mul_scalars : bool list * bool list -> bool list t
-  end *)
-
-  module Fq = Field
-
-  module Challenge = struct
-    type t = Boolean.var list
-
-    let length = 128
-
-    module Constant = struct
-      type t = bool list
-    end
-
-    let typ = Typ.list ~length Boolean.typ
-  end
-
-  module Digest = struct
-    type t = Fq.t
-
-    module Constant = Fq.Constant
-
-    let length = 256
-
-    module Unpacked = struct
-      type t = Boolean.var list
-
-      module Constant = struct
-        type t = bool list
-      end
-
-      let assert_equal t1 t2 =
-        assert (List.length t1 = length) ;
-        assert (List.length t2 = length) ;
-        Fq.Assert.equal (Fq.pack t1) (Fq.pack t2)
-
-      let typ = Typ.list ~length Boolean.typ
-    end
-  end
-
   module Requests = struct
     open Snarky.Request
 
@@ -301,6 +118,9 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
           ( Challenge.Constant.t
           , Fq.Constant.t
           , bool
+          , ( Challenge.Constant.t
+            , bool )
+            Types.Pairing_based.Bulletproof_challenge.t
           , Digest.Unpacked.Constant.t
           , Digest.Unpacked.Constant.t )
           Types.Pairing_based.Proof_state.t
@@ -308,34 +128,7 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
       | Prev_pairing_acc : G1.Constant.t Accumulator.t t
   end
 
-  module Fp_constant = struct
-    include Snarkette.Fields.Make_fp (struct
-                include B
-
-                let num_bits _ = 382
-
-                let log_and = ( land )
-
-                let log_or = ( lor )
-
-                let test_bit x (i : int) = shift_right x i land one = one
-
-                let to_yojson t = `String (to_string t)
-
-                let of_yojson _ = failwith "todo"
-
-                let ( // ) = ( / )
-              end)
-              (struct
-                let order = Fp_params.p
-              end)
-
-    let of_bits bs = Option.value_exn (of_bits bs)
-
-    let size_in_bits = 382
-  end
-
-  module L = Eval_lagrange.Eval_lagrange (Impl) (Sponge) (Fp_constant)
+  let multiscale scalars elts = ()
 
   let incrementally_verify_pairings
       ~verification_key:(m : _ Abc.t Matrix_evals.t) ~sponge ~public_input
@@ -362,23 +155,18 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
     let eta_a = sample () in
     let eta_b = sample () in
     let eta_c = sample () in
-    let g_1, h_1 = receive (PC :: PC) gh_1 in
+    let g_1, h_1 = receive (Type.degree_bounded_pc :: PC) gh_1 in
     let beta_1 = sample () in
-    let sigma_2, (g_2, h_2) = receive (Scalar :: PC :: PC) sigma_gh_2 in
+    let sigma_2, (g_2, h_2) =
+      receive (Scalar :: Type.degree_bounded_pc :: PC) sigma_gh_2
+    in
     let beta_2 = sample () in
-    let sigma_3, (g_3, h_3) = receive (Scalar :: PC :: PC) sigma_gh_3 in
+    let sigma_3, (g_3, h_3) =
+      receive (Scalar :: Type.degree_bounded_pc :: PC) sigma_gh_3
+    in
     let beta_3 = sample () in
-    (*
-    let x_hat_beta_3 =
-      let input_size = Array.length public_input in
-      L.tweaked_lagrange ~sponge
-        (L.Precomputation.create
-           ~domain_size:(L.Precomputation.domain_size input_size))
-        public_input
-        (L.Fp_repr.of_bits ~chunk_size:124 beta_3)
-    in *)
     let digest_before_evaluations =
-      Sponge.squeeze sponge ~length:digest_length
+      Sponge.squeeze sponge ~length:Digest.length
     in
     (* xi, r should be sampled here in the prover/CPU verifier using
 
@@ -389,18 +177,25 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
        ...
     *)
     let open Vector in
-    let combined_commitment (type n) (_ : n s nat) (ps : (_, n s) Vector.t) =
-      combined_commitment ~xi ps
-    in
     let open Pairing_marlin_types.Evals in
-    let f_1 =
-      combined_commitment Beta1.n [g_1; h_1; z_hat_a; z_hat_b; w_hat; x_hat; s]
+    let combine_commitments =
+      Pcs_batch.combine_commitments ~scale:G1.scale ~add:G1.( + ) ~xi
     in
-    let f_2 = combined_commitment Beta2.n [g_2; h_2] in
+    let f_1 =
+      combine_commitments
+        (Common.pairing_beta_1_pcs_batch ~domain_h)
+        [x_hat; h_1; z_hat_a; z_hat_b; w_hat; s]
+        [g_1]
+    in
+    let f_2 =
+      combine_commitments
+        (Common.pairing_beta_2_pcs_batch ~domain_h)
+        [h_2] [g_2]
+    in
     let f_3 =
-      combined_commitment Beta3.n
-        [ g_3
-        ; h_3
+      combine_commitments
+        (Common.pairing_beta_3_pcs_batch ~domain_k)
+        [ h_3
         ; m.row.a
         ; m.row.b
         ; m.row.c
@@ -410,6 +205,7 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
         ; m.value.a
         ; m.value.b
         ; m.value.c ]
+        [g_3]
     in
     let pairing_acc =
       accumulate_pairing_state ~r ~r_xi_sum pairing_acc (f_1, beta_1, pi_1)
@@ -428,130 +224,16 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
     in
     (digest_before_evaluations, pairing_acc, deferred)
 
-  let combined_evaluation ~xi Vector.(eval0 :: evals) =
+  let combined_evaluation ~xi ~evaluation_point
+      (without_degree_bound, with_degree_bound) =
+    Pcs_batch.combine_evaluations
+      (Common.dlog_pcs_batch ~domain_h ~domain_k)
+      ~crs_max_degree ~mul:Fq.mul ~add:Fq.add ~one:Fq.one ~evaluation_point ~xi
+      without_degree_bound with_degree_bound
+
+  (*
     List.fold_left (Vector.to_list evals) ~init:eval0 ~f:(fun acc eval ->
-        Fq.((xi * acc) + eval) )
-
-  module Evals = struct
-    type 'a t =
-      { sg_old: 'a
-      ; x_hat: 'a
-      ; w_hat: 'a
-      ; s: 'a
-      ; z_hat_a: 'a
-      ; z_hat_b: 'a
-      ; g_1: 'a
-      ; h_1: 'a
-      ; g_2: 'a
-      ; h_2: 'a
-      ; g_3: 'a
-      ; h_3: 'a
-      ; row_a: 'a
-      ; row_b: 'a
-      ; row_c: 'a
-      ; col_a: 'a
-      ; col_b: 'a
-      ; col_c: 'a
-      ; value_a: 'a
-      ; value_b: 'a
-      ; value_c: 'a }
-
-    open Vector
-
-    let to_vector
-        { sg_old
-        ; x_hat
-        ; w_hat
-        ; s
-        ; z_hat_a
-        ; z_hat_b
-        ; g_1
-        ; h_1
-        ; g_2
-        ; h_2
-        ; g_3
-        ; h_3
-        ; row_a
-        ; row_b
-        ; row_c
-        ; col_a
-        ; col_b
-        ; col_c
-        ; value_a
-        ; value_b
-        ; value_c } =
-      [ sg_old
-      ; x_hat
-      ; w_hat
-      ; s
-      ; z_hat_a
-      ; z_hat_b
-      ; g_1
-      ; h_1
-      ; g_2
-      ; h_2
-      ; g_3
-      ; h_3
-      ; row_a
-      ; row_b
-      ; row_c
-      ; col_a
-      ; col_b
-      ; col_c
-      ; value_a
-      ; value_b
-      ; value_c ]
-
-    let of_vector
-        ([ sg_old
-         ; x_hat
-         ; w_hat
-         ; s
-         ; z_hat_a
-         ; z_hat_b
-         ; g_1
-         ; h_1
-         ; g_2
-         ; h_2
-         ; g_3
-         ; h_3
-         ; row_a
-         ; row_b
-         ; row_c
-         ; col_a
-         ; col_b
-         ; col_c
-         ; value_a
-         ; value_b
-         ; value_c ] :
-          (_, Nat.N21.n) Vector.t) =
-      { sg_old
-      ; x_hat
-      ; w_hat
-      ; s
-      ; z_hat_a
-      ; z_hat_b
-      ; g_1
-      ; h_1
-      ; g_2
-      ; h_2
-      ; g_3
-      ; h_3
-      ; row_a
-      ; row_b
-      ; row_c
-      ; col_a
-      ; col_b
-      ; col_c
-      ; value_a
-      ; value_b
-      ; value_c }
-
-    let typ =
-      let t = Vector.typ Field.typ Nat.N21.n in
-      Typ.transport t ~there:to_vector ~back:of_vector
-      |> Typ.transport_var ~there:to_vector ~back:of_vector
-  end
+        Fq.((xi * acc) + eval) ) *)
 
   (* x^{2 ^ k} - 1 *)
   let vanishing_polynomial domain x =
@@ -573,14 +255,15 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
     done ;
     res
 
-  let prod k f =
-    let r = ref (f 0) in
-    for i = 1 to k - 1 do
-      r := Fq.(f i * !r)
-    done ;
-    !r
-
+  (* TODO: Check a_hat! *)
   let check_bulletproof_challenges chals ~sg_challenge_point ~sg_evaluation =
+    let prod k f =
+      let r = ref (f 0) in
+      for i = 1 to k - 1 do
+        r := Fq.(f i * !r)
+      done ;
+      !r
+    in
     let chals =
       Array.map chals
         ~f:(fun { Types.Pairing_based.Bulletproof_challenge.prechallenge
@@ -595,26 +278,15 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
     let k = Array.length chals in
     let chal_invs = Array.map chals ~f:Fq.inv in
     let pows = pow_two_pows sg_challenge_point k in
-    prod k (fun i -> Fq.(chals.(i) + (chal_invs.(i) * pows.(i))))
+    Fq.Assert.equal
+      (prod k (fun i -> Fq.(chals.(i) + (chal_invs.(i) * pows.(i)))))
+      sg_evaluation
 
-  (* TODO: Check a_hat! *)
+  module Marlin_checks = Marlin_checks.Make (Impl)
+
   let finalize_other_proof ~domain_k ~domain_h ~sponge ~sg_challenge_point
       ~sg_evaluation
-      ({ xi
-       ; r
-       ; combined_inner_product
-       ; bulletproof_challenges
-       ; a_hat
-       ; marlin=
-           { sigma_2
-           ; sigma_3
-           ; alpha
-           ; eta_a
-           ; eta_b
-           ; eta_c
-           ; beta_1
-           ; beta_2
-           ; beta_3 } } :
+      ({xi; r; combined_inner_product; bulletproof_challenges; a_hat; marlin} :
         _ Types.Pairing_based.Proof_state.Deferred_values.t) =
     check_bulletproof_challenges bulletproof_challenges ~sg_challenge_point
       ~sg_evaluation ;
@@ -627,12 +299,13 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
        f_tilde(beta_1) = 0
     *)
     let beta_1_evals, beta_2_evals, beta_3_evals =
-      let ty = Evals.typ in
+      let ty = Evals.typ Fq.typ in
       exists (Typ.tuple3 ty ty ty)
     in
     let open Fq in
     let absorb_evals e =
-      Vector.iter (Evals.to_vector e) ~f:(Sponge.absorb sponge)
+      let xs, ys = Evals.to_vectors e in
+      List.iter Vector.(to_list xs @ to_list ys) ~f:(Sponge.absorb sponge)
     in
     (* A lot of hashing. *)
     absorb_evals beta_1_evals ;
@@ -646,74 +319,40 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
         Assert.equal (pack r_actual) r
       in
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
-      let combine e = combined_evaluation ~xi (Evals.to_vector e) in
+      let combine pt e =
+        combined_evaluation ~xi ~evaluation_point:pt (Evals.to_vectors e)
+      in
       let actual_combined_inner_product =
-        combine beta_1_evals
-        + (r * (combine beta_2_evals + (r * combine beta_3_evals)))
+        combine marlin.beta_1 beta_1_evals
+        + r
+          * ( combine marlin.beta_2 beta_2_evals
+            + (r * combine marlin.beta_3 beta_3_evals) )
       in
       Assert.equal combined_inner_product actual_combined_inner_product
     in
-    let open Fq in
-    (* Marlin checks follow *)
-    let row = abc beta_3_evals.row_a beta_3_evals.row_b beta_3_evals.row_c
-    and col = abc beta_3_evals.col_a beta_3_evals.col_b beta_3_evals.col_c
-    and value =
-      abc beta_3_evals.value_a beta_3_evals.value_b beta_3_evals.value_c
-    and eta = abc eta_a eta_b eta_c
-    and z_ =
-      abc beta_1_evals.z_hat_a beta_1_evals.z_hat_b
-        (beta_1_evals.z_hat_a * beta_1_evals.z_hat_b)
-    in
-    let z_hat_beta_1 =
-      (beta_1_evals.w_hat * vanishing_polynomial Input_domain.domain beta_1)
-      + beta_1_evals.x_hat
-    in
-    let sum = sum' in
-    let r_alpha =
-      let v_h_alpha = vanishing_polynomial domain_h alpha in
-      fun x -> (v_h_alpha - vanishing_polynomial domain_h x) / (alpha - x)
-    in
-    let v_h_beta_1 = vanishing_polynomial domain_h beta_1 in
-    let v_h_beta_2 = vanishing_polynomial domain_h beta_2 in
-    let a_beta_3, b_beta_3 =
-      let a =
-        v_h_beta_1 * v_h_beta_2
-        * sum ms (fun m ->
-              eta m * value m
-              * prod (all_but m) (fun n -> (beta_2 - row n) * (beta_1 - col n))
-          )
-      in
-      let b = prod ms (fun m -> (beta_2 - row m) * (beta_1 - col m)) in
-      (a, b)
-    in
-    Assert.equal
-      (beta_3_evals.h_3 * vanishing_polynomial domain_k beta_3)
-      ( a_beta_3
-      - b_beta_3
-        * ( (beta_3 * beta_3_evals.g_3)
-          + (sigma_3 / of_int (Domain.size domain_k)) ) ) ;
-    Assert.equal
-      (r_alpha beta_2 * sigma_3)
-      ( (beta_2_evals.h_2 * v_h_beta_2)
-      + (beta_2 * beta_2_evals.g_2)
-      + (sigma_2 / of_int (Domain.size domain_h)) ) ;
-    Assert.equal
-      ( beta_1_evals.s
-      + (r_alpha beta_1 * sum ms (fun m -> eta m * z_ m))
-      - (sigma_2 * z_hat_beta_1) )
-      ((beta_1_evals.h_1 * v_h_beta_1) + (beta_1 * beta_1_evals.g_1))
+    let open Evals in
+    let evals evals fields = Vector.map fields ~f:(fun f -> f evals) in
+    Marlin_checks.check ~input_domain:Input_domain.domain ~domain_h ~domain_k
+      marlin
+      (evals beta_1_evals [g_1; h_1; z_hat_a; z_hat_b; w_hat; x_hat; s])
+      (evals beta_2_evals [g_2; h_2])
+      (evals beta_3_evals
+         [ g_3
+         ; h_3
+         ; row_a
+         ; row_b
+         ; row_c
+         ; col_a
+         ; col_b
+         ; col_c
+         ; value_a
+         ; value_b
+         ; value_c ])
 
-  let hash_me_only
-      ({ pairing_marlin_acc= {r_f_plus_r_v; r_pi; zr_pi}
-       ; pairing_marlin_index= {row; col; value} } :
-        _ Types.Dlog_based.Proof_state.Me_only.t) =
+  let hash_me_only t =
     let elts =
-      Array.append
-        (Array.concat_map [|r_f_plus_r_v; r_pi; zr_pi|] ~f:(fun g ->
-             Array.of_list (G1.to_field_elements g) ))
-        (Array.concat_map [|row; col; value|] ~f:(fun {a; b; c} ->
-             Array.concat_map [|a; b; c|] ~f:(fun g ->
-                 Array.of_list (G1.to_field_elements g) ) ))
+      Types.Dlog_based.Proof_state.Me_only.to_field_elements
+        ~g1:G1.to_field_elements t
     in
     let sponge = Sponge.create sponge_params in
     Array.iter elts ~f:(fun x -> Sponge.absorb sponge x) ;
@@ -741,17 +380,34 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
           marlin ~f
     ; combined_inner_product
     ; bulletproof_challenges=
-        Array.map bulletproof_challenges ~f:(fun r ->
+        Array.map bulletproof_challenges
+          ~f:(fun (r : _ Types.Pairing_based.Bulletproof_challenge.t) ->
             {r with prechallenge= f r.prechallenge} )
     ; xi= f xi
     ; r= f r
     ; a_hat }
 
-  (* TODO: The way this handles fq elts and bulletproof challenges is wrong. Fix. *)
-  let pack_data (fq, digest, challenge, bulletproof_challenges) =
+  let split_last xs =
+    let rec go acc = function
+      | [x] ->
+          (List.rev acc, x)
+      | x :: xs ->
+          go (x :: acc) xs
+      | [] ->
+          failwith "Empty list"
+    in
+    go [] xs
+
+  (* TODO: The way this handles fq elts is wrong. Fix. *)
+  let pack_data (bool, fq, digest, challenge, bulletproof_challenges) =
     Array.concat
-      [ Array.of_list_map (Vector.to_list fq) ~f:(fun x ->
-            Bitstring_lib.Bitstring.Lsb_first.to_list (Fq.unpack_full x) )
+      [ Array.map (Vector.to_array bool) ~f:List.return
+      ; Array.concat_map (Vector.to_array fq) ~f:(fun x ->
+            let low_bits, high_bit =
+              split_last
+                (Bitstring_lib.Bitstring.Lsb_first.to_list (Fq.unpack_full x))
+            in
+            [|low_bits; [high_bit]|] )
       ; Vector.to_array challenge
       ; Vector.to_array digest
       ; Array.map bulletproof_challenges
@@ -803,8 +459,12 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
       Sponge.absorb s prev_sponge_digest_before_evaluations ;
       s
     in
-    finalize_other_proof ~domain_k ~domain_h ~sponge prev_deferred_values
-      ~sg_challenge_point ~sg_evaluation ;
+    let prev_proof_finalized =
+      finalize_other_proof ~domain_k ~domain_h ~sponge prev_deferred_values
+        ~sg_challenge_point ~sg_evaluation
+    in
+    Boolean.Assert.any
+      [prev_proof_finalized; prev_statement.proof_state.was_base_case] ;
     let ( sponge_digest_before_evaluations_actual
         , pairing_acc_actual
         , marlin_actual ) =
@@ -832,7 +492,14 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
         (marlin_data marlin_actual))
        *)
 
-  let main t = main (Types.Dlog_based.Statement.of_data t)
+  let main (fp, fq, challenge, fq_challenge, digest) =
+    let unpack length = Vector.map ~f:(Fq.unpack ~length) in
+    ( unpack Fq.size_in_bits fp
+    , fq
+    , unpack Challenge.length challenge
+    , fq_challenge
+    , digest )
+    |> Types.Dlog_based.Statement.of_data |> main
 
   (*
 
@@ -1219,3 +886,135 @@ module Pairing_main (Inputs : Pairing_main_inputs_intf) = struct
     assert (actual_u_new = u_new) ;
     assert (actual_x_new = x_new)
 end *)
+(*
+  module Fp_constant = struct
+    include Snarkette.Fields.Make_fp (struct
+                include B
+
+                let num_bits _ = 382
+
+                let log_and = ( land )
+
+                let log_or = ( lor )
+
+                let test_bit x (i : int) = shift_right x i land one = one
+
+                let to_yojson t = `String (to_string t)
+
+                let of_yojson _ = failwith "todo"
+
+                let ( // ) = ( / )
+              end)
+              (struct
+                let order = Fp_params.p
+              end)
+
+    let of_bits bs = Option.value_exn (of_bits bs)
+
+    let size_in_bits = 382
+  end
+
+  module L = Eval_lagrange.Eval_lagrange (Impl) (Sponge) (Fp_constant) *)
+
+(* TODO: Could save 3 scalar muls at the cost of
+     (I think) 3 more public inputs here by witnessing
+
+     vr_i == value_i * randomness_i.
+
+     Actually can avoid both!
+  *)
+
+(*
+  module Accumulation_deferred_values = struct
+    type t =
+      {
+      }
+  end *)
+(* I think we need to absorb the evaluations to sample r properly.
+
+     OTOH -- the evaluations are completely determined subject to the proof verifying...
+  *)
+
+(* The xi sum scheme HAS to be
+
+     say v_0 : Fq
+
+     // let xi = witness() // == Fq_friendly_hash(sponge_digest_at_this_moment, v_0, ..., v_n)
+     let c = witness(); // sum_i xi^i v_i
+
+     expose c := sum_i 
+  *)
+
+(* Accumulate
+
+     sum_{i=1}^3 r^i f_i
+     = f_1 + r * (f_2 + r * f_3)
+
+     sum_{i=1}^3 r^i v_i g
+
+     Option 1:
+      compute
+      
+      f_1 - v_1 * g + r * (f_2 - v_2 * g + r * (f_3 - v_3 g))
+
+     cost:
+      3 fixed base scalar muls
+      3 variable base scalar muls
+
+     public inputs:
+      v_1, v_2, v_3
+
+     Option 2:
+     compute
+      f_1 + r * (f_2 + r * f_3)
+      and
+      (sum_{i=1}^3 r^i v_i) g
+
+     cost:
+      1 fixed base scalar mul
+      3 variable base
+
+     public inputs:
+        s := (sum_{i=1}^3 r^i v_i), digest_at_that_point
+
+        in the other snark do:
+          let evals = exists()
+          sponge = sponge(digest_at_that_point);
+          sponge.absorb(evals);
+          let xi = squeeze();
+          let r = squeeze();
+          let v_j = sum_i xi^i evals.beta_j[i] 
+          assert (s == sum_{j=1}^3 sum_i xi^i evals.beta_j[i])
+  *)
+(*
+  module Requests = struct
+    open Snarky.Request
+
+    module Prev = struct
+      type _ t +=
+        | Pairing_marlin_accumulator : G1.Constant.t Accumulator.t t
+        | Pairing_marlin_proof :
+            ( PC.Constant.t
+            , Fp.Unpacked.constant
+            , ( Opening_proof.Constant.t
+              , Fp.Unpacked.constant )
+              Pairing_marlin_types.Openings.t )
+            Proof.t
+            t
+        | Sponge_digest : Fp.Unpacked.constant t
+    end
+
+    type _ t +=
+      | Fp_mul : bool list * bool list -> bool list t
+      | Mul_scalars : bool list * bool list -> bool list t
+  end *)
+(*
+  let accumulate_and_defer
+      ~(defer : [`Mul of Fp.Unpacked.t * Fp.Unpacked.t] -> Boolean.var list)
+      r_i f_i z_i ({values; proof} : _ Opening.t) acc
+    =
+    let zr_i = defer (`Mul (z_i, r_i)) in
+    let acc = accumuluate_pairing_state r_i zr_i proof f_i acc in
+    (acc, {Accumulator.Input.zr= zr_i; z= z_i; v= values})
+
+*)
