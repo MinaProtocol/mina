@@ -15,6 +15,13 @@ crate-type = ["staticlib"]
 
 [dependencies]
 libc = { version = "0.2.0" }
-algebra = { path = "../algebra" }
+algebra = { git = "https://github.com/o1-labs/zexe/" }
+ff-fft = { git = "https://github.com/o1-labs/zexe/" }
 rand = { version = "0.7" }
 num-bigint = { version = "0.2.3" }
+sprs = { version = "0.7.1" }
+rand_core = { version = "0.5" }
+
+circuits = { git = "https://github.com/o1-labs/marlin/" }
+oracle = { git = "https://github.com/o1-labs/marlin/" }
+protocol = { git = "https://github.com/o1-labs/marlin/" }

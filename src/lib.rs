@@ -20,10 +20,7 @@ use algebra::{
 use circuits::index::Index;
 use ff_fft::EvaluationDomain;
 use num_bigint::BigUint;
-use oracle::{
-    self,
-    {poseidon, poseidon::Sponge},
-};
+use oracle::{self, poseidon, poseidon::Sponge};
 use protocol::prover::ProverProof;
 use rand::rngs::StdRng;
 use rand_core;
@@ -781,7 +778,6 @@ pub extern "C" fn camlsnark_bn382_fp_index_create(
             rows_to_csmat(public_inputs, h_to_x_ratio, c),
             public_inputs,
             oracle::bn_382::fp::params(),
-            oracle::bn_382::fq::params(),
             rng,
         )
         .unwrap(),
