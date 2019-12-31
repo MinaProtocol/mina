@@ -781,6 +781,7 @@ pub extern "C" fn camlsnark_bn382_fp_index_create(
             rows_to_csmat(public_inputs, h_to_x_ratio, c),
             public_inputs,
             oracle::bn_382::fp::params(),
+            oracle::bn_382::fq::params(),
             rng,
         )
         .unwrap(),
