@@ -93,11 +93,10 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           let%map new_root =
             with_label __LOC__
               (Pending_coinbase.Checked.add_coinbase root_after_delete
-                 ( Pending_coinbase.Update.Action.(var_of_t Update_none)
+                 ( Snark_transition.pending_coinbase_action transition
                  , ( Snark_transition.proposer transition
                    , Snark_transition.coinbase_amount transition
                    , previous_state_body_hash ) ))
-            (*TODO: get push_state boolean if there was any transaction in this block*)
           in
           (new_root, deleted_stack, no_coinbases_popped)
         in

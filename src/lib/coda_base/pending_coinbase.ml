@@ -357,7 +357,7 @@ module Update = struct
           | Update_one
           | Update_two_coinbase_in_first
           | Update_two_coinbase_in_second
-        [@@deriving sexp]
+        [@@deriving sexp, to_yojson]
 
         let to_latest = Fn.id
       end
@@ -807,8 +807,25 @@ struct
         let%bind amount1_equal_to_zero = equal_to_zero amount in
         let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
         let%bind () =
-          let%bind check1 = Boolean.equal no_update amount1_equal_to_zero in
-          (*let%bind coinbase_split = Update.Action.Checked.update_two_stacks_coinbase_in_first action in
+          as_prover
+            As_prover.(
+              Let_syntax.(
+                let%map amount1_equal_to_zero =
+                  read Boolean.typ amount1_equal_to_zero
+                and amount = read Currency.Amount.typ amount
+                and no_update = read Boolean.typ no_update
+                and action = read Update.Action.typ action in
+                Core.printf
+                  !"amount1_equal_to_zero %b amount1 \
+                    %{sexp:Currency.Amount.t} no_update %b action \
+                    %{sexp:Update.Action.t}\n\
+                    %!"
+                  amount1_equal_to_zero amount no_update action))
+        in
+        let%bind () =
+          with_label __LOC__
+            (let%bind check1 = Boolean.equal no_update amount1_equal_to_zero in
+             (*let%bind coinbase_split = Update.Action.Checked.update_two_stacks_coinbase_in_first action in
               let%bind coinbase_not_split =  Update.Action.Checked.update_one_stack action in
               let%bind check2 = Boolean.(equal amount2_equal_to_zero (not coinbase_split)) in
               let%bind check3 = 
@@ -816,18 +833,19 @@ struct
                 let%bind amount2_can_be_zero = Boolean.(no_coinbase_in_this_stack || coinbase_not_split)
                 in
                 Boolean.(equal amount2_equal_to_zero amount2_can_be_zero) 
-              in 
-              let%bind () =
-                as_prover As_prover.(Let_syntax.(
-                  let%map check1 = read Boolean.typ check1
-                   and check2 = read Boolean.typ check2
-                   and check3 = read Boolean.typ check3 
-                  in
-                  Core.printf !"check1 %b check2 %b check3 %b\n%!" check1 check2 check3
-                )
-                )
-              in*)
-          Boolean.Assert.all [check1]
+              in *)
+             let%bind () =
+               as_prover
+                 As_prover.(
+                   Let_syntax.(
+                     let%map check1 =
+                       read Boolean.typ check1
+                       (*and check2 = read Boolean.typ check2
+                   and check3 = read Boolean.typ check3 *)
+                     in
+                     Core.printf !"check1 %b \n%!" check1))
+             in
+             Boolean.Assert.all [check1])
           (*; check2; check3] *)
         in
         (*TODO: Add xnor in snarky*)

@@ -161,6 +161,7 @@ module type S = sig
 
   module Update : sig
     module Action : sig
+      [%%versioned:
       module Stable : sig
         module V1 : sig
           type t =
@@ -168,11 +169,9 @@ module type S = sig
             | Update_one
             | Update_two_coinbase_in_first
             | Update_two_coinbase_in_second
-          [@@deriving sexp]
+          [@@deriving sexp, to_yojson]
         end
-
-        module Latest = V1
-      end
+      end]
 
       type t = Stable.Latest.t =
         | Update_none

@@ -710,6 +710,9 @@ module T = struct
       \      Coinbase parts:$coinbase_count Spots\n\
       \      available:$spots_available Pending work in the \
        scan-state:$proof_bundles_waiting Work included:$work_count" ;
+    Core.printf
+      !"Pending coinbase action %{sexp: Pending_coinbase.Update.Action.t}\n%!"
+      stack_update_in_snark ;
     let new_staged_ledger =
       { scan_state= scan_state'
       ; ledger= new_ledger
