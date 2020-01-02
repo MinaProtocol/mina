@@ -79,7 +79,7 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
   loop []
 
 let%test_unit "to_alist (of_alist l) = l" =
-  Quickcheck.test
+  Async.Quickcheck.async_test
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
@@ -96,8 +96,8 @@ let%test_unit "to_alist (of_alist l) = l" =
               ~compare:[%compare: Bigstring.t * Bigstring.t]
           in
           [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
-          Async.Deferred.unit )
-      |> Async.don't_wait_for )
+          Async.Deferred.unit ) )
+  |> Async.don't_wait_for
 
 let%test_unit "sanity check" =
   Quickcheck.test
