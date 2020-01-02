@@ -139,7 +139,23 @@ let%test_unit "sanity check" =
         ~metadata:
           [ ("files", `List (List.map ~f:(fun s -> `String s) files))
           ; ("dirs", `List (List.map ~f:(fun s -> `String s) dirs))
-          ; ("db_dir", `String db_dir) ]
+          ; ("db_dir", `String db_dir)
+          ; ( "expected"
+            , `List
+                (List.map
+                   ~f:(fun (k, v) ->
+                     `List
+                       [ `String (Bigstring.to_string k)
+                       ; `String (Bigstring.to_string v) ] )
+                   sorted) )
+          ; ( "actual"
+            , `List
+                (List.map
+                   ~f:(fun (k, v) ->
+                     `List
+                       [ `String (Bigstring.to_string k)
+                       ; `String (Bigstring.to_string v) ] )
+                   alist) ) ]
         "all files in $db_dir" ;
       [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
       close db )
