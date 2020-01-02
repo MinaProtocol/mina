@@ -104,10 +104,7 @@ let%test_unit "sanity check" =
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
-      let db_dir =
-        Filename.temp_dir_name
-        ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
-      in
+      let db_dir = Filename.temp_dir "db_dir" "" in
       let s = Bigstring.of_string in
       let sorted =
         List.sort kvs ~compare:[%compare: string * string]
