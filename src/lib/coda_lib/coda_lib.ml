@@ -847,6 +847,10 @@ let create (config : Config.t) =
                     Coda_networking.ban_notify net peer banned_until
                   in
                   () ) ) ; *)
+          don't_wait_for
+            (Linear_pipe.iter
+               (Coda_networking.ban_notification_reader net)
+               ~f:(Fn.const Deferred.unit)) ;
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system
