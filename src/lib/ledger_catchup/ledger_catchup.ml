@@ -59,6 +59,7 @@ end
 let verify_transition ~logger ~trust_system ~verifier ~frontier
     ~unprocessed_transition_cache enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
+  let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let cached_initially_validated_transition_result =
     let open Deferred.Result.Let_syntax in
     let transition = Envelope.Incoming.data enveloped_transition in
@@ -66,7 +67,10 @@ let verify_transition ~logger ~trust_system ~verifier ~frontier
       External_transition.Validation.wrap transition
       |> External_transition.skip_time_received_validation
            `This_transition_was_not_received_via_gossip
-      |> External_transition.validate_proof ~verifier
+      |> Fn.compose Deferred.return
+           (External_transition.validate_genesis_protocol_state
+              ~genesis_state_hash)
+      >>= External_transition.validate_proof ~verifier
       >>= Fn.compose Deferred.return
             External_transition.validate_delta_transition_chain
     in
@@ -114,6 +118,13 @@ let verify_transition ~logger ~trust_system ~verifier ~frontier
           , Some ("invalid proof", []) )
       in
       Error (Error.of_string "invalid proof")
+  | Error `Invalid_genesis_protocol_state ->
+      let%map () =
+        Trust_system.record_envelope_sender trust_system logger sender
+          ( Trust_system.Actions.Gossiped_invalid_transition
+          , Some ("invalid genesis protocol state", []) )
+      in
+      Error (Error.of_string "invalid genesis protocol state")
   | Error `Invalid_delta_transition_chain_proof ->
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender

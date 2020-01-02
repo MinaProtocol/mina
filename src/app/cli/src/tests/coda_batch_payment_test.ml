@@ -9,11 +9,11 @@ let main () =
   Async.Scheduler.set_record_backtraces true ;
   let logger = Logger.create () in
   let keypairs =
-    List.map Genesis_ledger.accounts
-      ~f:Genesis_ledger.keypair_of_account_record_exn
+    List.map Test_genesis_ledger.accounts
+      ~f:Test_genesis_ledger.keypair_of_account_record_exn
   in
   let largest_account_keypair =
-    Genesis_ledger.largest_account_keypair_exn ()
+    Test_genesis_ledger.largest_account_keypair_exn ()
   in
   let proposers i = if i = 0 then Some i else None in
   let snark_work_public_keys i =

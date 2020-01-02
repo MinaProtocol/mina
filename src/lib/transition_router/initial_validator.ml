@@ -11,6 +11,7 @@ let max_blocklength_observed = ref 0
 
 type validation_error =
   [ `Invalid_time_received of [`Too_early | `Too_late of int64]
+  | `Invalid_genesis_protocol_state
   | `Invalid_proof
   | `Invalid_delta_transition_chain_proof
   | `Verifier_error of Error.t ]
@@ -45,6 +46,8 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash
       punish Sent_invalid_transition_chain_merkle_proof None
   | `Invalid_time_received `Too_early ->
       punish Gossiped_future_transition None
+  | `Invalid_genesis_protocol_state ->
+      punish Has_invalid_genesis_protocol_state None
   | `Invalid_time_received (`Too_late slot_diff) ->
       punish (Gossiped_old_transition slot_diff)
         (Some
@@ -133,7 +136,8 @@ module Duplicate_proposal_detector = struct
 end
 
 let run ~logger ~trust_system ~verifier ~transition_reader
-    ~valid_transition_writer ~initialization_finish_signal =
+    ~valid_transition_writer ~initialization_finish_signal ~genesis_state_hash
+    =
   let open Deferred.Let_syntax in
   let duplicate_checker = Duplicate_proposal_detector.create () in
   don't_wait_for
@@ -152,14 +156,15 @@ let run ~logger ~trust_system ~verifier ~transition_reader
            Duplicate_proposal_detector.check duplicate_checker logger
              transition_with_hash ;
            let sender = Envelope.Incoming.sender transition_env in
+           let defer f = Fn.compose Deferred.return f in
            match%bind
              let open Deferred.Result.Monad_infix in
              External_transition.(
                Validation.wrap transition_with_hash
-               |> Fn.compose Deferred.return
-                    (validate_time_received ~time_received)
+               |> defer (validate_time_received ~time_received)
+               >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
                >>= validate_proof ~verifier
-               >>= Fn.compose Deferred.return validate_delta_transition_chain)
+               >>= defer validate_delta_transition_chain)
            with
            | Ok verified_transition ->
                Envelope.Incoming.wrap ~data:verified_transition ~sender

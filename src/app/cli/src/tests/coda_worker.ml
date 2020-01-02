@@ -463,8 +463,8 @@ module T = struct
           in
           let propose_keypair =
             Option.map proposer ~f:(fun i ->
-                List.nth_exn Genesis_ledger.accounts i
-                |> Genesis_ledger.keypair_of_account_record_exn )
+                List.nth_exn Test_genesis_ledger.accounts i
+                |> Test_genesis_ledger.keypair_of_account_record_exn )
           in
           let initial_propose_keypairs =
             Keypair.Set.of_list (propose_keypair |> Option.to_list)
@@ -478,6 +478,7 @@ module T = struct
           in
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_propose_keys
+              ~genesis_ledger:Test_genesis_ledger.t
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
@@ -497,6 +498,8 @@ module T = struct
             ; time_controller
             ; consensus_local_state
             ; is_seed= List.is_empty peers
+            ; genesis_ledger_hash=
+                Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
             ; log_gossip_heard=
                 { snark_pool_diff= false
                 ; transaction_pool_diff= false
@@ -509,6 +512,11 @@ module T = struct
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
+          in
+          let genesis_state_hash =
+            Coda_state.Genesis_protocol_state.t
+              ~genesis_ledger:Test_genesis_ledger.t
+            |> With_hash.hash
           in
           let coda_deferred () =
             Coda_lib.create
@@ -529,7 +537,10 @@ module T = struct
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ~initial_propose_keypairs ~monitor ~consensus_local_state
                  ~transaction_database ~external_transition_database
-                 ~is_archive_rocksdb ~work_reassignment_wait:420000 ())
+                 ~is_archive_rocksdb ~work_reassignment_wait:420000
+                 ~genesis_state_hash ())
+              ~genesis_ledger:Test_genesis_ledger.t
+              ~base_proof:Precomputed_values.base_proof
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger

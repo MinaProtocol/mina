@@ -935,7 +935,8 @@ let%test_module _ =
           ; delegate= Public_key.Compressed.empty
           ; voting_for=
               Quickcheck.random_value ~seed:(`Deterministic "constant")
-                State_hash.gen } )
+                State_hash.gen
+          ; timing= Account.Timing.Untimed } )
 
     let%test_unit "Transactions are removed and added back in fork changes" =
       Thread_safe.block_on_async_exn (fun () ->

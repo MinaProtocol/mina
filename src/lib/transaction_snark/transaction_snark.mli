@@ -53,7 +53,7 @@ module Statement : sig
           ; fee_excess:
               ( Currency.Fee.Stable.V1.t
               , Sgn.Stable.V1.t )
-              Currency.Signed.Stable.V1.t
+              Currency.Signed_poly.Stable.V1.t
           ; proof_type: Proof_type.Stable.V1.t }
         [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
       end

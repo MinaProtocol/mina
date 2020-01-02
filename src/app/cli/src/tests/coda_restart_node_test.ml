@@ -9,7 +9,7 @@ include Heartbeat.Make ()
 let main () =
   let logger = Logger.create () in
   let largest_account_keypair =
-    Genesis_ledger.largest_account_keypair_exn ()
+    Test_genesis_ledger.largest_account_keypair_exn ()
   in
   Deferred.don't_wait_for (print_heartbeat logger) ;
   let n = 2 in

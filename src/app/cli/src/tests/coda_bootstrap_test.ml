@@ -7,7 +7,7 @@ let name = "coda-bootstrap-test"
 let main () =
   let logger = Logger.create () in
   let largest_account_keypair =
-    Genesis_ledger.largest_account_keypair_exn ()
+    Test_genesis_ledger.largest_account_keypair_exn ()
   in
   let n = 2 in
   let proposers i = Some i in

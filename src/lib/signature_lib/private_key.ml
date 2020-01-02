@@ -15,6 +15,12 @@ module Stable = struct
 
     let to_yojson t = `String (Tick.Inner_curve.Scalar.to_string t)
 
+    let of_yojson = function
+      | `String s ->
+          Ok (Tick.Inner_curve.Scalar.of_string s)
+      | _ ->
+          Error "Private_key.of_yojson expected `String"
+
     let gen =
       let open Bignum_bigint in
       Quickcheck.Generator.map
@@ -59,7 +65,7 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving to_yojson, sexp]
+type t = Stable.Latest.t [@@deriving yojson, sexp]
 
 [%%define_locally
 Stable.Latest.(gen)]

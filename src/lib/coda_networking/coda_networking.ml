@@ -503,6 +503,7 @@ module Config = struct
     ; trust_system: Trust_system.t
     ; time_controller: Block_time.Controller.t
     ; consensus_local_state: Consensus.Data.Local_state.t
+    ; genesis_ledger_hash: Ledger_hash.t
     ; creatable_gossip_net: Gossip_net.Any.creatable
     ; is_seed: bool
     ; log_gossip_heard: log_gossip_heard }
@@ -719,7 +720,9 @@ let create (config : Config.t)
     @ Consensus.Hooks.Rpcs.(
         List.map
           (rpc_handlers ~logger:config.logger
-             ~local_state:config.consensus_local_state)
+             ~local_state:config.consensus_local_state
+             ~genesis_ledger_hash:
+               (Frozen_ledger_hash.of_ledger_hash config.genesis_ledger_hash))
           ~f:(fun (Rpc_handler (rpc, f)) ->
             Rpcs.(Rpc_handler (Consensus_rpc rpc, f)) ))
   in
