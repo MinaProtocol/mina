@@ -5,6 +5,8 @@ use algebra::{
         bn_382::{
             g::{Affine as GAffine, Projective as GProjective},
             Bn_382, G1Affine, G1Projective,
+            g1::Bn_382G1Parameters,
+            g::Bn_382GParameters,
         },
         AffineCurve, ProjectiveCurve,
     },
@@ -21,7 +23,7 @@ use circuits::index::Index;
 use ff_fft::EvaluationDomain;
 use num_bigint::BigUint;
 use oracle::{self, poseidon, poseidon::Sponge};
-use protocol::prover::ProverProof;
+use protocol::{prover::{ ProverProof}, marlin_sponge::{DefaultFqSponge, DefaultFrSponge}};
 use rand::rngs::StdRng;
 use rand_core;
 use sprs::{CsMat, CsVecView, CSR};
@@ -556,7 +558,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_create(
         witness[ratio * block + 1 + intra_block] = w.clone();
     }
 
-    let proof = ProverProof::create(&witness, &index).unwrap();
+    let proof = ProverProof::create::<DefaultFqSponge<Bn_382G1Parameters>, DefaultFrSponge<Fp> > (&witness, &index).unwrap();
 
     return Box::into_raw(Box::new(proof));
 }
@@ -591,8 +593,8 @@ pub extern "C" fn camlsnark_bn382_fp_proof_h1_comm(p: *mut ProverProof<Bn_382>) 
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_g1_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
-    let x = (unsafe { (*p).g1_comm }).clone();
+pub extern "C" fn camlsnark_bn382_fp_proof_g1_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
+    let x = (unsafe { (*p).g1_comm });
     return Box::into_raw(Box::new(x));
 }
 
@@ -603,8 +605,8 @@ pub extern "C" fn camlsnark_bn382_fp_proof_h2_comm(p: *mut ProverProof<Bn_382>) 
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_g2_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
-    let x = (unsafe { (*p).g2_comm }).clone();
+pub extern "C" fn camlsnark_bn382_fp_proof_g2_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
+    let x = (unsafe { (*p).g2_comm });
     return Box::into_raw(Box::new(x));
 }
 
@@ -615,9 +617,23 @@ pub extern "C" fn camlsnark_bn382_fp_proof_h3_comm(p: *mut ProverProof<Bn_382>) 
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_proof_g3_comm(p: *mut ProverProof<Bn_382>) -> *const G1Affine {
-    let x = (unsafe { (*p).g3_comm }).clone();
+pub extern "C" fn camlsnark_bn382_fp_proof_g3_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
+    let x = (unsafe { (*p).g3_comm });
     return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_proof_commitment_with_degree_bound_0(
+    p: *const (G1Affine, G1Affine)) -> *const G1Affine {
+    let (x0, _) = unsafe { (*p)};
+    return Box::into_raw(Box::new(x0.clone()));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_proof_commitment_with_degree_bound_1(
+    p: *const (G1Affine, G1Affine)) -> *const G1Affine {
+    let (_, x1) = unsafe { (*p)};
+    return Box::into_raw(Box::new(x1.clone()));
 }
 
 #[no_mangle]
@@ -652,55 +668,55 @@ pub extern "C" fn camlsnark_bn382_fp_proof_sigma3(p: *mut ProverProof<Bn_382>) -
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_w_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
-    let x = (unsafe { (*p).w_eval }).clone();
+    let x = (unsafe { (*p).evals.w }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_za_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
-    let x = (unsafe { (*p).za_eval }).clone();
+    let x = (unsafe { (*p).evals.za }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_zb_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
-    let x = (unsafe { (*p).zb_eval }).clone();
+    let x = (unsafe { (*p).evals.zb }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_h1_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
-    let x = (unsafe { (*p).h1_eval }).clone();
+    let x = (unsafe { (*p).evals.h1 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_g1_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
-    let x = (unsafe { (*p).g1_eval }).clone();
+    let x = (unsafe { (*p).evals.g1 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_h2_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
-    let x = (unsafe { (*p).h2_eval }).clone();
+    let x = (unsafe { (*p).evals.h2 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_g2_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
-    let x = (unsafe { (*p).g2_eval }).clone();
+    let x = (unsafe { (*p).evals.g2 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_h3_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
-    let x = (unsafe { (*p).h3_eval }).clone();
+    let x = (unsafe { (*p).evals.h3 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_g3_eval(p: *mut ProverProof<Bn_382>) -> *const Fp {
-    let x = (unsafe { (*p).g3_eval }).clone();
+    let x = (unsafe { (*p).evals.g3 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
@@ -708,7 +724,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_g3_eval(p: *mut ProverProof<Bn_382>) 
 pub extern "C" fn camlsnark_bn382_fp_proof_row_evals_nocopy(
     p: *mut ProverProof<Bn_382>,
 ) -> *const [Fp; 3] {
-    let x = unsafe { (*p).row_eval };
+    let x = unsafe { (*p).evals.row };
     return Box::into_raw(Box::new(x));
 }
 
@@ -716,7 +732,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_row_evals_nocopy(
 pub extern "C" fn camlsnark_bn382_fp_proof_col_evals_nocopy(
     p: *mut ProverProof<Bn_382>,
 ) -> *const [Fp; 3] {
-    let x = unsafe { (*p).col_eval };
+    let x = unsafe { (*p).evals.col };
     return Box::into_raw(Box::new(x));
 }
 
@@ -724,7 +740,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_col_evals_nocopy(
 pub extern "C" fn camlsnark_bn382_fp_proof_val_evals_nocopy(
     p: *mut ProverProof<Bn_382>,
 ) -> *const [Fp; 3] {
-    let x = unsafe { (*p).val_eval };
+    let x = unsafe { (*p).evals.val };
     return Box::into_raw(Box::new(x));
 }
 
@@ -778,6 +794,7 @@ pub extern "C" fn camlsnark_bn382_fp_index_create(
             rows_to_csmat(public_inputs, h_to_x_ratio, c),
             public_inputs,
             oracle::bn_382::fp::params(),
+            oracle::bn_382::fq::params(),
             rng,
         )
         .unwrap(),
