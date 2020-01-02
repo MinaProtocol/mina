@@ -5,7 +5,7 @@ open Core_kernel
 open Bitstring_lib
 open Snark_bits
 
-module type Scan_state_constants_S = Scan_state_constants_intf.S   
+module type Scan_state_constants_S = Scan_state_constants_intf.S
 
 module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend

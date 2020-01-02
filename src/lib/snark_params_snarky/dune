@@ -4,7 +4,7 @@
  (implements snark_params)
  (library_flags -linkall)
  (inline_tests)
- (private_modules snark_util snark_intf scan_state_constants scan_state_constants_intf)
+ (private_modules intf snark_util snark_intf scan_state_constants scan_state_constants_intf)
  (libraries sponge group_map fold_lib o1trace coda_digestif tuple_lib bitstring_lib
    snarky_group_map
    core_kernel snarky snarky_verifier snarky_field_extensions snarky_curves
@@ -14,4 +14,4 @@
     ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky bisect_ppx --
     -conditional))
  (preprocessor_deps ../../config.mlh)
- (synopsis "Snark parameters"))
+ (synopsis "Snark parameters for snarky"))
