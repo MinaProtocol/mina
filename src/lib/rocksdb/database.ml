@@ -105,8 +105,14 @@ let%test_unit "checkpoint read test" =
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
-      let db_dir = Filename.temp_dir "test_db" "" in
-      let cp_dir = Filename.temp_dir "test_cp" "" in
+      let db_dir =
+        Filename.temp_dir_name
+        ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
+      in
+      let cp_dir =
+        Filename.temp_dir_name
+        ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
+      in
       let s = Bigstring.of_string in
       let sorted =
         List.sort kvs ~compare:[%compare: string * string]
