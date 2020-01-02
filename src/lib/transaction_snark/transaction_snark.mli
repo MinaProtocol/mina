@@ -178,6 +178,7 @@ val check_transaction :
   -> target:Frozen_ledger_hash.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> Transaction.t
+  -> state_hash_witness:Transaction_witness.State_hash_witness.t
   -> Tick.Handler.t
   -> unit
 
@@ -187,6 +188,7 @@ val check_user_command :
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase.Stack.t
   -> User_command.With_valid_signature.t
+  -> Transaction_witness.State_hash_witness.t
   -> Tick.Handler.t
   -> unit
 
@@ -197,6 +199,7 @@ val generate_transaction_witness :
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase_stack_state.t
   -> Transaction.t
+  -> Transaction_witness.State_hash_witness.t
   -> Tick.Handler.t
   -> unit
 
@@ -210,6 +213,7 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> Transaction.t
+    -> state_hash_witness:Transaction_witness.State_hash_witness.t
     -> Tick.Handler.t
     -> t
 
@@ -219,6 +223,7 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> User_command.With_valid_signature.t
+    -> state_hash_witness:Transaction_witness.State_hash_witness.t
     -> Tick.Handler.t
     -> t
 
@@ -228,6 +233,7 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> Fee_transfer.t
+    -> state_hash_witness:Transaction_witness.State_hash_witness.t
     -> Tick.Handler.t
     -> t
 

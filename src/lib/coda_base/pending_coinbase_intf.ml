@@ -47,7 +47,7 @@ module type S = sig
 
     type var = Public_key.Compressed.var * Amount.var * State_body_hash.var
 
-    val typ : (var, t) Typ.t
+    val typ : (var, value) Typ.t
 
     val empty : t
 

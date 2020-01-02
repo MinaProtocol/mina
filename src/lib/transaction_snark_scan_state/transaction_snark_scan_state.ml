@@ -208,6 +208,11 @@ let create_expected_statement
     | _ ->
         pending_coinbase_with_state
   in
+  Core.printf
+    !"Creating statement before %{sexp: Pending_coinbase.Stack.t} after \
+      %{sexp: Pending_coinbase.Stack.t} transaction %{sexp:Transaction.t}\n\
+      %!"
+    pending_coinbase_before pending_coinbase_after transaction ;
   let%bind fee_excess = Transaction.fee_excess transaction in
   let%map supply_increase = Transaction.supply_increase transaction in
   { Transaction_snark.Statement.source

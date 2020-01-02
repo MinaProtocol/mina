@@ -48,27 +48,22 @@ module Coinbase_data = struct
     , Amount.var_of_t amount
     , State_body_hash.var_of_t state_body_hash )
 
-  let to_input (pk, amount, state_body_hash) =
+  let to_input (pk, amount, _state_body_hash) =
     let open Random_oracle.Input in
     List.reduce_exn ~f:append
-      [ Public_key.Compressed.to_input pk
-      ; bitstring (Amount.to_bits amount)
-      ; State_body_hash.to_input state_body_hash ]
+      [Public_key.Compressed.to_input pk; bitstring (Amount.to_bits amount)]
 
   module Checked = struct
-    let _constant ((public_key, amount, state_body_hash) : value) =
-      ( Public_key.Compressed.var_of_t public_key
-      , Amount.var_of_t amount
-      , State_body_hash.var_of_t state_body_hash )
+    let _constant ((public_key, amount, _state_body_hash) : value) =
+      (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
 
-    let to_input (public_key, amount, state_body_hash) =
+    let to_input (public_key, amount, _state_body_hash) =
       let open Random_oracle.Input in
       List.reduce_exn ~f:append
         [ Public_key.Compressed.Checked.to_input public_key
         ; bitstring
             (Bitstring_lib.Bitstring.Lsb_first.to_list
-               (Amount.var_to_bits amount))
-        ; State_body_hash.var_to_input state_body_hash ]
+               (Amount.var_to_bits amount)) ]
   end
 
   let typ : (var, value) Typ.t =

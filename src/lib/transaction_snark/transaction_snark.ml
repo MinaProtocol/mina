@@ -301,8 +301,9 @@ module Base = struct
   (* Nonce should only be incremented if it is a "Normal" transaction. *)
   let%snarkydef apply_tagged_transaction (type shifted)
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
-      root pending_coinbase_stack_before pending_coinbase_after state_body_hash
-      ({sender; signature; payload} : Transaction_union.var) =
+      root pending_coinbase_stack_before pending_coinbase_after
+      state_hash_witness ({sender; signature; payload} : Transaction_union.var)
+      =
     let nonce = payload.common.nonce in
     let tag = payload.body.tag in
     let%bind is_user_command =
@@ -329,22 +330,60 @@ module Base = struct
     let%bind sender_compressed = Public_key.compress_var sender in
     let proposer = payload.body.public_key in
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
-    (*TODO: push state for any transaction*)
-    let%bind computed_pending_coinbase_stack_after =
-      let coinbase = (proposer, payload.body.amount, state_body_hash) in
-      let%bind stack' =
-        Pending_coinbase.Stack.Checked.push_coinbase coinbase
+    (*push state for any transaction*)
+    let state_body_hash, push_state = state_hash_witness in
+    let%bind pending_coinbase_stack_with_state =
+      let%bind updated_stack =
+        Pending_coinbase.Stack.Checked.push_state state_body_hash
           pending_coinbase_stack_before
       in
-      Pending_coinbase.Stack.Checked.if_ is_coinbase ~then_:stack'
+      Pending_coinbase.Stack.Checked.if_ push_state ~then_:updated_stack
         ~else_:pending_coinbase_stack_before
     in
-    let%bind () =
-      let%bind correct_coinbase_stack =
-        Pending_coinbase.Stack.equal_var computed_pending_coinbase_stack_after
-          pending_coinbase_after
+    let coinbase = (proposer, payload.body.amount, state_body_hash) in
+    let%bind computed_pending_coinbase_stack_after =
+      (*TODO: remove state body hash from coinbase*)
+      let%bind stack' =
+        Pending_coinbase.Stack.Checked.push_coinbase coinbase
+          pending_coinbase_stack_with_state
       in
-      Boolean.Assert.is_true correct_coinbase_stack
+      Pending_coinbase.Stack.Checked.if_ is_coinbase ~then_:stack'
+        ~else_:pending_coinbase_stack_with_state
+    in
+    let%bind () =
+      as_prover
+        As_prover.(
+          Let_syntax.(
+            let%map before =
+              read Pending_coinbase.Stack.typ pending_coinbase_stack_before
+            and with_state =
+              read Pending_coinbase.Stack.typ pending_coinbase_stack_with_state
+            and after = read Pending_coinbase.Stack.typ pending_coinbase_after
+            and computed_after =
+              read Pending_coinbase.Stack.typ
+                computed_pending_coinbase_stack_after
+            and state_hash_witness =
+              read Transaction_witness.State_hash_witness.typ
+                state_hash_witness
+            and coinbase = read Pending_coinbase.Coinbase_data.typ coinbase in
+            Core.printf
+              !"before %{sexp: Pending_coinbase.Stack.t} with state %{sexp: \
+                Pending_coinbase.Stack.t} after %{sexp: \
+                Pending_coinbase.Stack.t} after_computed %{sexp: \
+                Pending_coinbase.Stack.t} state_hash witness %{sexp: \
+                Transaction_witness.State_hash_witness.t} coinbase \
+                %{sexp:Pending_coinbase.Coinbase_data.value}\n\
+                %!"
+              before with_state after computed_after state_hash_witness
+              coinbase))
+    in
+    let%bind () =
+      with_label __LOC__
+        (let%bind correct_coinbase_stack =
+           Pending_coinbase.Stack.equal_var
+             computed_pending_coinbase_stack_after pending_coinbase_after
+         in
+         Boolean.Assert.is_true correct_coinbase_stack)
     in
     let%bind root =
       let%bind is_writeable =
@@ -422,7 +461,7 @@ module Base = struct
   module Prover_state = struct
     type t =
       { transaction: Transaction_union.t
-      ; state_body_hash: State_body_hash.t
+      ; state_hash_witness: Transaction_witness.State_hash_witness.t
       ; state1: Frozen_ledger_hash.t
       ; state2: Frozen_ledger_hash.t
       ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
@@ -459,14 +498,15 @@ module Base = struct
       exists' Pending_coinbase.Stack.typ ~f:(fun s ->
           (Prover_state.pending_coinbase_stack_state s).target )
     in
-    let%bind state_body_hash =
-      exists' State_body_hash.typ ~f:Prover_state.state_body_hash
+    let%bind state_hash_witness =
+      exists' Transaction_witness.State_hash_witness.typ
+        ~f:Prover_state.state_hash_witness
     in
     let%bind root_after, fee_excess, supply_increase =
       apply_tagged_transaction
         (module Shifted)
         root_before pending_coinbase_before pending_coinbase_after
-        state_body_hash t
+        state_hash_witness t
     in
     let%map () =
       with_label __LOC__
@@ -495,10 +535,10 @@ module Base = struct
 
   let transaction_union_proof ?(preeval = false) ~proving_key sok_digest state1
       state2 pending_coinbase_stack_state (transaction : Transaction_union.t)
-      state_body_hash handler =
+      state_hash_witness handler =
     let prover_state : Prover_state.t =
       { transaction
-      ; state_body_hash
+      ; state_hash_witness
       ; state1
       ; state2
       ; sok_digest
@@ -951,6 +991,7 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> Transaction.t
+    -> state_hash_witness:Transaction_witness.State_hash_witness.t
     -> Tick.Handler.t
     -> t
 
@@ -960,6 +1001,7 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> User_command.With_valid_signature.t
+    -> state_hash_witness:Transaction_witness.State_hash_witness.t
     -> Tick.Handler.t
     -> t
 
@@ -969,6 +1011,7 @@ module type S = sig
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack:Pending_coinbase.Stack.t
     -> Fee_transfer.t
+    -> state_hash_witness:Transaction_witness.State_hash_witness.t
     -> Tick.Handler.t
     -> t
 
@@ -976,11 +1019,11 @@ module type S = sig
 end
 
 let check_transaction_union ?(preeval = false) sok_message source target
-    pending_coinbase_stack_state transaction state_body_hash handler =
+    pending_coinbase_stack_state transaction state_hash_witness handler =
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
     { transaction
-    ; state_body_hash
+    ; state_hash_witness
     ; state1= source
     ; state2= target
     ; sok_digest
@@ -1003,33 +1046,34 @@ let check_transaction_union ?(preeval = false) sok_message source target
   in
   Or_error.ok_exn (run_and_check main prover_state) |> ignore
 
-let state_body_hash_of_transaction =
+let _state_body_hash_of_transaction =
   let open Transaction in
   function
   | Coinbase cb -> cb.Coinbase.state_body_hash | _ -> State_body_hash.dummy
 
 let check_transaction ?preeval ~sok_message ~source ~target
-    ~pending_coinbase_stack_state (transaction : Transaction.t) handler =
-  let state_body_hash = state_body_hash_of_transaction transaction in
+    ~pending_coinbase_stack_state (transaction : Transaction.t)
+    ~state_hash_witness handler =
   check_transaction_union ?preeval sok_message source target
     pending_coinbase_stack_state
     (Transaction_union.of_transaction transaction)
-    state_body_hash handler
+    state_hash_witness handler
 
 let check_user_command ~sok_message ~source ~target pending_coinbase_stack t
-    handler =
+    state_hash_witness handler =
   check_transaction ~sok_message ~source ~target
     ~pending_coinbase_stack_state:
       Pending_coinbase_stack_state.Stable.Latest.
         {source= pending_coinbase_stack; target= pending_coinbase_stack}
-    (User_command t) handler
+    (User_command t) ~state_hash_witness handler
 
 let generate_transaction_union_witness ?(preeval = false) sok_message source
-    target transaction pending_coinbase_stack_state state_body_hash handler =
+    target transaction pending_coinbase_stack_state state_hash_witness handler
+    =
   let sok_digest = Sok_message.digest sok_message in
   let prover_state : Base.Prover_state.t =
     { transaction
-    ; state_body_hash
+    ; state_hash_witness
     ; state1= source
     ; state2= target
     ; sok_digest
@@ -1049,11 +1093,11 @@ let generate_transaction_union_witness ?(preeval = false) sok_message source
   generate_auxiliary_input (tick_input ()) prover_state main top_hash
 
 let generate_transaction_witness ?preeval ~sok_message ~source ~target
-    pending_coinbase_stack_state (transaction : Transaction.t) handler =
-  let state_body_hash = state_body_hash_of_transaction transaction in
+    pending_coinbase_stack_state (transaction : Transaction.t)
+    state_hash_witness handler =
   generate_transaction_union_witness ?preeval sok_message source target
     (Transaction_union.of_transaction transaction)
-    pending_coinbase_stack_state state_body_hash handler
+    pending_coinbase_stack_state state_hash_witness handler
 
 let verification_keys_of_keys {Keys0.verification; _} = verification
 
@@ -1118,11 +1162,11 @@ struct
         top_hash )
 
   let of_transaction_union ?preeval sok_digest source target
-      ~pending_coinbase_stack_state transaction state_body_hash handler =
+      ~pending_coinbase_stack_state transaction state_hash_witness handler =
     let top_hash, proof =
       Base.transaction_union_proof ?preeval sok_digest
         ~proving_key:keys.proving.base source target
-        pending_coinbase_stack_state transaction state_body_hash handler
+        pending_coinbase_stack_state transaction state_hash_witness handler
     in
     { source
     ; sok_digest
@@ -1134,28 +1178,27 @@ struct
     ; proof= wrap `Base proof top_hash }
 
   let of_transaction ?preeval ~sok_digest ~source ~target
-      ~pending_coinbase_stack_state transaction handler =
-    let state_body_hash = state_body_hash_of_transaction transaction in
+      ~pending_coinbase_stack_state transaction ~state_hash_witness handler =
     of_transaction_union ?preeval sok_digest source target
       ~pending_coinbase_stack_state
       (Transaction_union.of_transaction transaction)
-      state_body_hash handler
+      state_hash_witness handler
 
   let of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack
-      user_command handler =
+      user_command ~state_hash_witness handler =
     of_transaction ~sok_digest ~source ~target
       ~pending_coinbase_stack_state:
         Pending_coinbase_stack_state.Stable.Latest.
           {source= pending_coinbase_stack; target= pending_coinbase_stack}
-      (User_command user_command) handler
+      (User_command user_command) ~state_hash_witness handler
 
   let of_fee_transfer ~sok_digest ~source ~target ~pending_coinbase_stack
-      transfer handler =
+      transfer ~state_hash_witness handler =
     of_transaction ~sok_digest ~source ~target
       ~pending_coinbase_stack_state:
         Pending_coinbase_stack_state.Stable.Latest.
           {source= pending_coinbase_stack; target= pending_coinbase_stack}
-      (Fee_transfer transfer) handler
+      (Fee_transfer transfer) ~state_hash_witness handler
 
   let merge t1 t2 ~sok_digest =
     if not (Frozen_ledger_hash.( = ) t1.target t2.source) then
@@ -1465,6 +1508,9 @@ let%test_module "transaction_snark" =
               ~state_body_hash
             |> Or_error.ok_exn
           in
+          let state_hash_witness : Transaction_witness.State_hash_witness.t =
+            None
+          in
           let transaction = Transaction.Coinbase cb in
           Ledger.with_ledger ~f:(fun ledger ->
               Ledger.create_new_account_exn ledger proposer
@@ -1486,7 +1532,8 @@ let%test_module "transaction_snark" =
                   { source= pending_coinbase_init
                   ; target=
                       Pending_coinbase.Stack.push_coinbase cb
-                        pending_coinbase_init } ) )
+                        pending_coinbase_init }
+                ~state_hash_witness ) )
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -1505,6 +1552,10 @@ let%test_module "transaction_snark" =
                      (Test_util.arbitrary_string
                         ~len:User_command_memo.max_digestible_string_length))
               in
+              let state_hash_witness : Transaction_witness.State_hash_witness.t
+                  =
+                None
+              in
               let target =
                 Ledger.merkle_root_after_user_command_exn ledger t1
               in
@@ -1521,7 +1572,7 @@ let%test_module "transaction_snark" =
               let pending_coinbase_stack = Pending_coinbase.Stack.empty in
               check_user_command ~sok_message
                 ~source:(Ledger.merkle_root ledger)
-                ~target pending_coinbase_stack t1
+                ~target pending_coinbase_stack t1 state_hash_witness
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let%test "base_and_merge" =
@@ -1531,6 +1582,10 @@ let%test_module "transaction_snark" =
               Array.iter wallets ~f:(fun {account; private_key= _} ->
                   Ledger.create_new_account_exn ledger account.public_key
                     account ) ;
+              let state_hash_witness : Transaction_witness.State_hash_witness.t
+                  =
+                None
+              in
               let t1 =
                 user_command wallets 0 1 8
                   (Fee.of_int (Random.int 20))
@@ -1567,7 +1622,7 @@ let%test_module "transaction_snark" =
               in
               let proof12 =
                 of_user_command' sok_digest ledger t1
-                  Pending_coinbase.Stack.empty
+                  Pending_coinbase.Stack.empty ~state_hash_witness
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
@@ -1580,7 +1635,7 @@ let%test_module "transaction_snark" =
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23 =
                 of_user_command' sok_digest ledger t2
-                  Pending_coinbase.Stack.empty
+                  Pending_coinbase.Stack.empty ~state_hash_witness
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =

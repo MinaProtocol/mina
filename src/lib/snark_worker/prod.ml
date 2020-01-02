@@ -87,6 +87,7 @@ module Inputs = struct
                         input
                           .Transaction_snark.Statement
                            .pending_coinbase_stack_state
+                      ~state_hash_witness:w.state_body_hash
                       (unstage (Coda_base.Sparse_ledger.handler w.ledger)) ) )
         | Merge (_, proof1, proof2) ->
             process (fun () -> M.merge ~sok_digest proof1 proof2) )
