@@ -101,6 +101,8 @@ let%test_unit "to_alist (of_alist l) = l" =
 
 let%test_unit "sanity check" =
   Quickcheck.test
+    ~examples:[[("k1", "v1"); ("k2", "v2")]]
+    ~trials:1
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
