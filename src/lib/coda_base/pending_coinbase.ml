@@ -565,7 +565,11 @@ struct
     let push_coinbase (cb : Coinbase.t) t =
       let data = Coinbase_stack_data.push t.Poly.data cb in
       (*let state_hash = Coinbase_stack_state_hash.push t.Poly.state_hash cb in*)
-      {t with data}
+      let res = {t with data} in
+      Core.printf
+        !"outside snark Push coinbase before %{sexp: t} after  %{sexp: t} \n%!"
+        t res ;
+      res
 
     let push_state (state_body_hash : State_body_hash.t) (t : t) =
       let res =
@@ -1057,13 +1061,10 @@ struct
     incr_index {t with tree} ~is_new_stack
 
   let latest_stack_id (t : t) ~is_new_stack =
-    if is_new_stack then Ok t.new_pos
-    else
-      match List.hd t.pos_list with
-      | Some x ->
-          Ok x
-      | None ->
-          Or_error.error_string "No Stack_id for the latest stack"
+    if is_new_stack then t.new_pos
+    else match List.hd t.pos_list with Some x -> x | None -> Stack_id.zero
+
+  (*Or_error.error_string "No stacks in the tree"*)
 
   let curr_stack_id (t : t) = List.hd t.pos_list
 
@@ -1077,7 +1078,7 @@ struct
 
   let latest_stack (t : t) ~is_new_stack =
     let open Or_error.Let_syntax in
-    let%bind key = latest_stack_id t ~is_new_stack in
+    let key = latest_stack_id t ~is_new_stack in
     let%bind res =
       Or_error.try_with (fun () ->
           let index = Merkle_tree.find_index_exn t.tree key in
@@ -1105,7 +1106,7 @@ struct
 
   let update_stack t ~(f : Stack.t -> Stack.t) ~is_new_stack =
     let open Or_error.Let_syntax in
-    let%bind key = latest_stack_id t ~is_new_stack in
+    let key = latest_stack_id t ~is_new_stack in
     let%bind stack_index = find_index t key in
     let%bind stack_before = get_stack t stack_index in
     let stack_after = f stack_before in
@@ -1120,7 +1121,7 @@ struct
 
   let update_coinbase_stack (t : t) stack ~is_new_stack =
     let open Or_error.Let_syntax in
-    let%bind key = latest_stack_id t ~is_new_stack in
+    let key = latest_stack_id t ~is_new_stack in
     let%bind stack_index = find_index t key in
     let%map res = set_stack t stack_index stack ~is_new_stack in
     Core.printf !"after update outside snark %{sexp: t} \n%!" res ;
@@ -1168,13 +1169,7 @@ struct
             respond (Provide index)
         | Checked.Find_index_of_newest_stacks _action ->
             let index1 =
-              let stack_id =
-                match latest_stack_id !pending_coinbase ~is_new_stack with
-                | Ok id ->
-                    id
-                | _ ->
-                    Stack_id.zero
-              in
+              let stack_id = latest_stack_id !pending_coinbase ~is_new_stack in
               find_index !pending_coinbase stack_id |> Or_error.ok_exn
             in
             let index2 =
@@ -1269,7 +1264,7 @@ let%test_unit "add stack + remove stack = initial tree " =
           Async.Deferred.return () ) )
 
 module type Pending_coinbase_intf = sig
-  type t
+  type t [@@deriving sexp]
 
   val add_coinbase :
     t -> coinbase:Coinbase.t -> is_new_stack:bool -> t Or_error.t
@@ -1296,12 +1291,17 @@ let add_coinbase_with_zero_checks (type t)
       T.add_state t coinbase.state_body_hash ~is_new_stack |> Or_error.ok_exn
     in
     let interim_tree =
-      T.add_coinbase t_with_state ~coinbase ~is_new_stack |> Or_error.ok_exn
-    in
-    if Amount.equal coinbase'.amount Amount.zero then interim_tree
-    else
-      T.add_coinbase interim_tree ~coinbase:coinbase' ~is_new_stack:false
+      T.add_coinbase t_with_state ~coinbase ~is_new_stack:false
       |> Or_error.ok_exn
+    in
+    let new_tree =
+      if Amount.equal coinbase'.amount Amount.zero then interim_tree
+      else
+        T.add_coinbase interim_tree ~coinbase:coinbase' ~is_new_stack:false
+        |> Or_error.ok_exn
+    in
+    Core.printf !"updated tree outside snark %{sexp:T.t}\n%!" new_tree ;
+    new_tree
 
 let%test_unit "Checked_stack = Unchecked_stack" =
   let open Quickcheck in
@@ -1327,18 +1327,19 @@ let%test_unit "Checked_tree = Unchecked_tree" =
   let open Quickcheck in
   let pending_coinbases = create () |> Or_error.ok_exn in
   test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
+      Core.printf !"-----------------------------------\n\n%!" ;
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
-      let action =
+      let is_new_stack, action =
         Currency.Amount.(
-          if equal coinbase.amount zero then Update.Action.Update_none
+          if equal coinbase.amount zero then (true, Update.Action.Update_none)
           else if coinbase.amount < Coda_compile_config.coinbase then
-            Update_two_coinbase_in_first
-          else Update_one)
+            (true, Update_one)
+          else (true, Update_one))
       in
       let unchecked =
         add_coinbase_with_zero_checks
           (module T)
-          pending_coinbases ~coinbase ~is_new_stack:true
+          pending_coinbases ~coinbase ~is_new_stack
       in
       (* inside the `open' below, Checked means something else, so define this function *)
       let f_add_coinbase = Checked.add_coinbase in
@@ -1352,7 +1353,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
                  (action_var, coinbase_var))
-              (unstage (handler pending_coinbases ~is_new_stack:true))
+              (unstage (handler pending_coinbases ~is_new_stack))
           in
           As_prover.read Hash.typ result
         in
@@ -1370,7 +1371,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
         Currency.Amount.(
           if equal coinbase.amount zero then Update.Action.Update_none
           else if coinbase.amount < Coda_compile_config.coinbase then
-            Update_two_coinbase_in_first
+            Update_one
           else Update_one)
       in
       let unchecked =
