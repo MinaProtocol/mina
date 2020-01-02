@@ -104,19 +104,22 @@ let%test_unit "sanity check" =
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
-      let db_dir = Filename.temp_dir "db_dir" "" in
-      let s = Bigstring.of_string in
-      let sorted =
-        List.sort kvs ~compare:[%compare: string * string]
-        |> List.map ~f:(fun (k, v) -> (s k, s v))
-      in
-      let db = create db_dir in
-      List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
-      let alist =
-        List.sort (to_alist db) ~compare:[%compare: Bigstring.t * Bigstring.t]
-      in
-      [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
-      close db )
+      File_system.with_temp_dir "/tmp/coda-test1" ~f:(fun db_dir ->
+          let s = Bigstring.of_string in
+          let sorted =
+            List.sort kvs ~compare:[%compare: string * string]
+            |> List.map ~f:(fun (k, v) -> (s k, s v))
+          in
+          let db = create db_dir in
+          List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
+          let alist =
+            List.sort (to_alist db)
+              ~compare:[%compare: Bigstring.t * Bigstring.t]
+          in
+          [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
+          close db ;
+          Async.Deferred.unit )
+      |> Async.don't_wait_for )
 
 (*
 let%test_unit "checkpoint read test" =
