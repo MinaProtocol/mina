@@ -221,7 +221,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_stack:Pending_coinbase.Stack.t
+    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> User_command.With_valid_signature.t
     -> state_hash_witness:Transaction_witness.State_hash_witness.t
     -> Tick.Handler.t
@@ -231,7 +231,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_stack:Pending_coinbase.Stack.t
+    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> Fee_transfer.t
     -> state_hash_witness:Transaction_witness.State_hash_witness.t
     -> Tick.Handler.t

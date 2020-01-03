@@ -102,8 +102,9 @@ let rec pair_up = function
   | _ ->
       failwith "Expected even length list"
 
+let state_body_hash = Quickcheck.random_value State_body_hash.gen
+
 let pending_coinbase_stack_target (t : Transaction.t) stack =
-  let state_body_hash = Quickcheck.random_value State_body_hash.gen in
   let stack_with_state =
     Pending_coinbase.Stack.(push_state state_body_hash stack)
   in

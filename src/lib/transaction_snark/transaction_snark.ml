@@ -999,7 +999,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_stack:Pending_coinbase.Stack.t
+    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> User_command.With_valid_signature.t
     -> state_hash_witness:Transaction_witness.State_hash_witness.t
     -> Tick.Handler.t
@@ -1009,7 +1009,7 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_stack:Pending_coinbase.Stack.t
+    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
     -> Fee_transfer.t
     -> state_hash_witness:Transaction_witness.State_hash_witness.t
     -> Tick.Handler.t
@@ -1184,20 +1184,14 @@ struct
       (Transaction_union.of_transaction transaction)
       state_hash_witness handler
 
-  let of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack
+  let of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack_state
       user_command ~state_hash_witness handler =
-    of_transaction ~sok_digest ~source ~target
-      ~pending_coinbase_stack_state:
-        Pending_coinbase_stack_state.Stable.Latest.
-          {source= pending_coinbase_stack; target= pending_coinbase_stack}
+    of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
       (User_command user_command) ~state_hash_witness handler
 
-  let of_fee_transfer ~sok_digest ~source ~target ~pending_coinbase_stack
+  let of_fee_transfer ~sok_digest ~source ~target ~pending_coinbase_stack_state
       transfer ~state_hash_witness handler =
-    of_transaction ~sok_digest ~source ~target
-      ~pending_coinbase_stack_state:
-        Pending_coinbase_stack_state.Stable.Latest.
-          {source= pending_coinbase_stack; target= pending_coinbase_stack}
+    of_transaction ~sok_digest ~source ~target ~pending_coinbase_stack_state
       (Fee_transfer transfer) ~state_hash_witness handler
 
   let merge t1 t2 ~sok_digest =
@@ -1469,14 +1463,39 @@ let%test_module "transaction_snark" =
       let keys = keys
     end)
 
+    let state_body_hash = Quickcheck.random_value State_body_hash.gen
+
+    let pending_coinbase_stack_target (t : Transaction.t) state_hash_witness
+        stack =
+      let stack_with_state =
+        Option.value_map state_hash_witness ~default:stack
+          ~f:(fun state_body_hash ->
+            Pending_coinbase.Stack.(push_state state_body_hash stack) )
+      in
+      match t with
+      | Coinbase c ->
+          Pending_coinbase.(Stack.push_coinbase c stack_with_state)
+      | _ ->
+          stack_with_state
+
     let of_user_command' sok_digest ledger user_command pending_coinbase_stack
-        handler =
+        state_hash_witness handler =
       let source = Ledger.merkle_root ledger in
       let target =
         Ledger.merkle_root_after_user_command_exn ledger user_command
       in
-      of_user_command ~sok_digest ~source ~target ~pending_coinbase_stack
-        user_command handler
+      let pending_coinbase_stack_target =
+        pending_coinbase_stack_target (User_command user_command)
+          state_hash_witness pending_coinbase_stack
+      in
+      let pending_coinbase_stack_state =
+        { Pending_coinbase_stack_state.source= pending_coinbase_stack
+        ; target= pending_coinbase_stack_target }
+      in
+      ( of_user_command ~sok_digest ~source ~target
+          ~pending_coinbase_stack_state user_command ~state_hash_witness
+          handler
+      , pending_coinbase_stack_target )
 
     (*
                 ~proposer:
@@ -1491,49 +1510,61 @@ let%test_module "transaction_snark" =
                              "221715137372156378645114069225806158618712943627692160064142985953895666487801880947288786"
                        ; is_odd= true }
        *)
-    let%test_unit "coinbase" =
+
+    let coinbase_test state_hash_witness =
+      let mk_pubkey () =
+        Public_key.(compress (of_private_key_exn (Private_key.create ())))
+      in
+      let proposer = mk_pubkey () in
+      let other = mk_pubkey () in
+      let pending_coinbase_init = Pending_coinbase.Stack.empty in
+      let state_body_hash = State_body_hash.dummy in
+      let cb =
+        Coinbase.create
+          ~amount:(Currency.Amount.of_int 10)
+          ~proposer
+          ~fee_transfer:(Some (other, Currency.Fee.of_int 1))
+          ~state_body_hash
+        |> Or_error.ok_exn
+      in
+      let transaction = Transaction.Coinbase cb in
+      let pending_coinbase_stack_target =
+        pending_coinbase_stack_target transaction state_hash_witness
+          pending_coinbase_init
+      in
+      Ledger.with_ledger ~f:(fun ledger ->
+          Ledger.create_new_account_exn ledger proposer
+            (Account.create proposer Balance.zero) ;
+          let sparse_ledger =
+            Sparse_ledger.of_ledger_subset_exn ledger [proposer; other]
+          in
+          check_transaction transaction
+            (unstage (Sparse_ledger.handler sparse_ledger))
+            ~sok_message:
+              (Coda_base.Sok_message.create ~fee:Currency.Fee.zero
+                 ~prover:Public_key.Compressed.empty)
+            ~source:(Sparse_ledger.merkle_root sparse_ledger)
+            ~target:
+              Sparse_ledger.(
+                merkle_root (apply_transaction_exn sparse_ledger transaction))
+            ~pending_coinbase_stack_state:
+              { source= pending_coinbase_init
+              ; target= pending_coinbase_stack_target }
+            ~state_hash_witness )
+
+    let%test_unit "coinbase with state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
-          let mk_pubkey () =
-            Public_key.(compress (of_private_key_exn (Private_key.create ())))
+          let state_hash_witness : Transaction_witness.State_hash_witness.t =
+            Some state_body_hash
           in
-          let proposer = mk_pubkey () in
-          let other = mk_pubkey () in
-          let pending_coinbase_init = Pending_coinbase.Stack.empty in
-          let state_body_hash = State_body_hash.dummy in
-          let cb =
-            Coinbase.create
-              ~amount:(Currency.Amount.of_int 10)
-              ~proposer
-              ~fee_transfer:(Some (other, Currency.Fee.of_int 1))
-              ~state_body_hash
-            |> Or_error.ok_exn
-          in
+          coinbase_test state_hash_witness )
+
+    let%test_unit "coinbase without state body hash" =
+      Test_util.with_randomness 12345678 (fun () ->
           let state_hash_witness : Transaction_witness.State_hash_witness.t =
             None
           in
-          let transaction = Transaction.Coinbase cb in
-          Ledger.with_ledger ~f:(fun ledger ->
-              Ledger.create_new_account_exn ledger proposer
-                (Account.create proposer Balance.zero) ;
-              let sparse_ledger =
-                Sparse_ledger.of_ledger_subset_exn ledger [proposer; other]
-              in
-              check_transaction transaction
-                (unstage (Sparse_ledger.handler sparse_ledger))
-                ~sok_message:
-                  (Coda_base.Sok_message.create ~fee:Currency.Fee.zero
-                     ~prover:Public_key.Compressed.empty)
-                ~source:(Sparse_ledger.merkle_root sparse_ledger)
-                ~target:
-                  Sparse_ledger.(
-                    merkle_root
-                      (apply_transaction_exn sparse_ledger transaction))
-                ~pending_coinbase_stack_state:
-                  { source= pending_coinbase_init
-                  ; target=
-                      Pending_coinbase.Stack.push_coinbase cb
-                        pending_coinbase_init }
-                ~state_hash_witness ) )
+          coinbase_test state_hash_witness )
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -1582,8 +1613,12 @@ let%test_module "transaction_snark" =
               Array.iter wallets ~f:(fun {account; private_key= _} ->
                   Ledger.create_new_account_exn ledger account.public_key
                     account ) ;
-              let state_hash_witness : Transaction_witness.State_hash_witness.t
-                  =
+              let state_hash_witness1 :
+                  Transaction_witness.State_hash_witness.t =
+                Some state_body_hash
+              in
+              let state_hash_witness2 :
+                  Transaction_witness.State_hash_witness.t =
                 None
               in
               let t1 =
@@ -1602,11 +1637,6 @@ let%test_module "transaction_snark" =
                      (Test_util.arbitrary_string
                         ~len:User_command_memo.max_digestible_string_length))
               in
-              let pending_coinbase_stack_state =
-                Pending_coinbase_stack_state.Stable.Latest.
-                  { source= Pending_coinbase.Stack.empty
-                  ; target= Pending_coinbase.Stack.empty }
-              in
               let sok_digest =
                 Sok_message.create ~fee:Fee.zero
                   ~prover:wallets.(0).account.public_key
@@ -1620,9 +1650,9 @@ let%test_module "transaction_snark" =
                        User_command.accounts_accessed (t :> User_command.t) )
                      [t1; t2])
               in
-              let proof12 =
+              let proof12, pending_coinbase_stack_next =
                 of_user_command' sok_digest ledger t1
-                  Pending_coinbase.Stack.empty ~state_hash_witness
+                  Pending_coinbase.Stack.empty state_hash_witness1
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
@@ -1633,14 +1663,19 @@ let%test_module "transaction_snark" =
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
-              let proof23 =
+              let proof23, pending_coinbase_stack_target =
                 of_user_command' sok_digest ledger t2
-                  Pending_coinbase.Stack.empty ~state_hash_witness
+                  pending_coinbase_stack_next state_hash_witness2
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn sparse_ledger
                   (t2 :> User_command.t)
+              in
+              let pending_coinbase_stack_state =
+                Pending_coinbase_stack_state.Stable.Latest.
+                  { source= Pending_coinbase.Stack.empty
+                  ; target= pending_coinbase_stack_target }
               in
               Ledger.apply_user_command ledger t2 |> Or_error.ok_exn |> ignore ;
               [%test_eq: Frozen_ledger_hash.t]
