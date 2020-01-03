@@ -102,6 +102,7 @@ val apply :
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
+  -> state_body_hash:State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
        * [`Staged_ledger of t]
@@ -113,6 +114,7 @@ val apply :
 val apply_diff_unchecked :
      t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
+  -> state_body_hash:State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
        * [`Staged_ledger of t]
@@ -132,7 +134,6 @@ val create_diff :
   -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
-  -> state_body_hash:State_body_hash.t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
 
 val statement_exn :

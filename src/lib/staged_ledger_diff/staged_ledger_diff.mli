@@ -104,19 +104,13 @@ module Diff : sig
     with type V1.t = t
 end
 
-type t =
-  { diff: Diff.t
-  ; creator: Public_key.Compressed.t
-  ; state_body_hash: State_body_hash.Stable.V1.t }
+type t = {diff: Diff.t; creator: Public_key.Compressed.t}
 [@@deriving sexp, to_yojson, fields]
 
 module Stable :
   sig
     module V1 : sig
-      type t =
-        { diff: Diff.t
-        ; creator: Public_key.Compressed.t
-        ; state_body_hash: State_body_hash.Stable.V1.t }
+      type t = {diff: Diff.t; creator: Public_key.Compressed.t}
       [@@deriving sexp, to_yojson, bin_io, version]
     end
 
@@ -142,10 +136,7 @@ module With_valid_signatures_and_proofs : sig
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t =
-    { diff: diff
-    ; creator: Public_key.Compressed.t
-    ; state_body_hash: State_body_hash.t }
+  type t = {diff: diff; creator: Public_key.Compressed.t}
   [@@deriving sexp, to_yojson]
 
   val user_commands : t -> User_command.With_valid_signature.t list
@@ -169,10 +160,7 @@ module With_valid_signatures : sig
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t =
-    { diff: diff
-    ; creator: Public_key.Compressed.t
-    ; state_body_hash: State_body_hash.t }
+  type t = {diff: diff; creator: Public_key.Compressed.t}
   [@@deriving sexp, to_yojson]
 end
 

@@ -115,10 +115,12 @@ let generate_next_state ~previous_protocol_state ~time_controller
       let diff =
         measure "create_diff" (fun () ->
             Staged_ledger.create_diff staged_ledger ~self ~logger
-              ~transactions_by_fee:transactions ~get_completed_work
-              ~state_body_hash:previous_protocol_state_body_hash )
+              ~transactions_by_fee:transactions ~get_completed_work )
       in
-      match%map Staged_ledger.apply_diff_unchecked staged_ledger diff with
+      match%map
+        Staged_ledger.apply_diff_unchecked staged_ledger diff
+          ~state_body_hash:previous_protocol_state_body_hash
+      with
       | Ok
           ( `Hash_after_applying next_staged_ledger_hash
           , `Ledger_proof ledger_proof_opt

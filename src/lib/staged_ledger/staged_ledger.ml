@@ -745,7 +745,7 @@ module T = struct
           (Float.of_int
              (List.length (Scan_state.all_work_pairs_exn t.scan_state))) )
 
-  let apply t witness ~logger ~verifier =
+  let apply t witness ~logger ~verifier ~state_body_hash =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () = check_completed_works ~logger ~verifier t.scan_state work in
@@ -755,8 +755,7 @@ module T = struct
       |> Deferred.return
     in
     let%map ((_, _, `Staged_ledger new_staged_ledger, __) as res) =
-      apply_diff t prediff ~logger
-        ~state_body_hash:(Staged_ledger_diff.state_body_hash witness)
+      apply_diff t prediff ~logger ~state_body_hash
     in
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
@@ -769,15 +768,15 @@ module T = struct
     res
 
   let apply_diff_unchecked t
-      (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t) =
+      (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t)
+      ~state_body_hash =
     let open Deferred.Result.Let_syntax in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
       @@ Pre_diff_info.get_unchecked sl_diff
       |> Deferred.return
     in
-    apply_diff t prediff ~logger:(Logger.null ())
-      ~state_body_hash:sl_diff.state_body_hash
+    apply_diff t prediff ~logger:(Logger.null ()) ~state_body_hash
 
   module Resources = struct
     module Discarded = struct
@@ -1244,8 +1243,7 @@ module T = struct
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
-         -> Transaction_snark_work.Checked.t option)
-      ~(state_body_hash : State_body_hash.t) =
+         -> Transaction_snark_work.Checked.t option) =
     O1trace.trace_event "curr_hash" ;
     let validating_ledger = Transaction_validator.create t.ledger in
     O1trace.trace_event "done mask" ;
@@ -1299,9 +1297,7 @@ module T = struct
       "Number of proofs ready for purchase: $proof_count"
       ~metadata:[("proof_count", `Int proof_count)] ;
     trace_event "prediffs done" ;
-    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
-    ; creator= self
-    ; state_body_hash }
+    {Staged_ledger_diff.With_valid_signatures_and_proofs.diff; creator= self}
 end
 
 include T
@@ -1321,7 +1317,7 @@ let%test_module "test" =
       Core.printf !"\n\nCreate and apply................................\n\n%!" ;
       let diff =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
-          ~get_completed_work:stmt_to_work ~state_body_hash
+          ~get_completed_work:stmt_to_work
       in
       let diff' = Staged_ledger_diff.forget diff in
       let%bind verifier = Verifier.create ~logger ~pids ~conf_dir:None in
@@ -1330,7 +1326,7 @@ let%test_module "test" =
               , `Staged_ledger sl'
               , `Pending_coinbase_data
                   (is_new_stack, coinbase_amount, pc_action) ) =
-        match%map Sl.apply !sl diff' ~logger ~verifier with
+        match%map Sl.apply !sl diff' ~logger ~verifier ~state_body_hash with
         | Ok x ->
             x
         | Error e ->
@@ -1737,8 +1733,7 @@ let%test_module "test" =
                   ; user_commands= List.take txns slots
                   ; coinbase= Zero }
                 , None )
-            ; creator= self_pk
-            ; state_body_hash= State_body_hash.dummy }
+            ; creator= self_pk }
         | Some (_, _) ->
             let txns_in_second_diff = List.drop txns slots in
             let diff : Staged_ledger_diff.Diff.t =
@@ -1752,7 +1747,7 @@ let%test_module "test" =
                   ; user_commands= txns_in_second_diff
                   ; coinbase= Zero } )
             in
-            {diff; creator= self_pk; state_body_hash= State_body_hash.dummy}
+            {diff; creator= self_pk}
       in
       let empty_diff : Staged_ledger_diff.t =
         { diff=
@@ -1760,8 +1755,7 @@ let%test_module "test" =
               ; user_commands= []
               ; coinbase= Staged_ledger_diff.At_most_two.Zero }
             , None )
-        ; creator= self_pk
-        ; state_body_hash= State_body_hash.dummy }
+        ; creator= self_pk }
       in
       Quickcheck.test (gen_below_capacity ())
         ~sexp_of:
@@ -1808,7 +1802,10 @@ let%test_module "test" =
                     let%bind verifier =
                       Verifier.create ~logger ~pids ~conf_dir:None
                     in
-                    let%bind apply_res = Sl.apply !sl diff ~logger ~verifier in
+                    let%bind apply_res =
+                      Sl.apply !sl diff ~logger ~verifier
+                        ~state_body_hash:State_body_hash.dummy
+                    in
                     let checked', diff' =
                       match apply_res with
                       | Error (Sl.Staged_ledger_error.Non_zero_fee_excess _) ->
