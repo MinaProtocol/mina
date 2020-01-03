@@ -81,7 +81,7 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
 let to_bigstring = Bigstring.of_string
 
 let%test_unit "to_alist (of_alist l) = l" =
-  Async.Quickcheck.test
+  Quickcheck.test
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
@@ -111,7 +111,7 @@ let%test_unit "to_alist (of_alist l) = l" =
           |> Async.don't_wait_for )
 
 let%test_unit "to_alist (of_alist l) = l" =
-  Async.Quickcheck.test ~trials:10
+  Quickcheck.test ~trials:10
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
