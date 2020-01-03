@@ -102,6 +102,20 @@ let rec pair_up = function
   | _ ->
       failwith "Expected even length list"
 
+let pending_coinbase_stack_target (t : Transaction.t) stack =
+  let state_body_hash = Quickcheck.random_value State_body_hash.gen in
+  let stack_with_state =
+    Pending_coinbase.Stack.(push_state state_body_hash stack)
+  in
+  let target =
+    match t with
+    | Coinbase c ->
+        Pending_coinbase.(Stack.push_coinbase c stack_with_state)
+    | _ ->
+        stack_with_state
+  in
+  (target, state_body_hash)
+
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
@@ -113,14 +127,10 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
-        let coinbase_stack_target =
-          match t with
-          | Coinbase c ->
-              Pending_coinbase.Stack.push_coinbase c coinbase_stack_source
-          | _ ->
-              coinbase_stack_source
+        let coinbase_stack_target, state_body_hash =
+          pending_coinbase_stack_target t coinbase_stack_source
         in
-        let state_hash_witness = None in
+        let state_hash_witness = Some state_body_hash in
         let span, proof =
           time (fun () ->
               T.of_transaction ?preeval ~sok_digest:Sok_message.Digest.default
@@ -166,13 +176,10 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
-        let coinbase_stack_target =
-          match t with
-          | Coinbase c ->
-              Pending_coinbase.(Stack.push_coinbase c Stack.empty)
-          | _ ->
-              Pending_coinbase.Stack.empty
+        let coinbase_stack_target, state_body_hash =
+          pending_coinbase_stack_target t Pending_coinbase.Stack.empty
         in
+        let state_hash_witness = Some state_body_hash in
         let () =
           Transaction_snark.check_transaction ?preeval ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
@@ -180,7 +187,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
             ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
-            ~state_hash_witness:None t
+            ~state_hash_witness t
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
         sparse_ledger' )
@@ -199,14 +206,10 @@ let generate_base_snarks_witness sparse_ledger0
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
-        let state_hash_witness = None in
-        let coinbase_stack_target =
-          match t with
-          | Coinbase c ->
-              Pending_coinbase.(Stack.push_coinbase c Stack.empty)
-          | _ ->
-              Pending_coinbase.Stack.empty
+        let coinbase_stack_target, state_body_hash =
+          pending_coinbase_stack_target t Pending_coinbase.Stack.empty
         in
+        let state_hash_witness = Some state_body_hash in
         let () =
           Transaction_snark.generate_transaction_witness ?preeval ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
