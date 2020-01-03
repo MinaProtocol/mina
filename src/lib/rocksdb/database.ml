@@ -78,86 +78,30 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
   in
   loop []
 
+let to_bigstring = Bigstring.of_string
+
 let%test_unit "to_alist (of_alist l) = l" =
-  Async.Quickcheck.async_test
+  Async.Quickcheck.test
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
-      File_system.with_temp_dir "/tmp/coda-test" ~f:(fun directory ->
-          let s = Bigstring.of_string in
+      match Hashtbl.of_alist (module String) kvs with
+      | `Duplicate_key _ ->
+          ()
+      | `Ok _ ->
+          let db_dir = Filename.temp_dir "db_dir" "" in
           let sorted =
             List.sort kvs ~compare:[%compare: string * string]
-            |> List.map ~f:(fun (k, v) -> (s k, s v))
+            |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
           in
-          let db = create directory in
+          let db = create db_dir in
           List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
           let alist =
             List.sort (to_alist db)
               ~compare:[%compare: Bigstring.t * Bigstring.t]
           in
-          [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
-          Async.Deferred.unit ) )
-  |> Async.don't_wait_for
-
-let%test_unit "sanity check" =
-  Quickcheck.test
-    ~examples:[[("k1", "v1"); ("k2", "v2")]]
-    Quickcheck.Generator.(
-      tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
-    ~f:(fun kvs ->
-      let db_dir = Filename.temp_dir "db_dir" "" in
-      let s = Bigstring.of_string in
-      let sorted =
-        List.sort kvs ~compare:[%compare: string * string]
-        |> List.map ~f:(fun (k, v) -> (s k, s v))
-      in
-      let db = create db_dir in
-      List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
-      let alist =
-        List.sort (to_alist db) ~compare:[%compare: Bigstring.t * Bigstring.t]
-      in
-      let rec all_files dirname basename =
-        let fullname = Filename.concat dirname basename in
-        match Sys.is_directory fullname with
-        | `Yes ->
-            let dirs, files =
-              Sys.ls_dir fullname
-              |> List.map ~f:(all_files fullname)
-              |> List.unzip
-            in
-            let dirs =
-              if String.equal dirname db_dir then List.concat dirs
-              else List.append (List.concat dirs) [fullname]
-            in
-            (dirs, List.concat files)
-        | _ ->
-            ([], [fullname])
-      in
-      let dirs, files = all_files db_dir "" in
-      Logger.debug (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:
-          [ ("files", `List (List.map ~f:(fun s -> `String s) files))
-          ; ("dirs", `List (List.map ~f:(fun s -> `String s) dirs))
-          ; ("db_dir", `String db_dir)
-          ; ( "expected"
-            , `List
-                (List.map
-                   ~f:(fun (k, v) ->
-                     `List
-                       [ `String (Bigstring.to_string k)
-                       ; `String (Bigstring.to_string v) ] )
-                   sorted) )
-          ; ( "actual"
-            , `List
-                (List.map
-                   ~f:(fun (k, v) ->
-                     `List
-                       [ `String (Bigstring.to_string k)
-                       ; `String (Bigstring.to_string v) ] )
-                   alist) ) ]
-        "all files in $db_dir" ;
-      [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
-      close db )
+          [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist
+      )
 
 (*
 let%test_unit "checkpoint read test" =
