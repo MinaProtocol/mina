@@ -474,7 +474,6 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 	stream, err := app.P2p.Host.NewStream(app.Ctx, peer, protocol.ID(o.ProtocolID))
 
 	if err != nil {
-		stream.Reset()
 		return nil, badp2p(err)
 	}
 
