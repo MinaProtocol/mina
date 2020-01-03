@@ -471,7 +471,7 @@ module T = struct
     let {Scan_state.Space_partition.first= slots, _; second} =
       Scan_state.partition_if_overflowing scan_state
     in
-    if List.length transactions > 0 then (
+    if List.length transactions > 0 then
       match second with
       | None ->
           (*Single partition:
@@ -486,11 +486,6 @@ module T = struct
             update_ledger_and_get_statements ledger working_stack transactions
               (Some state_body_hash)
           in
-          Core.printf
-            !"outside snark state_body_hash %{sexp: State_body_hash.t}\n\
-              working stack1 %{sexp:Pending_coinbase.Stack.t} \n\
-              %!"
-            state_body_hash working_stack ;
           ( is_new_stack
           , data
           , Pending_coinbase.Update.Action.Update_one
@@ -524,12 +519,6 @@ module T = struct
             update_ledger_and_get_statements ledger working_stack2
               txns_for_partition2 None
           in
-          Core.printf
-            !"outside snark state_body_hash %{sexp: State_body_hash.t}\n\
-              working stack1 %{sexp:Pending_coinbase.Stack.t}\n\
-             \ working stack2 %{sexp: Pending_coinbase.Stack.t} \n\
-              %!"
-            state_body_hash working_stack1 working_stack2 ;
           let second_has_data = List.length txns_for_partition2 > 0 in
           let pending_coinbase_action, stack_update =
             match (coinbase_in_first_partition, second_has_data) with
@@ -550,7 +539,7 @@ module T = struct
                 (* a diff consists of only non-coinbase transactions. This is currently not possible because a diff will have a coinbase at the very least, so don't update anything?*)
                 (Update_none, `Update_none)
           in
-          (false, data1 @ data2, pending_coinbase_action, stack_update) )
+          (false, data1 @ data2, pending_coinbase_action, stack_update)
     else
       Deferred.return
         (Ok
@@ -590,19 +579,11 @@ module T = struct
     | `Update_none ->
         Ok pending_coinbase_collection_updated1
     | `Update_one stack1 ->
-        Core.printf
-          !"outside snark updated_stack1 %{sexp:Pending_coinbase.Stack.t} \n%!"
-          stack1 ;
         Pending_coinbase.update_coinbase_stack
           pending_coinbase_collection_updated1 stack1 ~is_new_stack
         |> to_staged_ledger_or_error
     | `Update_two (stack1, stack2) ->
         (*The case when some of the transactions go into the old tree and remaining on to the new tree*)
-        Core.printf
-          !"outside snark updated_stack1 %{sexp:Pending_coinbase.Stack.t} \
-            updated_stack2 %{sexp: Pending_coinbase.Stack.t} \n\
-            %!"
-          stack1 stack2 ;
         let%bind update1 =
           Pending_coinbase.update_coinbase_stack
             pending_coinbase_collection_updated1 stack1 ~is_new_stack:false
@@ -712,9 +693,6 @@ module T = struct
       \      Coinbase parts:$coinbase_count Spots\n\
       \      available:$spots_available Pending work in the \
        scan-state:$proof_bundles_waiting Work included:$work_count" ;
-    Core.printf
-      !"Pending coinbase action %{sexp: Pending_coinbase.Update.Action.t}\n%!"
-      stack_update_in_snark ;
     let new_staged_ledger =
       { scan_state= scan_state'
       ; ledger= new_ledger
@@ -1314,7 +1292,6 @@ let%test_module "test" =
     let create_and_apply_with_state_body_hash state_body_hash sl logger pids
         txns stmt_to_work =
       let open Deferred.Let_syntax in
-      Core.printf !"\n\nCreate and apply................................\n\n%!" ;
       let diff =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
           ~get_completed_work:stmt_to_work
@@ -2006,23 +1983,6 @@ let%test_module "test" =
         in
         Pending_coinbase.Coinbase_data.of_coinbase
           (create coinbase_amount None)
-      in
-      Core.printf
-        !"update: %{sexp: Pending_coinbase.Update.Action.t} coinbase_amount \
-          %{sexp: Currency.Amount.t} is_new_stack %b\n\
-          %!"
-        pc_action coinbase_amount is_new_stack ;
-      let _push_state =
-        (*State_body_hash is pushed once for every diff iff there are any transactions in the diff*)
-        let transactions, _, _, _ =
-          match Pre_diff_info.get diff with
-          | Ok res ->
-              res
-          | Error e ->
-              failwith (Pre_diff_info.Error.to_string e)
-        in
-        if List.length transactions > 0 then Snark_params.Tick.Boolean.true_
-        else Snark_params.Tick.Boolean.false_
       in
       let f_pop_and_add =
         let open Snark_params.Tick in

@@ -436,40 +436,12 @@ module Base = struct
     in
     let coinbase = (proposer, payload.body.amount) in
     let%bind computed_pending_coinbase_stack_after =
-      (*TODO: remove state body hash from coinbase*)
       let%bind stack' =
         Pending_coinbase.Stack.Checked.push_coinbase coinbase
           pending_coinbase_stack_with_state
       in
       Pending_coinbase.Stack.Checked.if_ is_coinbase ~then_:stack'
         ~else_:pending_coinbase_stack_with_state
-    in
-    let%bind () =
-      as_prover
-        As_prover.(
-          Let_syntax.(
-            let%map before =
-              read Pending_coinbase.Stack.typ pending_coinbase_stack_before
-            and with_state =
-              read Pending_coinbase.Stack.typ pending_coinbase_stack_with_state
-            and after = read Pending_coinbase.Stack.typ pending_coinbase_after
-            and computed_after =
-              read Pending_coinbase.Stack.typ
-                computed_pending_coinbase_stack_after
-            and state_hash_witness =
-              read Transaction_witness.State_hash_witness.typ
-                state_hash_witness
-            and coinbase = read Pending_coinbase.Coinbase_data.typ coinbase in
-            Core.printf
-              !"before %{sexp: Pending_coinbase.Stack.t} with state %{sexp: \
-                Pending_coinbase.Stack.t} after %{sexp: \
-                Pending_coinbase.Stack.t} after_computed %{sexp: \
-                Pending_coinbase.Stack.t} state_hash witness %{sexp: \
-                Transaction_witness.State_hash_witness.t} coinbase \
-                %{sexp:Pending_coinbase.Coinbase_data.value}\n\
-                %!"
-              before with_state after computed_after state_hash_witness
-              coinbase))
     in
     let%bind () =
       with_label __LOC__

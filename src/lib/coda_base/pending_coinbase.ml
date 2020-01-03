@@ -48,9 +48,6 @@ module Coinbase_data = struct
       [Public_key.Compressed.to_input pk; bitstring (Amount.to_bits amount)]
 
   module Checked = struct
-    let _constant ((public_key, amount) : value) =
-      (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
-
     let to_input (public_key, amount) =
       let open Random_oracle.Input in
       List.reduce_exn ~f:append
@@ -275,10 +272,6 @@ module Coinbase_stack_state = struct
     let%bind init = Stack_hash.if_ cond ~then_:then_.init ~else_:else_.init in
     let%map curr = Stack_hash.if_ cond ~then_:then_.curr ~else_:else_.curr in
     {Poly.init; curr}
-
-  (*[%%define_locally
-  State_hash.
-    (gen, of_hash, to_bits, raw_hash_bytes, equal_var, typ, if_, var_of_t)]*)
 
   let push (t : t) (state_body_hash : State_body_hash.t) : t =
     (* this is the same computation for combining state hashes and state body hashes as
@@ -530,8 +523,6 @@ struct
       Coinbase_stack_data.to_bytes t.Poly.data
       ^ Coinbase_stack_state.to_bytes t.Poly.state
 
-    (*raw_hash_bytes?*)
-
     let equal_var var1 var2 =
       let open Tick.Checked.Let_syntax in
       let%bind b1 =
@@ -556,21 +547,10 @@ struct
 
     let push_coinbase (cb : Coinbase.t) t =
       let data = Coinbase_stack_data.push t.Poly.data cb in
-      (*let state_hash = Coinbase_stack_state_hash.push t.Poly.state_hash cb in*)
-      let res = {t with data} in
-      Core.printf
-        !"outside snark Push coinbase before %{sexp: t} after  %{sexp: t} \n%!"
-        t res ;
-      res
+      {t with data}
 
     let push_state (state_body_hash : State_body_hash.t) (t : t) =
-      let res =
-        {t with state= Coinbase_stack_state.push t.state state_body_hash}
-      in
-      Core.printf
-        !"outside snark Push state before %{sexp: t} after  %{sexp: t} \n%!"
-        t res ;
-      res
+      {t with state= Coinbase_stack_state.push t.state state_body_hash}
 
     let if_ (cond : Tick0.Boolean.var) ~(then_ : var) ~(else_ : var) :
         (var, 'a) Tick0.Checked.t =
@@ -589,30 +569,13 @@ struct
       let push_coinbase (coinbase : Coinbase_data.var) (t : t) :
           (t, 'a) Tick0.Checked.t =
         let%map data = Coinbase_stack_data.Checked.push t.data coinbase in
-        (*let%map state_hash =
-          Coinbase_stack_state_hash.Checked.push t.state_hash coinbase
-        in*)
         {t with data}
 
       let push_state (state_body_hash : State_body_hash.var) (t : t) =
-        let%bind state =
+        let%map state =
           Coinbase_stack_state.Checked.push t.state state_body_hash
         in
-        let res = {t with state} in
-        let%map () =
-          as_prover
-            As_prover.(
-              Let_syntax.(
-                let%map before = read Coinbase_stack_state.typ t.state
-                and after = read Coinbase_stack_state.typ state in
-                Core.printf
-                  !"in snark Push state before %{sexp: \
-                    Coinbase_stack_state.t} after  %{sexp: \
-                    Coinbase_stack_state.t} \n\
-                    %!"
-                  before after))
-        in
-        res
+        {t with state}
 
       let empty = var_of_t empty
 
@@ -799,35 +762,8 @@ struct
         let%bind amount1_equal_to_zero = equal_to_zero amount in
         let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
         let%bind () =
-          as_prover
-            As_prover.(
-              Let_syntax.(
-                let%map amount1_equal_to_zero =
-                  read Boolean.typ amount1_equal_to_zero
-                and amount = read Currency.Amount.typ amount
-                and no_update = read Boolean.typ no_update
-                and action = read Update.Action.typ action in
-                Core.printf
-                  !"amount1_equal_to_zero %b amount1 \
-                    %{sexp:Currency.Amount.t} no_update %b action \
-                    %{sexp:Update.Action.t}\n\
-                    %!"
-                  amount1_equal_to_zero amount no_update action))
-        in
-        let%bind () =
           with_label __LOC__
             (let%bind check1 = Boolean.equal no_update amount1_equal_to_zero in
-             let%bind () =
-               as_prover
-                 As_prover.(
-                   Let_syntax.(
-                     let%map check1 =
-                       read Boolean.typ check1
-                       (*and check2 = read Boolean.typ check2
-                   and check3 = read Boolean.typ check3 *)
-                     in
-                     Core.printf !"check1 %b \n%!" check1))
-             in
              Boolean.Assert.all [check1])
         in
         let%bind no_coinbase =
@@ -873,25 +809,7 @@ struct
       in
       let f stack1 stack2 =
         let%bind updated_stack1 = with_label __LOC__ (f1 stack1) in
-        let%bind updated_stack2 = f2 updated_stack1 stack2 in
-        let%map () =
-          as_prover
-            As_prover.(
-              Let_syntax.(
-                let%map updated_stack1 = read Stack.typ updated_stack1
-                and updated_stack2 = read Stack.typ updated_stack2
-                and stack1 = read Stack.typ stack1
-                and state_body_hash =
-                  read State_body_hash.typ state_body_hash
-                in
-                Core.printf
-                  !"in Snark stack1 %{sexp: Stack.t} \n\
-                    state body hash %{sexp: State_body_hash.t} \n\
-                    updated_stack1 %{sexp:Stack.t} \n\
-                    updated_stack2 %{sexp: Stack.t} \n\
-                    %!"
-                  stack1 state_body_hash updated_stack1 updated_stack2))
-        in
+        let%map updated_stack2 = f2 updated_stack1 stack2 in
         (updated_stack1, updated_stack2)
       in
       handle
@@ -1042,8 +960,6 @@ struct
     if is_new_stack then t.new_pos
     else match List.hd t.pos_list with Some x -> x | None -> Stack_id.zero
 
-  (*Or_error.error_string "No stacks in the tree"*)
-
   let curr_stack_id (t : t) = List.hd t.pos_list
 
   let previous_stack t =
@@ -1155,7 +1071,6 @@ struct
               in
               find_index !pending_coinbase stack_id |> Or_error.ok_exn
             in
-            Core.printf !"indices %d %d \n%!" index1 index2 ;
             respond @@ Provide (index1, index2)
         | Checked.Get_coinbase_stack idx ->
             let elt = get_stack !pending_coinbase idx |> Or_error.ok_exn in
@@ -1167,39 +1082,25 @@ struct
             pending_coinbase :=
               set_stack !pending_coinbase idx stack ~is_new_stack
               |> Or_error.ok_exn ;
-            Core.printf
-              !"after update inside snark %{sexp: t} \n%!"
-              !pending_coinbase ;
             respond (Provide ())
         | Checked.Set_oldest_coinbase_stack (idx, stack) ->
             pending_coinbase :=
               set_stack !pending_coinbase idx stack ~is_new_stack:false
               |> Or_error.ok_exn ;
-            Core.printf
-              !"after update inside snark %{sexp: t} \n%!"
-              !pending_coinbase ;
             respond (Provide ())
         | Checked.Get_previous_stack ->
             let prev_state =
-              if is_new_stack then (
+              if is_new_stack then
                 let stack =
                   previous_stack !pending_coinbase |> Or_error.ok_exn
                 in
-                Core.printf
-                  !"Prev stack (getting curr) %{sexp: Coinbase_stack_state.t}\n\
-                    %!"
-                  stack.state ;
                 { Coinbase_stack_state.Poly.init= stack.state.curr
-                ; curr= stack.state.curr } )
+                ; curr= stack.state.curr }
               else
                 let stack =
                   latest_stack !pending_coinbase ~is_new_stack
                   |> Or_error.ok_exn
                 in
-                Core.printf
-                  !"Prev stack (getting init) %{sexp: Coinbase_stack_state.t}\n\
-                    %!"
-                  stack.state ;
                 stack.state
             in
             respond (Provide prev_state)
@@ -1262,18 +1163,15 @@ let add_coinbase_with_zero_checks (type t)
     let t_with_state =
       T.add_state t state_body_hash ~is_new_stack |> Or_error.ok_exn
     in
+    (*add coinbase to the same stack*)
     let interim_tree =
       T.add_coinbase t_with_state ~coinbase ~is_new_stack:false
       |> Or_error.ok_exn
     in
-    let new_tree =
-      if Amount.equal coinbase'.amount Amount.zero then interim_tree
-      else
-        T.add_coinbase interim_tree ~coinbase:coinbase' ~is_new_stack:false
-        |> Or_error.ok_exn
-    in
-    Core.printf !"updated tree outside snark %{sexp:T.t}\n%!" new_tree ;
-    new_tree
+    if Amount.equal coinbase'.amount Amount.zero then interim_tree
+    else
+      T.add_coinbase interim_tree ~coinbase:coinbase' ~is_new_stack:false
+      |> Or_error.ok_exn
 
 let%test_unit "Checked_stack = Unchecked_stack" =
   let open Quickcheck in
@@ -1300,7 +1198,6 @@ let%test_unit "Checked_tree = Unchecked_tree" =
   let pending_coinbases = create () |> Or_error.ok_exn in
   test ~trials:20 (Generator.tuple2 Coinbase.gen State_body_hash.gen)
     ~f:(fun (coinbase, state_body_hash) ->
-      Core.printf !"-----------------------------------\n\n%!" ;
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let is_new_stack, action =
         Currency.Amount.(
@@ -1340,19 +1237,16 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
     ~f:(fun (coinbase, state_body_hash) ->
       let pending_coinbases = create () |> Or_error.ok_exn in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
-      Core.printf !"Coinbase %{sexp: Coinbase.t}\n%!" coinbase ;
       let action =
         Currency.Amount.(
           if equal coinbase.amount zero then Update.Action.Update_none
           else Update_one)
       in
-      Core.printf !"pc before adding cb %{sexp:t}\n%!" pending_coinbases ;
       let unchecked =
         add_coinbase_with_zero_checks
           (module T)
           pending_coinbases ~coinbase ~is_new_stack:true ~state_body_hash
       in
-      Core.printf !"pc after adding cb %{sexp:t}\n%!" unchecked ;
       (* inside the `open' below, Checked means something else, so define these functions *)
       let f_add_coinbase = Checked.add_coinbase in
       let f_pop_coinbase = Checked.pop_coinbases in
