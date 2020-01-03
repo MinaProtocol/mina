@@ -31,10 +31,7 @@ module type S = sig
   module Coinbase_data : sig
     module Stable : sig
       module V1 : sig
-        type t =
-          Public_key.Compressed.Stable.V1.t
-          * Amount.Stable.V1.t
-          * State_body_hash.Stable.V1.t
+        type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
         [@@deriving sexp, bin_io]
       end
 
@@ -45,7 +42,7 @@ module type S = sig
 
     type value [@@deriving sexp]
 
-    type var = Public_key.Compressed.var * Amount.var * State_body_hash.var
+    type var = Public_key.Compressed.var * Amount.var
 
     val typ : (var, value) Typ.t
 
@@ -189,7 +186,10 @@ module type S = sig
 
     module Stable : sig
       module V1 : sig
-        type t = Action.Stable.V1.t * Coinbase_data.Stable.V1.t
+        type t =
+          Action.Stable.V1.t
+          * Coinbase_data.Stable.V1.t
+          * State_body_hash.Stable.V1.t
         [@@deriving sexp]
       end
 
@@ -198,7 +198,7 @@ module type S = sig
 
     type t = Stable.Latest.t
 
-    type var = Action.var * Coinbase_data.var
+    type var = Action.var * Coinbase_data.var * State_body_hash.var
 
     val var_of_t : t -> var
   end

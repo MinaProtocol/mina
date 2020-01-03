@@ -2038,8 +2038,9 @@ let%test_module "test" =
         in
         let action = Update.Action.var_of_t pc_action in
         let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
+        let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
         Pending_coinbase.Checked.add_coinbase root_after_popping
-          (action, coinbase_var)
+          (action, coinbase_var, state_body_hash_var)
       in
       let checked_root_after_update =
         let open Snark_params.Tick in

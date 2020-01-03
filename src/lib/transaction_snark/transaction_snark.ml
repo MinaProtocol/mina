@@ -340,7 +340,7 @@ module Base = struct
       Pending_coinbase.Stack.Checked.if_ push_state ~then_:updated_stack
         ~else_:pending_coinbase_stack_before
     in
-    let coinbase = (proposer, payload.body.amount, state_body_hash) in
+    let coinbase = (proposer, payload.body.amount) in
     let%bind computed_pending_coinbase_stack_after =
       (*TODO: remove state body hash from coinbase*)
       let%bind stack' =

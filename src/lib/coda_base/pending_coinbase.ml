@@ -24,10 +24,7 @@ module Coinbase_data = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        Public_key.Compressed.Stable.V1.t
-        * Amount.Stable.V1.t
-        * State_body_hash.Stable.V1.t
+      type t = Public_key.Compressed.Stable.V1.t * Amount.Stable.V1.t
       [@@deriving sexp]
 
       let to_latest = Fn.id
@@ -36,28 +33,25 @@ module Coinbase_data = struct
 
   type t = Stable.Latest.t
 
-  let of_coinbase (cb : Coinbase.t) : t =
-    (cb.proposer, cb.amount, cb.state_body_hash)
+  let of_coinbase (cb : Coinbase.t) : t = (cb.proposer, cb.amount)
 
-  type var = Public_key.Compressed.var * Amount.var * State_body_hash.var
+  type var = Public_key.Compressed.var * Amount.var
 
   type value = Stable.Latest.t [@@deriving sexp]
 
-  let var_of_t ((public_key, amount, state_body_hash) : value) =
-    ( Public_key.Compressed.var_of_t public_key
-    , Amount.var_of_t amount
-    , State_body_hash.var_of_t state_body_hash )
+  let var_of_t ((public_key, amount) : value) =
+    (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
 
-  let to_input (pk, amount, _state_body_hash) =
+  let to_input (pk, amount) =
     let open Random_oracle.Input in
     List.reduce_exn ~f:append
       [Public_key.Compressed.to_input pk; bitstring (Amount.to_bits amount)]
 
   module Checked = struct
-    let _constant ((public_key, amount, _state_body_hash) : value) =
+    let _constant ((public_key, amount) : value) =
       (Public_key.Compressed.var_of_t public_key, Amount.var_of_t amount)
 
-    let to_input (public_key, amount, _state_body_hash) =
+    let to_input (public_key, amount) =
       let open Random_oracle.Input in
       List.reduce_exn ~f:append
         [ Public_key.Compressed.Checked.to_input public_key
@@ -69,27 +63,20 @@ module Coinbase_data = struct
   let typ : (var, value) Typ.t =
     let spec =
       let open Data_spec in
-      [Public_key.Compressed.typ; Amount.typ; State_body_hash.typ]
+      [Public_key.Compressed.typ; Amount.typ]
     in
     let of_hlist
-          : 'public_key 'amount 'state_body_hash.    ( unit
-                                                     ,    'public_key
-                                                       -> 'amount
-                                                       -> 'state_body_hash
-                                                       -> unit )
-                                                     H_list.t
-            -> 'public_key * 'amount * 'state_body_hash =
+          : 'public_key 'amount.    ( unit
+                                    , 'public_key -> 'amount -> unit )
+                                    H_list.t -> 'public_key * 'amount =
       let open H_list in
-      fun [public_key; amount; state_body_hash] ->
-        (public_key, amount, state_body_hash)
+      fun [public_key; amount] -> (public_key, amount)
     in
-    let to_hlist (public_key, amount, state_body_hash) =
-      H_list.[public_key; amount; state_body_hash]
-    in
+    let to_hlist (public_key, amount) = H_list.[public_key; amount] in
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
       ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let empty = (Public_key.Compressed.empty, Amount.zero, State_body_hash.dummy)
+  let empty = (Public_key.Compressed.empty, Amount.zero)
 
   let genesis = empty
 end
@@ -411,7 +398,11 @@ module Update = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Action.Stable.V1.t * Coinbase_data.Stable.V1.t [@@deriving sexp]
+      type t =
+        Action.Stable.V1.t
+        * Coinbase_data.Stable.V1.t
+        * State_body_hash.Stable.V1.t
+      [@@deriving sexp]
 
       let to_latest = Fn.id
     end
@@ -419,9 +410,10 @@ module Update = struct
 
   type t = Stable.Latest.t
 
-  type var = Action.var * Coinbase_data.var
+  type var = Action.var * Coinbase_data.var * State_body_hash.var
 
-  let var_of_t (a, c) = (Action.var_of_t a, Coinbase_data.var_of_t c)
+  let var_of_t (a, c, s) =
+    (Action.var_of_t a, Coinbase_data.var_of_t c, State_body_hash.var_of_t s)
 end
 
 (* Sparse_ledger.Make is applied more than once in the code, so
@@ -765,7 +757,7 @@ struct
         reraise_merkle_requests
 
     let%snarkydef add_coinbase t
-        ((action : Update.Action.var), (pk, amount, state_body_hash)) =
+        ((action : Update.Action.var), (pk, amount), state_body_hash) =
       (* Question: Do the transaction have the current protocol state? Which means that both the stacks should be updated with the curr (or previous) body hash without the coinbase?) 
     *)
       let%bind addr1, addr2 =
@@ -855,12 +847,10 @@ struct
         in
         (* TODO: Optimize here since we are pushing twice to the same stack *)
         let%bind stack_with_amount1 =
-          Stack.Checked.push_coinbase (pk, amount, state_body_hash) stack
+          Stack.Checked.push_coinbase (pk, amount) stack
         in
         let%bind stack_with_amount2 =
-          Stack.Checked.push_coinbase
-            (pk, rem_amount, state_body_hash)
-            stack_with_amount1
+          Stack.Checked.push_coinbase (pk, rem_amount) stack_with_amount1
         in
         chain Stack.if_ no_coinbase ~then_:(return stack)
           ~else_:
@@ -887,7 +877,7 @@ struct
             ~else_:stack0
         in
         let%bind stack_with_coinbase =
-          Stack.Checked.push_coinbase (pk, amount, state_body_hash) stack
+          Stack.Checked.push_coinbase (pk, amount) stack
         in
         Stack.if_ add_coinbase ~then_:stack_with_coinbase ~else_:stack
       in
@@ -1274,7 +1264,7 @@ end
 
 let add_coinbase_with_zero_checks (type t)
     (module T : Pending_coinbase_intf with type t = t) (t : t) ~coinbase
-    ~is_new_stack =
+    ~state_body_hash ~is_new_stack =
   if Amount.equal coinbase.Coinbase.amount Amount.zero then t
   else
     let max_coinbase_amount = Coda_compile_config.coinbase in
@@ -1283,12 +1273,11 @@ let add_coinbase_with_zero_checks (type t)
         ~amount:
           ( Amount.sub max_coinbase_amount coinbase.amount
           |> Option.value_exn ?here:None ?message:None ?error:None )
-        ~proposer:coinbase.proposer ~fee_transfer:None
-        ~state_body_hash:coinbase.state_body_hash
+        ~proposer:coinbase.proposer ~fee_transfer:None ~state_body_hash
       |> Or_error.ok_exn
     in
     let t_with_state =
-      T.add_state t coinbase.state_body_hash ~is_new_stack |> Or_error.ok_exn
+      T.add_state t state_body_hash ~is_new_stack |> Or_error.ok_exn
     in
     let interim_tree =
       T.add_coinbase t_with_state ~coinbase ~is_new_stack:false
@@ -1326,7 +1315,8 @@ let%test_unit "Checked_stack = Unchecked_stack" =
 let%test_unit "Checked_tree = Unchecked_tree" =
   let open Quickcheck in
   let pending_coinbases = create () |> Or_error.ok_exn in
-  test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
+  test ~trials:20 (Generator.tuple2 Coinbase.gen State_body_hash.gen)
+    ~f:(fun (coinbase, state_body_hash) ->
       Core.printf !"-----------------------------------\n\n%!" ;
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let is_new_stack, action =
@@ -1339,7 +1329,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
       let unchecked =
         add_coinbase_with_zero_checks
           (module T)
-          pending_coinbases ~coinbase ~is_new_stack
+          pending_coinbases ~coinbase ~is_new_stack ~state_body_hash
       in
       (* inside the `open' below, Checked means something else, so define this function *)
       let f_add_coinbase = Checked.add_coinbase in
@@ -1348,11 +1338,12 @@ let%test_unit "Checked_tree = Unchecked_tree" =
           let open Snark_params.Tick in
           let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
           let action_var = Update.Action.var_of_t action in
+          let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
           let%map result =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 (action_var, coinbase_var))
+                 (action_var, coinbase_var, state_body_hash_var))
               (unstage (handler pending_coinbases ~is_new_stack))
           in
           As_prover.read Hash.typ result
@@ -1364,9 +1355,11 @@ let%test_unit "Checked_tree = Unchecked_tree" =
 
 let%test_unit "Checked_tree = Unchecked_tree after pop" =
   let open Quickcheck in
-  test ~trials:20 Coinbase.gen ~f:(fun coinbase ->
+  test ~trials:20 (Generator.tuple2 Coinbase.gen State_body_hash.gen)
+    ~f:(fun (coinbase, state_body_hash) ->
       let pending_coinbases = create () |> Or_error.ok_exn in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
+      Core.printf !"Coinbase %{sexp: Coinbase.t}\n%!" coinbase ;
       let action =
         Currency.Amount.(
           if equal coinbase.amount zero then Update.Action.Update_none
@@ -1374,11 +1367,13 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
             Update_one
           else Update_one)
       in
+      Core.printf !"pc before adding cb %{sexp:t}\n%!" pending_coinbases ;
       let unchecked =
         add_coinbase_with_zero_checks
           (module T)
-          pending_coinbases ~coinbase ~is_new_stack:true
+          pending_coinbases ~coinbase ~is_new_stack:true ~state_body_hash
       in
+      Core.printf !"pc after adding cb %{sexp:t}\n%!" unchecked ;
       (* inside the `open' below, Checked means something else, so define these functions *)
       let f_add_coinbase = Checked.add_coinbase in
       let f_pop_coinbase = Checked.pop_coinbases in
@@ -1387,11 +1382,12 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
           let open Snark_params.Tick in
           let coinbase_var = Coinbase_data.(var_of_t coinbase_data) in
           let action_var = Update.Action.(var_of_t action) in
+          let state_body_hash_var = State_body_hash.var_of_t state_body_hash in
           let%map result =
             handle
               (f_add_coinbase
                  (Hash.var_of_t (merkle_root pending_coinbases))
-                 (action_var, coinbase_var))
+                 (action_var, coinbase_var, state_body_hash_var))
               (unstage (handler pending_coinbases ~is_new_stack:true))
           in
           As_prover.read Hash.typ result
@@ -1400,8 +1396,12 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
         x
       in
       assert (Hash.equal (merkle_root unchecked) checked_merkle_root) ;
-      let _, unchecked_after_pop =
-        remove_coinbase_stack unchecked |> Or_error.ok_exn
+      (*deleting the coinbase stack we just created. therefore if there was no update then no stack will be created*)
+      let proof_emitted = not (action = Update.Action.Update_none) in
+      let unchecked_after_pop =
+        if proof_emitted then
+          remove_coinbase_stack unchecked |> Or_error.ok_exn |> snd
+        else unchecked
       in
       let checked_merkle_root_after_pop =
         let comp =
@@ -1433,18 +1433,21 @@ let%test_unit "push and pop multiple stacks" =
           Pending_coinbase.incr_index t ~is_new_stack:true |> Or_error.ok_exn
         in
         (Pending_coinbase.Stack.empty, t')
-    | initial_coinbase :: coinbases ->
+    | (initial_coinbase, state_body_hash) :: coinbases ->
         let t' =
-          Pending_coinbase.add_coinbase t ~coinbase:initial_coinbase
-            ~is_new_stack:true
+          Pending_coinbase.add_state t state_body_hash ~is_new_stack:true
+          |> Or_error.ok_exn
+          |> Pending_coinbase.add_coinbase ~coinbase:initial_coinbase
+               ~is_new_stack:false
           |> Or_error.ok_exn
         in
         let updated =
           List.fold coinbases ~init:t'
-            ~f:(fun pending_coinbases (coinbase : Coinbase.t) ->
+            ~f:(fun pending_coinbases (coinbase, state_body_hash) ->
               add_coinbase_with_zero_checks
                 (module Pending_coinbase)
-                pending_coinbases ~coinbase ~is_new_stack:false )
+                pending_coinbases ~coinbase ~is_new_stack:false
+                ~state_body_hash )
         in
         let new_stack =
           Or_error.ok_exn
@@ -1487,5 +1490,8 @@ let%test_unit "push and pop multiple stacks" =
     in
     go coinbase_lists pending_coinbases
   in
-  let coinbase_lists_gen = Quickcheck.Generator.(list (list Coinbase.gen)) in
+  let coinbase_lists_gen =
+    Quickcheck.Generator.(
+      list (list (Generator.tuple2 Coinbase.gen State_body_hash.gen)))
+  in
   test ~trials:100 coinbase_lists_gen ~f:add_remove_check
