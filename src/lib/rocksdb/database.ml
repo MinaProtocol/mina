@@ -90,6 +90,9 @@ let%test_unit "to_alist (of_alist l) = l" =
           ()
       | `Ok _ ->
           let db_dir = Filename.temp_dir "db_dir" "" in
+          Logger.debug (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:[("db_dir", `String db_dir)]
+            "db_dir created" ;
           let sorted =
             List.sort kvs ~compare:[%compare: string * string]
             |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
