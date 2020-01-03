@@ -117,10 +117,9 @@ let%test_unit "checkpoint read test" =
             Filename.temp_dir_name
             ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
           in
-          let s = Bigstring.of_string in
           let sorted =
             List.sort kvs ~compare:[%compare: string * string]
-            |> List.map ~f:(fun (k, v) -> (s k, s v))
+            |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
           in
           let db = create db_dir in
           List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
