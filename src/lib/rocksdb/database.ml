@@ -103,6 +103,7 @@ let%test_unit "to_alist (of_alist l) = l" =
           [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
           close db )
 
+(*
 let%test_unit "checkpoint read test" =
   Quickcheck.test
     Quickcheck.Generator.(
@@ -170,3 +171,4 @@ let%test_unit "checkpoint write test" =
           [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
           close db ;
           close cp )
+*)
