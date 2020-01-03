@@ -660,9 +660,7 @@ let create (config : Config.t)
       "Sending best_tip to peer with IP %s"
       (Unix.Inet_addr.to_string conn.Peer.host) ;
     let action_msg = "Get_best_tip. query: $query" in
-    let msg_args =
-      [("query", Rpcs.Get_best_tip.query_to_yojson query)]
-    in
+    let msg_args = [("query", Rpcs.Get_best_tip.query_to_yojson query)] in
     let%bind result, sender =
       run_for_rpc_result conn query ~f:get_best_tip action_msg msg_args
     in

@@ -254,8 +254,8 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
                     { Consensus.Hooks.Rpcs.query=
                         (fun peer rpc query ->
                           Coda_networking.(
-                            query_peer network peer.peer_id (Rpcs.Consensus_rpc rpc)
-                              query) ) }
+                            query_peer network peer.peer_id
+                              (Rpcs.Consensus_rpc rpc) query) ) }
                   sync_jobs
               with
               | Error e ->
