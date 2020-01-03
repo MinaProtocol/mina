@@ -89,6 +89,36 @@ let%test_unit "to_alist (of_alist l) = l" =
       | `Duplicate_key _ ->
           ()
       | `Ok _ ->
+          File_system.with_temp_dir "/tmp/coda-test" ~f:(fun db_dir ->
+              Logger.debug (Logger.create ()) ~module_:__MODULE__
+                ~location:__LOC__
+                ~metadata:[("db_dir", `String db_dir)]
+                "test count" ;
+              let sorted =
+                List.sort kvs ~compare:[%compare: string * string]
+                |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
+              in
+              let db = create db_dir in
+              List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
+              let alist =
+                List.sort (to_alist db)
+                  ~compare:[%compare: Bigstring.t * Bigstring.t]
+              in
+              [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted
+                alist ;
+              close db ;
+              Async.Deferred.unit )
+          |> Async.don't_wait_for )
+
+let%test_unit "to_alist (of_alist l) = l" =
+  Async.Quickcheck.test ~trials:10
+    Quickcheck.Generator.(
+      tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
+    ~f:(fun kvs ->
+      match Hashtbl.of_alist (module String) kvs with
+      | `Duplicate_key _ ->
+          ()
+      | `Ok _ ->
           let db_dir = Filename.temp_dir "db_dir" "" in
           Logger.debug (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("db_dir", `String db_dir)]
