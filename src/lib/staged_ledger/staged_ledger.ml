@@ -2004,7 +2004,7 @@ let%test_module "test" =
         let create amount fee_transfer =
           Coinbase.create ~amount
             ~proposer:(Staged_ledger_diff.creator diff)
-            ~fee_transfer ~state_body_hash
+            ~fee_transfer
           |> Or_error.ok_exn
         in
         Pending_coinbase.Coinbase_data.of_coinbase

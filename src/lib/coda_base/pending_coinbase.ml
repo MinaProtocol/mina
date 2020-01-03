@@ -1256,7 +1256,7 @@ let add_coinbase_with_zero_checks (type t)
         ~amount:
           ( Amount.sub max_coinbase_amount coinbase.amount
           |> Option.value_exn ?here:None ?message:None ?error:None )
-        ~proposer:coinbase.proposer ~fee_transfer:None ~state_body_hash
+        ~proposer:coinbase.proposer ~fee_transfer:None
       |> Or_error.ok_exn
     in
     let t_with_state =
