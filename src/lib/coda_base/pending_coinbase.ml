@@ -758,8 +758,6 @@ struct
 
     let%snarkydef add_coinbase t
         ((action : Update.Action.var), (pk, amount), state_body_hash) =
-      (* Question: Do the transaction have the current protocol state? Which means that both the stacks should be updated with the curr (or previous) body hash without the coinbase?) 
-    *)
       let%bind addr1, addr2 =
         request_witness
           Typ.(Address.typ * Address.typ)
@@ -774,6 +772,8 @@ struct
       in
       let%bind no_update = Update.Action.Checked.no_update action in
       let update_state_stack (stack : Stack.var) =
+        (*get previous stack to carry-forward the stack of state body hashes*)
+        (*TODO: Do this or simply store the previous stack at the top level and request it?*)
         let%bind previous_state_stack =
           request_witness Coinbase_stack_state.typ
             As_prover.(map (return ()) ~f:(fun () -> Get_previous_stack))
@@ -782,6 +782,7 @@ struct
         let%bind stack_with_state_hash =
           Stack.Checked.push_state state_body_hash stack_initialized
         in
+        (*Always update the state body hash unless there are no transactions in this block*)
         Stack.Checked.if_ no_update ~then_:stack ~else_:stack_with_state_hash
       in
       let f1 stack0 =
@@ -816,15 +817,6 @@ struct
         let%bind () =
           with_label __LOC__
             (let%bind check1 = Boolean.equal no_update amount1_equal_to_zero in
-             (*let%bind coinbase_split = Update.Action.Checked.update_two_stacks_coinbase_in_first action in
-              let%bind coinbase_not_split =  Update.Action.Checked.update_one_stack action in
-              let%bind check2 = Boolean.(equal amount2_equal_to_zero (not coinbase_split)) in
-              let%bind check3 = 
-                (*Second stack will never have the coinbase split*)
-                let%bind amount2_can_be_zero = Boolean.(no_coinbase_in_this_stack || coinbase_not_split)
-                in
-                Boolean.(equal amount2_equal_to_zero amount2_can_be_zero) 
-              in *)
              let%bind () =
                as_prover
                  As_prover.(
@@ -837,10 +829,7 @@ struct
                      Core.printf !"check1 %b \n%!" check1))
              in
              Boolean.Assert.all [check1])
-          (*; check2; check3] *)
         in
-        (*TODO: Add xnor in snarky*)
-        (*state is pushed only if there's atleast one transaction in the transition. So, if it is false then coinbase amount has to be zero and if it's true then coinbase amount should be non-zero because we prioritize coinbase over user commands when creating a diff. But maybe this is too restricted?*)
         let%bind no_coinbase =
           let%bind no_update = Boolean.(no_update && amount1_equal_to_zero) in
           Boolean.(no_update || no_coinbase_in_this_stack)
@@ -857,6 +846,7 @@ struct
             (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
                ~else_:stack_with_amount2)
       in
+      (*This is for the second stack for when transactions in a  block are occupy two trees of the scan state; the second tree will carry-forward the state stack from the first stack and might have a coinbase*)
       let f2 (init_stack : Stack.var) stack0 =
         let%bind add_coinbase =
           Update.Action.Checked.update_two_stacks_coinbase_in_second action
@@ -912,8 +902,6 @@ struct
       >>| Hash.var_of_hash_packed
 
     let%snarkydef pop_coinbases t ~proof_emitted =
-      (*TODO: after popping stack, if there are no new stacks (merkle root of an empty tree) then update the next stack with this stack (if it is empty) so that we don't lose that infomation while having it constrained. As opposed to storing the stack at the top level of pending coinbase and requesting for that information when adding a coinbase.*)
-      (* This will cause two merkle updates one for deleting the current stack and the next updating the next stack with this deleted stack.*)
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
@@ -1094,7 +1082,7 @@ struct
     let%bind index = find_index t key in
     get_stack t index
 
-  let update_stack t ~(f : Stack.t -> Stack.t) ~is_new_stack =
+  let update_stack' t ~(f : Stack.t -> Stack.t) ~is_new_stack =
     let open Or_error.Let_syntax in
     let key = latest_stack_id t ~is_new_stack in
     let%bind stack_index = find_index t key in
@@ -1104,18 +1092,13 @@ struct
     set_stack t stack_index stack_after ~is_new_stack
 
   let add_coinbase t ~coinbase ~is_new_stack =
-    update_stack t ~f:(Stack.push_coinbase coinbase) ~is_new_stack
+    update_stack' t ~f:(Stack.push_coinbase coinbase) ~is_new_stack
 
   let add_state t state_body_hash ~is_new_stack =
-    update_stack t ~f:(Stack.push_state state_body_hash) ~is_new_stack
+    update_stack' t ~f:(Stack.push_state state_body_hash) ~is_new_stack
 
   let update_coinbase_stack (t : t) stack ~is_new_stack =
-    let open Or_error.Let_syntax in
-    let key = latest_stack_id t ~is_new_stack in
-    let%bind stack_index = find_index t key in
-    let%map res = set_stack t stack_index stack ~is_new_stack in
-    Core.printf !"after update outside snark %{sexp: t} \n%!" res ;
-    res
+    update_stack' t ~f:(fun _ -> stack) ~is_new_stack
 
   let remove_coinbase_stack (t : t) =
     let open Or_error.Let_syntax in
@@ -1322,8 +1305,6 @@ let%test_unit "Checked_tree = Unchecked_tree" =
       let is_new_stack, action =
         Currency.Amount.(
           if equal coinbase.amount zero then (true, Update.Action.Update_none)
-          else if coinbase.amount < Coda_compile_config.coinbase then
-            (true, Update_one)
           else (true, Update_one))
       in
       let unchecked =
@@ -1363,8 +1344,6 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
       let action =
         Currency.Amount.(
           if equal coinbase.amount zero then Update.Action.Update_none
-          else if coinbase.amount < Coda_compile_config.coinbase then
-            Update_one
           else Update_one)
       in
       Core.printf !"pc before adding cb %{sexp:t}\n%!" pending_coinbases ;
@@ -1396,7 +1375,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
         x
       in
       assert (Hash.equal (merkle_root unchecked) checked_merkle_root) ;
-      (*deleting the coinbase stack we just created. therefore if there was no update then no stack will be created*)
+      (*deleting the coinbase stack we just created. therefore if there was no update then don't try to delete*)
       let proof_emitted = not (action = Update.Action.Update_none) in
       let unchecked_after_pop =
         if proof_emitted then

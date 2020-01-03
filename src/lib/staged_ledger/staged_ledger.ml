@@ -500,8 +500,9 @@ module T = struct
         Assumption: Only one of the partition will have coinbase transaction(s)in it.
         1. Get the latest stack for coinbase in the first set of transactions
         2. get the first set of scan_state data[data1]
-        3. get a new stack for the second parition because the second set of transactions would start from the begining of the scan_state
-        4. get the second set of scan_state data[data2]*)
+        3. get a new stack for the second partion because the second set of transactions would start from the begining of the next tree in the scan_state
+        4. Initialize the new stack with the state from the first stack
+        5. get the second set of scan_state data[data2]*)
           let txns_for_partition1 = List.take transactions slots in
           let coinbase_in_first_partition =
             coinbase_exists txns_for_partition1
@@ -516,7 +517,6 @@ module T = struct
           in
           let txns_for_partition2 = List.drop transactions slots in
           let working_stack2 =
-            (*working_stack pending_coinbase_collection ~is_new_stack:true*)
             Pending_coinbase.Stack.create_with updated_stack1
           in
           (*Push the state body hash to the pending coinbase stack once per diff*)
@@ -531,37 +531,26 @@ module T = struct
               %!"
             state_body_hash working_stack1 working_stack2 ;
           let second_has_data = List.length txns_for_partition2 > 0 in
-          let new_stack_in_snark = false in
           let pending_coinbase_action, stack_update =
             match (coinbase_in_first_partition, second_has_data) with
             | true, true ->
                 ( Pending_coinbase.Update.Action.Update_two_coinbase_in_first
                 , `Update_two (updated_stack1, updated_stack2) )
-            (*updated_stack2 will not have any coinbase and therefore we don't
-            want to create a new stack in snark. updated_stack2 is only used to
-            update the pending_coinbase_aux because there's going to be data on
-            a "new tree" and we don't want to keep creating new stacks or
-            override existing stacks in the case when a tree has no coinbase at
-            all.*)
+            (*updated_stack2 does not have coinbase and but has the state from the previous stack*)
             | true, false ->
                 (*updated_stack1 has some new coinbase but parition 2 has no
-                data and so we don't have to update pending_coinbase_aux just
-                yet*)
+                data and so we have only one stack to update*)
                 (Update_one, `Update_one updated_stack1)
             | false, true ->
-                (*updated_stack1 does not have new coinbases and so don't
-                update it. [updated stack2] might have (definitely has some
-                data)*)
+                (*updated_stack1 just has the new state. [updated stack2] might have coinbase, definitely has some
+                data and therefore will have a non-dummy state.*)
                 ( Update_two_coinbase_in_second
                 , `Update_two (updated_stack1, updated_stack2) )
             | false, false ->
-                (* a diff consists of, at the very, least a coinbase*)
+                (* a diff consists of only non-coinbase transactions. This is currently not possible because a diff will have a coinbase at the very least, so don't update anything?*)
                 (Update_none, `Update_none)
           in
-          ( new_stack_in_snark
-          , data1 @ data2
-          , pending_coinbase_action
-          , stack_update ) )
+          (false, data1 @ data2, pending_coinbase_action, stack_update) )
     else
       Deferred.return
         (Ok
@@ -608,7 +597,7 @@ module T = struct
           pending_coinbase_collection_updated1 stack1 ~is_new_stack
         |> to_staged_ledger_or_error
     | `Update_two (stack1, stack2) ->
-        (*The case when part of the transactions go in to the old tree and remaining on to the new tree*)
+        (*The case when some of the transactions go into the old tree and remaining on to the new tree*)
         Core.printf
           !"outside snark updated_stack1 %{sexp:Pending_coinbase.Stack.t} \
             updated_stack2 %{sexp: Pending_coinbase.Stack.t} \n\
@@ -1441,9 +1430,8 @@ let%test_module "test" =
       One_or_two.map stmts ~f:(fun statement ->
           Ledger_proof.create ~statement ~sok_digest ~proof:Proof.dummy )
 
-    let _stmt_to_work_random_prover
-        (stmts : Transaction_snark_work.Statement.t) :
-        Transaction_snark_work.Checked.t option =
+    let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
+        : Transaction_snark_work.Checked.t option =
       let prover = stmt_to_prover stmts in
       let fee = Fee.of_int 1 in
       Some {Transaction_snark_work.Checked.fee; proofs= proofs stmts; prover}
@@ -1453,7 +1441,7 @@ let%test_module "test" =
       Quickcheck.random_value ~seed:(`Deterministic "snark worker")
         Public_key.Compressed.gen
 
-    let _stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
+    let stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
       let fee = Fee.of_int 1 in
       Some {fee; proofs= proofs stmts; prover= snark_worker_pk}
@@ -1555,7 +1543,7 @@ let%test_module "test" =
 
     (** Generic test framework. *)
 
-    let _test_simple :
+    let test_simple :
            Ledger.init_state
         -> User_command.With_valid_signature.t list
         -> int option list
@@ -1636,7 +1624,7 @@ let%test_module "test" =
 
     (** Generator for when we always have enough commands to fill all slots. *)
 
-    let _gen_at_capacity :
+    let gen_at_capacity :
         ( Ledger.init_state
         * User_command.With_valid_signature.t list
         * int option list )
@@ -1654,7 +1642,7 @@ let%test_module "test" =
 
     (*Same as gen_at_capacity except that the number of iterations[iters] is
     the function of [extra_block_count] and is same for all generated values*)
-    let _gen_at_capacity_fixed_blocks extra_block_count :
+    let gen_at_capacity_fixed_blocks extra_block_count :
         ( Ledger.init_state
         * User_command.With_valid_signature.t list
         * int option list )
@@ -1695,7 +1683,7 @@ let%test_module "test" =
       assert (List.length cmds = total_cmds) ;
       return (ledger_init_state, cmds, List.map ~f:Option.some cmds_per_iter)
 
-    (*let%test_unit "Max throughput-ledger proof count-fixed blocks" =
+    let%test_unit "Max throughput-ledger proof count-fixed blocks" =
       let expected_proof_count = 3 in
       Quickcheck.test (gen_at_capacity_fixed_blocks expected_proof_count)
         ~sexp_of:
@@ -1841,7 +1829,7 @@ let%test_module "test" =
                     return (diff', checked || checked') )
               in
               (*Note: if this fails, try increasing the number of trials*)
-              assert checked ) )*)
+              assert checked ) )
 
     let stmt_to_work_restricted work_list provers
         (stmts : Transaction_snark_work.Statement.t) :
@@ -1865,7 +1853,7 @@ let%test_module "test" =
     (** Like test_simple but with a random number of completed jobs available.
     *)
 
-    (* let test_random_number_of_proofs :
+    let test_random_number_of_proofs :
            Ledger.init_state
         -> User_command.With_valid_signature.t list
         -> int option list
@@ -2003,7 +1991,7 @@ let%test_module "test" =
         ~f:(fun (ledger_init_state, cmds, iters, proofs_available) ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_random_number_of_proofs ledger_init_state cmds iters
-                proofs_available sl test_mask `One_prover ) )*)
+                proofs_available sl test_mask `One_prover ) )
 
     let check_pending_coinbase proof diff ~sl_before ~sl_after state_body_hash
         pc_action ~coinbase_amount ~is_new_stack =
