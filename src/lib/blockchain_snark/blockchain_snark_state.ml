@@ -56,8 +56,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         Tick.Checked.t =
       let supply_increase = Snark_transition.supply_increase transition in
       let%bind `Success updated_consensus_state, consensus_state =
-        Consensus_state_hooks.next_state_checked ~prev_state:previous_state
-          ~prev_state_hash:previous_state_hash transition supply_increase
+        with_label __LOC__
+          (Consensus_state_hooks.next_state_checked ~prev_state:previous_state
+             ~prev_state_hash:previous_state_hash transition supply_increase)
       in
       let prev_pending_coinbase_root =
         previous_state |> Protocol_state.blockchain_state
@@ -115,16 +116,18 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
         in
         let%bind correct_transaction_snark =
-          verify_complete_merge
-            (Snark_transition.sok_digest transition)
-            ( previous_state |> Protocol_state.blockchain_state
-            |> Blockchain_state.snarked_ledger_hash )
-            ( transition |> Snark_transition.blockchain_state
-            |> Blockchain_state.snarked_ledger_hash )
-            Pending_coinbase.Stack.Checked.empty deleted_stack supply_increase
-            (As_prover.return
-               (Option.value ~default:Tock.Proof.dummy
-                  (Snark_transition.ledger_proof transition)))
+          with_label __LOC__
+            (verify_complete_merge
+               (Snark_transition.sok_digest transition)
+               ( previous_state |> Protocol_state.blockchain_state
+               |> Blockchain_state.snarked_ledger_hash )
+               ( transition |> Snark_transition.blockchain_state
+               |> Blockchain_state.snarked_ledger_hash )
+               Pending_coinbase.Stack.Checked.empty deleted_stack
+               supply_increase
+               (As_prover.return
+                  (Option.value ~default:Tock.Proof.dummy
+                     (Snark_transition.ledger_proof transition))))
         in
         let%bind correct_snark =
           Boolean.(correct_transaction_snark || nothing_changed)
@@ -166,8 +169,13 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         in
         result
       in
+      let%bind genesis_state_hash =
+        (*get the genesis state hash from previous state unless previous state is the genesis state itslef*)
+        Protocol_state.genesis_state_hash_checked
+          ~state_hash:previous_state_hash previous_state
+      in
       let new_state =
-        Protocol_state.create_var ~previous_state_hash
+        Protocol_state.create_var ~previous_state_hash ~genesis_state_hash
           ~blockchain_state:(Snark_transition.blockchain_state transition)
           ~consensus_state
       in
@@ -177,11 +185,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
 end
 
 module Checked = struct
-  let%snarkydef is_base_hash h =
-    Field.Checked.equal
-      (Field.Var.constant
-         ((Lazy.force Genesis_protocol_state.t).hash :> Field.t))
-      (State_hash.var_to_hash_packed h)
+  let%snarkydef is_base_case state =
+    Protocol_state.consensus_state state
+    |> Consensus.Data.Consensus_state.is_genesis_state_var
 
   let%snarkydef hash (t : Protocol_state.var) = Protocol_state.hash_checked t
 end

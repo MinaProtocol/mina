@@ -59,7 +59,53 @@ jobs:
                   name: Build bot
                   command: cd frontend/bot && yarn run build-ci
 
-    
+    build-archive:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+              environment:
+                CODA_DOCKER: true
+                HASURA_PORT: 8080
+            - image: postgres:12
+              environment:
+                POSTGRES_PASSWORD: codarules
+                POSTGRES_USER: admin
+                POSTGRES_DB: archiver
+            - image: hasura/graphql-engine:v1.0.0-beta.6
+              entrypoint: ["sh", "-c"]
+              command: ["sleep 10 && graphql-engine serve"]
+              environment:
+                HASURA_GRAPHQL_DATABASE_URL: postgres://admin:codarules@localhost:5432/archiver
+                HASURA_GRAPHQL_ENABLE_CONSOLE: "true"
+                HASURA_GRAPHQL_ENABLED_LOG_TYPES: startup, http-log, webhook-log, websocket-log, query-log
+        steps:
+            - checkout
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Build Archive Process
+                  command:  bash -c 'eval `opam config env` && make build_archive'
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
+            # NOTE: If we were using a machine executor we would be able to mount the sql file in 
+            # as a volume for the container to seed itself, this is the workaround.
+            # Ideally this DB setup step would be handled by the archive process itself. 
+            - run:
+                  name: Set Up Database
+                  command: | 
+                    sudo apt-get install -y postgresql 
+                    PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
+            - run:
+                  name: Configure Hasura
+                  command: ./scripts/archive/make_hasura_configurations.sh
+            - setup_remote_docker
+            - run: 
+                  name: Build and Release Archives
+                  command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
@@ -84,6 +130,9 @@ jobs:
                   name: Check CODEOWNERS file format
                   command: ./scripts/lint_codeowners.sh
             - run:
+                  name: Check RFC ids
+                  command: ./scripts/lint_rfcs.sh
+            - run:
                   name: Require ppx_coda preprocessing for linting
                   command: ./scripts/require-ppx-coda.py
     lint-opt:
@@ -91,6 +140,12 @@ jobs:
             - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Compare versioned types in PR
                   command: ./scripts/compare_pr_diff_types.sh
@@ -112,6 +167,9 @@ jobs:
         steps:
             - checkout
             - run:
+                name: Install tools
+                command: apk add patchelf dpkg tar
+            - run:
                 name: Install cachix
                 command: nix-env -iA cachix -f https://cachix.org/api/v1/install
             - run:
@@ -119,7 +177,36 @@ jobs:
                 command: |
                     cachix use codaprotocol
                     cd src/app/libp2p_helper
-                    nix-build default.nix
+                    nix-build default.nix | cachix push codaprotocol
+            - run:
+                name: Create package dir
+                command: mkdir -p package
+            - run:
+                name: Collect and strip binary
+                command: |
+                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
+                    chmod +w package/coda-libp2p_helper
+                    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 package/coda-libp2p_helper
+            - run:
+                name: Create deb
+                command: |
+                    mkdir -p package/deb/usr/local/sbin
+                    cp package/coda-libp2p_helper package/deb/usr/local/sbin/.
+                    mkdir -p package/deb/DEBIAN
+                    cp src/app/libp2p_helper/build/DEBIAN/control package/deb/DEBIAN/control
+                    DATE=$(date +%Y-%m-%d)
+                    sed -i "s/DATE/${DATE}/" package/deb/DEBIAN/control
+                    find src/app/libp2p_helper -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ' > /tmp/sha1sig
+                    HASH=$(cat /tmp/sha1sig)
+                    sed -i "s/HASH/${HASH}/" package/deb/DEBIAN/control
+                    echo "------------------------------------"
+                    cat package/deb/DEBIAN/control
+                    echo "------------------------------------"
+                    find package/deb/
+                    echo "------------------------------------"
+                    dpkg-deb -v --build package/deb/ package/coda-discovery-${HASH}.deb
+            - store_artifacts:
+                  path: package
 
     build-macos:
         macos:
@@ -727,7 +814,7 @@ workflows:
                     only: develop
             - tracetool
             - build-wallet
-            
+            - build-archive
             - build-macos
             - build-artifacts--testnet_postake_medium_curves
             - build-artifacts--net_10k

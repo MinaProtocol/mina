@@ -82,6 +82,13 @@ val of_scan_state_and_ledger :
   -> pending_coinbase_collection:Pending_coinbase.t
   -> t Or_error.t Deferred.t
 
+val of_scan_state_and_ledger_unchecked :
+     snarked_ledger_hash:Frozen_ledger_hash.t
+  -> ledger:Ledger.t
+  -> scan_state:Scan_state.t
+  -> pending_coinbase_collection:Pending_coinbase.t
+  -> t Or_error.t Deferred.t
+
 val replace_ledger_exn : t -> Ledger.t -> t
 
 val proof_txns : t -> Transaction.t Non_empty_list.t option

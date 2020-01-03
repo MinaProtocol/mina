@@ -1,6 +1,15 @@
+open Coda_base
+
 include
   Coda_numbers.Nat.Intf.S_unchecked
   with type t = Coda_numbers.Global_slot.Stable.Latest.t
+
+[%%versioned:
+module Stable : sig
+  module V1 : sig
+    type nonrec t = t [@@deriving sexp, eq, compare, hash, yojson]
+  end
+end]
 
 val ( + ) : t -> int -> t
 
@@ -16,7 +25,17 @@ val epoch : t -> Epoch.t
 
 val slot : t -> Slot.t
 
+val start_time : t -> Block_time.t
+
+val end_time : t -> Block_time.t
+
+val time_hum : t -> string
+
 val to_epoch_and_slot : t -> Epoch.t * Slot.t
+
+val of_time_exn : Block_time.t -> t
+
+val diff : t -> Epoch.t * Slot.t -> t
 
 module Checked : sig
   include

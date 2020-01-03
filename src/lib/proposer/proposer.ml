@@ -367,11 +367,13 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       let transition_hash =
                         Protocol_state.hash protocol_state
                       in
+                      let previous_state_hash =
+                        Protocol_state.hash previous_protocol_state
+                      in
                       let delta_transition_chain_proof =
                         Transition_chain_prover.prove
                           ~length:(Consensus.Constants.delta - 1)
-                          ~frontier
-                          (Protocol_state.hash previous_protocol_state)
+                          ~frontier previous_state_hash
                         |> Option.value_exn
                       in
                       let error_msg_prefix = "Validation failed: " in
@@ -381,134 +383,162 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                          transition."
                       in
                       match
-                        External_transition.Validation.wrap
-                          { With_hash.hash= transition_hash
-                          ; data=
-                              External_transition.create ~protocol_state
-                                ~protocol_state_proof ~staged_ledger_diff
-                                ~delta_transition_chain_proof }
-                        |> External_transition.skip_time_received_validation
-                             `This_transition_was_not_received_via_gossip
-                        |> External_transition.skip_proof_validation
-                             `This_transition_was_generated_internally
+                        let open Result.Let_syntax in
+                        let%map t =
+                          External_transition.Validation.wrap
+                            { With_hash.hash= transition_hash
+                            ; data=
+                                External_transition.create ~protocol_state
+                                  ~protocol_state_proof ~staged_ledger_diff
+                                  ~delta_transition_chain_proof }
+                          |> External_transition.skip_time_received_validation
+                               `This_transition_was_not_received_via_gossip
+                          |> External_transition
+                             .validate_genesis_protocol_state
+                               ~genesis_state_hash:
+                                 (Protocol_state.genesis_state_hash
+                                    ~state_hash:(Some previous_state_hash)
+                                    previous_protocol_state)
+                        in
+                        External_transition.skip_proof_validation
+                          `This_transition_was_generated_internally t
                         |> External_transition
                            .skip_delta_transition_chain_validation
                              `This_transition_was_not_received_via_gossip
-                        |> Transition_frontier_validation
-                           .validate_frontier_dependencies ~logger ~frontier
                       with
-                      | Error `Already_in_frontier ->
-                          Logger.error logger ~module_:__MODULE__
+                      | Error `Invalid_genesis_protocol_state ->
+                          let state_yojson =
+                            Fn.compose State_hash.to_yojson
+                              Protocol_state.genesis_state_hash
+                          in
+                          Logger.warn logger ~module_:__MODULE__
                             ~location:__LOC__
                             ~metadata:
-                              [ ( "protocol_state"
-                                , Protocol_state.value_to_yojson protocol_state
-                                ) ]
-                            "%sproposed transition is already in frontier"
-                            error_msg_prefix ;
+                              [ ( "expected"
+                                , state_yojson previous_protocol_state )
+                              ; ("got", state_yojson protocol_state) ]
+                            "Proposed transition has invalid genesis state hash" ;
                           return ()
-                      | Error `Not_selected_over_frontier_root ->
-                          Logger.warn logger ~module_:__MODULE__
-                            ~location:__LOC__
-                            "%sproposed transition is not selected over the \
-                             root of transition frontier.%s"
-                            error_msg_prefix reason_for_failure ;
-                          return ()
-                      | Error `Parent_missing_from_frontier ->
-                          Logger.warn logger ~module_:__MODULE__
-                            ~location:__LOC__
-                            "%sparent of proposed transition is missing from \
-                             the frontier.%s"
-                            error_msg_prefix reason_for_failure ;
-                          return ()
-                      | Ok transition -> (
-                          let%bind breadcrumb_result =
-                            Breadcrumb.build ~logger ~verifier ~trust_system
-                              ~parent:crumb ~transition ~sender:None
-                          in
-                          let exn name =
-                            raise
-                              (Error.to_exn
-                                 (Error.of_string
-                                    (sprintf
-                                       "Error building breadcrumb from \
-                                        proposed transition: %s"
-                                       name)))
-                          in
-                          match breadcrumb_result with
-                          | Error (`Fatal_error e) ->
-                              exn
-                                (sprintf "fatal error -- %s" (Exn.to_string e))
-                          | Error (`Invalid_staged_ledger_hash e) ->
-                              exn
-                                (sprintf "Invalid staged ledger hash -- %s"
-                                   (Error.to_string_hum e))
-                          | Error (`Invalid_staged_ledger_diff e) ->
-                              (*Unexpected errors from staged_ledger are captured in `Fatal_error*)
-                              Logger.error logger ~module_:__MODULE__
-                                ~location:__LOC__
-                                ~metadata:
-                                  [ ( "diff"
-                                    , Staged_ledger_diff.to_yojson
-                                        staged_ledger_diff ) ]
-                                !"Error building breadcrumb from proposed \
-                                  transition. Invalid staged ledger diff -- %s"
-                                (Error.to_string_hum e) ;
-                              return ()
-                          | Ok breadcrumb -> (
-                              let metadata =
-                                [ ( "state_hash"
-                                  , State_hash.to_yojson transition_hash ) ]
-                              in
-                              Logger.info logger ~module_:__MODULE__
-                                ~location:__LOC__
-                                !"Submitting newly produced block $state_hash \
-                                  to the transition frontier controller"
-                                ~metadata ;
-                              Coda_metrics.(
-                                Counter.inc_one Proposer.blocks_proposed) ;
-                              let%bind () =
-                                Strict_pipe.Writer.write transition_writer
-                                  breadcrumb
-                              in
-                              Logger.debug logger ~module_:__MODULE__
-                                ~location:__LOC__ ~metadata
-                                "Waiting for transition $state_hash to be \
-                                 inserted into frontier" ;
-                              Deferred.choose
-                                [ Deferred.choice
-                                    (Transition_registry.register
-                                       transition_registry transition_hash)
-                                    (Fn.const `Transition_accepted)
-                                ; Deferred.choice
-                                    ( Time.Timeout.create time_controller
-                                        (* We allow up to 15 seconds for the transition to make its way from the transition_writer to the frontier.
+                      | Ok t -> (
+                        match
+                          Transition_frontier_validation
+                          .validate_frontier_dependencies ~logger ~frontier t
+                        with
+                        | Error `Already_in_frontier ->
+                            Logger.error logger ~module_:__MODULE__
+                              ~location:__LOC__
+                              ~metadata:
+                                [ ( "protocol_state"
+                                  , Protocol_state.value_to_yojson
+                                      protocol_state ) ]
+                              "%sproposed transition is already in frontier"
+                              error_msg_prefix ;
+                            return ()
+                        | Error `Not_selected_over_frontier_root ->
+                            Logger.warn logger ~module_:__MODULE__
+                              ~location:__LOC__
+                              "%sproposed transition is not selected over the \
+                               root of transition frontier.%s"
+                              error_msg_prefix reason_for_failure ;
+                            return ()
+                        | Error `Parent_missing_from_frontier ->
+                            Logger.warn logger ~module_:__MODULE__
+                              ~location:__LOC__
+                              "%sparent of proposed transition is missing \
+                               from the frontier.%s"
+                              error_msg_prefix reason_for_failure ;
+                            return ()
+                        | Ok transition -> (
+                            let%bind breadcrumb_result =
+                              Breadcrumb.build ~logger ~verifier ~trust_system
+                                ~parent:crumb ~transition ~sender:None
+                            in
+                            let exn name =
+                              raise
+                                (Error.to_exn
+                                   (Error.of_string
+                                      (sprintf
+                                         "Error building breadcrumb from \
+                                          proposed transition: %s"
+                                         name)))
+                            in
+                            match breadcrumb_result with
+                            | Error (`Fatal_error e) ->
+                                exn
+                                  (sprintf "fatal error -- %s"
+                                     (Exn.to_string e))
+                            | Error (`Invalid_staged_ledger_hash e) ->
+                                exn
+                                  (sprintf "Invalid staged ledger hash -- %s"
+                                     (Error.to_string_hum e))
+                            | Error (`Invalid_staged_ledger_diff e) ->
+                                (*Unexpected errors from staged_ledger are captured in `Fatal_error*)
+                                Logger.error logger ~module_:__MODULE__
+                                  ~location:__LOC__
+                                  ~metadata:
+                                    [ ( "diff"
+                                      , Staged_ledger_diff.to_yojson
+                                          staged_ledger_diff ) ]
+                                  !"Error building breadcrumb from proposed \
+                                    transition. Invalid staged ledger diff -- \
+                                    %s"
+                                  (Error.to_string_hum e) ;
+                                return ()
+                            | Ok breadcrumb -> (
+                                let metadata =
+                                  [ ( "state_hash"
+                                    , State_hash.to_yojson transition_hash ) ]
+                                in
+                                Logger.info logger ~module_:__MODULE__
+                                  ~location:__LOC__
+                                  !"Submitting newly produced block \
+                                    $state_hash to the transition frontier \
+                                    controller"
+                                  ~metadata ;
+                                Coda_metrics.(
+                                  Counter.inc_one Proposer.blocks_proposed) ;
+                                let%bind () =
+                                  Strict_pipe.Writer.write transition_writer
+                                    breadcrumb
+                                in
+                                Logger.debug logger ~module_:__MODULE__
+                                  ~location:__LOC__ ~metadata
+                                  "Waiting for transition $state_hash to be \
+                                   inserted into frontier" ;
+                                Deferred.choose
+                                  [ Deferred.choice
+                                      (Transition_registry.register
+                                         transition_registry transition_hash)
+                                      (Fn.const `Transition_accepted)
+                                  ; Deferred.choice
+                                      ( Time.Timeout.create time_controller
+                                          (* We allow up to 15 seconds for the transition to make its way from the transition_writer to the frontier.
                                   This value is chosen to be reasonably generous. In theory, this should not take terribly long. But long
                                   cycles do happen in our system, and with medium curves those long cycles can be substantial. *)
-                                        (Time.Span.of_ms 20000L)
-                                        ~f:(Fn.const ())
-                                    |> Time.Timeout.to_deferred )
-                                    (Fn.const `Timed_out) ]
-                              >>| function
-                              | `Transition_accepted ->
-                                  Logger.info logger ~module_:__MODULE__
-                                    ~location:__LOC__ ~metadata
-                                    "Generated transition $state_hash was \
-                                     accepted into transition frontier"
-                              | `Timed_out ->
-                                  let str =
-                                    "Timed out waiting for generated \
-                                     transition $state_hash to enter \
-                                     transition frontier. Continuing to \
-                                     produce new blocks anyway. This may mean \
-                                     your CPU is overloaded. Consider \
-                                     disabling `-run-snark-worker` if it's \
-                                     configured."
-                                  in
-                                  (* FIXME #3167: this should be fatal, and more importantly, shouldn't happen. *)
-                                  Logger.error logger ~module_:__MODULE__
-                                    ~location:__LOC__ ~metadata "%s" str ) ) ))
-            )
+                                          (Time.Span.of_ms 20000L)
+                                          ~f:(Fn.const ())
+                                      |> Time.Timeout.to_deferred )
+                                      (Fn.const `Timed_out) ]
+                                >>| function
+                                | `Transition_accepted ->
+                                    Logger.info logger ~module_:__MODULE__
+                                      ~location:__LOC__ ~metadata
+                                      "Generated transition $state_hash was \
+                                       accepted into transition frontier"
+                                | `Timed_out ->
+                                    let str =
+                                      "Timed out waiting for generated \
+                                       transition $state_hash to enter \
+                                       transition frontier. Continuing to \
+                                       produce new blocks anyway. This may \
+                                       mean your CPU is overloaded. Consider \
+                                       disabling `-run-snark-worker` if it's \
+                                       configured."
+                                    in
+                                    (* FIXME #3167: this should be fatal, and more importantly, shouldn't happen. *)
+                                    Logger.error logger ~module_:__MODULE__
+                                      ~location:__LOC__ ~metadata "%s" str ) )
+                        ) )) )
       in
       let proposal_supervisor = Singleton_supervisor.create ~task:propose in
       let scheduler = Singleton_scheduler.create time_controller in

@@ -2,9 +2,9 @@ open Core
 open Async
 
 (* If OCamlformat ever breaks on any files add their paths here *)
-let whitelist = []
+let trustlist = []
 
-let dirs_whitelist =
+let dirs_trustlist =
   [ ".git"
   ; "_build"
   ; "stationary"
@@ -36,11 +36,11 @@ let main dry_run check path =
         match kind with
         | `Dir ->
             not
-              (List.exists dirs_whitelist ~f:(fun s ->
+              (List.exists dirs_trustlist ~f:(fun s ->
                    String.is_suffix ~suffix:s path ))
         | `File ->
             (not
-               (List.exists whitelist ~f:(fun s ->
+               (List.exists trustlist ~f:(fun s ->
                     String.is_suffix ~suffix:s path )))
             && ( String.is_suffix ~suffix:".ml" path
                || String.is_suffix ~suffix:".mli" path ) )

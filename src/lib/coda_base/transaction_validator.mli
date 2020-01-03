@@ -8,3 +8,14 @@ val apply_user_command :
   Hashless_ledger.t -> User_command.With_valid_signature.t -> unit Or_error.t
 
 val apply_transaction : Hashless_ledger.t -> Transaction.t -> unit Or_error.t
+
+module For_tests : sig
+  open Currency
+  open Coda_numbers
+
+  val validate_timing :
+       account:Account.t
+    -> txn_amount:Amount.t
+    -> txn_global_slot:Global_slot.t
+    -> Account.Timing.t Or_error.t
+end
