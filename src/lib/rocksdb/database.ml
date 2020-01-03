@@ -124,7 +124,45 @@ let%test_unit "checkpoint read test" =
           let db = create db_dir in
           List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
           create_checkpoint db cp_dir ;
+          Logger.debug (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
+            "checkpoint created" ;
           let cp = create cp_dir in
+          Logger.debug (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
+            "checkpoint loaded" ;
+          (*          set db ~key:(to_bigstring "abc") ~data:(to_bigstring "123") ; *)
+          let alist =
+            List.sort (to_alist db)
+              ~compare:[%compare: Bigstring.t * Bigstring.t]
+          in
+          [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
+          close db ;
+          close cp )
+
+let%test_unit "checkpoint write test" =
+  Quickcheck.test
+    Quickcheck.Generator.(
+      tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
+    ~f:(fun kvs ->
+      match Hashtbl.of_alist (module String) kvs with
+      | `Duplicate_key _ ->
+          ()
+      | `Ok tbl ->
+          let db_dir = Filename.temp_dir "db_dir" "" in
+          let cp_dir =
+            Filename.temp_dir_name
+            ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
+          in
+          let sorted =
+            List.sort (Hashtbl.to_alist tbl)
+              ~compare:[%compare: string * string]
+            |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
+          in
+          let db = create db_dir in
+          List.iter kvs ~f:(fun (key, data) ->
+              set db ~key:(to_bigstring key) ~data:(to_bigstring data) ) ;
+          create_checkpoint db cp_dir ;
+          let cp = create cp_dir in
+          set db ~key:(to_bigstring "abc") ~data:(to_bigstring "123") ;
           let alist =
             List.sort (to_alist cp)
               ~compare:[%compare: Bigstring.t * Bigstring.t]
