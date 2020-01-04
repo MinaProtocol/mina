@@ -2,7 +2,6 @@
  (name sgn)
  (public_name sgn)
  (library_flags -linkall)
- (inline_tests)
  (libraries sgn_type snark_params core_kernel ppx_deriving_yojson.runtime
    yojson)
  (preprocessor_deps ../../config.mlh)
