@@ -78,12 +78,11 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
 let logger = Logger.create ()
 
 let%test_unit "to_alist (of_alist l) = l" =
-  Quickcheck.test
+  Async.Quickcheck.async_test
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
       File_system.with_temp_dir "/tmp/coda-test" ~f:(fun directory ->
-          Logger.debug logger ~module_:__MODULE__ ~location:__LOC__ "foo" ;
           let s = Bigstring.of_string in
           let sorted =
             List.sort kvs ~compare:[%compare: string * string]
@@ -95,7 +94,6 @@ let%test_unit "to_alist (of_alist l) = l" =
             List.sort (to_alist db)
               ~compare:[%compare: Bigstring.t * Bigstring.t]
           in
-          [%test_result: Bool.t] ~expect:true false ;
           [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
-          Async.Deferred.unit )
-      |> Async.don't_wait_for )
+          Async.Deferred.unit ) )
+  |> Async.don't_wait_for
