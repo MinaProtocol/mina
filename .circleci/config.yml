@@ -177,12 +177,12 @@ jobs:
                 command: |
                     cachix use codaprotocol
                     cd src/app/libp2p_helper
-                    if [[ -v CACHIX_SIGNING_KEY ]];
-                    then
-                        nix-build default.nix | cachix push codaprotocol
-                    else
-                        echo "CACHIX_SIGNING_KEY is not set - only building locally"
+
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
                         nix-build default.nix
+                    else
+                        nix-build default.nix | cachix push codaprotocol
                     fi
             - run:
                 name: Create package dir
