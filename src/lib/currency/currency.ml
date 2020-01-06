@@ -104,6 +104,8 @@ module Balance = struct
     let ( + ) = add_amount
 
     let ( - ) = sub_amount
+
+    let if_ = Amount.Checked.if_
   end
 end
 

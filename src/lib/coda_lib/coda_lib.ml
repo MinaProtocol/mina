@@ -583,6 +583,33 @@ let staking_ledger t =
   let local_state = t.config.consensus_local_state in
   Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
 
+let find_delegators table pk =
+  Option.value_map
+    (Public_key.Compressed.Table.find table pk)
+    ~default:[] ~f:Coda_base.Account.Index.Table.data
+
+let current_epoch_delegators t ~pk =
+  let open Option.Let_syntax in
+  let%map _transition_frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let current_epoch_delegatee_table =
+    Consensus.Data.Local_state.current_epoch_delegatee_table
+      ~local_state:t.config.consensus_local_state
+  in
+  find_delegators current_epoch_delegatee_table pk
+
+let last_epoch_delegators t ~pk =
+  let open Option.Let_syntax in
+  let%bind _transition_frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let%map last_epoch_delegatee_table =
+    Consensus.Data.Local_state.last_epoch_delegatee_table
+      ~local_state:t.config.consensus_local_state
+  in
+  find_delegators last_epoch_delegatee_table pk
+
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier
     ~set_next_proposal:(fun p -> t.next_proposal <- Some p)
@@ -599,7 +626,7 @@ let start t =
     ~transition_writer:t.pipes.proposer_transition_writer ;
   Snark_worker.start t
 
-let create (config : Config.t) =
+let create (config : Config.t) ~genesis_ledger ~base_proof =
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->
@@ -751,7 +778,7 @@ let create (config : Config.t) =
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
             Broadcast_pipe.create
-              ( Lazy.force External_transition.genesis
+              ( External_transition.genesis ~genesis_ledger ~base_proof
               |> External_transition.Validated.to_initial_validated )
           in
           let valid_transitions, initialization_finish_signal =
@@ -768,7 +795,9 @@ let create (config : Config.t) =
                   ~network_transition_reader:
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
-                  ~proposer_transition_reader ~most_recent_valid_block )
+                  ~proposer_transition_reader ~most_recent_valid_block
+                  ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
+                  ~base_proof )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
