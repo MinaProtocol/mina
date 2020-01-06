@@ -107,6 +107,7 @@ let%test_unit "to_alist (of_alist l) = l" =
               close db ;
               Async.Deferred.unit ) )
 
+(*
 let%test_unit "to_alist (of_alist l) = l" =
   let open Async in
   Thread_safe.block_on_async_exn
@@ -145,6 +146,7 @@ let%test_unit "to_alist (of_alist l) = l" =
           close cp ;
           let%bind () = File_system.remove_dir db_dir in
           File_system.remove_dir cp_dir )
+*)
 
 (*
 let%test_unit "checkpoint read test" =
