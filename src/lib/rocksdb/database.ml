@@ -81,19 +81,17 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
 let to_bigstring = Bigstring.of_string
 
 let%test_unit "to_alist (of_alist l) = l" =
-  Quickcheck.test
+  Async.Thread_safe.block_on_async_exn
+  @@ fun () ->
+  Async.Quickcheck.async_test
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
       match Hashtbl.of_alist (module String) kvs with
       | `Duplicate_key _ ->
-          ()
+          Async.Deferred.unit
       | `Ok _ ->
           File_system.with_temp_dir "/tmp/coda-test" ~f:(fun db_dir ->
-              Logger.debug (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__
-                ~metadata:[("db_dir", `String db_dir)]
-                "test count" ;
               let sorted =
                 List.sort kvs ~compare:[%compare: string * string]
                 |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
@@ -107,34 +105,46 @@ let%test_unit "to_alist (of_alist l) = l" =
               [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted
                 alist ;
               close db ;
-              Async.Deferred.unit )
-          |> Async.don't_wait_for )
+              Async.Deferred.unit ) )
 
 let%test_unit "to_alist (of_alist l) = l" =
-  Quickcheck.test ~trials:10
+  let open Async in
+  Thread_safe.block_on_async_exn
+  @@ fun () ->
+  Quickcheck.async_test
     Quickcheck.Generator.(
-      tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
+      list @@ tuple2 String.quickcheck_generator String.quickcheck_generator)
     ~f:(fun kvs ->
       match Hashtbl.of_alist (module String) kvs with
       | `Duplicate_key _ ->
-          ()
-      | `Ok _ ->
-          let db_dir = Filename.temp_dir "db_dir" "" in
-          Logger.debug (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:[("db_dir", `String db_dir)]
-            "db_dir created" ;
-          let sorted =
-            List.sort kvs ~compare:[%compare: string * string]
-            |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
+          Deferred.unit
+      | `Ok db_hashtbl ->
+          let db_dir = Filename.temp_dir "test_db" "" in
+          let cp_dir =
+            Filename.temp_dir_name
+            ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
           in
           let db = create db_dir in
-          List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
+          Hashtbl.iteri db_hashtbl ~f:(fun ~key ~data ->
+              set db ~key:(to_bigstring key) ~data:(to_bigstring data) ) ;
+          create_checkpoint db cp_dir ;
+          let cp = create cp_dir in
+          let db_sorted =
+            List.sort
+              (Hashtbl.to_alist db_hashtbl)
+              ~compare:[%compare: string * string]
+            |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
+          in
           let alist =
-            List.sort (to_alist db)
+            List.sort (to_alist cp)
               ~compare:[%compare: Bigstring.t * Bigstring.t]
           in
-          [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
-          close db )
+          [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:db_sorted
+            alist ;
+          close db ;
+          close cp ;
+          let%bind () = File_system.remove_dir db_dir in
+          File_system.remove_dir cp_dir )
 
 (*
 let%test_unit "checkpoint read test" =
