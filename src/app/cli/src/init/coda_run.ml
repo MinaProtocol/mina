@@ -102,7 +102,9 @@ let summary exn_str =
     ; ("Machine", `String (Core.Unix.Utsname.machine uname))
     ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
     ; ("Exception", `String exn_str)
-    ; ("Command", `String daemon_command) ]
+    ; ("Command", `String daemon_command)
+    ; ("Coda_branch", `String Coda_version.branch)
+    ; ("Coda_commit", `String Coda_version.commit_id) ]
 
 let coda_status coda_ref =
   Option.value_map coda_ref
@@ -174,10 +176,11 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   else Some (report_file, temp_config)
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
-let setup_local_server ?(client_whitelist = []) ?rest_server_port
+let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ?(insecure_rest_server = false) coda =
-  let client_whitelist =
-    Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
+  let client_trustlist =
+    ref
+      (Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_trustlist))
   in
   (* Setup RPC server for client interactions *)
   let implement rpc f =
@@ -280,7 +283,26 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
           in
           Coda_lib.replace_propose_keypairs coda
             (Keypair.And_compressed_pk.Set.of_list keypair_and_compressed_key) ;
-          Deferred.unit ) ]
+          Deferred.unit )
+    ; implement Daemon_rpcs.Add_trustlist.rpc (fun () ip ->
+          return
+            (let ip_str = Unix.Inet_addr.to_string ip in
+             if Unix.Inet_addr.Set.mem !client_trustlist ip then
+               Or_error.errorf "%s already present in trustlist" ip_str
+             else (
+               client_trustlist := Unix.Inet_addr.Set.add !client_trustlist ip ;
+               Ok () )) )
+    ; implement Daemon_rpcs.Remove_trustlist.rpc (fun () ip ->
+          return
+            (let ip_str = Unix.Inet_addr.to_string ip in
+             if not @@ Unix.Inet_addr.Set.mem !client_trustlist ip then
+               Or_error.errorf "%s not present in trustlist" ip_str
+             else (
+               client_trustlist :=
+                 Unix.Inet_addr.Set.remove !client_trustlist ip ;
+               Ok () )) )
+    ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
+          return (Set.to_list !client_trustlist) ) ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
@@ -385,10 +407,10 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
               where_to_listen
               (fun address reader writer ->
                 let address = Socket.Address.Inet.addr address in
-                if not (Set.mem client_whitelist address) then (
+                if not (Set.mem !client_trustlist address) then (
                   Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                     !"Rejecting client connection from $address, it is not \
-                      present in the whitelist."
+                      present in the trustlist."
                     ~metadata:
                       [("$address", `String (Unix.Inet_addr.to_string address))] ;
                   Deferred.unit )

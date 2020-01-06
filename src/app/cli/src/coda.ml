@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"/src/config.mlh"]
 
 open Core
 open Async
@@ -8,6 +8,123 @@ open Cli_lib
 open Signature_lib
 open Init
 module YJ = Yojson.Safe
+
+let retrieve_genesis_state dir_opt ~logger :
+    (Ledger.t lazy_t * Proof.t) Deferred.t =
+  let open Cache_dir in
+  let tar_filename = Cache_dir.genesis_dir_name ^ ".tar.gz" in
+  let s3_bucket_prefix =
+    "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net" ^/ tar_filename
+  in
+  let extract dir =
+    match%map
+      Monitor.try_with_or_error ~extract_exn:true (fun () ->
+          let genesis_dir = dir ^/ Cache_dir.genesis_dir_name in
+          if Core.Sys.file_exists genesis_dir = `Yes then Deferred.return ()
+          else
+            (*Look for the tar and extract*)
+            let tar_file = genesis_dir ^ ".tar.gz" in
+            let%map _result =
+              Process.run_exn ~prog:"tar"
+                ~args:["-C"; dir; "-xzf"; tar_file]
+                ()
+            in
+            () )
+    with
+    | Ok () ->
+        ()
+    | Error e ->
+        Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
+          "Error extracting genesis ledger and proof : $error"
+          ~metadata:[("error", `String (Error.to_string_hum e))]
+  in
+  let retrieve dir =
+    Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
+      "Retrieving genesis ledger and genesis proof from $path"
+      ~metadata:[("path", `String dir)] ;
+    let%bind () = extract dir in
+    let dir = dir ^/ Cache_dir.genesis_dir_name in
+    let ledger_dir = dir ^/ "ledger" in
+    let proof_file = dir ^/ "genesis_proof" in
+    if
+      Core.Sys.file_exists ledger_dir = `Yes
+      && Core.Sys.file_exists proof_file = `Yes
+    then (
+      let genesis_ledger =
+        lazy (Ledger.create ~directory_name:ledger_dir ())
+      in
+      let%map base_proof =
+        match%map
+          Monitor.try_with_or_error ~extract_exn:true (fun () ->
+              let%bind r = Reader.open_file proof_file in
+              let%map contents =
+                Pipe.to_list (Reader.lines r) >>| String.concat
+              in
+              Sexp.of_string contents |> Proof.Stable.V1.t_of_sexp )
+        with
+        | Ok base_proof ->
+            base_proof
+        | Error e ->
+            failwithf "Error reading the base proof from %s: %s" proof_file
+              (Error.to_string_hum e) ()
+      in
+      Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+        "Successfully retrieved genesis ledger and genesis proof from $path"
+        ~metadata:[("path", `String dir)] ;
+      Some (genesis_ledger, base_proof) )
+    else (
+      Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
+        "Error retrieving genesis ledger and genesis proof from $path"
+        ~metadata:[("path", `String dir)] ;
+      Deferred.return None )
+  in
+  let res_or_fail dir_str = function
+    | Some res ->
+        res
+    | None ->
+        failwith
+          (sprintf
+             "Could not retrieve genesis ledger and genesis proof from %s"
+             dir_str)
+  in
+  match dir_opt with
+  | Some dir ->
+      let%map res = retrieve dir in
+      res_or_fail dir res
+  | None -> (
+      let directories =
+        [ manual_install_path
+        ; brew_install_path
+        ; Cache_dir.s3_install_path
+        ; autogen_path ]
+      in
+      match%bind
+        Deferred.List.fold directories ~init:None ~f:(fun acc dir ->
+            if is_some acc then Deferred.return acc else retrieve dir )
+      with
+      | Some res ->
+          Deferred.return res
+      | None ->
+          (*Check if it's in s3*)
+          let local_path = Cache_dir.s3_install_path ^/ tar_filename in
+          let%bind () =
+            match%map
+              Cache_dir.load_from_s3 [s3_bucket_prefix] [local_path] ~logger
+            with
+            | Ok () ->
+                ()
+            | Error e ->
+                Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
+                  "Could not curl genesis ledger and genesis proof from $uri: \
+                   $error"
+                  ~metadata:
+                    [ ("path", `String s3_bucket_prefix)
+                    ; ("error", `String (Error.to_string_hum e)) ]
+          in
+          let%map res = retrieve Cache_dir.s3_install_path in
+          res_or_fail
+            (String.concat ~sep:"," (s3_install_path :: directories))
+            res )
 
 [%%check_ocaml_word_size
 64]
@@ -30,17 +147,11 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
-let chain_id =
-  lazy
-    (let genesis_state_hash =
-       (Lazy.force Coda_state.Genesis_protocol_state.t).hash
-       |> State_hash.to_base58_check
-     in
-     let all_snark_keys =
-       List.fold_left ~f:( ^ ) ~init:"" Snark_keys.key_hashes
-     in
-     let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
-     Blake2.to_hex b2)
+let chain_id ~genesis_state_hash =
+  let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
+  let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
+  let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
+  Blake2.to_hex b2
 
 [%%inject
 "daemon_expiry", daemon_expiry]
@@ -57,6 +168,12 @@ let daemon logger =
             provide both `propose-key` and `propose-public-key`. (default: \
             don't produce blocks)"
          (optional string)
+     and genesis_ledger_dir_flag =
+       flag "genesis-ledger-dir"
+         ~doc:
+           "Dir Directory that contains the genesis ledger and the genesis \
+            blockchain proof (default: <config-dir>/genesis-ledger)"
+         (optional string)
      and initial_peers_raw =
        flag "kademlia-peer"
          ~doc:
@@ -72,27 +189,10 @@ let daemon logger =
            "seq|rand Choose work sequentially (seq) or randomly (rand) \
             (default: rand)"
          (optional work_selection_method)
-     and external_port =
-       flag "external-port"
-         ~doc:
-           (sprintf
-              "PORT Base server port for daemon TCP (discovery UDP on port+1) \
-               (default: %d)"
-              Port.default_external)
-         (optional int16)
-     and client_port =
-       flag "client-port"
-         ~doc:
-           (sprintf "PORT Client to daemon local communication (default: %d)"
-              Port.default_client)
-         (optional int16)
-     and rest_server_port =
-       flag "rest-port"
-         ~doc:
-           (sprintf
-              "PORT local REST-server for daemon interaction (default: %d)"
-              Port.default_rest)
-         (optional int16)
+     and external_port = Flag.Port.Daemon.external_
+     and client_port = Flag.Port.Daemon.client
+     and rest_server_port = Flag.Port.Daemon.rest_server
+     and archive_process_location = Flag.Host_and_port.Daemon.archive
      and metrics_server_port =
        flag "metrics-port"
          ~doc:
@@ -110,14 +210,11 @@ let daemon logger =
          (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
-     and is_archive_node =
-       flag "archive" no_arg ~doc:"Archive all blocks heard"
-     and log_json =
-       flag "log-json" no_arg
-         ~doc:"Print daemon log output as JSON (default: plain text)"
-     and log_level =
-       flag "log-level" (optional string)
-         ~doc:"Set daemon log level (default: Info)"
+     and is_archive_rocksdb =
+       flag "archive-rocksdb" no_arg
+         ~doc:"Stores all the blocks heard in RocksDB"
+     and log_json = Flag.Log.json
+     and log_level = Flag.Log.level
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
@@ -166,9 +263,7 @@ let daemon logger =
          (optional bool)
      and disable_libp2p =
        flag "disable-libp2p-discovery" no_arg ~doc:"Disable libp2p discovery"
-     and discovery_port =
-       flag "discovery-port" (optional int)
-         ~doc:"PORT Port to use for peer-to-peer discovery (default: 28675)"
+     and discovery_port = Flag.Port.Daemon.discovery
      and enable_old_discovery =
        flag "enable-old-discovery" no_arg
          ~doc:"Enable the old Haskell Kademlia discovery"
@@ -190,24 +285,6 @@ let daemon logger =
        let compute_conf_dir home =
          Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
        in
-       let%bind log_level =
-         match log_level with
-         | None ->
-             Deferred.return Logger.Level.Info
-         | Some log_level_str_with_case -> (
-             let open Logger in
-             let log_level_str = String.lowercase log_level_str_with_case in
-             match Level.of_string log_level_str with
-             | Error _ ->
-                 eprintf "Received unknown log-level %s. Expected one of: %s\n"
-                   log_level_str
-                   ( Level.all |> List.map ~f:Level.show
-                   |> List.map ~f:String.lowercase
-                   |> String.concat ~sep:", " ) ;
-                 exit 14
-             | Ok ll ->
-                 Deferred.return ll )
-       in
        let%bind conf_dir =
          if is_background then
            let home = Core.Sys.home_directory () in
@@ -215,13 +292,7 @@ let daemon logger =
            Deferred.return conf_dir
          else Sys.home_directory () >>| compute_conf_dir
        in
-       let () =
-         match Core.Sys.file_exists conf_dir with
-         | `Yes ->
-             ()
-         | _ ->
-             Core.Unix.mkdir_p conf_dir
-       in
+       let%bind () = File_system.create_dir conf_dir in
        let () =
          if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
@@ -230,18 +301,7 @@ let daemon logger =
              ~redirect_stderr:`Dev_null () )
          else ()
        in
-       let stdout_log_processor =
-         if log_json then Logger.Processor.raw ()
-         else
-           Logger.Processor.pretty ~log_level
-             ~config:
-               { Logproc_lib.Interpolator.mode= Inline
-               ; max_interpolation_length= 50
-               ; pretty_print= true }
-       in
-       Logger.Consumer_registry.register ~id:"default"
-         ~processor:stdout_log_processor
-         ~transport:(Logger.Transport.stdout ()) ;
+       Stdout_log.setup log_json log_level ;
        (* 512MB logrotate max size = 1GB max filesystem usage *)
        let logrotate_max_size = 1024 * 1024 * 512 in
        Logger.Consumer_registry.register ~id:"default"
@@ -290,33 +350,9 @@ let daemon logger =
        (* When persistence is added back, this needs to be revisited
         * to handle persistence related files properly *)
        let%bind () =
-         let del_files dir =
-           let rec all_files dirname basename =
-             let fullname = Filename.concat dirname basename in
-             match%bind Sys.is_directory fullname with
-             | `Yes ->
-                 let%map dirs, files =
-                   Sys.ls_dir fullname
-                   >>= Deferred.List.map ~f:(all_files fullname)
-                   >>| List.unzip
-                 in
-                 let dirs =
-                   if String.equal dirname conf_dir then List.concat dirs
-                   else List.append (List.concat dirs) [fullname]
-                 in
-                 (dirs, List.concat files)
-             | _ ->
-                 Deferred.return ([], [fullname])
-           in
-           let%bind dirs, files = all_files dir "" in
-           let%bind () =
-             Deferred.List.iter files ~f:(fun file -> Sys.remove file)
-           in
-           Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
-         in
          let make_version ~wipe_dir =
            let%bind () =
-             if wipe_dir then del_files conf_dir else Deferred.unit
+             if wipe_dir then File_system.clear_dir conf_dir else Deferred.unit
            in
            let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
            Writer.write_line wr Coda_version.commit_id ;
@@ -417,9 +453,12 @@ let daemon logger =
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
          type ('a, 'b, 'c) t =
-           {coda: 'a; client_whitelist: 'b; rest_server_port: 'c}
+           {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
        end in
        let coda_initialization_deferred () =
+         let%bind genesis_ledger, base_proof =
+           retrieve_genesis_state genesis_ledger_dir_flag ~logger
+         in
          let%bind config =
            match%map
              Monitor.try_with_or_error ~extract_exn:true (fun () ->
@@ -460,22 +499,13 @@ let daemon logger =
                  ~metadata:[("key", `String keyname)] ;
                default
          in
-         let external_port : int =
-           or_from_config YJ.Util.to_int_option "external-port"
-             ~default:Port.default_external external_port
+         let get_port {Flag.Types.value; default; name} =
+           or_from_config YJ.Util.to_int_option name ~default value
          in
-         let client_port =
-           or_from_config YJ.Util.to_int_option "client-port"
-             ~default:Port.default_client client_port
-         in
-         let rest_server_port =
-           or_from_config YJ.Util.to_int_option "rest-port"
-             ~default:Port.default_rest rest_server_port
-         in
-         let discovery_port =
-           or_from_config YJ.Util.to_int_option "discovery-port"
-             ~default:Port.default_discovery discovery_port
-         in
+         let external_port = get_port external_port in
+         let client_port = get_port client_port in
+         let rest_server_port = get_port rest_server_port in
+         let discovery_port = get_port discovery_port in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
@@ -597,9 +627,9 @@ let daemon logger =
            | None ->
                return None
          in
-         let%bind client_whitelist =
+         let%bind client_trustlist =
            Reader.load_sexp
-             (conf_dir ^/ "client_whitelist")
+             (conf_dir ^/ "client_trustlist")
              [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
            >>| Or_error.ok
          in
@@ -641,6 +671,13 @@ let daemon logger =
          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
+         let genesis_state_hash =
+           Coda_state.Genesis_protocol_state.t ~genesis_ledger
+           |> With_hash.hash
+         in
+         let genesis_ledger_hash =
+           Lazy.force genesis_ledger |> Ledger.merkle_root
+         in
          let time_controller =
            Block_time.Controller.create @@ Block_time.Controller.basic ~logger
          in
@@ -648,7 +685,7 @@ let daemon logger =
            propose_keypair |> Option.to_list |> Keypair.Set.of_list
          in
          let consensus_local_state =
-           Consensus.Data.Local_state.create
+           Consensus.Data.Local_state.create ~genesis_ledger
              ( Option.map propose_keypair ~f:(fun keypair ->
                    let open Keypair in
                    Public_key.compress keypair.public_key )
@@ -662,7 +699,7 @@ let daemon logger =
              ; logger
              ; target_peer_count= 8
              ; conf_dir
-             ; chain_id= Lazy.force chain_id
+             ; chain_id= chain_id ~genesis_state_hash
              ; initial_peers= initial_peers_cleaned
              ; addrs_and_ports
              ; trust_system
@@ -678,6 +715,7 @@ let daemon logger =
            ; trust_system
            ; time_controller
            ; consensus_local_state
+           ; genesis_ledger_hash
            ; log_gossip_heard
            ; creatable_gossip_net=
                Coda_networking.Gossip_net.(
@@ -777,17 +815,19 @@ let daemon logger =
                 ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
                 ~time_controller ~initial_propose_keypairs ~monitor
                 ~consensus_local_state ~transaction_database
-                ~external_transition_database ~is_archive_node
-                ~work_reassignment_wait ())
+                ~external_transition_database ~is_archive_rocksdb
+                ~work_reassignment_wait ~archive_process_location
+                ~genesis_state_hash ())
+             ~genesis_ledger ~base_proof
          in
-         {Coda_initialization.coda; client_whitelist; rest_server_port}
+         {Coda_initialization.coda; client_trustlist; rest_server_port}
        in
        (* Breaks a dependency cycle with monitor initilization and coda *)
        let coda_ref : Coda_lib.t option ref = ref None in
        Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
-       let%bind {Coda_initialization.coda; client_whitelist; rest_server_port}
+       let%bind {Coda_initialization.coda; client_trustlist; rest_server_port}
            =
          coda_initialization_deferred ()
        in
@@ -795,7 +835,7 @@ let daemon logger =
        let%bind () = maybe_sleep 3. in
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
-       Coda_run.setup_local_server ?client_whitelist ~rest_server_port
+       Coda_run.setup_local_server ?client_trustlist ~rest_server_port
          ~insecure_rest_server coda ;
        let%bind () = Coda_lib.start coda in
        let%bind () =

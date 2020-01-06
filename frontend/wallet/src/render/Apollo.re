@@ -9,9 +9,9 @@ external createRetryLink: retryOptions => ReasonApolloTypes.apolloLink =
 let client = {
   let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
 
-  let uri = "http://localhost:3085/graphql";
-  let codaLink =
-    ApolloLinks.createHttpLink(~uri, ~fetch=Bindings.Fetch.fetch, ());
+  let httpUri = "http://localhost:3085/graphql";
+  let httpLink =
+    ApolloLinks.createHttpLink(~uri=httpUri, ~fetch=Bindings.Fetch.fetch, ());
 
   let retryOptions: retryOptions = [%bs.raw
     {|
@@ -27,9 +27,29 @@ let client = {
   ];
   let retry = createRetryLink(retryOptions);
 
-  let retryLink = ApolloLinks.from([|retry, codaLink|]);
+  let retryLink = ApolloLinks.from([|retry, httpLink|]);
 
-  ReasonApollo.createApolloClient(~link=retryLink, ~cache=inMemoryCache, ());
+  let wsUri = "ws://localhost:3085/graphql";
+  let wsLink = ApolloLinks.webSocketLink(~uri=wsUri, ~reconnect=true, ());
+
+  let combinedLink =
+    ApolloLinks.split(
+      operation => {
+        let operationDefinition =
+          ApolloUtilities.getMainDefinition(operation##query);
+        operationDefinition##kind == "OperationDefinition"
+        &&
+        operationDefinition##operation == "subscription";
+      },
+      wsLink,
+      retryLink,
+    );
+
+  ReasonApollo.createApolloClient(
+    ~link=combinedLink,
+    ~cache=inMemoryCache,
+    (),
+  );
 };
 
 module Decoders = {

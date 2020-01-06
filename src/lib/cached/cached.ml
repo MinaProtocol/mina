@@ -257,24 +257,10 @@ let run
       match%bind
         let open Deferred.Result.Let_syntax in
         let%bind () =
-          Deferred.map ~f:Result.join
-          @@ Monitor.try_with (fun () ->
-                 let each_uri (uri_string, file_path) =
-                   let open Deferred.Let_syntax in
-                   let%map result =
-                     Process.run_exn ~prog:"curl"
-                       ~args:["-o"; file_path; uri_string]
-                       ()
-                   in
-                   Core_kernel.printf !"Curl finished: %s\n" result ;
-                   Result.return ()
-                 in
-                 Deferred.List.map ~f:each_uri
-                   (List.zip_exn
-                      (full_paths s3_bucket_prefix)
-                      (full_paths s3_install_path))
-                 |> Deferred.map ~f:Result.all_unit )
-          |> Deferred.Result.map_error ~f:Error.of_exn
+          Cache_dir.load_from_s3
+            (full_paths s3_bucket_prefix)
+            (full_paths s3_install_path)
+            ~logger:(Logger.create ())
         in
         With_components.load load ~base_path:(base_path s3_install_path)
       with

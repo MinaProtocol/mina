@@ -126,7 +126,7 @@ You should probably use `USEDOCKER=TRUE` unless you've done the [building withou
 
 These are the most important `make` targets:
 
-* `kademlia`: build the kademlia helper
+* `libp2p_helper`: build the libp2p helper
 * `build`: build everything
 * `docker`: build the container
 * `container`: restart the development container (or start it if it's not yet)

@@ -202,6 +202,7 @@ module For_tests = struct
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let payload : User_command.Payload.t =
           User_command.Payload.create ~fee:Fee.zero ~nonce
+            ~valid_until:Coda_numbers.Global_slot.max_value
             ~memo:User_command_memo.dummy
             ~body:(Payment {receiver= receiver_pk; amount= send_amount})
         in
@@ -298,8 +299,12 @@ module For_tests = struct
             With_hash.
               {data= previous_protocol_state; hash= previous_state_hash}
       in
+      let genesis_state_hash =
+        Protocol_state.genesis_state_hash
+          ~state_hash:(Some previous_state_hash) previous_protocol_state
+      in
       let protocol_state =
-        Protocol_state.create_value ~previous_state_hash
+        Protocol_state.create_value ~genesis_state_hash ~previous_state_hash
           ~blockchain_state:next_blockchain_state ~consensus_state
       in
       let next_external_transition =

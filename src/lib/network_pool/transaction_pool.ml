@@ -934,7 +934,8 @@ let%test_module _ =
           ; delegate= Public_key.Compressed.empty
           ; voting_for=
               Quickcheck.random_value ~seed:(`Deterministic "constant")
-                State_hash.gen } )
+                State_hash.gen
+          ; timing= Account.Timing.Untimed } )
 
     let%test_unit "Transactions are removed and added back in fork changes" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -989,6 +990,7 @@ let%test_module _ =
       User_command.forget_check
       @@ User_command.sign test_keys.(sender_idx)
            (User_command_payload.create ~fee:(Currency.Fee.of_int fee)
+              ~valid_until:Coda_numbers.Global_slot.max_value
               ~nonce:(Account.Nonce.of_int nonce)
               ~memo:(User_command_memo.create_by_digesting_string_exn "foo")
               ~body:
