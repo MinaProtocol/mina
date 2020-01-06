@@ -96,6 +96,5 @@ let%test_unit "to_alist (of_alist l) = l" =
             List.sort (to_alist db)
               ~compare:[%compare: Bigstring.t * Bigstring.t]
           in
-          [%test_result: Bool.t] ~expect:true false ;
           [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
           Async.Deferred.unit ) )
