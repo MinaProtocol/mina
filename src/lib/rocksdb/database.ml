@@ -80,17 +80,17 @@ let logger = Logger.create ()
 let to_bigstring = Bigstring.of_string
 
 let%test_unit "to_alist (of_alist l) = l" =
-  let open Async in
-  Thread_safe.block_on_async_exn
-  @@ fun () ->
-  Quickcheck.async_test
+  Quickcheck.test ~trials:1000
     Quickcheck.Generator.(
       list @@ tuple2 String.quickcheck_generator String.quickcheck_generator)
     ~f:(fun kvs ->
       match Hashtbl.of_alist (module String) kvs with
       | `Duplicate_key _ ->
-          Deferred.unit
+          ()
       | `Ok db_hashtbl ->
+          let open Async in
+          Thread_safe.block_on_async_exn
+          @@ fun () ->
           let db_dir = Filename.temp_dir "db" "" in
           let db = create db_dir in
           Hashtbl.iteri db_hashtbl ~f:(fun ~key ~data ->
