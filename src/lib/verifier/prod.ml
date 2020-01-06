@@ -1,9 +1,20 @@
-open Core
+(* prod.ml *)
+
+[%%import
+"/src/config.mlh"]
+
+open Core_kernel
 open Async
 open Coda_base
 open Coda_state
 open Blockchain_snark
+
+[%%if
+defined consensus_mechanism]
+
 open Snark_params
+
+[%%endif]
 
 type ledger_proof = Ledger_proof.Prod.t
 
