@@ -417,6 +417,7 @@ jobs:
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/run_unit_tests_ci.sh dev_medium_curves || (./scripts/link-coredumps.sh && false)'
+
                   no_output_timeout: 1h
             - store_artifacts:
                 path: core_dumps
