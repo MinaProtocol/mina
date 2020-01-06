@@ -11,7 +11,7 @@ end
 type t = Stable.V1.t
 
 module Level : sig
-  type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal | Spam
+  type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
   [@@deriving sexp, compare, yojson, show {with_path= false}, enumerate]
 
   val of_string : string -> (t, string) result
