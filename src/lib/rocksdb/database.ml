@@ -78,6 +78,8 @@ let to_alist t : (Bigstring.t * Bigstring.t) list =
 let logger = Logger.create ()
 
 let%test_unit "to_alist (of_alist l) = l" =
+  Async.Thread_safe.block_on_async_exn
+  @@ fun () ->
   Async.Quickcheck.async_test
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
@@ -97,4 +99,3 @@ let%test_unit "to_alist (of_alist l) = l" =
           [%test_result: Bool.t] ~expect:true false ;
           [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
           Async.Deferred.unit ) )
-  |> Async.don't_wait_for
