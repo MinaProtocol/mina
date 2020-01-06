@@ -674,9 +674,9 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			ctx, cancel := context.WithTimeout(app.Ctx, 15*time.Second)
 			defer cancel()
 			if err := app.P2p.Host.Connect(ctx, info); err != nil {
-				app.P2p.Logger.Warning("couldn't connect to %s peer %v (maybe the network ID mismatched?): %v", source, info.Loggable(), err)
+				app.P2p.Logger.Warningf("couldn't connect to %s peer %v (maybe the network ID mismatched?): %v", source, info.Loggable(), err)
 			} else {
-				app.P2p.Logger.Info("Found a %s peer: %s", source, info.Loggable())
+				app.P2p.Logger.Infof("Found a %s peer: %s", source, info.Loggable())
 				app.P2p.Host.Peerstore().AddAddrs(info.ID, info.Addrs, peerstore.ConnectedAddrTTL)
 				addrStrings := make([]string, len(info.Addrs))
 				for i, a := range info.Addrs {
@@ -945,7 +945,7 @@ func main() {
 		}
 		defer func() {
 			if r := recover(); r != nil {
-				helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r)
+				helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
 			}
 		}()
 		res, err := msg.run(app)
