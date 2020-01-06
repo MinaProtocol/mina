@@ -2,7 +2,7 @@ open Core
 open Async
 
 module Level = struct
-  type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal | Spam
+  type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
   [@@deriving sexp, compare, show {with_path= false}, enumerate]
 
   let of_string str =
