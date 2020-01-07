@@ -83,7 +83,7 @@ let to_bigstring = Bigstring.of_string
 let%test_unit "to_alist (of_alist l) = l" =
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->
-  Async.Quickcheck.async_test
+  Async.Quickcheck.async_test ~trials:500
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
@@ -105,115 +105,66 @@ let%test_unit "to_alist (of_alist l) = l" =
               [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted
                 alist ;
               close db ;
-              Async.Deferred.unit ) )
+              Async.after (Time.Span.of_ns 10.) ) )
 
-(*
-let%test_unit "to_alist (of_alist l) = l" =
+let%test_unit "checkpoint read" =
   let open Async in
   Thread_safe.block_on_async_exn
   @@ fun () ->
-  Quickcheck.async_test
+  Quickcheck.async_test ~trials:500
     Quickcheck.Generator.(
       list @@ tuple2 String.quickcheck_generator String.quickcheck_generator)
     ~f:(fun kvs ->
       match Hashtbl.of_alist (module String) kvs with
       | `Duplicate_key _ ->
           Deferred.unit
-      | `Ok db_hashtbl ->
+      | `Ok db_hashtbl -> (
+          let cp_hashtbl = Hashtbl.copy db_hashtbl in
           let db_dir = Filename.temp_dir "test_db" "" in
           let cp_dir =
-            Filename.temp_dir_name
-            ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
+            Filename.temp_dir_name ^/ "test_cp"
+            ^ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
           in
           let db = create db_dir in
           Hashtbl.iteri db_hashtbl ~f:(fun ~key ~data ->
               set db ~key:(to_bigstring key) ~data:(to_bigstring data) ) ;
           create_checkpoint db cp_dir ;
           let cp = create cp_dir in
-          let db_sorted =
-            List.sort
-              (Hashtbl.to_alist db_hashtbl)
-              ~compare:[%compare: string * string]
-            |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
-          in
-          let alist =
-            List.sort (to_alist cp)
-              ~compare:[%compare: Bigstring.t * Bigstring.t]
-          in
-          [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:db_sorted
-            alist ;
-          close db ;
-          close cp ;
-          let%bind () = File_system.remove_dir db_dir in
-          File_system.remove_dir cp_dir )
-*)
-
-(*
-let%test_unit "checkpoint read test" =
-  Quickcheck.test
-    Quickcheck.Generator.(
-      tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
-    ~f:(fun kvs ->
-      match Hashtbl.of_alist (module String) kvs with
-      | `Duplicate_key _ ->
-          ()
-      | `Ok _ ->
-          let db_dir = Filename.temp_dir "db_dir" "" in
-          let cp_dir =
-            Filename.temp_dir_name
-            ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
-          in
-          let sorted =
-            List.sort kvs ~compare:[%compare: string * string]
-            |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
-          in
-          let db = create db_dir in
-          List.iter sorted ~f:(fun (key, data) -> set db ~key ~data) ;
-          create_checkpoint db cp_dir ;
-          Logger.debug (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
-            "checkpoint created" ;
-          let cp = create cp_dir in
-          Logger.debug (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
-            "checkpoint loaded" ;
-          (*          set db ~key:(to_bigstring "abc") ~data:(to_bigstring "123") ; *)
-          let alist =
-            List.sort (to_alist db)
-              ~compare:[%compare: Bigstring.t * Bigstring.t]
-          in
-          [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
-          close db ;
-          close cp )
-
-let%test_unit "checkpoint write test" =
-  Quickcheck.test
-    Quickcheck.Generator.(
-      tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
-    ~f:(fun kvs ->
-      match Hashtbl.of_alist (module String) kvs with
-      | `Duplicate_key _ ->
-          ()
-      | `Ok tbl ->
-          let db_dir = Filename.temp_dir "db_dir" "" in
-          let cp_dir =
-            Filename.temp_dir_name
-            ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
-          in
-          let sorted =
-            List.sort (Hashtbl.to_alist tbl)
-              ~compare:[%compare: string * string]
-            |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
-          in
-          let db = create db_dir in
-          List.iter kvs ~f:(fun (key, data) ->
-              set db ~key:(to_bigstring key) ~data:(to_bigstring data) ) ;
-          create_checkpoint db cp_dir ;
-          let cp = create cp_dir in
-          set db ~key:(to_bigstring "abc") ~data:(to_bigstring "123") ;
-          let alist =
-            List.sort (to_alist cp)
-              ~compare:[%compare: Bigstring.t * Bigstring.t]
-          in
-          [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted alist ;
-          close db ;
-          close cp )
-*)
+          match
+            ( Hashtbl.add db_hashtbl ~key:"db_abc" ~data:"db_cde"
+            , Hashtbl.add cp_hashtbl ~key:"cp_abc" ~data:"cp_cde" )
+          with
+          | `Ok, `Ok ->
+              set db ~key:(to_bigstring "db_abc") ~data:(to_bigstring "db_cde") ;
+              set cp ~key:(to_bigstring "cp_abc") ~data:(to_bigstring "cp_cde") ;
+              let db_sorted =
+                List.sort
+                  (Hashtbl.to_alist db_hashtbl)
+                  ~compare:[%compare: string * string]
+                |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
+              in
+              let cp_sorted =
+                List.sort
+                  (Hashtbl.to_alist cp_hashtbl)
+                  ~compare:[%compare: string * string]
+                |> List.map ~f:(fun (k, v) -> (to_bigstring k, to_bigstring v))
+              in
+              let db_alist =
+                List.sort (to_alist db)
+                  ~compare:[%compare: Bigstring.t * Bigstring.t]
+              in
+              let cp_alist =
+                List.sort (to_alist cp)
+                  ~compare:[%compare: Bigstring.t * Bigstring.t]
+              in
+              [%test_result: (Bigstring.t * Bigstring.t) list]
+                ~expect:db_sorted db_alist ;
+              [%test_result: (Bigstring.t * Bigstring.t) list]
+                ~expect:cp_sorted cp_alist ;
+              close db ;
+              close cp ;
+              let%bind () = File_system.remove_dir db_dir in
+              let%bind () = File_system.remove_dir cp_dir in
+              Deferred.unit
+          | _ ->
+              Deferred.unit ) )
