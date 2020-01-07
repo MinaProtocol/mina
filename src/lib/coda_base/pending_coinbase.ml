@@ -809,7 +809,7 @@ struct
         Stack.if_ add_coinbase ~then_:stack_with_coinbase ~else_:stack
       in
       (*update the first stack*)
-      let%bind root', _prev, updated_stack1 =
+      let%bind root', `Old _prev, `New updated_stack1 =
         handle
           (Merkle_tree.fetch_and_update_req ~depth
              (Hash.var_to_hash_packed t)
