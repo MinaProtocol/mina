@@ -16,7 +16,6 @@ module Styles = {
         display(`inlineFlex),
         alignItems(`center),
         justifyContent(`center),
-        padding2(~v=`zero, ~h=`rem(1.)),
         background(white),
         border(`px(0), `solid, white),
         borderRadius(`rem(0.25)),
