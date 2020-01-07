@@ -34,7 +34,40 @@ module Style = {
   let blogContent =
     style([
       position(`relative),
+      selector(
+        "h2",
+        [
+          Theme.Typeface.ddinexp,
+          fontSize(`rem(1.125)),
+          letterSpacing(`em(0.1666)),
+          textTransform(`uppercase),
+          marginBottom(`rem(1.75)),
+          marginTop(`rem(1.75)),
+          lineHeight(`abs(1.25)),
+        ],
+      ),
       selector("img", [width(`percent(100.))]),
+      selector(
+        "hr",
+        [
+          backgroundImage(
+            linearGradient(
+              `deg(90.),
+              [
+                (`percent(25.), `rgb((27, 104, 191))),
+                (`percent(0.), `rgba((255, 255, 255, 0.))),
+              ],
+            ),
+          ),
+          backgroundSize(`size((`rem(0.25), `rem(0.125)))),
+          backgroundRepeat(`repeatX),
+          width(`percent(100.)),
+          height(`rem(0.125)),
+          border(`zero, `none, white),
+          marginTop(`rem(2.)),
+          marginBottom(`rem(2.)),
+        ],
+      ),
       color(Theme.Colors.saville),
       Theme.Typeface.ibmplexsans,
       /* selector(".side-footnote-container", [height(`zero)]), */

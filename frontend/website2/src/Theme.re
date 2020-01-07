@@ -82,6 +82,8 @@ module Typeface = {
   let rubik = fontFamily("Rubik, sans-serif");
 
   let pragmataPro = fontFamily("PragmataPro, monospace");
+
+  let ddinexp = fontFamily("D-Din-Exp,Helvetica Neue, Arial, sans-serif");
 };
 
 module MediaQuery = {
