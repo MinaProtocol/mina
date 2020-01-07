@@ -391,11 +391,12 @@ module Helper = struct
           Deferred.return ()
     in
     let double_close () =
-      Logger.fatal net.logger ~module_:__MODULE__ ~location:__LOC__
+      Logger.error net.logger ~module_:__MODULE__ ~location:__LOC__
         "stream with index $index closed twice by $party"
         ~metadata:
           [ ("index", `Int stream.idx)
-          ; ("party", `String (name_participant who_closed)) ]
+          ; ("party", `String (name_participant who_closed)) ] ;
+      stream.state
     in
     (* replace with [%derive.eq : [`Us|`Them]] when it is supported.*)
     let us_them_eq a b =
@@ -417,19 +418,20 @@ module Helper = struct
        | FullyOpen, _ ->
            HalfClosed who_closed
        | HalfClosed other, _ ->
-           if us_them_eq other who_closed then double_close () else release () ;
+           if us_them_eq other who_closed then ignore (double_close ())
+           else release () ;
            FullyClosed
        | FullyClosed, _ ->
            double_close () ) ;
     (* TODO: maybe we can check some invariants on the Go side too? *)
-    if not stream_state_invariant stream then
+    if not (stream_state_invariant stream) then
       Logger.error net.logger
         "after $who_closed closed the stream, stream state invariant broke \
          (previous state: $old_stream_state)"
         ~location:__LOC__ ~module_:__MODULE__
         ~metadata:
           [ ("who_closed", `String (name_participant who_closed))
-          ; ("old_stream_state", `String (stream_state_show old_state)) ]
+          ; ("old_stream_state", `String (show_stream_state old_state)) ]
 
   (** Track a new stream.
 
