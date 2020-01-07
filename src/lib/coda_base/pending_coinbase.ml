@@ -736,7 +736,6 @@ struct
       let%bind no_update = Update.Action.Checked.no_update action in
       let update_state_stack (stack : Stack.var) =
         (*get previous stack to carry-forward the stack of state body hashes*)
-        (*TODO: Do this or simply store the previous stack at the top level and request it?*)
         let%bind previous_state_stack =
           request_witness Coinbase_stack_state.typ
             As_prover.(map (return ()) ~f:(fun () -> Get_previous_stack))
@@ -782,7 +781,9 @@ struct
             (Stack.if_ amount2_equal_to_zero ~then_:stack_with_amount1
                ~else_:stack_with_amount2)
       in
-      (*This is for the second stack for when transactions in a  block are occupy two trees of the scan state; the second tree will carry-forward the state stack from the first stack and might have a coinbase*)
+      (*This is for the second stack for when transactions in a block occupy
+      two trees of the scan state; the second tree will carry-forward the state
+      stack from the first stack and may of may not have a coinbase*)
       let f2 (init_stack : Stack.var) stack0 =
         let%bind add_coinbase =
           Update.Action.Checked.update_two_stacks_coinbase_in_second action
@@ -807,17 +808,22 @@ struct
         in
         Stack.if_ add_coinbase ~then_:stack_with_coinbase ~else_:stack
       in
-      let f stack1 stack2 =
-        let%bind updated_stack1 = with_label __LOC__ (f1 stack1) in
-        let%map updated_stack2 = f2 updated_stack1 stack2 in
-        (updated_stack1, updated_stack2)
+      (*update the first stack*)
+      let%bind root', _prev, updated_stack1 =
+        handle
+          (Merkle_tree.fetch_and_update_req ~depth
+             (Hash.var_to_hash_packed t)
+             addr1 ~f:f1)
+          reraise_merkle_requests
       in
-      handle
-        (Merkle_tree.pair_of_modify_reqs ~depth
-           (Hash.var_to_hash_packed t)
-           (addr1, addr2) ~f)
-        reraise_merkle_requests
-      >>| Hash.var_of_hash_packed
+      (*update the second stack*)
+      let%map root, _, _ =
+        handle
+          (Merkle_tree.fetch_and_update_req ~depth root' addr2
+             ~f:(f2 updated_stack1))
+          reraise_merkle_requests
+      in
+      Hash.var_of_hash_packed root
 
     let%snarkydef pop_coinbases t ~proof_emitted =
       let%bind addr =
