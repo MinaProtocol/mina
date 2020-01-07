@@ -8,7 +8,12 @@ module Styles = {
       (100, [opacity(1.)]),
     ]);
 
-  let bg = style([transition(~duration=200, "background")]);
+  let bg =
+    style([
+      transition(~duration=200, "background"),
+      background(`url("bg-texture.png")),
+      backgroundColor(`hex("f2f2f2")),
+    ]);
 
   let window =
     merge([

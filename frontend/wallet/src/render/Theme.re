@@ -260,18 +260,16 @@ let codaLogoCurrent =
 
 module Onboarding = {
   let main =
-    merge([
-      style([
-        position(`absolute),
-        top(`zero),
-        left(`zero),
-        display(`flex),
-        flexDirection(`row),
-        paddingTop(Spacing.headerHeight),
-        paddingBottom(Spacing.footerHeight),
-        height(`vh(100.)),
-        width(`vw(100.)),
-      ]),
-      Window.Styles.bg,
+    style([
+      position(`absolute),
+      top(`zero),
+      left(`zero),
+      display(`flex),
+      flexDirection(`row),
+      paddingTop(Spacing.headerHeight),
+      paddingBottom(Spacing.footerHeight),
+      height(`vh(100.)),
+      width(`vw(100.)),
+      zIndex(2),
     ]);
 };
