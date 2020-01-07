@@ -52,7 +52,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; ban_reader: Intf.ban_notification Linear_pipe.Reader.t
       ; subscription: Message.msg Coda_net2.Pubsub.Subscription.t }
 
-    let create_libp2p (config : Config.t) first_peer_ivar
+    let create_rpc_implementations (Rpc_handler (rpc, handler)) =
+      let (module Impl) = implementation_of_rpc rpc in
+      Impl.implement_multi handler
+
+    (* Creates just the helper, making sure to register everything
+      BEFORE we start listening/advertise ourselves for discovery. *)
+    let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
         high_connectivity_ivar =
       let fail m =
         failwithf "Failed to connect to libp2p_helper process: %s" m ()
@@ -88,7 +94,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             ~location:__LOC__ ~module_:__MODULE__
             ~metadata:[("peer_id", `String peer_id)] ;
           let ctr = ref 0 in
-          let initializing_libp2p_result : unit Deferred.Or_error.t =
+          let initializing_libp2p_result : _ Deferred.Or_error.t =
             let open Deferred.Or_error.Let_syntax in
             let%bind () =
               configure net2 ~me ~maddrs:[]
@@ -105,7 +111,99 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   if !ctr < 4 then incr ctr
                   else Ivar.fill_if_empty high_connectivity_ivar () )
             in
+            let implementation_list =
+              List.bind rpc_handlers ~f:create_rpc_implementations
+            in
+            let implementations =
+              let handle_unknown_rpc conn_state ~rpc_tag ~version =
+                Deferred.don't_wait_for
+                  Trust_system.(
+                    record config.trust_system config.logger
+                      conn_state.Peer.host
+                      Actions.
+                        ( Violated_protocol
+                        , Some
+                            ( "Attempt to make unknown (fixed-version) RPC \
+                               call \"$rpc\" with version $version"
+                            , [ ("rpc", `String rpc_tag)
+                              ; ("version", `Int version) ] ) )) ;
+                `Close_connection
+              in
+              Rpc.Implementations.create_exn
+                ~implementations:implementation_list
+                ~on_unknown_rpc:(`Call handle_unknown_rpc)
+            in
+            (* We could keep this around to close just this listener if we wanted. We don't. *)
+            let%bind _rpc_handler =
+              Coda_net2.handle_protocol net2 ~on_handler_error:`Raise
+                ~protocol:rpc_transport_proto (fun stream ->
+                  let peer = Coda_net2.Stream.remote_peer stream in
+                  let r, w = Stream.pipes stream in
+                  let transport =
+                    Async_rpc_kernel.Pipe_transport.(create Kind.string r w)
+                  in
+                  let open Deferred.Let_syntax in
+                  match%bind
+                    Async_rpc_kernel.Rpc.Connection.create ~implementations
+                      ~connection_state:(Fn.const peer)
+                      ~description:
+                        (Info.of_thunk (fun () ->
+                             sprintf "stream from %s" peer.peer_id ))
+                      transport
+                  with
+                  | Error handshake_error ->
+                      don't_wait_for (Coda_net2.Stream.reset stream >>| ignore) ;
+                      Trust_system.(
+                        record config.trust_system config.logger peer.host
+                          Actions.
+                            ( Incoming_connection_error
+                            , Some
+                                ( "Handshake error: $exn"
+                                , [ ( "exn"
+                                    , `String (Exn.to_string handshake_error)
+                                    ) ] ) ))
+                  | Ok rpc_connection ->
+                      Async_rpc_kernel.Rpc.Connection.close rpc_connection )
+            in
+            let%bind subscription =
+              let open Deferred.Let_syntax in
+              Coda_net2.Pubsub.subscribe_encode net2
+                "coda/consensus-messages/0.0.1"
+                (* FIXME #4097: instead of doing validation here we put the message into a
+           queue for later potential broadcast. It will still be broadcast
+           despite failing validation, validation is only for automatic forwarding.
+           Instead, we should probably do "initial validation" up front here,
+           and turn should_forward_message into a filter_map instead of just a filter. *)
+                ~should_forward_message:(fun ~sender:_ ~data:_ ->
+                  Deferred.return false )
+                ~bin_prot:Message.V1.T.bin_msg
+                ~on_decode_failure:
+                  (`Call
+                    (fun ~sender ~data:_ err ->
+                      let metadata =
+                        [ ("sender_peer_id", `String sender)
+                        ; ("error", `String (Error.to_string_hum err)) ]
+                      in
+                      don't_wait_for
+                        ( match%bind Coda_net2.lookup_peerid net2 sender with
+                        | Ok p ->
+                            Trust_system.(
+                              record config.trust_system config.logger p.host
+                                Actions.
+                                  ( Violated_protocol
+                                  , Some
+                                      ( "failed to decode gossip message"
+                                      , metadata ) ))
+                        | Error _ ->
+                            Logger.warn config.logger
+                              "could not find IP of peer who sent invalid \
+                               gossip"
+                              ~module_:__MODULE__ ~location:__LOC__ ~metadata ;
+                            Deferred.unit ) ))
+            in
             let%map _ =
+              (* XXX: this ALWAYS needs to be AFTER handle_protocol/subscribe
+                or it is possible to miss connections! *)
               listen_on net2
                 (Multiaddr.of_string
                    (sprintf "/ip4/%s/tcp/%d"
@@ -121,11 +219,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                  (Deferred.all
                     (List.map ~f:(Coda_net2.add_peer net2) config.initial_peers)))
             |> don't_wait_for ;
-            ()
+            subscription
           in
           match%map initializing_libp2p_result with
-          | Ok () ->
-              net2
+          | Ok subscription ->
+              (net2, subscription)
           | Error e ->
               fail (Error.to_string_hum e) )
       | Ok (Error e) ->
@@ -133,45 +231,12 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       | Error e ->
           fail (Exn.to_string e)
 
-    let create config _rpc_handlers =
+    let create config rpc_handlers =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
-      let%bind net2 =
-        create_libp2p config first_peer_ivar high_connectivity_ivar
-      in
-      let%bind subscription =
-        Coda_net2.Pubsub.subscribe_encode net2
-          "coda/consensus-messages/0.0.1"
-          (* FIXME #4097: instead of doing validation here we put the message into a
-           queue for later potential broadcast. It will still be broadcast
-           despite failing validation, validation is only for automatic forwarding.
-           Instead, we should probably do "initial validation" up front here,
-           and turn should_forward_message into a filter_map instead of just a filter. *)
-          ~should_forward_message:(fun ~sender:_ ~data:_ ->
-            Deferred.return false )
-          ~bin_prot:Message.V1.T.bin_msg
-          ~on_decode_failure:
-            (`Call
-              (fun ~sender ~data:_ err ->
-                let metadata =
-                  [ ("sender_peer_id", `String sender)
-                  ; ("error", `String (Error.to_string_hum err)) ]
-                in
-                don't_wait_for
-                  ( match%bind Coda_net2.lookup_peerid net2 sender with
-                  | Ok p ->
-                      Trust_system.(
-                        record config.trust_system config.logger p.host
-                          Actions.
-                            ( Violated_protocol
-                            , Some ("failed to decode gossip message", metadata)
-                            ))
-                  | Error _ ->
-                      Logger.warn config.logger
-                        "could not find IP of peer who sent invalid gossip"
-                        ~module_:__MODULE__ ~location:__LOC__ ~metadata ;
-                      Deferred.unit ) ))
-        >>| Or_error.ok_exn
+      let%bind net2, subscription =
+        create_libp2p config rpc_handlers first_peer_ivar
+          high_connectivity_ivar
       in
       let do_ban (addr, expiration) =
         don't_wait_for
@@ -258,11 +323,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         | Ok (Error err) -> (
             (* call succeeded, result is an error *)
             Logger.error t.config.logger ~module_:__MODULE__ ~location:__LOC__
-              "RPC call error: $error, same error in machine format: \
-               $machine_error"
-              ~metadata:
-                [ ("error", `String (Error.to_string_hum err))
-                ; ("machine_error", `String (Error.to_string_mach err)) ] ;
+              "RPC call error: $error"
+              ~metadata:[("error", `String (Error.to_string_hum err))] ;
             match (Error.to_exn err, Error.sexp_of_t err) with
             | ( _
               , Sexp.List

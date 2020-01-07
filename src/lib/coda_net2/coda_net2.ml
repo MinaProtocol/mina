@@ -601,8 +601,7 @@ module Helper = struct
                               ~metadata:
                                 [ ("peer_id", `String m.sender)
                                 ; ("topic", `String sub.topic)
-                                ; ("error", `String (Error.to_string_mach e))
-                                ])
+                                ; ("error", `String (Error.to_string_hum e)) ])
                 | Error e ->
                     ( match sub.on_decode_failure with
                     | `Ignore ->
