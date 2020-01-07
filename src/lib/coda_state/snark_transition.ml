@@ -95,20 +95,21 @@ let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
   ; proposer
   ; coinbase_amount }
 
-let genesis : value lazy_t =
-  lazy
-    { Poly.blockchain_state= Lazy.force Blockchain_state.genesis
-    ; consensus_transition= Consensus.Data.Consensus_transition.genesis
-    ; supply_increase= Currency.Amount.zero
-    ; sok_digest=
-        Sok_message.digest
-          { fee= Currency.Fee.zero
-          ; prover=
-              Account.public_key
-                (List.hd_exn (Ledger.to_list (Lazy.force Genesis_ledger.t))) }
-    ; ledger_proof= None
-    ; proposer= Signature_lib.Public_key.Compressed.empty
-    ; coinbase_amount= Currency.Amount.zero }
+let genesis ~genesis_ledger : value =
+  let genesis_ledger = Lazy.force genesis_ledger in
+  { Poly.blockchain_state=
+      Blockchain_state.genesis
+        ~genesis_ledger_hash:(Ledger.merkle_root genesis_ledger)
+  ; consensus_transition= Consensus.Data.Consensus_transition.genesis
+  ; supply_increase= Currency.Amount.zero
+  ; sok_digest=
+      Sok_message.digest
+        { fee= Currency.Fee.zero
+        ; prover=
+            Account.public_key (List.hd_exn (Ledger.to_list genesis_ledger)) }
+  ; ledger_proof= None
+  ; proposer= Signature_lib.Public_key.Compressed.empty
+  ; coinbase_amount= Currency.Amount.zero }
 
 let to_hlist
     { Poly.blockchain_state

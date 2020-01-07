@@ -83,6 +83,8 @@ module Make (Inputs : Inputs_intf) :
       Validation.wrap transition_with_hash
       |> skip_time_received_validation
            `This_transition_was_not_received_via_gossip
+      |> skip_genesis_protocol_state_validation
+           `This_transition_was_generated_internally
       |> validate_proof ~verifier
       >>= Fn.compose Deferred.Result.return
             (skip_delta_transition_chain_validation

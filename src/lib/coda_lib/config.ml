@@ -38,5 +38,6 @@ type t =
   ; is_archive_rocksdb: bool [@default false]
   ; archive_process_location:
       Core.Host_and_port.t Cli_lib.Flag.Types.with_name option
-        [@default None] }
+        [@default None]
+  ; genesis_state_hash: State_hash.t }
 [@@deriving make]
