@@ -3,6 +3,16 @@ external downloadKey:
   (string, (int, int) => unit, Belt.Result.t(unit, string) => unit) => unit =
   "";
 
+module Styles = {
+  open Css;
+  let progressRingCircle =
+    style([
+      transition(~duration=0, "stroke-dashoffset"),
+      transform(rotate(`deg(-90))),
+      transformOrigin(`percent(50.), `percent(50.)),
+    ]);
+};
+
 [@react.component]
 let make = (~keyName, ~onFinish) => {
   let ((downloaded, total), updateState) = React.useState(() => (0, 0));
@@ -19,7 +29,36 @@ let make = (~keyName, ~onFinish) => {
     None;
   });
 
+  let radius = 52.;
+  let circumference = radius *. 2. *. Js.Math._PI;
+  let percent = float_of_int(downloaded) /. float_of_int(total);
+  let offset = circumference -. percent *. circumference;
   <div>
+    <svg width="120" height="120">
+      <circle
+        stroke="#D8D8D8"
+        strokeWidth="4"
+        fill="transparent"
+        r="52"
+        cx="60"
+        cy="60"
+      />
+      <circle
+        className=Styles.progressRingCircle
+        stroke="#3CFF64"
+        strokeWidth="4"
+        strokeDasharray={
+          Js.Float.toString(circumference)
+          ++ " "
+          ++ Js.Float.toString(circumference)
+        }
+        strokeDashoffset={Js.Float.toString(offset)}
+        fill="transparent"
+        r={Js.Float.toString(radius)}
+        cx="60"
+        cy="60"
+      />
+    </svg>
     {React.string(
        Printf.sprintf(
          "Downloaded %.1f%% of %dmb.",

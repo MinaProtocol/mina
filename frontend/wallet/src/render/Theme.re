@@ -19,6 +19,7 @@ module Colors = {
       Printf.sprintf("hsla(%d,%d%%,%d%%,%f)", h, s, l, a);
 
   let bgColor = white;
+  let offWhite = a => `rgba((255, 255, 255, a));
 
   // Linux doesn't support transparency
   let bgColorElectronWindow = "#FFE9E9E9";
@@ -264,8 +265,6 @@ module Onboarding = {
         position(`absolute),
         top(`zero),
         left(`zero),
-        background(white),
-        zIndex(100),
         display(`flex),
         flexDirection(`row),
         paddingTop(Spacing.headerHeight),

@@ -2,7 +2,7 @@ open Tc;
 
 module Styles = {
   open Css;
-
+  let map = WelcomeStep.Styles.map;
   let hero = style([display(`flex), width(`percent(100.))]);
   let fadeIn =
     keyframes([
@@ -29,18 +29,9 @@ module Styles = {
       color(Theme.Colors.slateAlpha(0.4)),
     ]);
   let header = {
-    merge([Theme.Text.Header.h1]);
+    WelcomeStep.Styles.header;
   };
-  let heroBody =
-    merge([
-      Theme.Text.Body.regularLight,
-      style([
-        marginTop(`rem(1.)),
-        marginBottom(`rem(2.)),
-        maxWidth(`rem(24.)),
-        color(Theme.Colors.midnightBlue),
-      ]),
-    ]);
+  let heroBody = WelcomeStep.Styles.heroBody;
 
   let buttonRow = {
     style([display(`flex), flexDirection(`row)]);
@@ -66,7 +57,9 @@ type daemonState =
 let make = (~nextStep, ~prevStep) => {
   let dispatchToMain = React.useContext(ProcessDispatchProvider.context);
   let (state, setState) = React.useState(() => Unavailable);
+  let mapImage = Hooks.useAsset("map@2x.png");
   <div className=Theme.Onboarding.main>
+    <div className=Styles.map> <img src=mapImage alt="Map" /> </div>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
         <FadeIn duration=500>
@@ -77,29 +70,24 @@ let make = (~nextStep, ~prevStep) => {
         <FadeIn duration=500 delay=150>
           <p className=Styles.heroBody>
             {React.string(
-               "First, let's install and configure the Coda daemon. This will allow you to connect to the Coda network and make transactions. Follow the instructions at the link below to begin.",
+               "Your node will allow you to connect to the Coda network and make transactions.",
              )}
           </p>
         </FadeIn>
-        <FadeIn duration=500 delay=250>
-          <Link
-            kind=Link.Blue
-            onClick={_ =>
-              openExternal("https://codaprotocol.com/docs/getting-started/")
-            }>
-            {React.string("Getting started")}
-          </Link>
-        </FadeIn>
         <Spacer height=2.0 />
+        <Downloader
+          keyName="keys-temporary_hack-testnet_postake.tar.bz2"
+          onFinish={_ => ()}
+        />
         <div className=Styles.buttonRow>
           <Button
-            style=Button.Gray
-            label="Go Back"
+            style=Button.MidnightBlue
+            label="Custom Setup"
             onClick={_ => prevStep()}
           />
           <Spacer width=0.5 />
           <Button
-            label="Continue"
+            label="Express Setup"
             style=Button.HyperlinkBlue
             disabled={state == Loading}
             onClick={_ => {

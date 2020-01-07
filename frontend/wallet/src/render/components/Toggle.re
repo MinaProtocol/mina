@@ -29,7 +29,6 @@ module Styles = {
         height(`rem(1.)),
         width(`rem(1.)),
         transition(~duration=400, "all"),
-        background(`url("bg-texture.png")),
         backgroundSize(`cover),
         contentRule("\"\""),
         borderRadius(`percent(50.)),

@@ -1,9 +1,10 @@
 type mode =
-  | Blue
   | HyperlinkBlue
   | Gray
   | Green
-  | Red;
+  | Red
+  | OffWhite
+  | MidnightBlue;
 
 module Styles = {
   open Css;
@@ -15,7 +16,6 @@ module Styles = {
         display(`inlineFlex),
         alignItems(`center),
         justifyContent(`center),
-        padding2(~v=`zero, ~h=`rem(1.)),
         background(white),
         border(`px(0), `solid, white),
         borderRadius(`rem(0.25)),
@@ -25,63 +25,46 @@ module Styles = {
       ]),
     ]);
 
-  let blue =
-    merge([
-      base,
-      style([
-        backgroundColor(Theme.Colors.marineAlpha(0.1)),
-        color(Theme.Colors.marineAlpha(1.)),
-        hover([backgroundColor(Theme.Colors.marine), color(white)]),
-        focus([backgroundColor(Theme.Colors.marine), color(white)]),
-        active([backgroundColor(Theme.Colors.marine), color(white)]),
-      ]),
-    ]);
+  let buttonLink = style([textDecoration(`none), color(white)]);
+  let buttonColor = mode =>
+    switch (mode) {
+    | HyperlinkBlue => white
+    | Gray => Theme.Colors.midnight
+    | Green => white
+    | Red => white
+    | OffWhite => white
+    | MidnightBlue => white
+    };
 
-  let hyperlinkBlue =
-    merge([
-      base,
-      style([
-        color(Theme.Colors.hyperlink),
-        backgroundColor(Theme.Colors.hyperlinkAlpha(0.15)),
-        hover([backgroundColor(Theme.Colors.hyperlink), color(white)]),
-        focus([backgroundColor(Theme.Colors.hyperlink), color(white)]),
-        active([backgroundColor(Theme.Colors.hyperlink), color(white)]),
-      ]),
-    ]);
+  let buttonBgColor = mode =>
+    switch (mode) {
+    | HyperlinkBlue => Theme.Colors.hyperlink
+    | Gray => Theme.Colors.slateAlpha(0.05)
+    | Green => Theme.Colors.serpentine
+    | Red => Theme.Colors.roseBud
+    | OffWhite => Theme.Colors.offWhite(0.2)
+    | MidnightBlue => Theme.Colors.midnight
+    };
 
-  let green =
-    merge([
-      base,
-      style([
-        backgroundColor(Theme.Colors.serpentine),
-        color(white),
-        hover([backgroundColor(Theme.Colors.jungle)]),
-        focus([backgroundColor(Theme.Colors.jungle)]),
-        active([backgroundColor(Theme.Colors.jungle)]),
-      ]),
-    ]);
+  let buttonHoverBgColor = mode =>
+    switch (mode) {
+    | HyperlinkBlue => Theme.Colors.hyperlinkAlpha(0.3)
+    | Gray => Theme.Colors.slateAlpha(0.2)
+    | Green => Theme.Colors.jungle
+    | Red => Theme.Colors.yeezy
+    | OffWhite => Theme.Colors.offWhite(0.5)
+    | MidnightBlue => Theme.Colors.midnightAlpha(0.3)
+    };
 
-  let red =
+  let buttonStyles = mode =>
     merge([
       base,
       style([
-        backgroundColor(Theme.Colors.roseBud),
-        color(white),
-        hover([backgroundColor(Theme.Colors.yeezy)]),
-        focus([backgroundColor(Theme.Colors.yeezy)]),
-        active([backgroundColor(Theme.Colors.yeezy)]),
-      ]),
-    ]);
-
-  let gray =
-    merge([
-      base,
-      style([
-        backgroundColor(Theme.Colors.slateAlpha(0.05)),
-        color(Theme.Colors.midnight),
-        hover([backgroundColor(Theme.Colors.slateAlpha(0.2))]),
-        focus([backgroundColor(Theme.Colors.slateAlpha(0.2))]),
-        active([backgroundColor(Theme.Colors.slateAlpha(0.2))]),
+        backgroundColor(buttonBgColor(mode)),
+        color(buttonColor(mode)),
+        hover([backgroundColor(buttonHoverBgColor(mode))]),
+        focus([backgroundColor(buttonHoverBgColor(mode))]),
+        active([backgroundColor(buttonHoverBgColor(mode))]),
       ]),
     ]);
 
@@ -93,14 +76,16 @@ let make =
     (
       ~label,
       ~onClick=?,
-      ~style=Blue,
+      ~style=HyperlinkBlue,
       ~disabled=false,
       ~width=10.5,
       ~height=3.,
+      ~padding=1.,
       ~icon=?,
       ~type_="button",
       ~onMouseEnter=?,
       ~onMouseLeave=?,
+      ~link=?,
     ) =>
   <button
     disabled
@@ -109,19 +94,25 @@ let make =
     ?onMouseLeave
     className={Css.merge([
       disabled ? Styles.disabled : "",
-      Css.style([Css.minWidth(`rem(width)), Css.height(`rem(height))]),
-      switch (style) {
-      | Blue => Styles.blue
-      | Green => Styles.green
-      | Red => Styles.red
-      | Gray => Styles.gray
-      | HyperlinkBlue => Styles.hyperlinkBlue
-      },
+      Css.style([
+        Css.minWidth(`rem(width)),
+        Css.height(`rem(height)),
+        Css.padding2(~v=`zero, ~h=`rem(padding)),
+      ]),
+      Styles.buttonStyles(style),
     ])}
     type_>
-    {switch (icon) {
-     | Some(kind) => <Icon kind />
-     | None => React.null
+    {switch (link, icon) {
+     | (Some(link), Some(icon)) =>
+       <>
+         <Icon kind=icon />
+         <a href=link className=Styles.buttonLink target="_blank">
+           {React.string(label)}
+         </a>
+       </>
+     | (None, None) => React.string(label)
+     | (None, Some(icon)) => <> <Icon kind=icon /> {React.string(label)} </>
+     | (Some(link), None) =>
+       <a href=link target="_blank"> {React.string(label)} </a>
      }}
-    {React.string(label)}
   </button>;
