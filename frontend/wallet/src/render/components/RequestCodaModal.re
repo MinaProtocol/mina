@@ -69,11 +69,15 @@ let make = (~accounts, ~setModalState) => {
         <Spacer width=1. />
         {switch (selectedAccount) {
          | None =>
-           <Button label="Copy public key" style=Button.Blue disabled=true />
+           <Button
+             label="Copy public key"
+             style=Button.HyperlinkBlue
+             disabled=true
+           />
          | Some(selectedAccount) =>
            <Button
              label="Copy public key"
-             style=Button.Blue
+             style=Button.HyperlinkBlue
              onClick={handleClipboard(~account=selectedAccount)}
            />
          }}
