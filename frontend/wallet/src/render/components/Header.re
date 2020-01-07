@@ -10,6 +10,8 @@ module Styles = {
         left(`px(0)),
         right(`px(0)),
         zIndex(100),
+        background(`url("bg-texture.png")),
+        backgroundColor(`hex("f2f2f2")),
         height(Spacing.headerHeight),
         maxHeight(Spacing.headerHeight),
         minHeight(Spacing.headerHeight),

@@ -24,6 +24,8 @@ module Styles = {
       right(`zero),
       bottom(`zero),
       zIndex(99),
+      background(`url("bg-texture.png")),
+      backgroundColor(`hex("f2f2f2")),
       padding2(~v=`rem(2.), ~h=`rem(12.)),
       borderTop(`px(1), `solid, white),
       borderLeft(`px(1), `solid, white),
@@ -192,7 +194,7 @@ let make = () => {
   <div className=Styles.container>
     <div className=Styles.headerContainer>
       <div className=Styles.label> {React.string("Account Settings")} </div>
-      <Version />
+     <Version />
     </div>
     <Spacer height=0.5 />
     <div className=Styles.accountSettings>
