@@ -131,7 +131,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let coinbase_stack_target, state_body_hash =
           pending_coinbase_stack_target t coinbase_stack_source
         in
-        let state_hash_witness = Some state_body_hash in
+        let state_body_hash_opt = Some state_body_hash in
         let span, proof =
           time (fun () ->
               T.of_transaction ?preeval ~sok_digest:Sok_message.Digest.default
@@ -139,7 +139,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 ~pending_coinbase_stack_state:
                   {source= coinbase_stack_source; target= coinbase_stack_target}
-                t ~state_hash_witness
+                { Transaction_protocol_state.Poly.transaction= t
+                ; block_data= state_body_hash_opt }
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
         in
         ( (Time.Span.max span max_span, sparse_ledger', coinbase_stack_target)
@@ -180,7 +181,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
         let coinbase_stack_target, state_body_hash =
           pending_coinbase_stack_target t Pending_coinbase.Stack.empty
         in
-        let state_hash_witness = Some state_body_hash in
+        let state_body_hash_opt = Some state_body_hash in
         let () =
           Transaction_snark.check_transaction ?preeval ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
@@ -188,7 +189,8 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
             ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
-            ~state_hash_witness t
+            { Transaction_protocol_state.Poly.block_data= state_body_hash_opt
+            ; transaction= t }
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
         sparse_ledger' )
@@ -210,7 +212,7 @@ let generate_base_snarks_witness sparse_ledger0
         let coinbase_stack_target, state_body_hash =
           pending_coinbase_stack_target t Pending_coinbase.Stack.empty
         in
-        let state_hash_witness = Some state_body_hash in
+        let state_body_hash_opt = Some state_body_hash in
         let () =
           Transaction_snark.generate_transaction_witness ?preeval ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
@@ -218,7 +220,8 @@ let generate_base_snarks_witness sparse_ledger0
             { Transaction_snark.Pending_coinbase_stack_state.source=
                 Pending_coinbase.Stack.empty
             ; target= coinbase_stack_target }
-            t state_hash_witness
+            { Transaction_protocol_state.Poly.transaction= t
+            ; block_data= state_body_hash_opt }
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
         sparse_ledger' )

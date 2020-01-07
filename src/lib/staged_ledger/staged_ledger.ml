@@ -369,8 +369,9 @@ module T = struct
     let%map () = Async.Scheduler.yield () in
     let open Result.Let_syntax in
     let%map undo, statement, updated_coinbase_stack = r in
-    ( { Scan_state.Transaction_with_witness.transaction_with_info= undo
-      ; witness= {ledger= ledger_witness; state_body_hash= state_body_hash_opt}
+    ( { Scan_state.Transaction_with_witness.transaction_with_info=
+          {transaction= undo; block_data= state_body_hash_opt}
+      ; witness= {ledger= ledger_witness}
       ; statement }
     , updated_coinbase_stack )
 
@@ -424,7 +425,9 @@ module T = struct
         ~f:(fun (d : Scan_state.Transaction_with_witness.t) acc ->
           let open Or_error.Let_syntax in
           let%bind acc = acc in
-          let%map t = d.transaction_with_info |> Ledger.Undo.transaction in
+          let%map t =
+            d.transaction_with_info.transaction |> Ledger.Undo.transaction
+          in
           t :: acc )
     in
     let total_fee_excess txns =

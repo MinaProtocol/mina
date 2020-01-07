@@ -40,7 +40,7 @@ module Inputs = struct
   end
 
   type single_spec =
-    ( Transaction.t
+    ( Transaction.t Transaction_protocol_state.t
     , Transaction_witness.t
     , Transaction_snark.t )
     Snark_work_lib.Work.Single.Spec.t
@@ -87,7 +87,6 @@ module Inputs = struct
                         input
                           .Transaction_snark.Statement
                            .pending_coinbase_stack_state
-                      ~state_hash_witness:w.state_body_hash
                       (unstage (Coda_base.Sparse_ledger.handler w.ledger)) ) )
         | Merge (_, proof1, proof2) ->
             process (fun () -> M.merge ~sok_digest proof1 proof2) )

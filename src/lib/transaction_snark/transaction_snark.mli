@@ -177,8 +177,7 @@ val check_transaction :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> Transaction.t
-  -> state_hash_witness:Transaction_witness.State_hash_witness.t
+  -> Transaction.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -187,8 +186,7 @@ val check_user_command :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase.Stack.t
-  -> User_command.With_valid_signature.t
-  -> Transaction_witness.State_hash_witness.t
+  -> User_command.With_valid_signature.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -198,8 +196,7 @@ val generate_transaction_witness :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase_stack_state.t
-  -> Transaction.t
-  -> Transaction_witness.State_hash_witness.t
+  -> Transaction.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -212,8 +209,7 @@ module type S = sig
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> Transaction.t
-    -> state_hash_witness:Transaction_witness.State_hash_witness.t
+    -> Transaction.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 
@@ -222,8 +218,7 @@ module type S = sig
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> User_command.With_valid_signature.t
-    -> state_hash_witness:Transaction_witness.State_hash_witness.t
+    -> User_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 
@@ -232,8 +227,7 @@ module type S = sig
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> Fee_transfer.t
-    -> state_hash_witness:Transaction_witness.State_hash_witness.t
+    -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 
