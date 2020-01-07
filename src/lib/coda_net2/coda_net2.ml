@@ -40,7 +40,7 @@ type stream_state =
       (** Streams move from [FullyOpen] to [HalfClosed `Us] when the write pipe is closed. Streams move from [FullyOpen] to [HalfClosed `Them] when [Stream.reset] is called or the remote host closes their write stream. *)
   | FullyClosed
       (** Streams move from [HalfClosed peer] to FullyClosed once the party that isn't peer has their "close write" event. Once a stream is FullyClosed, its resources are released. *)
-[@@deriving string]
+[@@deriving show]
 
 type erased_magic = [`Be_very_careful_to_be_type_safe]
 
@@ -429,7 +429,7 @@ module Helper = struct
         ~location:__LOC__ ~module_:__MODULE__
         ~metadata:
           [ ("who_closed", `String (name_participant who_closed))
-          ; ("old_stream_state", `String (stream_state_to_string old_state)) ]
+          ; ("old_stream_state", `String (stream_state_show old_state)) ]
 
   (** Track a new stream.
 
