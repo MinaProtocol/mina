@@ -131,12 +131,14 @@ let%test_unit "checkpoint read" =
           create_checkpoint db cp_dir ;
           let cp = create cp_dir in
           match
-            ( Hashtbl.add db_hashtbl ~key:"db_abc" ~data:"db_cde"
-            , Hashtbl.add cp_hashtbl ~key:"cp_abc" ~data:"cp_cde" )
+            ( Hashtbl.add db_hashtbl ~key:"db_key" ~data:"db_data"
+            , Hashtbl.add cp_hashtbl ~key:"cp_key" ~data:"cp_data" )
           with
           | `Ok, `Ok ->
-              set db ~key:(to_bigstring "db_abc") ~data:(to_bigstring "db_cde") ;
-              set cp ~key:(to_bigstring "cp_abc") ~data:(to_bigstring "cp_cde") ;
+              set db ~key:(to_bigstring "db_key")
+                ~data:(to_bigstring "db_data") ;
+              set cp ~key:(to_bigstring "cp_key")
+                ~data:(to_bigstring "cp_data") ;
               let db_sorted =
                 List.sort
                   (Hashtbl.to_alist db_hashtbl)
