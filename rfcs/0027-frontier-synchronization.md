@@ -41,7 +41,7 @@ IMPLEMENTATION NOTE: The entire chain of mask destruction hooks needs to be exec
 
 #### Frontier Read Monad
 
-A new monad is introduced for specifying reads from the transition frontier (see [alternatives section](#alternatives-misread) for explanation on why). All existing read functions on the transition frontier will instead by turned into functions which do not take in a transition frontier and return a result wrapped in the `'a Transition_frontier.Read.t` monad. The monad is designed to interact with deferreds so that async programming is still accessible during reads when necessary.
+A new monad is introduced for specifying reads from the transition frontier (see [alternatives section](#alternatives-misread) for explanation on why). All existing read functions on the transition frontier will instead by turned into functions which do not take in a transition frontier and return a result wrapped in the `'a Transition_frontier.Read.t` monad. This monad is used to build up a list of computations which will be performed during the read phase. The monad is designed to interact with deferreds so that async programming is still accessible during reads when necessary.
 
 #### New Frontier Interface
 
@@ -53,7 +53,7 @@ module Transition_frontier : sig
     module Full : sig
       type t
       val block : t -> Block.Validated.t
-      val staged_ledger : t -> Transaction_snark_scan_state.t
+      val staged_ledger : t -> Staged_ledger.t
     end
 
     module Partial : sig
