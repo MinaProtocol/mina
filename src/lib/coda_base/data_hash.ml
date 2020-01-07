@@ -138,30 +138,20 @@ module Make_full_size () = struct
 
   (* inside functor of no arguments, versioned types are allowed *)
 
-  module Arg = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = Pedersen.Digest.Stable.V1.t
-        [@@deriving sexp, compare, hash, yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Pedersen.Digest.Stable.V1.t
-      [@@deriving sexp, compare, hash, yojson]
+      module T = struct
+        type t = Pedersen.Digest.Stable.V1.t
+        [@@deriving sexp, compare, hash, yojson]
+      end
+
+      include T
 
       let to_latest = Fn.id
 
-      type _unused = unit constraint t = Arg.Stable.V1.t
-
-      include Comparable.Make (Arg.Stable.V1)
-      include Hashable.Make_binable (Arg.Stable.V1)
+      include Comparable.Make (T)
+      include Hashable.Make_binable (T)
     end
   end]
 
