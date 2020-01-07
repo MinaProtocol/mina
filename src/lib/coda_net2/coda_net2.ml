@@ -40,6 +40,7 @@ type stream_state =
       (** Streams move from [FullyOpen] to [HalfClosed `Us] when the write pipe is closed. Streams move from [FullyOpen] to [HalfClosed `Them] when [Stream.reset] is called or the remote host closes their write stream. *)
   | FullyClosed
       (** Streams move from [HalfClosed peer] to FullyClosed once the party that isn't peer has their "close write" event. Once a stream is FullyClosed, its resources are released. *)
+[@@deriving string]
 
 type erased_magic = [`Be_very_careful_to_be_type_safe]
 
@@ -366,6 +367,12 @@ module Helper = struct
 
   (** Advance the stream_state automata, closing pipes as necessary. *)
   let advance_stream_state net (stream : stream) who_closed =
+    let name_participant = function
+      | `Us ->
+          "the local host"
+      | `Them ->
+          "the remote host"
+    in
     let%map () =
       match who_closed with
       | `Us -> (
@@ -388,10 +395,7 @@ module Helper = struct
         "stream with index $index closed twice by $party"
         ~metadata:
           [ ("index", `Int stream.idx)
-          ; ( "party"
-            , `String (match who_closed with `Us -> "us" | `Them -> "them") )
-          ] ;
-      failwith "stream double closed"
+          ; ("party", `String (name_participant who_closed)) ]
     in
     (* replace with [%derive.eq : [`Us|`Them]] when it is supported.*)
     let us_them_eq a b =
@@ -407,6 +411,7 @@ module Helper = struct
             ~module_:__MODULE__ ~location:__LOC__
             ~metadata:[("idx", `Int stream.idx)]
     in
+    let old_state = stream.state in
     stream.state
     <- ( match (stream.state, who_closed) with
        | FullyOpen, _ ->
@@ -417,7 +422,14 @@ module Helper = struct
        | FullyClosed, _ ->
            double_close () ) ;
     (* TODO: maybe we can check some invariants on the Go side too? *)
-    assert (stream_state_invariant stream)
+    if not stream_state_invariant stream then
+      Logger.error net.logger
+        "after $who_closed closed the stream, stream state invariant broke \
+         (previous state: $old_stream_state)"
+        ~location:__LOC__ ~module_:__MODULE__
+        ~metadata:
+          [ ("who_closed", `String (name_participant who_closed))
+          ; ("old_stream_state", `String (stream_state_to_string old_state)) ]
 
   (** Track a new stream.
 
@@ -735,7 +747,8 @@ module Helper = struct
         let%bind m = Incoming_stream_msg.of_yojson v |> or_error in
         match Hashtbl.find t.streams m.stream_idx with
         | Some {incoming_w; _} ->
-            don't_wait_for (Pipe.write incoming_w (Data.to_string m.data)) ;
+            don't_wait_for
+              (Pipe.write_if_open incoming_w (Data.to_string m.data)) ;
             Ok ()
         | None ->
             Or_error.errorf
