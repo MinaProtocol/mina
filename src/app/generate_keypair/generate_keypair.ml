@@ -1,4 +1,4 @@
 open Async
 
 (* Utiltity app that only generates keypairs *)
-let () = Command.run Cli_lib.Generate_keypair.generate_keypair
+let () = Command.run Cli_lib.Commands.generate_keypair

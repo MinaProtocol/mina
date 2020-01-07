@@ -850,7 +850,7 @@ let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    Cli_lib.Handle_exception_nicely.handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%bind privkey =
@@ -864,7 +864,7 @@ let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
-    Cli_lib.Handle_exception_nicely.handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%map kp =
@@ -1357,7 +1357,7 @@ let generate_libp2p_keypair =
       "Generate a new libp2p keypair and print it out (this contains the \
        secret key!)"
     (Command.Param.return
-       ( Cli_lib.Handle_exception_nicely.handle_exception_nicely
+       ( Cli_lib.Exceptions.handle_nicely
        @@ fun () ->
        Deferred.ignore
          (let open Deferred.Let_syntax in
@@ -1501,7 +1501,7 @@ let command =
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
-    ; ("generate-keypair", Cli_lib.Generate_keypair.generate_keypair)
+    ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("cancel-transaction", cancel_transaction)
     ; ("set-staking", set_staking)
