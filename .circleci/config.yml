@@ -288,7 +288,7 @@ jobs:
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                 command: |
-                    bash -c 'eval `opam config env` && make build-with-genesis 2>&1 | tee /tmp/buildocaml.log'
+                    bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 20m
             ### collection
             - run:
@@ -339,7 +339,7 @@ jobs:
                   command: sudo pip install awscli
             - run:
                   name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build-with-genesis 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                   no_output_timeout: 20m
@@ -348,7 +348,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
             - run:
                   name: Rebuild for pvkey changes
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build-with-genesis 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                   no_output_timeout: 20m
@@ -411,7 +411,7 @@ jobs:
                   command: sudo pip install awscli
             - run:
                   name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build-with-genesis 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: net_10k
                   no_output_timeout: 20m
@@ -420,7 +420,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
             - run:
                   name: Rebuild for pvkey changes
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build-with-genesis 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
                   environment:
                     DUNE_PROFILE: net_10k
                   no_output_timeout: 20m
