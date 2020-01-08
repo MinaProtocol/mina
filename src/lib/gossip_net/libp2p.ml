@@ -56,6 +56,26 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let (module Impl) = implementation_of_rpc rpc in
       Impl.implement_multi handler
 
+    let prepare_stream_transport stream =
+      (* Closing the connection calls close_read on the read
+          pipe, which coda_net2 does not expect. To avoid this, add
+          an extra pipe and don't propagate the close. We still want
+          to close the connection because it flushes all the internal
+          state machines and fills the `closed` ivar.
+
+          Pipe.transfer isn't appropriate because it will close the
+          real_r when read_w is closed, precisely what we don't want.
+          *)
+      let read_r, read_w = Pipe.create () in
+      let underlying_r, underlying_w = Coda_net2.Stream.pipes stream in
+      don't_wait_for
+        (Pipe.iter underlying_r ~f:(fun msg -> Pipe.write_if_open read_w msg)) ;
+      let transport =
+        Async_rpc_kernel.Pipe_transport.(
+          create Kind.string read_r underlying_w)
+      in
+      transport
+
     (* Creates just the helper, making sure to register everything
       BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
@@ -138,10 +158,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
               Coda_net2.handle_protocol net2 ~on_handler_error:`Raise
                 ~protocol:rpc_transport_proto (fun stream ->
                   let peer = Coda_net2.Stream.remote_peer stream in
-                  let r, w = Stream.pipes stream in
-                  let transport =
-                    Async_rpc_kernel.Pipe_transport.(create Kind.string r w)
-                  in
+                  let transport = prepare_stream_transport stream in
                   let open Deferred.Let_syntax in
                   match%bind
                     Async_rpc_kernel.Rpc.Connection.create ~implementations
@@ -152,6 +169,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       transport
                   with
                   | Error handshake_error ->
+                      let%bind () = Async_rpc_kernel.Rpc.Transport.close transport in
                       don't_wait_for (Coda_net2.Stream.reset stream >>| ignore) ;
                       Trust_system.(
                         record config.trust_system config.logger peer.host
@@ -163,7 +181,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                                     , `String (Exn.to_string handshake_error)
                                     ) ] ) ))
                   | Ok rpc_connection ->
-                      Async_rpc_kernel.Rpc.Connection.close rpc_connection )
+                      Async_rpc_kernel.Rpc.Connection.close ~reason:(Info.of_string "connection completed") rpc_connection )
             in
             let%bind subscription =
               let open Deferred.Let_syntax in
@@ -288,27 +306,27 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     let try_call_rpc_with_dispatch : type r q.
            t
-        -> Unix.Inet_addr.t
-        -> string Pipe.Reader.t
-        -> string Pipe.Writer.t
+        -> Peer.t
+        -> Async.Rpc.Transport.t
         -> (r, q) dispatch
         -> r
         -> q Deferred.Or_error.t =
-     fun t addr rd wr dispatch query ->
+     fun t peer transport dispatch query ->
       let call () =
         Monitor.try_with (fun () ->
+            (* Async_rpc_kernel takes a transport instead of a Reader.t *)
             Async_rpc_kernel.Rpc.Connection.with_close
               ~connection_state:(fun _ -> ())
               ~dispatch_queries:(fun conn ->
                 Versioned_rpc.Connection_with_menu.create conn
                 >>=? fun conn' -> dispatch conn' query )
-              Async_rpc_kernel.Pipe_transport.(create Kind.string rd wr)
+              transport
               ~on_handshake_error:
                 (`Call
                   (fun exn ->
                     let%map () =
                       Trust_system.(
-                        record t.config.trust_system t.config.logger addr
+                        record t.config.trust_system t.config.logger peer.host
                           Actions.
                             ( Outgoing_connection_error
                             , Some
@@ -336,7 +354,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   ; _rpc_version ] ) ->
                 let%map () =
                   Trust_system.(
-                    record t.config.trust_system t.config.logger addr
+                    record t.config.trust_system t.config.logger peer.host
                       Actions.
                         ( Outgoing_connection_error
                         , Some ("Closed connection", []) ))
@@ -345,7 +363,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             | _ ->
                 let%map () =
                   Trust_system.(
-                    record t.config.trust_system t.config.logger addr
+                    record t.config.trust_system t.config.logger peer.host
                       Actions.
                         ( Violated_protocol
                         , Some
@@ -367,25 +385,19 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       call ()
 
     let try_call_rpc : type q r.
-           t
-        -> Unix.Inet_addr.t
-        -> _
-        -> _
-        -> (q, r) rpc
-        -> q
-        -> r Deferred.Or_error.t =
-     fun t peer rd wr rpc query ->
+        t -> Peer.t -> _ -> (q, r) rpc -> q -> r Deferred.Or_error.t =
+     fun t peer transport rpc query ->
       let (module Impl) = implementation_of_rpc rpc in
-      try_call_rpc_with_dispatch t peer rd wr Impl.dispatch_multi query
+      try_call_rpc_with_dispatch t peer transport Impl.dispatch_multi query
 
-    let query_peer t (peer : Peer.Id.t) rpc rpc_input =
+    let query_peer t (peer_id : Peer.Id.t) rpc rpc_input =
       match%bind
-        Coda_net2.open_stream t.net2 ~protocol:rpc_transport_proto peer
+        Coda_net2.open_stream t.net2 ~protocol:rpc_transport_proto peer_id
       with
       | Ok stream ->
-          let rd, wr = Coda_net2.Stream.pipes stream in
           let peer = Coda_net2.Stream.remote_peer stream in
-          try_call_rpc t peer.host rd wr rpc rpc_input
+          let transport = prepare_stream_transport stream in
+          try_call_rpc t peer transport rpc rpc_input
           >>| fun data ->
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
       | Error e ->

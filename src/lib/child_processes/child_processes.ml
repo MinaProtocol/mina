@@ -154,7 +154,9 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
       Deferred.unit
 
 type output_handling =
-  [`Log of Logger.Level.t | `Don't_log] * [`Pipe | `No_pipe]
+  [`Log of Logger.Level.t | `Don't_log]
+  * [`Pipe | `No_pipe]
+  * [`Keep_empty | `Filter_empty]
 
 (** Given a Reader.t coming from a process output, optionally log the lines
     coming from it and return a strict pipe that will get the lines if the
@@ -165,7 +167,7 @@ let reader_to_strict_pipe_with_logging :
     -> output_handling
     -> Logger.t
     -> string Strict_pipe.Reader.t =
- fun reader name (log, pipe) logger ->
+ fun reader name (log, pipe, filter_empty) logger ->
   let master_r, master_w =
     Strict_pipe.create ~name
       (Strict_pipe.Buffered (`Capacity 100, `Overflow Crash))
@@ -173,7 +175,12 @@ let reader_to_strict_pipe_with_logging :
   let lines_js_pipe = Reader.lines reader in
   don't_wait_for
     ( Pipe.iter_without_pushback lines_js_pipe ~f:(fun line ->
-          Strict_pipe.Writer.write master_w line )
+          match filter_empty with
+          | `Keep_empty ->
+              Strict_pipe.Writer.write master_w line
+          | `Filter_empty ->
+              if not (String.equal line "") then
+                Strict_pipe.Writer.write master_w line )
     >>= fun () ->
     Strict_pipe.Writer.close master_w ;
     Deferred.unit ) ;
@@ -359,8 +366,8 @@ let%test_module _ =
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:["exit"]
-              ~stdout:(`Log Logger.Level.Debug, `Pipe)
-              ~stderr:(`Log Logger.Level.Error, `No_pipe)
+              ~stdout:(`Log Logger.Level.Debug, `Pipe, `Keep_empty)
+              ~stderr:(`Log Logger.Level.Error, `No_pipe, `Keep_empty)
               ~termination:`Raise_on_failure
             |> Deferred.map ~f:Or_error.ok_exn
           in
@@ -382,8 +389,8 @@ let%test_module _ =
           let%bind process =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:["loop"]
-              ~stdout:(`Don't_log, `Pipe)
-              ~stderr:(`Don't_log, `No_pipe)
+              ~stdout:(`Don't_log, `Pipe, `Keep_empty)
+              ~stderr:(`Don't_log, `No_pipe, `Keep_empty)
               ~termination:`Always_raise
             |> Deferred.map ~f:Or_error.ok_exn
           in
@@ -426,8 +433,8 @@ let%test_module _ =
           let mk_process () =
             start_custom ~logger ~name ~git_root_relative_path ~conf_dir
               ~args:["loop"]
-              ~stdout:(`Don't_log, `No_pipe)
-              ~stderr:(`Don't_log, `No_pipe)
+              ~stdout:(`Don't_log, `No_pipe, `Keep_empty)
+              ~stderr:(`Don't_log, `No_pipe, `Keep_empty)
               ~termination:`Ignore
           in
           let%bind process1 =

@@ -92,6 +92,8 @@ module Helper = struct
     { net: t
     ; idx: int
     ; mutable state: stream_state
+    ; mutable state_lock: bool
+    ; state_wait: unit Async.Condition.t
     ; protocol: string
     ; peer: Peer.t
     ; incoming_r: string Pipe.Reader.t
@@ -352,9 +354,13 @@ module Helper = struct
           (Fn.compose (Result.map_error ~f:Error.of_string) M.output_of_yojson) )
     else Deferred.Or_error.error_string "helper process already exited"
 
-  let stream_state_invariant stream =
+  let stream_state_invariant stream logger =
     let us_closed = Pipe.is_closed stream.outgoing_w in
     let them_closed = Pipe.is_closed stream.incoming_w in
+    Logger.info logger "%sus_closed && %sthem_closed"
+      (if us_closed then "" else "not ")
+      (if them_closed then "" else "not ")
+      ~module_:__MODULE__ ~location:__LOC__ ;
     match stream.state with
     | FullyOpen ->
         (not us_closed) && not them_closed
@@ -365,7 +371,9 @@ module Helper = struct
     | FullyClosed ->
         us_closed && them_closed
 
-  (** Advance the stream_state automata, closing pipes as necessary. *)
+  (** Advance the stream_state automata, closing pipes as necessary. This
+      executes atomically, using a bool + condition variable to synchronize
+      updates. *)
   let advance_stream_state net (stream : stream) who_closed =
     let name_participant = function
       | `Us ->
@@ -373,72 +381,94 @@ module Helper = struct
       | `Them ->
           "the remote host"
     in
-    let%map () =
-      match who_closed with
-      | `Us -> (
-          match%map
-            do_rpc net (module Rpcs.Close_stream) {stream_idx= stream.idx}
-          with
-          | Ok "closeStream success" ->
-              ()
-          | Ok v ->
-              failwithf "helper broke RPC protocol: closeStream got %s" v ()
-          | Error e ->
-              Error.raise e )
-      | `Them ->
-          (* Helper notified us that the Go side closed its write pipe. *)
-          Pipe.close stream.incoming_w ;
-          Deferred.return ()
+    let rec acquire_lock () =
+      if not stream.state_lock then (
+        stream.state_lock <- true ;
+        Deferred.unit )
+      else
+        let%bind () = Async.Condition.wait stream.state_wait in
+        acquire_lock ()
     in
-    let double_close () =
-      Logger.error net.logger ~module_:__MODULE__ ~location:__LOC__
-        "stream with index $index closed twice by $party"
-        ~metadata:
-          [ ("index", `Int stream.idx)
-          ; ("party", `String (name_participant who_closed)) ] ;
-      stream.state
-    in
-    (* replace with [%derive.eq : [`Us|`Them]] when it is supported.*)
-    let us_them_eq a b =
-      match (a, b) with `Us, `Us | `Them, `Them -> true | _, _ -> false
-    in
-    let release () =
-      match Hashtbl.find_and_remove net.streams stream.idx with
-      | Some _ ->
-          ()
-      | None ->
-          Logger.error net.logger
-            "tried to release stream $idx but it was already gone"
-            ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:[("idx", `Int stream.idx)]
-    in
+    let%bind () = acquire_lock () in
     let old_state = stream.state in
-    stream.state
-    <- ( match (stream.state, who_closed) with
-       | FullyOpen, _ ->
-           HalfClosed who_closed
-       | HalfClosed other, _ ->
-           if us_them_eq other who_closed then ignore (double_close ())
-           else release () ;
-           FullyClosed
-       | FullyClosed, _ ->
-           double_close () ) ;
-    (* TODO: maybe we can check some invariants on the Go side too? *)
-    if not (stream_state_invariant stream) then
-      Logger.error net.logger
-        "after $who_closed closed the stream, stream state invariant broke \
-         (previous state: $old_stream_state)"
-        ~location:__LOC__ ~module_:__MODULE__
-        ~metadata:
-          [ ("who_closed", `String (name_participant who_closed))
-          ; ("old_stream_state", `String (show_stream_state old_state)) ]
+    Monitor.protect
+      ~finally:(fun () ->
+        stream.state_lock <- false ;
+        Async.Condition.signal stream.state_wait () ;
+        Deferred.unit )
+      (fun () ->
+        let%map () =
+          match who_closed with
+          | `Us -> (
+              match%map
+                do_rpc net (module Rpcs.Close_stream) {stream_idx= stream.idx}
+              with
+              | Ok "closeStream success" ->
+                  ()
+              | Ok v ->
+                  failwithf "helper broke RPC protocol: closeStream got %s" v
+                    ()
+              | Error e ->
+                  Error.raise e )
+          | `Them ->
+              (* Helper notified us that the Go side closed its write pipe. *)
+              Pipe.close stream.incoming_w ;
+              Deferred.return ()
+        in
+        let double_close () =
+          Logger.error net.logger ~module_:__MODULE__ ~location:__LOC__
+            "stream with index $index closed twice by $party"
+            ~metadata:
+              [ ("index", `Int stream.idx)
+              ; ("party", `String (name_participant who_closed)) ] ;
+          stream.state
+        in
+        (* replace with [%derive.eq : [`Us|`Them]] when it is supported.*)
+        let us_them_eq a b =
+          match (a, b) with `Us, `Us | `Them, `Them -> true | _, _ -> false
+        in
+        let release () =
+          match Hashtbl.find_and_remove net.streams stream.idx with
+          | Some _ ->
+              ()
+          | None ->
+              Logger.error net.logger
+                "tried to release stream $idx but it was already gone"
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("idx", `Int stream.idx)]
+        in
+        stream.state
+        <- ( match old_state with
+           | FullyOpen ->
+               HalfClosed who_closed
+           | HalfClosed other ->
+               if us_them_eq other who_closed then ignore (double_close ())
+               else release () ;
+               FullyClosed
+           | FullyClosed ->
+               double_close () ) ;
+        Logger.info net.logger "transitioning from %s to %s after %s closed"
+          (show_stream_state old_state)
+          (show_stream_state stream.state)
+          (name_participant who_closed)
+          ~location:__LOC__ ~module_:__MODULE__ ;
+        (* TODO: maybe we can check some invariants on the Go side too? *)
+        if not (stream_state_invariant stream net.logger) then
+          Logger.error net.logger
+            "after $who_closed closed the stream, stream state invariant \
+             broke (previous state: $old_stream_state)"
+            ~location:__LOC__ ~module_:__MODULE__
+            ~metadata:
+              [ ("who_closed", `String (name_participant who_closed))
+              ; ("old_stream_state", `String (show_stream_state old_state)) ]
+        )
 
   (** Track a new stream.
 
-    This is used for both newly created outbound streams and incomming streams, and
+    This is used for both newly created outbound streams and incoming streams, and
     spawns the task that sends outbound messages to the helper.
 
-    The writing end of the stream will be automatically be closed once the
+    Our writing end of the stream will be automatically be closed once the
     write pipe is closed.
   *)
   let make_stream net idx protocol remote_peer_info =
@@ -454,6 +484,8 @@ module Helper = struct
       { net
       ; idx
       ; state= FullyOpen
+      ; state_lock= false
+      ; state_wait= Async.Condition.create ()
       ; peer
       ; protocol
       ; incoming_r
@@ -461,22 +493,25 @@ module Helper = struct
       ; outgoing_r
       ; outgoing_w }
     in
-    (let%bind () =
-       Pipe.iter outgoing_r ~f:(fun msg ->
-           match%map
-             do_rpc net
-               (module Rpcs.Send_stream_msg)
-               {stream_idx= idx; data= to_b58_data msg}
-           with
-           | Ok "sendStreamMsg success" ->
-               ()
-           | Ok v ->
-               failwithf "helper broke RPC protocol: sendStreamMsg got %s" v ()
-           | Error e ->
-               Error.raise e )
-     in
-     advance_stream_state net stream `Us)
-    |> don't_wait_for ;
+    let outgoing_loop () =
+      let%bind () =
+        Pipe.iter outgoing_r ~f:(fun msg ->
+            match%map
+              do_rpc net
+                (module Rpcs.Send_stream_msg)
+                {stream_idx= idx; data= to_b58_data msg}
+            with
+            | Ok "sendStreamMsg success" ->
+                ()
+            | Ok v ->
+                failwithf "helper broke RPC protocol: sendStreamMsg got %s" v
+                  ()
+            | Error e ->
+                Error.raise e )
+      in
+      advance_stream_state net stream `Us
+    in
+    don't_wait_for (outgoing_loop ()) ;
     stream
 
   (** Parses a normal RPC response and resolves the deferred it answers. *)
@@ -1178,9 +1213,9 @@ let create ~logger ~conf_dir =
     Child_processes.start_custom ~logger ~name:"libp2p_helper"
       ~git_root_relative_path:"src/app/libp2p_helper/result/bin/libp2p_helper"
       ~conf_dir ~args:[]
-      ~stdout:(`Log Logger.Level.Spam, `Pipe)
+      ~stdout:(`Log Logger.Level.Spam, `Pipe, `Filter_empty)
       ~stderr:
-        (`Log Logger.Level.Spam, `No_pipe)
+        (`Log Logger.Level.Spam, `No_pipe, `Filter_empty)
         (* TODO the stderr log messages are JSON but not in our format. The
              helper should either emit our format or we should convert in
              OCaml *)
