@@ -53,7 +53,9 @@ let render ~max_interpolation_length ~format_json metadata items =
         | `Interpolate id ->
             let%map json =
               String.Map.find metadata id
-              |> Result.of_option ~error:"bad interpolation"
+              |> Result.of_option
+                   ~error:
+                     ("bad interpolation (partial message: " ^ msg_acc ^ ")")
             in
             let str = format_json json in
             if String.length str > max_interpolation_length then
