@@ -127,7 +127,7 @@ let retrieve_genesis_state dir_opt ~logger :
                   "Could not curl genesis ledger and genesis proof from $uri: \
                    $error"
                   ~metadata:
-                    [ ("path", `String s3_bucket_prefix)
+                    [ ("uri", `String s3_bucket_prefix)
                     ; ("error", `String (Error.to_string_hum e)) ]
           in
           let%map res = retrieve Cache_dir.s3_install_path in
