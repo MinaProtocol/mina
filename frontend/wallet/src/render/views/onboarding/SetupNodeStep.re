@@ -54,9 +54,7 @@ type daemonState =
 [@bs.scope "window"] [@bs.val] external openExternal: string => unit = "";
 
 [@react.component]
-let make = (~nextStep, ~prevStep) => {
-  let dispatchToMain = React.useContext(ProcessDispatchProvider.context);
-  let (state, setState) = React.useState(() => Unavailable);
+let make = (~customSetup, ~expressSetup) => {
   let mapImage = Hooks.useAsset("map@2x.png");
   <div className=Theme.Onboarding.main>
     <div className=Styles.map> <img src=mapImage alt="Map" /> </div>
@@ -75,63 +73,19 @@ let make = (~nextStep, ~prevStep) => {
           </p>
         </FadeIn>
         <Spacer height=2.0 />
-        <Downloader
-          keyName="keys-temporary_hack-testnet_postake.tar.bz2"
-          onFinish={_ => ()}
-        />
         <div className=Styles.buttonRow>
           <Button
             style=Button.MidnightBlue
             label="Custom Setup"
-            onClick={_ => prevStep()}
+            onClick={_ => customSetup()}
           />
           <Spacer width=0.5 />
           <Button
             label="Express Setup"
             style=Button.HyperlinkBlue
-            disabled={state == Loading}
-            onClick={_ => {
-              dispatchToMain(
-                CodaProcess.Action.StartCoda([
-                  "-discovery-port",
-                  "8303",
-                  ...List.foldl(
-                       ~f=(peer, acc) => ["-peer", peer, ...acc],
-                       ~init=[],
-                       CodaProcess.defaultPeers,
-                     ),
-                ]),
-              );
-              setState(_ => Loading);
-            }}
+            onClick={_ => expressSetup()}
           />
         </div>
-      </div>
-      <div className=Styles.heroRight>
-        {switch (state) {
-         | Loading =>
-           <NetworkQuery>
-             (
-               ({result}) =>
-                 switch (result) {
-                 | Data(_) =>
-                   nextStep();
-                   React.null;
-                 | _ =>
-                   <>
-                     <Loader hideText=true />
-                     <p className=Theme.Text.Body.regular>
-                       {React.string("Starting your node...")}
-                     </p>
-                   </>
-                 }
-             )
-           </NetworkQuery>
-         | Started =>
-           nextStep();
-           React.null;
-         | Unavailable => React.null
-         }}
       </div>
     </div>
   </div>;

@@ -1,3 +1,17 @@
+type onboardingPage =
+  | Welcome
+  | SetUpNode
+  | InstallCoda
+  | PortForward
+  | MachineConfigure
+  | CloudServerConfigure
+  | RunNode
+  | PortForwardError
+  | DaemonError
+  | AccountCreation
+  | StakeCoda
+  | LastStep;
+
 module Styles = {
   open Css;
 
@@ -25,7 +39,7 @@ module Styles = {
       position(`fixed),
       left(`px(0)),
       top(`px(0)),
-      zIndex(-1),
+      zIndex(1),
       maxWidth(`percent(100.)),
     ]);
 };
@@ -34,21 +48,37 @@ module Styles = {
 let make = () => {
   let (showOnboarding, closeOnboarding) =
     React.useContext(OnboardingProvider.context);
-  let (onboardingStep, setOnboardingStep) = React.useState(() => 0);
-  let prevStep = () => {
-    setOnboardingStep(currentStep => currentStep - 1);
-  };
+  let (onboardingStep, setOnboardingStep) = React.useState(() => Welcome);
 
-  let nextStep = () => {
-    setOnboardingStep(currentStep => currentStep + 1);
-  };
-
-  let onboardingSteps = [
-    <WelcomeStep nextStep />,
-    <SetupNodeStep nextStep prevStep />,
-    <AccountCreationStep nextStep prevStep />,
-    <CompletionStep closeOnboarding prevStep />,
-  ];
+  let step =
+    switch (onboardingStep) {
+    | Welcome =>
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+    | SetUpNode =>
+      <SetupNodeStep
+        customSetup={_ => setOnboardingStep(_ => InstallCoda)}
+        expressSetup={_ => setOnboardingStep(_ => InstallCoda)}
+      />
+    | InstallCoda =>
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+    | PortForward =>
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+    | MachineConfigure =>
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+    | CloudServerConfigure =>
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+    | RunNode =>
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+    | PortForwardError =>
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+    | DaemonError =>
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+    | AccountCreation =>
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+    | StakeCoda =>
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+    | LastStep => <CompletionStep closeOnboarding />
+    };
 
   let mapImage = Hooks.useAsset("map@2x.png");
 
@@ -58,7 +88,7 @@ let make = () => {
           <img src=mapImage alt="Map" className=Styles.map />
         </div>
         <OnboardingHeader />
-        {Array.of_list(onboardingSteps)[onboardingStep]}
+        step
       </div>
     : React.null;
 };
