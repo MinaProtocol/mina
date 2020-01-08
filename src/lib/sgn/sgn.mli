@@ -1,6 +1,12 @@
+[%%import "/src/config.mlh"]
+
 open Core_kernel
+
+[%%if defined consensus_mechanism]
+
 open Snark_params.Tick
-module Functor = Functor
+
+[%%endif]
 
 [%%versioned:
 module Stable : sig
@@ -17,11 +23,13 @@ val to_field : t -> Field.t
 
 val gen : t Quickcheck.Generator.t
 
+val negate : t -> t
+
+[%%if defined consensus_mechanism]
+
 type var = private Field.Var.t
 
 val typ : (var, t) Typ.t
-
-val negate : t -> t
 
 module Checked : sig
   val constant : t -> var
@@ -42,3 +50,5 @@ module Checked : sig
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 end
+
+[%%endif]
