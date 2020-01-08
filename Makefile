@@ -78,16 +78,17 @@ libp2p_helper:
 # Alias
 dht: kademlia libp2p_helper
 
-# generate genesis ledger and genesis proof using default accounts if doesn't exist or if runtime_genesis_ledger.exe changes
-$(GENESIS_STATE_PATH): _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
-	$(info Generating genesis state at $(GENESIS_STATE_PATH))
-	./$<
 
 _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe:
 	$(info Building runtime_genesis_ledger)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+.PHONY: _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
 
-build: git_hooks reformat-diff $(GENESIS_STATE_PATH)
+# generate genesis ledger and genesis proof using default accounts if doesn't exist or if runtime_genesis_ledger.exe changes
+genesis_ledger: _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+	@if  [ ! -f $(GENESIS_STATE_PATH) ] || [ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -nt $(GENESIS_STATE_PATH) ] ; then ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe; fi
+
+build: git_hooks reformat-diff genesis_ledger
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE)
 
@@ -311,4 +312,4 @@ ml-docs:
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download macos-setup-compile _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download macos-setup-compile
