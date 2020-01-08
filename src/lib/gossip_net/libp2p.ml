@@ -56,7 +56,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let (module Impl) = implementation_of_rpc rpc in
       Impl.implement_multi handler
 
-    let prepare_stream_transport stream =
+    let prepare_stream_transport logger stream =
       (* Closing the connection calls close_read on the read
           pipe, which coda_net2 does not expect. To avoid this, add
           an extra pipe and don't propagate the close. We still want
@@ -69,7 +69,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let read_r, read_w = Pipe.create () in
       let underlying_r, underlying_w = Coda_net2.Stream.pipes stream in
       don't_wait_for
-        (Pipe.iter underlying_r ~f:(fun msg -> Pipe.write_if_open read_w msg)) ;
+        (Pipe.iter underlying_r ~f:(fun msg ->
+             Logger.error logger "writing the following to rpc: %s" msg
+               ~module_:__MODULE__ ~location:__LOC__ ;
+             Pipe.write_if_open read_w msg )) ;
       let transport =
         Async_rpc_kernel.Pipe_transport.(
           create Kind.string read_r underlying_w)
@@ -158,7 +161,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
               Coda_net2.handle_protocol net2 ~on_handler_error:`Raise
                 ~protocol:rpc_transport_proto (fun stream ->
                   let peer = Coda_net2.Stream.remote_peer stream in
-                  let transport = prepare_stream_transport stream in
+                  let transport =
+                    prepare_stream_transport config.logger stream
+                  in
                   let open Deferred.Let_syntax in
                   match%bind
                     Async_rpc_kernel.Rpc.Connection.create ~implementations
@@ -169,7 +174,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       transport
                   with
                   | Error handshake_error ->
-                      let%bind () = Async_rpc_kernel.Rpc.Transport.close transport in
+                      let%bind () =
+                        Async_rpc_kernel.Rpc.Transport.close transport
+                      in
                       don't_wait_for (Coda_net2.Stream.reset stream >>| ignore) ;
                       Trust_system.(
                         record config.trust_system config.logger peer.host
@@ -181,7 +188,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                                     , `String (Exn.to_string handshake_error)
                                     ) ] ) ))
                   | Ok rpc_connection ->
-                      Async_rpc_kernel.Rpc.Connection.close ~reason:(Info.of_string "connection completed") rpc_connection )
+                      Async_rpc_kernel.Rpc.Connection.close
+                        ~reason:(Info.of_string "connection completed")
+                        rpc_connection )
             in
             let%bind subscription =
               let open Deferred.Let_syntax in
@@ -396,7 +405,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       with
       | Ok stream ->
           let peer = Coda_net2.Stream.remote_peer stream in
-          let transport = prepare_stream_transport stream in
+          let transport = prepare_stream_transport t.config.logger stream in
           try_call_rpc t peer transport rpc rpc_input
           >>| fun data ->
           Connected (Envelope.Incoming.wrap_peer ~data ~sender:peer)
