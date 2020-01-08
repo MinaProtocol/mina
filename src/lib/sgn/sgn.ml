@@ -1,6 +1,27 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
+
+[%%if
+defined consensus_mechanism]
+
 open Snark_params.Tick
-include Sgn_type.Sgn
+
+[%%endif]
+
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t = Sgn_type.Sgn.Stable.V1.t = Pos | Neg
+    [@@deriving sexp, hash, compare, eq, yojson]
+
+    let to_latest = Fn.id
+  end
+end]
+
+type t = Sgn_type.Sgn.t = Pos | Neg
+[@@deriving sexp, hash, compare, eq, yojson]
 
 let gen =
   Quickcheck.Generator.map Bool.quickcheck_generator ~f:(fun b ->
@@ -16,6 +37,9 @@ let of_field_exn x =
   if Field.equal x Field.one then Pos
   else if Field.equal x neg_one then Neg
   else failwith "Sgn.of_field: Expected positive or negative 1"
+
+[%%if
+defined consensus_mechanism]
 
 type var = Field.Var.t
 
@@ -63,3 +87,5 @@ module Checked = struct
 
   let if_ = Field.Checked.if_
 end
+
+[%%endif]
