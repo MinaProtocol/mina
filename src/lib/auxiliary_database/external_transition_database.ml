@@ -26,7 +26,12 @@ module Pagination =
     (struct
       type t = (Filtered_external_transition.t, State_hash.t) With_hash.t
     end)
-    (Block_time.Stable.V1)
+    (struct
+      include Block_time.Stable.V1
+
+      (* sort blocks in descending order *)
+      let compare a b = -compare a b
+    end)
 
 let fee_transfer_participants (pk, _) = [pk]
 
@@ -71,6 +76,8 @@ let add {database; pagination; logger}
       add_user_blocks pagination (transition_with_hash, date)
 
 let get_total_values {pagination; _} = Pagination.get_total_values pagination
+
+let get_value {pagination; _} cursor = Pagination.get_value pagination cursor
 
 let get_all_values {pagination; _} = Pagination.get_all_values pagination
 

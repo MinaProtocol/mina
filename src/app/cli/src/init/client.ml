@@ -403,15 +403,6 @@ let get_nonce_exn ~rpc public_key port =
   | Ok nonce ->
       return nonce
 
-let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
-    a Deferred.t =
-  match%bind Deferred.Or_error.try_with ~extract_exn:true f with
-  | Ok e ->
-      return e
-  | Error e ->
-      eprintf "Error: %s" (Error.to_string_hum e) ;
-      exit 4
-
 let batch_send_payments =
   let module Payment_info = struct
     type t =
@@ -859,7 +850,7 @@ let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%bind privkey =
@@ -873,7 +864,7 @@ let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
-    handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%map kp =
@@ -885,20 +876,6 @@ let dump_keypair =
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check )
       (kp.private_key |> Private_key.to_base58_check))
-
-let generate_keypair =
-  Command.async ~summary:"Generate a new public-key/private-key pair"
-    (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
-    @@ fun () ->
-    let open Deferred.Let_syntax in
-    let kp = Keypair.create () in
-    let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
-    printf "Keypair generated\nPublic key: %s\n"
-      ( kp.public_key |> Public_key.compress
-      |> Public_key.Compressed.to_base58_check ) ;
-    exit 0)
 
 let dump_ledger =
   let sl_hash_flag =
@@ -1380,7 +1357,7 @@ let generate_libp2p_keypair =
       "Generate a new libp2p keypair and print it out (this contains the \
        secret key!)"
     (Command.Param.return
-       ( handle_exception_nicely
+       ( Cli_lib.Exceptions.handle_nicely
        @@ fun () ->
        Deferred.ignore
          (let open Deferred.Let_syntax in
@@ -1401,53 +1378,53 @@ let generate_libp2p_keypair =
                    ~metadata:[("err", `String (Error.to_string_hum e))] ;
                  exit 20 )) ))
 
-let whitelist_ip_flag =
+let trustlist_ip_flag =
   Command.Param.(
     flag "ip-address"
-      ~doc:"IP An IPv4 or IPv6 address for the client whitelist"
+      ~doc:"IP An IPv4 or IPv6 address for the client trustlist"
       (required Cli_lib.Arg_type.ip_address))
 
-let whitelist_add =
+let trustlist_add =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
-  Command.async ~summary:"Add an IP to the whitelist"
-    (Cli_lib.Background_daemon.rpc_init whitelist_ip_flag
-       ~f:(fun port whitelist_ip ->
-         let whitelist_ip_string = Unix.Inet_addr.to_string whitelist_ip in
-         match%map Client.dispatch Add_whitelist.rpc whitelist_ip port with
+  Command.async ~summary:"Add an IP to the trustlist"
+    (Cli_lib.Background_daemon.rpc_init trustlist_ip_flag
+       ~f:(fun port trustlist_ip ->
+         let trustlist_ip_string = Unix.Inet_addr.to_string trustlist_ip in
+         match%map Client.dispatch Add_trustlist.rpc trustlist_ip port with
          | Ok (Ok ()) ->
-             printf "Added %s to client whitelist" whitelist_ip_string
+             printf "Added %s to client trustlist" trustlist_ip_string
          | Ok (Error e) ->
-             eprintf "Error adding %s to client whitelist: %s"
-               whitelist_ip_string (Error.to_string_hum e)
+             eprintf "Error adding %s to client trustlist: %s"
+               trustlist_ip_string (Error.to_string_hum e)
          | Error e ->
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
-let whitelist_remove =
+let trustlist_remove =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
-  Command.async ~summary:"Add an IP to the whitelist"
-    (Cli_lib.Background_daemon.rpc_init whitelist_ip_flag
-       ~f:(fun port whitelist_ip ->
-         let whitelist_ip_string = Unix.Inet_addr.to_string whitelist_ip in
-         match%map Client.dispatch Remove_whitelist.rpc whitelist_ip port with
+  Command.async ~summary:"Add an IP to the trustlist"
+    (Cli_lib.Background_daemon.rpc_init trustlist_ip_flag
+       ~f:(fun port trustlist_ip ->
+         let trustlist_ip_string = Unix.Inet_addr.to_string trustlist_ip in
+         match%map Client.dispatch Remove_trustlist.rpc trustlist_ip port with
          | Ok (Ok ()) ->
-             printf "Removed %s to client whitelist" whitelist_ip_string
+             printf "Removed %s to client trustlist" trustlist_ip_string
          | Ok (Error e) ->
-             eprintf "Error removing %s from client whitelist: %s"
-               whitelist_ip_string (Error.to_string_hum e)
+             eprintf "Error removing %s from client trustlist: %s"
+               trustlist_ip_string (Error.to_string_hum e)
          | Error e ->
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
-let whitelist_list =
+let trustlist_list =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
-  Command.async ~summary:"Add an IP to the whitelist"
+  Command.async ~summary:"Add an IP to the trustlist"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
-         match%map Client.dispatch Get_whitelist.rpc () port with
+         match%map Client.dispatch Get_trustlist.rpc () port with
          | Ok ips ->
              printf
                "The following IPs are permitted to connect to the daemon \
@@ -1524,7 +1501,7 @@ let command =
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
-    ; ("generate-keypair", generate_keypair)
+    ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("cancel-transaction", cancel_transaction)
     ; ("set-staking", set_staking)
@@ -1535,17 +1512,17 @@ let command =
     ; ("stop-daemon", stop_daemon)
     ; ("status", status) ]
 
-let client_whitelist_group =
-  Command.group ~summary:"Client whitelist management"
+let client_trustlist_group =
+  Command.group ~summary:"Client trustlist management"
     ~preserve_subcommand_order:()
-    [ ("add", whitelist_add)
-    ; ("list", whitelist_list)
-    ; ("remove", whitelist_remove) ]
+    [ ("add", trustlist_add)
+    ; ("list", trustlist_list)
+    ; ("remove", trustlist_remove) ]
 
 let advanced =
   Command.group ~summary:"Advanced client commands"
     [ ("get-nonce", get_nonce_cmd)
-    ; ("client-whitelist", client_whitelist_group)
+    ; ("client-trustlist", client_trustlist_group)
     ; ("get-trust-status", get_trust_status)
     ; ("get-trust-status-all", get_trust_status_all)
     ; ("get-public-keys", get_public_keys)

@@ -8,7 +8,7 @@ let name = "coda-archive-node-test"
 let main () =
   let logger = Logger.create () in
   let largest_account_keypair =
-    Genesis_ledger.largest_account_keypair_exn ()
+    Test_genesis_ledger.largest_account_keypair_exn ()
   in
   let largest_account_public_key =
     Public_key.compress largest_account_keypair.public_key

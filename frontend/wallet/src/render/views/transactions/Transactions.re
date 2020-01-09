@@ -1,3 +1,4 @@
+open ReactIntl;
 open Tc;
 
 module Styles = {
@@ -167,13 +168,16 @@ let make = () => {
   <div className=Styles.container>
     <div className=Styles.headerRow>
       <span className=Css.(style([display(`flex), alignItems(`center)]))>
-        {React.string("Sender")}
+        <FormattedMessage id="sender" defaultMessage="sender" />
         <span className=Styles.icon> <Icon kind=Icon.BentArrow /> </span>
-        {React.string("recipient")}
+        <FormattedMessage id="recipient" defaultMessage="recipient" />
       </span>
-      <span> {ReasonReact.string("Memo")} </span>
+      <span> <FormattedMessage id="memo" defaultMessage="memo" /> </span>
       <span className=Css.(style([textAlign(`right)]))>
-        {ReasonReact.string("Date / Amount")}
+        <FormattedMessage
+          id="transactions.date/amount"
+          defaultMessage="date / amount"
+        />
       </span>
     </div>
     {switch (activeAccount) {
@@ -207,7 +211,7 @@ let make = () => {
                     <div className=Styles.alertContainer>
                       <Alert
                         kind=`Info
-                        message="You don't have any transactions related to this account."
+                        defaultMessage="You don't have any transactions related to this account."
                       />
                     </div>
                   | (_, _) =>
@@ -238,7 +242,7 @@ let make = () => {
      | None =>
        <div className=Styles.alertContainer>
          <Alert
-           message="Select an account from the side bar to view related transactions."
+           defaultMessage="Select an account from the side bar to view related transactions."
            kind=`Info
          />
        </div>

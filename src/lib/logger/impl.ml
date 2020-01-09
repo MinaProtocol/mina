@@ -139,7 +139,8 @@ module Processor = struct
           Logproc_lib.Interpolator.interpolate config msg.message msg.metadata
         with
         | Error err ->
-            Core.printf "logproc interpolation error: %s\n" err ;
+            Core.printf "logproc interpolation error in %s: %s\n"
+              msg.source.location err ;
             None
         | Ok (str, extra) ->
             let formatted_extra =
