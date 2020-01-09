@@ -22,9 +22,6 @@ else
 CODA_TMP_DIR := $(TMPDIR)
 endif
 
-#Genesis state autogen path
-GENESIS_STATE_PATH = $(CODA_TMP_DIR)/coda_cache_dir/coda_genesis_$(GITLONGHASH).tar.gz
-
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
@@ -78,14 +75,17 @@ libp2p_helper:
 # Alias
 dht: kademlia libp2p_helper
 
-
 _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe:
 	$(info Building runtime_genesis_ledger)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/runtime_genesis_ledger/genesis_filename.txt
 .PHONY: _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
 
+#Genesis state autogen path
+genesis_path:
+GENESIS_STATE_PATH = $(CODA_TMP_DIR)/coda_cache_dir/$(shell cat _build/default/src/app/runtime_genesis_ledger/genesis_filename.txt).tar.gz
+
 # generate genesis ledger and genesis proof using default accounts if doesn't exist or if runtime_genesis_ledger.exe changes
-genesis_ledger: _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+genesis_ledger: _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe genesis_path
 	@if  [ ! -f $(GENESIS_STATE_PATH) ] || [ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -nt $(GENESIS_STATE_PATH) ] ; then ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe; fi
 
 build: git_hooks reformat-diff genesis_ledger

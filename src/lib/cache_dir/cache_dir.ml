@@ -1,3 +1,20 @@
+[%%import
+"/src/config.mlh"]
+
+[%%inject
+"curve_size", curve_size]
+
+(*coda_genesis_4601df6ee5bd20c8d0ddcb65d9ffe33279bc1ee0_02889a232867abcb*)
+
+[%%inject
+"fake_accounts_target", fake_accounts_target]
+
+[%%inject
+"proof_level", proof_level]
+
+[%%inject
+"genesis_ledger", genesis_ledger]
+
 open Core
 open Async
 
@@ -7,7 +24,28 @@ let s3_install_path = "/tmp/s3_cache_dir"
 
 let manual_install_path = "/var/lib/coda"
 
-let genesis_dir_name = "coda_genesis" ^ "_" ^ Coda_version.commit_id
+let genesis_dir_name =
+  let digest =
+    (*include all the compile time constants that would affect the genesis
+    ledger and the proof*)
+    Blake2.digest_string
+      ( ( List.map
+            [ curve_size
+            ; Snark_params.ledger_depth
+            ; fake_accounts_target
+            ; Consensus.Constants.c
+            ; Consensus.Constants.k ]
+            ~f:Int.to_string
+        |> String.concat ~sep:"" )
+      ^ proof_level ^ genesis_ledger )
+    |> Blake2.to_hex
+  in
+  let digest_short =
+    let len = 16 in
+    if String.length digest - len <= 0 then digest
+    else String.sub digest ~pos:(String.length digest - len) ~len
+  in
+  "coda_genesis" ^ "_" ^ Coda_version.commit_id ^ "_" ^ digest_short
 
 let brew_install_path =
   match

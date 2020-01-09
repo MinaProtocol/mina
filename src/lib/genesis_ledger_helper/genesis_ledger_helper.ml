@@ -8,6 +8,9 @@ let retrieve_genesis_state dir_opt ~logger :
     (Ledger.t lazy_t * Proof.t) Deferred.t =
   let open Cache_dir in
   let tar_filename = Cache_dir.genesis_dir_name ^ ".tar.gz" in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "Retrieving the genesis tar file $filename"
+    ~metadata:[("filename", `String tar_filename)] ;
   let s3_bucket_prefix =
     "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net" ^/ tar_filename
   in
@@ -102,10 +105,10 @@ let retrieve_genesis_state dir_opt ~logger :
       res_or_fail dir res
   | None -> (
       let directories =
-        [ manual_install_path
+        [ autogen_path
+        ; manual_install_path
         ; brew_install_path
-        ; Cache_dir.s3_install_path
-        ; autogen_path ]
+        ; Cache_dir.s3_install_path ]
       in
       match%bind
         Deferred.List.fold directories ~init:None ~f:(fun acc dir ->
