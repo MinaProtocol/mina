@@ -60,10 +60,78 @@ module Bigint (P : Prefix) (F : Ctypes.FOREIGN) = struct
     foreign (prefix "find_wnaf") (size_t @-> typ @-> returning (ptr void))
 end
 
+module VerifierIndex
+    (P : Prefix)
+    (Index : Type)
+    (Urs : Type)
+    (G1Affine : Type)
+    (F : Ctypes.FOREIGN) =
+struct
+  include (
+    struct
+        type t = unit ptr
+
+        let typ = ptr void
+      end :
+      Type )
+
+  open F
+
+  let prefix = P.prefix
+
+  let delete = foreign (prefix "delete") (typ @-> returning void)
+
+  let create = foreign (prefix "create") (Index.typ @-> returning typ)
+
+  let urs = foreign (prefix "urs") (typ @-> returning Urs.typ)
+
+  let make =
+    foreign (prefix "make")
+      ( size_t @-> size_t @-> size_t @-> size_t @-> Urs.typ @-> G1Affine.typ
+      @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ
+      @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ
+      @-> returning typ )
+end
+
+module URS
+    (P : Prefix)
+    (G1Affine : Type)
+    (FieldVector : Type)
+    (F : Ctypes.FOREIGN) =
+struct
+  include (
+    struct
+        type t = unit ptr
+
+        let typ = ptr void
+      end :
+      Type )
+
+  open P
+  open F
+
+  let create = foreign (prefix "create") (size_t @-> returning typ)
+
+  let read = foreign (prefix "read") (string @-> returning typ)
+
+  let write = foreign (prefix "write") (typ @-> string @-> returning void)
+
+  let lagrange_commitment =
+    foreign
+      (prefix "lagrange_commitment")
+      (typ @-> size_t @-> size_t @-> size_t @-> returning G1Affine.typ)
+
+  let commit_subdomain =
+    foreign
+      (prefix "commit_subdomain")
+      (typ @-> size_t @-> size_t @-> FieldVector.typ @-> returning G1Affine.typ)
+end
+
 module Index
     (P : Prefix)
     (Constraint_matrix : Type)
     (G1Affine : Type)
+    (URS : Type)
     (F : Ctypes.FOREIGN) =
 struct
   open F
@@ -80,7 +148,8 @@ struct
 
   let create =
     foreign (prefix "create")
-      (M.typ @-> M.typ @-> M.typ @-> size_t @-> size_t @-> returning typ)
+      ( M.typ @-> M.typ @-> M.typ @-> size_t @-> size_t @-> URS.typ
+      @-> returning typ )
 
   let m_poly_comm m f =
     foreign
@@ -93,6 +162,16 @@ struct
     let map3 (a, b, c) f = (f a, f b, f c) in
     let polys = ("row", "col", "val") and mats = ("a", "b", "c") in
     map3 mats (fun m -> map3 polys (fun p -> m_poly_comm m p))
+
+  let metadata s = foreign (prefix s) (typ @-> returning size_t)
+
+  let num_variables = metadata "num_variables"
+
+  let public_inputs = metadata "public_inputs"
+
+  let nonzero_entries = metadata "nonzero_entries"
+
+  let max_degree = metadata "max_degree"
 end
 
 module Vector (P : Prefix) (E : Type) (F : Ctypes.FOREIGN) = struct
@@ -137,19 +216,30 @@ struct
   module Affine = struct
     let prefix = with_prefix (prefix "affine")
 
-    include (
-      struct
-          type t = unit ptr
+    module T : Type = struct
+      type t = unit ptr
 
-          let typ = ptr void
-        end :
-        Type )
+      let typ = ptr void
+    end
+
+    include T
 
     let x = foreign (prefix "x") (typ @-> returning BaseField.typ)
 
     let y = foreign (prefix "y") (typ @-> returning BaseField.typ)
 
+    let create =
+      foreign (prefix "create")
+        (BaseField.typ @-> BaseField.typ @-> returning typ)
+
     let delete = foreign (prefix "delete") (typ @-> returning void)
+
+    module Vector =
+      Vector (struct
+          let prefix = prefix
+        end)
+        (T)
+        (F)
   end
 
   let delete = foreign (prefix "delete") (typ @-> returning void)
@@ -220,6 +310,22 @@ struct
     foreign (prefix "create")
       (Index.typ @-> FieldVector.typ @-> FieldVector.typ @-> returning typ)
 
+  let make =
+    foreign (prefix "make")
+      ( FieldVector.typ @-> AffineCurve.typ @-> AffineCurve.typ
+      @-> AffineCurve.typ @-> AffineCurve.typ @-> AffineCurve.typ
+      @-> AffineCurve.typ @-> AffineCurve.typ @-> AffineCurve.typ
+      @-> AffineCurve.typ @-> AffineCurve.typ @-> AffineCurve.typ
+      @-> AffineCurve.typ @-> AffineCurve.typ @-> AffineCurve.typ
+      @-> AffineCurve.typ @-> ScalarField.typ @-> ScalarField.typ
+      @-> ScalarField.typ @-> ScalarField.typ @-> ScalarField.typ
+      @-> ScalarField.typ @-> ScalarField.typ @-> ScalarField.typ
+      @-> ScalarField.typ @-> ScalarField.typ @-> ScalarField.typ
+      @-> ScalarField.typ @-> ScalarField.typ @-> ScalarField.typ
+      @-> ScalarField.typ @-> ScalarField.typ @-> ScalarField.typ
+      @-> ScalarField.typ @-> ScalarField.typ @-> ScalarField.typ
+      @-> returning typ )
+
   let delete = foreign (prefix "delete") (typ @-> returning void)
 
   let f name f_typ = foreign (prefix name) (typ @-> returning f_typ)
@@ -232,15 +338,33 @@ struct
 
   let h1_comm = f "h1_comm" AffineCurve.typ
 
-  let g1_comm = f "g1_comm" AffineCurve.typ
-
   let h2_comm = f "h2_comm" AffineCurve.typ
-
-  let g2_comm = f "g2_comm" AffineCurve.typ
 
   let h3_comm = f "h3_comm" AffineCurve.typ
 
-  let g3_comm = f "g3_comm" AffineCurve.typ
+  module Commitment_with_degree_bound = struct
+    include (
+      struct
+          type t = unit ptr
+
+          let typ = ptr void
+        end :
+        Type )
+
+    let prefix = with_prefix (P.prefix "commitment_with_degree_bound")
+
+    let f i = foreign (prefix i) (typ @-> returning AffineCurve.typ)
+
+    let f0 = f "0"
+
+    let f1 = f "1"
+  end
+
+  let g1_comm_nocopy = f "g1_comm_nocopy" Commitment_with_degree_bound.typ
+
+  let g2_comm_nocopy = f "g2_comm_nocopy" Commitment_with_degree_bound.typ
+
+  let g3_comm_nocopy = f "g3_comm_nocopy" Commitment_with_degree_bound.typ
 
   let w_eval = f "w_eval" ScalarField.typ
 
@@ -275,6 +399,58 @@ struct
   let col_evals_nocopy = f "col_evals_nocopy" Evals.typ
 
   let val_evals_nocopy = f "val_evals_nocopy" Evals.typ
+end
+
+module Oracles
+    (P : Prefix)
+    (Field : Type)
+    (VerifierIndex : Type)
+    (Proof : Type)
+    (F : Ctypes.FOREIGN) =
+struct
+  include (
+    struct
+        type t = unit ptr
+
+        let typ = ptr void
+      end :
+      Type )
+
+  open F
+
+  let prefix = P.prefix
+
+  let delete = foreign (prefix "delete") (typ @-> returning void)
+
+  let create =
+    foreign (prefix "create")
+      (VerifierIndex.typ @-> Proof.typ @-> returning typ)
+
+  let element name = foreign (prefix name) (typ @-> returning Field.typ)
+
+  let alpha = element "alpha"
+
+  let eta_a = element "eta_a"
+
+  let eta_b = element "eta_b"
+
+  let eta_c = element "eta_c"
+
+  let beta1 = element "beta1"
+
+  let beta2 = element "beta2"
+
+  let beta3 = element "beta3"
+
+  let r_k = element "r_k"
+
+  let batch = element "batch"
+
+  let r = element "r"
+
+  let x_hat_beta1 = element "x_hat_beta1"
+
+  let digest_before_evaluations = element "digest_before_evaluations"
 end
 
 module Field
@@ -423,11 +599,29 @@ module Full (F : Ctypes.FOREIGN) = struct
       (Fp)
       (F)
 
+  module Fp_urs =
+    URS (struct
+        let prefix = with_prefix (prefix "fp_urs")
+      end)
+      (G1.Affine)
+      (Fp.Vector)
+      (F)
+
   module Fp_index =
     Index (struct
         let prefix = with_prefix (prefix "fp_index")
       end)
       (Fp.Constraint_matrix)
+      (G1.Affine)
+      (Fp_urs)
+      (F)
+
+  module Fp_verifier_index =
+    VerifierIndex (struct
+        let prefix = with_prefix (prefix "fp_verifier_index")
+      end)
+      (Fp_index)
+      (Fp_urs)
       (G1.Affine)
       (F)
 
@@ -439,5 +633,14 @@ module Full (F : Ctypes.FOREIGN) = struct
       (Fp)
       (Fp_index)
       (Fp.Vector)
+      (F)
+
+  module Fp_oracles =
+    Oracles (struct
+        let prefix = with_prefix (prefix "fp_oracles")
+      end)
+      (Fp)
+      (Fp_verifier_index)
+      (Fp_proof)
       (F)
 end
