@@ -49,7 +49,95 @@ module type Input_intf = sig
   end
 end
 
-module Make (F : Input_intf) = struct
+module type S = sig
+  type t [@@deriving sexp, bin_io]
+
+  val to_bigint : t -> B.R.t
+
+  val of_bigint : B.R.t -> t
+
+  val of_int : int -> t
+
+  val one : t
+
+  val zero : t
+
+  val add : t -> t -> t
+
+  val sub : t -> t -> t
+
+  val mul : t -> t -> t
+
+  val div : t -> t -> t
+
+  val inv : t -> t
+
+  val square : t -> t
+
+  val sqrt : t -> t
+
+  val is_square : t -> bool
+
+  val equal : t -> t -> bool
+
+  val size_in_bits : int
+
+  val to_bits : t -> bool list
+
+  val of_bits : bool list -> t
+
+  val print : t -> unit
+
+  val random : unit -> t
+
+  val negate : t -> t
+
+  val ( + ) : t -> t -> t
+
+  val ( - ) : t -> t -> t
+
+  val ( * ) : t -> t -> t
+
+  val ( / ) : t -> t -> t
+
+  module Mutable : sig
+    val add : t -> other:t -> unit
+
+    val mul : t -> other:t -> unit
+
+    val sub : t -> other:t -> unit
+
+    val copy : over:t -> t -> unit
+  end
+
+  val ( += ) : t -> t -> unit
+
+  val ( *= ) : t -> t -> unit
+
+  val ( -= ) : t -> t -> unit
+
+  val delete : t -> unit
+
+  module Vector : sig
+    type elt = t
+
+    type t = elt Snarky.Vector.t
+
+    val typ : t Ctypes.typ
+
+    val delete : t -> unit
+
+    val create : unit -> t
+
+    val get : t -> int -> elt
+
+    val emplace_back : t -> elt -> unit
+
+    val length : t -> int
+  end
+end
+
+module Make (F : Input_intf) : S with type t = F.t = struct
   open F
 
   type t = F.t sexp_opaque [@@deriving sexp]
