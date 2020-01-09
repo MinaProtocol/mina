@@ -4,46 +4,50 @@ open Coda_base
 
 type exn += Genesis_state_initialization_error
 
-let retrieve_genesis_state dir_opt ~logger :
+let retrieve_genesis_state dir_opt ~logger ~conf_dir :
     (Ledger.t lazy_t * Proof.t) Deferred.t =
   let open Cache_dir in
   let tar_filename = Cache_dir.genesis_dir_name ^ ".tar.gz" in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-    "Retrieving the genesis tar file $filename"
+    "Looking for the genesis tar file $filename"
     ~metadata:[("filename", `String tar_filename)] ;
   let s3_bucket_prefix =
     "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net" ^/ tar_filename
   in
-  let extract dir =
+  let extract tar_dir =
+    let target_dir = conf_dir ^/ Cache_dir.genesis_dir_name in
     match%map
       Monitor.try_with_or_error ~extract_exn:true (fun () ->
-          let genesis_dir = dir ^/ Cache_dir.genesis_dir_name in
-          if Core.Sys.file_exists genesis_dir = `Yes then Deferred.return ()
-          else
-            (*Look for the tar and extract*)
-            let tar_file = genesis_dir ^ ".tar.gz" in
-            let%map _result =
-              Process.run_exn ~prog:"tar"
-                ~args:["-C"; dir; "-xzf"; tar_file]
-                ()
-            in
-            () )
+          (*Delete any old genesis state*)
+          let%bind () =
+            File_system.remove_dir (conf_dir ^/ "coda_genesis_*")
+          in
+          (*Look for the tar and extract*)
+          let tar_file = tar_dir ^/ Cache_dir.genesis_dir_name ^ ".tar.gz" in
+          let%map _result =
+            Process.run_exn ~prog:"tar"
+              ~args:["-C"; conf_dir; "-xzf"; tar_file]
+              ()
+          in
+          () )
     with
     | Ok () ->
-        ()
+        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
+          "Found genesis tar file at $source and extracted it to $path"
+          ~metadata:[("source", `String tar_dir); ("path", `String target_dir)]
     | Error e ->
         Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
           "Error extracting genesis ledger and proof : $error"
           ~metadata:[("error", `String (Error.to_string_hum e))]
   in
-  let retrieve dir =
+  let retrieve tar_dir =
     Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
       "Retrieving genesis ledger and genesis proof from $path"
-      ~metadata:[("path", `String dir)] ;
-    let%bind () = extract dir in
-    let dir = dir ^/ Cache_dir.genesis_dir_name in
-    let ledger_dir = dir ^/ "ledger" in
-    let proof_file = dir ^/ "genesis_proof" in
+      ~metadata:[("path", `String tar_dir)] ;
+    let%bind () = extract tar_dir in
+    let extract_target = conf_dir ^/ Cache_dir.genesis_dir_name in
+    let ledger_dir = extract_target ^/ "ledger" in
+    let proof_file = extract_target ^/ "genesis_proof" in
     if
       Core.Sys.file_exists ledger_dir = `Yes
       && Core.Sys.file_exists proof_file = `Yes
@@ -82,12 +86,12 @@ let retrieve_genesis_state dir_opt ~logger :
       in
       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
         "Successfully retrieved genesis ledger and genesis proof from $path"
-        ~metadata:[("path", `String dir)] ;
+        ~metadata:[("path", `String tar_dir)] ;
       Some (genesis_ledger, base_proof) )
     else (
       Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
         "Error retrieving genesis ledger and genesis proof from $path"
-        ~metadata:[("path", `String dir)] ;
+        ~metadata:[("path", `String tar_dir)] ;
       Deferred.return None )
   in
   let res_or_fail dir_str = function
@@ -95,8 +99,9 @@ let retrieve_genesis_state dir_opt ~logger :
         res
     | None ->
         Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
-          "Could not retrieve genesis ledger and genesis proof from $dir"
-          ~metadata:[("dir", `String dir_str)] ;
+          "Could not retrieve genesis ledger and genesis proof from paths \
+           $paths"
+          ~metadata:[("paths", `String dir_str)] ;
         raise Genesis_state_initialization_error
   in
   match dir_opt with
@@ -135,5 +140,5 @@ let retrieve_genesis_state dir_opt ~logger :
           in
           let%map res = retrieve Cache_dir.s3_install_path in
           res_or_fail
-            (String.concat ~sep:"," (s3_install_path :: directories))
+            (String.concat ~sep:"," (s3_bucket_prefix :: directories))
             res )

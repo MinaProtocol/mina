@@ -341,7 +341,7 @@ let daemon logger =
        let coda_initialization_deferred () =
          let%bind genesis_ledger, base_proof =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
-             ~logger
+             ~logger ~conf_dir
          in
          let%bind config =
            match%map

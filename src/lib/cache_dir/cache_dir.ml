@@ -28,24 +28,25 @@ let genesis_dir_name =
   let digest =
     (*include all the compile time constants that would affect the genesis
     ledger and the proof*)
-    Blake2.digest_string
-      ( ( List.map
-            [ curve_size
-            ; Snark_params.ledger_depth
-            ; fake_accounts_target
-            ; Consensus.Constants.c
-            ; Consensus.Constants.k ]
-            ~f:Int.to_string
-        |> String.concat ~sep:"" )
-      ^ proof_level ^ genesis_ledger )
-    |> Blake2.to_hex
+    let str =
+      ( List.map
+          [ curve_size
+          ; Snark_params.ledger_depth
+          ; fake_accounts_target
+          ; Consensus.Constants.c
+          ; Consensus.Constants.k ]
+          ~f:Int.to_string
+      |> String.concat ~sep:"" )
+      ^ proof_level ^ genesis_ledger
+    in
+    Blake2.digest_string str |> Blake2.to_hex
   in
   let digest_short =
     let len = 16 in
     if String.length digest - len <= 0 then digest
-    else String.sub digest ~pos:(String.length digest - len) ~len
+    else String.sub digest ~pos:0 ~len
   in
-  "coda_genesis" ^ "_" ^ Coda_version.commit_id ^ "_" ^ digest_short
+  "coda_genesis" ^ "_" ^ Coda_version.commit_id_short ^ "_" ^ digest_short
 
 let brew_install_path =
   match
