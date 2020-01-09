@@ -163,6 +163,8 @@ module Group (Impl : Snarky.Snark_intf.Run) = struct
       val create : Constant.t -> t
     end
 
+    val constant : Constant.t -> t
+
     val multiscale_known :
       (Boolean.var list * Scaling_precomputation.t) array -> t
   end
@@ -185,13 +187,19 @@ module Dlog_main_inputs = struct
 
     module Impl : Snarky.Snark_intf.Run with type prover_state = unit
 
-    module Fp_params : sig
-      val p : Bigint.t
+    module Fp : sig
+      type t
+
+      val order : Bigint.t
 
       val size_in_bits : int
+
+      val to_bigint : t -> Impl.Bigint.t
+
+      val of_bigint : Impl.Bigint.t -> t
     end
 
-    module G1 : Group(Impl).S
+    module G1 : Group(Impl).S with type t = Impl.Field.t * Impl.Field.t
 
     module Generators : sig
       val g : G1.t
@@ -204,7 +212,7 @@ module Dlog_main_inputs = struct
     module Input_domain : sig
       val domain : Domain.t
 
-      val lagrange_commitments : G1.t array
+      val lagrange_commitments : G1.Constant.t array
     end
 
     val sponge_params : Impl.Field.t Sponge_lib.Params.t
@@ -215,12 +223,16 @@ end
 
 module Pairing_main_inputs = struct
   module type S = sig
+    val crs_max_degree : int
+
     module Impl : Snarky.Snark_intf.Run with type prover_state = unit
 
-    module Fq_constant : sig
+    module Fq : sig
       type t
 
-      val size_in_bits : int
+      val to_bits : t -> bool list
+
+      val of_bits : bool list -> t
     end
 
     module G : sig
