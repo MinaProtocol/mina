@@ -1,13 +1,3 @@
-module Make (Impl : Snarky.Snark_intf.Run) = struct
-  open Impl
-
-  type t = Boolean.var list
-
-  let length = 128
-
-  module Constant = struct
-    type t = bool list
-  end
-
-  let typ = Typ.list ~length Boolean.typ
-end
+open Pickles_types
+module Constant = Limb_vector.Constant.Make (Nat.N2)
+module Make (Impl : Snarky.Snark_intf.Run) = Limb_vector.Make (Impl) (Nat.N2)
