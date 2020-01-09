@@ -1290,7 +1290,7 @@ let%test_module "test" =
       let open Deferred.Let_syntax in
       let diff =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
-          ~get_completed_work:stmt_to_work
+          ~get_completed_work:stmt_to_work ~state_body_hash
           ~coinbase_receiver:(`Other coinbase_receiver)
       in
       let diff' = Staged_ledger_diff.forget diff in
@@ -1977,7 +1977,7 @@ let%test_module "test" =
       let coinbase_data =
         let create amount fee_transfer =
           Coinbase.create ~amount
-            ~proposer:(Staged_ledger_diff.creator diff)
+            ~receiver:(Staged_ledger_diff.coinbase_receiver diff)
             ~fee_transfer ~state_body_hash
           |> Or_error.ok_exn
         in

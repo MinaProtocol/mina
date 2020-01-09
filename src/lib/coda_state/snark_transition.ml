@@ -17,7 +17,7 @@ module Poly = struct
         ; supply_increase: 'amount
         ; ledger_proof: Proof.Stable.V1.t option
         ; coinbase_receiver: 'proposer_pk
-        ; coinbase_amount: 'amount
+        ; coinbase_amount: 'amount }
       [@@deriving bin_io, to_yojson, sexp, fields, version]
     end
   end]

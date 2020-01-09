@@ -767,7 +767,7 @@ end
 
 let genesis ~genesis_ledger ~base_proof =
   let genesis_protocol_state =
-    Coda_state.Genesis_protocol_state.t ~genesis_ledger
+    Coda_state.Genesis_protocol_state.t ~genesis_ledger in
   let creator= fst Consensus_state_hooks.genesis_winner in
   let empty_diff =
     { Staged_ledger_diff.diff=

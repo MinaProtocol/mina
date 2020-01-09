@@ -172,7 +172,7 @@ end]
 type t = Stable.Latest.t =
   { diff: Diff.t
   ; creator: Public_key.Compressed.t
-  ; coinbase_receiver: Public_key.Compressed.Stable.V1.t
+  ; coinbase_receiver: Public_key.Compressed.t
   ; state_body_hash: State_body_hash.t }
 [@@deriving sexp, to_yojson, fields]
 
