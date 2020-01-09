@@ -167,7 +167,9 @@ module Helper = struct
 
       type output = string [@@deriving yojson]
 
-      let name = "closeStream"
+      (* This RPC remains unused, see below for the commented out
+      Close_stream usage *)
+      let[@warning "-32"] name = "closeStream"
     end
 
     module Remove_stream_handler = struct
@@ -399,7 +401,11 @@ module Helper = struct
       (fun () ->
         let%map () =
           match who_closed with
-          | `Us -> (
+          | `Us ->
+              (* FIXME related to https://github.com/libp2p/go-libp2p-circuit/issues/18
+                 "preemptive" or half-closing a stream doesn't actually seem supported:
+                 after closing it we can't read anymore.*)
+              (*
               match%map
                 do_rpc net (module Rpcs.Close_stream) {stream_idx= stream.idx}
               with
@@ -410,10 +416,12 @@ module Helper = struct
                     ()
               | Error e ->
                   Error.raise e )
+              *)
+              Deferred.unit
           | `Them ->
               (* Helper notified us that the Go side closed its write pipe. *)
               Pipe.close stream.incoming_w ;
-              Deferred.return ()
+              Deferred.unit
         in
         let double_close () =
           Logger.error net.logger ~module_:__MODULE__ ~location:__LOC__
