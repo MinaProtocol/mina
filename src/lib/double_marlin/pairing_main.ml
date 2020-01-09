@@ -5,6 +5,7 @@ open Import
 open Util
 open Types.Pairing_based
 open Pickles_types
+open Common
 
 module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
   open Inputs
@@ -19,13 +20,21 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let size_in_bits = Fp.size_in_bits
 
     module Constant = struct
-      type t = Fp.Constant.t * bool
+      type t = Fq.t
     end
 
     type t = (* Low bits, high bit *)
       Fp.t * Boolean.var
 
-    let typ = Typ.tuple2 Fp.typ Boolean.typ
+    let typ =
+      Typ.transport
+        (Typ.tuple2 Fp.typ Boolean.typ)
+        ~there:(fun x ->
+          let low, high = Common.split_last (Fq.to_bits x) in
+          (Fp.Constant.project low, high) )
+        ~back:(fun (low, high) ->
+          let low, _ = Common.split_last (Fp.Constant.unpack low) in
+          Fq.of_bits (low @ [high]) )
 
     let to_bits (x, b) = Field.unpack x ~length:(Field.size_in_bits - 1) @ [b]
   end
@@ -46,6 +55,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
           (Fq.Constant.t, G.Constant.t) Pairing_based.Openings.Bulletproof.t t
       | Prev_app_state : App_state.Constant.t t
       | Prev_sg : G.Constant.t t
+      | Prev_x_hat_beta_1 : Field.Constant.t t
       | Me_only :
           ( G.Constant.t
           , App_state.Constant.t )
@@ -56,8 +66,8 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
           , Fp.Constant.t
           , Challenge.Constant.t
           , Fq.Constant.t
-          , Digest.Unpacked.Constant.t
-          , Digest.Unpacked.Constant.t )
+          , Digest.Constant.t
+          , Digest.Constant.t )
           Dlog_based.Proof_state.t
           t
   end
@@ -183,22 +193,16 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     in
     let sample () = Sponge.squeeze sponge ~length:Challenge.length in
     let open Pairing_marlin_types.Messages in
-    (* Compute the lagrange interpolation of the input by ourself.
-        Add it to the opening.
-
-        These scalings are only 2 constraints per bit.
-        Could be worse!
-    *)
     let x_hat =
-      (* Must handle 1 ! *)
       G.multiscale_known
         (Array.mapi public_input ~f:(fun i x ->
-             (x, lagrange_precomputations.(i)) ))
+             (x, lagrange_precomputations.(i + 1)) ))
+      |> G.(( + ) (constant Input_domain.lagrange_commitments.(0)))
     in
+    absorb sponge PC x_hat ;
     (* No need to absorb the public input into the sponge as we've already
       absorbed x'_hat, a0, and y0 *)
     let w_hat = receive PC w_hat in
-    let s = receive PC s in
     let z_hat_a = receive PC z_hat_a in
     let z_hat_b = receive PC z_hat_b in
     let alpha = sample () in
@@ -223,6 +227,19 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       Sponge.squeeze sponge ~length:Digest.length
     in
     (* xi, r are sampled here using the other sponge. *)
+
+    (* At this point we would be able to compute combined inner product,
+       using bulletproof_challenges_old (corresponding to sg_old).
+
+       However, that requires access to the old bulletproof challenges,
+       which we no longer have here. We need to somehow pass thru the old bp
+       challenges to the next verifier so that they can compute
+
+       f_{old bullet proof challenges}(beta_i).
+
+       Perhaps it was handed to us as a hash / we pass it thru the me only?
+    *)
+
     (* No need to expose the polynomial evaluations as deferred values as they're
        not needed here for the incremental verification. All we need is a_hat and
        "combined_inner_product".
@@ -236,7 +253,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         ~polynomials:
           ( [ x_hat
             ; w_hat
-            ; s
             ; z_hat_a
             ; z_hat_b
             ; h_1
@@ -290,73 +306,84 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
      Maybe we can do that with the x_hat evaluation?
   *)
 
-  let combined_evaluation ~xi Vector.(eval0 :: evals) =
-    List.fold_left (Vector.to_list evals) ~init:eval0 ~f:(fun acc eval ->
-        Fp.((xi * acc) + eval) )
-
   module Marlin_checks = Marlin_checks.Make (Impl)
 
   let finalize_other_proof ~domain_k ~domain_h ~sponge
       ({xi; r; r_xi_sum; marlin} :
         _ Types.Dlog_based.Proof_state.Deferred_values.t) =
     let open Vector in
+    let open Pairing_marlin_types in
     (*
     let sponge =
       let s = Sponge.create sponge_params in
       Sponge.absorb s (`Bits digest_before_evaluations) ;
       s
     in *)
-    let beta_1_evals, beta_2_evals, beta_3_evals =
-      exists (Pairing_marlin_types.Evals.typ Field.typ) ~request:(fun () ->
-          Requests.Prev_evals )
+    let evals =
+      exists (Evals.typ Field.typ) ~request:(fun () -> Requests.Prev_evals)
+    in
+    let x_hat_beta_1 =
+      exists Field.typ ~request:(fun () -> Requests.Prev_x_hat_beta_1)
     in
     let absorb_field x = Sponge.absorb sponge (`Field x) in
-    Vector.iter beta_1_evals ~f:absorb_field ;
-    Vector.iter beta_2_evals ~f:absorb_field ;
-    Vector.iter beta_3_evals ~f:absorb_field ;
+    Vector.iter (Evals.to_vector evals) ~f:absorb_field ;
     let open Fp in
     let xi_actual = Sponge.squeeze sponge ~length:Challenge.length in
     let r_actual = Sponge.squeeze sponge ~length:Challenge.length in
+    let combined_evaluation batch pt without_bound =
+      Pcs_batch.combine_evaluations batch ~crs_max_degree ~mul ~add ~one
+        ~evaluation_point:pt ~xi without_bound []
+    in
+    let beta1, beta2, beta3 =
+      Evals.to_combined_vectors ~x_hat:x_hat_beta_1 evals
+    in
     Boolean.all
       [ Fp.equal (Field.pack xi_actual) xi
       ; Fp.equal (Field.pack r_actual) r
       ; (let r_xi_sum_actual =
            r
-           * ( combined_evaluation ~xi beta_1_evals
+           * ( combined_evaluation Common.pairing_beta_1_pcs_batch
+                 marlin.beta_1 beta1
              + r
-               * ( combined_evaluation ~xi beta_2_evals
-                 + (r * combined_evaluation ~xi beta_3_evals) ) )
+               * ( combined_evaluation Common.pairing_beta_2_pcs_batch
+                     marlin.beta_2 beta2
+                 + r
+                   * combined_evaluation Common.pairing_beta_3_pcs_batch
+                       marlin.beta_3 beta3 ) )
          in
          Fp.equal r_xi_sum r_xi_sum_actual)
-      ; Marlin_checks.check ~input_domain:Input_domain.domain ~domain_h
-          ~domain_k marlin beta_1_evals beta_2_evals beta_3_evals ]
+      ; Marlin_checks.check ~x_hat_beta_1 ~input_domain:Input_domain.domain
+          ~domain_h ~domain_k marlin evals ]
 
-  let hash_me_only t =
-    let elts =
-      Types.Pairing_based.Proof_state.Me_only.to_field_elements t
-        ~app_state:App_state.to_field_elements ~g:G.to_field_elements
+  let hash_me_only ~index =
+    let open Types.Pairing_based.Proof_state.Me_only in
+    let after_index =
+      let sponge = Sponge.create sponge_params in
+      Array.iter (index_to_field_elements ~g:G.to_field_elements index)
+        ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
+      sponge
     in
-    let sponge = Sponge.create sponge_params in
-    Array.iter elts ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
-    Sponge.squeeze sponge ~length:Digest.length
+    stage (fun t ->
+        let sponge = Sponge.copy after_index in
+        Array.iter
+          ~f:(fun x -> Sponge.absorb sponge (`Field x))
+          (to_field_elements_without_index t
+             ~app_state:App_state.to_field_elements ~g:G.to_field_elements) ;
+        Sponge.squeeze sponge ~length:Digest.length )
 
-  let decompress_me_only digest =
-    let (me_only : _ Types.Pairing_based.Proof_state.Me_only.t) =
-      exists (Types.Pairing_based.Proof_state.Me_only.typ G.typ App_state.typ)
-        ~request:(fun () -> Requests.Me_only)
-    in
-    Field.Assert.equal digest (Field.pack (hash_me_only me_only)) ;
-    me_only
-
-  let pack_data (fp, fq, challenge, fq_challenge, digest) =
+  let pack_data (fp, challenge, digest) =
     Array.concat
       [ Array.of_list_map (Vector.to_list fp) ~f:(fun x ->
-            Bitstring_lib.Bitstring.Lsb_first.to_list (Fp.unpack_full x) )
+            let t =
+              Bitstring_lib.Bitstring.Lsb_first.to_list (Fp.unpack_full x)
+            in
+            t )
+        (*
       ; Array.of_list_map (Vector.to_list fq) ~f:(fun (low_bits, high_bit) ->
             let low_bits = Fp.unpack ~length:(Fq.size_in_bits - 1) low_bits in
             low_bits @ [high_bit] )
-      ; Vector.to_array challenge
-      ; Vector.to_array fq_challenge
+*)
+      ; Vector.to_array challenge (*       ; Vector.to_array fq_challenge *)
       ; Vector.to_array digest ]
 
   let main
@@ -365,17 +392,26 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
                { marlin
                ; combined_inner_product
                ; xi
-               ; bulletproof_challenges
+               ; bulletproof_challenges: (_, _) Bulletproof_challenge.t array
                ; a_hat }
            ; sponge_digest_before_evaluations
            ; was_base_case
            ; me_only= me_only_digest }
        ; pass_through } :
         _ Statement.t) =
+    let me_only =
+      exists
+        ~request:(fun () -> Requests.Me_only)
+        (Types.Pairing_based.Proof_state.Me_only.typ G.typ App_state.typ)
+    in
     let { Types.Pairing_based.Proof_state.Me_only.app_state
         ; dlog_marlin_index
         ; sg } =
-      decompress_me_only me_only_digest
+      me_only
+    in
+    let hash_me_only = unstage (hash_me_only ~index:dlog_marlin_index) in
+    let () =
+      Field.Assert.equal me_only_digest (Field.pack (hash_me_only me_only))
     in
     let ( prev_deferred_values
         , prev_sponge_digest_before_evaluations
@@ -383,7 +419,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       let state =
         exists
           (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Fq.typ
-             Digest.Unpacked.typ Digest.Unpacked.typ) ~request:(fun () ->
+             Digest.typ Digest.typ) ~request:(fun () ->
             Requests.Prev_proof_state )
       in
       ( Types.Dlog_based.Proof_state.Deferred_values.map_challenges ~f:Fp.pack
@@ -400,6 +436,10 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       let prev_me_only =
         hash_me_only {app_state= prev_app_state; dlog_marlin_index; sg= sg_old}
       in
+      (* This statement needs to have exposed f_{old challenges}(old_challenge_point).
+         But then I think we need to expose that for the next guy who will compute
+         the combined_inner_product?
+      *)
       { Types.Dlog_based.Statement.pass_through= prev_me_only
       ; proof_state= prev_proof_state }
     in
@@ -430,12 +470,12 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
              ~length:(Array.length bulletproof_challenges))
           ~request:(fun () -> Requests.Prev_openings_proof)
       in
+      let public_input =
+        pack_data (Types.Dlog_based.Statement.to_data prev_statement)
+      in
       incrementally_verify_proof ~xi ~verification_key:dlog_marlin_index
-        ~sponge
-        ~public_input:
-          (pack_data (Types.Dlog_based.Statement.to_data prev_statement))
-        ~sg_old ~combined_inner_product ~advice:{a_hat; sg} ~messages
-        ~openings_proof
+        ~sponge ~public_input ~sg_old ~combined_inner_product
+        ~advice:{a_hat; sg} ~messages ~openings_proof
     in
     let is_base_case = App_state.is_base_case app_state in
     Boolean.Assert.(is_base_case = was_base_case) ;
