@@ -79,66 +79,68 @@ module Dlog_based = struct
         { xi: 'challenge
         ; r: 'challenge
         ; r_xi_sum: 'fp
-        ; marlin: ('challenge, 'fp) Marlin.t
-              (* We could reuse marlin.beta_1 or something instead of this. *)
-        ; sg_challenge_point: 'fq_challenge
-        ; sg_evaluation: 'fq }
+        ; marlin: ('challenge, 'fp) Marlin.t }
 
-      let map_challenges
-          {xi; r; r_xi_sum; marlin; sg_challenge_point; sg_evaluation} ~f =
-        { xi= f xi
-        ; r= f r
-        ; r_xi_sum
-        ; marlin= Marlin.map_challenges marlin ~f
-        ; sg_challenge_point
-        ; sg_evaluation }
+      let map_challenges {xi; r; r_xi_sum; marlin} ~f =
+        {xi= f xi; r= f r; r_xi_sum; marlin= Marlin.map_challenges marlin ~f}
 
       open Snarky.H_list
 
-      let to_hlist {xi; r; r_xi_sum; marlin; sg_challenge_point; sg_evaluation}
-          =
-        [xi; r; r_xi_sum; marlin; sg_challenge_point; sg_evaluation]
+      let to_hlist {xi; r; r_xi_sum; marlin} = [xi; r; r_xi_sum; marlin]
 
-      let of_hlist
-          ([xi; r; r_xi_sum; marlin; sg_challenge_point; sg_evaluation] :
-            (unit, _) t) =
-        {xi; r; r_xi_sum; marlin; sg_challenge_point; sg_evaluation}
+      let of_hlist ([xi; r; r_xi_sum; marlin] : (unit, _) t) =
+        {xi; r; r_xi_sum; marlin}
 
       let typ chal fp fq =
         Snarky.Typ.of_hlistable
-          [chal; chal; fp; Marlin.typ chal fp; chal; fq]
+          [chal; chal; fp; Marlin.typ chal fp]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
 
     module Me_only = struct
-      type 'g1 t =
+      type ('g1, 'bulletproof_challenge) t =
         { pairing_marlin_index: 'g1 Abc.t Matrix_evals.t
-        ; pairing_marlin_acc: 'g1 Pairing_marlin_types.Accumulator.t }
+        ; pairing_marlin_acc: 'g1 Pairing_marlin_types.Accumulator.t
+        ; old_bulletproof_challenges: 'bulletproof_challenge array }
 
       let to_field_elements
-          { pairing_marlin_acc= {r_f_plus_r_v; r_pi; zr_pi}
-          ; pairing_marlin_index= {row; col; value} } ~g1:g1_to_field_elements
-          =
-        Array.append
-          (Array.concat_map [|r_f_plus_r_v; r_pi; zr_pi|] ~f:(fun g ->
-               Array.of_list (g1_to_field_elements g) ))
-          (Array.concat_map [|row; col; value|] ~f:(fun {a; b; c} ->
-               Array.concat_map [|a; b; c|] ~f:(fun g ->
-                   Array.of_list (g1_to_field_elements g) ) ))
+          { pairing_marlin_acc=
+              { opening_check= {r_f_minus_r_v_plus_rz_pi; r_pi}
+              ; degree_bound_checks=
+                  {shifted_accumulator; unshifted_accumulators} }
+          ; pairing_marlin_index= {row; col; value}
+          ; old_bulletproof_challenges } ~g1:g1_to_field_elements =
+        Array.concat
+          [ Array.concat_map [|row; col; value|] ~f:(fun {a; b; c} ->
+                Array.concat_map [|a; b; c|] ~f:(fun g ->
+                    Array.of_list (g1_to_field_elements g) ) )
+          ; old_bulletproof_challenges
+          ; Array.concat_map
+              (Array.append
+                 [|r_f_minus_r_v_plus_rz_pi; r_pi; shifted_accumulator|]
+                 (Vector.to_array unshifted_accumulators))
+              ~f:(fun g -> Array.of_list (g1_to_field_elements g)) ]
 
       open Snarky.H_list
 
-      let to_hlist {pairing_marlin_index; pairing_marlin_acc} =
-        [pairing_marlin_index; pairing_marlin_acc]
+      let to_hlist
+          {pairing_marlin_index; pairing_marlin_acc; old_bulletproof_challenges}
+          =
+        [pairing_marlin_index; pairing_marlin_acc; old_bulletproof_challenges]
 
-      let of_hlist ([pairing_marlin_index; pairing_marlin_acc] : (unit, _) t) =
-        {pairing_marlin_index; pairing_marlin_acc}
+      let of_hlist
+          ([ pairing_marlin_index
+           ; pairing_marlin_acc
+           ; old_bulletproof_challenges ] :
+            (unit, _) t) =
+        {pairing_marlin_index; pairing_marlin_acc; old_bulletproof_challenges}
 
-      let typ g1 =
+      let typ g1 chal ~length =
         Snarky.Typ.of_hlistable
           [ g1 |> Abc.typ |> Matrix_evals.typ
-          ; Pairing_marlin_types.Accumulator.typ g1 ]
+          ; Pairing_marlin_types.Accumulator.typ g1
+          ; Snarky.Typ.array ~length chal ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
@@ -170,13 +172,22 @@ module Dlog_based = struct
     type ('g, 's) t =
       {app_state: 's; dlog_marlin_index: 'g Abc.t Matrix_evals.t; sg: 'g}
 
-    let to_field_elements {app_state; dlog_marlin_index= {row; col; value}}
-        ~app_state:app_state_to_field_elements ~g:g_to_field_elements =
-      Array.append
-        (app_state_to_field_elements app_state)
-        (Array.concat_map [|row; col; value|] ~f:(fun {a; b; c} ->
-             Array.concat_map [|a; b; c|] ~f:(fun g ->
-                 Array.of_list (g_to_field_elements g) ) ))
+    let index_to_field_elements ({row; col; value} : _ Abc.t Matrix_evals.t)
+        ~g:g_to_field_elements =
+      Array.concat_map [|row; col; value|] ~f:(fun {a; b; c} ->
+          Array.concat_map [|a; b; c|] ~f:(fun g ->
+              Array.of_list (g_to_field_elements g) ) )
+
+    let to_field_elements {app_state; dlog_marlin_index; sg}
+        ~app_state:app_state_to_field_elements ~g =
+      Array.concat
+        [ index_to_field_elements ~g dlog_marlin_index
+        ; Array.of_list (g sg)
+        ; app_state_to_field_elements app_state ]
+
+    let to_field_elements_without_index {app_state; dlog_marlin_index= _; sg}
+        ~app_state:app_state_to_field_elements ~g =
+      Array.concat [Array.of_list (g sg); app_state_to_field_elements app_state]
 
     open Snarky.H_list
 
@@ -250,8 +261,6 @@ module Dlog_based = struct
                 { xi
                 ; r
                 ; r_xi_sum
-                ; sg_challenge_point
-                ; sg_evaluation
                 ; marlin=
                     { sigma_2
                     ; sigma_3
@@ -270,25 +279,19 @@ module Dlog_based = struct
       let challenge =
         [xi; r; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3]
       in
-      let fq_challenge = [sg_challenge_point] in
-      let fq = [sg_evaluation] in
       let digest = [sponge_digest_before_evaluations; me_only; pass_through] in
-      (fp, fq, challenge, fq_challenge, digest)
+      (fp, challenge, digest)
 
-    let of_data (fp, fq, challenge, fq_challenge, digest) =
+    let of_data (fp, challenge, digest) =
       let open Vector in
       let [sigma_2; sigma_3; r_xi_sum] = fp in
       let [xi; r; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3] =
         challenge
       in
-      let [sg_evaluation] = fq in
-      let [sg_challenge_point] = fq_challenge in
       let [sponge_digest_before_evaluations; me_only; pass_through] = digest in
       { proof_state=
           { deferred_values=
               { xi
-              ; sg_evaluation
-              ; sg_challenge_point
               ; r
               ; r_xi_sum
               ; marlin=
