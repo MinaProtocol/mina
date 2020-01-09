@@ -1,7 +1,5 @@
 open Core_kernel
-
-let weight = ref 0
-
+open Common
 module Bn382 = Snarky_bn382_backend.Pairing_based
 module Fq = Snarky_bn382_backend.Fq
 module Fp = Snarky_bn382_backend.Fp
@@ -43,6 +41,9 @@ let unrelated_g g =
   group_map_fp hash
 
 module Inputs = struct
+  let crs_max_degree = 1 lsl 22
+
+  module Fq = Fq
   module Impl = Snarky.Snark.Run.Make (Bn382) (Unit)
 
   let sponge_params_constant =
@@ -113,6 +114,10 @@ module Inputs = struct
   module Sponge = struct
     module S = struct
       type t = S.t
+
+      let copy = S.copy
+
+      let state = S.state
 
       let create ?init params = S.create ?init params
 
@@ -214,6 +219,8 @@ module Inputs = struct
 
     let ( + ) = T.add_exn
 
+    let constant = T.constant
+
     let multiscale_known = T.multiscale_known
 
     (* TODO: Make real *)
@@ -286,11 +293,13 @@ module Inputs = struct
   end
 end
 
+let crs_power (_n : int) = G1.one
+
 let pairing_marlin_acc_init =
   let open Snarky_bn382_backend in
-  let x = Fp.random () in
+  let x = fp_random_oracle __LOC__ in
   let commitment_to_id_poly = G1.scale G1.one x in
-  let eval_pt = Fp.random () in
+  let eval_pt = fp_random_oracle __LOC__ in
   let evaluation = eval_pt in
   let pi =
     (* (f(x) - evaluation) / (x - eval_pt)
@@ -299,38 +308,62 @@ let pairing_marlin_acc_init =
     *)
     G1.one
   in
+  let zr_pi = G1.scale pi eval_pt in
   Pickles_types.Pairing_marlin_types.Accumulator.map ~f:G1.to_affine_exn
-    { r_f_plus_r_v= G1.add commitment_to_id_poly (G1.scale G1.one evaluation)
-    ; r_pi= pi
-    ; zr_pi= G1.scale pi eval_pt }
+    { opening_check=
+        { r_f_minus_r_v_plus_rz_pi=
+            G1.(
+              commitment_to_id_poly
+              + negate (G1.scale G1.one evaluation)
+              + zr_pi)
+        ; r_pi= pi }
+    ; degree_bound_checks=
+        { shifted_accumulator=
+            G1.(
+              crs_power (Domain.size Inputs.domain_h - 1)
+              + crs_power (Domain.size Inputs.domain_k - 1))
+        ; unshifted_accumulators= G1.[one; one] } }
 
-let bulletproof_log2 = 15
+let bulletproof_log2 = Common.bulletproof_log2
 
 open Pickles_types
 module M = Pairing_main.Main (Inputs)
 
-let hash_me_only t =
-  let elts =
-    Types.Pairing_based.Proof_state.Me_only.to_field_elements t
-      ~g:(fun g ->
-        let x, y = Snarky_bn382_backend.G.to_affine_exn g in
-        [x; y] )
-      ~app_state:(fun x -> [|x|])
-  in
-  let sponge = Fp_sponge.Bits.create Inputs.sponge_params_constant in
-  Array.iter elts ~f:(fun x -> Fp_sponge.Bits.absorb sponge x) ;
-  Fp_sponge.Bits.squeeze sponge ~length:M.Digest.length
+let hash_me_only = Common.hash_pairing_me_only
+
+module Index_metadata = struct
+  type t =
+    {public_inputs: int; variables: int; nonzero_entries: int; max_degree: int}
+  [@@deriving bin_io]
+end
 
 let%test_unit "pairing-main" =
   let module Stmt = Types.Pairing_based.Statement in
   let input =
     let open Pickles_types.Vector in
+    let open Inputs.Impl in
+    let bulletproof_challenge =
+      let open Types.Pairing_based.Bulletproof_challenge in
+      Typ.transport Typ.field
+        ~there:(fun {prechallenge; is_square} ->
+          Field.Constant.project
+            (is_square :: Challenge.Constant.to_bits prechallenge) )
+        ~back:(fun x ->
+          match
+            List.take (Field.Constant.unpack x) (1 + M.Challenge.length)
+          with
+          | is_square :: bs ->
+              {is_square; prechallenge= Challenge.Constant.of_bits bs}
+          | _ ->
+              assert false )
+    in
+    let challenge = M.Challenge.packed_typ in
     Snarky.Typ.tuple5
       (typ Inputs.Impl.Boolean.typ Nat.N1.n)
       (typ M.Fq.typ Nat.N4.n)
-      (typ Inputs.Impl.Field.typ Nat.N3.n)
-      (typ Inputs.Impl.Field.typ Nat.N9.n)
-      (Snarky.Typ.array ~length:bulletproof_log2 Inputs.Impl.Field.typ)
+      (typ M.Digest.packed_typ Nat.N3.n)
+      (typ challenge Nat.N9.n)
+      (Snarky.Typ.array ~length:bulletproof_log2 bulletproof_challenge)
   in
   let n =
     Inputs.Impl.constraint_count (fun () -> M.main (Inputs.Impl.exists input))
@@ -338,50 +371,154 @@ let%test_unit "pairing-main" =
   Core.printf "pairing-main: %d / %d\n%!" n
     !Snarky_bn382_backend.R1cs_constraint_system.weight ;
   let main x () = M.main x in
-  let kp = Inputs.Impl.generate_keypair ~exposing:[input] main in
+  let kp =
+    time "generating keypair" (fun () ->
+        Inputs.Impl.generate_keypair ~exposing:[input] main )
+  in
   let pk = Inputs.Impl.Keypair.pk kp in
+  let vk_commitments =
+    Snarky_bn382_backend.Pairing_based.Keypair.vk_commitments pk
+  in
+  let vk = Inputs.Impl.Keypair.vk kp in
+  (*
+    Snarky_bn382.Fp_urs.write
+      (Snarky_bn382.Fp_verifier_index.urs vk)
+      "/home/izzy/pickles/vk-urs" ;
+
+    let metadata : Index_metadata.t =
+      { public_inputs= Unsigned.Size_t.to_int (Snarky_bn382.Fp_index.public_inputs pk)
+      ; variables= Unsigned.Size_t.to_int (Snarky_bn382.Fp_index.num_variables pk)
+      ; nonzero_entries= Unsigned.Size_t.to_int (Snarky_bn382.Fp_index.nonzero_entries pk)
+      ; max_degree= Unsigned.Size_t.to_int (Snarky_bn382.Fp_index.max_degree pk)
+      }
+    in
+    Out_channel.write_all "/home/izzy/pickles/vk"
+      (Binable.to_string (module Vk)
+        (metadata, vk_commitments))
+*)
   Core.printf "pairing-main: %d / %d\n%!" n
     !Snarky_bn382_backend.R1cs_constraint_system.weight ;
   let wt = !Snarky_bn382_backend.R1cs_constraint_system.wt in
   Core.printf "weights %d %d %d\n%!" wt.a wt.b wt.c ;
-  let pi =
-    let pass_through =
-      { Types.Pairing_based.Proof_state.Pass_through.pairing_marlin_index=
-          Snarky_bn382_backend.Keypair.vk_commitments pk
-      ; pairing_marlin_acc= pairing_marlin_acc_init }
-    in
-    let module I = Inputs.Impl in
-    let me_only =
-      { Types.Pairing_based.Proof_state.Me_only.app_state= I.Field.Constant.zero
-      ; dlog_marlin_index=
-          (let g = Snarky_bn382_backend.G.one in
-           let t = {Pickles_types.Abc.a= g; b= g; c= g} in
-           {row= t; col= t; value= t})
-      ; sg= group_map_fp (fp_random_oracle "sg") }
-    in
-    let fq : M.Fq.Constant.t = (fp_random_oracle ~length:20 "fq", true) in
-    let fp = I.Field.Constant.zero in
-    let challenge = fp_random_oracle ~length:128 in
-    let digest = fp_random_oracle ~length:256 "digest" in
-    let g = Snarky_bn382_backend.G.one in
-    let bulletproof_challenges =
-      Array.init bulletproof_log2 ~f:(fun i ->
-          Fp.zero
-          (*
-          bits_random_oracle (sprintf "bp_%d" i)
-            ~length:129
-          |> Fp.of_bits
+  let module I = Inputs.Impl in
+  let fq : M.Fq.Constant.t = Fq.of_bits (bits_random_oracle ~length:20 "fq") in
+  let me_only =
+    { Types.Pairing_based.Proof_state.Me_only.app_state= I.Field.Constant.zero
+    ; dlog_marlin_index=
+        (let g = Snarky_bn382_backend.G.one in
+         let t = {Pickles_types.Abc.a= g; b= g; c= g} in
+         {row= t; col= t; value= t})
+    ; sg= group_map_fp (fp_random_oracle "sg") }
+  in
+  let challenge s =
+    Challenge.Constant.of_bits
+      (bits_random_oracle ~length:M.Challenge.length s)
+  in
+  let bulletproof_challenges =
+    Array.init bulletproof_log2 ~f:(fun i ->
+        { Types.Pairing_based.Bulletproof_challenge.prechallenge=
+            (let z = Int64.zero in
+             Vector.[z; z])
+        ; is_square= true }
+        (*
+        bits_random_oracle (sprintf "bp_%d" i)
+          ~length:129
+        |> Fp.of_bits
 *)
-      )
+    )
+  in
+  let fp = I.Field.Constant.zero in
+  let pass_through =
+    { Types.Pairing_based.Proof_state.Pass_through.pairing_marlin_index=
+        vk_commitments
+    ; pairing_marlin_acc= pairing_marlin_acc_init
+    ; old_bulletproof_challenges=
+        Array.init bulletproof_log2 ~f:(fun i ->
+            challenge (sprintf "%s %d" __LOC__ i)
+            |> Challenge.Constant.to_bits |> Fq.of_bits ) }
+  in
+  let digest : M.Digest.Constant.t =
+    let z = Int64.zero in
+    Vector.[z; z; z; z]
+  in
+  let prev_proof_state : _ Types.Dlog_based.Proof_state.t =
+    { deferred_values=
+        { xi= challenge "xi"
+        ; r= challenge "r"
+        ; r_xi_sum= fp
+        ; marlin=
+            { sigma_2= fp
+            ; sigma_3= fp
+            ; alpha= challenge __LOC__
+            ; eta_a= challenge __LOC__
+            ; eta_b= challenge __LOC__
+            ; eta_c= challenge __LOC__
+            ; beta_1= challenge __LOC__
+            ; beta_2= challenge __LOC__
+            ; beta_3= challenge __LOC__ } }
+    ; sponge_digest_before_evaluations= digest
+    ; me_only= Common.hash_dlog_me_only pass_through }
+  in
+  let statement =
+    { Stmt.proof_state=
+        { deferred_values=
+            { xi= challenge "xi"
+            ; r= challenge "r"
+            ; bulletproof_challenges
+            ; a_hat= fq
+            ; combined_inner_product= fq
+            ; marlin=
+                { sigma_2= fq
+                ; sigma_3= fq
+                ; alpha= challenge "alpha"
+                ; eta_a= challenge "eta_a"
+                ; eta_b= challenge "eta_b"
+                ; eta_c= challenge "eta_c"
+                ; beta_1= challenge "beta_1"
+                ; beta_2= challenge "beta_2"
+                ; beta_3= challenge "beta_3" } }
+        ; was_base_case= true
+        ; sponge_digest_before_evaluations= digest
+        ; me_only= hash_me_only me_only }
+    ; pass_through= prev_proof_state.me_only }
+  in
+  (*
+  let vk, vk_commitments =
+    let module Vk = struct
+      type t = Index_metadata.t * G1.Affine.t Abc.t Matrix_evals.t
+      [@@deriving bin_io]
+    end
     in
+    let vk_urs = Snarky_bn382.Fp_urs.read "/home/izzy/pickles/vk-urs" in
+    let { Index_metadata.public_inputs; variables; nonzero_entries; max_degree }, commitments =
+      Binable.of_string (module Vk)
+        (In_channel.read_all "/home/izzy/pickles/vk")
+    in
+    ( Snarky_bn382.Fp_verifier_index.make
+        (Unsigned.Size_t.of_int public_inputs)
+        (Unsigned.Size_t.of_int variables)
+        (Unsigned.Size_t.of_int nonzero_entries)
+        (Unsigned.Size_t.of_int max_degree)
+        vk_urs
+        (Tuple2.uncurry Snarky_bn382.G1.Affine.create commitments.row.a)
+        (Tuple2.uncurry Snarky_bn382.G1.Affine.create commitments.col.a)
+        (Tuple2.uncurry Snarky_bn382.G1.Affine.create commitments.value.a)
+        (Tuple2.uncurry Snarky_bn382.G1.Affine.create commitments.row.b)
+        (Tuple2.uncurry Snarky_bn382.G1.Affine.create commitments.col.b)
+        (Tuple2.uncurry Snarky_bn382.G1.Affine.create commitments.value.b)
+        (Tuple2.uncurry Snarky_bn382.G1.Affine.create commitments.row.c)
+        (Tuple2.uncurry Snarky_bn382.G1.Affine.create commitments.col.c)
+        (Tuple2.uncurry Snarky_bn382.G1.Affine.create commitments.value.c)
+    , commitments )
+  in *)
+  let pi =
+    let g = Snarky_bn382_backend.G.one in
     let prev_evals =
-      let open Pairing_marlin_types.Evals in
       let mk n = Vector.init n ~f:(fun _ -> I.Field.Constant.zero) in
-      (mk Beta1.n, mk Beta2.n, mk Beta3.n)
+      Pairing_marlin_types.Evals.of_vector (mk Nat.N18.n)
     in
     let prev_messages : _ Pairing_marlin_types.Messages.t =
       { w_hat= g
-      ; s= g
       ; z_hat_a= g
       ; z_hat_b= g
       ; gh_1= ((g, g), g)
@@ -396,28 +533,6 @@ let%test_unit "pairing-main" =
       ; delta= g }
     in
     let prev_sg = group_map_fp (fp_random_oracle "prev_sg") in
-    let prev_proof_state : _ Types.Dlog_based.Proof_state.t =
-      let challenge = bits_random_oracle ~length:M.Challenge.length in
-      let digest = List.init M.Digest.length ~f:(fun _ -> false) in
-      { deferred_values=
-          { xi= challenge "xi"
-          ; r= challenge "r"
-          ; r_xi_sum= fp
-          ; marlin=
-              { sigma_2= fp
-              ; sigma_3= fp
-              ; alpha= challenge __LOC__
-              ; eta_a= challenge __LOC__
-              ; eta_b= challenge __LOC__
-              ; eta_c= challenge __LOC__
-              ; beta_1= challenge __LOC__
-              ; beta_2= challenge __LOC__
-              ; beta_3= challenge __LOC__ }
-          ; sg_challenge_point= challenge __LOC__
-          ; sg_evaluation= fq }
-      ; sponge_digest_before_evaluations= digest
-      ; me_only= digest }
-    in
     let handler (Snarky.Request.With {request; respond}) =
       let open M.Requests in
       let k x = respond (Provide x) in
@@ -438,36 +553,48 @@ let%test_unit "pairing-main" =
           k prev_sg
       | Prev_proof_state ->
           k prev_proof_state
+      | Prev_x_hat_beta_1 ->
+          k Bn382.Field.one
       | _ ->
           Snarky.Request.unhandled
     in
+    (*
+    Binable.of_string (module I.Proof)
+      (In_channel.read_all "/home/izzy/pickles/initial_proof")
+*)
     I.prove pk [input]
       (fun x () -> I.handle (main x) handler)
-      ()
-      (Stmt.to_data
-         { proof_state=
-             { deferred_values=
-                 { xi= challenge "xi"
-                 ; r= challenge "r"
-                 ; bulletproof_challenges
-                 ; a_hat= fq
-                 ; combined_inner_product= fq
-                 ; marlin=
-                     { sigma_2= fq
-                     ; sigma_3= fq
-                     ; alpha= challenge "alpha"
-                     ; eta_a= challenge "eta_a"
-                     ; eta_b= challenge "eta_b"
-                     ; eta_c= challenge "eta_c"
-                     ; beta_1= challenge "beta_1"
-                     ; beta_2= challenge "beta_2"
-                     ; beta_3= challenge "beta_3" } }
-             ; was_base_case= true
-             ; sponge_digest_before_evaluations= digest
-             ; me_only= I.Field.Constant.project (hash_me_only me_only) }
-         ; pass_through= I.Field.Constant.project prev_proof_state.me_only })
+      () (Stmt.to_data statement)
   in
-  ()
+  (*
+  Out_channel.write_all "/home/izzy/initial_proof"
+    ~data:(Binable.to_string (module I.Proof) pi) ;
+*)
+  let actual_statement =
+    { statement with
+      proof_state= {statement.proof_state with me_only}
+    ; pass_through }
+  in
+  let _ =
+    let input = I.generate_public_input [input] (Stmt.to_data statement) in
+    let dummy_prev_x_hat_beta_1 = Fq.zero in
+    let fq_prev_evals =
+      let e =
+        Pickles_types.Dlog_marlin_types.Evals.of_vectors
+          ( Vector.init Nat.N16.n ~f:(fun _ -> Fq.zero)
+          , Vector.init Nat.N3.n ~f:(fun _ -> Fq.zero) )
+      in
+      (e, e, e)
+    in
+    Test_dlog_main.wrap_proof vk
+      ( Fp.one
+      :: List.init
+           (Bn382.Field.Vector.length input)
+           ~f:(Bn382.Field.Vector.get input) )
+      (actual_statement, dummy_prev_x_hat_beta_1, fq_prev_evals)
+      pi
+  in
+  Core.printf "hi" ; ()
 
 (*
 module Dlog_inputs : Intf.Dlog_main_inputs.S = struct
