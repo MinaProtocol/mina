@@ -98,10 +98,13 @@ do
     done
 done
 
-# Genesis Ledger Copy
+# Genesis Ledger Copy tar and unpack
 for f in /tmp/coda_cache_dir/coda_genesis*; do
     cp /tmp/coda_cache_dir/coda_genesis* "${BUILDDIR}/var/lib/coda/."
 done
+pushd "${BUILDDIR}/var/lib/coda"
+tar -zxvf coda_genesis*
+popd
 
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
@@ -118,7 +121,7 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
 ls -lh coda*.deb
 
 # Tar up keys for an artifact
@@ -132,30 +135,31 @@ else
     tar -cvjf "${cwd}"/coda_pvkeys_"${GITHASH}"_"${DUNE_PROFILE}".tar.bz2 * ; \
     popd
 fi
-ls -lh coda_pvkeys_*
-
-# second deb without the proving keys -- FIXME: DRY
-echo "------------------------------------------------------------"
-echo "Building deb without keys:"
-
-cat << EOF > "${BUILDDIR}/DEBIAN/control"
-Package: ${PROJECT}-noprovingkeys
-Version: ${VERSION}
-Section: base
-Priority: optional
-Architecture: amd64
-Depends: coda-discovery, libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
-License: Apache-2.0
-Homepage: https://codaprotocol.com/
-Maintainer: o(1)Labs <build@o1labs.org>
-Description: Coda Client and Daemon
- Coda Protocol Client and Daemon
- Built from ${GITHASH} by ${CIRCLE_BUILD_URL}
-EOF
-
-# remove proving keys
-rm -f "${BUILDDIR}"/var/lib/coda/*_proving
-
-# build another deb
-dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh coda*.deb
+
+### DISABLED PV KEYLESS DEBs, not being used currently - code kept to re-enable
+# # second deb without the proving keys -- FIXME: DRY
+# echo "------------------------------------------------------------"
+# echo "Building deb without keys:"
+
+# cat << EOF > "${BUILDDIR}/DEBIAN/control"
+# Package: ${PROJECT}-noprovingkeys
+# Version: ${VERSION}
+# Section: base
+# Priority: optional
+# Architecture: amd64
+# Depends: coda-discovery, libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
+# License: Apache-2.0
+# Homepage: https://codaprotocol.com/
+# Maintainer: o(1)Labs <build@o1labs.org>
+# Description: Coda Client and Daemon
+#  Coda Protocol Client and Daemon
+#  Built from ${GITHASH} by ${CIRCLE_BUILD_URL}
+# EOF
+
+# # remove proving keys
+# rm -f "${BUILDDIR}"/var/lib/coda/*_proving
+
+# # build another deb
+# fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
+# ls -lh coda*.deb
