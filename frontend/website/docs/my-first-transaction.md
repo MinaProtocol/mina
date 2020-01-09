@@ -12,7 +12,7 @@ Run the following command to start up a Coda node instance and connect to the ne
         -peer /dns4/peer2-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF \
         -peer /dns4/peer3-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7
 
-The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8303 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>`.
+The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8302 and 8303 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>` and `-discovery-port <custom-TCP-port+1>`
 
 !!!note
     The daemon process needs to be running whenever you issue commands from `coda client`, so make sure you don't kill it by accident.
