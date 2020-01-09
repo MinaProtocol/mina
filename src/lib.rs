@@ -19,14 +19,18 @@ use algebra::{
     },
     UniformRand,
 };
-use circuits::index::Index;
-use ff_fft::EvaluationDomain;
+use commitment::urs::{ URS};
+use circuits::index::{Index, VerifierIndex, EvaluationDomains, MatrixValues, URSSpec, URSValue};
+use ff_fft::{Evaluations, EvaluationDomain};
 use num_bigint::BigUint;
 use oracle::{self, poseidon, poseidon::Sponge};
-use protocol::{prover::{ ProverProof}, marlin_sponge::{DefaultFqSponge, DefaultFrSponge}};
+use protocol::{prover::{ ProverProof, ProofEvaluations, RandomOracles}, marlin_sponge::{DefaultFqSponge, DefaultFrSponge}};
 use rand::rngs::StdRng;
 use rand_core;
 use sprs::{CsMat, CsVecView, CSR};
+use std::os::raw::c_char;
+use std::ffi::CStr;
+use std::fs::File;
 
 fn index_to_witness_position(public_inputs: usize, h_to_x_ratio: usize, i: usize) -> usize {
     if i < public_inputs {
@@ -542,8 +546,8 @@ pub extern "C" fn camlsnark_bn382_fp_proof_create(
     let primary_input = unsafe { &(*primary_input) };
     let auxiliary_input = unsafe { &(*auxiliary_input) };
 
-    let mut witness = vec![Fp::zero(); index.h_group.size()];
-    let ratio = index.h_group.size() / index.x_group.size();
+    let mut witness = vec![Fp::zero(); index.domains.h.size()];
+    let ratio = index.domains.h.size() / index.domains.x.size();
 
     witness[0] = Fp::one();
     for (i, x) in primary_input.iter().enumerate() {
@@ -559,6 +563,94 @@ pub extern "C" fn camlsnark_bn382_fp_proof_create(
     }
 
     let proof = ProverProof::create::<DefaultFqSponge<Bn_382G1Parameters>, DefaultFrSponge<Fp> > (&witness, &index).unwrap();
+
+    return Box::into_raw(Box::new(proof));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_proof_make(
+    primary_input : *const Vec<Fp>,
+
+    w_comm        : *const G1Affine,
+    za_comm       : *const G1Affine,
+    zb_comm       : *const G1Affine,
+    h1_comm       : *const G1Affine,
+    g1_comm_0     : *const G1Affine,
+    g1_comm_1     : *const G1Affine,
+    h2_comm       : *const G1Affine,
+    g2_comm_0     : *const G1Affine,
+    g2_comm_1     : *const G1Affine,
+    h3_comm       : *const G1Affine,
+    g3_comm_0     : *const G1Affine,
+    g3_comm_1     : *const G1Affine,
+    proof1        : *const G1Affine,
+    proof2        : *const G1Affine,
+    proof3        : *const G1Affine,
+
+    sigma2        : *const Fp,
+    sigma3        : *const Fp,
+
+    w: *const Fp,
+    za: *const Fp,
+    zb: *const Fp,
+    h1: *const Fp,
+    g1: *const Fp,
+    h2: *const Fp,
+    g2: *const Fp,
+    h3: *const Fp,
+    g3: *const Fp,
+    row_0: *const Fp,
+    row_1: *const Fp,
+    row_2: *const Fp,
+    col_0: *const Fp,
+    col_1: *const Fp,
+    col_2: *const Fp,
+    val_0: *const Fp,
+    val_1: *const Fp,
+    val_2: *const Fp,
+) -> *const ProverProof<Bn_382> {
+    let public = unsafe { &(*primary_input) }.clone();
+
+    let proof = ProverProof {
+        w_comm: (unsafe { *w_comm }).clone(),
+        za_comm: (unsafe { *za_comm }).clone() ,
+        zb_comm: (unsafe { *zb_comm }).clone() ,
+        h1_comm: (unsafe { *h1_comm }).clone() ,
+        g1_comm: ((unsafe { *g1_comm_0 }).clone(),(unsafe { *g1_comm_1 }).clone()),
+        h2_comm: (unsafe { *h2_comm }).clone() ,
+        g2_comm: ((unsafe { *g2_comm_0 }).clone(),(unsafe { *g2_comm_1 }).clone()),
+        h3_comm: (unsafe { *h3_comm }).clone() ,
+        g3_comm: ((unsafe { *g3_comm_0 }).clone(),(unsafe { *g3_comm_1 }).clone()),
+        proof1: (unsafe { *proof1 }).clone() ,
+        proof2: (unsafe { *proof2 }).clone() ,
+        proof3: (unsafe { *proof3 }).clone() ,
+        public,
+        sigma2: (unsafe { *sigma2 }).clone(),
+        sigma3: (unsafe { *sigma3 }).clone(),
+        evals: ProofEvaluations {
+            w :(unsafe {*w}).clone(),
+            za:(unsafe {*za}).clone(),
+            zb:(unsafe {*zb}).clone(),
+            h1:(unsafe {*h1}).clone(),
+            g1:(unsafe {*g1}).clone(),
+            h2:(unsafe {*h2}).clone(),
+            g2:(unsafe {*g2}).clone(),
+            h3:(unsafe {*h3}).clone(),
+            g3:(unsafe {*g3}).clone(),
+            row:
+                [ (unsafe {*row_0}).clone(),
+                  (unsafe {*row_1}).clone(),
+                  (unsafe {*row_2}).clone() ],
+            col:
+                [ (unsafe {*col_0}).clone(),
+                  (unsafe {*col_1}).clone(),
+                  (unsafe {*col_2}).clone() ],
+            val:
+                [ (unsafe {*val_0}).clone(),
+                  (unsafe {*val_1}).clone(),
+                  (unsafe {*val_2}).clone() ],
+        }
+    };
 
     return Box::into_raw(Box::new(proof));
 }
@@ -762,18 +854,235 @@ pub extern "C" fn camlsnark_bn382_fp_proof_evals_2(evals: *const [Fp; 3]) -> *co
     return Box::into_raw(Box::new(x));
 }
 
+// Fp oracles
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_create(
+    index: *const VerifierIndex<Bn_382>,
+    proof: *const ProverProof<Bn_382>,
+) -> *const RandomOracles<Fp> {
+    let index = unsafe { &(*index) };
+    let proof = unsafe { &(*proof) };
+    let oracles = proof.oracles::<DefaultFqSponge<Bn_382G1Parameters>, DefaultFrSponge<Fp> >(index).unwrap();
+    return Box::into_raw(Box::new(oracles));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_alpha(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).alpha ));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_eta_a(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).eta_a ));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_eta_b(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).eta_b ));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_eta_c(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).eta_c ));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_beta1(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[0] ));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_beta2(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[1] ));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_beta3(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[2] ));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_r_k(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).r_k ));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_batch(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).batch ));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_r(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).r ));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_x_hat_beta1(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).x_hat_beta1 ));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_digest_before_evaluations(
+    oracles: *const RandomOracles<Fp>,
+) -> *const Fp {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).digest_before_evaluations ));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_oracles_delete(
+    x: *mut RandomOracles<Fp>) {
+    let _box = unsafe { Box::from_raw(x) };
+}
+
+// Fp verifier index stubs
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_verifier_index_create(
+    index: *const Index<Bn_382>
+) -> *const VerifierIndex<Bn_382> {
+    Box::into_raw(Box::new(unsafe {&(*index)}.verifier_index()))
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_verifier_index_urs(
+    index: *const VerifierIndex<Bn_382>
+) -> *const URS<Bn_382> {
+    let index = unsafe { & *index };
+    let urs = index.urs.clone();
+    Box::into_raw(Box::new(urs))
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_verifier_index_make(
+    public_inputs: usize,
+    variables: usize,
+    nonzero_entries: usize,
+    max_degree: usize,
+    urs: *const URS<Bn_382>,
+    row_a: *const G1Affine,
+    col_a: *const G1Affine,
+    val_a: *const G1Affine,
+    row_b: *const G1Affine,
+    col_b: *const G1Affine,
+    val_b: *const G1Affine,
+    row_c: *const G1Affine,
+    col_c: *const G1Affine,
+    val_c: *const G1Affine,
+) -> *const VerifierIndex<Bn_382> {
+    let urs : URS<Bn_382> = (unsafe { &*urs }).clone();
+    let index = VerifierIndex {
+        domains: EvaluationDomains::create(variables, public_inputs, nonzero_entries).unwrap(),
+        matrix_commitments: [
+            MatrixValues { row: (unsafe {*row_a}).clone(), col: (unsafe {*col_a}).clone(), val: (unsafe {*val_a}).clone() },
+            MatrixValues { row: (unsafe {*row_b}).clone(), col: (unsafe {*col_b}).clone(), val: (unsafe {*val_b}).clone() },
+            MatrixValues { row: (unsafe {*row_c}).clone(), col: (unsafe {*col_c}).clone(), val: (unsafe {*val_c}).clone() },
+        ],
+        fq_sponge_params: oracle::bn_382::fq::params(),
+        fr_sponge_params: oracle::bn_382::fp::params(),
+        max_degree,
+        public_inputs,
+        urs,
+    };
+    Box::into_raw(Box::new(index))
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_verifier_index_delete(
+    x: *mut Index<Bn_382>
+) {
+    let _box = unsafe { Box::from_raw(x) };
+}
+
+// Fp URS stubs
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_urs_create(depth : usize) -> *const URS<Bn_382> {
+    Box::into_raw(Box::new(URS::create(depth, (0..depth).collect(), &mut rand_core::OsRng)))
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_urs_write(urs : *mut URS<Bn_382>, path: *mut c_char) {
+    let path = (unsafe { CStr::from_ptr(path) }).to_string_lossy().into_owned();
+    let file = File::create(path).unwrap();
+    let urs = unsafe { &*urs };
+    let _ = urs.write(file);
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_urs_read(path: *mut c_char) -> *const URS<Bn_382> {
+    let path = (unsafe { CStr::from_ptr(path) }).to_string_lossy().into_owned();
+    let file = File::open(path).unwrap();
+    let res = URS::<Bn_382>::read(file).unwrap();
+    return Box::into_raw(Box::new(res));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_urs_lagrange_commitment(
+    urs : *const URS<Bn_382>,
+    domain_size : usize,
+    stride : usize,
+    i: usize)
+-> *const G1Affine {
+    let urs = unsafe { &*urs };
+    let x_domain = EvaluationDomain::<Fp>::new(domain_size).unwrap();
+
+    let evals = (0..domain_size).map(|j| if i == j { Fp::one() } else { Fp::zero() }).collect();
+    let p = Evaluations::<Fp>::from_vec_and_domain(evals, x_domain).interpolate();
+    let res = urs.exponentiate_sub_domain(&p, stride).unwrap();
+
+    Box::into_raw(Box::new(res))
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_urs_commit_subdomain(
+    urs : *const URS<Bn_382>,
+    domain_size : usize,
+    stride : usize,
+    evals : *const Vec<Fp>)
+-> *const G1Affine {
+    let urs = unsafe { &*urs };
+    let x_domain = EvaluationDomain::<Fp>::new(domain_size).unwrap();
+
+    let evals = unsafe { &*evals };
+    let p = Evaluations::<Fp>::from_vec_and_domain(evals.clone(), x_domain).interpolate();
+    let res = urs.exponentiate_sub_domain(&p, stride).unwrap();
+
+    Box::into_raw(Box::new(res))
+}
+
 // Fp index stubs
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fp_index_create(
+pub extern "C" fn camlsnark_bn382_fp_index_create<'a>(
     a: *mut Vec<(Vec<usize>, Vec<Fp>)>,
     b: *mut Vec<(Vec<usize>, Vec<Fp>)>,
     c: *mut Vec<(Vec<usize>, Vec<Fp>)>,
     vars: usize,
     public_inputs: usize,
-) -> *mut Index<Bn_382> {
+    urs : *mut URS<Bn_382>
+) -> *mut Index<'a, Bn_382> {
     assert!(public_inputs > 0);
 
-    let rng = &mut rand_core::OsRng;
+    let urs = unsafe { &*urs };
     let a = unsafe { &*a };
     let b = unsafe { &*b };
     let c = unsafe { &*c };
@@ -795,7 +1104,7 @@ pub extern "C" fn camlsnark_bn382_fp_index_create(
             public_inputs,
             oracle::bn_382::fp::params(),
             oracle::bn_382::fq::params(),
-            rng,
+            URSSpec::Use(urs),
         )
         .unwrap(),
     ));
@@ -867,6 +1176,38 @@ pub extern "C" fn camlsnark_bn382_fp_index_c_val_comm(
     index: *const Index<Bn_382>,
 ) -> *const G1Affine {
     Box::into_raw(Box::new((unsafe { (*index).compiled[0].val_comm }).clone()))
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_index_nonzero_entries(
+    index: *const Index<Bn_382>,
+) -> usize {
+    let index = unsafe { &*index };
+    index.compiled.iter().map(|x| x.constraints.nnz()).max().unwrap()
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_index_max_degree(
+    index: *const Index<Bn_382>,
+) -> usize {
+    let index = unsafe { &*index };
+    index.urs.get_ref().max_degree()
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_index_num_variables(
+    index: *const Index<Bn_382>,
+) -> usize {
+    let index = unsafe { &*index };
+    index.compiled[0].constraints.shape().0
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_index_public_inputs(
+    index: *const Index<Bn_382>,
+) -> usize {
+    let index = unsafe { &*index };
+    index.public_inputs
 }
 
 // G / Fp stubs
@@ -952,6 +1293,16 @@ pub extern "C" fn camlsnark_bn382_g_of_affine_coordinates(
 }
 
 #[no_mangle]
+pub extern "C" fn camlsnark_bn382_g_affine_create(
+    x: *const Fp,
+    y: *const Fp
+    ) -> *const GAffine {
+    let x = (unsafe { *x }).clone();
+    let y = (unsafe { *y }).clone();
+    Box::into_raw(Box::new(GAffine::new(x, y, false)))
+}
+
+#[no_mangle]
 pub extern "C" fn camlsnark_bn382_g_affine_x(p: *const GAffine) -> *const Fp {
     let p = unsafe { *p };
     return Box::into_raw(Box::new(p.x.clone()));
@@ -966,6 +1317,38 @@ pub extern "C" fn camlsnark_bn382_g_affine_y(p: *const GAffine) -> *const Fp {
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_g_affine_delete(x: *mut GAffine) {
     let _box = unsafe { Box::from_raw(x) };
+}
+
+// G vector stubs
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_g_affine_vector_create() -> *mut Vec<GAffine> {
+    return Box::into_raw(Box::new(Vec::new()));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_g_affine_vector_length(v: *const Vec<GAffine>) -> i32 {
+    let v_ = unsafe { &(*v) };
+    return v_.len() as i32;
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_g_affine_vector_emplace_back(v: *mut Vec<GAffine>, x: *const GAffine) {
+    let v_ = unsafe { &mut (*v) };
+    let x_ = unsafe { &(*x) };
+    v_.push(*x_);
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_g_affine_vector_get(v: *mut Vec<GAffine>, i: u32) -> *mut GAffine {
+    let v_ = unsafe { &mut (*v) };
+    return Box::into_raw(Box::new((*v_)[i as usize]));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_g_affine_vector_delete(v: *mut Vec<GAffine>) {
+    // Deallocation happens automatically when a box variable goes out of
+    // scope.
+    let _box = unsafe { Box::from_raw(v) };
 }
 
 // G1 / Fq stubs
@@ -1051,6 +1434,16 @@ pub extern "C" fn camlsnark_bn382_g1_of_affine_coordinates(
 }
 
 #[no_mangle]
+pub extern "C" fn camlsnark_bn382_g1_affine_create(
+    x: *const Fq,
+    y: *const Fq
+    ) -> *const G1Affine {
+    let x = (unsafe { *x }).clone();
+    let y = (unsafe { *y }).clone();
+    Box::into_raw(Box::new(G1Affine::new(x, y, false)))
+}
+
+#[no_mangle]
 pub extern "C" fn camlsnark_bn382_g1_affine_x(p: *const G1Affine) -> *const Fq {
     let p = unsafe { *p };
     return Box::into_raw(Box::new(p.x.clone()));
@@ -1065,6 +1458,39 @@ pub extern "C" fn camlsnark_bn382_g1_affine_y(p: *const G1Affine) -> *const Fq {
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_g1_affine_delete(x: *mut G1Affine) {
     let _box = unsafe { Box::from_raw(x) };
+}
+
+// G1 vector stubs
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_g1_affine_vector_create() -> *mut Vec<G1Affine> {
+    return Box::into_raw(Box::new(Vec::new()));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_g1_affine_vector_length(v: *const Vec<G1Affine>) -> i32 {
+    let v_ = unsafe { &(*v) };
+    return v_.len() as i32;
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_g1_affine_vector_emplace_back(v: *mut Vec<G1Affine>, x: *const G1Affine) {
+    let v_ = unsafe { &mut (*v) };
+    let x_ = unsafe { &(*x) };
+    v_.push(*x_);
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_g1_affine_vector_get(v: *mut Vec<G1Affine>, i: u32) -> *mut G1Affine {
+    let v_ = unsafe { &mut (*v) };
+    return Box::into_raw(Box::new((*v_)[i as usize]));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_g1_affine_vector_delete(v: *mut Vec<G1Affine>) {
+    // Deallocation happens automatically when a box variable goes out of
+    // scope.
+    let _box = unsafe { Box::from_raw(v) };
 }
 
 // Fq stubs

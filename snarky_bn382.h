@@ -218,9 +218,45 @@ void camlsnark_bn382_fq_sponge_absorb(void *, void *, void *);
 
 void *camlsnark_bn382_fq_sponge_squeeze(void *, void *);
 
+// Fp oracles
+void *camlsnark_bn382_fp_oracles_create(void*, void*);
+void camlsnark_bn382_fp_oracles_delete(void*);
+
+void* camlsnark_bn382_fp_oracles_alpha(void*);
+void* camlsnark_bn382_fp_oracles_eta_a(void*);
+void* camlsnark_bn382_fp_oracles_eta_b(void*);
+void* camlsnark_bn382_fp_oracles_eta_c(void*);
+void* camlsnark_bn382_fp_oracles_beta1(void*);
+void* camlsnark_bn382_fp_oracles_beta2(void*);
+void* camlsnark_bn382_fp_oracles_beta3(void*);
+void* camlsnark_bn382_fp_oracles_batch(void*);
+void* camlsnark_bn382_fp_oracles_r(void*);
+void* camlsnark_bn382_fp_oracles_r_k(void*);
+void* camlsnark_bn382_fp_oracles_x_hat_beta1(void*);
+void* camlsnark_bn382_fp_oracles_digest_before_evaluations(void*);
+
+// Fp verifier index
+void *camlsnark_bn382_fp_verifier_index_create(void*);
+void camlsnark_bn382_fp_verifier_index_delete(void*);
+void *camlsnark_bn382_fp_verifier_index_urs(void*);
+
+void *camlsnark_bn382_fp_verifier_index_make(
+    size_t, size_t, size_t, size_t,
+    void*,
+    void*, void*, void*,
+    void*, void*, void*,
+    void*, void*, void*);
+
+// Fp URS
+void *camlsnark_bn382_fp_urs_create(size_t);
+void camlsnark_bn382_fp_urs_write(void*, char*);
+void* camlsnark_bn382_fp_urs_read(char*);
+void* camlsnark_bn382_fp_urs_lagrange_commitment(void*, size_t, size_t, size_t);
+void* camlsnark_bn382_fp_urs_commit_subdomain(void*, size_t, size_t, void*);
+
 // Fp index
 
-void *camlsnark_bn382_fp_index_create(void*, void*, void*, size_t, size_t);
+void *camlsnark_bn382_fp_index_create(void*, void*, void*, size_t, size_t, void*);
 
 void camlsnark_bn382_fp_index_delete(void *);
 
@@ -236,20 +272,30 @@ void *camlsnark_bn382_fp_index_c_row_comm(void*);
 void *camlsnark_bn382_fp_index_c_col_comm(void*);
 void *camlsnark_bn382_fp_index_c_val_comm(void*);
 
+size_t camlsnark_bn382_fp_index_num_variables(void*);
+size_t camlsnark_bn382_fp_index_public_inputs(void*);
+size_t camlsnark_bn382_fp_index_nonzero_entries(void*);
+size_t camlsnark_bn382_fp_index_max_degree(void*);
+
 // Fp proof
 
 void camlsnark_bn382_fp_proof_delete(void *);
 void *camlsnark_bn382_fp_proof_create(void *, void* , void*);
+void *camlsnark_bn382_fp_proof_make(void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *);
 
 void *camlsnark_bn382_fp_proof_w_comm(void *);
 void *camlsnark_bn382_fp_proof_za_comm(void *);
 void *camlsnark_bn382_fp_proof_zb_comm(void *);
 void *camlsnark_bn382_fp_proof_h1_comm(void *);
-void *camlsnark_bn382_fp_proof_g1_comm(void *);
 void *camlsnark_bn382_fp_proof_h2_comm(void *);
-void *camlsnark_bn382_fp_proof_g2_comm(void *);
 void *camlsnark_bn382_fp_proof_h3_comm(void *);
-void *camlsnark_bn382_fp_proof_g3_comm(void *);
+
+void *camlsnark_bn382_fp_proof_g1_comm_nocopy(void *);
+void *camlsnark_bn382_fp_proof_g2_comm_nocopy(void *);
+void *camlsnark_bn382_fp_proof_g3_comm_nocopy(void *);
+
+void *camlsnark_bn382_fp_proof_commitment_with_degree_bound_0(void *);
+void *camlsnark_bn382_fp_proof_commitment_with_degree_bound_1(void *);
 
 void *camlsnark_bn382_fp_proof_proof1(void *);
 void *camlsnark_bn382_fp_proof_proof2(void *);
@@ -285,9 +331,16 @@ void *camlsnark_bn382_g_negate(void *);
 void *camlsnark_bn382_g_to_affine(void *);
 void *camlsnark_bn382_g_of_affine(void *);
 void *camlsnark_bn382_g_of_affine_coordinates(void *, void*);
+void *camlsnark_bn382_g_affine_create(void *, void*);
 void *camlsnark_bn382_g_affine_x(void *);
 void *camlsnark_bn382_g_affine_y(void *);
 void camlsnark_bn382_g_affine_delete(void *);
+
+void *camlsnark_bn382_g_affine_vector_create();
+int camlsnark_bn382_g_affine_vector_length(void *);
+void camlsnark_bn382_g_affine_vector_emplace_back(void *, void *);
+void *camlsnark_bn382_g_affine_vector_get(void *, int);
+void camlsnark_bn382_g_affine_vector_delete(void *);
 
 // G1
 void *camlsnark_bn382_g1_one();
@@ -300,6 +353,14 @@ void *camlsnark_bn382_g1_negate(void *);
 void *camlsnark_bn382_g1_to_affine(void *);
 void *camlsnark_bn382_g1_of_affine(void *);
 void *camlsnark_bn382_g1_of_affine_coordinates(void *, void*);
+void *camlsnark_bn382_g1_affine_create(void *, void*);
 void *camlsnark_bn382_g1_affine_x(void *);
 void *camlsnark_bn382_g1_affine_y(void *);
 void camlsnark_bn382_g1_affine_delete(void *);
+
+void *camlsnark_bn382_g1_affine_vector_create();
+int camlsnark_bn382_g1_affine_vector_length(void *);
+void camlsnark_bn382_g1_affine_vector_emplace_back(void *, void *);
+void *camlsnark_bn382_g1_affine_vector_get(void *, int);
+void camlsnark_bn382_g1_affine_vector_delete(void *);
+
