@@ -73,7 +73,7 @@ let rec of_list : type a. a list -> a e = function
       T (x :: xs)
 
 let reverse t =
-  let T xs = of_list (List.rev (to_list t)) in
+  let (T xs) = of_list (List.rev (to_list t)) in
   Obj.magic xs
 
 let rec take_from_list : type a n. a list -> n nat -> (a, n) t =
