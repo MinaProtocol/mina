@@ -98,6 +98,11 @@ do
     done
 done
 
+# Genesis Ledger Copy
+for f in /tmp/coda_cache_dir/coda_genesis*; do
+    cp /tmp/coda_cache_dir/coda_genesis* "${BUILDDIR}/var/lib/coda/."
+done
+
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
 #       but it needs to be present for this to be effective
