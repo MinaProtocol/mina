@@ -18,7 +18,7 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
 
   open Vector
 
-  let check ~input_domain ~domain_h ~domain_k
+  let check ~input_domain ~domain_h ~domain_k ~x_hat_beta_1
       { Types.Dlog_based.Proof_state.Deferred_values.Marlin.sigma_2
       ; sigma_3
       ; alpha
@@ -27,18 +27,19 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
       ; eta_c
       ; beta_1
       ; beta_2
-      ; beta_3 } [g_1; h_1; z_hat_a; z_hat_b; w_hat; x_hat; s] [g_2; h_2]
-      [ g_3
+      ; beta_3 }
+      { Pairing_marlin_types.Evals.w_hat
+      ; z_hat_a
+      ; z_hat_b
+      ; g_1
+      ; h_1
+      ; g_2
+      ; h_2
+      ; g_3
       ; h_3
-      ; row_a
-      ; row_b
-      ; row_c
-      ; col_a
-      ; col_b
-      ; col_c
-      ; value_a
-      ; value_b
-      ; value_c ] =
+      ; row= {a= row_a; b= row_b; c= row_c}
+      ; col= {a= col_a; b= col_b; c= col_c}
+      ; value= {a= value_a; b= value_b; c= value_c} } =
     let open F in
     (* Marlin checks follow *)
     let row = abc row_a row_b row_c
@@ -46,7 +47,9 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
     and value = abc value_a value_b value_c
     and eta = abc eta_a eta_b eta_c
     and z_ = abc z_hat_a z_hat_b (z_hat_a * z_hat_b) in
-    let z_hat = (w_hat * vanishing_polynomial input_domain beta_1) + x_hat in
+    let z_hat =
+      (w_hat * vanishing_polynomial input_domain beta_1) + x_hat_beta_1
+    in
     let sum = sum' in
     let r_alpha =
       let v_h_alpha = vanishing_polynomial domain_h alpha in
@@ -83,8 +86,7 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
           ( (h_2 * v_h_beta_2) + (beta_2 * g_2)
           + (sigma_2 / of_int (Domain.size domain_h)) )
       ; equal
-          ( s
-          + (r_alpha beta_1 * sum ms (fun m -> eta m * z_ m))
+          ( (r_alpha beta_1 * sum ms (fun m -> eta m * z_ m))
           - (sigma_2 * z_hat) )
           ((h_1 * v_h_beta_1) + (beta_1 * g_1)) ]
 end
