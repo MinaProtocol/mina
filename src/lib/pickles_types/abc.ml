@@ -1,7 +1,7 @@
 module H_list = Snarky.H_list
 open H_list
 
-type 'a t = {a: 'a; b: 'a; c: 'a} [@@deriving fields]
+type 'a t = {a: 'a; b: 'a; c: 'a} [@@deriving fields, bin_io]
 
 let to_hlist {a; b; c} = [a; b; c]
 

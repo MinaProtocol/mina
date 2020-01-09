@@ -1,9 +1,8 @@
+(* TODO: Remove x_hat *)
 module Evals = struct
   type 'a t =
-    { sg_old: 'a
-    ; x_hat: 'a
+    { x_hat: 'a
     ; w_hat: 'a
-    ; s: 'a
     ; z_hat_a: 'a
     ; z_hat_b: 'a
     ; h_1: 'a
@@ -24,10 +23,8 @@ module Evals = struct
   [@@deriving fields]
 
   let to_vectors
-      { sg_old
-      ; x_hat
+      { x_hat
       ; w_hat
-      ; s
       ; z_hat_a
       ; z_hat_b
       ; h_1
@@ -46,10 +43,8 @@ module Evals = struct
       ; g_2
       ; g_3 } =
     Vector.
-      ( [ sg_old
-        ; x_hat
+      ( [ x_hat
         ; w_hat
-        ; s
         ; z_hat_a
         ; z_hat_b
         ; h_1
@@ -67,10 +62,8 @@ module Evals = struct
       , [g_1; g_2; g_3] )
 
   let of_vectors
-      (( [ sg_old
-         ; x_hat
+      (( [ x_hat
          ; w_hat
-         ; s
          ; z_hat_a
          ; z_hat_b
          ; h_1
@@ -87,10 +80,8 @@ module Evals = struct
          ; value_c ]
        , [g_1; g_2; g_3] ) :
         ('a, _) Vector.t * ('a, _) Vector.t) : 'a t =
-    { sg_old
-    ; x_hat
+    { x_hat
     ; w_hat
-    ; s
     ; z_hat_a
     ; z_hat_b
     ; h_1
@@ -111,7 +102,7 @@ module Evals = struct
 
   let typ fq =
     let t =
-      Snarky.Typ.tuple2 (Vector.typ fq Nat.N18.n) (Vector.typ fq Nat.N3.n)
+      Snarky.Typ.tuple2 (Vector.typ fq Nat.N16.n) (Vector.typ fq Nat.N3.n)
     in
     Snarky.Typ.transport t ~there:to_vectors ~back:of_vectors
     |> Snarky.Typ.transport_var ~there:to_vectors ~back:of_vectors

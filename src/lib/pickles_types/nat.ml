@@ -4,6 +4,12 @@ type _ s = S
 
 type _ t = Z : z t | S : 'n t -> 'n s t
 
+let to_int : type n. n t -> int =
+  let rec go : type n. int -> n t -> int =
+   fun acc n -> match n with Z -> acc | S n -> go (acc + 1) n
+  in
+  fun x -> go 0 x
+
 module type Intf = sig
   type n
 

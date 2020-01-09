@@ -5,91 +5,270 @@ module Typ = Snarky.Typ
 module Evals = struct
   open Vector
 
-  module Make (N : Nat_intf) = struct
-    include N
+  type 'a t =
+    { w_hat: 'a
+    ; z_hat_a: 'a
+    ; z_hat_b: 'a
+    ; g_1: 'a
+    ; h_1: 'a
+    ; g_2: 'a
+    ; h_2: 'a
+    ; g_3: 'a
+    ; h_3: 'a
+    ; row: 'a Abc.t
+    ; col: 'a Abc.t
+    ; value: 'a Abc.t }
+  [@@deriving fields, bin_io]
 
-    type 'a t = ('a, n) Vector.t
+  (* This is just the order used for iterating when absorbing the evaluations
+     into the sponge. *)
+  let to_vector
+      { w_hat
+      ; z_hat_a
+      ; z_hat_b
+      ; g_1
+      ; h_1
+      ; g_2
+      ; h_2
+      ; g_3
+      ; h_3
+      ; row= {a= row_a; b= row_b; c= row_c}
+      ; col= {a= col_a; b= col_b; c= col_c}
+      ; value= {a= value_a; b= value_b; c= value_c} } =
+    Vector.
+      [ w_hat
+      ; z_hat_a
+      ; z_hat_b
+      ; h_1
+      ; g_1
+      ; h_2
+      ; g_2
+      ; h_3
+      ; row_a
+      ; row_b
+      ; row_c
+      ; col_a
+      ; col_b
+      ; col_c
+      ; value_a
+      ; value_b
+      ; value_c
+      ; g_3 ]
 
-    include Binable (N)
+  let of_vector
+      Vector.
+        [ w_hat
+        ; z_hat_a
+        ; z_hat_b
+        ; h_1
+        ; g_1
+        ; h_2
+        ; g_2
+        ; h_3
+        ; row_a
+        ; row_b
+        ; row_c
+        ; col_a
+        ; col_b
+        ; col_c
+        ; value_a
+        ; value_b
+        ; value_c
+        ; g_3 ] =
+    { w_hat
+    ; z_hat_a
+    ; z_hat_b
+    ; g_1
+    ; h_1
+    ; g_2
+    ; h_2
+    ; g_3
+    ; h_3
+    ; row= {a= row_a; b= row_b; c= row_c}
+    ; col= {a= col_a; b= col_b; c= col_c}
+    ; value= {a= value_a; b= value_b; c= value_c} }
 
-    let typ elt = Vector.typ elt n
-  end
+  let to_vectors
+      { w_hat
+      ; z_hat_a
+      ; z_hat_b
+      ; g_1
+      ; h_1
+      ; g_2
+      ; h_2
+      ; g_3
+      ; h_3
+      ; row= {a= row_a; b= row_b; c= row_c}
+      ; col= {a= col_a; b= col_b; c= col_c}
+      ; value= {a= value_a; b= value_b; c= value_c} } ~x_hat =
+    Vector.
+      ( ([x_hat; w_hat; z_hat_a; z_hat_b; h_1], [g_1])
+      , ([h_2], [g_2])
+      , ( [ h_3
+          ; row_a
+          ; row_b
+          ; row_c
+          ; col_a
+          ; col_b
+          ; col_c
+          ; value_a
+          ; value_b
+          ; value_c ]
+        , [g_3] ) )
 
-  module Beta1 = Make (Nat.N7)
-  module Beta1_wire = Make (Nat.N6)
-  module Beta2 = Make (Nat.N2)
-  module Beta3 = Make (Nat.N11)
+  let to_combined_vectors
+      { w_hat
+      ; z_hat_a
+      ; z_hat_b
+      ; g_1
+      ; h_1
+      ; g_2
+      ; h_2
+      ; g_3
+      ; h_3
+      ; row= {a= row_a; b= row_b; c= row_c}
+      ; col= {a= col_a; b= col_b; c= col_c}
+      ; value= {a= value_a; b= value_b; c= value_c} } ~x_hat =
+    Vector.
+      ( [x_hat; w_hat; z_hat_a; z_hat_b; g_1; h_1]
+      , [g_2; h_2]
+      , [ g_3
+        ; h_3
+        ; row_a
+        ; row_b
+        ; row_c
+        ; col_a
+        ; col_b
+        ; col_c
+        ; value_a
+        ; value_b
+        ; value_c ] )
 
-  type 'a t = 'a Beta1.t * 'a Beta2.t * 'a Beta3.t
+  let of_vectors
+      Vector.(
+        ( ([w_hat; z_hat_a; z_hat_b; h_1], [g_1])
+        , ([h_2], [g_2])
+        , ( [ h_3
+            ; row_a
+            ; row_b
+            ; row_c
+            ; col_a
+            ; col_b
+            ; col_c
+            ; value_a
+            ; value_b
+            ; value_c ]
+          , [g_3] ) )) =
+    { w_hat
+    ; z_hat_a
+    ; z_hat_b
+    ; g_1
+    ; h_1
+    ; g_2
+    ; h_2
+    ; g_3
+    ; h_3
+    ; row= {a= row_a; b= row_b; c= row_c}
+    ; col= {a= col_a; b= col_b; c= col_c}
+    ; value= {a= value_a; b= value_b; c= value_c} }
 
-  let typ elt = Typ.tuple3 (Beta1.typ elt) (Beta2.typ elt) (Beta3.typ elt)
+  let typ fq =
+    let there = to_vector in
+    let back = of_vector in
+    Vector.typ fq Nat.N18.n |> Typ.transport ~there ~back
+    |> Typ.transport_var ~there ~back
 end
 
-(*
 module Accumulator = struct
-  module Input = struct
-    (* TODO: Needs to be exposed in the public input and the
-       arithmetic checked. *)
-    type ('challenge, 'fp ) t =
-      { zr: 'fp
-      ; z: 'challenge (* Evaluation point. This is beta_i so no need to re-expose it as a separate deferred value *)
-      ; v: 'fp (* Evaluation. This is xi_sum so no need to re-expose it as a separate deferred value *) 
-			; vr : 'fp
-			}
+  let on_both t1 t2 f x = f (x t1) (x t2)
+
+  module Degree_bound_checks = struct
+    (*
+       For the degree bound checks
+
+       e(U_i, beta^{N - d_i} H) = e(V_i, H)
+
+       To batch this, we check (in Einstein notation)
+
+       0
+       = r_i ( e(U_i, beta^{N - d_i} H) - e(V_i, H) )
+       = e(r_i U_i, beta^{N - d_i} H) - e(r_i V_i, H)
+    *)
+
+    module N = Nat.N2
+
+    type 'g t =
+      {shifted_accumulator: 'g; unshifted_accumulators: ('g, N.n) Vector.t}
     [@@deriving fields]
 
-    let to_hlist {zr; z; v; vr} = H_list.[zr; z; v; vr]
+    let to_hlist {shifted_accumulator; unshifted_accumulators} =
+      H_list.[shifted_accumulator; unshifted_accumulators]
 
-    let of_hlist ([zr; z; v; vr] : (unit, _) H_list.t) = {zr; z; v; vr} 
+    let of_hlist
+        ([shifted_accumulator; unshifted_accumulators] : (unit, _) H_list.t) =
+      {shifted_accumulator; unshifted_accumulators}
 
-    let typ challenge fp =
-      Snarky.Typ.of_hlistable [fp; challenge; fp; fp] ~var_to_hlist:to_hlist
+    let typ g =
+      Snarky.Typ.of_hlistable [g; Vector.typ g N.n] ~var_to_hlist:to_hlist
         ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
-    let assert_equal challenge fp t1 t2 =
-      challenge t1.z t2.z ;
-      List.iter [ zr; v; vr ] ~f:(fun f ->
-        fp (f t1) (f t2))
+    let assert_equal g t1 t2 =
+      Vector.iter2 (unshifted_accumulators t1) (unshifted_accumulators t2) ~f:g ;
+      on_both t1 t2 g shifted_accumulator
+
+    let map {shifted_accumulator; unshifted_accumulators} ~f =
+      { shifted_accumulator= f shifted_accumulator
+      ; unshifted_accumulators= Vector.map ~f unshifted_accumulators }
+  end
+
+  module Opening_check = struct
+    type 'g t = {r_f_minus_r_v_plus_rz_pi: 'g; r_pi: 'g} [@@deriving fields]
+
+    let to_hlist {r_f_minus_r_v_plus_rz_pi; r_pi} =
+      H_list.[r_f_minus_r_v_plus_rz_pi; r_pi]
+
+    let of_hlist ([r_f_minus_r_v_plus_rz_pi; r_pi] : (unit, _) H_list.t) =
+      {r_f_minus_r_v_plus_rz_pi; r_pi}
+
+    let typ g =
+      Snarky.Typ.of_hlistable [g; g] ~var_to_hlist:to_hlist
+        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    let assert_equal g t1 t2 =
+      let on_both f = on_both t1 t2 f in
+      List.iter ~f:(on_both g) [r_f_minus_r_v_plus_rz_pi; r_pi]
+
+    let map {r_f_minus_r_v_plus_rz_pi; r_pi} ~f =
+      {r_f_minus_r_v_plus_rz_pi= f r_f_minus_r_v_plus_rz_pi; r_pi= f r_pi}
   end
 
   type 'g t =
-    { r_f: 'g
-    ; r_v : 'g
-    ; r_pi: 'g
-    ; zr_pi: 'g} [@@deriving fields]
+    { opening_check: 'g Opening_check.t
+    ; degree_bound_checks: 'g Degree_bound_checks.t }
+  [@@deriving fields]
 
-  let to_hlist {r_f; r_pi; zr_pi} = H_list.[r_f; r_pi; zr_pi]
+  let to_hlist {opening_check; degree_bound_checks} =
+    H_list.[opening_check; degree_bound_checks]
 
-  let of_hlist ([r_f; r_pi; zr_pi] : (unit, _) H_list.t) =
-    {r_f; r_pi; zr_pi}
-
-  let typ g =
-    Typ.of_hlistable [g; g; g] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-
-  let assert_equal g t1 t2 =
-    List.iter ~f:(fun x -> g (x t1) (x t2)) [r_f; r_pi; zr_pi]
-end *)
-
-module Accumulator = struct
-  (* TODO: zr_pi can be merged with r_f_plus_r_v *)
-  type 'g t = {r_f_plus_r_v: 'g; r_pi: 'g; zr_pi: 'g} [@@deriving fields]
-
-  let to_hlist {r_f_plus_r_v; r_pi; zr_pi} = H_list.[r_f_plus_r_v; r_pi; zr_pi]
-
-  let of_hlist ([r_f_plus_r_v; r_pi; zr_pi] : (unit, _) H_list.t) =
-    {r_f_plus_r_v; r_pi; zr_pi}
+  let of_hlist ([opening_check; degree_bound_checks] : (unit, _) H_list.t) =
+    {opening_check; degree_bound_checks}
 
   let typ g =
-    Snarky.Typ.of_hlistable [g; g; g] ~var_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+    Snarky.Typ.of_hlistable
+      [Opening_check.typ g; Degree_bound_checks.typ g]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
 
   let assert_equal g t1 t2 =
-    List.iter ~f:(fun x -> g (x t1) (x t2)) [r_f_plus_r_v; r_pi; zr_pi]
+    let on_both f = on_both t1 t2 f in
+    on_both (Opening_check.assert_equal g) opening_check ;
+    on_both (Degree_bound_checks.assert_equal g) degree_bound_checks
 
-  let map {r_f_plus_r_v; r_pi; zr_pi} ~f =
-    {r_f_plus_r_v= f r_f_plus_r_v; r_pi= f r_pi; zr_pi= f zr_pi}
+  let map {opening_check; degree_bound_checks} ~f =
+    { opening_check= Opening_check.map ~f opening_check
+    ; degree_bound_checks= Degree_bound_checks.map ~f degree_bound_checks }
 end
 
 module Opening = struct
@@ -108,35 +287,17 @@ end
 module Openings = struct
   open Evals
 
-  type ('b1, 'b2, 'b3) t_ = {beta_1: 'b1; beta_2: 'b2; beta_3: 'b3}
-  [@@deriving fields, bin_io]
-
-  module Wire = struct
-    type ('proof, 'fp) t =
-      ( ('proof, 'fp Beta1_wire.t) Opening.t
-      , ('proof, 'fp Beta2.t) Opening.t
-      , ('proof, 'fp Beta3.t) Opening.t )
-      t_
-    [@@deriving bin_io]
-  end
-
-  type ('proof, 'fp) t =
-    ( ('proof, 'fp Beta1.t) Opening.t
-    , ('proof, 'fp Beta2.t) Opening.t
-    , ('proof, 'fp Beta3.t) Opening.t )
-    t_
+  type ('proof, 'fp) t = {proofs: 'proof Tuple_lib.Triple.t; evals: 'fp Evals.t}
   [@@deriving bin_io]
 
-  let to_hlist {beta_1; beta_2; beta_3} = H_list.[beta_1; beta_2; beta_3]
+  let to_hlist {proofs; evals} = H_list.[proofs; evals]
 
-  let of_hlist ([beta_1; beta_2; beta_3] : (unit, _) H_list.t) =
-    {beta_1; beta_2; beta_3}
+  let of_hlist ([proofs; evals] : (unit, _) H_list.t) = {proofs; evals}
 
   let typ proof fp =
-    let op vals = Opening.typ proof (vals fp) in
     let open Snarky.Typ in
     of_hlistable
-      [op Beta1.typ; op Beta2.typ; op Beta3.typ]
+      [tuple3 proof proof proof; Evals.typ fp]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
@@ -146,7 +307,6 @@ module Messages = struct
 
   type ('pc, 'fp) t =
     { w_hat: 'pc
-    ; s: 'pc
     ; z_hat_a: 'pc
     ; z_hat_b: 'pc
     ; gh_1: 'pc degree_bounded * 'pc
@@ -154,19 +314,19 @@ module Messages = struct
     ; sigma_gh_3: 'fp * ('pc degree_bounded * 'pc) }
   [@@deriving fields, bin_io]
 
-  let to_hlist {w_hat; s; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3} =
-    H_list.[w_hat; s; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3]
+  let to_hlist {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3} =
+    H_list.[w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3]
 
   let of_hlist
-      ([w_hat; s; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3] :
+      ([w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3] :
         (unit, _) H_list.t) =
-    {w_hat; s; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3}
+    {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3}
 
   let typ pc fp =
     let open Snarky.Typ in
     let db = pc * pc in
     of_hlistable
-      [pc; pc; pc; pc; db * pc; fp * (db * pc); fp * (db * pc)]
+      [pc; pc; pc; db * pc; fp * (db * pc); fp * (db * pc)]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end

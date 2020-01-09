@@ -8,16 +8,19 @@ type 'a s = 'a Nat.s
 
 type 'a nat = 'a Nat.t = Z : z nat | S : 'n nat -> 'n s nat
 
-let nat_to_int : type n. n nat -> int =
-  let rec go : type n. int -> n nat -> int =
-   fun acc n -> match n with Z -> acc | S n -> go (acc + 1) n
-  in
-  fun x -> go 0 x
-
 type ('a, _) t = [] : ('a, z) t | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n s) t
 
 let rec iter : type a n. (a, n) t -> f:(a -> unit) -> unit =
  fun t ~f -> match t with [] -> () | x :: xs -> f x ; iter xs ~f
+
+let rec iter2 : type a b n. (a, n) t -> (b, n) t -> f:(a -> b -> unit) -> unit
+    =
+ fun t1 t2 ~f ->
+  match (t1, t2) with
+  | [], [] ->
+      ()
+  | x :: xs, y :: ys ->
+      f x y ; iter2 xs ys ~f
 
 let rec map2 : type a b c n.
     (a, n) t -> (b, n) t -> f:(a -> b -> c) -> (c, n) t =
@@ -68,6 +71,20 @@ let rec of_list : type a. a list -> a e = function
   | x :: xs ->
       let (T xs) = of_list xs in
       T (x :: xs)
+
+let reverse t =
+  let T xs = of_list (List.rev (to_list t)) in
+  Obj.magic xs
+
+let rec take_from_list : type a n. a list -> n nat -> (a, n) t =
+ fun xs n ->
+  match (xs, n) with
+  | _, Z ->
+      []
+  | x :: xs, S n ->
+      x :: take_from_list xs n
+  | _ ->
+      failwith "take_from_list: Not enough to take"
 
 let rec fold : type acc a n. (a, n) t -> f:(acc -> a -> acc) -> init:acc -> acc
     =
