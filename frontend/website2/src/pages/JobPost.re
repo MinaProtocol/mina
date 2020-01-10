@@ -4,14 +4,70 @@ module Style = {
 
   let wrapper =
     style([
-      padding2(~v=`rem(2.), ~h=`rem(2.)),
+      padding2(~v=`rem(1.), ~h=`rem(1.)),
       media(
         Theme.MediaQuery.notMobile,
-        [maxWidth(`rem(43.)), marginLeft(`auto), marginRight(`auto)],
+        [maxWidth(`rem(48.)), marginLeft(`auto), marginRight(`auto)],
       ),
     ]);
 
-  let blogContent = BlogPost.Style.blogContent;
+  let jobContent =
+    style([
+      position(`relative),
+      selector("p", [fontSize(`rem(1.125)), lineHeight(`rem(1.875))]),
+      selector(
+        "h2",
+        [
+          Theme.Typeface.ibmplexsans,
+          fontSize(`rem(1.68)),
+          marginBottom(`rem(1.75)),
+          marginTop(`rem(1.75)),
+          lineHeight(`abs(1.25)),
+        ],
+      ),
+      selector("img", [width(`percent(100.))]),
+      selector(
+        "hr",
+        [
+          backgroundImage(
+            linearGradient(
+              `deg(90.),
+              [
+                (`percent(25.), `rgb((27, 104, 191))),
+                (`percent(0.), `rgba((255, 255, 255, 0.))),
+              ],
+            ),
+          ),
+          backgroundSize(`size((`rem(0.25), `rem(0.125)))),
+          backgroundRepeat(`repeatX),
+          width(`percent(100.)),
+          height(`rem(0.125)),
+          border(`zero, `none, white),
+          marginTop(`rem(2.)),
+          marginBottom(`rem(2.)),
+        ],
+      ),
+      color(Theme.Colors.saville),
+      Theme.Typeface.ibmplexsans,
+      selector(
+        "a",
+        [
+          fontSize(`rem(1.125)),
+          lineHeight(`rem(1.875)),
+          ...Theme.Link.basicStyles,
+        ],
+      ),
+      selector(
+        "ul",
+        [
+          paddingLeft(`rem(1.)),
+          fontSize(`rem(1.125)),
+          lineHeight(`rem(1.875)),
+        ],
+      ),
+      selector("ul > li", [paddingLeft(`rem(0.5))]),
+      selector("ul > li > ul", [marginLeft(`rem(1.))]),
+    ]);
 };
 
 [@react.component]
@@ -30,7 +86,7 @@ let make = (~post: option(ContentType.JobPost.t)) => {
       <div className=Style.wrapper>
         <div className=Style.title> {React.string(title)} </div>
         <Spacer height=2.0 />
-        <div className=Style.blogContent>
+        <div className=Style.jobContent>
           <Markdown content />
           <Spacer height=1.0 />
           <h2> {React.string("About Us")} </h2>
