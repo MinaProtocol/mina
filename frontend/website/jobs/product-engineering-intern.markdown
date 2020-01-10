@@ -37,6 +37,6 @@ We’re working on technologies with the potential to reimagine social structure
 
 This is a chance to join a small, collaborative team and have a ton of independence while working on fascinating cross-disciplinary problems that span cryptography, engineering, product design, economics, and sociology. We also offer competitive compensation both in salary and equity as well as top-of-the-market benefits.
 
-If you’d be interested in talking further, please get in touch by sending an email with your resume and the subject “Product Engineer Applicant” to [jobs@o1labs.org](mailto:jobs@o1labs.org?subject=%22Senior%20Frontend%20Engineer%20Applicant%22).
+If you’d be interested in talking further, please get in touch by sending an email with your resume and the subject “Product Engineering Intern Applicant” to [jobs@o1labs.org](mailto:jobs@o1labs.org?subject=%22Product%20Engineering%20Intern%20Applicant%22).
 
 We are committed to building a diverse, inclusive company. People of color, LGBTQ individuals, women, and people with disabilities are strongly encouraged to apply.

@@ -33,9 +33,8 @@ O(1) Labs is a small, well-funded startup aiming to develop the first cryptocurr
 
 We’re working on technologies with the potential to reimagine social structures. We believe it’s important to incorporate diverse perspectives from conception through realization.
 
-We offer a competitive employee benefits package.
+This is a chance to join a small, collaborative team and have a ton of independence while working on fascinating cross-disciplinary problems that span cryptography, engineering, product design, economics, and sociology. We also offer competitive compensation both in salary and equity as well as top-of-the-market benefits.
 
-If you’d be interested in talking further, please get in touch by sending an email with your resume and the subject "Engineer Applicant" to [jobs@o1labs.org](mailto:jobs@o1labs.org?subject=%22Engineer%20Applicant%22).
+If you’d be interested in talking further, please get in touch by sending an email with your resume and the subject "Protocol Engineer (Product) Applicant" to [jobs@o1labs.org](mailto:jobs@o1labs.org?subject=%22Protocol%20Engineer%20(Product)%20Applicant%22).
 
 We are committed to building a diverse, inclusive company. People of color, LGBTQ individuals, women, and people with disabilities are strongly encouraged to apply.
-
