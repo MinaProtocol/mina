@@ -501,9 +501,9 @@ module T = struct
             ; genesis_ledger_hash=
                 Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
             ; log_gossip_heard=
-                { snark_pool_diff= false
-                ; transaction_pool_diff= false
-                ; new_state= false }
+                { snark_pool_diff= true
+                ; transaction_pool_diff= true
+                ; new_state= true }
             ; creatable_gossip_net=
                 Coda_networking.Gossip_net.(
                   Any.Creatable
