@@ -113,7 +113,6 @@ module Router = {
 };
 
 let jobOpenings = [|
-  ("engineering-manager", "Engineering Manager (San Francisco)"),
   (
     "protocol-reliability-engineer",
     "Protocol Reliability Engineer (San Francisco)",
