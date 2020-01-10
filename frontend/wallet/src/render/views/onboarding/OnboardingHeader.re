@@ -70,7 +70,7 @@ module HelpSection = {
 
 [@react.component]
 let make = () => {
-  let codaSvg = Hooks.useAsset("CodaLogoWhite.svg");
+  let codaSvg = Hooks.useAsset("CodaLogoWhite.png");
   <header className=Styles.header>
     <div className=Styles.logo> <img src=codaSvg alt="Coda logo" /> </div>
     <HelpSection />
