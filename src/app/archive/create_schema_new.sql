@@ -61,7 +61,7 @@ CREATE TABLE blocks
 );
 
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
-CREATE INDEX idx_blocks_create_id  ON blocks(creator_id);
+CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 
 CREATE TABLE blocks_transactions
