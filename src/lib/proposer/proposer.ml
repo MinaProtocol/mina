@@ -228,8 +228,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
                         self
                     | `Other pk ->
                         pk )
-                  ~coinbase_amount
-                  ()
+                  ~coinbase_amount ()
               in
               let internal_transition =
                 Internal_transition.create ~snark_transition
