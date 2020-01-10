@@ -75,6 +75,3 @@ type 'a t = 'a Stable.Latest.t [@@deriving sexp]
 let transaction t = t.Poly.transaction
 
 let block_data t = t.Poly.block_data
-
-(*let gen ~gen_a = 
-  let open Quickcheck.Generator in*)

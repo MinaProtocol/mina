@@ -383,8 +383,6 @@ module Update = struct
         Boolean.((not b0) && b1)
 
       let update_two_stacks_coinbase_in_second (b0, b1) = Boolean.(b0 && b1)
-
-      let _update_one_stack (b0, b1) = Boolean.(b0 && not b1)
     end
   end
 
@@ -747,8 +745,8 @@ struct
         (*Always update the state body hash unless there are no transactions in this block*)
         Stack.Checked.if_ no_update ~then_:stack ~else_:stack_with_state_hash
       in
-      let f1 stack0 =
-        let%bind stack = update_state_stack stack0 in
+      let update_stack1 stack =
+        let%bind stack = update_state_stack stack in
         let total_coinbase_amount =
           Currency.Amount.var_of_t Coda_compile_config.coinbase
         in
@@ -762,8 +760,8 @@ struct
         let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
         let%bind () =
           with_label __LOC__
-            (let%bind check1 = Boolean.equal no_update amount1_equal_to_zero in
-             Boolean.Assert.all [check1])
+            (let%bind check = Boolean.equal no_update amount1_equal_to_zero in
+             Boolean.Assert.is_true check)
         in
         let%bind no_coinbase =
           let%bind no_update = Boolean.(no_update && amount1_equal_to_zero) in
@@ -783,8 +781,8 @@ struct
       in
       (*This is for the second stack for when transactions in a block occupy
       two trees of the scan state; the second tree will carry-forward the state
-      stack from the first stack and may of may not have a coinbase*)
-      let f2 (init_stack : Stack.var) stack0 =
+      stack from the first stack and may or may not have a coinbase*)
+      let update_stack2 (init_stack : Stack.var) stack0 =
         let%bind add_coinbase =
           Update.Action.Checked.update_two_stacks_coinbase_in_second action
         in
@@ -813,14 +811,14 @@ struct
         handle
           (Merkle_tree.fetch_and_update_req ~depth
              (Hash.var_to_hash_packed t)
-             addr1 ~f:f1)
+             addr1 ~f:update_stack1)
           reraise_merkle_requests
       in
       (*update the second stack*)
       let%map root, _, _ =
         handle
           (Merkle_tree.fetch_and_update_req ~depth root' addr2
-             ~f:(f2 updated_stack1))
+             ~f:(update_stack2 updated_stack1))
           reraise_merkle_requests
       in
       Hash.var_of_hash_packed root

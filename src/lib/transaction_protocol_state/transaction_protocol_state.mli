@@ -3,6 +3,14 @@ open Coda_base
 open Snark_params
 open Tick
 
+(** Transactions included in a block with the associated block data. Block data
+gets added to the pending coinbase once per stack for each block. Therefore,
+only the first transaction from a sequence of transactions included in a block
+needs to carry this information and the rest of the transactions will have the
+updated stacks as part of their statements. Block data is currently the state
+body hash of the previous block. TODO: This will change to current block in an
+upcoming PR*)
+
 module Block_data : sig
   [%%versioned:
   module Stable : sig
