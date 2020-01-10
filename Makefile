@@ -16,11 +16,7 @@ ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
 endif
 
-ifeq ($(TMPDIR),)
-CODA_TMP_DIR := /tmp
-else
-CODA_TMP_DIR := $(TMPDIR)
-endif
+TMPDIR ?= /tmp
 
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
@@ -75,22 +71,23 @@ libp2p_helper:
 # Alias
 dht: kademlia libp2p_helper
 
-_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe:
+GENESIS_DIR := $(TMPDIR)/coda_cache_dir
+
+genesis_tar:
+	@GENESIS_FILE=$(GENESIS_DIR)/$(shell cat _build/default/src/app/runtime_genesis_ledger/genesis_filename.txt).tar.gz && if [ ! -f $$GENESIS_FILE ] || [ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -nt $$GENESIS_FILE ]; \
+	then ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe; \
+	fi
+
+genesis_ledger:
+# compile the tool and write the filename to `genesis_filename.txt`
 	$(info Building runtime_genesis_ledger)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/runtime_genesis_ledger/genesis_filename.txt
-.PHONY: _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/runtime_genesis_ledger/genesis_filename.txt && make genesis_tar
+	$(info Genesis ledger and genesis proof generated)
 
-#Genesis state autogen path
-genesis_path:
-GENESIS_STATE_PATH = $(CODA_TMP_DIR)/coda_cache_dir/$(shell cat _build/default/src/app/runtime_genesis_ledger/genesis_filename.txt).tar.gz
-
-# generate genesis ledger and genesis proof using default accounts if doesn't exist or if runtime_genesis_ledger.exe changes
-genesis_ledger: _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe genesis_path
-	@if  [ ! -f $(GENESIS_STATE_PATH) ] || [ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -nt $(GENESIS_STATE_PATH) ] ; then ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe; fi
-
-build: git_hooks reformat-diff genesis_ledger
+build: git_hooks reformat-diff
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE) && make genesis_ledger
+	$(info Build complete)
 
 build_archive: git_hooks reformat-diff
 	$(info Starting Build)

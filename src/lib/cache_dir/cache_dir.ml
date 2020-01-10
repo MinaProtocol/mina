@@ -1,20 +1,3 @@
-[%%import
-"/src/config.mlh"]
-
-[%%inject
-"curve_size", curve_size]
-
-(*coda_genesis_4601df6ee5bd20c8d0ddcb65d9ffe33279bc1ee0_02889a232867abcb*)
-
-[%%inject
-"fake_accounts_target", fake_accounts_target]
-
-[%%inject
-"proof_level", proof_level]
-
-[%%inject
-"genesis_ledger", genesis_ledger]
-
 open Core
 open Async
 
@@ -30,14 +13,14 @@ let genesis_dir_name =
     ledger and the proof*)
     let str =
       ( List.map
-          [ curve_size
+          [ Coda_compile_config.curve_size
           ; Snark_params.ledger_depth
-          ; fake_accounts_target
+          ; Coda_compile_config.fake_accounts_target
           ; Consensus.Constants.c
           ; Consensus.Constants.k ]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
-      ^ proof_level ^ genesis_ledger
+      ^ Coda_compile_config.proof_level ^ Coda_compile_config.genesis_ledger
     in
     Blake2.digest_string str |> Blake2.to_hex
   in
