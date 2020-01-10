@@ -305,6 +305,7 @@ jobs:
                 command: |
                     mkdir -p package/keys
                     echo 'keys'
+                    mkdir -p /tmp/s3_cache_dir
                     cp /tmp/s3_cache_dir/* package/keys/.
                     echo 'coda'
                     cp _build/default/src/app/cli/src/coda.exe package/coda
