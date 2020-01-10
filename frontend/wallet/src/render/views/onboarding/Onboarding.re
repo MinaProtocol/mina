@@ -1,6 +1,9 @@
 type onboardingPage =
   | Welcome
   | SetUpNode
+  | CustomSetupA
+  | CustomSetupB
+  | CustomSetupC
   | InstallCoda
   | PortForward
   | MachineConfigure
@@ -11,38 +14,6 @@ type onboardingPage =
   | AccountCreation
   | StakeCoda
   | LastStep;
-
-module Styles = {
-  open Css;
-
-  let main =
-    style([
-      position(`absolute),
-      top(`zero),
-      left(`zero),
-      display(`flex),
-      flexDirection(`row),
-      paddingTop(Theme.Spacing.headerHeight),
-      paddingBottom(Theme.Spacing.footerHeight),
-      height(`vh(100.)),
-      width(`vw(100.)),
-      zIndex(100),
-    ]);
-  let fadeIn = keyframes([(0, [opacity(0.)]), (100, [opacity(1.)])]);
-  let body =
-    merge([
-      Theme.Text.Body.regular,
-      style([animation(fadeIn, ~duration=1050, ~iterationCount=`count(1))]),
-    ]);
-  let map =
-    style([
-      position(`fixed),
-      left(`px(0)),
-      top(`px(0)),
-      zIndex(1),
-      maxWidth(`percent(100.)),
-    ]);
-};
 
 [@react.component]
 let make = () => {
@@ -56,11 +27,30 @@ let make = () => {
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
     | SetUpNode =>
       <SetupNodeStep
-        customSetup={_ => setOnboardingStep(_ => InstallCoda)}
+        customSetup={_ => setOnboardingStep(_ => CustomSetupA)}
         expressSetup={_ => setOnboardingStep(_ => InstallCoda)}
       />
+    | CustomSetupA =>
+      <CustomSetupA
+        prevStep={_ => setOnboardingStep(_ => SetUpNode)}
+        completeSetup={_ => setOnboardingStep(_ => CustomSetupB)}
+      />
+    | CustomSetupB =>
+      <CustomSetupB
+        prevStep={_ => setOnboardingStep(_ => CustomSetupA)}
+        runNode={_ => setOnboardingStep(_ => RunNode)}
+        nextStep={_ => setOnboardingStep(_ => CustomSetupC)}
+      />
+    | CustomSetupC =>
+      <CustomSetupC
+        prevStep={_ => setOnboardingStep(_ => CustomSetupB)}
+        runNode={_ => setOnboardingStep(_ => RunNode)}
+      />
     | InstallCoda =>
-      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+      <InstallCodaStep
+        prevStep={_ => setOnboardingStep(_ => SetUpNode)}
+        nextStep={_ => setOnboardingStep(_ => RunNode)}
+      />
     | PortForward =>
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
     | MachineConfigure =>
@@ -68,27 +58,30 @@ let make = () => {
     | CloudServerConfigure =>
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
     | RunNode =>
-      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+      <RunNodeStep
+        prevStep={_ => setOnboardingStep(_ => InstallCoda)}
+        createAccount={_ => setOnboardingStep(_ => AccountCreation)}
+      />
     | PortForwardError =>
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
     | DaemonError =>
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
     | AccountCreation =>
-      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+      <AccountCreationStep
+        prevStep={_ => setOnboardingStep(_ => RunNode)}
+        nextStep={_ => setOnboardingStep(_ => StakeCoda)}
+      />
     | StakeCoda =>
-      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
-    | LastStep => <CompletionStep closeOnboarding />
+      <StakeCodaStep
+        prevStep={_ => setOnboardingStep(_ => AccountCreation)}
+        nextStep={_ => setOnboardingStep(_ => LastStep)}
+      />
+    | LastStep =>
+      <CompletionStep
+        prevStep={_ => setOnboardingStep(_ => StakeCoda)}
+        closeOnboarding
+      />
     };
 
-  let mapImage = Hooks.useAsset("map@2x.png");
-
-  showOnboarding
-    ? <div className=Styles.main>
-        <div className=Styles.map>
-          <img src=mapImage alt="Map" className=Styles.map />
-        </div>
-        <OnboardingHeader />
-        step
-      </div>
-    : React.null;
+  showOnboarding ? step : React.null;
 };

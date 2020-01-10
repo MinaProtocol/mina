@@ -1,4 +1,5 @@
 let component = ReasonReact.statelessComponent("Header");
+[@bs.scope "window"] [@bs.val] external openExternal: string => unit = "";
 
 module Styles = {
   open Css;
@@ -53,7 +54,7 @@ module HelpSection = {
         width=2.
         height=2.
         style=Button.OffWhite
-        link="https://codaprotocol.com/docs/"
+        onClick={_ => openExternal("https://codaprotocol.com/docs/")}
       />
       <Button
         label="Discord"
@@ -61,7 +62,7 @@ module HelpSection = {
         width=3.5
         height=2.
         style=Button.OffWhite
-        link="https://discordapp.com/invite/Vexf4ED"
+        onClick={_ => openExternal("https://discordapp.com/invite/Vexf4ED")}
       />
     </div>;
   };

@@ -1,0 +1,96 @@
+module Styles = {
+  open Css;
+  let hero = {
+    style([display(`flex), flexDirection(`row)]);
+  };
+  let heroLeft = {
+    style([
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`center),
+      width(`percent(100.0)),
+      maxWidth(`rem(32.0)),
+      marginLeft(`rem(5.)),
+      marginRight(`rem(5.)),
+      marginTop(`rem(3.5)),
+    ]);
+  };
+  let heroRight = {
+    style([
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`center),
+      marginTop(`rem(3.5)),
+    ]);
+  };
+  let header = {
+    merge([
+      Theme.Text.Header.h1,
+      style([color(white), fontSize(`rem(2.70))]),
+    ]);
+  };
+  let heroBody = {
+    merge([
+      Theme.Text.Body.regularLight,
+      style([
+        marginTop(`rem(1.)),
+        maxWidth(`rem(28.)),
+        color(white),
+        animationFillMode(`forwards),
+      ]),
+    ]);
+  };
+
+  let main =
+    style([
+      position(`absolute),
+      top(`zero),
+      left(`zero),
+      display(`flex),
+      flexDirection(`row),
+      paddingTop(Theme.Spacing.headerHeight),
+      paddingBottom(Theme.Spacing.footerHeight),
+      height(`vh(100.)),
+      width(`vw(100.)),
+      zIndex(100),
+    ]);
+  let map =
+    style([
+      position(`fixed),
+      left(`px(0)),
+      top(`px(0)),
+      zIndex(1),
+      maxWidth(`percent(100.)),
+    ]);
+  let buttonRow = {
+    style([display(`flex), flexDirection(`row)]);
+  };
+};
+
+[@react.component]
+let make = (~heading, ~description, ~miscLeft, ~miscRight=?) => {
+  let mapImage = Hooks.useAsset("map@2x.png");
+  <div className=Styles.main>
+    <div className=Styles.map>
+      <img src=mapImage alt="Map" className=Styles.map />
+    </div>
+    <OnboardingHeader />
+    <div className=Theme.Onboarding.main>
+      <div className=Styles.hero>
+        <div className=Styles.heroLeft>
+          <FadeIn duration=500 delay=0>
+            <h1 className=Styles.header> {React.string(heading)} </h1>
+          </FadeIn>
+          <FadeIn duration=500 delay=150>
+            <div className=Styles.heroBody> description </div>
+          </FadeIn>
+          <div className=Styles.heroBody> miscLeft </div>
+        </div>
+        {switch (miscRight) {
+         | Some(items) => <div className=Styles.heroRight> items </div>
+         | None => React.null
+         }}
+      </div>
+    </div>
+  </div>;
+};

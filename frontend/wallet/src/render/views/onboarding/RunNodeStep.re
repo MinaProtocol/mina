@@ -1,13 +1,13 @@
 [@bs.scope "window"] [@bs.val] external openExternal: string => unit = "";
 
 [@react.component]
-let make = (~customSetup, ~expressSetup) => {
+let make = (~prevStep, ~createAccount) => {
   <OnboardingTemplate
-    heading="Setting Up Your Node"
+    heading="Connecting to the Network"
     description={
       <p>
         {React.string(
-           "Your node will allow you to connect to the Coda Network and make transactions.",
+           "Establishing a connection typically takes between 5-15 minutes.",
          )}
       </p>
     }
@@ -17,14 +17,14 @@ let make = (~customSetup, ~expressSetup) => {
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
             style=Button.MidnightBlue
-            label="Custom Setup"
-            onClick={_ => customSetup()}
+            label="Go Back"
+            onClick={_ => prevStep()}
           />
           <Spacer width=0.5 />
           <Button
-            label="Express Setup"
+            label="Continue"
             style=Button.HyperlinkBlue
-            onClick={_ => expressSetup()}
+            onClick={_ => createAccount()}
           />
         </div>
       </>
