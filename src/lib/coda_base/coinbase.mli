@@ -22,6 +22,14 @@ type t = Stable.Latest.t = private
   ; state_body_hash: State_body_hash.Stable.V1.t }
 [@@deriving sexp, compare, eq, hash, yojson]
 
+include Codable.Base58_check_intf with type t := t
+
+val proposer : t -> Public_key.Compressed.t
+
+val amount : t -> Currency.Amount.t
+
+val fee_transfer : t -> Fee_transfer.Single.t option
+
 val create :
      amount:Currency.Amount.t
   -> proposer:Public_key.Compressed.t

@@ -12,6 +12,10 @@ module Stable = struct
     [@@deriving sexp, compare, eq, hash, yojson]
 
     let to_latest = Fn.id
+
+    let description = "Coinbase"
+
+    let version_byte = Base58_check.Version_bytes.coinbase
   end
 end]
 
@@ -21,6 +25,20 @@ type t = Stable.Latest.t =
   ; fee_transfer: Fee_transfer.Single.t option
   ; state_body_hash: State_body_hash.t }
 [@@deriving sexp, compare, eq, hash, yojson]
+
+module Base58_check = Codable.Make_base58_check (Stable.Latest)
+
+[%%define_locally
+Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
+
+[%%define_locally
+Base58_check.String_ops.(to_string, of_string)]
+
+let proposer t = t.proposer
+
+let amount t = t.amount
+
+let fee_transfer t = t.fee_transfer
 
 let is_valid {amount; fee_transfer; _} =
   match fee_transfer with

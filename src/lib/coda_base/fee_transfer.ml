@@ -26,6 +26,10 @@ module Single = struct
 
   [%%define_locally
   Base58_check.String_ops.(to_string, of_string)]
+
+  let receiver (receiver, _) = receiver
+
+  let fee (_, fee) = fee
 end
 
 [%%versioned

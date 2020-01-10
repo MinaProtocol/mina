@@ -29,11 +29,11 @@ CREATE TABLE user_commands
 CREATE TYPE internal_command_type AS ENUM ('fee_transfer', 'coinbase');
 
 CREATE TABLE internal_commands
-( id          serial                PRIMARY KEY
-, type        internal_command_type NOT NULL
-, receiver_id int                   NOT NULL REFERENCES public_keys(id)
-, fee         bigint                NOT NULL
-, transaction_id      int    NOT NULL UNIQUE
+( id             serial                PRIMARY KEY
+, type           internal_command_type NOT NULL
+, receiver_id    int                   NOT NULL REFERENCES public_keys(id)
+, fee            bigint                NOT NULL
+, transaction_id int                   NOT NULL UNIQUE
 );
 
 CREATE TABLE transactions
@@ -57,7 +57,7 @@ CREATE TABLE blocks
 , ledger_hash            text   NOT NULL
 , height                 bigint NOT NULL
 , timestamp              bigint NOT NULL
-, coinbase_id            int    NOT NULL UNIQUE REFERENCES internal_commands(id)
+, coinbase_id            int             UNIQUE REFERENCES internal_commands(id)
 );
 
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);

@@ -16,6 +16,10 @@ module Single : sig
   include Comparable.S with type t := t
 
   include Codable.Base58_check_intf with type t := t
+
+  val receiver : t -> Public_key.Compressed.t
+
+  val fee : t -> Currency.Fee.t
 end
 
 module Stable : sig
