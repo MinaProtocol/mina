@@ -108,6 +108,8 @@ module Data = struct
     module Base58_check = Codable.Make_base58_check (struct
       include Stable.Latest
 
+      let version_byte = Base58_check.Version_bytes.epoch_seed
+
       let description = "Epoch Seed"
     end)
 
@@ -786,7 +788,7 @@ module Data = struct
         let pending_coinbase_handler =
           unstage
             (Coda_base.Pending_coinbase.handler empty_pending_coinbase
-               ~is_new_stack:false)
+               ~is_new_stack:true)
         in
         let handlers =
           Snarky.Request.Handler.(
