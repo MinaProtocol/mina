@@ -438,6 +438,39 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                               ] ;
                           Deferred.unit )) ) )))
 
+let coda_crash_message ~log_issue ~action ~error =
+  let followup =
+    if log_issue then
+      sprintf
+        !{err| The Coda Protocol developers would like to know why!
+
+    Please:
+      Open an issue:
+        <https://github.com/CodaProtocol/coda/issues/new>
+
+      Briefly describe what you were doing and %s
+
+    %!|err}
+        action
+    else action
+  in
+  sprintf !{err|
+
+  ☠  Coda Daemon %s.
+  %s
+%!|err} error followup
+
+let no_report exn_str coda_ref =
+  sprintf
+    "include the last 20 lines from .coda-config/coda.log and then paste the \
+     following:\n\
+     Summary:\n\
+     %s\n\
+     Status:\n\
+     %s\n"
+    (Yojson.Safe.to_string (coda_status !coda_ref))
+    (Yojson.Safe.to_string (summary exn_str))
+
 let handle_crash e ~conf_dir ~top_logger coda_ref =
   let exn_str = Exn.to_string e in
   Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
@@ -466,45 +499,41 @@ let handle_crash e ~conf_dir ~top_logger coda_ref =
         sprintf "attach the crash report %s" report_file
     | Ok None ->
         (*TODO: tar failed, should we ask people to zip the temp directory themselves?*)
-        no_report ()
+        no_report exn_str coda_ref
     | Error e ->
         Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
           "Exception when generating crash report: $exn"
           ~metadata:[("exn", `String (Error.to_string_hum e))] ;
-        no_report ()
+        no_report exn_str coda_ref
   in
-  Core.eprintf
-    !{err|
-
-  ☠  Coda daemon crashed. The Coda Protocol developers would like to know why!
-
-  Please:
-    Open an issue:
-      <https://github.com/CodaProtocol/coda/issues/new>
-
-    Briefly describe what you were doing and %s
-%!|err}
-    action_string
+  let message =
+    coda_crash_message ~error:"crashed" ~action:action_string ~log_issue:true
+  in
+  Core.print_string message
 
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-      (let%bind () =
-         match Monitor.extract_exn exn with
-         | Coda_networking.No_initial_peers ->
-             Core.eprintf
-               !{err|
-
-  ☠  Coda Daemon failed to connect to any initial peers.
-
-You might be trying to connect to a different network version, or need to troubleshoot your configuration. See https://codaprotocol.com/docs/troubleshooting/ for details.
-
-%!|err} ;
-             return ()
-         | _ ->
-             handle_crash exn ~conf_dir ~top_logger coda_ref
-       in
-       Stdlib.exit 1)
-      |> don't_wait_for ) ;
+      ( match Monitor.extract_exn exn with
+      | Coda_networking.No_initial_peers ->
+          let message =
+            coda_crash_message ~error:"failed to connect to any initial peers"
+              ~action:
+                "You might be trying to connect to a different network \
+                 version, or need to troubleshoot your configuration. See \
+                 https://codaprotocol.com/docs/troubleshooting/ for details."
+              ~log_issue:false
+          in
+          Core.print_string message
+      | Genesis_ledger_helper.Genesis_state_initialization_error ->
+          let message =
+            coda_crash_message ~error:"failed to initialize the genesis state"
+              ~action:"include the last 50 lines from .coda-config/coda.log"
+              ~log_issue:true
+          in
+          Core.print_string message
+      | _ ->
+          handle_crash exn ~conf_dir ~top_logger coda_ref ) ;
+      Stdlib.exit 1 ) ;
   Async_unix.Signal.(
     handle terminating ~f:(fun signal ->
         log_shutdown ~conf_dir ~top_logger coda_ref ;

@@ -15,6 +15,8 @@ ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
 endif
 
+TMPDIR ?= /tmp
+
 ifeq ($(USEDOCKER),TRUE)
  $(info INFO Using Docker Named $(DOCKERNAME))
  WRAP = docker exec -it $(DOCKERNAME)
@@ -61,9 +63,23 @@ clean:
 libp2p_helper:
 	bash -c "source ~/.profile && cd src/app/libp2p_helper && nix-build default.nix"
 
+
+GENESIS_DIR := $(TMPDIR)/coda_cache_dir
+
+genesis_tar:
+	@GENESIS_FILE=$(GENESIS_DIR)/$(shell cat _build/default/src/app/runtime_genesis_ledger/genesis_filename.txt).tar.gz && if [ ! -f $$GENESIS_FILE ] || [ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -nt $$GENESIS_FILE ]; \
+	then ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe; \
+	fi
+
+genesis_ledger:
+# compile the tool and write the filename to `genesis_filename.txt`
+	$(info Building runtime_genesis_ledger)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/runtime_genesis_ledger/genesis_filename.txt && make genesis_tar
+	$(info Genesis ledger and genesis proof generated)
+
 build: git_hooks reformat-diff
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE) && dune exec --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE) && make genesis_ledger
 	$(info Build complete)
 
 build_archive: git_hooks reformat-diff
@@ -284,4 +300,4 @@ ml-docs:
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust docker-toolchain-discovery toolchains doc_diagrams ml-docs macos-setup macos-setup-download macos-setup-compile libp2p_helper
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download macos-setup-compile libp2p_helper
