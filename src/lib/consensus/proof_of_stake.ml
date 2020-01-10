@@ -108,6 +108,8 @@ module Data = struct
     module Base58_check = Codable.Make_base58_check (struct
       include Stable.Latest
 
+      let version_byte = Base58_check.Version_bytes.epoch_seed
+
       let description = "Epoch Seed"
     end)
 

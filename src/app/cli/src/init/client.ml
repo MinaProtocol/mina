@@ -403,15 +403,6 @@ let get_nonce_exn ~rpc public_key port =
   | Ok nonce ->
       return nonce
 
-let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
-    a Deferred.t =
-  match%bind Deferred.Or_error.try_with ~extract_exn:true f with
-  | Ok e ->
-      return e
-  | Error e ->
-      eprintf "Error: %s" (Error.to_string_hum e) ;
-      exit 4
-
 let batch_send_payments =
   let module Payment_info = struct
     type t =
@@ -859,7 +850,7 @@ let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%bind privkey =
@@ -873,7 +864,7 @@ let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
-    handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%map kp = Secrets.Keypair.Terminal_stdin.read_exn privkey_path in
@@ -881,20 +872,6 @@ let dump_keypair =
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check )
       (kp.private_key |> Private_key.to_base58_check))
-
-let generate_keypair =
-  Command.async ~summary:"Generate a new public-key/private-key pair"
-    (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
-    @@ fun () ->
-    let open Deferred.Let_syntax in
-    let kp = Keypair.create () in
-    let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
-    printf "Keypair generated\nPublic key: %s\n"
-      ( kp.public_key |> Public_key.compress
-      |> Public_key.Compressed.to_base58_check ) ;
-    exit 0)
 
 let dump_ledger =
   let sl_hash_flag =
@@ -1374,31 +1351,29 @@ let lock_account =
 
 let generate_libp2p_keypair =
   Command.async
-    ~summary:"Generate a new libp2p keypair and print out the peer ID"
+    ~summary:"Generate a new libp2p keypair and print it out the peer ID"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
-    @@ fun () ->
-    Deferred.ignore
-      (let open Deferred.Let_syntax in
-      (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
-      let logger = Logger.create () in
-      (* Using the helper only for keypair generation requires no state. *)
-      File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
-          match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
-          | Ok net ->
-              let%bind me = Coda_net2.Keypair.random net in
-              let%map () = Coda_net2.shutdown net in
-              let%map () =
-                Secrets.Libp2p_keypair.Terminal_stdin.write_exn me
-                  ~privkey_path
-              in
-              printf "libp2p peer ID:\n%s\n" (Coda_net2.Keypair.to_peer_id me)
-          | Error e ->
-              Logger.fatal logger "failed to generate libp2p keypair: $err"
-                ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:[("err", `String (Error.to_string_hum e))] ;
-              exit 20 )))
+    Command.Param.return
+      ( Cli_lib.Exceptions.handle_nicely
+      @@ fun () ->
+      Deferred.ignore
+        (let open Deferred.Let_syntax in
+        (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
+        let logger = Logger.null () in
+        (* Using the helper only for keypair generation requires no state. *)
+        File_system.with_temp_dir "coda-generate-libp2p-keypair"
+          ~f:(fun tmpd ->
+            match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
+            | Ok net ->
+                let%bind me = Coda_net2.Keypair.random net in
+                let%map () = Coda_net2.shutdown net in
+                printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
+            | Error e ->
+                Logger.fatal logger "failed to generate libp2p keypair: $err"
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:[("err", `String (Error.to_string_hum e))] ;
+                exit 20 )) ))
 
 let trustlist_ip_flag =
   Command.Param.(
@@ -1511,19 +1486,24 @@ let accounts =
     ; ("lock", lock_account) ]
 
 let client =
-  Command.group ~summary:"Simple client commands" ~preserve_subcommand_order:()
+  Command.group ~summary:"Lightweight client commands"
+    ~preserve_subcommand_order:()
     [ ("get-balance", get_balance_graphql)
     ; ("send-payment", send_payment_graphql)
     ; ("delegate-stake", delegate_stake_graphql)
     ; ("cancel-transaction", cancel_transaction_graphql)
-    ; ("set-staking", set_staking_graphql) ]
+    ; ("set-staking", set_staking_graphql)
+    ; ("set-snark-worker", set_snark_worker)
+    ; ("set-snark-work-fee", set_snark_work_fee)
+    ; ("stop-daemon", stop_daemon)
+    ; ("status", status) ]
 
 let command =
-  Command.group ~summary:"Lightweight client commands"
+  Command.group ~summary:"[Deprecated] Lightweight client commands"
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
-    ; ("generate-keypair", generate_keypair)
+    ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("cancel-transaction", cancel_transaction)
     ; ("set-staking", set_staking)
