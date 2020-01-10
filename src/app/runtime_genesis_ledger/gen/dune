@@ -1,0 +1,6 @@
+(executable
+ (name gen)
+ (libraries async core ppxlib yojson cache_dir)
+ (preprocess
+  (pps ppx_jane ppxlib.metaquot ppxlib.runner))
+ (modes native))
