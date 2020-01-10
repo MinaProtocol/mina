@@ -610,7 +610,7 @@ module Helper = struct
     | Error e ->
         Error e
 
-  let handle_upcall t v =
+  let rec handle_upcall t v =
     let open Yojson.Safe.Util in
     let open Or_error.Let_syntax in
     let open Upcall in
@@ -649,6 +649,8 @@ module Helper = struct
                         in
                         match%map lookup_peerid t m.sender with
                         | Ok sender ->
+                            Logger.error t.logger "forwarding gossip message"
+                              ~module_:__MODULE__ ~location:__LOC__ ;
                             finish sender
                         | Error e ->
                             Logger.error t.logger
@@ -698,8 +700,11 @@ module Helper = struct
             let decoded = sub.decode raw_data in
             let%bind is_valid =
               match decoded with
-              | Ok data ->
+              | Ok _ ->
+                  (* FIXME #4097:
                   sub.validator m.peer_id data
+                  *)
+                  Deferred.return false
               | Error e ->
                   ( match sub.on_decode_failure with
                   | `Ignore ->
@@ -731,7 +736,13 @@ module Helper = struct
                   ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:[("error", `String (Error.to_string_hum e))])
             |> don't_wait_for ;
-            Ok ()
+            (* FIXME #4097: since validation always fails we won't see the message if we don't manually bubble it up here *)
+            handle_upcall t
+              (Upcall.Publish.to_yojson
+                 { upcall= "publish"
+                 ; subscription_idx= m.subscription_idx
+                 ; sender= m.peer_id
+                 ; data= m.data })
         | None ->
             Or_error.errorf
               "asked to validate message for unregistered subscription idx %d"

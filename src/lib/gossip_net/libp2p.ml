@@ -69,7 +69,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let read_r, read_w = Pipe.create () in
       let underlying_r, underlying_w = Coda_net2.Stream.pipes stream in
       don't_wait_for
-        (Pipe.iter underlying_r ~f:(fun msg -> Pipe.write_if_open read_w msg)) ;
+        (Pipe.iter underlying_r ~f:(fun msg ->
+             Pipe.write_without_pushback_if_open read_w msg ;
+             Deferred.unit )) ;
       let transport =
         Async_rpc_kernel.Pipe_transport.(
           create Kind.string read_r underlying_w)
