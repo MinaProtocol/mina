@@ -283,8 +283,3 @@ MoreFs.symlinkSync(
   Node.Process.cwd() ++ "/graphql-docs",
   "./site/docs/graphql",
 );
-
-MoreFs.symlinkSync(
-  Node.Process.cwd() ++ "/archive-node-docs",
-  "./site/docs/archive-node",
-);

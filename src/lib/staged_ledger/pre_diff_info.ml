@@ -90,8 +90,7 @@ type t =
     example, when there are three slots and maximum number of provers), in which case,
     we simply add one coinbase as part of the second prediff.
   *)
-let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t)
-    (state_body_hash : State_body_hash.t) =
+let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t) =
   let open Result.Let_syntax in
   let coinbase = Coda_compile_config.coinbase in
   let coinbase_or_error = function
@@ -121,12 +120,10 @@ let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t)
     in
     let%bind cb1 =
       coinbase_or_error
-        (Coinbase.create ~amount:amt ~proposer ~fee_transfer:ft1
-           ~state_body_hash)
+        (Coinbase.create ~amount:amt ~proposer ~fee_transfer:ft1)
     in
     let%map cb2 =
       Coinbase.create ~amount:rem_coinbase ~proposer ~fee_transfer:ft2
-        ~state_body_hash
       |> coinbase_or_error
     in
     [cb1; cb2]
@@ -137,7 +134,6 @@ let create_coinbase coinbase_parts (proposer : Public_key.Compressed.t)
   | `One x ->
       let%map cb =
         Coinbase.create ~amount:coinbase ~proposer ~fee_transfer:x
-          ~state_body_hash
         |> coinbase_or_error
       in
       [cb]
@@ -213,12 +209,11 @@ let create_fee_transfers completed_works delta public_key coinbase_fts =
       |> One_or_two.group_list )
   |> to_staged_ledger_or_error
 
-let get_individual_info coinbase_parts proposer user_commands completed_works
-    state_body_hash =
+let get_individual_info coinbase_parts proposer user_commands completed_works =
   let open Result.Let_syntax in
   let%bind coinbase_parts =
     O1trace.measure "create_coinbase" (fun () ->
-        create_coinbase coinbase_parts proposer state_body_hash )
+        create_coinbase coinbase_parts proposer )
   in
   let coinbase_fts =
     List.concat_map coinbase_parts ~f:(fun cb ->
@@ -278,7 +273,7 @@ let get' (t : With_valid_signatures.t) =
           `Two x
     in
     get_individual_info coinbase_parts t.creator t1.user_commands
-      t1.completed_works t.state_body_hash
+      t1.completed_works
   in
   let apply_pre_diff_with_at_most_one
       (t2 : With_valid_signatures.pre_diff_with_at_most_one_coinbase) =
@@ -286,7 +281,7 @@ let get' (t : With_valid_signatures.t) =
       match t2.coinbase with Zero -> `Zero | One x -> `One x
     in
     get_individual_info coinbase_added t.creator t2.user_commands
-      t2.completed_works t.state_body_hash
+      t2.completed_works
   in
   let open Result.Let_syntax in
   let%bind () = check_coinbase t.diff in

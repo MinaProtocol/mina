@@ -7,8 +7,7 @@ module Stable = struct
     type t =
       { proposer: Public_key.Compressed.Stable.V1.t
       ; amount: Currency.Amount.Stable.V1.t
-      ; fee_transfer: Fee_transfer.Single.Stable.V1.t option
-      ; state_body_hash: State_body_hash.Stable.V1.t }
+      ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
     [@@deriving sexp, compare, eq, hash, yojson]
 
     let to_latest = Fn.id
@@ -18,8 +17,7 @@ end]
 type t = Stable.Latest.t =
   { proposer: Public_key.Compressed.t
   ; amount: Currency.Amount.t
-  ; fee_transfer: Fee_transfer.Single.t option
-  ; state_body_hash: State_body_hash.t }
+  ; fee_transfer: Fee_transfer.Single.t option }
 [@@deriving sexp, compare, eq, hash, yojson]
 
 let is_valid {amount; fee_transfer; _} =
@@ -29,8 +27,8 @@ let is_valid {amount; fee_transfer; _} =
   | Some (_, fee) ->
       Currency.Amount.(of_fee fee <= amount)
 
-let create ~amount ~proposer ~fee_transfer ~state_body_hash =
-  let t = {proposer; amount; fee_transfer; state_body_hash} in
+let create ~amount ~proposer ~fee_transfer =
+  let t = {proposer; amount; fee_transfer} in
   if is_valid t then
     let adjusted_fee_transfer =
       if
@@ -43,7 +41,7 @@ let create ~amount ~proposer ~fee_transfer ~state_body_hash =
     Ok {t with fee_transfer= adjusted_fee_transfer}
   else Or_error.error_string "Coinbase.create: invalid coinbase"
 
-let supply_increase {proposer= _; amount; fee_transfer; state_body_hash= _} =
+let supply_increase {proposer= _; amount; fee_transfer} =
   match fee_transfer with
   | None ->
       Ok amount
@@ -67,8 +65,7 @@ let gen =
     Currency.Fee.gen_incl Currency.Fee.zero (Currency.Amount.to_fee amount)
   in
   let prover = Public_key.Compressed.gen in
-  let%bind fee_transfer =
+  let%map fee_transfer =
     Option.quickcheck_generator (Quickcheck.Generator.tuple2 prover fee)
   in
-  let%map state_body_hash = State_body_hash.gen in
-  {proposer; amount; fee_transfer; state_body_hash}
+  {proposer; amount; fee_transfer}
