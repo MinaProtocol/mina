@@ -49,11 +49,11 @@ let make = (~nextStep, ~prevStep) => {
         </FadeIn>
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
-            style=Button.Gray
+            style=Button.MidnightBlue
             label="Go Back"
             onClick={_ => prevStep()}
           />
-          <Spacer width=0.5 />
+          <Spacer width=1.5 />
           <AddAccountMutation>
             {(mutation, {result}) =>
                <>

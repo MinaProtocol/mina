@@ -15,19 +15,21 @@ let make = (~prevStep, ~completeSetup) => {
       <>
         <Button
           label="Coda Install Guide"
+          width=14.
           icon=Icon.Docs
           style=Button.OffWhite
           onClick={_ => openExternal("https://codaprotocol.com/docs/")}
         />
-        <Spacer height=2.0 />
+        <Spacer height=2.5 />
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
             style=Button.MidnightBlue
             label="Go Back"
             onClick={_ => prevStep()}
           />
-          <Spacer width=0.5 />
+          <Spacer width=1.5 />
           <Button
+            width=15.
             label="Setup Is Complete"
             style=Button.HyperlinkBlue
             onClick={_ => completeSetup()}

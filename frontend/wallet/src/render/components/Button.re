@@ -43,7 +43,7 @@ module Styles = {
     | Green => Theme.Colors.serpentine
     | Red => Theme.Colors.roseBud
     | OffWhite => Theme.Colors.offWhite(0.2)
-    | MidnightBlue => Theme.Colors.midnight
+    | MidnightBlue => Theme.Colors.hyperlinkAlpha(0.3)
     };
 
   let buttonHoverBgColor = mode =>

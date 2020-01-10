@@ -205,7 +205,7 @@ let make = (~prevStep, ~closeOnboarding) => {
             label="Go Back"
             onClick={_ => prevStep()}
           />
-          <Spacer width=0.5 />
+          <Spacer width=1.5 />
           <Button
             label="Take me to My Account"
             style=Button.HyperlinkBlue

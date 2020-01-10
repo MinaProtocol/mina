@@ -11,10 +11,17 @@ let make = (~prevStep, ~nextStep) => {
     }
     miscLeft=
       <>
+        <Spacer height=4. />
         <Button
           label="Go Back"
           style=Button.MidnightBlue
           onClick={_ => prevStep()}
+        />
+        <Spacer height=1.5 />
+        <Button
+          label="Continue"
+          style=Button.HyperlinkBlue
+          onClick={_ => nextStep()}
         />
       </>
     miscRight={

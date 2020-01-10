@@ -9,19 +9,20 @@ let make = (~prevStep, ~runNode) => {
     description={<p> {React.string("Where have you set up Coda?")} </p>}
     miscLeft=
       <>
+        <Spacer height=2.5 />
         <TextField
           label="IP Address"
           onChange={value => setIp(_ => value)}
           value=ip
         />
-        <Spacer height=2.0 />
+        <Spacer height=2.5 />
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
             style=Button.MidnightBlue
             label="Go Back"
             onClick={_ => prevStep()}
           />
-          <Spacer width=0.5 />
+          <Spacer width=1. />
           <Button
             label="Continue"
             style=Button.HyperlinkBlue

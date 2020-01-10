@@ -20,7 +20,7 @@ let make = (~prevStep, ~createAccount) => {
             label="Go Back"
             onClick={_ => prevStep()}
           />
-          <Spacer width=0.5 />
+          <Spacer width=1.5 />
           <Button
             label="Continue"
             style=Button.HyperlinkBlue

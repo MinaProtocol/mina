@@ -12,13 +12,13 @@ let make = (~prevStep, ~runNode, ~nextStep) => {
             label="Go Back"
             onClick={_ => prevStep()}
           />
-          <Spacer width=0.5 />
+          <Spacer width=1.0 />
           <Button
             label="Local Machine"
             style=Button.HyperlinkBlue
             onClick={_ => runNode()}
           />
-          <Spacer width=0.5 />
+          <Spacer width=1.5 />
           <Button
             label="Remote Server"
             style=Button.HyperlinkBlue

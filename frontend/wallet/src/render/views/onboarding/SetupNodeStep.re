@@ -20,7 +20,7 @@ let make = (~customSetup, ~expressSetup) => {
             label="Custom Setup"
             onClick={_ => customSetup()}
           />
-          <Spacer width=0.5 />
+          <Spacer width=1.5 />
           <Button
             label="Express Setup"
             style=Button.HyperlinkBlue

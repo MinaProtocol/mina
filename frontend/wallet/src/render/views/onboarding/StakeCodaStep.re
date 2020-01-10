@@ -20,14 +20,16 @@ let make = (~prevStep, ~nextStep) => {
             label="Go Back"
             onClick={_ => prevStep()}
           />
-          <Spacer width=0.5 />
+          <Spacer width=1.5 />
           <Button
+            width=17.
             style=Button.MidnightBlue
             label="Continue without Auto-Staking"
             onClick={_ => nextStep()}
           />
-          <Spacer width=0.5 />
+          <Spacer width=1.5 />
           <Button
+            width=13.
             label="Enable Auto-Staking"
             style=Button.HyperlinkBlue
             onClick={_ => nextStep()}
