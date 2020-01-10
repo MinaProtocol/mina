@@ -1429,15 +1429,20 @@ let accounts =
     ; ("lock", lock_account) ]
 
 let client =
-  Command.group ~summary:"Simple client commands" ~preserve_subcommand_order:()
+  Command.group ~summary:"Lightweight client commands"
+    ~preserve_subcommand_order:()
     [ ("get-balance", get_balance_graphql)
     ; ("send-payment", send_payment_graphql)
     ; ("delegate-stake", delegate_stake_graphql)
     ; ("cancel-transaction", cancel_transaction_graphql)
-    ; ("set-staking", set_staking_graphql) ]
+    ; ("set-staking", set_staking_graphql)
+    ; ("set-snark-worker", set_snark_worker)
+    ; ("set-snark-work-fee", set_snark_work_fee)
+    ; ("stop-daemon", stop_daemon)
+    ; ("status", status) ]
 
 let command =
-  Command.group ~summary:"Lightweight client commands"
+  Command.group ~summary:"[Deprecated] Lightweight client commands"
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
