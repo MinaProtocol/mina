@@ -113,18 +113,18 @@ module Router = {
 };
 
 let jobOpenings = [|
-  ("engineering-manager", "Engineering Manager (San Francisco)"),
   (
     "protocol-reliability-engineer",
     "Protocol Reliability Engineer (San Francisco)",
   ),
   ("product-manager", "Product Manager (San Francisco)"),
   (
-    "platform-engineer",
-    "Senior Platform Engineer (Frontend Product) (San Francisco)",
+    "product-engineering-intern",
+    "Product Engineering Intern (Frontend) (San Francisco)",
   ),
   ("visual-designer", "Visual Designer (San Francisco)"),
   ("protocol-engineer", "Senior Protocol Engineer (San Francisco)"),
+  ("protocol-engineer-product", "Protocol Engineer (San Francisco)"),
 |];
 
 Rimraf.sync("site");
