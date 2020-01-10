@@ -20,7 +20,7 @@ CREATE TABLE user_commands
 , sender_id      int               NOT NULL REFERENCES public_keys(id)
 , receiver_id    int               NOT NULL REFERENCES public_keys(id)
 , nonce          bigint            NOT NULL
-, amount         bigint            NOT NULL
+, amount         bigint
 , fee            bigint            NOT NULL
 , memo           text              NOT NULL
 , transaction_id int               NOT NULL UNIQUE
