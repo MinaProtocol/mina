@@ -1628,12 +1628,13 @@ let%test_module "transaction_snark" =
         Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
       let proposer = mk_pubkey () in
+      let receiver = mk_pubkey () in
       let other = mk_pubkey () in
       let pending_coinbase_init = Pending_coinbase.Stack.empty in
       let cb =
         Coinbase.create
           ~amount:(Currency.Amount.of_int 10)
-          ~proposer
+          ~receiver
           ~fee_transfer:(Some (other, Currency.Fee.of_int 1))
         |> Or_error.ok_exn
       in
