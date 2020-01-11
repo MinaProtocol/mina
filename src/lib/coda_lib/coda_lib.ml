@@ -49,8 +49,10 @@ type pipes =
   ; proposer_transition_writer:
       (Transition_frontier.Breadcrumb.t, synchronous, unit Deferred.t) Writer.t
   ; external_transitions_writer:
-      (External_transition.t Envelope.Incoming.t * Block_time.t) Pipe.Writer.t
-  }
+      ( External_transition.t Envelope.Incoming.t
+      * Block_time.t
+      * (bool -> unit) )
+      Pipe.Writer.t }
 
 type t =
   { config: Config.t
@@ -795,7 +797,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
                   ~network_transition_reader:
                     (Strict_pipe.Reader.map external_transitions_reader
-                       ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
+                       ~f:(fun (tn, tm, cb) ->
+                         (`Transition tn, `Time_received tm, `Valid_cb cb) ))
                   ~proposer_transition_reader ~most_recent_valid_block
                   ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
                   ~base_proof )

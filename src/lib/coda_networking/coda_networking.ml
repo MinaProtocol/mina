@@ -515,13 +515,17 @@ type t =
   ; trust_system: Trust_system.t
   ; gossip_net: Gossip_net.Any.t
   ; states:
-      (External_transition.t Envelope.Incoming.t * Block_time.t)
+      ( External_transition.t Envelope.Incoming.t
+      * Block_time.t
+      * (bool -> unit) )
       Strict_pipe.Reader.t
   ; transaction_pool_diffs:
-      Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
+      ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
+      * (bool -> unit) )
       Linear_pipe.Reader.t
   ; snark_pool_diffs:
-      Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t Linear_pipe.Reader.t
+      (Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t * (bool -> unit))
+      Linear_pipe.Reader.t
   ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
   ; first_received_message_signal: unit Ivar.t }
 [@@deriving fields]
@@ -751,8 +755,11 @@ let create (config : Config.t)
   in
   let first_received_message_signal = Ivar.create () in
   let states, snark_pool_diffs, transaction_pool_diffs =
-    Strict_pipe.Reader.partition_map3 received_gossips ~f:(fun envelope ->
+    Strict_pipe.Reader.partition_map3 received_gossips
+      ~f:(fun (envelope, valid_cb) ->
         Ivar.fill_if_empty first_received_message_signal () ;
+        Logger.fatal config.logger ~module_:__MODULE__ ~location:__LOC__
+          "RECEIVED A GOSSIP!" ;
         match Envelope.Incoming.data envelope with
         | New_state state ->
             Perf_histograms.add_span ~name:"external_transition_latency"
@@ -771,7 +778,8 @@ let create (config : Config.t)
                   ] ;
             `Fst
               ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
-              , Block_time.now config.time_controller )
+              , Block_time.now config.time_controller
+              , valid_cb )
         | Snark_pool_diff diff ->
             if config.log_gossip_heard.snark_pool_diff then
               Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -783,7 +791,7 @@ let create (config : Config.t)
                   ] ;
             Coda_metrics.(
               Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
-            `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff))
+            `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
         | Transaction_pool_diff diff ->
             if config.log_gossip_heard.transaction_pool_diff then
               Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -808,7 +816,8 @@ let create (config : Config.t)
                     false )
                   else true )
             in
-            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff')) )
+            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff'), valid_cb)
+    )
   in
   { gossip_net
   ; logger= config.logger

@@ -148,6 +148,46 @@ func needsDHT() error {
 	return badRPC(errors.New("helper not yet joined to pubsub"))
 }
 
+func parseMultiaddrWithID(ma multiaddr.Multiaddr, id peer.ID) (*codaPeerInfo, error) {
+	ipComponent, tcpMaddr := multiaddr.SplitFirst(ma)
+	if !(ipComponent.Protocol().Code == multiaddr.P_IP4 || ipComponent.Protocol().Code == multiaddr.P_IP6) {
+		return nil, badRPC(errors.New(fmt.Sprintf("only IP connections are supported right now, how did this peer connect?: %s", ma.String())))
+	}
+
+	tcpComponent, _ := multiaddr.SplitFirst(tcpMaddr)
+	if tcpComponent.Protocol().Code != multiaddr.P_TCP {
+		return nil, badRPC(errors.New("only TCP connections are supported right now, how did this peer connect?"))
+	}
+
+	port, err := strconv.Atoi(tcpComponent.Value())
+	if err != nil {
+		return nil, err
+	}
+
+	return &codaPeerInfo{Libp2pPort: port, Host: ipComponent.Value(), PeerID: peer.IDB58Encode(id)}, nil
+}
+
+func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
+	if app.P2p == nil {
+		return nil, needsConfigure()
+	}
+
+	ctx, cancel := context.WithTimeout(app.Ctx, 15*time.Second)
+	defer cancel()
+
+	conn, err := app.P2p.Host.Network().DialPeer(ctx, id)
+
+	if err != nil {
+		return nil, err
+	}
+
+	maybePeer, err := parseMultiaddrWithID(conn.RemoteMultiaddr(), conn.RemotePeer())
+	if err != nil {
+		return nil, err
+	}
+	return maybePeer, nil
+}
+
 type configureMsg struct {
 	Statedir  string   `json:"statedir"`
 	Privk     string   `json:"privk"`
@@ -250,10 +290,10 @@ type subscribeMsg struct {
 }
 
 type publishUpcall struct {
-	Upcall       string `json:"upcall"`
-	Subscription int    `json:"subscription_idx"`
-	Data         string `json:"data"`
-	Sender       string `json:"sender"`
+	Upcall       string       `json:"upcall"`
+	Subscription int          `json:"subscription_idx"`
+	Data         string       `json:"data"`
+	Sender       codaPeerInfo `json:"sender"`
 }
 
 func (s *subscribeMsg) run(app *app) (interface{}, error) {
@@ -267,13 +307,20 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		seqno := <-seqs
 		ch := make(chan bool)
 		app.Validators[seqno] = ch
-		app.writeMsg(validateUpcall{
-			PeerID: id.Pretty(),
-			Data:   b58.Encode(msg.Data),
-			Seqno:  seqno,
-			Upcall: "validate",
-			Idx:    s.Subscription,
-		})
+		sender, err := findPeerInfo(app, id)
+		if err != nil {
+			app.writeMsg(validateUpcall{
+				Sender: *sender,
+				Data:   b58.Encode(msg.Data),
+				Seqno:  seqno,
+				Upcall: "validate",
+				Idx:    s.Subscription,
+			})
+		} else {
+			app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us a pubsub message, dropping it", peer.IDB58Encode(id))
+			delete(app.Validators, seqno)
+			return false
+		}
 
 		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
 		select {
@@ -307,16 +354,21 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		for {
 			msg, err := sub.Next(ctx)
 			if err == nil {
-				data := b58.Encode(msg.Data)
-				app.writeMsg(publishUpcall{
-					Upcall:       "publish",
-					Subscription: s.Subscription,
-					Data:         data,
-					Sender:       peer.IDB58Encode(msg.ReceivedFrom),
-				})
+				sender, err := findPeerInfo(app, msg.ReceivedFrom)
+				if err == nil {
+					app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us an already-validated pubsub message, dropping it", peer.IDB58Encode(msg.ReceivedFrom))
+				} else {
+					data := b58.Encode(msg.Data)
+					app.writeMsg(publishUpcall{
+						Upcall:       "publish",
+						Subscription: s.Subscription,
+						Data:         data,
+						Sender:       *sender,
+					})
+				}
 			} else {
 				if ctx.Err() != context.Canceled {
-					log.Print("sub.Next failed: ", err)
+					app.P2p.Logger.Error("sub.Next failed: ", err)
 				} else {
 					break
 				}
@@ -343,11 +395,11 @@ func (u *unsubscribeMsg) run(app *app) (interface{}, error) {
 }
 
 type validateUpcall struct {
-	PeerID string `json:"peer_id"`
-	Data   string `json:"data"`
-	Seqno  int    `json:"seqno"`
-	Upcall string `json:"upcall"`
-	Idx    int    `json:"subscription_idx"`
+	Sender codaPeerInfo `json:"sender"`
+	Data   string       `json:"data"`
+	Seqno  int          `json:"seqno"`
+	Upcall string       `json:"upcall"`
+	Idx    int          `json:"subscription_idx"`
 }
 
 type validationCompleteMsg struct {
@@ -728,34 +780,10 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	return "beginAdvertising success", nil
 }
 
-type peerInfo struct {
-	Multiaddr string `json:"multiaddr"`
-	PeerID    string `json:"peer_id"`
-}
-
 type codaPeerInfo struct {
 	Libp2pPort int    `json:"libp2p_port"`
 	Host       string `json:"host"`
 	PeerID     string `json:"peer_id"`
-}
-
-func parseMultiaddrWithID(ma multiaddr.Multiaddr, id peer.ID) (*codaPeerInfo, error) {
-	ipComponent, tcpMaddr := multiaddr.SplitFirst(ma)
-	if !(ipComponent.Protocol().Code == multiaddr.P_IP4 || ipComponent.Protocol().Code == multiaddr.P_IP6) {
-		return nil, badRPC(errors.New(fmt.Sprintf("only IP connections are supported right now, how did this peer connect?: %s", ma.String())))
-	}
-
-	tcpComponent, _ := multiaddr.SplitFirst(tcpMaddr)
-	if tcpComponent.Protocol().Code != multiaddr.P_TCP {
-		return nil, badRPC(errors.New("only TCP connections are supported right now, how did this peer connect?"))
-	}
-
-	port, err := strconv.Atoi(tcpComponent.Value())
-	if err != nil {
-		return nil, err
-	}
-
-	return &codaPeerInfo{Libp2pPort: port, Host: ipComponent.Value(), PeerID: peer.IDB58Encode(id)}, nil
 }
 
 type findPeerMsg struct {
@@ -768,23 +796,12 @@ func (ap *findPeerMsg) run(app *app) (interface{}, error) {
 		return nil, err
 	}
 
-	if app.P2p == nil {
-		return nil, needsConfigure()
-	}
-
-	ctx, cancel := context.WithTimeout(app.Ctx, 15*time.Second)
-	defer cancel()
-
-	conn, err := app.P2p.Host.Network().DialPeer(ctx, id)
+	maybePeer, err := findPeerInfo(app, id)
 
 	if err != nil {
 		return nil, err
 	}
 
-	maybePeer, err := parseMultiaddrWithID(conn.RemoteMultiaddr(), conn.RemotePeer())
-	if err != nil {
-		return nil, err
-	}
 	return *maybePeer, nil
 }
 

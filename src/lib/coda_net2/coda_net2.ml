@@ -9,6 +9,12 @@ open Network_peer
 type peer_info = {libp2p_port: int; host: string; peer_id: string}
 [@@deriving yojson]
 
+let peer_of_peer_info peer_info =
+  Peer.create
+    (Unix.Inet_addr.of_string peer_info.host)
+    ~libp2p_port:peer_info.libp2p_port
+    ~peer_id:(Peer.Id.unsafe_of_string peer_info.peer_id)
+
 (* BTC alphabet *)
 let alphabet =
   B58.make_alphabet
@@ -76,10 +82,10 @@ module Helper = struct
     ; topic: string
     ; idx: int
     ; mutable closed: bool
-    ; validator: string -> 'a -> bool Deferred.t
+    ; validator: 'a Envelope.Incoming.t -> bool Deferred.t
     ; encode: 'a -> string
     ; on_decode_failure:
-        [`Ignore | `Call of sender:Peer.Id.t -> data:string -> Error.t -> unit]
+        [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
     ; decode: string -> 'a Or_error.t
     ; write_pipe:
         ( 'a Envelope.Incoming.t
@@ -553,13 +559,13 @@ module Helper = struct
   module Upcall = struct
     module Publish = struct
       type t =
-        {upcall: string; subscription_idx: int; sender: string; data: Data.t}
+        {upcall: string; subscription_idx: int; sender: peer_info; data: Data.t}
       [@@deriving yojson]
     end
 
     module Validate = struct
       type t =
-        { peer_id: string
+        { sender: peer_info
         ; data: Data.t
         ; seqno: int
         ; upcall: string
@@ -610,7 +616,7 @@ module Helper = struct
     | Error e ->
         Error e
 
-  let rec handle_upcall t v =
+  let handle_upcall t v =
     let open Yojson.Safe.Util in
     let open Or_error.Let_syntax in
     let open Upcall in
@@ -624,8 +630,11 @@ module Helper = struct
                ~message:
                  "How did we receive pubsub before configuring our keypair?"
         in
-        if Peer.Id.equal m.sender me.peer_id then
-          (* elide messages that we sent *) return ()
+        if Peer.Id.equal m.sender.peer_id me.peer_id then (
+          Logger.fatal t.logger
+            "not handling published message originated from me"
+            ~module_:__MODULE__ ~location:__LOC__ ;
+          (* elide messages that we sent *) return () )
         else
           let idx = m.subscription_idx in
           let data = m.data in
@@ -636,37 +645,24 @@ module Helper = struct
                 let decoded = sub.decode raw_data in
                 match decoded with
                 | Ok data ->
-                    don't_wait_for
-                      Deferred.Let_syntax.(
-                        let finish sender =
-                          (* TAKE CARE: doing anything with the return
+                    (* TAKE CARE: doing anything with the return
                           value here except ignore is UNSOUND because
                           write_pipe has a cast type. We don't remember
                           what the original 'return was. *)
-                          Strict_pipe.Writer.write sub.write_pipe
-                            (Envelope.Incoming.wrap_peer ~data ~sender)
-                          |> ignore
-                        in
-                        match%map lookup_peerid t m.sender with
-                        | Ok sender ->
-                            Logger.error t.logger "forwarding gossip message"
-                              ~module_:__MODULE__ ~location:__LOC__ ;
-                            finish sender
-                        | Error e ->
-                            Logger.error t.logger
-                              "failed to find connection info for alleged \
-                               sender $peer_id on topic $topic: $error"
-                              ~module_:__MODULE__ ~location:__LOC__
-                              ~metadata:
-                                [ ("peer_id", `String m.sender)
-                                ; ("topic", `String sub.topic)
-                                ; ("error", `String (Error.to_string_hum e)) ])
+                    Strict_pipe.Writer.write sub.write_pipe
+                      (Envelope.Incoming.wrap_peer ~data
+                         ~sender:(peer_of_peer_info m.sender))
+                    |> ignore
                 | Error e ->
                     ( match sub.on_decode_failure with
                     | `Ignore ->
                         ()
                     | `Call f ->
-                        f ~sender:m.sender ~data:raw_data e ) ;
+                        f
+                          (Envelope.Incoming.wrap_peer
+                             ~sender:(peer_of_peer_info m.sender)
+                             ~data:raw_data)
+                          e ) ;
                     Logger.error t.logger
                       "failed to decode message published on subscription \
                        $topic ($idx): $error"
@@ -693,6 +689,7 @@ module Helper = struct
         let%bind m = Validate.of_yojson v |> or_error in
         let idx = m.subscription_idx in
         let seqno = m.seqno in
+        let sender = peer_of_peer_info m.sender in
         match Hashtbl.find t.subscriptions idx with
         | Some sub ->
             (let open Deferred.Let_syntax in
@@ -700,17 +697,15 @@ module Helper = struct
             let decoded = sub.decode raw_data in
             let%bind is_valid =
               match decoded with
-              | Ok _ ->
-                  (* FIXME #4097:
-                  sub.validator m.peer_id data
-                  *)
-                  Deferred.return false
+              | Ok data ->
+                  sub.validator (Envelope.Incoming.wrap_peer ~data ~sender)
               | Error e ->
                   ( match sub.on_decode_failure with
                   | `Ignore ->
                       ()
                   | `Call f ->
-                      f ~sender:m.peer_id ~data:raw_data e ) ;
+                      f (Envelope.Incoming.wrap_peer ~sender ~data:raw_data) e
+                  ) ;
                   Logger.error t.logger
                     "failed to decode message published on subscription \
                      $topic ($idx): $error"
@@ -736,13 +731,7 @@ module Helper = struct
                   ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:[("error", `String (Error.to_string_hum e))])
             |> don't_wait_for ;
-            (* FIXME #4097: since validation always fails we won't see the message if we don't manually bubble it up here *)
-            handle_upcall t
-              (Upcall.Publish.to_yojson
-                 { upcall= "publish"
-                 ; subscription_idx= m.subscription_idx
-                 ; sender= m.peer_id
-                 ; data= m.data })
+            Ok ()
         | None ->
             Or_error.errorf
               "asked to validate message for unregistered subscription idx %d"
@@ -908,11 +897,10 @@ module Pubsub = struct
       ; topic: string
       ; idx: int
       ; mutable closed: bool
-      ; validator: string -> 'a -> bool Deferred.t
+      ; validator: 'a Envelope.Incoming.t -> bool Deferred.t
       ; encode: 'a -> string
       ; on_decode_failure:
-          [ `Ignore
-          | `Call of sender:Peer.Id.t -> data:string -> Error.t -> unit ]
+          [`Ignore | `Call of string Envelope.Incoming.t -> Error.t -> unit]
       ; decode: string -> 'a Or_error.t
       ; write_pipe:
           ( 'a Envelope.Incoming.t
@@ -959,10 +947,7 @@ module Pubsub = struct
       ; encode
       ; on_decode_failure
       ; decode
-      ; validator=
-          (fun s d ->
-            should_forward_message ~sender:(Peer.Id.unsafe_of_string s) ~data:d
-            )
+      ; validator= should_forward_message
       ; write_pipe
       ; read_pipe }
     in
@@ -1412,7 +1397,7 @@ let%test_module "coda network tests" =
       [%test_eq: M.msg] M.b_sent (unwrap_eof a_recv) ;
       shutdown ()
 
-    let should_forward_message ~sender:_ ~data:_ = return true
+    let should_forward_message _ = return true
 
     let%test_unit "pubsub_raw" =
       let test_def =

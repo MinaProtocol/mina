@@ -30,7 +30,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     type network_interface =
       { broadcast_message_writer:
-          ( Message.msg Envelope.Incoming.t
+          ( Message.msg Envelope.Incoming.t * (bool -> unit)
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -80,7 +80,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                     Incoming.wrap ~data:msg
                       ~sender:(Sender.Remote (sender.host, sender.peer_id)))
                 in
-                Strict_pipe.Writer.write intf.broadcast_message_writer msg ) )
+                Strict_pipe.Writer.write intf.broadcast_message_writer
+                  (msg, Fn.const ()) ) )
 
     let call_rpc : type q r.
            t
@@ -107,9 +108,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; peer_table: (Peer.Id.t, Peer.t) Hashtbl.t
       ; initial_peers: Peer.t list
       ; received_message_reader:
-          Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
+          (Message.msg Envelope.Incoming.t * (bool -> unit))
+          Strict_pipe.Reader.t
       ; received_message_writer:
-          ( Message.msg Envelope.Incoming.t
+          ( Message.msg Envelope.Incoming.t * (bool -> unit)
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t

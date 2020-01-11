@@ -46,7 +46,8 @@ module type S = sig
        config:Resource_pool.Config.t
     -> logger:Logger.t
     -> disk_location:string
-    -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
+    -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
+                      * (bool -> unit) )
                       Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier option
                                Broadcast_pipe.Reader.t
@@ -376,13 +377,14 @@ module Make (Transition_frontier : Transition_frontier_intf) :
   let add_completed_work t
       (res : (('a, 'b, 'c) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
     apply_and_broadcast t
-      (Envelope.Incoming.wrap
-         ~data:
-           (Resource_pool.Diff.Stable.V1.Add_solved_work
-              ( One_or_two.map res.spec.instances ~f:Single.Spec.statement
-              , { proof= res.proofs
-                ; fee= {fee= res.spec.fee; prover= res.prover} } ))
-         ~sender:Envelope.Sender.Local)
+      ( Envelope.Incoming.wrap
+          ~data:
+            (Resource_pool.Diff.Stable.V1.Add_solved_work
+               ( One_or_two.map res.spec.instances ~f:Single.Spec.statement
+               , { proof= res.proofs
+                 ; fee= {fee= res.spec.fee; prover= res.prover} } ))
+          ~sender:Envelope.Sender.Local
+      , Fn.const () )
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
@@ -614,7 +616,7 @@ let%test_module "random set test" =
                      failwith "There should have been a proof here" ) ;
                  Deferred.unit ) ;
           Mock_snark_pool.apply_and_broadcast network_pool
-            (Envelope.Incoming.local command) )
+            (Envelope.Incoming.local command, Fn.const ()) )
 
     let%test_unit "when creating a network, the incoming diffs in reader pipe \
                    will automatically get process" =
@@ -629,17 +631,18 @@ let%test_module "random set test" =
           let verify_unsolved_work () =
             let work_diffs =
               List.map works ~f:(fun work ->
-                  Envelope.Incoming.local
-                    (Mock_snark_pool.Resource_pool.Diff.Stable.V1
-                     .Add_solved_work
-                       ( work
-                       , Priced_proof.
-                           { proof= One_or_two.map ~f:mk_dummy_proof work
-                           ; fee=
-                               { fee= Currency.Fee.of_int 0
-                               ; prover=
-                                   Signature_lib.Public_key.Compressed.empty }
-                           } )) )
+                  ( Envelope.Incoming.local
+                      (Mock_snark_pool.Resource_pool.Diff.Stable.V1
+                       .Add_solved_work
+                         ( work
+                         , Priced_proof.
+                             { proof= One_or_two.map ~f:mk_dummy_proof work
+                             ; fee=
+                                 { fee= Currency.Fee.of_int 0
+                                 ; prover=
+                                     Signature_lib.Public_key.Compressed.empty
+                                 } } ))
+                  , Fn.const () ) )
               |> Linear_pipe.of_list
             in
             let frontier_broadcast_pipe_r, _ =

@@ -50,6 +50,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; first_peer_ivar: unit Ivar.t
       ; high_connectivity_ivar: unit Ivar.t
       ; ban_reader: Intf.ban_notification Linear_pipe.Reader.t
+      ; message_reader:
+          (Message.msg Envelope.Incoming.t * (bool -> unit))
+          Strict_pipe.Reader.t
       ; subscription: Message.msg Coda_net2.Pubsub.Subscription.t }
 
     let create_rpc_implementations (Rpc_handler (rpc, handler)) =
@@ -184,51 +187,69 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                                 , [ ( "exn"
                                     , `String (Exn.to_string handshake_error)
                                     ) ] ) ))
-                  | Ok rpc_connection ->
+                  | Ok rpc_connection -> (
                       let%bind () =
                         Async_rpc_kernel.Rpc.Connection.close_finished
                           rpc_connection
                       in
-                      Async_rpc_kernel.Rpc.Connection.close
-                        ~reason:(Info.of_string "connection completed")
-                        rpc_connection )
+                      let%bind () =
+                        Async_rpc_kernel.Rpc.Connection.close
+                          ~reason:(Info.of_string "connection completed")
+                          rpc_connection
+                      in
+                      match%map Coda_net2.Stream.reset stream with
+                      | Error e ->
+                          Logger.error config.logger
+                            "failed to reset stream: $error"
+                            ~module_:__MODULE__ ~location:__LOC__
+                            ~metadata:
+                              [("error", `String (Error.to_string_hum e))]
+                      | Ok () ->
+                          () ) )
+            in
+            let message_reader, message_writer =
+              Strict_pipe.create
+                ~name:"Gossip_net.Libp2p messages with validation callbacks"
+                Strict_pipe.(Buffered (`Capacity 64, `Overflow Crash))
             in
             let%bind subscription =
-              let open Deferred.Let_syntax in
               Coda_net2.Pubsub.subscribe_encode net2
                 "coda/consensus-messages/0.0.1"
-                (* FIXME #4097: instead of doing validation here we put the message into a
-           queue for later potential broadcast. It will still be broadcast
-           despite failing validation, validation is only for automatic forwarding.
-           Instead, we should probably do "initial validation" up front here,
-           and turn should_forward_message into a filter_map instead of just a filter. *)
-                ~should_forward_message:(fun ~sender:_ ~data:_ ->
-                  Deferred.return false )
+                (* Fix for #4097: validation is tied into a lot of complex control flow.
+                   Instead of refactoring it to have validation up-front and decoupled,
+                   we pass along a validation callback with the message. This ends up
+                   ignoring the actual subscription message pipe, so drain it separately. *)
+                ~should_forward_message:(fun envelope ->
+                  let valid_ivar = Ivar.create () in
+                  Strict_pipe.Writer.write message_writer
+                    (envelope, Ivar.fill valid_ivar) ;
+                  Ivar.read valid_ivar )
                 ~bin_prot:Message.V1.T.bin_msg
                 ~on_decode_failure:
                   (`Call
-                    (fun ~sender ~data:_ err ->
+                    (fun envelope (err : Error.t) ->
+                      let host, peer_id =
+                        Envelope.Incoming.sender envelope
+                        |> Envelope.Sender.remote_exn
+                      in
                       let metadata =
-                        [ ("sender_peer_id", `String sender)
+                        [ ("sender_peer_id", `String peer_id)
                         ; ("error", `String (Error.to_string_hum err)) ]
                       in
-                      don't_wait_for
-                        ( match%bind Coda_net2.lookup_peerid net2 sender with
-                        | Ok p ->
-                            Trust_system.(
-                              record config.trust_system config.logger p.host
-                                Actions.
-                                  ( Violated_protocol
-                                  , Some
-                                      ( "failed to decode gossip message"
-                                      , metadata ) ))
-                        | Error _ ->
-                            Logger.warn config.logger
-                              "could not find IP of peer who sent invalid \
-                               gossip"
-                              ~module_:__MODULE__ ~location:__LOC__ ~metadata ;
-                            Deferred.unit ) ))
+                      Trust_system.(
+                        record config.trust_system config.logger host
+                          Actions.
+                            ( Violated_protocol
+                            , Some ("failed to decode gossip message", metadata)
+                            ))
+                      |> don't_wait_for ;
+                      () ))
             in
+            (* #4097 fix: drain the published message pipe, which we don't care about. *)
+            don't_wait_for
+              (Strict_pipe.Reader.iter
+                 (Coda_net2.Pubsub.Subscription.message_pipe subscription)
+                 ~f:(Fn.const Deferred.unit)) ;
             let%map _ =
               (* XXX: this ALWAYS needs to be AFTER handle_protocol/subscribe
                 or it is possible to miss connections! *)
@@ -247,11 +268,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                  (Deferred.all
                     (List.map ~f:(Coda_net2.add_peer net2) config.initial_peers)))
             |> don't_wait_for ;
-            subscription
+            (subscription, message_reader)
           in
           match%map initializing_libp2p_result with
-          | Ok subscription ->
-              (net2, subscription)
+          | Ok (subscription, message_reader) ->
+              (net2, subscription, message_reader)
           | Error e ->
               fail (Error.to_string_hum e) )
       | Ok (Error e) ->
@@ -262,7 +283,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     let create config rpc_handlers =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
-      let%bind net2, subscription =
+      let%bind net2, subscription, message_reader =
         create_libp2p config rpc_handlers first_peer_ivar
           high_connectivity_ivar
       in
@@ -295,6 +316,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; first_peer_ivar
       ; high_connectivity_ivar
       ; subscription
+      ; message_reader
       ; ban_reader }
 
     let peers t = Coda_net2.peers t.net2
@@ -326,7 +348,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
         Monitor.try_with (fun () ->
             (* Async_rpc_kernel takes a transport instead of a Reader.t *)
             Async_rpc_kernel.Rpc.Connection.with_close
-              ~connection_state:(fun _ -> ())
+              ~connection_state:(Fn.const ())
               ~dispatch_queries:(fun conn ->
                 Versioned_rpc.Connection_with_menu.create conn
                 >>=? fun conn' -> dispatch conn' query )
@@ -428,8 +450,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     let on_first_high_connectivity t ~f =
       Deferred.map (Ivar.read t.high_connectivity_ivar) ~f
 
-    let received_message_reader t =
-      Coda_net2.Pubsub.Subscription.message_pipe t.subscription
+    let received_message_reader t = t.message_reader
 
     let ban_notification_reader t = t.ban_reader
 

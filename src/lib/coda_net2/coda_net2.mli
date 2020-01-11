@@ -137,9 +137,7 @@ module Pubsub : sig
   val subscribe :
        net
     -> string
-    -> should_forward_message:(   sender:Peer.Id.t
-                               -> data:string
-                               -> bool Deferred.t)
+    -> should_forward_message:(string Envelope.Incoming.t -> bool Deferred.t)
     -> string Subscription.t Deferred.Or_error.t
 
   (** Like [subscribe], but knows how to stringify/destringify
@@ -156,12 +154,11 @@ module Pubsub : sig
   val subscribe_encode :
        net
     -> string
-    -> should_forward_message:(sender:Peer.Id.t -> data:'a -> bool Deferred.t)
+    -> should_forward_message:('a Envelope.Incoming.t -> bool Deferred.t)
     -> bin_prot:'a Bin_prot.Type_class.t
     -> on_decode_failure:[ `Ignore
                          | `Call of
-                           sender:Peer.Id.t -> data:string -> Error.t -> unit
-                         ]
+                           string Envelope.Incoming.t -> Error.t -> unit ]
     -> 'a Subscription.t Deferred.Or_error.t
 end
 

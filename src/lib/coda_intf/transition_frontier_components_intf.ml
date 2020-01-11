@@ -306,7 +306,8 @@ module type Initial_validator_intf = sig
     -> trust_system:Trust_system.t
     -> transition_reader:( [ `Transition of
                              external_transition Envelope.Incoming.t ]
-                         * [`Time_received of Block_time.t] )
+                         * [`Time_received of Block_time.t]
+                         * [`Valid_cb of bool -> unit] )
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( [ `Transition of
                                    external_transition_with_initial_validation
@@ -346,7 +347,8 @@ module type Transition_router_intf = sig
     -> network_transition_reader:( [ `Transition of
                                      External_transition.t Envelope.Incoming.t
                                    ]
-                                 * [`Time_received of Block_time.t] )
+                                 * [`Time_received of Block_time.t]
+                                 * [`Valid_cb of bool -> unit] )
                                  Strict_pipe.Reader.t
     -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:External_transition.Initial_validated.t

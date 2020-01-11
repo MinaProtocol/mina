@@ -703,7 +703,8 @@ struct
 
   (* TODO: This causes the signature to get checked twice as it is checked
      below before feeding it to add *)
-  let add t txns = apply_and_broadcast t (Envelope.Incoming.local txns)
+  let add t txns =
+    apply_and_broadcast t (Envelope.Incoming.local txns, Fn.const ())
 end
 
 (* Use this one in downstream consumers *)

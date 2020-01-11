@@ -42,7 +42,8 @@ module type Gossip_net_intf = sig
   val on_first_high_connectivity : t -> f:(unit -> 'a) -> 'a Deferred.t
 
   val received_message_reader :
-    t -> Message.msg Envelope.Incoming.t Strict_pipe.Reader.t
+       t
+    -> (Message.msg Envelope.Incoming.t * (bool -> unit)) Strict_pipe.Reader.t
 
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
 
