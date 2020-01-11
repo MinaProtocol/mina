@@ -63,7 +63,7 @@ let make = () => {
         createAccount={_ => setOnboardingStep(_ => AccountCreation)}
       />
     | PortForwardError =>
-      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+      <PortForwardErrorStep retry={_ => setOnboardingStep(_ => RunNode)} />
     | DaemonError =>
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
     | AccountCreation =>
