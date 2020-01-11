@@ -51,13 +51,13 @@ ALTER TABLE internal_commands ADD FOREIGN KEY (transaction_id) REFERENCES transa
 CREATE TABLE blocks
 ( id                     serial PRIMARY KEY
 , state_hash             text   NOT NULL UNIQUE
-, parent_id              int    NOT NULL        REFERENCES blocks(id)
+, parent_id              int                    REFERENCES blocks(id)
 , creator_id             int    NOT NULL        REFERENCES public_keys(id)
 , snarked_ledger_hash_id int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
 , ledger_hash            text   NOT NULL
 , height                 bigint NOT NULL
 , timestamp              bigint NOT NULL
-, coinbase_id            int             UNIQUE REFERENCES internal_commands(id)
+, coinbase_id            int             UNIQUE REFERENCES transactions(id)
 );
 
 CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);

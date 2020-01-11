@@ -1,10 +1,13 @@
 open Async
 open Caqti_async
 open Coda_base
+open Coda_state
+open Coda_transition
 open Signature_lib
 
 module Public_key = struct
-  let add (module Conn : CONNECTION) (t : Public_key.Compressed.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (t : Public_key.Compressed.t) =
     let open Deferred.Result.Let_syntax in
     let public_key = Public_key.Compressed.to_base58_check t in
     match%bind
@@ -22,6 +25,26 @@ module Public_key = struct
           public_key
 end
 
+module Snarked_ledger_hash = struct
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (t : Frozen_ledger_hash.t) =
+    let open Deferred.Result.Let_syntax in
+    let hash = Frozen_ledger_hash.to_string t in
+    match%bind
+      Conn.find_opt
+        (Caqti_request.find_opt Caqti_type.string Caqti_type.int
+           "SELECT id FROM snarked_ledger_hashes WHERE value = ?")
+        hash
+    with
+    | Some id ->
+        return id
+    | None ->
+        Conn.find
+          (Caqti_request.find Caqti_type.string Caqti_type.int
+             "INSERT INTO snarked_ledger_hashes (value) VALUES (?) RETURNING id")
+          hash
+end
+
 module Transaction = struct
   let add (module Conn : CONNECTION) (t : Transaction_hash.t) =
     let hash = Transaction_hash.to_base58_check t in
@@ -30,20 +53,12 @@ module Transaction = struct
          "INSERT INTO transactions (hash) VALUES (?) RETURNING id")
       hash
 
-  let find_user_command (module Conn : CONNECTION) (t : Transaction_hash.t) =
-    let hash = Transaction_hash.to_base58_check t in
-    Conn.find_opt
-      (Caqti_request.find_opt Caqti_type.string Caqti_type.int
-         "SELECT user_command_id FROM transactions WHERE hash = ?")
-      hash
-
-  let find_internal_command (module Conn : CONNECTION) (t : Transaction_hash.t)
+  let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
       =
-    let hash = Transaction_hash.to_base58_check t in
     Conn.find_opt
       (Caqti_request.find_opt Caqti_type.string Caqti_type.int
-         "SELECT internal_command_id FROM transactions WHERE hash = ?")
-      hash
+         "SELECT id FROM transactions WHERE hash = ?")
+      (Transaction_hash.to_base58_check transaction_hash)
 
   let update_user_command_id (module Conn : CONNECTION) ~(transaction_id : int)
       ~(user_command_id : int) =
@@ -99,19 +114,23 @@ module User_command = struct
     in
     Caqti_type.custom ~encode ~decode rep
 
-  let add (module Conn : CONNECTION) (t : User_command.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION) (t : User_command.t) =
     let open Deferred.Result.Let_syntax in
-    let hash = Transaction_hash.hash_user_command t in
-    match%bind Transaction.find_user_command (module Conn) hash with
-    | Some user_command_id ->
-        return user_command_id
+    let transaction_hash = Transaction_hash.hash_user_command t in
+    match%bind Transaction.find (module Conn) ~transaction_hash with
+    | Some transaction_id ->
+        return transaction_id
     | None ->
-        let%bind transaction_id = Transaction.add (module Conn) hash in
+        let%bind transaction_id =
+          Transaction.add (module Conn) transaction_hash
+        in
         let%bind sender_id =
-          Public_key.add (module Conn) (User_command.sender t)
+          Public_key.add_if_doesn't_exist (module Conn) (User_command.sender t)
         in
         let%bind receiver_id =
-          Public_key.add (module Conn) (User_command.receiver t)
+          Public_key.add_if_doesn't_exist
+            (module Conn)
+            (User_command.receiver t)
         in
         let%bind user_command_id =
           Conn.find
@@ -136,7 +155,7 @@ module User_command = struct
             (module Conn)
             ~transaction_id ~user_command_id
         in
-        return user_command_id
+        return transaction_id
 end
 
 module Fee_transfer = struct
@@ -152,16 +171,21 @@ module Fee_transfer = struct
     let rep = Caqti_type.(tup4 string int int int) in
     Caqti_type.custom ~encode ~decode rep
 
-  let add (module Conn : CONNECTION) (t : Fee_transfer.Single.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      (t : Fee_transfer.Single.t) =
     let open Deferred.Result.Let_syntax in
-    let hash = Transaction_hash.hash_fee_transfer t in
-    match%bind Transaction.find_internal_command (module Conn) hash with
-    | Some internal_command_id ->
-        return internal_command_id
+    let transaction_hash = Transaction_hash.hash_fee_transfer t in
+    match%bind Transaction.find (module Conn) ~transaction_hash with
+    | Some transaction_id ->
+        return transaction_id
     | None ->
-        let%bind transaction_id = Transaction.add (module Conn) hash in
+        let%bind transaction_id =
+          Transaction.add (module Conn) transaction_hash
+        in
         let%bind receiver_id =
-          Public_key.add (module Conn) (Fee_transfer.Single.receiver t)
+          Public_key.add_if_doesn't_exist
+            (module Conn)
+            (Fee_transfer.Single.receiver t)
         in
         let%bind internal_command_id =
           Conn.find
@@ -177,7 +201,7 @@ module Fee_transfer = struct
             (module Conn)
             ~transaction_id ~internal_command_id
         in
-        return internal_command_id
+        return transaction_id
 end
 
 module Coinbase = struct
@@ -193,16 +217,18 @@ module Coinbase = struct
     let rep = Caqti_type.(tup4 string int int int) in
     Caqti_type.custom ~encode ~decode rep
 
-  let add (module Conn : CONNECTION) (t : Coinbase.t) =
+  let add_if_doesn't_exist (module Conn : CONNECTION) (t : Coinbase.t) =
     let open Deferred.Result.Let_syntax in
-    let hash = Transaction_hash.hash_coinbase t in
-    match%bind Transaction.find_internal_command (module Conn) hash with
-    | Some internal_command_id ->
-        return internal_command_id
+    let transaction_hash = Transaction_hash.hash_coinbase t in
+    match%bind Transaction.find (module Conn) ~transaction_hash with
+    | Some transaction_id ->
+        return transaction_id
     | None ->
-        let%bind transaction_id = Transaction.add (module Conn) hash in
+        let%bind transaction_id =
+          Transaction.add (module Conn) transaction_hash
+        in
         let%bind receiver_id =
-          Public_key.add (module Conn) (Coinbase.proposer t)
+          Public_key.add_if_doesn't_exist (module Conn) (Coinbase.proposer t)
         in
         let%bind internal_command_id =
           Conn.find
@@ -218,51 +244,142 @@ module Coinbase = struct
             (module Conn)
             ~transaction_id ~internal_command_id
         in
-        return internal_command_id
+        return transaction_id
 end
 
-(*
-let add_block (module Conn : CONNECTION)
-    ({data= block; hash} : (External_transition.t, State_hash.t) With_hash.t) =
-  let open Deferred.Result.Let_syntax in
-  let transactions = External_transition.transactions block in
-  let%bind () = Conn.start () in
-  let%bind ids =
-    Deferred.Result.all
-      (Core.List.map transactions ~f:(function
-        | User_command user_command_checked ->
-            let user_command =
-              User_command.forget_check user_command_checked
-            in
-            let hash =
-              Transaction_hash.hash_user_command user_command
-              |> Transaction_hash.to_base58_check
-            in
-            let%bind transaction_id =
-              Conn.find
-                (Caqti_request.find Caqti_type.string Caqti_type.int
-                   "INSERT INTO transactions (hash) VALUES (?) RETURNING id")
-                hash
-            in
-            (*
-            let%bind _user_command_id =
-                Conn.find
-                  (Caqti_request.find Caqti_type.)
-            *)
-            failwith "..."
-        | Fee_transfer fee_transfer ->
-            failwith "..."
-        | Coinbase coinbase ->
-            failwith "..." ))
-  in
-  Conn.commit ()
+module Block = struct
+  type t =
+    { state_hash: string
+    ; parent_id: int option
+    ; creator_id: int
+    ; snarked_ledger_hash_id: int
+    ; ledger_hash: string
+    ; height: int
+    ; timestamp: int64
+    ; coinbase_id: int option }
 
-let run t reader =
-  Strict_pipe.Reader.iter reader ~f:(function
-    | Diff.Transition_frontier (Breadcrumb_added {block; _}) ->
-        failwith "..."
-    | Transition_frontier _ ->
-        failwith "..."
-    | Transaction_pool {added; _} ->
-        failwith "..." )
-*)
+  let typ =
+    let encode t =
+      Ok
+        ( t.state_hash
+        , ( t.parent_id
+          , ( t.creator_id
+            , ( t.snarked_ledger_hash_id
+              , (t.ledger_hash, (t.height, (t.timestamp, (t.coinbase_id, ()))))
+              ) ) ) )
+    in
+    let decode
+        ( state_hash
+        , ( parent_id
+          , ( creator_id
+            , ( snarked_ledger_hash_id
+              , (ledger_hash, (height, (timestamp, (coinbase_id, ())))) ) ) )
+        ) =
+      Ok
+        { state_hash
+        ; parent_id
+        ; creator_id
+        ; snarked_ledger_hash_id
+        ; ledger_hash
+        ; height
+        ; timestamp
+        ; coinbase_id }
+    in
+    let rep =
+      Caqti_type.(
+        tup2 string
+          (tup2 (option int)
+             (tup2 int
+                (tup2 int
+                   (tup2 string
+                      (tup2 int (tup2 int64 (tup2 (option int) unit))))))))
+    in
+    Caqti_type.custom ~encode ~decode rep
+
+  let find (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
+    Conn.find_opt
+      (Caqti_request.find_opt Caqti_type.string Caqti_type.int
+         "SELECT id FROM blocks WHERE state_hash = ?")
+      (State_hash.to_string state_hash)
+
+  let add_if_doesn't_exist (module Conn : CONNECTION)
+      ({data= t; hash} : (External_transition.t, State_hash.t) With_hash.t) =
+    let open Deferred.Result.Let_syntax in
+    match%bind find (module Conn) ~state_hash:hash with
+    | Some block_id ->
+        return block_id
+    | None ->
+        let%bind parent_id =
+          find (module Conn) ~state_hash:(External_transition.parent_hash t)
+        in
+        let%bind creator_id =
+          Public_key.add_if_doesn't_exist
+            (module Conn)
+            (External_transition.proposer t)
+        in
+        let%bind snarked_ledger_hash_id =
+          Snarked_ledger_hash.add_if_doesn't_exist
+            (module Conn)
+            ( External_transition.blockchain_state t
+            |> Blockchain_state.snarked_ledger_hash )
+        in
+        let%bind block_id =
+          Conn.find
+            (Caqti_request.find typ Caqti_type.int
+               "INSERT INTO blocks (state_hash, parent_id, creator_id, \
+                snarked_ledger_hash_id, ledger_hash, height, timestamp, \
+                coinbase_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
+            { state_hash= hash |> State_hash.to_string
+            ; parent_id
+            ; creator_id
+            ; snarked_ledger_hash_id
+            ; ledger_hash=
+                External_transition.blockchain_state t
+                |> Blockchain_state.staged_ledger_hash
+                |> Staged_ledger_hash.ledger_hash |> Ledger_hash.to_string
+            ; height=
+                External_transition.blockchain_length t
+                |> Unsigned.UInt32.to_int
+            ; timestamp= External_transition.timestamp t |> Block_time.to_int64
+            ; coinbase_id= None }
+        in
+        let transactions = External_transition.transactions t in
+        let user_commands, fee_transfers, coinbases =
+          Core.List.fold transactions ~init:([], [], [])
+            ~f:(fun (acc_user_commands, acc_fee_transfers, acc_coinbases) ->
+            function
+            | Coda_base.Transaction.User_command user_command_checked ->
+                let user_command =
+                  Coda_base.User_command.forget_check user_command_checked
+                in
+                ( user_command :: acc_user_commands
+                , acc_fee_transfers
+                , acc_coinbases )
+            | Fee_transfer fee_transfer_bundled ->
+                let fee_transfers = One_or_two.to_list fee_transfer_bundled in
+                ( acc_user_commands
+                , fee_transfers @ acc_fee_transfers
+                , acc_coinbases )
+            | Coinbase coinbase -> (
+              match Coda_base.Coinbase.fee_transfer coinbase with
+              | None ->
+                  ( acc_user_commands
+                  , acc_fee_transfers
+                  , coinbase :: acc_coinbases )
+              | Some fee_transfer ->
+                  ( acc_user_commands
+                  , fee_transfer :: acc_fee_transfers
+                  , coinbase :: acc_coinbases ) ) )
+        in
+        let%bind user_command_ids =
+          Deferred.Result.all
+            (Core.List.map user_commands
+               ~f:(User_command.add_if_doesn't_exist (module Conn)))
+        in
+        let%bind fee_transfer_ids =
+          Deferred.Result.all
+            (Core.List.map fee_transfers
+               ~f:(Fee_transfer.add_if_doesn't_exist (module Conn)))
+        in
+        return block_id
+end
