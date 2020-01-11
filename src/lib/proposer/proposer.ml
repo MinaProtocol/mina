@@ -114,9 +114,8 @@ let generate_next_state ~previous_protocol_state ~time_controller
       (let open Deferred.Let_syntax in
       let diff =
         measure "create_diff" (fun () ->
-Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
-  ~logger
-              ~transactions_by_fee:transactions ~get_completed_work )
+            Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
+              ~logger ~transactions_by_fee:transactions ~get_completed_work )
       in
       match%map
         Staged_ledger.apply_diff_unchecked staged_ledger diff
@@ -234,7 +233,7 @@ Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
                         self
                     | `Other pk ->
                         pk )
-  ~coinbase_amount ~pending_coinbase_action ()
+                  ~coinbase_amount ~pending_coinbase_action ()
               in
               let internal_transition =
                 Internal_transition.create ~snark_transition

@@ -776,9 +776,8 @@ let genesis ~genesis_ledger ~base_proof =
           ; user_commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
-; creator
-    ; coinbase_receiver= creator
-}
+    ; creator
+    ; coinbase_receiver= creator }
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =

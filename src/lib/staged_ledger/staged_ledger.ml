@@ -1283,9 +1283,9 @@ module T = struct
       "Number of proofs ready for purchase: $proof_count"
       ~metadata:[("proof_count", `Int proof_count)] ;
     trace_event "prediffs done" ;
-{Staged_ledger_diff.With_valid_signatures_and_proofs.diff; creator= self
-    ; coinbase_receiver
-}
+    { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
+    ; creator= self
+    ; coinbase_receiver }
 end
 
 include T
@@ -1725,9 +1725,8 @@ let%test_module "test" =
                   ; user_commands= List.take txns slots
                   ; coinbase= Zero }
                 , None )
-; creator= self_pk 
-            ; coinbase_receiver
-}
+            ; creator= self_pk
+            ; coinbase_receiver }
         | Some (_, _) ->
             let txns_in_second_diff = List.drop txns slots in
             let diff : Staged_ledger_diff.Diff.t =
@@ -1741,9 +1740,7 @@ let%test_module "test" =
                   ; user_commands= txns_in_second_diff
                   ; coinbase= Zero } )
             in
-{diff; creator= self_pk
-            ; coinbase_receiver
-}
+            {diff; creator= self_pk; coinbase_receiver}
       in
       let empty_diff : Staged_ledger_diff.t =
         { diff=

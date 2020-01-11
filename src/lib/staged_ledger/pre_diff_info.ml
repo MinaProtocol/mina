@@ -90,8 +90,7 @@ type t =
     example, when there are three slots and maximum number of provers), in which case,
     we simply add one coinbase as part of the second prediff.
   *)
-let create_coinbase coinbase_parts  ~(receiver : Public_key.Compressed.t)
-  =
+let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t) =
   let open Result.Let_syntax in
   let coinbase = Coda_compile_config.coinbase in
   let coinbase_or_error = function
@@ -134,8 +133,7 @@ let create_coinbase coinbase_parts  ~(receiver : Public_key.Compressed.t)
       return []
   | `One x ->
       let%map cb =
-Coinbase.create ~amount:coinbase ~receiver
-  ~fee_transfer:x
+        Coinbase.create ~amount:coinbase ~receiver ~fee_transfer:x
         |> coinbase_or_error
       in
       [cb]
@@ -211,7 +209,8 @@ let create_fee_transfers completed_works delta public_key coinbase_fts =
       |> One_or_two.group_list )
   |> to_staged_ledger_or_error
 
-let get_individual_info coinbase_parts ~receiver user_commands completed_works =
+let get_individual_info coinbase_parts ~receiver user_commands completed_works
+    =
   let open Result.Let_syntax in
   let%bind coinbase_parts =
     O1trace.measure "create_coinbase" (fun () ->
@@ -274,16 +273,16 @@ let get' (t : With_valid_signatures.t) =
       | Two x ->
           `Two x
     in
-    get_individual_info coinbase_parts ~receiver:t.coinbase_receiver t1.user_commands
-      t1.completed_works
+    get_individual_info coinbase_parts ~receiver:t.coinbase_receiver
+      t1.user_commands t1.completed_works
   in
   let apply_pre_diff_with_at_most_one
       (t2 : With_valid_signatures.pre_diff_with_at_most_one_coinbase) =
     let coinbase_added =
       match t2.coinbase with Zero -> `Zero | One x -> `One x
     in
-    get_individual_info coinbase_added ~receiver:t.coinbase_receiver t2.user_commands
-      t2.completed_works
+    get_individual_info coinbase_added ~receiver:t.coinbase_receiver
+      t2.user_commands t2.completed_works
   in
   let open Result.Let_syntax in
   let%bind () = check_coinbase t.diff in
