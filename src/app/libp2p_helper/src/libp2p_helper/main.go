@@ -307,25 +307,27 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		seqno := <-seqs
 		ch := make(chan bool)
 		app.Validators[seqno] = ch
+
 		sender, err := findPeerInfo(app, id)
+
 		if err != nil {
-			app.writeMsg(validateUpcall{
-				Sender: *sender,
-				Data:   b58.Encode(msg.Data),
-				Seqno:  seqno,
-				Upcall: "validate",
-				Idx:    s.Subscription,
-			})
-		} else {
 			app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us a pubsub message, dropping it", peer.IDB58Encode(id))
 			delete(app.Validators, seqno)
 			return false
 		}
 
+		app.writeMsg(validateUpcall{
+			Sender: *sender,
+			Data:   b58.Encode(msg.Data),
+			Seqno:  seqno,
+			Upcall: "validate",
+			Idx:    s.Subscription,
+		})
+
 		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
 		select {
 		case <-ctx.Done():
-			// do NOT delete app.Validators[seqno] here! the ocaml side doesn't
+			// XXX: do 🅽🅾🆃  delete app.Validators[seqno] here! the ocaml side doesn't
 			// care about the timeout and will validate it anyway.
 			// validationComplete will remove app.Validators[seqno] once the
 			// coda process gets around to it.
