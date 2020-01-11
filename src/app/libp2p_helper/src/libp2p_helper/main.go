@@ -391,6 +391,7 @@ func (u *unsubscribeMsg) run(app *app) (interface{}, error) {
 	if sub, ok := app.Subs[u.Subscription]; ok {
 		sub.Sub.Cancel()
 		sub.Cancel()
+		delete(app.Subs, u.Subscription)
 		return "unsubscribe success", nil
 	}
 	return nil, badRPC(errors.New("subscription not found"))
@@ -576,6 +577,7 @@ func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
 	}
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
 		err := stream.Reset()
+		delete(app.Streams, cs.StreamIdx)
 		if err != nil {
 			return nil, badp2p(err)
 		}
