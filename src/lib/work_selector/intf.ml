@@ -36,12 +36,16 @@ module type Inputs_intf = sig
       -> Transaction_snark_work.t option
   end
 
+  module Transaction_protocol_state : sig
+    type 'a t
+  end
+
   module Staged_ledger : sig
     type t
 
     val all_work_pairs_exn :
          t
-      -> ( Transaction.t
+      -> ( Transaction.t Transaction_protocol_state.t
          , Transaction_witness.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
@@ -68,7 +72,7 @@ module type Lib_intf = sig
 
     val remove :
          t
-      -> ( Transaction.t
+      -> ( Transaction.t Transaction_protocol_state.t
          , Transaction_witness.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
@@ -77,7 +81,7 @@ module type Lib_intf = sig
 
     val set :
          t
-      -> ( Transaction.t
+      -> ( Transaction.t Transaction_protocol_state.t
          , Transaction_witness.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
@@ -88,13 +92,13 @@ module type Lib_intf = sig
   val get_expensive_work :
        snark_pool:Snark_pool.t
     -> fee:Fee.t
-    -> ( Transaction.t
+    -> ( Transaction.t Transaction_protocol_state.t
        , Transaction_witness.t
        , Ledger_proof.t )
        Snark_work_lib.Work.Single.Spec.t
        One_or_two.t
        list
-    -> ( Transaction.t
+    -> ( Transaction.t Transaction_protocol_state.t
        , Transaction_witness.t
        , Ledger_proof.t )
        Snark_work_lib.Work.Single.Spec.t
@@ -105,7 +109,7 @@ module type Lib_intf = sig
   val all_unseen_works :
        Staged_ledger.t
     -> State.t
-    -> ( Transaction.t
+    -> ( Transaction.t Transaction_protocol_state.t
        , Transaction_witness.t
        , Ledger_proof.t )
        Snark_work_lib.Work.Single.Spec.t
@@ -123,7 +127,7 @@ module type Lib_intf = sig
     val does_not_have_better_fee :
          snark_pool:Snark_pool.t
       -> fee:Fee.t
-      -> ( Transaction.t
+      -> ( Transaction.t Transaction_protocol_state.t
          , Transaction_witness.t
          , Ledger_proof.t )
          Snark_work_lib.Work.Single.Spec.t
@@ -164,7 +168,7 @@ module type Make_selection_method_intf = functor
   -> Selection_method_intf
      with type staged_ledger := Inputs.Staged_ledger.t
       and type work :=
-                 ( Inputs.Transaction.t
+                 ( Inputs.Transaction.t Inputs.Transaction_protocol_state.t
                  , Inputs.Transaction_witness.t
                  , Inputs.Ledger_proof.t )
                  Snark_work_lib.Work.Single.Spec.t

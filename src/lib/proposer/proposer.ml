@@ -114,16 +114,20 @@ let generate_next_state ~previous_protocol_state ~time_controller
       (let open Deferred.Let_syntax in
       let diff =
         measure "create_diff" (fun () ->
-            Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
-              ~logger ~transactions_by_fee:transactions ~get_completed_work
-              ~state_body_hash:previous_protocol_state_body_hash )
+Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
+  ~logger
+              ~transactions_by_fee:transactions ~get_completed_work )
       in
-      match%map Staged_ledger.apply_diff_unchecked staged_ledger diff with
+      match%map
+        Staged_ledger.apply_diff_unchecked staged_ledger diff
+          ~state_body_hash:previous_protocol_state_body_hash
+      with
       | Ok
           ( `Hash_after_applying next_staged_ledger_hash
           , `Ledger_proof ledger_proof_opt
           , `Staged_ledger transitioned_staged_ledger
-          , `Pending_coinbase_data (is_new_stack, coinbase_amount) ) ->
+          , `Pending_coinbase_data
+              (is_new_stack, coinbase_amount, pending_coinbase_action) ) ->
           (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
           ignore
           @@ Ledger.unregister_mask_exn
@@ -134,7 +138,8 @@ let generate_next_state ~previous_protocol_state ~time_controller
             , next_staged_ledger_hash
             , ledger_proof_opt
             , is_new_stack
-            , coinbase_amount )
+            , coinbase_amount
+            , pending_coinbase_action )
       | Error (Staged_ledger.Staged_ledger_error.Unexpected e) ->
           raise (Error.to_exn e)
       | Error e ->
@@ -156,7 +161,8 @@ let generate_next_state ~previous_protocol_state ~time_controller
       , next_staged_ledger_hash
       , ledger_proof_opt
       , is_new_stack
-      , coinbase_amount ) ->
+      , coinbase_amount
+      , pending_coinbase_action ) ->
       let%bind protocol_state, consensus_transition_data =
         lift_sync (fun () ->
             let previous_ledger_hash =
@@ -228,7 +234,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
                         self
                     | `Other pk ->
                         pk )
-                  ~coinbase_amount ()
+  ~coinbase_amount ~pending_coinbase_action ()
               in
               let internal_transition =
                 Internal_transition.create ~snark_transition

@@ -50,9 +50,7 @@ let build ~logger ~verifier ~trust_system ~parent
                 | `Incorrect_target_staged_ledger_hash ->
                     "staged ledger hash"
                 | `Incorrect_target_snarked_ledger_hash ->
-                    "snarked ledger hash"
-                | `Incorrect_staged_ledger_diff_state_body_hash ->
-                    "state body hash" ))
+                    "snarked ledger hash" ))
           in
           let message = "invalid staged ledger diff: incorrect " ^ reasons in
           let%map () =
@@ -252,12 +250,9 @@ module For_tests = struct
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
-          ~coinbase_receiver:`Proposer ~self:largest_account_public_key
-          ~transactions_by_fee:transactions ~get_completed_work
-          ~state_body_hash:
-            ( validated_transition parent_breadcrumb
-            |> External_transition.Validated.protocol_state
-            |> Protocol_state.body |> Protocol_state.Body.hash )
+~coinbase_receiver:`Proposer 
+          ~self:largest_account_public_key ~transactions_by_fee:transactions
+          ~get_completed_work
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
@@ -266,6 +261,10 @@ module For_tests = struct
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
             staged_ledger_diff
+            ~state_body_hash:
+              ( validated_transition parent_breadcrumb
+              |> External_transition.Validated.protocol_state
+              |> Protocol_state.body |> Protocol_state.Body.hash )
         with
         | Ok r ->
             return r

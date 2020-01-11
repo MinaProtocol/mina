@@ -159,21 +159,19 @@ end
 module Stable = struct
   module V1 = struct
     type t =
-      { diff: Diff.Stable.V1.t
-      ; creator: Public_key.Compressed.Stable.V1.t
-      ; coinbase_receiver: Public_key.Compressed.Stable.V1.t
-      ; state_body_hash: State_body_hash.Stable.V1.t }
+{diff: Diff.Stable.V1.t
+; creator: Public_key.Compressed.Stable.V1.t
+; coinbase_receiver: Public_key.Compressed.Stable.V1.t
+}
     [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id
   end
 end]
 
-type t = Stable.Latest.t =
-  { diff: Diff.t
-  ; creator: Public_key.Compressed.t
+type t = Stable.Latest.t = {diff: Diff.t; creator: Public_key.Compressed.t
   ; coinbase_receiver: Public_key.Compressed.t
-  ; state_body_hash: State_body_hash.t }
+                           }
 [@@deriving sexp, to_yojson, fields]
 
 module With_valid_signatures_and_proofs = struct
@@ -194,11 +192,9 @@ module With_valid_signatures_and_proofs = struct
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t =
-    { diff: diff
-    ; creator: Public_key.Compressed.t
+  type t = {diff: diff; creator: Public_key.Compressed.t
     ; coinbase_receiver: Public_key.Compressed.t
-    ; state_body_hash: State_body_hash.t }
+           }
   [@@deriving sexp, to_yojson]
 
   let user_commands t =
@@ -226,11 +222,9 @@ module With_valid_signatures = struct
     * pre_diff_with_at_most_one_coinbase option
   [@@deriving sexp, to_yojson]
 
-  type t =
-    { diff: diff
-    ; creator: Public_key.Compressed.t
+  type t = {diff: diff; creator: Public_key.Compressed.t
     ; coinbase_receiver: Public_key.Compressed.t
-    ; state_body_hash: State_body_hash.t }
+           }
   [@@deriving sexp, to_yojson]
 end
 
@@ -267,11 +261,9 @@ let validate_user_commands (t : t)
           ; user_commands
           ; coinbase= d2.coinbase } )
   in
-  ( { creator= t.creator
+({creator= t.creator
     ; coinbase_receiver= t.coinbase_receiver
-    ; diff= (p1, p2)
-    ; state_body_hash= t.state_body_hash }
-    : With_valid_signatures.t )
+ ; diff= (p1, p2)} : With_valid_signatures.t)
 
 let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
     With_valid_signatures.t =
@@ -288,10 +280,9 @@ let forget_proof_checks (d : With_valid_signatures_and_proofs.t) :
           ; coinbase= d2.coinbase }
           : With_valid_signatures.pre_diff_with_at_most_one_coinbase ) )
   in
-  { creator= d.creator
+{creator= d.creator
   ; coinbase_receiver= d.coinbase_receiver
-  ; diff= (p1, p2)
-  ; state_body_hash= d.state_body_hash }
+; diff= (p1, p2)}
 
 let forget_pre_diff_with_at_most_two
     (pre_diff :
@@ -312,9 +303,8 @@ let forget (t : With_valid_signatures_and_proofs.t) =
   { diff=
       ( forget_pre_diff_with_at_most_two (fst t.diff)
       , Option.map (snd t.diff) ~f:forget_pre_diff_with_at_most_one )
-  ; creator= t.creator
   ; coinbase_receiver= t.coinbase_receiver
-  ; state_body_hash= t.state_body_hash }
+  ; creator= t.creator }
 
 let user_commands (t : t) =
   (fst t.diff).user_commands

@@ -479,9 +479,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let apply_coinbase t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
-      ({receiver; fee_transfer; amount= coinbase_amount; state_body_hash= _} as
-       cb :
-        Coinbase.t) =
+      ({receiver; fee_transfer; amount= coinbase_amount} as cb : Coinbase.t) =
     let get_or_initialize pk =
       let initial_account = Account.initialize pk in
       match get_or_create_account_exn t pk (Account.initialize pk) with
@@ -523,11 +521,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   the undo functions should ever return an error. This should be fixed in the types. *)
   let undo_coinbase t
       Undo.Coinbase_undo.
-        { coinbase=
-            { receiver
-            ; fee_transfer
-            ; amount= coinbase_amount
-            ; state_body_hash= _ }
+        { coinbase= {receiver; fee_transfer; amount= coinbase_amount}
         ; previous_empty_accounts } =
     let receiver_reward =
       match fee_transfer with

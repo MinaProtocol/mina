@@ -90,8 +90,8 @@ type t =
     example, when there are three slots and maximum number of provers), in which case,
     we simply add one coinbase as part of the second prediff.
   *)
-let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t)
-    (state_body_hash : State_body_hash.t) =
+let create_coinbase coinbase_parts  ~(receiver : Public_key.Compressed.t)
+  =
   let open Result.Let_syntax in
   let coinbase = Coda_compile_config.coinbase in
   let coinbase_or_error = function
@@ -121,12 +121,10 @@ let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t)
     in
     let%bind cb1 =
       coinbase_or_error
-        (Coinbase.create ~amount:amt ~receiver ~fee_transfer:ft1
-           ~state_body_hash)
+        (Coinbase.create ~amount:amt ~receiver ~fee_transfer:ft1)
     in
     let%map cb2 =
       Coinbase.create ~amount:rem_coinbase ~receiver ~fee_transfer:ft2
-        ~state_body_hash
       |> coinbase_or_error
     in
     [cb1; cb2]
@@ -136,8 +134,8 @@ let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t)
       return []
   | `One x ->
       let%map cb =
-        Coinbase.create ~amount:coinbase ~receiver ~fee_transfer:x
-          ~state_body_hash
+Coinbase.create ~amount:coinbase ~receiver
+  ~fee_transfer:x
         |> coinbase_or_error
       in
       [cb]
@@ -213,12 +211,11 @@ let create_fee_transfers completed_works delta public_key coinbase_fts =
       |> One_or_two.group_list )
   |> to_staged_ledger_or_error
 
-let get_individual_info ~receiver coinbase_parts user_commands completed_works
-    state_body_hash =
+let get_individual_info coinbase_parts ~receiver user_commands completed_works =
   let open Result.Let_syntax in
   let%bind coinbase_parts =
     O1trace.measure "create_coinbase" (fun () ->
-        create_coinbase coinbase_parts ~receiver state_body_hash )
+        create_coinbase coinbase_parts ~receiver )
   in
   let coinbase_fts =
     List.concat_map coinbase_parts ~f:(fun cb ->
@@ -277,16 +274,16 @@ let get' (t : With_valid_signatures.t) =
       | Two x ->
           `Two x
     in
-    get_individual_info ~receiver:t.coinbase_receiver coinbase_parts
-      t1.user_commands t1.completed_works t.state_body_hash
+    get_individual_info coinbase_parts ~receiver:t.coinbase_receiver t1.user_commands
+      t1.completed_works
   in
   let apply_pre_diff_with_at_most_one
       (t2 : With_valid_signatures.pre_diff_with_at_most_one_coinbase) =
     let coinbase_added =
       match t2.coinbase with Zero -> `Zero | One x -> `One x
     in
-    get_individual_info coinbase_added ~receiver:t.coinbase_receiver
-      t2.user_commands t2.completed_works t.state_body_hash
+    get_individual_info coinbase_added ~receiver:t.coinbase_receiver t2.user_commands
+      t2.completed_works
   in
   let open Result.Let_syntax in
   let%bind () = check_coinbase t.diff in
