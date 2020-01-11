@@ -129,10 +129,11 @@ mutation ($sender: PublicKey!,
           $receiver: PublicKey!,
           $amount: UInt64!,
           $fee: UInt64!,
+          $validUntil: UInt64,
           $nonce: UInt32,
           $memo: String) {
   sendPayment(input: 
-    {from: $sender, to: $receiver, amount: $amount, fee: $fee, nonce: $nonce, memo: $memo}) {
+    {from: $sender, to: $receiver, amount: $amount, fee: $fee, valid_until: $validUntil, nonce: $nonce, memo: $memo}) {
     payment {
       id
     }

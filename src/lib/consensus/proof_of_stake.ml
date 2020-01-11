@@ -2451,7 +2451,9 @@ module Hooks = struct
               ~genesis_ledger_hash ) ]
   end
 
-  let is_genesis time = Epoch.(equal (of_time_exn time) zero)
+  let is_genesis_epoch time =
+    let open Epoch in
+    match of_time time with Ok epoch -> equal epoch zero | Error _ -> false
 
   (* Select the correct epoch data to use from a consensus state for a given epoch.
    * The rule for selecting the correct epoch data changes based on whether or not

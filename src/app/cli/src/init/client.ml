@@ -28,6 +28,11 @@ module Args = struct
     <*> arg1 <*> arg2 <*> arg3 <*> arg4 <*> arg5 <*> arg6
 end
 
+let mutually_exclusive_flags flags =
+  let open Command.Param in
+  List.map flags ~f:(map ~f:Option.(map ~f:some))
+  |> choose_one ~if_nothing_chosen:(`Default_to None)
+
 let or_error_str ~f_ok ~error = function
   | Ok x ->
       f_ok x
@@ -498,7 +503,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          considered valid. This makes it possible to have transactions which \
          expire if they are not applied before this time. If omitted, the \
          transaction will never expire."
-      (optional global_slot)
+      (optional consensus_time_raw)
   in
   let nonce_flag =
     flag "nonce"
@@ -552,8 +557,11 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
                ~f:User_command_memo.create_from_string_exn
            in
            let valid_until =
-             Option.value valid_until_opt
-               ~default:Coda_numbers.Global_slot.max_value
+             Option.map valid_until_opt
+               ~f:
+                 Coda_numbers.(
+                   Fn.compose Global_slot.of_int Consensus_time.to_int)
+             |> Option.value ~default:Coda_numbers.Global_slot.max_value
            in
            let command =
              Coda_commands.setup_user_command ~fee ~nonce ~memo ~valid_until
@@ -587,22 +595,64 @@ let send_payment =
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
 
-let send_payment_graphql =
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let receiver_flag =
-    flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
-      (required public_key_compressed)
-  in
-  let amount_flag =
-    flag "amount" ~doc:"VALUE Payment amount you want to send"
-      (required txn_amount)
-  in
-  let args =
-    Args.zip3 Cli_lib.Flag.user_command_common receiver_flag amount_flag
-  in
-  Command.async ~summary:"Send payment to an address"
-    (Cli_lib.Background_daemon.graphql_init args
+(*
+module Graphql_commands = struct
+  module Make_command (Spec : Command_spec_intf) : Command_intf = struct
+    let command =
+      Command.async ~summary:"Send payment to an address"
+        (Cli_lib.Background_daemon.graphql_init Spec.args
+          ~f:(fun graphql_endpoint args ->
+            let%map response = Graphql_client.query_exn (Spec.query args) in
+            Spec.on_success response))
+  end
+
+  module Send_payment = Make_command (struct
+    type args =
+      { receiver: Public_key.Compressed.t
+      ; amount: Amount.t
+      ; expiration: Slot.t }
+
+    let args : args Command.Param.t =
+      [%map_open
+        let receiver =
+          flag "receiver" (required public_key_compressed)
+            ~doc:"PUBLICKEY Public key to which you want to send money"
+        and amount =
+          flag "amount" (required txn_amount)
+            ~doc:"VALUE Payment amount you want to send"
+        and expiration =
+          choose_one
+            ~if_nothing_chosen:If_nothing_chosen.Return_none
+            [ flag "expiration-slot" (optional int)
+                ~doc:"SLOT Slot you want your transaction to expire on"
+            ; map ~f:slot_of_unix_time (* TODO: move map into custom arg_type? *)
+                (flag "expiration-unix-time" (optional int)
+                  ~doc:"NUMBER Unix time (expressed in seconds or milliseconds) you want your transaction to expire at")
+            ; map ~f:slot_of_date_time
+                flag "expiration-date-time" (optional string)
+                  ~doc:"DATE_TIME Date and time you want your transaction to expire at" ]
+        in
+        {receiver; amount; expiration}]
+
+    let action {sender; fee; nonce; memo; receiver; amount; expiration} =
+      let%bind slot_time_response =
+          (Graphql_queries.Get_slot_time.make ())
+          graphql_endpoint
+      in
+      let%map response =
+        Graphql_client.query_exn
+          (Graphql_queries.Send_payment.make
+            ~receiver:(Encoders.public_key receiver)
+            ~sender:(Encoders.public_key sender)
+            ~amount:(Encoders.amount amount)
+            ~fee:(Encoders.fee fee)
+            ?expiration:(Option.map expiration ~f:Encoders.slot)
+            ?nonce:(Option.map nonce ~f:Encoders.nonce)
+            ?memo
+            ())
+          graphql_endpoint
+      in
+
        ~f:(fun graphql_endpoint
           ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, amount)
           ->
@@ -613,6 +663,64 @@ let send_payment_graphql =
                   ~receiver:(Encoders.public_key receiver)
                   ~sender:(Encoders.public_key sender)
                   ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
+                  ?nonce:(Option.map nonce ~f:Encoders.nonce)
+                  ?memo ()))
+             graphql_endpoint
+         in
+         printf "Dispatched payment with ID %s\n"
+           ((response#sendPayment)#payment)#id ))
+  end)
+end
+*)
+
+let send_payment_graphql =
+  let open Command.Param in
+  let open Cli_lib.Arg_type in
+  let module Consensus_time = Consensus.Data.Consensus_time in
+  let receiver_flag =
+    flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
+      (required public_key_compressed)
+  in
+  let amount_flag =
+    flag "amount" ~doc:"VALUE Payment amount you want to send"
+      (required txn_amount)
+  in
+  let expiration_flag =
+    mutually_exclusive_flags
+      [ flag "expiration-slot"
+          (optional consensus_time_raw)
+          ~doc:"SLOT Slot you want your transaction to expire on"
+      ; flag "expiration-unix-time"
+          (optional (consensus_time_unix "-expiration-unix-time"))
+          ~doc:
+            "NUMBER Unix time (expressed in seconds or milliseconds) you want \
+             your transaction to expire at"
+      ; flag "expiration-date-time"
+          (optional (consensus_time_date_time "-expiration-date-time"))
+          ~doc:"DATE_TIME Date and time you want your transaction to expire at"
+      ]
+  in
+  let args =
+    Args.zip4 Cli_lib.Flag.user_command_common receiver_flag amount_flag
+      expiration_flag
+  in
+  Command.async ~summary:"Send payment to an address"
+    (Cli_lib.Background_daemon.graphql_init args
+       ~f:(fun graphql_endpoint
+          ( {Cli_lib.Flag.sender; fee; nonce; memo}
+          , receiver
+          , amount
+          , expiration )
+          ->
+         let%map response =
+           Graphql_client.(
+             query_exn
+               (Graphql_queries.Send_payment.make
+                  ~receiver:(Encoders.public_key receiver)
+                  ~sender:(Encoders.public_key sender)
+                  ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
+                  ?validUntil:
+                    (Option.map expiration ~f:Encoders.consensus_time)
                   ?nonce:(Option.map nonce ~f:Encoders.nonce)
                   ?memo ()))
              graphql_endpoint

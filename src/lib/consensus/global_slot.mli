@@ -1,3 +1,4 @@
+open Core_kernel
 open Coda_base
 
 include
@@ -17,6 +18,10 @@ val create : epoch:Epoch.t -> slot:Slot.t -> t
 
 val of_epoch_and_slot : Epoch.t * Slot.t -> t
 
+val of_int : int -> t
+
+val to_int : t -> int
+
 val to_uint32 : t -> Unsigned.uint32
 
 val of_uint32 : Unsigned.uint32 -> t
@@ -32,6 +37,8 @@ val end_time : t -> Block_time.t
 val time_hum : t -> string
 
 val to_epoch_and_slot : t -> Epoch.t * Slot.t
+
+val of_time : Block_time.t -> t Or_error.t
 
 val of_time_exn : Block_time.t -> t
 

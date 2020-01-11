@@ -30,8 +30,12 @@ let time_hum t =
   let epoch, slot = to_epoch_and_slot t in
   sprintf "epoch=%d, slot=%d" (Epoch.to_int epoch) (Slot.to_int slot)
 
-let of_time_exn time =
-  of_epoch_and_slot @@ Epoch.epoch_and_slot_of_time_exn time
+let of_time time =
+  let open Or_error.Let_syntax in
+  let%map epoch_and_slot = Epoch.epoch_and_slot_of_time time in
+  of_epoch_and_slot epoch_and_slot
+
+let of_time_exn time = Or_error.ok_exn (of_time time)
 
 let diff t (other_epoch, other_slot) =
   let open UInt32.Infix in

@@ -269,7 +269,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
 let wait_till_genesis ~logger ~time_controller =
   let module Time = Coda_base.Block_time in
   let now = Time.now time_controller in
-  try Consensus.Hooks.is_genesis now |> Fn.const Deferred.unit
+  try Consensus.Hooks.is_genesis_epoch now |> Fn.const Deferred.unit
   with Invalid_argument _ ->
     let time_till_genesis =
       Time.diff Consensus.Constants.genesis_state_timestamp now
@@ -283,7 +283,7 @@ let wait_till_genesis ~logger ~time_controller =
     let rec logger_loop () =
       let%bind () = after (Time_ns.Span.of_sec 30.) in
       let now = Time.now time_controller in
-      try Consensus.Hooks.is_genesis now |> Fn.const Deferred.unit
+      try Consensus.Hooks.is_genesis_epoch now |> Fn.const Deferred.unit
       with Invalid_argument _ ->
         let tm_remaining =
           Time.diff Consensus.Constants.genesis_state_timestamp now

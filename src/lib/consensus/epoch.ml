@@ -8,16 +8,20 @@ include Coda_numbers.Nat.Make32 ()
 
 module Time = Block_time
 
-let of_time_exn t : t =
-  if Time.(t < Constants.genesis_state_timestamp) then
-    raise
-      (Invalid_argument
-         "Epoch.of_time: time is earlier than genesis block timestamp") ;
+let of_time t =
+  let open Or_error.Let_syntax in
+  let%map () =
+    Result.ok_if_true
+      Time.(t >= Constants.genesis_state_timestamp)
+      ~error:(Error.of_string "")
+  in
   let time_since_genesis = Time.diff t Constants.genesis_state_timestamp in
   uint32_of_int64
     Int64.Infix.(
       Time.Span.to_ms time_since_genesis
       / Time.Span.to_ms Constants.Epoch.duration)
+
+let of_time_exn t : t = Or_error.ok_exn (of_time t)
 
 let start_time (epoch : t) =
   let ms =
@@ -38,8 +42,9 @@ let slot_start_time (epoch : t) (slot : Slot.t) =
 let slot_end_time (epoch : t) (slot : Slot.t) =
   Time.add (slot_start_time epoch slot) Constants.block_window_duration
 
-let epoch_and_slot_of_time_exn tm : t * Slot.t =
-  let epoch = of_time_exn tm in
+let epoch_and_slot_of_time tm : (t * Slot.t) Or_error.t =
+  let open Or_error.Let_syntax in
+  let%map epoch = of_time tm in
   let time_since_epoch = Coda_base.Block_time.diff tm (start_time epoch) in
   let slot =
     uint32_of_int64
@@ -47,6 +52,8 @@ let epoch_and_slot_of_time_exn tm : t * Slot.t =
          Time.Span.to_ms time_since_epoch / Constants.Slot.duration_ms)
   in
   (epoch, slot)
+
+let epoch_and_slot_of_time_exn tm = Or_error.ok_exn (epoch_and_slot_of_time tm)
 
 let diff_in_slots ((epoch, slot) : t * Slot.t) ((epoch', slot') : t * Slot.t) :
     int64 =

@@ -56,6 +56,8 @@ end
 module Encoders = struct
   let optional = Option.value_map ~default:`Null
 
+  let uint32 value = `String (Unsigned.UInt32.to_string value)
+
   let uint64 value = `String (Unsigned.UInt64.to_string value)
 
   let amount value = `String (Currency.Amount.to_string value)
@@ -64,7 +66,8 @@ module Encoders = struct
 
   let nonce value = `String (Coda_base.Account.Nonce.to_string value)
 
-  let uint32 value = `String (Unsigned.UInt32.to_string value)
+  let consensus_time value =
+    uint32 (Consensus.Data.Consensus_time.to_uint32 value)
 
   let public_key value = `String (Public_key.Compressed.to_base58_check value)
 end

@@ -126,13 +126,15 @@ module Time = struct
   [%%if
   time_offsets]
 
-  let now offset = of_time (Time.sub (Time.now ()) (Lazy.force offset))
+  let normalize offset t = sub t (Lazy.force offset)
 
   [%%else]
 
-  let now _ = of_time (Time.now ())
+  let normalize _ t = t
 
   [%%endif]
+
+  let now offset = Time.now () |> of_time |> normalize offset
 
   let field_var_to_unpacked (x : Tick.Field.Var.t) =
     Tick.Field.Checked.unpack ~length:64 x

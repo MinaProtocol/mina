@@ -1062,8 +1062,8 @@ module Types = struct
     end
 
     (** Converts a type into a graphql argument type. Expect name to start with uppercase    *)
-    let make_numeric_arg (type t) ~name
-        (module Numeric : Numeric_type with type t = t) =
+    let make_numeric_arg (type a) ~name
+        (module Numeric : Numeric_type with type t = a) : a option arg_typ =
       let lower_name = String.lowercase name in
       scalar name
         ~doc:
@@ -1087,6 +1087,20 @@ module Types = struct
     let uint64_arg = make_numeric_arg ~name:"UInt64" (module Unsigned.UInt64)
 
     let uint32_arg = make_numeric_arg ~name:"UInt32" (module Unsigned.UInt32)
+
+    let consensus_time_arg =
+      make_numeric_arg ~name:"UInt32"
+        ( module struct
+          open Consensus.Data.Consensus_time
+
+          type nonrec t = t
+
+          let of_string = Fn.compose of_uint32 Unsigned.UInt32.of_string
+
+          let of_int = Fn.compose of_uint32 Unsigned.UInt32.of_int
+        end
+        : Numeric_type
+          with type t = Consensus.Data.Consensus_time.t )
 
     module Fields = struct
       let from ~doc = arg "from" ~typ:(non_null public_key_arg) ~doc

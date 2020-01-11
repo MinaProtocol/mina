@@ -104,6 +104,8 @@ module Time : sig
 
   val to_time : t -> Time.t
 
+  val normalize : Controller.t -> t -> t
+
   val now : Controller.t -> t
 
   val to_int64 : t -> Int64.t

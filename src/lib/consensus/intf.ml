@@ -387,10 +387,18 @@ module type S = sig
 
       val to_string_hum : t -> string
 
+      val of_time : Block_time.t -> t Or_error.t
+
       val of_time_exn : Block_time.t -> t
 
       (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)
       val get_old : t -> t
+
+      val of_int : int -> t
+
+      val to_int : t -> int
+
+      val of_uint32 : Unsigned.UInt32.t -> t
 
       val to_uint32 : t -> Unsigned.UInt32.t
     end
@@ -478,7 +486,7 @@ module type S = sig
     end
 
     (* Check whether we are in the genesis epoch *)
-    val is_genesis : Coda_base.Block_time.t -> bool
+    val is_genesis_epoch : Coda_base.Block_time.t -> bool
 
     (**
      * Check that a consensus state was received at a valid time.

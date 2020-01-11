@@ -18,10 +18,14 @@ cd "$SCRIPTPATH/.."
 mkdir -p wallet-keys
 export CODA_PRIVKEY_PASS=""
 
+dune build src/app/cli/src/coda.exe
+
 # Iterate over the keys in the JSON and wrap them in the proper format
 i=1
+max=$(jq -r '.|length' < "$jsonpath")
 for k in $(jq -r '.[] | .private_key' < "$jsonpath"); do
-    dune exec -- coda advanced wrap-key -privkey-path "wallet-keys/$i" <<<"$k"
+    echo "wrapping key $i/$max"
+    ./_build/default/src/app/cli/src/coda.exe advanced wrap-key -privkey-path "wallet-keys/$i" >/dev/null <<<"$k"
     # echo "$k" > "wallet-keys/$i"
     i=$((i + 1))
 done
