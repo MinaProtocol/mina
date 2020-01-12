@@ -1651,7 +1651,8 @@ let%test_module "transaction_snark" =
           Ledger.create_new_account_exn ledger proposer
             (Account.create proposer Balance.zero) ;
           let sparse_ledger =
-            Sparse_ledger.of_ledger_subset_exn ledger [proposer; other]
+            Sparse_ledger.of_ledger_subset_exn ledger
+              [proposer; receiver; other]
           in
           check_transaction transaction_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
