@@ -1568,7 +1568,7 @@ let%test_module "transaction_snark" =
 
     type wallet = {private_key: Private_key.t; account: Account.t}
 
-    let random_wallets () =
+    let random_wallets ?(n = min (Int.pow 2 ledger_depth) (1 lsl 10)) () =
       let random_wallet () : wallet =
         let private_key = Private_key.create () in
         { private_key
@@ -1577,12 +1577,9 @@ let%test_module "transaction_snark" =
               (Public_key.compress (Public_key.of_private_key_exn private_key))
               (Balance.of_int (50 + Random.int 100)) }
       in
-      let n = min (Int.pow 2 ledger_depth) (1 lsl 10) in
       Array.init n ~f:(fun _ -> random_wallet ())
 
-    let user_command wallets i j amt fee nonce memo =
-      let sender = wallets.(i) in
-      let receiver = wallets.(j) in
+    let user_command sender receiver amt fee nonce memo =
       let payload : User_command.Payload.t =
         User_command.Payload.create ~fee ~nonce ~memo
           ~valid_until:Global_slot.max_value
@@ -1599,13 +1596,34 @@ let%test_module "transaction_snark" =
           ; signature }
       |> Option.value_exn
 
+    let _user_command_with_wallet wallets i j amt fee nonce memo =
+      let sender = wallets.(i) in
+      let receiver = wallets.(j) in
+      user_command sender receiver amt fee nonce memo
+
+    (*      let payload : User_command.Payload.t =
+        User_command.Payload.create ~fee ~nonce ~memo
+          ~valid_until:Global_slot.max_value
+          ~body:
+            (Payment
+               { receiver= receiver.account.public_key
+               ; amount= Amount.of_int amt })
+      in
+      let signature = Schnorr.sign sender.private_key payload in
+      User_command.check
+        User_command.Poly.Stable.Latest.
+          { payload
+          ; sender= Public_key.of_private_key_exn sender.private_key
+          ; signature }
+      |> Option.value_exn*)
+
     let keys = Keys.create ()
 
     include Make (struct
       let keys = keys
     end)
 
-    let state_body_hash = Quickcheck.random_value State_body_hash.gen
+    let _state_body_hash = Quickcheck.random_value State_body_hash.gen
 
     let pending_coinbase_stack_target (t : Transaction.t) state_body_hash_opt
         stack =
@@ -1620,7 +1638,12 @@ let%test_module "transaction_snark" =
       | _ ->
           stack_with_state
 
-    let of_user_command' sok_digest ledger user_command pending_coinbase_stack
+    let check_balance pk balance ledger =
+      let loc = Ledger.location_of_key ledger pk |> Option.value_exn in
+      let acc = Ledger.get ledger loc |> Option.value_exn in
+      [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
+
+    let _of_user_command' sok_digest ledger user_command pending_coinbase_stack
         state_body_hash_opt handler =
       let source = Ledger.merkle_root ledger in
       let target =
@@ -1656,7 +1679,7 @@ let%test_module "transaction_snark" =
                        ; is_odd= true }
        *)
 
-    let coinbase_test state_body_hash_opt =
+    let _coinbase_test state_body_hash_opt =
       let mk_pubkey () =
         Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
@@ -1698,7 +1721,7 @@ let%test_module "transaction_snark" =
               { source= pending_coinbase_init
               ; target= pending_coinbase_stack_target } )
 
-    let%test_unit "coinbase with state body hash" =
+    (*let%test_unit "coinbase with state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
           let state_body_hash_opt : Transaction_protocol_state.Block_data.t =
             Some state_body_hash
@@ -1722,7 +1745,7 @@ let%test_module "transaction_snark" =
                   Ledger.create_new_account_exn ledger account.public_key
                     account ) ;
               let t1 =
-                user_command wallets 1 0 8
+                user_command_with_wallet wallets 1 0 8
                   (Fee.of_int (Random.int 20))
                   Account.Nonce.zero
                   (User_command_memo.create_by_digesting_string_exn
@@ -1751,9 +1774,82 @@ let%test_module "transaction_snark" =
                 ~source:(Ledger.merkle_root ledger)
                 ~target pending_coinbase_stack
                 {transaction= t1; block_data= state_body_hash_opt}
-                (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
+                (unstage @@ Sparse_ledger.handler sparse_ledger) ) )*)
 
-    let%test "base_and_merge" =
+    let%test_unit "account creation fee - user commands" =
+      Test_util.with_randomness 123456789 (fun () ->
+          let wallets = random_wallets ~n:3 () |> Array.to_list in
+          let sender = List.hd_exn wallets in
+          let receivers = List.tl_exn wallets in
+          let txns_per_receiver = 2 in
+          let amount = 8 in
+          let txn_fee = 2 in
+          let account_fee = 1 in
+          let memo =
+            User_command_memo.create_by_digesting_string_exn
+              (Test_util.arbitrary_string
+                 ~len:User_command_memo.max_digestible_string_length)
+          in
+          Ledger.with_ledger ~f:(fun ledger ->
+              let _, txns =
+                let receivers =
+                  List.fold ~init:receivers
+                    (List.init (txns_per_receiver - 1) ~f:Fn.id)
+                    ~f:(fun acc _ -> receivers @ acc)
+                in
+                List.fold receivers ~init:(Account.Nonce.zero, [])
+                  ~f:(fun (nonce, txns) receiver ->
+                    let uc =
+                      user_command sender receiver amount (Fee.of_int txn_fee)
+                        nonce memo
+                    in
+                    (Account.Nonce.succ nonce, txns @ [uc]) )
+              in
+              Core.printf
+                !"txns %{sexp: User_command.With_valid_signature.t list}\n%!"
+                txns ;
+              let state_body_hash_opt : Transaction_protocol_state.Block_data.t
+                  =
+                None
+              in
+              Ledger.create_new_account_exn ledger sender.account.public_key
+                sender.account ;
+              let () =
+                List.iter txns ~f:(fun uc ->
+                    let source = Ledger.merkle_root ledger in
+                    let _txn = Transaction.User_command uc in
+                    let mentioned_keys =
+                      User_command.accounts_accessed (uc :> User_command.t)
+                    in
+                    let sparse_ledger =
+                      Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
+                    in
+                    let _undo = Ledger.apply_user_command ledger uc in
+                    let target = Ledger.merkle_root ledger in
+                    let sok_message =
+                      Sok_message.create ~fee:Fee.zero
+                        ~prover:sender.account.public_key
+                    in
+                    let pending_coinbase_stack =
+                      Pending_coinbase.Stack.empty
+                    in
+                    check_user_command ~sok_message ~source ~target
+                      pending_coinbase_stack
+                      {transaction= uc; block_data= state_body_hash_opt}
+                      (unstage @@ Sparse_ledger.handler sparse_ledger) )
+              in
+              Core.printf !"ledger %{sexp: Ledger.t} \n%!" ledger ;
+              List.iter receivers ~f:(fun receiver ->
+                  check_balance receiver.account.public_key
+                    ((amount * txns_per_receiver) - account_fee)
+                    ledger ) ;
+              check_balance sender.account.public_key
+                ( Balance.to_int sender.account.balance
+                - (amount + txn_fee) * txns_per_receiver
+                  * List.length receivers )
+                ledger ) )
+
+    (*let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
           Ledger.with_ledger ~f:(fun ledger ->
@@ -1766,7 +1862,7 @@ let%test_module "transaction_snark" =
                 None
               in
               let t1 =
-                user_command wallets 0 1 8
+                user_command_with_wallet wallets 0 1 8
                   (Fee.of_int (Random.int 20))
                   Account.Nonce.zero
                   (User_command_memo.create_by_digesting_string_exn
@@ -1774,7 +1870,7 @@ let%test_module "transaction_snark" =
                         ~len:User_command_memo.max_digestible_string_length))
               in
               let t2 =
-                user_command wallets 1 2 3
+                user_command_with_wallet wallets 1 2 3
                   (Fee.of_int (Random.int 20))
                   Account.Nonce.zero
                   (User_command_memo.create_by_digesting_string_exn
@@ -1844,7 +1940,7 @@ let%test_module "transaction_snark" =
                 (Wrap_input.of_tick_field
                    (merge_top_hash ~sok_digest ~state1 ~state2:state3
                       ~supply_increase:Amount.zero ~fee_excess:total_fees
-                      ~pending_coinbase_stack_state wrap_vk_state)) ) )
+                      ~pending_coinbase_stack_state wrap_vk_state)) ) )*)
   end )
 
 let%test_module "account timing check" =
