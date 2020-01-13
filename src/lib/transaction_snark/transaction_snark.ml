@@ -422,7 +422,6 @@ module Base = struct
     in
     let%bind is_payment = Transaction_union.Tag.Checked.is_payment tag in
     let%bind sender_compressed = Public_key.compress_var sender in
-    let proposer = payload.body.public_key in
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
     (*push state for any transaction*)
     let state_body_hash =
@@ -441,7 +440,8 @@ module Base = struct
       Pending_coinbase.Stack.Checked.if_ push_state ~then_:updated_stack
         ~else_:pending_coinbase_stack_before
     in
-    let coinbase = (proposer, payload.body.amount) in
+    let coinbase_receiver = payload.body.public_key in
+    let coinbase = (coinbase_receiver, payload.body.amount) in
     let%bind computed_pending_coinbase_stack_after =
       let%bind stack' =
         Pending_coinbase.Stack.Checked.push_coinbase coinbase
@@ -1628,12 +1628,13 @@ let%test_module "transaction_snark" =
         Public_key.(compress (of_private_key_exn (Private_key.create ())))
       in
       let proposer = mk_pubkey () in
+      let receiver = mk_pubkey () in
       let other = mk_pubkey () in
       let pending_coinbase_init = Pending_coinbase.Stack.empty in
       let cb =
         Coinbase.create
           ~amount:(Currency.Amount.of_int 10)
-          ~proposer
+          ~receiver
           ~fee_transfer:(Some (other, Currency.Fee.of_int 1))
         |> Or_error.ok_exn
       in
@@ -1650,7 +1651,8 @@ let%test_module "transaction_snark" =
           Ledger.create_new_account_exn ledger proposer
             (Account.create proposer Balance.zero) ;
           let sparse_ledger =
-            Sparse_ledger.of_ledger_subset_exn ledger [proposer; other]
+            Sparse_ledger.of_ledger_subset_exn ledger
+              [proposer; receiver; other]
           in
           check_transaction transaction_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
