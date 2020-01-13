@@ -17,6 +17,8 @@ module Constant = struct
       include Vector.Binable (N)
     end
 
+    let length = 64 * Nat.to_int N.n
+
     type t = Int64.t A.t [@@deriving bin_io]
 
     let to_bits = to_bits
@@ -30,6 +32,12 @@ module Constant = struct
         List.groupi ~break:(fun i _ _ -> i mod 64 = 0) bits |> List.map ~f:pack
       in
       Vector.take_from_list bits N.n
+
+    let of_fp x =
+      of_bits (List.take (Snarky_bn382_backend.Fp.to_bits x) length)
+
+    let of_fq x =
+      of_bits (List.take (Snarky_bn382_backend.Fq.to_bits x) length)
   end
 end
 
