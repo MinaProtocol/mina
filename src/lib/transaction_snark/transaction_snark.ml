@@ -526,7 +526,15 @@ module Base = struct
         ~f:(fun ~is_empty_and_writeable account ->
           let%map balance =
             (* receiver_increase will be zero in the stake delegation case *)
-            Balance.Checked.(account.balance + receiver_increase)
+            let%bind receiver_amount =
+              let%bind amount_for_new_acc =
+                Amount.Checked.sub receiver_increase
+                  (Amount.var_of_t (Amount.of_int 1))
+              in
+              Currency.Amount.Checked.if_ is_empty_and_writeable
+                ~then_:amount_for_new_acc ~else_:receiver_increase
+            in
+            Balance.Checked.(account.balance + receiver_amount)
           and delegate =
             Public_key.Compressed.Checked.if_ is_empty_and_writeable
               ~then_:receiver ~else_:account.delegate
