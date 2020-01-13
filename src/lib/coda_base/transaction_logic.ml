@@ -513,14 +513,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let apply_coinbase t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
       ({receiver; fee_transfer; amount= coinbase_amount} as cb : Coinbase.t) =
-    (*let get_or_initialize pk =
-      let initial_account = Account.initialize pk in
-      match get_or_create_account_exn t pk (Account.initialize pk) with
-      | `Added, location ->
-          (location, initial_account, [pk])
-      | `Existed, location ->
-          (location, Option.value_exn (get t location), [])
-    in*)
     let open Or_error.Let_syntax in
     let%bind receiver_reward, emptys1, transferee_update =
       match fee_transfer with

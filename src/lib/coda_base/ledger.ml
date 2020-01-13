@@ -224,11 +224,6 @@ module Ledger_inner = struct
   let get_or_create ledger key =
     let action, loc =
       get_or_create_account_exn ledger key (Account.initialize key)
-      (*match get_or_create_account_exn ledger key (Account.initialize key) with
-      | `Existed, loc ->
-          ([], loc)
-      | `Added, loc ->
-          ([key], loc)*)
     in
     (action, Option.value_exn (get ledger loc), loc)
 
