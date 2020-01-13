@@ -5,6 +5,8 @@ include Data_hash.Make_full_size ()
 module Base58_check = Codable.Make_base58_check (struct
   include Stable.Latest
 
+  let version_byte = Base58_check.Version_bytes.state_hash
+
   let description = "State hash"
 end)
 

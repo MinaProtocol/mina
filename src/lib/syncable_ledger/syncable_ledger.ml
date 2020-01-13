@@ -259,7 +259,12 @@ end = struct
           with
           | Ok answer ->
               Either.First answer
-          | Error _ ->
+          | Error e ->
+              Logger.error (Logger.create ()) ~module_:__MODULE__
+                ~location:__LOC__
+                ~metadata:[("error", `String (Error.to_string_hum e))]
+                "When handling What_child_hashes request, the following error \
+                 happended: $error" ;
               Either.Second
                 ( Actions.Violated_protocol
                 , Some
@@ -389,8 +394,6 @@ end = struct
         [("address", Addr.to_yojson addr); ("hash", Hash.to_yojson expected)]
       "Expecting content addr $address, expected: $hash" ;
     Addr.Table.add_exn t.waiting_content ~key:addr ~data:expected
-
-  (* TODO #435: verify content hash matches expected and blame the peer who gave it to us *)
 
   (** Given an address and the accounts below that address, fill in the tree
       with them. *)

@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 open Core_kernel
 open Snark_bits
@@ -19,15 +19,12 @@ module type S = sig
   module Digest : sig
     type t [@@deriving sexp, eq, hash, compare, yojson]
 
-    module Stable :
-      sig
-        module V1 : sig
-          type t [@@deriving sexp, bin_io, compare, hash, eq, version, yojson]
-        end
-
-        module Latest = V1
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type nonrec t = t [@@deriving sexp, compare, hash, eq, yojson]
       end
-      with type V1.t = t
+    end]
 
     val size_in_bits : int
 
@@ -82,15 +79,12 @@ struct
   open Inputs
 
   module Digest = struct
+    [%%versioned_asserted
     module Stable = struct
       module V1 = struct
-        module T = struct
-          type t = Field.t
-          [@@deriving
-            sexp, bin_io, compare, hash, eq, version {asserted; unnumbered}]
-        end
+        type t = Field.t [@@deriving sexp, compare, hash, eq]
 
-        include T
+        let to_latest = Fn.id
 
         let to_yojson t = `String (Field.to_string t)
 
@@ -102,10 +96,11 @@ struct
               Error "expected string"
       end
 
-      module Latest = V1
-    end
+      module Tests = struct
+        (* TODO : write tests, move out of functor *)
+      end
+    end]
 
-    (* omit bin_io, version *)
     type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare]
 
     [%%define_locally

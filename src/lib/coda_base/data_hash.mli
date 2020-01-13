@@ -1,10 +1,8 @@
-open Data_hash_intf
+(* data_hash.mli *)
 
-module type Basic = Basic
+module type Small = Data_hash_intf.Small
 
-module type Full_size = Full_size
-
-module type Small = Small
+module type Full_size = Data_hash_intf.Full_size
 
 module Make_small (M : sig
   val length_in_bits : int

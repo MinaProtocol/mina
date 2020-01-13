@@ -18,7 +18,7 @@ module Stable :
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t =
-    { transaction_with_info: Ledger.Undo.t
+    { transaction_with_info: Ledger.Undo.t Transaction_protocol_state.t
     ; statement: Transaction_snark.Statement.t
     ; witness: Transaction_witness.t }
   [@@deriving sexp]
@@ -137,7 +137,7 @@ val update_metrics : t -> unit Or_error.t
 (** All the proof bundles for snark workers*)
 val all_work_pairs_exn :
      t
-  -> ( Transaction.t
+  -> ( Transaction.t Transaction_protocol_state.t
      , Transaction_witness.t
      , Ledger_proof.t )
      Snark_work_lib.Work.Single.Spec.t

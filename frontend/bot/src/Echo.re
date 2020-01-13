@@ -28,13 +28,14 @@ module ListenBlocks = [%graphql
 module BlockSet = Belt.MutableSet.String;
 let processedBlocks = BlockSet.make();
 
-let sendEcho = (echoKey, fee, {from: userKey, amount}) =>
+let sendEcho = (echoKey, fee, password, {from: userKey, amount}) =>
   if (amount > fee) {
     Coda.sendPayment(
       ~from=echoKey,
       ~to_=userKey,
       ~amount=Int64.sub(amount, fee),
       ~fee,
+      ~password,
     )
     |> Wonka.forEach((. {ReasonUrql.Client.ClientTypes.response}) =>
          switch (response) {
@@ -81,7 +82,7 @@ let checkAlreadyProcessed =
     };
   };
 
-let start = (echoKey, fee) => {
+let start = (echoKey, fee, password) => {
   log(`Info, "Starting echo on %s", echoKey);
   ReasonUrql.Client.executeSubscription(
     ~client=Graphql.client,
@@ -98,7 +99,7 @@ let start = (echoKey, fee) => {
          |> List.filter(({to_, isDelegation}) =>
               to_ == echoKey && !isDelegation
             )
-         |> List.iter(sendEcho(echoKey, fee))
+         |> List.iter(sendEcho(echoKey, fee, password))
        | Error(e) =>
          log(`Error, "Error retrieving new block. Message: %s", e.message)
        | NotFound =>

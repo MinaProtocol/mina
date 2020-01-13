@@ -52,7 +52,9 @@ val check :
             | `Best_tip_transition
             | `Frontier_hash
             | `Root
-            | `Root_transition ] ] ] )
+            | `Root_transition
+            | `Transition of State_hash.t
+            | `Arcs of State_hash.t ] ] ] )
      Result.t
 
 val initialize :
@@ -61,7 +63,9 @@ val initialize :
 val add :
      t
   -> transition:External_transition.Validated.t
-  -> (unit, [> `Not_found of [> `Parent_transition]]) Result.t
+  -> ( unit
+     , [> `Not_found of [> `Parent_transition | `Arcs of State_hash.t]] )
+     Result.t
 
 val move_root :
      t

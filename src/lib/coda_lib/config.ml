@@ -19,6 +19,7 @@ type t =
   ; trust_system: Trust_system.t
   ; monitor: Monitor.t option
   ; initial_propose_keypairs: Keypair.Set.t
+  ; coinbase_receiver: [`Proposer | `Other of Public_key.Compressed.t]
   ; work_selection_method: (module Work_selector.Selection_method_intf)
   ; snark_worker_config: Snark_worker_config.t
   ; work_reassignment_wait: int
@@ -36,5 +37,8 @@ type t =
   ; snark_work_fee: Currency.Fee.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; is_archive_rocksdb: bool [@default false]
-  ; archive_process_port: int option [@default None] }
+  ; archive_process_location:
+      Core.Host_and_port.t Cli_lib.Flag.Types.with_name option
+        [@default None]
+  ; genesis_state_hash: State_hash.t }
 [@@deriving make]
