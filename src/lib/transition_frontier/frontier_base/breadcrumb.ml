@@ -250,8 +250,8 @@ module For_tests = struct
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
-          ~self:largest_account_public_key ~transactions_by_fee:transactions
-          ~get_completed_work
+          ~coinbase_receiver:`Proposer ~self:largest_account_public_key
+          ~transactions_by_fee:transactions ~get_completed_work
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt

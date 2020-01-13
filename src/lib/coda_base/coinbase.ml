@@ -5,7 +5,7 @@ open Import
 module Stable = struct
   module V1 = struct
     type t =
-      { proposer: Public_key.Compressed.Stable.V1.t
+      { receiver: Public_key.Compressed.Stable.V1.t
       ; amount: Currency.Amount.Stable.V1.t
       ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
     [@@deriving sexp, compare, eq, hash, yojson]
@@ -15,7 +15,7 @@ module Stable = struct
 end]
 
 type t = Stable.Latest.t =
-  { proposer: Public_key.Compressed.t
+  { receiver: Public_key.Compressed.t
   ; amount: Currency.Amount.t
   ; fee_transfer: Fee_transfer.Single.t option }
 [@@deriving sexp, compare, eq, hash, yojson]
@@ -27,21 +27,21 @@ let is_valid {amount; fee_transfer; _} =
   | Some (_, fee) ->
       Currency.Amount.(of_fee fee <= amount)
 
-let create ~amount ~proposer ~fee_transfer =
-  let t = {proposer; amount; fee_transfer} in
+let create ~amount ~receiver ~fee_transfer =
+  let t = {receiver; amount; fee_transfer} in
   if is_valid t then
     let adjusted_fee_transfer =
       if
         Public_key.Compressed.equal
-          (Option.value_map fee_transfer ~default:proposer ~f:fst)
-          proposer
+          (Option.value_map fee_transfer ~default:receiver ~f:fst)
+          receiver
       then None
       else fee_transfer
     in
     Ok {t with fee_transfer= adjusted_fee_transfer}
   else Or_error.error_string "Coinbase.create: invalid coinbase"
 
-let supply_increase {proposer= _; amount; fee_transfer} =
+let supply_increase {receiver= _; amount; fee_transfer} =
   match fee_transfer with
   | None ->
       Ok amount
@@ -57,7 +57,7 @@ let fee_excess t =
 
 let gen =
   let open Quickcheck.Let_syntax in
-  let%bind proposer = Public_key.Compressed.gen in
+  let%bind receiver = Public_key.Compressed.gen in
   let%bind amount =
     Currency.Amount.(gen_incl zero Coda_compile_config.coinbase)
   in
@@ -68,4 +68,4 @@ let gen =
   let%map fee_transfer =
     Option.quickcheck_generator (Quickcheck.Generator.tuple2 prover fee)
   in
-  {proposer; amount; fee_transfer}
+  {receiver; amount; fee_transfer}

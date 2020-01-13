@@ -286,17 +286,22 @@ endif
 ########################################
 # Diagrams for documentation
 
-docs/res/%.dot.png: docs/res/%.dot
+%.dot.png: %.dot
 	dot -Tpng $< > $@
 
-docs/res/%.tex.pdf: docs/res/%.tex
-	cd docs/res && pdflatex $(notdir $<)
+%.tex.pdf: %.tex
+	cd $(dir $@) && pdflatex -halt-on-error $(notdir $<)
 	cp $(@:.tex.pdf=.pdf) $@
 
-docs/res/%.tex.png: docs/res/%.tex.pdf
+%.tex.png: %.tex.pdf
 	convert -density 600x600 $< -quality 90 -resize 1080x1080 $@
 
-doc_diagrams: $(addsuffix .png,$(wildcard docs/res/*.tex) $(wildcard docs/res/*.dot))
+%.conv.tex.png: %.conv.tex
+	cd $(dir $@) && pdflatex -halt-on-error -shell-escape $(notdir $<)
+
+doc_diagram_sources=$(addprefix docs/res/,*.dot *.tex *.conv.tex)
+doc_diagram_sources+=$(addprefix rfcs/res/,*.dot *.tex *.conv.tex)
+doc_diagrams: $(addsuffix .png,$(wildcard $(doc_diagram_sources)))
 
 ########################################
 # Generate odoc documentation

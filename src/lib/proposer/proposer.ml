@@ -102,7 +102,7 @@ end = struct
 end
 
 let generate_next_state ~previous_protocol_state ~time_controller
-    ~staged_ledger ~transactions ~get_completed_work ~logger
+    ~staged_ledger ~transactions ~get_completed_work ~logger ~coinbase_receiver
     ~(keypair : Keypair.t) ~proposal_data ~scheduled_time =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
@@ -114,8 +114,8 @@ let generate_next_state ~previous_protocol_state ~time_controller
       (let open Deferred.Let_syntax in
       let diff =
         measure "create_diff" (fun () ->
-            Staged_ledger.create_diff staged_ledger ~self ~logger
-              ~transactions_by_fee:transactions ~get_completed_work )
+            Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
+              ~logger ~transactions_by_fee:transactions ~get_completed_work )
       in
       match%map
         Staged_ledger.apply_diff_unchecked staged_ledger diff
@@ -227,7 +227,13 @@ let generate_next_state ~previous_protocol_state ~time_controller
                   ~blockchain_state:
                     (Protocol_state.blockchain_state protocol_state)
                   ~consensus_transition:consensus_transition_data
-                  ~proposer:self ~coinbase_amount ~pending_coinbase_action ()
+                  ~coinbase_receiver:
+                    ( match coinbase_receiver with
+                    | `Proposer ->
+                        self
+                    | `Other pk ->
+                        pk )
+                  ~coinbase_amount ~pending_coinbase_action ()
               in
               let internal_transition =
                 Internal_transition.create ~snark_transition
@@ -243,7 +249,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
               Some (protocol_state, internal_transition, witness) ) )
 
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
-    ~transaction_resource_pool ~time_controller ~keypairs
+    ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
     ~set_next_proposal =
   trace "block_producer" (fun () ->
@@ -285,8 +291,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               Interruptible.lift (Deferred.return ()) (Ivar.read ivar)
             in
             let%bind next_state_opt =
-              generate_next_state ~scheduled_time ~proposal_data
-                ~previous_protocol_state ~time_controller
+              generate_next_state ~scheduled_time ~coinbase_receiver
+                ~proposal_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
             in

@@ -769,13 +769,15 @@ let genesis ~genesis_ledger ~base_proof =
   let genesis_protocol_state =
     Coda_state.Genesis_protocol_state.t ~genesis_ledger
   in
+  let creator = fst Consensus_state_hooks.genesis_winner in
   let empty_diff =
     { Staged_ledger_diff.diff=
         ( { completed_works= []
           ; user_commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
-    ; creator= fst Consensus_state_hooks.genesis_winner }
+    ; creator
+    ; coinbase_receiver= creator }
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =

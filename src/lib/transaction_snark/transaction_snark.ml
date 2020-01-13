@@ -422,7 +422,6 @@ module Base = struct
     in
     let%bind is_payment = Transaction_union.Tag.Checked.is_payment tag in
     let%bind sender_compressed = Public_key.compress_var sender in
-    let proposer = payload.body.public_key in
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
     (*push state for any transaction*)
     let state_body_hash =
@@ -441,7 +440,8 @@ module Base = struct
       Pending_coinbase.Stack.Checked.if_ push_state ~then_:updated_stack
         ~else_:pending_coinbase_stack_before
     in
-    let coinbase = (proposer, payload.body.amount) in
+    let coinbase_receiver = payload.body.public_key in
+    let coinbase = (coinbase_receiver, payload.body.amount) in
     let%bind computed_pending_coinbase_stack_after =
       let%bind stack' =
         Pending_coinbase.Stack.Checked.push_coinbase coinbase
@@ -1592,26 +1592,10 @@ let%test_module "transaction_snark" =
           ; signature }
       |> Option.value_exn
 
-    let _user_command_with_wallet wallets i j amt fee nonce memo =
+    let user_command_with_wallet wallets i j amt fee nonce memo =
       let sender = wallets.(i) in
       let receiver = wallets.(j) in
       user_command sender receiver amt fee nonce memo
-
-    (*      let payload : User_command.Payload.t =
-        User_command.Payload.create ~fee ~nonce ~memo
-          ~valid_until:Global_slot.max_value
-          ~body:
-            (Payment
-               { receiver= receiver.account.public_key
-               ; amount= Amount.of_int amt })
-      in
-      let signature = Schnorr.sign sender.private_key payload in
-      User_command.check
-        User_command.Poly.Stable.Latest.
-          { payload
-          ; sender= Public_key.of_private_key_exn sender.private_key
-          ; signature }
-      |> Option.value_exn*)
 
     let keys = Keys.create ()
 
@@ -1619,7 +1603,7 @@ let%test_module "transaction_snark" =
       let keys = keys
     end)
 
-    let _state_body_hash = Quickcheck.random_value State_body_hash.gen
+    let state_body_hash = Quickcheck.random_value State_body_hash.gen
 
     let pending_coinbase_stack_target (t : Transaction.t) state_body_hash_opt
         stack =
@@ -1639,7 +1623,7 @@ let%test_module "transaction_snark" =
       let acc = Ledger.get ledger loc |> Option.value_exn in
       [%test_eq: Balance.t] acc.balance (Balance.of_int balance)
 
-    let _of_user_command' sok_digest ledger user_command pending_coinbase_stack
+    let of_user_command' sok_digest ledger user_command pending_coinbase_stack
         state_body_hash_opt handler =
       let source = Ledger.merkle_root ledger in
       let target =
@@ -1675,25 +1659,23 @@ let%test_module "transaction_snark" =
                        ; is_odd= true }
        *)
 
-    let create_coinbase proposer ft amt =
-      let cb =
-        Coinbase.create
-          ~amount:(Currency.Amount.of_int amt)
-          ~proposer ~fee_transfer:ft
-        |> Or_error.ok_exn
-      in
-      Transaction.Coinbase cb
-
     let mk_pubkey () =
       Public_key.(compress (of_private_key_exn (Private_key.create ())))
 
-    let _coinbase_test state_body_hash_opt =
+    let coinbase_test state_body_hash_opt =
       let proposer = mk_pubkey () in
+      let receiver = mk_pubkey () in
       let other = mk_pubkey () in
       let pending_coinbase_init = Pending_coinbase.Stack.empty in
+      let cb =
+        Coinbase.create
+          ~amount:(Currency.Amount.of_int 10)
+          ~receiver
+          ~fee_transfer:(Some (other, Currency.Fee.of_int 1))
+        |> Or_error.ok_exn
+      in
       let txn_in_block =
-        { Transaction_protocol_state.Poly.transaction=
-            create_coinbase proposer (Some (other, Fee.of_int 1)) 10
+        { Transaction_protocol_state.Poly.transaction= Transaction.Coinbase cb
         ; block_data= state_body_hash_opt }
       in
       let pending_coinbase_stack_target =
@@ -1704,7 +1686,8 @@ let%test_module "transaction_snark" =
           Ledger.create_new_account_exn ledger proposer
             (Account.create proposer Balance.zero) ;
           let sparse_ledger =
-            Sparse_ledger.of_ledger_subset_exn ledger [proposer; other]
+            Sparse_ledger.of_ledger_subset_exn ledger
+              [proposer; receiver; other]
           in
           check_transaction txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
@@ -1720,7 +1703,7 @@ let%test_module "transaction_snark" =
               { source= pending_coinbase_init
               ; target= pending_coinbase_stack_target } )
 
-    (*let%test_unit "coinbase with state body hash" =
+    let%test_unit "coinbase with state body hash" =
       Test_util.with_randomness 123456789 (fun () ->
           let state_body_hash_opt : Transaction_protocol_state.Block_data.t =
             Some state_body_hash
@@ -1773,7 +1756,7 @@ let%test_module "transaction_snark" =
                 ~source:(Ledger.merkle_root ledger)
                 ~target pending_coinbase_stack
                 {transaction= t1; block_data= state_body_hash_opt}
-                (unstage @@ Sparse_ledger.handler sparse_ledger) ) )*)
+                (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let account_fee = Fee.to_int Coda_compile_config.account_creation_fee
 
@@ -1907,7 +1890,7 @@ let%test_module "transaction_snark" =
     let%test_unit "account creation fee - coinbase" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets ~n:3 () in
-          let proposer = wallets.(0) in
+          let receiver = wallets.(0) in
           let other = wallets.(1) in
           let dummy_account = wallets.(2) in
           let reward = 10 in
@@ -1929,7 +1912,7 @@ let%test_module "transaction_snark" =
                     let cb =
                       Coinbase.create
                         ~amount:(Currency.Amount.of_int reward)
-                        ~proposer:proposer.account.public_key
+                        ~receiver:receiver.account.public_key
                         ~fee_transfer:(List.hd fts)
                       |> Or_error.ok_exn
                     in
@@ -1942,7 +1925,7 @@ let%test_module "transaction_snark" =
                     let source = Ledger.merkle_root ledger in
                     let txn = Transaction.Coinbase cb in
                     let mentioned_keys =
-                      proposer.account.public_key
+                      receiver.account.public_key
                       :: Option.value_map ~default:[] cb.fee_transfer
                            ~f:(fun ft -> [fst ft])
                     in
@@ -1969,13 +1952,13 @@ let%test_module "transaction_snark" =
                       (unstage (Sparse_ledger.handler sparse_ledger)) )
               in
               let fees = fee * ft_count in
-              check_balance proposer.account.public_key
+              check_balance receiver.account.public_key
                 ((reward * coinbase_count) - account_fee - fees)
                 ledger ;
               check_balance other.account.public_key (fees - account_fee)
                 ledger ) )
 
-    (*let%test "base_and_merge" =
+    let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
           Ledger.with_ledger ~f:(fun ledger ->
@@ -2066,7 +2049,7 @@ let%test_module "transaction_snark" =
                 (Wrap_input.of_tick_field
                    (merge_top_hash ~sok_digest ~state1 ~state2:state3
                       ~supply_increase:Amount.zero ~fee_excess:total_fees
-                      ~pending_coinbase_stack_state wrap_vk_state)) ) )*)
+                      ~pending_coinbase_stack_state wrap_vk_state)) ) )
   end )
 
 let%test_module "account timing check" =
