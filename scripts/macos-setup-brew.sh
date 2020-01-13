@@ -16,9 +16,9 @@ done;
 
 echo "Todo:    ${NEEDED_PACKAGES}"
 
-# Remove old python
+# Remove old python (uses force to always return true)
 # https://discourse.brew.sh/t/python-2-eol-2020/4647
-brew uninstall python@2
+brew uninstall --force python@2
 
 # only run if there's work to do
 if [[ $NEEDED_PACKAGES = *[![:space:]]* ]]; then
