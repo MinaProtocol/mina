@@ -58,6 +58,7 @@ type t =
   ; initialization_finish_signal: unit Ivar.t
   ; pipes: pipes
   ; wallets: Secrets.Wallets.t
+  ; coinbase_receiver: [`Proposer | `Other of Public_key.Compressed.t]
   ; propose_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
@@ -583,6 +584,33 @@ let staking_ledger t =
   let local_state = t.config.consensus_local_state in
   Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
 
+let find_delegators table pk =
+  Option.value_map
+    (Public_key.Compressed.Table.find table pk)
+    ~default:[] ~f:Coda_base.Account.Index.Table.data
+
+let current_epoch_delegators t ~pk =
+  let open Option.Let_syntax in
+  let%map _transition_frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let current_epoch_delegatee_table =
+    Consensus.Data.Local_state.current_epoch_delegatee_table
+      ~local_state:t.config.consensus_local_state
+  in
+  find_delegators current_epoch_delegatee_table pk
+
+let last_epoch_delegators t ~pk =
+  let open Option.Let_syntax in
+  let%bind _transition_frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  let%map last_epoch_delegatee_table =
+    Consensus.Data.Local_state.last_epoch_delegatee_table
+      ~local_state:t.config.consensus_local_state
+  in
+  find_delegators last_epoch_delegatee_table pk
+
 let start t =
   Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier
     ~set_next_proposal:(fun p -> t.next_proposal <- Some p)
@@ -594,6 +622,7 @@ let start t =
       (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
     ~time_controller:t.config.time_controller
     ~keypairs:(Agent.read_only t.propose_keypairs)
+    ~coinbase_receiver:t.coinbase_receiver
     ~consensus_local_state:t.config.consensus_local_state
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.proposer_transition_writer ;
@@ -943,6 +972,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                       external_transitions_writer }
             ; wallets
             ; propose_keypairs
+            ; coinbase_receiver= config.coinbase_receiver
             ; seen_jobs=
                 Work_selector.State.init
                   ~reassignment_wait:config.work_reassignment_wait

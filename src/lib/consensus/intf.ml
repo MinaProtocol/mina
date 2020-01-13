@@ -192,7 +192,8 @@ module type Snark_transition = sig
          , 'consensus_transition
          , 'sok_digest
          , 'amount
-         , 'public_key )
+         , 'public_key
+         , 'pending_coinbase_action )
          t
     [@@deriving sexp]
   end
@@ -206,11 +207,12 @@ module type Snark_transition = sig
     , consensus_transition_var
     , Sok_message.Digest.Checked.t
     , Amount.var
-    , Public_key.Compressed.var )
+    , Public_key.Compressed.var
+    , Pending_coinbase.Update.Action.var )
     Poly.t
 
   val consensus_transition :
-    (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
+    (_, 'consensus_transition, _, _, _, _) Poly.t -> 'consensus_transition
 end
 
 module type State_hooks = sig
@@ -314,6 +316,17 @@ module type S = sig
         -> t
 
       val current_proposers : t -> Signature_lib.Public_key.Compressed.Set.t
+
+      val current_epoch_delegatee_table :
+           local_state:t
+        -> Coda_base.Account.t Coda_base.Account.Index.Table.t
+           Public_key.Compressed.Table.t
+
+      val last_epoch_delegatee_table :
+           local_state:t
+        -> Coda_base.Account.t Coda_base.Account.Index.Table.t
+           Public_key.Compressed.Table.t
+           option
 
       (** Swap in a new set of proposers and invalidate and/or recompute cached
        * data *)
@@ -498,7 +511,7 @@ module type S = sig
      * schedule a proposal with some particular keypair at some time in the
      * future, or to propose now with some keypair and check again some time in
      * the future.
-    *)
+     *)
     val next_proposal :
          Unix_timestamp.t
       -> Consensus_state.Value.t
@@ -509,7 +522,7 @@ module type S = sig
 
     (**
      * A hook for managing local state when the locked tip is updated.
-    *)
+     *)
     val frontier_root_transition :
          Consensus_state.Value.t
       -> Consensus_state.Value.t
@@ -518,8 +531,8 @@ module type S = sig
       -> unit
 
     (**
-       * Indicator of when we should bootstrap
-    *)
+     * Indicator of when we should bootstrap
+     *)
     val should_bootstrap :
          existing:Consensus_state.Value.t
       -> candidate:Consensus_state.Value.t
@@ -535,16 +548,16 @@ module type S = sig
     type local_state_sync [@@deriving to_yojson]
 
     (**
-      * Predicate indicating whether or not the local state requires synchronization.
-    *)
+     * Predicate indicating whether or not the local state requires synchronization.
+     *)
     val required_local_state_sync :
          consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
       -> local_state_sync Non_empty_list.t option
 
     (**
-      * Synchronize local state over the network.
-    *)
+     * Synchronize local state over the network.
+     *)
     val sync_local_state :
          logger:Logger.t
       -> trust_system:Trust_system.t
