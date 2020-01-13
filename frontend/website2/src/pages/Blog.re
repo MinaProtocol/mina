@@ -97,7 +97,11 @@ let make = (~posts) => {
 Next.injectGetInitialProps(make, _ => {
   Contentful.getEntries(
     Lazy.force(Contentful.client),
-    {"include": 0, "content_type": ContentType.Post.id},
+    {
+      "include": 0,
+      "content_type": ContentType.Post.id,
+      "order": "-fields.date",
+    },
   )
   |> Js.Promise.then_((entries: ContentType.Post.entries) => {
        let posts =
