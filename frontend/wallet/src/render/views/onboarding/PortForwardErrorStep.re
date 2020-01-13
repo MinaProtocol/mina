@@ -25,7 +25,12 @@ let make = (~retry) => {
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
             label="Retry"
-            style=Button.HyperlinkBlue
+            style=Button.HyperlinkBlue2
+            onClick={_ => retry()}
+          />
+          <Button
+            label="I've Fixed the Problem"
+            style=Button.HyperlinkBlue3
             onClick={_ => retry()}
           />
         </div>

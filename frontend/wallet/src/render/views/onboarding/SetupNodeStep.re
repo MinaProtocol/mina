@@ -16,14 +16,14 @@ let make = (~customSetup, ~expressSetup) => {
         <Spacer height=2.0 />
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
-            style=Button.MidnightBlue
+            style=Button.HyperlinkBlue2
             label="Custom Setup"
             onClick={_ => customSetup()}
           />
           <Spacer width=1.5 />
           <Button
             label="Express Setup"
-            style=Button.HyperlinkBlue
+            style=Button.HyperlinkBlue3
             onClick={_ => expressSetup()}
           />
         </div>

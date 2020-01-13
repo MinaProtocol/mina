@@ -8,20 +8,20 @@ let make = (~prevStep, ~runNode, ~nextStep) => {
         <Spacer height=2.0 />
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
-            style=Button.MidnightBlue
+            style=Button.HyperlinkBlue2
             label="Go Back"
             onClick={_ => prevStep()}
           />
           <Spacer width=1.0 />
           <Button
             label="Local Machine"
-            style=Button.HyperlinkBlue
+            style=Button.HyperlinkBlue3
             onClick={_ => runNode()}
           />
           <Spacer width=1.5 />
           <Button
             label="Remote Server"
-            style=Button.HyperlinkBlue
+            style=Button.HyperlinkBlue3
             onClick={_ => nextStep()}
           />
         </div>

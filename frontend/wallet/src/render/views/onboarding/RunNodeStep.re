@@ -16,14 +16,14 @@ let make = (~prevStep, ~createAccount) => {
         <Spacer height=2.0 />
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
-            style=Button.MidnightBlue
+            style=Button.HyperlinkBlue2
             label="Go Back"
             onClick={_ => prevStep()}
           />
           <Spacer width=1.5 />
           <Button
             label="Continue"
-            style=Button.HyperlinkBlue
+            style=Button.HyperlinkBlue3
             onClick={_ => createAccount()}
           />
         </div>

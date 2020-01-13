@@ -18,14 +18,14 @@ let make = (~prevStep, ~runNode) => {
         <Spacer height=2.5 />
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
-            style=Button.MidnightBlue
+            style=Button.HyperlinkBlue2
             label="Go Back"
             onClick={_ => prevStep()}
           />
           <Spacer width=1. />
           <Button
             label="Continue"
-            style=Button.HyperlinkBlue
+            style=Button.HyperlinkBlue3
             onClick={_ => runNode()}
           />
         </div>

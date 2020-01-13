@@ -16,14 +16,14 @@ let make = (~prevStep, ~nextStep) => {
         <Spacer height=2.0 />
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
-            style=Button.MidnightBlue
+            style=Button.HyperlinkBlue2
             label="Go Back"
             onClick={_ => prevStep()}
           />
           <Spacer width=1.5 />
           <Button
             width=17.
-            style=Button.MidnightBlue
+            style=Button.HyperlinkBlue2
             label="Continue without Auto-Staking"
             onClick={_ => nextStep()}
           />
@@ -31,7 +31,7 @@ let make = (~prevStep, ~nextStep) => {
           <Button
             width=13.
             label="Enable Auto-Staking"
-            style=Button.HyperlinkBlue
+            style=Button.HyperlinkBlue3
             onClick={_ => nextStep()}
           />
         </div>

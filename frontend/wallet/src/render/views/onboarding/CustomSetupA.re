@@ -23,7 +23,7 @@ let make = (~prevStep, ~completeSetup) => {
         <Spacer height=2.5 />
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
-            style=Button.MidnightBlue
+            style=Button.HyperlinkBlue2
             label="Go Back"
             onClick={_ => prevStep()}
           />
@@ -31,7 +31,7 @@ let make = (~prevStep, ~completeSetup) => {
           <Button
             width=15.
             label="Setup Is Complete"
-            style=Button.HyperlinkBlue
+            style=Button.HyperlinkBlue3
             onClick={_ => completeSetup()}
           />
         </div>

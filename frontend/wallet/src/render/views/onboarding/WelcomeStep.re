@@ -12,7 +12,7 @@ let make = (~nextStep) => {
     miscLeft={
       <Button
         label="Get Started"
-        style=Button.HyperlinkBlue
+        style=Button.HyperlinkBlue3
         onClick={_ => nextStep()}
       />
     }

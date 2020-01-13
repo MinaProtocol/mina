@@ -49,7 +49,7 @@ let make = (~nextStep, ~prevStep) => {
         </FadeIn>
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
-            style=Button.MidnightBlue
+            style=Button.HyperlinkBlue2
             label="Go Back"
             onClick={_ => prevStep()}
           />
@@ -59,7 +59,7 @@ let make = (~nextStep, ~prevStep) => {
                <>
                  <Button
                    label="Create"
-                   style=Button.HyperlinkBlue
+                   style=Button.HyperlinkBlue3
                    disabled={
                      switch (result) {
                      | Loading => true

@@ -22,7 +22,7 @@ let make = (~tryAgain) => {
         <Spacer height=2.0 />
         <div className=OnboardingTemplate.Styles.buttonRow>
           <Button
-            style=Button.HyperlinkBlue
+            style=Button.HyperlinkBlue3
             label="Try Again"
             onClick={_ => tryAgain()}
           />
