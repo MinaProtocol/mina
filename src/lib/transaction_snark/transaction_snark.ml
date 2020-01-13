@@ -503,8 +503,21 @@ module Base = struct
                       ~then_:(return payload.body.public_key)
                       ~else_:(return account.delegate))
              in
+             let%bind sender_amount =
+               let%bind amount_for_new_acc =
+                 let fee =
+                   Amount.Signed.create
+                     ~magnitude:
+                       (Amount.Checked.of_fee Fee.(var_of_t (of_int 1)))
+                     ~sgn:Sgn.Checked.neg
+                 in
+                 Amount.Signed.Checked.add sender_delta fee
+               in
+               Currency.Amount.Signed.Checked.if_ is_empty_and_writeable
+                 ~then_:amount_for_new_acc ~else_:sender_delta
+             in
              let%map balance =
-               Balance.Checked.add_signed_amount account.balance sender_delta
+               Balance.Checked.add_signed_amount account.balance sender_amount
              in
              { Account.Poly.balance
              ; public_key= sender_compressed
@@ -600,10 +613,20 @@ module Base = struct
         root_before pending_coinbase_before pending_coinbase_after
         state_body_hash_opt t
     in
+    let%bind () =
+      as_prover
+        As_prover.(
+          Let_syntax.(
+            let%map root_checked = read Frozen_ledger_hash.typ root_after in
+            Core.printf
+              !"Root after %{sexp: Frozen_ledger_hash.t}\n%!"
+              root_checked))
+    in
     let%map () =
       with_label __LOC__
         (let%bind sok_digest =
-           exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
+           with_label __LOC__
+             (exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest)
          in
          let input =
            let open Random_oracle.Input in
@@ -616,10 +639,11 @@ module Base = struct
              ; Amount.var_to_input supply_increase
              ; Amount.Signed.Checked.to_input fee_excess ]
          in
-         make_checked (fun () ->
-             Random_oracle.Checked.(
-               hash ~init:Hash_prefix.base_snark (pack_input input)) )
-         >>= Field.Checked.Assert.equal top_hash)
+         with_label __LOC__
+           ( make_checked (fun () ->
+                 Random_oracle.Checked.(
+                   hash ~init:Hash_prefix.base_snark (pack_input input)) )
+           >>= Field.Checked.Assert.equal top_hash ))
     in
     ()
 
@@ -1145,6 +1169,7 @@ let check_transaction ?preeval ~sok_message ~source ~target
   let state_body_hash_opt =
     Transaction_protocol_state.block_data transaction_in_block
   in
+  Core.printf !"root unchecked %{sexp: Frozen_ledger_hash.t}\n%!" target ;
   check_transaction_union ?preeval sok_message source target
     pending_coinbase_stack_state
     (Transaction_union.of_transaction transaction)
