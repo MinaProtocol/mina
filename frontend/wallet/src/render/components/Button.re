@@ -4,7 +4,10 @@ type mode =
   | Green
   | Red
   | OffWhite
-  | MidnightBlue;
+  | MidnightBlue
+  | HyperlinkBlue2
+  | HyperlinkBlue3
+  | LightBlue;
 
 module Styles = {
   open Css;
@@ -34,6 +37,9 @@ module Styles = {
     | Red => white
     | OffWhite => white
     | MidnightBlue => white
+    | HyperlinkBlue2 => white
+    | HyperlinkBlue3 => white
+    | LightBlue => Theme.Colors.hyperlink
     };
 
   let buttonBgColor = mode =>
@@ -44,6 +50,9 @@ module Styles = {
     | Red => Theme.Colors.roseBud
     | OffWhite => Theme.Colors.offWhite(0.2)
     | MidnightBlue => Theme.Colors.hyperlinkAlpha(0.3)
+    | HyperlinkBlue2 => Theme.Colors.hyperlinkAlpha(0.3)
+    | HyperlinkBlue3 => Theme.Colors.hyperlink
+    | LightBlue => Theme.Colors.marineAlpha(0.1)
     };
 
   let buttonHoverBgColor = mode =>
@@ -53,7 +62,23 @@ module Styles = {
     | Green => Theme.Colors.jungle
     | Red => Theme.Colors.yeezy
     | OffWhite => Theme.Colors.offWhite(0.5)
-    | MidnightBlue => Theme.Colors.midnightAlpha(0.3)
+    | MidnightBlue => Theme.Colors.hyperlink
+    | HyperlinkBlue2 => Theme.Colors.hyperlinkAlpha(0.7)
+    | HyperlinkBlue3 => Theme.Colors.blue3
+    | LightBlue => Theme.Colors.hyperlink
+    };
+
+  let buttonHoverColor = mode =>
+    switch (mode) {
+    | HyperlinkBlue => white
+    | Gray => Theme.Colors.midnight
+    | Green => white
+    | Red => white
+    | OffWhite => white
+    | MidnightBlue => white
+    | HyperlinkBlue2 => white
+    | HyperlinkBlue3 => white
+    | LightBlue => white
     };
 
   let buttonStyles = mode =>
@@ -62,7 +87,10 @@ module Styles = {
       style([
         backgroundColor(buttonBgColor(mode)),
         color(buttonColor(mode)),
-        hover([backgroundColor(buttonHoverBgColor(mode))]),
+        hover([
+          backgroundColor(buttonHoverBgColor(mode)),
+          color(buttonHoverColor(mode)),
+        ]),
         focus([backgroundColor(buttonHoverBgColor(mode))]),
         active([backgroundColor(buttonHoverBgColor(mode))]),
       ]),

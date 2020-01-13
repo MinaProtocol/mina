@@ -80,6 +80,8 @@ module Colors = {
 
   let tealAlpha = a => `rgba((71, 130, 160, a));
   let teal = tealAlpha(1.0);
+
+  let blue3 = `hex("0AA9FF");
 };
 
 module Typeface = {
