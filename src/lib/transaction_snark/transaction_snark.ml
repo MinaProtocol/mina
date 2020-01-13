@@ -458,6 +458,10 @@ module Base = struct
          in
          Boolean.Assert.is_true correct_coinbase_stack)
     in
+    let account_creation_amount_var =
+      Amount.Checked.of_fee
+        Fee.(var_of_t Coda_compile_config.account_creation_fee)
+    in
     let%bind receiver =
       (* A stake delegation only uses the sender *)
       Public_key.Compressed.Checked.if_ is_stake_delegation
@@ -471,12 +475,12 @@ module Base = struct
           let%map balance =
             (* receiver_increase will be zero in the stake delegation case *)
             let%bind receiver_amount =
-              let%bind amount_for_new_acc =
+              let%bind amount_for_new_account =
                 Amount.Checked.sub receiver_increase
-                  (Amount.var_of_t (Amount.of_int 1))
+                  account_creation_amount_var
               in
               Currency.Amount.Checked.if_ is_empty_and_writeable
-                ~then_:amount_for_new_acc ~else_:receiver_increase
+                ~then_:amount_for_new_account ~else_:receiver_increase
             in
             Balance.Checked.(account.balance + receiver_amount)
           and delegate =
@@ -534,9 +538,7 @@ module Base = struct
              let%bind sender_amount =
                let%bind amount_for_new_acc =
                  let fee =
-                   Amount.Signed.create
-                     ~magnitude:
-                       (Amount.Checked.of_fee Fee.(var_of_t (of_int 1)))
+                   Amount.Signed.create ~magnitude:account_creation_amount_var
                      ~sgn:Sgn.Checked.neg
                  in
                  (*The sender delta could be zero here in the case of fee transfers and coinbase but sender = receiver and therefore the account would exist after the previous merkle update. Therefore, modify the reciever before modifying the sender so that balance doesn't go below zero*)
@@ -1773,6 +1775,8 @@ let%test_module "transaction_snark" =
                 {transaction= t1; block_data= state_body_hash_opt}
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )*)
 
+    let account_fee = Fee.to_int Coda_compile_config.account_creation_fee
+
     let%test_unit "account creation fee - user commands" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets ~n:3 () |> Array.to_list in
@@ -1781,7 +1785,6 @@ let%test_module "transaction_snark" =
           let txns_per_receiver = 2 in
           let amount = 8 in
           let txn_fee = 2 in
-          let account_fee = 1 in
           let memo =
             User_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
@@ -1847,7 +1850,6 @@ let%test_module "transaction_snark" =
           let receivers = random_wallets ~n:3 () |> Array.to_list in
           let txns_per_receiver = 3 in
           let fee = 8 in
-          let account_fee = 1 in
           Ledger.with_ledger ~f:(fun ledger ->
               let txns =
                 let receivers =
@@ -1910,7 +1912,6 @@ let%test_module "transaction_snark" =
           let dummy_account = wallets.(2) in
           let reward = 10 in
           let fee = 1 in
-          let account_fee = 1 in
           let coinbase_count = 3 in
           let ft_count = 2 in
           let state_body_hash_opt : Transaction_protocol_state.Block_data.t =

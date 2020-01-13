@@ -115,6 +115,13 @@ let get_or_initialize_exn public_key t idx =
     (`Added, {account with delegate= public_key; public_key})
   else (`Existed, account)
 
+let sub_acc_creation_fee action (amount : Currency.Amount.t) =
+  if action = `Added then
+    Option.value_exn
+      Currency.Amount.(
+        sub amount (of_fee Coda_compile_config.account_creation_fee))
+  else amount
+
 let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
     =
   let sender_idx = find_index_exn t (Public_key.compress sender) in
@@ -149,19 +156,7 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
       in
       let receiver_balance =
         (*deduct account-creation fee*)
-        let amount' =
-          match action with
-          | `Added ->
-              Core.printf !"Added\n%!" ;
-              Option.value_exn (Amount.sub amount (Amount.of_int 1))
-          | `Existed ->
-              Core.printf !"Existed\n%!" ; amount
-        in
-        Core.printf
-          !"in sparse_ledger receiver amount: before %{sexp: Amount.t} after \
-            %{sexp: Amount.t}\n\
-            %!"
-          amount amount' ;
+        let amount' = sub_acc_creation_fee action amount in
         Option.value_exn (Balance.add_amount receiver_account.balance amount')
       in
       set_exn t receiver_idx {receiver_account with balance= receiver_balance}
@@ -173,11 +168,7 @@ let apply_fee_transfer_exn =
     let open Currency in
     let amount = Amount.of_fee fee in
     let balance =
-      let amount' =
-        if action = `Added then
-          Option.value_exn (Amount.sub amount (Amount.of_int 1))
-        else amount
-      in
+      let amount' = sub_acc_creation_fee action amount in
       Option.value_exn (Balance.add_amount account.balance amount')
     in
     set_exn t index {account with balance}
@@ -191,11 +182,7 @@ let apply_coinbase_exn t
     let idx = find_index_exn t pk in
     let action, a = get_or_initialize_exn pk t idx in
     let balance =
-      let amount' =
-        if action = `Added then
-          Option.value_exn (Amount.sub amount (Amount.of_int 1))
-        else amount
-      in
+      let amount' = sub_acc_creation_fee action amount in
       Option.value_exn (Balance.add_amount a.balance amount')
     in
     set_exn t idx {a with balance}

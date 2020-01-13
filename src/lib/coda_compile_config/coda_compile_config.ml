@@ -16,4 +16,9 @@
 [%%inject
 "genesis_ledger", genesis_ledger]
 
+[%%inject
+"account_creation_fee", account_creation_fee]
+
 let coinbase = Currency.Amount.of_int coinbase_int
+
+let account_creation_fee = Currency.Fee.of_int account_creation_fee

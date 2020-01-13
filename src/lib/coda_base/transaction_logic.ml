@@ -257,7 +257,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let sub_amount balance amount =
     error_opt "insufficient funds" (Balance.sub_amount balance amount)
 
-  let sub_acc_creation_fee action amount fee =
+  let sub_acc_creation_fee action amount =
+    let fee = Coda_compile_config.account_creation_fee in
     if action = `Added then
       error_opt
         (sprintf
@@ -441,14 +442,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           in
           let%map receiver_balance' =
             (*deduct the account creation fee*)
-            let%bind amount' =
-              sub_acc_creation_fee action amount (Currency.Fee.of_int 1)
-            in
-            Core.printf
-              !"receiver amount: before %{sexp: Amount.t} after %{sexp: \
-                Amount.t}\n\
-                %!"
-              amount amount' ;
+            let%bind amount' = sub_acc_creation_fee action amount in
             add_amount receiver_account.balance amount'
           in
           set ledger sender_location
@@ -493,7 +487,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       process_fee_transfer t transfer ~modify_balance:(fun action _ b f ->
           let%bind amount =
             let amount = Amount.of_fee f in
-            sub_acc_creation_fee action amount (Currency.Fee.of_int 1)
+            sub_acc_creation_fee action amount
           in
           add_amount b amount )
     in
@@ -509,9 +503,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             then `Added
             else `Existed
           in
-          let%bind amount =
-            sub_acc_creation_fee action (Amount.of_fee f) (Fee.of_int 1)
-          in
+          let%bind amount = sub_acc_creation_fee action (Amount.of_fee f) in
           sub_amount b amount )
     in
     remove_accounts_exn t previous_empty_accounts
@@ -544,7 +536,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           in
           let emptys = previous_empty_accounts action receiver in
           let%map balance =
-            let%bind amount = sub_acc_creation_fee action fee (Fee.of_int 1) in
+            let%bind amount = sub_acc_creation_fee action fee in
             add_amount receiver_account.balance amount
           in
           ( proposer_reward
@@ -556,9 +548,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     let emptys2 = previous_empty_accounts action2 proposer in
     let%map proposer_balance =
-      let%bind amount =
-        sub_acc_creation_fee action2 proposer_reward (Fee.of_int 1)
-      in
+      let%bind amount = sub_acc_creation_fee action2 proposer_reward in
       add_amount proposer_account.balance amount
     in
     set t proposer_location {proposer_account with balance= proposer_balance} ;
@@ -592,9 +582,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               then `Added
               else `Existed
             in
-            let amount =
-              sub_acc_creation_fee action fee (Fee.of_int 1) |> Or_error.ok_exn
-            in
+            let amount = sub_acc_creation_fee action fee |> Or_error.ok_exn in
             Option.value_exn
               (Balance.sub_amount receiver_account.balance amount)
           in
@@ -615,8 +603,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         else `Existed
       in
       let amount =
-        sub_acc_creation_fee action proposer_reward (Fee.of_int 1)
-        |> Or_error.ok_exn
+        sub_acc_creation_fee action proposer_reward |> Or_error.ok_exn
       in
       Option.value_exn (Balance.sub_amount proposer_account.balance amount)
     in
@@ -671,9 +658,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               then `Added
               else `Existed
             in
-            let%bind amount' =
-              sub_acc_creation_fee action amount (Currency.Fee.of_int 1)
-            in
+            let%bind amount' = sub_acc_creation_fee action amount in
             sub_amount receiver_account.balance amount'
           in
           set ledger sender_location
