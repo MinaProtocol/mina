@@ -1760,6 +1760,42 @@ let%test_module "transaction_snark" =
 
     let account_fee = Fee.to_int Coda_compile_config.account_creation_fee
 
+    let state_body_hash_opt : Transaction_protocol_state.Block_data.t = None
+
+    let test_transaction ledger txn =
+      let source = Ledger.merkle_root ledger in
+      let pending_coinbase_stack = Pending_coinbase.Stack.empty in
+      let mentioned_keys, pending_coinbase_stack_target =
+        match txn with
+        | Transaction.User_command uc ->
+            ( User_command.accounts_accessed (uc :> User_command.t)
+            , pending_coinbase_stack )
+        | Fee_transfer ft ->
+            ( One_or_two.map ft ~f:(fun (key, _) -> key) |> One_or_two.to_list
+            , pending_coinbase_stack )
+        | Coinbase ({receiver; fee_transfer; _} as cb) ->
+            ( receiver
+              :: Option.value_map ~default:[] fee_transfer ~f:(fun ft ->
+                     [fst ft] )
+            , Pending_coinbase.Stack.push_coinbase cb pending_coinbase_stack )
+      in
+      let sender =
+        let txn_union = Transaction_union.of_transaction txn in
+        txn_union.sender |> Public_key.compress
+      in
+      let sparse_ledger =
+        Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
+      in
+      let _undo = Ledger.apply_transaction ledger txn in
+      let target = Ledger.merkle_root ledger in
+      let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sender in
+      check_transaction ~sok_message ~source ~target
+        ~pending_coinbase_stack_state:
+          { Pending_coinbase_stack_state.source= pending_coinbase_stack
+          ; target= pending_coinbase_stack_target }
+        {transaction= txn; block_data= state_body_hash_opt}
+        (unstage @@ Sparse_ledger.handler sparse_ledger)
+
     let%test_unit "account creation fee - user commands" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets ~n:3 () |> Array.to_list in
@@ -1774,7 +1810,7 @@ let%test_module "transaction_snark" =
                  ~len:User_command_memo.max_digestible_string_length)
           in
           Ledger.with_ledger ~f:(fun ledger ->
-              let _, txns =
+              let _, ucs =
                 let receivers =
                   List.fold ~init:receivers
                     (List.init (txns_per_receiver - 1) ~f:Fn.id)
@@ -1788,35 +1824,11 @@ let%test_module "transaction_snark" =
                     in
                     (Account.Nonce.succ nonce, txns @ [uc]) )
               in
-              let state_body_hash_opt : Transaction_protocol_state.Block_data.t
-                  =
-                None
-              in
               Ledger.create_new_account_exn ledger sender.account.public_key
                 sender.account ;
               let () =
-                List.iter txns ~f:(fun uc ->
-                    let source = Ledger.merkle_root ledger in
-                    let _txn = Transaction.User_command uc in
-                    let mentioned_keys =
-                      User_command.accounts_accessed (uc :> User_command.t)
-                    in
-                    let sparse_ledger =
-                      Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
-                    in
-                    let _undo = Ledger.apply_user_command ledger uc in
-                    let target = Ledger.merkle_root ledger in
-                    let sok_message =
-                      Sok_message.create ~fee:Fee.zero
-                        ~prover:sender.account.public_key
-                    in
-                    let pending_coinbase_stack =
-                      Pending_coinbase.Stack.empty
-                    in
-                    check_user_command ~sok_message ~source ~target
-                      pending_coinbase_stack
-                      {transaction= uc; block_data= state_body_hash_opt}
-                      (unstage @@ Sparse_ledger.handler sparse_ledger) )
+                List.iter ucs ~f:(fun uc ->
+                    test_transaction ledger (Transaction.User_command uc) )
               in
               List.iter receivers ~f:(fun receiver ->
                   check_balance receiver.account.public_key
@@ -1834,7 +1846,7 @@ let%test_module "transaction_snark" =
           let txns_per_receiver = 3 in
           let fee = 8 in
           Ledger.with_ledger ~f:(fun ledger ->
-              let txns =
+              let fts =
                 let receivers =
                   List.fold ~init:receivers
                     (List.init (txns_per_receiver - 1) ~f:Fn.id)
@@ -1850,37 +1862,10 @@ let%test_module "transaction_snark" =
                     in
                     txns @ [ft] )
               in
-              let state_body_hash_opt : Transaction_protocol_state.Block_data.t
-                  =
-                None
-              in
               let () =
-                List.iter txns ~f:(fun ft ->
-                    let source = Ledger.merkle_root ledger in
+                List.iter fts ~f:(fun ft ->
                     let txn = Transaction.Fee_transfer ft in
-                    let mentioned_keys =
-                      One_or_two.map ft ~f:(fun (key, _) -> key)
-                      |> One_or_two.to_list
-                    in
-                    let sparse_ledger =
-                      Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
-                    in
-                    let _undo = Ledger.apply_transaction ledger txn in
-                    let target = Ledger.merkle_root ledger in
-                    let sok_message =
-                      Sok_message.create ~fee:Fee.zero
-                        ~prover:(List.hd_exn mentioned_keys)
-                    in
-                    let pending_coinbase_stack =
-                      Pending_coinbase.Stack.empty
-                    in
-                    check_transaction ~sok_message ~source ~target
-                      ~pending_coinbase_stack_state:
-                        { Pending_coinbase_stack_state.source=
-                            pending_coinbase_stack
-                        ; target= pending_coinbase_stack }
-                      {transaction= txn; block_data= state_body_hash_opt}
-                      (unstage @@ Sparse_ledger.handler sparse_ledger) )
+                    test_transaction ledger txn )
               in
               List.iter receivers ~f:(fun receiver ->
                   check_balance receiver.account.public_key
@@ -1897,12 +1882,8 @@ let%test_module "transaction_snark" =
           let fee = 1 in
           let coinbase_count = 3 in
           let ft_count = 2 in
-          let state_body_hash_opt : Transaction_protocol_state.Block_data.t =
-            None
-          in
-          let pending_coinbase_init = Pending_coinbase.Stack.empty in
           Ledger.with_ledger ~f:(fun ledger ->
-              let _, txns =
+              let _, cbs =
                 let fts =
                   List.map (List.init ft_count ~f:Fn.id) ~f:(fun _ ->
                       (other.account.public_key, Fee.of_int fee) )
@@ -1921,35 +1902,9 @@ let%test_module "transaction_snark" =
               Ledger.create_new_account_exn ledger
                 dummy_account.account.public_key dummy_account.account ;
               let () =
-                List.iteri txns ~f:(fun _i cb ->
-                    let source = Ledger.merkle_root ledger in
+                List.iter cbs ~f:(fun cb ->
                     let txn = Transaction.Coinbase cb in
-                    let mentioned_keys =
-                      receiver.account.public_key
-                      :: Option.value_map ~default:[] cb.fee_transfer
-                           ~f:(fun ft -> [fst ft])
-                    in
-                    let sparse_ledger =
-                      (*if first iteration then sparse ledger wouldn't have anything*)
-                      (*if i = 0 then Sparse_ledger.of_ledger_subset_exn ledger [] else *)
-                      Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
-                    in
-                    let _undo = Ledger.apply_transaction ledger txn in
-                    let target = Ledger.merkle_root ledger in
-                    let sok_message =
-                      Sok_message.create ~fee:Fee.zero
-                        ~prover:(List.hd_exn mentioned_keys)
-                    in
-                    let pending_coinbase_stack_target =
-                      pending_coinbase_stack_target txn state_body_hash_opt
-                        pending_coinbase_init
-                    in
-                    check_transaction ~sok_message ~source ~target
-                      ~pending_coinbase_stack_state:
-                        { source= pending_coinbase_init
-                        ; target= pending_coinbase_stack_target }
-                      {transaction= txn; block_data= state_body_hash_opt}
-                      (unstage (Sparse_ledger.handler sparse_ledger)) )
+                    test_transaction ledger txn )
               in
               let fees = fee * ft_count in
               check_balance receiver.account.public_key
