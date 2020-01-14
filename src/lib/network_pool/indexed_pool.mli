@@ -60,7 +60,7 @@ val add_from_gossip_exn :
   -> ( t * User_command.With_valid_signature.t Sequence.t
      , [ `Invalid_nonce
        | `Insufficient_funds
-       | (* NOTE: don't punish for this, attackers can induce nodes to blacklist
+       | (* NOTE: don't punish for this, attackers can induce nodes to banlist
           each other that way! *)
          `Insufficient_replace_fee
        | `Overflow ] )

@@ -125,7 +125,7 @@ is substantially behind the network, it should disable gossip until it catches
 up.
 
 There was [some discussion](https://github.com/CodaProtocol/coda/pull/761#issuecomment-424456658)
-about score decay when the RFC for blacklisting was first proposed. It wasn't
+about score decay when the RFC for banlisting was first proposed. It wasn't
 resolved and the current system doesn't implement any decay. A punishment score
 system with decay is equivalent to trust scores if you only count bad behavior.
 These are pretty close in effect, especially when we're doing discrete bans
@@ -172,7 +172,7 @@ the lowest fee transaction in the mempool.
 If an incoming transaction has too low of a fee for us to accept, we count it as
 bad for the purposes of trust scores. Except in the case of replacement
 transactions. If we punished nodes for sending transactions without the
-replacement fee increment, an attacker could induce nodes to blacklist each
+replacement fee increment, an attacker could induce nodes to banlist each
 other by sending them different transactions at the same nonce.
 
 ### Constants

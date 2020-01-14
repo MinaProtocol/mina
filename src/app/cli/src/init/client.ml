@@ -26,6 +26,10 @@ module Args = struct
   let zip6 arg1 arg2 arg3 arg4 arg5 arg6 =
     return (fun a b c d e f -> (a, b, c, d, e, f))
     <*> arg1 <*> arg2 <*> arg3 <*> arg4 <*> arg5 <*> arg6
+
+  let zip7 arg1 arg2 arg3 arg4 arg5 arg6 arg7 =
+    return (fun a b c d e f g -> (a, b, c, d, e, f, g))
+    <*> arg1 <*> arg2 <*> arg3 <*> arg4 <*> arg5 <*> arg6 <*> arg7
 end
 
 let or_error_str ~f_ok ~error = function
@@ -403,15 +407,6 @@ let get_nonce_exn ~rpc public_key port =
   | Ok nonce ->
       return nonce
 
-let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
-    a Deferred.t =
-  match%bind Deferred.Or_error.try_with ~extract_exn:true f with
-  | Ok e ->
-      return e
-  | Error e ->
-      eprintf "Error: %s" (Error.to_string_hum e) ;
-      exit 4
-
 let batch_send_payments =
   let module Payment_info = struct
     type t =
@@ -487,65 +482,23 @@ let batch_send_payments =
        ~f:main)
 
 let user_command (body_args : User_command_payload.Body.t Command.Param.t)
-    ~label ~summary ~error =
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let amount_flag =
-    flag "fee"
-      ~doc:
-        (Printf.sprintf
-           "FEE Amount you are willing to pay to process the transaction \
-            (default: %d) (minimum: %d)"
-           (Currency.Fee.to_int Cli_lib.Default.transaction_fee)
-           (Currency.Fee.to_int User_command.minimum_fee))
-      (optional txn_fee)
-  in
-  let valid_until_flag =
-    flag "valid-until"
-      ~doc:
-        "GLOBAL-SLOT The last global-slot at which this transaction will be \
-         considered valid. This makes it possible to have transactions which \
-         expire if they are not applied before this time. If omitted, the \
-         transaction will never expire."
-      (optional global_slot)
-  in
-  let nonce_flag =
-    flag "nonce"
-      ~doc:
-        "NONCE Nonce that you would like to set for your transaction \
-         (default: nonce of your account on the best ledger or the successor \
-         of highest value nonce of your sent transactions from the \
-         transaction pool )"
-      (optional txn_nonce)
-  in
-  let memo_flag =
-    flag "memo"
-      ~doc:
-        (sprintf
-           "STRING Memo accompanying the transaction (up to %d characters)"
-           User_command_memo.max_input_length)
-      (optional string)
-  in
+    ~label ~summary ~error ~sender_key ~create_command =
   let flag =
-    Args.zip6 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
-      valid_until_flag memo_flag
+    let open Cli_lib.Flag in
+    Args.zip5 body_args User_command.fee User_command.nonce
+      User_command.valid_until User_command.memo
   in
   Command.async ~summary
     (Cli_lib.Background_daemon.rpc_init flag
-       ~f:(fun port
-          (body, from_account, fee_opt, nonce_opt, valid_until_opt, memo_opt)
-          ->
+       ~f:(fun port (body, fee_opt, nonce_opt, valid_until_opt, memo_opt) ->
          let open Deferred.Let_syntax in
-         let%bind sender_kp =
-           Secrets.Keypair.Terminal_stdin.read_exn from_account
-         in
          let%bind nonce =
            match nonce_opt with
            | Some nonce ->
                return nonce
            | None ->
-               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
-                 sender_kp.public_key port
+               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc public_key
+                 port
          in
          let fee =
            Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
@@ -564,9 +517,8 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
              Option.value valid_until_opt
                ~default:Coda_numbers.Global_slot.max_value
            in
-           let command =
-             Coda_commands.setup_user_command ~fee ~nonce ~memo ~valid_until
-               ~sender_kp body
+           let%bind command =
+             create_command ~fee ~nonce ~memo ~valid_until ~body ~sender_kp
            in
            Daemon_rpcs.Client.dispatch_with_message
              Daemon_rpcs.Send_user_command.rpc command port
@@ -582,42 +534,186 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
 let send_payment =
   let body =
     let open Command.Let_syntax in
-    let open Cli_lib.Arg_type in
-    let%map_open receiver =
-      flag "receiver"
-        ~doc:"PUBLICKEY Public key address to which you want to send money"
-        (required public_key_compressed)
-    and amount =
-      flag "amount" ~doc:"VALUE Payment amount you want to send"
-        (required txn_amount)
-    in
+    let open Cli_lib.Flag in
+    let%map_open receiver = User_command.receiver
+    and amount = User_command.amount in
     User_command_payload.Body.Payment {receiver; amount}
   in
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
 
-let print_payment =
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let receiver_flag =
-    flag "receiver" ~doc:".." (required public_key_compressed)
-  and sender_flag = flag "sender" ~doc:".." (required public_key_compressed)
-  and amount = flag "amount" ~doc:".." (required txn_amount) in
-  Command.async ~summary:"Print a payment in json"
-    (Command.Param.map3 receiver_flag sender_flag amount
-       ~f:(fun receiver sender amount () ->
-         Core.print_endline @@ Yojson.Safe.to_string
-         @@ Graphql_client.User_command.to_yojson
-              Graphql_client.User_command.
-                { id= "abc"
-                ; isDelegation= false
-                ; nonce= 0
-                ; from= sender
-                ; to_= receiver
-                ; amount
-                ; fee= User_command.minimum_fee
-                ; memo= User_command_memo.empty } ;
+type user_command =
+  { is_delegation: bool
+  ; nonce: Coda_numbers.Account_nonce.t
+  ; to_: Public_key.Compressed.t
+  ; amount: Currency.Amount.t
+  ; fee: Currency.Fee.t
+  ; memo: User_command_memo.t
+  ; valid_until: Coda_numbers.Global_slot.t }
+[@@deriving yojson]
+
+let hardware_wallet_script = "sign.py"
+
+let get_public_key hardware_wallet_nonce =
+  let open Deferred.Let_syntax in
+  let prog, args =
+    ( "python3"
+    , [ hardware_wallet_script
+      ; "--request=publickey"
+      ; "--nonce="
+        ^ Coda_numbers.Hardware_wallet_nonce.to_string hardware_wallet_nonce ]
+    )
+  in
+  match%bind Process.run ~prog ~args () with
+  | Ok pk_string -> (
+    match Public_key.Compressed.of_base58_check pk_string with
+    | Ok pk_compressed ->
+        return (Public_key.decompress pk_compressed |> Option.value_exn)
+    | Error e ->
+        eprintf "Failed to parse public key returned by hardware wallet: %s"
+          (Error.to_string_hum e) ;
+        exit 22 )
+  | Error e ->
+      eprintf "Failed to retrieve public key from the hardware wallet: %s"
+        (Error.to_string_hum e) ;
+      exit 22
+
+type signature = {field: string; scalar: string} [@@deriving yojson]
+
+let alphabet =
+  B58.make_alphabet
+    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
+
+let decode_field : string -> Snark_params.Tick.Field.t =
+ fun str ->
+  B58.decode alphabet (Bytes.of_string str)
+  |> Bytes.to_string
+  |> String.fold ~init:Bigint.zero ~f:(fun acc byte ->
+         let byte = Char.to_int byte - Char.to_int '1' in
+         let open Bigint in
+         (acc * of_int 58) + of_int byte )
+  |> Snark_params.Tick.Bigint.of_bignum_bigint
+  |> Snark_params.Tick.Bigint.to_field
+
+let decode_scalar : string -> Snark_params.Tick.Inner_curve.Scalar.t =
+ fun str ->
+  B58.decode alphabet (Bytes.of_string str)
+  |> Bytes.to_string
+  |> String.fold ~init:0 ~f:(fun acc byte ->
+         let byte = Char.to_int byte - Char.to_int '1' in
+         (acc * 58) + byte )
+  |> Snark_params.Tick.Inner_curve.Scalar.of_int
+
+let get_signature hardware_wallet_nonce user_command =
+  let open Deferred.Let_syntax in
+  let prog, args =
+    ( "python3"
+    , [ hardware_wallet_script
+      ; "--request=transaction"
+      ; "--nonce="
+        ^ Coda_numbers.Hardware_wallet_nonce.to_string hardware_wallet_nonce
+      ; "--transaction='" ^ Yojson.Safe.to_string
+        @@ user_command_to_yojson user_command ] )
+  in
+  match%bind Process.run ~prog ~args () with
+  | Ok signature -> (
+    match Yojson.Safe.from_string signature |> signature_of_yojson with
+    | Ok {field; scalar} ->
+        return (decode_field field, decode_scalar scalar)
+    | Error e ->
+        eprintf "Failed to parse the output from hardware wallet: %s" e ;
+        exit 22 )
+  | Error e ->
+      eprintf "Failed to sign the user command using hardware wallet: %s"
+        (Error.to_string_hum e) ;
+      exit 22
+
+let get_pk_from_hardware_wallet =
+  Command.async ~summary:"Get public key from hardware wallet"
+    (Command.Param.map Cli_lib.Flag.User_command.hardware_wallet_nonce
+       ~f:(fun hardware_wallet_nonce () ->
+         let open Deferred.Let_syntax in
+         let%bind pk = get_public_key hardware_wallet_nonce in
+         Core.print_endline @@ Public_key.Compressed.to_base58_check
+         @@ Public_key.compress pk ;
          Deferred.unit ))
+
+let send_payment_hardware_wallet =
+  let flags =
+    let open Cli_lib.Flag.User_command in
+    Args.zip7 hardware_wallet_nonce receiver amount fee nonce valid_until memo
+  in
+  Command.async ~summary:"Send payment to an address with hardware wallet"
+    (Cli_lib.Background_daemon.rpc_init flags
+       ~f:(fun port
+          ( hardware_wallet_nonce
+          , receiver
+          , amount
+          , fee_opt
+          , nonce_opt
+          , valid_until_opt
+          , memo_opt )
+          ->
+         let open Deferred.Let_syntax in
+         let%bind sender_pk = get_public_key hardware_wallet_nonce in
+         let%bind nonce =
+           match nonce_opt with
+           | Some nonce ->
+               return nonce
+           | None ->
+               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc sender_pk
+                 port
+         in
+         let fee =
+           Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
+         in
+         if Currency.Fee.( < ) fee User_command.minimum_fee then (
+           printf "Fee %d is less than the minimum, %d\n%!"
+             (Currency.Fee.to_int fee)
+             (Currency.Fee.to_int User_command.minimum_fee) ;
+           exit 29 )
+         else
+           let memo =
+             Option.value_map memo_opt ~default:User_command_memo.empty
+               ~f:User_command_memo.create_from_string_exn
+           in
+           let valid_until =
+             Option.value valid_until_opt
+               ~default:Coda_numbers.Global_slot.max_value
+           in
+           let%bind (signature : Signature.t) =
+             get_signature hardware_wallet_nonce
+               { is_delegation= false
+               ; nonce
+               ; to_= receiver
+               ; amount
+               ; fee
+               ; memo
+               ; valid_until }
+           in
+           let command =
+             Coda_base.User_command.Poly.
+               { payload=
+                   User_command_payload.Poly.
+                     { common=
+                         User_command_payload.Common.Poly.
+                           {fee; nonce; valid_until; memo}
+                     ; body=
+                         User_command_payload.Body.Payment
+                           Payment_payload.Poly.{receiver; amount} }
+               ; sender= sender_pk
+               ; signature }
+           in
+           Daemon_rpcs.Client.dispatch_with_message
+             Daemon_rpcs.Send_user_command.rpc command port
+             ~success:(fun receipt_chain_hash ->
+               sprintf
+                 "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
+                 "label"
+                 (User_command.to_base58_check command)
+                 (Receipt.Chain_hash.to_string receipt_chain_hash) )
+             ~error:(fun e -> sprintf "%s: %s" "error" (Error.to_string_hum e))
+             ~join_error:Or_error.join ))
 
 let send_payment_graphql =
   let open Command.Param in
@@ -882,7 +978,7 @@ let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%bind privkey =
@@ -896,7 +992,7 @@ let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
-    handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%map kp =
@@ -908,20 +1004,6 @@ let dump_keypair =
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check )
       (kp.private_key |> Private_key.to_base58_check))
-
-let generate_keypair =
-  Command.async ~summary:"Generate a new public-key/private-key pair"
-    (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
-    @@ fun () ->
-    let open Deferred.Let_syntax in
-    let kp = Keypair.create () in
-    let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
-    printf "Keypair generated\nPublic key: %s\n"
-      ( kp.public_key |> Public_key.compress
-      |> Public_key.Compressed.to_base58_check ) ;
-    exit 0)
 
 let dump_ledger =
   let sl_hash_flag =
@@ -1403,7 +1485,7 @@ let generate_libp2p_keypair =
       "Generate a new libp2p keypair and print it out (this contains the \
        secret key!)"
     (Command.Param.return
-       ( handle_exception_nicely
+       ( Cli_lib.Exceptions.handle_nicely
        @@ fun () ->
        Deferred.ignore
          (let open Deferred.Let_syntax in
@@ -1424,53 +1506,53 @@ let generate_libp2p_keypair =
                    ~metadata:[("err", `String (Error.to_string_hum e))] ;
                  exit 20 )) ))
 
-let whitelist_ip_flag =
+let trustlist_ip_flag =
   Command.Param.(
     flag "ip-address"
-      ~doc:"IP An IPv4 or IPv6 address for the client whitelist"
+      ~doc:"IP An IPv4 or IPv6 address for the client trustlist"
       (required Cli_lib.Arg_type.ip_address))
 
-let whitelist_add =
+let trustlist_add =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
-  Command.async ~summary:"Add an IP to the whitelist"
-    (Cli_lib.Background_daemon.rpc_init whitelist_ip_flag
-       ~f:(fun port whitelist_ip ->
-         let whitelist_ip_string = Unix.Inet_addr.to_string whitelist_ip in
-         match%map Client.dispatch Add_whitelist.rpc whitelist_ip port with
+  Command.async ~summary:"Add an IP to the trustlist"
+    (Cli_lib.Background_daemon.rpc_init trustlist_ip_flag
+       ~f:(fun port trustlist_ip ->
+         let trustlist_ip_string = Unix.Inet_addr.to_string trustlist_ip in
+         match%map Client.dispatch Add_trustlist.rpc trustlist_ip port with
          | Ok (Ok ()) ->
-             printf "Added %s to client whitelist" whitelist_ip_string
+             printf "Added %s to client trustlist" trustlist_ip_string
          | Ok (Error e) ->
-             eprintf "Error adding %s to client whitelist: %s"
-               whitelist_ip_string (Error.to_string_hum e)
+             eprintf "Error adding %s to client trustlist: %s"
+               trustlist_ip_string (Error.to_string_hum e)
          | Error e ->
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
-let whitelist_remove =
+let trustlist_remove =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
-  Command.async ~summary:"Add an IP to the whitelist"
-    (Cli_lib.Background_daemon.rpc_init whitelist_ip_flag
-       ~f:(fun port whitelist_ip ->
-         let whitelist_ip_string = Unix.Inet_addr.to_string whitelist_ip in
-         match%map Client.dispatch Remove_whitelist.rpc whitelist_ip port with
+  Command.async ~summary:"Add an IP to the trustlist"
+    (Cli_lib.Background_daemon.rpc_init trustlist_ip_flag
+       ~f:(fun port trustlist_ip ->
+         let trustlist_ip_string = Unix.Inet_addr.to_string trustlist_ip in
+         match%map Client.dispatch Remove_trustlist.rpc trustlist_ip port with
          | Ok (Ok ()) ->
-             printf "Removed %s to client whitelist" whitelist_ip_string
+             printf "Removed %s to client trustlist" trustlist_ip_string
          | Ok (Error e) ->
-             eprintf "Error removing %s from client whitelist: %s"
-               whitelist_ip_string (Error.to_string_hum e)
+             eprintf "Error removing %s from client trustlist: %s"
+               trustlist_ip_string (Error.to_string_hum e)
          | Error e ->
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
-let whitelist_list =
+let trustlist_list =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
-  Command.async ~summary:"Add an IP to the whitelist"
+  Command.async ~summary:"Add an IP to the trustlist"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
-         match%map Client.dispatch Get_whitelist.rpc () port with
+         match%map Client.dispatch Get_trustlist.rpc () port with
          | Ok ips ->
              printf
                "The following IPs are permitted to connect to the daemon \
@@ -1535,20 +1617,25 @@ let accounts =
     ; ("lock", lock_account) ]
 
 let client =
-  Command.group ~summary:"Simple client commands" ~preserve_subcommand_order:()
+  Command.group ~summary:"Lightweight client commands"
+    ~preserve_subcommand_order:()
     [ ("get-balance", get_balance_graphql)
     ; ("send-payment", send_payment_graphql)
     ; ("delegate-stake", delegate_stake_graphql)
     ; ("cancel-transaction", cancel_transaction_graphql)
-    ; ("set-staking", set_staking_graphql) ]
+    ; ("set-staking", set_staking_graphql)
+    ; ("set-snark-worker", set_snark_worker)
+    ; ("set-snark-work-fee", set_snark_work_fee)
+    ; ("stop-daemon", stop_daemon)
+    ; ("status", status) ]
 
 let command =
-  Command.group ~summary:"Lightweight client commands"
+  Command.group ~summary:"[Deprecated] Lightweight client commands"
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
-    ; ("print-payment", print_payment)
-    ; ("generate-keypair", generate_keypair)
+    ; ("get-public-key", get_pk_from_hardware_wallet)
+    ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("cancel-transaction", cancel_transaction)
     ; ("set-staking", set_staking)
@@ -1559,17 +1646,17 @@ let command =
     ; ("stop-daemon", stop_daemon)
     ; ("status", status) ]
 
-let client_whitelist_group =
-  Command.group ~summary:"Client whitelist management"
+let client_trustlist_group =
+  Command.group ~summary:"Client trustlist management"
     ~preserve_subcommand_order:()
-    [ ("add", whitelist_add)
-    ; ("list", whitelist_list)
-    ; ("remove", whitelist_remove) ]
+    [ ("add", trustlist_add)
+    ; ("list", trustlist_list)
+    ; ("remove", trustlist_remove) ]
 
 let advanced =
   Command.group ~summary:"Advanced client commands"
     [ ("get-nonce", get_nonce_cmd)
-    ; ("client-whitelist", client_whitelist_group)
+    ; ("client-trustlist", client_trustlist_group)
     ; ("get-trust-status", get_trust_status)
     ; ("get-trust-status-all", get_trust_status_all)
     ; ("get-public-keys", get_public_keys)

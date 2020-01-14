@@ -1,12 +1,10 @@
 open Coda_base
 
+[%%versioned:
 module Stable : sig
   module V1 : sig
     type t = {state_hash: State_hash.t; frontier_hash: Frontier_hash.t}
-    [@@deriving bin_io, yojson]
   end
+end]
 
-  module Latest = V1
-end
-
-type t = Stable.Latest.t
+type t = Stable.Latest.t [@@deriving yojson]
