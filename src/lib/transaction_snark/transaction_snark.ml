@@ -1671,7 +1671,8 @@ let%test_module "transaction_snark" =
         Coinbase.create
           ~amount:(Currency.Amount.of_int 10)
           ~receiver
-          ~fee_transfer:(Some (other, Currency.Fee.of_int 1))
+          ~fee_transfer:
+            (Some (other, Coda_compile_config.account_creation_fee))
         |> Or_error.ok_exn
       in
       let txn_in_block =
@@ -1879,14 +1880,15 @@ let%test_module "transaction_snark" =
           let other = wallets.(1) in
           let dummy_account = wallets.(2) in
           let reward = 10 in
-          let fee = 1 in
+          let fee = Fee.to_int Coda_compile_config.account_creation_fee in
           let coinbase_count = 3 in
           let ft_count = 2 in
           Ledger.with_ledger ~f:(fun ledger ->
               let _, cbs =
                 let fts =
                   List.map (List.init ft_count ~f:Fn.id) ~f:(fun _ ->
-                      (other.account.public_key, Fee.of_int fee) )
+                      ( other.account.public_key
+                      , Coda_compile_config.account_creation_fee ) )
                 in
                 List.fold ~init:(fts, []) (List.init coinbase_count ~f:Fn.id)
                   ~f:(fun (fts, cbs) _ ->
