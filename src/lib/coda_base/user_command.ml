@@ -73,6 +73,16 @@ let is_trivial t = Fee.(fee t < minimum_fee)
 
 let sender t = Public_key.compress Poly.(t.sender)
 
+let receiver = Fn.compose Payload.receiver payload
+
+let amount = Fn.compose Payload.amount payload
+
+let memo = Fn.compose Payload.memo payload
+
+let valid_until = Fn.compose Payload.valid_until payload
+
+let is_payment = Fn.compose Payload.is_payment payload
+
 let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
   ; sender= kp.public_key
