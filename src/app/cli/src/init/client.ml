@@ -482,23 +482,28 @@ let batch_send_payments =
        ~f:main)
 
 let user_command (body_args : User_command_payload.Body.t Command.Param.t)
-    ~label ~summary ~error ~sender_key ~create_command =
+    ~label ~summary ~error =
   let flag =
     let open Cli_lib.Flag in
-    Args.zip5 body_args User_command.fee User_command.nonce
-      User_command.valid_until User_command.memo
+    Args.zip6 body_args Cli_lib.Flag.privkey_read_path User_command.fee
+      User_command.nonce User_command.valid_until User_command.memo
   in
   Command.async ~summary
     (Cli_lib.Background_daemon.rpc_init flag
-       ~f:(fun port (body, fee_opt, nonce_opt, valid_until_opt, memo_opt) ->
+       ~f:(fun port
+          (body, from_account, fee_opt, nonce_opt, valid_until_opt, memo_opt)
+          ->
          let open Deferred.Let_syntax in
+         let%bind sender_kp =
+           Secrets.Keypair.Terminal_stdin.read_exn from_account
+         in
          let%bind nonce =
            match nonce_opt with
            | Some nonce ->
                return nonce
            | None ->
-               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc public_key
-                 port
+               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
+                 sender_kp.public_key port
          in
          let fee =
            Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
@@ -517,8 +522,9 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
              Option.value valid_until_opt
                ~default:Coda_numbers.Global_slot.max_value
            in
-           let%bind command =
-             create_command ~fee ~nonce ~memo ~valid_until ~body ~sender_kp
+           let command =
+             Coda_commands.setup_user_command ~fee ~nonce ~memo ~valid_until
+               ~sender_kp body
            in
            Daemon_rpcs.Client.dispatch_with_message
              Daemon_rpcs.Send_user_command.rpc command port
@@ -1634,6 +1640,7 @@ let command =
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
+    ; ("send-payment-hardware-wallet", send_payment_hardware_wallet)
     ; ("get-public-key", get_pk_from_hardware_wallet)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("delegate-stake", delegate_stake)
