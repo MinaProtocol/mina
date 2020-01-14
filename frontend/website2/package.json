@@ -25,6 +25,7 @@
     "nextjs-morph-page": "^2.0.3",
     "react": "^16.8.6",
     "react-dom": "^16.8.6",
+    "react-gtm-module": "^2.0.8",
     "reason-react": "^0.7.0",
     "rehype-katex": "^2.0.0",
     "rehype-raw": "^4.0.1",
