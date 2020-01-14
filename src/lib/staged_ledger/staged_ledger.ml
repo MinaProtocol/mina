@@ -2006,10 +2006,8 @@ let%test_module "test" =
               assert checked ) )
 
     let%test_unit "Provers can't pay the account creation fee" =
-      let is_empty_diff (diff : Staged_ledger_diff.t) =
+      let no_work_included (diff : Staged_ledger_diff.t) =
         List.is_empty (Staged_ledger_diff.completed_works diff)
-        && List.is_empty (Staged_ledger_diff.user_commands diff)
-        && Currency.Amount.(equal (Staged_ledger_diff.coinbase diff) zero)
       in
       let stmt_to_work stmts =
         let prover = stmt_to_prover stmts in
@@ -2031,7 +2029,7 @@ let%test_module "test" =
                  Sequence.singleton
                    ( init_state
                    , List.take cmds (List.length cmds - transaction_capacity)
-                   , List.tl_exn iters )
+                   , [None] )
                else Sequence.empty ))
         ~trials:1
         ~f:(fun (ledger_init_state, cmds, iters) ->
@@ -2046,8 +2044,8 @@ let%test_module "test" =
                       ~coinbase_receiver:(`Other coinbase_receiver)
                     |> Staged_ledger_diff.forget
                   in
-                  (*Diff will be empty because no proofs were purchased since the fee for the proofs are not sufficient to pay for account creation*)
-                  assert (is_empty_diff diff) ;
+                  (*No proofs were purchased since the fee for the proofs are not sufficient to pay for account creation*)
+                  assert (no_work_included diff) ;
                   Deferred.return (diff, ()) ) ) )
 
     let stmt_to_work_restricted work_list provers

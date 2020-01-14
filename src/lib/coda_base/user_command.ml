@@ -219,7 +219,7 @@ module Gen = struct
           account_nonces.(sender) <- Account_nonce.succ nonce ;
           let%bind fee =
             Currency.Fee.(
-              gen_incl (of_int 3)
+              gen_incl (of_int 5)
                 (min (of_int 10) @@ Currency.Amount.to_fee this_split))
           in
           let amount =
