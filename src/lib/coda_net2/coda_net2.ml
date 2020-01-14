@@ -1281,7 +1281,7 @@ let create ~logger ~conf_dir =
 
 let%test_module "coda network tests" =
   ( module struct
-    let logger = Logger.null ()
+    let logger = Logger.create ()
 
     let testmsg =
       "This is a test. This is a test of the Outdoor Warning System. This is \
@@ -1349,7 +1349,14 @@ let%test_module "coda network tests" =
         let r, w = Stream.pipes stream in
         Pipe.write_without_pushback w testmsg ;
         Pipe.close w ;
+        (* HACK: let our messages send before we reset.
+          It would be more principled to add flushing to
+          the stream interface. *)
+        let%bind () = after (Time.Span.of_sec 1.) in
+        let%bind _ = Stream.reset stream in
         let%bind msg = Pipe.read_all r in
+        (* give time for [a] to notice the reset finish. *)
+        let%bind () = after (Time.Span.of_sec 1.) in
         let msg = Queue.to_list msg |> String.concat in
         assert (msg = testmsg) ;
         assert !handler_finished ;
@@ -1378,21 +1385,27 @@ let%test_module "coda network tests" =
     let make_pubsub_test name (module M : Pubsub_config) =
       let open Deferred.Let_syntax in
       let%bind a, b, shutdown = setup_two_nodes ("test_pubsub_" ^ name) in
-      (* Give the libp2p helpers time to see each other. *)
       let%bind a_sub = M.subscribe a "test" |> Deferred.Or_error.ok_exn in
       let%bind b_sub = M.subscribe b "test" |> Deferred.Or_error.ok_exn in
+      let%bind a_peers = peers a in
+      let%bind b_peers = peers b in
+      Logger.fatal logger "a peers = $apeers, b peers = $bpeers"
+        ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:
+          [ ("apeers", `List (List.map ~f:Peer.to_yojson a_peers))
+          ; ("bpeers", `List (List.map ~f:Peer.to_yojson b_peers)) ] ;
       let a_r = Pubsub.Subscription.message_pipe a_sub in
       let b_r = Pubsub.Subscription.message_pipe b_sub in
       (* Give the subscriptions time to propagate *)
-      let%bind () = after (sec 0.5) in
+      let%bind () = after (sec 2.) in
       let%bind () = Pubsub.Subscription.publish a_sub M.a_sent in
       (* Give the publish time to propagate *)
-      let%bind () = after (sec 0.5) in
+      let%bind () = after (sec 2.) in
       let%bind b_recv = Strict_pipe.Reader.read b_r in
       [%test_eq: M.msg] M.a_sent (unwrap_eof b_recv) ;
       let%bind () = Pubsub.Subscription.publish b_sub M.b_sent in
       (* Give the publish time to propagate *)
-      let%bind () = after (sec 0.5) in
+      let%bind () = after (sec 2.) in
       let%bind a_recv = Strict_pipe.Reader.read a_r in
       [%test_eq: M.msg] M.b_sent (unwrap_eof a_recv) ;
       shutdown ()
