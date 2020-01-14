@@ -197,46 +197,47 @@ jobs:
                 command: |
                     sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
                     df -h
-            # Attach workspace from prior linux build
-            - attach_workspace:
-                at: /tmp/workspace
-            - run:
-                name: Unpack Workspace PV Keys
-                command: |
-                    sudo mkdir -p /var/lib/coda
-                    sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
-                    sudo rm /tmp/workspace/coda*.bz2
+                background: true
             - checkout
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
+            ### homebrew
+            - run:
+                name: Create homebrew cache signature file including a year/date stamp to ensure occasional rebuilds
+                command: |
+                    cat scripts/macos-setup-brew.sh > brew_ci_cache.sig
+                    date +%Y-%m > brew_ci_cache.sig
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
-                    - homebrew-v8-{{ checksum "scripts/macos-setup-brew.sh" }}
-                    - homebrew-v8-
+                    - homebrew-v7-{{ checksum "brew_ci_cache.sig" }}
+                    - homebrew-v7-6+7C2dsmcJjRMux2kVt_DCKFQf7t_bD4Fd_ZOiogIMw=
             - run:
-                name: Install macos dependencies - homebrew - make macos-setup-download
+                name: Install macos dependencies - homebrew - macos-setup-brew.sh
                 command: |
-                    ./scripts/skip_if_only_frontend.sh make macos-setup-download
+                    ./scripts/skip_if_only_frontend.sh ./scripts/macos-setup-brew.sh
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v8-{{ checksum "scripts/macos-setup-brew.sh" }}
+                key: homebrew-v7-{{ checksum "brew_ci_cache.sig" }}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
 
             - run:
-                name: Create opam cache signature file
+                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
                     cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
+                    date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
                 name: Restore cache - opam
                 keys:
                     - opam-v6-{{ checksum "opam_ci_cache.sig" }}
                     - opam-v5-{{ checksum "src/opam.export" }}
                     - opam-v4-{{ checksum "src/opam.export" }}
+                    - opam-v7-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-v7-igyglTvPBxMMa2HOSyL8o7xJusIN4L6cuLaccWdS7pY=
             - run:
                 name: Ensure/Fix opam permisssions
                 command: |
@@ -249,7 +250,7 @@ jobs:
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
                 name: Save cache - opam
-                key: opam-v6-{{ checksum "opam_ci_cache.sig" }}
+                key: opam-v7-{{ checksum "opam_ci_cache.sig" }}
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
@@ -265,40 +266,44 @@ jobs:
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     cachix use codaprotocol
                     cd src/app/libp2p_helper
-                    nix-build default.nix
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build default.nix
+                    else
+                        nix-build default.nix | cachix push codaprotocol
+                    fi
+
+            ### dune
             - run:
                 name: Build ocaml
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
-                command: |
-                    bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
-                no_output_timeout: 1h
+                command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                no_output_timeout: 50m
+            ### collection
             - run:
                 name: Collect PV Keys
                 command: |
                     mkdir -p package/keys
-                    cp /var/lib/coda/* package/keys/.
-            - run:
-                name: Collect and rewrite aux binaries (kademlia + libp2p_helper + logproc)
-                command: |
+
+                    echo 'keys'
+                    cp /tmp/s3_cache_dir/* package/keys/.
+                    echo 'coda'
+                    cp _build/default/src/app/cli/src/coda.exe package/coda
+                    echo 'libp2p_helper'
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
                     ./scripts/librewrite-macos.sh package/coda-libp2p_helper
                     cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
             - run:
-                name: Collect coda binary
-                command: |
-                    cp src/_build/default/app/cli/src/coda.exe package/coda
-            - run:
-                name: Build homebrew package
+                name: Build homebrew coda package
                 command: |
                     tar czvf homebrew-coda.tar.gz package
                     openssl dgst -sha256 homebrew-coda.tar.gz > homebrew-coda.tar.gz.sha256
                     cp homebrew-coda.tar.gz* package/.
             - run:
                   name: Copy artifacts to cloud
-                  bsckground: true
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             - store_artifacts:
                   path: package
@@ -324,7 +329,12 @@ jobs:
                   name: Pin external packages
                   command: ./scripts/pin-external-packages.sh
             - run:
-                  name: Download candidate stable PV keys
+                  name: Install awscli
+                  command: sudo pip install awscli
+            - run:
+                  name: Build OCaml
+                  command: |
+                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                   command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
