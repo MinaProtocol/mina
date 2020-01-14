@@ -378,7 +378,7 @@ jobs:
                   name: Build OCaml
                   command: |
                     ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
-                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe
+                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
                   environment:
                     DUNE_PROFILE: {{profile}}
                   no_output_timeout: 20m
