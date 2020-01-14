@@ -42,13 +42,14 @@ type subscription struct {
 }
 
 type app struct {
-	P2p        *codanet.Helper
-	Ctx        context.Context
-	Subs       map[int]subscription
-	Validators map[int]chan bool
-	Streams    map[int]net.Stream
-	OutLock    sync.Mutex
-	Out        *bufio.Writer
+	P2p             *codanet.Helper
+	Ctx             context.Context
+	Subs            map[int]subscription
+	Validators      map[int]chan bool
+	Streams         map[int]net.Stream
+	OutLock         sync.Mutex
+	Out             *bufio.Writer
+	UnsafeNoTrustIP bool
 }
 
 var seqs = make(chan int)
@@ -178,6 +179,9 @@ func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
 	conn, err := app.P2p.Host.Network().DialPeer(ctx, id)
 
 	if err != nil {
+		if app.UnsafeNoTrustIP {
+			return &codaPeerInfo{Libp2pPort: 0, Host: "127.0.0.1", PeerID: peer.IDB58Encode(id)}, nil
+		}
 		return nil, err
 	}
 
@@ -189,11 +193,12 @@ func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
 }
 
 type configureMsg struct {
-	Statedir  string   `json:"statedir"`
-	Privk     string   `json:"privk"`
-	NetworkID string   `json:"network_id"`
-	ListenOn  []string `json:"ifaces"`
-	External  string   `json:"external_maddr"`
+	Statedir        string   `json:"statedir"`
+	Privk           string   `json:"privk"`
+	NetworkID       string   `json:"network_id"`
+	ListenOn        []string `json:"ifaces"`
+	External        string   `json:"external_maddr"`
+	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
 }
 
 type discoveredPeerUpcall struct {
@@ -203,6 +208,7 @@ type discoveredPeerUpcall struct {
 }
 
 func (m *configureMsg) run(app *app) (interface{}, error) {
+	app.UnsafeNoTrustIP = m.UnsafeNoTrustIP
 	privkBytes, err := b58.Decode(m.Privk)
 	if err != nil {
 		return nil, badRPC(err)
@@ -290,10 +296,10 @@ type subscribeMsg struct {
 }
 
 type publishUpcall struct {
-	Upcall       string       `json:"upcall"`
-	Subscription int          `json:"subscription_idx"`
-	Data         string       `json:"data"`
-	Sender       codaPeerInfo `json:"sender"`
+	Upcall       string        `json:"upcall"`
+	Subscription int           `json:"subscription_idx"`
+	Data         string        `json:"data"`
+	Sender       *codaPeerInfo `json:"sender"`
 }
 
 func (s *subscribeMsg) run(app *app) (interface{}, error) {
@@ -310,14 +316,14 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 
 		sender, err := findPeerInfo(app, id)
 
-		if err != nil {
+		if err != nil && !app.UnsafeNoTrustIP {
 			app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us a pubsub message, dropping it", peer.IDB58Encode(id))
 			delete(app.Validators, seqno)
 			return false
 		}
 
 		app.writeMsg(validateUpcall{
-			Sender: *sender,
+			Sender: sender,
 			Data:   b58.Encode(msg.Data),
 			Seqno:  seqno,
 			Upcall: "validate",
@@ -357,7 +363,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			msg, err := sub.Next(ctx)
 			if err == nil {
 				sender, err := findPeerInfo(app, msg.ReceivedFrom)
-				if err == nil {
+				if err == nil && !app.UnsafeNoTrustIP {
 					app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us an already-validated pubsub message, dropping it", peer.IDB58Encode(msg.ReceivedFrom))
 				} else {
 					data := b58.Encode(msg.Data)
@@ -365,7 +371,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 						Upcall:       "publish",
 						Subscription: s.Subscription,
 						Data:         data,
-						Sender:       *sender,
+						Sender:       sender,
 					})
 				}
 			} else {
@@ -398,11 +404,11 @@ func (u *unsubscribeMsg) run(app *app) (interface{}, error) {
 }
 
 type validateUpcall struct {
-	Sender codaPeerInfo `json:"sender"`
-	Data   string       `json:"data"`
-	Seqno  int          `json:"seqno"`
-	Upcall string       `json:"upcall"`
-	Idx    int          `json:"subscription_idx"`
+	Sender *codaPeerInfo `json:"sender"`
+	Data   string        `json:"data"`
+	Seqno  int           `json:"seqno"`
+	Upcall string        `json:"upcall"`
+	Idx    int           `json:"subscription_idx"`
 }
 
 type validationCompleteMsg struct {

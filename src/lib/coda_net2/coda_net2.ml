@@ -225,7 +225,8 @@ module Helper = struct
         ; statedir: string
         ; ifaces: string list
         ; external_maddr: string
-        ; network_id: string }
+        ; network_id: string
+        ; unsafe_no_trust_ip: bool }
       [@@deriving yojson]
 
       type output = string [@@deriving yojson]
@@ -559,13 +560,16 @@ module Helper = struct
   module Upcall = struct
     module Publish = struct
       type t =
-        {upcall: string; subscription_idx: int; sender: peer_info; data: Data.t}
+        { upcall: string
+        ; subscription_idx: int
+        ; sender: peer_info option
+        ; data: Data.t }
       [@@deriving yojson]
     end
 
     module Validate = struct
       type t =
-        { sender: peer_info
+        { sender: peer_info option
         ; data: Data.t
         ; seqno: int
         ; upcall: string
@@ -620,6 +624,17 @@ module Helper = struct
     let open Yojson.Safe.Util in
     let open Or_error.Let_syntax in
     let open Upcall in
+    let wrap sender data =
+      match sender with
+      | Some sender ->
+          if String.equal sender.host "127.0.0.1" then
+            Envelope.Incoming.local data
+          else
+            Envelope.Incoming.wrap_peer ~sender:(peer_of_peer_info sender)
+              ~data
+      | None ->
+          Envelope.Incoming.local data
+    in
     match member "upcall" v |> to_string with
     (* Message published on one of our subscriptions *)
     | "publish" -> (
@@ -630,7 +645,10 @@ module Helper = struct
                ~message:
                  "How did we receive pubsub before configuring our keypair?"
         in
-        if Peer.Id.equal m.sender.peer_id me.peer_id then (
+        if
+          Option.fold m.sender ~init:false ~f:(fun _ sender ->
+              Peer.Id.equal sender.peer_id me.peer_id )
+        then (
           Logger.fatal t.logger
             "not handling published message originated from me"
             ~module_:__MODULE__ ~location:__LOC__ ;
@@ -650,19 +668,14 @@ module Helper = struct
                           write_pipe has a cast type. We don't remember
                           what the original 'return was. *)
                     Strict_pipe.Writer.write sub.write_pipe
-                      (Envelope.Incoming.wrap_peer ~data
-                         ~sender:(peer_of_peer_info m.sender))
+                      (wrap m.sender data)
                     |> ignore
                 | Error e ->
                     ( match sub.on_decode_failure with
                     | `Ignore ->
                         ()
                     | `Call f ->
-                        f
-                          (Envelope.Incoming.wrap_peer
-                             ~sender:(peer_of_peer_info m.sender)
-                             ~data:raw_data)
-                          e ) ;
+                        f (wrap m.sender raw_data) e ) ;
                     Logger.error t.logger
                       "failed to decode message published on subscription \
                        $topic ($idx): $error"
@@ -689,7 +702,6 @@ module Helper = struct
         let%bind m = Validate.of_yojson v |> or_error in
         let idx = m.subscription_idx in
         let seqno = m.seqno in
-        let sender = peer_of_peer_info m.sender in
         match Hashtbl.find t.subscriptions idx with
         | Some sub ->
             (let open Deferred.Let_syntax in
@@ -698,14 +710,13 @@ module Helper = struct
             let%bind is_valid =
               match decoded with
               | Ok data ->
-                  sub.validator (Envelope.Incoming.wrap_peer ~data ~sender)
+                  sub.validator (wrap m.sender data)
               | Error e ->
                   ( match sub.on_decode_failure with
                   | `Ignore ->
                       ()
                   | `Call f ->
-                      f (Envelope.Incoming.wrap_peer ~sender ~data:raw_data) e
-                  ) ;
+                      f (wrap m.sender raw_data) e ) ;
                   Logger.error t.logger
                     "failed to decode message published on subscription \
                      $topic ($idx): $error"
@@ -1024,7 +1035,8 @@ let list_peers net =
   | Error _ ->
       []
 
-let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer =
+let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
+    ~unsafe_no_trust_ip =
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
@@ -1032,7 +1044,8 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer =
       ; statedir= net.conf_dir
       ; ifaces= List.map ~f:Multiaddr.to_string maddrs
       ; external_maddr= Multiaddr.to_string external_maddr
-      ; network_id }
+      ; network_id
+      ; unsafe_no_trust_ip }
   with
   | Ok "configure success" ->
       Ivar.fill net.me_keypair me ;
@@ -1307,11 +1320,11 @@ let%test_module "coda network tests" =
       let maddrs = ["/ip4/127.0.0.1/tcp/0"] in
       let%bind () =
         configure a ~external_maddr:(List.hd_exn maddrs) ~me:kp_a ~maddrs
-          ~network_id ~on_new_peer:Fn.ignore
+          ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       and () =
         configure b ~external_maddr:(List.hd_exn maddrs) ~me:kp_b ~maddrs
-          ~network_id ~on_new_peer:Fn.ignore
+          ~network_id ~on_new_peer:Fn.ignore ~unsafe_no_trust_ip:true
         >>| Or_error.ok_exn
       in
       let%bind a_advert = begin_advertising a
