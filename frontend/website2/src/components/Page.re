@@ -126,5 +126,6 @@ let make = (~children, ~footerColor=Theme.Colors.white) => {
     <Nav />
     <div> children </div>
     <Footer bgcolor=footerColor />
+    <CookieWarning />
   </>;
 };

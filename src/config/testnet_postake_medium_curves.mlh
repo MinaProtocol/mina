@@ -1,5 +1,5 @@
 [%%define ledger_depth 14]
-[%%define fake_accounts_target 50]
+[%%define fake_accounts_target 9000]
 [%%import "/src/config/curve/medium.mlh"]
 [%%import "/src/config/coinbase/standard.mlh"]
 [%%import "/src/config/scan_state/point2tps.mlh"]
@@ -21,7 +21,7 @@
 
 [%%define genesis_ledger "testnet_postake"]
 
-[%%define genesis_state_timestamp "2019-11-11 17:00:00-07:00"]
+[%%define genesis_state_timestamp "2020-01-14 13:00:00-07:00"]
 [%%define block_window_duration 180000]
 
 [%%define integration_tests false]
