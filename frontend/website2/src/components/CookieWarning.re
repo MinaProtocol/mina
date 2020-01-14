@@ -24,20 +24,23 @@ module Styles = {
       justifyContent(`spaceBetween),
       display(`flex),
       width(`percent(100.)),
-      background(white),
+      background(Theme.Colors.slateAlpha(0.8)),
     ]);
 
-  let content = Theme.Body.basic_semibold;
+  let content = merge([Theme.Body.basic_semibold, style([color(white)])]);
 
   let button =
     merge([
       Theme.Body.small,
       style([
-        background(Theme.Colors.azureAlpha(0.1)),
+        opacity(1.),
+        color(Theme.Colors.slate),
+        background(white),
         borderRadius(px(3)),
-        padding2(~v=`rem(0.5), ~h=`rem(1.)),
+        padding2(~v=`rem(0.75), ~h=`rem(1.5)),
         border(`zero, `none, `transparent),
-        hover([background(Theme.Colors.azureAlpha(0.3))]),
+        textTransform(`capitalize),
+        hover([opacity(0.7)]),
       ]),
     ]);
 };
