@@ -257,6 +257,8 @@ jobs:
                 name: Restore cache - opam
                 keys:
                     - opam-v7-{{ checksum "opam_ci_cache.sig" }}
+                    - opam-v7-igyglTvPBxMMa2HOSyL8o7xJusIN4L6cuLaccWdS7pY=
+                    - opam-v7-igyglTvPBxMMa2HOSyL8o7xJusIN4L6cuLaccWdS7pY
                     - opam-v6-{{ checksum "opam_ci_cache.sig" }}
                     - opam-v5-{{ checksum "src/opam.export" }}
                     - opam-v4-{{ checksum "src/opam.export" }}
@@ -296,17 +298,22 @@ jobs:
                 name: Build ocaml
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
-                command: |
-                    bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
-                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe
+                command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                no_output_timeout: 20m
+            - run:
+                name: Build ocaml - generate keypair
+                environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
+                command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
                 no_output_timeout: 20m
             ### collection
             - run:
                 name: Collect Keys and Binaries
                 command: |
                     mkdir -p package/keys
-                    echo 'keys'
+                    echo 'keys and genesis'
                     cp /tmp/s3_cache_dir/* package/keys/.
+                    cp $TMPDIR/coda_cache_dir/coda_genesis_*.tar.gz package/keys/.
                     echo 'coda'
                     cp _build/default/src/app/cli/src/coda.exe package/coda
                     echo 'libp2p_helper'

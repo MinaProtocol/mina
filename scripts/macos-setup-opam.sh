@@ -1,5 +1,5 @@
 #!/bin/bash
-set -x #echo on
+set -x # echo on
 set -eu
 
 # Keep compile dirs to avoid recompiles
@@ -10,16 +10,14 @@ export OPAMYES=1
 # Set term to xterm if not set
 export TERM=${TERM:-xterm}
 
-# ocaml downloading
-opam init
+# ocaml environment
 eval $(opam config env)
 
-opam update
-
-SWITCH_LIST=$(opam switch list -s)
+# check for cache'd opam
 SWITCH='4.07.1'
+SWITCH_LIST=$(opam switch list -s)
 
-# Check to see if we have switch
+# Check to see if we have explicit switch version
 SWITCH_FOUND=false
 for val in $SWITCH_LIST; do
   if [ $val == $SWITCH ]; then
@@ -30,13 +28,12 @@ done
 if [ "$SWITCH_FOUND" = true ]; then
   opam switch set $SWITCH
 else
+  # Build opam from scratch
+  opam init
+  opam update
   opam switch create $SWITCH || true
   opam switch $SWITCH
 fi
-
-# Test -- see if curent export is different from saved export
-opam switch export opam.export.test
-diff -U1 opam.export.test src/opam.export || true
 
 # All our ocaml packages
 opam switch import src/opam.export
@@ -59,3 +56,7 @@ opam pin add src/external/async_kernel
 opam pin add src/external/coda_base58
 opam pin add src/external/graphql_ppx
 eval $(opam config env)
+
+# show switch list at end
+echo "opam switch list"
+opam switch list -s
