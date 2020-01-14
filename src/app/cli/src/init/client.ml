@@ -549,9 +549,9 @@ let send_payment =
     ~error:"Failed to send payment"
 
 type user_command =
-  { is_delegation: bool
+  { isDelegation: bool
   ; nonce: Coda_numbers.Account_nonce.t
-  ; to_: Public_key.Compressed.t
+  ; toAccount: Public_key.Compressed.t
   ; amount: Currency.Amount.t
   ; fee: Currency.Fee.t
   ; memo: User_command_memo.t
@@ -605,10 +605,12 @@ let decode_scalar : string -> Snark_params.Tick.Inner_curve.Scalar.t =
  fun str ->
   B58.decode alphabet (Bytes.of_string str)
   |> Bytes.to_string
-  |> String.fold ~init:0 ~f:(fun acc byte ->
+  |> String.fold ~init:Bigint.zero ~f:(fun acc byte ->
          let byte = Char.to_int byte - Char.to_int '1' in
-         (acc * 58) + byte )
-  |> Snark_params.Tick.Inner_curve.Scalar.of_int
+         let open Bigint in
+         (acc * of_int 58) + of_int byte )
+  |> Snark_params.Tock.Bigint.of_bignum_bigint
+  |> Snark_params.Tock.Bigint.to_field
 
 let get_signature hardware_wallet_nonce user_command =
   let open Deferred.Let_syntax in
@@ -689,9 +691,9 @@ let send_payment_hardware_wallet =
            in
            let%bind (signature : Signature.t) =
              get_signature hardware_wallet_nonce
-               { is_delegation= false
+               { isDelegation= false
                ; nonce
-               ; to_= receiver
+               ; toAccount= receiver
                ; amount
                ; fee
                ; memo
