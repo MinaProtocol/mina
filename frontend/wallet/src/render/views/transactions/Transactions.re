@@ -1,3 +1,4 @@
+open ReactIntl;
 open Tc;
 
 module Styles = {
@@ -167,13 +168,16 @@ let make = () => {
   <div className=Styles.container>
     <div className=Styles.headerRow>
       <span className=Css.(style([display(`flex), alignItems(`center)]))>
-        {React.string("Sender")}
+        <FormattedMessage id="sender" defaultMessage="sender" />
         <span className=Styles.icon> <Icon kind=Icon.BentArrow /> </span>
-        {React.string("recipient")}
+        <FormattedMessage id="recipient" defaultMessage="recipient" />
       </span>
-      <span> {ReasonReact.string("Memo")} </span>
+      <span> <FormattedMessage id="memo" defaultMessage="memo" /> </span>
       <span className=Css.(style([textAlign(`right)]))>
-        {ReasonReact.string("Date / Amount")}
+        <FormattedMessage
+          id="transactions.date/amount"
+          defaultMessage="date / amount"
+        />
       </span>
     </div>
     {switch (activeAccount) {
@@ -197,42 +201,48 @@ let make = () => {
                    ~default="",
                    data##blocks##pageInfo##lastCursor,
                  );
-               switch (Array.length(transactions), Array.length(pending)) {
-               | (0, 0) =>
-                 <div className=Styles.alertContainer>
-                   <Alert
-                     kind=`Info
-                     message="You don't have any transactions related to this account."
-                   />
-                 </div>
-               | (_, _) =>
-                 <TransactionsList
-                   pending
-                   transactions
-                   hasNextPage=data##blocks##pageInfo##hasNextPage
-                   onLoadMore={() => {
-                     let moreTransactions =
-                       TransactionsQueryString.make(
-                         ~publicKey=Apollo.Encoders.publicKey(pubkey),
-                         ~after=lastCursor,
-                         (),
-                       );
+               <BlockListener
+                 refetch={() =>
+                   response.refetch(Some(transactionQuery##variables))
+                 }
+                 subscribeToMore={response.subscribeToMore}>
+                 {switch (Array.length(transactions), Array.length(pending)) {
+                  | (0, 0) =>
+                    <div className=Styles.alertContainer>
+                      <Alert
+                        kind=`Info
+                        defaultMessage="You don't have any transactions related to this account."
+                      />
+                    </div>
+                  | (_, _) =>
+                    <TransactionsList
+                      pending
+                      transactions
+                      hasNextPage=data##blocks##pageInfo##hasNextPage
+                      onLoadMore={() => {
+                        let moreTransactions =
+                          TransactionsQueryString.make(
+                            ~publicKey=Apollo.Encoders.publicKey(pubkey),
+                            ~after=lastCursor,
+                            (),
+                          );
 
-                     response.fetchMore(
-                       ~variables=moreTransactions##variables,
-                       ~updateQuery,
-                       (),
-                     );
-                   }}
-                 />
-               };
+                        response.fetchMore(
+                          ~variables=moreTransactions##variables,
+                          ~updateQuery,
+                          (),
+                        );
+                      }}
+                    />
+                  }}
+               </BlockListener>;
              }
          )
        </TransactionsQuery>;
      | None =>
        <div className=Styles.alertContainer>
          <Alert
-           message="Select an account from the side bar to view related transactions."
+           defaultMessage="Select an account from the side bar to view related transactions."
            kind=`Info
          />
        </div>

@@ -1,10 +1,11 @@
 open Core
+open Async
 
 let () =
   Out_channel.write_all "remove_keys_trigger.ml" ~data:"" ;
   let dir = Cache_dir.autogen_path in
-  match Sys.is_directory dir with
+  match Core.Sys.is_directory dir with
   | `Yes ->
-      List.iter (Sys.ls_dir dir) ~f:(fun p -> Sys.remove (dir ^/ p))
+      File_system.clear_dir dir |> Deferred.don't_wait_for
   | `No | `Unknown ->
       ()

@@ -97,6 +97,8 @@ module T = struct
         , unit
         , Coda_lib.Root_diff.t Pipe.Reader.t )
         Rpc_parallel.Function.t
+    ; initialization_finish_signal:
+        ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t
     ; prove_receipt:
         ( 'worker
         , Receipt.Chain_hash.t * Receipt.Chain_hash.t
@@ -155,6 +157,7 @@ module T = struct
            unit
         -> External_transition.Validated.Stable.V1.t Pipe.Reader.t Deferred.t
     ; coda_root_diff: unit -> Coda_lib.Root_diff.t Pipe.Reader.t Deferred.t
+    ; coda_initialization_finish_signal: unit -> unit Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
         -> (Receipt.Chain_hash.t * User_command.t list) Deferred.t
@@ -208,6 +211,9 @@ module T = struct
 
     let root_diff_impl ~worker_state ~conn_state:() () =
       worker_state.coda_root_diff ()
+
+    let initialization_finish_signal_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_initialization_finish_signal ()
 
     let get_balance_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_get_balance pk
@@ -322,6 +328,11 @@ module T = struct
       C.create_pipe ~name:"root_diff" ~f:root_diff_impl ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: Coda_lib.Root_diff.Stable.V1.t] ()
 
+    let initialization_finish_signal =
+      C.create_pipe ~name:"initialization_finish_signal"
+        ~f:initialization_finish_signal_impl ~bin_input:Unit.bin_t
+        ~bin_output:Unit.bin_t ()
+
     let sync_status =
       C.create_pipe ~name:"sync_status" ~f:sync_status_impl
         ~bin_input:Unit.bin_t ~bin_output:Sync_status.Stable.V1.bin_t ()
@@ -366,6 +377,7 @@ module T = struct
       ; start
       ; verified_transitions
       ; root_diff
+      ; initialization_finish_signal
       ; get_balance
       ; get_nonce
       ; root_length
@@ -451,8 +463,8 @@ module T = struct
           in
           let propose_keypair =
             Option.map proposer ~f:(fun i ->
-                List.nth_exn Genesis_ledger.accounts i
-                |> Genesis_ledger.keypair_of_account_record_exn )
+                List.nth_exn Test_genesis_ledger.accounts i
+                |> Test_genesis_ledger.keypair_of_account_record_exn )
           in
           let initial_propose_keypairs =
             Keypair.Set.of_list (propose_keypair |> Option.to_list)
@@ -466,6 +478,7 @@ module T = struct
           in
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_propose_keys
+              ~genesis_ledger:Test_genesis_ledger.t
           in
           let gossip_net_params =
             Gossip_net.Real.Config.
@@ -488,6 +501,8 @@ module T = struct
             ; trust_system
             ; time_controller
             ; consensus_local_state
+            ; genesis_ledger_hash=
+                Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
             ; log_gossip_heard=
                 { snark_pool_diff= false
                 ; transaction_pool_diff= false
@@ -501,10 +516,15 @@ module T = struct
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
+          let genesis_state_hash =
+            Coda_state.Genesis_protocol_state.t
+              ~genesis_ledger:Test_genesis_ledger.t
+            |> With_hash.hash
+          in
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~net_config ~gossip_net_params
+                 ~coinbase_receiver:`Proposer ~net_config ~gossip_net_params
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
@@ -520,7 +540,10 @@ module T = struct
                  ~snark_work_fee:(Currency.Fee.of_int 0)
                  ~initial_propose_keypairs ~monitor ~consensus_local_state
                  ~transaction_database ~external_transition_database
-                 ~is_archive_rocksdb ~work_reassignment_wait:420000 ())
+                 ~is_archive_rocksdb ~work_reassignment_wait:420000
+                 ~genesis_state_hash ())
+              ~genesis_ledger:Test_genesis_ledger.t
+              ~base_proof:Precomputed_values.base_proof
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger
@@ -659,6 +682,13 @@ module T = struct
                    Linear_pipe.write_if_open w diff )) ;
             return r.pipe
           in
+          let coda_initialization_finish_signal () =
+            let r, w = Linear_pipe.create () in
+            upon
+              (Ivar.read @@ Coda_lib.initialization_finish_signal coda)
+              (fun () -> don't_wait_for @@ Linear_pipe.write_if_open w ()) ;
+            return r.pipe
+          in
           let coda_dump_tf () =
             Deferred.return
               ( Coda_lib.dump_tf coda |> Or_error.ok
@@ -708,6 +738,8 @@ module T = struct
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions
           ; coda_root_diff= with_monitor coda_root_diff
+          ; coda_initialization_finish_signal=
+              with_monitor coda_initialization_finish_signal
           ; coda_get_balance= with_monitor coda_get_balance
           ; coda_get_nonce= with_monitor coda_get_nonce
           ; coda_root_length= with_monitor coda_root_length
