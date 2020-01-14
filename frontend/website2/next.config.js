@@ -62,10 +62,5 @@ module.exports = withTM(withBundleAnalyzer(withMDX({
     CONTENTFUL_TOKEN: TOKEN,
     CONTENTFUL_IMAGE_TOKEN: IMAGE_TOKEN,
     CONTENTFUL_SPACE: SPACE,
-  },
-  publicRuntimeConfig: {
-    CONTENTFUL_TOKEN: TOKEN,
-    CONTENTFUL_IMAGE_TOKEN: IMAGE_TOKEN,
-    CONTENTFUL_SPACE: SPACE,
   }
 })))
