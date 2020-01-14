@@ -788,7 +788,7 @@ module Data = struct
         let pending_coinbase_handler =
           unstage
             (Coda_base.Pending_coinbase.handler empty_pending_coinbase
-               ~is_new_stack:false)
+               ~is_new_stack:true)
         in
         let handlers =
           Snarky.Request.Handler.(

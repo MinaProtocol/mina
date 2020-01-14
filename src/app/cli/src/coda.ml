@@ -51,6 +51,13 @@ let daemon logger =
             provide both `propose-key` and `propose-public-key`. (default: \
             don't produce blocks)"
          (optional string)
+     and coinbase_receiver_flag =
+       flag "coinbase-receiver"
+         ~doc:
+           "PUBLICKEY Address to send coinbase rewards to (if this node is \
+            proposing blocks). If not provided, coinbase rewards will be sent \
+            to the proposer of a block."
+         (optional public_key_compressed)
      and genesis_ledger_dir_flag =
        flag "genesis-ledger-dir"
          ~doc:
@@ -619,10 +626,14 @@ let daemon logger =
                terminated_child_loop ()
          in
          O1trace.trace_task "terminated child loop" terminated_child_loop ;
+         let coinbase_receiver =
+           Option.value_map coinbase_receiver_flag ~default:`Proposer
+             ~f:(fun pk -> `Other pk)
+         in
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~net_config ~gossip_net_params
+                ~coinbase_receiver ~net_config ~gossip_net_params
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)

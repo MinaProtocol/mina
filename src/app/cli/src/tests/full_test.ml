@@ -181,7 +181,8 @@ let run_test () : unit Deferred.t =
       let%bind coda =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
-             ~conf_dir:temp_conf_dir ~gossip_net_params
+             ~coinbase_receiver:`Proposer ~conf_dir:temp_conf_dir
+             ~gossip_net_params
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_propose_keypairs:(Keypair.Set.singleton keypair)
