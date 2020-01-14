@@ -228,41 +228,44 @@ jobs:
                 command: |
                     sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
                     df -h
+                background: true
             - checkout
             - run:
                   name: Update submodules
                   command: git submodule sync && git submodule update --init --recursive
             ### homebrew
+            - run:
+                name: Create homebrew cache signature file including a year/date stamp to ensure occasional rebuilds
+                command: |
+                    cat scripts/macos-setup-brew.sh > brew_ci_cache.sig
+                    date +%Y-%m > brew_ci_cache.sig
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
-                    - homebrew-v7-{{ checksum "scripts/macos-setup-brew.sh" }}
+                    - homebrew-v7-{{ checksum "brew_ci_cache.sig" }}
+                    - homebrew-v7-6+7C2dsmcJjRMux2kVt_DCKFQf7t_bD4Fd_ZOiogIMw=
             - run:
                 name: Install macos dependencies - homebrew - macos-setup-brew.sh
                 command: |
                     ./scripts/skip_if_only_frontend.sh ./scripts/macos-setup-brew.sh
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v7-{{ checksum "scripts/macos-setup-brew.sh" }}
+                key: homebrew-v7-{{ checksum "brew_ci_cache.sig" }}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
             ### opam
             - run:
-                name: Create opam cache signature file
+                name: Create opam cache signature file including a year/date stamp to ensure occasional rebuilds
                 command: |
                     cat scripts/macos-setup-opam.sh > opam_ci_cache.sig
                     cat src/opam.export >> opam_ci_cache.sig
+                    date +%Y-%m >> opam_ci_cache.sig
             - restore_cache:
                 name: Restore cache - opam
                 keys:
                     - opam-v7-{{ checksum "opam_ci_cache.sig" }}
                     - opam-v7-igyglTvPBxMMa2HOSyL8o7xJusIN4L6cuLaccWdS7pY=
-                    - opam-v7-igyglTvPBxMMa2HOSyL8o7xJusIN4L6cuLaccWdS7pY
-                    - opam-v6-{{ checksum "opam_ci_cache.sig" }}
-                    - opam-v5-{{ checksum "src/opam.export" }}
-                    - opam-v4-{{ checksum "src/opam.export" }}
-                    - opam-v3-{{ checksum "src/opam.export" }}
             - run:
                 name: Ensure/Fix opam permisssions
                 command: |
@@ -292,7 +295,13 @@ jobs:
                     . ~/.nix-profile/etc/profile.d/nix.sh
                     cachix use codaprotocol
                     cd src/app/libp2p_helper
-                    nix-build default.nix
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build default.nix
+                    else
+                        nix-build default.nix | cachix push codaprotocol
+                    fi
+
             ### dune
             - run:
                 name: Build ocaml
