@@ -1388,8 +1388,11 @@ module T = struct
             ~receiver:coinbase_receiver partitions )
     in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-      "Number of proofs ready for purchase: $proof_count"
-      ~metadata:[("proof_count", `Int proof_count)] ;
+      "Number of proofs ready for purchase: $proof_count Number of user \
+       commands ready to be included: $txn_count"
+      ~metadata:
+        [ ("proof_count", `Int proof_count)
+        ; ("txn_count", `Int (Sequence.length valid_on_this_ledger)) ] ;
     trace_event "prediffs done" ;
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self
