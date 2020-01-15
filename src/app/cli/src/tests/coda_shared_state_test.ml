@@ -8,7 +8,8 @@ let main () =
   let logger = Logger.create () in
   let n = 2 in
   let keypairs =
-    List.map Test_genesis_ledger.accounts
+    List.map
+      (Lazy.force Test_genesis_ledger.accounts)
       ~f:Test_genesis_ledger.keypair_of_account_record_exn
   in
   let snark_work_public_keys i =

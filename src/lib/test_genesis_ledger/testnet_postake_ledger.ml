@@ -375,11 +375,15 @@ include Make (struct
       } ]
 
   let fake_accounts =
-    let open Quickcheck in
-    random_value ~seed:(`Deterministic "fake accounts for testnet postake")
-      (Generator.list_with_length
-         (fake_accounts_target - List.length real_accounts)
-         Fake_accounts.gen)
+    lazy
+      (let open Quickcheck in
+      random_value ~seed:(`Deterministic "fake accounts for testnet postake")
+        (Generator.list_with_length
+           (fake_accounts_target - List.length real_accounts)
+           Fake_accounts.gen))
 
-  let accounts = real_accounts @ fake_accounts
+  let accounts =
+    let open Lazy.Let_syntax in
+    let%map fake_accounts = fake_accounts in
+    real_accounts @ fake_accounts
 end)

@@ -66,7 +66,7 @@ let generate_base_proof ~ledger =
   (base_hash, base_proof)
 
 let compiled_accounts_json () : Account_config.t =
-  List.map Test_genesis_ledger.accounts ~f:(fun (sk_opt, acc) ->
+  List.map (Lazy.force Test_genesis_ledger.accounts) ~f:(fun (sk_opt, acc) ->
       { Account_config.pk= acc.public_key
       ; sk= sk_opt
       ; balance= acc.balance

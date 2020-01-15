@@ -4,7 +4,7 @@ open Signature_lib
 module type S = sig
   val t : Ledger.t Lazy.t
 
-  val accounts : (Private_key.t option * Account.t) list
+  val accounts : (Private_key.t option * Account.t) list Lazy.t
 
   val find_account_record_exn :
     f:(Account.t -> bool) -> Private_key.t option * Account.t

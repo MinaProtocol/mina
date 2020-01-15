@@ -14,7 +14,7 @@ let%test_module "Full_frontier tests" =
 
     let logger = Logger.null ()
 
-    let accounts_with_secret_keys = Test_genesis_ledger.accounts
+    let accounts_with_secret_keys = Lazy.force Test_genesis_ledger.accounts
 
     let max_length = 5
 

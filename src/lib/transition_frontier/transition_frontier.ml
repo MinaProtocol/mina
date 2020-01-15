@@ -483,7 +483,8 @@ module For_tests = struct
   let gen ?(logger = Logger.null ()) ?verifier ?trust_system
       ?consensus_local_state
       ?(root_ledger_and_accounts =
-        (Lazy.force Test_genesis_ledger.t, Test_genesis_ledger.accounts))
+        ( Lazy.force Test_genesis_ledger.t
+        , Lazy.force Test_genesis_ledger.accounts ))
       ?(gen_root_breadcrumb = gen_genesis_breadcrumb ~logger ?verifier ())
       ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
@@ -566,9 +567,9 @@ module For_tests = struct
 
   let gen_with_branch ?logger ?verifier ?trust_system ?consensus_local_state
       ?(root_ledger_and_accounts =
-        (Lazy.force Test_genesis_ledger.t, Test_genesis_ledger.accounts))
-      ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
-      ~branch_size () =
+        ( Lazy.force Test_genesis_ledger.t
+        , Lazy.force Test_genesis_ledger.accounts )) ?gen_root_breadcrumb
+      ?(get_branch_root = root) ~max_length ~frontier_size ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
       gen ?logger ?verifier ?trust_system ?consensus_local_state

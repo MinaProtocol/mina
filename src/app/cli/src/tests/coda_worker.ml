@@ -463,7 +463,7 @@ module T = struct
           in
           let propose_keypair =
             Option.map proposer ~f:(fun i ->
-                List.nth_exn Test_genesis_ledger.accounts i
+                List.nth_exn (Lazy.force Test_genesis_ledger.accounts) i
                 |> Test_genesis_ledger.keypair_of_account_record_exn )
           in
           let initial_propose_keypairs =
