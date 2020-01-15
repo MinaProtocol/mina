@@ -19,7 +19,7 @@ module Style = {
       padding2(~v=`rem(1.), ~h=`rem(1.)),
       media(
         Theme.MediaQuery.notMobile,
-        [maxWidth(`rem(43.)), marginLeft(`auto), marginRight(`auto)],
+        [maxWidth(`rem(48.)), marginLeft(`auto), marginRight(`auto)],
       ),
     ]);
 
@@ -34,6 +34,7 @@ module Style = {
   let blogContent =
     style([
       position(`relative),
+      selector("p", [lineHeight(`abs(1.5))]),
       selector(
         "h2",
         [
@@ -150,6 +151,7 @@ let cache: Js.Dict.t(option(ContentType.Post.t)) = Js.Dict.empty();
 Next.injectGetInitialProps(make, ({Next.query}) => {
   switch (Js.Dict.get(query, "slug")) {
   | Some(slug) =>
+    let slug = ContentType.stripHTMLSuffix(slug);
     switch (Js.Dict.get(cache, slug)) {
     | Some(post) => Js.Promise.resolve({"post": post})
     | None =>
@@ -170,7 +172,7 @@ Next.injectGetInitialProps(make, ({Next.query}) => {
            Js.Dict.set(cache, slug, post);
            Js.Promise.resolve({"post": post});
          })
-    }
+    };
   | None => Js.Promise.resolve({"post": None})
   }
 });
