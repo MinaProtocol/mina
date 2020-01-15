@@ -357,7 +357,12 @@ struct
                   acc_statement transaction.statement
               else
                 M.return
-                @@ Or_error.error_string (write_error "Bad base statement") )
+                @@ Or_error.error_string
+                     (sprintf
+                        !"Bad base statement expected: \
+                          %{sexp:Transaction_snark.Statement.t} got: \
+                          %{sexp:Transaction_snark.Statement.t}"
+                        transaction.statement expected_statement) )
     in
     let res =
       Fold.fold_chronological_until tree ~init:None

@@ -379,8 +379,17 @@ jobs:
                   command: sudo pip install awscli
             - run:
                   name: Build OCaml
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  environment:
+                    DUNE_PROFILE: testnet_postake_medium_curves
+                  no_output_timeout: 20m
+            - run:
+                  name: Upload generated PV keys
+                  command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
+            - run:
+                  name: Rebuild for pvkey changes
                   command: |
-                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
                     ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
@@ -389,15 +398,6 @@ jobs:
                   name: Generate runtime ledger with 10k accounts
                   command: |
                     ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000'
-                  no_output_timeout: 20m
-            - run:
-                  name: Upload generated PV keys
-                  command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
-            - run:
-                  name: Rebuild for pvkey changes
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
-                  environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
                   no_output_timeout: 20m
             - run:
                   name: Build deb package with PV keys and PV key tar
