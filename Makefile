@@ -77,7 +77,7 @@ GENESIS_DIR := $(TMPDIR)/coda_cache_dir
 genesis_tar:
 	@GENESIS_FILE=$(GENESIS_DIR)/$(shell cat _build/default/src/app/runtime_genesis_ledger/genesis_filename.txt).tar.gz && \
 	if [ ! -f $$GENESIS_FILE ] || [ _build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -nt $$GENESIS_FILE ]; then \
-		./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000; \
+		./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe ; \
 	fi
 
 # compile the tool and write the filename to `genesis_filename.txt`
