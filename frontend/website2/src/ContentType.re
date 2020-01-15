@@ -1,3 +1,11 @@
+// Removes .html from a slug for backwards compatibility
+let stripHTMLSuffix = s =>
+  switch (String.split_on_char('.', s)) {
+  | [] => ""
+  | [slug, "html"] => slug
+  | [slug, ..._] => slug
+  };
+
 module System = {
   type contentType = {id: string};
   type contentTypeSys = {sys: contentType};

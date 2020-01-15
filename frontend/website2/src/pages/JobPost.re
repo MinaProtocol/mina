@@ -137,6 +137,7 @@ let make = (~post: option(ContentType.JobPost.t)) => {
 Next.injectGetInitialProps(make, ({Next.query}) => {
   switch (Js.Dict.get(query, "slug")) {
   | Some(slug) =>
+    let slug = ContentType.stripHTMLSuffix(slug);
     Contentful.getEntries(
       Lazy.force(Contentful.client),
       {
@@ -152,7 +153,7 @@ Next.injectGetInitialProps(make, ({Next.query}) => {
            | _ => None
            };
          Js.Promise.resolve({"post": post});
-       })
+       });
 
   | None => Js.Promise.resolve({"post": None})
   }
