@@ -26,6 +26,7 @@ module Config = struct
     ; conf_dir: string
     ; chain_id: string
     ; logger: Logger.t
+    ; unsafe_no_trust_ip: bool
     ; trust_system: Trust_system.t
     ; keypair: Coda_net2.Keypair.t option }
   [@@deriving make]
@@ -131,6 +132,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                         (Option.value_exn config.addrs_and_ports.peer)
                           .libp2p_port))
                 ~network_id:config.chain_id
+                ~unsafe_no_trust_ip:config.unsafe_no_trust_ip
                 ~on_new_peer:(fun _ ->
                   Ivar.fill_if_empty first_peer_ivar () ;
                   if !ctr < 4 then incr ctr

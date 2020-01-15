@@ -366,7 +366,7 @@ module Helper = struct
   let stream_state_invariant stream logger =
     let us_closed = Pipe.is_closed stream.outgoing_w in
     let them_closed = Pipe.is_closed stream.incoming_w in
-    Logger.info logger "%sus_closed && %sthem_closed"
+    Logger.trace logger "%sus_closed && %sthem_closed"
       (if us_closed then "" else "not ")
       (if them_closed then "" else "not ")
       ~module_:__MODULE__ ~location:__LOC__ ;
@@ -462,11 +462,6 @@ module Helper = struct
                FullyClosed
            | FullyClosed ->
                double_close () ) ;
-        Logger.info net.logger "transitioning from %s to %s after %s closed"
-          (show_stream_state old_state)
-          (show_stream_state stream.state)
-          (name_participant who_closed)
-          ~location:__LOC__ ~module_:__MODULE__ ;
         (* TODO: maybe we can check some invariants on the Go side too? *)
         if not (stream_state_invariant stream net.logger) then
           Logger.error net.logger
@@ -649,7 +644,7 @@ module Helper = struct
           Option.fold m.sender ~init:false ~f:(fun _ sender ->
               Peer.Id.equal sender.peer_id me.peer_id )
         then (
-          Logger.fatal t.logger
+          Logger.trace t.logger
             "not handling published message originated from me"
             ~module_:__MODULE__ ~location:__LOC__ ;
           (* elide messages that we sent *) return () )

@@ -758,8 +758,6 @@ let create (config : Config.t)
     Strict_pipe.Reader.partition_map3 received_gossips
       ~f:(fun (envelope, valid_cb) ->
         Ivar.fill_if_empty first_received_message_signal () ;
-        Logger.fatal config.logger ~module_:__MODULE__ ~location:__LOC__
-          "RECEIVED A GOSSIP!" ;
         match Envelope.Incoming.data envelope with
         | New_state state ->
             Perf_histograms.add_span ~name:"external_transition_latency"

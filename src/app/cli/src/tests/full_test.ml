@@ -140,6 +140,7 @@ let run_test () : unit Deferred.t =
           { timeout= Time.Span.of_sec 3.
           ; logger
           ; initial_peers= []
+          ; unsafe_no_trust_ip= true
           ; conf_dir= temp_conf_dir
           ; chain_id= "bogus chain id for testing"
           ; addrs_and_ports=

@@ -533,6 +533,7 @@ let daemon logger =
              ; logger
              ; conf_dir
              ; chain_id= chain_id ~genesis_state_hash
+             ; unsafe_no_trust_ip= false
              ; initial_peers
              ; addrs_and_ports
              ; trust_system
