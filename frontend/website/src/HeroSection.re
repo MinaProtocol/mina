@@ -212,7 +212,7 @@ let make = () => {
         flexWrap(`wrap),
         maxWidth(`rem(73.0)),
         media(
-          Style.MediaQuery.somewhatLarge,
+          Style.MediaQuery.full,
           [marginLeft(`px(80)), marginRight(`px(80))],
         ),
         media(

@@ -10,8 +10,7 @@ import time
 from itertools import chain
 
 build_artifact_profiles = [
-    'testnet_postake_medium_curves',
-    'net_10k'
+    'testnet_postake_medium_curves'
 ]
 
 unit_test_profiles = ['test_postake_snarkless_unittest', 'dev']
