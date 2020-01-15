@@ -171,11 +171,11 @@ docker-toolchain-rust:
 	fi
 
 docker-toolchain-discovery:
-	@echo "Building codaprotocol/coda:toolchain-discovery-$(KADEMLIA_SIG)" ;\
-    docker build --file dockerfiles/Dockerfile-toolchain-discovery --tag codaprotocol/coda:toolchain-discovery-$(KADEMLIA_SIG) . ;\
+	@echo "Building codaprotocol/coda:toolchain-discovery-$(LIBP2P_HELPER_SIG)" ;\
+    docker build --file dockerfiles/Dockerfile-toolchain-discovery --tag codaprotocol/coda:toolchain-discovery-$(LIBP2P_HELPER_SIG) . ;\
     echo  'Extracting deb package' ;\
     mkdir -p _build ;\
-    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-discovery-$(KADEMLIA_SIG) /src/coda-discovery.deb > _build/coda-discovery.deb
+    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-discovery-$(LIBP2P_HELPER_SIG) /src/coda-discovery.deb > _build/coda-discovery.deb
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
