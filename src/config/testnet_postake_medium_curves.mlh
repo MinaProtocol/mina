@@ -1,11 +1,12 @@
 [%%define ledger_depth 14]
-[%%define fake_accounts_target 9000]
+[%%define fake_accounts_target 50]
 [%%import "/src/config/curve/medium.mlh"]
 [%%import "/src/config/coinbase/standard.mlh"]
 [%%import "/src/config/scan_state/point2tps.mlh"]
 [%%import "/src/config/debug_level/some.mlh"]
 [%%import "/src/config/proof_level/full.mlh"]
 [%%import "/src/config/txpool_size.mlh"]
+[%%import "/src/config/account_creation_fee/standard.mlh"]
 
 (* custom consensus parameters for the testnet release *)
 [%%define consensus_mechanism "proof_of_stake"]
