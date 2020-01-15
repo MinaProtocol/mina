@@ -475,9 +475,17 @@ module Base = struct
           let%map balance =
             (* receiver_increase will be zero in the stake delegation case *)
             let%bind receiver_amount =
-              let%bind amount_for_new_account =
-                Amount.Checked.sub receiver_increase
+              let%bind amount_for_new_account, `Underflow underflow =
+                Amount.Checked.sub_flagged receiver_increase
                   account_creation_amount_var
+              in
+              let%bind () =
+                let%bind enough_amount_for_new_account =
+                  Boolean.(
+                    if_ is_empty_and_writeable ~then_:(not underflow)
+                      ~else_:true_)
+                in
+                Boolean.Assert.is_true enough_amount_for_new_account
               in
               Currency.Amount.Checked.if_ is_empty_and_writeable
                 ~then_:amount_for_new_account ~else_:receiver_increase
@@ -538,12 +546,24 @@ module Base = struct
              in
              let%bind sender_amount =
                let%bind amount_for_new_acc =
-                 let fee =
+                 let neg_account_creation_amount =
                    Amount.Signed.create ~magnitude:account_creation_amount_var
                      ~sgn:Sgn.Checked.neg
                  in
-                 (*The sender delta could be zero here in the case of fee transfers and coinbase but sender = receiver and therefore the account would exist after the previous merkle update. Therefore, modify the reciever before modifying the sender so that balance doesn't go below zero*)
-                 Amount.Signed.Checked.add sender_delta fee
+                 (*The sender delta could be zero here when a fee transfer is single and a coinbase has no fee transfer in which case sender = receiver. The account would exist after the previous merkle update. Therefore, modify the reciever before modifying the sender so that balance doesn't go below zero*)
+                 Amount.Signed.Checked.add sender_delta
+                   neg_account_creation_amount
+               in
+               let%bind () =
+                 let is_negative_amt =
+                   Sgn.Checked.is_neg amount_for_new_acc.sgn
+                 in
+                 let%bind enough_amount_for_new_account =
+                   Boolean.(
+                     if_ is_empty_and_writeable ~then_:(not is_negative_amt)
+                       ~else_:true_)
+                 in
+                 Boolean.Assert.is_true enough_amount_for_new_account
                in
                Currency.Amount.Signed.Checked.if_ is_empty_and_writeable
                  ~then_:amount_for_new_acc ~else_:sender_delta
