@@ -344,6 +344,9 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			// validationComplete will remove app.Validators[seqno] once the
 			// coda process gets around to it.
 			app.P2p.Logger.Error("validation timed out :(")
+			if app.UnsafeNoTrustIP {
+				return true
+			}
 			return false
 		case res := <-ch:
 			return res
@@ -370,7 +373,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			msg, err := sub.Next(ctx)
 			if err == nil {
 				sender, err := findPeerInfo(app, msg.ReceivedFrom)
-				if err == nil && !app.UnsafeNoTrustIP {
+				if err != nil && !app.UnsafeNoTrustIP {
 					app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us an already-validated pubsub message, dropping it", peer.IDB58Encode(msg.ReceivedFrom))
 				} else {
 					data := b58.Encode(msg.Data)
