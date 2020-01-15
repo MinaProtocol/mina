@@ -1,3 +1,5 @@
+open ReactIntl
+
 module Styles = {
   open Css;
 
@@ -27,6 +29,7 @@ module Styles = {
           backgroundColor(Theme.Colors.hyperlinkAlpha(0.15)),
           borderRadius(`px(2)),
         ]),
+        textTransform(`capitalize)
       ]),
     ]);
 };
@@ -40,7 +43,10 @@ let make = () => {
     <div className=Styles.footer>
       <a
         className=Styles.addAccountLink onClick={_ => setModalOpen(_ => true)}>
-        {React.string("+ New Account")}
+        <FormattedMessage
+          id="sidebar.new-account"
+          defaultMessage="+ New Account"
+        />
       </a>
     </div>
     {switch (modalOpen) {

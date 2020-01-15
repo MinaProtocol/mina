@@ -16,3 +16,4 @@ node_modules/
 .DS_Store
 .graphql_ppx_cache
 /scripts/archive/output
+accounts.json
