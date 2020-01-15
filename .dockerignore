@@ -1,6 +1,7 @@
 *
 !src/opam.export
 !coda.deb
+!coda-discovery.deb
 !src/external/**/*
 !src/app/libp2p_helper
 !src/app/trace-tool
