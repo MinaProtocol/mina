@@ -622,8 +622,10 @@ module Helper = struct
     let wrap sender data =
       match sender with
       | Some sender ->
-          if String.equal sender.host "127.0.0.1" then
-            Envelope.Incoming.local data
+          if
+            String.equal sender.host "127.0.0.1"
+            && Int.equal sender.libp2p_port 0
+          then Envelope.Incoming.local data
           else
             Envelope.Incoming.wrap_peer ~sender:(peer_of_peer_info sender)
               ~data

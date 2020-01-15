@@ -80,6 +80,12 @@ const (
 	unbanIP
 )
 
+type codaPeerInfo struct {
+	Libp2pPort int    `json:"libp2p_port"`
+	Host       string `json:"host"`
+	PeerID     string `json:"peer_id"`
+}
+
 type envelope struct {
 	Method methodIdx   `json:"method"`
 	Seqno  int         `json:"seqno"`
@@ -173,17 +179,17 @@ func findPeerInfo(app *app, id peer.ID) (*codaPeerInfo, error) {
 		return nil, needsConfigure()
 	}
 
-	ctx, cancel := context.WithTimeout(app.Ctx, 15*time.Second)
-	defer cancel()
+	conns := app.P2p.Host.Network().ConnsToPeer(id)
 
-	conn, err := app.P2p.Host.Network().DialPeer(ctx, id)
-
-	if err != nil {
+	if len(conns) == 0 {
 		if app.UnsafeNoTrustIP {
+			app.P2p.Logger.Info("UnsafeNoTrustIP: pretending it's localhost")
 			return &codaPeerInfo{Libp2pPort: 0, Host: "127.0.0.1", PeerID: peer.IDB58Encode(id)}, nil
 		}
-		return nil, err
+		return nil, badp2p(errors.New("tried to find peer info but no open connections to that peer ID"))
 	}
+
+	conn := conns[0]
 
 	maybePeer, err := parseMultiaddrWithID(conn.RemoteMultiaddr(), conn.RemotePeer())
 	if err != nil {
@@ -337,11 +343,12 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			// care about the timeout and will validate it anyway.
 			// validationComplete will remove app.Validators[seqno] once the
 			// coda process gets around to it.
+			app.P2p.Logger.Error("validation timed out :(")
 			return false
 		case res := <-ch:
 			return res
 		}
-	}, pubsub.WithValidatorConcurrency(1), pubsub.WithValidatorTimeout(5*time.Second))
+	}, pubsub.WithValidatorConcurrency(6), pubsub.WithValidatorTimeout(30*time.Second))
 
 	if err != nil {
 		return nil, badp2p(err)
@@ -788,12 +795,6 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	}()
 
 	return "beginAdvertising success", nil
-}
-
-type codaPeerInfo struct {
-	Libp2pPort int    `json:"libp2p_port"`
-	Host       string `json:"host"`
-	PeerID     string `json:"peer_id"`
 }
 
 type findPeerMsg struct {
