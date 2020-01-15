@@ -19,7 +19,7 @@ module Style = {
       padding2(~v=`rem(1.), ~h=`rem(1.)),
       media(
         Theme.MediaQuery.notMobile,
-        [maxWidth(`rem(43.)), marginLeft(`auto), marginRight(`auto)],
+        [maxWidth(`rem(48.)), marginLeft(`auto), marginRight(`auto)],
       ),
     ]);
 
@@ -34,6 +34,7 @@ module Style = {
   let blogContent =
     style([
       position(`relative),
+      selector("p", [lineHeight(`abs(1.5))]),
       selector(
         "h2",
         [

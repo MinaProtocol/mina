@@ -71,6 +71,7 @@ module Styles = {
       height(px(40)),
       width(px(120)),
       fontWeight(`semiBold),
+      fontSize(`percent(100.)),
       borderRadius(px(4)),
       cursor(`pointer),
       active([outline(px(0), `solid, `transparent)]),
