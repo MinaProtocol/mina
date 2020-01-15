@@ -468,7 +468,7 @@ module Base = struct
         ~then_:sender_compressed ~else_:payload.body.public_key
     in
     (* we explicitly set the public_key because it could be zero if the account is new *)
-    let%bind root =
+    let%bind root_after_receiver_update =
       (* This update should be a no-op in the stake delegation case *)
       Frozen_ledger_hash.modify_account_recv root receiver
         ~f:(fun ~is_empty_and_writeable account ->
@@ -489,15 +489,16 @@ module Base = struct
           in
           {account with balance; delegate; public_key= receiver} )
     in
-    let%map root =
+    let%map new_root =
       let%bind is_writeable =
         let%bind is_fee_transfer =
           Transaction_union.Tag.Checked.is_fee_transfer tag
         in
         Boolean.any [is_fee_transfer; is_coinbase]
       in
-      Frozen_ledger_hash.modify_account_send root ~is_writeable
-        sender_compressed ~f:(fun ~is_empty_and_writeable account ->
+      Frozen_ledger_hash.modify_account_send root_after_receiver_update
+        ~is_writeable sender_compressed
+        ~f:(fun ~is_empty_and_writeable account ->
           with_label __LOC__
             (let%bind next_nonce =
                Account.Nonce.Checked.succ_if account.nonce is_user_command
@@ -560,7 +561,7 @@ module Base = struct
              ; voting_for= account.voting_for
              ; timing }) )
     in
-    (root, excess, supply_increase)
+    (new_root, excess, supply_increase)
 
   (* Someday:
    write the following soundness tests:
