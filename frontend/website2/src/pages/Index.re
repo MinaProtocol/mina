@@ -5,7 +5,7 @@ module Styles = {
 
 [@react.component]
 let make = (~links) => {
-  <Page footerColor=Theme.Colors.navyBlue>
+  <Page title="Coda Cryptocurrency Protocol" footerColor=Theme.Colors.navyBlue>
     <div className=Styles.page>
       <section
         className=Css.(

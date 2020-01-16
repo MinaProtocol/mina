@@ -47,7 +47,7 @@ module Style = {
 
 [@react.component]
 let make = (~posts) => {
-  <Page>
+  <Page title="Coda Protocol Blog">
     <Wrapped>
       <Next.Head> Markdown.katexStylesheet </Next.Head>
       <ul className=Style.postList>
