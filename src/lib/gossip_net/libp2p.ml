@@ -201,8 +201,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       in
                       match%map Coda_net2.Stream.reset stream with
                       | Error e ->
-                          Logger.error config.logger
-                            "failed to reset stream: $error"
+                          Logger.info config.logger
+                            "failed to reset stream (this means it was \
+                             probably closed successfully): $error"
                             ~module_:__MODULE__ ~location:__LOC__
                             ~metadata:
                               [("error", `String (Error.to_string_hum e))]
