@@ -399,7 +399,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   Trust_system.(
                     record t.config.trust_system t.config.logger peer.host
                       Actions.
-                        ( Violated_protocol
+                        ( Outgoing_connection_error
                         , Some
                             ( "RPC call failed, reason: $exn"
                             , [("exn", `String (Error.to_string_hum err))] ) ))
