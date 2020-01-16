@@ -293,8 +293,8 @@ upon the foundation of the previous proposal.
     + This also involves transmitting the proving key, which can be large.
 * Keys should be regenerated per-account, reuse should be avoided.
   - Re-using keys would allow the original key generator to generate false
-    proofs, if they had stored the 'toxic waste' randomness use when generating
-    them.
+    proofs, if they had stored the 'toxic waste' randomness used when
+    generating them.
 
 #### Benefits
 
