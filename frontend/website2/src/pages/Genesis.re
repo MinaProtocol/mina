@@ -145,39 +145,8 @@ let make = () => {
         </div>
         <br />
         <hr className=Styles.lineBreak />
-        <div>
-          <div className=Styles.buttonRow>
-            <HoverCard
-              heading={React.string({js| Testnet Docs |js})}
-              text={React.string(
-                "Learn how to install Coda and connect to the network.",
-              )}
-              href="/docs/getting-started"
-            />
-            <HoverCard
-              heading={React.string({js| Grants |js})}
-              text={React.string(
-                "Receive funding to work on Coda related projects and research.",
-              )}
-              href="https://github.com/CodaProtocol/coda-grants"
-            />
-            <HoverCard
-              heading={React.string({js| Developer Docs |js})}
-              text={React.string(
-                "Contribute to Coda source code and core products.",
-              )}
-              href="/docs/developers"
-            />
-            // TODO: Put SDK waitlist link here
-            <HoverCard
-              heading={React.string({js| Coda SDK |js})}
-              text={React.string(
-                "Sign up for the Coda SDK waitlist to integrate digital payments into your app.",
-              )}
-              href="https://docs.google.com/forms/d/e/1FAIpQLSc1obbB_0ON8Ptfhc56jZ_NfwzxhmNtMuVuLNDqoO8Y46eWiw/viewform?usp=sf_link"
-            />
-          </div>
-        </div>
+        <WhitepaperButton label="Technical whitepaper" sigil=Icons.technical />
+        <WhitepaperButton label="Economic whitepaper" sigil=Icons.economic />
       </div>
     </Wrapped>
   </Page>;
