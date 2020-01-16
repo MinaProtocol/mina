@@ -261,21 +261,6 @@ module Styles = {
 
   let heroText =
     merge([header, style([maxWidth(`px(500)), textAlign(`left)])]);
-
-  let termynal =
-    style([
-      height(`rem(16.875)),
-      margin2(~v=`zero, ~h=`rem(1.875)),
-      fontSize(`rem(0.625)),
-      media(
-        Theme.MediaQuery.notMobile,
-        [
-          padding2(~v=`rem(4.6875), ~h=`rem(2.1875)),
-          height(`rem(25.)),
-          fontSize(`rem(1.)),
-        ],
-      ),
-    ]);
 };
 
 module Section = {
@@ -328,13 +313,14 @@ let make = () => {
     <Next.Head>
       <script src="https://apis.google.com/js/api.js" />
       <script src="/static/js/leaderboard.js" />
-      <script
-        src="https://cdnjs.cloudflare.com/ajax/libs/marked/0.7.0/marked.min.js"
-        integrity="sha256-0Ed5s/n37LIeAWApZmZUhY9icm932KvYkTVdJzUBiI4="
-        // crossOrigin="anonymous"
-      />
-      <script src="/static/js/termynal.js" />
-      <link rel="stylesheet" href="/static/css/termynal.css" />
+      {ReasonReact.cloneElement(
+         <script
+           src="https://cdnjs.cloudflare.com/ajax/libs/marked/0.7.0/marked.min.js"
+           integrity="sha256-0Ed5s/n37LIeAWApZmZUhY9icm932KvYkTVdJzUBiI4="
+         />,
+         ~props={"crossOrigin": "anonymous"},
+         [||],
+       )}
     </Next.Head>
     <Wrapped>
       <div className=Styles.page>
@@ -445,11 +431,9 @@ let make = () => {
               </div>
             </div>
             <div className=Styles.copy>
-              <p>
-                <h4 className=Styles.sidebarHeader>
-                  {React.string("Testnet Points")}
-                </h4>
-              </p>
+              <h4 className=Styles.sidebarHeader>
+                {React.string("Testnet Points")}
+              </h4>
               <p className=Styles.markdownStyles>
                 {React.string("The goal of Testnet Points")}
                 <a href="#disclaimer"> {React.string("*")} </a>
@@ -457,12 +441,8 @@ let make = () => {
                    " is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
                  )}
               </p>
-              <p>
-                <h2 id="challenges-current-week" className=Styles.weekHeader />
-              </p>
-              <p>
-                <div id="challenges-list" className=Styles.markdownStyles />
-              </p>
+              <h2 id="challenges-current-week" className=Styles.weekHeader />
+              <div id="challenges-list" className=Styles.markdownStyles />
               <p id="disclaimer" className=Css.(style([fontStyle(`italic)]))>
                 {React.string(
                    "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",

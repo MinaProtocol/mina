@@ -54,7 +54,7 @@ module Member = {
             style([
               width(`rem(5.5)),
               height(`rem(5.5)),
-              unsafe("-webkit-filter", "grayscale(1)"),
+              unsafe("WebkitFilter", "grayscale(1)"),
               unsafe("filter", "grayscale(1)"),
               marginLeft(`rem(0.875)),
               marginTop(`rem(0.625)),
@@ -255,7 +255,7 @@ let make = () => {
           backgroundColor(Theme.Colors.navyBlue),
           // TODO: How do you use the boxShadow in bs-css
           unsafe(
-            "box-shadow",
+            "boxShadow",
             "0 2px 50px 0 rgba(0, 0, 0, 0.2), 0 7px 8px 0 rgba(0, 0, 0, 0.5)",
           ),
           textAlign(`center),

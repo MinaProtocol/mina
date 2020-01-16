@@ -6,8 +6,15 @@
       "subdirs": true
     }
   ],
-  "bs-dependencies": ["reason-react", "bs-css", "bsc-stdlib-polyfill"],
-  "reason": { "react-jsx": 3 },
+  "bs-dependencies": [
+    "reason-react",
+    "bs-css",
+    "bsc-stdlib-polyfill",
+    "bs-fetch"
+  ],
+  "reason": {
+    "react-jsx": 3
+  },
   "package-specs": {
     "module": "es6"
   },
