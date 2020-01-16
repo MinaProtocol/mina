@@ -354,7 +354,7 @@ upon the foundation of the previous proposal.
 #### Drawbacks
 
 * All of the drawbacks of constraints-only WASM (see
-  [above](#constraints-only-wasm-drawbacks)). Exceptions:
+  [above][constraints-only-wasm-drawbacks]). Exceptions:
   - The sender of the transaction no longer needs to generate a proof.
   - The smart contract author does not need to participate in off-chain
     communications.
@@ -367,7 +367,7 @@ upon the foundation of the previous proposal.
 #### Benefits
 
 * All of the benefits for constraints-only WASM (see
-  [above](#constraints-only-wasm-benefits)).
+  [above][constraints-only-wasm-benefits]).
 * Transaction sender does not need to perform an expensive computation
   (proving).
   - This allows low-power devices to trigger smart contracts.
