@@ -396,7 +396,7 @@ upon the foundation of the previous proposal.
 
 * Smart contracts will be much more human-readable.
   - Program style is less data-oriented and more logic-oriented.
-* All of the drawbacks of WASM for constraints and witnesses, except those
+* All of the benefits of WASM for constraints and witnesses, except those
   specific to WASM.
 * Transaction sender does not need to perform an expensive computation
   (proving).
