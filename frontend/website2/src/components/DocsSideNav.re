@@ -144,7 +144,7 @@ module Folder = {
             src="/static/img/chevron-down.svg"
             width="16"
             height="16"
-            className={expanded ? "" : Style.flip}
+            className={expanded ? Style.flip : ""}
           />
         </a>
       </div>
