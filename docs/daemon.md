@@ -19,7 +19,7 @@ command-line flags. These flags are supported in the config file:
 
 - `external-port` int
 - `client-port` int
-- `propose-key` private-key-file
+- `block-producer-key` private-key-file
 - `rest-port` int
 - `peers` string list. This does not get overridden by `-peer` arguments.
   Instead, `-peer` arguments are added to this list.
