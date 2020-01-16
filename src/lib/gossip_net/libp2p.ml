@@ -114,8 +114,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
               config.addrs_and_ports.peer
               <- Some
                    (Peer.create config.addrs_and_ports.bind_ip
-                      ~libp2p_port:config.addrs_and_ports.libp2p_port ~peer_id:my_peer_id)
-          ) ;
+                      ~libp2p_port:config.addrs_and_ports.libp2p_port
+                      ~peer_id:my_peer_id) ) ;
           Logger.info config.logger "libp2p peer ID this session is $peer_id"
             ~location:__LOC__ ~module_:__MODULE__
             ~metadata:[("peer_id", `String my_peer_id)] ;
@@ -224,13 +224,15 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 ~should_forward_message:(fun envelope ->
                   (* Messages from ourselves are valid. Don't try and reingest them. *)
                   match Envelope.Incoming.sender envelope with
-                  | Local -> Deferred.return true
-                  | Remote (_, sender_peer_id) -> if not (Peer.Id.equal sender_peer_id my_peer_id) then
-                    ( let valid_ivar = Ivar.create () in
-                      Strict_pipe.Writer.write message_writer
-                      (envelope, Ivar.fill valid_ivar) ;
-                    Ivar.read valid_ivar )
-                    else Deferred.return true )
+                  | Local ->
+                      Deferred.return true
+                  | Remote (_, sender_peer_id) ->
+                      if not (Peer.Id.equal sender_peer_id my_peer_id) then (
+                        let valid_ivar = Ivar.create () in
+                        Strict_pipe.Writer.write message_writer
+                          (envelope, Ivar.fill valid_ivar) ;
+                        Ivar.read valid_ivar )
+                      else Deferred.return true )
                 ~bin_prot:Message.V1.T.bin_msg
                 ~on_decode_failure:
                   (`Call
