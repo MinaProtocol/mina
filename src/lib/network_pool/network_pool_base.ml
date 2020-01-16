@@ -23,15 +23,19 @@ end)
   let broadcasts {read_broadcasts; _} = read_broadcasts
 
   let apply_and_broadcast t (pool_diff, valid_cb) =
+    let rebroadcast diff' ~real =
+      valid_cb true ;
+      Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+        "Broadcasting %s"
+        (Resource_pool.Diff.summary diff') ;
+      if real then Linear_pipe.write t.write_broadcasts diff' else Deferred.unit
+    in
     match%bind Resource_pool.Diff.apply t.resource_pool pool_diff with
     | Ok diff' ->
-        valid_cb true ;
-        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Broadcasting %s"
-          (Resource_pool.Diff.summary diff') ;
-        Linear_pipe.write t.write_broadcasts diff'
-    | Error e ->
-        valid_cb false ;
+        rebroadcast diff' ~real:true
+    | Error (`Locally_generated diff') ->
+        rebroadcast diff' ~real:false
+    | Error (`Other e) ->
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
           "Pool diff apply feedback: %s" (Error.to_string_hum e) ;
         Deferred.unit

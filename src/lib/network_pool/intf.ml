@@ -37,7 +37,10 @@ module type Resource_pool_diff_intf = sig
 
   val summary : t -> string
 
-  val apply : pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
+  val apply :
+       pool
+    -> t Envelope.Incoming.t
+    -> (t, [`Locally_generated of t | `Other of Error.t]) Result.t Deferred.t
 end
 
 (** A [Resource_pool_intf] ties together an associated pair of
@@ -176,7 +179,10 @@ module type Snark_pool_diff_intf = sig
 
   val compact_json : t -> Yojson.Safe.json
 
-  val apply : resource_pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
+  val apply :
+       resource_pool
+    -> t Envelope.Incoming.t
+    -> (t, [`Locally_generated of t | `Other of Error.t]) Result.t Deferred.t
 end
 
 module type Transaction_pool_diff_intf = sig

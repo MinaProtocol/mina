@@ -448,7 +448,7 @@ let%test_module "random set test" =
           let open Deferred.Let_syntax in
           Deferred.List.iter sample_solved_work ~f:(fun (work, fee) ->
               let%map res = apply_diff resource_pool work fee in
-              assert (Or_error.is_ok res) ;
+              assert (Result.is_ok res) ;
               () )
         in
         resource_pool
@@ -508,7 +508,7 @@ let%test_module "random set test" =
                     let%map res =
                       apply_diff t statements ~proof:(fun _ -> proofs) fee
                     in
-                    assert (Or_error.is_error res) ;
+                    assert (Result.is_error res) ;
                     () )
               in
               [%test_eq: Transaction_snark_work.Info.t list] completed_works
@@ -558,7 +558,7 @@ let%test_module "random set test" =
               and cheap_fee = min fee_1 fee_2 in
               let%bind _ = apply_diff t work cheap_fee in
               let%map res = apply_diff t work expensive_fee in
-              assert (Or_error.is_error res) ;
+              assert (Result.is_error res) ;
               assert (
                 cheap_fee.fee
                 = (Option.value_exn
@@ -712,7 +712,15 @@ let%test_module "random set test" =
           let%bind res1 =
             apply_diff ~sender:fake_sender resource_pool stmt1 fee1
           in
-          Or_error.ok_exn res1 |> ignore ;
+          let ok_exn = function
+            | Ok e ->
+                e
+            | Error (`Other e) ->
+                Or_error.ok_exn (Error e)
+            | Error (`Locally_generated _) ->
+                failwith "rejected because locally generated"
+          in
+          ok_exn res1 |> ignore ;
           let rebroadcastable1 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~is_expired:(Fn.const `Ok)
@@ -721,7 +729,7 @@ let%test_module "random set test" =
             rebroadcastable1 [] ;
           let%bind res2 = apply_diff resource_pool stmt2 fee2 in
           let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
-          Or_error.ok_exn res2 |> ignore ;
+          ok_exn res2 |> ignore ;
           let rebroadcastable2 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~is_expired:(Fn.const `Ok)
