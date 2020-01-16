@@ -20,6 +20,11 @@ genesis_ledger = "release"]
 include Release_ledger
 
 [%%elif
+genesis_ledger = "fuzz"]
+
+include Fuzz_ledger
+
+[%%elif
 genesis_ledger = "test"]
 
 include Test_ledger

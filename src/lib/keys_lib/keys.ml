@@ -33,7 +33,10 @@ module type S = sig
 
     val instance_hash : Protocol_state.value -> Tick.Field.t
 
-    val main : Tick.Field.Var.t -> (unit, Prover_state.t) Tick.Checked.t
+    val main :
+         logger:Logger.t
+      -> Tick.Field.Var.t
+      -> (unit, Prover_state.t) Tick.Checked.t
   end
 
   module Wrap : sig
@@ -112,7 +115,7 @@ let create () : (module S) Async.Deferred.t =
               (Blockchain_snark.Blockchain_transition.instance_hash
                  (Tock.Keypair.vk Wrap.keys))
 
-          let main x =
+          let main ~logger x =
             let there
                 { Prover_state.wrap_vk
                 ; prev_proof
@@ -141,7 +144,7 @@ let create () : (module S) Async.Deferred.t =
             with_state
               ~and_then:(fun s -> As_prover.set_state (back s))
               As_prover.(map get_state ~f:there)
-              (main (Logger.create ()) x)
+              (main logger x)
         end
 
         module Wrap = struct

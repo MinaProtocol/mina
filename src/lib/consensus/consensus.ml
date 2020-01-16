@@ -17,3 +17,5 @@ consesus_mechanism]
 "invalid value for \"consensus_mechanism\""]
 
 [%%endif]
+
+module Proof_of_stake = Proof_of_stake

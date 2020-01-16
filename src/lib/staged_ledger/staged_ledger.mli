@@ -69,6 +69,12 @@ val pending_coinbase_collection : t -> Pending_coinbase.t
 
 val create_exn : ledger:Ledger.t -> t
 
+val of_scan_state_and_ledger_unchecked :
+     ledger:Ledger.t
+  -> scan_state:Scan_state.t
+  -> pending_coinbase_collection:Pending_coinbase.t
+  -> t
+
 val of_scan_state_and_ledger :
      logger:Logger.t
   -> verifier:Verifier.t

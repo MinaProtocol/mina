@@ -340,6 +340,9 @@ module Data = struct
       ; vrf_result: Random_oracle.Digest.t }
 
     let prover_state {stake_proof; _} = stake_proof
+
+    let global_slot {epoch_and_slot; _} =
+      Global_slot.of_epoch_and_slot epoch_and_slot
   end
 
   module Local_state = struct
@@ -2101,6 +2104,17 @@ module Data = struct
       , next_epoch_data
       , has_ancestor_in_same_checkpoint_window
       , checkpoints )]
+
+    module Unsafe = struct
+      (* TODO: very unsafe, do not use unless you know what you are doing *)
+      let dummy_advance (t : Value.t) ?(increase_epoch_count = false)
+          ~new_global_slot : Value.t =
+        let new_epoch_count =
+          if increase_epoch_count then Global_slot.(t.epoch_count + 1)
+          else t.epoch_count
+        in
+        {t with epoch_count= new_epoch_count; curr_global_slot= new_global_slot}
+    end
   end
 
   module Prover_state = struct
@@ -3023,3 +3037,9 @@ let%test_module "Proof of stake tests" =
       assert (Value.equal checked_value next_consensus_state) ;
       ()
   end )
+
+module Exported = struct
+  module Global_slot = Global_slot
+  module Proposal_data = Data.Proposal_data
+  module Consensus_state = Data.Consensus_state
+end

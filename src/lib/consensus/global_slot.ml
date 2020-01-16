@@ -1,5 +1,6 @@
 open Unsigned
 open Core
+open Coda_base
 open Snark_params.Tick
 
 module T = Coda_numbers.Nat.Make32 ()
@@ -19,6 +20,15 @@ let slot t = UInt32.Infix.(t mod Constants.slots_per_epoch)
 
 let to_epoch_and_slot t = (epoch t, slot t)
 
+let ( + ) x n = UInt32.add x (of_int n)
+
+let start_time t =
+  Block_time.add Constants.genesis_state_timestamp
+    Block_time.Span.(
+      Constants.block_window_duration * of_ms (UInt32.to_int64 t))
+
+let end_time t = start_time (t + 1)
+
 module Checked = struct
   include T.Checked
 
@@ -34,5 +44,3 @@ module Checked = struct
         ( Epoch.Checked.Unsafe.of_integer epoch
         , Slot.Checked.Unsafe.of_integer slot ) )
 end
-
-let ( + ) x n = UInt32.add x (of_int n)

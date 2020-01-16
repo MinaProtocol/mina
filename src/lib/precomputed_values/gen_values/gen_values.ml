@@ -69,7 +69,8 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
       ; update= Lazy.force Snark_transition.genesis }
     in
     let main x =
-      Tick.handle (Keys.Step.main x)
+      Tick.handle
+        (Keys.Step.main ~logger:(Logger.create ()) x)
         (Lazy.force Consensus.Data.Prover_state.precomputed_handler)
     in
     let tick =

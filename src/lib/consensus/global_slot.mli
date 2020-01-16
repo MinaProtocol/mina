@@ -1,6 +1,9 @@
+open Unsigned
+
 module Stable : sig
   module V1 : sig
-    type t [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+    type t = UInt32.t
+    [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
   end
 
   module Latest = V1
@@ -23,6 +26,10 @@ val epoch : t -> Epoch.t
 val slot : t -> Slot.t
 
 val to_epoch_and_slot : t -> Epoch.t * Slot.t
+
+val start_time : t -> Coda_base.Block_time.t
+
+val end_time : t -> Coda_base.Block_time.t
 
 module Checked : sig
   include Coda_numbers.Nat.Intf.S_checked with type unchecked := t
