@@ -317,7 +317,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	}
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
 		seqno := <-seqs
-		ch := make(chan bool)
+		ch := make(chan bool, 1)
 		app.Validators[seqno] = ch
 
 		sender, err := findPeerInfo(app, id)
