@@ -42,6 +42,7 @@ module Style = {
     ]);
 };
 
+// the page looking icon in the button
 module Icon = {
   module Style = {
     let container = style([position(`relative)]);
