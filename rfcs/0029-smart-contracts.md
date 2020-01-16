@@ -109,8 +109,7 @@ upon the foundation of the previous proposal.
 * Inclusion in a block, proof verification, etc. are fixed size, so nothing
   needs to be done for gas etc.
 
-### Witness generation + proving off chain: store WASM blob for generating the
-### constraints
+### Witness generation + proving off chain: store WASM blob for generating the constraints
 
 * Need to implement a universal snark verifier in Snarky, to be included in the
   transaction snark.
@@ -204,8 +203,7 @@ upon the foundation of the previous proposal.
   - If the 'proof accepted' flag is true, apply the state change to the Merkle
     tree.
 
-### Witness generation + proving on chain: store WASM blobs for generating
-### constraints and witnesses in accounts
+### Witness generation + proving on chain: store WASM blobs for generating constraints and witnesses in accounts
 
 * Details for the constraints blob and for proof verification follow roughly
   the above.
@@ -308,8 +306,7 @@ upon the foundation of the previous proposal.
   keys and proofs.
 * The size of the constraint system is unrestricted.
 
-### Witness generation + proving off chain: store WASM blob for generating the
-### constraints
+### Witness generation + proving off chain: store WASM blob for generating the constraints
 
 #### Drawbacks
 [constraints-only-wasm-drawbacks]: #constraints-only-wasm-drawbacks
@@ -352,8 +349,7 @@ upon the foundation of the previous proposal.
 * There is a good amount of WASM tooling under active development.
 * Existing WASM interpreters generally provide good sandboxing.
 
-### Witness generation + proving on chain: store WASM blobs for generating
-### constraints and witnesses in accounts
+### Witness generation + proving on chain: store WASM blobs for generating constraints and witnesses in accounts
 
 #### Drawbacks
 
