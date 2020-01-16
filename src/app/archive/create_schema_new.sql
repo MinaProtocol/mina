@@ -15,38 +15,26 @@ CREATE INDEX idx_snarked_ledger_hashes_value ON snarked_ledger_hashes(value);
 CREATE TYPE user_command_type AS ENUM ('payment', 'delegation');
 
 CREATE TABLE user_commands
-( id             serial            PRIMARY KEY
-, type           user_command_type NOT NULL
-, sender_id      int               NOT NULL REFERENCES public_keys(id)
-, receiver_id    int               NOT NULL REFERENCES public_keys(id)
-, nonce          bigint            NOT NULL
-, amount         bigint
-, fee            bigint            NOT NULL
-, memo           text              NOT NULL
-, transaction_id int               NOT NULL UNIQUE
+( id          serial            PRIMARY KEY
+, type        user_command_type NOT NULL
+, sender_id   int               NOT NULL REFERENCES public_keys(id)
+, receiver_id int               NOT NULL REFERENCES public_keys(id)
+, nonce       bigint            NOT NULL
+, amount      bigint
+, fee         bigint            NOT NULL
+, memo        text              NOT NULL
+, hash        text              NOT NULL UNIQUE
 );
 
 CREATE TYPE internal_command_type AS ENUM ('fee_transfer', 'coinbase');
 
 CREATE TABLE internal_commands
-( id             serial                PRIMARY KEY
-, type           internal_command_type NOT NULL
-, receiver_id    int                   NOT NULL REFERENCES public_keys(id)
-, fee            bigint                NOT NULL
-, transaction_id int                   NOT NULL UNIQUE
+( id          serial                PRIMARY KEY
+, type        internal_command_type NOT NULL
+, receiver_id int                   NOT NULL REFERENCES public_keys(id)
+, fee         bigint                NOT NULL
+, hash        text                  NOT NULL UNIQUE
 );
-
-CREATE TABLE transactions
-( id                  serial PRIMARY KEY
-, hash                text   NOT NULL UNIQUE
-, user_command_id     int    REFERENCES user_commands(id)
-, internal_command_id int    REFERENCES internal_commands(id)
-);
-
-CREATE INDEX idx_transactions_hash ON transactions(hash);
-
-ALTER TABLE user_commands     ADD FOREIGN KEY (transaction_id) REFERENCES transactions(id);
-ALTER TABLE internal_commands ADD FOREIGN KEY (transaction_id) REFERENCES transactions(id);
 
 CREATE TABLE blocks
 ( id                     serial PRIMARY KEY
@@ -64,8 +52,14 @@ CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
 CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 
-CREATE TABLE blocks_transactions
-( block_id       int NOT NULL REFERENCES blocks(id)
-, transaction_id int NOT NULL REFERENCES transactions(id)
-, PRIMARY KEY (block_id, transaction_id)
+CREATE TABLE blocks_user_commands
+( block_id        int NOT NULL REFERENCES blocks(id)
+, user_command_id int NOT NULL REFERENCES user_commands(id)
+, PRIMARY KEY (block_id, user_command_id)
+);
+
+CREATE TABLE blocks_internal_commands
+( block_id            int NOT NULL REFERENCES blocks(id)
+, internal_command_id int NOT NULL REFERENCES internal_commands(id)
+, PRIMARY KEY (block_id, internal_command_id)
 );
