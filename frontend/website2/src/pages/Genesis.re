@@ -54,7 +54,11 @@ module Styles = {
       ]),
     ]);
 
-  let heroHeading = merge([Theme.H1.hero, style([marginTop(`rem(1.53))])]);
+  let heroHeading =
+    merge([
+      Theme.H1.hero,
+      style([fontWeight(`semiBold), marginTop(`rem(1.53))]),
+    ]);
 
   let heroCopy = merge([Theme.Body.basic]);
 
@@ -63,8 +67,8 @@ module Styles = {
       Theme.H3.basic,
       style([
         textAlign(`left),
-        fontWeight(`normal),
-        color(Theme.Colors.midnight),
+        fontWeight(`semiBold),
+        color(Theme.Colors.marine),
       ]),
     ]);
 
@@ -74,14 +78,14 @@ module Styles = {
       style([
         width(`rem(14.)),
         height(`rem(3.)),
-        backgroundColor(Theme.Colors.hyperlink),
+        backgroundColor(Theme.Colors.clover),
         borderRadius(`px(6)),
         textDecoration(`none),
         color(white),
         padding2(~v=`px(12), ~h=`px(24)),
         textAlign(`center),
         alignSelf(`center),
-        hover([backgroundColor(Theme.Colors.hyperlinkHover)]),
+        hover([backgroundColor(Theme.Colors.jungle)]),
         media(
           Theme.MediaQuery.tablet,
           [marginLeft(`rem(0.)), alignSelf(`flexStart)],
@@ -128,6 +132,15 @@ module Styles = {
         [display(`flex), flexDirection(`row)],
       ),
     ]);
+
+  let textBlock = style([maxWidth(`rem(43.75)), width(`percent(100.))]);
+  let textBlockHeading =
+    style([
+      Theme.Typeface.ibmplexsans,
+      color(Theme.Colors.marine),
+      fontWeight(`medium),
+      fontSize(`rem(2.)),
+    ]);
 };
 
 [@react.component]
@@ -138,13 +151,19 @@ let make = () => {
         <div className=Styles.heroRow>
           <div className=Styles.heroText>
             <h1 className=Styles.heroHeading> {React.string("Genesis")} </h1>
+            <Spacer height=2. />
+            <h3 className=Styles.heroH3>
+              {React.string(
+                 "Become one of 1000 community members to receive a grant of 66,000 pre-mainnet tokens on Coda.",
+               )}
+            </h3>
             <Spacer height=1. />
             <p className=Styles.heroCopy>
               {React.string(
-                 "Become one of 1000 community members to receive a grant of 66,000 pre-mainnet tokens on Coda. You'll complete challenges on testnet, learn how to operate the protocol, receive public recognition on our leaderboard and help to strengthen the Coda network and community.",
+                 "You'll complete challenges on testnet, learn how to operate the protocol, receive public recognition on our leaderboard and help to strengthen the Coda network and community.",
                )}
             </p>
-            <Spacer height=1. />
+            <Spacer height=2. />
             <a href="/docs/getting-started" className=Styles.ctaButton>
               {React.string({js| Apply Now |js})}
             </a>
@@ -155,7 +174,27 @@ let make = () => {
             className=Styles.heroImage
           />
         </div>
-        <br />
+        <Spacer height=3. />
+        <h1 className=Styles.textBlockHeading>
+          {React.string("Become a Genesis Founding Member")}
+        </h1>
+        <div className=Styles.textBlock>
+          <p className=Styles.heroCopy>
+            {React.string(
+               "Becoming a Genesis founding member is the highest honor in the Coda community.
+             You'll have an opportunity to strengthen and harden the protocol, create tooling
+              and documentation and build the community.",
+             )}
+          </p>
+          <Spacer height=1. />
+          <p className=Styles.heroCopy>
+            {React.string(
+               "When the protocol launches in mainnet, you will be the backbone of robust,
+             decentralized participation. Together, we will enable the first blockchain
+             that is truly decentralized at scale. ",
+             )}
+          </p>
+        </div>
         <hr className=Styles.lineBreak />
         <div className=Styles.whitePaperButtonRow>
           <WhitepaperButton
