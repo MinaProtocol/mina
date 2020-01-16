@@ -34,73 +34,78 @@ module Icon = {
 
 [@react.component]
 let make = () => {
-  // HACK: On firefox (and only firefox) the text seems to not be centered in the announcementbar
-  //  This way we can write CSS that only targets firefox
-  Css.(
-    global(
-      "@-moz-document url-prefix()",
-      [
-        unsafe(
-          "#announcementbar--viewdemo, #announcementbar--testnetlive { margin-bottom",
-          "-0.125rem; }",
-        ),
-        unsafe("#announcementbar--anchor { padding-top", "0.5625rem; }"),
-        unsafe("#announcementbar--anchor { padding-bottom", "0.5625rem; }"),
-      ],
-    )
-  );
-
-  <a
-    name="announcementbar"
-    id="announcementbar--anchor"
-    href="/testnet"
-    className=Css.(
-      style(
-        Theme.paddingX(`rem(1.25))
-        @ Theme.paddingY(`rem(0.5))
-        @ [
-          backgroundColor(Theme.Colors.azureAlpha(0.1)),
-          textDecoration(`none),
-          borderRadius(`px(3)),
-          display(`flex),
-          justifyContent(`spaceBetween),
-          hover([
-            opacity(0.9),
-            backgroundColor(Theme.Colors.azureAlpha(0.2)),
-          ]),
-        ],
-      )
-    )>
-    <div className=Css.(style([display(`flex), alignItems(`center)]))>
-      Icon.svg
+  <>
+    <style>
+      {React.string(
+         // HACK: On firefox (and only firefox) the text seems to not be centered in the announcementbar
+         //  This way we can write CSS that only targets firefox
+         {|
+      @-moz-document url-prefix() {
+        #announcementbar--viewdemo,#announcementbar--testnetlive {
+          margin-bottom:-0.125rem;
+        }
+        #announcementbar--anchor {
+          padding-top:0.5625rem;
+        }
+        #announcementbar--anchor {
+          padding-bottom:0.5625rem;
+        }
+      }
+          |},
+       )}
+    </style>
+    <a
+      name="announcementbar"
+      id="announcementbar--anchor"
+      href="/testnet"
+      className=Css.(
+        style(
+          Theme.paddingX(`rem(1.25))
+          @ Theme.paddingY(`rem(0.5))
+          @ [
+            backgroundColor(Theme.Colors.azureAlpha(0.1)),
+            textDecoration(`none),
+            borderRadius(`px(3)),
+            display(`flex),
+            justifyContent(`spaceBetween),
+            hover([
+              opacity(0.9),
+              backgroundColor(Theme.Colors.azureAlpha(0.2)),
+            ]),
+          ],
+        )
+      )>
+      <div className=Css.(style([display(`flex), alignItems(`center)]))>
+        Icon.svg
+        <p
+          id="announcementbar--testnetlive"
+          className=Css.(
+            merge([
+              Theme.Body.basic,
+              style([
+                marginLeft(`rem(1.25)),
+                marginBottom(`zero),
+                marginTop(`px(0)),
+              ]),
+            ])
+          )>
+          {React.string("Testnet Beta is live")}
+        </p>
+      </div>
       <p
-        id="announcementbar--testnetlive"
+        id="announcementbar--viewdemo"
         className=Css.(
           merge([
-            Theme.Body.basic,
+            Theme.Link.No_hover.basic,
             style([
-              marginLeft(`rem(1.25)),
-              marginBottom(`zero),
               marginTop(`px(0)),
+              marginBottom(`zero),
+              marginLeft(`rem(1.5)),
             ]),
           ])
         )>
-        {React.string("Testnet Beta is live")}
+        {React.string({j|Join Now\u00A0→|j})}
       </p>
-    </div>
-    <p
-      id="announcementbar--viewdemo"
-      className=Css.(
-        merge([
-          Theme.Link.No_hover.basic,
-          style([
-            marginTop(`px(0)),
-            marginBottom(`zero),
-            marginLeft(`rem(1.5)),
-          ]),
-        ])
-      )>
-      {React.string({j|Join Now\u00A0→|j})}
-    </p>
-  </a>;
+    </a>
+  </>;
 };
