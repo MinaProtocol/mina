@@ -1,23 +1,5 @@
 import Page from '@reason/pages/Docs';
 export default Page;
-export var player;
-export function onYouTubeIframeAPIReady() {
-    console.log("player");
-    document.player = new YT.Player('youtube-iframe', {
-      events: {
-        'onError': onPlayerError,
-      }
-    });
-  }
-  
-<script src="https://www.youtube.com/iframe_api"> </script> 
-
-export function onPlayerError(event) {
-  console.error("Error with Youtube player");
-}
-export function seekTo(seconds) {
-  document.player.seekTo(seconds);
-}
 
 <Metadata title="Coda Protocol Architecture" />
 
