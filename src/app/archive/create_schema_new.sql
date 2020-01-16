@@ -23,7 +23,7 @@ CREATE TABLE user_commands
 , amount         bigint
 , fee            bigint            NOT NULL
 , memo           text              NOT NULL
-, transaction_id int               NOT NULL UNIQUE
+, hash           text              NOT NULL UNIQUE
 );
 
 CREATE TYPE internal_command_type AS ENUM ('fee_transfer', 'coinbase');
@@ -33,25 +33,13 @@ CREATE TABLE internal_commands
 , type        internal_command_type NOT NULL
 , receiver_id int                   NOT NULL REFERENCES public_keys(id)
 , fee         bigint                NOT NULL
-, transaction_id      int    NOT NULL UNIQUE
+, hash        text                  NOT NULL UNIQUE
 );
-
-CREATE TABLE transactions
-( id                  serial PRIMARY KEY
-, hash                text   NOT NULL UNIQUE
-, user_command_id     int    REFERENCES user_commands(id)
-, internal_command_id int    REFERENCES internal_commands(id)
-);
-
-CREATE INDEX idx_transactions_hash ON transactions(hash);
-
-ALTER TABLE user_commands     ADD FOREIGN KEY (transaction_id) REFERENCES transactions(id);
-ALTER TABLE internal_commands ADD FOREIGN KEY (transaction_id) REFERENCES transactions(id);
 
 CREATE TABLE blocks
 ( id                     serial PRIMARY KEY
 , state_hash             text   NOT NULL UNIQUE
-, parent_id              int    NOT NULL        REFERENCES blocks(id)
+, parent_id              int                    REFERENCES blocks(id)
 , creator_id             int    NOT NULL        REFERENCES public_keys(id)
 , snarked_ledger_hash_id int    NOT NULL        REFERENCES snarked_ledger_hashes(id)
 , ledger_hash            text   NOT NULL
@@ -64,8 +52,14 @@ CREATE INDEX idx_blocks_state_hash ON blocks(state_hash);
 CREATE INDEX idx_blocks_creator_id ON blocks(creator_id);
 CREATE INDEX idx_blocks_height     ON blocks(height);
 
-CREATE TABLE blocks_transactions
-( block_id       int NOT NULL REFERENCES blocks(id)
-, transaction_id int NOT NULL REFERENCES transactions(id)
-, PRIMARY KEY (block_id, transaction_id)
+CREATE TABLE blocks_user_commands
+( block_id        int NOT NULL REFERENCES blocks(id)
+, user_command_id int NOT NULL REFERENCES user_commands(id)
+, PRIMARY KEY (block_id, user_command_id)
+);
+
+CREATE TABLE blocks_internal_commands
+( block_id            int NOT NULL REFERENCES blocks(id)
+, internal_command_id int NOT NULL REFERENCES internal_commands(id)
+, PRIMARY KEY (block_id, internal_command_id)
 );
