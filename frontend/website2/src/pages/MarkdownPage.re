@@ -31,8 +31,8 @@ module Style = {
 };
 
 [@react.component]
-let make = (~children) => {
-  <Page>
+let make = (~title, ~children) => {
+  <Page title>
     <div className=Style.page>
       <div className=Style.content>
         <Next.MDXProvider

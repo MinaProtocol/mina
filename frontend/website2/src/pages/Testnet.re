@@ -3,13 +3,7 @@ module Styles = {
 
   let markdownStyles =
     style([
-      selector(
-        "a",
-        [
-          cursor(`pointer),
-          ...Theme.Link.basicStyles,
-        ],
-      ),
+      selector("a", [cursor(`pointer), ...Theme.Link.basicStyles]),
       selector(
         "h4",
         Theme.H4.wideStyles
@@ -330,7 +324,7 @@ module Section = {
 
 [@react.component]
 let make = () => {
-  <Page>
+  <Page title="Coda Testnet">
     <Next.Head>
       <script src="https://apis.google.com/js/api.js" />
       <script src="/static/js/leaderboard.js" />
