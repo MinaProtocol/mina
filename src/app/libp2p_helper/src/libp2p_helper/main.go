@@ -336,6 +336,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			Idx:    s.Subscription,
 		})
 
+                return true // should really not be doing this!
 		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
 		select {
 		case <-ctx.Done():
