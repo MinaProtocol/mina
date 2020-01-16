@@ -106,7 +106,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             | None ->
                 Keypair.random net2
           in
-          let peer_id = Keypair.to_peer_id me |> Peer.Id.to_string in
+          let my_peer_id = Keypair.to_peer_id me |> Peer.Id.to_string in
           ( match config.addrs_and_ports.peer with
           | Some _ ->
               ()
@@ -114,11 +114,11 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
               config.addrs_and_ports.peer
               <- Some
                    (Peer.create config.addrs_and_ports.bind_ip
-                      ~libp2p_port:config.addrs_and_ports.libp2p_port ~peer_id)
+                      ~libp2p_port:config.addrs_and_ports.libp2p_port ~peer_id:my_peer_id)
           ) ;
           Logger.info config.logger "libp2p peer ID this session is $peer_id"
             ~location:__LOC__ ~module_:__MODULE__
-            ~metadata:[("peer_id", `String peer_id)] ;
+            ~metadata:[("peer_id", `String my_peer_id)] ;
           let ctr = ref 0 in
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             let open Deferred.Or_error.Let_syntax in
@@ -222,10 +222,15 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                    we pass along a validation callback with the message. This ends up
                    ignoring the actual subscription message pipe, so drain it separately. *)
                 ~should_forward_message:(fun envelope ->
-                  let valid_ivar = Ivar.create () in
-                  Strict_pipe.Writer.write message_writer
-                    (envelope, Ivar.fill valid_ivar) ;
-                  Ivar.read valid_ivar )
+                  (* Messages from ourselves are valid. Don't try and reingest them. *)
+                  match Envelope.Incoming.sender envelope with
+                  | Local -> Deferred.return true
+                  | Remote (_, sender_peer_id) -> if not (Peer.Id.equal sender_peer_id my_peer_id) then
+                    ( let valid_ivar = Ivar.create () in
+                      Strict_pipe.Writer.write message_writer
+                      (envelope, Ivar.fill valid_ivar) ;
+                    Ivar.read valid_ivar )
+                    else Deferred.return true )
                 ~bin_prot:Message.V1.T.bin_msg
                 ~on_decode_failure:
                   (`Call
