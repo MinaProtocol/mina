@@ -315,6 +315,11 @@ jobs:
                     DUNE_PROFILE: testnet_postake_medium_curves
                 command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
                 no_output_timeout: 20m
+            - run:
+                  name: Generate runtime ledger with 10k accounts
+                  command: |
+                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000'
+                  no_output_timeout: 20m
             ### collection
             - run:
                 name: Collect Keys and Binaries
@@ -374,9 +379,7 @@ jobs:
                   command: sudo pip install awscli
             - run:
                   name: Build OCaml
-                  command: |
-                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
-                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                   no_output_timeout: 20m
@@ -385,9 +388,16 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh scripts/publish-pvkeys.sh
             - run:
                   name: Rebuild for pvkey changes
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                  command: |
+                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
+                  no_output_timeout: 20m
+            - run:
+                  name: Generate runtime ledger with 10k accounts
+                  command: |
+                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000'
                   no_output_timeout: 20m
             - run:
                   name: Build deb package with PV keys and PV key tar
@@ -623,20 +633,6 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments"'
             - store_artifacts:
                   path: test_logs
-    test--test_postake_holy_grail:
-        resource_class: large
-        docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
-        steps:
-            - checkout
-            - run:
-                  name: Update OPAM
-                  command: ./scripts/update-opam-in-docker.sh
-            - run:
-                  name: Running test -- test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_holy_grail:coda-restarts-and-txns-holy-grail -num-proposers 5"'
-            - store_artifacts:
-                  path: test_logs
     test--test_postake_snarkless:
         resource_class: large
         docker:
@@ -810,7 +806,6 @@ workflows:
             - test--test_postake_delegation
             - test--test_postake_five_even_snarkless
             - test--test_postake_five_even_txns
-            - test--test_postake_holy_grail
             - test--test_postake_snarkless
             - test--test_postake_split
             - test--test_postake_split_snarkless

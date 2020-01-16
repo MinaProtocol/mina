@@ -15,23 +15,15 @@ const blogType = 'test';
 const client = createClient({ accessToken: TOKEN, space: SPACE });
 
 module.exports = withTM(withBundleAnalyzer(withMDX({
-  async exportPathMap() {
+  async exportPathMap(pages) {
     let blogPosts = await client.getEntries({ include: 0, content_type: blogType });
     let jobPosts = await client.getEntries({
       include: 0, content_type: 'jobPost'
     });
 
-    let pages = {
-      '/': { page: '/' },
-      '/about': { page: '/about' },
-      '/blog': { page: '/blog' },
-      '/blog/': { page: '/blog' },
-      '/jobs': { page: '/jobs' },
-      '/jobs/': {
-        page: '/jobs'
-      },
-      '/developers': { page: '/developers' },
-    };
+    // Add versions with trailing slash for backwards compatibility
+    pages['/blog/'] = { page: '/blog'}
+    pages['/jobs/'] = { page: '/jobs'}
 
     blogPosts.items.forEach(
       ({ fields: { slug } }) => {
@@ -47,14 +39,12 @@ module.exports = withTM(withBundleAnalyzer(withMDX({
         pages['/jobs/' + slug + ".html"] = { page: '/jobs/[slug]', query: { slug: slug } }
       });
 
-
     return pages;
   },
   pageExtensions: ['jsx', 'js', 'mdx'],
   transpileModules: ['bs-platform', 'bs-css', 'bsc-stdlib-polyfill'],
   webpack(config, options) {
     config.resolve.alias['@reason'] = path.join(__dirname, 'lib', 'es6', 'src');
-    config.resolve.alias['@docs'] = path.join(__dirname, 'docs');
     config.resolve.extensions.push('.bs.js');
     return config
   },

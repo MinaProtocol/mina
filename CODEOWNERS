@@ -15,8 +15,8 @@
 
 /src/external/ @cmr @bkase @psteckler @imeckler
 
-/src/app/archive @wu-s-john @bkase @schmavery
-/src/app/cli/src/tests @cmr @bkase @wu-s-john @ghost-not-in-the-shell @deepthiskumar
+/src/app/archive @bkase @schmavery @ghost-not-in-the-shell @nholland94
+/src/app/cli/src/tests @cmr @bkase @ghost-not-in-the-shell @deepthiskumar
 /src/app/cli/src/coda.ml @nholland94 @bkase @cmr @imeckler
 /src/app/cli/src/init @nholland94 @bkase @cmr @imeckler
 /src/app/kademlia-haskell/ @bkase @enolan @cmr @psteckler
@@ -26,25 +26,25 @@
 /src/app/website/ @bkase @schmavery @figitaki
 /src/app/runtime_genesis_ledger/ @cmr @psteckler @deepthiskumar
 
-/src/lib/best_tip_prover/ @wu-s-john @nholland94
+/src/lib/best_tip_prover/ @nholland94 @ghost-not-in-the-shell
 /src/lib/blake2/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/blockchain_snark/ @nholland94 @bkase @imeckler @mrmr1993
-/src/lib/bootstrap_controller/ @nholland94 @wu-s-john @ghost-not-in-the-shell
+/src/lib/bootstrap_controller/ @nholland94 @ghost-not-in-the-shell
 /src/lib/cache_lib/ @nholland94 @ghost-not-in-the-shell
 /src/lib/chunked_triples/ @psteckler @rbkhmrcr @vanishreerao @imeckler @mrmr1993
-/src/lib/cli_lib/ @wu-s-john @bkase @schmavery
+/src/lib/cli_lib/ @bkase @schmavery @figitaki
 /src/lib/coda_base/ @cmr @nholland94 @bkase @imeckler
-/src/lib/coda_commands @bkase @wu-s-john @schmavery
-/src/lib/coda_graphql @bkase @wu-s-john @schmavery
+/src/lib/coda_commands @bkase @schmavery @figitaki
+/src/lib/coda_graphql @bkase @schmavery @o1pranay
 /src/lib/coda_networking/ @cmr @enolan @nholland94
 /src/lib/coda_numbers/ @bkase @nholland94 @imeckler @mrmr1993
-/src/lib/coda_state/ @nholland94 @ghost-not-in-the-shell @wu-s-john
-/src/lib/coda_transition/ @nholland94 @ghost-not-in-the-shell @wu-s-john
+/src/lib/coda_state/ @nholland94 @ghost-not-in-the-shell @deepthiskumar
+/src/lib/coda_transition/ @nholland94 @ghost-not-in-the-shell @deepthiskumar
 /src/lib/consensus/ @nholland94 @imeckler
 /src/lib/crs/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/crypto_params/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/currency/ @bkase @nholland94 @imeckler @rbkhmrcr @vanishreerao
-/src/lib/daemon_rpcs/ @wu-s-john @bkase @schmavery
+/src/lib/daemon_rpcs/ @bkase @schmavery @figitaki
 /src/lib/debug_assert/ @nholland94 @bkase @cmr
 /src/lib/dummy_values/ @bkase @imeckler @mrmr1993
 /src/lib/test_genesis_ledger/ @nholland94 @bkase @cmr @jkrauska @yourbuddyconner
@@ -53,9 +53,9 @@
 /src/lib/hash_prefixes/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/interruptible/ @bkase @nholland94
 /src/lib/kademlia @bkase @cmr @enolan @psteckler
-/src/lib/key_value_database/ @wu-s-john @bkase @nholland94
+/src/lib/key_value_database/ @bkase @nholland94 @psteckler
 /src/lib/keys_lib/ @cmr @mrmr1993 @imeckler
-/src/lib/ledger_catchup/ @nholland94 @wu-s-john @ghost-not-in-the-shell
+/src/lib/ledger_catchup/ @nholland94 @ghost-not-in-the-shell
 /src/lib/ledger_proof/ @nholland94 @imeckler
 /src/lib/linked_tree/ @cmr @imeckler @bkase
 /src/lib/lite_base/ @bkase @cmr @imeckler
@@ -63,10 +63,10 @@
 /src/lib/lite_params/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/logger/ @nholland94 @schmavery
 /src/lib/logproc_lib/ @nholland94 @schmavery
-/src/lib/merkle_address/ @cmr @bkase @nholland94 @wu-s-john
+/src/lib/merkle_address/ @cmr @bkase @nholland94
 /src/lib/merkle_ledger/ @cmr @nholland94 @psteckler
-/src/lib/merkle_list_prover/ @wu-s-john @cmr @psteckler @nholland94 @ghost-not-in-the-shell
-/src/lib/merkle_list_verifier/ @wu-s-john @cmr @psteckler @nholland94 @ghost-not-in-the-shell
+/src/lib/merkle_list_prover/ @cmr @psteckler @nholland94 @ghost-not-in-the-shell
+/src/lib/merkle_list_verifier/ @cmr @psteckler @nholland94 @ghost-not-in-the-shell
 /src/lib/merkle_mask/ @nholland94 @psteckler
 /src/lib/module_version/ @psteckler @mrmr1993
 /src/lib/network_pool/ @enolan @nholland94 @deepthiskumar
@@ -85,8 +85,8 @@
 /src/lib/prover/ @nholland94 @bkase @imeckler @mrmr1993
 /src/lib/quickcheck_lib/ @nholland94 @ghost-not-in-the-shell @enolan
 /src/lib/random_oracle/ @cmr @imeckler @mrmr1993
-/src/lib/receipt_chain_database/ @wu-s-john @bkase
-/src/lib/rocksdb/ @psteckler @nholland94 @wu-s-john
+/src/lib/receipt_chain_database/ @bkase @nholland94
+/src/lib/rocksdb/ @psteckler @nholland94
 /src/lib/transition_chain_prover/ @ghost-not-in-the-shell @nholland94
 /src/lib/transition_chain_verifier/ @ghost-not-in-the-shell @nholland94
 /src/lib/rose_tree/ @bkase @nholland94
@@ -110,16 +110,16 @@
 /src/lib/sparse_ledger_lib/ @bkase @imeckler @cmr
 /src/lib/staged_ledger/ @deepthiskumar @cmr
 /src/lib/staged_ledger_diff/ @deepthiskumar @cmr
-/src/lib/sync_handler/ @cmr @wu-s-john
+/src/lib/sync_handler/ @cmr @nholland94
 /src/lib/syncable_ledger/ @cmr @enolan
-/src/lib/auxiliary_database/ @wu-s-john @bkase @schmavery
+/src/lib/auxiliary_database/ @bkase @schmavery @nholland94
 /src/lib/transaction_snark/ @deepthiskumar @bkase @imeckler @mrmr1993
 /src/lib/transaction_snark_scan_state/ @deepthiskumar @imeckler @cmr
 /src/lib/transaction_snark_work/ @deepthiskumar @cmr @imeckler
-/src/lib/transition_frontier/ @nholland94 @wu-s-john
+/src/lib/transition_frontier/ @nholland94 @cmr
 /src/lib/transition_frontier_controller/ @nholland94 @ghost-not-in-the-shell
-/src/lib/transition_handler/ @wu-s-john @nholland94 @ghost-not-in-the-shell
-/src/lib/transition_router/ @wu-s-john @nholland94 @ghost-not-in-the-shell
+/src/lib/transition_handler/ @nholland94 @ghost-not-in-the-shell
+/src/lib/transition_router/ @nholland94 @ghost-not-in-the-shell
 /src/lib/trust_system/ @enolan @nholland94
 /src/lib/unsigned_extended/ @bkase @mrmr1993 @imeckler
 /src/lib/vrf_lib/ @nholland94 @mrmr1993 @bkase @imeckler
