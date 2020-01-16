@@ -80,8 +80,9 @@ let make = (~post: option(ContentType.JobPost.t)) => {
         <a> {React.string("Check out the rest of our jobs instead")} </a>
       </Next.Link>
     </Page>
-  | Some(({title, jobDescription: content}: ContentType.JobPost.t)) =>
-    <Page>
+  | Some(({title, jobDescription: content, slug}: ContentType.JobPost.t)) =>
+    // Manually set the canonical route to remove .html
+    <Page title route={"/jobs/" ++ slug}>
       <Next.Head> Markdown.katexStylesheet </Next.Head>
       <div className=Style.wrapper>
         <div className=Style.title> {React.string(title)} </div>
