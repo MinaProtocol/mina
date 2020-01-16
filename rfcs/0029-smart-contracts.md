@@ -398,14 +398,6 @@ upon the foundation of the previous proposal.
   - Program style is less data-oriented and more logic-oriented.
 * All of the benefits of WASM for constraints and witnesses, except those
   specific to WASM.
-* Transaction sender does not need to perform an expensive computation
-  (proving).
-  - This allows low-power devices to trigger smart contracts.
-* User experience is better.
-  - Smart contract authors only send the minimum necessary information: the
-    constraint system generator and the witness generator.
-  - Transation senders only send the transaction and any other necessary
-    information. No extra computation or data is needed.
 
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
