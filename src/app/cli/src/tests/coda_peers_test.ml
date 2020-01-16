@@ -25,29 +25,27 @@ let main () =
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let _, expected_peers = Coda_processes.net_configs n in
-  let%bind _ = after (Time.Span.of_sec 10.) in
+  let%bind _ = after (Time.Span.of_sec 20.) in
   let%bind () =
     Deferred.all_unit
       (List.map2_exn workers expected_peers ~f:(fun worker expected_peers ->
-           let expected_peers =
+           let expected_peer_ports =
              List.map expected_peers ~f:(fun p ->
-                 Host_and_port.create
-                   ~host:(Unix.Inet_addr.to_string p.external_ip)
-                   ~port:p.libp2p_port )
+              p.libp2p_port)
            in
            let%map peers = Coda_process.peers_exn worker in
            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
              !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: \
-               Host_and_port.t list}\n"
-             peers expected_peers ;
-           let module S = Host_and_port.Set in
+               int list}\n"
+             peers expected_peer_ports ;
+           let module S = Int.Set in
            assert (
-             S.equal
-               (S.of_list
+             S.is_subset
+               ~of_:(S.of_list
                   ( peers
-                  |> List.map ~f:Network_peer.Peer.to_discovery_host_and_port
+                  |> List.map ~f:(fun p -> p.Network_peer.Peer.libp2p_port)
                   ))
-               (S.of_list expected_peers) ) ))
+               (S.of_list expected_peer_ports) ) ))
   in
   Deferred.List.iter workers ~f:(Coda_process.disconnect ~logger)
 
