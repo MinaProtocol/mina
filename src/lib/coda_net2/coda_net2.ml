@@ -636,13 +636,13 @@ module Helper = struct
     (* Message published on one of our subscriptions *)
     | "publish" -> (
         let%bind m = Publish.of_yojson v |> or_error in
-        let me =
+        let _me =
           Ivar.peek t.me_keypair
           |> Option.value_exn
                ~message:
                  "How did we receive pubsub before configuring our keypair?"
         in
-        if
+        (*if
           Option.fold m.sender ~init:false ~f:(fun _ sender ->
               Peer.Id.equal sender.peer_id me.peer_id )
         then (
@@ -650,50 +650,49 @@ module Helper = struct
             "not handling published message originated from me"
             ~module_:__MODULE__ ~location:__LOC__ ;
           (* elide messages that we sent *) return () )
-        else
-          let idx = m.subscription_idx in
-          let data = m.data in
-          match Hashtbl.find t.subscriptions idx with
-          | Some sub ->
-              if not sub.closed then (
-                let raw_data = Data.to_string data in
-                let decoded = sub.decode raw_data in
-                match decoded with
-                | Ok data ->
-                    (* TAKE CARE: doing anything with the return
+        else*)
+        let idx = m.subscription_idx in
+        let data = m.data in
+        match Hashtbl.find t.subscriptions idx with
+        | Some sub ->
+            if not sub.closed then (
+              let raw_data = Data.to_string data in
+              let decoded = sub.decode raw_data in
+              match decoded with
+              | Ok data ->
+                  (* TAKE CARE: doing anything with the return
                           value here except ignore is UNSOUND because
                           write_pipe has a cast type. We don't remember
                           what the original 'return was. *)
-                    Strict_pipe.Writer.write sub.write_pipe
-                      (wrap m.sender data)
-                    |> ignore
-                | Error e ->
-                    ( match sub.on_decode_failure with
-                    | `Ignore ->
-                        ()
-                    | `Call f ->
-                        f (wrap m.sender raw_data) e ) ;
-                    Logger.error t.logger
-                      "failed to decode message published on subscription \
-                       $topic ($idx): $error"
-                      ~module_:__MODULE__ ~location:__LOC__
-                      ~metadata:
-                        [ ("topic", `String sub.topic)
-                        ; ("idx", `Int idx)
-                        ; ("error", `String (Error.to_string_hum e)) ] ;
-                    ()
-                (* TODO: add sender to Publish.t and include it here. *)
-                (* TODO: think about exposing the PeerID of the originator as well? *) )
-              else
-                Logger.debug t.logger
-                  "received msg for subscription $sub after unsubscribe, was \
-                   it still in the stdout pipe?"
-                  ~module_:__MODULE__ ~location:__LOC__
-                  ~metadata:[("sub", `Int idx)] ;
-              Ok ()
-          | None ->
-              Or_error.errorf
-                "message published with inactive subsubscription %d" idx )
+                  Strict_pipe.Writer.write sub.write_pipe (wrap m.sender data)
+                  |> ignore
+              | Error e ->
+                  ( match sub.on_decode_failure with
+                  | `Ignore ->
+                      ()
+                  | `Call f ->
+                      f (wrap m.sender raw_data) e ) ;
+                  Logger.error t.logger
+                    "failed to decode message published on subscription \
+                     $topic ($idx): $error"
+                    ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:
+                      [ ("topic", `String sub.topic)
+                      ; ("idx", `Int idx)
+                      ; ("error", `String (Error.to_string_hum e)) ] ;
+                  ()
+              (* TODO: add sender to Publish.t and include it here. *)
+              (* TODO: think about exposing the PeerID of the originator as well? *) )
+            else
+              Logger.debug t.logger
+                "received msg for subscription $sub after unsubscribe, was it \
+                 still in the stdout pipe?"
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("sub", `Int idx)] ;
+            Ok ()
+        | None ->
+            Or_error.errorf
+              "message published with inactive subsubscription %d" idx )
     (* Validate a message received on a subscription *)
     | "validate" -> (
         let%bind m = Validate.of_yojson v |> or_error in
