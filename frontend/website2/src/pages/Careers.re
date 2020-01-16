@@ -230,9 +230,11 @@ module BenefitItem = {
       <h3 className=Style.benefitTitle> {React.string(title)} </h3>
       <ul className=Style.benefitsListItems>
         {React.array(
-           Array.map(
-             item =>
-               <li className=Style.benefitDetails> {React.string(item)} </li>,
+           Array.mapi(
+             (i, item) =>
+               <li key={string_of_int(i)} className=Style.benefitDetails>
+                 {React.string(item)}
+               </li>,
              details,
            ),
          )}

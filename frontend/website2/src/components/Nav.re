@@ -1,6 +1,6 @@
 // Nav styles adapted from https://medium.com/creative-technology-concepts-code/responsive-mobile-dropdown-navigation-using-css-only-7218e4498a99
 
-module NavStyle = {
+module Style = {
   open Css;
   open Theme;
 
@@ -93,6 +93,28 @@ module NavStyle = {
         ),
       ]),
     ]);
+
+  let menuToggleButton =
+    merge([
+      Theme.Link.basic,
+      style(
+        Theme.paddingY(`rem(0.5))
+        @ [
+          marginLeft(`rem(1.0)),
+          border(`zero, `solid, `transparent),
+          cursor(`pointer),
+          display(`flex),
+          justifyContent(`flexEnd),
+          position(`relative),
+          userSelect(`none),
+          backgroundColor(`transparent),
+          outline(`zero, `none, `transparent),
+          focus([color(Theme.Colors.hyperlinkHover)]),
+          // The menu is always shown on full-size
+          media(MediaQuery.menu, [display(`none)]),
+        ],
+      ),
+    ]);
 };
 
 module DropdownMenu = {
@@ -101,28 +123,7 @@ module DropdownMenu = {
     let (menuOpen, toggleMenu) = React.useState(() => false);
     <>
       <button
-        className=Css.(
-          merge([
-            Theme.Link.basic,
-            style(
-              Theme.paddingY(`rem(0.5))
-              @ [
-                marginLeft(`rem(1.0)),
-                border(`zero, `solid, `transparent),
-                cursor(`pointer),
-                display(`flex),
-                justifyContent(`flexEnd),
-                position(`relative),
-                userSelect(`none),
-                backgroundColor(`transparent),
-                outline(`zero, `none, `transparent),
-                focus([color(Theme.Colors.hyperlinkHover)]),
-                // The menu is always shown on full-size
-                media(NavStyle.MediaQuery.menu, [display(`none)]),
-              ],
-            ),
-          ])
-        )
+        className=Style.menuToggleButton
         id="nav-menu-btn"
         onClick={_ => toggleMenu(_ => !menuOpen)}>
         {React.string("Menu")}
@@ -131,7 +132,7 @@ module DropdownMenu = {
         <ul
           id="nav-menu"
           className={
-            menuOpen ? NavStyle.expandedMenuItems : NavStyle.collapsedMenuItems
+            menuOpen ? Style.expandedMenuItems : Style.collapsedMenuItems
           }>
           children
         </ul>
@@ -154,23 +155,22 @@ module NavWrapper = {
                  Css.paddingLeft(`rem(0.75)), // we need to skip padding right here as it's on the edge
                  Css.listStyle(`none, `inside, `none),
                  Css.media(
-                   NavStyle.MediaQuery.menuMax,
+                   Style.MediaQuery.menuMax,
                    [Css.width(`percent(100.)), Css.padding(`zero)],
                  ),
                ])}>
                elem
              </li>;
            } else {
-             <>
+             <React.Fragment key={string_of_int(idx)}>
                <li
-                 key={string_of_int(idx) ++ "-li"}
                  className={Css.style(
                    Theme.paddingX(`rem(0.75))
                    @ Theme.paddingY(`rem(0.5))
                    @ [
                      Css.listStyle(`none, `inside, `none),
                      Css.media(
-                       NavStyle.MediaQuery.menuMax,
+                       Style.MediaQuery.menuMax,
                        [Css.width(`percent(100.)), Css.padding(`zero)],
                      ),
                    ],
@@ -178,7 +178,6 @@ module NavWrapper = {
                  elem
                </li>
                <hr
-                 key={string_of_int(idx) ++ "-hr"}
                  ariaHidden=true
                  className=Css.(
                    style([
@@ -193,11 +192,11 @@ module NavWrapper = {
                      borderLeftWidth(`zero),
                      borderRightWidth(`zero),
                      width(`percent(85.)),
-                     media(NavStyle.MediaQuery.menu, [display(`none)]),
+                     media(Style.MediaQuery.menu, [display(`none)]),
                    ])
                  )
                />
-             </>;
+             </React.Fragment>;
            }
          )
       |> React.array;
@@ -230,7 +229,7 @@ module NavWrapper = {
           className=Css.(
             style([
               display(`flex),
-              NavStyle.bottomNudge,
+              Style.bottomNudge,
               width(`percent(50.0)),
               marginTop(`zero),
               media(
@@ -239,10 +238,10 @@ module NavWrapper = {
                   width(`auto),
                   marginRight(`rem(0.75)),
                   marginTop(`zero),
-                  NavStyle.bottomNudgeOffset(0.1875),
+                  Style.bottomNudgeOffset(0.1875),
                 ],
               ),
-              media(NavStyle.MediaQuery.menu, [marginTop(`zero)]),
+              media(Style.MediaQuery.menu, [marginTop(`zero)]),
             ])
           )>
           <Image className="" name="/static/img/coda-logo" alt="Coda Home" />
@@ -253,7 +252,7 @@ module NavWrapper = {
           style([
             order(3),
             width(`percent(100.0)),
-            NavStyle.bottomNudge,
+            Style.bottomNudge,
             display(`none), // just hide when status lift happens
             media(
               Theme.MediaQuery.statusLift(keepAnnouncementBar),
@@ -265,7 +264,7 @@ module NavWrapper = {
                      ? [display(`block)] : [display(`none)],
               ],
             ),
-            media(NavStyle.MediaQuery.menu, [width(`percent(40.0))]),
+            media(Style.MediaQuery.menu, [width(`percent(40.0))]),
           ])
         )>
         <div
@@ -288,12 +287,12 @@ module NavWrapper = {
             width(`auto),
             maxWidth(px(500)),
             order(2),
-            NavStyle.bottomNudgeOffset(0.5),
+            Style.bottomNudgeOffset(0.5),
             media(
               Theme.MediaQuery.statusLift(keepAnnouncementBar),
-              [order(3), width(`auto), NavStyle.bottomNudge],
+              [order(3), width(`auto), Style.bottomNudge],
             ),
-            media(NavStyle.MediaQuery.menu, [width(`percent(50.0))]),
+            media(Style.MediaQuery.menu, [width(`percent(50.0))]),
           ])
         )>
         <DropdownMenu> items </DropdownMenu>
@@ -352,7 +351,7 @@ module SimpleButton = {
                 whiteSpace(`nowrap),
                 hover([color(Theme.Colors.hyperlink)]),
                 isActive ? color(Colors.hyperlink) : color(Colors.saville),
-                media(NavStyle.MediaQuery.menuMax, menuStyle),
+                media(Style.MediaQuery.menuMax, menuStyle),
               ],
             ),
           ])

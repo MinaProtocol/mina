@@ -143,8 +143,10 @@ module MultiLine = {
   let make = (~values) => {
     <>
       {values
-       |> Array.map(v => {
-            <div className=Style.item> {React.string(v)} </div>
+       |> Array.mapi((i, v) => {
+            <div key={string_of_int(i)} className=Style.item>
+              {React.string(v)}
+            </div>
           })
        |> React.array}
     </>;
