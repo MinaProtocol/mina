@@ -116,6 +116,18 @@ module Styles = {
       marginTop(rem(5.18)),
       marginBottom(rem(3.)),
     ]);
+
+  let whitePaperButtonRow =
+    style([
+      display(`grid),
+      gridTemplateColumns([`percent(100.)]),
+      gridTemplateRows([auto]),
+      gridRowGap(`rem(0.7)),
+      media(
+        Theme.MediaQuery.notMobile,
+        [display(`flex), flexDirection(`row)],
+      ),
+    ]);
 };
 
 [@react.component]
@@ -145,8 +157,14 @@ let make = () => {
         </div>
         <br />
         <hr className=Styles.lineBreak />
-        <WhitepaperButton label="Technical whitepaper" sigil=Icons.technical />
-        <WhitepaperButton label="Economic whitepaper" sigil=Icons.economic />
+        <div className=Styles.whitePaperButtonRow>
+          <WhitepaperButton
+            label="Technical whitepaper"
+            sigil=Icons.technical
+          />
+          <Spacer width=2.5 />
+          <WhitepaperButton label="Economic whitepaper" sigil=Icons.economic />
+        </div>
       </div>
     </Wrapped>
   </Page>;
