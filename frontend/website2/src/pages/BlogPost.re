@@ -121,9 +121,12 @@ let make = (~post: option(ContentType.Post.t)) => {
       </Next.Link>
     </Page>
   | Some(
-      ({title, subtitle, author, date, text: content}: ContentType.Post.t),
+      (
+        {title, subtitle, author, date, text: content, snippet, slug}: ContentType.Post.t
+      ),
     ) =>
-    <Page>
+    // Manually set the canonical route to remove .html
+    <Page title description=snippet route={"/blog/" ++ slug}>
       <Next.Head> Markdown.katexStylesheet </Next.Head>
       <div className=Style.wrapper>
         <div className=Style.title id="title"> {React.string(title)} </div>
