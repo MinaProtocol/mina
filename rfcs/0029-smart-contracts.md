@@ -145,9 +145,9 @@ upon the foundation of the previous proposal.
     how much gas per block can be used.
   - The amount of gas used should be added to the transaction before including
     it in the blockchain.
-  - **The gas for the evaluation should be held by the sender account, not the
+  - The gas for the evaluation should be held by the sender account, not the
     account hosting the WASM, to ensure that a bad actor can't drain an account
-    by triggering the predicate repeatedly.**
+    by triggering the predicate repeatedly.
   - The gas price and limit should be set in the transaction, so that the
     sender can control their spend.
   - The WASM evaluation should be deterministic (i.e. always produce the same
