@@ -86,7 +86,7 @@ let validate_transactions external_transition =
 let of_transition external_transition tracked_participants
     (calculated_transactions : Transaction.t list) =
   let open External_transition.Validated in
-  let creator = proposer external_transition in
+  let creator = block_producer external_transition in
   let protocol_state =
     { Protocol_state.previous_state_hash= parent_hash external_transition
     ; blockchain_state=
