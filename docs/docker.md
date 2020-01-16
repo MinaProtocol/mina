@@ -41,7 +41,7 @@ services:
     network: host
     image: codaprotocol/coda-daemon:<version>
     command: 
-      daemon -peer <testnet>.o1test.net:8303 -rest-port 8304 -external-port 10101 -metrics-port 10000 -propose-key /root/wallet-keys/my_wallet -unsafe-track-propose-key
+      daemon -peer <testnet>.o1test.net:8303 -rest-port 8304 -external-port 10101 -metrics-port 10000 -block-producer-key /root/wallet-keys/my_wallet -unsafe-track-block-producer-key
     environment: 
       CODA_PRIVKEY_PASS: <key-password>
     volumes:
@@ -52,6 +52,6 @@ In addition to running the daemon on the host network, it does a few other thing
 - `-rest-port 8304` it enables the Daemon's GraphQL endpoint on `localhost:8304`
 - `-external-port 10101` it specifies a non-default external communication (TCP) port (also implicitly sets `10102` as the gossip (UDP) port)
 - `-metrics-port 10000` it enables the Daemon's Prometheus metrics endpoint on `localhost:10000`
-- `propose-key /root/wallet-keys/my_wallet` it loads an arbitrary wallet key file at runtime to act as a Block Producer
-- `-unsafe-track-propose-key` it tells the daemon to *(insecurely)* strip the password from the wallet key file and load it into the internal wallet store for use with GraphQL 
+- `block-producer-key /root/wallet-keys/my_wallet` it loads an arbitrary wallet key file at runtime to act as a Block Producer
+- `-unsafe-track-block-producer-key` it tells the daemon to *(insecurely)* strip the password from the wallet key file and load it into the internal wallet store for use with GraphQL 
 

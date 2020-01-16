@@ -1,6 +1,6 @@
 (library
- (name proposer)
- (public_name proposer)
+ (name block_producer)
+ (public_name block_producer)
  (library_flags -linkall)
  (inline_tests)
  (libraries
@@ -10,4 +10,4 @@
    network_pool unix_timestamp otp_lib transition_chain_prover)
  (preprocess
   (pps ppx_coda ppx_jane bisect_ppx -- -conditional))
- (synopsis "Coda block proposer"))
+ (synopsis "Coda block producer"))
