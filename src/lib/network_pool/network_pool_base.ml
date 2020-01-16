@@ -28,7 +28,8 @@ end)
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         "Broadcasting %s"
         (Resource_pool.Diff.summary diff') ;
-      if real then Linear_pipe.write t.write_broadcasts diff' else Deferred.unit
+      if real then Linear_pipe.write t.write_broadcasts diff'
+      else Deferred.unit
     in
     match%bind Resource_pool.Diff.apply t.resource_pool pool_diff with
     | Ok diff' ->
