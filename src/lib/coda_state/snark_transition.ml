@@ -9,7 +9,7 @@ module Poly = struct
            , 'consensus_transition
            , 'sok_digest
            , 'amount
-           , 'proposer_pk
+           , 'producer_pk
            , 'pending_coinbase_action )
            t =
         { blockchain_state: 'blockchain_state
@@ -17,7 +17,7 @@ module Poly = struct
         ; sok_digest: 'sok_digest
         ; supply_increase: 'amount
         ; ledger_proof: Proof.Stable.V1.t option
-        ; coinbase_receiver: 'proposer_pk
+        ; coinbase_receiver: 'producer_pk
         ; coinbase_amount: 'amount
         ; pending_coinbase_action: 'pending_coinbase_action }
       [@@deriving bin_io, to_yojson, sexp, fields, version]
@@ -28,14 +28,14 @@ module Poly = struct
        , 'consensus_transition
        , 'sok_digest
        , 'amount
-       , 'proposer_pk
+       , 'producer_pk
        , 'pending_coinbase_action )
        t =
         ( 'blockchain_state
         , 'consensus_transition
         , 'sok_digest
         , 'amount
-        , 'proposer_pk
+        , 'producer_pk
         , 'pending_coinbase_action )
         Stable.Latest.t =
     { blockchain_state: 'blockchain_state
@@ -43,7 +43,7 @@ module Poly = struct
     ; sok_digest: 'sok_digest
     ; supply_increase: 'amount
     ; ledger_proof: Proof.t option
-    ; coinbase_receiver: 'proposer_pk
+    ; coinbase_receiver: 'producer_pk
     ; coinbase_amount: 'amount
     ; pending_coinbase_action: 'pending_coinbase_action }
   [@@deriving sexp, to_yojson, fields]

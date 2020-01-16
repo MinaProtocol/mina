@@ -50,9 +50,9 @@ genesis_ledger = "testnet_postake"]
 include Testnet_postake_ledger
 
 [%%elif
-genesis_ledger = "testnet_postake_many_proposers"]
+genesis_ledger = "testnet_postake_many_producers"]
 
-include Testnet_postake_ledger_many_proposers
+include Testnet_postake_ledger_many_producers
 
 [%%else]
 

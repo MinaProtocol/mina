@@ -6,7 +6,7 @@ module Poly : sig
        , 'consensus_transition
        , 'sok_digest
        , 'amount
-       , 'proposer_pk
+       , 'producer_pk
        , 'pending_coinbase_action )
        t =
     { blockchain_state: 'blockchain_state
@@ -14,7 +14,7 @@ module Poly : sig
     ; sok_digest: 'sok_digest
     ; supply_increase: 'amount
     ; ledger_proof: Proof.Stable.V1.t option
-    ; coinbase_receiver: 'proposer_pk
+    ; coinbase_receiver: 'producer_pk
     ; coinbase_amount: 'amount
     ; pending_coinbase_action: 'pending_coinbase_action }
   [@@deriving sexp, fields]
@@ -26,7 +26,7 @@ module Poly : sig
              , 'consensus_transition
              , 'sok_digest
              , 'amount
-             , 'proposer_pk
+             , 'producer_pk
              , 'pending_coinbase_action )
              t
         [@@deriving bin_io, sexp, version]
@@ -38,14 +38,14 @@ module Poly : sig
               , 'consensus_transition
               , 'sok_digest
               , 'amount
-              , 'proposer_pk
+              , 'producer_pk
               , 'pending_coinbase_action )
               V1.t =
                 ( 'blockchain_state
                 , 'consensus_transition
                 , 'sok_digest
                 , 'amount
-                , 'proposer_pk
+                , 'producer_pk
                 , 'pending_coinbase_action )
                 t
 end
@@ -112,7 +112,7 @@ val coinbase_amount : (_, _, _, 'amount, _, _) Poly.t -> 'amount
 
 val ledger_proof : _ Poly.t -> Proof.t option
 
-val coinbase_receiver : (_, _, _, _, 'proposer_pk, _) Poly.t -> 'proposer_pk
+val coinbase_receiver : (_, _, _, _, 'producer_pk, _) Poly.t -> 'producer_pk
 
 val pending_coinbase_action :
   (_, _, _, _, _, 'pending_coinbase_action) Poly.t -> 'pending_coinbase_action

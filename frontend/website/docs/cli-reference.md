@@ -1,5 +1,8 @@
 # CLI Reference
 
+!!! warning
+    this document is out of date. Refer to the CLI help built into the executable.
+
 The Coda CLI (command-line interface) is the primary way for users to interact with the Coda network. It provides standard client functionality to create accounts, send transactions, and participate in consensus. There are also advanced client and daemon commands for power users.
 
 The CLI is installed as part of the Coda bundle, and can be accessed from a shell by beginning a statement with `coda`. 
@@ -76,16 +79,16 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
     [-log-level Set]                            daemon log level (default: Warn)
     [-peer HOST:PORT]                           TCP daemon communications (can be
                                                 given multiple times)
-    [-propose-key KEYFILE]                      Private key file for the proposing
+    [-block-producer-key KEYFILE]               Private key file for the proposing
                                                 transitions. You cannot provide
-                                                both `propose-key` and
-                                                `propose-public-key`.
+                                                both `block-producer-key` and
+                                                `block-producer-pubkey`.
                                                 (default:don't propose)
-    [-propose-public-key PUBLICKEY]             Public key for the associated
+    [-block-producer-pubkey PUBLICKEY]          Public key for the associated
                                                 private key that is being tracked
                                                 by this daemon. You cannot provide
-                                                both `propose-key` and
-                                                `propose-public-key`. (default:
+                                                both `block-producer-key` and
+                                                `block-producer-pubkey`. (default:
                                                 don't propose)
     [-rest-port PORT]                           local REST-server for daemon
                                                 interaction (default no
@@ -97,10 +100,10 @@ The CLI is installed as part of the Coda bundle, and can be accessed from a shel
                                                 proof (default: 1)
     [-tracing]                                  Trace into
                                                 $config-directory/$pid.trace
-    [-unsafe-track-propose-key]                 Your private key will be copied to
+    [-unsafe-track-block-producer-key]          Your private key will be copied to
                                                 the internal wallets folder
                                                 stripped of its password if it is
-                                                given using the `propose-key`
+                                                given using the `block-producer-key`
                                                 flag. (default:don't copy the
                                                 private key)
     [-work-selection seq|rand]                  Choose work sequentially (seq) or
