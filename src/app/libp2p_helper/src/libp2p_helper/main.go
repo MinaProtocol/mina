@@ -930,8 +930,9 @@ type errorResult struct {
 }
 
 type successResult struct {
-	Seqno   int             `json:"seqno"`
-	Success json.RawMessage `json:"success"`
+	Seqno    int             `json:"seqno"`
+	Success  json.RawMessage `json:"success"`
+	Duration string          `json:"duration"`
 }
 
 func main() {
@@ -981,11 +982,12 @@ func main() {
 				helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
 			}
 		}()
+		start := time.Now()
 		res, err := msg.run(app)
 		if err == nil {
 			res, err := json.Marshal(res)
 			if err == nil {
-				app.writeMsg(successResult{Seqno: env.Seqno, Success: res})
+				app.writeMsg(successResult{Seqno: env.Seqno, Success: res, Duration: time.Now().Sub(start).String()})
 			} else {
 				app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
 			}
