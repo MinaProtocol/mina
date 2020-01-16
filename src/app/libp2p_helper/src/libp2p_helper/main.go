@@ -317,7 +317,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	}
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
 		seqno := <-seqs
-		ch := make(chan bool)
+		ch := make(chan bool, 1)
 		app.Validators[seqno] = ch
 
 		sender, err := findPeerInfo(app, id)
@@ -336,7 +336,6 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			Idx:    s.Subscription,
 		})
 
-		return true
 		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
 		select {
 		case <-ctx.Done():
@@ -350,7 +349,8 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			}
 			return false
 		case res := <-ch:
-			return res
+			return true || res
+			// should really return res here!
 		}
 	}, pubsub.WithValidatorConcurrency(6), pubsub.WithValidatorTimeout(30*time.Second))
 
