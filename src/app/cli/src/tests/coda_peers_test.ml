@@ -30,21 +30,20 @@ let main () =
     Deferred.all_unit
       (List.map2_exn workers expected_peers ~f:(fun worker expected_peers ->
            let expected_peer_ports =
-             List.map expected_peers ~f:(fun p ->
-              p.libp2p_port)
+             List.map expected_peers ~f:(fun p -> p.libp2p_port)
            in
            let%map peers = Coda_process.peers_exn worker in
            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-             !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: \
-               int list}\n"
+             !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: int list}\n"
              peers expected_peer_ports ;
            let module S = Int.Set in
            assert (
              S.is_subset
-               ~of_:(S.of_list
-                  ( peers
-                  |> List.map ~f:(fun p -> p.Network_peer.Peer.libp2p_port)
-                  ))
+               ~of_:
+                 (S.of_list
+                    ( peers
+                    |> List.map ~f:(fun p -> p.Network_peer.Peer.libp2p_port)
+                    ))
                (S.of_list expected_peer_ports) ) ))
   in
   Deferred.List.iter workers ~f:(Coda_process.disconnect ~logger)
