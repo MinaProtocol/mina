@@ -14,7 +14,7 @@ module Colors = {
     `hsla((`deg(201.), `percent(71.), `percent(52.), `num(a)));
   let hyperlink = hyperlinkAlpha(1.0);
 
-  let hyperlinkHover = `hsl((`deg(201.), `percent(71.), `percent(40.)));
+  let hyperlinkHover = `hex("0AA9FF");
   let hyperlinkLight = `hsl((`deg(201.), `percent(71.), `percent(70.)));
 
   let metallicBlue = `rgb((70, 99, 131));
@@ -146,6 +146,7 @@ module H1 = {
       fontSize(`rem(2.25)),
       letterSpacing(`rem(-0.02375)),
       lineHeight(`rem(3.0)),
+      color(Colors.saville),
       media(
         MediaQuery.full,
         [
