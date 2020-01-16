@@ -82,6 +82,7 @@ module Styles = {
         padding2(~v=`px(12), ~h=`px(24)),
         textAlign(`center),
         alignSelf(`center),
+        hover([backgroundColor(Theme.Colors.hyperlinkHover)]),
         media(
           Theme.MediaQuery.tablet,
           [marginLeft(`rem(0.)), alignSelf(`flexStart)],
