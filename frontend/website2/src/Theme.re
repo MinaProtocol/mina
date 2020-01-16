@@ -278,6 +278,8 @@ module H4 = {
       color(Colors.greyishBrown),
     ]);
 
+  let semiBold = merge([basic, style([fontWeight(`semiBold)])]);
+
   let (wide, wideStyles) =
     generateStyles([
       fontSize(`rem(0.75)),
