@@ -50,7 +50,7 @@ upon the foundation of the previous proposal.
 * Transactions should be extended with an optional field containing the proof
   and verification key address.
   - The presence of this field should trigger the predicate from the contract,
-    overruling the existing permissionsmodel.
+    overruling the existing permissions model.
   - The proof should accept the transaction as a 'public input', so that the
     proof can witness the validity of the transaction.
   - If the contract may also modify data stored on-chain, the old and new state
