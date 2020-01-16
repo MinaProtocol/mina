@@ -118,9 +118,11 @@ module Styles = {
     ]);
 };
 
+let description = "Coda is 100% open-source, built for and by community members like yourself. Find resources on how to join the network as a node operator, begin contributing code, and stay up to date on developer tooling and grants.";
+
 [@react.component]
 let make = () => {
-  <Page>
+  <Page title="Coda Developer Portal" description>
     <Wrapped>
       <div className=Styles.page>
         <div className=Styles.heroRow>

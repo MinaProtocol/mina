@@ -86,7 +86,7 @@ module KnowledgeBase = {
           maxWidth(`rem(58.625)),
           marginLeft(`auto),
           marginRight(`auto),
-          unsafe("min-width", "min-content"),
+          unsafe("minWidth", "min-content"),
           paddingBottom(`rem(1.)),
           media(Theme.MediaQuery.notMobile, [paddingBottom(`rem(2.))]),
         ])
