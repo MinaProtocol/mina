@@ -528,8 +528,7 @@ module type S = sig
            * [`Staged_ledger of Staged_ledger.t]
          , [ `Invalid_staged_ledger_diff of
              [ `Incorrect_target_staged_ledger_hash
-             | `Incorrect_target_snarked_ledger_hash
-             | `Incorrect_staged_ledger_diff_state_body_hash ]
+             | `Incorrect_target_snarked_ledger_hash ]
              list
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )

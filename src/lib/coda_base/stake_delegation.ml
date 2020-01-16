@@ -15,6 +15,8 @@ type t = Stable.Latest.t =
   | Set_delegate of {new_delegate: Public_key.Compressed.Stable.V1.t}
 [@@deriving eq, sexp, hash, yojson]
 
+let receiver = function Set_delegate {new_delegate} -> new_delegate
+
 let gen =
   Quickcheck.Generator.map Public_key.Compressed.gen ~f:(fun k ->
       Set_delegate {new_delegate= k} )
