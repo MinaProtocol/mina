@@ -19,6 +19,7 @@ type t =
   ; trust_system: Trust_system.t
   ; monitor: Monitor.t option
   ; initial_block_production_keypairs: Keypair.Set.t
+  ; coinbase_receiver: [`Producer | `Other of Public_key.Compressed.t]
   ; work_selection_method: (module Work_selector.Selection_method_intf)
   ; snark_worker_config: Snark_worker_config.t
   ; work_reassignment_wait: int
@@ -38,5 +39,6 @@ type t =
   ; is_archive_rocksdb: bool [@default false]
   ; archive_process_location:
       Core.Host_and_port.t Cli_lib.Flag.Types.with_name option
-        [@default None] }
+        [@default None]
+  ; genesis_state_hash: State_hash.t }
 [@@deriving make]

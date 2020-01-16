@@ -14,7 +14,7 @@ let main () =
     if i = snark_worker_and_block_producer_id then Some i else None
   in
   let largest_public_key =
-    let _, account = Genesis_ledger.largest_account_exn () in
+    let _, account = Test_genesis_ledger.largest_account_exn () in
     Account.public_key account
   in
   let snark_work_public_keys i =
@@ -67,7 +67,7 @@ let main () =
     wait_for_snark_worker_proof new_block_pipe1 largest_public_key
   in
   let new_snark_worker =
-    List.find_map_exn Genesis_ledger.accounts ~f:(fun (_, account) ->
+    List.find_map_exn Test_genesis_ledger.accounts ~f:(fun (_, account) ->
         let public_key = Account.public_key account in
         Option.some_if
           (not @@ Public_key.Compressed.equal largest_public_key public_key)

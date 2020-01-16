@@ -117,6 +117,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
           match validation with
           | ( _
             , _
+            , _
             , (`Delta_transition_chain, Truth.True delta_state_hashes)
             , _
             , _ ) ->

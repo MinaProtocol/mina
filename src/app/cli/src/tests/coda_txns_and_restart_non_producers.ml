@@ -10,7 +10,8 @@ let main () =
   let snark_work_public_keys =
     Fn.const
     @@ Some
-         (List.nth_exn Genesis_ledger.accounts 5 |> snd |> Account.public_key)
+         ( List.nth_exn Test_genesis_ledger.accounts 5
+         |> snd |> Account.public_key )
   in
   let producers n = if n < 3 then Some n else None in
   let%bind testnet =
@@ -20,8 +21,8 @@ let main () =
   in
   (* send txns *)
   let keypairs =
-    List.map Genesis_ledger.accounts
-      ~f:Genesis_ledger.keypair_of_account_record_exn
+    List.map Test_genesis_ledger.accounts
+      ~f:Test_genesis_ledger.keypair_of_account_record_exn
   in
   let%bind () = after wait_time in
   Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~keypairs

@@ -16,12 +16,12 @@ let main () =
   let open Keypair in
   let logger = Logger.create () in
   let largest_account_keypair =
-    Genesis_ledger.largest_account_keypair_exn ()
+    Test_genesis_ledger.largest_account_keypair_exn ()
   in
   let another_account_keypair =
-    Genesis_ledger.find_new_account_record_exn
+    Test_genesis_ledger.find_new_account_record_exn
       [largest_account_keypair.public_key]
-    |> Genesis_ledger.keypair_of_account_record_exn
+    |> Test_genesis_ledger.keypair_of_account_record_exn
   in
   let block_production_interval =
     Consensus.Constants.block_window_duration_ms

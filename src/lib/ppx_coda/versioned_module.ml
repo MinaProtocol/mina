@@ -74,25 +74,38 @@ let rec add_deriving ~loc ~version_option attributes =
 let version_type ~version_option version stri =
   let loc = stri.pstr_loc in
   let t, params =
-    (* NOTE: Can't use [Ast_pattern] here; it rejects attributes attached to
-       types..
-    *)
+    let subst_type stri =
+      (* NOTE: Can't use [Ast_pattern] here; it rejects attributes attached to
+         types..
+      *)
+      match stri.pstr_desc with
+      | Pstr_type
+          ( rec_flag
+          , [({ptype_name= {txt= "t"; _}; ptype_private= Public; _} as typ)] )
+        ->
+          let params = typ.ptype_params in
+          let typ =
+            { typ with
+              ptype_attributes=
+                add_deriving ~loc:typ.ptype_loc ~version_option
+                  typ.ptype_attributes }
+          in
+          let t = {stri with pstr_desc= Pstr_type (rec_flag, [typ])} in
+          (t, params)
+      | _ ->
+          (* TODO: Handle rpc types. *)
+          Location.raise_errorf ~loc:stri.pstr_loc
+            "Expected a single public type t."
+    in
     match stri.pstr_desc with
-    | Pstr_type
-        ( rec_flag
-        , [({ptype_name= {txt= "t"; _}; ptype_private= Public; _} as typ)] ) ->
-        let params = typ.ptype_params in
-        let typ =
-          { typ with
-            ptype_attributes=
-              add_deriving ~loc:typ.ptype_loc ~version_option
-                typ.ptype_attributes }
-        in
-        let t = {stri with pstr_desc= Pstr_type (rec_flag, [typ])} in
-        (t, params)
+    | Pstr_type _ ->
+        subst_type stri
+    | Pstr_module {pmb_expr= {pmod_desc= Pmod_structure (stri :: _); _}; _} ->
+        subst_type stri
     | _ ->
         (* TODO: Handle rpc types. *)
-        Location.raise_errorf ~loc "Expected a single public type t."
+        Location.raise_errorf ~loc:stri.pstr_loc
+          "Expected a single public type t, or a module T."
   in
   let (module Ast_builder) = Ast_builder.make loc in
   let with_version =
@@ -248,7 +261,25 @@ let version_type ~version_option version stri =
           , bin_writer_t
           , bin_t )] ]
   in
-  (List.is_empty params, t :: with_version :: bin_io_shadows)
+  match stri.pstr_desc with
+  | Pstr_type _ ->
+      (List.is_empty params, t :: with_version :: bin_io_shadows)
+  | Pstr_module
+      ( {pmb_expr= {pmod_desc= Pmod_structure (stri :: str); _} as pmod; _} as
+      pmb ) ->
+      ( List.is_empty params
+      , [ { stri with
+            pstr_desc=
+              Pstr_module
+                { pmb with
+                  pmb_expr=
+                    { pmod with
+                      pmod_desc=
+                        Pmod_structure
+                          (t :: with_version :: (bin_io_shadows @ str)) } } }
+        ] )
+  | _ ->
+      assert false
 
 let convert_module_stri ~version_option last_version stri =
   let module_pattern =
@@ -278,6 +309,13 @@ let convert_module_stri ~version_option last_version stri =
     | [] ->
         Location.raise_errorf ~loc:str.loc
           "Expected a type declaration in this structure."
+    | ({pstr_desc= Pstr_module {pmb_name= {txt= "T"; _}; _}; _} as type_stri)
+      :: ( { pstr_desc=
+               Pstr_include
+                 {pincl_mod= {pmod_desc= Pmod_ident {txt= Lident "T"; _}; _}; _}
+           ; _ }
+           :: _ as str ) ->
+        (type_stri, str)
     | type_stri :: str ->
         (type_stri, str)
   in

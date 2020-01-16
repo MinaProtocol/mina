@@ -10,8 +10,7 @@ import time
 from itertools import chain
 
 build_artifact_profiles = [
-    'testnet_postake_medium_curves',
-    'net_10k'
+    'testnet_postake_medium_curves'
 ]
 
 unit_test_profiles = ['test_postake_snarkless_unittest', 'dev']
@@ -51,7 +50,6 @@ small_curves_tests = {
     'test_postake_bootstrap':
     ['coda-bootstrap-test', 'coda-long-fork -num-block-producers 2'],
     'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
-    'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-block-producers 5'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
     'test_postake_five_even_snarkless':
@@ -82,7 +80,7 @@ ci_excludes = [
 required_excludes = [
     'test_postake_five_even_snarkless:*',
     'test_postake_catchup:*',
-    'test_postake_holy_grail:*',
+    'test_postake_three_producers:*'
 ]
 
 # these extra jobs are not filters, they are full status check names

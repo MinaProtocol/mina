@@ -26,6 +26,12 @@ val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
 
 val staking_ledger : t -> Sparse_ledger.t option
 
+val current_epoch_delegators :
+  t -> pk:Public_key.Compressed.t -> Coda_base.Account.t list option
+
+val last_epoch_delegators :
+  t -> pk:Public_key.Compressed.t -> Coda_base.Account.t list option
+
 val replace_snark_worker_key :
   t -> Public_key.Compressed.t option -> unit Deferred.t
 
@@ -108,7 +114,11 @@ val start : t -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : Config.t -> t Deferred.t
+val create :
+     Config.t
+  -> genesis_ledger:Ledger.t Lazy.t
+  -> base_proof:Proof.t
+  -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 

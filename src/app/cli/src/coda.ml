@@ -30,17 +30,11 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
-let chain_id =
-  lazy
-    (let genesis_state_hash =
-       (Lazy.force Coda_state.Genesis_protocol_state.t).hash
-       |> State_hash.to_base58_check
-     in
-     let all_snark_keys =
-       List.fold_left ~f:( ^ ) ~init:"" Snark_keys.key_hashes
-     in
-     let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
-     Blake2.to_hex b2)
+let chain_id ~genesis_state_hash =
+  let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
+  let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
+  let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
+  Blake2.to_hex b2
 
 [%%inject
 "daemon_expiry", daemon_expiry]
@@ -56,6 +50,19 @@ let daemon logger =
            "KEYFILE Private key file for the block producer. You cannot \
             provide both `block-producer-key` and `block-producer-pubkey`. \
             (default: don't produce blocks)"
+         (optional string)
+     and coinbase_receiver_flag =
+       flag "coinbase-receiver"
+         ~doc:
+           "PUBLICKEY Address to send coinbase rewards to (if this node is \
+            producing blocks). If not provided, coinbase rewards will be sent \
+            to the producer of a block."
+         (optional public_key_compressed)
+     and genesis_ledger_dir_flag =
+       flag "genesis-ledger-dir"
+         ~doc:
+           "Dir Directory that contains the genesis ledger and the genesis \
+            blockchain proof (default: <config-dir>/genesis-ledger)"
          (optional string)
      and initial_peers_raw =
        flag "kademlia-peer"
@@ -175,13 +182,7 @@ let daemon logger =
            Deferred.return conf_dir
          else Sys.home_directory () >>| compute_conf_dir
        in
-       let () =
-         match Core.Sys.file_exists conf_dir with
-         | `Yes ->
-             ()
-         | _ ->
-             Core.Unix.mkdir_p conf_dir
-       in
+       let%bind () = File_system.create_dir conf_dir in
        let () =
          if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
@@ -239,33 +240,9 @@ let daemon logger =
        (* When persistence is added back, this needs to be revisited
         * to handle persistence related files properly *)
        let%bind () =
-         let del_files dir =
-           let rec all_files dirname basename =
-             let fullname = Filename.concat dirname basename in
-             match%bind Sys.is_directory fullname with
-             | `Yes ->
-                 let%map dirs, files =
-                   Sys.ls_dir fullname
-                   >>= Deferred.List.map ~f:(all_files fullname)
-                   >>| List.unzip
-                 in
-                 let dirs =
-                   if String.equal dirname conf_dir then List.concat dirs
-                   else List.append (List.concat dirs) [fullname]
-                 in
-                 (dirs, List.concat files)
-             | _ ->
-                 Deferred.return ([], [fullname])
-           in
-           let%bind dirs, files = all_files dir "" in
-           let%bind () =
-             Deferred.List.iter files ~f:(fun file -> Sys.remove file)
-           in
-           Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
-         in
          let make_version ~wipe_dir =
            let%bind () =
-             if wipe_dir then del_files conf_dir else Deferred.unit
+             if wipe_dir then File_system.clear_dir conf_dir else Deferred.unit
            in
            let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
            Writer.write_line wr Coda_version.commit_id ;
@@ -369,6 +346,10 @@ let daemon logger =
            {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
        end in
        let coda_initialization_deferred () =
+         let%bind genesis_ledger, base_proof =
+           Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
+             ~logger ~conf_dir
+         in
          let%bind config =
            match%map
              Monitor.try_with_or_error ~extract_exn:true (fun () ->
@@ -581,6 +562,13 @@ let daemon logger =
          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
+         let genesis_state_hash =
+           Coda_state.Genesis_protocol_state.t ~genesis_ledger
+           |> With_hash.hash
+         in
+         let genesis_ledger_hash =
+           Lazy.force genesis_ledger |> Ledger.merkle_root
+         in
          let time_controller =
            Block_time.Controller.create @@ Block_time.Controller.basic ~logger
          in
@@ -588,7 +576,7 @@ let daemon logger =
            block_production_keypair |> Option.to_list |> Keypair.Set.of_list
          in
          let consensus_local_state =
-           Consensus.Data.Local_state.create
+           Consensus.Data.Local_state.create ~genesis_ledger
              ( Option.map block_production_keypair ~f:(fun keypair ->
                    let open Keypair in
                    Public_key.compress keypair.public_key )
@@ -602,7 +590,7 @@ let daemon logger =
              ; logger
              ; target_peer_count= 8
              ; conf_dir
-             ; chain_id= Lazy.force chain_id
+             ; chain_id= chain_id ~genesis_state_hash
              ; initial_peers= initial_peers_cleaned
              ; addrs_and_ports
              ; trust_system
@@ -618,6 +606,7 @@ let daemon logger =
            ; trust_system
            ; time_controller
            ; consensus_local_state
+           ; genesis_ledger_hash
            ; log_gossip_heard
            ; creatable_gossip_net=
                Coda_networking.Gossip_net.(
@@ -699,10 +688,14 @@ let daemon logger =
                terminated_child_loop ()
          in
          O1trace.trace_task "terminated child loop" terminated_child_loop ;
+         let coinbase_receiver =
+           Option.value_map coinbase_receiver_flag ~default:`Producer
+             ~f:(fun pk -> `Other pk)
+         in
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~net_config ~gossip_net_params
+                ~coinbase_receiver ~net_config ~gossip_net_params
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
@@ -718,7 +711,9 @@ let daemon logger =
                 ~time_controller ~initial_block_production_keypairs ~monitor
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
-                ~work_reassignment_wait ~archive_process_location ())
+                ~work_reassignment_wait ~archive_process_location
+                ~genesis_state_hash ())
+             ~genesis_ledger ~base_proof
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in
@@ -857,8 +852,8 @@ let internal_commands =
 let coda_commands logger =
   [ ("accounts", Client.accounts)
   ; ("daemon", daemon logger)
-  ; ("client", Client.command)
-  ; ("client2", Client.client)
+  ; ("client-old", Client.command)
+  ; ("client", Client.client)
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)

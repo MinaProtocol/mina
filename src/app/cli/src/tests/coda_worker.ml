@@ -463,8 +463,8 @@ module T = struct
           in
           let block_production_keypair =
             Option.map block_production_key ~f:(fun i ->
-                List.nth_exn Genesis_ledger.accounts i
-                |> Genesis_ledger.keypair_of_account_record_exn )
+                List.nth_exn Test_genesis_ledger.accounts i
+                |> Test_genesis_ledger.keypair_of_account_record_exn )
           in
           let initial_block_production_keypairs =
             Keypair.Set.of_list (block_production_keypair |> Option.to_list)
@@ -478,6 +478,7 @@ module T = struct
           in
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_block_production_keys
+              ~genesis_ledger:Test_genesis_ledger.t
           in
           let gossip_net_params =
             Gossip_net.Real.Config.
@@ -500,6 +501,8 @@ module T = struct
             ; trust_system
             ; time_controller
             ; consensus_local_state
+            ; genesis_ledger_hash=
+                Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
             ; log_gossip_heard=
                 { snark_pool_diff= false
                 ; transaction_pool_diff= false
@@ -513,10 +516,15 @@ module T = struct
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
+          let genesis_state_hash =
+            Coda_state.Genesis_protocol_state.t
+              ~genesis_ledger:Test_genesis_ledger.t
+            |> With_hash.hash
+          in
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~net_config ~gossip_net_params
+                 ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
@@ -533,7 +541,9 @@ module T = struct
                  ~initial_block_production_keypairs ~monitor
                  ~consensus_local_state ~transaction_database
                  ~external_transition_database ~is_archive_rocksdb
-                 ~work_reassignment_wait:420000 ())
+                 ~work_reassignment_wait:420000 ~genesis_state_hash ())
+              ~genesis_ledger:Test_genesis_ledger.t
+              ~base_proof:Precomputed_values.base_proof
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger
