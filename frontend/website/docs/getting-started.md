@@ -1,5 +1,9 @@
 # Getting Started
 
+
+!!! warning
+    The testnet is currently down as we work hard towards the next release towards the end of January, 20th week.
+
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
 !!! note
