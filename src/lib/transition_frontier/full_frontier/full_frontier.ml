@@ -69,7 +69,6 @@ let close t =
   Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 0.0) ;
   ignore
     (Ledger.Maskable.unregister_mask_exn ~grandchildren:`Recursive
-       t.root_ledger
        (Breadcrumb.mask (root t)))
 
 let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
@@ -318,10 +317,7 @@ let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
         let breadcrumb = find_exn t hash in
         let mask = Breadcrumb.mask breadcrumb in
         (* this should get garbage collected and should not require additional destruction *)
-        ignore
-          (Ledger.Maskable.unregister_mask_exn
-             (Ledger.Mask.Attached.get_parent mask)
-             mask) ;
+        ignore (Ledger.Maskable.unregister_mask_exn mask) ;
         Hashtbl.remove t.table hash ) ;
     (* STEP 2 *)
     (* go ahead and remove the old root from the frontier *)
@@ -362,7 +358,7 @@ let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)
-      ignore (Ledger.Maskable.unregister_mask_exn s mt) ) ;
+      ignore (Ledger.Maskable.unregister_mask_exn mt) ) ;
     new_staged_ledger
   in
   (* rewrite the new root breadcrumb to contain the new root mask *)

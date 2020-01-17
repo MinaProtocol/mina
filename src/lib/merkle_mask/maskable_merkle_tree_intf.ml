@@ -20,7 +20,6 @@ module type S = sig
        ?grandchildren:[ `Check
                       | `Recursive
                       | `I_promise_I_am_reparenting_this_mask ]
-    -> t
     -> attached_mask
     -> unattached_mask
 

@@ -231,10 +231,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             ~logger ~verifier ~scan_state ~snarked_ledger:temp_mask
             ~expected_merkle_root ~pending_coinbases
         in
-        ignore
-          (Ledger.Maskable.unregister_mask_exn
-             (Ledger.Mask.Attached.get_parent temp_mask)
-             temp_mask) ;
+        ignore (Ledger.Maskable.unregister_mask_exn temp_mask) ;
         result
       in
       (scan_state, pending_coinbases, new_root)

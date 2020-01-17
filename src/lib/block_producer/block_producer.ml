@@ -130,7 +130,6 @@ let generate_next_state ~previous_protocol_state ~time_controller
           (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
           ignore
           @@ Ledger.unregister_mask_exn
-               (Staged_ledger.ledger staged_ledger)
                (Staged_ledger.ledger transitioned_staged_ledger) ;
           Some
             ( diff
