@@ -1,5 +1,9 @@
 # Getting Started
 
+
+!!! warning
+    The testnet is currently down as we work hard towards the next release (near the end of the week of January 20th).
+
 This section will walk you through the requirements needed to run a Coda protocol node on your local machine and connect to the network.
 
 !!! note
@@ -87,4 +91,3 @@ For walk-through instructions see [this guide](/docs/troubleshooting/#port-forwa
 ## Next
 
 Now that you've installed Coda and configured your network, let's move on to the fun part - [sending a transaction](/docs/my-first-transaction/)!
-
