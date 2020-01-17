@@ -1,3 +1,29 @@
+module Style = {
+  open Css;
+  let header =
+    style([
+      display(`flex),
+      marginTop(rem(2.)),
+      marginBottom(`rem(0.5)),
+      color(Theme.Colors.denimTwo),
+      hover([selector(".headerlink", [display(`inlineBlock)])]),
+    ]);
+
+  let headerLink =
+    style([
+      display(`none),
+      width(rem(1.)),
+      height(rem(1.)),
+      fontSize(`px(16)),
+      lineHeight(`px(24)),
+      marginLeft(rem(0.5)),
+      color(`transparent),
+      hover([color(`transparent)]),
+      backgroundSize(`cover),
+      backgroundImage(url("/static/img/link.svg")),
+    ]);
+};
+
 module type Component = {
   let className: string;
   let element: React.element;
@@ -10,21 +36,34 @@ module Wrap = (C: Component) => {
   };
 };
 
+module WrapHeader = (C: Component) => {
+  let className = C.className;
+  let make = props => {
+    switch (Js.Undefined.toOption(props##id)) {
+    | None => ReasonReact.cloneElement(C.element, ~props, [||])
+    | Some(id) =>
+      // Somewhat dangerously add a headerlink to the header's children
+      let children =
+        Js.Array.concat(
+          [|
+            <a className={"headerlink " ++ Style.headerLink} href={"#" ++ id}>
+              {React.string("a")}
+            </a>,
+          |],
+          [|props##children|],
+        );
+      ReasonReact.cloneElement(C.element, ~props, children);
+    };
+  };
+};
+
 open Css;
 
-let headerStyle =
-  style([
-    display(`flex),
-    marginTop(rem(2.)),
-    marginBottom(`rem(0.5)),
-    color(Theme.Colors.denimTwo),
-  ]);
-
 module H1 =
-  Wrap({
+  WrapHeader({
     let className =
       merge([
-        headerStyle,
+        Style.header,
         Theme.H1.hero,
         style([alignItems(`baseline), fontWeight(`light)]),
       ]);
@@ -32,10 +71,10 @@ module H1 =
   });
 
 module H2 =
-  Wrap({
+  WrapHeader({
     let className =
       merge([
-        headerStyle,
+        Style.header,
         Theme.H2.basic,
         style([alignItems(`baseline), fontWeight(`light)]),
       ]);
@@ -43,10 +82,10 @@ module H2 =
   });
 
 module H3 =
-  Wrap({
+  WrapHeader({
     let className =
       merge([
-        headerStyle,
+        Style.header,
         Theme.H3.basic,
         style([alignItems(`center), fontWeight(`medium)]),
       ]);
@@ -55,8 +94,8 @@ module H3 =
   });
 
 module H4 =
-  Wrap({
-    let className = merge([headerStyle, Theme.H4.basic]);
+  WrapHeader({
+    let className = merge([Style.header, Theme.H4.basic]);
     let element = <h2 className />;
   });
 
