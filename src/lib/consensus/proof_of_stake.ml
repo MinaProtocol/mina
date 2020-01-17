@@ -2608,6 +2608,7 @@ module Hooks = struct
                 set_snapshot local_state snapshot_id
                   {ledger= snapshot_ledger; delegatee_table} ;
                 return true
+            (* TODO figure out punishments here. *)
             | Ok (Error err) ->
                 Logger.faulty_peer_without_punishment logger
                   ~module_:__MODULE__ ~location:__LOC__
