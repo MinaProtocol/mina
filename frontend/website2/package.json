@@ -36,6 +36,7 @@
     "remark-math": "^2.0.0",
     "remark-parse": "^7.0.2",
     "remark-rehype": "^5.0.0",
+    "remark-slug": "^5.1.2",
     "unified": "^8.4.2"
   },
   "devDependencies": {
