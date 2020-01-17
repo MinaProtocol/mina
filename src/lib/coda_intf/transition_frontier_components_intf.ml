@@ -79,7 +79,7 @@ module type Transition_handler_processor_intf = sig
                                  , State_hash.t )
                                  Cached.t
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:transition_frontier_breadcrumb
+    -> producer_transition_reader:transition_frontier_breadcrumb
                                   Strict_pipe.Reader.t
     -> clean_up_catchup_scheduler:unit Ivar.t
     -> catchup_job_writer:( State_hash.t
@@ -290,7 +290,7 @@ module type Transition_frontier_controller_intf = sig
     -> network_transition_reader:External_transition.Initial_validated.t
                                  Envelope.Incoming.t
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
+    -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> clear_reader:[`Clear] Strict_pipe.Reader.t
     -> External_transition.Validated.t Strict_pipe.Reader.t
 end
@@ -347,7 +347,7 @@ module type Transition_router_intf = sig
                                    ]
                                  * [`Time_received of Block_time.t] )
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
+    -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:External_transition.Initial_validated.t
                                Broadcast_pipe.Reader.t
                                * External_transition.Initial_validated.t

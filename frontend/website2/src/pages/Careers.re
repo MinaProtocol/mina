@@ -340,7 +340,7 @@ module CareersSpacer = {
 
 [@react.component]
 let make = (~posts) => {
-  <Page>
+  <Page title="Work with us!">
     <div className=Style.page>
       <h1 className=Theme.H3.wings> {React.string("Work with us!")} </h1>
       <Spacer height=2.0 />

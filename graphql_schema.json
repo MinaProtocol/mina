@@ -3944,7 +3944,7 @@
         },
         {
           "kind": "OBJECT",
-          "name": "BlockProposals",
+          "name": "BlockProducerTimings",
           "description": null,
           "fields": [
             {
@@ -4647,7 +4647,7 @@
               "deprecationReason": null
             },
             {
-              "name": "proposePubkeys",
+              "name": "blockProducerPubkeys",
               "description": null,
               "args": [],
               "type": {
@@ -4695,12 +4695,12 @@
               "deprecationReason": null
             },
             {
-              "name": "nextProposal",
+              "name": "nextBlockProduction",
               "description": null,
               "args": [],
               "type": {
                 "kind": "OBJECT",
-                "name": "BlockProposals",
+                "name": "BlockProducerTimings",
                 "ofType": null
               },
               "isDeprecated": false,

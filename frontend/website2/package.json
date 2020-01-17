@@ -16,6 +16,7 @@
     "@mdx-js/react": "^1.5.1",
     "@next/mdx": "^9.1.5",
     "bs-css": "^9.0.1",
+    "bs-fetch": "^0.5.0",
     "bsc-stdlib-polyfill": "Schmavery/bsc-stdlib-polyfill",
     "contentful": "^7.10.0",
     "emotion-server": "^10.0.17",
@@ -35,6 +36,7 @@
     "remark-math": "^2.0.0",
     "remark-parse": "^7.0.2",
     "remark-rehype": "^5.0.0",
+    "remark-slug": "^5.1.2",
     "unified": "^8.4.2"
   },
   "devDependencies": {

@@ -309,7 +309,7 @@ module Section = {
 
 [@react.component]
 let make = () => {
-  <Page>
+  <Page title="Coda Testnet">
     <Next.Head>
       <script src="https://apis.google.com/js/api.js" />
       <script src="/static/js/leaderboard.js" />

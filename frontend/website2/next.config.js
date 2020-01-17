@@ -1,7 +1,7 @@
 const path = require('path');
 
 const { createClient } = require('contentful');
-const withMDX = require('@next/mdx')();
+const withMDX = require('@next/mdx')({ options: { remarkPlugins: [require("remark-slug")] } });
 const withTM = require('next-transpile-modules');
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
@@ -42,7 +42,7 @@ module.exports = withTM(withBundleAnalyzer(withMDX({
     return pages;
   },
   pageExtensions: ['jsx', 'js', 'mdx'],
-  transpileModules: ['bs-platform', 'bs-css', 'bsc-stdlib-polyfill'],
+  transpileModules: ['bs-platform', 'bs-css', 'bsc-stdlib-polyfill', 'bs-fetch'],
   webpack(config, options) {
     config.resolve.alias['@reason'] = path.join(__dirname, 'lib', 'es6', 'src');
     config.resolve.extensions.push('.bs.js');
