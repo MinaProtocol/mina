@@ -20,7 +20,7 @@ module Styles = {
       display(`none),
       media(
         Theme.MediaQuery.tablet,
-        [display(`flex), marginLeft(`rem(1.))],
+        [display(`flex), marginRight(`rem(-6.)), marginLeft(`rem(1.))],
       ),
     ]);
 
@@ -31,7 +31,6 @@ module Styles = {
       width(`percent(100.)),
       color(Theme.Colors.saville),
       textAlign(`center),
-      margin2(~v=rem(3.5), ~h=`zero),
     ]);
 
   let heroRow =
@@ -40,7 +39,14 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`spaceBetween),
       alignItems(`center),
-      media(Theme.MediaQuery.tablet, [flexDirection(`row)]),
+      media(
+        Theme.MediaQuery.tablet,
+        [
+          flexDirection(`row),
+          alignItems(`flexEnd),
+          padding2(~v=`rem(3.5), ~h=`zero),
+        ],
+      ),
     ]);
 
   let heroText =
@@ -93,34 +99,6 @@ module Styles = {
       ]),
     ]);
 
-  let buttonRow =
-    style([
-      display(`grid),
-      gridTemplateColumns([`repeat((`num(1), `rem(21.25)))]),
-      gridTemplateRows([`repeat((`num(1), `rem(14.25)))]),
-      media(
-        Theme.MediaQuery.tablet,
-        [
-          gridTemplateColumns([`repeat((`num(2), `rem(23.8)))]),
-          gridTemplateRows([`repeat((`num(2), `rem(12.5)))]),
-        ],
-      ),
-      media(
-        Theme.MediaQuery.desktop,
-        [
-          gridTemplateColumns([`repeat((`num(2), `rem(32.5)))]),
-          gridTemplateRows([`repeat((`num(2), `rem(11.5)))]),
-        ],
-      ),
-      gridRowGap(rem(2.5625)),
-      gridColumnGap(rem(3.)),
-      justifyContent(`center),
-      marginLeft(`auto),
-      marginRight(`auto),
-      marginTop(rem(5.18)),
-      marginBottom(rem(3.)),
-    ]);
-
   let whitePaperButtonRow =
     style([
       display(`grid),
@@ -133,6 +111,29 @@ module Styles = {
       ),
     ]);
 
+  let stepRowFlex = style([display(`flex), justifyContent(`center)]);
+  let stepRow =
+    style([
+      display(`grid),
+      gridTemplateColumns([`repeat((`num(1), `rem(20.)))]),
+      gridTemplateRows([auto]),
+      gridRowGap(`rem(1.0)),
+      gridColumnGap(`rem(2.43)),
+      margin(`auto),
+      media(
+        Theme.MediaQuery.tablet,
+        [
+          gridTemplateColumns([`repeat((`num(3), `rem(17.5)))]),
+          gridColumnGap(`rem(1.43)),
+        ],
+      ),
+      media(
+        Theme.MediaQuery.desktop,
+        [gridTemplateColumns([`repeat((`num(3), `rem(21.25)))])],
+      ),
+      gridColumnGap(`rem(2.43)),
+    ]);
+
   let textBlock = style([maxWidth(`rem(43.75)), width(`percent(100.))]);
   let textBlockHeading =
     style([
@@ -141,6 +142,8 @@ module Styles = {
       fontWeight(`medium),
       fontSize(`rem(2.)),
     ]);
+  let resources =
+    merge([textBlockHeading, style([color(Theme.Colors.midnight)])]);
 };
 
 [@react.component]
@@ -195,7 +198,47 @@ let make = () => {
              )}
           </p>
         </div>
-        <hr className=Styles.lineBreak />
+        <Spacer height=3. />
+        <div className=Styles.stepRowFlex>
+          <div className=Styles.stepRow>
+            <StepButton
+              label="Step 1: Apply Now"
+              image="/static/img/ApplyCircle.svg"
+              buttonLabel="Apply"
+              buttonLink="https://google.com"
+            />
+            <StepButton
+              label="Step 2: Join Discord"
+              image="/static/img/DiscordCircle.svg"
+              buttonLabel="Join"
+              buttonLink="https://google.com"
+            />
+            <StepButton
+              label="Step 3: Participate in Testnet"
+              image="/static/img/TestnetCircle.svg"
+              buttonLabel="Get Started"
+              buttonLink="https://google.com"
+            />
+          </div>
+        </div>
+        <Spacer height=4.25 />
+        <div className=Styles.textBlock>
+          <p className=Styles.heroCopy>
+            {React.string(
+               "Up to 1000 members will be selected from our testnet community
+               to receive a grant of 66,000 tokens as founding members of Genesis.
+                Prior to mainnet, 6.67% of the protocol will be distributed in this manner.
+                New Genesis founding members will be announced on a rolling basis.
+                To learn more about the selection criteria and requirements, see the ",
+             )}
+            <a className=Theme.Link.basic href="https://google.com">
+              {React.string("Terms and Conditions.")}
+            </a>
+          </p>
+        </div>
+        <Spacer height=4.25 />
+        <h1 className=Styles.resources> {React.string("Resources")} </h1>
+        <Spacer height=2. />
         <div className=Styles.whitePaperButtonRow>
           <WhitepaperButton
             label="Technical whitepaper"
@@ -203,6 +246,44 @@ let make = () => {
           />
           <Spacer width=2.5 />
           <WhitepaperButton label="Economic whitepaper" sigil=Icons.economic />
+        </div>
+        <Spacer height=1.5 />
+        <a className=Theme.Link.basic href="https://google.com">
+          {React.string("Terms and Conditions ")}
+        </a>
+        <Spacer height=5.65 />
+        <h1 className=Styles.resources>
+          {React.string("About Coda Protocol")}
+        </h1>
+        <div className=Styles.textBlock>
+          <Spacer height=1.875 />
+          <p className=Styles.heroCopy>
+            <a className=Theme.Link.basic href="https://codaprotocol.com">
+              {React.string("Coda Protocol")}
+            </a>
+            {React.string(
+               ", the world's lightest blockchain, provides a foundation for the
+               decentralized digital economy (Web 3.0), offering scalability to thousands
+                of transactions per second, millions of users, and years of transaction
+                history without sacrificing security. By utilizing recursive zk-SNARKs,
+                the Coda blockchain always stays about 20 kilobytes (the size of a few tweets).
+                Recursive zk-SNARKs allow nodes to rapidly share and update proof
+                of the correct blockchain state across the network. This breakthrough application
+                of zk-SNARKs solves the issues of scalability and high barrier to entry for nodes
+                that have plagued legacy blockchains to-date. By making it easier for nodes to
+                participate, Coda improves decentralization and therefore security of the network.
+                The Coda blockchain can be easily accessed from any device, including phones and
+                browsers, and can be seamlessly integrated into new decentralized applications (dapps).",
+             )}
+          </p>
+          <Spacer height=1.3 />
+          <p className=Styles.heroCopy>
+            {React.string("For regular updates on Coda, follow us on ")}
+            <a className=Theme.Link.basic href="">
+              {React.string("Twitter")}
+            </a>
+            {React.string(".")}
+          </p>
         </div>
       </div>
     </Wrapped>
