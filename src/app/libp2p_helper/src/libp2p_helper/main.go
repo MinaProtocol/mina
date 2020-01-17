@@ -336,7 +336,6 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			Idx:    s.Subscription,
 		})
 
-                return true // should really not be doing this!
 		// Wait for the validation response, but be sure to honor any timeout/deadline in ctx
 		select {
 		case <-ctx.Done():
@@ -350,10 +349,12 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			}
 			return false
 		case res := <-ch:
-			return true || res
-			// should really return res here!
+			if !res {
+				app.P2p.Logger.Error("why u fail to validate :(")
+			}
+			return res
 		}
-	}, pubsub.WithValidatorConcurrency(6), pubsub.WithValidatorTimeout(30*time.Second))
+	}, pubsub.WithValidatorConcurrency(32), pubsub.WithValidatorTimeout(5*time.Minute))
 
 	if err != nil {
 		return nil, badp2p(err)

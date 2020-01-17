@@ -169,7 +169,9 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                >>= defer validate_delta_transition_chain)
            with
            | Ok verified_transition ->
-               is_valid_cb true ;
+               External_transition.poke_validation_callback
+                 (Envelope.Incoming.data transition_env)
+                 is_valid_cb ;
                Envelope.Incoming.wrap ~data:verified_transition ~sender
                |> Writer.write valid_transition_writer ;
                return ()

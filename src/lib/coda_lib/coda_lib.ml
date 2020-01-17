@@ -844,9 +844,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                                 transition ) ]
                         "Rebroadcasting $state_hash" ;
                       (* remove verified status for network broadcast *)
-                      Coda_networking.broadcast_state net
-                        (External_transition.Validation.forget_validation
-                           transition)
+                      External_transition.Validated.broadcast transition
                   | Error reason ->
                       let timing_error_json =
                         match reason with
@@ -855,6 +853,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                         | `Too_late slots ->
                             `String (sprintf "%Lu slots too late" slots)
                       in
+                      External_transition.Validated.don't_broadcast transition ;
                       Logger.warn config.logger ~module_:__MODULE__
                         ~location:__LOC__
                         ~metadata:
