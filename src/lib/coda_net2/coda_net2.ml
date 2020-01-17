@@ -315,7 +315,7 @@ module Helper = struct
     end
 
     module Ban_ip = struct
-      type input = string [@@deriving yojson]
+      type input = {ip: string} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -1191,7 +1191,7 @@ let lookup_peerid = Helper.lookup_peerid
 
 let ban_ip net ip =
   match%map
-    Helper.(do_rpc net (module Rpcs.Ban_ip) (Unix.Inet_addr.to_string ip))
+    Helper.(do_rpc net (module Rpcs.Ban_ip) {ip= Unix.Inet_addr.to_string ip})
   with
   | Ok "banIP success" ->
       net.banned_ips <- ip :: net.banned_ips ;
