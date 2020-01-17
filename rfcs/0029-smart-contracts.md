@@ -399,6 +399,90 @@ upon the foundation of the previous proposal.
 * All of the benefits of WASM for constraints and witnesses, except those
   specific to WASM.
 
+## Time estimates
+[time-estimates]: #time-estimates
+
+### Storage model
+
+* Economics/business logic decisions.
+  - No estimate (@es92 to advise).
+* Storage design decisions.
+  - No estimate (crypto and protocol teams to advise).
+* On-chain storage model.
+  - Estimate 2-5 days (to check with protocol team).
+* Storage expiry logic.
+  - Estimate 1-2 days (to check with protocol team).
+* Data storage transactions (consensus and transaction snark).
+  - Estimate 5-10 days (to check with protocol team).
+* Further testing and initial optimisations.
+  - Estimate 2-6 days (to check with protocol team).
+
+### Proof verification
+
+* Universal snark implementations.
+  - No estimate (@ihm to advise).
+  - Not necessary for verification key model.
+* Verification of transactions using proofs (consensus and transaction snark).
+  - Estimate 5-10 days (to check with crypto team).
+* Integration for reading additional on-chain storage.
+  - Estimate 2-4 days.
+  - This is a 'good to have', could be omitted.
+* Integration with additional public/auxiliary inputs.
+  - Estimate 3-4 days.
+  - Not necessary for off-chain proof generation models.
+* Further testing and initial optimisations.
+  - Estimate 4-7 days (to check with crypto team).
+
+### WASM Evaluation
+
+* Economics/business logic decisions for gas.
+  - No estimate (@es92 to advise).
+* Evaluation using reference interpreter (written in OCaml).
+  - https://github.com/WebAssembly/spec
+    + Runs slower, easier to integrate.
+  - Integration with daemon.
+    + Estimate 2-4 days.
+  - Orchestration for gas measurement.
+    + Estimate 3-5 days.
+  - Memory limiting / sandboxing.
+    + Estimate 1-4 days.
+  - Integration of snark-specific built-ins.
+    + Estimate 5-8 days.
+* Evaluation using WASM3 interpreter (written in C).
+  - https://github.com/wasm3/wasm3
+    + Runs faster, harder to integrate.
+  - Integration with daemon.
+    + Estimate 5-10 days.
+  - Orchestration for gas measurement.
+    + Estimate 4-8 days.
+  - Memory limiting / sandboxing.
+    + Estimate 2-5 days.
+  - Integration of snark-specific built-ins.
+    + Estimate 7-12 days.
+- Gas costs per instruction and built-in operation.
+  + Estimate 2-4 days.
+* Further testing and initial optimisations.
+  - Estimate 2-6 days.
+
+Estimates should run roughly the same for other VMs, the main factors will be
+the language that the VM is implemented in, instruction complexity and the VM's
+data-flow model.
+
+### Snarky implementation in rust
+
+Since rust has strong support for WASM, and is similar enough to OCaml that we
+could closely follow snarky's implementation/libraries, this could form a
+viable option for a good smart contract language, and allow us to use a WASM
+backend.
+
+* Duplicate snarky core implementation in rust.
+  - Estimate 1-2 weeks.
+* Convert snarky libraries to rust snarky libraries.
+  - Estimate 1-2 weeks.
+* Set up for easy WASM compilation and special-casing for our snark-specific
+  built-ins.
+  - 3-5 days.
+
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
