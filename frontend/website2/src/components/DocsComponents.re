@@ -22,22 +22,27 @@ module Style = {
       backgroundSize(`cover),
       backgroundImage(url("/static/img/link.svg")),
     ]);
+
+  let list =
+    merge([
+      style([
+        margin2(~v=`rem(1.), ~h=`zero),
+        marginLeft(rem(1.5)),
+        padding(`zero),
+      ]),
+      Theme.Body.basic,
+    ]);
 };
 
-module type Component = {
-  let className: string;
-  let element: React.element;
-};
+module type Component = {let element: React.element;};
 
 module Wrap = (C: Component) => {
-  let className = C.className;
   let make = props => {
     ReasonReact.cloneElement(C.element, ~props, [||]);
   };
 };
 
 module WrapHeader = (C: Component) => {
-  let className = C.className;
   let make = props => {
     switch (Js.Undefined.toOption(props##id)) {
     | None => ReasonReact.cloneElement(C.element, ~props, [||])
@@ -46,9 +51,10 @@ module WrapHeader = (C: Component) => {
       let children =
         Js.Array.concat(
           [|
-            <a className={"headerlink " ++ Style.headerLink} href={"#" ++ id}>
-              {React.string("a")}
-            </a>,
+            <a
+              className={"headerlink " ++ Style.headerLink}
+              href={"#" ++ id}
+            />,
           |],
           [|props##children|],
         );
@@ -61,106 +67,105 @@ open Css;
 
 module H1 =
   WrapHeader({
-    let className =
-      merge([
-        Style.header,
-        Theme.H1.hero,
-        style([alignItems(`baseline), fontWeight(`light)]),
-      ]);
-    let element = <h1 className />;
+    let element =
+      <h1
+        className={merge([
+          Style.header,
+          Theme.H1.hero,
+          style([alignItems(`baseline), fontWeight(`light)]),
+        ])}
+      />;
   });
 
 module H2 =
   WrapHeader({
-    let className =
-      merge([
-        Style.header,
-        Theme.H2.basic,
-        style([alignItems(`baseline), fontWeight(`light)]),
-      ]);
-    let element = <h2 className />;
+    let element =
+      <h2
+        className={merge([
+          Style.header,
+          Theme.H2.basic,
+          style([alignItems(`baseline), fontWeight(`light)]),
+        ])}
+      />;
   });
 
 module H3 =
   WrapHeader({
-    let className =
-      merge([
-        Style.header,
-        Theme.H3.basic,
-        style([alignItems(`center), fontWeight(`medium)]),
-      ]);
-
-    let element = <h2 className />;
+    let element =
+      <h2
+        className={merge([
+          Style.header,
+          Theme.H3.basic,
+          style([alignItems(`center), fontWeight(`medium)]),
+        ])}
+      />;
   });
 
 module H4 =
   WrapHeader({
-    let className = merge([Style.header, Theme.H4.basic]);
-    let element = <h2 className />;
+    let element = <h2 className={merge([Style.header, Theme.H4.basic])} />;
   });
 
 module P =
   Wrap({
-    let className =
-      style([
-        color(Theme.Colors.saville),
-        fontWeight(`extraLight),
-        ...Theme.Body.basicStyles,
-      ]);
-
-    let element = <p className />;
+    let element =
+      <p
+        className={style([
+          color(Theme.Colors.saville),
+          fontWeight(`extraLight),
+          ...Theme.Body.basicStyles,
+        ])}
+      />;
   });
 
 module A =
   Wrap({
-    let className = Theme.Link.basic;
-    let element = <a className />;
+    let element = <a className=Theme.Link.basic />;
   });
 
 module Strong =
   Wrap({
-    let className =
-      style([fontWeight(`num(600)), color(Theme.Colors.saville)]);
-    let element = <strong className />;
+    let element =
+      <strong
+        className={style([
+          fontWeight(`num(600)),
+          color(Theme.Colors.saville),
+        ])}
+      />;
   });
 
 module Pre =
   Wrap({
-    let className =
-      style([
-        backgroundColor(Theme.Colors.slateAlpha(0.05)),
-        borderRadius(`px(9)),
-        padding2(~v=`rem(0.5), ~h=`rem(1.)),
-        overflow(`scroll),
-      ]);
-    let element = <pre className />;
+    let element =
+      <pre
+        className={style([
+          backgroundColor(Theme.Colors.slateAlpha(0.05)),
+          borderRadius(`px(9)),
+          padding2(~v=`rem(0.5), ~h=`rem(1.)),
+          overflow(`scroll),
+        ])}
+      />;
   });
 
 module Code =
   Wrap({
-    let className =
-      style([Theme.Typeface.pragmataPro, color(Theme.Colors.midnight)]);
-    let element = <code className />;
+    let element =
+      <code
+        className={style([
+          Theme.Typeface.pragmataPro,
+          color(Theme.Colors.midnight),
+        ])}
+      />;
   });
 
 module Ul =
   Wrap({
-    let className =
-      merge([
-        style([
-          margin2(~v=`rem(1.), ~h=`zero),
-          marginLeft(rem(1.5)),
-          padding(`zero),
-        ]),
-        Theme.Body.basic,
-      ]);
-    let element = <ul className />;
+    let element = <ul className=Style.list />;
   });
 
 module Ol =
   Wrap({
-    let className = Ul.className;
-    let element = <ol className />;
+    let element = <ol className=Style.list />;
   });
 
 module Metadata = {
