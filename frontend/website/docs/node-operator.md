@@ -16,44 +16,48 @@ The Coda network is secured by [Proof-of-Stake consensus](/docs/glossary/#proof-
 
 <!-- coda client set-staking -privkey-path keys/my-wallet -->
 
-Since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can now start the daemon with the `-propose-key` flag to begin staking coda. Let's stop our current daemon process, and restart it with the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`):
+Since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can now start the daemon with the `-block-producer-key` flag to begin staking coda. Let's stop our current daemon process, and restart it with the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`):
 
     coda daemon \
         -discovery-port 8303 \
         -peer /dns4/peer1-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs \
         -peer /dns4/peer2-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF \
         -peer /dns4/peer3-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7 \
-        -propose-key keys/my-wallet
+        -block-producer-key keys/my-wallet
 
 !!! note
     You can provide a list of key files to turn on staking for multiple wallets at the same time.
 
 We can always check which wallets we're currently staking with, by using the `coda client status` command:
 
-    coda client status
+```
+coda client status
     
-    Coda Daemon Status 
-    -----------------------------------
-    
-    Global Number of Accounts:                     18
-    The Total Number of Blocks in the Blockchain:  1
-    Local Uptime:                                  36s
-    Ledger Merkle Root:                            ...
-    Staged-ledger Hash:                            ...
-    Staged Hash:                                   ...
-    GIT SHA1:                                      ...
-    Configuration Directory:                       ...
-    Peers:                                         ...
-    User_commands Sent:                            0
-    Snark Worker Running:                          false
-    Sync Status:                                   Offline
-    Proposers Running:                             Total: 1 (8QnLUNW7sUxnApau4SLShwr25koiSKrECxtveu89PPmQW5pEyy3xK8YgRpZQkZEanc)
-    Best Tip Consensus Time:                       0:0
-    Consensus Time Now:                            11542:461
-    Consensus Mechanism:                           proof_of_stake
-    ...
+Coda daemon status
+-----------------------------------
 
-The `Proposers Running` field in the response above returns the number of accounts currently staking, with the associated key.
+Global number of accounts:       187
+Block height:                    8512
+Max observed block length:       8512
+Local uptime:                    6h17m58s
+Ledger Merkle root:              ...
+Protocol state hash:             ...
+Git SHA-1:                       ...
+Configuration directory:         ...
+Peers:                           ...
+User_commands sent:              0
+SNARK worker:                    None
+SNARK work fee:                  1
+Sync status:                     Synced
+Block producers running:         0
+Best tip consensus time:         epoch=71, slot=211
+Next block will be produced in:  None this epoch… checking at in 1.212h
+Consensus time now:              epoch=71, slot=215
+Consensus mechanism:             proof_of_stake
+...
+```
+
+The `Block producers running` field in the response above returns the number of accounts currently staking, with the associated keys.
 
 !!! warning
     Keep in mind that if you are staking independently with funds in a wallet, you need to remain connected to the network at all times to be receive coinbase rewards as a block producer. If you need to go offline frequently, it may be better to delegate your stake.

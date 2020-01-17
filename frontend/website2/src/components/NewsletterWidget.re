@@ -26,8 +26,6 @@ module Styles = {
       border(px(1), `solid, Theme.Colors.jungle),
       color(Theme.Colors.jungle),
       borderRadius(px(4)),
-      visibility(`hidden),
-      opacity(0.),
       transition("all", ~duration=150),
     ]);
 
@@ -85,16 +83,38 @@ module Styles = {
     ]);
 };
 
-let widgetCounter = ref(0);
-let uniqueId = () => {
-  widgetCounter := widgetCounter^ + 1;
-  string_of_int(widgetCounter^);
-};
+[@bs.new]
+external urlSearchParams: Js.t('a) => Fetch.urlSearchParams =
+  "URLSearchParams";
 
 [@react.component]
 let make = (~center as centerText=false) => {
-  let formId = uniqueId();
-  <form id={"subscribe-form-" ++ formId} className=Styles.container>
+  let (successState, showSuccess) = React.useState(() => false);
+  let (email, setEmail) = React.useState(() => "");
+
+  <form
+    className=Styles.container
+    onSubmit={e => {
+      ReactEvent.Form.preventDefault(e);
+      Fetch.fetchWithInit(
+        "https://jfs501bgik.execute-api.us-east-2.amazonaws.com/dev/subscribe",
+        Fetch.RequestInit.make(
+          ~method_=Post,
+          ~body=
+            Fetch.BodyInit.makeWithUrlSearchParams(
+              urlSearchParams({"email": email}),
+            ),
+          ~mode=NoCORS,
+          (),
+        ),
+      )
+      |> Js.Promise.then_(_ => {
+           showSuccess(_ => true);
+           Js.Global.setTimeout(() => showSuccess(_ => false), 5000)
+           |> Js.Promise.resolve;
+         })
+      |> ignore;
+    }}>
     <div
       className=Css.(
         style([
@@ -104,44 +124,22 @@ let make = (~center as centerText=false) => {
       )>
       {React.string("Subscribe to our newsletter for updates")}
     </div>
-    <div id={"success-message-" ++ formId} className=Styles.successMessage>
-      {React.string({js|✓ Check your email|js})}
-    </div>
-    <input
-      type_="email"
-      name="email"
-      placeholder="janedoe@example.com"
-      className=Styles.textField
-    />
-    <input
-      type_="submit"
-      value="Subscribe"
-      id={"subscribe-button-" ++ formId}
-      className=Styles.submit
-    />
-    <RunScript>
-      {j|
-            document.getElementById('subscribe-form-$formId '.trim()).onsubmit = function (e) {
-              e.preventDefault();
-              const formElement = document.getElementById('subscribe-form-$formId '.trim());
-              const request = new XMLHttpRequest();
-              const submitButton = document.getElementById('subscribe-button-$formId '.trim());
-              submitButton.setAttribute('disabled', 'disabled');
-              request.onload = function () {
-                const successMessage = document.getElementById('success-message-$formId '.trim());
-                successMessage.style.visibility = "visible";
-                successMessage.style.opacity = 1;
-                setTimeout(function () {
-                  submitButton.removeAttribute('disabled');
-                  successMessage.style.visibility = "hidden";
-                  successMessage.style.opacity = 0;
-                }, 5000);
-              };
-              request.open("POST", "https://jfs501bgik.execute-api.us-east-2.amazonaws.com/dev/subscribe");
-              request.send(new URLSearchParams(new FormData(formElement)));
-              return false;
-            }
-          |j}
-    </RunScript>
+    {successState
+       ? <div className=Styles.successMessage>
+           {React.string({js|✓ Check your email|js})}
+         </div>
+       : <>
+           <input
+             type_="email"
+             value=email
+             placeholder="janedoe@example.com"
+             onChange={e => {
+               let value = ReactEvent.Form.target(e)##value;
+               setEmail(_ => value);
+             }}
+             className=Styles.textField
+           />
+           <input type_="submit" value="Subscribe" className=Styles.submit />
+         </>}
   </form>;
 };
