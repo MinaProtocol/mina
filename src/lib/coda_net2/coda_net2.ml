@@ -1411,13 +1411,16 @@ let%test_module "coda network tests" =
       let%bind () = Pubsub.Subscription.publish a_sub M.a_sent in
       (* Give the publish time to propagate *)
       let%bind () = after (sec 2.) in
+      let%bind a_recv = Strict_pipe.Reader.read a_r in
       let%bind b_recv = Strict_pipe.Reader.read b_r in
+      [%test_eq: M.msg] M.a_sent (unwrap_eof a_recv) ;
       [%test_eq: M.msg] M.a_sent (unwrap_eof b_recv) ;
       let%bind () = Pubsub.Subscription.publish b_sub M.b_sent in
-      (* Give the publish time to propagate *)
       let%bind () = after (sec 2.) in
       let%bind a_recv = Strict_pipe.Reader.read a_r in
+      let%bind b_recv = Strict_pipe.Reader.read b_r in
       [%test_eq: M.msg] M.b_sent (unwrap_eof a_recv) ;
+      [%test_eq: M.msg] M.b_sent (unwrap_eof b_recv) ;
       shutdown ()
 
     let should_forward_message _ = return true
