@@ -405,25 +405,23 @@ upon the foundation of the previous proposal.
 ### Storage model
 
 * Economics/business logic decisions.
-  - No estimate (@es92 to advise).
+  - Estimate 1 week.
 * Storage design decisions.
   - No estimate (crypto and protocol teams to advise).
 * On-chain storage model.
-  - Estimate 2-5 days (to check with protocol team).
-* Storage expiry logic.
-  - Estimate 1-2 days (to check with protocol team).
+  - Estimate 2-4 weeks.
+* Storage expiry logic + transaction.
+  - Estimate 2 weeks.
 * Data storage transactions (consensus and transaction snark).
-  - Estimate 5-10 days (to check with protocol team).
-* Further testing and initial optimisations.
-  - Estimate 2-6 days (to check with protocol team).
+  - Estimate 2 weeks.
 
 ### Proof verification
 
 * Universal snark implementations.
-  - No estimate (@ihm to advise).
+  - Estimate 1-2 weeks.
   - Not necessary for verification key model.
 * Verification of transactions using proofs (consensus and transaction snark).
-  - Estimate 5-10 days (to check with crypto team).
+  - Estimate 1 week.
 * Integration for reading additional on-chain storage.
   - Estimate 2-4 days.
   - This is a 'good to have', could be omitted.
@@ -433,32 +431,39 @@ upon the foundation of the previous proposal.
 * Further testing and initial optimisations.
   - Estimate 4-7 days (to check with crypto team).
 
+### Gas
+
+* Decide on block gas limits.
+  - Estimate 1-2 weeks.
+* Limiting block gas usage to the given limit.
+  - Estimate 2 weeks.
+* Logic to reject blocks above the gas limit.
+  - Estimate 2 weeks.
+
 ### WASM Evaluation
 
-* Economics/business logic decisions for gas.
-  - No estimate (@es92 to advise).
 * Evaluation using reference interpreter (written in OCaml).
   - https://github.com/WebAssembly/spec
     + Runs slower, easier to integrate.
   - Integration with daemon.
-    + Estimate 2-4 days.
+    + Estimate 1-2 weeks.
   - Orchestration for gas measurement.
-    + Estimate 3-5 days.
+    + Estimate 1 week.
   - Memory limiting / sandboxing.
     + Estimate 1-4 days.
   - Integration of snark-specific built-ins.
-    + Estimate 5-8 days.
+    + Estimate 1-2 weeks.
 * Evaluation using WASM3 interpreter (written in C).
   - https://github.com/wasm3/wasm3
     + Runs faster, harder to integrate.
   - Integration with daemon.
-    + Estimate 5-10 days.
+    + Estimate 2-3 weeks.
   - Orchestration for gas measurement.
-    + Estimate 4-8 days.
+    + Estimate 1-2 weeks.
   - Memory limiting / sandboxing.
     + Estimate 2-5 days.
   - Integration of snark-specific built-ins.
-    + Estimate 7-12 days.
+    + Estimate 2-3 weeks.
 - Gas costs per instruction and built-in operation.
   + Estimate 2-4 days.
 * Further testing and initial optimisations.
@@ -482,6 +487,46 @@ backend.
 * Set up for easy WASM compilation and special-casing for our snark-specific
   built-ins.
   - 3-5 days.
+
+### Per proposal
+
+* Witness generation + proving off chain: store verification keys in accounts
+  - Storage estimate: 7-9 weeks
+  - Proof verification estimate: 2-4 weeks
+  - **Total estimate: 7-9 weeks** (assuming run mostly in parallel)
+
+* Witness generation + proving off chain: store WASM blob for generating the
+  constraints
+  - Storage estimate: 7-9 weeks
+  - Proof verification estimate: 4-6 weeks
+  - Gas estimate: 5-6 weeks
+  - WASM estimate: 4-6 weeks
+  - **Total estimate: 7-9 weeks** (assuming run mostly in parallel)
+
+* Witness generation + proving on chain: store WASM blobs for generating
+  constraints and witnesses in accounts
+  - Storage estimate: 7-9 weeks
+  - Proof verification estimate: 5-8 weeks
+  - Gas estimate: 5-6 weeks
+  - WASM estimate: 4-6 weeks
+  - **Total estimate: 7-9 weeks** (assuming run mostly in parallel)
+
+* Witness generation + proving on chain: store snarky programs in accounts
+  (snarky-rust version, no WASM)
+  - Storage estimate: 7-9 weeks
+  - Proof verification estimate: 5-7 weeks
+  - Gas estimate: 5 weeks
+  - Snarky rust estimate: 2-4 weeks
+  - **Total estimate: 7-9 weeks** (assuming run mostly in parallel)
+
+* Witness generation + proving on chain: store snarky programs in accounts
+  (snarky-rust version, using WASM)
+  - Storage estimate: 7-9 weeks
+  - Proof verification estimate: 5-7 weeks
+  - Gas estimate: 5 weeks
+  - WASM estimate 4-6 weeks
+  - Snarky rust estimate: 3-5 weeks, mostly in parallel
+  - **Total estimate: 7-9 weeks** (assuming run mostly in parallel)
 
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
