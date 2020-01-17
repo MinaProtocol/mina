@@ -13,6 +13,7 @@ module Style = {
       width(`percent(100.)),
       media(Theme.MediaQuery.notMobile, [width(`rem(27.5))]),
       media(Theme.MediaQuery.veryLarge, [width(`rem(33.125))]),
+      hover([backgroundColor(Theme.Colors.tan)]),
     ]);
 
   let ellipticBackground =
@@ -45,7 +46,7 @@ module Style = {
 // the page looking icon in the button
 module Icon = {
   module Style = {
-    let container = style([position(`relative)]);
+    let container = style([position(`relative), backgroundColor(white)]);
 
     let page = style([]);
 

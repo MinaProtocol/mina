@@ -8,6 +8,8 @@ module Colors = {
       Printf.sprintf("hsla(%f,%f%%,%f%%,%f)", h, s, l, a);
 
   let fadedBlue = `rgb((111, 167, 197));
+  let babyBlue = `hex("F4F8FB");
+
   let white = Css.white;
   let whiteAlpha = a => `rgba((255, 255, 255, a));
   let hyperlinkAlpha = a =>
@@ -65,6 +67,8 @@ module Colors = {
 
   let jungleAlpha = a => `rgba((47, 172, 70, a));
   let jungle = jungleAlpha(1.);
+
+  let tan = `hex("E3E0D5");
 };
 
 module Typeface = {
