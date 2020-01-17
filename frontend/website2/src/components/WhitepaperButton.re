@@ -69,10 +69,10 @@ module Icon = {
 };
 
 [@react.component]
-let make = (~label, ~sigil) => {
-  <button className=Style.container ariaLabel=label>
+let make = (~label, ~href, ~sigil) => {
+  <a href className=Style.container ariaLabel=label>
     <span className=Style.ellipticBackground> EllipticBackground.svg </span>
     <label className=Style.label> {React.string(label)} </label>
     <span className=Style.icon> <Icon sigil /> </span>
-  </button>;
+  </a>;
 };

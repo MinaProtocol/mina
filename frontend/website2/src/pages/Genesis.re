@@ -215,13 +215,13 @@ let make = () => {
               label="Step 2: Join Discord"
               image="/static/img/DiscordCircle.svg"
               buttonLabel="Join"
-              buttonLink="https://google.com"
+              buttonLink="https://bit.ly/CodaDiscord"
             />
             <StepButton
               label="Step 3: Participate in Testnet"
               image="/static/img/TestnetCircle.svg"
               buttonLabel="Get Started"
-              buttonLink="https://google.com"
+              buttonLink="https://codaprotocol.com/testnet/"
             />
           </div>
         </div>
@@ -270,12 +270,19 @@ let make = () => {
           <WhitepaperButton
             label="Technical whitepaper"
             sigil=Icons.technical
+            href="https://cdn.codaprotocol.com/v2/static/coda-whitepaper-05-10-2018-0.pdf"
           />
           <Spacer width=2.5 />
-          <WhitepaperButton label="Economic whitepaper" sigil=Icons.economic />
+          <WhitepaperButton
+            label="Economic whitepaper"
+            sigil=Icons.economic
+            href="https://cdn.codaprotocol.com/v2/static/coda-whitepaper-05-10-2018-0.pdf"
+          />
         </div>
         <Spacer height=1.5 />
-        <a className=Theme.Link.basic href="https://google.com">
+        <a
+          className=Theme.Link.basic
+          href="/static/T&C - Coda Genesis Program.pdf">
           {React.string("Terms and Conditions ")}
         </a>
         <Spacer height=5.65 />
@@ -306,7 +313,9 @@ let make = () => {
           <Spacer height=1.3 />
           <p className=Styles.heroCopy>
             {React.string("For regular updates on Coda, follow us on ")}
-            <a className=Theme.Link.basic href="">
+            <a
+              className=Theme.Link.basic
+              href="https://twitter.com/codaprotocol?lang=en">
               {React.string("Twitter")}
             </a>
             {React.string(".")}
