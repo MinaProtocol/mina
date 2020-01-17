@@ -1,0 +1,13 @@
+(library
+ (name block_producer)
+ (public_name block_producer)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries
+   async async_extra core coda_base coda_intf coda_state
+   coda_transition envelope interruptible o1trace pipe_lib
+   prover transaction_snark_scan_state transition_frontier
+   network_pool unix_timestamp otp_lib transition_chain_prover)
+ (preprocess
+  (pps ppx_coda ppx_jane bisect_ppx -- -conditional))
+ (synopsis "Coda block producer"))

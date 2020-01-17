@@ -36,7 +36,9 @@ module Transaction_with_witness = struct
     module V1 = struct
       (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
       type t =
-        { transaction_with_info: Transaction_logic.Undo.Stable.V1.t
+        { transaction_with_info:
+            Transaction_logic.Undo.Stable.V1.t
+            Transaction_protocol_state.Stable.V1.t
         ; statement: Transaction_snark.Statement.Stable.V1.t
         ; witness: Transaction_witness.Stable.V1.t sexp_opaque }
       [@@deriving sexp]
@@ -46,7 +48,7 @@ module Transaction_with_witness = struct
   end]
 
   type t = Stable.Latest.t =
-    { transaction_with_info: Ledger.Undo.t
+    { transaction_with_info: Ledger.Undo.t Transaction_protocol_state.t
     ; statement: Transaction_snark.Statement.t
     ; witness: Transaction_witness.t sexp_opaque }
   [@@deriving sexp]
@@ -184,7 +186,9 @@ let create_expected_statement
     Frozen_ledger_hash.of_ledger_hash
     @@ Sparse_ledger.merkle_root witness.ledger
   in
-  let%bind transaction = Ledger.Undo.transaction transaction_with_info in
+  let%bind transaction =
+    Ledger.Undo.transaction transaction_with_info.transaction
+  in
   let%bind after =
     Or_error.try_with (fun () ->
         Sparse_ledger.apply_transaction_exn witness.ledger transaction )
@@ -196,11 +200,17 @@ let create_expected_statement
     statement.pending_coinbase_stack_state.source
   in
   let pending_coinbase_after =
+    let pending_coinbase_with_state =
+      Option.value_map transaction_with_info.block_data
+        ~f:(fun sbh ->
+          Pending_coinbase.Stack.push_state sbh pending_coinbase_before )
+        ~default:pending_coinbase_before
+    in
     match transaction with
     | Coinbase c ->
-        Pending_coinbase.Stack.push pending_coinbase_before c
+        Pending_coinbase.Stack.push_coinbase c pending_coinbase_with_state
     | _ ->
-        pending_coinbase_before
+        pending_coinbase_with_state
   in
   let%bind fee_excess = Transaction.fee_excess transaction in
   let%map supply_increase = Transaction.supply_increase transaction in
@@ -347,7 +357,12 @@ struct
                   acc_statement transaction.statement
               else
                 M.return
-                @@ Or_error.error_string (write_error "Bad base statement") )
+                @@ Or_error.error_string
+                     (sprintf
+                        !"Bad base statement expected: \
+                          %{sexp:Transaction_snark.Statement.t} got: \
+                          %{sexp:Transaction_snark.Statement.t}"
+                        transaction.statement expected_statement) )
     in
     let res =
       Fold.fold_chronological_until tree ~init:None
@@ -464,7 +479,8 @@ let extract_txns txns_with_witnesses =
   (* TODO: This type checks, but are we actually pulling the inverse txn here? *)
   List.map txns_with_witnesses
     ~f:(fun (txn_with_witness : Transaction_with_witness.t) ->
-      Ledger.Undo.transaction txn_with_witness.transaction_with_info
+      Ledger.Undo.transaction
+        txn_with_witness.transaction_with_info.transaction
       |> Or_error.ok_exn )
 
 let latest_ledger_proof t =
@@ -491,7 +507,7 @@ let target_merkle_root t =
 (*All the transactions in the order in which they were applied*)
 let staged_transactions t =
   List.map ~f:(fun (t : Transaction_with_witness.t) ->
-      t.transaction_with_info |> Ledger.Undo.transaction )
+      t.transaction_with_info.transaction |> Ledger.Undo.transaction )
   @@ Parallel_scan.pending_data t
   |> Or_error.all
 
@@ -499,7 +515,8 @@ let staged_transactions t =
 let staged_undos t : Staged_undos.t =
   List.map
     (Parallel_scan.pending_data t |> List.rev)
-    ~f:(fun (t : Transaction_with_witness.t) -> t.transaction_with_info)
+    ~f:(fun (t : Transaction_with_witness.t) ->
+      t.transaction_with_info.transaction )
 
 let partition_if_overflowing t =
   let bundle_count work_count = (work_count + 1) / 2 in
@@ -571,10 +588,11 @@ let all_work_pairs_exn t =
     match extract_from_job job with
     | First (transaction_with_info, statement, witness) ->
         let transaction =
-          Or_error.ok_exn @@ Ledger.Undo.transaction transaction_with_info
+          Or_error.ok_exn
+          @@ Ledger.Undo.transaction transaction_with_info.transaction
         in
         Snark_work_lib.Work.Single.Spec.Transition
-          (statement, transaction, witness)
+          (statement, {transaction_with_info with transaction}, witness)
     | Second (p1, p2) ->
         let merged =
           Transaction_snark.Statement.merge

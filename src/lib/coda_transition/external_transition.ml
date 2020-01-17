@@ -45,7 +45,7 @@ module Stable = struct
     let parent_hash {protocol_state; _} =
       Protocol_state.previous_state_hash protocol_state
 
-    let proposer {staged_ledger_diff; _} =
+    let block_producer {staged_ledger_diff; _} =
       Staged_ledger_diff.creator staged_ledger_diff
 
     let transactions {staged_ledger_diff; _} =
@@ -111,7 +111,7 @@ Stable.Latest.
   , consensus_state
   , state_hash
   , parent_hash
-  , proposer
+  , block_producer
   , transactions
   , user_commands
   , payments
@@ -594,7 +594,7 @@ module With_validation = struct
 
   let parent_hash t = lift parent_hash t
 
-  let proposer t = lift proposer t
+  let block_producer t = lift block_producer t
 
   let user_commands t = lift user_commands t
 
@@ -751,7 +751,7 @@ module Validated = struct
     , consensus_state
     , state_hash
     , parent_hash
-    , proposer
+    , block_producer
     , transactions
     , user_commands
     , payments
@@ -769,16 +769,15 @@ let genesis ~genesis_ledger ~base_proof =
   let genesis_protocol_state =
     Coda_state.Genesis_protocol_state.t ~genesis_ledger
   in
+  let creator = fst Consensus_state_hooks.genesis_winner in
   let empty_diff =
     { Staged_ledger_diff.diff=
         ( { completed_works= []
           ; user_commands= []
           ; coinbase= Staged_ledger_diff.At_most_two.Zero }
         , None )
-    ; creator= fst Consensus_state_hooks.genesis_winner
-    ; state_body_hash=
-        Protocol_state.body (With_hash.data genesis_protocol_state)
-        |> Protocol_state.Body.hash }
+    ; creator
+    ; coinbase_receiver= creator }
   in
   (* the genesis transition is assumed to be valid *)
   let (`I_swear_this_is_safe_see_my_comment transition) =
@@ -873,8 +872,7 @@ module Staged_ledger_validation = struct
            * [`Staged_ledger of Staged_ledger.t]
          , [ `Invalid_staged_ledger_diff of
              [ `Incorrect_target_staged_ledger_hash
-             | `Incorrect_target_snarked_ledger_hash
-             | `Incorrect_staged_ledger_diff_state_body_hash ]
+             | `Incorrect_target_snarked_ledger_hash ]
              list
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
@@ -887,18 +885,14 @@ module Staged_ledger_validation = struct
       Protocol_state.blockchain_state (protocol_state transition)
     in
     let staged_ledger_diff = staged_ledger_diff transition in
-    let diff_state_body_hash =
-      Staged_ledger_diff.state_body_hash staged_ledger_diff
-    in
-    let parent_state_body_hash =
-      Protocol_state.(Body.hash @@ body parent_protocol_state)
-    in
     let%bind ( `Hash_after_applying staged_ledger_hash
              , `Ledger_proof proof_opt
              , `Staged_ledger transitioned_staged_ledger
              , `Pending_coinbase_data _ ) =
       Staged_ledger.apply ~logger ~verifier parent_staged_ledger
         staged_ledger_diff
+        ~state_body_hash:
+          Protocol_state.(Body.hash @@ body parent_protocol_state)
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in
@@ -925,10 +919,7 @@ module Staged_ledger_validation = struct
             (not
                (Frozen_ledger_hash.equal target_ledger_hash
                   (Blockchain_state.snarked_ledger_hash blockchain_state)))
-            `Incorrect_target_snarked_ledger_hash
-        ; Option.some_if
-            (State_body_hash.equal diff_state_body_hash parent_state_body_hash)
-            `Incorrect_staged_ledger_diff_state_body_hash ]
+            `Incorrect_target_snarked_ledger_hash ]
     in
     Deferred.return
       ( match maybe_errors with
