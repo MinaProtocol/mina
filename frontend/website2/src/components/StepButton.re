@@ -31,7 +31,11 @@ module Style = {
   let label =
     merge([
       Theme.H3.basic,
-      style([width(`rem(11.25)), color(Theme.Colors.marine)]),
+      style([
+        width(`rem(11.25)),
+        alignSelf(`center),
+        color(Theme.Colors.marine),
+      ]),
     ]);
   let ctaButton =
     merge([

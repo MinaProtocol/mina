@@ -10,6 +10,7 @@ module Style = {
       backgroundColor(`transparent),
       padding(`zero),
       border(`px(1), `solid, Theme.Colors.marine),
+      overflow(`hidden),
       width(`percent(100.)),
       media(Theme.MediaQuery.notMobile, [width(`rem(27.5))]),
       media(Theme.MediaQuery.veryLarge, [width(`rem(33.125))]),
