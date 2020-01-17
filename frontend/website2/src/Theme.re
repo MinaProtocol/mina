@@ -124,9 +124,10 @@ module Link = {
       color(Colors.hyperlink),
       textDecoration(`none),
       fontWeight(`medium),
-      fontSize(`rem(1.0)),
+      fontSize(`rem(1.125)),
       letterSpacing(`rem(-0.0125)),
       lineHeight(`rem(1.5)),
+      media(MediaQuery.notMobile, [fontSize(`rem(1.0))]),
     ]);
 
   module No_hover = {
