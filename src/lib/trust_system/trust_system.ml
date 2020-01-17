@@ -81,7 +81,7 @@ module Actions = struct
     let old_gossip_increment = Peer_trust.max_rate 20. in
     match action with
     | Gossiped_old_transition slot_diff ->
-        (* NOTE: slot_diff here is [received_slot - (proposed_slot + Δ)]
+        (* NOTE: slot_diff here is [received_slot - (produced_slot + Δ)]
          *
          * We want to decrease the score exponentially based on how out of date the transition
          * we received was. We would like the base score decrease to be some constant

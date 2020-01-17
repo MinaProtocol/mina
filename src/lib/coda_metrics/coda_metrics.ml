@@ -574,19 +574,19 @@ module Consensus = struct
     Gauge.v "stake_delegators" ~help ~namespace ~subsystem
 end
 
-module Proposer = struct
-  let subsystem = "Proposer"
+module Block_producer = struct
+  let subsystem = "Block_producer"
 
   let slots_won : Counter.t =
     let help =
-      "slots which the proposer has won (does not represent that a proposer \
-       actually proposed)"
+      "slots which the loaded block production keys have won (does not \
+       represent that a block was actually produced)"
     in
     Counter.v "slots_won" ~help ~namespace ~subsystem
 
-  let blocks_proposed : Counter.t =
-    let help = "blocks produced and submitted by the proposer" in
-    Counter.v "blocks_proposed" ~help ~namespace ~subsystem
+  let blocks_produced : Counter.t =
+    let help = "blocks produced and submitted by the daemon" in
+    Counter.v "blocks_produced" ~help ~namespace ~subsystem
 end
 
 module Transition_frontier = struct

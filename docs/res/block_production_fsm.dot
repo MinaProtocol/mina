@@ -1,0 +1,12 @@
+digraph G {
+  rankdir=LR;
+
+  "Consensus.next_producer_timing" -> wait_for_block_prodution [label="`Produce t"];
+  wait_for_block_production -> "Consensus.generate_transition";
+  "Consensus.generate_transition" -> prove;
+  prove -> external_transition_pipe;
+  prove -> "Consensus.next_producer_timing";
+
+  "Consensus.next_producer_timing" -> wait_to_check [label="`Check_again t"];
+  wait_to_check -> "Consensus.next_producer_timing";
+}
