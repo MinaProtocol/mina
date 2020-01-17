@@ -30,6 +30,8 @@ val amount : t -> Currency.Amount.t
 
 val fee_transfer : t -> Fee_transfer.Single.t option
 
+val state_body_hash : t -> State_body_hash.t
+
 val create :
      amount:Currency.Amount.t
   -> proposer:Public_key.Compressed.t

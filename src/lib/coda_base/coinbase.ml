@@ -40,6 +40,8 @@ let amount t = t.amount
 
 let fee_transfer t = t.fee_transfer
 
+let state_body_hash t = t.state_body_hash
+
 let is_valid {amount; fee_transfer; _} =
   match fee_transfer with
   | None ->
