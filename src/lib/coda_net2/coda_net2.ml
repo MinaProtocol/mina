@@ -323,7 +323,7 @@ module Helper = struct
     end
 
     module Unban_ip = struct
-      type input = string [@@deriving yojson]
+      type input = {ip: string} [@@deriving yojson]
 
       type output = string [@@deriving yojson]
 
@@ -1205,7 +1205,8 @@ let ban_ip net ip =
 
 let unban_ip net ip =
   match%map
-    Helper.(do_rpc net (module Rpcs.Unban_ip) (Unix.Inet_addr.to_string ip))
+    Helper.(
+      do_rpc net (module Rpcs.Unban_ip) {ip= Unix.Inet_addr.to_string ip})
   with
   | Ok "unbanIP success" ->
       net.banned_ips
