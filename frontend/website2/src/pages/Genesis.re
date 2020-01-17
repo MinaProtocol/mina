@@ -257,7 +257,7 @@ let make = () => {
               {React.string(
                  "To learn more about the selection criteria and requirements, see the ",
                )}
-              <a className=Theme.Link.basic href="https://google.com">
+              <a className=Theme.Link.basic href="/tcGenesis">
                 {React.string("Terms and Conditions.")}
               </a>
             </li>
@@ -280,9 +280,7 @@ let make = () => {
           />
         </div>
         <Spacer height=1.5 />
-        <a
-          className=Theme.Link.basic
-          href="/static/T&C - Coda Genesis Program.pdf">
+        <a className=Theme.Link.basic href="/tcGenesis">
           {React.string("Terms and Conditions ")}
         </a>
         <Spacer height=5.65 />
