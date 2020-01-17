@@ -167,11 +167,13 @@ let make = () => {
             <Spacer height=1. />
             <p className=Styles.heroCopy>
               {React.string(
-                 "You'll complete challenges on testnet, learn how to operate the protocol, receive public recognition on our leaderboard and help to strengthen the Coda network and community.",
+                 "You'll complete challenges on testnet, learn how to operate the protocol, receive public recognition on our leaderboard, and help to strengthen the Coda network and community.",
                )}
             </p>
             <Spacer height=2. />
-            <a href="/docs/getting-started" className=Styles.ctaButton>
+            <a
+              href=" https://forms.gle/Eer4yM1gb5SvLCk79"
+              className=Styles.ctaButton>
               {React.string({js| Apply Now |js})}
             </a>
           </div>
@@ -190,7 +192,7 @@ let make = () => {
             {React.string(
                "Becoming a Genesis founding member is the highest honor in the Coda community.
              You'll have an opportunity to strengthen and harden the protocol, create tooling
-              and documentation and build the community.",
+              and documentation, and build the community.",
              )}
           </p>
           <Spacer height=1. />
@@ -209,7 +211,7 @@ let make = () => {
               label="Step 1: Apply Now"
               image="/static/img/ApplyCircle.svg"
               buttonLabel="Apply"
-              buttonLink="https://google.com"
+              buttonLink=" https://forms.gle/Eer4yM1gb5SvLCk79"
             />
             <StepButton
               label="Step 2: Join Discord"

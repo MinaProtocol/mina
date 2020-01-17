@@ -47,25 +47,12 @@ module Style = {
 // the page looking icon in the button
 module Icon = {
   module Style = {
-    let container = style([position(`relative), backgroundColor(white)]);
-
-    let page = style([]);
-
-    let sigil =
-      style([
-        position(`absolute),
-        left(`percent(50.)),
-        top(`percent(50.)),
-        transform(translate(`percent(-50.), `percent(-50.))),
-      ]);
+    let container = style([position(`relative)]);
   };
 
   [@react.component]
   let make = (~sigil) => {
-    <div className=Style.container>
-      <span className=Style.page> Icons.page </span>
-      <span className=Style.sigil> sigil </span>
-    </div>;
+    <div className=Style.container> sigil </div>;
   };
 };
 
