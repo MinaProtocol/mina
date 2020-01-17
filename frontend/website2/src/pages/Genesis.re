@@ -135,6 +135,10 @@ module Styles = {
     ]);
 
   let textBlock = style([maxWidth(`rem(43.75)), width(`percent(100.))]);
+  let legalListBlock =
+    style([maxWidth(`rem(43.)), width(`percent(100.))]);
+  let legalListItem = style([marginBottom(`rem(0.25))]);
+  let legalListList = style([marginLeft(`rem(1.625))]);
   let textBlockHeading =
     style([
       Theme.Typeface.ibmplexsans,
@@ -222,19 +226,42 @@ let make = () => {
           </div>
         </div>
         <Spacer height=4.25 />
-        <div className=Styles.textBlock>
+        <div className=Styles.legalListBlock>
           <p className=Styles.heroCopy>
             {React.string(
-               "Up to 1000 members will be selected from our testnet community
-               to receive a grant of 66,000 tokens as founding members of Genesis.
-                Prior to mainnet, 6.67% of the protocol will be distributed in this manner.
-                New Genesis founding members will be announced on a rolling basis.
-                To learn more about the selection criteria and requirements, see the ",
+               "Up to 1000 members will be selected from our testnet community to receive a distribution of 66,000 tokens as founding members of Genesis.",
              )}
-            <a className=Theme.Link.basic href="https://google.com">
-              {React.string("Terms and Conditions.")}
-            </a>
           </p>
+          <ul className={Css.merge([Styles.heroCopy, Styles.legalListList])}>
+            <li className=Styles.legalListItem>
+              {React.string(
+                 "At mainnet launch, 6.67% of the protocol will be distributed in this manner.",
+               )}
+            </li>
+            <li className=Styles.legalListItem>
+              {React.string(
+                 "Distributions will be locked up for up to four years after mainnet launch.",
+               )}
+            </li>
+            <li className=Styles.legalListItem>
+              {React.string(
+                 "Starting on mainnet launch, Genesis founding members will have to participate as block producers and continuously stake all tokens received from the Genesis Program.",
+               )}
+            </li>
+            <li className=Styles.legalListItem>
+              {React.string(
+                 "New Genesis founding members will be announced on a rolling basis.",
+               )}
+            </li>
+            <li className=Styles.legalListItem>
+              {React.string(
+                 "To learn more about the selection criteria and requirements, see the ",
+               )}
+              <a className=Theme.Link.basic href="https://google.com">
+                {React.string("Terms and Conditions.")}
+              </a>
+            </li>
+          </ul>
         </div>
         <Spacer height=4.25 />
         <h1 className=Styles.resources> {React.string("Resources")} </h1>
