@@ -1,7 +1,7 @@
 // This is the layout for the docs MDX pages
 
 module Style = {
-  open Css;
+  open! Css;
 
   let content =
     style([
