@@ -72,6 +72,7 @@ module Styles = {
       fontSize(`percent(100.)),
       borderRadius(px(4)),
       cursor(`pointer),
+      unsafe("WebkitAppearance", "none"),
       active([outline(px(0), `solid, `transparent)]),
       focus([outline(px(0), `solid, `transparent)]),
       hover([backgroundColor(Theme.Colors.jungle)]),
