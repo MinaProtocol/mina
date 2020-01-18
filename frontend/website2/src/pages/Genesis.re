@@ -152,7 +152,9 @@ module Styles = {
 
 [@react.component]
 let make = () => {
-  <Page>
+  <Page
+    title="Genesis"
+    description="Become one of 1000 community members to receive a grant of 66,000 pre-mainnet tokens on Coda.">
     <Wrapped>
       <div className=Styles.page>
         <div className=Styles.heroRow>
