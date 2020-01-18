@@ -32,13 +32,11 @@ Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 [%%define_locally
 Base58_check.String_ops.(to_string, of_string)]
 
-let proposer t = t.proposer
+let receiver t = t.receiver
 
 let amount t = t.amount
 
 let fee_transfer t = t.fee_transfer
-
-let state_body_hash t = t.state_body_hash
 
 let is_valid {amount; fee_transfer; _} =
   match fee_transfer with
@@ -75,17 +73,29 @@ let fee_excess t =
   Or_error.map (supply_increase t) ~f:(fun _increase ->
       Currency.Fee.Signed.zero )
 
-let gen =
-  let open Quickcheck.Let_syntax in
-  let%bind receiver = Public_key.Compressed.gen in
-  let%bind amount =
-    Currency.Amount.(gen_incl zero Coda_compile_config.coinbase)
-  in
-  let fee =
-    Currency.Fee.gen_incl Currency.Fee.zero (Currency.Amount.to_fee amount)
-  in
-  let prover = Public_key.Compressed.gen in
-  let%map fee_transfer =
-    Option.quickcheck_generator (Quickcheck.Generator.tuple2 prover fee)
-  in
-  {receiver; amount; fee_transfer}
+module Gen = struct
+  let gen =
+    let open Quickcheck.Let_syntax in
+    let%bind receiver = Public_key.Compressed.gen in
+    let%bind amount =
+      Currency.Amount.(gen_incl zero Coda_compile_config.coinbase)
+    in
+    let fee =
+      Currency.Fee.gen_incl Currency.Fee.zero (Currency.Amount.to_fee amount)
+    in
+    let prover = Public_key.Compressed.gen in
+    let%map fee_transfer =
+      Option.quickcheck_generator (Quickcheck.Generator.tuple2 prover fee)
+    in
+    {receiver; amount; fee_transfer}
+
+  let with_random_receivers ~keys ~min_amount ~max_amount ~fee_transfer =
+    let open Quickcheck.Let_syntax in
+    let%map receiver =
+      let open Signature_lib in
+      Quickcheck_lib.of_array keys
+      >>| fun keypair -> Public_key.compress keypair.Keypair.public_key
+    and amount = Int.gen_incl min_amount max_amount >>| Currency.Amount.of_int
+    and fee_transfer = Option.quickcheck_generator fee_transfer in
+    {receiver; amount; fee_transfer}
+end

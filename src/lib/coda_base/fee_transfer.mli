@@ -20,6 +20,11 @@ module Single : sig
   val receiver : t -> Public_key.Compressed.t
 
   val fee : t -> Currency.Fee.t
+
+  module Gen : sig
+    val with_random_receivers :
+      keys:Signature_keypair.t array -> max_fee:int -> t Quickcheck.Generator.t
+  end
 end
 
 module Stable : sig

@@ -22,13 +22,11 @@ type t = Stable.Latest.t = private
 
 include Codable.Base58_check_intf with type t := t
 
-val proposer : t -> Public_key.Compressed.t
+val receiver : t -> Public_key.Compressed.t
 
 val amount : t -> Currency.Amount.t
 
 val fee_transfer : t -> Fee_transfer.Single.t option
-
-val state_body_hash : t -> State_body_hash.t
 
 val create :
      amount:Currency.Amount.t
@@ -40,4 +38,13 @@ val supply_increase : t -> Currency.Amount.t Or_error.t
 
 val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
 
-val gen : t Quickcheck.Generator.t
+module Gen : sig
+  val gen : t Quickcheck.Generator.t
+
+  val with_random_receivers :
+       keys:Signature_keypair.t array
+    -> min_amount:int
+    -> max_amount:int
+    -> fee_transfer:Fee_transfer.Single.t Quickcheck.Generator.t
+    -> t Quickcheck.Generator.t
+end

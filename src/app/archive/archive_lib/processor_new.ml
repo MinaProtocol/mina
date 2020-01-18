@@ -180,7 +180,7 @@ module Coinbase = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          Public_key.add_if_doesn't_exist (module Conn) (Coinbase.proposer t)
+          Public_key.add_if_doesn't_exist (module Conn) (Coinbase.receiver t)
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -279,7 +279,7 @@ module Block = struct
         let%bind creator_id =
           Public_key.add_if_doesn't_exist
             (module Conn)
-            (External_transition.proposer t)
+            (External_transition.block_producer t)
         in
         let%bind snarked_ledger_hash_id =
           Snarked_ledger_hash.add_if_doesn't_exist
@@ -398,8 +398,7 @@ module Block = struct
                           (Coinbase.amount coinbase1)
                           (Coinbase.amount coinbase2)
                       |> Core.Option.value_exn )
-                    ~proposer:(Coinbase.proposer coinbase1)
-                    ~state_body_hash:(Coinbase.state_body_hash coinbase1)
+                    ~receiver:(Coinbase.receiver coinbase1)
                     ~fee_transfer:None
                   |> Core.Result.map_error ~f:(fun _ ->
                          `Coinbase_creation_failure )
@@ -440,12 +439,5 @@ let run (module Conn : CONNECTION) reader =
         Deferred.return ()
     | Transaction_pool {added; removed= _} ->
         Deferred.List.iter added ~f:(fun (user_command, _) ->
-            match%bind
-              let open Deferred.Result.Let_syntax in
-              let%bind () = Conn.start () in
-              User_command.add_if_doesn't_exist (module Conn) user_command
-            with
-            | Error _ ->
-                Conn.rollback () >>| ignore
-            | Ok _ ->
-                Conn.commit () >>| ignore ) )
+            User_command.add_if_doesn't_exist (module Conn) user_command
+            >>| ignore ) )
