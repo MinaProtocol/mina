@@ -809,7 +809,7 @@ module Helper = struct
     | "streamLost" ->
         let%bind m = Stream_lost.of_yojson v |> or_error in
         let stream_idx = m.stream_idx in
-        Logger.warn t.logger
+        Logger.trace t.logger
           "Encountered error while reading stream $idx: $error"
           ~module_:__MODULE__ ~location:__LOC__
           ~metadata:[("error", `String m.reason); ("idx", `Int stream_idx)] ;
