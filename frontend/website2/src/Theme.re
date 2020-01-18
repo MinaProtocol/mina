@@ -8,13 +8,15 @@ module Colors = {
       Printf.sprintf("hsla(%f,%f%%,%f%%,%f)", h, s, l, a);
 
   let fadedBlue = `rgb((111, 167, 197));
+  let babyBlue = `hex("F4F8FB");
+
   let white = Css.white;
   let whiteAlpha = a => `rgba((255, 255, 255, a));
   let hyperlinkAlpha = a =>
     `hsla((`deg(201.), `percent(71.), `percent(52.), `num(a)));
   let hyperlink = hyperlinkAlpha(1.0);
 
-  let hyperlinkHover = `hsl((`deg(201.), `percent(71.), `percent(40.)));
+  let hyperlinkHover = `hex("0AA9FF");
   let hyperlinkLight = `hsl((`deg(201.), `percent(71.), `percent(70.)));
 
   let metallicBlue = `rgb((70, 99, 131));
@@ -65,6 +67,8 @@ module Colors = {
 
   let jungleAlpha = a => `rgba((47, 172, 70, a));
   let jungle = jungleAlpha(1.);
+
+  let tan = `hex("E3E0D5");
 };
 
 module Typeface = {
@@ -120,9 +124,10 @@ module Link = {
       color(Colors.hyperlink),
       textDecoration(`none),
       fontWeight(`medium),
-      fontSize(`rem(1.0)),
+      fontSize(`rem(1.125)),
       letterSpacing(`rem(-0.0125)),
       lineHeight(`rem(1.5)),
+      media(MediaQuery.notMobile, [fontSize(`rem(1.0))]),
     ]);
 
   module No_hover = {
@@ -146,6 +151,7 @@ module H1 = {
       fontSize(`rem(2.25)),
       letterSpacing(`rem(-0.02375)),
       lineHeight(`rem(3.0)),
+      color(Colors.saville),
       media(
         MediaQuery.full,
         [
@@ -276,6 +282,8 @@ module H4 = {
       fontWeight(`normal),
       color(Colors.greyishBrown),
     ]);
+
+  let semiBold = merge([basic, style([fontWeight(`semiBold)])]);
 
   let (wide, wideStyles) =
     generateStyles([
