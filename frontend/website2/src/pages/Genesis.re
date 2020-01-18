@@ -277,6 +277,7 @@ let make = () => {
             href="https://cdn.codaprotocol.com/v2/static/coda-whitepaper-05-10-2018-0.pdf"
           />
           <Spacer width=2.5 />
+          // comment
           <WhitepaperButton
             label="Economics whitepaper"
             sigil=Icons.economic
