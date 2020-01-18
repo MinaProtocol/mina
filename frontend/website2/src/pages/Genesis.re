@@ -142,12 +142,10 @@ module Styles = {
   let textBlockHeading =
     style([
       Theme.Typeface.ibmplexsans,
-      color(Theme.Colors.marine),
+      color(Theme.Colors.saville),
       fontWeight(`medium),
       fontSize(`rem(2.)),
     ]);
-  let resources =
-    merge([textBlockHeading, style([color(Theme.Colors.midnight)])]);
 };
 
 [@react.component]
@@ -161,7 +159,7 @@ let make = () => {
             <Spacer height=2. />
             <h3 className=Styles.heroH3>
               {React.string(
-                 "Become one of 1000 community members to receive a grant of 66,000 pre-mainnet tokens on Coda.",
+                 "Become one of 1000 community members to receive a token grant.",
                )}
             </h3>
             <Spacer height=1. />
@@ -217,17 +215,19 @@ let make = () => {
               label="Step 2: Join Discord"
               image="/static/img/DiscordCircle.svg"
               buttonLabel="Join"
-              buttonLink="https://bit.ly/CodaDiscord"
+              buttonLink="http://bit.ly/GenesisDiscord"
             />
             <StepButton
               label="Step 3: Participate in Testnet"
               image="/static/img/TestnetCircle.svg"
               buttonLabel="Get Started"
-              buttonLink="https://codaprotocol.com/testnet/"
+              buttonLink="http://bit.ly/GenesisTestnet"
             />
           </div>
         </div>
-        <Spacer height=4.25 />
+        <Spacer height=4. />
+        <h1 className=Styles.textBlockHeading> {React.string("Details")} </h1>
+        <Spacer height=1. />
         <div className=Styles.legalListBlock>
           <p className=Styles.heroCopy>
             {React.string(
@@ -266,7 +266,9 @@ let make = () => {
           </ul>
         </div>
         <Spacer height=4.25 />
-        <h1 className=Styles.resources> {React.string("Resources")} </h1>
+        <h1 className=Styles.textBlockHeading>
+          {React.string("Resources")}
+        </h1>
         <Spacer height=2. />
         <div className=Styles.whitePaperButtonRow>
           <WhitepaperButton
@@ -275,10 +277,11 @@ let make = () => {
             href="https://cdn.codaprotocol.com/v2/static/coda-whitepaper-05-10-2018-0.pdf"
           />
           <Spacer width=2.5 />
+          // comment
           <WhitepaperButton
-            label="Economic whitepaper"
+            label="Economics whitepaper"
             sigil=Icons.economic
-            href="https://cdn.codaprotocol.com/v2/static/coda-whitepaper-05-10-2018-0.pdf"
+            href="/static/pdf/economicsWP.pdf"
           />
         </div>
         <Spacer height=1.5 />
@@ -286,7 +289,7 @@ let make = () => {
           {React.string("Terms and Conditions ")}
         </a>
         <Spacer height=5.65 />
-        <h1 className=Styles.resources>
+        <h1 className=Styles.textBlockHeading>
           {React.string("About Coda Protocol")}
         </h1>
         <div className=Styles.textBlock>
@@ -296,18 +299,17 @@ let make = () => {
               {React.string("Coda Protocol")}
             </a>
             {React.string(
-               ", the world's lightest blockchain, provides a foundation for the
-               decentralized digital economy (Web 3.0), offering scalability to thousands
-                of transactions per second, millions of users, and years of transaction
-                history without sacrificing security. By utilizing recursive zk-SNARKs,
-                the Coda blockchain always stays about 20 kilobytes (the size of a few tweets).
-                Recursive zk-SNARKs allow nodes to rapidly share and update proof
-                of the correct blockchain state across the network. This breakthrough application
-                of zk-SNARKs solves the issues of scalability and high barrier to entry for nodes
-                that have plagued legacy blockchains to-date. By making it easier for nodes to
-                participate, Coda improves decentralization and therefore security of the network.
-                The Coda blockchain can be easily accessed from any device, including phones and
-                browsers, and can be seamlessly integrated into new decentralized applications (dapps).",
+               ", the world's lightest blockchain, provides a foundation for the decentralized digital economy (Web 3.0),
+                offering scalability to thousands of transactions per second, millions of users, and years of transaction
+                 history without sacrificing security. By utilizing recursive zk-SNARKs, the Coda blockchain always stays
+                  the same size"
+               ++ {js|—|js}
+               ++ "about 20 kilobytes (the size of a few tweets). Recursive zk-SNARKs allow nodes to rapidly
+                   share and update proof of the correct blockchain state across the network. This breakthrough application
+                    of zk-SNARKs solves the issues of scalability and high barrier to entry for nodes that have plagued
+                    legacy blockchains to-date. By making it easier for nodes to participate, Coda improves decentralization
+                     and therefore security of the network. The Coda blockchain can be easily accessed from any device,
+                      including phones and browsers, and can be seamlessly integrated into new decentralized applications (dapps).",
              )}
           </p>
           <Spacer height=1.3 />
