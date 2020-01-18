@@ -12,8 +12,7 @@ open Common
 let compute_challenges chals =
   let nonresidue = Fq.of_int 5 in
   Array.map chals
-    ~f:(fun {Types.Pairing_based.Bulletproof_challenge.prechallenge; is_square}
-       ->
+    ~f:(fun {Types.Bulletproof_challenge.prechallenge; is_square} ->
       let prechallenge =
         Fq.of_bits (Challenge.Constant.to_bits prechallenge)
       in
@@ -66,16 +65,14 @@ module Inputs = struct
 
     (* TODO: Make the real values *)
     let lagrange_commitments =
-      let h = 131072 in
       let x = 64 in
-      let stride = h / x in
       let u = Unsigned.Size_t.of_int in
       time "lagrange" (fun () ->
           Array.init (Domain.size domain) ~f:(fun i ->
               Snarky_bn382_backend.G1.Affine.of_backend
                 (Snarky_bn382.Fp_urs.lagrange_commitment
                    (Lazy.force Snarky_bn382_backend.Pairing_based.Keypair.urs)
-                   (u x) (u stride) (u i)) ) )
+                   (u x) (u i)) ) )
   end
 
   module G1 = struct
@@ -259,9 +256,44 @@ module Inputs = struct
 
       let rounds_full = 8
 
-      let rounds_partial = 55
+      module Alpha_17 = struct
+        let rounds_partial = 25
 
-      let to_the_alpha x = Impl.Field.(square (square x) * x)
+        let to_the_alpha x =
+          x |> Impl.Field.square |> Impl.Field.square |> Impl.Field.square
+          |> Impl.Field.square
+          |> Impl.Field.(( * ) x)
+      end
+
+      (* Rounds required = 37 *)
+      module Alpha_13 = struct
+        let rounds_partial = 37 - 8
+
+        let to_the_alpha x =
+          x |> Impl.Field.square
+          |> Impl.Field.(( * ) x)
+          |> Impl.Field.square |> Impl.Field.square
+          |> Impl.Field.(( * ) x)
+      end
+
+      (* Rounds required = 39 *)
+      module Alpha_11 = struct
+        let rounds_partial = 39 - 8
+
+        let to_the_alpha x =
+          x |> Impl.Field.square |> Impl.Field.square
+          |> Impl.Field.(( * ) x)
+          |> Impl.Field.square
+          |> Impl.Field.(( * ) x)
+      end
+
+      module Alpha_5 = struct
+        let rounds_partial = 49
+
+        let to_the_alpha x = Impl.Field.(square (square x) * x)
+      end
+
+      include Alpha_11
 
       module Operations = struct
         (* TODO: experiment with sealing version of this *)
@@ -349,19 +381,16 @@ module Inputs = struct
   end
 end
 
-module M = Dlog_main.Dlog_main (Inputs)
+module M = Dlog_main.Dlog_main (Dlog_main_inputs)
 
 let wrap_proof vk public_input
     ( (prev_statement :
         ( Challenge.Constant.t
         , Fq.t
         , bool
-        , ( Challenge.Constant.t
-          , bool )
-          Types.Pairing_based.Bulletproof_challenge.t
+        , (Challenge.Constant.t, bool) Types.Bulletproof_challenge.t
         , _ Types.Pairing_based.Proof_state.Me_only.t
         , _ Types.Dlog_based.Proof_state.Me_only.t
-        , _
         , _ )
         Types.Pairing_based.Statement.t)
     , (prev_x_hat_beta1 : Fq.t)

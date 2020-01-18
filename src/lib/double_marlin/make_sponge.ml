@@ -1,21 +1,27 @@
 open Core_kernel
 
+module Rounds = struct
+  let rounds_full = 8
+
+  let rounds_partial = 30
+end
+
 module Make (Field : Snarky_bn382_backend.Field.S) = struct
-  module Rounds = struct
-    let rounds_full = 8
-
-    let rounds_partial = 55
-  end
-
   module Inputs = struct
     include Rounds
     module Field = Field
 
-    (* TODO: Square in place *)
     let to_the_alpha x =
       let open Field in
-      let x4 = square (square x) in
-      x4 *= x ; x4
+      let res = square x in
+      Mutable.square res ;
+      (* x^4 *)
+      Mutable.square res ;
+      (* x^8 *)
+      Mutable.square res ;
+      (* x^16 *)
+      res *= x ;
+      res
 
     module Operations = struct
       let add_assign ~state i x = Field.(state.(i) += x)

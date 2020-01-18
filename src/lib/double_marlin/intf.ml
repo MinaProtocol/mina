@@ -2,6 +2,27 @@ open Core_kernel
 open Pickles_types
 module Sponge_lib = Sponge
 
+module type App_state_intf = sig
+  module Impl : Snarky.Snark_intf.Run
+
+  type t
+
+  module Constant : sig
+    type t
+
+    val tag : t Tag.t
+  end
+
+  (* This function should be collision resistant. *)
+  val to_field_elements : t -> Impl.Field.t array
+
+  val typ : (t, Constant.t) Impl.Typ.t
+
+  val check_update : t -> t -> Impl.Boolean.var
+
+  val is_base_case : t -> Impl.Boolean.var
+end
+
 module Snarkable = struct
   module type S1 = sig
     type _ t
@@ -274,22 +295,5 @@ module Pairing_main_inputs = struct
        and type input :=
                   [`Field of Impl.Field.t | `Bits of Impl.Boolean.var list]
        and type digest := length:int -> Impl.Boolean.var list
-
-    module App_state : sig
-      type t
-
-      module Constant : sig
-        type t
-      end
-
-      (* This function should be collision resistant. *)
-      val to_field_elements : t -> Impl.Field.t array
-
-      val typ : (t, Constant.t) Impl.Typ.t
-
-      val check_update : t -> t -> Impl.Boolean.var
-
-      val is_base_case : t -> Impl.Boolean.var
-    end
   end
 end

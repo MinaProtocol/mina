@@ -10,10 +10,6 @@ end
 
 type 'a abc = {a: 'a; b: 'a; c: 'a} [@@deriving sexp]
 
-let weight = ref 0
-
-let wt = ref {a= 0; b= 0; c= 0}
-
 module Weight = struct
   open Core
 
@@ -160,24 +156,6 @@ struct
       let terms = terms best in
       match swap with `unswapped -> terms | `swapped -> swap_ab terms
     in
-    (*
-    let s =
-      match swap with
-      | `unswapped -> "unswapped"
-      | `swapped -> "swapped"
-    in
-    let print () =
-      sprintf !"%s (delta=%{sexp:int * int * int}) (pre=%{sexp:Weight.t}) (post=%{sexp:Weight.t}) \n%!"
-        s
-        delta
-        base
-        (base +. delta)
-    in
-    (if !i mod 1000 = 0 then print_endline (print ()));
-    if not (Weight.norm (base +. delta) <= Weight.norm (base +. swap_ab delta))
-    then failwith (print ())
-  );
-  incr i ; *)
     (terms, base +. delta)
 
   let add_r1cs t (a, b, c) =
@@ -190,11 +168,7 @@ struct
           Fp.Vector.emplace_back coeffs x ) ;
       Mat.append_row m indices coeffs
     in
-    append t.m.a a ;
-    append t.m.b b ;
-    append t.m.c c ;
-    weight := Int.max (Weight.norm t.weight) !weight ;
-    wt := t.weight
+    append t.m.a a ; append t.m.b b ; append t.m.c c
 
   let add_constraint ?label:_ t
       (constr : Fp.t Snarky.Cvar.t Snarky.Constraint.basic) =

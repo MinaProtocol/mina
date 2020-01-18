@@ -119,7 +119,12 @@ module Keypair = struct
     ; value=
         { a= Fp_index.a_val_comm t
         ; b= Fp_index.b_val_comm t
-        ; c= Fp_index.c_val_comm t } }
+        ; c= Fp_index.c_val_comm t } 
+    ; rc=
+        { a= Fp_index.a_rc_comm t
+        ; b= Fp_index.b_rc_comm t
+        ; c= Fp_index.c_rc_comm t } 
+    }
     |> Matrix_evals.map ~f:(Abc.map ~f:G1.Affine.of_backend)
 end
 

@@ -1,7 +1,11 @@
 open Core_kernel
 open Import
 
-type m = A | B | C
+module M = struct
+  type t = A | B | C [@@deriving eq]
+end
+
+type m = M.t = A | B |C 
 
 let ms = [A; B; C]
 

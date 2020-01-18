@@ -5,12 +5,13 @@ module Fq = Snarky_bn382_backend.Fq
 module Fp = Snarky_bn382_backend.Fp
 module G = Snarky_bn382_backend.G
 module G1 = Snarky_bn382_backend.G1
+module Inputs = Pairing_main_inputs
 
 let group_map_fp =
   let params =
     Group_map.Params.create (module Fp) ~a:Fp.zero ~b:(Fp.of_int 7)
   in
-  fun x -> Group_map.to_group (module Fp) ~params x |> G.of_affine
+  fun x -> Group_map.to_group (module Fp) ~params x
 
 let bits_random_oracle =
   let h = Digestif.blake2s 32 in
@@ -39,259 +40,6 @@ let unrelated_g g =
     fp_random_oracle (str x ^ str y)
   in
   group_map_fp hash
-
-module Inputs = struct
-  let crs_max_degree = 1 lsl 22
-
-  module Fq = Fq
-  module Impl = Snarky.Snark.Run.Make (Bn382) (Unit)
-
-  let sponge_params_constant =
-    Sponge.Params.(map bn382_p ~f:Impl.Field.Constant.of_string)
-
-  let%test_unit "one-identity" =
-    let module F = Impl.Field.Constant in
-    let x = F.random () in
-    assert (F.equal x F.(one * x))
-
-  module Fq_constant = struct
-    type t = unit
-
-    let size_in_bits = 382
-  end
-
-  open Impl
-
-  module App_state = struct
-    type t = Field.t
-
-    module Constant = Field.Constant
-
-    let to_field_elements x = [|x|]
-
-    let typ = Typ.field
-
-    let check_update x0 x1 = Field.(equal x1 (x0 + one))
-
-    let is_base_case x = Field.(equal x zero)
-  end
-
-  module Poseidon_inputs = struct
-    module Field = Impl.Field
-
-    let rounds_full = 8
-
-    let rounds_partial = 55
-
-    let to_the_alpha x = Impl.Field.(square (square x) * x)
-
-    module Operations = struct
-      (* TODO: experiment with sealing version of this *)
-      let add_assign ~state i x = state.(i) <- Field.( + ) state.(i) x
-
-      let apply_affine_map (matrix, constants) v =
-        let seal x =
-          let x' =
-            exists Field.typ ~compute:As_prover.(fun () -> read_var x)
-          in
-          Field.Assert.equal x x' ; x'
-        in
-        let dotv row =
-          Array.reduce_exn (Array.map2_exn row v ~f:Field.( * )) ~f:Field.( + )
-        in
-        Array.mapi matrix ~f:(fun i row ->
-            seal Field.(constants.(i) + dotv row) )
-
-      let copy = Array.copy
-    end
-  end
-
-  module S = Sponge.Make_sponge (Sponge.Poseidon (Poseidon_inputs))
-
-  let sponge_params =
-    Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
-
-  module Sponge = struct
-    module S = struct
-      type t = S.t
-
-      let copy = S.copy
-
-      let state = S.state
-
-      let create ?init params = S.create ?init params
-
-      let absorb t input =
-        ksprintf Impl.with_label "absorb: %s" __LOC__ (fun () ->
-            S.absorb t input )
-
-      let squeeze t =
-        ksprintf Impl.with_label "squeeze: %s" __LOC__ (fun () -> S.squeeze t)
-    end
-
-    include Sponge.Make_bit_sponge (struct
-                type t = Impl.Boolean.var
-              end)
-              (struct
-                include Impl.Field
-
-                let to_bits t =
-                  Bitstring_lib.Bitstring.Lsb_first.to_list
-                    (Impl.Field.unpack_full t)
-              end)
-              (S)
-
-    let absorb t input =
-      match input with
-      | `Field x ->
-          absorb t x
-      | `Bits bs ->
-          absorb t (Field.pack bs)
-  end
-
-  module Input_domain = struct
-    let domain = Domain.Pow_2_roots_of_unity 5
-
-    (* TODO: Make the real values *)
-    let lagrange_commitments =
-      Array.init (Domain.size domain) ~f:(fun i ->
-          unrelated_g (G.scale G.one (Fq.of_int i)) )
-  end
-
-  module G = struct
-    module Inputs = struct
-      module Impl = Impl
-
-      module Params = struct
-        open Impl.Field.Constant
-
-        let a = zero
-
-        let b = of_int 7
-
-        let one = G.to_affine_exn G.one
-
-        let group_size_in_bits = 382
-      end
-
-      module F = struct
-        include struct
-          open Impl.Field
-
-          type nonrec t = t
-
-          let ( * ), ( + ), ( - ), inv_exn, square, scale, if_, typ, constant =
-            (( * ), ( + ), ( - ), inv, square, scale, if_, typ, constant)
-
-          let negate x = scale x Constant.(negate one)
-        end
-
-        module Constant = struct
-          open Impl.Field.Constant
-
-          type nonrec t = t
-
-          let ( * ), ( + ), ( - ), inv_exn, square, negate =
-            (( * ), ( + ), ( - ), inv, square, negate)
-        end
-
-        let assert_square x y = Impl.assert_square x y
-
-        let assert_r1cs x y z = Impl.assert_r1cs x y z
-      end
-
-      module Constant = Snarky_bn382_backend.G
-    end
-
-    module Params = Inputs.Params
-    module Constant = Inputs.Constant
-    module T = Snarky_curve.For_native_base_field (Inputs)
-
-    module Scaling_precomputation = struct
-      include T.Scaling_precomputation
-
-      let create base = create ~unrelated_base:(unrelated_g base) base
-    end
-
-    type t = T.t
-
-    let typ = T.typ
-
-    let ( + ) = T.add_exn
-
-    let constant = T.constant
-
-    let multiscale_known = T.multiscale_known
-
-    (* TODO: Make real *)
-    let scale t bs =
-      let x, y = t in
-      let constraints_per_bit =
-        if Option.is_some (Field.to_constant x) then 2 else 6
-      in
-      let x = exists Field.typ ~compute:(fun () -> As_prover.read_var x)
-      and x2 =
-        exists Field.typ ~compute:(fun () ->
-            Field.Constant.square (As_prover.read_var x) )
-      in
-      ksprintf Impl.with_label "scale %s" __LOC__ (fun () ->
-          (* Dummy constraints *)
-          let num_bits = List.length bs in
-          for _ = 1 to constraints_per_bit * num_bits do
-            assert_r1cs x x x2
-          done ;
-          (x, y) )
-
-    (*         T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) *)
-    let to_field_elements (x, y) = [x; y]
-
-    let assert_equal (x1, y1) (x2, y2) =
-      Field.Assert.equal x1 x2 ; Field.Assert.equal y1 y2
-
-    let scale_inv t bs =
-      let res =
-        exists typ
-          ~compute:
-            As_prover.(
-              fun () ->
-                G.scale (read typ t)
-                  (Fq.inv (Fq.of_bits (List.map ~f:(read Boolean.typ) bs))))
-      in
-      (* TODO: assert_equal t (scale res bs) ; *)
-      ignore (scale res bs) ;
-      res
-
-    let scale_by_quadratic_nonresidue t = T.double (T.double t) + t
-
-    let one_fifth = Fq.(inv (of_int 5))
-
-    let scale_by_quadratic_nonresidue_inv t =
-      let res =
-        exists typ
-          ~compute:As_prover.(fun () -> G.scale (read typ t) one_fifth)
-      in
-      (*TODO:assert_equal t (scale_by_quadratic_nonresidue res) ; *)
-      ignore (scale_by_quadratic_nonresidue res) ;
-      res
-
-    let negate = T.negate
-
-    let one = T.one
-
-    let if_ b ~then_:(tx, ty) ~else_:(ex, ey) =
-      (Field.if_ b ~then_:tx ~else_:ex, Field.if_ b ~then_:ty ~else_:ey)
-  end
-
-  let domain_k = Domain.Pow_2_roots_of_unity 18
-
-  let domain_h = Domain.Pow_2_roots_of_unity 18
-
-  module Generators = struct
-    let g = G.one
-
-    let h = G.T.constant (unrelated_g Snarky_bn382_backend.G.one)
-  end
-end
 
 let crs_power (_n : int) = G1.one
 
@@ -327,7 +75,7 @@ let pairing_marlin_acc_init =
 let bulletproof_log2 = Common.bulletproof_log2
 
 open Pickles_types
-module M = Pairing_main.Main (Inputs)
+module M = Pairing_main.Main (Pairing_main_inputs)
 
 let hash_me_only = Common.hash_pairing_me_only
 
@@ -338,12 +86,40 @@ module Index_metadata = struct
 end
 
 let%test_unit "pairing-main" =
+  (let open Test_dlog_main in
+  let fp_as_fq (x : Fp.t) = Fq.of_bigint (Fp.to_bigint x) in
+  let input =
+    let open Pickles_types.Vector in
+    let fp =
+      let open Inputs.Impl in
+      Typ.transport M.Fq.typ ~there:fp_as_fq ~back:(fun (x : Fq.t) ->
+          Fp.of_bigint (Fq.to_bigint x) )
+    in
+    Snarky.Typ.tuple3 (typ fp Nat.N3.n)
+      (*       (typ M.Fq.typ Nat.N1.n) *)
+      (typ M.Challenge.packed_typ Nat.N9.n)
+      (*       (typ M.Fq.typ Nat.N1.n) *)
+      (typ M.Digest.packed_typ Nat.N3.n)
+  in
+  let n =
+    Inputs.Impl.constraint_count (fun () -> M.main (Inputs.Impl.exists input))
+  in
+  let kp =
+    Inputs.Impl.generate_keypair ~exposing:[input] (fun x () -> M.main x)
+  in
+  (*
+  Core.printf "dlog-main: %d / %d\n%!" n
+    !Snarky_bn382_backend.R1cs_constraint_system.weight ;
+  let wt = !Snarky_bn382_backend.R1cs_constraint_system.wt in
+  Core.printf "weights %d %d %d\n%!" wt.a wt.b wt.c ;
+     *)
+  Core.printf "yo: %d\n%!" n ; failwith "here") ;
   let module Stmt = Types.Pairing_based.Statement in
   let input =
     let open Pickles_types.Vector in
     let open Inputs.Impl in
     let bulletproof_challenge =
-      let open Types.Pairing_based.Bulletproof_challenge in
+      let open Types.Bulletproof_challenge in
       Typ.transport Typ.field
         ~there:(fun {prechallenge; is_square} ->
           Field.Constant.project
@@ -365,12 +141,15 @@ let%test_unit "pairing-main" =
       (typ challenge Nat.N9.n)
       (Snarky.Typ.array ~length:bulletproof_log2 bulletproof_challenge)
   in
+  let main x = M.main (module Inputs.App_state) in
   let n =
-    Inputs.Impl.constraint_count (fun () -> M.main (Inputs.Impl.exists input))
+    Inputs.Impl.constraint_count (fun () -> main (Inputs.Impl.exists input))
   in
+  (*
   Core.printf "pairing-main: %d / %d\n%!" n
     !Snarky_bn382_backend.R1cs_constraint_system.weight ;
-  let main x () = M.main x in
+*)
+  let main x () = main x in
   let kp =
     time "generating keypair" (fun () ->
         Inputs.Impl.generate_keypair ~exposing:[input] main )
@@ -396,16 +175,18 @@ let%test_unit "pairing-main" =
       (Binable.to_string (module Vk)
         (metadata, vk_commitments))
 *)
+  (*
   Core.printf "pairing-main: %d / %d\n%!" n
     !Snarky_bn382_backend.R1cs_constraint_system.weight ;
   let wt = !Snarky_bn382_backend.R1cs_constraint_system.wt in
   Core.printf "weights %d %d %d\n%!" wt.a wt.b wt.c ;
+*)
   let module I = Inputs.Impl in
   let fq : M.Fq.Constant.t = Fq.of_bits (bits_random_oracle ~length:20 "fq") in
   let me_only =
     { Types.Pairing_based.Proof_state.Me_only.app_state= I.Field.Constant.zero
     ; dlog_marlin_index=
-        (let g = Snarky_bn382_backend.G.one in
+        (let g = Snarky_bn382_backend.G.(to_affine_exn one) in
          let t = {Pickles_types.Abc.a= g; b= g; c= g} in
          {row= t; col= t; value= t})
     ; sg= group_map_fp (fp_random_oracle "sg") }
@@ -416,7 +197,7 @@ let%test_unit "pairing-main" =
   in
   let bulletproof_challenges =
     Array.init bulletproof_log2 ~f:(fun i ->
-        { Types.Pairing_based.Bulletproof_challenge.prechallenge=
+        { Types.Bulletproof_challenge.prechallenge=
             (let z = Int64.zero in
              Vector.[z; z])
         ; is_square= true }
@@ -512,7 +293,7 @@ let%test_unit "pairing-main" =
     , commitments )
   in *)
   let pi =
-    let g = Snarky_bn382_backend.G.one in
+    let g = Snarky_bn382_backend.G.(to_affine_exn one) in
     let prev_evals =
       let mk n = Vector.init n ~f:(fun _ -> I.Field.Constant.zero) in
       Pairing_marlin_types.Evals.of_vector (mk Nat.N18.n)
@@ -539,9 +320,9 @@ let%test_unit "pairing-main" =
       match request with
       | Compute.Fq_is_square bits ->
           k Fq.(is_square (of_bits bits))
-      | Me_only ->
+      | Me_only Inputs.App_state.Tag ->
           k me_only
-      | Prev_app_state ->
+      | Prev_app_state Inputs.App_state.Tag ->
           k Bn382.Field.zero
       | Prev_evals ->
           k prev_evals
@@ -586,13 +367,21 @@ let%test_unit "pairing-main" =
       in
       (e, e, e)
     in
-    Test_dlog_main.wrap_proof vk
+    Concrete.Pairing_based_proof.wrap
+      ~dlog_marlin_index
+      ~pairing_marlin_index
+      vk
+      ()
+      { proof= pi
+      ; statement
+      }
+(*
       ( Fp.one
       :: List.init
            (Bn382.Field.Vector.length input)
            ~f:(Bn382.Field.Vector.get input) )
       (actual_statement, dummy_prev_x_hat_beta_1, fq_prev_evals)
-      pi
+*)
   in
   Core.printf "hi" ; ()
 
@@ -701,3 +490,257 @@ let%test_unit "dlog-main" =
 
       let zero : t = constant Field.Constant.zero
     end *)
+
+(*
+module Inputs = struct
+  let crs_max_degree = 1 lsl 22
+
+  module Fq = Fq
+  module Impl = Snarky.Snark.Run.Make (Bn382) (Unit)
+
+  let sponge_params_constant =
+    Sponge.Params.(map bn382_p ~f:Impl.Field.Constant.of_string)
+
+  let%test_unit "one-identity" =
+    let module F = Impl.Field.Constant in
+    let x = F.random () in
+    assert (F.equal x F.(one * x))
+
+  module Fq_constant = struct
+    type t = unit
+
+    let size_in_bits = 382
+  end
+
+  open Impl
+
+  module App_state = struct
+    type t = Field.t
+
+    module Constant = Field.Constant
+
+    let to_field_elements x = [|x|]
+
+    let typ = Typ.field
+
+    let check_update x0 x1 = Field.(equal x1 (x0 + one))
+
+    let is_base_case x = Field.(equal x zero)
+  end
+
+  module Poseidon_inputs = struct
+    module Field = Impl.Field
+
+    let rounds_full = 8
+
+    let rounds_partial = 25
+
+    let to_the_alpha x =
+      x |> Impl.Field.square |> Impl.Field.square |> Impl.Field.square
+      |> Impl.Field.square
+      |> Impl.Field.(( * ) x)
+
+    module Operations = struct
+      (* TODO: experiment with sealing version of this *)
+      let add_assign ~state i x = state.(i) <- Field.( + ) state.(i) x
+
+      let apply_affine_map (matrix, constants) v =
+        let seal x =
+          let x' =
+            exists Field.typ ~compute:As_prover.(fun () -> read_var x)
+          in
+          Field.Assert.equal x x' ; x'
+        in
+        let dotv row =
+          Array.reduce_exn (Array.map2_exn row v ~f:Field.( * )) ~f:Field.( + )
+        in
+        Array.mapi matrix ~f:(fun i row ->
+            seal Field.(constants.(i) + dotv row) )
+
+      let copy = Array.copy
+    end
+  end
+
+  let sponge_params =
+    Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
+
+  module Sponge = struct
+    module S = Sponge.Make_sponge (Sponge.Poseidon (Poseidon_inputs))
+
+    include Sponge.Make_bit_sponge (struct
+                type t = Impl.Boolean.var
+              end)
+              (struct
+                include Impl.Field
+
+                let to_bits t =
+                  Bitstring_lib.Bitstring.Lsb_first.to_list
+                    (Impl.Field.unpack_full t)
+              end)
+              (S)
+
+    let absorb t input =
+      match input with
+      | `Field x ->
+          absorb t x
+      | `Bits bs ->
+          absorb t (Field.pack bs)
+  end
+
+  module Input_domain = struct
+    let domain = Domain.Pow_2_roots_of_unity 5
+
+    (* TODO: Make the real values *)
+    let lagrange_commitments =
+      Array.init (Domain.size domain) ~f:(fun i ->
+          unrelated_g (G.scale G.one (Fq.of_int i)) )
+  end
+
+  module G = struct
+    module Inputs = struct
+      module Impl = Impl
+
+      module Params = struct
+        open Impl.Field.Constant
+
+        let a = zero
+
+        let b = of_int 7
+
+        let one = G.to_affine_exn G.one
+
+        let group_size_in_bits = 382
+      end
+
+      module F = struct
+        include struct
+          open Impl.Field
+
+          type nonrec t = t
+
+          let ( * ), ( + ), ( - ), inv_exn, square, scale, if_, typ, constant =
+            (( * ), ( + ), ( - ), inv, square, scale, if_, typ, constant)
+
+          let negate x = scale x Constant.(negate one)
+        end
+
+        module Constant = struct
+          open Impl.Field.Constant
+
+          type nonrec t = t
+
+          let ( * ), ( + ), ( - ), inv_exn, square, negate =
+            (( * ), ( + ), ( - ), inv, square, negate)
+        end
+
+        let assert_square x y = Impl.assert_square x y
+
+        let assert_r1cs x y z = Impl.assert_r1cs x y z
+      end
+
+      module Constant = Snarky_bn382_backend.G
+    end
+
+    module Params = Inputs.Params
+
+    module Constant = struct
+      type t = G.Affine.t
+
+      let to_affine_exn = Fn.id
+
+      let of_affine = Fn.id
+    end
+
+    module T = Snarky_curve.For_native_base_field (Inputs)
+
+    module Scaling_precomputation = struct
+      include T.Scaling_precomputation
+
+      let create (base : Constant.t) =
+        let base = G.of_affine base in
+        create ~unrelated_base:(G.of_affine (unrelated_g base)) base
+    end
+
+    type t = T.t
+
+    let typ = Typ.transport T.typ ~there:G.of_affine ~back:G.to_affine_exn
+
+    let ( + ) = T.add_exn
+
+    let constant x = T.constant (G.of_affine x)
+
+    let multiscale_known = T.multiscale_known
+
+    (* TODO: Make real *)
+    let scale t bs =
+      let x, y = t in
+      let constraints_per_bit =
+        if Option.is_some (Field.to_constant x) then 2 else 6
+      in
+      let x = exists Field.typ ~compute:(fun () -> As_prover.read_var x)
+      and x2 =
+        exists Field.typ ~compute:(fun () ->
+            Field.Constant.square (As_prover.read_var x) )
+      in
+      ksprintf Impl.with_label "scale %s" __LOC__ (fun () ->
+          (* Dummy constraints *)
+          let num_bits = List.length bs in
+          for _ = 1 to constraints_per_bit * num_bits do
+            assert_r1cs x x x2
+          done ;
+          (x, y) )
+
+    (*         T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) *)
+    let to_field_elements (x, y) = [x; y]
+
+    let assert_equal (x1, y1) (x2, y2) =
+      Field.Assert.equal x1 x2 ; Field.Assert.equal y1 y2
+
+    let scale_inv t bs =
+      let res =
+        exists T.typ
+          ~compute:
+            As_prover.(
+              fun () ->
+                G.scale (read T.typ t)
+                  (Fq.inv (Fq.of_bits (List.map ~f:(read Boolean.typ) bs))))
+      in
+      (* TODO: assert_equal t (scale res bs) ; *)
+      ignore (scale res bs) ;
+      res
+
+    let scale_by_quadratic_nonresidue t = T.double (T.double t) + t
+
+    let one_fifth = Fq.(inv (of_int 5))
+
+    let scale_by_quadratic_nonresidue_inv t =
+      let res =
+        exists T.typ
+          ~compute:As_prover.(fun () -> G.scale (read T.typ t) one_fifth)
+      in
+      (*TODO:assert_equal t (scale_by_quadratic_nonresidue res) ; *)
+      ignore (scale_by_quadratic_nonresidue res) ;
+      res
+
+    let negate = T.negate
+
+    let one = T.one
+
+    let if_ b ~then_:(tx, ty) ~else_:(ex, ey) =
+      (Field.if_ b ~then_:tx ~else_:ex, Field.if_ b ~then_:ty ~else_:ey)
+  end
+
+  let domain_k = Domain.Pow_2_roots_of_unity 18
+
+  let domain_h = Domain.Pow_2_roots_of_unity 18
+
+  module Generators = struct
+    let g = G.one
+
+    let h =
+      G.T.constant
+        (Snarky_bn382_backend.G.of_affine
+           (unrelated_g Snarky_bn382_backend.G.one))
+  end
+end
+*)

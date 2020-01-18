@@ -53,14 +53,12 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       | Prev_messages : (PC.Constant.t, Fq.Constant.t) Messages.t t
       | Prev_openings_proof :
           (Fq.Constant.t, G.Constant.t) Pairing_based.Openings.Bulletproof.t t
-      | Prev_app_state : App_state.Constant.t t
+      | Prev_app_state : 's Tag.t -> 's t
       | Prev_sg : G.Constant.t t
       | Prev_x_hat_beta_1 : Field.Constant.t t
       | Me_only :
-          ( G.Constant.t
-          , App_state.Constant.t )
-          Pairing_based.Proof_state.Me_only.t
-          t
+          's Tag.t
+          -> (G.Constant.t, 's) Pairing_based.Proof_state.Me_only.t t
       | Prev_proof_state :
           ( Challenge.Constant.t
           , Fp.Constant.t
@@ -119,7 +117,8 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         G.scale_inv base pre
       in
       ( G.(left_term + right_term)
-      , {Bulletproof_challenge.prechallenge= pre; is_square= pre_is_square} )
+      , { Types.Bulletproof_challenge.prechallenge= pre
+        ; is_square= pre_is_square } )
     in
     let terms, challenges =
       Array.map2_exn gammas prechallenges ~f:term_and_challenge |> Array.unzip
@@ -298,7 +297,8 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
            [alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3] )
 
   let chals_data chals =
-    Array.map chals ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
+    Array.map chals
+      ~f:(fun {Types.Bulletproof_challenge.prechallenge; is_square} ->
         Data.bits (is_square :: prechallenge) )
     |> Array.reduce_exn ~f:Data.append
 
@@ -355,7 +355,11 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       ; Marlin_checks.check ~x_hat_beta_1 ~input_domain:Input_domain.domain
           ~domain_h ~domain_k marlin evals ]
 
-  let hash_me_only ~index =
+  module type App_state_intf = Intf.App_state_intf with module Impl := Impl
+
+  type 's app_state = (module App_state_intf with type t = 's)
+
+  let hash_me_only (type s) ((module A) : s app_state) ~index =
     let open Types.Pairing_based.Proof_state.Me_only in
     let after_index =
       let sponge = Sponge.create sponge_params in
@@ -367,8 +371,8 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         let sponge = Sponge.copy after_index in
         Array.iter
           ~f:(fun x -> Sponge.absorb sponge (`Field x))
-          (to_field_elements_without_index t
-             ~app_state:App_state.to_field_elements ~g:G.to_field_elements) ;
+          (to_field_elements_without_index t ~app_state:A.to_field_elements
+             ~g:G.to_field_elements) ;
         Sponge.squeeze sponge ~length:Digest.length )
 
   let pack_data (fp, challenge, digest) =
@@ -378,21 +382,24 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
               Bitstring_lib.Bitstring.Lsb_first.to_list (Fp.unpack_full x)
             in
             t )
-        (*
+      ; Vector.to_array challenge
+      ; Vector.to_array digest ]
+
+  (*
       ; Array.of_list_map (Vector.to_list fq) ~f:(fun (low_bits, high_bit) ->
             let low_bits = Fp.unpack ~length:(Fq.size_in_bits - 1) low_bits in
             low_bits @ [high_bit] )
 *)
-      ; Vector.to_array challenge (*       ; Vector.to_array fq_challenge *)
-      ; Vector.to_array digest ]
 
-  let main
+  let main (type s) ((module A) as am : s app_state)
       ({ proof_state=
            { deferred_values=
+               (* Fq values that we need the next verifier to check. *)
                { marlin
                ; combined_inner_product
-               ; xi
-               ; bulletproof_challenges: (_, _) Bulletproof_challenge.t array
+               ; xi (* The batching challenge. *)
+               ; bulletproof_challenges: (_, _) Types.Bulletproof_challenge.t
+                                         array
                ; a_hat }
            ; sponge_digest_before_evaluations
            ; was_base_case
@@ -401,15 +408,15 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         _ Statement.t) =
     let me_only =
       exists
-        ~request:(fun () -> Requests.Me_only)
-        (Types.Pairing_based.Proof_state.Me_only.typ G.typ App_state.typ)
+        ~request:(fun () -> Requests.Me_only A.Constant.tag)
+        (Types.Pairing_based.Proof_state.Me_only.typ G.typ A.typ)
     in
     let { Types.Pairing_based.Proof_state.Me_only.app_state
         ; dlog_marlin_index
         ; sg } =
       me_only
     in
-    let hash_me_only = unstage (hash_me_only ~index:dlog_marlin_index) in
+    let hash_me_only = unstage (hash_me_only am ~index:dlog_marlin_index) in
     let () =
       Field.Assert.equal me_only_digest (Field.pack (hash_me_only me_only))
     in
@@ -428,11 +435,10 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       , state )
     in
     let prev_app_state =
-      exists App_state.typ ~request:(fun () -> Requests.Prev_app_state)
+      exists A.typ ~request:(fun () -> Requests.Prev_app_state A.Constant.tag)
     in
     let sg_old = exists G.typ ~request:(fun () -> Requests.Prev_sg) in
     let prev_statement =
-      (* TODO: A lot of repeated hashing happening here on the dlog_marlin_index *)
       let prev_me_only =
         hash_me_only {app_state= prev_app_state; dlog_marlin_index; sg= sg_old}
       in
@@ -453,7 +459,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     in
     let sponge =
       let s = Sponge.create sponge_params in
-      Array.iter (App_state.to_field_elements app_state) ~f:(fun x ->
+      Array.iter (A.to_field_elements app_state) ~f:(fun x ->
           Sponge.absorb s (`Field x) ) ;
       s
     in
@@ -477,7 +483,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         ~sponge ~public_input ~sg_old ~combined_inner_product
         ~advice:{a_hat; sg} ~messages ~openings_proof
     in
-    let is_base_case = App_state.is_base_case app_state in
+    let is_base_case = A.is_base_case app_state in
     Boolean.Assert.(is_base_case = was_base_case) ;
     let prev_proof_correct =
       Boolean.all [bullet_proof_success; prev_proof_finalized]
@@ -497,7 +503,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         (chals_data bulletproof_challenges_actual @ marlin_data marlin_actual)) ; *)
     Boolean.(
       Assert.any
-        [ prev_proof_correct && App_state.check_update prev_app_state app_state
+        [ prev_proof_correct && A.check_update prev_app_state app_state
         ; is_base_case ])
 
   (* TODO: Turn this on -- think about what to do in the base case.
@@ -509,7 +515,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
 
   (* TODO: The code here and in [pack_data] in dlog_main should be unified into
    one piece of code from which both functions are derived. *)
-  let main
+  let main am
       ( bool
       , fq
       , (digest : (Fp.t, _) Vector.t)
@@ -521,9 +527,9 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     , digest
     , unpack Challenge.length challenge
     , Array.map bulletproof_challenges ~f:(fun t ->
-          Types.Pairing_based.Bulletproof_challenge.unpack
+          Types.Bulletproof_challenge.unpack
             (Fp.unpack ~length:(1 + Challenge.length) t) ) )
-    |> Types.Pairing_based.Statement.of_data |> main
+    |> Types.Pairing_based.Statement.of_data |> main am
 end
 
 (* Evaluations:

@@ -40,6 +40,8 @@ module type Input_intf = sig
 
   val mut_mul : t -> t -> unit
 
+  val mut_square : t -> unit
+
   val mut_sub : t -> t -> unit
 
   val copy : t -> t -> unit
@@ -104,6 +106,8 @@ module type S = sig
     val add : t -> other:t -> unit
 
     val mul : t -> other:t -> unit
+
+    val square : t -> unit
 
     val sub : t -> other:t -> unit
 
@@ -222,6 +226,8 @@ module Make (F : Input_intf) : S with type t = F.t = struct
     let add t ~other = mut_add t other
 
     let mul t ~other = mut_mul t other
+
+    let square = mut_square
 
     let sub t ~other = mut_sub t other
 

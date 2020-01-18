@@ -39,12 +39,15 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
       ; h_3
       ; row= {a= row_a; b= row_b; c= row_c}
       ; col= {a= col_a; b= col_b; c= col_c}
-      ; value= {a= value_a; b= value_b; c= value_c} } =
+      ; value= {a= value_a; b= value_b; c= value_c} 
+      ; rc= {a= rc_a; b= rc_b; c= rc_c} 
+      } =
     let open F in
     (* Marlin checks follow *)
     let row = abc row_a row_b row_c
     and col = abc col_a col_b col_c
     and value = abc value_a value_b value_c
+    and rc = abc rc_a rc_b rc_c
     and eta = abc eta_a eta_b eta_c
     and z_ = abc z_hat_a z_hat_b (z_hat_a * z_hat_b) in
     let z_hat =
@@ -65,14 +68,18 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
     let v_h_beta_1 = vanishing_polynomial domain_h beta_1 in
     let v_h_beta_2 = vanishing_polynomial domain_h beta_2 in
     let a_beta_3, b_beta_3 =
+      let beta_1_beta_2 = beta_1 * beta_2 in
+      let term =
+        Memo.general ~cache_size_bound:10
+          (fun m -> beta_1_beta_2 + rc m - beta_1 * row m - beta_2 * col m)
+      in
       let a =
         v_h_beta_1 * v_h_beta_2
         * sum ms (fun m ->
-              eta m * value m
-              * prod (all_but m) (fun n -> (beta_2 - row n) * (beta_1 - col n))
+              eta m * value m * prod (all_but m) term
           )
       in
-      let b = prod ms (fun m -> (beta_2 - row m) * (beta_1 - col m)) in
+      let b = prod ms term in
       (a, b)
     in
     Boolean.all

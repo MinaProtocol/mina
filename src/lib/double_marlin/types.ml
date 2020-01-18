@@ -1,6 +1,30 @@
 open Pickles_types
 open Core_kernel
 
+module Bulletproof_challenge = struct
+  type ('challenge, 'bool) t = {prechallenge: 'challenge; is_square: 'bool}
+  [@@deriving bin_io]
+
+  let pack {prechallenge; is_square} = is_square :: prechallenge
+
+  let unpack = function
+    | is_square :: prechallenge ->
+        {is_square; prechallenge}
+    | _ ->
+        failwith "Bulletproof_challenge.unpack"
+
+  open Snarky.H_list
+
+  let to_hlist {prechallenge; is_square} = [is_square; prechallenge]
+
+  let of_hlist ([is_square; prechallenge] : (unit, _) t) =
+    {prechallenge; is_square}
+
+  let typ chal bool =
+    Snarky.Typ.of_hlistable [bool; chal] ~var_to_hlist:to_hlist
+      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+end
+
 module Dlog_based = struct
   module Proof_state = struct
     module Deferred_values = struct
@@ -20,6 +44,7 @@ module Dlog_based = struct
           ; beta_1: 'challenge (* 128 bits *)
           ; beta_2: 'challenge (* 128 bits *)
           ; beta_3: 'challenge (* 128 bits *) }
+        [@@deriving bin_io]
 
         let map_challenges
             { sigma_2
@@ -80,6 +105,7 @@ module Dlog_based = struct
         ; r: 'challenge
         ; r_xi_sum: 'fp
         ; marlin: ('challenge, 'fp) Marlin.t }
+      [@@deriving bin_io]
 
       let map_challenges {xi; r; r_xi_sum; marlin} ~f =
         {xi= f xi; r= f r; r_xi_sum; marlin= Marlin.map_challenges marlin ~f}
@@ -150,6 +176,7 @@ module Dlog_based = struct
       ; sponge_digest_before_evaluations: 'digest
             (* Not needed by other proof system *)
       ; me_only: 'me_only }
+    [@@deriving bin_io]
 
     open Snarky.H_list
 
@@ -222,6 +249,7 @@ module Dlog_based = struct
           , 'digest )
           Proof_state.t
       ; pass_through: 'pass_through }
+    [@@deriving bin_io]
 
     (*
     let reader ~fp ~challenge ()  =
@@ -313,30 +341,6 @@ end
 module Pairing_based = struct
   module Marlin_polys = Vector.Nat.N20
 
-  module Bulletproof_challenge = struct
-    type ('challenge, 'bool) t = {prechallenge: 'challenge; is_square: 'bool}
-
-    let pack {prechallenge; is_square} = is_square :: prechallenge
-
-    let unpack = function
-      | is_square :: prechallenge ->
-          {is_square; prechallenge}
-      | _ ->
-          failwith "Bulletproof_challenge.unpack"
-
-    open Snarky.H_list
-
-    let to_hlist {prechallenge; is_square} = [is_square; prechallenge]
-
-    let of_hlist ([is_square; prechallenge] : (unit, _) t) =
-      {prechallenge; is_square}
-
-    let typ chal bool =
-      Snarky.Typ.of_hlistable [bool; chal] ~var_to_hlist:to_hlist
-        ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
-  end
-
   module Openings = struct
     module Evaluations = struct
       module By_point = struct
@@ -414,6 +418,7 @@ module Pairing_based = struct
         ; r: 'challenge (* 128 bits *)
         ; bulletproof_challenges: 'bulletproof_challenge array
         ; a_hat: 'fq }
+      [@@deriving bin_io]
 
       open Snarky.H_list
 
@@ -453,6 +458,7 @@ module Pairing_based = struct
       ; was_base_case: 'bool
       ; sponge_digest_before_evaluations: 'digest
       ; me_only: 'me_only }
+    [@@deriving bin_io]
 
     open Snarky.H_list
 
@@ -491,8 +497,7 @@ module Pairing_based = struct
          , 'bulletproof_challenge
          , 'me_only
          , 'pass_through
-         , 'digest
-         , 's )
+         , 'digest )
          t =
       { proof_state:
           ( 'challenge
@@ -503,6 +508,7 @@ module Pairing_based = struct
           , 'digest )
           Proof_state.t
       ; pass_through: 'pass_through }
+    [@@deriving bin_io]
 
     let to_data
         { proof_state=

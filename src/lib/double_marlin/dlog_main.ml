@@ -41,6 +41,19 @@ let accumulate_degree_bound_checks ~add ~scale ~r_h ~r_k
   in
   {Accumulator.Degree_bound_checks.shifted_accumulator; unshifted_accumulators}
 
+(*
+   check that pi proves that U opens to v at z.
+
+   pi =? commitmennt to (U - v * g ) / (beta*g - z)
+
+   e(pi, beta*g - z*g) = e(U - v, g)
+
+   e(pi, beta*g) - e(z*pi, g) - e(U - v, g) = 0
+   e(pi, beta*g) - e(z*pi - (U - v * g), g) = 0
+
+   sum_i r^i e(pi_i, beta_i*g) - e(z*pi - (U - v_i * g), g) = 0
+*)
+
 let accumulate_opening_check ~add ~negate ~scale ~generator ~r
     ~(* r should be exposed. *) r_xi_sum (* s should be exposed *)
     {Accumulator.Opening_check.r_f_minus_r_v_plus_rz_pi; r_pi}
@@ -66,7 +79,7 @@ let accumulate_opening_check ~add ~negate ~scale ~generator ~r
   in
   {Accumulator.Opening_check.r_f_minus_r_v_plus_rz_pi; r_pi= r_pi + pi_term}
 
-module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
+module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
   open Inputs
   open Impl
 
@@ -166,9 +179,7 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
           ( Challenge.Constant.t
           , Fq.Constant.t
           , bool
-          , ( Challenge.Constant.t
-            , bool )
-            Types.Pairing_based.Bulletproof_challenge.t
+          , (Challenge.Constant.t, bool) Types.Bulletproof_challenge.t
           , Digest.Constant.t
           , Digest.Constant.t )
           Types.Pairing_based.Proof_state.t
@@ -178,7 +189,7 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
           , Field.Constant.t )
           Types.Dlog_based.Proof_state.Me_only.t
           t
-      | Prev_x_hat_beta_1 : Field.Constant.t t
+      | Prev_x_hat : Field.Constant.t Tuple_lib.Triple.t t
 
     (*
       | Prev_pairing_acc : G1.Constant.t Accumulator.t t
@@ -417,9 +428,7 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
   (* TODO: Check a_hat! *)
   let compute_challenges chals =
     Array.map chals
-      ~f:(fun { Types.Pairing_based.Bulletproof_challenge.prechallenge
-              ; is_square }
-         ->
+      ~f:(fun {Types.Bulletproof_challenge.prechallenge; is_square} ->
         let sq =
           Fq.if_ is_square ~then_:prechallenge
             ~else_:Fq.(nonresidue * prechallenge)
@@ -458,18 +467,18 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
       let ty = Evals.typ Fq.typ in
       exists (Typ.tuple3 ty ty ty) ~request:(fun () -> Requests.Prev_evals)
     in
-    let x_hat_beta_1 =
-      exists Fq.typ ~request:(fun () -> Requests.Prev_x_hat_beta_1)
+    let (x_hat1, x_hat2, x_hat3) =
+      exists (Typ.tuple3 Fq.typ Fq.typ Fq.typ) ~request:(fun () -> Requests.Prev_x_hat)
     in
     let open Fq in
-    let absorb_evals e =
+    let absorb_evals x_hat e =
       let xs, ys = Evals.to_vectors e in
-      List.iter Vector.(to_list xs @ to_list ys) ~f:(Sponge.absorb sponge)
+      List.iter Vector.(x_hat :: (to_list xs @ to_list ys)) ~f:(Sponge.absorb sponge)
     in
     (* A lot of hashing. *)
-    absorb_evals beta_1_evals ;
-    absorb_evals beta_2_evals ;
-    absorb_evals beta_3_evals ;
+    absorb_evals x_hat1 beta_1_evals ;
+    absorb_evals x_hat2 beta_2_evals ;
+    absorb_evals x_hat3 beta_3_evals ;
     let xi_and_r_correct =
       let xi_actual = Sponge.squeeze sponge ~length:Challenge.length in
       let r_actual = Sponge.squeeze sponge ~length:Challenge.length in
@@ -486,20 +495,21 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
           sg_polynomial ~add:Field.add ~mul:Field.mul
             old_bulletproof_challenges old_bulletproof_challenges_inv
         in
-        let combine pt e =
+        let combine pt x_hat e =
           let a, b = Evals.to_vectors e in
-          combined_evaluation ~xi ~evaluation_point:pt (sg_old pt :: a, b)
+          combined_evaluation ~xi ~evaluation_point:pt (sg_old pt :: x_hat :: a, b)
         in
-        combine marlin.beta_1 beta_1_evals
+        combine marlin.beta_1 x_hat1 beta_1_evals
         + r
-          * ( combine marlin.beta_2 beta_2_evals
-            + (r * combine marlin.beta_3 beta_3_evals) )
+          * ( combine marlin.beta_2 x_hat2 beta_2_evals
+            + (r * combine marlin.beta_3 x_hat3 beta_3_evals) )
       in
       equal combined_inner_product actual_combined_inner_product
     in
     let marlin_checks_passed =
       Marlin_checks.check ~input_domain:Input_domain.domain ~domain_h ~domain_k
-        ~x_hat_beta_1 marlin
+        ~x_hat_beta_1:x_hat1
+        marlin
         { w_hat= beta_1_evals.w_hat
         ; g_1= beta_1_evals.g_1
         ; h_1= beta_1_evals.h_1
@@ -509,18 +519,11 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
         ; h_2= beta_2_evals.h_2
         ; g_3= beta_3_evals.g_3
         ; h_3= beta_3_evals.h_3
-        ; row=
-            { a= beta_3_evals.row_a
-            ; b= beta_3_evals.row_b
-            ; c= beta_3_evals.row_c }
-        ; col=
-            { a= beta_3_evals.col_a
-            ; b= beta_3_evals.col_b
-            ; c= beta_3_evals.col_c }
-        ; value=
-            { a= beta_3_evals.value_a
-            ; b= beta_3_evals.value_b
-            ; c= beta_3_evals.value_c } }
+        ; row= beta_3_evals.row
+        ; col= beta_3_evals.col
+        ; value=beta_3_evals.value
+        ; rc= beta_3_evals.rc
+        }
     in
     ( Boolean.all
         [xi_and_r_correct; combined_inner_product_correct; marlin_checks_passed]
@@ -553,7 +556,7 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
     ; combined_inner_product
     ; bulletproof_challenges=
         Array.map bulletproof_challenges
-          ~f:(fun (r : _ Types.Pairing_based.Bulletproof_challenge.t) ->
+          ~f:(fun (r : _ Types.Bulletproof_challenge.t) ->
             {r with prechallenge= f r.prechallenge} )
     ; xi= f xi
     ; r= f r
@@ -574,9 +577,8 @@ module Dlog_main (Inputs : Intf.Dlog_main_inputs.S) = struct
       ; Vector.to_array digest
       ; Vector.to_array challenge
       ; Array.map bulletproof_challenges
-          ~f:(fun { Types.Pairing_based.Bulletproof_challenge.prechallenge
-                  ; is_square }
-             -> is_square :: prechallenge ) ]
+          ~f:(fun {Types.Bulletproof_challenge.prechallenge; is_square} ->
+            is_square :: prechallenge ) ]
 
   let main
       ({ proof_state=
