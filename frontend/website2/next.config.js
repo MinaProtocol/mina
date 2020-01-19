@@ -10,9 +10,10 @@ const withBundleAnalyzer = require('@next/bundle-analyzer')({
 const SPACE = process.env.CONTENTFUL_SPACE || '37811siqosrn';
 const TOKEN = process.env.CONTENTFUL_TOKEN || 'gONaARVCc0G5FLIkoJ2m4qi9yTpT8oi7u-C6VYxQ6UQ';
 const IMAGE_TOKEN = process.env.CONTENTFUL_IMAGE_TOKEN || "3B4LS4VD0c4RCsUl1rxmmX/d8ba4bd5295e3b65569cbda1329e90a6";
+const CONTENTFUL_HOST = process.env.CONTENTFUL_HOST || "cdn.contentful.com";
 
 const blogType = 'test';
-const client = createClient({ accessToken: TOKEN, space: SPACE });
+const client = createClient({ accessToken: TOKEN, space: SPACE, host: CONTENTFUL_HOST });
 
 module.exports = withTM(withBundleAnalyzer(withMDX({
   async exportPathMap(pages) {
@@ -52,5 +53,6 @@ module.exports = withTM(withBundleAnalyzer(withMDX({
     CONTENTFUL_TOKEN: TOKEN,
     CONTENTFUL_IMAGE_TOKEN: IMAGE_TOKEN,
     CONTENTFUL_SPACE: SPACE,
+    CONTENTFUL_HOST: CONTENTFUL_HOST,
   }
 })))
