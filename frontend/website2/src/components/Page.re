@@ -115,12 +115,10 @@ module Footer = {
 
 let siteDescription = "Coda is the first cryptocurrency with a succinct blockchain. Our lightweight blockchain means anyone can use Coda directly from any device, in less data than a few tweets.";
 
-// TODO: Make title required so that it doesn't get forgotten.
-// Need to be able to pass title from MDX docs
 [@react.component]
 let make =
     (
-      ~title=?,
+      ~title,
       ~description=siteDescription,
       ~route=?,
       ~children,
@@ -131,12 +129,8 @@ let make =
 
   <>
     <Next.Head>
-      {ReactUtils.fromOpt(title, ~f=title =>
-         <>
-           <title> {React.string(title)} </title>
-           <meta property="og:title" content=title />
-         </>
-       )}
+      <title> {React.string(title)} </title>
+      <meta property="og:title" content=title />
       <meta property="og:image" content="/static/img/coda_facebook_OG.jpg" />
       <meta property="og:type" content="website" />
       <meta property="og:description" content=description />
