@@ -17,7 +17,7 @@ let setup_server ~logger ~postgres_address ~server_port =
   | Error e ->
       Logger.error logger ~module_:__MODULE__ ~location:__LOC__
         "Failed to connect to postgresql database, see error: $error"
-        ~metadata:[("error", Caqti_error.show e)] ;
+        ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
   | Ok conn ->
       Processor_new.run conn reader ~logger |> don't_wait_for ;
@@ -65,7 +65,7 @@ let command =
   fun () ->
     let logger = Logger.create () in
     Stdout_log.setup log_json log_level ;
-    setup_server ~logger ~postgres:postgres.value
+    setup_server ~logger ~postgres_address:postgres.value
       ~server_port:
         (Option.value server_port.value ~default:server_port.default)
 
