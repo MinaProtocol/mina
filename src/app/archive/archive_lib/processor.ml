@@ -253,12 +253,16 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
       | Diff.Transition_frontier _ ->
           (* TODO: Implement *)
           Deferred.return ()
-      | Transaction_pool {added; removed= _} -> (
+      | Transaction_pool {added= _; removed= _} ->
+          Deferred.unit
+          (*
+        (
           match%bind
             added_transactions t @@ User_command.Map.of_alist_exn added
           with
           | Ok result ->
               Deferred.return result
           | Error e ->
-              Graphql_lib.Client.Connection_error.ok_exn e ) )
+              Graphql_lib.Client.Connection_error.ok_exn e )
+      *) )
 end

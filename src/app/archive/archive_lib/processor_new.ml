@@ -6,6 +6,15 @@ open Coda_transition
 open Pipe_lib
 open Signature_lib
 
+let rec deferred_result_list_fold ls ~init ~f =
+  let open Deferred.Result.Let_syntax in
+  match ls with
+  | [] ->
+      return init
+  | h :: t ->
+      let%bind init = f init h in
+      deferred_result_list_fold t ~init ~f
+
 module Public_key = struct
   let add_if_doesn't_exist (module Conn : CONNECTION)
       (t : Public_key.Compressed.t) =
@@ -336,16 +345,20 @@ module Block = struct
                   , coinbase :: acc_coinbases ) ) )
         in
         let%bind user_command_ids =
-          Deferred.Result.all
-            (Core.List.map user_commands
-               ~f:(User_command.add_if_doesn't_exist (module Conn)))
+          deferred_result_list_fold user_commands ~init:[]
+            ~f:(fun acc user_command ->
+              let%map id =
+                User_command.add_if_doesn't_exist (module Conn) user_command
+              in
+              id :: acc )
         in
         let%bind () =
-          Deferred.Result.all_unit
-            (Core.List.map user_command_ids ~f:(fun user_command_id ->
-                 Block_and_User_command.add
-                   (module Conn)
-                   ~block_id ~user_command_id ))
+          deferred_result_list_fold user_command_ids ~init:()
+            ~f:(fun () user_command_id ->
+              Block_and_User_command.add
+                (module Conn)
+                ~block_id ~user_command_id
+              >>| ignore )
         in
         (* For technique reasons, there might be multiple fee transfers for
            one receiver. As suggested by deepthi, I combine all the fee transfer
@@ -369,16 +382,20 @@ module Block = struct
         in
         let combined_fee_transfers = Core.Hashtbl.data fee_transfer_table in
         let%bind fee_transfer_ids =
-          Deferred.Result.all
-            (Core.List.map combined_fee_transfers
-               ~f:(Fee_transfer.add_if_doesn't_exist (module Conn)))
+          deferred_result_list_fold combined_fee_transfers ~init:[]
+            ~f:(fun acc fee_transfer ->
+              let%map id =
+                Fee_transfer.add_if_doesn't_exist (module Conn) fee_transfer
+              in
+              id :: acc )
         in
         let%bind () =
-          Deferred.Result.all_unit
-            (Core.List.map fee_transfer_ids ~f:(fun fee_transfer_id ->
-                 Block_and_Internal_command.add
-                   (module Conn)
-                   ~block_id ~internal_command_id:fee_transfer_id ))
+          deferred_result_list_fold fee_transfer_ids ~init:()
+            ~f:(fun () fee_transfer_id ->
+              Block_and_Internal_command.add
+                (module Conn)
+                ~block_id ~internal_command_id:fee_transfer_id
+              >>| ignore )
         in
         (* For technical reasons, each block might have up to 2 coinbases.
            I would combine the coinbases if there are 2 of them.
@@ -401,10 +418,10 @@ module Block = struct
                     ~receiver:(Coinbase.receiver coinbase1)
                     ~fee_transfer:None
                   |> Core.Result.map_error ~f:(fun _ ->
-                         `Coinbase_creation_failure )
+                         failwith "Coinbase_combination_failed" )
                   |> Deferred.return
               | _ ->
-                  Deferred.Result.fail `There_can't_be_more_than_2_coinbases
+                  failwith "There_can't_be_more_than_2_coinbases"
             in
             let%bind coinbase_id =
               Coinbase.add_if_doesn't_exist (module Conn) combined_coinbase
@@ -423,7 +440,7 @@ module Block = struct
         return block_id
 end
 
-let run (module Conn : CONNECTION) reader =
+let run (module Conn : CONNECTION) reader ~logger =
   Strict_pipe.Reader.iter reader ~f:(function
     | Diff.Transition_frontier (Breadcrumb_added {block; _}) -> (
         match%bind
@@ -431,13 +448,18 @@ let run (module Conn : CONNECTION) reader =
           let%bind () = Conn.start () in
           Block.add_if_doesn't_exist (module Conn) block
         with
-        | Error _ ->
+        | Error e ->
+            Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ("block", With_hash.hash block |> State_hash.to_yojson)
+                ; ("error", `String (Caqti_error.show e)) ]
+              "Failed to archive block: $block, see $error" ;
             Conn.rollback () >>| ignore
         | Ok _ ->
             Conn.commit () >>| ignore )
-    | Diff.Transition_frontier _ ->
+    | Transition_frontier _ ->
         Deferred.return ()
     | Transaction_pool {added; removed= _} ->
-        Deferred.List.iter added ~f:(fun (user_command, _) ->
+        Deferred.List.iter added ~f:(fun user_command ->
             User_command.add_if_doesn't_exist (module Conn) user_command
             >>| ignore ) )
