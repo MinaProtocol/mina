@@ -1,7 +1,7 @@
 // This is the layout for the docs MDX pages
 
 module Style = {
-  open Css;
+  open! Css;
 
   let content =
     style([
@@ -71,12 +71,14 @@ module EditLink = {
   };
 };
 
+type metadata = {title: string};
+
 [@react.component]
-let make = (~children) => {
+let make = (~metadata, ~children) => {
   let router = Next.Router.useRouter();
   let currentSlug =
     Js.String.replaceByRe(Js.Re.fromString("^/docs/?"), "", router.route);
-  <Page>
+  <Page title={metadata.title}>
     <div className=Style.page>
       <DocsSideNav currentSlug />
       <div className=Style.content>
@@ -84,7 +86,6 @@ let make = (~children) => {
         <Next.MDXProvider
           components={
             "Alert": Alert.make,
-            "Metadata": DocsComponents.Metadata.make,
             "h1": DocsComponents.H1.make,
             "h2": DocsComponents.H2.make,
             "h3": DocsComponents.H3.make,
@@ -104,4 +105,7 @@ let make = (~children) => {
   </Page>;
 };
 
-let default = make;
+let default =
+  (. metadata) =>
+    (. props: {. "children": React.element}) =>
+      make({"metadata": metadata, "children": props##children});

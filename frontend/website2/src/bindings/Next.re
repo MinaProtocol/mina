@@ -37,6 +37,8 @@ module Config = {
   external contentful_image_token: string = "CONTENTFUL_IMAGE_TOKEN";
   [@bs.val] [@bs.scope "process.env"]
   external contentful_space: string = "CONTENTFUL_SPACE";
+  [@bs.val] [@bs.scope "process.env"]
+  external contentful_host: string = "CONTENTFUL_HOST";
 };
 
 module MDXProvider = {
