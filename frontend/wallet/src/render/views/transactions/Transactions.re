@@ -146,6 +146,7 @@ let extractTransactions: Js.t('a) => extractedResponse =
 [@react.component]
 let make = () => {
   let activeAccount = Hooks.useActiveAccount();
+  let zeroState = Hooks.useAsset("ZeroState.png");
 
   let updateQuery: ReasonApolloQuery.updateQueryT = [%bs.raw
     {| function (prevResult, { fetchMoreResult }) {
@@ -166,20 +167,6 @@ let make = () => {
   ];
 
   <div className=Styles.container>
-    <div className=Styles.headerRow>
-      <span className=Css.(style([display(`flex), alignItems(`center)]))>
-        <FormattedMessage id="sender" defaultMessage="sender" />
-        <span className=Styles.icon> <Icon kind=Icon.BentArrow /> </span>
-        <FormattedMessage id="recipient" defaultMessage="recipient" />
-      </span>
-      <span> <FormattedMessage id="memo" defaultMessage="memo" /> </span>
-      <span className=Css.(style([textAlign(`right)]))>
-        <FormattedMessage
-          id="transactions.date/amount"
-          defaultMessage="date / amount"
-        />
-      </span>
-    </div>
     {switch (activeAccount) {
      | Some(pubkey) =>
        let transactionQuery =
@@ -206,6 +193,30 @@ let make = () => {
                    response.refetch(Some(transactionQuery##variables))
                  }
                  subscribeToMore={response.subscribeToMore}>
+                 <div className=Styles.headerRow>
+                   <span
+                     className=Css.(
+                       style([display(`flex), alignItems(`center)])
+                     )>
+                     <FormattedMessage id="sender" defaultMessage="sender" />
+                     <span className=Styles.icon>
+                       <Icon kind=Icon.BentArrow />
+                     </span>
+                     <FormattedMessage
+                       id="recipient"
+                       defaultMessage="recipient"
+                     />
+                   </span>
+                   <span>
+                     <FormattedMessage id="memo" defaultMessage="memo" />
+                   </span>
+                   <span className=Css.(style([textAlign(`right)]))>
+                     <FormattedMessage
+                       id="transactions.date/amount"
+                       defaultMessage="date / amount"
+                     />
+                   </span>
+                 </div>
                  {switch (Array.length(transactions), Array.length(pending)) {
                   | (0, 0) =>
                     <div className=Styles.alertContainer>
@@ -241,9 +252,10 @@ let make = () => {
        </TransactionsQuery>;
      | None =>
        <div className=Styles.alertContainer>
-         <Alert
-           defaultMessage="Select an account from the side bar to view related transactions."
-           kind=`Info
+         <img
+           width="608px"
+           src=zeroState
+           alt="Join the revolution on Discord"
          />
        </div>
      }}
