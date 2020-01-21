@@ -177,8 +177,8 @@ let make = () => {
               {React.string({js| Apply Now |js})}
             </a>
           </div>
-          <img
-            src="/static/img/genesishero.png"
+          <Image
+            name="/static/img/genesisHero"
             alt="Genesis Program hero image with a light blue theme."
             className=Styles.heroImage
           />
