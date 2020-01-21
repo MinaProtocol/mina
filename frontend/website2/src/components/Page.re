@@ -120,6 +120,7 @@ let make =
     (
       ~title,
       ~description=siteDescription,
+      ~image="/static/img/coda_facebook_OG.jpg",
       ~route=?,
       ~children,
       ~footerColor=Theme.Colors.white,
@@ -131,7 +132,7 @@ let make =
     <Next.Head>
       <title> {React.string(title)} </title>
       <meta property="og:title" content=title />
-      <meta property="og:image" content="/static/img/coda_facebook_OG.jpg" />
+      <meta property="og:image" content=image />
       <meta property="og:type" content="website" />
       <meta property="og:description" content=description />
       <meta name="description" content=description />

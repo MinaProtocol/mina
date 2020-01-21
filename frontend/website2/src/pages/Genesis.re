@@ -152,7 +152,7 @@ module Styles = {
 let make = () => {
   <Page
     title="Genesis"
-    description="Become one of 1000 community members to receive a token grant.">
+    description="Join Genesis. Become one of 1000 community members to receive a grant of 66,000 coda tokens. You'll participate in activities that will strengthen the Coda network and community.">
     <Wrapped>
       <div className=Styles.page>
         <div className=Styles.heroRow>
