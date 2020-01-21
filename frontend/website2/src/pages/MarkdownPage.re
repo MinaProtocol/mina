@@ -30,15 +30,16 @@ module Style = {
     ]);
 };
 
+type metadata = {title: string};
+
 [@react.component]
-let make = (~title, ~children) => {
-  <Page title>
+let make = (~metadata, ~children) => {
+  <Page title={metadata.title}>
     <div className=Style.page>
       <div className=Style.content>
         <Next.MDXProvider
           components={
             "Alert": Alert.make,
-            "Metadata": DocsComponents.Metadata.make,
             "h1": DocsComponents.H1.make,
             "h2": DocsComponents.H2.make,
             "h3": DocsComponents.H3.make,
@@ -58,4 +59,7 @@ let make = (~title, ~children) => {
   </Page>;
 };
 
-let default = make;
+let default =
+  (. metadata) =>
+    (. props: {. "children": React.element}) =>
+      make({"metadata": metadata, "children": props##children});

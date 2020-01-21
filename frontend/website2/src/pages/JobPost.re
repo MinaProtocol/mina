@@ -74,7 +74,7 @@ module Style = {
 let make = (~post: option(ContentType.JobPost.t)) => {
   switch (post) {
   | None =>
-    <Page>
+    <Page title="Work with us!">
       <div> {React.string("Couldn't find that job post!")} </div>
       <Next.Link href="/careers">
         <a> {React.string("Check out the rest of our jobs instead")} </a>

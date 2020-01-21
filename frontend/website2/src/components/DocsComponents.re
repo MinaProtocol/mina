@@ -167,10 +167,3 @@ module Ol =
   Wrap({
     let element = <ol className=Style.list />;
   });
-
-module Metadata = {
-  [@react.component]
-  let make = (~title) => {
-    <Next.Head> <title> {React.string(title)} </title> </Next.Head>;
-  };
-};
