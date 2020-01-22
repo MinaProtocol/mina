@@ -6,7 +6,7 @@ module Style = {
   let content =
     style([
       maxWidth(`rem(43.)),
-      marginLeft(`rem(1.)),
+      media(Theme.MediaQuery.notMobile, [marginLeft(`rem(1.))]),
       selector(
         "p > code, li > code",
         [
@@ -31,8 +31,7 @@ module Style = {
 
   let editLink =
     style([
-      position(`relative),
-      float(`right),
+      media(Theme.MediaQuery.tablet, [position(`relative), float(`right)]),
       display(`flex),
       alignItems(`center),
       marginTop(`rem(3.25)),
