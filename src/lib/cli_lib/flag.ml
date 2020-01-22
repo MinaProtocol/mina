@@ -253,13 +253,15 @@ module Uri = struct
     let postgres =
       let doc_builder =
         Doc_builder.create ~display:to_string
-          ~examples:[Uri.of_string "postgres://localhost:5432/coda"]
+          ~examples:
+            [Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"]
           "URI" "URI for postgresql database"
       in
       create ~name:"postgres"
         ~arg_type:(Command.Arg_type.map Command.Param.string ~f:Uri.of_string)
         doc_builder
-        (Resolve_with_default (Uri.of_string "postgres://localhost:5432"))
+        (Resolve_with_default
+           (Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"))
   end
 end
 
