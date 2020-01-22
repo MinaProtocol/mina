@@ -56,8 +56,7 @@ let make = () => {
     </style>
     <a
       name="announcementbar"
-      id="announcementbar--anchor"
-      href="/testnet"
+      href="/genesis"
       className=Css.(
         style(
           Theme.paddingX(`rem(1.25))
@@ -78,7 +77,6 @@ let make = () => {
       <div className=Css.(style([display(`flex), alignItems(`center)]))>
         Icon.svg
         <p
-          id="announcementbar--testnetlive"
           className=Css.(
             merge([
               Theme.Body.basic,
@@ -89,11 +87,10 @@ let make = () => {
               ]),
             ])
           )>
-          {React.string("Testnet Beta is live")}
+          {React.string("Token Program is live")}
         </p>
       </div>
       <p
-        id="announcementbar--viewdemo"
         className=Css.(
           merge([
             Theme.Link.No_hover.basic,
@@ -104,7 +101,7 @@ let make = () => {
             ]),
           ])
         )>
-        {React.string({j|Join Now\u00A0→|j})}
+        {React.string({j|Apply Now\u00A0→|j})}
       </p>
     </a>
   </>;

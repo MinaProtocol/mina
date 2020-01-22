@@ -270,10 +270,10 @@ module NavWrapper = {
         <div
           className=Css.(
             style([
-              width(`rem(21.25)),
+              width(`rem(22.25)),
               media(
                 Theme.MediaQuery.statusLift(keepAnnouncementBar),
-                [width(`rem(21.25)), margin(`auto)],
+                [width(`rem(22.25)), margin(`auto)],
               ),
             ])
           )>
