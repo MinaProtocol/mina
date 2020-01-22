@@ -83,6 +83,8 @@ docker run -it -d --entrypoint /bin/bash  codaprotocol/coda-daemon:0.0.11-beta1-
 
 This starts a new container with the latest release installed and opens a shell. All the following commands should be run inside the Docker container. **NOTE** We are running in detatched mode which means closing the terminal will not stop the docker container.
 
+If you'd like to run the container interactively, you can add `-it` to the command above. Note that you can always detach the container with the key sequence `ctrl-p` `ctrl-q`.
+
 You can run `coda -help` to check if the installation succeeded.
 
 ### Windows
