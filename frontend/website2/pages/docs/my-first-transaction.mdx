@@ -49,10 +49,10 @@ If you see `Sync Status: Bootstrap`, this means that the Coda node is bootstrapp
 
 Once our node is synced, we'll create a public/private key-pair so that we can sign transactions and generate an address to receive payments. For security reasons, we'll want to put the keys under a directory that is harder for attackers to access.
 
-Run the following command which creates a public and private key `my-wallet` and `my-wallet.pub` under the `keys` directory:
+Run either one of the following commands which will create a public and private key `my-wallet` and `my-wallet.pub` under the `keys` directory:
 
     coda client-old generate-keypair -privkey-path keys/my-wallet 
-    or
+  
     coda accounts create
     
 <Alert kind="warning">
