@@ -68,10 +68,11 @@ You can run `coda -help` to check if the installation succeeded.
 
 ### Ubuntu 18.04 / Debian 9
 
-For Linux distrobutions we are temporarily using Docker. Run the following command to install Docker.
+For Linux distrobutions we are temporarily using Docker. Run the following commands to install Docker and configure the usergroup.
 
 ```
 curl get.docker.com | sh
+sudo usermod -aG <user> docker
 ```
 
 Next to download, start and connect to the image by running the command below:
