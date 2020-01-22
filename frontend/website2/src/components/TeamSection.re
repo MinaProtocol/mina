@@ -317,9 +317,9 @@ let make = () => {
        proselytizing, so you may find him speaking at a conference near you."
       />
       <Member
-        name="Ember Richardson"
+        name="Ember Arlynx"
         title="Protocol Engineer"
-        description="Ember Richardson is a seasoned open source contributor, recently \
+        description="Ember Arlynx is a seasoned open source contributor, recently \
          working primarily on the Rust compiler and libraries. They studied \
          computer science at Clarkson University and have worked at Dyn, \
          Mozilla, Leap Motion, and NICTA. They are especially interested in \
