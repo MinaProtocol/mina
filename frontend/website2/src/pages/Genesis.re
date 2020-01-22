@@ -198,7 +198,7 @@ let make = () => {
               and documentation, and build the community.",
              )}
           </p>
-          <Spacer height=1. />
+          <Spacer height=0.25 />
           <p className=Styles.heroCopy>
             {React.string(
                "When the protocol launches in mainnet, you will be the backbone of robust,
