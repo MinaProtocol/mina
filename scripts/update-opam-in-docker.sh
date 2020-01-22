@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# fail on any failed command
+set -e
+
 # update OPAM packages, including pinned ones
 
 if [ ! -f /.dockerenv ]; then
