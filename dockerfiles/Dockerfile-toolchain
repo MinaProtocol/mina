@@ -24,6 +24,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     libgmp-dev \
     libgmp3-dev \
     libjemalloc-dev \
+    libpq-dev \
     libprocps-dev \
     libsodium-dev \
     libssl-dev \
