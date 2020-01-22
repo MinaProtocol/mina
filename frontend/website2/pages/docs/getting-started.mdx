@@ -5,7 +5,7 @@ export default Page({title: "Getting Started"});
 
 <Alert>
 
-  These instructions are tempporarily for a **release-cantidate**. They will be changed on January 25th with the launch of Phase 3.
+  These instructions are tempporarily for a **release-cantidate**. They will be changed on January 24th with the launch of Phase 3.
 
 </Alert>
 
@@ -77,10 +77,10 @@ curl get.docker.com | sh
 Next to download, start and connect to the image by running the command below:
 
 ```
-docker run -it --entrypoint /bin/bash  codaprotocol/coda-daemon:0.0.11-beta1-release-0.0.12-beta-493b4c6
+docker run -it -d --entrypoint /bin/bash  codaprotocol/coda-daemon:0.0.11-beta1-release-0.0.12-beta-493b4c6
 ```
 
-All the following commands should be run inside the Docker container.
+This starts a new container with the latest release installed and opens a shell. All the following commands should be run inside the Docker container. **NOTE** We are running in detatched mode which means closing the terminal will not stop the docker container.
 
 You can run `coda -help` to check if the installation succeeded.
 
