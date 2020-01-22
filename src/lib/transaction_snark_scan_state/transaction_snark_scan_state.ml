@@ -590,8 +590,7 @@ let _all_work_pairs_exn_test t
         in
         Snark_work_lib.Work.Single.Spec.Transition
           ( statement
-          , { Transaction_protocol_state.Poly.transaction
-            ; block_data= Some (snd state_hash) }
+          , transaction
           , {Transaction_witness.ledger= ledger_witness; protocol_state_body}
           )
     | Second (p1, p2) ->
@@ -609,7 +608,7 @@ let _all_work_pairs_exn_test t
 
 let all_work_pairs t
     ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t) :
-    ( Transaction.t Transaction_protocol_state.t
+    ( Transaction.t
     , Transaction_witness.t
     , Ledger_proof.t )
     Snark_work_lib.Work.Single.Spec.t
@@ -629,8 +628,7 @@ let all_work_pairs t
         in
         Snark_work_lib.Work.Single.Spec.Transition
           ( statement
-          , { Transaction_protocol_state.Poly.transaction
-            ; block_data= Some (snd state_hash) }
+          , transaction
           , {Transaction_witness.ledger= ledger_witness; protocol_state_body}
           )
     | Second (p1, p2) ->
@@ -641,16 +639,6 @@ let all_work_pairs t
         in
         Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
   in
-  (*let%map all_specs = List.fold_until all_jobs ~init:[] ~f:(fun acc jobs ->
-    match List.fold ~init:(Ok []) jobs ~f:(fun acc job -> 
-    let open Or_error.Let_syntax in
-    let%bind acc = acc in
-    let%map spec = single_spec job
-    in job :: acc ) with
-  | Ok list -> Continue ((List.rev list) @ acc)
-  | Error e -> Stop (Error e)
-) ~final:(fun acc -> Ok acc) |> 
-  in*)
   let%map res =
     List.fold_until all_jobs ~init:[]
       ~finish:(fun lst -> Ok lst)

@@ -140,7 +140,7 @@ val update_metrics : t -> unit Or_error.t
 val all_work_pairs :
      t
   -> get_state:(State_hash.t -> Coda_state.Protocol_state.value Or_error.t)
-  -> ( Transaction.t Transaction_protocol_state.t
+  -> ( Transaction.t
      , Transaction_witness.t
      , Ledger_proof.t )
      Snark_work_lib.Work.Single.Spec.t

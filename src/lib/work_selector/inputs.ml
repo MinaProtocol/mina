@@ -60,10 +60,7 @@ module Test_inputs = struct
 
   module Staged_ledger = struct
     type t =
-      ( int Transaction_protocol_state.t
-      , int
-      , Transaction_snark_work.t )
-      Snark_work_lib.Work.Single.Spec.t
+      (int, int, Transaction_snark_work.t) Snark_work_lib.Work.Single.Spec.t
       List.t
 
     let work = Fn.id

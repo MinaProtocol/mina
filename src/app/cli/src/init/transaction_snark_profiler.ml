@@ -102,7 +102,11 @@ let rec pair_up = function
   | _ ->
       failwith "Expected even length list"
 
-let state_body_hash = Quickcheck.random_value State_body_hash.gen
+let state_body =
+  Coda_state.(
+    Genesis_protocol_state.compile_time_genesis.data |> Protocol_state.body)
+
+let state_body_hash = Coda_state.Protocol_state.Body.hash state_body
 
 let pending_coinbase_stack_target (t : Transaction.t) stack =
   let stack_with_state =
@@ -115,7 +119,7 @@ let pending_coinbase_stack_target (t : Transaction.t) stack =
     | _ ->
         stack_with_state
   in
-  (target, state_body_hash)
+  target
 
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
@@ -128,10 +132,9 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
-        let coinbase_stack_target, state_body_hash =
+        let coinbase_stack_target =
           pending_coinbase_stack_target t coinbase_stack_source
         in
-        let state_body_hash_opt = Some state_body_hash in
         let span, proof =
           time (fun () ->
               T.of_transaction ?preeval ~sok_digest:Sok_message.Digest.default
@@ -140,7 +143,7 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 ~pending_coinbase_stack_state:
                   {source= coinbase_stack_source; target= coinbase_stack_target}
                 { Transaction_protocol_state.Poly.transaction= t
-                ; block_data= state_body_hash_opt }
+                ; block_data= state_body }
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
         in
         ( (Time.Span.max span max_span, sparse_ledger', coinbase_stack_target)
@@ -178,10 +181,9 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
-        let coinbase_stack_target, state_body_hash =
+        let coinbase_stack_target =
           pending_coinbase_stack_target t Pending_coinbase.Stack.empty
         in
-        let state_body_hash_opt = Some state_body_hash in
         let () =
           Transaction_snark.check_transaction ?preeval ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
@@ -189,7 +191,7 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
             ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
-            { Transaction_protocol_state.Poly.block_data= state_body_hash_opt
+            { Transaction_protocol_state.Poly.block_data= state_body
             ; transaction= t }
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
@@ -209,10 +211,9 @@ let generate_base_snarks_witness sparse_ledger0
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
-        let coinbase_stack_target, state_body_hash =
+        let coinbase_stack_target =
           pending_coinbase_stack_target t Pending_coinbase.Stack.empty
         in
-        let state_body_hash_opt = Some state_body_hash in
         let () =
           Transaction_snark.generate_transaction_witness ?preeval ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
@@ -221,7 +222,7 @@ let generate_base_snarks_witness sparse_ledger0
                 Pending_coinbase.Stack.empty
             ; target= coinbase_stack_target }
             { Transaction_protocol_state.Poly.transaction= t
-            ; block_data= state_body_hash_opt }
+            ; block_data= state_body }
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
         sparse_ledger' )

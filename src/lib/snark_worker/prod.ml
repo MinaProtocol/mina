@@ -40,7 +40,7 @@ module Inputs = struct
   end
 
   type single_spec =
-    ( Transaction.t Transaction_protocol_state.t
+    ( Transaction.t
     , Transaction_witness.t
     , Transaction_snark.t )
     Snark_work_lib.Work.Single.Spec.t
@@ -82,7 +82,9 @@ module Inputs = struct
                 Or_error.try_with (fun () ->
                     M.of_transaction ~sok_digest
                       ~source:input.Transaction_snark.Statement.source
-                      ~target:input.target t
+                      ~target:input.target
+                      { Transaction_protocol_state.Poly.transaction= t
+                      ; block_data= w.protocol_state_body }
                       ~pending_coinbase_stack_state:
                         input
                           .Transaction_snark.Statement

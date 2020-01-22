@@ -179,7 +179,7 @@ val check_user_command :
      sok_message:Sok_message.t
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
-  -> Pending_coinbase.Stack.t
+  -> Pending_coinbase_stack_state.t
   -> User_command.With_valid_signature.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit

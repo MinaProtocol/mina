@@ -569,7 +569,7 @@ let request_work t =
     | Ok (res, seen_jobs) ->
         set_seen_jobs t seen_jobs ; res
     | Error e ->
-        Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
+        Logger.error t.config.logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:[("error", `String (Error.to_string_hum e))]
           "Snark-work-request error: $error" ;
         None
