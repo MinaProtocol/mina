@@ -94,6 +94,19 @@ let%test_unit "Coinbase: read and write" =
       | Error e ->
           failwith @@ Caqti_error.show e )
 
+let assert_parent_exist ~parent_id ~parent_hash =
+  let open Deferred.Result.Let_syntax in
+  match parent_id with
+  | Some id ->
+      let%map Processor_new.Block.{state_hash= actual; _} =
+        Processor_new.Block.load conn ~id
+      in
+      [%test_result: string]
+        ~expect:(parent_hash |> State_hash.to_base58_check)
+        actual
+  | None ->
+      failwith "Failed to find parent block in database"
+
 let%test_unit "Block: read and write" =
   Quickcheck.test ~trials:20
     ( Quickcheck.Generator.with_size ~size:10
@@ -122,21 +135,31 @@ let%test_unit "Block: read and write" =
       List.iter diffs ~f:(Strict_pipe.Writer.write writer) ;
       Strict_pipe.Writer.close writer ;
       let%bind () = processor_deferred_computation in
-      let hashes =
-        List.map ~f:Transition_frontier.Breadcrumb.state_hash breadcrumbs
-      in
       match%map
-        Processor_new.deferred_result_list_fold hashes ~init:()
-          ~f:(fun () state_hash ->
-            match%map Processor_new.Block.find conn ~state_hash with
-            | Ok (Some _) ->
-                Ok ()
-            | Ok None ->
-                failwith "fail to find saved block"
-            | Error e ->
-                Error e )
+        Processor_new.deferred_result_list_fold breadcrumbs ~init:()
+          ~f:(fun () breadcrumb ->
+            let open Deferred.Result.Let_syntax in
+            match%bind
+              Processor_new.Block.find conn
+                ~state_hash:
+                  (Transition_frontier.Breadcrumb.state_hash breadcrumb)
+            with
+            | Some id ->
+                let%bind Processor_new.Block.{parent_id; _} =
+                  Processor_new.Block.load conn ~id
+                in
+                if
+                  Transition_frontier.Breadcrumb.blockchain_length breadcrumb
+                  > Unsigned.UInt32.of_int 1
+                then
+                  assert_parent_exist ~parent_id
+                    ~parent_hash:
+                      (Transition_frontier.Breadcrumb.parent_hash breadcrumb)
+                else Deferred.Result.return ()
+            | None ->
+                failwith "Failed to find saved block in database" )
       with
-      | Ok _ ->
+      | Ok () ->
           ()
       | Error e ->
           failwith @@ Caqti_error.show e )

@@ -275,6 +275,13 @@ module Block = struct
          "SELECT id FROM blocks WHERE state_hash = ?")
       (State_hash.to_string state_hash)
 
+  let load (module Conn : CONNECTION) ~(id : int) =
+    Conn.find
+      (Caqti_request.find Caqti_type.int typ
+         "SELECT state_hash, parent_id, creator_id, snarked_ledger_hash_id, \
+          ledger_hash, height, timestamp, coinbase_id FROM blocks WHERE id = ?")
+      id
+
   let add_if_doesn't_exist (module Conn : CONNECTION)
       ({data= t; hash} : (External_transition.t, State_hash.t) With_hash.t) =
     let open Deferred.Result.Let_syntax in
