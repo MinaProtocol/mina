@@ -2,10 +2,10 @@ import Page from '@reason/pages/Docs';
 export default Page({title: "Getting Started"});
 
 # Getting Started
-
+a
 <Alert>
 
-  The testnet is currently down as we work hard towards the next release towards the end of January, 20th week.
+  These instructions are tempporarily for a **release-cantidate. They will be changed on January 25th with the launch of Phase 3.
 
 </Alert>
 
@@ -68,17 +68,19 @@ You can run `coda -help` to check if the installation succeeded.
 
 ### Ubuntu 18.04 / Debian 9
 
-Add the Coda Debian repo and install:
+For Linux distrobutions we are temporarily using Docker. Run the following command to install Docker.
 
 ```
-sudo apt-get remove coda-testnet-postake-medium-curves
-sudo apt-get remove coda-kademlia
-echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/coda.list
-sudo apt-get update
-sudo apt-get install -t release coda-testnet-postake-medium-curves
+curl get.docker.com | sh
 ```
 
-If you already have `coda` installed from a previous release, running the above commands should automatically uninstall and reinstall the newest version. If you're installing Coda from scratch, you may see this error when you run the first command: `E: Unable to locate package coda-testnet-postake-medium-curves`. You can ignore this - it just means there wasn't a prior release installed.
+Next to download, start and connect to the image by running the command below:
+
+```
+docker run -it --entrypoint /bin/bash  codaprotocol/coda-daemon:0.0.11-beta1-release-0.0.12-beta-493b4c6
+```
+
+All the following commands should be run inside the Docker container.
 
 You can run `coda -help` to check if the installation succeeded.
 
