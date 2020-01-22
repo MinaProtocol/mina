@@ -317,9 +317,9 @@ let make = () => {
        proselytizing, so you may find him speaking at a conference near you."
       />
       <Member
-        name="Corey Richardson"
+        name="Ember Arlynx"
         title="Protocol Engineer"
-        description="Corey Richardson is a seasoned open source contributor, recently \
+        description="Ember Arlynx is a seasoned open source contributor, recently \
          working primarily on the Rust compiler and libraries. They studied \
          computer science at Clarkson University and have worked at Dyn, \
          Mozilla, Leap Motion, and NICTA. They are especially interested in \
@@ -350,18 +350,6 @@ let make = () => {
        machine."
       />
       <Member
-        name="John Wu"
-        title="Protocol Engineer"
-        description="John Wu obtained a BS in Applied Mathematics at UCLA and a MS in \
-       Computer Science at NYU. His academic interests in CS and Math span \
-       many different fields with particular focus on programming languages \
-       and machine learning. His industry experience includes projects with \
-       Visa, American Express, Amazon and JetBrains. Most recently John \
-       helped develop Datalore, a new data science IDE from JetBrains that \
-       suggests context-aware actions to help data scientists with their \
-       analyses."
-      />
-      <Member
         name="Nacera Rodstein"
         title="Operations Associate"
         description="Nacera has had a career spanning startups, medium sized companies, and \
@@ -371,16 +359,6 @@ let make = () => {
               acquisition by Turner), Mokum Solutions, Sephora, Venture Beat, AMSI, \
               Oracle, and a software sales business which she helped start up and \
               scale."
-      />
-      <Member
-        name="Joel Krauska"
-        title="Protocol Reliability Eng"
-        description="Joel builds networks. He loves open source technologies, automation \
-       and monitoring large systems at scale. Over the years, he has worked \
-       for ISPs, network hardware and software vendors, online gaming \
-       companies, consumer electronics, large scale websites and network \
-       analytics companies.  He has a MS and BS from the University of \
-       Illinois Engineering."
       />
       <Member
         name="Paul Steckler"
@@ -411,17 +389,6 @@ let make = () => {
        industry at Xerox PARC and Intertrust Technologies. Vanishree enjoys \
        developing cryptographic solutions for real-world challenges and \
        communicating intuitive explanations of complex cryptography concepts."
-      />
-      <Member
-        name="Echo Nolan"
-        title="Protocol Engineer"
-        description="Echo is interested in programming languages, type systems and \
-       prediction markets. He has made open source contributions to Idris and \
-       various parts of the Haskell ecosystem. He's also made and lost a fair \
-       amount of money trading predictions on Augur. Before joining O(1) \
-       Labs, Echo worked on an text messaging platform for academic \
-       conselors, using functional programming techniques to deliver hundreds \
-       of thousands of messages to students."
       />
       <Member
         name="Matthew Ryan"

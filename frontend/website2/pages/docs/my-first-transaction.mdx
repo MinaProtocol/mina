@@ -11,9 +11,7 @@ Run the following command to start up a Coda node instance and connect to the ne
 
     coda daemon \
         -discovery-port 8303 \
-        -peer /dns4/peer1-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs \
-        -peer /dns4/peer2-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF \
-        -peer /dns4/peer3-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7
+        -peer /ip4/34.82.159.8/tcp/10002/ipfs/12D3KooWDjSiDwnatZyNw7Mf9G1iWL29YdAJWQF35vkRwcbu7fyL
 
 The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8303 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>`.
 
@@ -51,10 +49,12 @@ If you see `Sync Status: Bootstrap`, this means that the Coda node is bootstrapp
 
 Once our node is synced, we'll create a public/private key-pair so that we can sign transactions and generate an address to receive payments. For security reasons, we'll want to put the keys under a directory that is harder for attackers to access.
 
-Run the following command which creates a public and private key `my-wallet` and `my-wallet.pub` under the `keys` directory:
+Run either one of the following commands which will create a public and private key `my-wallet` and `my-wallet.pub` under the `keys` directory:
 
-    coda client generate-keypair -privkey-path keys/my-wallet
-
+    coda client-old generate-keypair -privkey-path keys/my-wallet 
+  
+    coda accounts create
+    
 <Alert kind="warning">
 
   The public key can be shared freely with anyone, but be very careful with your private key file. Never share this private key with anyone, as it is the equivalent of a password for your funds.
@@ -64,7 +64,7 @@ Run the following command which creates a public and private key `my-wallet` and
 The response from this command will look like this:
 
     Keypair generated
-    Public key: tNciWPvQgfUkdXyguKoBW1msCkwBtTmrioH5SrgU1V4gh2Th9q29x5DC6fQkJR2KqYGiAwaMoPQkQvr2Ltb6WvhMfb7JcC9TDi93YiUMuS7Nz25kZvWn83dY3NPpdF77at8VCkML1mYAQG
+    Public key:  4vsRCVbLm6LvUyzYWT95WaCzyi4D4UHxRpLBhMn7q2mRPgNCgRG3Jr3tDuhgQdmzbvCcBxhUwB3REpY2Dyf1NAxSSs8Q2vdJX93pT7eyqcyRU2S9UpDddDgovj46BSknNjzydKoopebp5Kva
 
 Since the public key is quite long and difficult to remember, let's save it as an environment variable:
 
@@ -82,7 +82,7 @@ Once a faucet-mod thumbs up your request, keep an eye on the Discord channel to 
 
 We can check our balance to make sure that we received the funds by running the following command, passing in our public key:
 
-    coda client get-balance -address $CODA_PK
+    coda client get-balance -public-key $CODA_PK
 
 You might see `No account found at that public_key (zero balance)`. Be patient! Depending on the traffic in the network, it may take a few blocks before your transaction goes through.
 
@@ -124,7 +124,7 @@ If this command is formatted properly, we should get a response that looks like 
 
 Now that we can send transactions, it might be helpful to know our balance, so that we don't spend our testnet tokens too carelessly! Let's check our current balance by running the following command, passing in the public key of the account we generated:
 
-    coda client get-balance -address $CODA_PK
+    coda client get-balance -public-key $CODA_PK
 
 We'll get a response that looks like this:
 
