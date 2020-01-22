@@ -1,6 +1,7 @@
 module Styles = {
   open Css;
-  let page = style([display(`block), justifyContent(`center)]);
+  let page =
+    style([display(`block), justifyContent(`center), overflowX(`hidden)]);
 };
 
 [@react.component]
