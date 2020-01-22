@@ -32,6 +32,11 @@ struct
                 (i <= p) ;
               let stuff, seen =
                 Selection_method.work ~snark_pool ~fee sl seen ~logger
+                  ~get_protocol_state:(fun _ ->
+                    Ok
+                      Coda_state.Genesis_protocol_state.compile_time_genesis
+                        .data )
+                |> Or_error.ok_exn
               in
               match stuff with None -> return () | _ -> go (i + 1) seen
             in
@@ -46,6 +51,9 @@ struct
       let rec go seen all_work =
         let stuff, seen =
           Selection_method.work ~snark_pool ~fee sl seen ~logger
+            ~get_protocol_state:(fun _ ->
+              Ok Coda_state.Genesis_protocol_state.compile_time_genesis.data )
+          |> Or_error.ok_exn
         in
         match stuff with
         | None ->
@@ -99,7 +107,10 @@ struct
       let%bind sl = gen_staged_ledger in
       let%map pool =
         gen_snark_pool
-          (T.Staged_ledger.all_work_pairs_exn sl)
+          ( T.Staged_ledger.all_work_pairs sl ~get_state:(fun _ ->
+                Ok Coda_state.Genesis_protocol_state.compile_time_genesis.data
+            )
+          |> Or_error.ok_exn )
           (Currency.Fee.of_int 2)
       in
       (sl, pool)
@@ -118,6 +129,11 @@ struct
                 (i <= p) ;
               let work, seen =
                 Selection_method.work ~snark_pool ~fee:my_fee sl seen ~logger
+                  ~get_protocol_state:(fun _ ->
+                    Ok
+                      Coda_state.Genesis_protocol_state.compile_time_genesis
+                        .data )
+                |> Or_error.ok_exn
               in
               match work with
               | None ->
@@ -126,7 +142,8 @@ struct
                   [%test_result: Bool.t]
                     ~message:"Should not get any cheap jobs" ~expect:true
                     (Lib.For_tests.does_not_have_better_fee ~snark_pool
-                       ~fee:my_fee job) ;
+                       ~fee:my_fee
+                       (One_or_two.map job ~f:Lib.Work_spec.statement)) ;
                   go (i + 1) seen
             in
             go 0 (Lib.State.init ~reassignment_wait) ) )

@@ -892,7 +892,8 @@ module Staged_ledger_validation = struct
       Staged_ledger.apply ~logger ~verifier parent_staged_ledger
         staged_ledger_diff
         ~state_body_hash:
-          Protocol_state.(Body.hash @@ body parent_protocol_state)
+          ( Protocol_state.hash parent_protocol_state
+          , Protocol_state.(Body.hash @@ body parent_protocol_state) )
       |> Deferred.Result.map_error ~f:(fun e ->
              `Staged_ledger_application_failed e )
     in

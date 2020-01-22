@@ -255,6 +255,30 @@ let best_ledger_opt t =
   let%map staged_ledger = best_staged_ledger_opt t in
   Staged_ledger.ledger staged_ledger
 
+let get_protocol_state t state_hash =
+  let open Or_error.Let_syntax in
+  let to_or_error opt ~error_string =
+    match opt with
+    | Some value ->
+        Ok value
+    | None ->
+        Or_error.error_string error_string
+  in
+  let%bind frontier =
+    to_or_error
+      (Broadcast_pipe.Reader.peek t.components.transition_frontier)
+      ~error_string:"Could not retrieve transition frontier"
+  in
+  let%map breadcrumb =
+    to_or_error
+      (Transition_frontier.find frontier state_hash)
+      ~error_string:
+        (sprintf
+           !"Protocol state with hash %{sexp: State_hash.t} not found"
+           state_hash)
+  in
+  Transition_frontier.Breadcrumb.protocol_state breadcrumb
+
 let compose_of_option f =
   Fn.compose
     (Option.value_map ~default:`Bootstrapping ~f:(fun x -> `Active x))
@@ -536,11 +560,20 @@ let request_work t =
         None
   in
   let fee = snark_work_fee t in
-  let instances_opt, seen_jobs =
-    Work_selection_method.work ~logger:t.config.logger ~fee
-      ~snark_pool:(snark_pool t) sl (seen_jobs t)
+  let instances_opt =
+    match
+      Work_selection_method.work ~logger:t.config.logger ~fee
+        ~snark_pool:(snark_pool t) ~get_protocol_state:(get_protocol_state t)
+        sl (seen_jobs t)
+    with
+    | Ok (res, seen_jobs) ->
+        set_seen_jobs t seen_jobs ; res
+    | Error e ->
+        Logger.info t.config.logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:[("error", `String (Error.to_string_hum e))]
+          "Snark-work-request error: $error" ;
+        None
   in
-  set_seen_jobs t seen_jobs ;
   Option.map instances_opt ~f:(fun instances ->
       {Snark_work_lib.Work.Spec.instances; fee} )
 
