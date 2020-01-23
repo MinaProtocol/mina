@@ -23,18 +23,6 @@ module Make (Inputs : Inputs_intf) :
     in
     Root_history.lookup root_history state_hash
 
-  (*
-  let get_root_snarked_ledger ~frontier ledger_hash =
-    let root_ledger =
-      Ledger.Any_ledger.cast (module Ledger.Db)
-      @@ Transition_frontier.root_snarked_ledger frontier
-    in 
-    if Ledger_hash.equal ledger_hash 
-      (Ledger.Any_ledger.M.merkle_root root_ledger)
-    then Some root_ledger
-    else None
-*)
-
   let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
       Ledger.Any_ledger.cast (module Ledger.Db)
