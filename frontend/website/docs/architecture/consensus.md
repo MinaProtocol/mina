@@ -25,7 +25,7 @@ A consensus mechanism controls many aspects in a protocol which is built on top 
 
 **TODO**
 
-### Proposal\_data
+### Block\_data
 
 **TODO**
 
@@ -42,13 +42,13 @@ A consensus mechanism controls many aspects in a protocol which is built on top 
 
 ### generate\_transition
 
-The `generate_transition` hook fully generates a new protocol state and consensus transition data as an extension of a previous protocol state on the blockchain. The new blockchain state is provided to this function, along with the transactions to include in the staged ledger diff and the relevant proposal data. This hook is intended to be called by the proposer, with the best tip in the frontier at the time being passed in as the `previous_protocol_state`. The proposer should interact with the `next_proposal` hook in order to determine when this hook should be called.
+The `generate_transition` hook fully generates a new protocol state and consensus transition data as an extension of a previous protocol state on the blockchain. The new blockchain state is provided to this function, along with the transactions to include in the staged ledger diff and the relevant block data. This hook is intended to be called by the block producer, with the best tip in the frontier at the time being passed in as the `previous_protocol_state`. The block producer should interact with the `next_producer_timing` hook in order to determine when this hook should be called.
 
-### next\_proposal
+### next\_producer\_timing
 
-The `next_proposal` hook informs the protocol when it is valid to generate and propose the next transition. This hook may either return a time to propose a transition at, or a time to check the hook again. This allows a consensus mechanism to space out proposals, as well as control more advanced scheduling of proposals based on other information in the protocol.
+The `next_producer_timing` hook informs the protocol when it is valid to generate and broadcast the next transition. This hook may either return a time to produce a transition at, or a time to check the hook again. This allows a consensus mechanism to space out block production, as well as control more advanced scheduling of block production based on other information in the protocol.
 
-<!-- <sup>_For more information on how the `next_proposal` hook interacts the `Proposer`, see the [`Proposer` documentation](proposer.md#proposal-scheduling)._</sup> -->
+<!-- <sup>_For more information on how the `next_producer_timing` hook interacts with the `Block_producer`, see the [`Block_producer` documentation](block_producer.md#block-production-scheduling)._</sup> -->
 
 ### next\_state\_checked
 

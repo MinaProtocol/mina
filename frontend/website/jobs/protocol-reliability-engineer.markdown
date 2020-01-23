@@ -10,6 +10,7 @@ We’re hiring engineers to work on a bunch of exciting projects, including:
 - Advancing our testing environment that can simulate network performance with thousands of machines across variable network conditions
 - Creating the core machine images we use to streamline onboarding new network nodes
 - Developing sophisticated diagnostic systems that continuously monitor network performance and provide visibility into network health
+- Manage and grow testnets
 - Designing robust, self-healing systems that ensure the health and stability of a fledgling cryptocurrency network under intense network loads or highly adversarial environments
 
 No prior cryptocurrency experience is necessary.
@@ -31,6 +32,7 @@ This is a chance to join a small, collaborative team and gain a ton of independe
 - Ansible
 - Nix package management
 - MirageOS
+- Azure
 
 There are no hard requirements and we're more interested in learning about your individual background.
 

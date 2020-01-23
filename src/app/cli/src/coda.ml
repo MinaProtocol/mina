@@ -9,123 +9,6 @@ open Signature_lib
 open Init
 module YJ = Yojson.Safe
 
-let retrieve_genesis_state dir_opt ~logger :
-    (Ledger.t lazy_t * Proof.t) Deferred.t =
-  let open Cache_dir in
-  let tar_filename = Cache_dir.genesis_dir_name ^ ".tar.gz" in
-  let s3_bucket_prefix =
-    "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net" ^/ tar_filename
-  in
-  let extract dir =
-    match%map
-      Monitor.try_with_or_error ~extract_exn:true (fun () ->
-          let genesis_dir = dir ^/ Cache_dir.genesis_dir_name in
-          if Core.Sys.file_exists genesis_dir = `Yes then Deferred.return ()
-          else
-            (*Look for the tar and extract*)
-            let tar_file = genesis_dir ^ ".tar.gz" in
-            let%map _result =
-              Process.run_exn ~prog:"tar"
-                ~args:["-C"; dir; "-xzf"; tar_file]
-                ()
-            in
-            () )
-    with
-    | Ok () ->
-        ()
-    | Error e ->
-        Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
-          "Error extracting genesis ledger and proof : $error"
-          ~metadata:[("error", `String (Error.to_string_hum e))]
-  in
-  let retrieve dir =
-    Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
-      "Retrieving genesis ledger and genesis proof from $path"
-      ~metadata:[("path", `String dir)] ;
-    let%bind () = extract dir in
-    let dir = dir ^/ Cache_dir.genesis_dir_name in
-    let ledger_dir = dir ^/ "ledger" in
-    let proof_file = dir ^/ "genesis_proof" in
-    if
-      Core.Sys.file_exists ledger_dir = `Yes
-      && Core.Sys.file_exists proof_file = `Yes
-    then (
-      let genesis_ledger =
-        lazy (Ledger.create ~directory_name:ledger_dir ())
-      in
-      let%map base_proof =
-        match%map
-          Monitor.try_with_or_error ~extract_exn:true (fun () ->
-              let%bind r = Reader.open_file proof_file in
-              let%map contents =
-                Pipe.to_list (Reader.lines r) >>| String.concat
-              in
-              Sexp.of_string contents |> Proof.Stable.V1.t_of_sexp )
-        with
-        | Ok base_proof ->
-            base_proof
-        | Error e ->
-            failwithf "Error reading the base proof from %s: %s" proof_file
-              (Error.to_string_hum e) ()
-      in
-      Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
-        "Successfully retrieved genesis ledger and genesis proof from $path"
-        ~metadata:[("path", `String dir)] ;
-      Some (genesis_ledger, base_proof) )
-    else (
-      Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
-        "Error retrieving genesis ledger and genesis proof from $path"
-        ~metadata:[("path", `String dir)] ;
-      Deferred.return None )
-  in
-  let res_or_fail dir_str = function
-    | Some res ->
-        res
-    | None ->
-        failwith
-          (sprintf
-             "Could not retrieve genesis ledger and genesis proof from %s"
-             dir_str)
-  in
-  match dir_opt with
-  | Some dir ->
-      let%map res = retrieve dir in
-      res_or_fail dir res
-  | None -> (
-      let directories =
-        [ manual_install_path
-        ; brew_install_path
-        ; Cache_dir.s3_install_path
-        ; autogen_path ]
-      in
-      match%bind
-        Deferred.List.fold directories ~init:None ~f:(fun acc dir ->
-            if is_some acc then Deferred.return acc else retrieve dir )
-      with
-      | Some res ->
-          Deferred.return res
-      | None ->
-          (*Check if it's in s3*)
-          let local_path = Cache_dir.s3_install_path ^/ tar_filename in
-          let%bind () =
-            match%map
-              Cache_dir.load_from_s3 [s3_bucket_prefix] [local_path] ~logger
-            with
-            | Ok () ->
-                ()
-            | Error e ->
-                Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
-                  "Could not curl genesis ledger and genesis proof from $uri: \
-                   $error"
-                  ~metadata:
-                    [ ("path", `String s3_bucket_prefix)
-                    ; ("error", `String (Error.to_string_hum e)) ]
-          in
-          let%map res = retrieve Cache_dir.s3_install_path in
-          res_or_fail
-            (String.concat ~sep:"," (s3_install_path :: directories))
-            res )
-
 [%%check_ocaml_word_size
 64]
 
@@ -161,13 +44,20 @@ let daemon logger =
   let open Cli_lib.Arg_type in
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir = Cli_lib.Flag.conf_dir
-     and propose_key =
-       flag "propose-key"
+     and block_production_key =
+       flag "block-producer-key"
          ~doc:
            "KEYFILE Private key file for the block producer. You cannot \
-            provide both `propose-key` and `propose-public-key`. (default: \
-            don't produce blocks)"
+            provide both `block-producer-key` and `block-producer-pubkey`. \
+            (default: don't produce blocks)"
          (optional string)
+     and coinbase_receiver_flag =
+       flag "coinbase-receiver"
+         ~doc:
+           "PUBLICKEY Address to send coinbase rewards to (if this node is \
+            producing blocks). If not provided, coinbase rewards will be sent \
+            to the producer of a block."
+         (optional public_key_compressed)
      and genesis_ledger_dir_flag =
        flag "genesis-ledger-dir"
          ~doc:
@@ -457,7 +347,8 @@ let daemon logger =
        end in
        let coda_initialization_deferred () =
          let%bind genesis_ledger, base_proof =
-           retrieve_genesis_state genesis_ledger_dir_flag ~logger
+           Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
+             ~logger ~conf_dir
          in
          let%bind config =
            match%map
@@ -619,8 +510,8 @@ let daemon logger =
            ; client_port
            ; libp2p_port= discovery_port }
          in
-         let%bind propose_keypair =
-           match propose_key with
+         let%bind block_production_keypair =
+           match block_production_key with
            | Some sk_file ->
                let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
                Some kp
@@ -681,12 +572,12 @@ let daemon logger =
          let time_controller =
            Block_time.Controller.create @@ Block_time.Controller.basic ~logger
          in
-         let initial_propose_keypairs =
-           propose_keypair |> Option.to_list |> Keypair.Set.of_list
+         let initial_block_production_keypairs =
+           block_production_keypair |> Option.to_list |> Keypair.Set.of_list
          in
          let consensus_local_state =
            Consensus.Data.Local_state.create ~genesis_ledger
-             ( Option.map propose_keypair ~f:(fun keypair ->
+             ( Option.map block_production_keypair ~f:(fun keypair ->
                    let open Keypair in
                    Public_key.compress keypair.public_key )
              |> Option.to_list |> Public_key.Compressed.Set.of_list )
@@ -797,10 +688,14 @@ let daemon logger =
                terminated_child_loop ()
          in
          O1trace.trace_task "terminated child loop" terminated_child_loop ;
+         let coinbase_receiver =
+           Option.value_map coinbase_receiver_flag ~default:`Producer
+             ~f:(fun pk -> `Other pk)
+         in
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~net_config ~gossip_net_params
+                ~coinbase_receiver ~net_config ~gossip_net_params
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
@@ -813,7 +708,7 @@ let daemon logger =
                 ~persistent_root_location:(conf_dir ^/ "root")
                 ~persistent_frontier_location:(conf_dir ^/ "frontier")
                 ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-                ~time_controller ~initial_propose_keypairs ~monitor
+                ~time_controller ~initial_block_production_keypairs ~monitor
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
@@ -957,8 +852,8 @@ let internal_commands =
 let coda_commands logger =
   [ ("accounts", Client.accounts)
   ; ("daemon", daemon logger)
-  ; ("client", Client.command)
-  ; ("client2", Client.client)
+  ; ("client-old", Client.command)
+  ; ("client", Client.client)
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
@@ -984,7 +879,7 @@ let coda_commands logger =
         ; (module Coda_shared_state_test)
         ; (module Coda_transitive_peers_test)
         ; (module Coda_shared_prefix_test)
-        ; (module Coda_shared_prefix_multiproposer_test)
+        ; (module Coda_shared_prefix_multiproducer_test)
         ; (module Coda_five_nodes_test)
         ; (module Coda_restart_node_test)
         ; (module Coda_receipt_chain_test)
@@ -992,7 +887,7 @@ let coda_commands logger =
         ; (module Coda_bootstrap_test)
         ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
-        ; (module Coda_txns_and_restart_non_proposers)
+        ; (module Coda_txns_and_restart_non_producers)
         ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)

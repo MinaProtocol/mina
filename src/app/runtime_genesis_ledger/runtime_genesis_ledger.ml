@@ -106,7 +106,7 @@ let get_accounts accounts_json_file n =
         | Ok res ->
             Ok res
         | Error e ->
-            Or_error.errorf "Could not read accounts from file:%s\n%s" file
+            Or_error.errorf "Could not read accounts from file: %s\n%s" file
               (Error.to_string_hum e) )
     | None ->
         Deferred.return (Ok (compiled_accounts_json ()))

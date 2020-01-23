@@ -170,6 +170,20 @@ let memo (t : t) = t.common.memo
 
 let body (t : t) = t.body
 
+let receiver (t : t) =
+  match t.body with
+  | Payment payload ->
+      payload.Payment_payload.Poly.receiver
+  | Stake_delegation payload ->
+      Stake_delegation.receiver payload
+
+let amount (t : t) =
+  match t.body with
+  | Payment payload ->
+      Some payload.Payment_payload.Poly.amount
+  | Stake_delegation _ ->
+      None
+
 let is_payment (t : t) =
   match t.body with Payment _ -> true | Stake_delegation _ -> false
 
