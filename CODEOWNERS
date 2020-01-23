@@ -22,7 +22,6 @@
 /src/app/libp2p_helper @emberian @bkase @nholland94
 /src/app/reformat/ @bkase
 /src/app/trace-tool/ @emberian @mrmr1993
-/src/app/website/ @bkase @schmavery @figitaki
 /src/app/runtime_genesis_ledger/ @emberian @psteckler @deepthiskumar
 
 /src/lib/best_tip_prover/ @nholland94 @ghost-not-in-the-shell
