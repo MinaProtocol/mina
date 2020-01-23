@@ -372,7 +372,7 @@ let make = () => {
       />
       <Member
         name="Harold Herbert"
-        title="Lead Designer"
+        title="Head of Design"
         description="Harold previously designed brands, products, and experiences at Hired, \
              Flipboard, Zillow, and with a range of technology companies while \
              running an independent design studio. He believes that all design is \
