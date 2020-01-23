@@ -16,3 +16,11 @@ let createContext = default => {
   let make = context->React.Context.provider;
   (context, make, makeProps);
 };
+
+let staticArray = a => {
+  a
+  |> Array.mapi((i, e) =>
+       <React.Fragment key={string_of_int(i)}> e </React.Fragment>
+     )
+  |> React.array;
+};

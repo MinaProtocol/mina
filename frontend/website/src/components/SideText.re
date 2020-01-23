@@ -2,22 +2,20 @@
 let make = (~className="", ~paragraphs) => {
   let ps =
     paragraphs
-    |> Array.mapi((i, entry) => {
-         let key = string_of_int(i);
+    |> Array.map(entry => {
          let content =
            switch (entry) {
-           | `str(s) => [|<span key> {React.string(s)} </span>|]
+           | `str(s) => [|<span> {React.string(s)} </span>|]
            | `styled(xs) =>
-             List.mapi(
-               (i, x) => {
-                 let styleKey = string_of_int(i);
+             List.map(
+               x => {
                  switch (x) {
                  | `emph(s) =>
-                   <span key=styleKey className=Theme.Body.basic_semibold>
+                   <span className=Theme.Body.basic_semibold>
                      {React.string(s)}
                    </span>
-                 | `str(s) => <span key=styleKey> {React.string(s)} </span>
-                 };
+                 | `str(s) => <span> {React.string(s)} </span>
+                 }
                },
                xs,
              )
@@ -25,7 +23,6 @@ let make = (~className="", ~paragraphs) => {
            };
 
          <p
-           key
            className=Css.(
              merge([Theme.Body.basic, style([marginBottom(`rem(1.5))])])
            )>
@@ -40,6 +37,6 @@ let make = (~className="", ~paragraphs) => {
         style([media(Theme.MediaQuery.notMobile, [width(`rem(20.625))])]),
       ])
     )>
-    {React.array(ps)}
+    {ReactUtils.staticArray(ps)}
   </div>;
 };
