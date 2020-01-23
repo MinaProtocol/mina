@@ -2210,6 +2210,8 @@ module Data = struct
 
     let curr_slot = curr_ Global_slot.slot
 
+    let curr_global_slot_var (t : var) = t.curr_global_slot
+
     let consensus_time (t : Value.t) = t.curr_global_slot
 
     let blockchain_length {Poly.blockchain_length; _} = blockchain_length

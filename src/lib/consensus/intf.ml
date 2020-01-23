@@ -442,6 +442,8 @@ module type S = sig
 
       val blockchain_length : Value.t -> Length.t
 
+      val curr_global_slot_var : var -> Global_slot.Checked.t
+
       val graphql_type :
         unit -> ('ctx, Value.t option) Graphql_async.Schema.typ
 

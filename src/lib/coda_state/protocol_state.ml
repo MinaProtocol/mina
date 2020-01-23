@@ -127,6 +127,8 @@ module Body = struct
           hash ~init:Hash_prefix.protocol_state_body (pack_input input)
           |> State_body_hash.var_of_hash_packed) )
 
+  let consensus_state {Poly.consensus_state; _} = consensus_state
+
   [%%endif]
 
   let hash s =

@@ -63,6 +63,8 @@ module Body : sig
   val hash : Value.t -> State_body_hash.t
 
   val hash_checked : var -> (State_body_hash.var, _) Checked.t
+
+  val consensus_state : (_, _, 'a) Poly.t -> 'a
 end
 
 module Value : sig
