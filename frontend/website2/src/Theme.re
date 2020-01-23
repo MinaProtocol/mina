@@ -46,9 +46,10 @@ module Colors = {
   let clover = `rgb((22, 168, 85));
   let lightClover = `rgba((118, 205, 135, 0.12));
 
-  let teal = `rgb((71, 130, 160));
-  let tealBlue = `rgb((0, 170, 170));
   let tealAlpha = a => `rgba((71, 130, 160, a));
+  let teal = tealAlpha(1.);
+  let tealBlueAlpha = a => `rgba((0, 170, 170, a));
+  let tealBlue = tealBlueAlpha(1.);
 
   let rosebud = `rgb((163, 83, 111));
   let rosebudAlpha = a => `rgba((163, 83, 111, a));
@@ -68,7 +69,7 @@ module Colors = {
   let jungleAlpha = a => `rgba((47, 172, 70, a));
   let jungle = jungleAlpha(1.);
 
-  let tan = `hex("E3E0D5");
+  let tan = `hex("F1EFEA");
 };
 
 module Typeface = {

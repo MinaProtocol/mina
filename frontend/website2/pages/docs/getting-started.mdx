@@ -3,9 +3,12 @@ export default Page({title: "Getting Started"});
 
 # Getting Started
 
-<Alert>
+<Alert kind="welcome">
 
-  These instructions are tempporarily for a **release-cantidate**. They will be changed on January 25th with the launch of Phase 3.
+  Welcome to [Coda Genesis Program](https://codaprotocol.com/genesis) applicants! You're in the right place to complete your application by connecting to Coda's testnet.
+  The current status of the testnet is **OFFLINE** - The Phase 3 testnet will launch on Friday January 24, 2PM UTC-8. We will send an announcement out on the [Coda Discord server](https://bit.ly/CodaDiscord) in the #announcements channel, as well as through email, when the network is live.
+
+  **Sign Up to Receive Stake** - [sign up here](http://bit.ly/StakingSignup) to receive a delegation to stake on the network. Block producers (nodes that stake coda and participate in consensus) are integral to the Coda network, and producing blocks will help you win testnet challenges and accumulate testnet points*. Reach out in the Discord server if you have any questions about signing up to stake on the testnet.
 
 </Alert>
 
@@ -23,12 +26,12 @@ This section will walk you through the requirements needed to run a Coda protoco
 
 Note: Windows is not officially supported at this time. However, community members succeeded in setting up nodes using Windows Subsystem for Linux. Click [here](https://forums.codaprotocol.com/t/unofficial-wsl-instructions/26) for instructions on using Windows, which are created by the community.
 
-**Hardware**: Sending and receiving coda does not require any special hardware, but participating as a node operator currently requires:
+**Hardware**: Sending and receiving coda does not require any special hardware, but running a block producer on the Coda network currently requires:
 
 - at least a 4-core processor
-- at least 16 GB of RAM
+- at least 8GB of RAM
 
-GPUs aren't currently required, but may be required for node operators when the protoctol is upgraded.
+Note that if you plan on running a snark worker node, you may need more RAM -- 16GB is recommended. GPUs aren't currently required, but may be required for node operators when the protoctol is upgraded.
 
 **Network**: At least 1 Mbps connection
 
@@ -68,19 +71,17 @@ You can run `coda -help` to check if the installation succeeded.
 
 ### Ubuntu 18.04 / Debian 9
 
-For Linux distrobutions we are temporarily using Docker. Run the following command to install Docker.
+Add the Coda Debian repo and install:
 
 ```
-curl get.docker.com | sh
+sudo apt-get remove coda-testnet-postake-medium-curves
+sudo apt-get remove coda-kademlia
+echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/coda.list
+sudo apt-get update
+sudo apt-get install -t release coda-testnet-postake-medium-curves
 ```
 
-Next to download, start and connect to the image by running the command below:
-
-```
-docker run -it --entrypoint /bin/bash  codaprotocol/coda-daemon:0.0.11-beta1-release-0.0.12-beta-493b4c6
-```
-
-All the following commands should be run inside the Docker container.
+If you already have `coda` installed from a previous release, running the above commands should automatically uninstall and reinstall the newest version. If you're installing Coda from scratch, you may see this error when you run the first command: `E: Unable to locate package coda-testnet-postake-medium-curves`. You can ignore this - it just means there wasn't a prior release installed.
 
 You can run `coda -help` to check if the installation succeeded.
 

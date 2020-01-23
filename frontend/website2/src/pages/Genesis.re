@@ -111,7 +111,7 @@ module Styles = {
       ),
     ]);
 
-  let stepRowFlex = style([display(`flex), justifyContent(`center)]);
+  let stepRowFlex = style([display(`flex), justifyContent(`flexStart)]);
   let stepRow =
     style([
       display(`grid),
@@ -125,13 +125,16 @@ module Styles = {
         [
           gridTemplateColumns([`repeat((`num(3), `rem(17.5)))]),
           gridColumnGap(`rem(1.43)),
+          margin(`zero),
         ],
       ),
       media(
         Theme.MediaQuery.desktop,
-        [gridTemplateColumns([`repeat((`num(3), `rem(21.25)))])],
+        [
+          gridTemplateColumns([`repeat((`num(3), `rem(20.)))]),
+          gridColumnGap(`rem(2.43)),
+        ],
       ),
-      gridColumnGap(`rem(2.43)),
     ]);
 
   let textBlock = style([maxWidth(`rem(43.75)), width(`percent(100.))]);
@@ -195,7 +198,7 @@ let make = () => {
               and documentation, and build the community.",
              )}
           </p>
-          <Spacer height=1. />
+          <Spacer height=0.25 />
           <p className=Styles.heroCopy>
             {React.string(
                "When the protocol launches in mainnet, you will be the backbone of robust,
