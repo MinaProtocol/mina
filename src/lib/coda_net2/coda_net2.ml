@@ -15,21 +15,22 @@ let peer_of_peer_info peer_info =
     ~libp2p_port:peer_info.libp2p_port
     ~peer_id:(Peer.Id.unsafe_of_string peer_info.peer_id)
 
-(* BTC alphabet *)
-let alphabet =
-  B58.make_alphabet
-    "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"
-
 let of_b58_data = function
   | `String s -> (
-    try Ok (Bytes.of_string s |> B58.decode alphabet |> Bytes.to_string)
-    with B58.Invalid_base58_character ->
-      Or_error.error_string "invalid base58" )
+    match Base64.decode s
+    with | Ok result -> Ok result
+         | Error (`Msg s) -> Or_error.error_string ("invalid base64: " ^ s))
   | _ ->
       Or_error.error_string "expected a string"
 
+let logger = Logger.create ()
+
 let to_b58_data (s : string) =
-  B58.encode alphabet (Bytes.of_string s) |> Bytes.to_string
+  let start = Time.now () in
+  let res = Base64.encode_string ~pad:true s in
+  let after = Time.now () in
+  (if (String.length s > 100) then Logger.fatal logger "Base64 %d bytes took %s" (String.length s) (Time.Span.to_string (Time.diff after start)) ~module_:__MODULE__ ~location:__LOC__) ;
+  res
 
 let to_int_res x =
   match Yojson.Safe.Util.to_int_option x with
@@ -133,11 +134,9 @@ module Helper = struct
   end = struct
     type t = string
 
-    let encode_string t =
-      B58.encode alphabet (Bytes.of_string t) |> Bytes.to_string
+    let encode_string t = Base64.encode_string ~pad:true t
 
-    let decode_string s =
-      Bytes.of_string s |> B58.decode alphabet |> Bytes.to_string
+    let decode_string s = Base64.decode_exn s
 
     let to_yojson s = `String (encode_string s)
 
@@ -343,7 +342,7 @@ module Helper = struct
   let do_rpc (type a b) t (rpc : (a, b) rpc) (body : a) : b Deferred.Or_error.t
       =
     let module M = (val rpc) in
-    if not t.finished then (
+    if not t.finished && (not @@ Writer.is_closed (Child_processes.stdin t.subprocess)) then (
       let res = Ivar.create () in
       let seqno = genseq t in
       Hashtbl.add_exn t.outstanding_requests ~key:seqno ~data:res ;
@@ -1330,7 +1329,7 @@ let%test_module "coda network tests" =
       Or_error.ok_exn a_advert ;
       Or_error.ok_exn b_advert ;
       (* Give the helpers time to announce and discover each other on localhost *)
-      let%map () = after (Time.Span.of_sec 1.5) in
+      let%map () = after (Time.Span.of_sec 2.5) in
       let shutdown () =
         let%bind () = shutdown a in
         let%bind () = shutdown b in

@@ -18,6 +18,8 @@ import (
 
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
 
+	"encoding/base64"
+
 	"github.com/go-errors/errors"
 	logging "github.com/ipfs/go-log"
 	logwriter "github.com/ipfs/go-log/writer"
@@ -29,7 +31,6 @@ import (
 	discovery "github.com/libp2p/go-libp2p-discovery"
 	pubsub "github.com/libp2p/go-libp2p-pubsub"
 	filter "github.com/libp2p/go-maddr-filter"
-	b58 "github.com/mr-tron/base58/base58"
 	"github.com/multiformats/go-multiaddr"
 	logging2 "github.com/whyrusleeping/go-logging"
 )
@@ -215,7 +216,7 @@ type discoveredPeerUpcall struct {
 
 func (m *configureMsg) run(app *app) (interface{}, error) {
 	app.UnsafeNoTrustIP = m.UnsafeNoTrustIP
-	privkBytes, err := b58.Decode(m.Privk)
+	privkBytes, err := codaDecode(m.Privk)
 	if err != nil {
 		return nil, badRPC(err)
 	}
@@ -286,7 +287,7 @@ func (t *publishMsg) run(app *app) (interface{}, error) {
 		return nil, needsDHT()
 	}
 
-	data, err := b58.Decode(t.Data)
+	data, err := codaDecode(t.Data)
 	if err != nil {
 		return nil, badRPC(err)
 	}
@@ -308,6 +309,17 @@ type publishUpcall struct {
 	Sender       *codaPeerInfo `json:"sender"`
 }
 
+// we use base64 for encoding blobs in our JSON protocol. there are more
+// efficient options but this one is easy to reach to.
+
+func codaEncode(data []byte) string {
+	return base64.StdEncoding.EncodeToString(data)
+}
+
+func codaDecode(data string) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(data)
+}
+
 func (s *subscribeMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
@@ -316,9 +328,17 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		return nil, needsDHT()
 	}
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
+		if id == app.P2p.Me {
+			// messages from ourself are valid.
+			app.P2p.Logger.Info("would have validated but it's from us!")
+			return true
+		}
+
 		seqno := <-seqs
 		ch := make(chan bool, 1)
 		app.Validators[seqno] = ch
+
+		app.P2p.Logger.Info("validating a new pubsub message ...")
 
 		sender, err := findPeerInfo(app, id)
 
@@ -330,7 +350,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 
 		app.writeMsg(validateUpcall{
 			Sender: sender,
-			Data:   b58.Encode(msg.Data),
+			Data:   codaEncode(msg.Data),
 			Seqno:  seqno,
 			Upcall: "validate",
 			Idx:    s.Subscription,
@@ -345,12 +365,16 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			// coda process gets around to it.
 			app.P2p.Logger.Error("validation timed out :(")
 			if app.UnsafeNoTrustIP {
+				app.P2p.Logger.Info("validated!")
 				return true
 			}
+			app.P2p.Logger.Info("unvalidated :(")
 			return false
 		case res := <-ch:
 			if !res {
 				app.P2p.Logger.Error("why u fail to validate :(")
+			} else {
+				app.P2p.Logger.Info("validated!")
 			}
 			return res
 		}
@@ -379,7 +403,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 				if err != nil && !app.UnsafeNoTrustIP {
 					app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us an already-validated pubsub message, dropping it", peer.IDB58Encode(msg.ReceivedFrom))
 				} else {
-					data := b58.Encode(msg.Data)
+					data := codaEncode(msg.Data)
 					app.writeMsg(publishUpcall{
 						Upcall:       "publish",
 						Subscription: s.Subscription,
@@ -470,7 +494,7 @@ func (*generateKeypairMsg) run(app *app) (interface{}, error) {
 		return nil, badp2p(err)
 	}
 
-	return generatedKeypair{Private: b58.Encode(privkBytes), Public: b58.Encode(pubkBytes), PeerID: peer.IDB58Encode(peerID)}, nil
+	return generatedKeypair{Private: codaEncode(privkBytes), Public: codaEncode(pubkBytes), PeerID: peer.IDB58Encode(peerID)}, nil
 }
 
 type streamLostUpcall struct {
@@ -504,7 +528,7 @@ func handleStreamReads(app *app, stream net.Stream, idx int) {
 			if len != 0 {
 				app.writeMsg(incomingMsgUpcall{
 					Upcall:    "incomingStreamMsg",
-					Data:      b58.Encode(buf[:len]),
+					Data:      codaEncode(buf[:len]),
 					StreamIdx: idx,
 				})
 			}
@@ -614,7 +638,7 @@ func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
-	data, err := b58.Decode(cs.Data)
+	data, err := codaDecode(cs.Data)
 	if err != nil {
 		return nil, badRPC(err)
 	}
@@ -972,12 +996,12 @@ func main() {
 		}
 		if err := json.Unmarshal([]byte(line), &env); err != nil {
 			log.Print("when unmarshaling the envelope...")
-			log.Fatal(err)
+			log.Panic(err)
 		}
 		msg := msgHandlers[env.Method]()
 		if err := json.Unmarshal(raw, msg); err != nil {
 			log.Print("when unmarshaling the method invocation...")
-			log.Fatal(err)
+			log.Panic(err)
 		}
 		defer func() {
 			if r := recover(); r != nil {

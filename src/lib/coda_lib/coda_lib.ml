@@ -768,7 +768,13 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                      Transition_chain_prover.prove ~frontier hash ))
               ~get_transition_chain:
                 (handle_request "get_transition_chain"
-                   ~f:Sync_handler.get_transition_chain)
+                   ~f:(fun ~frontier hash ->
+                    let start = Time.now () in
+                    let res = Sync_handler.get_transition_chain ~frontier hash in
+                    let after = Time.now () in
+                    Logger.fatal config.logger "get_transition_chain took %s" (Time.Span.to_string (Time.diff after start)) ~module_:__MODULE__ ~location:__LOC__ ;
+                    res
+                    ))
           in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config

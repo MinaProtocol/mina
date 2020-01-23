@@ -43,6 +43,7 @@ type Helper struct {
 	DiscoveredPeers chan peer.AddrInfo
 	Rendezvous      string
 	Discovery       *discovery.RoutingDiscovery
+	Me              peer.ID
 }
 
 type customValidator struct {
@@ -64,6 +65,12 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 // MakeHelper does all the initialization to run one host
 func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string) (*Helper, error) {
 	logger := logging.Logger("codanet.Helper")
+
+	me, err := peer.IDFromPrivateKey(pk)
+	if err != nil {
+		return nil, err
+	}
+
 	dso := dsb.DefaultOptions
 
 	ds, err := dsb.NewDatastore(path.Join(statedir, "libp2p-peerstore-v0"), &dso)
@@ -145,5 +152,6 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		Rendezvous:      rendezvousString,
 		Filters:         filters,
 		Discovery:       nil,
+		Me:              me,
 	}, nil
 }

@@ -42,10 +42,16 @@ struct
     let second_hash = get ctx3 |> to_raw_string in
     second_hash |> String.sub ~pos:0 ~len:checksum_len
 
+  let logger = Logger.create ()
+
   let encode payload =
     let checksum = compute_checksum payload in
     let bytes = version_string ^ payload ^ checksum |> Bytes.of_string in
-    B58.encode coda_alphabet bytes |> Bytes.to_string
+    let before = Time.now () in
+    let res = B58.encode coda_alphabet bytes in
+    let after = Time.now () in
+    if (String.length payload > 100) then Logger.fatal logger "Base58_check.encode %d bytes took %s" (String.length payload) (Time.Span.to_string (Time.diff after before)) ~module_:__MODULE__ ~location:__LOC__ ;
+    Bytes.to_string res
 
   let decode_exn s =
     let bytes = Bytes.of_string s in
@@ -139,4 +145,13 @@ let%test_module "base58check tests" =
         let _payload = decode_exn "abcd" in
         false
       with Invalid_base58_check_length _ -> true
+
+    let%test "very long shouldn't take forever" =
+      let before = Time.now () in
+      let res = test_roundtrip (String.init (1024 * 27) ~f:(fun _ -> ' ')) in
+      let after = Time.now () in
+      let diff = Time.diff after before in
+      if Time.Span.(diff >= of_sec 2.) then
+        failwithf "Roundtriping a 250KiB string took %s, unreasonably longer than 2s" (Time.Span.to_string_hum diff) () ;
+      res
   end )
