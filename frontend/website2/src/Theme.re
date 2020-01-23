@@ -68,7 +68,7 @@ module Colors = {
   let jungleAlpha = a => `rgba((47, 172, 70, a));
   let jungle = jungleAlpha(1.);
 
-  let tan = `hex("E3E0D5");
+  let tan = `hex("F1EFEA");
 };
 
 module Typeface = {
