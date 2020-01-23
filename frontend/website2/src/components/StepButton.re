@@ -12,8 +12,14 @@ module Style = {
       padding2(~v=`rem(2.5), ~h=`rem(3.12)),
       border(`px(1), `solid, Theme.Colors.marine),
       width(`rem(20.)),
-      media(Theme.MediaQuery.tablet, [width(`rem(17.5))]),
-      media(Theme.MediaQuery.desktop, [width(`rem(21.25))]),
+      media(
+        Theme.MediaQuery.tablet,
+        [width(`rem(17.5)), padding2(~v=`rem(2.5), ~h=`rem(2.5))],
+      ),
+      media(
+        Theme.MediaQuery.desktop,
+        [width(`rem(21.25)), padding2(~v=`rem(2.5), ~h=`rem(3.12))],
+      ),
       display(`flex),
       flexDirection(`column),
       justifyContent(`spaceBetween),
@@ -31,12 +37,9 @@ module Style = {
   let label =
     merge([
       Theme.H3.basic,
-      style([
-        width(`rem(11.25)),
-        alignSelf(`center),
-        color(Theme.Colors.marine),
-      ]),
+      style([alignSelf(`center), color(Theme.Colors.marine)]),
     ]);
+  let labelSemiBold = merge([label, style([fontWeight(`semiBold)])]);
   let ctaButton =
     merge([
       Theme.Body.basic_semibold,
@@ -56,9 +59,12 @@ module Style = {
 };
 
 [@react.component]
-let make = (~label, ~image, ~buttonLabel, ~buttonLink) => {
+let make = (~labelStep, ~label, ~image, ~buttonLabel, ~buttonLink) => {
   <div className=Style.container ariaLabel=label>
-    <label className=Style.label> {React.string(label)} </label>
+    <label className=Style.label>
+      <span className=Style.labelSemiBold> {React.string(labelStep)} </span>
+      {React.string(label)}
+    </label>
     <img src=image className=Style.image />
     <a className=Style.ctaButton href=buttonLink>
       {React.string(buttonLabel)}

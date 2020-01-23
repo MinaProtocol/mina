@@ -208,19 +208,22 @@ let make = () => {
         <div className=Styles.stepRowFlex>
           <div className=Styles.stepRow>
             <StepButton
-              label="Step 1: Apply Now"
+              labelStep="Step 1: "
+              label="Apply Now"
               image="/static/img/ApplyCircle.svg"
               buttonLabel="Apply"
               buttonLink=" https://forms.gle/Eer4yM1gb5SvLCk79"
             />
             <StepButton
-              label="Step 2: Join Discord"
+              labelStep="Step 2: "
+              label=" Join Discord"
               image="/static/img/DiscordCircle.svg"
               buttonLabel="Join"
               buttonLink="http://bit.ly/GenesisDiscord"
             />
             <StepButton
-              label="Step 3: Participate in Testnet"
+              labelStep="Step 3: "
+              label="Participate in Testnet"
               image="/static/img/TestnetCircle.svg"
               buttonLabel="Get Started"
               buttonLink="http://bit.ly/GenesisTestnet"
