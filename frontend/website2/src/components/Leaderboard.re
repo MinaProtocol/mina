@@ -44,8 +44,24 @@ module Styles = {
       margin2(~v=`zero, ~h=`auto),
     ]);
 
+  let leaderboard =
+    style([
+      background(Theme.Colors.hyperlinkAlpha(0.15)),
+      width(`percent(100.)),
+      borderRadius(px(3)),
+      paddingTop(`rem(1.)),
+      Theme.Typeface.pragmataPro,
+      lineHeight(rem(1.5)),
+      color(Theme.Colors.midnight),
+      selector(
+        "div:nth-child(even)",
+        [backgroundColor(`rgba((71, 130, 130, 0.1)))],
+      ),
+    ]);
+
   let leaderboardRow =
     style([
+      padding2(~v=`zero, ~h=`rem(1.)),
       display(`grid),
       gridColumnGap(rem(1.5)),
       gridTemplateColumns([rem(1.), rem(5.5), rem(5.5), rem(3.5)]),
@@ -65,27 +81,11 @@ module Styles = {
       style([color(Theme.Colors.midnight)]),
     ]);
 
-  let leaderboard =
-    style([
-      background(Theme.Colors.hyperlinkAlpha(0.15)),
-      width(`percent(100.)),
-      borderRadius(px(3)),
-      paddingTop(`rem(1.)),
-      Theme.Typeface.pragmataPro,
-      lineHeight(rem(1.5)),
-      color(Theme.Colors.midnight),
-      selector(
-        ".leaderboard-row > span",
-        [textOverflow(`ellipsis), whiteSpace(`nowrap), overflow(`hidden)],
-      ),
-      selector("div span:last-child", [opacity(0.5)]),
-      selector("div span:nth-child(odd)", [justifySelf(`flexEnd)]),
-      selector("div", [padding2(~v=`zero, ~h=`rem(1.))]),
-      selector(
-        "div:nth-child(even)",
-        [backgroundColor(`rgba((71, 130, 130, 0.1)))],
-      ),
-    ]);
+  let cell = style([whiteSpace(`nowrap), overflow(`hidden)]);
+  let rank = merge([cell, style([justifySelf(`flexEnd)])]);
+  let username = merge([cell, style([textOverflow(`ellipsis)])]);
+  let current = merge([cell, style([justifySelf(`flexEnd)])]);
+  let total = merge([cell, style([opacity(0.5)])]);
 };
 
 module LeaderboardRow = {
@@ -93,10 +93,18 @@ module LeaderboardRow = {
   let make = (~rank, ~entry) => {
     <>
       <div className=Styles.leaderboardRow>
-        <span> {React.string(string_of_int(rank))} </span>
-        <span> {React.string(entry.member.nickname)} </span>
-        <span> {React.string(string_of_int(entry.score))} </span>
-        <span> {React.string(string_of_int(entry.score))} </span>
+        <span className=Styles.rank>
+          {React.string(string_of_int(rank))}
+        </span>
+        <span className=Styles.username>
+          {React.string(entry.member.nickname)}
+        </span>
+        <span className=Styles.current>
+          {React.string(string_of_int(entry.score))}
+        </span>
+        <span className=Styles.total>
+          {React.string(string_of_int(entry.score))}
+        </span>
       </div>
     </>;
   };

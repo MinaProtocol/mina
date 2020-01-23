@@ -223,8 +223,7 @@ module Styles = {
 
 module Section = {
   [@react.component]
-  let make = (~name, ~children) => {
-    let (expanded, setExpanded) = React.useState(() => false);
+  let make = (~name, ~expanded, ~setExpanded, ~children) => {
     <div className=Css.(style([display(`flex), flexDirection(`column)]))>
       {if (expanded) {
          <div className=Styles.gradientSectionExpanded> children </div>;
@@ -254,6 +253,7 @@ module Section = {
 
 [@react.component]
 let make = (~challenges) => {
+  let (expanded, setExpanded) = React.useState(() => false);
   <Page title="Coda Testnet">
     <Wrapped>
       <div className=Styles.page>
@@ -336,7 +336,7 @@ let make = (~challenges) => {
           </div>
         </div>
         <hr />
-        <Section name="Leaderboard">
+        <Section name="Leaderboard" expanded setExpanded>
           <div className=Styles.dashboardHeader>
             <h1 className=Theme.H1.hero>
               {React.string("Testnet Leaderboard")}
@@ -356,7 +356,9 @@ let make = (~challenges) => {
               </h4>
               <p className=Styles.markdownStyles>
                 {React.string("The goal of Testnet Points")}
-                <a href="#disclaimer"> {React.string("*")} </a>
+                <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
+                  {React.string("*")}
+                </a>
                 {React.string(
                    " is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
                  )}
