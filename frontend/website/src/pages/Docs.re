@@ -48,7 +48,7 @@ module EditLink = {
       name="Edit Link"
       target="_blank"
       href={
-        "https://github.com/CodaProtocol/coda/edit/develop/frontend/website2/pages"
+        "https://github.com/CodaProtocol/coda/edit/develop/frontend/website/pages"
         ++ route
         ++ ".mdx"
       }
