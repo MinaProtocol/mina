@@ -166,14 +166,14 @@ Next.injectGetInitialProps(make, ({Next.query}) => {
           "fields.slug": slug,
         },
       )
-      |> Js.Promise.then_((entries: ContentType.Post.entries) => {
+      |> Promise.map((entries: ContentType.Post.entries) => {
            let post =
              switch (entries.items) {
              | [|item|] => Some(item.fields)
              | _ => None
              };
            Js.Dict.set(cache, slug, post);
-           Js.Promise.resolve({"post": post});
+           {"post": post};
          })
     };
   | None => Js.Promise.resolve({"post": None})

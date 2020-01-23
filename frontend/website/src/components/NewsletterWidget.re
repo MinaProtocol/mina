@@ -106,12 +106,10 @@ let make = (~center as centerText=false) => {
           ),
         ~mode=NoCORS,
       )
-      |> Js.Promise.then_(_ => {
+      |> Promise.iter(_ => {
            showSuccess(_ => true);
-           Js.Global.setTimeout(() => showSuccess(_ => false), 5000)
-           |> Js.Promise.resolve;
-         })
-      |> ignore;
+           ignore @@ Js.Global.setTimeout(() => showSuccess(_ => false), 5000);
+         });
     }}>
     <div
       className=Css.(

@@ -366,12 +366,12 @@ Next.injectGetInitialProps(make, _ => {
     Lazy.force(Contentful.client),
     {"include": 0, "content_type": ContentType.JobPost.id},
   )
-  |> Js.Promise.then_((entries: ContentType.JobPost.entries) => {
+  |> Promise.map((entries: ContentType.JobPost.entries) => {
        let posts =
          Array.map(
            (e: ContentType.JobPost.entry) => e.fields,
            entries.items,
          );
-       Js.Promise.resolve({"posts": posts});
+       {"posts": posts};
      })
 });
