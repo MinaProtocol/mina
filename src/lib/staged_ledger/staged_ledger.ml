@@ -308,16 +308,15 @@ module T = struct
     to_staged_ledger_or_error
       (Pending_coinbase.latest_stack pending_coinbase_collection ~is_new_stack)
 
-  let push_coinbase_and_get_new_collection current_stack (t : Transaction.t)
-      state_body_hash =
-    let stack_with_state =
-      Pending_coinbase.Stack.push_state state_body_hash current_stack
-    in
+  let push_coinbase current_stack (t : Transaction.t) =
     match t with
     | Coinbase c ->
-        Pending_coinbase.Stack.push_coinbase c stack_with_state
+        Pending_coinbase.Stack.push_coinbase c current_stack
     | _ ->
-        stack_with_state
+        current_stack
+
+  let push_state current_stack state_body_hash =
+    Pending_coinbase.Stack.push_state state_body_hash current_stack
 
   let apply_transaction_and_get_statement ledger current_stack s
       state_body_hash =
@@ -329,8 +328,10 @@ module T = struct
     let source =
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
+    let pending_coinbase_with_coinbase = push_coinbase current_stack s in
+    (*Each transaction will have the state updated so as to contstraint the protocol state in transaction snark*)
     let pending_coinbase_after =
-      push_coinbase_and_get_new_collection current_stack s state_body_hash
+      push_state pending_coinbase_with_coinbase state_body_hash
     in
     let%map undo =
       Ledger.apply_transaction ledger s |> to_staged_ledger_or_error
@@ -343,7 +344,7 @@ module T = struct
       ; pending_coinbase_stack_state=
           {source= current_stack; target= pending_coinbase_after}
       ; proof_type= `Base }
-    , pending_coinbase_after )
+    , pending_coinbase_with_coinbase )
 
   let apply_transaction_and_get_witness ledger current_stack s
       state_and_body_hash =
@@ -382,11 +383,12 @@ module T = struct
 
   let update_ledger_and_get_statements ledger current_stack ts
       state_and_body_hash =
-    let open Deferred.Let_syntax in
+    let open Deferred.Result.Let_syntax in
     let rec go coinbase_stack acc = function
       | [] ->
-          return (Ok (List.rev acc, coinbase_stack))
+          Deferred.return (Ok (List.rev acc, coinbase_stack))
       | t :: ts -> (
+          let open Deferred.Let_syntax in
           match%bind
             apply_transaction_and_get_witness ledger coinbase_stack t
               state_and_body_hash
@@ -397,7 +399,9 @@ module T = struct
           | Error e ->
               return (Error e) )
     in
-    go current_stack [] ts
+    (*Push the state body hash to the pending coinbase stack once per diff per stack*)
+    let%map res, updated_stack_with_coinbase = go current_stack [] ts in
+    (res, push_state updated_stack_with_coinbase (snd state_and_body_hash))
 
   let check_completed_works ~logger ~verifier scan_state
       (completed_works : Transaction_snark_work.t list) =
@@ -517,10 +521,10 @@ module T = struct
               txns_for_partition1 state_and_body_hash
           in
           let txns_for_partition2 = List.drop transactions slots in
+          (*Push the new state to the state_stack from the previous block even in the second stack*)
           let working_stack2 =
-            Pending_coinbase.Stack.create_with updated_stack1
+            Pending_coinbase.Stack.create_with working_stack1
           in
-          (*Push the state body hash to the pending coinbase stack once per diff*)
           let%map data2, updated_stack2 =
             update_ledger_and_get_statements ledger working_stack2
               txns_for_partition2 state_and_body_hash

@@ -806,12 +806,13 @@ module Merge = struct
         ~f:Prover_state.pending_coinbase_stack4
     in
     let%bind () =
-      let%bind valid_pending_coinbase_stack_transition =
-        Pending_coinbase.Stack.Checked.check_merge
-          ~transition1:(pending_coinbase1, pending_coinbase2)
-          ~transition2:(pending_coinbase3, pending_coinbase4)
-      in
-      Boolean.Assert.is_true valid_pending_coinbase_stack_transition
+      with_label __LOC__
+        (let%bind valid_pending_coinbase_stack_transition =
+           Pending_coinbase.Stack.Checked.check_merge
+             ~transition1:(pending_coinbase1, pending_coinbase2)
+             ~transition2:(pending_coinbase3, pending_coinbase4)
+         in
+         Boolean.Assert.is_true valid_pending_coinbase_stack_transition)
     in
     let%bind wrap_vk_hash_state =
       make_checked (fun () ->
@@ -825,34 +826,37 @@ module Merge = struct
       Verifier.Verification_key.Precomputation.create tock_vk
     in
     let%bind () =
-      let%bind total_fees =
-        Amount.Signed.Checked.add fee_excess12 fee_excess23
-      in
-      let%bind supply_increase =
-        Amount.Checked.add supply_increase12 supply_increase23
-      in
-      let%bind input =
-        let%bind sok_digest =
-          exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
-        in
-        construct_input_checked ~prefix:wrap_vk_hash_state ~sok_digest
-          ~state1:s1 ~state2:s3 ~pending_coinbase_stack1:pending_coinbase1
-          ~pending_coinbase_stack2:pending_coinbase3 ~supply_increase
-          ~fee_excess:total_fees
-      in
-      Field.Checked.Assert.equal top_hash input
+      with_label __LOC__
+        (let%bind total_fees =
+           Amount.Signed.Checked.add fee_excess12 fee_excess23
+         in
+         let%bind supply_increase =
+           Amount.Checked.add supply_increase12 supply_increase23
+         in
+         let%bind input =
+           let%bind sok_digest =
+             exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
+           in
+           construct_input_checked ~prefix:wrap_vk_hash_state ~sok_digest
+             ~state1:s1 ~state2:s3 ~pending_coinbase_stack1:pending_coinbase1
+             ~pending_coinbase_stack2:pending_coinbase4 ~supply_increase
+             ~fee_excess:total_fees
+         in
+         Field.Checked.Assert.equal top_hash input)
     and verify_12 =
-      verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
-        Prover_state.transition12 s1 s2
-        ~pending_coinbase_stack1:pending_coinbase1
-        ~pending_coinbase_stack2:pending_coinbase2 supply_increase12
-        fee_excess12
+      with_label __LOC__
+        (verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
+           Prover_state.transition12 s1 s2
+           ~pending_coinbase_stack1:pending_coinbase1
+           ~pending_coinbase_stack2:pending_coinbase2 supply_increase12
+           fee_excess12)
     and verify_23 =
-      verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
-        Prover_state.transition23 s2 s3
-        ~pending_coinbase_stack1:pending_coinbase3
-        ~pending_coinbase_stack2:pending_coinbase4 supply_increase23
-        fee_excess23
+      with_label __LOC__
+        (verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
+           Prover_state.transition23 s2 s3
+           ~pending_coinbase_stack1:pending_coinbase3
+           ~pending_coinbase_stack2:pending_coinbase4 supply_increase23
+           fee_excess23)
     in
     Boolean.Assert.all [verify_12; verify_23]
 
@@ -1763,7 +1767,7 @@ let%test_module "transaction_snark" =
                        User_command.accounts_accessed (t :> User_command.t) )
                      [t1; t2])
               in
-              let proof12, pending_coinbase_stack_next =
+              let proof12, _ =
                 of_user_command' sok_digest ledger t1
                   Pending_coinbase.Stack.empty state_body_hash
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
@@ -1778,7 +1782,7 @@ let%test_module "transaction_snark" =
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23, pending_coinbase_stack_target =
                 of_user_command' sok_digest ledger t2
-                  pending_coinbase_stack_next state_body_hash
+                  Pending_coinbase.Stack.empty state_body_hash
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =

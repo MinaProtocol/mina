@@ -791,8 +791,8 @@ struct
       in
       (*This is for the second stack for when transactions in a block occupy
       two trees of the scan state; the second tree will carry-forward the state
-      stack from the first stack and may or may not have a coinbase*)
-      let update_stack2 (init_stack : Stack.var) stack0 =
+      stack from the previous block, push the new state, and may or may not have a coinbase*)
+      let update_stack2 (init_stack : Stack.var) (stack0 : Stack.var) =
         let%bind add_coinbase =
           Update.Action.Checked.update_two_stacks_coinbase_in_second action
         in
@@ -803,12 +803,13 @@ struct
           Boolean.(update_second_stack || add_coinbase)
         in
         let%bind stack =
-          Stack.if_ update_state
-            ~then_:
+          let%bind stack_with_state =
+            Stack.Checked.push_state state_body_hash
               { stack0 with
                 state=
                   State_stack.create ~init:init_stack.Stack.Poly.state.curr }
-            ~else_:stack0
+          in
+          Stack.if_ update_state ~then_:stack_with_state ~else_:stack0
         in
         let%bind stack_with_coinbase =
           Stack.Checked.push_coinbase (pk, amount) stack
@@ -816,7 +817,7 @@ struct
         Stack.if_ add_coinbase ~then_:stack_with_coinbase ~else_:stack
       in
       (*update the first stack*)
-      let%bind root', `Old _prev, `New updated_stack1 =
+      let%bind root', `Old prev, `New _updated_stack1 =
         handle
           (Merkle_tree.fetch_and_update_req ~depth
              (Hash.var_to_hash_packed t)
@@ -827,7 +828,7 @@ struct
       let%map root, _, _ =
         handle
           (Merkle_tree.fetch_and_update_req ~depth root' addr2
-             ~f:(update_stack2 updated_stack1))
+             ~f:(update_stack2 prev))
           reraise_merkle_requests
       in
       Hash.var_of_hash_packed root
