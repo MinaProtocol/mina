@@ -12,11 +12,11 @@ module Style = {
       padding2(~v=`rem(2.5), ~h=`rem(3.12)),
       border(`px(1), `solid, Theme.Colors.marine),
       width(`rem(20.)),
-      media(Theme.MediaQuery.tablet, [width(`rem(17.5))]),
-      media(Theme.MediaQuery.desktop, [width(`rem(21.25))]),
       display(`flex),
       flexDirection(`column),
       justifyContent(`spaceBetween),
+      media(Theme.MediaQuery.tablet, [width(`rem(17.5))]),
+      media(Theme.MediaQuery.desktop, [width(`rem(20.))]),
     ]);
 
   let image = style([alignSelf(`center)]);
