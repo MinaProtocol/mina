@@ -3,9 +3,13 @@ export default Page({title: "Getting Started"});
 
 # Getting Started
 
-<Alert>
+<Alert kind="welcome">
 
-  These instructions are temporarily for a **release-candidate**. They will be changed on January 25th with the launch of Phase 3.
+  Welcome to [Coda Genesis Program](https://codaprotocol.com/genesis) applicants! You're in the right place to complete your application by connecting to Coda's testnet.
+  The current status of the is OFFLINE -- The Phase 3 testnet will launch on Friday January 24, 2PM UTC-8. We will send an announcement out on the [Coda Discord server](https://bit.ly/CodaDiscord) in the #announcements channel when the network is live.
+
+  In the meanwhile, [sign up here](http://bit.ly/StakingSignup) to receieve a delegation to stake on the network. Block producers (nodes that stake coda and participate in consensus) are integral to the Coda network, and Genesis applicants that participate as block producers will be well positioned to become a founding member. 
+  Reach out in the Discord server if you have any questions about signing up to stake on the testnet.
 
 </Alert>
 
@@ -68,19 +72,17 @@ You can run `coda -help` to check if the installation succeeded.
 
 ### Ubuntu 18.04 / Debian 9
 
-For Linux distrobutions we are temporarily using Docker. Run the following command to install Docker.
+Add the Coda Debian repo and install:
 
 ```
-curl get.docker.com | sh
+sudo apt-get remove coda-testnet-postake-medium-curves
+sudo apt-get remove coda-kademlia
+echo "deb [trusted=yes] http://packages.o1test.net release main" | sudo tee /etc/apt/sources.list.d/coda.list
+sudo apt-get update
+sudo apt-get install -t release coda-testnet-postake-medium-curves
 ```
 
-Next to download, start and connect to the image by running the command below:
-
-```
-docker run -it --entrypoint /bin/bash  codaprotocol/coda-daemon:0.0.11-beta1-release-0.0.12-beta-493b4c6
-```
-
-All the following commands should be run inside the Docker container.
+If you already have `coda` installed from a previous release, running the above commands should automatically uninstall and reinstall the newest version. If you're installing Coda from scratch, you may see this error when you run the first command: `E: Unable to locate package coda-testnet-postake-medium-curves`. You can ignore this - it just means there wasn't a prior release installed.
 
 You can run `coda -help` to check if the installation succeeded.
 

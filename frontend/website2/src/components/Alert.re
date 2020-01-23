@@ -30,6 +30,8 @@ let make = (~kind="", ~children) => {
   let (title, color) =
     switch (kind) {
     | "warning" => ("warning", Theme.Colors.rosebudAlpha(0.8))
+    | "danger" => ("danger", Theme.Colors.rosebudAlpha(0.8))
+    | "welcome" => ("welcome", Theme.Colors.tealBlueAlpha(0.8))
     | _ => ("note", Theme.Colors.marineAlpha(0.8))
     };
   <div className={Style.main(color)}>
