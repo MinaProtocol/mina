@@ -308,7 +308,7 @@ jobs:
             - run:
                   name: Generate runtime ledger with 10k accounts
                   command: |
-                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000'
+                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000 -account-file genesis_ledgers/phase_three/genesis_ledger.json'
                   no_output_timeout: 20m
             ### collection
             - run:
@@ -386,7 +386,7 @@ jobs:
             - run:
                   name: Generate runtime ledger with 10k accounts
                   command: |
-                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000'
+                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000 -account-file genesis_ledgers/phase_three/genesis_ledger.json'
                   no_output_timeout: 20m
             - run:
                   name: Build deb package with PV keys and PV key tar
