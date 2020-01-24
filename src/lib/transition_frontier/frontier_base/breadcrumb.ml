@@ -120,7 +120,7 @@ let blockchain_state = lift External_transition.Validated.blockchain_state
 
 let blockchain_length = lift External_transition.Validated.blockchain_length
 
-let proposer = lift External_transition.Validated.proposer
+let block_producer = lift External_transition.Validated.block_producer
 
 let user_commands = lift External_transition.Validated.user_commands
 
@@ -250,7 +250,7 @@ module For_tests = struct
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
-          ~coinbase_receiver:`Proposer ~self:largest_account_public_key
+          ~coinbase_receiver:`Producer ~self:largest_account_public_key
           ~transactions_by_fee:transactions ~get_completed_work
       in
       let state_body_hash =

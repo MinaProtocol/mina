@@ -799,6 +799,7 @@ module T = struct
       ; receiver_pk: Public_key.Compressed.t
       ; budget: Fee.t Or_error.t
       ; discarded: Discarded.t
+      ; is_coinbase_reciever_new: bool
       ; logger: Logger.t sexp_opaque }
     [@@deriving sexp_of]
 
@@ -823,7 +824,8 @@ module T = struct
               else (w1, w2) )
 
     let coinbase_work ?(is_two = false)
-        (works : Transaction_snark_work.Checked.t Sequence.t) =
+        (works : Transaction_snark_work.Checked.t Sequence.t)
+        ~is_coinbase_reciever_new =
       let open Option.Let_syntax in
       let min1, min2 = cheapest_two_work works in
       let diff ws ws' =
@@ -833,13 +835,20 @@ module T = struct
               ~equal:Transaction_snark_work.Statement.equal
             |> not )
       in
+      let%bind budget =
+        (*if the coinbase receiver is new then the account creation fee will be deducted from the reward*)
+        if is_coinbase_reciever_new then
+          Coda_compile_config.(
+            Currency.Amount.(sub coinbase (of_fee account_creation_fee)))
+        else Some Coda_compile_config.coinbase
+      in
       let stmt = Transaction_snark_work.statement in
       if is_two then
         match (min1, min2) with
         | None, _ ->
             None
         | Some w, None ->
-            if Amount.(of_fee w.fee <= Coda_compile_config.coinbase) then
+            if Amount.(of_fee w.fee <= budget) then
               let cb =
                 Staged_ledger_diff.At_most_two.Two
                   (Option.map (coinbase_ft w) ~f:(fun ft -> (ft, None)))
@@ -850,7 +859,7 @@ module T = struct
               Some (cb, works)
         | Some w1, Some w2 ->
             let%map sum = Fee.add w1.fee w2.fee in
-            if Amount.(of_fee sum <= Coda_compile_config.coinbase) then
+            if Amount.(of_fee sum <= budget) then
               let cb =
                 Staged_ledger_diff.At_most_two.Two
                   (Option.map (coinbase_ft w1) ~f:(fun ft ->
@@ -875,7 +884,7 @@ module T = struct
               (cb, works)
       else
         Option.map min1 ~f:(fun w ->
-            if Amount.(of_fee w.fee <= Coda_compile_config.coinbase) then
+            if Amount.(of_fee w.fee <= budget) then
               let cb = Staged_ledger_diff.At_most_two.One (coinbase_ft w) in
               (cb, diff works (Sequence.of_list [stmt w]))
             else
@@ -883,12 +892,14 @@ module T = struct
               (cb, works) )
 
     let init_coinbase_and_fee_transfers cw_seq ~add_coinbase ~job_count ~slots
-        =
+        ~is_coinbase_reciever_new =
       let cw_unchecked work =
         Sequence.map work ~f:Transaction_snark_work.forget
       in
       let coinbase, rem_cw =
-        match (add_coinbase, coinbase_work cw_seq) with
+        match
+          (add_coinbase, coinbase_work cw_seq ~is_coinbase_reciever_new)
+        with
         | true, Some (ft, rem_cw) ->
             (ft, rem_cw)
         | true, None ->
@@ -911,7 +922,8 @@ module T = struct
 
     let init (uc_seq : User_command.With_valid_signature.t Sequence.t)
         (cw_seq : Transaction_snark_work.Checked.t Sequence.t)
-        (slots, job_count) ~receiver_pk ~add_coinbase logger =
+        (slots, job_count) ~receiver_pk ~add_coinbase logger
+        ~is_coinbase_reciever_new =
       let seq_rev seq =
         let rec go seq rev_seq =
           match Sequence.next seq with
@@ -924,6 +936,7 @@ module T = struct
       in
       let coinbase, singles =
         init_coinbase_and_fee_transfers cw_seq ~add_coinbase ~job_count ~slots
+          ~is_coinbase_reciever_new
       in
       let fee_transfers =
         Public_key.Compressed.Map.of_alist_reduce singles ~f:(fun f1 f2 ->
@@ -958,6 +971,7 @@ module T = struct
       ; coinbase
       ; budget
       ; discarded
+      ; is_coinbase_reciever_new
       ; logger }
 
     let reselect_coinbase_work t =
@@ -969,13 +983,19 @@ module T = struct
         | Staged_ledger_diff.At_most_two.Zero ->
             (t.coinbase, t.completed_work_rev)
         | One _ -> (
-          match coinbase_work t.completed_work_rev with
+          match
+            coinbase_work t.completed_work_rev
+              ~is_coinbase_reciever_new:t.is_coinbase_reciever_new
+          with
           | None ->
               (One None, t.completed_work_rev)
           | Some (ft, rem_cw) ->
               (ft, rem_cw) )
         | Two _ -> (
-          match coinbase_work t.completed_work_rev ~is_two:true with
+          match
+            coinbase_work t.completed_work_rev ~is_two:true
+              ~is_coinbase_reciever_new:t.is_coinbase_reciever_new
+          with
           | None ->
               (Two None, t.completed_work_rev)
               (*Check for work constraint will be done in [check_constraints_and_update]*)
@@ -1218,15 +1238,16 @@ module T = struct
       (* There isn't enough work for the transactions. Discard a trasnaction and check again *)
       check_constraints_and_update (Resources.discard_user_command resources)
 
-  let one_prediff cw_seq ts_seq ~receiver ~add_coinbase partition logger =
+  let one_prediff cw_seq ts_seq ~receiver ~add_coinbase partition logger
+      ~is_coinbase_reciever_new =
     O1trace.measure "one_prediff" (fun () ->
         let init_resources =
           Resources.init ts_seq cw_seq partition ~receiver_pk:receiver
-            ~add_coinbase logger
+            ~add_coinbase logger ~is_coinbase_reciever_new
         in
         check_constraints_and_update init_resources )
 
-  let generate logger cw_seq ts_seq ~receiver
+  let generate logger cw_seq ts_seq ~receiver ~is_coinbase_reciever_new
       (partitions : Scan_state.Space_partition.t) =
     let pre_diff_with_one (res : Resources.t) :
         Staged_ledger_diff.With_valid_signatures_and_proofs
@@ -1265,7 +1286,7 @@ module T = struct
     in
     let second_pre_diff (res : Resources.t) partition ~add_coinbase work =
       one_prediff work res.discarded.user_commands_rev ~receiver partition
-        ~add_coinbase logger
+        ~add_coinbase logger ~is_coinbase_reciever_new
     in
     let isEmpty (res : Resources.t) =
       has_no_user_commands res && Resources.coinbase_added res = 0
@@ -1275,7 +1296,7 @@ module T = struct
     | None ->
         let res =
           one_prediff cw_seq ts_seq ~receiver partitions.first
-            ~add_coinbase:true logger
+            ~add_coinbase:true logger ~is_coinbase_reciever_new
         in
         make_diff res None
     | Some y ->
@@ -1284,14 +1305,14 @@ module T = struct
         let cw_seq_2 = Sequence.drop cw_seq (snd partitions.first) in
         let res =
           one_prediff cw_seq_1 ts_seq ~receiver partitions.first
-            ~add_coinbase:false logger
+            ~add_coinbase:false logger ~is_coinbase_reciever_new
         in
         let incr_coinbase_and_compute res count =
           let new_res = Resources.incr_coinbase_part_by res count in
           if Resources.space_available new_res then
             (*All slots could not be filled either because of budget constraints or not enough work done. Don't create the second prediff instead recompute first diff with just once coinbase*)
             ( one_prediff cw_seq_1 ts_seq ~receiver partitions.first
-                ~add_coinbase:true logger
+                ~add_coinbase:true logger ~is_coinbase_reciever_new
             , None )
           else
             let res2 =
@@ -1300,13 +1321,13 @@ module T = struct
             if isEmpty res2 then
               (*Don't create the second prediff instead recompute first diff with just once coinbase*)
               ( one_prediff cw_seq_1 ts_seq ~receiver partitions.first
-                  ~add_coinbase:true logger
+                  ~add_coinbase:true logger ~is_coinbase_reciever_new
               , None )
             else (new_res, Some res2)
         in
         let try_with_coinbase () : Resources.t =
           one_prediff cw_seq_1 ts_seq ~receiver partitions.first
-            ~add_coinbase:true logger
+            ~add_coinbase:true logger ~is_coinbase_reciever_new
         in
         let res1, res2 =
           if Sequence.is_empty res.user_commands_rev then
@@ -1345,10 +1366,16 @@ module T = struct
             Transaction_snark_work.Statement.t
          -> Transaction_snark_work.Checked.t option) =
     let coinbase_receiver =
-      match coinbase_receiver with `Proposer -> self | `Other pk -> pk
+      match coinbase_receiver with `Producer -> self | `Other pk -> pk
     in
     O1trace.trace_event "curr_hash" ;
     let validating_ledger = Transaction_validator.create t.ledger in
+    let is_new_account pk =
+      Transaction_validator.Hashless_ledger.location_of_key validating_ledger
+        pk
+      |> Option.is_none
+    in
+    let is_coinbase_reciever_new = is_new_account coinbase_receiver in
     O1trace.trace_event "done mask" ;
     let partitions = Scan_state.partition_if_overflowing t.scan_state in
     O1trace.trace_event "partitioned" ;
@@ -1359,9 +1386,16 @@ module T = struct
         ~f:(fun (seq, count) w ->
           match get_completed_work w with
           | Some cw_checked ->
-              Continue
-                ( Sequence.append seq (Sequence.singleton cw_checked)
-                , One_or_two.length cw_checked.proofs + count )
+              (*If new provers can't pay the account-creation-fee then discard their work. To encourage using an existing account for snark workers*)
+              if
+                (not (is_new_account cw_checked.prover))
+                || Currency.Fee.(
+                     cw_checked.fee >= Coda_compile_config.account_creation_fee)
+              then
+                Continue
+                  ( Sequence.append seq (Sequence.singleton cw_checked)
+                  , One_or_two.length cw_checked.proofs + count )
+              else Stop (seq, count)
           | None ->
               Stop (seq, count) )
         ~finish:Fn.id
@@ -1394,11 +1428,14 @@ module T = struct
     let diff =
       O1trace.measure "generate diff" (fun () ->
           generate logger completed_works_seq valid_on_this_ledger
-            ~receiver:coinbase_receiver partitions )
+            ~receiver:coinbase_receiver ~is_coinbase_reciever_new partitions )
     in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-      "Number of proofs ready for purchase: $proof_count"
-      ~metadata:[("proof_count", `Int proof_count)] ;
+      "Number of proofs ready for purchase: $proof_count Number of user \
+       commands ready to be included: $txn_count"
+      ~metadata:
+        [ ("proof_count", `Int proof_count)
+        ; ("txn_count", `Int (Sequence.length valid_on_this_ledger)) ] ;
     trace_event "prediffs done" ;
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self
@@ -1473,22 +1510,26 @@ let%test_module "test" =
 
     (* Assert the given staged ledger is in the correct state after applying
          the first n user commands passed to the given base ledger. Checks the
-         states of the proposer account and user accounts but ignores snark
-         workers for simplicity. *)
+         states of the block producer account and user accounts but ignores
+         snark workers for simplicity. *)
     let assert_ledger :
            Ledger.t
+        -> coinbase_cost:Currency.Fee.t
         -> Sl.t
         -> User_command.With_valid_signature.t list
         -> int
         -> Public_key.Compressed.t list
         -> unit =
-     fun test_ledger staged_ledger cmds_all cmds_used pks_to_check ->
-      let old_proposer_balance =
-        Option.value_map
-          (Option.bind
-             (Ledger.location_of_key test_ledger coinbase_receiver)
-             ~f:(Ledger.get test_ledger))
-          ~default:Currency.Balance.zero
+     fun test_ledger ~coinbase_cost staged_ledger cmds_all cmds_used
+         pks_to_check ->
+      let producer_account =
+        Option.bind
+          (Ledger.location_of_key test_ledger coinbase_receiver)
+          ~f:(Ledger.get test_ledger)
+      in
+      let is_producer_acc_new = Option.is_none producer_account in
+      let old_producer_balance =
+        Option.value_map producer_account ~default:Currency.Balance.zero
           ~f:(fun a -> a.balance)
       in
       let rec apply_cmds =
@@ -1513,12 +1554,30 @@ let%test_module "test" =
           let expect = get_account_exn test_ledger pk in
           let actual = get_account_exn (Sl.ledger staged_ledger) pk in
           [%test_result: Account.t] ~expect actual ) ;
-      (* We only test that the proposer got any reward here, since calculating
-         the exact correct amount depends on the snark fees and tx fees. *)
-      let new_proposer_balance =
+      (* We only test that the block producer got the coinbase reward here, since calculating the exact correct amount depends on the snark fees and tx fees. *)
+      let producer_balance_with_coinbase =
+        (let open Option.Let_syntax in
+        let%bind total_cost =
+          if is_producer_acc_new then
+            Currency.Fee.add coinbase_cost
+              Coda_compile_config.account_creation_fee
+          else Some coinbase_cost
+        in
+        let%bind reward =
+          Coda_compile_config.(
+            Currency.Amount.(sub coinbase (of_fee total_cost)))
+        in
+        Currency.Balance.add_amount old_producer_balance reward)
+        |> Option.value_exn
+      in
+      let new_producer_balance =
         (get_account_exn (Sl.ledger staged_ledger) coinbase_receiver).balance
       in
-      assert (Currency.Balance.(new_proposer_balance > old_proposer_balance))
+      assert (
+        Currency.Balance.(
+          new_producer_balance >= producer_balance_with_coinbase) )
+
+    let work_fee = Coda_compile_config.account_creation_fee
 
     (* Deterministically compute a prover public key from a snark work statement. *)
     let stmt_to_prover :
@@ -1539,8 +1598,10 @@ let%test_module "test" =
     let stmt_to_work_random_prover (stmts : Transaction_snark_work.Statement.t)
         : Transaction_snark_work.Checked.t option =
       let prover = stmt_to_prover stmts in
-      let fee = Fee.of_int 1 in
-      Some {Transaction_snark_work.Checked.fee; proofs= proofs stmts; prover}
+      Some
+        { Transaction_snark_work.Checked.fee= work_fee
+        ; proofs= proofs stmts
+        ; prover }
 
     (* Fixed public key for when there is only one snark worker. *)
     let snark_worker_pk =
@@ -1549,27 +1610,43 @@ let%test_module "test" =
 
     let stmt_to_work_one_prover (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
-      let fee = Fee.of_int 1 in
-      Some {fee; proofs= proofs stmts; prover= snark_worker_pk}
+      Some {fee= work_fee; proofs= proofs stmts; prover= snark_worker_pk}
 
-    let coinbase_fee_transfers_first_prediff = function
+    let coinbase_first_prediff = function
       | Staged_ledger_diff.At_most_two.Zero ->
-          0
-      | One _ ->
-          1
-      | _ ->
-          2
+          (0, [])
+      | One None ->
+          (1, [])
+      | One (Some ft) ->
+          (1, [ft])
+      | Two None ->
+          (2, [])
+      | Two (Some (ft, None)) ->
+          (2, [ft])
+      | Two (Some (ft1, Some ft2)) ->
+          (2, [ft1; ft2])
 
-    let coinbase_fee_transfers_second_prediff = function
+    let coinbase_second_prediff = function
       | Staged_ledger_diff.At_most_one.Zero ->
-          0
-      | _ ->
-          1
+          (0, [])
+      | One None ->
+          (1, [])
+      | One (Some ft) ->
+          (1, [ft])
 
-    let coinbase_fee_transfers (sl_diff : Staged_ledger_diff.t) =
-      coinbase_fee_transfers_first_prediff (fst sl_diff.diff).coinbase
+    let coinbase_count (sl_diff : Staged_ledger_diff.t) =
+      (coinbase_first_prediff (fst sl_diff.diff).coinbase |> fst)
       + Option.value_map ~default:0 (snd sl_diff.diff) ~f:(fun d ->
-            coinbase_fee_transfers_second_prediff d.coinbase )
+            coinbase_second_prediff d.coinbase |> fst )
+
+    let coinbase_cost (sl_diff : Staged_ledger_diff.t) =
+      let coinbase_fts =
+        (coinbase_first_prediff (fst sl_diff.diff).coinbase |> snd)
+        @ Option.value_map ~default:[] (snd sl_diff.diff) ~f:(fun d ->
+              coinbase_second_prediff d.coinbase |> snd )
+      in
+      List.fold coinbase_fts ~init:Currency.Fee.zero ~f:(fun total ft ->
+          Currency.Fee.add total (snd ft) |> Option.value_exn )
 
     (* These tests do a lot of updating Merkle ledgers so making Pedersen
        hashing faster is a big win.
@@ -1678,7 +1755,7 @@ let%test_module "test" =
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.user_commands diff
             in
-            let cb = coinbase_fee_transfers diff in
+            let cb = coinbase_count diff in
             ( match provers with
             | `One_prover ->
                 assert (cb = 1)
@@ -1697,8 +1774,9 @@ let%test_module "test" =
                     :> User_command.t list )
             | None ->
                 () ) ;
-            assert_ledger test_mask !sl cmds_left cmds_applied_this_iter
-              (init_pks init_state) ;
+            let coinbase_cost = coinbase_cost diff in
+            assert_ledger test_mask ~coinbase_cost !sl cmds_left
+              cmds_applied_this_iter (init_pks init_state) ;
             return (diff, proof_count') )
       in
       (*Should have enough blocks to generate at least expected_proof_count
@@ -1941,6 +2019,49 @@ let%test_module "test" =
               (*Note: if this fails, try increasing the number of trials*)
               assert checked ) )
 
+    let%test_unit "Provers can't pay the account creation fee" =
+      let no_work_included (diff : Staged_ledger_diff.t) =
+        List.is_empty (Staged_ledger_diff.completed_works diff)
+      in
+      let stmt_to_work stmts =
+        let prover = stmt_to_prover stmts in
+        Some
+          { Transaction_snark_work.Checked.fee=
+              Currency.Fee.(sub work_fee (of_int 1)) |> Option.value_exn
+          ; proofs= proofs stmts
+          ; prover }
+      in
+      Quickcheck.test (gen_below_capacity ())
+        ~sexp_of:
+          [%sexp_of:
+            Ledger.init_state
+            * User_command.With_valid_signature.t list
+            * int option list]
+        ~shrinker:
+          (Quickcheck.Shrinker.create (fun (init_state, cmds, iters) ->
+               if List.length iters > 1 then
+                 Sequence.singleton
+                   ( init_state
+                   , List.take cmds (List.length cmds - transaction_capacity)
+                   , [None] )
+               else Sequence.empty ))
+        ~trials:1
+        ~f:(fun (ledger_init_state, cmds, iters) ->
+          async_with_ledgers ledger_init_state (fun sl _test_mask ->
+              let logger = Logger.null () in
+              iter_cmds_acc cmds iters ()
+                (fun _cmds_left _count_opt cmds_this_iter () ->
+                  let diff =
+                    Sl.create_diff !sl ~self:self_pk ~logger
+                      ~transactions_by_fee:cmds_this_iter
+                      ~get_completed_work:stmt_to_work
+                      ~coinbase_receiver:(`Other coinbase_receiver)
+                    |> Staged_ledger_diff.forget
+                  in
+                  (*No proofs were purchased since the fee for the proofs are not sufficient to pay for account creation*)
+                  assert (no_work_included diff) ;
+                  Deferred.return (diff, ()) ) ) )
+
     let stmt_to_work_restricted work_list provers
         (stmts : Transaction_snark_work.Statement.t) :
         Transaction_snark_work.Checked.t option =
@@ -1956,8 +2077,10 @@ let%test_module "test" =
           (List.find work_list ~f:(fun s ->
                Transaction_snark_work.Statement.compare s stmts = 0 ))
       then
-        let fee = Fee.of_int 1 in
-        Some {Transaction_snark_work.Checked.fee; proofs= proofs stmts; prover}
+        Some
+          { Transaction_snark_work.Checked.fee= work_fee
+          ; proofs= proofs stmts
+          ; prover }
       else None
 
     (** Like test_simple but with a random number of completed jobs available.
@@ -1995,15 +2118,16 @@ let%test_module "test" =
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.user_commands diff
             in
-            let cb = coinbase_fee_transfers diff in
+            let cb = coinbase_count diff in
             assert (proofs_available_this_iter = 0 || cb > 0) ;
             ( match provers with
             | `One_prover ->
                 assert (cb <= 1)
             | `Many_provers ->
                 assert (cb <= 2) ) ;
-            assert_ledger test_mask !sl cmds_left cmds_applied_this_iter
-              (init_pks init_state) ;
+            let coinbase_cost = coinbase_cost diff in
+            assert_ledger test_mask ~coinbase_cost !sl cmds_left
+              cmds_applied_this_iter (init_pks init_state) ;
             (diff, List.tl_exn proofs_available_left) )
       in
       assert (List.is_empty proofs_available_left)
@@ -2361,15 +2485,16 @@ let%test_module "test" =
             let cmds_applied_this_iter =
               List.length @@ Staged_ledger_diff.user_commands diff
             in
-            let cb = coinbase_fee_transfers diff in
+            let cb = coinbase_count diff in
             assert (proofs_available_this_iter = 0 || cb > 0) ;
             ( match provers with
             | `One_prover ->
                 assert (cb <= 1)
             | `Many_provers ->
                 assert (cb <= 2) ) ;
-            assert_ledger test_mask !sl cmds_left cmds_applied_this_iter
-              (init_pks init_state) ;
+            let coinbase_cost = coinbase_cost diff in
+            assert_ledger test_mask ~coinbase_cost !sl cmds_left
+              cmds_applied_this_iter (init_pks init_state) ;
             ( diff
             , (List.tl_exn proofs_available_left, List.tl_exn state_body_hashes)
             ) )

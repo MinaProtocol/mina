@@ -1,0 +1,354 @@
+import Page from '@reason/pages/Docs';
+export default Page({title: "Snarky Universe"});
+
+**snarky-universe** is a snarky standard library that provides functions for dealing
+with various useful objects (field elements, hashes, Merkle trees, signatures, integers).
+
+## API documentation
+
+```reasonml
+module Field = {
+  module type Basic = {
+    type bool;
+
+    type t;
+
+    let size_in_bits: int;
+
+    let (==): (t, t) => bool;
+
+    let equal: (t, t) => bool;
+
+    let ( * ): (t, t) => t;
+
+    let (+): (t, t) => t;
+
+    let (-): (t, t) => t;
+
+    let (/): (t, t) => t;
+
+    let mul: (t, t) => t;
+
+    let add: (t, t) => t;
+
+    let sub: (t, t) => t;
+
+    let div: (t, t) => t;
+
+    let negate: t => t;
+
+    let sqrt: t => t;
+
+    let square: t => t;
+
+    let invert: t => t;
+
+    let one: t;
+
+    let zero: t;
+
+    let ofString: string => t;
+
+    let ofInt: int => t;
+
+    let ofBits: array(bool) => t;
+  };
+
+  module type Checked = {
+    include Basic;
+
+    include Cond_intf with type bool := bool and type t := t;
+
+    let toBits: (~length: int=?, t) => array(bool);
+
+    let parity: (~length: int=?, t) => bool;
+
+    let assertEqual: (t, t) => unit;
+
+    let assertR1: (t, t, t) => unit;
+
+    let isSquare: t => bool;
+
+    /** If x is a square in the field and
+    (b, y) = x;
+    If b = true, then y is sqrt(x)
+    If b = false, then y is a value which is not meaningful */
+
+    let sqrtCheck: t => (t, bool);
+  };
+
+  module type Constant = {
+    [@deriving yojson]
+    type t;
+
+    include Basic with type bool := bool and type t := t;
+
+    let parity: t => bool;
+
+    let toString: t => string;
+
+    let toBits: t => array(bool);
+  };
+};
+
+module type S = {
+  module Impl: Snarky.Snark_intf.Run with type prover_state = unit;
+
+  module Bool: {
+    open Impl;
+
+    type t = Boolean.var;
+
+    module Constant: {
+      [@deriving yojson]
+      type t = bool;
+    };
+
+    let true_: t;
+
+    let false_: t;
+
+    let typ: Typ.t(t, bool);
+
+    let (||): (t, t) => t;
+
+    let (&&): (t, t) => t;
+
+    let (!): t => t;
+
+    let negate: t => t;
+
+    let (==): (t, t) => t;
+
+    let equal: (t, t) => t;
+
+    let all: list(t) => t;
+
+    let any: list(t) => t;
+
+    let exactlyOne: list(t) => t;
+
+    let assertTrue: t => unit;
+
+    let assertFalse: t => unit;
+
+    let assertAll: list(t) => unit;
+
+    let assertAny: list(t) => unit;
+
+    let assertExactlyOne: list(t) => unit;
+
+    let assertEqual: (t, t) => unit;
+  };
+
+  module Field: {
+    include Field.Checked with type bool := Bool.t;
+
+    module Constant: Field.Constant;
+
+    let typ: Impl.Typ.t(t, Constant.t);
+  };
+
+  module Hash: {
+    type t = Field.t;
+
+    let equal: (t, t) => Bool.t;
+
+    let assertEqual: (t, t) => unit;
+
+    let hash: array(Field.t) => t;
+
+    include Cond_intf with type bool := Bool.t and type t := t;
+
+    module Constant: {
+      [@deriving yojson]
+      type t = Field.Constant.t;
+
+      let hash: array(Field.Constant.t) => t;
+    };
+
+    let typ: Impl.Typ.t(t, Constant.t);
+  };
+
+  module MerkleTree: {
+    open Impl;
+
+    type t('a);
+
+    module Index: {
+      type t = array(Boolean.var);
+
+      let typ: (~depth: int) => Typ.t(t, int);
+    };
+
+    module Path: {
+      type t = array(Hash.t);
+
+      let typ: (~depth: int) => Typ.t(t, array(Hash.Constant.t));
+    };
+
+    module MembershipProof: {
+      type t_('index, 'hash) = {
+        index: 'index,
+        path: array('hash),
+      };
+
+      type t = t_(Index.t, Hash.t);
+
+      module Constant: {
+        [@deriving yojson]
+        type t = t_(int, Hash.Constant.t);
+      };
+
+      let typ: (~depth: int) => Typ.t(t, Constant.t);
+
+      let check:
+        (t, Hash.t /* root hash */, Hash.t /* element hash */) => Bool.t;
+    };
+
+    let ofRoot: ('a => Hash.t, Hash.t) => t('a);
+
+    module Constant: {
+      type t('a);
+
+      let root: t(_) => Hash.Constant.t;
+
+      let ofArray: ('a => Hash.Constant.t, 'a, array('a)) => t('a);
+
+      module MembershipProof: {
+        let create: (t('a), int) => MembershipProof.Constant.t;
+
+        type t = MembershipProof.Constant.t;
+
+        let check: (t, Hash.Constant.t, Hash.Constant.t) => bool;
+      };
+    };
+  };
+
+  module Integer: {
+    type t;
+
+    let one: t;
+
+    let ofBigint: Bigint.t => t;
+
+    let ofInt: int => t;
+
+    let ofString: string => t;
+
+    let (+): (t, t) => t;
+
+    let ( * ): (t, t) => t;
+
+    let add: (t, t) => t;
+
+    let mul: (t, t) => t;
+
+    let divMod: (t, t) => (t, t);
+
+    let equal: (t, t) => Bool.t;
+
+    let (==): (t, t) => Bool.t;
+
+    let (<=): (t, t) => Bool.t;
+
+    let (>=): (t, t) => Bool.t;
+
+    let (<): (t, t) => Bool.t;
+
+    let (>): (t, t) => Bool.t;
+
+    let toField: t => Field.t;
+
+    let ofBits: array(Bool.t) => t;
+
+    let toBits: (~length: int=?, t) => array(Bool.t);
+  };
+
+  module InputSpec: Input_spec.S with module Impl := Impl;
+
+  let runMain:
+    (
+      InputSpec.t(unit => unit, unit, 'arg0 => 'computation0, 'public_input),
+      (module InputSpec.Witness_intf with type t = 'witness),
+      ('witness, 'arg0) => 'computation0
+    ) =>
+    unit;
+
+  module Schnorr: {
+    module PrivateKey: {
+      type t;
+
+      module Constant: {
+        [@deriving yojson]
+        type t;
+      };
+    };
+
+    module PublicKey: {
+      type t;
+
+      let ofPrivateKey: PrivateKey.t => t;
+
+      module Constant: {
+        [@deriving yojson]
+        type t;
+      };
+
+      let typ: Impl.Typ.t(t, Constant.t);
+    };
+
+    module Signature: {
+      type t;
+
+      module Constant: {
+        [@deriving yojson]
+        type t;
+      };
+
+      let typ: Impl.Typ.t(t, Constant.t);
+
+      let check: (t, PublicKey.t, array(Field.t)) => Bool.t;
+    };
+
+    module Constant: {
+      let sign:
+        (PrivateKey.Constant.t, array(Field.Constant.t)) =>
+        Signature.Constant.t;
+
+      let check:
+        (
+          Signature.Constant.t,
+          PublicKey.Constant.t,
+          array(Field.Constant.t)
+        ) =>
+        bool;
+    };
+  };
+};
+
+module type Cond_intf = {
+  type bool;
+
+  type t;
+
+  type cond;
+
+  let (-?): (bool, t) => cond;
+
+  let (-:): (cond, t) => t;
+};
+
+```
+
+### "Constant" module pattern
+
+Most modules in **snarky-universe** have a submodule called "Constant". For example,
+there is a module `Field` with the submodule `Field.Constant`.
+
+`Field` provides operations on "in SNARK" variable field elements, whereas
+`Field.Constant` provides operations on regular old field elements.
+
+The difference is the following. The only things you can fundamentally do with "in snark" field
+elements is add and multiply them. With "Constant" field elements, you can look at their bits,
+turn them into a string, print them out to the console, etc.

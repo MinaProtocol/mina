@@ -220,12 +220,13 @@ module Status = struct
 
     let sync_status = map_entry "Sync status" ~f:Sync_status.to_string
 
-    let propose_pubkeys = list_entry "Block producers running" ~to_string:Fn.id
+    let block_production_keys =
+      list_entry "Block producers running" ~to_string:Fn.id
 
     let histograms = option_entry "Histograms" ~f:Histograms.to_text
 
-    let next_proposal =
-      option_entry "Next proposal" ~f:(fun proposal_status ->
+    let next_block_production =
+      option_entry "Next block will be produced in" ~f:(fun producer_timing ->
           let str time =
             let open Block_time in
             let current_time =
@@ -237,14 +238,14 @@ module Status = struct
             let diff = diff time current_time in
             if Span.(zero < diff) then
               sprintf "in %s" (Span.to_string_hum diff)
-            else "Proposing now..."
+            else "Producing a block now..."
           in
-          match proposal_status with
-          | `Check_again proposing_time ->
-              sprintf "None this epoch… checking at %s" (str proposing_time)
-          | `Propose proposing_time ->
-              str proposing_time
-          | `Propose_now ->
+          match producer_timing with
+          | `Check_again time ->
+              sprintf "None this epoch… checking at %s" (str time)
+          | `Produce producing_time ->
+              str producing_time
+          | `Produce_now ->
               "Now" )
 
     let consensus_time_best_tip =
@@ -310,13 +311,13 @@ module Status = struct
     ; snark_worker: string option
     ; snark_work_fee: int
     ; sync_status: Sync_status.Stable.V1.t
-    ; propose_pubkeys: string list
+    ; block_production_keys: string list
     ; histograms: Histograms.t option
     ; consensus_time_best_tip: Consensus.Data.Consensus_time.Stable.V1.t option
-    ; next_proposal:
+    ; next_block_production:
         [ `Check_again of Block_time.Stable.V1.t
-        | `Propose of Block_time.Stable.V1.t
-        | `Propose_now ]
+        | `Produce of Block_time.Stable.V1.t
+        | `Produce_now ]
         option
     ; consensus_time_now: Consensus.Data.Consensus_time.Stable.V1.t
     ; consensus_mechanism: string
@@ -335,9 +336,9 @@ module Status = struct
     Fields.to_list ~sync_status ~num_accounts ~blockchain_length
       ~highest_block_length_received ~uptime_secs ~ledger_merkle_root
       ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent ~snark_worker
-      ~propose_pubkeys ~histograms ~consensus_time_best_tip ~consensus_time_now
-      ~consensus_mechanism ~consensus_configuration ~next_proposal
-      ~snark_work_fee ~addrs_and_ports ~libp2p_peer_id
+      ~block_production_keys ~histograms ~consensus_time_best_tip
+      ~consensus_time_now ~consensus_mechanism ~consensus_configuration
+      ~next_block_production ~snark_work_fee ~addrs_and_ports ~libp2p_peer_id
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

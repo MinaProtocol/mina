@@ -15,7 +15,7 @@ module type Ledger_intf = sig
   val set : t -> location -> Account.t -> unit
 
   val get_or_create :
-    t -> Account.key -> Account.key list * Account.t * location
+    t -> Account.key -> [`Added | `Existed] * Account.t * location
 
   val get_or_create_account_exn :
     t -> Account.key -> Account.t -> [`Added | `Existed] * location
@@ -257,6 +257,17 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let sub_amount balance amount =
     error_opt "insufficient funds" (Balance.sub_amount balance amount)
 
+  let sub_account_creation_fee action amount =
+    let fee = Coda_compile_config.account_creation_fee in
+    if action = `Added then
+      error_opt
+        (sprintf
+           !"Error subtracting account creation fee %{sexp: Currency.Fee.t}; \
+             transaction amount %{sexp: Currency.Amount.t} insufficient"
+           fee amount)
+        Amount.(sub amount (of_fee fee))
+    else Ok amount
+
   let check b =
     ksprintf (fun s -> if b then Ok () else Or_error.error_string s)
 
@@ -357,6 +368,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           Ok (Coinbase c.coinbase)
   end
 
+  let previous_empty_accounts action pk = if action = `Added then [pk] else []
+
   (* someday: It would probably be better if we didn't modify the receipt chain hash
   in the case that the sender is equal to the receiver, but it complicates the SNARK, so
   we don't for now. *)
@@ -421,11 +434,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           ignore @@ set ledger sender_location sender_account ;
           return (undo []) )
         else
-          let previous_empty_accounts, receiver_account, receiver_location =
+          let action, receiver_account, receiver_location =
             get_or_create ledger receiver
           in
+          let previous_empty_accounts =
+            previous_empty_accounts action receiver
+          in
           let%map receiver_balance' =
-            add_amount receiver_account.balance amount
+            (*deduct the account creation fee*)
+            let%bind amount' = sub_account_creation_fee action amount in
+            add_amount receiver_account.balance amount'
           in
           set ledger sender_location
             {sender_account with balance= sender_balance'} ;
@@ -441,21 +459,24 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let open Or_error.Let_syntax in
     match transfer with
     | `One (pk, fee) ->
-        let emptys, a, loc = get_or_create t pk in
-        let%map balance = modify_balance a.balance fee in
+        let action, a, loc = get_or_create t pk in
+        let emptys = previous_empty_accounts action pk in
+        let%map balance = modify_balance action pk a.balance fee in
         set t loc {a with balance} ;
         emptys
     | `Two ((pk1, fee1), (pk2, fee2)) ->
-        let emptys1, a1, l1 = get_or_create t pk1 in
+        let action1, a1, l1 = get_or_create t pk1 in
+        let emptys1 = previous_empty_accounts action1 pk1 in
         if Public_key.Compressed.equal pk1 pk2 then (
           let%bind fee = error_opt "overflow" (Fee.add fee1 fee2) in
-          let%map balance = modify_balance a1.balance fee in
+          let%map balance = modify_balance action1 pk1 a1.balance fee in
           set t l1 {a1 with balance} ;
           emptys1 )
         else
-          let emptys2, a2, l2 = get_or_create t pk2 in
-          let%bind balance1 = modify_balance a1.balance fee1 in
-          let%map balance2 = modify_balance a2.balance fee2 in
+          let action2, a2, l2 = get_or_create t pk2 in
+          let emptys2 = previous_empty_accounts action2 pk2 in
+          let%bind balance1 = modify_balance action1 pk1 a1.balance fee1 in
+          let%map balance2 = modify_balance action2 pk1 a2.balance fee2 in
           set t l1 {a1 with balance= balance1} ;
           set t l2 {a2 with balance= balance2} ;
           emptys1 @ emptys2
@@ -463,8 +484,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let apply_fee_transfer t transfer =
     let open Or_error.Let_syntax in
     let%map previous_empty_accounts =
-      process_fee_transfer t transfer ~modify_balance:(fun b f ->
-          add_amount b (Amount.of_fee f) )
+      process_fee_transfer t transfer ~modify_balance:(fun action _ b f ->
+          let%bind amount =
+            let amount = Amount.of_fee f in
+            sub_account_creation_fee action amount
+          in
+          add_amount b amount )
     in
     Undo.Fee_transfer_undo.{fee_transfer= transfer; previous_empty_accounts}
 
@@ -472,22 +497,22 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ({previous_empty_accounts; fee_transfer} : Undo.Fee_transfer_undo.t) =
     let open Or_error.Let_syntax in
     let%map _ =
-      process_fee_transfer t fee_transfer ~modify_balance:(fun b f ->
-          sub_amount b (Amount.of_fee f) )
+      process_fee_transfer t fee_transfer ~modify_balance:(fun _ pk b f ->
+          let action =
+            if List.mem ~equal:Account.equal_key previous_empty_accounts pk
+            then `Added
+            else `Existed
+          in
+          let%bind amount =
+            sub_account_creation_fee action (Amount.of_fee f)
+          in
+          sub_amount b amount )
     in
     remove_accounts_exn t previous_empty_accounts
 
   let apply_coinbase t
       (* TODO: Better system needed for making atomic changes. Could use a monad. *)
       ({receiver; fee_transfer; amount= coinbase_amount} as cb : Coinbase.t) =
-    let get_or_initialize pk =
-      let initial_account = Account.initialize pk in
-      match get_or_create_account_exn t pk (Account.initialize pk) with
-      | `Added, location ->
-          (location, initial_account, [pk])
-      | `Existed, location ->
-          (location, Option.value_exn (get t location), [])
-    in
     let open Or_error.Let_syntax in
     let%bind receiver_reward, emptys1, transferee_update =
       match fee_transfer with
@@ -500,19 +525,27 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             error_opt "Coinbase fee transfer too large"
               (Amount.sub coinbase_amount fee)
           in
-          let transferee_location, transferee_account, emptys =
-            get_or_initialize transferee
+          let action, transferee_account, transferee_location =
+            get_or_create t transferee
           in
-          let%map balance = add_amount transferee_account.balance fee in
+          let emptys = previous_empty_accounts action transferee in
+          let%map balance =
+            let%bind amount = sub_account_creation_fee action fee in
+            add_amount transferee_account.balance amount
+          in
           ( receiver_reward
           , emptys
           , Some (transferee_location, {transferee_account with balance}) )
     in
-    let receiver_location, receiver_account, emptys2 =
-      get_or_initialize receiver
+    let action2, receiver_account, receiver_location =
+      get_or_create t receiver
     in
-    let%map balance = add_amount receiver_account.balance receiver_reward in
-    set t receiver_location {receiver_account with balance} ;
+    let emptys2 = previous_empty_accounts action2 receiver in
+    let%map receiver_balance =
+      let%bind amount = sub_account_creation_fee action2 receiver_reward in
+      add_amount receiver_account.balance amount
+    in
+    set t receiver_location {receiver_account with balance= receiver_balance} ;
     Option.iter transferee_update ~f:(fun (l, a) -> set t l a) ;
     Undo.Coinbase_undo.
       {coinbase= cb; previous_empty_accounts= emptys1 @ emptys2}
@@ -535,11 +568,22 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let transferee_account =
             Or_error.ok_exn (get' t "transferee" transferee_location)
           in
+          let transferee_balance =
+            let action =
+              if
+                List.mem previous_empty_accounts transferee
+                  ~equal:Account.equal_key
+              then `Added
+              else `Existed
+            in
+            let amount =
+              sub_account_creation_fee action fee |> Or_error.ok_exn
+            in
+            Option.value_exn
+              (Balance.sub_amount transferee_account.balance amount)
+          in
           set t transferee_location
-            { transferee_account with
-              balance=
-                Option.value_exn
-                  (Balance.sub_amount transferee_account.balance fee) } ;
+            {transferee_account with balance= transferee_balance} ;
           Option.value_exn (Amount.sub coinbase_amount fee)
     in
     let receiver_location =
@@ -548,11 +592,18 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let receiver_account =
       Or_error.ok_exn (get' t "receiver" receiver_location)
     in
-    set t receiver_location
-      { receiver_account with
-        balance=
-          Option.value_exn
-            (Balance.sub_amount receiver_account.balance receiver_reward) } ;
+    let receiver_balance =
+      let action =
+        if List.mem previous_empty_accounts receiver ~equal:Account.equal_key
+        then `Added
+        else `Existed
+      in
+      let amount =
+        sub_account_creation_fee action receiver_reward |> Or_error.ok_exn
+      in
+      Option.value_exn (Balance.sub_amount receiver_account.balance amount)
+    in
+    set t receiver_location {receiver_account with balance= receiver_balance} ;
     remove_accounts_exn t previous_empty_accounts
 
   let undo_user_command ledger
@@ -596,7 +647,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             get' ledger "receiver" receiver_location
           in
           let%map receiver_balance' =
-            sub_amount receiver_account.balance amount
+            let action =
+              if
+                List.mem previous_empty_accounts receiver
+                  ~equal:Account.equal_key
+              then `Added
+              else `Existed
+            in
+            let%bind amount' = sub_account_creation_fee action amount in
+            sub_amount receiver_account.balance amount'
           in
           set ledger sender_location
             {sender_account with balance= sender_balance'} ;

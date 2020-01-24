@@ -138,9 +138,27 @@ let create_coinbase coinbase_parts ~(receiver : Public_key.Compressed.t) =
       in
       [cb]
   | `Two None ->
-      two_parts (Currency.Amount.of_int 1) None None
+      two_parts
+        (Currency.Amount.of_fee Coda_compile_config.account_creation_fee)
+        None None
   | `Two (Some (ft1, ft2)) ->
-      two_parts (Currency.Amount.of_fee (snd ft1)) (Some ft1) ft2
+      let%bind amount =
+        let%map fee =
+          Currency.Fee.add Coda_compile_config.account_creation_fee (snd ft1)
+          |> Option.value_map
+               ~default:
+                 (Error
+                    (Error.Coinbase_error
+                       (sprintf
+                          !"Overflow when trying to add account_creation_fee \
+                            %{sexp: Currency.Fee.t} to a fee transfer %{sexp: \
+                            Currency.Fee.t}"
+                          Coda_compile_config.account_creation_fee (snd ft1))))
+               ~f:(fun v -> Ok v)
+        in
+        Currency.Amount.of_fee fee
+      in
+      two_parts amount (Some ft1) ft2
 
 let sum_fees xs ~f =
   with_return (fun {return} ->
