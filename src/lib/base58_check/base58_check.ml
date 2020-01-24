@@ -73,7 +73,9 @@ struct
     payload
 
   let decode s =
-    let error_str e desc = sprintf "Invalid base58 %s in %s" e desc in
+    let error_str e desc =
+      sprintf "Error decoding %s\nInvalid base58 %s in %s" s e desc
+    in
     try Ok (decode_exn s) with
     | Invalid_base58_character str ->
         Or_error.error_string (error_str "character" str)
