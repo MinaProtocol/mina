@@ -242,7 +242,7 @@ let make = () => {
           <ul className={Css.merge([Styles.heroCopy, Styles.legalListList])}>
             <li className=Styles.legalListItem>
               {React.string(
-                 "At mainnet launch, 6.67% of the protocol will be distributed in this manner.",
+                 "At mainnet launch, 6.6% of the protocol will be distributed in this manner.",
                )}
             </li>
             <li className=Styles.legalListItem>
