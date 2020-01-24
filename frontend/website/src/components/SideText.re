@@ -26,7 +26,7 @@ let make = (~className="", ~paragraphs) => {
            className=Css.(
              merge([Theme.Body.basic, style([marginBottom(`rem(1.5))])])
            )>
-           {React.array(content)}
+           {ReactUtils.staticArray(content)}
          </p>;
        });
 
