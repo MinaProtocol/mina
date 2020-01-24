@@ -277,7 +277,7 @@ let add_breadcrumb_exn t breadcrumb =
     "Applying diffs: $diffs" ;
   let (`New_root new_root_identifier) =
     Full_frontier.apply_diffs t.full_frontier diffs
-      ~ignore_consensus_local_state:false
+      ~enable_epoch_ledger_sync:(`Enabled (root_snarked_ledger t))
   in
   Option.iter new_root_identifier
     ~f:

@@ -36,7 +36,7 @@ val calculate_diffs : t -> Breadcrumb.t -> Diff.Full.E.t list
 val apply_diffs :
      t
   -> Diff.Full.E.t list
-  -> ignore_consensus_local_state:bool
+  -> enable_epoch_ledger_sync:[`Enabled of Ledger.Db.t | `Disabled]
   -> [`New_root of Root_identifier.t option]
 
 module For_tests : sig

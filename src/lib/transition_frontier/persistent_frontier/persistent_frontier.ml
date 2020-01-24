@@ -211,7 +211,10 @@ module Instance = struct
     in
     let apply_diff diff =
       let (`New_root _) =
-        Full_frontier.apply_diffs frontier [diff] ~ignore_consensus_local_state
+        Full_frontier.apply_diffs frontier [diff]
+          ~enable_epoch_ledger_sync:
+            ( if ignore_consensus_local_state then `Disabled
+            else `Enabled root_ledger )
       in
       Extensions.notify extensions ~frontier ~diffs:[diff]
       |> Deferred.map ~f:Result.return
