@@ -2,19 +2,30 @@
 "/src/config.mlh"]
 
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params.Tick
 open Snark_bits
 
-module type Basic = sig
-  type t = Pedersen.Digest.t [@@deriving sexp, yojson]
+[%%else]
 
-  val gen : t Quickcheck.Generator.t
+open Snark_params_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
+
+module type Basic = sig
+  type t = Field.t [@@deriving sexp, yojson]
 
   val to_decimal_string : t -> string
 
   val to_bytes : t -> string
 
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
+
+  val gen : t Quickcheck.Generator.t
 
   type var
 
@@ -26,7 +37,7 @@ module type Basic = sig
 
   val var_to_bits : var -> (Boolean.var list, _) Checked.t
 
-  val typ : (var, t) Typ.t
+  val typ : (vaor, t) Typ.t
 
   val assert_equal : var -> var -> (unit, _) Checked.t
 
@@ -34,9 +45,12 @@ module type Basic = sig
 
   val var_of_t : t -> var
 
-  [%%endif]
-
+  (* TODO : define bit ops using Random_oracle instead of Pedersen.Digest,
+     move this outside of consensus_mechanism guard
+  *)
   include Bits_intf.S with type t := t
+
+  [%%endif]
 
   val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 end
@@ -47,8 +61,7 @@ module type Full_size = sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = Pedersen.Digest.Stable.V1.t
-      [@@deriving sexp, compare, hash, yojson]
+      type t = Field.t [@@deriving sexp, compare, hash, yojson]
 
       include Comparable.S with type t := t
 
@@ -60,7 +73,7 @@ module type Full_size = sig
 
   include Hashable with type t := t
 
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
@@ -68,17 +81,5 @@ module type Full_size = sig
 
   [%%endif]
 
-  val of_hash : Pedersen.Digest.t -> t
-end
-
-module type Small = sig
-  include Basic
-
-  [%%if defined consensus_mechanism]
-
-  val var_of_hash_packed : Pedersen.Checked.Digest.var -> (var, _) Checked.t
-
-  [%%endif]
-
-  val of_hash : Pedersen.Digest.t -> t Or_error.t
+  val of_hash : Field.t -> t
 end

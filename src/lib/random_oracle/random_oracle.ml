@@ -1,4 +1,20 @@
-open Core
+[%%import
+"/src/config.mlh"]
+
+open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
+open Curve_choice
+module Field = Tick0.Field
+
+[%%else]
+
+open Snark_params_nonconsensus
+module Sponge_params = Sponge_params_nonconsensus.Sponge_params
+
+[%%endif]
 
 module State = struct
   include Array
@@ -7,13 +23,10 @@ module State = struct
 end
 
 module Input = Input
-open Curve_choice
 
 let params : _ Sponge.Params.t =
   let open Sponge_params in
   {mds; round_constants}
-
-module Field = Tick0.Field
 
 let pack_input ~project {Input.field_elements; bitstrings} =
   let packed_bits =
@@ -36,6 +49,9 @@ module Inputs = struct
 
   let rounds_partial = 33
 
+  [%%ifdef
+  consensus_mechanism]
+
   let to_the_alpha x =
     let open Field in
     let res = x + zero in
@@ -50,7 +66,27 @@ module Inputs = struct
     res *= x ;
     res
 
+  [%%else]
+
+  let to_the_alpha x =
+    let open Field in
+    let res = x in
+    let res = res * res in
+    (* x^2 *)
+    let res = res * res in
+    (* x^4 *)
+    let res = res * x in
+    (* x^5 *)
+    let res = res * res in
+    (* x^10 *)
+    res * x
+
+  [%%endif]
+
   module Operations = struct
+    [%%ifdef
+    consensus_mechanism]
+
     let add_assign ~state i x = Field.(state.(i) += x)
 
     let apply_affine_map (rows, c) v =
@@ -63,6 +99,21 @@ module Inputs = struct
 
     (* TODO: Have an explicit function for making a copy of a field element. *)
     let copy a = Array.map a ~f:(fun x -> Field.(x + zero))
+
+    [%%else]
+
+    let add_assign ~state i x = Field.(state.(i) <- state.(i) + x)
+
+    let apply_affine_map (rows, c) v =
+      Array.mapi rows ~f:(fun j row ->
+          let res = ref Field.zero in
+          Array.iteri row ~f:(fun i r -> res := Field.(!res + (r * v.(i)))) ;
+          (res := Field.(!res + c.(j))) ;
+          !res )
+
+    let copy a = Array.map a ~f:Fn.id
+
+    [%%endif]
   end
 
   let _alphath_root =
@@ -70,7 +121,7 @@ module Inputs = struct
       Bigint.of_string Sponge_params.inv_alpha |> Bigint.to_zarith_bigint
     in
     let k = 4 in
-    let chunks = (Tick0.Field.size_in_bits + (k - 1)) / k in
+    let chunks = (Field.size_in_bits + (k - 1)) / k in
     let inv_alpha =
       let chunk i =
         let b j = Z.testbit inv_alpha ((k * i) + j) in
@@ -101,7 +152,7 @@ module Inputs = struct
 end
 
 module Digest = struct
-  open Tick0.Field
+  open Field
 
   type nonrec t = t
 
@@ -118,6 +169,11 @@ include Sponge.Make_hash (Sponge.Poseidon (Inputs))
 let update ~state = update ~state params
 
 let hash ?init = hash ?init params
+
+let zero_hash = hash [||]
+
+[%%ifdef
+consensus_mechanism]
 
 module Checked = struct
   module Inputs = struct
@@ -227,10 +283,11 @@ module Checked = struct
   let digest xs = xs.(0)
 end
 
+[%%endif]
+
 let pack_input = pack_input ~project:Field.project
 
 let prefix_to_field (s : string) =
-  let open Tick0 in
   let bits_per_character = 8 in
   assert (bits_per_character * String.length s < Field.size_in_bits) ;
   Field.project Fold_lib.Fold.(to_list (string_bits (s :> string)))
@@ -238,7 +295,6 @@ let prefix_to_field (s : string) =
 let salt (s : string) = update ~state:initial_state [|prefix_to_field s|]
 
 let%test_unit "iterativeness" =
-  let open Tick0 in
   let x1 = Field.random () in
   let x2 = Field.random () in
   let x3 = Field.random () in
@@ -248,6 +304,9 @@ let%test_unit "iterativeness" =
     update ~state:(update ~state:initial_state [|x1; x2|]) [|x3; x4|]
   in
   [%test_eq: Field.t array] s_full s_it
+
+[%%ifdef
+consensus_mechanism]
 
 let%test_unit "sponge checked-unchecked" =
   let module T = Tick0 in
@@ -259,3 +318,5 @@ let%test_unit "sponge checked-unchecked" =
     (fun (x, y) -> Runners.Tick.make_checked (fun () -> Checked.hash [|x; y|]))
     (fun (x, y) -> hash [|x; y|])
     (x, y)
+
+[%%endif]

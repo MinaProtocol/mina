@@ -4,14 +4,22 @@
 open Core_kernel
 open Module_version
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 open Snark_params.Tick
 
-[%%endif]
-
 let parity y = Bigint.(test_bit (of_field y) 0)
+
+[%%else]
+
+open Snark_params_nonconsensus
+
+let parity y = Field.parity y
+
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
 
 let gen_uncompressed =
   Quickcheck.Generator.filter_map Field.gen_uniform ~f:(fun x ->
@@ -27,7 +35,7 @@ module Compressed = struct
     [%%versioned_asserted
     module Stable = struct
       module V1 = struct
-        type t = (Snark_params.Tick.Field.t, bool) Poly.Stable.V1.t
+        type t = (Field.t, bool) Poly.Stable.V1.t
 
         let to_latest = Fn.id
 
@@ -48,12 +56,11 @@ module Compressed = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (Snark_params.Tick.Field.t, bool) Poly.Stable.V1.t
-      [@@deriving eq, compare, hash]
+      type t = (Field.t, bool) Poly.Stable.V1.t [@@deriving eq, compare, hash]
 
       (* dummy type for inserting constraint
          adding constraint to t produces "unused rec" error
-                                *)
+      *)
       type unused = unit constraint t = Arg.Stable.V1.t
 
       let to_latest = Fn.id
@@ -128,8 +135,8 @@ module Compressed = struct
   let to_input {Poly.x; is_odd} =
     {Random_oracle.Input.field_elements= [|x|]; bitstrings= [|[is_odd]|]}
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   (* snarky-dependent *)
 
@@ -191,8 +198,7 @@ module Uncompressed = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = Snark_params.Tick.Field.t * Snark_params.Tick.Field.t
-      [@@deriving eq, compare, hash]
+      type t = Field.t * Field.t [@@deriving eq, compare, hash]
 
       let to_latest = Fn.id
 
@@ -298,8 +304,8 @@ module Uncompressed = struct
     Quickcheck.test gen ~f:(fun pk ->
         assert (equal (decompress_exn (compress pk)) pk) )
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   (* snarky-dependent *)
 

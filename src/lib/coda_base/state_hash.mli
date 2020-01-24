@@ -1,8 +1,22 @@
+(* state_hash.mli *)
+
+[%%import "/src/config.mlh"]
+
+[%%ifdef consensus_mechanism]
+
+open Snark_params.Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+
+[%%endif]
+
 include Data_hash.Full_size
 
 include Codable.Base58_check_intf with type t := t
 
-val zero : Crypto_params.Tick0.field
+val zero : Field.t
 
 val raw_hash_bytes : t -> string
 

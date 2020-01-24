@@ -23,5 +23,7 @@ module type S = sig
 
   val hash : ?init:field_constant State.t -> field array -> Digest.t
 
+  val zero_hash : Digest.t
+
   val pack_input : (field, bool) Input.t -> field array
 end

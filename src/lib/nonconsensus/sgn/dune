@@ -1,0 +1,11 @@
+(library
+ (name sgn_nonconsensus)
+ (public_name sgn_nonconsensus)
+ (library_flags -linkall)
+ (libraries sgn_type snark_params_nonconsensus core_kernel ppx_deriving_yojson.runtime
+   yojson)
+ (preprocessor_deps ../../../config.mlh)
+ (preprocess
+  (pps ppx_coda ppx_bin_prot ppx_sexp_conv ppx_compare ppx_hash ppx_optcomp ppx_deriving.eq bisect_ppx ppx_deriving_yojson --
+    -conditional))
+ (synopsis "sgn library"))

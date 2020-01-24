@@ -1,14 +1,31 @@
+(* schnorr.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
-open Snark_params
+
+[%%ifdef
+consensus_mechanism]
+
 open Bitstring_lib
+open Snark_params
+open Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Currency = Currency_nonconsensus.Currency
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+module Signature_lib = Signature_lib_nonconsensus
+
+[%%endif]
 
 module Message = struct
-  module Scalar = Tick.Inner_curve.Scalar
-  open Tick
+  module Scalar = Inner_curve.Scalar
 
   type t = User_command_payload.t
-
-  type var = Transaction_union_payload.var
 
   let challenge_length = 128
 
@@ -41,7 +58,7 @@ module Message = struct
 
   let hash t ~public_key ~r =
     let input =
-      let px, py = Tick.Inner_curve.to_affine_exn public_key in
+      let px, py = Inner_curve.to_affine_exn public_key in
       Random_oracle.Input.append
         (Transaction_union_payload.to_input
            (Transaction_union_payload.of_user_command_payload t))
@@ -51,6 +68,11 @@ module Message = struct
     hash ~init:Hash_prefix.signature (pack_input input)
     |> Digest.to_bits ~length:challenge_length
     |> Scalar.of_bits
+
+  [%%ifdef
+  consensus_mechanism]
+
+  type var = Transaction_union_payload.var
 
   let%snarkydef hash_checked t ~public_key ~r =
     let%bind t = Transaction_union_payload.Checked.to_input t in
@@ -64,7 +86,21 @@ module Message = struct
         hash ~init:Hash_prefix_states.signature (pack_input input)
         |> Digest.to_bits ~length:challenge_length
         |> Bitstring.Lsb_first.of_list )
+
+  [%%endif]
 end
+
+[%%ifdef
+consensus_mechanism]
 
 include Signature_lib.Checked.Schnorr (Tick) (Snark_params.Tick.Inner_curve)
           (Message)
+
+[%%else]
+
+include Signature_lib.Checked.Schnorr
+          (Snark_params_nonconsensus)
+          (Snark_params_nonconsensus.Inner_curve)
+          (Message)
+
+[%%endif]
