@@ -574,38 +574,6 @@ let work_statements_for_new_diff t : Transaction_snark_work.Statement.t list =
              | Some stmt ->
                  stmt )) )
 
-let _all_work_pairs_exn_test t
-    ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t) =
-  let all_jobs = all_jobs t in
-  let module A = Available_job in
-  let single_spec (job : job) =
-    match extract_from_job job with
-    | First (transaction_with_info, statement, state_hash, ledger_witness) ->
-        let transaction =
-          Ledger.Undo.transaction transaction_with_info |> Or_error.ok_exn
-        in
-        let protocol_state_body =
-          let state = get_state (fst state_hash) |> Or_error.ok_exn in
-          Coda_state.Protocol_state.body state
-        in
-        Snark_work_lib.Work.Single.Spec.Transition
-          ( statement
-          , transaction
-          , {Transaction_witness.ledger= ledger_witness; protocol_state_body}
-          )
-    | Second (p1, p2) ->
-        let merged =
-          Transaction_snark.Statement.merge
-            (Ledger_proof.statement p1)
-            (Ledger_proof.statement p2)
-          |> Or_error.ok_exn
-        in
-        Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
-  in
-  List.concat_map all_jobs ~f:(fun jobs ->
-      List.map (One_or_two.group_list jobs) ~f:(One_or_two.map ~f:single_spec)
-  )
-
 let all_work_pairs t
     ~(get_state : State_hash.t -> Coda_state.Protocol_state.value Or_error.t) :
     ( Transaction.t
@@ -639,37 +607,21 @@ let all_work_pairs t
         in
         Snark_work_lib.Work.Single.Spec.Merge (merged, p1, p2)
   in
-  let%map res =
-    List.fold_until all_jobs ~init:[]
-      ~finish:(fun lst -> Ok lst)
-      ~f:(fun acc jobs ->
-        let specs_list : 'a One_or_two.t list Or_error.t =
-          List.fold ~init:(Ok []) (One_or_two.group_list jobs)
-            ~f:(fun acc' pair ->
-              let%bind acc' = acc' in
-              let%map spec = One_or_two.Or_error.map ~f:single_spec pair in
-              spec :: acc' )
-        in
-        match specs_list with
-        | Ok list ->
-            Continue (acc @ List.rev list)
-        | Error e ->
-            Stop (Error e) )
-  in
-  let test_res = _all_work_pairs_exn_test t ~get_state in
-  let () =
-    assert (
-      List.equal
-        (fun s1 s2 ->
-          One_or_two.equal
-            (fun a1 a2 ->
-              Transaction_snark.Statement.equal
-                (Snark_work_lib.Work.Single.Spec.statement a1)
-                (Snark_work_lib.Work.Single.Spec.statement a2) )
-            s1 s2 )
-        res test_res )
-  in
-  res
+  List.fold_until all_jobs ~init:[]
+    ~finish:(fun lst -> Ok lst)
+    ~f:(fun acc jobs ->
+      let specs_list : 'a One_or_two.t list Or_error.t =
+        List.fold ~init:(Ok []) (One_or_two.group_list jobs)
+          ~f:(fun acc' pair ->
+            let%bind acc' = acc' in
+            let%map spec = One_or_two.Or_error.map ~f:single_spec pair in
+            spec :: acc' )
+      in
+      match specs_list with
+      | Ok list ->
+          Continue (acc @ List.rev list)
+      | Error e ->
+          Stop (Error e) )
 
 let update_metrics = Parallel_scan.update_metrics
 

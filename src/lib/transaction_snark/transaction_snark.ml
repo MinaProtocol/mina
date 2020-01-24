@@ -35,9 +35,6 @@ module Pending_coinbase_stack_state = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (*type source = {at_block: Pending_coinbase.Stack.Stable.V1.t; at_transaction: Pending_coinbase.Stack.Stable.V1.t}
-      [@@deriving sexp, hash, compare, eq, fields, yojson]*)
-
       type t =
         { source: Pending_coinbase.Stack.Stable.V1.t
         ; target: Pending_coinbase.Stack.Stable.V1.t }
@@ -402,11 +399,11 @@ module Base = struct
     let%bind is_user_command =
       Transaction_union.Tag.Checked.is_user_command tag
     in
+    let current_global_slot =
+      Coda_state.Protocol_state.Body.consensus_state state_body
+      |> Consensus.Data.Consensus_state.curr_global_slot_var
+    in
     let%bind () =
-      let current_global_slot =
-        Coda_state.Protocol_state.Body.consensus_state state_body
-        |> Consensus.Data.Consensus_state.curr_global_slot_var
-      in
       Global_slot.Checked.(current_global_slot <= payload.common.valid_until)
       >>= Boolean.Assert.is_true
     in
@@ -426,17 +423,9 @@ module Base = struct
     let%bind state_body_hash =
       Coda_state.Protocol_state.Body.hash_checked state_body
     in
-    (*let push_state =
-      Transaction_protocol_state.Block_data.Checked.push_state
-        state_body_hash_opt
-    in*)
     let%bind pending_coinbase_stack_with_state =
-      (*let%bind updated_stack =*)
       Pending_coinbase.Stack.Checked.push_state state_body_hash
         pending_coinbase_stack_before
-      (*in
-      Pending_coinbase.Stack.Checked.if_ push_state ~then_:updated_stack
-        ~else_:pending_coinbase_stack_before*)
     in
     let coinbase_receiver = payload.body.public_key in
     let coinbase = (coinbase_receiver, payload.body.amount) in
@@ -483,15 +472,14 @@ module Base = struct
                Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
                  ~else_:current
              in
-             (* TODO: use actual slot. See issue #4036. *)
-             let txn_global_slot = Global_slot.Checked.zero in
              let%bind timing =
                let%bind txn_amount =
                  (* if not a payment, allow check_timing to pass, regardless of account balance *)
                  if_ is_payment ~typ:Amount.typ ~then_:payload.body.amount
                    ~else_:Amount.(var_of_t zero)
                in
-               check_timing ~account ~txn_amount ~txn_global_slot
+               check_timing ~account ~txn_amount
+                 ~txn_global_slot:current_global_slot
              in
              let%bind delegate =
                let if_ = chain Public_key.Compressed.Checked.if_ in

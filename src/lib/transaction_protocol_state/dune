@@ -3,7 +3,7 @@
  (public_name transaction_protocol_state)
  (library_flags -linkall)
  (inline_tests)
- (libraries core snarky coda_base coda_state sgn module_version)
+ (libraries core snarky coda_state sgn module_version)
  (preprocess
   (pps ppx_snarky ppx_coda -lint-version-syntax-warnings ppx_jane ppx_deriving.std ppx_deriving_yojson bisect_ppx -- -conditional))
  (synopsis "Transaction protocol state library"))

@@ -154,10 +154,7 @@ module Data_hash_binable = struct
   include Data_hash.Make_full_size ()
 end
 
-(* a coinbase stack has two components, data and a state_hash
-   we create modules for each component
-*)
-
+(*Stack of coinbases*)
 module Coinbase_stack = struct
   include Data_hash_binable
 
@@ -196,6 +193,7 @@ module Stack_hash = struct
   let dummy = of_hash Outside_pedersen_image.t
 end
 
+(*Stack of protocol state body hashes*)
 module State_stack = struct
   module Poly = struct
     [%%versioned
@@ -304,7 +302,9 @@ module State_stack = struct
           {t with curr} )
 
     let check_merge (s1, t1) (s2, t2) =
-      (*state stacks are updated for every transaction in transaction snark but only once for every blockchain snark. Therefore, sources and targets of each transition will be equal for transactions in the same block*)
+      (*state stacks are updated for every transaction in transaction snark but
+      only once for every blockchain snark. Therefore, source stacks (and
+      target stacks) will be equal for transactions in the same block*)
       let%bind eq_src = equal_var s1 s2
       and eq_target = equal_var t1 t2
       and correct_transition = equal_var t1 s2 in
@@ -437,6 +437,7 @@ struct
     let%bind then_ = then_ and else_ = else_ in
     if_ b ~then_ ~else_
 
+  (*pair of coinbase and state stacks*)
   module Stack = struct
     module Poly = struct
       [%%versioned
