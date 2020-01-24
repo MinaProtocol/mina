@@ -55,7 +55,7 @@ Run either one of the following commands which will create a public and private 
   
     coda accounts create
 
-If you are running the node on a cloud virtual machine, make sure to copy your generated private key file to your local machine. You can do this with the command `ssh copy <source> <destination>`. In the case that your machine shuts down, you will need to import the private key file using the following command and flag: 
+If you are running the node on a cloud virtual machine, make sure to copy your generated private key file to your local machine. You can do this with the command `scp <source> <destination>`. In the case that your machine shuts down, you will need to import the private key file using the following command and flag: 
 
     coda accounts import -privkey-path <INSERT FILE PATH HERE> 
 
