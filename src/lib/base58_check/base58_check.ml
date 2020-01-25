@@ -145,13 +145,4 @@ let%test_module "base58check tests" =
         let _payload = decode_exn "abcd" in
         false
       with Invalid_base58_check_length _ -> true
-
-    let%test "very long shouldn't take forever" =
-      let before = Time.now () in
-      let res = test_roundtrip (String.init (1024 * 27) ~f:(fun _ -> ' ')) in
-      let after = Time.now () in
-      let diff = Time.diff after before in
-      if Time.Span.(diff >= of_sec 2.) then
-        failwithf "Roundtriping a 250KiB string took %s, unreasonably longer than 2s" (Time.Span.to_string_hum diff) () ;
-      res
   end )
