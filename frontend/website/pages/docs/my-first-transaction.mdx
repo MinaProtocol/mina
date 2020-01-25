@@ -83,7 +83,7 @@ Once a faucet-mod thumbs up your request, keep an eye on the Discord channel to 
 
 We can check our balance to make sure that we received the funds by running the following command, passing in our public key:
 
-    coda client get-balance -public-key $CODA_PK
+    coda client get-balance -public-key $CODA_PUBLIC_KEY
 
 You might see `No account found at that public_key (zero balance)`. Be patient! Depending on the traffic in the network, it may take a few blocks before your transaction goes through.
 
@@ -105,16 +105,16 @@ Let's send some of our newly received coda to this service to see what a payment
 
     coda client send-payment \
       -amount 20 \
-      -receiver tNciB5atiEC8k4poyYQX64WPZzSTt1pLYwujjiQeQtw9xaTPY5ZqVdcc6aP3MUVUVm8QTP7vcGPtGqZmDmozkjpZZKiMppMc4D6Dq8JScuPw5D9oCjAoYq431Ka8Ch2povNMJE7TYusPM3 \
+      -receiver 4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x \
       -fee 5 \
-      -privkey-path keys/my-wallet
+      -sender $YOUR_PUBLIC_KEY
 
 If you're wondering what we passed in to the commands above:
 
 - For `amount`, we're sending a test value of `20` coda
 - The `receiver` is the public key of the [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo)
 - For `fee`, let's use the current market rate of `5` coda
-- The `privkey-path` is the private key file path of the private key we generated the `keys` folder
+- The `sender` is the full public key located in `*.pub` ex. `4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x`
 
 If this command is formatted properly, we should get a response that looks like the following:
 
