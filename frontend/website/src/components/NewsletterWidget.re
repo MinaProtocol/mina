@@ -97,24 +97,19 @@ let make = (~center as centerText=false) => {
     className=Styles.container
     onSubmit={e => {
       ReactEvent.Form.preventDefault(e);
-      Fetch.fetchWithInit(
+      ReFetch.fetch(
         "https://jfs501bgik.execute-api.us-east-2.amazonaws.com/dev/subscribe",
-        Fetch.RequestInit.make(
-          ~method_=Post,
-          ~body=
-            Fetch.BodyInit.makeWithUrlSearchParams(
-              urlSearchParams({"email": email}),
-            ),
-          ~mode=NoCORS,
-          (),
-        ),
+        ~method_=Post,
+        ~body=
+          Fetch.BodyInit.makeWithUrlSearchParams(
+            urlSearchParams({"email": email}),
+          ),
+        ~mode=NoCORS,
       )
-      |> Js.Promise.then_(_ => {
+      |> Promise.iter(_ => {
            showSuccess(_ => true);
-           Js.Global.setTimeout(() => showSuccess(_ => false), 5000)
-           |> Js.Promise.resolve;
-         })
-      |> ignore;
+           ignore @@ Js.Global.setTimeout(() => showSuccess(_ => false), 5000);
+         });
     }}>
     <div
       className=Css.(

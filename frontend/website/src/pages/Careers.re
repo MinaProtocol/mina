@@ -229,12 +229,10 @@ module BenefitItem = {
       )>
       <h3 className=Style.benefitTitle> {React.string(title)} </h3>
       <ul className=Style.benefitsListItems>
-        {React.array(
-           Array.mapi(
-             (i, item) =>
-               <li key={string_of_int(i)} className=Style.benefitDetails>
-                 {React.string(item)}
-               </li>,
+        {ReactUtils.staticArray(
+           Array.map(
+             item =>
+               <li className=Style.benefitDetails> {React.string(item)} </li>,
              details,
            ),
          )}
@@ -368,12 +366,12 @@ Next.injectGetInitialProps(make, _ => {
     Lazy.force(Contentful.client),
     {"include": 0, "content_type": ContentType.JobPost.id},
   )
-  |> Js.Promise.then_((entries: ContentType.JobPost.entries) => {
+  |> Promise.map((entries: ContentType.JobPost.entries) => {
        let posts =
          Array.map(
            (e: ContentType.JobPost.entry) => e.fields,
            entries.items,
          );
-       Js.Promise.resolve({"posts": posts});
+       {"posts": posts};
      })
 });

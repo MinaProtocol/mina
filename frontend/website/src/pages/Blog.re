@@ -103,9 +103,9 @@ Next.injectGetInitialProps(make, _ => {
       "order": "-fields.date",
     },
   )
-  |> Js.Promise.then_((entries: ContentType.Post.entries) => {
+  |> Promise.map((entries: ContentType.Post.entries) => {
        let posts =
          Array.map((e: ContentType.Post.entry) => e.fields, entries.items);
-       Js.Promise.resolve({"posts": posts});
+       {"posts": posts};
      })
 });
