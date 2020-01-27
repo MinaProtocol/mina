@@ -801,7 +801,18 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm, cb) ->
                          (`Transition tn, `Time_received tm, `Valid_cb cb) ))
-                  ~proposer_transition_reader ~most_recent_valid_block
+                  ~proposer_transition_reader:
+                    (Strict_pipe.Reader.map proposer_transition_reader
+                       ~f:(fun breadcrumb ->
+                         let et =
+                           Transition_frontier.Breadcrumb.validated_transition
+                             breadcrumb
+                           |> External_transition.Validation.forget_validation
+                         in
+                         External_transition.poke_validation_callback et
+                           (fun _ -> Coda_networking.broadcast_state net et) ;
+                         breadcrumb ))
+                  ~most_recent_valid_block
                   ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
                   ~base_proof )
           in
