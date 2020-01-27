@@ -11,7 +11,8 @@ Run the following command to start up a Coda node instance and connect to the ne
 
     coda daemon \
         -discovery-port 8303 \
-        -peer /ip4/34.82.159.8/tcp/10002/ipfs/12D3KooWDjSiDwnatZyNw7Mf9G1iWL29YdAJWQF35vkRwcbu7fyL
+        -peer /dns4/seed-one.genesis.o1test.net/tcp/10002/ipfs/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH \
+        -peer /dns4/seed-two.genesis.o1test.net/tcp/10002/ipfs/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA
 
 The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8303 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>`.
 
@@ -82,7 +83,7 @@ Once a faucet-mod thumbs up your request, keep an eye on the Discord channel to 
 
 We can check our balance to make sure that we received the funds by running the following command, passing in our public key:
 
-    coda client get-balance -public-key $CODA_PK
+    coda client get-balance -public-key $CODA_PUBLIC_KEY
 
 You might see `No account found at that public_key (zero balance)`. Be patient! Depending on the traffic in the network, it may take a few blocks before your transaction goes through.
 
@@ -104,16 +105,16 @@ Let's send some of our newly received coda to this service to see what a payment
 
     coda client send-payment \
       -amount 20 \
-      -receiver tNciB5atiEC8k4poyYQX64WPZzSTt1pLYwujjiQeQtw9xaTPY5ZqVdcc6aP3MUVUVm8QTP7vcGPtGqZmDmozkjpZZKiMppMc4D6Dq8JScuPw5D9oCjAoYq431Ka8Ch2povNMJE7TYusPM3 \
+      -receiver 4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x \
       -fee 5 \
-      -privkey-path keys/my-wallet
+      -sender $YOUR_PUBLIC_KEY
 
 If you're wondering what we passed in to the commands above:
 
 - For `amount`, we're sending a test value of `20` coda
 - The `receiver` is the public key of the [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo)
 - For `fee`, let's use the current market rate of `5` coda
-- The `privkey-path` is the private key file path of the private key we generated the `keys` folder
+- The `sender` is the full public key located in `*.pub` ex. `4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x`
 
 If this command is formatted properly, we should get a response that looks like the following:
 
