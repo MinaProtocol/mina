@@ -17,20 +17,17 @@ let peer_of_peer_info peer_info =
 
 let of_b58_data = function
   | `String s -> (
-    match Base64.decode s
-    with | Ok result -> Ok result
-         | Error (`Msg s) -> Or_error.error_string ("invalid base64: " ^ s))
+    match Base64.decode s with
+    | Ok result ->
+        Ok result
+    | Error (`Msg s) ->
+        Or_error.error_string ("invalid base64: " ^ s) )
   | _ ->
       Or_error.error_string "expected a string"
 
 let logger = Logger.create ()
 
-let to_b58_data (s : string) =
-  let start = Time.now () in
-  let res = Base64.encode_string ~pad:true s in
-  let after = Time.now () in
-  (if (String.length s > 100) then Logger.fatal logger "Base64 %d bytes took %s" (String.length s) (Time.Span.to_string (Time.diff after start)) ~module_:__MODULE__ ~location:__LOC__) ;
-  res
+let to_b58_data (s : string) = Base64.encode_string ~pad:true s
 
 let to_int_res x =
   match Yojson.Safe.Util.to_int_option x with
@@ -354,7 +351,10 @@ module Helper = struct
       in
       let rpc = Yojson.Safe.to_string actual_obj in
       Logger.spam t.logger "sending line to libp2p_helper: $line"
-        ~metadata:[("line", `String rpc)] ;
+        ~metadata:
+          [ ( "line"
+            , `String (String.slice rpc 0 (Int.min (String.length rpc) 2048))
+            ) ] ;
       Writer.write_line (Child_processes.stdin t.subprocess) rpc ;
       let%map res_json = Ivar.read res in
       Or_error.bind res_json
@@ -516,7 +516,13 @@ module Helper = struct
                 failwithf "helper broke RPC protocol: sendStreamMsg got %s" v
                   ()
             | Error e ->
-                Error.raise e )
+                Logger.error net.logger
+                  "error sending message on stream $idx: $error"
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:
+                    [ ("idx", `Int idx)
+                    ; ("error", `String (Error.to_string_hum e)) ] ;
+                Pipe.close outgoing_w )
       in
       advance_stream_state net stream `Us
     in
@@ -1241,12 +1247,16 @@ let create ~logger ~conf_dir =
                   Ivar.fill iv
                     (Or_error.error_string
                        "libp2p_helper process died before answering") ) ;
-              Deferred.unit )
-            else (
               Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
                 !"libp2p_helper process died: %s"
                 (Unix.Exit_or_signal.to_string_hum e) ;
-              raise Child_processes.Child_died ) ))
+              raise Child_processes.Child_died )
+            else (
+              Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                !"libp2p_helper process died (naturally? not throwing \
+                  exception): %s"
+                (Unix.Exit_or_signal.to_string_hum e) ;
+              Deferred.unit ) ))
   with
   | Error e ->
       Deferred.Or_error.error_string
