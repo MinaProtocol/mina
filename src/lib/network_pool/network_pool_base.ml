@@ -37,8 +37,10 @@ end)
     | Error (`Locally_generated diff') ->
         rebroadcast diff' ~real:false
     | Error (`Other e) ->
+        valid_cb false ;
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Pool diff apply feedback: %s" (Error.to_string_hum e) ;
+          "Refusing to rebroadcast: pool diff apply feedback: %s"
+          (Error.to_string_hum e) ;
         Deferred.unit
 
   let of_resource_pool_and_diffs resource_pool ~logger ~incoming_diffs =

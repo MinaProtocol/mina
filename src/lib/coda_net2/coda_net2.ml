@@ -25,8 +25,6 @@ let of_b58_data = function
   | _ ->
       Or_error.error_string "expected a string"
 
-let logger = Logger.create ()
-
 let to_b58_data (s : string) = Base64.encode_string ~pad:true s
 
 let to_int_res x =
@@ -339,7 +337,10 @@ module Helper = struct
   let do_rpc (type a b) t (rpc : (a, b) rpc) (body : a) : b Deferred.Or_error.t
       =
     let module M = (val rpc) in
-    if not t.finished && (not @@ Writer.is_closed (Child_processes.stdin t.subprocess)) then (
+    if
+      (not t.finished)
+      && (not @@ Writer.is_closed (Child_processes.stdin t.subprocess))
+    then (
       let res = Ivar.create () in
       let seqno = genseq t in
       Hashtbl.add_exn t.outstanding_requests ~key:seqno ~data:res ;
