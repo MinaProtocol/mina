@@ -50,7 +50,14 @@ struct
     let before = Time.now () in
     let res = B58.encode coda_alphabet bytes in
     let after = Time.now () in
-    if (String.length payload > 100) then Logger.fatal logger "Base58_check.encode %d bytes took %s" (String.length payload) (Time.Span.to_string (Time.diff after before)) ~module_:__MODULE__ ~location:__LOC__ ;
+    if
+      String.length payload > 4096
+      || Time.Span.(Time.diff after before >= of_sec 1.)
+    then
+      Logger.warn logger "Base58_check.encode %d bytes took %s"
+        (String.length payload)
+        (Time.Span.to_string (Time.diff after before))
+        ~module_:__MODULE__ ~location:__LOC__ ;
     Bytes.to_string res
 
   let decode_exn s =
