@@ -47,6 +47,7 @@ type app struct {
 	Ctx             context.Context
 	Subs            map[int]subscription
 	Validators      map[int]chan bool
+	ValidatorMutex  *sync.Mutex
 	Streams         map[int]net.Stream
 	OutLock         sync.Mutex
 	Out             *bufio.Writer
@@ -336,7 +337,9 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 
 		seqno := <-seqs
 		ch := make(chan bool, 1)
+		app.ValidatorMutex.Lock()
 		app.Validators[seqno] = ch
+		app.ValidatorMutex.Unlock()
 
 		app.P2p.Logger.Info("validating a new pubsub message ...")
 
@@ -344,6 +347,8 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 
 		if err != nil && !app.UnsafeNoTrustIP {
 			app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us a pubsub message, dropping it", peer.IDB58Encode(id))
+			app.ValidatorMutex.Lock()
+			defer app.ValidatorMutex.Unlock()
 			delete(app.Validators, seqno)
 			return false
 		}
@@ -457,6 +462,8 @@ func (r *validationCompleteMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
+	app.ValidatorMutex.Lock()
+	defer app.ValidatorMutex.Unlock()
 	if ch, ok := app.Validators[r.Seqno]; ok {
 		ch <- r.Valid
 		delete(app.Validators, r.Seqno)
@@ -979,11 +986,12 @@ func main() {
 	out := bufio.NewWriter(os.Stdout)
 
 	app := &app{
-		P2p:        nil,
-		Ctx:        context.Background(),
-		Subs:       make(map[int]subscription),
-		Validators: make(map[int]chan bool),
-		Streams:    make(map[int]net.Stream),
+		P2p:            nil,
+		Ctx:            context.Background(),
+		Subs:           make(map[int]subscription),
+		ValidatorMutex: &sync.Mutex{},
+		Validators:     make(map[int]chan bool),
+		Streams:        make(map[int]net.Stream),
 		// OutLock doesn't need to be initialized
 		Out: out,
 	}
