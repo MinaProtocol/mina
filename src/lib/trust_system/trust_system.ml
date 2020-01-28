@@ -70,7 +70,7 @@ module Actions = struct
   let to_trust_response (_action, _) =
     let open Peer_trust.Trust_response in
     (* FIXME figure out a good value for this *)
-    let _fulfilled_increment = Peer_trust.max_rate 10. in
+    let fulfilled_increment = Peer_trust.max_rate 10. in
     (* the summed decreases of a connection and request equals
        the increase of a fulfilled request *)
     let _request_increment = 0.90 *. fulfilled_increment in
