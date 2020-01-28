@@ -252,7 +252,7 @@ module Section = {
 };
 
 [@react.component]
-let make = (~challenges) => {
+let make = (~challenges, ~testnetName) => {
   let (expanded, setExpanded) = React.useState(() => false);
   <Page title="Coda Testnet">
     <Wrapped>
@@ -363,7 +363,7 @@ let make = (~challenges) => {
                    " is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
                  )}
               </p>
-              <Challenges challenges />
+              <Challenges challenges testnetName />
               <p id="disclaimer" className=Css.(style([fontStyle(`italic)]))>
                 {React.string(
                    "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
@@ -395,7 +395,12 @@ let make = (~challenges) => {
   </Page>;
 };
 
-Next.injectGetInitialProps(make, _ => {
+Next.injectGetInitialProps(make, _ =>
   Challenges.fetchAllChallenges()
-  |> Promise.map(challenges => {{"challenges": challenges}})
-});
+  |> Promise.map(((testnetName, ranking, continuous, threshold)) => {
+       {
+         "challenges": (ranking, continuous, threshold),
+         "testnetName": testnetName,
+       }
+     })
+);
