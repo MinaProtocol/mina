@@ -1243,19 +1243,18 @@ let create ~logger ~conf_dir =
       ~termination:
         (`Handler
           (fun ~killed e ->
-            if killed then (
+            if not killed then (
               Hashtbl.iter outstanding_requests ~f:(fun iv ->
                   Ivar.fill iv
                     (Or_error.error_string
                        "libp2p_helper process died before answering") ) ;
               Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                !"libp2p_helper process died: %s"
+                !"libp2p_helper process died unexpectedly: %s"
                 (Unix.Exit_or_signal.to_string_hum e) ;
               raise Child_processes.Child_died )
             else (
-              Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                !"libp2p_helper process died (naturally? not throwing \
-                  exception): %s"
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                !"libp2p_helper process killed successfully: %s"
                 (Unix.Exit_or_signal.to_string_hum e) ;
               Deferred.unit ) ))
   with
