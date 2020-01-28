@@ -54,8 +54,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
     ~time_controller ~proposer_transition_reader ~verified_transition_writer
     ~clear_reader ~transition_reader_ref ~transition_writer_ref
     ~consensus_local_state ~frontier_w ~initial_root_transition
-    ~persistent_root ~persistent_frontier ~genesis_state_hash ~genesis_ledger
-    ~best_seen_transition =
+    ~persistent_root ~persistent_frontier ~genesis_state_hash ~genesis_ledger =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
@@ -63,9 +62,6 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   in
   transition_reader_ref := bootstrap_controller_reader ;
   transition_writer_ref := bootstrap_controller_writer ;
-  Option.iter best_seen_transition ~f:(fun best_seen_transition ->
-      Strict_pipe.Writer.write bootstrap_controller_writer best_seen_transition
-  ) ;
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
   trace_recurring "bootstrap controller" (fun () ->
       upon
@@ -202,7 +198,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
       (load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
          ~consensus_local_state ~genesis_state_hash ~genesis_ledger ~base_proof)
   with
-  | best_tip, None ->
+  | _, None ->
       let%map initial_root_transition =
         Persistent_frontier.(
           with_instance_exn persistent_frontier ~f:Instance.get_root_transition)
@@ -213,7 +209,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
         ~verified_transition_writer ~clear_reader ~transition_reader_ref
         ~consensus_local_state ~transition_writer_ref ~frontier_w
         ~persistent_root ~persistent_frontier ~initial_root_transition
-        ~genesis_state_hash ~genesis_ledger ~best_seen_transition:best_tip
+        ~genesis_state_hash ~genesis_ledger
   | None, Some frontier ->
       return
       @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
@@ -235,7 +231,6 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
           ~consensus_local_state ~transition_writer_ref ~frontier_w
           ~persistent_root ~persistent_frontier ~initial_root_transition
           ~genesis_state_hash ~genesis_ledger
-          ~best_seen_transition:(Some best_tip)
       else
         let root = Transition_frontier.root frontier in
         let%map () =
@@ -407,8 +402,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                          ~transition_reader_ref ~transition_writer_ref
                          ~consensus_local_state ~frontier_w ~persistent_root
                          ~persistent_frontier ~initial_root_transition
-                         ~genesis_state_hash ~genesis_ledger
-                         ~best_seen_transition:(Some enveloped_transition) )
+                         ~genesis_state_hash ~genesis_ledger )
                      else Deferred.unit
                  | None ->
                      Deferred.unit ) ) ) ;

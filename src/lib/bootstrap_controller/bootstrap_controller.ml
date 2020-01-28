@@ -178,7 +178,6 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       Transition_frontier.Persistent_root.Instance.snarked_ledger
         temp_persistent_root_instance
     in
-    let start_time = Core.Time.now () in
     let%bind hash, sender, expected_staged_ledger_hash =
       let root_sync_ledger =
         Sync_ledger.Db.create temp_snarked_ledger ~logger:t.logger
@@ -193,27 +192,12 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       Sync_ledger.Db.destroy root_sync_ledger ;
       data
     in
-    Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:
-        [ ( "time_elapsed"
-          , `String
-              (Core.Time.Span.to_string @@ Time.diff (Time.now ()) start_time)
-          ) ]
-      "Bootstrap: sync snarked ledger took $time_elapsed" ;
-    let start_time = Core.Time.now () in
     let%bind staged_ledger_aux_result =
       let open Deferred.Or_error.Let_syntax in
       let%bind scan_state, expected_merkle_root, pending_coinbases =
         Coda_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
           t.network sender hash
       in
-      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:
-          [ ( "time_elapsed"
-            , `String
-                (Core.Time.Span.to_string @@ Time.diff (Time.now ()) start_time)
-            ) ]
-        "Bootstrap: download scan state and pending coinbase took $time_elapsed" ;
       let received_staged_ledger_hash =
         Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
           (Staged_ledger.Scan_state.hash scan_state)
@@ -293,7 +277,6 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
           |> External_transition.Initial_validated.consensus_state
         in
         (* Synchronize consensus local state if necessary *)
-        let start_time = Core.Time.now () in
         match%bind
           match
             Consensus.Hooks.required_local_state_sync ~consensus_state
@@ -334,13 +317,6 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             Writer.close sync_ledger_writer ;
             loop ()
         | Ok () ->
-            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              ~metadata:
-                [ ( "time_elapsed"
-                  , `String
-                      ( Core.Time.Span.to_string
-                      @@ Core.Time.diff (Core.Time.now ()) start_time ) ) ]
-              "Bootstrap: sync consensus local state took $time_elapsed" ;
             (* Close the old frontier and reload a new on from disk. *)
             let new_root_data =
               Transition_frontier.Root_data.Limited.Stable.V1.
