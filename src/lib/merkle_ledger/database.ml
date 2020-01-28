@@ -60,6 +60,11 @@ module Make (Inputs : Inputs_intf) :
     let kvdb = Kvdb.create directory in
     {uuid; kvdb}
 
+  let create_checkpoint t ~directory_name () =
+    let uuid = Uuid_unix.create () in
+    let kvdb = Kvdb.create_checkpoint t.kvdb directory_name in
+    {uuid; kvdb}
+
   let close {kvdb; uuid= _} = Kvdb.close kvdb
 
   let with_ledger ~f =

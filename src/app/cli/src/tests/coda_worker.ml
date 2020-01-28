@@ -535,6 +535,9 @@ module T = struct
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~persistent_root_location:(conf_dir ^/ "root")
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
+                 ~staking_epoch_ledger_location:
+                   (conf_dir ^/ "staking_epoch_ledger")
+                 ~next_epoch_ledger_location:(conf_dir ^/ "next_epoch_ledger")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)

@@ -707,6 +707,9 @@ let daemon logger =
                 ~wallets_disk_location:(conf_dir ^/ "wallets")
                 ~persistent_root_location:(conf_dir ^/ "root")
                 ~persistent_frontier_location:(conf_dir ^/ "frontier")
+                ~staking_epoch_ledger_location:
+                  (conf_dir ^/ "staking_epoch_ledger")
+                ~next_epoch_ledger_location:(conf_dir ^/ "next_epoch_ledger")
                 ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
                 ~time_controller ~initial_block_production_keypairs ~monitor
                 ~consensus_local_state ~transaction_database

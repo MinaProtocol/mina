@@ -161,6 +161,12 @@ struct
   let create _ =
     {uuid= Uuid_unix.create (); table= Bigstring_frozen.Table.create ()}
 
+  let create_checkpoint t _ =
+    { uuid= Uuid_unix.create ()
+    ; table=
+        Bigstring_frozen.Table.of_alist_exn
+        @@ Bigstring_frozen.Table.to_alist t.table }
+
   let close _ = ()
 
   let get t ~key = Bigstring_frozen.Table.find t.table key

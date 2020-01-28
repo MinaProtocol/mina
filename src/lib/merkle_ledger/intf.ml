@@ -74,6 +74,8 @@ module type Key_value_database = sig
      and type value := Bigstring.t
      and type config := config
 
+  val create_checkpoint : t -> string -> t
+
   val get_uuid : t -> Uuid.t
 
   val set_batch :

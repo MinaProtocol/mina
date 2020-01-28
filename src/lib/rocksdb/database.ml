@@ -16,7 +16,8 @@ let create directory =
   {uuid= Uuid_unix.create (); db= Rocks.open_db ~opts directory}
 
 let create_checkpoint t dir =
-  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None
+  Rocks.checkpoint_create t.db ~dir ?log_size_for_flush:None ;
+  create dir
 
 let get_uuid t = t.uuid
 
@@ -128,8 +129,7 @@ let%test_unit "checkpoint read" =
           let db = create db_dir in
           Hashtbl.iteri db_hashtbl ~f:(fun ~key ~data ->
               set db ~key:(to_bigstring key) ~data:(to_bigstring data) ) ;
-          create_checkpoint db cp_dir ;
-          let cp = create cp_dir in
+          let cp = create_checkpoint db cp_dir in
           match
             ( Hashtbl.add db_hashtbl ~key:"db_key" ~data:"db_data"
             , Hashtbl.add cp_hashtbl ~key:"cp_key" ~data:"cp_data" )
