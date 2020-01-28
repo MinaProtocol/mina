@@ -84,8 +84,7 @@ let renderChallenges = (challenges: array(challenge)) => {
 let make = (~challenges, ~testnetName) => {
   let (ranking, continuous, threshold) = challenges;
   switch (testnetName) {
-  | None =>
-    <h2 className=Styles.weekHeader> {React.string("No active testnet")} </h2>
+  | None => React.null
   | Some(testnet) =>
     <>
       <h2 className=Styles.weekHeader> {React.string(testnet)} </h2>
