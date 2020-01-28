@@ -91,7 +91,7 @@ end)
     | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) -> (
         let reject_and_log_if_local reason =
           if is_local then (
-            Logger.warn (Pool.get_logger pool) ~module_:__MODULE__
+            Logger.trace (Pool.get_logger pool) ~module_:__MODULE__
               ~location:__LOC__
               "Rejecting locally generated snark work $work, %s" reason
               ~metadata:[("work", Work.compact_json work)] ;
