@@ -302,14 +302,13 @@ let move_root t ~new_root_hash ~garbage ~enable_epoch_ledger_sync =
   (* STEP 0 *)
   let () =
     match enable_epoch_ledger_sync with
-    | `Enabled _snarked_ledger ->
+    | `Enabled snarked_ledger ->
         O1trace.measure "calling consensus hook frontier_root_transition"
           (fun () ->
             Consensus.Hooks.frontier_root_transition
               (Breadcrumb.consensus_state old_root_node.breadcrumb)
               (Breadcrumb.consensus_state new_root_node.breadcrumb)
-              ~local_state:t.consensus_local_state
-              ~snarked_ledger:t.root_ledger )
+              ~local_state:t.consensus_local_state ~snarked_ledger )
     | `Disabled ->
         ()
   in

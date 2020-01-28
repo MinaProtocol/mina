@@ -528,7 +528,7 @@ module type S = sig
          Consensus_state.Value.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> snarked_ledger:Coda_base.Ledger.Any_ledger.witness
+      -> snarked_ledger:Coda_base.Ledger.Db.t
       -> unit
 
     (**

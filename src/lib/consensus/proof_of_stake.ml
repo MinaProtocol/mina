@@ -2900,6 +2900,11 @@ module Hooks = struct
 
   let frontier_root_transition (prev : Consensus_state.Value.t)
       (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
+    let snarked_ledger =
+      Coda_base.Ledger.Any_ledger.cast
+        (module Coda_base.Ledger.Db)
+        snarked_ledger
+    in
     if
       not
         (Epoch.equal
