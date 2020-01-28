@@ -1230,6 +1230,7 @@ let banned_ips net = Deferred.return net.Helper.banned_ips
 
 let create ~logger ~conf_dir =
   let outstanding_requests = Hashtbl.create (module Int) in
+  let termination_hack_ref : Helper.t option ref = ref None in
   match%bind
     Child_processes.start_custom ~logger ~name:"libp2p_helper"
       ~git_root_relative_path:"src/app/libp2p_helper/result/bin/libp2p_helper"
@@ -1243,15 +1244,28 @@ let create ~logger ~conf_dir =
       ~termination:
         (`Handler
           (fun ~killed e ->
-            if not killed then (
-              Hashtbl.iter outstanding_requests ~f:(fun iv ->
-                  Ivar.fill iv
-                    (Or_error.error_string
-                       "libp2p_helper process died before answering") ) ;
-              Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-                !"libp2p_helper process died unexpectedly: %s"
-                (Unix.Exit_or_signal.to_string_hum e) ;
-              raise Child_processes.Child_died )
+            Hashtbl.iter outstanding_requests ~f:(fun iv ->
+                Ivar.fill iv
+                  (Or_error.error_string
+                     "libp2p_helper process died before answering") ) ;
+            if
+              (not killed)
+              && not
+                   (Option.value_map ~default:false
+                      ~f:(fun t -> t.finished)
+                      !termination_hack_ref)
+            then (
+              match e with
+              | Error (`Exit_non_zero _) | Error (`Signal _) ->
+                  Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+                    !"libp2p_helper process died unexpectedly: %s"
+                    (Unix.Exit_or_signal.to_string_hum e) ;
+                  raise Child_processes.Child_died
+              | Ok () ->
+                  Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                    "libp2p helper process exited peacefully but it should \
+                     have been killed by shutdown!" ;
+                  Deferred.unit )
             else (
               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                 !"libp2p_helper process killed successfully: %s"
@@ -1279,6 +1293,7 @@ let create ~logger ~conf_dir =
         ; seqno= 1
         ; finished= false }
       in
+      termination_hack_ref := Some t ;
       Strict_pipe.Reader.iter (Child_processes.stdout_lines subprocess)
         ~f:(fun line ->
           let open Yojson.Safe.Util in
