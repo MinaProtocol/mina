@@ -116,7 +116,7 @@ module Make0 (Inputs : Input_intf) = struct
       | Insta_ban ->
           Record_inst.ban old_record
       | Trust_increase incr ->
-          [%test_pred: Float.t] Float.is_positive incr ;
+          (* [%test_pred: Float.t] Float.is_positive incr ; *)
           Record_inst.add_trust old_record incr
       | Trust_decrease incr ->
           [%test_pred: Float.t] Float.is_positive incr ;
