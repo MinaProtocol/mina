@@ -297,6 +297,7 @@ let start_custom :
   don't_wait_for
     (let open Deferred.Let_syntax in
     let%bind termination_status = Process.wait process in
+    let%bind () = after (Time.Span.of_sec 0.5) in
     let%bind () = Writer.close @@ Process.stdin process in
     let%bind () = Reader.close @@ Process.stdout process in
     let%bind () = Reader.close @@ Process.stderr process in

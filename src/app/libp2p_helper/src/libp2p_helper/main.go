@@ -1029,7 +1029,7 @@ func main() {
 			app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
 		}
 	}
-	os.Exit(0)
+	os.Exit(100)
 }
 
 var _ json.Marshaler = (*methodIdx)(nil)
