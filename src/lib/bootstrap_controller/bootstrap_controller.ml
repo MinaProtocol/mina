@@ -240,7 +240,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
           Trust_system.(
             record t.trust_system t.logger sender_host
               Actions.
-                ( Violated_protocol
+                ( Outgoing_connection_error
                 , Some
                     ( "Can't find scan state from the peer or received faulty \
                        scan state from the peer."
