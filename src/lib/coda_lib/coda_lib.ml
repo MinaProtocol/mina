@@ -810,7 +810,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                            |> External_transition.Validation.forget_validation
                          in
                          External_transition.poke_validation_callback et
-                           (fun _ -> Coda_networking.broadcast_state net et) ;
+                           (fun v ->
+                             if v then Coda_networking.broadcast_state net et
+                         ) ;
                          breadcrumb ))
                   ~most_recent_valid_block
                   ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
