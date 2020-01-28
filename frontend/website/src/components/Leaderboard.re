@@ -31,7 +31,8 @@ let fetchLeaderboard = () => {
        | Some(resultsArr) => Array.map(parseEntry, resultsArr)
        | None => [||]
        };
-     });
+     })
+  |> Js.Promise.catch(_ => Promise.return([||]));
 };
 
 module Styles = {
@@ -82,7 +83,8 @@ module Styles = {
     ]);
 
   let cell = style([whiteSpace(`nowrap), overflow(`hidden)]);
-  let rank = merge([cell, style([justifySelf(`flexEnd)])]);
+  let flexEnd = style([justifySelf(`flexEnd)]);
+  let rank = merge([cell, flexEnd]);
   let username = merge([cell, style([textOverflow(`ellipsis)])]);
   let current = merge([cell, style([justifySelf(`flexEnd)])]);
   let total = merge([cell, style([opacity(0.5)])]);
@@ -122,9 +124,9 @@ let make = () => {
   <div className=Styles.leaderboardContainer>
     <div id="testnet-leaderboard" className=Styles.leaderboard>
       <div className=Styles.headerRow>
-        <span> {React.string("#")} </span>
+        <span className=Styles.flexEnd> {React.string("#")} </span>
         <span> {React.string("Username")} </span>
-        <span> {React.string("Current")} </span>
+        <span className=Styles.flexEnd> {React.string("Current")} </span>
         <span> {React.string("Total")} </span>
       </div>
       <hr />
