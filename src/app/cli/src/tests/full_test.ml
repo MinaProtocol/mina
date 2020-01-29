@@ -128,8 +128,10 @@ let run_test () : unit Deferred.t =
           external_transition_database_dir
       in
       let time_controller = Block_time.Controller.(create @@ basic ~logger) in
+      let epoch_ledger_location = temp_conf_dir ^/ "epoch_ledger" in
       let consensus_local_state =
         Consensus.Data.Local_state.create ~genesis_ledger:Test_genesis_ledger.t
+          ~epoch_ledger_location
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
@@ -203,11 +205,8 @@ let run_test () : unit Deferred.t =
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~persistent_root_location:(temp_conf_dir ^/ "root")
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
-             ~staking_epoch_ledger_location:
-               (temp_conf_dir ^/ "staking_epoch_ledger")
-             ~next_epoch_ledger_location:(temp_conf_dir ^/ "next_epoch_ledger")
-             ~time_controller ~receipt_chain_database ~snark_work_fee
-             ~consensus_local_state ~transaction_database
+             ~epoch_ledger_location ~time_controller ~receipt_chain_database
+             ~snark_work_fee ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
              ~genesis_state_hash:
                Coda_state.Genesis_protocol_state.For_tests.genesis_state_hash

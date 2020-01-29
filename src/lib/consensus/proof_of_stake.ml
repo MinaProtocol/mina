@@ -158,6 +158,7 @@ module Data = struct
     module Snapshot = struct
       type t =
         { ledger: Coda_base.Sparse_ledger.t
+        ; location: string
         ; delegatee_table:
             Coda_base.Account.t Coda_base.Account.Index.Table.t
             Public_key.Compressed.Table.t }
@@ -239,7 +240,7 @@ module Data = struct
           Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
       last_checked_slot_and_epoch
 
-    let create block_producer_pubkeys ~genesis_ledger =
+    let create block_producer_pubkeys ~genesis_ledger ~epoch_ledger_location =
       (* TODO: remove this duplicate of the genesis ledger *)
       let ledger =
         Coda_base.Sparse_ledger.of_any_ledger
@@ -250,10 +251,14 @@ module Data = struct
       let delegatee_table =
         compute_delegatee_table_sparse_ledger block_producer_pubkeys ledger
       in
-      let genesis_epoch_snapshot = {Snapshot.delegatee_table; ledger} in
+      let genesis_epoch_snapshot =
+        {Snapshot.delegatee_table; ledger; location= ""}
+      in
       ref
-        { Data.staking_epoch_snapshot= genesis_epoch_snapshot
-        ; next_epoch_snapshot= genesis_epoch_snapshot
+        { Data.staking_epoch_snapshot=
+            {genesis_epoch_snapshot with location= epoch_ledger_location ^ "1"}
+        ; next_epoch_snapshot=
+            {genesis_epoch_snapshot with location= epoch_ledger_location ^ "2"}
         ; genesis_epoch_snapshot
         ; last_checked_slot_and_epoch=
             make_last_checked_slot_and_epoch_table
@@ -263,11 +268,12 @@ module Data = struct
 
     let block_production_keys_swap t block_production_pubkeys now =
       let old : Data.t = !t in
-      let s {Snapshot.ledger; delegatee_table= _} =
+      let s {Snapshot.ledger; delegatee_table= _; location} =
         { Snapshot.ledger
         ; delegatee_table=
             compute_delegatee_table_sparse_ledger block_production_pubkeys
-              ledger }
+              ledger
+        ; location }
       in
       t :=
         { Data.staking_epoch_snapshot= s old.staking_epoch_snapshot
@@ -2586,7 +2592,7 @@ module Hooks = struct
         set_snapshot local_state Staking_epoch_snapshot
           { ledger= !local_state.next_epoch_snapshot.ledger
           ; delegatee_table= !local_state.next_epoch_snapshot.delegatee_table
-          } ;
+          ; location= failwith "this part would be rewritten" } ;
         return true )
       else
         Deferred.List.exists (random_peers 3) ~f:(fun peer ->
@@ -2606,7 +2612,9 @@ module Hooks = struct
                     snapshot_ledger
                 in
                 set_snapshot local_state snapshot_id
-                  {ledger= snapshot_ledger; delegatee_table} ;
+                  { ledger= snapshot_ledger
+                  ; delegatee_table
+                  ; location= failwith "this part would be rewritten" } ;
                 return true
             (* TODO figure out punishments here. *)
             | Ok (Error err) ->
@@ -2918,7 +2926,11 @@ module Hooks = struct
             Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
       in
       let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
-      let epoch_snapshot = {Local_state.Snapshot.delegatee_table; ledger} in
+      let epoch_snapshot =
+        { Local_state.Snapshot.delegatee_table
+        ; ledger
+        ; location= !local_state.staking_epoch_snapshot.location }
+      in
       !local_state.last_epoch_delegatee_table
       <- Some !local_state.staking_epoch_snapshot.delegatee_table ;
       !local_state.staking_epoch_snapshot <- !local_state.next_epoch_snapshot ;

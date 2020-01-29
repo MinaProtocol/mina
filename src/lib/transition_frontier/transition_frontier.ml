@@ -2,6 +2,7 @@
 *  the transition frontier, wrapping high-level initialization
 *  logic as well as gluing together the logic for adding items
 *  to the frontier *)
+open Core
 
 open Core_kernel
 open Async_kernel
@@ -508,6 +509,7 @@ module For_tests = struct
         ~default:
           (Consensus.Data.Local_state.create
              ~genesis_ledger:Test_genesis_ledger.t
+             ~epoch_ledger_location:(Filename.temp_dir_name ^/ "epoch_ledger")
              Public_key.Compressed.Set.empty)
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in

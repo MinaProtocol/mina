@@ -313,6 +313,7 @@ module type S = sig
       val create :
            Signature_lib.Public_key.Compressed.Set.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> epoch_ledger_location:string
         -> t
 
       val current_block_production_keys :

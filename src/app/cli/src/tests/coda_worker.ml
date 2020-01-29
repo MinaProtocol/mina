@@ -476,9 +476,10 @@ module T = struct
                     Public_key.compress keypair.public_key )
               |> Option.to_list )
           in
+          let epoch_ledger_location = conf_dir ^/ "epoch_ledger" in
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_block_production_keys
-              ~genesis_ledger:Test_genesis_ledger.t
+              ~genesis_ledger:Test_genesis_ledger.t ~epoch_ledger_location
           in
           let gossip_net_params =
             Gossip_net.Real.Config.
@@ -535,9 +536,7 @@ module T = struct
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~persistent_root_location:(conf_dir ^/ "root")
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
-                 ~staking_epoch_ledger_location:
-                   (conf_dir ^/ "staking_epoch_ledger")
-                 ~next_epoch_ledger_location:(conf_dir ^/ "next_epoch_ledger")
+                 ~epoch_ledger_location
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
