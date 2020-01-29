@@ -157,7 +157,7 @@ module Data = struct
   module Local_state = struct
     module Snapshot = struct
       type t =
-        { ledger: Coda_base.Sparse_ledger.t
+        { ledger: Coda_base.Ledger.Db.t
         ; location: string
         ; delegatee_table:
             Coda_base.Account.t Coda_base.Account.Index.Table.t
@@ -170,8 +170,8 @@ module Data = struct
       let to_yojson {ledger; delegatee_table} =
         `Assoc
           [ ( "ledger_hash"
-            , Coda_base.(
-                Sparse_ledger.merkle_root ledger |> Ledger_hash.to_yojson) )
+            , Coda_base.(Ledger.Db.merkle_root ledger |> Ledger_hash.to_yojson)
+            )
           ; ( "delegators"
             , `Assoc
                 ( Hashtbl.to_alist delegatee_table
@@ -194,7 +194,6 @@ module Data = struct
         ; mutable next_epoch_snapshot: Snapshot.t
         ; last_checked_slot_and_epoch:
             (Epoch.t * Slot.t) Public_key.Compressed.Table.t
-        ; genesis_epoch_snapshot: Snapshot.t
         ; mutable last_epoch_delegatee_table:
             Coda_base.Account.t Coda_base.Account.Index.Table.t
             Public_key.Compressed.Table.t
@@ -214,9 +213,11 @@ module Data = struct
                 |> List.map ~f:(fun (key, epoch_and_slot) ->
                        ( Public_key.Compressed.to_string key
                        , [%to_yojson: Epoch.t * Slot.t] epoch_and_slot ) ) ) )
-          ; ( "genesis_epoch_snapshot"
-            , [%to_yojson: Snapshot.t] t.genesis_epoch_snapshot ) ]
+          ]
     end
+
+    open Coda_base
+    module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 
     (* The outer ref changes whenever we swap in new staker set; all the snapshots are recomputed *)
     type t = Data.t ref [@@deriving sexp, to_yojson]
@@ -242,24 +243,37 @@ module Data = struct
 
     let create block_producer_pubkeys ~genesis_ledger ~epoch_ledger_location =
       (* TODO: remove this duplicate of the genesis ledger *)
+      let genesis_ledger = Lazy.force genesis_ledger in
+      let staking_epoch_ledger_location = epoch_ledger_location ^ "1" in
+      let staking_epoch_ledger =
+        Ledger.Db.create ~directory_name:staking_epoch_ledger_location ()
+      in
+      ignore
+      @@ Ledger_transfer.transfer_accounts genesis_ledger staking_epoch_ledger ;
+      let next_epoch_ledger_location = epoch_ledger_location ^ "2" in
+      let next_epoch_ledger =
+        Ledger.Db.create ~directory_name:next_epoch_ledger_location ()
+      in
+      ignore
+      @@ Ledger_transfer.transfer_accounts genesis_ledger next_epoch_ledger ;
       let ledger =
         Coda_base.Sparse_ledger.of_any_ledger
           (Coda_base.Ledger.Any_ledger.cast
              (module Coda_base.Ledger)
-             (Lazy.force genesis_ledger))
+             genesis_ledger)
       in
       let delegatee_table =
         compute_delegatee_table_sparse_ledger block_producer_pubkeys ledger
       in
-      let genesis_epoch_snapshot =
-        {Snapshot.delegatee_table; ledger; location= ""}
-      in
       ref
         { Data.staking_epoch_snapshot=
-            {genesis_epoch_snapshot with location= epoch_ledger_location ^ "1"}
+            { Snapshot.ledger= staking_epoch_ledger
+            ; delegatee_table
+            ; location= staking_epoch_ledger_location }
         ; next_epoch_snapshot=
-            {genesis_epoch_snapshot with location= epoch_ledger_location ^ "2"}
-        ; genesis_epoch_snapshot
+            { Snapshot.ledger= next_epoch_ledger
+            ; delegatee_table
+            ; location= next_epoch_ledger_location }
         ; last_checked_slot_and_epoch=
             make_last_checked_slot_and_epoch_table
               (Public_key.Compressed.Table.create ())
@@ -272,14 +286,14 @@ module Data = struct
         { Snapshot.ledger
         ; delegatee_table=
             compute_delegatee_table_sparse_ledger block_production_pubkeys
-              ledger
+              ( Coda_base.Sparse_ledger.of_any_ledger
+              @@ Coda_base.Ledger.Any_ledger.cast (module Ledger.Db) ledger )
         ; location }
       in
       t :=
         { Data.staking_epoch_snapshot= s old.staking_epoch_snapshot
-        ; next_epoch_snapshot= s old.next_epoch_snapshot
-        ; genesis_epoch_snapshot=
-            s old.genesis_epoch_snapshot
+        ; next_epoch_snapshot=
+            s old.next_epoch_snapshot
             (* assume these keys are different and therefore we haven't checked any
          * slots or epochs *)
         ; last_checked_slot_and_epoch=
@@ -863,7 +877,12 @@ module Data = struct
                          { private_key
                          ; public_key
                          ; delegator
-                         ; ledger= epoch_snapshot.ledger }
+                         ; ledger=
+                             Coda_base.(
+                               Sparse_ledger.of_any_ledger
+                               @@ Ledger.Any_ledger.cast
+                                    (module Ledger.Db)
+                                    epoch_snapshot.ledger) }
                      ; global_slot
                      ; vrf_result }) ) ;
           None )
@@ -2406,8 +2425,13 @@ module Hooks = struct
                 List.find_map candidate_snapshots ~f:(fun snapshot ->
                     if
                       Ledger_hash.equal ledger_hash
-                        (Sparse_ledger.merkle_root snapshot.ledger)
-                    then Some snapshot.ledger
+                        (Ledger.Db.merkle_root snapshot.ledger)
+                    then
+                      Some
+                        ( Coda_base.Sparse_ledger.of_any_ledger
+                        @@ Coda_base.Ledger.Any_ledger.cast
+                             (module Coda_base.Ledger.Db)
+                             snapshot.ledger )
                     else None )
                 |> Result.of_option ~error:"epoch ledger not found"
             in
@@ -2521,7 +2545,9 @@ module Hooks = struct
         ~epoch:(Data.Consensus_state.curr_epoch consensus_state)
         ~local_state
     in
-    Data.Local_state.Snapshot.ledger snapshot
+    Coda_base.Sparse_ledger.of_any_ledger
+    @@ Coda_base.Ledger.Any_ledger.cast (module Coda_base.Ledger.Db)
+    @@ Data.Local_state.Snapshot.ledger snapshot
 
   type local_state_sync =
     { snapshot_id: Local_state.snapshot_identifier
@@ -2540,7 +2566,7 @@ module Hooks = struct
         (not
            (Ledger_hash.equal
               (Frozen_ledger_hash.to_ledger_hash expected_root)
-              (Sparse_ledger.merkle_root
+              (Ledger.Db.merkle_root
                  (Local_state.get_snapshot local_state snapshot_id).ledger)))
         {snapshot_id; expected_root}
     in
@@ -2566,6 +2592,9 @@ module Hooks = struct
 
   let sync_local_state ~logger ~trust_system ~local_state ~random_peers
       ~(query_peer : Rpcs.query) requested_syncs =
+    failwith "not implemented"
+
+  (*
     let open Local_state in
     let open Snapshot in
     let open Deferred.Let_syntax in
@@ -2586,7 +2615,7 @@ module Hooks = struct
         && Coda_base.(
              Ledger_hash.equal
                (Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
-               (Sparse_ledger.merkle_root
+               (Ledger.Db.merkle_root
                   !local_state.next_epoch_snapshot.ledger))
       then (
         set_snapshot local_state Staking_epoch_snapshot
@@ -2636,6 +2665,7 @@ module Hooks = struct
     in
     if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()
     else Error (Error.of_string "failed to synchronize epoch ledger")
+*)
 
   let received_within_window (epoch, slot) ~time_received =
     let open Time in
@@ -2843,7 +2873,7 @@ module Hooks = struct
         Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
           !"Using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
           (epoch_snapshot_name source)
-          (Coda_base.Sparse_ledger.merkle_root snapshot.ledger) ;
+          (Coda_base.Ledger.Db.merkle_root snapshot.ledger) ;
         snapshot
       in
       let block_data unseen_pks slot =
@@ -2908,11 +2938,6 @@ module Hooks = struct
 
   let frontier_root_transition (prev : Consensus_state.Value.t)
       (next : Consensus_state.Value.t) ~local_state ~snarked_ledger =
-    let snarked_ledger =
-      Coda_base.Ledger.Any_ledger.cast
-        (module Coda_base.Ledger.Db)
-        snarked_ledger
-    in
     if
       not
         (Epoch.equal
@@ -2922,10 +2947,15 @@ module Hooks = struct
       let delegatee_table =
         compute_delegatee_table
           (Local_state.current_block_production_keys local_state)
-          ~iter_accounts:(fun f ->
-            Coda_base.Ledger.Any_ledger.M.iteri snarked_ledger ~f )
+          ~iter_accounts:(fun f -> Coda_base.Ledger.Db.iteri snarked_ledger ~f
+        )
       in
-      let ledger = Coda_base.Sparse_ledger.of_any_ledger snarked_ledger in
+      Coda_base.Ledger.Db.close !local_state.staking_epoch_snapshot.ledger ;
+      Unix.rmdir !local_state.staking_epoch_snapshot.location ;
+      let ledger =
+        Coda_base.Ledger.Db.create_checkpoint snarked_ledger
+          ~directory_name:!local_state.staking_epoch_snapshot.location ()
+      in
       let epoch_snapshot =
         { Local_state.Snapshot.delegatee_table
         ; ledger
