@@ -54,6 +54,11 @@ genesis_ledger = "testnet_postake_many_proposers"]
 
 include Testnet_postake_ledger_many_proposers
 
+[%%elif
+genesis_ledger = "phase_three_redux"]
+
+include Phase_three_redux
+
 [%%else]
 
 [%%error
