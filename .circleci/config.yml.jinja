@@ -61,8 +61,8 @@ jobs:
 
     build-archive:
         docker:
-            - image: codaprotocol/coda:toolchain-9a537323b3d04ef9d8a425de7c408cb16d2aa30d
-              environment: 
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+              environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
             - image: postgres:12
@@ -91,7 +91,7 @@ jobs:
                   command: ls && ./scripts/archive/make_hasura_configurations.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-9a537323b3d04ef9d8a425de7c408cb16d2aa30d
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run:
@@ -114,7 +114,7 @@ jobs:
                   command: ./scripts/require-ppx-coda.py
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-03e9ed5771ebca91003ce50fb246640f3d5ff061
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run:
@@ -315,7 +315,7 @@ jobs:
         resource_class: large
         {%- endif %}
         docker:
-            - image: codaprotocol/coda:toolchain-9a537323b3d04ef9d8a425de7c408cb16d2aa30d
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run:
@@ -360,6 +360,22 @@ jobs:
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
+            - setup_remote_docker
+            - run:
+                  name: Build and Upload Docker
+                  command: |
+                    source /tmp/DOCKER_DEPLOY_ENV
+                    echo "Publishing Docker"
+                    echo "Should Publish Docker: $CODA_WAS_PUBLISHED"
+                    set -x
+                    if [[ "$CODA_WAS_PUBLISHED" = true  ]]; then
+
+                        echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+                        ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
+                        -s coda-daemon \
+                        -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                        --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+                    fi
             {%- if profile in medium_curve_profiles %}
             - persist_to_workspace:
                 root: /tmp/artifacts
@@ -373,7 +389,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9a537323b3d04ef9d8a425de7c408cb16d2aa30d
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -414,7 +430,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9a537323b3d04ef9d8a425de7c408cb16d2aa30d
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -433,7 +449,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-9a537323b3d04ef9d8a425de7c408cb16d2aa30d
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run:
@@ -452,7 +468,7 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9a537323b3d04ef9d8a425de7c408cb16d2aa30d
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
         steps:
             - checkout
             - run:
