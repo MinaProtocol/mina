@@ -983,6 +983,10 @@ func main() {
 	}()
 
 	lines := bufio.NewScanner(os.Stdin)
+	bufsize := (1024 * 1024) * 12
+	// 12MiB buffer size, generously over the 8MiB max pubsub message size, to
+	// account for encoding inefficiencies.
+	lines.Buffer(make([]byte, bufsize), bufsize)
 	out := bufio.NewWriter(os.Stdout)
 
 	app := &app{
@@ -1029,7 +1033,10 @@ func main() {
 			app.writeMsg(errorResult{Seqno: env.Seqno, Errorr: err.Error()})
 		}
 	}
-	os.Exit(100)
+	app.writeMsg(errorResult{Seqno: 0, Errorr: fmt.Sprintf("helper stdin scanning stopped because %v", lines.Err())})
+	// we never want the helper to get here, it should be killed or gracefully
+	// shut down instead of stdin closed.
+	os.Exit(1)
 }
 
 var _ json.Marshaler = (*methodIdx)(nil)
