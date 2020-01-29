@@ -4,7 +4,6 @@
 *  to the frontier *)
 open Core
 
-open Core_kernel
 open Async_kernel
 open Coda_base
 open Coda_transition
@@ -509,7 +508,7 @@ module For_tests = struct
         ~default:
           (Consensus.Data.Local_state.create
              ~genesis_ledger:Test_genesis_ledger.t
-             ~epoch_ledger_location:(Filename.temp_dir_name ^/ "epoch_ledger")
+             ~epoch_ledger_location:(Filename.temp_file "epoch_ledger" "")
              Public_key.Compressed.Set.empty)
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in

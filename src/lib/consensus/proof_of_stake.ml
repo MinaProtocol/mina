@@ -252,12 +252,12 @@ module Data = struct
       (* TODO: remove this duplicate of the genesis ledger *)
       let open Coda_base in
       let genesis_ledger = Lazy.force genesis_ledger in
-      let staking_epoch_ledger_location = "staking_" ^ epoch_ledger_location in
+      let staking_epoch_ledger_location = epoch_ledger_location ^ "_staking" in
       let staking_epoch_ledger =
         create_epoch_ledger ~location:staking_epoch_ledger_location
           ~genesis_ledger
       in
-      let next_epoch_ledger_location = "next_" ^ epoch_ledger_location in
+      let next_epoch_ledger_location = epoch_ledger_location ^ "_next" in
       let next_epoch_ledger =
         create_epoch_ledger ~location:next_epoch_ledger_location
           ~genesis_ledger
