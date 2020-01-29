@@ -66,6 +66,31 @@ end = struct
   [%%define_locally
   Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
 
+  let precision = Unsigned.of_int 9
+
+  let to_formatted_string amount =
+    let whole = Unsigned.div amount precision in
+    let remainder = Unsigned.rem amount precision in
+    to_string whole ^ "." ^ to_string remainder
+
+  let of_formatted_string input =
+    let parts = String.split ~on:'.' input in
+    match parts with
+    | [whole] ->
+        of_string (whole ^ String.make (to_int precision) '0')
+    | [whole; decimal] ->
+        let decimal_length = String.length decimal in
+        let precision_int = to_int precision in
+        if
+          let open Int in
+          decimal_length > precision_int
+        then of_string (whole ^ String.sub decimal ~pos:0 ~len:precision_int)
+        else
+          of_string
+            (whole ^ decimal ^ String.make (precision_int - decimal_length) '0')
+    | [] | _ ->
+        failwith "Invalid currency input"
+
   let gen_incl a b : t Quickcheck.Generator.t =
     let a = Bignum_bigint.of_string Unsigned.(to_string a) in
     let b = Bignum_bigint.of_string Unsigned.(to_string b) in
