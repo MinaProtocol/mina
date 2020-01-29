@@ -5,7 +5,7 @@ open Pipe_lib
 
 let request_service_name = "CODA_WEB_CLIENT_SERVICE"
 
-module Base58_check = Base58_check.Make (struct
+module Base58_check = Base58_check.Base58_check_old.Make (struct
   let description = "CODA_WEB_CLIENT_SERVICE"
 
   let version_byte = Base58_check.Version_bytes.web_pipe

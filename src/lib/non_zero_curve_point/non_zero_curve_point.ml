@@ -59,7 +59,8 @@ module Compressed = struct
 	 we call the same functor below with Stable.Latest, which also has
 	 the shadowed versions
        *)
-      include Codable.Make_base58_check (struct
+      (* TEMP HACK: support both old and new key formats temporarily *)
+      module Old_base58 = Codable.Make_base58_check_old (struct
         type nonrec t = t
 
         include Registered
@@ -68,6 +69,18 @@ module Compressed = struct
 
         let version_byte = version_byte
       end)
+
+      module New_base58 = Codable.Make_base58_check_new (struct
+        type nonrec t = t
+
+        include Registered
+
+        let description = description
+
+        let version_byte = version_byte
+      end)
+
+      include Old_base58
 
       (* sexp representation is a Base58Check string, like the yojson representation *)
       let sexp_of_t t = to_base58_check t |> Sexp.of_string
@@ -132,12 +145,17 @@ module Compressed = struct
 
   include Comparable.Make_binable (Stable.Latest)
   include Hashable.Make_binable (Stable.Latest)
-  include Codable.Make_base58_check (Stable.Latest)
+  include Stable.Latest.Old_base58
 
   [%%define_locally
   Stable.Latest.(sexp_of_t, t_of_sexp, gen)]
 
   let to_string = to_base58_check
+
+  let of_base58_check_exn s =
+    let open Stable.V1 in
+    try Old_base58.of_base58_check_exn s
+    with _ -> New_base58.of_base58_check_exn s
 
   let empty = Poly.{x= Field.zero; is_odd= false}
 

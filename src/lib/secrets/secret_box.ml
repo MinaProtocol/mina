@@ -4,7 +4,7 @@ open Sodium
 module BytesWr = struct
   include Bytes
 
-  module Base58_check = Base58_check.Make (struct
+  module Base58_check = Base58_check.Base58_check_old.Make (struct
     let description = "Secret box"
 
     let version_byte = Base58_check.Version_bytes.secret_box_byteswr

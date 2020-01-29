@@ -35,7 +35,7 @@ module Stable = struct
 
     include T
     include Sexpable.Of_stringable (T)
-    module Base58_check = Base58_check.Make (T)
+    module Base58_check = Base58_check.Base58_check_old.Make (T)
 
     let to_yojson s = `String (Base58_check.encode (to_string s))
 
