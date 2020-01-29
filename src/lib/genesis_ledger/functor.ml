@@ -18,10 +18,14 @@ module Make_from_base (Base : Base_intf) : Intf.S = struct
   let t =
     lazy
       (let ledger = Ledger.create_ephemeral () in
+       let failed = ref false in
        List.iter accounts ~f:(fun (_, account) ->
-           try Ledger.create_new_account_exn ledger account.public_key account with 
-           _ -> printf "failed to create account for %s" (Public_key.Compressed.to_string account.public_key)
-           ) ;
+           try Ledger.create_new_account_exn ledger account.public_key account
+           with _ ->
+             failed := true ;
+             printf "failed to create account for %s\n"
+               (Public_key.Compressed.to_string account.public_key) ) ;
+       if !failed then failwith "oh no" ;
        ledger)
 
   let find_account_record_exn ~f =
