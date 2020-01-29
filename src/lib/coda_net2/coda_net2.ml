@@ -361,7 +361,9 @@ module Helper = struct
       Or_error.bind res_json
         ~f:
           (Fn.compose (Result.map_error ~f:Error.of_string) M.output_of_yojson) )
-    else Deferred.Or_error.error_string "helper process already exited"
+    else
+      Deferred.Or_error.errorf "helper process already exited (doing RPC %s)"
+        (M.input_to_yojson body |> Yojson.Safe.to_string)
 
   let stream_state_invariant stream logger =
     let us_closed = Pipe.is_closed stream.outgoing_w in
@@ -537,22 +539,28 @@ module Helper = struct
     let%bind seq = v |> member "seqno" |> to_int_res in
     let err = v |> member "error" in
     let res = v |> member "success" in
-    let fill_result =
-      match (err, res) with
-      | `Null, r ->
-          Ok r
-      | e, `Null ->
-          Or_error.errorf "RPC #%d failed: %s" seq (Yojson.Safe.to_string e)
-      | _, _ ->
-          Or_error.errorf "unexpected response to RPC #%d: %s" seq
+    if not (Int.equal seq 0) then
+      let fill_result =
+        match (err, res) with
+        | `Null, r ->
+            Ok r
+        | e, `Null ->
+            Or_error.errorf "RPC #%d failed: %s" seq (Yojson.Safe.to_string e)
+        | _, _ ->
+            Or_error.errorf "unexpected response to RPC #%d: %s" seq
+              (Yojson.Safe.to_string v)
+      in
+      match Hashtbl.find_and_remove t.outstanding_requests seq with
+      | Some ivar ->
+          Ivar.fill ivar fill_result ; Ok ()
+      | None ->
+          Or_error.errorf "spurious reply to RPC #%d: %s" seq
             (Yojson.Safe.to_string v)
-    in
-    match Hashtbl.find_and_remove t.outstanding_requests seq with
-    | Some ivar ->
-        Ivar.fill ivar fill_result ; Ok ()
-    | None ->
-        Or_error.errorf "spurious reply to RPC #%d: %s" seq
-          (Yojson.Safe.to_string v)
+    else (
+      Logger.error t.logger "important info from helper: %s"
+        (Yojson.Safe.to_string err)
+        ~module_:__MODULE__ ~location:__LOC__ ;
+      Ok () )
 
   (** Parses an "upcall" and performs it.
 
