@@ -383,7 +383,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			}
 			return res
 		}
-	}, pubsub.WithValidatorConcurrency(32), pubsub.WithValidatorTimeout(5*time.Minute))
+	}, pubsub.WithValidatorTimeout(5*time.Minute))
 
 	if err != nil {
 		return nil, badp2p(err)
