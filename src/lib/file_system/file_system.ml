@@ -5,6 +5,15 @@ let remove_dir dir =
   let%bind _ = Process.run_exn ~prog:"rm" ~args:["-rf"; dir] () in
   Deferred.unit
 
+let rec rmrf path =
+  match Core.Sys.is_directory path with
+  | `Yes ->
+      Core.Sys.readdir path
+      |> Array.iter ~f:(fun name -> rmrf (Filename.concat path name)) ;
+      Core.Unix.rmdir path
+  | _ ->
+      Core.Sys.remove path
+
 let try_finally ~(f : unit -> 'a Deferred.t)
     ~(finally : unit -> unit Deferred.t) =
   try_with f

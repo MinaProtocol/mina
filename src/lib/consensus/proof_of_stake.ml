@@ -2951,7 +2951,7 @@ module Hooks = struct
         )
       in
       Coda_base.Ledger.Db.close !local_state.staking_epoch_snapshot.ledger ;
-      Unix.rmdir !local_state.staking_epoch_snapshot.location ;
+      File_system.rmrf !local_state.staking_epoch_snapshot.location ;
       let ledger =
         Coda_base.Ledger.Db.create_checkpoint snarked_ledger
           ~directory_name:!local_state.staking_epoch_snapshot.location ()
