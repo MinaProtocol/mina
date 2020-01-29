@@ -330,6 +330,10 @@ module type S = sig
            Public_key.Compressed.Table.t
            option
 
+      val next_epoch_ledger : t -> Coda_base.Ledger.Db.t
+
+      val staking_epoch_ledger : t -> Coda_base.Ledger.Db.t
+
       (** Swap in a new set of block production keys and invalidate and/or
           recompute cached data *)
       val block_production_keys_swap :
