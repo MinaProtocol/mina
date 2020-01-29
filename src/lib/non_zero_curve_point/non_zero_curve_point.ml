@@ -3,6 +3,7 @@
 
 open Core_kernel
 open Module_version
+open Fold_lib
 
 [%%if
 defined consensus_mechanism]
@@ -125,15 +126,34 @@ module Compressed = struct
 
   let empty = Poly.{x= Field.zero; is_odd= false}
 
-  let to_input {Poly.x; is_odd} =
-    {Random_oracle.Input.field_elements= [|x|]; bitstrings= [|[is_odd]|]}
+  let bit_length_to_triple_length n = (n + 2) / 3
 
+  let length_in_triples = bit_length_to_triple_length (1 + Field.size_in_bits)
+
+  let fold_bits Poly.{is_odd; x} =
+    {Fold.fold= (fun ~init ~f -> f ((Field.Bits.fold x).fold ~init ~f) is_odd)}
+
+  let fold t = Fold.group3 ~default:false (fold_bits t)
+
+  (* TODO: Right now everyone could switch to using the other unpacking...
+   Either decide this is ok or assert bitstring lt field size *)
   [%%if
   defined consensus_mechanism]
 
   (* snarky-dependent *)
 
   type var = (Field.Var.t, Boolean.var) Poly.t
+
+  let var_to_triples ({x; is_odd} : var) =
+    let%map x_bits =
+      Field.Checked.choose_preimage_var x ~length:Field.size_in_bits
+    in
+    Bitstring_lib.Bitstring.pad_to_triple_list
+      (x_bits @ [is_odd])
+      ~default:Boolean.false_
+
+  let to_input {Poly.x; is_odd} =
+    {Random_oracle.Input.field_elements= [|x|]; bitstrings= [|[is_odd]|]}
 
   let to_hlist Poly.Stable.Latest.{x; is_odd} = Snarky.H_list.[x; is_odd]
 
