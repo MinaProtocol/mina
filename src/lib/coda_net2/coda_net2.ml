@@ -897,12 +897,17 @@ module Pubsub = struct
       Helper.do_rpc net
         (module Helper.Rpcs.Publish)
         {topic; data= Helper.Data.pack_data data}
-      |> Deferred.Or_error.ok_exn
     with
-    | "publish success" ->
+    | Ok "publish success" ->
         ()
-    | v ->
+    | Ok v ->
         failwithf "helper broke RPC protocol: publish got %s" v ()
+    | Error e ->
+        Logger.error net.logger
+          "error while publishing message on $topic: $err" ~module_:__MODULE__
+          ~location:__LOC__
+          ~metadata:
+            [("topic", `String topic); ("err", `String (Error.to_string_hum e))]
 
   module Subscription = struct
     type 'a t = 'a Helper.subscription =
@@ -933,12 +938,13 @@ module Pubsub = struct
           Helper.do_rpc net
             (module Helper.Rpcs.Unsubscribe)
             {subscription_idx= idx}
-          |> Deferred.Or_error.ok_exn
         with
-        | "unsubscribe success" ->
+        | Ok "unsubscribe success" ->
             Ok ()
-        | v ->
-            failwithf "helper broke RPC protocol: unsubscribe got %s" v () )
+        | Ok v ->
+            failwithf "helper broke RPC protocol: unsubscribe got %s" v ()
+        | Error e ->
+            Error e )
       else Deferred.Or_error.error_string "already unsubscribed"
 
     let message_pipe {read_pipe; _} = read_pipe
@@ -1132,13 +1138,21 @@ module Protocol_handler = struct
       Helper.do_rpc net
         (module Helper.Rpcs.Remove_stream_handler)
         {protocol= protocol_name}
-      |> Deferred.Or_error.ok_exn
     with
-    | "removeStreamHandler success" ->
+    | Ok "removeStreamHandler success" ->
         close_connections net protocol_name
-    | v ->
+    | Ok v ->
         close_connections net protocol_name ;
         failwithf "helper broke RPC protocol: addStreamHandler got %s" v ()
+    | Error e ->
+        Logger.info net.logger
+          "error while closing handler for $protocol, closing connections \
+           anyway: $err"
+          ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ("protocol", `String protocol_name)
+            ; ("err", `String (Error.to_string_hum e)) ] ;
+        close_connections net protocol_name
 end
 
 let handle_protocol net ~on_handler_error ~protocol f =
@@ -1150,13 +1164,14 @@ let handle_protocol net ~on_handler_error ~protocol f =
   else
     match%map
       Helper.do_rpc net (module Helper.Rpcs.Add_stream_handler) {protocol}
-      |> Deferred.Or_error.ok_exn
     with
-    | "addStreamHandler success" ->
+    | Ok "addStreamHandler success" ->
         Hashtbl.add_exn net.protocol_handlers ~key:protocol ~data:ph ;
         Ok ph
-    | v ->
+    | Ok v ->
         failwithf "helper broke RPC protocol: addStreamHandler got %s" v ()
+    | Error e ->
+        Error e
 
 let open_stream net ~protocol peer =
   match%map
