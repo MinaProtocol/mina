@@ -299,6 +299,7 @@ let start_custom :
     let%bind termination_status = Process.wait process in
     Logger.trace logger "child process %s died" name ~module_:__MODULE__
       ~location:__LOC__ ;
+    let%bind () = after (Time.Span.of_sec 1.) in
     let%bind () = Writer.close @@ Process.stdin process in
     let%bind () = Reader.close @@ Process.stdout process in
     let%bind () = Reader.close @@ Process.stderr process in
