@@ -55,6 +55,7 @@ Run either one of the following commands which will create a public and private 
     coda client-old generate-keypair -privkey-path keys/my-wallet 
   
     coda accounts create
+
     
 <Alert kind="warning">
 
@@ -66,6 +67,10 @@ The response from this command will look like this:
 
     Keypair generated
     Public key:  4vsRCVbLm6LvUyzYWT95WaCzyi4D4UHxRpLBhMn7q2mRPgNCgRG3Jr3tDuhgQdmzbvCcBxhUwB3REpY2Dyf1NAxSSs8Q2vdJX93pT7eyqcyRU2S9UpDddDgovj46BSknNjzydKoopebp5Kva
+
+You may already have a public and private keypair generated before you download the new version of Coda. If this is the case, you can import it with the following command.
+
+    coda accounts import keys/my-previously-generated-key
 
 Since the public key is quite long and difficult to remember, let's save it as an environment variable:
 
@@ -81,6 +86,8 @@ In order to send our first transaction, we'll first need to get some coda to pla
 
 Once a faucet-mod thumbs up your request, keep an eye on the Discord channel to see when the transaction goes through on that side. It may take a few minutes for your funds to appear.
 
+Sometimes Tiny goes to sleep or isn't feeling well. In that case, ask a fellow community member in the `#testnet-general` on Discord to send you some tokens!
+
 We can check our balance to make sure that we received the funds by running the following command, passing in our public key:
 
     coda client get-balance -public-key $CODA_PUBLIC_KEY
@@ -93,7 +100,11 @@ While you're waiting take a look at your daemon logs for new blocks being genera
 
 ## Make a payment
 
-Finally we get to the good stuff, sending our first transaction! For testing purposes, there's already an [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo) set up that will immediately refund your payment minus the transaction fees.
+Finally we get to the good stuff, sending our first transaction! Before you send a payment, you'll need to unlock your account. You can do so with:
+
+    coda accounts unlock -public-key $CODA_PUBLIC_KEY
+
+For testing purposes, there's already an [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo) set up that will immediately refund your payment minus the transaction fees.
 
 <Alert kind="warning">
 
@@ -104,14 +115,14 @@ Finally we get to the good stuff, sending our first transaction! For testing pur
 Let's send some of our newly received coda to this service to see what a payment looks like:
 
     coda client send-payment \
-      -amount 20 \
+      -amount 10 \
       -receiver 4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x \
       -fee 5 \
       -sender $YOUR_PUBLIC_KEY
 
 If you're wondering what we passed in to the commands above:
 
-- For `amount`, we're sending a test value of `20` coda
+- For `amount`, we're sending a test value of `10` coda
 - The `receiver` is the public key of the [echo service](https://github.com/CodaProtocol/coda-automation/tree/master/services/echo)
 - For `fee`, let's use the current market rate of `5` coda
 - The `sender` is the full public key located in `*.pub` ex. `4vsRCVNep7JaFhtySu6vZCjnArvoAhkRscTy5TQsGTsKM4tJcYVc3uNUMRxQZAwVzSvkHDGWBmvhFpmCeiPASGnByXqvKzmHt4aR5uAWAQf3kqhwDJ2ZY3Hw4Dzo6awnJkxY338GEp12LE4x`

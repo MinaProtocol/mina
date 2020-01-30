@@ -21,7 +21,7 @@ The Coda network is secured by [Proof-of-Stake consensus](/docs/glossary/#proof-
 
 <!-- coda client set-staking -privkey-path keys/my-wallet -->
 
-Since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can now start the daemon with the `-propose-key` flag to begin staking coda. Let's stop our current daemon process, and restart it with the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`):
+Since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can now start the daemon with the `-propose-key` flag to begin staking coda. Let's stop our current daemon process, and restart it with the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`). If you instead imported a private key, you can find your key inside `~/.coda-config/wallets/store/`.:
 
     coda daemon \
         -discovery-port 8303 \
@@ -75,7 +75,11 @@ Delegating coda is an alternative option to staking it directly, with the benefi
 - you will need to pay a small transaction fee to make a delegate change, as this change is issued as a transaction recorded on the blockchain
 - the delegate staking for you may choose to charge you a commission for providing the staking service
 
-To delegate your stake, instead of running your own staking node, run this command:
+To delegate your stake, instead of running your own staking node, make sure you've unlocked your account:
+
+    coda account unlock -public-key $CODA_PUBLIC_KEY
+
+And run this command:
 
     coda client delegate-stake \
         -delegate <delegate-public-key> \
