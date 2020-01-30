@@ -36,6 +36,8 @@ let zip xs ys = map2 xs ys ~f:(fun x y -> (x, y))
 let rec to_list : type a n. (a, n) t -> a list =
  fun t -> match t with [] -> [] | x :: xs -> x :: to_list xs
 
+let sexp_of_t a _ v = Core_kernel.List.sexp_of_t a (to_list v)
+
 let to_array t = Array.of_list (to_list t)
 
 let rec length : type a n. (a, n) t -> n nat = function

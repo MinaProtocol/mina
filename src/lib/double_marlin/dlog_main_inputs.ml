@@ -164,9 +164,13 @@ module G1 = struct
     ignore (scale res bs) ;
     res
 
-  let scale_by_quadratic_nonresidue t = T.double (T.double t) + t
+  (* g -> 7 * g *)
+  let scale_by_quadratic_nonresidue t =
+    let t2 = T.double t in
+    let t4 = T.double t2 in
+    t + t2 + t4
 
-  let one_fifth = Fp.(inv (of_int 5))
+  let one_seventh = Fp.(inv (of_int 7))
 
   let scale_by_quadratic_nonresidue_inv t =
     let res =
@@ -174,7 +178,7 @@ module G1 = struct
         ~compute:
           As_prover.(
             fun () ->
-              G1.(to_affine_exn (scale (of_affine (read typ t)) one_fifth)))
+              G1.(to_affine_exn (scale (of_affine (read typ t)) one_seventh)))
     in
     (*TODO:assert_equal t (scale_by_quadratic_nonresidue res) ; *)
     ignore (scale_by_quadratic_nonresidue res) ;

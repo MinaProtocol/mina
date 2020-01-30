@@ -17,6 +17,8 @@ module type Input_intf = sig
 
     val y : t -> BaseField.t
 
+    val create : BaseField.t -> BaseField.t -> t
+
     val delete : t -> unit
   end
 
@@ -56,6 +58,11 @@ module Make
 struct
   module Affine = struct
     type t = BaseField.t * BaseField.t [@@deriving bin_io]
+
+    let to_backend (x, y) =
+      let t = C.Affine.create x y in
+      Caml.Gc.finalise C.Affine.delete t ;
+      t
 
     let of_backend t =
       let x = C.Affine.x t in

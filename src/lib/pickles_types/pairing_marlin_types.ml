@@ -249,6 +249,16 @@ module Accumulator = struct
   end
 
   module Opening_check = struct
+    (* For a commitment f opening at a point z to a value v one checks
+
+       e(f - [v], H) = e(pi, beta*H - z H)
+
+       e(f - [v], H) = e(pi, beta*H) - e(pi, z H)
+
+       e(f - [v], H) = e(pi, beta*H) - e(z pi, H)
+
+       e(f - [v] + z pi, H) = e(pi, beta*H)
+    *)
     type 'g t = {r_f_minus_r_v_plus_rz_pi: 'g; r_pi: 'g}
     [@@deriving fields, bin_io]
 

@@ -138,6 +138,8 @@ module type S = sig
     val emplace_back : t -> elt -> unit
 
     val length : t -> int
+
+    val of_array : elt array -> t
   end
 end
 
@@ -248,6 +250,12 @@ module Make (F : Input_intf) : S with type t = F.t = struct
     type elt = t
 
     include Vector
+
+    (* TODO: Leaky *)
+    let of_array a =
+      let t = create () in
+      Array.iter a ~f:(emplace_back t) ;
+      t
   end
 
   let%test "of_bits to_bits" =

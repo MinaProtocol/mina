@@ -24,7 +24,7 @@ let sg_polynomial ~add ~mul chals chal_invs pt =
     done ;
     !r
   in
-  prod (fun i -> chals.(i) + (chal_invs.(i) * pow_two_pows.(i)))
+  prod (fun i -> chal_invs.(i) + (chals.(i) * pow_two_pows.(k - 1 - i)))
 
 let accumulate_degree_bound_checks ~add ~scale ~r_h ~r_k
     { Accumulator.Degree_bound_checks.shifted_accumulator
@@ -135,9 +135,8 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   let product m f = List.reduce_exn (List.init m ~f) ~f:Field.( * )
 
-  let bulletproof_challenges = Common.bulletproof_log2
-
   let b (u : Fq.t array) (x : Fq.t) : Fq.t =
+    let bulletproof_challenges = Array.length u in
     let x_to_pow2s =
       let res = Array.create ~len:bulletproof_challenges x in
       for i = 1 to bulletproof_challenges - 1 do
@@ -231,6 +230,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     let open Pairing_marlin_types.Messages in
     Core.printf "Input size = %d\n%!" (Array.length public_input) ;
     let x_hat =
+      assert (Int.ceil_pow2 (Array.length public_input) = Domain.size Input_domain.domain);
       let pairs =
         Array.mapi public_input ~f:(fun i x ->
             (x, Input_domain.lagrange_commitments.(i)) )
@@ -416,7 +416,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
   let prod xs f = List.reduce_exn (List.map xs ~f) ~f:Fq.( * )
 
   (* TODO: Put this in the functor argument. *)
-  let nonresidue = Fq.of_int 5
+  let nonresidue = Fq.of_int 7
 
   let pow_two_pows x k =
     let res = Array.init k ~f:(fun _ -> x) in
@@ -451,10 +451,10 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       ~old_sg_challenge_point
       ~old_sg_evaluation *)
       old_bulletproof_challenges
-      ({xi; r; combined_inner_product; bulletproof_challenges; a_hat; marlin} :
+      ({xi; r; combined_inner_product; bulletproof_challenges; b; marlin} :
         _ Types.Pairing_based.Proof_state.Deferred_values.t) =
     let open Vector in
-    (* You use the NEW bulletproof challenges to check a_hat. Not the old ones. *)
+    (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     (* As a proof size optimization, we can probably rig each polynomial
        to vanish on the previous challenges.
     
@@ -497,7 +497,8 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
         in
         let combine pt x_hat e =
           let a, b = Evals.to_vectors e in
-          combined_evaluation ~xi ~evaluation_point:pt (sg_old pt :: x_hat :: a, b)
+          combined_evaluation ~xi ~evaluation_point:pt
+            (sg_old pt :: x_hat :: a, b)
         in
         combine marlin.beta_1 x_hat1 beta_1_evals
         + r
@@ -549,7 +550,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       ; xi
       ; r
       ; bulletproof_challenges
-      ; a_hat } ~f =
+      ; b } ~f =
     { Types.Pairing_based.Proof_state.Deferred_values.marlin=
         Types.Pairing_based.Proof_state.Deferred_values.Marlin.map_challenges
           marlin ~f
@@ -560,7 +561,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
             {r with prechallenge= f r.prechallenge} )
     ; xi= f xi
     ; r= f r
-    ; a_hat }
+    ; b }
 
   let split_last = Common.split_last
 
@@ -581,12 +582,15 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
             is_square :: prechallenge ) ]
 
   let main
+      ~bulletproof_log2
       ({ proof_state=
            { deferred_values= {marlin; xi; r; r_xi_sum}
            ; sponge_digest_before_evaluations
-           ; me_only= me_only_digest }
+           ; me_only= me_only_digest 
+           ; was_base_case
+           }
        ; pass_through } :
-        (Challenge.t, _, _, _, _, _, _) Types.Dlog_based.Statement.t) =
+        (Challenge.t, _, _, _, _, _, _, _) Types.Dlog_based.Statement.t) =
     (* 
     Need the old sg_challenge_point and old sg_evaluation to correctly compute
        the combined_inner_product.
@@ -599,7 +603,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       let state =
         exists
           (Types.Pairing_based.Proof_state.typ Challenge.typ Fq.typ Boolean.typ
-             Digest.typ Digest.typ ~length:bulletproof_challenges)
+             Digest.typ Digest.typ ~length:bulletproof_log2)
           ~request:(fun () -> Requests.Prev_proof_state)
       in
       ( map_challenges ~f:Fq.pack state.deferred_values
@@ -609,7 +613,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     let prev_me_only =
       exists
         (Types.Dlog_based.Proof_state.Me_only.typ G1.typ Fq.typ
-           ~length:bulletproof_challenges) ~request:(fun () ->
+           ~length:bulletproof_log2) ~request:(fun () ->
           Requests.Prev_me_only )
     in
     let pairing_marlin_index = prev_me_only.pairing_marlin_index in
@@ -629,6 +633,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       finalize_other_proof ~domain_k ~domain_h ~sponge prev_deferred_values
         ~old_bulletproof_challenges:prev_me_only.old_bulletproof_challenges
     in
+    Boolean.Assert.(was_base_case = prev_statement.proof_state.was_base_case);
     Boolean.Assert.any
       [prev_proof_finalized; prev_statement.proof_state.was_base_case] ;
     let ( sponge_digest_before_evaluations_actual
@@ -667,10 +672,11 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
         (marlin_data marlin_actual))
        *)
 
-  let main (fp, challenge, digest) =
+  let main (bool, fp, challenge, digest) =
     (* TODO: Use unpack? *)
     let unpack length = Vector.map ~f:(Fq.choose_preimage_var ~length) in
-    ( unpack Fq.size_in_bits fp (*     , fq *)
+    ( bool
+    , unpack Fq.size_in_bits fp (*     , fq *)
     , unpack Challenge.length challenge (*     , fq_challenge *)
     , digest )
     |> Types.Dlog_based.Statement.of_data |> main

@@ -34,7 +34,7 @@ module Pairing_based = struct
   module Digest = D.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
-  let input =
+  let input ~bulletproof_log2 =
     let open Pickles_types in
     let v = Vector.typ in
     let bulletproof_challenge =
@@ -53,7 +53,7 @@ module Pairing_based = struct
     Snarky.Typ.tuple5 (v Boolean.typ Nat.N1.n) (v Fq.typ Nat.N4.n)
       (v Digest.packed_typ Nat.N3.n)
       (v Challenge.packed_typ Nat.N9.n)
-      (Typ.array ~length:Common.bulletproof_log2 bulletproof_challenge)
+      (Typ.array ~length:bulletproof_log2 bulletproof_challenge)
 end
 
 module Dlog_based = struct
@@ -70,7 +70,9 @@ module Dlog_based = struct
       Typ.transport Field.typ ~there:fp_as_fq ~back:(fun (x : Fq.t) ->
           Fp.of_bigint (Fq.to_bigint x) )
     in
-    Snarky.Typ.tuple3 (typ fp Nat.N3.n)
+    Snarky.Typ.tuple4
+      (typ Impl.Boolean.typ Nat.N1.n)
+      (typ fp Nat.N3.n)
       (typ Challenge.packed_typ Nat.N9.n)
       (typ Digest.packed_typ Nat.N3.n)
 end

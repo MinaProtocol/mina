@@ -261,6 +261,8 @@ module Pairing_main_inputs = struct
 
       include Group(Impl).S
 
+      val one : t
+
       val if_ : Boolean.var -> then_:t -> else_:t -> t
 
       val scale_inv : t -> Boolean.var list -> t

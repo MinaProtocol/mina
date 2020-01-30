@@ -1,4 +1,15 @@
+open Core_kernel
 open Pickles_types
+
+module Challenge_polynomial = struct
+  type t =
+    { challenges : Fq.t array
+    ; commitment : G.Affine.t
+    }
+  [@@deriving bin_io]
+end
+
+type message = Challenge_polynomial.t
 
 type t =
   ( G.Affine.t
@@ -22,7 +33,7 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
   let gpair (type a) (t : a) (f : a -> Snarky_bn382.G.Affine.Pair.t) : G.Affine.t * G.Affine.t =
     let t = f t in
     let g = G.Affine.of_backend in
-    Snarky_bn382.G.Affine.Pair.( g (f0 t), g (f0 t))
+    Snarky_bn382.G.Affine.Pair.( g (f0 t), g (f1 t))
   in
   let proof =
     let t = proof t in
@@ -38,6 +49,7 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
     ; z_1= fq z1
     ; z_2= fq z2
     ; delta= g delta
+    ; sg = g sg
     }
   in
   let g = g t in
@@ -69,7 +81,6 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
         ; g_2= fq g2
         ; g_3= fq g3
         } )
-
   in
   let fq = fq t in
   { messages=
@@ -129,7 +140,7 @@ let eval_to_backend
     rc_b
     rc_c
 
-let to_backend primary_input
+let to_backend { Challenge_polynomial.challenges; commitment } primary_input
     ({ messages=
         { w_hat      = w_comm
         ; z_hat_a    = za_comm
@@ -144,6 +155,7 @@ let to_backend primary_input
              ; z_1
              ; z_2
              ; delta
+             ; sg
              }
          ; evals=(evals0, evals1, evals2)
          }
@@ -151,7 +163,7 @@ let to_backend primary_input
   : Snarky_bn382.Fq_proof.t =
   let primary_input =
     let v = Fq.Vector.create () in
-    List.iter (Fq.Vector.emplace_back v) primary_input ;
+    List.iter ~f:(Fq.Vector.emplace_back v) primary_input ;
     v
   in
   let g (a, b) =
@@ -161,12 +173,12 @@ let to_backend primary_input
   in
   let lr =
     let v = Snarky_bn382.G.Affine.Pair.Vector.create () in
-    Array.iter (fun (l, r) ->
+    Array.iter lr ~f:(fun (l, r) ->
         (* Very leaky *)
         Snarky_bn382.G.Affine.Pair.Vector.emplace_back v
           (Snarky_bn382.G.Affine.Pair.make
              (g l) (g r)) 
-      ) lr ;
+      ) ;
     v
   in
   Snarky_bn382.Fq_proof.make
@@ -189,9 +201,19 @@ let to_backend primary_input
    z_1
    z_2
    (g delta)
+   (g sg)
    (* Leaky! *)
    (eval_to_backend evals0)
    (eval_to_backend evals1)
    (eval_to_backend evals2)
+   (Fq.Vector.of_array challenges)
+   (G.Affine.to_backend commitment)
 
+let create ?message pk ~primary ~auxiliary =
+  let { Challenge_polynomial.challenges; commitment } = Option.value_exn message in
+  let res = Snarky_bn382.Fq_proof.create pk primary auxiliary (Fq.Vector.of_array challenges) (G.Affine.to_backend commitment) in
+  let t = of_backend res in
+  Snarky_bn382.Fq_proof.delete res ;
+  t
 
+let verify ?message:_ _ _ _ = true

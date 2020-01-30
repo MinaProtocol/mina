@@ -3,6 +3,7 @@ open Pickles_types
 
 module Constant = struct
   type 'n t = (Int64.t, 'n) Vector.t
+  [@@deriving sexp_of]
 
   let to_bits t =
     Vector.to_list t
@@ -12,14 +13,25 @@ module Constant = struct
 
   module Make (N : Vector.Nat_intf) = struct
     module A = struct
-      type 'a t = ('a, N.n) Vector.t
+      type 'a t = ('a, N.n sexp_opaque) Vector.t [@@deriving sexp_of]
 
       include Vector.Binable (N)
     end
 
     let length = 64 * Nat.to_int N.n
 
-    type t = Int64.t A.t [@@deriving bin_io]
+    module Hex64 = struct
+      include Int64
+
+      let to_hex t =
+        let mask = of_int 0xffffffff in
+        let lo, hi = to_int_exn (t land mask), to_int_exn ( (t lsr 32) land mask) in
+        sprintf "%08x%08x" hi lo
+
+      let sexp_of_t = Fn.compose String.sexp_of_t to_hex
+    end
+
+    type t = Hex64.t A.t [@@deriving bin_io, sexp_of]
 
     let to_bits = to_bits
 

@@ -171,8 +171,9 @@ module Dlog_based = struct
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
     end
 
-    type ('challenge, 'fp, 'fq_challenge, 'fq, 'me_only, 'digest) t =
+    type ('challenge, 'fp, 'bool, 'fq_challenge, 'fq, 'me_only, 'digest) t =
       { deferred_values: ('challenge, 'fp, 'fq_challenge, 'fq) Deferred_values.t
+      ; was_base_case: 'bool
       ; sponge_digest_before_evaluations: 'digest
             (* Not needed by other proof system *)
       ; me_only: 'me_only }
@@ -180,17 +181,17 @@ module Dlog_based = struct
 
     open Snarky.H_list
 
-    let to_hlist {deferred_values; sponge_digest_before_evaluations; me_only} =
-      [deferred_values; sponge_digest_before_evaluations; me_only]
+    let to_hlist {deferred_values; was_base_case; sponge_digest_before_evaluations; me_only} =
+      [deferred_values; was_base_case;sponge_digest_before_evaluations; me_only]
 
     let of_hlist
-        ([deferred_values; sponge_digest_before_evaluations; me_only] :
+        ([deferred_values; was_base_case;sponge_digest_before_evaluations; me_only] :
           (unit, _) t) =
-      {deferred_values; sponge_digest_before_evaluations; me_only}
+      {deferred_values; was_base_case;sponge_digest_before_evaluations; me_only}
 
-    let typ chal fp fq me_only digest =
+    let typ chal fp bool fq me_only digest =
       Snarky.Typ.of_hlistable
-        [Deferred_values.typ chal fp fq; digest; me_only]
+        [Deferred_values.typ chal fp fq; bool; digest; me_only]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
@@ -234,6 +235,7 @@ module Dlog_based = struct
   module Statement = struct
     type ( 'challenge
          , 'fp
+         , 'bool
          , 'fq_challenge
          , 'fq
          , 'me_only
@@ -243,6 +245,7 @@ module Dlog_based = struct
       { proof_state:
           ( 'challenge
           , 'fp
+          , 'bool
           , 'fq_challenge
           , 'fq
           , 'me_only
@@ -299,6 +302,7 @@ module Dlog_based = struct
                     ; beta_1
                     ; beta_2
                     ; beta_3 } }
+            ; was_base_case
             ; sponge_digest_before_evaluations
             ; me_only }
         ; pass_through } =
@@ -307,18 +311,21 @@ module Dlog_based = struct
       let challenge =
         [xi; r; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3]
       in
+      let bool = [ was_base_case ] in
       let digest = [sponge_digest_before_evaluations; me_only; pass_through] in
-      (fp, challenge, digest)
+      (bool, fp, challenge, digest)
 
-    let of_data (fp, challenge, digest) =
+    let of_data (bool, fp, challenge, digest) =
       let open Vector in
       let [sigma_2; sigma_3; r_xi_sum] = fp in
       let [xi; r; alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3] =
         challenge
       in
+      let [ was_base_case ] = bool in
       let [sponge_digest_before_evaluations; me_only; pass_through] = digest in
       { proof_state=
-          { deferred_values=
+          {  was_base_case;
+            deferred_values=
               { xi
               ; r
               ; r_xi_sum
@@ -351,40 +358,24 @@ module Pairing_based = struct
     end
 
     module Bulletproof = struct
-      type ('fq, 'g) t =
-        {gammas: ('g * 'g) array; z_1: 'fq; z_2: 'fq; beta: 'g; delta: 'g}
-
-      open Snarky.H_list
-
-      let to_hlist {gammas; z_1; z_2; beta; delta} =
-        [gammas; z_1; z_2; beta; delta]
-
-      let of_hlist ([gammas; z_1; z_2; beta; delta] : (unit, _) t) =
-        {gammas; z_1; z_2; beta; delta}
-
-      let typ fq g ~length =
-        let open Snarky.Typ in
-        of_hlistable
-          [array ~length (g * g); fq; fq; g; g]
-          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+      include Pickles_types.Dlog_marlin_types.Openings.Bulletproof
 
       module Advice = struct
         (* This is data that can be computed in linear time from the above plus the statement.
         
           It doesn't need to be sent on the wire, but it does need to be provided to the verifier
         *)
-        type ('fq, 'g) t = {sg: 'g; a_hat: 'fq}
+        type ('fq, 'g) t = { b: 'fq}
 
         open Snarky.H_list
 
-        let to_hlist {sg; a_hat} = [sg; a_hat]
+        let to_hlist { b} = [ b]
 
-        let of_hlist ([sg; a_hat] : (unit, _) t) = {sg; a_hat}
+        let of_hlist ([ b] : (unit, _) t) = { b}
 
         let typ fq g =
           let open Snarky.Typ in
-          of_hlistable [fq; g] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+          of_hlistable [fq] ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
             ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
       end
     end
@@ -417,15 +408,15 @@ module Pairing_based = struct
         ; xi: 'challenge (* 128 bits *)
         ; r: 'challenge (* 128 bits *)
         ; bulletproof_challenges: 'bulletproof_challenge array
-        ; a_hat: 'fq }
+        ; b: 'fq }
       [@@deriving bin_io]
 
       open Snarky.H_list
 
       let to_hlist
-          {marlin; combined_inner_product; xi; r; bulletproof_challenges; a_hat}
+          {marlin; combined_inner_product; xi; r; bulletproof_challenges; b}
           =
-        [marlin; combined_inner_product; xi; r; bulletproof_challenges; a_hat]
+        [marlin; combined_inner_product; xi; r; bulletproof_challenges; b]
 
       let of_hlist
           ([ marlin
@@ -433,9 +424,9 @@ module Pairing_based = struct
            ; xi
            ; r
            ; bulletproof_challenges
-           ; a_hat ] :
+           ; b ] :
             (unit, _) t) =
-        {marlin; combined_inner_product; xi; r; bulletproof_challenges; a_hat}
+        {marlin; combined_inner_product; xi; r; bulletproof_challenges; b}
 
       let typ chal fq bool ~length =
         Snarky.Typ.of_hlistable
@@ -516,7 +507,7 @@ module Pairing_based = struct
                 { xi
                 ; r
                 ; bulletproof_challenges
-                ; a_hat
+                ; b
                 ; combined_inner_product
                 ; marlin=
                     { sigma_2
@@ -534,7 +525,7 @@ module Pairing_based = struct
         ; pass_through } =
       let open Vector in
       let bool = [was_base_case] in
-      let fq = [sigma_2; sigma_3; combined_inner_product; a_hat] in
+      let fq = [sigma_2; sigma_3; combined_inner_product; b] in
       let challenge =
         [alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3; xi; r]
       in
@@ -544,7 +535,7 @@ module Pairing_based = struct
     let of_data (bool, fq, digest, challenge, bulletproof_challenges) =
       let open Vector in
       let [was_base_case] = bool in
-      let [sigma_2; sigma_3; combined_inner_product; a_hat] = fq in
+      let [sigma_2; sigma_3; combined_inner_product; b] = fq in
       let [alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3; xi; r] =
         challenge
       in
@@ -554,7 +545,7 @@ module Pairing_based = struct
               { xi
               ; r
               ; bulletproof_challenges
-              ; a_hat
+              ; b
               ; combined_inner_product
               ; marlin=
                   { sigma_2

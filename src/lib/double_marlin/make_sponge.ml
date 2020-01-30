@@ -26,13 +26,13 @@ module Make (Field : Snarky_bn382_backend.Field.S) = struct
     module Operations = struct
       let add_assign ~state i x = Field.(state.(i) += x)
 
-      let apply_affine_map (rows, c) v =
-        Array.mapi rows ~f:(fun j row ->
-            let open Field in
-            let res = zero + zero in
-            Array.iteri row ~f:(fun i r -> res += (r * v.(i))) ;
-            res += c.(j) ;
-            res )
+    (* TODO: Clean this up to use the near mds matrix properly *)
+      let apply_affine_map (_rows, c) v =
+        let open Field in
+        let res = [| v.(0) + v.(2); v.(0) + v.(1); v.(1) + v.(2) |] in
+        Array.iteri res ~f:(fun i ri ->
+            ri += c.(i) );
+        res
 
       let copy a = Array.map a ~f:(fun x -> Field.(x + zero))
     end

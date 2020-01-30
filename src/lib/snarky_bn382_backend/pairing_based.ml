@@ -81,9 +81,14 @@ module Keypair = struct
   type t = Fp_index.t
 
   let urs =
+    let path ="/home/izzy/pickles/urs" in
+    (*
+      let res = Snarky_bn382.Fp_urs.create (Unsigned.Size_t.of_int (2 * 786_433)) in
+    Snarky_bn382.Fp_urs.write res path;
+    failwith "hi''"; *)
     lazy
       (let start = Time.now () in
-       let res = Snarky_bn382.Fp_urs.read "/home/izzy/pickles/urs" in
+       let res = Snarky_bn382.Fp_urs.read path in
        let stop = Time.now () in
        Core.printf
          !"read urs in %{sexp:Time.Span.t}\n%!"
@@ -94,7 +99,8 @@ module Keypair = struct
       { R1CS_constraint_system.public_input_size
       ; auxiliary_input_size
       ; m= {a; b; c}
-      ; weight= _ } =
+      ; weight } =
+    Core.printf !"pairing weight is %{sexp:R1cs_constraint_system.Weight.t}\n%!" weight ;
     let vars = 1 + public_input_size + auxiliary_input_size in
     Fp_index.create a b c
       (Unsigned.Size_t.of_int vars)

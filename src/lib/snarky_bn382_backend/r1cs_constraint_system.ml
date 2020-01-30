@@ -85,19 +85,20 @@ struct
         (c, i) :: acc )
       xs ys
     |> List.rev
+    |> List.filter ~f:(fun (c, _) -> not (Fp.equal c Fp.zero))
 
   let decr_constant_term = function
     | (c, 0) :: terms ->
         (Fp.(sub c one), 0) :: terms
     | (_, _) :: _ as terms ->
         (Fp.(sub zero one), 0) :: terms
-    | [] ->
-        []
+    | [] -> [ (Fp.(sub zero one), 0) ]
 
   let canonicalize x =
     let c, terms =
       Fp.(
         Snarky.Cvar.to_constant_and_terms ~add ~mul ~zero:(of_int 0)
+          ~equal
           ~one:(of_int 1))
         x
     in
@@ -108,7 +109,7 @@ struct
     let terms = match c with None -> terms | Some c -> (c, 0) :: terms in
     match terms with
     | [] ->
-        None
+      Some ([], 0, false)
     | (c0, i0) :: terms ->
         let acc, i, ts, n =
           Sequence.of_list terms
@@ -119,7 +120,7 @@ struct
         in
         Some (List.rev ((acc, i) :: ts), n + 1, has_constant_term)
 
-  let choose_best base opts terms =
+  let _choose_best base opts terms =
     let ( +. ) = Weight.( + ) in
     let best f xs =
       List.min_elt xs ~compare:(fun (_, wt1) (_, wt2) ->
@@ -176,6 +177,14 @@ struct
     let var_exn t = Option.value_exn (var t) in
     let choose_best opts terms =
       let constr, new_weight = choose_best t.weight opts terms in
+      (* TODO: Delete
+      if label = Some "special" then begin
+        let (a, b, c) = constr in
+        printf !"ABC:\n%{sexp:int list}\n%{sexp:int list}\n%{sexp: int list}\n%!"
+          (List.map ~f:(fun (_, x) -> x) a)
+          (List.map ~f:(fun (_, x) -> x) b)
+          (List.map ~f:(fun (_, x) -> x) c) ;
+      end; *)
       t.weight <- new_weight ;
       add_r1cs t constr
     in

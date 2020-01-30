@@ -18,18 +18,20 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
   let to_the_alpha x = x |> square |> square |> square |> square |> ( * ) x
 
   module Operations = struct
+    let seal x =
+      let x' = exists typ ~compute:As_prover.(fun () -> read_var x) in
+      Assert.equal x x' ; x'
+
     (* TODO: experiment with sealing version of this *)
     let add_assign ~state i x = state.(i) <- state.(i) + x
 
-    let apply_affine_map (matrix, constants) v =
-      let seal x =
-        let x' = exists typ ~compute:As_prover.(fun () -> read_var x) in
-        Assert.equal x x' ; x'
+    (* TODO: Clean this up to use the near mds matrix properly *)
+    let apply_affine_map (_matrix, constants) v =
+      let near_mds_matrix_v = 
+        [| v.(0) + v.(2); v.(0) + v.(1); v.(1) + v.(2) |]
       in
-      let dotv row =
-        Array.reduce_exn (Array.map2_exn row v ~f:( * )) ~f:( + )
-      in
-      Array.mapi matrix ~f:(fun i row -> seal (constants.(i) + dotv row))
+      Array.mapi near_mds_matrix_v ~f:(fun i x ->
+          seal (constants.(i) + x))
 
     let copy = Array.copy
   end

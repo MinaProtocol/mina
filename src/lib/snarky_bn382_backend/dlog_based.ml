@@ -18,9 +18,13 @@ let field_size : Bigint.R.t = Snarky_bn382.Fp.size ()
 
 module Field = Fq
 module R1CS_constraint_system =
-  R1cs_constraint_system.Make (Fq) (Snarky_bn382.Fq.Constraint_matrix)
+  R1cs_constraint_system.Make
+    (Fq)
+    (Snarky_bn382.Fq.Constraint_matrix)
 module Var = Var
 open Core_kernel
+
+module Proof = Dlog_based_proof
 
 module Verification_key = struct
   open Snarky_bn382
@@ -33,6 +37,55 @@ module Verification_key = struct
 end
 
 module Oracles = struct
+  open Snarky_bn382
+
+  let create vk prev_challenge input (pi : Proof.t) =
+    printf "%s\n%!" __LOC__ ;
+    let pi = Proof.to_backend prev_challenge input pi in
+    printf "%s\n%!" __LOC__ ;
+    let t = Fq_oracles.create vk pi in
+    printf "%s\n%!" __LOC__ ;
+    Caml.Gc.finalise Fq_oracles.delete t ;
+    t
+
+  let field f t =
+    let x = f t in
+    Caml.Gc.finalise Fq.delete x ;
+    x
+
+  open Fq_oracles
+
+  let alpha = field alpha
+
+  let eta_a = field eta_a
+
+  let eta_b = field eta_b
+
+  let eta_c = field eta_c
+
+  let beta1 = field beta1
+
+  let beta2 = field beta2
+
+  let beta3 = field beta3
+
+  let polys = field polys
+
+  let evals = field evals
+
+  (* TODO: Leaky *)
+  let opening_prechallenges t =
+    let open Snarky_bn382 in
+    let t = opening_prechallenges t in
+    Array.init (Fq.Vector.length t) ~f:(Fq.Vector.get t)
+
+  let x_hat t =
+    let t = x_hat_nocopy t in
+    let fq f = field f t in
+    Snarky_bn382.Fq_triple.(
+      fq f0, fq f1, fq f2)
+
+  let digest_before_evaluations = field digest_before_evaluations
 end
 
 module Proving_key = struct
@@ -41,11 +94,11 @@ module Proving_key = struct
   include Binable.Of_binable
             (Unit)
             (struct
-              type t = unit
+              type nonrec t = t
 
               let to_binable _ = ()
 
-              let of_binable () = ()
+              let of_binable () = failwith "todo"
             end)
 
   let is_initialized _ = `Yes
@@ -64,9 +117,10 @@ module Keypair = struct
   type t = Fq_index.t
 
   let urs =
+    let path = "/home/izzy/pickles/dlog-urs" in
     lazy
       (let start = Time.now () in
-       let res = Snarky_bn382.Fq_urs.read "/home/izzy/pickles/urs" in
+       let res = Snarky_bn382.Fq_urs.read path in
        let stop = Time.now () in
        Core.printf
          !"read urs in %{sexp:Time.Span.t}\n%!"
@@ -77,7 +131,8 @@ module Keypair = struct
       { R1CS_constraint_system.public_input_size
       ; auxiliary_input_size
       ; m= {a; b; c}
-      ; weight= _ } =
+      ; weight } =
+    Core.printf !"dlog weight is %{sexp:R1cs_constraint_system.Weight.t}\n%!" weight ;
     let vars = 1 + public_input_size + auxiliary_input_size in
     Fq_index.create a b c
       (Unsigned.Size_t.of_int vars)
@@ -109,14 +164,4 @@ module Keypair = struct
         ; c= Fq_index.c_rc_comm t } 
     }
     |> Matrix_evals.map ~f:(Abc.map ~f:G.Affine.of_backend)
-end
-
-module Proof = struct
-  include Unit
-
-  type message = unit
-
-  let create ?message:_ _pk ~primary:_ ~auxiliary:_ = ()
-
-  let verify ?message:_ _ _ _ = true
 end

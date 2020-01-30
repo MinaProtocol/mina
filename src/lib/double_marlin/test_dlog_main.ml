@@ -381,6 +381,7 @@ module Inputs = struct
   end
 end
 
+(*
 module M = Dlog_main.Dlog_main (Dlog_main_inputs)
 
 let wrap_proof vk public_input
@@ -686,3 +687,4 @@ let wrap_proof vk public_input
   let wt = !Snarky_bn382_backend.R1cs_constraint_system.wt in
   Core.printf "weights %d %d %d\n%!" wt.a wt.b wt.c ;
   Core.printf "yo: %d\n%!" n *)
+   *)

@@ -28,6 +28,8 @@ module App_state = struct
     include Field.Constant
 
     let tag = Tag
+
+    let is_base_case = Field.Constant.(equal zero)
   end
 
   let to_field_elements x = [|x|]
@@ -70,8 +72,15 @@ module Input_domain = struct
 
   (* TODO: Make the real values *)
   let lagrange_commitments =
-    Array.init (Domain.size domain) ~f:(fun i ->
-        unrelated_g (G.to_affine_exn (G.scale G.one (Fq.of_int i))) )
+    let domain_size = Domain.size domain in
+    let u = Unsigned.Size_t.of_int in
+    time "lagrange" (fun () ->
+        Array.init domain_size ~f:(fun i ->
+            Snarky_bn382_backend.G.Affine.of_backend
+              (Snarky_bn382.Fq_urs.lagrange_commitment
+                 (Lazy.force Snarky_bn382_backend.Dlog_based.Keypair.urs)
+                 (u domain_size) (u i)) ) )
+
 end
 
 module G = struct
@@ -188,9 +197,13 @@ module G = struct
     ignore (scale res bs) ;
     res
 
-  let scale_by_quadratic_nonresidue t = T.double (T.double t) + t
+  (* g -> 7 * g *)
+  let scale_by_quadratic_nonresidue t =
+    let t2 = T.double t in
+    let t4 = T.double t2 in
+    t + t2 + t4
 
-  let one_fifth = Fq.(inv (of_int 5))
+  let one_seventh = Fq.(inv (of_int 7))
 
   let scale_by_quadratic_nonresidue_inv t =
     let res =
@@ -198,7 +211,7 @@ module G = struct
         ~compute:
           As_prover.(
             fun () ->
-              G.to_affine_exn (G.scale (G.of_affine (read typ t)) one_fifth))
+              G.to_affine_exn (G.scale (G.of_affine (read typ t)) one_seventh))
     in
     (*TODO:assert_equal t (scale_by_quadratic_nonresidue res) ; *)
     ignore (scale_by_quadratic_nonresidue res) ;
@@ -219,5 +232,9 @@ let domain_h = Domain.Pow_2_roots_of_unity 18
 module Generators = struct
   let g = G.one
 
-  let h = G.constant (unrelated_g Snarky_bn382_backend.G.(to_affine_exn one))
+  let h =
+    Snarky_bn382.Fq_urs.h
+      (Lazy.force Snarky_bn382_backend.Dlog_based.Keypair.urs)
+    |> Snarky_bn382_backend.G.Affine.of_backend
+    |> G.constant
 end

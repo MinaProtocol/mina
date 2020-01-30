@@ -7,6 +7,7 @@ module G = Snarky_bn382_backend.G
 module G1 = Snarky_bn382_backend.G1
 module Inputs = Pairing_main_inputs
 
+(*
 let group_map_fp =
   let params =
     Group_map.Params.create (module Fp) ~a:Fp.zero ~b:(Fp.of_int 7)
@@ -85,6 +86,7 @@ module Index_metadata = struct
   [@@deriving bin_io]
 end
 
+(*
 let%test_unit "pairing-main" =
   (let open Test_dlog_main in
   let fp_as_fq (x : Fp.t) = Fq.of_bigint (Fp.to_bigint x) in
@@ -744,3 +746,5 @@ module Inputs = struct
   end
 end
 *)
+   *)
+   *)

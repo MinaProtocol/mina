@@ -124,21 +124,25 @@ end
 module Openings = struct
   module Bulletproof = struct
     type ('fq, 'g) t =
-      {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g}
+      {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g
+      (* TODO: Could move this back to "advice" rather than putting it
+        on the wire. *)
+        ; sg : 'g
+      }
     [@@deriving bin_io]
 
     open Snarky.H_list
 
-    let to_hlist {lr; z_1; z_2; delta} =
-      [lr; z_1; z_2; delta]
+    let to_hlist {lr; z_1; z_2; delta; sg} =
+      [lr; z_1; z_2; delta; sg]
 
-    let of_hlist ([lr; z_1; z_2; delta] : (unit, _) t) =
-      {lr; z_1; z_2; delta}
+    let of_hlist ([lr; z_1; z_2; delta; sg] : (unit, _) t) =
+      {lr; z_1; z_2; delta; sg}
 
     let typ fq g ~length =
       let open Snarky.Typ in
       of_hlistable
-        [array ~length (g * g); fq; fq; g]
+        [array ~length (g * g); fq; fq; g; g]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
         ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
   end

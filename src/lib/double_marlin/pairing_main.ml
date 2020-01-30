@@ -62,6 +62,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       | Prev_proof_state :
           ( Challenge.Constant.t
           , Fp.Constant.t
+          , bool
           , Challenge.Constant.t
           , Fq.Constant.t
           , Digest.Constant.t
@@ -69,6 +70,20 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
           Dlog_based.Proof_state.t
           t
   end
+
+  let print_g lab g =
+    as_prover As_prover.(fun () ->
+        match G.to_field_elements g with
+        | [x; y ] ->
+          printf !"%s: %!"
+            lab;
+          Field.Constant.print (read_var x);
+          printf ", %!";
+          Field.Constant.print (read_var y);
+          printf "\n%!"
+
+        | _ -> assert false
+      )
 
   let rec absorb : type a.
       Sponge.t -> (a, < scalar: Fq.t ; g1: G.t >) Type.t -> a -> unit =
@@ -79,21 +94,43 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
             Sponge.absorb sponge (`Field x) )
     | Scalar ->
         let low_bits, high_bit = t in
+        as_prover As_prover.(fun () ->
+            Core.printf "low_bits\n%!";
+            Fp.Constant.print (read_var low_bits) ;
+            Core.printf "high_bit %b\n%!"
+              (read Boolean.typ high_bit)) ;
+
         Sponge.absorb sponge (`Field low_bits) ;
         Sponge.absorb sponge (`Bits [high_bit])
     | ty1 :: ty2 ->
-        let absorb t = absorb sponge t in
         let t1, t2 = t in
+        let absorb t = absorb sponge t in
         absorb ty1 t1 ; absorb ty2 t2
 
   let bullet_reduce sponge gammas =
     let absorb t = absorb sponge t in
     let prechallenges =
-      Array.map gammas ~f:(fun gammas_i ->
+      Array.mapi gammas ~f:(fun i gammas_i ->
+          as_prover As_prover.(fun () ->
+            printf "Oabout to absorb: %d\n%!" i;
+            Array.iter (Sponge.state sponge) ~f:(fun x ->
+                Field.Constant.print (read_var x) ;
+                printf "%!") );
           absorb (PC :: PC) gammas_i ;
-          Sponge.squeeze sponge ~length:Challenge.length )
+          as_prover As_prover.(fun () ->
+            printf "Oabout to squeeze: %d\n%!" i;
+            Array.iter (Sponge.state sponge) ~f:(fun x ->
+                Field.Constant.print (read_var x) ;
+                printf "%!") );
+          let pre = Sponge.squeeze sponge ~length:Challenge.length  in
+          as_prover As_prover.(fun () ->
+              printf "Opre %!";
+              Field.Constant.print (read_var (Field.pack pre)) ;
+              printf "\n%!" ) ;
+          pre
+        )
     in
-    let term_and_challenge (gamma_neg_one, gamma_one) pre =
+    let term_and_challenge (l, r) pre =
       let pre_is_square =
         exists Boolean.typ
           ~request:
@@ -104,15 +141,16 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       in
       let left_term =
         let base =
-          G.if_ pre_is_square ~then_:gamma_neg_one
-            ~else_:(G.scale_by_quadratic_nonresidue gamma_neg_one)
+          G.if_ pre_is_square
+            ~then_:l
+            ~else_:(G.scale_by_quadratic_nonresidue l)
         in
         G.scale base pre
       in
       let right_term =
         let base =
-          G.if_ pre_is_square ~then_:gamma_one
-            ~else_:(G.scale_by_quadratic_nonresidue_inv gamma_one)
+          G.if_ pre_is_square ~then_:r
+            ~else_:(G.scale_by_quadratic_nonresidue_inv r)
         in
         G.scale_inv base pre
       in
@@ -136,23 +174,20 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
 
   let dlog_pcs_batch = Common.dlog_pcs_batch ~domain_h ~domain_k
 
-  (* Confused about how verifier chooses c in 3. Looks like prover can use
-    whatever c they like *)
-  let check_bulletproof ~g ~h ~sponge ~xi ~sg_old ~combined_inner_product
+  let check_bulletproof ~sponge ~xi ~sg_old ~combined_inner_product
       ~
       (* Corresponds to y in figure 7 of WTS *)
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       (advice : _ Openings.Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
-      ~(openings_proof : (Fq.t, G.t) Openings.Bulletproof.t) =
+      ~openings_proof:({ lr; delta; z_1; z_2; sg } : (Fq.t, G.t) Openings.Bulletproof.t) =
     (* a_hat should be equal to
        sum_i < t, r^i pows(beta_i) >
        = sum_i r^i < t, pows(beta_i) > *)
-    let () =
-      (* Absorb the statement ( combined_polynomial, combined_inner_product, combined_evaluation ) *)
-      ()
+    let u = 
+      (* TODO sample u randomly *)
+      G.one
     in
-    let proof = openings_proof in
     (* TODO: Absorb (combined_polynomial, inner_product_result/tau *)
     let open G in
     let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
@@ -160,23 +195,32 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         (sg_old :: without_degree_bound)
         with_degree_bound
     in
+    print_g "combined_polynomial" combined_polynomial ;
     (* TODO: Absorb challenges into the sponge and expose it as another input *)
-    let gamma_prod, challenges = bullet_reduce sponge proof.gammas in
-    let gamma0 =
-      let tau = scale g (Fq.to_bits combined_inner_product) in
-      combined_polynomial + tau
-    in
-    let a_hat = Fq.to_bits advice.a_hat in
-    let lhs = scale (gamma0 + gamma_prod + proof.beta) a_hat + proof.delta in
+    let lr_prod, challenges = bullet_reduce sponge lr in
+    let p_prime = combined_polynomial + scale u (Fq.to_bits combined_inner_product) in
+    let q = p_prime + lr_prod in
+    absorb sponge PC delta ;
+    let c = Sponge.squeeze sponge ~length:Challenge.length in
+
+    (* c Q + delta = z1 (G + b U) + z2 H *)
+    let lhs = scale q c + delta in
     let rhs =
-      scale (advice.sg + scale g a_hat) (Fq.to_bits proof.z_1)
-      + scale h (Fq.to_bits proof.z_2)
+      let scale t x = scale t (Fq.to_bits x) in
+      scale (sg + scale u advice.b) z_1
+        (* TODO: Use scale_known *)
+      + scale Generators.h z_2
     in
     (`Success (equal_g lhs rhs), challenges)
 
   let lagrange_precomputations =
     Array.map Input_domain.lagrange_commitments
       ~f:G.Scaling_precomputation.create
+
+  let print_chal lab chal =
+    as_prover As_prover.(fun () ->
+        printf !"%s: %{sexp:Challenge.Constant.t}\n%!" lab
+        (read Challenge.typ chal) )
 
   (* How to advance the proof state in "dlog main"
 
@@ -193,10 +237,10 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let sample () = Sponge.squeeze sponge ~length:Challenge.length in
     let open Pairing_marlin_types.Messages in
     let x_hat =
+      assert (Int.ceil_pow2 (Array.length public_input) = Domain.size Input_domain.domain);
       G.multiscale_known
         (Array.mapi public_input ~f:(fun i x ->
-             (x, lagrange_precomputations.(i + 1)) ))
-      |> G.(( + ) (constant Input_domain.lagrange_commitments.(0)))
+             (x, lagrange_precomputations.(i)) ))
     in
     absorb sponge PC x_hat ;
     (* No need to absorb the public input into the sponge as we've already
@@ -208,7 +252,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let eta_a = sample () in
     let eta_b = sample () in
     let eta_c = sample () in
-    let g_1, h_1 = receive (Type.degree_bounded_pc :: PC) gh_1 in
+    let g_1, h_1 = receive ( (PC :: PC) :: PC) gh_1 in
     let beta_1 = sample () in
     (* At this point, we should use the previous "bulletproof_challenges" to
        compute to compute f(beta_1) outside the snark
@@ -217,11 +261,15 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let sigma_2, (g_2, h_2) =
       receive (Scalar :: Type.degree_bounded_pc :: PC) sigma_gh_2
     in
+    print_chal "beta_1" beta_1;
     let beta_2 = sample () in
+    print_chal "beta_2" beta_2;
     let sigma_3, (g_3, h_3) =
       receive (Scalar :: Type.degree_bounded_pc :: PC) sigma_gh_3
     in
     let beta_3 = sample () in
+    print_chal "beta_3" beta_3;
+    let sponge_before_evaluations = Sponge.copy sponge in
     let sponge_digest_before_evaluations =
       Sponge.squeeze sponge ~length:Digest.length
     in
@@ -246,9 +294,22 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
        Then, in the other proof, we can witness the evaluations and check their correctness
        against "combined_inner_product" *)
     let bulletproof_challenges =
-      (* TODO: Absorb xi and combined_inner_product ? *)
-      check_bulletproof ~g:Generators.g ~h:Generators.h ~sponge ~xi ~sg_old
-        ~combined_inner_product ~advice ~openings_proof
+      (* TODO:
+         This sponge needs to be initialized with (some derivative of)
+         1. The polynomial commitments
+         2. The combined inner product
+         3. The challenge points.
+
+         It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
+         the combined inner product. 
+      *)
+      (* TODO: What is Generators.h *)
+      check_bulletproof
+        ~sponge:sponge_before_evaluations
+        ~xi
+        ~sg_old
+        ~combined_inner_product ~advice
+        ~openings_proof
         ~polynomials:
           ( [ x_hat
             ; w_hat
@@ -265,7 +326,11 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
             ; m.col.c
             ; m.value.a
             ; m.value.b
-            ; m.value.c ]
+            ; m.value.c 
+            ; m.rc.a
+            ; m.rc.b
+            ; m.rc.c 
+            ]
           , [g_1; g_2; g_3] )
     in
     ( sponge_digest_before_evaluations
@@ -375,9 +440,10 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
              ~g:G.to_field_elements) ;
         Sponge.squeeze sponge ~length:Digest.length )
 
-  let pack_data (fp, challenge, digest) =
+  let pack_data (bool, fp, challenge, digest) =
     Array.concat
-      [ Array.of_list_map (Vector.to_list fp) ~f:(fun x ->
+      [ Array.map (Vector.to_array bool) ~f:List.return
+      ; Array.of_list_map (Vector.to_list fp) ~f:(fun x ->
             let t =
               Bitstring_lib.Bitstring.Lsb_first.to_list (Fp.unpack_full x)
             in
@@ -385,11 +451,9 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       ; Vector.to_array challenge
       ; Vector.to_array digest ]
 
-  (*
-      ; Array.of_list_map (Vector.to_list fq) ~f:(fun (low_bits, high_bit) ->
-            let low_bits = Fp.unpack ~length:(Fq.size_in_bits - 1) low_bits in
-            low_bits @ [high_bit] )
-*)
+  let print_bool lab x =
+    as_prover (fun () ->
+        printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
 
   let main (type s) ((module A) as am : s app_state)
       ({ proof_state=
@@ -400,7 +464,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
                ; xi (* The batching challenge. *)
                ; bulletproof_challenges: (_, _) Types.Bulletproof_challenge.t
                                          array
-               ; a_hat }
+               ; b }
            ; sponge_digest_before_evaluations
            ; was_base_case
            ; me_only= me_only_digest }
@@ -425,7 +489,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         , prev_proof_state ) =
       let state =
         exists
-          (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Fq.typ
+          (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Boolean.typ Fq.typ
              Digest.typ Digest.typ) ~request:(fun () ->
             Requests.Prev_proof_state )
       in
@@ -449,22 +513,17 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       { Types.Dlog_based.Statement.pass_through= prev_me_only
       ; proof_state= prev_proof_state }
     in
-    let sponge =
-      let s = Sponge.create sponge_params in
-      Sponge.absorb s (`Field prev_sponge_digest_before_evaluations) ;
-      s
-    in
     let prev_proof_finalized =
+      let sponge =
+        let s = Sponge.create sponge_params in
+        Sponge.absorb s (`Field prev_sponge_digest_before_evaluations) ;
+        s
+      in
       finalize_other_proof ~domain_k ~domain_h ~sponge prev_deferred_values
     in
-    let sponge =
-      let s = Sponge.create sponge_params in
-      Array.iter (A.to_field_elements app_state) ~f:(fun x ->
-          Sponge.absorb s (`Field x) ) ;
-      s
-    in
+    let is_base_case = A.is_base_case app_state in
     let ( sponge_digest_before_evaluations_actual
-        , (`Success bullet_proof_success, bulletproof_challenges_actual)
+        , (`Success bulletproof_success, bulletproof_challenges_actual)
         , marlin_actual ) =
       let messages =
         exists (Pairing_marlin_types.Messages.typ PC.typ Fq.typ)
@@ -476,18 +535,96 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
              ~length:(Array.length bulletproof_challenges))
           ~request:(fun () -> Requests.Prev_openings_proof)
       in
+      assert_equal_g openings_proof.sg sg ;
       let public_input =
-        pack_data (Types.Dlog_based.Statement.to_data prev_statement)
+        Array.append
+          [| [Boolean.true_] |]
+          (pack_data (Types.Dlog_based.Statement.to_data prev_statement))
       in
+      let sponge = Sponge.create sponge_params in
       incrementally_verify_proof ~xi ~verification_key:dlog_marlin_index
         ~sponge ~public_input ~sg_old ~combined_inner_product
-        ~advice:{a_hat; sg} ~messages ~openings_proof
+        ~advice:{b} ~messages ~openings_proof
     in
-    let is_base_case = A.is_base_case app_state in
     Boolean.Assert.(is_base_case = was_base_case) ;
     let prev_proof_correct =
-      Boolean.all [bullet_proof_success; prev_proof_finalized]
+      print_bool "bulletproof_success" bulletproof_success;
+      print_bool "prev_proof_finalized" prev_proof_finalized;
+      print_bool "prev-was-base" prev_statement.proof_state.was_base_case;
+      let prev_proof_finalized =
+        Boolean.(prev_proof_finalized || prev_statement.proof_state.was_base_case)
+      in
+      print_bool "prev_proof_finalized'" prev_proof_finalized;
+      Boolean.all [bulletproof_success; prev_proof_finalized]
     in
+    let update_succeeded =A.check_update prev_app_state app_state in
+    print_bool "prev_proof_correct" prev_proof_correct ;
+    print_bool "update succeeded" update_succeeded ;
+    print_bool "is base" is_base_case ;
+    begin
+      let fq (x1, b1) (x2, b2) =
+        Field.Assert.equal x1 x2;
+        Boolean.Assert.(b1 = b2)
+      in
+      let chal c1 c2 =
+        Field.Assert.equal (Field.project c1) (Field.project c2)
+      in
+      fq marlin.sigma_2 marlin_actual.sigma_2 ;
+      fq marlin.sigma_3 marlin_actual.sigma_3 ;
+      chal marlin.alpha marlin_actual.alpha ;
+      chal marlin.eta_a marlin_actual.eta_a ;
+      chal marlin.eta_b marlin_actual.eta_b ;
+      chal marlin.eta_c marlin_actual.eta_c ;
+      chal marlin.beta_1 marlin_actual.beta_1 ;
+      chal marlin.beta_2 marlin_actual.beta_2 ;
+      chal marlin.beta_3 marlin_actual.beta_3 ;
+      Array.iteri bulletproof_challenges ~f:(fun i c1 ->
+          let c1 = Field.pack c1.prechallenge in
+          let c2 = 
+            Field.if_ is_base_case ~then_:c1 ~else_:(Field.pack bulletproof_challenges_actual.(i).prechallenge)
+          in
+          printf "bp_chals_%d\n%!" i;
+          Field.Assert.equal c1 c2
+(*           Boolean.Assert.(c1.is_square = c2.is_square) ; *)
+        );
+      Field.Assert.equal sponge_digest_before_evaluations
+        (Field.pack sponge_digest_before_evaluations_actual) ;
+    end;
+    Boolean.(
+      Assert.any
+        [ prev_proof_correct && update_succeeded
+        ; is_base_case ])
+    (*
+    Data.(
+      (* TODO: Other stuff too... *)
+        assert_equal
+          ~field_size:Field.size_in_bits
+          ~pack:Field.pack
+          (fun expected computed ->
+             let other = Field.if_ is_base_case ~then_:expected ~else_:computed in
+             as_prover As_prover.(fun () ->
+
+                 let expected = read_var expected in
+                 let other = read_var other in
+                 printf !"check %{sexp:Field.Constant.t} = %{sexp:Field.Constant.t}\n%!"
+                   expected
+                   other ;
+
+                 printf !"x - y:%!";
+                 Field.Constant.(print (expected - other));
+                 printf !"\n%!";
+                 printf !"y - x:%!";
+                 Field.Constant.(print (other - expected));
+                 printf !"\n%!";
+
+                 assert (Field.Constant.equal expected other);
+               ) ;
+             Impl.assert_ ~label:"special"
+               (Impl.Constraint.equal expected other) 
+          )
+          (marlin_data marlin)
+          (marlin_data marlin_actual))
+       *)
     (*
     Data.(
       assert_equal (fun public_input computed ->
@@ -501,10 +638,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         ~field_size:Field.size_in_bits
         (chals_data bulletproof_challenges @ marlin_data marlin)
         (chals_data bulletproof_challenges_actual @ marlin_data marlin_actual)) ; *)
-    Boolean.(
-      Assert.any
-        [ prev_proof_correct && A.check_update prev_app_state app_state
-        ; is_base_case ])
 
   (* TODO: Turn this on -- think about what to do in the base case.
      Also need to expose base_case_ness for the next proof. 
