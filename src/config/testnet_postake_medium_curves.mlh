@@ -20,7 +20,7 @@
 
 [%%define genesis_ledger "phase_three_redux"]
 
-[%%define genesis_state_timestamp "2019-11-11 17:00:00-07:00"]
+[%%define genesis_state_timestamp "2020-01-29 16:45:00-08:00"]
 [%%define block_window_duration 180000]
 
 [%%define integration_tests false]
