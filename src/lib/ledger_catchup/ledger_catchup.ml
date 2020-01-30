@@ -517,7 +517,7 @@ let%test_module "Ledger_catchup tests" =
           "catchup breadcrumbs were not equal to the best tip path we expected"
 
     let%test_unit "can catchup to a peer within [2/k,k]" =
-      Quickcheck.test ~trials:5
+      Quickcheck.test ~trials:1
         Fake_network.Generator.(
           let open Quickcheck.Generator.Let_syntax in
           let%bind peer_branch_size =

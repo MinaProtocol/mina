@@ -503,12 +503,15 @@ module For_tests = struct
     let trust_system =
       Option.value trust_system ~default:(Trust_system.null ())
     in
+    let epoch_ledger_location =
+      Filename.temp_dir_name ^/ "epoch_ledger"
+      ^ (Uuid_unix.create () |> Uuid.to_string)
+    in
     let consensus_local_state =
       Option.value consensus_local_state
         ~default:
           (Consensus.Data.Local_state.create
-             ~genesis_ledger:Test_genesis_ledger.t
-             ~epoch_ledger_location:(Filename.temp_file "epoch_ledger" "")
+             ~genesis_ledger:Test_genesis_ledger.t ~epoch_ledger_location
              Public_key.Compressed.Set.empty)
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
