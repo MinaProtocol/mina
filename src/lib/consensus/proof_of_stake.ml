@@ -241,8 +241,11 @@ module Data = struct
     let create_epoch_ledger ~location ~genesis_ledger =
       let open Coda_base in
       let module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db) in
-      if Sys.file_exists location then
-        Ledger.Db.create ~directory_name:location ()
+      if Sys.file_exists location then (
+        Logger.info (Logger.create ()) ~module_:__MODULE__ ~location:__LOC__
+          !"Loading epoch ledger from disk: %s"
+          location ;
+        Ledger.Db.create ~directory_name:location () )
       else
         let epoch_ledger = Ledger.Db.create ~directory_name:location () in
         ignore @@ Ledger_transfer.transfer_accounts genesis_ledger epoch_ledger ;
