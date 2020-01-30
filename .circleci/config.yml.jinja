@@ -62,7 +62,7 @@ jobs:
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-c7cdd86ab369a0250c3f0880803392d694fb3af8
+            - image: codaprotocol/coda:toolchain-01a7053fdbd1f3fce2f52f93b0cf5a415aa5c913
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -108,7 +108,7 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-c7cdd86ab369a0250c3f0880803392d694fb3af8
+            - image: codaprotocol/coda:toolchain-01a7053fdbd1f3fce2f52f93b0cf5a415aa5c913
         steps:
             - checkout
             - run:
@@ -137,7 +137,7 @@ jobs:
                   command: ./scripts/require-ppx-coda.py
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-c7cdd86ab369a0250c3f0880803392d694fb3af8
+            - image: codaprotocol/coda:toolchain-01a7053fdbd1f3fce2f52f93b0cf5a415aa5c913
         steps:
             - checkout
             - run:
@@ -363,7 +363,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-c7cdd86ab369a0250c3f0880803392d694fb3af8
+            - image: codaprotocol/coda:toolchain-01a7053fdbd1f3fce2f52f93b0cf5a415aa5c913
         steps:
             - checkout
             - run:
@@ -447,7 +447,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-c7cdd86ab369a0250c3f0880803392d694fb3af8
+            - image: codaprotocol/coda:toolchain-01a7053fdbd1f3fce2f52f93b0cf5a415aa5c913
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -488,7 +488,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-c7cdd86ab369a0250c3f0880803392d694fb3af8
+            - image: codaprotocol/coda:toolchain-01a7053fdbd1f3fce2f52f93b0cf5a415aa5c913
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -507,7 +507,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-c7cdd86ab369a0250c3f0880803392d694fb3af8
+            - image: codaprotocol/coda:toolchain-01a7053fdbd1f3fce2f52f93b0cf5a415aa5c913
         steps:
             - checkout
             - run:
@@ -526,7 +526,7 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-c7cdd86ab369a0250c3f0880803392d694fb3af8
+            - image: codaprotocol/coda:toolchain-01a7053fdbd1f3fce2f52f93b0cf5a415aa5c913
         steps:
             - checkout
             - run:

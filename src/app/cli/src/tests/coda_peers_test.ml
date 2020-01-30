@@ -25,7 +25,7 @@ let main () =
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let _, expected_peers = Coda_processes.net_configs n in
-  let%bind _ = after (Time.Span.of_sec 20.) in
+  let%bind _ = after (Time.Span.of_sec 60.) in
   let%bind () =
     Deferred.all_unit
       (List.map2_exn workers expected_peers ~f:(fun worker expected_peers ->
