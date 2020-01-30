@@ -32,15 +32,20 @@ let%test_module "Full_frontier tests" =
       let diffs = Full_frontier.calculate_diffs frontier breadcrumb in
       ignore
         (Full_frontier.apply_diffs frontier diffs
-           ~ignore_consensus_local_state:false)
+           ~enable_epoch_ledger_sync:`Disabled)
 
     let add_breadcrumbs frontier = List.iter ~f:(add_breadcrumb frontier)
 
     let create_frontier () =
+      let open Core in
       let base_hash = Frontier_hash.empty in
+      let epoch_ledger_location =
+        Filename.temp_dir_name ^/ "epoch_ledger"
+        ^ (Uuid_unix.create () |> Uuid.to_string)
+      in
       let consensus_local_state =
         Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-          ~genesis_ledger:Test_genesis_ledger.t
+          ~genesis_ledger:Test_genesis_ledger.t ~epoch_ledger_location
       in
       let root_ledger =
         Or_error.ok_exn
@@ -70,7 +75,8 @@ let%test_module "Full_frontier tests" =
                 Full_frontier.find_exn frontier
                   (Breadcrumb.state_hash breadcrumb)
               in
-              [%test_eq: Breadcrumb.t] breadcrumb queried_breadcrumb ) )
+              [%test_eq: Breadcrumb.t] breadcrumb queried_breadcrumb ;
+              Full_frontier.For_tests.close_databases ~frontier ) )
 
     let%test_unit "Constructing a better branch should change the best tip" =
       let gen_branches =
@@ -105,8 +111,8 @@ let%test_module "Full_frontier tests" =
               add_breadcrumbs frontier (List.tl_exn long_branch) ;
               test_best_tip
                 (List.last_exn long_branch)
-                ~message:"best tip should change when all of best tip is added"
-          ) )
+                ~message:"best tip should change when all of best tip is added" ;
+              Full_frontier.For_tests.close_databases ~frontier ) )
 
     let%test_unit "The root should be updated after (> max_length) nodes are \
                    added in sequence" =
@@ -139,7 +145,8 @@ let%test_module "Full_frontier tests" =
                          ~message:
                            "roots should be the same before max_length \
                             breadcrumbs" ;
-                     i + 1 ) ) )
+                     i + 1 ) ;
+              Full_frontier.For_tests.close_databases ~frontier ) )
 
     let%test_unit "The length of the longest branch should never be greater \
                    than max_length" =
@@ -157,8 +164,8 @@ let%test_module "Full_frontier tests" =
                   [%test_pred: int] (( >= ) max_length)
                     (List.length
                        Full_frontier.(
-                         path_map frontier (best_tip frontier) ~f:Fn.id)) ) )
-      )
+                         path_map frontier (best_tip frontier) ~f:Fn.id)) ) ;
+              Full_frontier.For_tests.close_databases ~frontier ) )
 
     let%test_unit "Common ancestor can be reliably found" =
       let ancestor_length = (max_length / 2) - 1 in
@@ -189,5 +196,6 @@ let%test_module "Full_frontier tests" =
               add_breadcrumbs frontier (branch_a @ branch_b) ;
               [%test_eq: State_hash.t]
                 (Full_frontier.common_ancestor frontier tip_a tip_b)
-                (Breadcrumb.state_hash youngest_ancestor) ) )
+                (Breadcrumb.state_hash youngest_ancestor) ;
+              Full_frontier.For_tests.close_databases ~frontier ) )
   end )

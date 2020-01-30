@@ -589,4 +589,11 @@ module For_tests = struct
           make_branch (get_branch_root frontier) )
     in
     (frontier, branch)
+
+  let close_databases ~frontier =
+    Full_frontier.For_tests.close_databases ~frontier:frontier.full_frontier ;
+    Ledger.Db.close (root_snarked_ledger frontier) ;
+    Core.Option.iter
+      (persistent_frontier frontier).Persistent_frontier.Factory_type.instance
+      ~f:(fun instance -> Persistent_frontier.Database.close instance.db)
 end

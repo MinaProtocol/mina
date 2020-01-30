@@ -517,7 +517,7 @@ let%test_module "Ledger_catchup tests" =
           "catchup breadcrumbs were not equal to the best tip path we expected"
 
     let%test_unit "can catchup to a peer within [2/k,k]" =
-      Quickcheck.test ~trials:1
+      Quickcheck.test ~trials:5
         Fake_network.Generator.(
           let open Quickcheck.Generator.Let_syntax in
           let%bind peer_branch_size =
@@ -536,7 +536,11 @@ let%test_module "Ledger_catchup tests" =
                 (best_tip peer_net.state.frontier))
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path ) )
+              test_successful_catchup ~my_net ~target_best_tip_path ) ;
+          Transition_frontier.For_tests.close_databases
+            ~frontier:my_net.state.frontier ;
+          Transition_frontier.For_tests.close_databases
+            ~frontier:peer_net.state.frontier )
 
     let%test_unit "catchup succeeds even if the parent transition is already \
                    in the frontier" =
@@ -551,7 +555,11 @@ let%test_module "Ledger_catchup tests" =
             [Transition_frontier.best_tip peer_net.state.frontier]
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path ) )
+              test_successful_catchup ~my_net ~target_best_tip_path ) ;
+          Transition_frontier.For_tests.close_databases
+            ~frontier:my_net.state.frontier ;
+          Transition_frontier.For_tests.close_databases
+            ~frontier:peer_net.state.frontier )
 
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
@@ -597,8 +605,11 @@ let%test_module "Ledger_catchup tests" =
                   (Ivar.read (Cache_lib.Cached.final_state cached_transition))
               in
               if result <> `Failed then
-                failwith "expected ledger catchup to fail, but it succeeded" )
-          )
+                failwith "expected ledger catchup to fail, but it succeeded" ;
+              Transition_frontier.For_tests.close_databases
+                ~frontier:my_net.state.frontier ;
+              Transition_frontier.For_tests.close_databases
+                ~frontier:peer_net.state.frontier ) )
 
     (* TODO: fix and re-enable *)
     (*
