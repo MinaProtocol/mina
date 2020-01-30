@@ -334,13 +334,8 @@ jobs:
             - run:
                   name: Build OCaml
                   command: |
+                    ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
                     ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
-                  environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
-                  command: ./scripts/skip_if_only_frontend.sh scripts/pvkeys-download.sh
-            - run:
-                  name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                   no_output_timeout: 20m
