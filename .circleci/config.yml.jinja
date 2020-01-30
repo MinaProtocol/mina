@@ -198,6 +198,15 @@ jobs:
                     sudo rm -rf /Library/Developer/CoreSimulator/Profiles/Runtimes/
                     df -h
                 background: true
+            # Attach workspace from prior linux build
+            - attach_workspace:
+                at: /tmp/workspace
+            - run:
+                name: Unpack Workspace PV Keys
+                command: |
+                    sudo mkdir -p /var/lib/coda
+                    sudo tar xvf /tmp/workspace/coda*.bz2 -C /var/lib/coda/
+                    sudo rm /tmp/workspace/coda*.bz2
             - checkout
             - run:
                   name: Update submodules
@@ -285,17 +294,19 @@ jobs:
                 name: Collect PV Keys
                 command: |
                     mkdir -p package/keys
-
-                    echo 'keys'
-                    cp /tmp/s3_cache_dir/* package/keys/.
-                    echo 'coda'
-                    cp _build/default/src/app/cli/src/coda.exe package/coda
-                    echo 'libp2p_helper'
+                    cp /var/lib/coda/* package/keys/.
+            - run:
+                name: Collect and rewrite aux binaries (kademlia + libp2p_helper + logproc)
+                command: |
                     cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
                     chmod +w package/coda-libp2p_helper
                     ./scripts/librewrite-macos.sh package/coda-libp2p_helper
                     cp src/_build/default/app/logproc/logproc.exe package/coda-logproc
                     chmod +wx package/coda-logproc
+            - run:
+                name: Collect coda binary
+                command: |
+                    cp src/_build/default/app/cli/src/coda.exe package/coda
             - run:
                 name: Build homebrew coda package
                 command: |
