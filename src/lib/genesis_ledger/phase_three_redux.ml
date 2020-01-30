@@ -3,14 +3,12 @@ let vrf_winner_keypair =
     ( Core_kernel.Binable.of_string
         (module Signature_lib.Public_key.Compressed.Stable.Latest)
         pk
-    , Core_kernel.Binable.of_string
-        (module Signature_lib.Private_key.Stable.Latest)
-        sk )
+    , sk )
   in
   conv
     ( "\001\001`\232/\r\250p\253\234f7^I\156\235'\243\001\027;V\249\192Y\158\198#\143:\2138D\211\202\022t\212}\205\208\193\174\253\153\192\192\215\186\217\199\218A\185\187\178\165~\241\198\224\149\184\152D\130m\b\128\166(\209\022yUK\r\243\223'\026o\164\170\150\255\2234\155B\227E\191vb\236]\000\000\001"
-    , "`\222n\145/\225]\210\202\031\136\000\016\001\174%]. \
-       2X\143GX,\137\209\157\177\201\190\133\006\135>C\015\227\187\\s\237\0169\236\215\030\151\173\236\018\134\006\194W\229\027\232\021Q\141\011\173/\209(\015$\226\244\254\194\154yT\213J\227\166\155'K\209\203\231\1662\221\239\217c\252\151\138\131\001\000"
+    , Signature_lib.Private_key.of_base58_check_exn
+        "6BnSKU5GQjgvEPbM45Qzazsf6M8eCrQdpL7x4jAvA4sr8Ga3FAx8AxdgWcqN7uNGu1SthMgDeMSUvEbkY9a56UxwmJpTzhzVUjfgfFsjJSVp9H1yWHt6H5couPNpF7L7e5u7NBGYnDMhx"
     )
 
 open Functor.Without_private
