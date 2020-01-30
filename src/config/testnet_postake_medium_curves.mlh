@@ -30,6 +30,6 @@
 
 [%%define print_versioned_types false]
 
-[%%define daemon_expiry "2020-01-15 14:00:00-07:00"]
+[%%define daemon_expiry "2024-01-15 14:00:00-07:00"]
 
 [%%define pending_coinbase_hack true]
