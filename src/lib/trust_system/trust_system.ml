@@ -67,16 +67,20 @@ module Actions = struct
       for logging. *)
   type t = action * (string * (string, Yojson.Safe.json) List.Assoc.t) option
 
-  let to_trust_response (action, _) =
+  let to_trust_response (_action, _) =
     let open Peer_trust.Trust_response in
     (* FIXME figure out a good value for this *)
     let fulfilled_increment = Peer_trust.max_rate 10. in
     (* the summed decreases of a connection and request equals
        the increase of a fulfilled request *)
-    let request_increment = 0.90 *. fulfilled_increment in
-    let connected_increment = 0.10 *. fulfilled_increment in
-    let epoch_ledger_provided_increment = 10. *. fulfilled_increment in
-    let old_gossip_increment = Peer_trust.max_rate 20. in
+    let _request_increment = 0.90 *. fulfilled_increment in
+    let _connected_increment = 0.10 *. fulfilled_increment in
+    let _epoch_ledger_provided_increment = 10. *. fulfilled_increment in
+    let _old_gossip_increment = Peer_trust.max_rate 20. in
+    (* TEMP HACK FOR TESTNET: disable trust system *)
+    Trust_increase 0.0
+
+  (*
     match action with
     | Gossiped_old_transition slot_diff ->
         (* NOTE: slot_diff here is [received_slot - (proposed_slot + Δ)]
@@ -141,6 +145,7 @@ module Actions = struct
         Trust_decrease (old_gossip_increment *. 3.)
     | Sent_old_gossip ->
         Trust_decrease old_gossip_increment
+    *)
 
   let to_log : t -> string * (string, Yojson.Safe.json) List.Assoc.t =
    fun (action, extra_opt) ->
