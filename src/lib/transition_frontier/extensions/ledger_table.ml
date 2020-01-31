@@ -2,6 +2,10 @@ open Core_kernel
 open Coda_base
 open Frontier_base
 
+(* WARNING: don't use this code until @nholland has landed a PR that
+   synchronize the read/write of transition frontier
+ *)
+
 module T = struct
   (* a pair of hash tables
      the first maps ledger hashes to ledgers

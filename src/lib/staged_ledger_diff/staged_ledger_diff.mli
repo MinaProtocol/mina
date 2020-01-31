@@ -107,7 +107,7 @@ end
 type t =
   { diff: Diff.t
   ; creator: Public_key.Compressed.t
-  ; state_body_hash: State_body_hash.Stable.V1.t }
+  ; coinbase_receiver: Public_key.Compressed.t }
 [@@deriving sexp, to_yojson, fields]
 
 module Stable :
@@ -116,7 +116,7 @@ module Stable :
       type t =
         { diff: Diff.t
         ; creator: Public_key.Compressed.t
-        ; state_body_hash: State_body_hash.Stable.V1.t }
+        ; coinbase_receiver: Public_key.Compressed.t }
       [@@deriving sexp, to_yojson, bin_io, version]
     end
 
@@ -145,7 +145,7 @@ module With_valid_signatures_and_proofs : sig
   type t =
     { diff: diff
     ; creator: Public_key.Compressed.t
-    ; state_body_hash: State_body_hash.t }
+    ; coinbase_receiver: Public_key.Compressed.t }
   [@@deriving sexp, to_yojson]
 
   val user_commands : t -> User_command.With_valid_signature.t list
@@ -172,7 +172,7 @@ module With_valid_signatures : sig
   type t =
     { diff: diff
     ; creator: Public_key.Compressed.t
-    ; state_body_hash: State_body_hash.t }
+    ; coinbase_receiver: Public_key.Compressed.t }
   [@@deriving sexp, to_yojson]
 end
 

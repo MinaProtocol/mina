@@ -75,8 +75,7 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
       | Error (`Failure msg) ->
           Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
-              [ ( "target_root"
-                , Root_identifier.Stable.Latest.to_yojson root_identifier ) ]
+              [("target_root", Root_identifier.to_yojson root_identifier)]
             "Unable to fast forward persistent frontier: %s" msg ;
           Error (`Failure msg) )
   in

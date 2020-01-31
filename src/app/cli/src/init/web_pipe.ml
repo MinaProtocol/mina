@@ -19,11 +19,11 @@ module Storage (Bin : Binable.S) = struct
 end
 
 module Make_broadcaster (Put_request : Web_request.Intf.S) = struct
-  let get_proposer_chain coda =
+  let get_block_producer_chain coda =
     let open Base in
     let open Keypair in
     let get_lite_chain_exn = Option.value_exn Coda_run.get_lite_chain in
-    (* HACK: we are just passing in the proposer path for this demo *)
+    (* HACK: we are just passing in the block producer path for this demo *)
     let keypair = Test_genesis_ledger.largest_account_keypair_exn () in
     let keys = [Public_key.compress keypair.public_key] in
     get_lite_chain_exn coda keys
@@ -37,7 +37,7 @@ module Make_broadcaster (Put_request : Web_request.Intf.S) = struct
   let run ~filename ~logger coda =
     let%bind web_client_pipe = Web_pipe.create ~filename ~logger in
     Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda) ~f:(fun _ ->
-        let chain = get_proposer_chain coda in
+        let chain = get_block_producer_chain coda in
         Web_pipe.store web_client_pipe chain )
 end
 

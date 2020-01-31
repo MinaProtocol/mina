@@ -57,6 +57,7 @@ echo "------------------------------------------------------------"
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
+cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
 
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
@@ -98,6 +99,11 @@ do
     done
 done
 
+# Genesis Ledger Copy
+for f in /tmp/coda_cache_dir/coda_genesis*; do
+    cp /tmp/coda_cache_dir/coda_genesis* "${BUILDDIR}/var/lib/coda/."
+done
+
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
 #       but it needs to be present for this to be effective
@@ -113,7 +119,7 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
 ls -lh coda*.deb
 
 # Tar up keys for an artifact
@@ -152,5 +158,5 @@ EOF
 rm -f "${BUILDDIR}"/var/lib/coda/*_proving
 
 # build another deb
-dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh coda*.deb

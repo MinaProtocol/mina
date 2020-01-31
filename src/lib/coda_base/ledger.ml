@@ -222,14 +222,10 @@ module Ledger_inner = struct
     Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t)
 
   let get_or_create ledger key =
-    let key, loc =
-      match get_or_create_account_exn ledger key (Account.initialize key) with
-      | `Existed, loc ->
-          ([], loc)
-      | `Added, loc ->
-          ([key], loc)
+    let action, loc =
+      get_or_create_account_exn ledger key (Account.initialize key)
     in
-    (key, Option.value_exn (get ledger loc), loc)
+    (action, Option.value_exn (get ledger loc), loc)
 
   let create_empty ledger key =
     let start_hash = merkle_root ledger in

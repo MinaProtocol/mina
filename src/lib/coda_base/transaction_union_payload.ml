@@ -217,7 +217,7 @@ module Changes = struct
       let%bind receiver_increase =
         let%bind coinbase_receiver_increase =
           with_label __LOC__
-            (let%bind proposer_reward, `Underflow underflowed =
+            (let%bind producer_reward, `Underflow underflowed =
                Amount.Checked.sub_flagged coinbase_amount
                  (Amount.Checked.of_fee fee)
              in
@@ -225,7 +225,7 @@ module Changes = struct
                Boolean.Assert.any
                  [Boolean.not underflowed; Boolean.not is_coinbase]
              in
-             proposer_reward)
+             producer_reward)
         in
         if_amount is_stake_delegation
           ~then_:(Amount.var_of_t Amount.zero)

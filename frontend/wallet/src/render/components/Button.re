@@ -1,3 +1,5 @@
+open ReactIntl;
+
 type mode =
   | Blue
   | HyperlinkBlue
@@ -109,7 +111,11 @@ let make =
     ?onMouseLeave
     className={Css.merge([
       disabled ? Styles.disabled : "",
-      Css.style([Css.minWidth(`rem(width)), Css.height(`rem(height))]),
+      Css.style([
+        Css.minWidth(`rem(width)),
+        Css.height(`rem(height)),
+        Css.textTransform(`capitalize),
+      ]),
       switch (style) {
       | Blue => Styles.blue
       | Green => Styles.green
@@ -123,5 +129,5 @@ let make =
      | Some(kind) => <Icon kind />
      | None => React.null
      }}
-    {React.string(label)}
+    <FormattedMessage id=label defaultMessage=label />
   </button>;
