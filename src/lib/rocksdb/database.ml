@@ -84,7 +84,7 @@ let to_bigstring = Bigstring.of_string
 let%test_unit "to_alist (of_alist l) = l" =
   Async.Thread_safe.block_on_async_exn
   @@ fun () ->
-  Async.Quickcheck.async_test ~trials:200
+  Async.Quickcheck.async_test ~trials:50
     Quickcheck.Generator.(
       tuple2 String.quickcheck_generator String.quickcheck_generator |> list)
     ~f:(fun kvs ->
@@ -108,12 +108,11 @@ let%test_unit "to_alist (of_alist l) = l" =
               close db ;
               Async.Deferred.unit ) )
 
-(*
 let%test_unit "checkpoint read" =
   let open Async in
   Thread_safe.block_on_async_exn
   @@ fun () ->
-  Quickcheck.async_test ~trials:200
+  Quickcheck.async_test ~trials:50
     Quickcheck.Generator.(
       list @@ tuple2 String.quickcheck_generator String.quickcheck_generator)
     ~f:(fun kvs ->
@@ -170,5 +169,6 @@ let%test_unit "checkpoint read" =
               let%bind () = File_system.remove_dir cp_dir in
               Deferred.unit
           | _ ->
+              let%bind () = File_system.remove_dir db_dir in
+              let%bind () = File_system.remove_dir cp_dir in
               Deferred.unit ) )
-*)
