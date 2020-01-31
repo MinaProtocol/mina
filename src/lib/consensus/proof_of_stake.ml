@@ -64,6 +64,10 @@ let compute_delegatee_table keys ~iter_accounts =
     (Float.of_int num_delegators) ;
   outer_table
 
+let compute_delegatee_table_sparse_ledger keys ledger =
+  compute_delegatee_table keys ~iter_accounts:(fun f ->
+      Coda_base.Sparse_ledger.iteri ledger ~f:(fun i acct -> f i acct) )
+
 let compute_delegatee_table_ledger_db keys ledger =
   compute_delegatee_table keys ~iter_accounts:(fun f ->
       Coda_base.Ledger.Db.iteri ledger ~f:(fun i acct -> f i acct) )
@@ -323,6 +327,35 @@ module Data = struct
           !t.staking_epoch_snapshot <- v
       | Next_epoch_snapshot ->
           !t.next_epoch_snapshot <- v
+
+    let reset_snapshot (t : t) id ~sparse_ledger =
+      let open Coda_base in
+      let module Ledger_transfer =
+        Ledger_transfer.From_sparse_ledger (Ledger.Db) in
+      let delegatee_table =
+        compute_delegatee_table_sparse_ledger
+          (current_block_production_keys t)
+          sparse_ledger
+      in
+      match id with
+      | Staking_epoch_snapshot ->
+          let old_ledger = !t.staking_epoch_snapshot.ledger in
+          Ledger.Db.close old_ledger ;
+          let location = !t.staking_epoch_snapshot.location in
+          File_system.rmrf location ;
+          let ledger = Ledger.Db.create ~directory_name:location () in
+          ignore
+          @@ Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger ;
+          !t.staking_epoch_snapshot <- {delegatee_table; ledger; location}
+      | Next_epoch_snapshot ->
+          let old_ledger = !t.next_epoch_snapshot.ledger in
+          Ledger.Db.close old_ledger ;
+          let location = !t.next_epoch_snapshot.location in
+          File_system.rmrf location ;
+          let ledger = Ledger.Db.create ~directory_name:location () in
+          ignore
+          @@ Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger ;
+          !t.staking_epoch_snapshot <- {delegatee_table; ledger; location}
 
     let next_epoch_ledger (t : t) =
       Snapshot.ledger @@ get_snapshot t Next_epoch_snapshot
@@ -2634,22 +2667,35 @@ module Hooks = struct
           ; location= !local_state.staking_epoch_snapshot.location } ;
         return true )
       else
-        let ledger =
-          match snapshot_id with
-          | Staking_epoch_snapshot ->
-              !local_state.staking_epoch_snapshot.ledger
-          | Next_epoch_snapshot ->
-              !local_state.next_epoch_snapshot.ledger
-        in
-        let sync_ledger =
-          Coda_base.Sync_ledger.Db.create ledger ~logger ~trust_system
-        in
-        (*Coda_networking.glue_sync_ledger (failwith "get a network")
-          (Coda_base.Sync_ledger.Db.query_reader sync_ledger)
-          (Coda_base.Sync_ledger.Db.answer_writer sync_ledger) ; *)
-        let%map _, _ = Coda_base.Sync_ledger.Db.valid_tree sync_ledger in
-        Coda_base.Sync_ledger.Db.destroy sync_ledger ;
-        true
+        Deferred.List.exists (random_peers 3) ~f:(fun peer ->
+            match%bind
+              query_peer.query peer Rpcs.Get_epoch_ledger
+                (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
+            with
+            | Ok (Ok sparse_ledger) ->
+                let%bind () =
+                  Trust_system.(
+                    record trust_system logger peer.host
+                      Actions.(Epoch_ledger_provided, None))
+                in
+                reset_snapshot local_state snapshot_id ~sparse_ledger ;
+                return true
+            | Ok (Error err) ->
+                Logger.faulty_peer_without_punishment logger
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:
+                    [ ("peer", Network_peer.Peer.to_yojson peer)
+                    ; ("error", `String err) ]
+                  "Peer $peer failed to serve requested epoch ledger: $error" ;
+                return false
+            | Error err ->
+                Logger.faulty_peer_without_punishment logger
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:
+                    [ ("peer", Network_peer.Peer.to_yojson peer)
+                    ; ("error", `String (Error.to_string_hum err)) ]
+                  "Error when querying peer $peer for epoch ledger: $error" ;
+                return false )
     in
     if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()
     else Error (Error.of_string "failed to synchronize epoch ledger")
