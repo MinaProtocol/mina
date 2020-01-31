@@ -162,6 +162,7 @@ module Data = struct
     module Snapshot = struct
       type t =
         { ledger: Coda_base.Ledger.Db.t
+        ; merkle_root: Coda_base.Ledger_hash.t
         ; location: string
         ; delegatee_table:
             Coda_base.Account.t Coda_base.Account.Index.Table.t
@@ -171,11 +172,9 @@ module Data = struct
       let delegators t key =
         Public_key.Compressed.Table.find t.delegatee_table key
 
-      let to_yojson {ledger; delegatee_table} =
+      let to_yojson {ledger; delegatee_table; merkle_root; location} =
         `Assoc
-          [ ( "ledger_hash"
-            , Coda_base.(Ledger.Db.merkle_root ledger |> Ledger_hash.to_yojson)
-            )
+          [ ("ledger_hash", Coda_base.Ledger_hash.to_yojson merkle_root)
           ; ( "delegators"
             , `Assoc
                 ( Hashtbl.to_alist delegatee_table
@@ -272,12 +271,14 @@ module Data = struct
       ref
         { Data.staking_epoch_snapshot=
             { Snapshot.ledger= staking_epoch_ledger
+            ; merkle_root= Ledger.Db.merkle_root staking_epoch_ledger
             ; delegatee_table=
                 compute_delegatee_table_ledger_db block_producer_pubkeys
                   staking_epoch_ledger
             ; location= staking_epoch_ledger_location }
         ; next_epoch_snapshot=
             { Snapshot.ledger= next_epoch_ledger
+            ; merkle_root= Ledger.Db.merkle_root next_epoch_ledger
             ; delegatee_table=
                 compute_delegatee_table_ledger_db block_producer_pubkeys
                   next_epoch_ledger
@@ -290,8 +291,9 @@ module Data = struct
 
     let block_production_keys_swap t block_production_pubkeys now =
       let old : Data.t = !t in
-      let s {Snapshot.ledger; delegatee_table= _; location} =
+      let s {Snapshot.ledger; delegatee_table= _; location; merkle_root} =
         { Snapshot.ledger
+        ; merkle_root
         ; delegatee_table=
             compute_delegatee_table_ledger_db block_production_pubkeys ledger
         ; location }
@@ -337,6 +339,7 @@ module Data = struct
           (current_block_production_keys t)
           sparse_ledger
       in
+      let merkle_root = Sparse_ledger.merkle_root sparse_ledger in
       match id with
       | Staking_epoch_snapshot ->
           let old_ledger = !t.staking_epoch_snapshot.ledger in
@@ -346,7 +349,8 @@ module Data = struct
           let ledger = Ledger.Db.create ~directory_name:location () in
           ignore
           @@ Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger ;
-          !t.staking_epoch_snapshot <- {delegatee_table; ledger; location}
+          !t.staking_epoch_snapshot
+          <- {delegatee_table; ledger; location; merkle_root}
       | Next_epoch_snapshot ->
           let old_ledger = !t.next_epoch_snapshot.ledger in
           Ledger.Db.close old_ledger ;
@@ -355,7 +359,8 @@ module Data = struct
           let ledger = Ledger.Db.create ~directory_name:location () in
           ignore
           @@ Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger ;
-          !t.next_epoch_snapshot <- {delegatee_table; ledger; location}
+          !t.next_epoch_snapshot
+          <- {delegatee_table; ledger; location; merkle_root}
 
     let next_epoch_ledger (t : t) =
       Snapshot.ledger @@ get_snapshot t Next_epoch_snapshot
@@ -2464,10 +2469,7 @@ module Hooks = struct
                   ; !local_state.Data.next_epoch_snapshot ]
                 in
                 List.find_map candidate_snapshots ~f:(fun snapshot ->
-                    if
-                      Ledger_hash.equal ledger_hash
-                        (Ledger.Db.merkle_root snapshot.ledger)
-                    then
+                    if Ledger_hash.equal ledger_hash snapshot.merkle_root then
                       Some
                         ( Coda_base.Sparse_ledger.of_any_ledger
                         @@ Coda_base.Ledger.Any_ledger.cast
@@ -2607,8 +2609,7 @@ module Hooks = struct
         (not
            (Ledger_hash.equal
               (Frozen_ledger_hash.to_ledger_hash expected_root)
-              (Ledger.Db.merkle_root
-                 (Local_state.get_snapshot local_state snapshot_id).ledger)))
+              (Local_state.get_snapshot local_state snapshot_id).merkle_root))
         {snapshot_id; expected_root}
     in
     match source with
@@ -2653,7 +2654,7 @@ module Hooks = struct
         && Coda_base.(
              Ledger_hash.equal
                (Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
-               (Ledger.Db.merkle_root !local_state.next_epoch_snapshot.ledger))
+               !local_state.next_epoch_snapshot.merkle_root)
       then (
         File_system.rmrf !local_state.staking_epoch_snapshot.location ;
         let ledger =
@@ -2663,6 +2664,7 @@ module Hooks = struct
         in
         set_snapshot local_state Staking_epoch_snapshot
           { ledger
+          ; merkle_root= !local_state.next_epoch_snapshot.merkle_root
           ; delegatee_table= !local_state.next_epoch_snapshot.delegatee_table
           ; location= !local_state.staking_epoch_snapshot.location } ;
         return true )
@@ -2906,7 +2908,7 @@ module Hooks = struct
         Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
           !"Using %s_epoch_snapshot root hash %{sexp:Coda_base.Ledger_hash.t}"
           (epoch_snapshot_name source)
-          (Coda_base.Ledger.Db.merkle_root snapshot.ledger) ;
+          snapshot.merkle_root ;
         snapshot
       in
       let block_data unseen_pks slot =
@@ -2987,6 +2989,7 @@ module Hooks = struct
              Coda_base.Ledger.Db.create_checkpoint
                !local_state.next_epoch_snapshot.ledger
                ~directory_name:!local_state.staking_epoch_snapshot.location ()
+         ; merkle_root= !local_state.next_epoch_snapshot.merkle_root
          ; delegatee_table= !local_state.next_epoch_snapshot.delegatee_table
          ; location= !local_state.staking_epoch_snapshot.location } ;
       Coda_base.Ledger.Db.close !local_state.next_epoch_snapshot.ledger ;
@@ -2995,6 +2998,7 @@ module Hooks = struct
       <- { ledger=
              Coda_base.Ledger.Db.create_checkpoint snarked_ledger
                ~directory_name:!local_state.next_epoch_snapshot.location ()
+         ; merkle_root= Coda_base.Ledger.Db.merkle_root snarked_ledger
          ; delegatee_table=
              compute_delegatee_table_ledger_db
                (Local_state.current_block_production_keys local_state)
