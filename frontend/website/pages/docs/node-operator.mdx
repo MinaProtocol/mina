@@ -21,14 +21,15 @@ The Coda network is secured by [Proof-of-Stake consensus](/docs/glossary/#proof-
 
 <!-- coda client set-staking -privkey-path keys/my-wallet -->
 
-Since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can now start the daemon with the `-propose-key` flag to begin staking coda. Let's stop our current daemon process, and restart it with the following command, passing in the file path for the associated private key (by default, keypairs live in `~/.coda-config/wallets/store`).
+Since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can now start the daemon with the `-propose-key` flag to begin staking coda. 
+Let's stop our current daemon process, and restart it with the following command, passing in the file path for the associated private key (by default, keypairs live in `~/.coda-config/wallets/store`). Since we conveniently saved it as an environment variable in the previous step, we can run the following command:
 
     coda daemon \
         -external-port 8302 \
         -discovery-port 8303 \
         -peer /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/ipfs/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH \
         -peer /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/ipfs/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA \
-        -propose-key <PRIVATE-KEY-FILE>
+        -propose-key $PRIVATE_KEY_FILE
 
 <Alert>
 
