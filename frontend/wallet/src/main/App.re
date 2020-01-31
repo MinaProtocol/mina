@@ -1,7 +1,7 @@
 open BsElectron;
 open Tc;
 
-[@bs.module "electron"][@bs.scope "shell"][@bs.val]
+[@bs.module "electron"] [@bs.scope "shell"] [@bs.val]
 external openItem: string => unit = "openItem";
 
 let createTray = dispatch => {
@@ -132,6 +132,8 @@ let run = () =>
       App.on(`WillQuit, () => dispatch(Action.ControlCoda(None)));
       createTray(dispatch);
       createApplicationMenu();
+
+      DaemonProcess.CodaProcess.(start(defaultArgs)) |> ignore;
 
       AppWindow.deepLink({AppWindow.Input.path: Route.Home, dispatch});
     },

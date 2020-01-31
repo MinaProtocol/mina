@@ -84,6 +84,8 @@ module GADT = struct
   module type Key_intf = sig
     type 'a t
 
+    val to_string : 'a t -> string
+
     val binable_key_type : 'a t -> 'a t Bin_prot.Type_class.t
 
     val binable_data_type : 'a t -> 'a Bin_prot.Type_class.t

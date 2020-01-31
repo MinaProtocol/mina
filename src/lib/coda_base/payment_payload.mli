@@ -1,6 +1,4 @@
 open Core
-open Fold_lib
-open Tuple_lib
 open Snark_params.Tick
 open Import
 
@@ -40,14 +38,10 @@ val gen : max_amount:Currency.Amount.t -> t Quickcheck.Generator.t
 
 type var = (Public_key.Compressed.var, Currency.Amount.var) Poly.t
 
-val length_in_triples : int
-
 val typ : (var, t) Typ.t
 
-val to_triples : t -> bool Triple.t list
+val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
-val fold : t -> bool Triple.t Fold.t
-
-val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
 val var_of_t : t -> var

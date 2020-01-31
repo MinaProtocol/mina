@@ -28,6 +28,6 @@ else
     TEST_CASE="$TEST_FILE:$2"
 fi
 ulimit -s 65532 && (ulimit -n 10240 || true) && \
-dune exec "$TEST_RUNNER_PROG" --profile=$DUNE_PROFILE -- \
+dune exec "$TEST_RUNNER_PROG" --profile=$DUNE_PROFILE --display short -- \
     inline-test-runner "$LIBRARY_NAME" \
     -only-test "$TEST_CASE"

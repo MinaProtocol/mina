@@ -1,0 +1,5 @@
+(library
+  (name extensions)
+  (public_name transition_frontier_extensions)
+  (libraries transition_frontier_base transition_frontier_full_frontier async_kernel core_kernel coda_base pipe_lib)
+  (preprocess (pps ppx_jane ppx_coda)))

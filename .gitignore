@@ -3,8 +3,8 @@ _build*
 *.install
 .merlin*
 result
-test.log
-build.log
+*.log
+*.aux
 src/config.mlh
 src/config/config.mlh
 src/external/ocaml-rocksdb/rocksdb
@@ -16,3 +16,4 @@ node_modules/
 .DS_Store
 .graphql_ppx_cache
 /scripts/archive/output
+accounts.json

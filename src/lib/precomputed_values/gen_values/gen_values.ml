@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"/src/config.mlh"]
 
 open Ppxlib
 open Asttypes
@@ -38,7 +38,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
   let base_hash =
-    Keys.Step.instance_hash (Lazy.force Genesis_protocol_state.t).data
+    Keys.Step.instance_hash Genesis_protocol_state.compile_time_genesis.data
 
   let base_hash_expr =
     [%expr
@@ -64,14 +64,18 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     let prover_state =
       { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state= Lazy.force Protocol_state.negative_one
+      ; prev_state=
+          Protocol_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
+      ; genesis_state_hash= Genesis_protocol_state.compile_time_genesis.hash
       ; expected_next_state= None
-      ; update= Lazy.force Snark_transition.genesis }
+      ; update= Snark_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
+      }
     in
     let main x =
       Tick.handle
         (Keys.Step.main ~logger:(Logger.create ()) x)
-        (Lazy.force Consensus.Data.Prover_state.precomputed_handler)
+        (Consensus.Data.Prover_state.precomputed_handler
+           ~genesis_ledger:Test_genesis_ledger.t)
     in
     let tick =
       Tick.prove

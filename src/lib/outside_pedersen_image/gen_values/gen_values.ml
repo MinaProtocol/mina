@@ -1,6 +1,3 @@
-[%%import
-"../../../config.mlh"]
-
 open Ppxlib
 open Asttypes
 open Parsetree

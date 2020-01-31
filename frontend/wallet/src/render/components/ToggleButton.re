@@ -46,6 +46,7 @@ let make = (~options, ~selected, ~onChange) => {
     {Array.mapi(
        (i, option_) =>
          <button
+           key={string_of_int(i) ++ option_}
            className={Styles.button(i == selected)}
            onClick={_e => onChange(i)}>
            {React.string(option_)}

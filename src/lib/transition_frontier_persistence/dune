@@ -1,5 +1,0 @@
-(library
-  (name transition_frontier_persistence)
-  (public_name transition_frontier_persistence)
-  (libraries coda_base core async rocksdb coda_intf signature_lib consensus storage transition_frontier yojson rpc_parallel)
-  (preprocess (pps ppx_coda -lint-version-syntax-warnings ppx_jane ppx_deriving.eq ppx_bin_prot ppx_deriving_yojson)))

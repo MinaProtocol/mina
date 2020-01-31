@@ -9,7 +9,9 @@ import sys
 import time
 from itertools import chain
 
-build_artifact_profiles = ['testnet_postake_medium_curves']
+build_artifact_profiles = [
+    'testnet_postake_medium_curves'
+]
 
 unit_test_profiles = ['test_postake_snarkless_unittest', 'dev']
 
@@ -21,10 +23,14 @@ simple_tests = [
 ]
 
 integration_tests = [
-    'coda-peers-test', 'coda-transitive-peers-test',
-    'coda-block-production-test', 'coda-shared-prefix-test -who-proposes 0',
-    'coda-shared-prefix-test -who-proposes 1', 'coda-restart-node-test',
-    'coda-change-snark-worker-test', 'coda-archive-node-test'
+    'coda-peers-test',
+    'coda-transitive-peers-test',
+    'coda-block-production-test',
+    'coda-shared-prefix-test -who-produces 0',
+    'coda-shared-prefix-test -who-produces 1',
+    'coda-restart-node-test',
+    'coda-change-snark-worker-test',
+    'coda-archive-node-test'
 ]
 
 all_tests = simple_tests + integration_tests
@@ -37,23 +43,19 @@ small_curves_tests = {
     'test_postake_split_snarkless':
     integration_tests,
     'test_postake_split':
-    ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
+    ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
     'test_postake':
     simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_bootstrap':
-    ['coda-bootstrap-test', 'coda-long-fork -num-proposers 2'],
-    'test_postake_three_proposers': ['coda-txns-and-restart-non-proposers'],
-    'test_postake_holy_grail': [
-        'coda-restarts-and-txns-holy-grail -num-proposers 5',
-        'coda-long-fork -num-proposers 5'
-    ],
+    ['coda-bootstrap-test', 'coda-long-fork -num-block-producers 2'],
+    'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
     'test_postake_five_even_snarkless':
-    ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
+    ['coda-shared-prefix-multiproducer-test -num-block-producers 5'],
     'test_postake_five_even_txns':
-    ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
+    ['coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments'],
 }
 
 medium_curves_tests = {
@@ -62,22 +64,23 @@ medium_curves_tests = {
     'test_postake_snarkless_medium_curves':
     simple_tests,
     'test_postake_split_medium_curves':
-    ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
+    ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
 }
 
 medium_curve_profiles_full = [
     'test_postake_medium_curves', 'testnet_postake_medium_curves',
-    'testnet_postake_many_proposers_medium_curves'
+    'testnet_postake_many_producers_medium_curves'
 ]
 
-ci_blacklist = [
+ci_excludes = [
     "ci/circleci: lint-opt",
 ]
 
-# of all the generated CI jobs, allow these specific ones to fail (extra blacklist on top of ci_blacklist)
-required_blacklist = [
+# of all the generated CI jobs, allow these specific ones to fail (extra excludes on top of ci_excludes)
+required_excludes = [
     'test_postake_five_even_snarkless:*',
     'test_postake_catchup:*',
+    'test_postake_three_producers:*'
 ]
 
 # these extra jobs are not filters, they are full status check names
@@ -123,25 +126,25 @@ def parse_filter(pattern_src):
 
 
 def filter_tests(tests,
-                 whitelist_filters,
-                 blacklist_filters,
+                 includes_filters,
+                 excludes_filters,
                  permutations=None):
     if permutations is None:
         permutations = tests
 
-    whitelist_patterns = list(map(parse_filter, whitelist_filters))
-    blacklist_patterns = list(map(parse_filter, blacklist_filters))
+    includes_patterns = list(map(parse_filter, includes_filters))
+    excludes_patterns = list(map(parse_filter, excludes_filters))
 
     def keep(profile, test):
-        whitelisted = all(
+        included = all(
             test_pattern(profile_pat, profile)
             and test_pattern(test_pat, test)
-            for (profile_pat, test_pat) in whitelist_patterns)
-        blacklisted = any(
+            for (profile_pat, test_pat) in includes_patterns)
+        excluded = any(
             test_pattern(profile_pat, profile)
             and test_pattern(test_pat, test)
-            for (profile_pat, test_pat) in blacklist_patterns)
-        return whitelisted and not (blacklisted)
+            for (profile_pat, test_pat) in excludes_patterns)
+        return included and not excluded
 
     result = collections.defaultdict(list)
     for (profile, tests) in permutations.items():
@@ -170,8 +173,8 @@ def run(args):
 
     logproc_filter = '.level in ["Warn", "Error", "Fatal", "Faulty_peer"]'
     coda_build_path = './_build/default'
+    coda_app_path = 'src/app'
 
-    coda_app_path = 'app' if os.path.exists('dune-project') else 'src/app'
     coda_exe_path = os.path.join(coda_app_path, 'cli/src/coda.exe')
     coda_exe = os.path.join(coda_build_path, coda_exe_path)
 
@@ -188,16 +191,16 @@ def run(args):
 
     all_tests = small_curves_tests
     all_tests.update(medium_curves_tests)
-    all_tests = filter_tests(all_tests, args.whitelist_patterns,
-                             args.blacklist_patterns)
+    all_tests = filter_tests(all_tests, args.includes_patterns,
+                             args.excludes_patterns)
     if len(all_tests) == 0:
         # TODO: support direct test dispatching
-        if args.whitelist_patterns != ['*']:
+        if args.includes_patterns != ['*']:
             fail(
-                'no tests were selected -- whitelist pattern did not match any known tests'
+                'no tests were selected -- includes pattern did not match any known tests'
             )
         else:
-            fail('no tests were selected -- blacklist is too restrictive')
+            fail('no tests were selected -- excludes is too restrictive')
 
     print('Preparing to run the following tests:')
     for (profile, tests) in all_tests.items():
@@ -246,9 +249,9 @@ def run(args):
 
 def get_required_status():
     tests = filter_tests(small_curves_tests, ['*'],
-                         required_blacklist,
+                         required_excludes,
                          permutations=filter_tests(small_curves_tests, ['*'],
-                                                   ci_blacklist))
+                                                   ci_excludes))
     return list(
         filter(
             lambda el: el not in not_required_status_checks,
@@ -272,7 +275,7 @@ def render(args):
     (output_file, ext) = os.path.splitext(args.circle_jinja_file)
     assert ext == '.jinja'
 
-    tests = filter_tests(small_curves_tests, ['*'], ci_blacklist)
+    tests = filter_tests(small_curves_tests, ['*'], ci_excludes)
 
     env = jinja2.Environment(
         loader=jinja2.FileSystemLoader(circle_ci_conf_dir), autoescape=False)
@@ -347,21 +350,20 @@ def main():
         '-d',
         '--dry-run',
         action='store_true',
-        help=
-        'Do not perform any side effects, only print what the program would do.'
+        help='Do not perform any side effects, only print what the program would do.'
     )
     run_parser.add_argument('-b',
-                            '--blacklist-pattern',
+                            '--excludes-pattern',
                             action='append',
                             type=str,
                             default=[],
-                            dest='blacklist_patterns',
+                            dest='excludes_patterns',
                             help='''
             Specify a pattern of tests to exclude from running. This flag can be
             provided multiple times to specify a series of patterns'
         ''')
     run_parser.add_argument(
-        'whitelist_patterns',
+        'includes_patterns',
         nargs='*',
         type=str,
         default=['*'],

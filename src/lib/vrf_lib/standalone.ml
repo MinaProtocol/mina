@@ -5,9 +5,42 @@ module Context = struct
   [@@deriving sexp]
 end
 
+module Evaluation = struct
+  module Discrete_log_equality = struct
+    module Poly = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type 'scalar t = {c: 'scalar; s: 'scalar} [@@deriving sexp]
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      type 'scalar t = 'scalar Stable.Latest.t = {c: 'scalar; s: 'scalar}
+      [@@deriving sexp]
+    end
+  end
+
+  module Poly = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type ('group, 'dleq) t =
+          {discrete_log_equality: 'dleq; scaled_message_hash: 'group}
+        [@@deriving sexp]
+      end
+    end]
+
+    type ('group, 'dleq) t = ('group, 'dleq) Stable.Latest.t =
+      {discrete_log_equality: 'dleq; scaled_message_hash: 'group}
+    [@@deriving sexp]
+  end
+end
+
 module Make
     (Impl : Snarky.Snark_intf.S) (Scalar : sig
-        type t [@@deriving eq, sexp, bin_io]
+        type t [@@deriving eq, sexp]
 
         val random : unit -> t
 
@@ -29,7 +62,7 @@ module Make
           end
         end
     end) (Group : sig
-      type t [@@deriving sexp, bin_io]
+      type t [@@deriving sexp]
 
       val add : t -> t -> t
 
@@ -112,7 +145,11 @@ module Make
   end
 
   module Evaluation : sig
-    type t [@@deriving sexp, bin_io]
+    type t =
+      ( Group.t
+      , Scalar.t Evaluation.Discrete_log_equality.Poly.t )
+      Evaluation.Poly.t
+    [@@deriving sexp]
 
     type var
 
@@ -154,9 +191,11 @@ end = struct
 
   module Evaluation = struct
     module Discrete_log_equality = struct
-      type 'scalar t_ = {c: 'scalar; s: 'scalar} [@@deriving sexp, bin_io]
+      type 'scalar t_ = 'scalar Evaluation.Discrete_log_equality.Poly.t =
+        {c: 'scalar; s: 'scalar}
+      [@@deriving sexp]
 
-      type t = Scalar.t t_ [@@deriving sexp, bin_io]
+      type t = Scalar.t t_ [@@deriving sexp]
 
       type var = Scalar.var t_
 
@@ -171,11 +210,11 @@ end = struct
           ~value_of_hlist:(fun [c; s] -> {c; s})
     end
 
-    type ('group, 'dleq) t_ =
+    type ('group, 'dleq) t_ = ('group, 'dleq) Evaluation.Poly.t =
       {discrete_log_equality: 'dleq; scaled_message_hash: 'group}
-    [@@deriving sexp, bin_io]
+    [@@deriving sexp]
 
-    type t = (Group.t, Discrete_log_equality.t) t_ [@@deriving sexp, bin_io]
+    type t = (Group.t, Discrete_log_equality.t) t_ [@@deriving sexp]
 
     type var = (Group.var, Discrete_log_equality.var) t_
 

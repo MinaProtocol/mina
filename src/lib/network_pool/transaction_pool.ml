@@ -1,6 +1,7 @@
 (** A pool of transactions that can be included in future blocks. Combined with
     the Network_pool module, this handles storing and gossiping the correct
-    transactions (user commands) and providing them to the proposer code. *)
+    transactions (user commands) and providing them to the block producer code.
+*)
 
 open Core
 open Async
@@ -9,6 +10,7 @@ open Module_version
 open Pipe_lib
 open Signature_lib
 
+(* TEMP HACK UNTIL DEFUNCTORING: transition frontier interface is simplified *)
 module type Transition_frontier_intf = sig
   type t
 
@@ -20,18 +22,14 @@ module type Transition_frontier_intf = sig
     val staged_ledger : t -> staged_ledger
   end
 
-  module Diff : sig
-    module Best_tip_diff : sig
-      type view =
-        { new_user_commands: User_command.t list
-        ; removed_user_commands: User_command.t list
-        ; reorg_best_tip: bool }
-    end
-  end
+  type best_tip_diff =
+    { new_user_commands: User_command.t list
+    ; removed_user_commands: User_command.t list
+    ; reorg_best_tip: bool }
 
   val best_tip : t -> Breadcrumb.t
 
-  val best_tip_diff_pipe : t -> Diff.Best_tip_diff.view Broadcast_pipe.Reader.t
+  val best_tip_diff_pipe : t -> best_tip_diff Broadcast_pipe.Reader.t
 end
 
 module type S = sig
@@ -163,7 +161,7 @@ struct
 
     let handle_diff t frontier
         ({new_user_commands; removed_user_commands; reorg_best_tip= _} :
-          Transition_frontier.Diff.Best_tip_diff.view) =
+          Transition_frontier.best_tip_diff) =
       (* This runs whenever the best tip changes. The simple case is when the
          new best tip is an extension of the old one. There, we just remove any
          user commands that were included in it from the transaction pool.
@@ -718,7 +716,7 @@ end)
                        with type staged_ledger := Staged_ledger.t) :
   S
   with type transition_frontier := Transition_frontier.t
-   and type best_tip_diff := Transition_frontier.Diff.Best_tip_diff.view =
+   and type best_tip_diff := Transition_frontier.best_tip_diff =
   Make0
     (Coda_base.Ledger)
     (struct
@@ -736,7 +734,20 @@ end)
     (Staged_ledger)
     (Transition_frontier)
 
-include Make (Staged_ledger) (Transition_frontier)
+(* TODO: defunctor or remove monkey patching (#3731) *)
+include Make
+          (Staged_ledger)
+          (struct
+            include Transition_frontier
+
+            type best_tip_diff = Extensions.Best_tip_diff.view =
+              { new_user_commands: User_command.t list
+              ; removed_user_commands: User_command.t list
+              ; reorg_best_tip: bool }
+
+            let best_tip_diff_pipe t =
+              Extensions.(get_view_pipe (extensions t) Best_tip_diff)
+          end)
 
 let%test_module _ =
   ( module struct
@@ -767,27 +778,20 @@ let%test_module _ =
         let staged_ledger = Fn.id
       end
 
-      module Diff = struct
-        module Best_tip_diff = struct
-          type view =
-            { new_user_commands: User_command.t list
-            ; removed_user_commands: User_command.t list
-            ; reorg_best_tip: bool }
-        end
-      end
+      type best_tip_diff =
+        { new_user_commands: User_command.t list
+        ; removed_user_commands: User_command.t list
+        ; reorg_best_tip: bool }
 
-      type t =
-        Diff.Best_tip_diff.view Broadcast_pipe.Reader.t * Breadcrumb.t ref
+      type t = best_tip_diff Broadcast_pipe.Reader.t * Breadcrumb.t ref
 
-      let create : unit -> t * Diff.Best_tip_diff.view Broadcast_pipe.Writer.t
-          =
+      let create : unit -> t * best_tip_diff Broadcast_pipe.Writer.t =
        fun () ->
         let pipe_r, pipe_w =
           Broadcast_pipe.create
-            Diff.Best_tip_diff.
-              { new_user_commands= []
-              ; removed_user_commands= []
-              ; reorg_best_tip= false }
+            { new_user_commands= []
+            ; removed_user_commands= []
+            ; reorg_best_tip= false }
         in
         let accounts =
           List.map (Array.to_list test_keys) ~f:(fun kp ->
@@ -931,7 +935,8 @@ let%test_module _ =
           ; delegate= Public_key.Compressed.empty
           ; voting_for=
               Quickcheck.random_value ~seed:(`Deterministic "constant")
-                State_hash.gen } )
+                State_hash.gen
+          ; timing= Account.Timing.Untimed } )
 
     let%test_unit "Transactions are removed and added back in fork changes" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -986,6 +991,7 @@ let%test_module _ =
       User_command.forget_check
       @@ User_command.sign test_keys.(sender_idx)
            (User_command_payload.create ~fee:(Currency.Fee.of_int fee)
+              ~valid_until:Coda_numbers.Global_slot.max_value
               ~nonce:(Account.Nonce.of_int nonce)
               ~memo:(User_command_memo.create_by_digesting_string_exn "foo")
               ~body:

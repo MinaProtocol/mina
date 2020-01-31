@@ -3,15 +3,15 @@
   (public_name consensus)
   (inline_tests)
   (modules (:standard \ proof_of_stake_fuzzer))
+  (flags (-w -37))
   (library_flags (-linkall))
   (libraries
     snarky_taylor
     core_kernel
     coda_base
     with_hash
-    genesis_ledger
+    test_genesis_ledger
     snark_params
-    gossip_net
     perf_histograms
     rc_pool
     test_util
@@ -22,7 +22,8 @@
     module_version
     yojson
     staged_ledger_hash
-    coda_metrics)
+    coda_metrics
+    graphql_lib)
    (preprocessor_deps "../../config.mlh")
    (preprocess (pps ppx_base ppx_coda -lint-version-syntax-warnings ppx_let ppx_assert ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv bisect_ppx -conditional))
    (synopsis "Consensus mechanisms"))

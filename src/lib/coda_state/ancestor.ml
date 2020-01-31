@@ -12,8 +12,7 @@ module Input = struct
     end
   end]
 
-  type t = Stable.Latest.t =
-    {descendant: State_hash.Stable.V1.t; generations: int}
+  type t = Stable.Latest.t = {descendant: State_hash.t; generations: int}
   [@@deriving sexp]
 end
 

@@ -7,19 +7,23 @@ let main () =
   let%bind program_dir = Unix.getcwd () in
   let n = 3 in
   let logger = Logger.create () in
-  let proposal_interval = Consensus.Constants.block_window_duration_ms in
+  let block_production_interval =
+    Consensus.Constants.block_window_duration_ms
+  in
   let acceptable_delay =
     Time.Span.of_ms
-      (proposal_interval * Consensus.Constants.delta |> Float.of_int)
+      (block_production_interval * Consensus.Constants.delta |> Float.of_int)
   in
-  let work_selection_method = Cli_lib.Arg_type.Sequence in
+  let work_selection_method =
+    Cli_lib.Arg_type.Work_selection_method.Sequence
+  in
   Coda_processes.init () ;
   let trace_dir = Unix.getenv "CODA_TRACING" in
   let max_concurrent_connections = None in
   let configs =
-    Coda_processes.local_configs n ~program_dir ~proposal_interval
+    Coda_processes.local_configs n ~program_dir ~block_production_interval
       ~acceptable_delay ~snark_worker_public_keys:None
-      ~proposers:(Fn.const None) ~work_selection_method ~trace_dir
+      ~block_production_keys:(Fn.const None) ~work_selection_method ~trace_dir
       ~max_concurrent_connections
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
@@ -32,9 +36,9 @@ let main () =
     peers ;
   let config =
     Coda_process.local_config ~peers ~addrs_and_ports ~acceptable_delay
-      ~snark_worker_key:None ~proposer:None ~program_dir ~work_selection_method
-      ~trace_dir ~offset:Time.Span.zero () ~max_concurrent_connections
-      ~is_archive_node:false
+      ~snark_worker_key:None ~block_production_key:None ~program_dir
+      ~work_selection_method ~trace_dir ~offset:Time.Span.zero ()
+      ~max_concurrent_connections ~is_archive_rocksdb:false
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in

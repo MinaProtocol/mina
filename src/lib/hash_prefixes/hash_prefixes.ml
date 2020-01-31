@@ -1,7 +1,5 @@
 let length_in_bytes = 20
 
-let length_in_triples = ((8 * length_in_bytes) + 2) / 3
-
 module T : sig
   type t = private string
 

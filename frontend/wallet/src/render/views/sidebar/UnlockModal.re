@@ -1,7 +1,15 @@
+open ReactIntl;
 open Tc;
 
+module Styles = {
+  open Css;
+
+  let subtitle =
+    merge([Theme.Text.Body.regular, style([textTransform(`capitalize)])]);
+};
+
 module UnlockAccount = [%graphql
-  {| mutation unlock($password: String, $publicKey: PublicKey) {
+  {| mutation unlock($password: String!, $publicKey: PublicKey!) {
       unlockWallet(input: {password: $password, publicKey: $publicKey}) {
           publicKey
         }
@@ -13,6 +21,17 @@ module UnlockMutation = ReasonApollo.CreateMutation(UnlockAccount);
 type modalState = {error: option(string)};
 [@react.component]
 let make = (~account, ~onClose, ~onSuccess) => {
+  let intl = useIntl();
+
+  let modalTitle =
+    Intl.formatMessage(
+      intl,
+      {
+        "id": "unlock-modal.unlock-account",
+        "defaultMessage": "Unlock Account",
+      },
+    );
+
   let (error, setError) = React.useState(() => None);
   let (password, setPassword) = React.useState(() => "");
   let variables =
@@ -21,12 +40,13 @@ let make = (~account, ~onClose, ~onSuccess) => {
       ~publicKey=Apollo.Encoders.publicKey(account),
       (),
     )##variables;
-  <Modal title="Unlock Account" onRequestClose=onClose>
+  <Modal title=modalTitle onRequestClose=onClose>
     <UnlockMutation>
       ...{(mutation, {result}) =>
         <form
           className=Modal.Styles.default
           onSubmit={event => {
+            ReactEvent.Synthetic.stopPropagation(event);
             ReactEvent.Form.preventDefault(event);
             mutation(
               ~variables,
@@ -52,8 +72,12 @@ let make = (~account, ~onClose, ~onSuccess) => {
              setError(_ => Some(message));
              React.null;
            }}
-          <p className=Theme.Text.Body.regular>
-            {React.string("Please enter password for ")}
+          <p className=Styles.subtitle>
+            <FormattedMessage
+              id="unlock-modal.please-enter-password"
+              defaultMessage="Please enter password for"
+            />
+            {React.string(" ")}
             <AccountName pubkey=account />
             {React.string(".")}
           </p>
@@ -68,12 +92,15 @@ let make = (~account, ~onClose, ~onSuccess) => {
           <Spacer height=1.5 />
           <div className=Css.(style([display(`flex)]))>
             <Button
-              label="Cancel"
+              label="cancel"
               style=Button.Gray
-              onClick={_ => onClose()}
+              onClick={evt => {
+                ReactEvent.Synthetic.stopPropagation(evt);
+                onClose();
+              }}
             />
             <Spacer width=1. />
-            <Button label="Unlock" style=Button.Green type_="submit" />
+            <Button label="unlock" style=Button.Green type_="submit" />
           </div>
         </form>
       }

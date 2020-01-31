@@ -1,6 +1,7 @@
 (library
   (name bootstrap_controller)
   (public_name bootstrap_controller)
+  (inline_tests)
   (preprocess (pps ppx_coda ppx_jane ppx_deriving.eq))
   (libraries
     core
@@ -12,4 +13,5 @@
     kademlia
     transition_frontier
     coda_networking
-    sync_handler))
+    sync_handler
+    fake_network))

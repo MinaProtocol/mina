@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"/src/config.mlh"]
 
 open Core
 open Async
@@ -30,17 +30,11 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
-let chain_id =
-  lazy
-    (let genesis_state_hash =
-       (Lazy.force Coda_state.Genesis_protocol_state.t).hash
-       |> State_hash.to_base58_check
-     in
-     let all_snark_keys =
-       List.fold_left ~f:( ^ ) ~init:"" Snark_keys.key_hashes
-     in
-     let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
-     Blake2.to_hex b2)
+let chain_id ~genesis_state_hash =
+  let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
+  let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
+  let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
+  Blake2.to_hex b2
 
 [%%inject
 "daemon_expiry", daemon_expiry]
@@ -50,12 +44,25 @@ let daemon logger =
   let open Cli_lib.Arg_type in
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir = Cli_lib.Flag.conf_dir
-     and propose_key =
-       flag "propose-key"
+     and block_production_key =
+       flag "block-producer-key"
          ~doc:
            "KEYFILE Private key file for the block producer. You cannot \
-            provide both `propose-key` and `propose-public-key`. (default: \
-            don't produce blocks)"
+            provide both `block-producer-key` and `block-producer-pubkey`. \
+            (default: don't produce blocks)"
+         (optional string)
+     and coinbase_receiver_flag =
+       flag "coinbase-receiver"
+         ~doc:
+           "PUBLICKEY Address to send coinbase rewards to (if this node is \
+            producing blocks). If not provided, coinbase rewards will be sent \
+            to the producer of a block."
+         (optional public_key_compressed)
+     and genesis_ledger_dir_flag =
+       flag "genesis-ledger-dir"
+         ~doc:
+           "Dir Directory that contains the genesis ledger and the genesis \
+            blockchain proof (default: <config-dir>/genesis-ledger)"
          (optional string)
      and initial_peers_raw =
        flag "kademlia-peer"
@@ -72,27 +79,10 @@ let daemon logger =
            "seq|rand Choose work sequentially (seq) or randomly (rand) \
             (default: rand)"
          (optional work_selection_method)
-     and external_port =
-       flag "external-port"
-         ~doc:
-           (sprintf
-              "PORT Base server port for daemon TCP (discovery UDP on port+1) \
-               (default: %d)"
-              Port.default_external)
-         (optional int16)
-     and client_port =
-       flag "client-port"
-         ~doc:
-           (sprintf "PORT Client to daemon local communication (default: %d)"
-              Port.default_client)
-         (optional int16)
-     and rest_server_port =
-       flag "rest-port"
-         ~doc:
-           (sprintf
-              "PORT local REST-server for daemon interaction (default: %d)"
-              Port.default_rest)
-         (optional int16)
+     and external_port = Flag.Port.Daemon.external_
+     and client_port = Flag.Port.Daemon.client
+     and rest_server_port = Flag.Port.Daemon.rest_server
+     and archive_process_location = Flag.Host_and_port.Daemon.archive
      and metrics_server_port =
        flag "metrics-port"
          ~doc:
@@ -110,14 +100,11 @@ let daemon logger =
          (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
-     and is_archive_node =
-       flag "archive" no_arg ~doc:"Archive all blocks heard"
-     and log_json =
-       flag "log-json" no_arg
-         ~doc:"Print daemon log output as JSON (default: plain text)"
-     and log_level =
-       flag "log-level" (optional string)
-         ~doc:"Set daemon log level (default: Info)"
+     and is_archive_rocksdb =
+       flag "archive-rocksdb" no_arg
+         ~doc:"Stores all the blocks heard in RocksDB"
+     and log_json = Flag.Log.json
+     and log_level = Flag.Log.level
      and snark_work_fee =
        flag "snark-worker-fee"
          ~doc:
@@ -166,9 +153,7 @@ let daemon logger =
          (optional bool)
      and disable_libp2p =
        flag "disable-libp2p-discovery" no_arg ~doc:"Disable libp2p discovery"
-     and discovery_port =
-       flag "discovery-port" (optional int)
-         ~doc:"PORT Port to use for peer-to-peer discovery (default: 28675)"
+     and discovery_port = Flag.Port.Daemon.discovery
      and enable_old_discovery =
        flag "enable-old-discovery" no_arg
          ~doc:"Enable the old Haskell Kademlia discovery"
@@ -190,24 +175,6 @@ let daemon logger =
        let compute_conf_dir home =
          Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
        in
-       let%bind log_level =
-         match log_level with
-         | None ->
-             Deferred.return Logger.Level.Info
-         | Some log_level_str_with_case -> (
-             let open Logger in
-             let log_level_str = String.lowercase log_level_str_with_case in
-             match Level.of_string log_level_str with
-             | Error _ ->
-                 eprintf "Received unknown log-level %s. Expected one of: %s\n"
-                   log_level_str
-                   ( Level.all |> List.map ~f:Level.show
-                   |> List.map ~f:String.lowercase
-                   |> String.concat ~sep:", " ) ;
-                 exit 14
-             | Ok ll ->
-                 Deferred.return ll )
-       in
        let%bind conf_dir =
          if is_background then
            let home = Core.Sys.home_directory () in
@@ -215,13 +182,7 @@ let daemon logger =
            Deferred.return conf_dir
          else Sys.home_directory () >>| compute_conf_dir
        in
-       let () =
-         match Core.Sys.file_exists conf_dir with
-         | `Yes ->
-             ()
-         | _ ->
-             Core.Unix.mkdir_p conf_dir
-       in
+       let%bind () = File_system.create_dir conf_dir in
        let () =
          if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
@@ -230,18 +191,7 @@ let daemon logger =
              ~redirect_stderr:`Dev_null () )
          else ()
        in
-       let stdout_log_processor =
-         if log_json then Logger.Processor.raw ()
-         else
-           Logger.Processor.pretty ~log_level
-             ~config:
-               { Logproc_lib.Interpolator.mode= Inline
-               ; max_interpolation_length= 50
-               ; pretty_print= true }
-       in
-       Logger.Consumer_registry.register ~id:"default"
-         ~processor:stdout_log_processor
-         ~transport:(Logger.Transport.stdout ()) ;
+       Stdout_log.setup log_json log_level ;
        (* 512MB logrotate max size = 1GB max filesystem usage *)
        let logrotate_max_size = 1024 * 1024 * 512 in
        Logger.Consumer_registry.register ~id:"default"
@@ -290,33 +240,9 @@ let daemon logger =
        (* When persistence is added back, this needs to be revisited
         * to handle persistence related files properly *)
        let%bind () =
-         let del_files dir =
-           let rec all_files dirname basename =
-             let fullname = Filename.concat dirname basename in
-             match%bind Sys.is_directory fullname with
-             | `Yes ->
-                 let%map dirs, files =
-                   Sys.ls_dir fullname
-                   >>= Deferred.List.map ~f:(all_files fullname)
-                   >>| List.unzip
-                 in
-                 let dirs =
-                   if String.equal dirname conf_dir then List.concat dirs
-                   else List.append (List.concat dirs) [fullname]
-                 in
-                 (dirs, List.concat files)
-             | _ ->
-                 Deferred.return ([], [fullname])
-           in
-           let%bind dirs, files = all_files dir "" in
-           let%bind () =
-             Deferred.List.iter files ~f:(fun file -> Sys.remove file)
-           in
-           Deferred.List.iter dirs ~f:(fun file -> Unix.rmdir file)
-         in
          let make_version ~wipe_dir =
            let%bind () =
-             if wipe_dir then del_files conf_dir else Deferred.unit
+             if wipe_dir then File_system.clear_dir conf_dir else Deferred.unit
            in
            let%bind wr = Writer.open_file (conf_dir ^/ "coda.version") in
            Writer.write_line wr Coda_version.commit_id ;
@@ -417,9 +343,13 @@ let daemon logger =
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
          type ('a, 'b, 'c) t =
-           {coda: 'a; client_whitelist: 'b; rest_server_port: 'c}
+           {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
        end in
        let coda_initialization_deferred () =
+         let%bind genesis_ledger, base_proof =
+           Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
+             ~logger ~conf_dir
+         in
          let%bind config =
            match%map
              Monitor.try_with_or_error ~extract_exn:true (fun () ->
@@ -460,22 +390,13 @@ let daemon logger =
                  ~metadata:[("key", `String keyname)] ;
                default
          in
-         let external_port : int =
-           or_from_config YJ.Util.to_int_option "external-port"
-             ~default:Port.default_external external_port
+         let get_port {Flag.Types.value; default; name} =
+           or_from_config YJ.Util.to_int_option name ~default value
          in
-         let client_port =
-           or_from_config YJ.Util.to_int_option "client-port"
-             ~default:Port.default_client client_port
-         in
-         let rest_server_port =
-           or_from_config YJ.Util.to_int_option "rest-port"
-             ~default:Port.default_rest rest_server_port
-         in
-         let discovery_port =
-           or_from_config YJ.Util.to_int_option "discovery-port"
-             ~default:Port.default_discovery discovery_port
-         in
+         let external_port = get_port external_port in
+         let client_port = get_port client_port in
+         let rest_server_port = get_port rest_server_port in
+         let discovery_port = get_port discovery_port in
          let snark_work_fee_flag =
            let json_to_currency_fee_option json =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
@@ -494,7 +415,8 @@ let daemon logger =
            or_from_config
              (Fn.compose Option.return
                 (Fn.compose work_selection_method_val YJ.Util.to_string))
-             "work-selection" ~default:Cli_lib.Arg_type.Random
+             "work-selection"
+             ~default:Cli_lib.Arg_type.Work_selection_method.Random
              work_selection_method_flag
          in
          let work_reassignment_wait =
@@ -515,7 +437,7 @@ let daemon logger =
              ~default:false log_transaction_pool_diff
          in
          let log_gossip_heard =
-           { Coda_networking.Gossip_net.Config.snark_pool_diff=
+           { Coda_networking.Config.snark_pool_diff=
                log_received_snark_pool_diff
            ; transaction_pool_diff= log_transaction_pool_diff
            ; new_state= log_received_blocks }
@@ -588,17 +510,17 @@ let daemon logger =
            ; client_port
            ; libp2p_port= discovery_port }
          in
-         let%bind propose_keypair =
-           match propose_key with
+         let%bind block_production_keypair =
+           match block_production_key with
            | Some sk_file ->
                let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
                Some kp
            | None ->
                return None
          in
-         let%bind client_whitelist =
+         let%bind client_trustlist =
            Reader.load_sexp
-             (conf_dir ^/ "client_whitelist")
+             (conf_dir ^/ "client_trustlist")
              [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
            >>| Or_error.ok
          in
@@ -638,47 +560,58 @@ let daemon logger =
          let trust_dir = conf_dir ^/ "trust" in
          let () = Snark_params.set_chunked_hashing true in
          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
-         let transition_frontier_location =
-           conf_dir ^/ "transition_frontier"
-         in
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
+         let genesis_state_hash =
+           Coda_state.Genesis_protocol_state.t ~genesis_ledger
+           |> With_hash.hash
+         in
+         let genesis_ledger_hash =
+           Lazy.force genesis_ledger |> Ledger.merkle_root
+         in
          let time_controller =
            Block_time.Controller.create @@ Block_time.Controller.basic ~logger
          in
-         let initial_propose_keypairs =
-           propose_keypair |> Option.to_list |> Keypair.Set.of_list
+         let initial_block_production_keypairs =
+           block_production_keypair |> Option.to_list |> Keypair.Set.of_list
          in
          let consensus_local_state =
-           Consensus.Data.Local_state.create
-             ( Option.map propose_keypair ~f:(fun keypair ->
+           Consensus.Data.Local_state.create ~genesis_ledger
+             ( Option.map block_production_keypair ~f:(fun keypair ->
                    let open Keypair in
                    Public_key.compress keypair.public_key )
              |> Option.to_list |> Public_key.Compressed.Set.of_list )
          in
          trace_database_initialization "consensus local state" __LOC__
            trust_dir ;
+         let gossip_net_params =
+           Gossip_net.Real.Config.
+             { timeout= Time.Span.of_sec 3.
+             ; logger
+             ; target_peer_count= 8
+             ; conf_dir
+             ; chain_id= chain_id ~genesis_state_hash
+             ; initial_peers= initial_peers_cleaned
+             ; addrs_and_ports
+             ; trust_system
+             ; enable_libp2p= not disable_libp2p
+             ; disable_haskell= not enable_old_discovery
+             ; libp2p_keypair
+             ; libp2p_peers=
+                 List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
+             ; max_concurrent_connections }
+         in
          let net_config =
            { Coda_networking.Config.logger
            ; trust_system
            ; time_controller
            ; consensus_local_state
-           ; gossip_net_params=
-               { timeout= Time.Span.of_sec 3.
-               ; logger
-               ; target_peer_count= 8
-               ; conf_dir
-               ; chain_id= Lazy.force chain_id
-               ; initial_peers= initial_peers_cleaned
-               ; addrs_and_ports
-               ; trust_system
-               ; log_gossip_heard
-               ; enable_libp2p= not disable_libp2p
-               ; disable_haskell= not enable_old_discovery
-               ; libp2p_keypair
-               ; libp2p_peers=
-                   List.map ~f:Coda_net2.Multiaddr.of_string libp2p_peers_raw
-               ; max_concurrent_connections } }
+           ; genesis_ledger_hash
+           ; log_gossip_heard
+           ; creatable_gossip_net=
+               Coda_networking.Gossip_net.(
+                 Any.Creatable ((module Real), Real.create gossip_net_params))
+           }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in
@@ -755,10 +688,14 @@ let daemon logger =
                terminated_child_loop ()
          in
          O1trace.trace_task "terminated child loop" terminated_child_loop ;
+         let coinbase_receiver =
+           Option.value_map coinbase_receiver_flag ~default:`Producer
+             ~f:(fun pk -> `Other pk)
+         in
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~net_config
+                ~coinbase_receiver ~net_config ~gossip_net_params
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
@@ -768,21 +705,24 @@ let daemon logger =
                   ; shutdown_on_disconnect= true }
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~wallets_disk_location:(conf_dir ^/ "wallets")
-                ~ledger_db_location:(conf_dir ^/ "ledger_db")
+                ~persistent_root_location:(conf_dir ^/ "root")
+                ~persistent_frontier_location:(conf_dir ^/ "frontier")
                 ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-                ~transition_frontier_location ~time_controller
-                ~initial_propose_keypairs ~monitor ~consensus_local_state
-                ~transaction_database ~external_transition_database
-                ~is_archive_node ~work_reassignment_wait ())
+                ~time_controller ~initial_block_production_keypairs ~monitor
+                ~consensus_local_state ~transaction_database
+                ~external_transition_database ~is_archive_rocksdb
+                ~work_reassignment_wait ~archive_process_location
+                ~genesis_state_hash ())
+             ~genesis_ledger ~base_proof
          in
-         {Coda_initialization.coda; client_whitelist; rest_server_port}
+         {Coda_initialization.coda; client_trustlist; rest_server_port}
        in
        (* Breaks a dependency cycle with monitor initilization and coda *)
        let coda_ref : Coda_lib.t option ref = ref None in
        Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
-       let%bind {Coda_initialization.coda; client_whitelist; rest_server_port}
+       let%bind {Coda_initialization.coda; client_trustlist; rest_server_port}
            =
          coda_initialization_deferred ()
        in
@@ -790,7 +730,7 @@ let daemon logger =
        let%bind () = maybe_sleep 3. in
        let web_service = Web_pipe.get_service () in
        Web_pipe.run_service coda web_service ~conf_dir ~logger ;
-       Coda_run.setup_local_server ?client_whitelist ~rest_server_port
+       Coda_run.setup_local_server ?client_trustlist ~rest_server_port
          ~insecure_rest_server coda ;
        let%bind () = Coda_lib.start coda in
        let%bind () =
@@ -912,8 +852,8 @@ let internal_commands =
 let coda_commands logger =
   [ ("accounts", Client.accounts)
   ; ("daemon", daemon logger)
-  ; ("client", Client.command)
-  ; ("client2", Client.client)
+  ; ("client-old", Client.command)
+  ; ("client", Client.client)
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
@@ -939,7 +879,7 @@ let coda_commands logger =
         ; (module Coda_shared_state_test)
         ; (module Coda_transitive_peers_test)
         ; (module Coda_shared_prefix_test)
-        ; (module Coda_shared_prefix_multiproposer_test)
+        ; (module Coda_shared_prefix_multiproducer_test)
         ; (module Coda_five_nodes_test)
         ; (module Coda_restart_node_test)
         ; (module Coda_receipt_chain_test)
@@ -947,7 +887,7 @@ let coda_commands logger =
         ; (module Coda_bootstrap_test)
         ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
-        ; (module Coda_txns_and_restart_non_proposers)
+        ; (module Coda_txns_and_restart_non_producers)
         ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)
@@ -986,6 +926,7 @@ let () =
   don't_wait_for (ensure_testnet_id_still_good logger) ;
   (* Turn on snark debugging in prod for now *)
   Snarky.Snark.set_eval_constraints true ;
+  Snarky.Libsnark.set_printing_off () ;
   (* intercept command-line processing for "version", because we don't
      use the Jane Street scripts that generate their version information
    *)

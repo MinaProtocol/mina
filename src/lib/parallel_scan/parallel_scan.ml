@@ -106,9 +106,7 @@ module Base = struct
       end
     end]
 
-    type 'base t = 'base Stable.Latest.t =
-      | Empty
-      | Full of 'base Record.Stable.V1.t
+    type 'base t = 'base Stable.Latest.t = Empty | Full of 'base Record.t
     [@@deriving sexp]
 
     let job_str = function Empty -> "Base.Empty" | Full _ -> "Base.Full"
@@ -158,7 +156,7 @@ module Merge = struct
     type 'merge t = 'merge Stable.Latest.t =
       | Empty
       | Part of 'merge
-      | Full of 'merge Record.Stable.V1.t
+      | Full of 'merge Record.t
     [@@deriving sexp]
 
     let job_str = function
@@ -258,8 +256,7 @@ module Job_view = struct
       end
     end]
 
-    type t = Stable.Latest.t =
-      {seq_no: Sequence_number.Stable.V1.t; status: Job_status.Stable.V1.t}
+    type t = Stable.Latest.t = {seq_no: Sequence_number.t; status: Job_status.t}
     [@@deriving sexp]
   end
 
@@ -279,10 +276,10 @@ module Job_view = struct
 
     type 'a t = 'a Stable.Latest.t =
       | BEmpty
-      | BFull of ('a * Extra.Stable.V1.t)
+      | BFull of ('a * Extra.t)
       | MEmpty
       | MPart of 'a
-      | MFull of ('a * 'a * Extra.Stable.V1.t)
+      | MFull of ('a * 'a * Extra.t)
     [@@deriving sexp]
   end
 
@@ -293,7 +290,7 @@ module Job_view = struct
     end
   end]
 
-  type 'a t = 'a Stable.Latest.t = {position: int; value: 'a Node.Stable.V1.t}
+  type 'a t = 'a Stable.Latest.t = {position: int; value: 'a Node.t}
   [@@deriving sexp]
 end
 
@@ -770,6 +767,25 @@ module Tree = struct
       tree
     |> List.rev
 
+  (*calculates the number of base and merge jobs that is currently with the Todo status*)
+  let todo_job_count :
+      (_ * 'merge_job Merge.Job.t, _ * 'base_job Base.Job.t) t -> int * int =
+   fun tree ->
+    fold_depth ~init:(0, 0)
+      ~f_merge:(fun _ (b, m) (_, j) ->
+        match j with
+        | Merge.Job.Full {status= Job_status.Todo; _} ->
+            (b, m + 1)
+        | _ ->
+            (b, m) )
+      ~f_base:(fun (b, m) (_, d) ->
+        match d with
+        | Base.Job.Full {status= Job_status.Todo; _} ->
+            (b + 1, m)
+        | _ ->
+            (b, m) )
+      tree
+
   let leaves : ('merge_t, 'base_t) t -> 'base_t list =
    fun tree ->
     fold_depth ~init:[]
@@ -924,9 +940,7 @@ module T = struct
   end
 
   type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
-    { trees:
-        ('merge Merge.Stable.V1.t, 'base Base.Stable.V1.t) Tree.Stable.V1.t
-        Non_empty_list.Stable.V1.t
+    { trees: ('merge Merge.t, 'base Base.t) Tree.t Non_empty_list.t
     ; acc: ('merge * 'base list) option
           (*last emitted proof and the corresponding transactions*)
     ; curr_job_seq_no: int
@@ -1363,6 +1377,22 @@ let incr_sequence_no : type a b. (a, b) t -> (unit, a, b) State_or_error.t =
     let state = reset_seq_no state in
     put state
   else put {state with curr_job_seq_no= state.curr_job_seq_no + 1}
+
+let update_metrics t =
+  Or_error.try_with (fun () ->
+      List.rev (Non_empty_list.to_list t.trees)
+      |> List.iteri ~f:(fun i t ->
+             let name = sprintf "tree%d" i in
+             Coda_metrics.(
+               Gauge.set (Scan_state_metrics.scan_state_available_space ~name))
+               (Int.to_float @@ Tree.available_space t) ;
+             let base_job_count, merge_job_count = Tree.todo_job_count t in
+             Coda_metrics.(
+               Gauge.set (Scan_state_metrics.scan_state_base_snarks ~name))
+               (Int.to_float @@ base_job_count) ;
+             Coda_metrics.(
+               Gauge.set (Scan_state_metrics.scan_state_merge_snarks ~name))
+               (Int.to_float @@ merge_job_count) ) )
 
 let update_helper :
        data:'base list

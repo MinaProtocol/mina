@@ -85,7 +85,9 @@ let schedule_user_command t (txn : User_command.t) account_opt :
 let get_account t (addr : Public_key.Compressed.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Coda_lib.best_ledger t in
-  Ledger.location_of_key ledger addr |> Option.bind ~f:(Ledger.get ledger)
+  let open Option.Let_syntax in
+  let%bind loc = Ledger.location_of_key ledger addr in
+  Ledger.get ledger loc
 
 let get_accounts t =
   let open Participating_state.Let_syntax in
@@ -167,7 +169,7 @@ let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let trust_system = config.trust_system in
   Trust_system.reset trust_system ip_address
 
-let replace_proposers keys pks =
+let replace_block_production_keys keys pks =
   let kps =
     List.filter_map pks ~f:(fun pk ->
         let open Option.Let_syntax in
@@ -176,13 +178,15 @@ let replace_proposers keys pks =
         in
         (kps, pk) )
   in
-  Coda_lib.replace_propose_keypairs keys
+  Coda_lib.replace_block_production_keypairs keys
     (Keypair.And_compressed_pk.Set.of_list kps) ;
   kps |> List.map ~f:snd
 
-let setup_user_command ~fee ~nonce ~memo ~sender_kp user_command_body =
+let setup_user_command ~fee ~nonce ~valid_until ~memo ~sender_kp
+    user_command_body =
   let payload =
-    User_command.Payload.create ~fee ~nonce ~memo ~body:user_command_body
+    User_command.Payload.create ~fee ~nonce ~valid_until ~memo
+      ~body:user_command_body
   in
   let signed_user_command = User_command.sign sender_kp payload in
   User_command.forget_check signed_user_command
@@ -246,7 +250,7 @@ type active_state_fields =
   ; blockchain_length: int option
   ; ledger_merkle_root: string option
   ; state_hash: string option
-  ; consensus_time_best_tip: string option }
+  ; consensus_time_best_tip: Consensus.Data.Consensus_time.t option }
 
 let get_status ~flag t =
   let open Coda_lib.Config in
@@ -268,11 +272,11 @@ let get_status ~flag t =
       ~f:Public_key.Compressed.to_base58_check
   in
   let snark_work_fee = Currency.Fee.to_int @@ Coda_lib.snark_work_fee t in
-  let propose_pubkeys = Coda_lib.propose_public_keys t in
+  let block_production_keys = Coda_lib.block_production_pubkeys t in
   let consensus_mechanism = Consensus.name in
   let time_controller = (Coda_lib.config t).time_controller in
   let consensus_time_now =
-    Consensus.time_hum (Block_time.now time_controller)
+    Consensus.Data.Consensus_time.of_time_exn @@ Block_time.now time_controller
   in
   let consensus_configuration = Consensus.Configuration.t in
   let r = Perf_histograms.report in
@@ -314,7 +318,7 @@ let get_status ~flag t =
   in
   let highest_block_length_received =
     Length.to_int @@ Consensus.Data.Consensus_state.blockchain_length
-    @@ Coda_transition.External_transition.consensus_state
+    @@ Coda_transition.External_transition.Initial_validated.consensus_state
     @@ Pipe_lib.Broadcast_pipe.Reader.peek
          (Coda_lib.most_recent_valid_transition t)
   in
@@ -351,7 +355,7 @@ let get_status ~flag t =
           `Active `Catchup
     in
     let consensus_time_best_tip =
-      Consensus.Data.Consensus_state.time_hum consensus_state
+      Consensus.Data.Consensus_state.consensus_time consensus_state
     in
     ( sync_status
     , { num_accounts= Some num_accounts
@@ -377,21 +381,15 @@ let get_status ~flag t =
           ; state_hash= None
           ; consensus_time_best_tip= None } )
   in
-  let next_proposal =
-    let str time =
-      let open Block_time in
-      let since_epoch_time = time |> Span.of_ms |> of_span_since_epoch in
-      let diff = diff since_epoch_time (now time_controller) in
-      if Span.(zero < diff) then sprintf "in %s" (Span.to_string_hum diff)
-      else "Computing next proposal state..."
-    in
-    Option.map (Coda_lib.next_proposal t) ~f:(function
-      | `Propose_now _ ->
-          "Now"
-      | `Propose (time, _, _) ->
-          str time
+  let next_block_production =
+    let open Block_time in
+    Option.map (Coda_lib.next_producer_timing t) ~f:(function
+      | `Produce_now _ ->
+          `Produce_now
+      | `Produce (time, _, _) ->
+          `Produce (time |> Span.of_ms |> of_span_since_epoch)
       | `Check_again time ->
-          sprintf "None this epoch… checking at %s" (str time) )
+          `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
   in
   let libp2p_peer_id =
     Option.value ~default:"<not connected to libp2p>"
@@ -401,7 +399,7 @@ let get_status ~flag t =
   in
   let addrs_and_ports =
     Kademlia.Node_addrs_and_ports.to_display
-      (Coda_lib.config t).net_config.gossip_net_params.addrs_and_ports
+      (Coda_lib.config t).gossip_net_params.addrs_and_ports
   in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status
@@ -417,11 +415,11 @@ let get_status ~flag t =
   ; user_commands_sent
   ; snark_worker
   ; snark_work_fee
-  ; propose_pubkeys=
-      Public_key.Compressed.Set.to_list propose_pubkeys
+  ; block_production_keys=
+      Public_key.Compressed.Set.to_list block_production_keys
       |> List.map ~f:Public_key.Compressed.to_base58_check
   ; histograms
-  ; next_proposal
+  ; next_block_production
   ; consensus_time_now
   ; consensus_mechanism
   ; consensus_configuration

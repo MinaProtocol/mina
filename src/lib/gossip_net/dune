@@ -3,7 +3,8 @@
  (public_name gossip_net)
  (library_flags -linkall)
  (inline_tests)
-(libraries async async_extra coda_base coda_metrics coda_net2 core file_system kademlia logger o1trace perf_histograms pipe_lib trust_system)
+ (libraries perf_histograms core coda_base coda_transition coda_net2 network_pool trust_system pipe_lib logger kademlia async async_extra o1trace coda_metrics)
+ (preprocessor_deps ../../config.mlh)
  (preprocess
-  (pps ppx_coda ppx_inline_test ppx_deriving.eq ppx_deriving.make ppx_deriving_yojson bisect_ppx ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_fields_conv ppx_let ppx_custom_printf -- -conditional))
+  (pps ppx_coda -lint-version-syntax-warnings ppx_inline_test ppx_deriving.eq ppx_deriving.make ppx_deriving_yojson bisect_ppx ppx_optcomp ppx_bin_prot ppx_sexp_conv ppx_fields_conv ppx_let ppx_custom_printf ppx_pipebang -- -conditional))
  (synopsis "Gossip Network"))

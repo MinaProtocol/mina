@@ -3,4 +3,4 @@
   (public_name staged_ledger_hash)
   (preprocessor_deps "../../config.mlh")
   (preprocess (pps ppx_coda ppx_snarky ppx_jane ppx_deriving.std ppx_deriving_yojson))
-  (libraries core_kernel coda_base snark_params genesis_ledger bitstring_lib fold_lib tuple_lib with_hash))
+  (libraries core_kernel coda_base snark_params test_genesis_ledger bitstring_lib fold_lib tuple_lib with_hash))

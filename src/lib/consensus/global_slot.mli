@@ -1,15 +1,15 @@
-open Unsigned
+open Coda_base
 
+include
+  Coda_numbers.Nat.Intf.S_unchecked
+  with type t = Coda_numbers.Global_slot.Stable.Latest.t
+
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type t = UInt32.t
-    [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+    type nonrec t = t [@@deriving sexp, eq, compare, hash, yojson]
   end
-
-  module Latest = V1
-end
-
-include Coda_numbers.Nat.Intf.S_unchecked with type t = Stable.Latest.t
+end]
 
 val ( + ) : t -> int -> t
 
@@ -25,16 +25,27 @@ val epoch : t -> Epoch.t
 
 val slot : t -> Slot.t
 
+val start_time : t -> Block_time.t
+
+val end_time : t -> Block_time.t
+
+val time_hum : t -> string
+
 val to_epoch_and_slot : t -> Epoch.t * Slot.t
 
-val start_time : t -> Coda_base.Block_time.t
+val of_time_exn : Block_time.t -> t
 
-val end_time : t -> Coda_base.Block_time.t
+val diff : t -> Epoch.t * Slot.t -> t
 
 module Checked : sig
-  include Coda_numbers.Nat.Intf.S_checked with type unchecked := t
+  include
+    Coda_numbers.Nat.Intf.S_checked
+    with type unchecked := t
+     and type var = Coda_numbers.Global_slot.Checked.var
 
   open Snark_params.Tick
 
   val to_epoch_and_slot : t -> (Epoch.Checked.t * Slot.Checked.t, _) Checked.t
 end
+
+val typ : (Checked.t, t) Snark_params.Tick.Typ.t

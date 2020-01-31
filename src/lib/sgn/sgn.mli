@@ -1,27 +1,35 @@
+[%%import "/src/config.mlh"]
+
 open Core_kernel
+
+[%%if defined consensus_mechanism]
+
 open Snark_params.Tick
 
-type t = Sgn_type.Sgn.t = Pos | Neg
-[@@deriving sexp, hash, compare, eq, yojson]
+[%%endif]
 
+[%%versioned:
 module Stable : sig
   module V1 : sig
-    type nonrec t = t
-    [@@deriving sexp, bin_io, hash, compare, eq, yojson, version]
+    type t = Sgn_type.Sgn.Stable.V1.t = Pos | Neg
+    [@@deriving sexp, hash, compare, eq, yojson]
   end
+end]
 
-  module Latest = V1
-end
+type t = Stable.Latest.t = Pos | Neg
+[@@deriving sexp, hash, compare, eq, yojson]
 
 val to_field : t -> Field.t
 
 val gen : t Quickcheck.Generator.t
 
+val negate : t -> t
+
+[%%if defined consensus_mechanism]
+
 type var = private Field.Var.t
 
 val typ : (var, t) Typ.t
-
-val negate : t -> t
 
 module Checked : sig
   val constant : t -> var
@@ -42,3 +50,5 @@ module Checked : sig
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 end
+
+[%%endif]

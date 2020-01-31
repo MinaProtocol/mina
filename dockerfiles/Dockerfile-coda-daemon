@@ -16,7 +16,9 @@ RUN apt-get -y update && \
     libgomp1 \
     libffi6 \
     apt-transport-https \
-    ca-certificates && \
+    ca-certificates \
+    dnsutils \
+    tzdata && \
   rm -rf /var/lib/apt/lists/*
 
 # coda package

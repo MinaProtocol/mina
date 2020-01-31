@@ -19,7 +19,7 @@ let make = () => {
   let activeAccount = Hooks.useActiveAccount();
   <>
     <Button
-      label="Send"
+      label="send"
       onClick={_ => setModalOpen(_ => true)}
       disabled={!Option.isSome(activeAccount)}
     />

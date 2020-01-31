@@ -33,10 +33,29 @@ module Spec : sig
     -> autogen_path:string
     -> manual_install_path:string
     -> brew_install_path:string
+    -> s3_install_path:string
     -> digest_input:('input -> string)
     -> create_env:('input -> 'env)
     -> input:'input
     -> 'a t
 end
 
-val run : 'a Spec.t -> 'a Deferred.t
+(** A monoid for tracking the "dirty bit" of whether or not we've generated
+ * something or only received cache hits *)
+module Track_generated : sig
+  type t = [`Generated_something | `Cache_hit]
+
+  val empty : t
+
+  (** Generated_something overrides caches hits *)
+  val ( + ) : t -> t -> t
+end
+
+module With_track_generated : sig
+  type 'a t = {data: 'a; dirty: Track_generated.t}
+end
+
+module Deferred_with_track_generated :
+  Monad.S with type 'a t = 'a With_track_generated.t Deferred.t
+
+val run : 'a Spec.t -> 'a Deferred_with_track_generated.t

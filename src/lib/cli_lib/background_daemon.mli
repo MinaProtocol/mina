@@ -1,12 +1,12 @@
+open Core
 open Async
-open Command
 
 val rpc_init :
-     f:(int -> 'a -> unit Deferred.t)
-  -> 'a Param.t
-  -> (unit -> unit Deferred.t) Param.t
+     f:(Host_and_port.t -> 'a -> unit Deferred.t)
+  -> 'a Command.Param.t
+  -> (unit -> unit Deferred.t) Command.Param.t
 
 val graphql_init :
-     f:(int -> 'a -> unit Deferred.t)
-  -> 'a Param.t
-  -> (unit -> unit Deferred.t) Param.t
+     f:(Uri.t Flag.Types.with_name -> 'a -> unit Deferred.t)
+  -> 'a Command.Param.t
+  -> (unit -> unit Deferred.t) Command.Param.t

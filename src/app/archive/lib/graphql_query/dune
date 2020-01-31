@@ -1,7 +1,0 @@
-(library
-  (name graphql_query)
-  (public_name graphql_query)
-  (libraries core coda_base coda_transition graphql_client_lib transition_frontier_controller_tests)
-  (preprocessor_deps ../../archive_graphql_schema.json)
-  (preprocess (pps ppx_jane ppx_coda graphql_ppx -- -schema src/app/archive/archive_graphql_schema.json))
-  )

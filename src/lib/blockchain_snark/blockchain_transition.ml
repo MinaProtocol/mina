@@ -149,6 +149,12 @@ module Make (T : Transaction_snark.Verification.S) = struct
         let var_to_field = var_to_hash_packed
       end
 
+      module Body_hash = struct
+        include Coda_base.State_body_hash
+
+        let var_to_field = var_to_hash_packed
+      end
+
       module Checked = struct
         include Blockchain_snark_state.Checked
         include U.Checked
@@ -228,6 +234,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
         ~autogen_path:Cache_dir.autogen_path
         ~manual_install_path:Cache_dir.manual_install_path
         ~brew_install_path:Cache_dir.brew_install_path
+        ~s3_install_path:Cache_dir.s3_install_path
         ~digest_input:
           (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
         ~create_env:Tick.Keypair.generate
@@ -236,6 +243,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
              (Step_base.main (Logger.null ())))
 
     let cached () =
+      let open Cached.Deferred_with_track_generated.Let_syntax in
       let paths = Fn.compose Cache_dir.possible_paths Filename.basename in
       let%bind step_vk, step_pk = Cached.run step_cached in
       let module Wrap = Wrap_base (struct
@@ -258,6 +266,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
           ~autogen_path:Cache_dir.autogen_path
           ~manual_install_path:Cache_dir.manual_install_path
           ~brew_install_path:Cache_dir.brew_install_path
+          ~s3_install_path:Cache_dir.s3_install_path
           ~digest_input:(fun x ->
             Md5.to_hex (Tock.R1CS_constraint_system.digest (Lazy.force x)) )
           ~input:(lazy (Tock.constraint_system ~exposing:Wrap.input Wrap.main))
@@ -283,8 +292,7 @@ end
 let instance_hash wrap_vk =
   let open Coda_base in
   let init =
-    Random_oracle.update
-      ~state:Hash_prefix.Random_oracle.transition_system_snark
+    Random_oracle.update ~state:Hash_prefix.transition_system_snark
       Snark_params.Tick.Verifier.(
         let vk = vk_of_backend_vk wrap_vk in
         let g1 = Tick.Inner_curve.to_affine_exn in

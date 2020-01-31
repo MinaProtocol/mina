@@ -1,4 +1,5 @@
 open Async_kernel
+open Core_kernel
 
 module type Time_intf = sig
   type t
@@ -33,6 +34,18 @@ module Timeout_intf (Time : Time_intf) = struct
     val cancel : Time.Controller.t -> 'a t -> 'a -> unit
 
     val remaining_time : 'a t -> Time.Span.t
+
+    val await :
+         timeout_duration:Time.Span.t
+      -> Time.Controller.t
+      -> 'a Deferred.t
+      -> [`Ok of 'a | `Timeout] Deferred.t
+
+    val await_exn :
+         timeout_duration:Time.Span.t
+      -> Time.Controller.t
+      -> 'a Deferred.t
+      -> 'a Deferred.t
   end
 end
 
@@ -65,4 +78,21 @@ module Make (Time : Time_intf) : Timeout_intf(Time).S = struct
     let current_time = Time.now ctrl in
     let time_elapsed = Time.diff current_time start_time in
     Time.Span.(span - time_elapsed)
+
+  let await ~timeout_duration time_controller deferred =
+    let timeout =
+      Deferred.create (fun ivar ->
+          ignore (create time_controller timeout_duration ~f:(Ivar.fill ivar))
+      )
+    in
+    Deferred.(
+      choose
+        [choice deferred (fun x -> `Ok x); choice timeout (Fn.const `Timeout)])
+
+  let await_exn ~timeout_duration time_controller deferred =
+    match%map await ~timeout_duration time_controller deferred with
+    | `Timeout ->
+        failwith "timeout"
+    | `Ok x ->
+        x
 end

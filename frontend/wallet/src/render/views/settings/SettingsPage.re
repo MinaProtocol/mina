@@ -1,3 +1,4 @@
+open ReactIntl;
 open Tc;
 
 module Styles = {
@@ -18,8 +19,15 @@ module Styles = {
 
   let container =
     style([
-      height(`percent(100.)),
-      padding(`rem(2.)),
+      position(`absolute),
+      top(`rem(4.)),
+      left(`zero),
+      right(`zero),
+      bottom(`zero),
+      zIndex(99),
+      background(`url("bg-texture.png")),
+      backgroundColor(`hex("f2f2f2")),
+      padding2(~v=`rem(2.), ~h=`rem(12.)),
       borderTop(`px(1), `solid, white),
       borderLeft(`px(1), `solid, white),
       overflow(`scroll),
@@ -31,6 +39,7 @@ module Styles = {
       style([
         margin2(~v=`rem(0.5), ~h=`zero),
         color(Theme.Colors.midnight),
+        textTransform(`capitalize),
       ]),
     ]);
 
@@ -99,7 +108,8 @@ module Version = {
 
     <div className=Styles.versionText>
       <span className=Css.(style([color(Theme.Colors.slateAlpha(0.3))]))>
-        {React.string("Version:")}
+        <FormattedMessage id="version" defaultMessage="Version" />
+        {React.string(":")}
       </span>
       <Spacer width=0.5 />
       <span className=Css.(style([color(Theme.Colors.slateAlpha(0.7))]))>
@@ -122,24 +132,49 @@ module Version = {
   };
 };
 
+type ownedAccounts =
+  Account.t = {
+    locked: option(bool),
+    publicKey: PublicKey.t,
+    balance: {. "total": int64},
+  };
+
 module AccountSettingsItem = {
   [@react.component]
-  let make = (~publicKey) => {
-    let keyStr = PublicKey.toString(publicKey);
+  let make = (~account) => {
+    let keyStr = PublicKey.toString(account##publicKey);
     let route = "/settings/" ++ Js.Global.encodeURIComponent(keyStr);
+    let isLocked = Option.withDefault(~default=true, account##locked);
+    let (showModal, setModalOpen) = React.useState(() => false);
     <div
       className=Styles.accountItem
-      onClick={_ => ReasonReact.Router.push(route)}>
+      onClick={_ =>
+        isLocked ? setModalOpen(_ => true) : ReasonReact.Router.push(route)
+      }>
       <div className=Styles.accountName>
-        <AccountName pubkey=publicKey />
+        <AccountName pubkey=account##publicKey />
       </div>
       <span className=Styles.accountKey>
-        <Pill> {React.string(PublicKey.prettyPrint(publicKey))} </Pill>
+        <Pill>
+          {React.string(PublicKey.prettyPrint(account##publicKey))}
+        </Pill>
       </span>
       <Spacer width=5.0 />
       <span className=Styles.accountChevron>
         <Icon kind=Icon.EmptyChevronRight />
       </span>
+      {showModal
+         ? <UnlockModal
+             account={
+               account##publicKey;
+             }
+             onClose={() => setModalOpen(_ => false)}
+             onSuccess={() => {
+               setModalOpen(_ => false);
+               ReasonReact.Router.push(route);
+             }}
+           />
+         : React.null}
     </div>;
   };
 };
@@ -148,6 +183,7 @@ module AccountsQueryString = [%graphql
   {|
     query getWallets {
       ownedWallets {
+        locked
         publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
       }
     }
@@ -160,15 +196,14 @@ module AccountsQuery = ReasonApollo.CreateQuery(AccountsQueryString);
 let make = () => {
   <div className=Styles.container>
     <div className=Styles.headerContainer>
-      <div className=Theme.Text.Header.h3>
-        {React.string("Node Settings")}
+      <div className=Styles.label>
+        <FormattedMessage
+          id="account-settings"
+          defaultMessage="Account Settings"
+        />
       </div>
       <Version />
     </div>
-    <Spacer height=1. />
-    <NetworkDropdown />
-    <Spacer height=1. />
-    <div className=Styles.label> {React.string("Account Settings")} </div>
     <Spacer height=0.5 />
     <div className=Styles.accountSettings>
       <AccountsQuery>
@@ -179,12 +214,7 @@ let make = () => {
            | Error(_) => React.null
            | Data(data) =>
              data##ownedWallets
-             |> Array.map(~f=w =>
-                  <AccountSettingsItem
-                    key={PublicKey.toString(w##publicKey)}
-                    publicKey=w##publicKey
-                  />
-                )
+             |> Array.map(~f=account => <AccountSettingsItem account />)
              |> React.array
            }}
       </AccountsQuery>

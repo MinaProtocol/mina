@@ -1,3 +1,5 @@
+open Tc;
+
 module Styles = {
   open Css;
   let toast = (bgColor, textColor) =>
@@ -9,10 +11,20 @@ module Styles = {
 };
 
 [@react.component]
-let make = () => {
+let make =
+    (
+      ~defaultText=?,
+      ~defaultStyle=ToastProvider.Default,
+      ~onClick: unit => unit=() => (),
+    ) => {
   let (value, _) = React.useContext(ToastProvider.context);
-  switch (value) {
-  | Some({text, style}) =>
+  let value =
+    Option.map(value, ~f=({ToastProvider.text, style}) => (text, style));
+  let default = Option.map(defaultText, ~f=text => (text, defaultStyle));
+
+  // The second arg to orElse has precedence
+  switch (Option.orElse(default, value)) {
+  | Some((text, style)) =>
     let (bgColor, textColor) =
       Theme.Colors.(
         switch (style) {
@@ -22,7 +34,8 @@ let make = () => {
         | Warning => (yeezyAlpha(0.15), yeezy)
         }
       );
-    <div className={Styles.toast(bgColor, textColor)}>
+    <div
+      className={Styles.toast(bgColor, textColor)} onClick={_ => onClick()}>
       <p className=Theme.Text.Body.regular> {React.string(text)} </p>
     </div>;
   | None => React.null

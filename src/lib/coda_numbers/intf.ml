@@ -11,15 +11,17 @@ module type S_unchecked = sig
 
   include Hashable.S with type t := t
 
-  val length_in_bits : int
+  val max_value : t
 
-  val length_in_triples : int
+  val length_in_bits : int
 
   val gen : t Quickcheck.Generator.t
 
   val zero : t
 
   val succ : t -> t
+
+  val add : t -> t -> t
 
   val of_int : int -> t
 
@@ -59,6 +61,8 @@ module type S_checked = sig
 
   val succ : t -> (t, _) Checked.t
 
+  val add : t -> t -> (t, _) Checked.t
+
   val is_succ : pred:t -> succ:t -> (Boolean.var, _) Checked.t
 
   val min : t -> t -> (t, _) Checked.t
@@ -67,14 +71,13 @@ module type S_checked = sig
 
   val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
 
-  val to_triples : t -> (Boolean.var Triple.t list, _) Checked.t
-
   val to_integer : t -> field Snarky_integer.Integer.t
 
   val succ_if : t -> Boolean.var -> (t, _) Checked.t
 
   val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
 
+  (** warning: this typ does not work correctly with the generic if_ *)
   val typ : (t, unchecked) Snark_params.Tick.Typ.t
 
   val equal : t -> t -> (Boolean.var, _) Checked.t
@@ -95,22 +98,27 @@ module type S_checked = sig
 end
 
 module type S = sig
+  open Bitstring_lib
+  open Snark_params.Tick
+
   include S_unchecked
 
   module Checked : S_checked with type unchecked := t
 
+  (** warning: this typ does not work correctly with the generic if_ *)
   val typ : (Checked.t, t) Snark_params.Tick.Typ.t
+
+  val var_to_bits : Checked.t -> Boolean.var Bitstring.Lsb_first.t
 end
 
 module type UInt32 = sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type nonrec t = Unsigned_extended.UInt32.t
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+      type t = Unsigned_extended.UInt32.t
+      [@@deriving sexp, eq, compare, hash, yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include S with type t = Stable.Latest.t
 
@@ -120,14 +128,13 @@ module type UInt32 = sig
 end
 
 module type UInt64 = sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t = Unsigned_extended.UInt64.t
-      [@@deriving bin_io, sexp, eq, compare, hash, yojson, version]
+      [@@deriving sexp, eq, compare, hash, yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include S with type t = Stable.Latest.t
 

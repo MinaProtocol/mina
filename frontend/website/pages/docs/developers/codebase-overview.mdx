@@ -1,0 +1,145 @@
+import Page from '@reason/pages/Docs';
+export default Page({title: "Codebase Overview"});
+
+# Codebase Overview
+
+The Coda Protocol is written in OCaml, a statically typed, functional programming langauge.
+
+For OCaml beginners, it may help to skim through [Real World OCaml](https://realworldocaml.org/) for a good introduction to the language, and some deep dives into specific topics if you're interested. 
+Assuming basic familiarity with OCaml, here's some more info on how it is used in the Coda Protocol.
+
+## Code Structure
+
+See the [Repository Structure page](/docs/developers/directory-structure/).
+
+## Compilation
+
+The OCaml compiler can target bytecode and native compilation. Our code statically links with some libraries so it can't compile to bytecode. Also our code doesn't play well with the REPL. Dune is our build system. Dune has a concept of folders representing modules in addition to each file representing a module. If the folder has a file with the same name, it's essentially equivalent to `index.js` in Node.
+
+We also have interface files in OCaml -- they have the extension `.mli` which just contain type signatures and structures for a module. The corresponding implementation must have the same file name, but with the `.ml` extension. Only the things defined in the interface will be available from other modules. If an interface file does not exist for a module, everything is exposed by default. *Note: Reason follows the same rules with the `.rei` and `.re` extensions.*
+
+For the linking step, `dune` uses `ldd` under the hood. You can also use things like `-O3` for optimization. For debugging, you can use `gdb` which isn't fully supported by OCaml but it works. The upcoming release of OCaml (4.08) will be compatible with `gdb`.
+
+## Documentation
+
+One difficult issue with learning OCaml is locating and reading documentation for libraries. One library in particular is the `Core` library, which has the following structure:
+
+```
+              Base
+               |
+            Core_kernel -> Async_kernel
+               |               |
+    Unix  <-  Core  ->       Async
+```
+
+There are actually multiple sources for `Core` documentation. To find the correct documentation, first go the GitHub then use that to locate the correct documentation. If you can't find the module you're looking for go to `Core_kernel` and if that fails then look for `Base` also note that find will not work if the sections are not expanded.
+
+Instead of using the HTML documentation, a better way is to use editor integration using a tool like `merlin` which provides type hints. One downside though is that Merlin will only work if your code compiles. It also gives us code navigation like go to definition.
+
+OPAM, which  is the package manager for OCaml. usually ships documentation with libraries. This can be accessed through `merlin`.
+
+## Extensions
+
+OCaml has a notion of compiler plugins, known as a ppx. This is just a hook that allows compile time code generation. 
+
+An example of an extension on a type signature is as follows
+
+```
+    type t =
+      | A
+      | B [@ to_yojson f]
+    
+    [@@ deriving yojson]
+```
+
+In the above example, the single `@` scopes an extension to a single expression, and the `@@` denotes the extension will be expanded in the scope of the calling context.
+
+For an extension on a structure or a value, you use the following syntax.
+
+`%` returns a value/expression.
+
+`%%` injects a statement
+
+```
+    let x = [% ...]
+    [%% ...]
+    let y =
+      let%... z = ... in
+      match%... ... with
+      | ...
+      | ... in
+    
+    [%% if x]
+      let x = y
+    [%% else]
+      let x = z
+    [%% endif]
+```
+
+**TL;DR** Anytime you see `[@ ...]` `[@@ ...]` `[% ...]` `[%% ...]` it's a language extension.
+
+## Monads
+
+Functional design patterns that allows you to write computation in a very generic way, that removes the need for boilerplate code. Monads allow us to abstract up to a higher level of computation, while taking care of all the glue for us. In other words, monads are programmable semicolons.
+
+For example consider the following imperative example:
+
+```
+    function example(x) {
+      if ( x == null ) return null;
+      x = x + 1;
+      if ( !isEven(x) ) return null;
+      return x;
+    }
+```
+
+This can expressed similarly in functional programming using a monad, using option:
+
+```
+    type a' option =
+      | None
+      | Some of 'a
+    
+    let return x = Some x
+    
+    (* Bind infix operation, applies f to m *)
+    let (>>=) m f =
+      match m with
+      | Some x -> f x
+      | None   -> None
+    
+    (**
+      Map infix operation
+      Essentially the same as bind, but the inner function unwraps the value.
+     **)
+    let (>>|) m f = m >>= (fun x -> return (f x))
+```
+
+Now we an use these primitives to reimplement the imperative example above as follows.
+
+```
+    let add_one = ((+) 1)
+    
+    let bind_even : int -> int option =
+      fun x -> if x mod 2 = 0 then Some x else None
+    
+    let example x = x >>| add_one >>= bind_even;
+
+OCaml has a `ppx` that makes writing monads much easier to follow, using the let syntax.
+
+    let%bind x = y in
+      f x
+    
+    (* This compiles down to the following *)
+    y >>= (fun x -> f x)
+```
+
+Essentially, this syntax takes the value from the let statement and places it on the left of the bind infix call, and puts the assignment into a lambda.
+
+## Async
+
+Under the hood, Async uses Monads however Ivar's are the primitive.  `a' Ivar.t` is essentially a mutex that can only be filled once. Once the value from a computation returns, it then fills the Ivar. The rest of the syntactic sugar takes the Ivar and passes them through `Deferred` monads. 
+
+There does exist a `yield` function, however we try to avoid using it since it has some weird behavior. Instead we usually operate on the wrapped values which happens in between `Deferred` bindings.
+
+Warning: One other thing to note is `Async.Pipe` which operates essentially like a buffer. DO NOT USE THIS. This is unsafe, since it has unlimited buffering by default (memory overflow), has some funky behavior around which end of the pipe should do what. Instead use `Strict_pipe` which wraps pipe, but gives us certain guarantees around how it can be used. One more custom helper we've written is `Broadcast_pipe` which allows a single pipe to be hooked up to multiple downstream pipes. Also, there's a `Linear_pipe` that was written before we really understood the pitfalls of pipes, this is deprecated now in favor of `Strict_pipe` and `Broadcast_pipe`

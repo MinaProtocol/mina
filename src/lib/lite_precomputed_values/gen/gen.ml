@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"/src/config.mlh"]
 
 open Ppxlib
 open Asttypes
@@ -74,13 +74,14 @@ let protocol_state (s : Protocol_state.Value.t) : Lite_base.Protocol_state.t =
           Lite_compat.blockchain_state (Protocol_state.blockchain_state s)
       ; consensus_state } }
 
+(*TODO: why do we have this??*)
 let genesis ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct
     let loc = loc
   end) in
   let open E in
   let protocol_state =
-    protocol_state (Lazy.force Genesis_protocol_state.t).data
+    protocol_state Genesis_protocol_state.compile_time_genesis.data
   in
   let ledger =
     Sparse_ledger_lib.Sparse_ledger.of_hash ~depth:0

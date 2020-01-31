@@ -147,9 +147,6 @@ module Checked = struct
 
   type t = Boolean.var array
 
-  let to_triples t =
-    Fold_lib.Fold.(to_list (group3 ~default:Boolean.false_ (of_array t)))
-
   let constant unchecked =
     assert (Int.(String.length (unchecked :> string) = memo_length)) ;
     Array.map
@@ -158,8 +155,6 @@ module Checked = struct
 end
 
 let length_in_bits = 8 * memo_length
-
-let length_in_triples = (length_in_bits + 2) / 3
 
 let fold_bits t =
   { Fold_lib.Fold.fold=
@@ -174,8 +169,6 @@ let fold_bits t =
         go init 0 ) }
 
 let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
-
-let fold t = Fold_lib.Fold.group3 ~default:false (fold_bits t)
 
 let typ : (Checked.t, t) Typ.t =
   Typ.transport

@@ -6,6 +6,7 @@
 [%%import "config/debug_level/some.mlh"]
 [%%import "config/proof_level/full.mlh"]
 [%%import "config/txpool_size.mlh"]
+[%%import "/src/config/account_creation_fee/standard.mlh"]
 
 [%%define time_offsets true]
 [%%define fake_hash false]

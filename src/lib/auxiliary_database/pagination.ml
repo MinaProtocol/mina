@@ -45,7 +45,8 @@ struct
     }
 
   let get_value t cursor =
-    let _, value = Hashtbl.find_exn t.all_values.table cursor in
+    let open Option.Let_syntax in
+    let%map _, value = Hashtbl.find t.all_values.table cursor in
     value
 
   let add (pagination : t) participants cursor value date =

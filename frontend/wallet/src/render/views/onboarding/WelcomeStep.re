@@ -13,7 +13,7 @@ module Styles = {
   let hero = {
     style([display(`flex), flexDirection(`row)]);
   };
- 
+
   let heroLeft = {
     style([
       display(`flex),
@@ -27,12 +27,7 @@ module Styles = {
     ]);
   };
   let header = {
-    merge([
-      Theme.Text.Header.h1,
-      style([
-        fontSize(`rem(2.70)),
-      ]),
-    ]);
+    merge([Theme.Text.Header.h1, style([fontSize(`rem(2.70))])]);
   };
   let heroBody = {
     merge([
@@ -137,25 +132,34 @@ module Info = {
 
 [@react.component]
 let make = (~nextStep) => {
+  let mapImage = Hooks.useAsset("map@2x.png");
+  let codaImage = Hooks.useAsset("coda-icon.png");
+  let towerImage = Hooks.useAsset("hero-illustration.png");
   <div className=Theme.Onboarding.main>
     <div className=Styles.map>
-      <img src="map@2x.png" alt="Map" className=Styles.map />
+      <img src=mapImage alt="Map" className=Styles.map />
     </div>
     <div className=Styles.hero>
       <div className=Styles.heroLeft>
-      <FadeIn duration=500 delay=0>
-        <h1 className=Styles.header>
+        <FadeIn duration=500 delay=0>
+          <h1 className=Styles.header>
             {React.string("Welcome to Coda Wallet!")}
-        </h1>
-      </FadeIn>
-      <FadeIn duration=500 delay=150>
-        <p className=Styles.heroBody>
+          </h1>
+        </FadeIn>
+        <FadeIn duration=500 delay=150>
+          <p className=Styles.heroBody>
             {React.string(
-              {|Coda swaps the traditional blockchain for a tiny cryptographic proof, enabling a cryptocurrency that stays the same size forever. With the Coda Wallet you can send, recieve and view transactions on the Coda network.|},
-            )}
-        </p>
-      </FadeIn>
-        <div> <Button label="Continue" onClick={_ => nextStep()} /> </div>
+               {|Coda swaps the traditional blockchain for a tiny cryptographic proof, enabling a cryptocurrency that stays the same size forever. With the Coda Wallet you can send, recieve and view transactions on the Coda network.|},
+             )}
+          </p>
+        </FadeIn>
+        <div>
+          <Button
+            label="Continue"
+            style=Button.HyperlinkBlue
+            onClick={_ => nextStep()}
+          />
+        </div>
       </div>
       <div />
       <div className=Styles.image>
@@ -167,7 +171,7 @@ let make = (~nextStep) => {
           textColor=Theme.Colors.jungle>
           <img
             className=Styles.codaImage
-            src="coda-icon.png"
+            src=codaImage
             alt="Small Coda logo representing its small, fixed blockchain size."
           />
         </Info>
@@ -179,7 +183,7 @@ let make = (~nextStep) => {
           label="Increasing"
           textColor=Theme.Colors.roseBud>
           <img
-            src="hero-illustration.png"
+            src=towerImage
             alt="Huge tower of blocks representing the data required by other blockchains."
           />
         </Info>

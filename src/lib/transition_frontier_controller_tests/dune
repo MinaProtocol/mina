@@ -1,6 +1,0 @@
-(library
-  (name transition_frontier_controller_tests)
-  (public_name transition_frontier_controller_tests)
-  (inline_tests)
-  (libraries core_kernel consensus coda_intf coda_base coda_state coda_transition sync_handler transition_handler transition_frontier_controller bootstrap_controller genesis_ledger quickcheck_lib ledger_catchup transition_frontier_persistence transaction_status transition_chain_prover)
-  (preprocess (pps ppx_jane ppx_coda ppx_deriving.std ppx_deriving_yojson)))

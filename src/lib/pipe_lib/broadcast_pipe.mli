@@ -4,7 +4,7 @@ in it. *)
 
 open Async_kernel
 
-exception Already_closed
+exception Already_closed of string
 
 module Reader : sig
   (** The read side of the broadcast pipe *)

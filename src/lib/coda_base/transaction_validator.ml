@@ -51,14 +51,10 @@ module Hashless_ledger = struct
         (`Existed, loc)
 
   let get_or_create ledger key =
-    let key, loc =
-      match get_or_create_account_exn ledger key (Account.initialize key) with
-      | `Existed, loc ->
-          ([], loc)
-      | `Added, loc ->
-          ([key], loc)
+    let action, loc =
+      get_or_create_account_exn ledger key (Account.initialize key)
     in
-    (key, Option.value_exn (get ledger loc), loc)
+    (action, Option.value_exn (get ledger loc), loc)
 
   let remove_accounts_exn _t =
     failwith "hashless_ledger: bug in transaction_logic, who is calling undo?"

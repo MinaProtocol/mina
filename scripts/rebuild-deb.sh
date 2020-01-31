@@ -5,23 +5,30 @@
 set -euo pipefail
 
 SCRIPTPATH="$( cd "$(dirname "$0")" ; pwd -P )"
-cd "${SCRIPTPATH}/../src/_build"
+cd "${SCRIPTPATH}/../_build"
 
-GITHASH=$(git rev-parse --short=8 HEAD)
+GITHASH=$(git rev-parse --short=7 HEAD)
 GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!; s!_!-!g' )
 GITTAG=$(git describe --abbrev=0)
 
 # Identify All Artifacts by Branch and Git Hash
 set +u
-PVKEYHASH=$(./default/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
+PVKEYHASH=$(./default/src/app/cli/src/coda.exe internal snark-hashes | sort | md5sum | cut -c1-8)
 
 PROJECT="coda-$(echo "$DUNE_PROFILE" | tr _ -)"
 
 if [ "$GITBRANCH" == "master" ]; then
-    VERSION="$GITTAG-${GITHASH}"
+    VERSION="${GITTAG}-${GITHASH}"
 else
-    VERSION="${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
+    VERSION="${GITTAG}+${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
 fi
+
+# Export variables for use with downstream steps
+echo "export CODA_DEB_VERSION=$VERSION" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_PROJECT=$PROJECT" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_HASH=$GITHASH" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_BRANCH=$GITBRANCH" >> /tmp/DOCKER_DEPLOY_ENV
+echo "export CODA_GIT_TAG=$GITTAG" >> /tmp/DOCKER_DEPLOY_ENV
 
 BUILDDIR="deb_build"
 
@@ -48,24 +55,33 @@ cat "${BUILDDIR}/DEBIAN/control"
 echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
-cp ./default/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
-cp ./default/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
+cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
+cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
+cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
 
 # Build Config
 mkdir -p "${BUILDDIR}/etc/coda/build_config"
-cp ../config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
-rsync -Huav ../config/* "${BUILDDIR}/etc/coda/build_config/."
+cp ../src/config/"$DUNE_PROFILE".mlh "${BUILDDIR}/etc/coda/build_config/BUILD.mlh"
+rsync -Huav ../src/config/* "${BUILDDIR}/etc/coda/build_config/."
 
 # Keys
 # Identify actual keys used in build
 echo "Checking PV keys"
 mkdir -p "${BUILDDIR}/var/lib/coda"
-compile_keys=$(./default/app/cli/src/coda.exe internal snark-hashes)
+compile_keys=$(./default/src/app/cli/src/coda.exe internal snark-hashes)
 for key in $compile_keys
 do
     echo -n "Looking for keys matching: ${key} -- "
 
     # Awkward, you can't do a filetest on a wildcard - use loops
+    for f in  /tmp/s3_cache_dir/${key}*; do
+        if [ -e "$f" ]; then
+            echo " [OK] found key in s3 key set"
+            cp /tmp/s3_cache_dir/${key}* "${BUILDDIR}/var/lib/coda/."
+            break
+        fi
+    done
+
     for f in  /var/lib/coda/${key}*; do
         if [ -e "$f" ]; then
             echo " [OK] found key in stable key set"
@@ -83,6 +99,11 @@ do
     done
 done
 
+# Genesis Ledger Copy
+for f in /tmp/coda_cache_dir/coda_genesis*; do
+    cp /tmp/coda_cache_dir/coda_genesis* "${BUILDDIR}/var/lib/coda/."
+done
+
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
 #       but it needs to be present for this to be effective
@@ -98,7 +119,7 @@ find "${BUILDDIR}"
 
 # Build the package
 echo "------------------------------------------------------------"
-dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}_${VERSION}.deb
 ls -lh coda*.deb
 
 # Tar up keys for an artifact
@@ -137,5 +158,5 @@ EOF
 rm -f "${BUILDDIR}"/var/lib/coda/*_proving
 
 # build another deb
-dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
+fakeroot dpkg-deb --build "${BUILDDIR}" ${PROJECT}-noprovingkeys_${VERSION}.deb
 ls -lh coda*.deb

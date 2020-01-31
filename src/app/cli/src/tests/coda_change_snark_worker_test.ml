@@ -7,27 +7,29 @@ open Async
 let name = "coda-change-snark-worker-test"
 
 let main () =
-  let snark_worker_and_proposer_id = 0 in
+  let snark_worker_and_block_producer_id = 0 in
   let logger = Logger.create () in
   let n = 2 in
-  let proposers i =
-    if i = snark_worker_and_proposer_id then Some i else None
+  let block_production_keys i =
+    if i = snark_worker_and_block_producer_id then Some i else None
   in
   let largest_public_key =
-    let _, account = Genesis_ledger.largest_account_exn () in
+    let _, account = Test_genesis_ledger.largest_account_exn () in
     Account.public_key account
   in
   let snark_work_public_keys i =
-    if i = snark_worker_and_proposer_id then Some largest_public_key else None
+    if i = snark_worker_and_block_producer_id then Some largest_public_key
+    else None
   in
   let%bind testnet =
-    Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Sequence ~max_concurrent_connections:None
+    Coda_worker_testnet.test logger n block_production_keys
+      snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
+      ~max_concurrent_connections:None
   in
   let%bind new_block_pipe1, new_block_pipe2 =
     let%map pipe =
       Coda_worker_testnet.Api.validated_transitions_keyswaptest testnet
-        snark_worker_and_proposer_id
+        snark_worker_and_block_producer_id
     in
     Pipe.fork ~pushback_uses:`Fast_consumer_only (Option.value_exn pipe).pipe
   in
@@ -65,7 +67,7 @@ let main () =
     wait_for_snark_worker_proof new_block_pipe1 largest_public_key
   in
   let new_snark_worker =
-    List.find_map_exn Genesis_ledger.accounts ~f:(fun (_, account) ->
+    List.find_map_exn Test_genesis_ledger.accounts ~f:(fun (_, account) ->
         let public_key = Account.public_key account in
         Option.some_if
           (not @@ Public_key.Compressed.equal largest_public_key public_key)
@@ -78,7 +80,7 @@ let main () =
   let%bind () =
     let%map opt =
       Coda_worker_testnet.Api.replace_snark_worker_key testnet
-        snark_worker_and_proposer_id (Some new_snark_worker)
+        snark_worker_and_block_producer_id (Some new_snark_worker)
     in
     Option.value_exn opt
   in
@@ -89,7 +91,7 @@ let main () =
   let%bind () =
     let%map opt =
       Coda_worker_testnet.Api.replace_snark_worker_key testnet
-        snark_worker_and_proposer_id None
+        snark_worker_and_block_producer_id None
     in
     Option.value_exn opt
   in

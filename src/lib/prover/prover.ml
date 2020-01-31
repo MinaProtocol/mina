@@ -88,6 +88,8 @@ module Worker_state = struct
                    { Keys.Step.Prover_state.prev_proof= chain.proof
                    ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
                    ; prev_state= chain.state
+                   ; genesis_state_hash=
+                       Coda_state.Protocol_state.genesis_state_hash chain.state
                    ; expected_next_state= Some next_state
                    ; update= block }
                  in
@@ -136,6 +138,8 @@ module Worker_state = struct
                    { Keys.Step.Prover_state.prev_proof= chain.proof
                    ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
                    ; prev_state= chain.state
+                   ; genesis_state_hash=
+                       Coda_state.Protocol_state.genesis_state_hash chain.state
                    ; expected_next_state= Some next_state
                    ; update= block }
                  in

@@ -1,6 +1,6 @@
 {
   "name": "coda-wallet",
-  "version": "0.1.0",
+  "version": "0.1.2",
   "description": "",
   "main": "./lib/js/src/main/App.js",
   "dependencies": {
@@ -10,8 +10,10 @@
     "bs-css": "^8.0.2",
     "bs-electron": "github:Schmavery/bs-electron#0cf39124417bc3157b7a675154f591bf6e4b79ba",
     "bs-platform": "5.0.3",
+    "bs-react-intl": "^1.0.0",
     "graphql_ppx": "^0.2.8",
     "node-fetch": "^2.5.0",
+    "react-intl": "^3.6.2",
     "react-modal": "^3.8.1",
     "react-waypoint": "^9.0.2",
     "reason-apollo": "^0.16.0",
@@ -20,25 +22,26 @@
   },
   "devDependencies": {
     "concurrently": "^4.1.0",
-    "electron-builder": "^20.39.0",
+    "electron-builder": "^21.2.0",
+    "electron-notarize": "^0.2.1",
     "fastpack": "^0.8.4",
     "graphql-faker": "^1.9.0",
     "node": "^8.15.0"
   },
   "scripts": {
-    "fake": "graphql-faker --port 8080 -- schema.graphql",
+    "fake": "graphql-faker --port 3085 -- schema.graphql",
     "real": "./_build/coda-daemon-macos/coda.exe daemon -rest-port 8080 &> /dev/tty",
     "fake-inspector": "graphql-faker --open -- schema.graphql",
     "build": "yarn copy-schema && bsb -make-world",
     "build-ci": "yarn run query-fake && yarn run build",
     "clean": "bsb -clean-world",
     "pack": "fpack --development ./lib/js/src/render/Index.js",
-    "query": "send-introspection-query http://localhost:8080/graphql",
+    "query": "send-introspection-query http://localhost:3085/graphql",
     "query-fake": "concurrently --kill-others 'yarn run fake' 'sleep 5 && yarn run query' || true",
     "query-real": "concurrently --kill-others 'yarn run real' 'sleep 15 && yarn run query' || true",
     "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei' -print)",
     "test": "yarn run build && jest lib/js/",
-    "dist": "yarn run build && yarn run pack && build",
+    "dist": "yarn run build && yarn run pack && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
     "dev-real": "yarn run copy-schema && concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/render/Index.js' 'electron ./lib/js/src/main/App.js'",
     "dev": "yarn gen-sdl && GRAPHQL_BACKEND=faker yarn dev-real",
     "copy-schema": "cp ../../graphql_schema.json graphql_schema.json",
@@ -46,6 +49,7 @@
     "regen-sdl": "node generate-schema.js http://localhost:8080/graphql > schema.graphql"
   },
   "build": {
+    "afterSign": "scripts/notarize.js",
     "appId": "org.codaprotocol.wallet",
     "asarUnpack": [
       "lib"
@@ -69,7 +73,7 @@
       "bundle/**/*",
       "public/**/*"
     ],
-    "productName": "CodaWallet",
+    "productName": "Coda Wallet",
     "compression": "store",
     "dmg": {
       "contents": [
@@ -83,13 +87,19 @@
           "type": "link",
           "path": "/Applications"
         }
-      ]
+      ],
+      "sign": false
     },
     "linux": {
       "executableName": "coda-wallet",
       "target": [
         "AppImage"
       ]
+    },
+    "mac": {
+      "hardenedRuntime": true,
+      "entitlements": "public/build/entitlements.mac.plist",
+      "entitlementsInherit": "public/build/entitlements.mac.plist"
     },
     "win": {
       "target": "NSIS"

@@ -1,0 +1,5 @@
+(library
+  (name gadt_lib)
+  (public_name gadt_lib)
+  (libraries core_kernel)
+  (preprocess (pps ppx_coda ppx_jane)))

@@ -56,10 +56,7 @@ let format_msg ~interpolation_config ~timezone msg =
   Out_channel.(flush stdout)
 
 let yojson_from_string_result str =
-  try Ok (Yojson.Safe.from_string str)
-  with exn ->
-    print_string "exn!" ;
-    Error (Exn.to_string exn)
+  try Ok (Yojson.Safe.from_string str) with exn -> Error (Exn.to_string exn)
 
 let process_line ~timezone ~interpolation_config ~filter line =
   let open Result.Let_syntax in

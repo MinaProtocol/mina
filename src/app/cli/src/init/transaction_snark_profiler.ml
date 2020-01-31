@@ -24,6 +24,7 @@ let create_ledger_and_transactions num_transitions =
   let txn from_kp (to_kp : Signature_lib.Keypair.t) amount fee nonce =
     let payload : User_command.Payload.t =
       User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
+        ~valid_until:Coda_numbers.Global_slot.max_value
         ~body:
           (Payment {receiver= Public_key.compress to_kp.public_key; amount})
     in
@@ -64,8 +65,8 @@ let create_ledger_and_transactions num_transitions =
       in
       let coinbase =
         Coinbase.create ~amount:Coda_compile_config.coinbase
-          ~proposer:(Public_key.compress keys.(0).public_key)
-          ~fee_transfer:None ~state_body_hash:State_body_hash.dummy
+          ~receiver:(Public_key.compress keys.(0).public_key)
+          ~fee_transfer:None
         |> Or_error.ok_exn
       in
       let transitions =
@@ -101,6 +102,21 @@ let rec pair_up = function
   | _ ->
       failwith "Expected even length list"
 
+let state_body_hash = Quickcheck.random_value State_body_hash.gen
+
+let pending_coinbase_stack_target (t : Transaction.t) stack =
+  let stack_with_state =
+    Pending_coinbase.Stack.(push_state state_body_hash stack)
+  in
+  let target =
+    match t with
+    | Coinbase c ->
+        Pending_coinbase.(Stack.push_coinbase c stack_with_state)
+    | _ ->
+        stack_with_state
+  in
+  (target, state_body_hash)
+
 (* This gives the "wall-clock time" to snarkify the given list of transactions, assuming
    unbounded parallelism. *)
 let profile (module T : Transaction_snark.S) sparse_ledger0
@@ -112,13 +128,10 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
-        let coinbase_stack_target =
-          match t with
-          | Coinbase c ->
-              Pending_coinbase.Stack.push coinbase_stack_source c
-          | _ ->
-              coinbase_stack_source
+        let coinbase_stack_target, state_body_hash =
+          pending_coinbase_stack_target t coinbase_stack_source
         in
+        let state_body_hash_opt = Some state_body_hash in
         let span, proof =
           time (fun () ->
               T.of_transaction ?preeval ~sok_digest:Sok_message.Digest.default
@@ -126,7 +139,8 @@ let profile (module T : Transaction_snark.S) sparse_ledger0
                 ~target:(Sparse_ledger.merkle_root sparse_ledger')
                 ~pending_coinbase_stack_state:
                   {source= coinbase_stack_source; target= coinbase_stack_target}
-                t
+                { Transaction_protocol_state.Poly.transaction= t
+                ; block_data= state_body_hash_opt }
                 (unstage (Sparse_ledger.handler sparse_ledger)) )
         in
         ( (Time.Span.max span max_span, sparse_ledger', coinbase_stack_target)
@@ -164,13 +178,10 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
-        let coinbase_stack_target =
-          match t with
-          | Coinbase c ->
-              Pending_coinbase.(Stack.push Stack.empty c)
-          | _ ->
-              Pending_coinbase.Stack.empty
+        let coinbase_stack_target, state_body_hash =
+          pending_coinbase_stack_target t Pending_coinbase.Stack.empty
         in
+        let state_body_hash_opt = Some state_body_hash in
         let () =
           Transaction_snark.check_transaction ?preeval ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
@@ -178,7 +189,8 @@ let check_base_snarks sparse_ledger0 (transitions : Transaction.t list) preeval
             ~pending_coinbase_stack_state:
               { source= Pending_coinbase.Stack.empty
               ; target= coinbase_stack_target }
-            t
+            { Transaction_protocol_state.Poly.block_data= state_body_hash_opt
+            ; transaction= t }
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
         sparse_ledger' )
@@ -197,13 +209,10 @@ let generate_base_snarks_witness sparse_ledger0
         let sparse_ledger' =
           Sparse_ledger.apply_transaction_exn sparse_ledger t
         in
-        let coinbase_stack_target =
-          match t with
-          | Coinbase c ->
-              Pending_coinbase.(Stack.push Stack.empty c)
-          | _ ->
-              Pending_coinbase.Stack.empty
+        let coinbase_stack_target, state_body_hash =
+          pending_coinbase_stack_target t Pending_coinbase.Stack.empty
         in
+        let state_body_hash_opt = Some state_body_hash in
         let () =
           Transaction_snark.generate_transaction_witness ?preeval ~sok_message
             ~source:(Sparse_ledger.merkle_root sparse_ledger)
@@ -211,7 +220,8 @@ let generate_base_snarks_witness sparse_ledger0
             { Transaction_snark.Pending_coinbase_stack_state.source=
                 Pending_coinbase.Stack.empty
             ; target= coinbase_stack_target }
-            t
+            { Transaction_protocol_state.Poly.transaction= t
+            ; block_data= state_body_hash_opt }
             (unstage (Sparse_ledger.handler sparse_ledger))
         in
         sparse_ledger' )
@@ -229,8 +239,8 @@ let run profiler num_transactions repeats preeval =
            | User_command t ->
                let t = (t :> User_command.t) in
                User_command.accounts_accessed t
-           | Coinbase {proposer; fee_transfer; _} ->
-               proposer :: Option.to_list (Option.map fee_transfer ~f:fst) ))
+           | Coinbase {receiver; fee_transfer; _} ->
+               receiver :: Option.to_list (Option.map fee_transfer ~f:fst) ))
   in
   for i = 1 to repeats do
     let message = profiler sparse_ledger transitions preeval in
@@ -240,6 +250,7 @@ let run profiler num_transactions repeats preeval =
 
 let main num_transactions repeats preeval () =
   Snarky.Libsnark.set_no_profiling false ;
+  Snarky.Libsnark.set_printing_off () ;
   Test_util.with_randomness 123456789 (fun () ->
       let keys = Transaction_snark.Keys.create () in
       let module T = Transaction_snark.Make (struct

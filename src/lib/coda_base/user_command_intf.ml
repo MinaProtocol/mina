@@ -77,6 +77,21 @@ module type S = sig
 
   val sender : t -> Public_key.Compressed.t
 
+  val receiver : t -> Public_key.Compressed.t
+
+  val amount : t -> Currency.Amount.t option
+
+  val is_payment : t -> bool
+
+  val memo : t -> User_command_memo.t
+
+  val valid_until : t -> Coda_numbers.Global_slot.t
+
+  (* for filtering *)
+  val minimum_fee : Currency.Fee.t
+
+  val is_trivial : t -> bool
+
   include Gen_intf with type t := t
 
   module With_valid_signature : sig

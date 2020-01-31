@@ -111,15 +111,18 @@ module Non_snark = struct
 
   let dummy : t Lazy.t =
     lazy
-      { ledger_hash= Ledger.merkle_root (Lazy.force Genesis_ledger.t)
+      { ledger_hash= Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
       ; aux_hash= Aux_hash.dummy
       ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
+
+  let genesis ~genesis_ledger_hash : t =
+    { ledger_hash= genesis_ledger_hash
+    ; aux_hash= Aux_hash.dummy
+    ; pending_coinbase_aux= Pending_coinbase_aux.dummy }
 
   type var = Boolean.var list
 
   let length_in_bits = 256
-
-  let length_in_triples = (length_in_bits + 2) / 3
 
   let digest ({ledger_hash; aux_hash; pending_coinbase_aux} : t) =
     let h = Digestif.SHA256.init () in
@@ -227,11 +230,10 @@ let of_aux_ledger_and_coinbase_hash aux_hash ledger_hash pending_coinbase : t =
         (Pending_coinbase.hash_extra pending_coinbase)
   ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 
-let genesis : t Lazy.t =
-  lazy
-    (let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
-     { non_snark= Lazy.force Non_snark.dummy
-     ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase })
+let genesis ~genesis_ledger_hash : t =
+  let pending_coinbase = Pending_coinbase.create () |> Or_error.ok_exn in
+  { non_snark= Non_snark.genesis ~genesis_ledger_hash
+  ; pending_coinbase_hash= Pending_coinbase.merkle_root pending_coinbase }
 
 let var_of_t ({pending_coinbase_hash; non_snark} : t) : var =
   let non_snark = Non_snark.var_of_t non_snark in
@@ -245,9 +247,6 @@ let to_input ({non_snark; pending_coinbase_hash} : t) =
     append
       (Non_snark.to_input non_snark)
       (field (pending_coinbase_hash :> Field.t)))
-
-let length_in_triples =
-  Non_snark.length_in_triples + Pending_coinbase.Hash.length_in_triples
 
 let var_to_input ({non_snark; pending_coinbase_hash} : var) =
   Random_oracle.Input.(

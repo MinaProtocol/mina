@@ -36,22 +36,28 @@ let create a =
          Deferred.unit )) ;
   (t, t)
 
-exception Already_closed
+exception Already_closed of string
 
-let guard_already_closed t k =
-  if Pipe.is_closed t.root_pipe then raise Already_closed else k ()
+let if_closed t ~then_ ~else_ =
+  if Pipe.is_closed t.root_pipe then then_ () else else_ ()
+
+let guard_already_closed ~context t f =
+  if_closed t ~then_:(fun () -> raise (Already_closed context)) ~else_:f
 
 module Reader = struct
   type nonrec 'a t = 'a t
 
-  let peek t = guard_already_closed t (fun () -> t.cache)
+  let peek t =
+    guard_already_closed ~context:"Reader.peek" t (fun () -> t.cache)
 
   let fresh_reader_id t =
     t.reader_id <- t.reader_id + 1 ;
     t.reader_id
 
-  let prepare_pipe t ~f =
-    guard_already_closed t (fun () ->
+  let prepare_pipe t ~default_value ~f =
+    if_closed t
+      ~then_:(Fn.const (Deferred.return default_value))
+      ~else_:(fun () ->
         let r, w = Pipe.create () in
         Pipe.write_without_pushback w (peek t) ;
         let reader_id = fresh_reader_id t in
@@ -69,7 +75,7 @@ module Reader = struct
     Pipe.add_consumer p ~downstream_flushed:(fun () -> Deferred.return `Ok)
 
   let fold t ~init ~f =
-    prepare_pipe t ~f:(fun r ->
+    prepare_pipe t ~default_value:init ~f:(fun r ->
         let consumer = add_trivial_consumer r in
         Pipe.fold r ~init ~f:(fun acc v ->
             let%map res = f acc v in
@@ -77,7 +83,7 @@ module Reader = struct
             res ) )
 
   let iter t ~f =
-    prepare_pipe t ~f:(fun r ->
+    prepare_pipe t ~default_value:() ~f:(fun r ->
         let consumer = add_trivial_consumer r in
         Pipe.iter ~flushed:(Consumer consumer) r ~f:(fun v ->
             let%map () = f v in
@@ -94,7 +100,7 @@ module Reader = struct
             Pipe.Consumer.values_sent_downstream consumer ;
             loop ~consumer reader )
     in
-    prepare_pipe t ~f:(fun reader ->
+    prepare_pipe t ~default_value:() ~f:(fun reader ->
         let consumer = add_trivial_consumer reader in
         loop ~consumer reader )
 end
@@ -103,14 +109,14 @@ module Writer = struct
   type nonrec 'a t = 'a t
 
   let write t x =
-    guard_already_closed t (fun () ->
+    guard_already_closed ~context:"Writer.write" t (fun () ->
         t.cache <- x ;
         let%bind () = Pipe.write t.root_pipe x in
         let%bind _ = Pipe.downstream_flushed t.root_pipe in
         Deferred.unit )
 
   let close t =
-    guard_already_closed t (fun () ->
+    guard_already_closed ~context:"Writer.close" t (fun () ->
         Pipe.close t.root_pipe ;
         Int.Table.iter t.pipes ~f:(fun w -> Pipe.close w) ;
         Int.Table.clear t.pipes )

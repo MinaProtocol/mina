@@ -1,13 +1,11 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
-open Util
 open Core_kernel
 open Snark_params
 open Tick
 open Unsigned_extended
 open Snark_bits
-open Fold_lib
 
 module Time = struct
   (* Milliseconds since epoch *)
@@ -64,15 +62,8 @@ module Time = struct
   type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
   module B = Bits
-
-  let bit_length = 64
-
-  let length_in_triples = bit_length_to_triple_length bit_length
-
   module Bits = Bits.UInt64
   include B.Snarkable.UInt64 (Tick)
-
-  let fold t = Fold.group3 ~default:false (Bits.fold t)
 
   module Span = struct
     [%%versioned

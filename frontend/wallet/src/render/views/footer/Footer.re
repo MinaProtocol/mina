@@ -1,3 +1,5 @@
+open ReactIntl;
+
 module Styles = {
   open Css;
 
@@ -51,10 +53,14 @@ module StakingSwitch = {
                   ? Theme.Colors.serpentine : Theme.Colors.slateAlpha(0.7),
               ),
               marginLeft(`rem(1.)),
+              firstLetter([textTransform(`capitalize)]),
             ]),
           ])
         )>
-        {ReasonReact.string("Compress the blockchain")}
+        <FormattedMessage
+          id="footer.compress-blockchain"
+          defaultMessage="Compress the blockchain"
+        />
       </span>
     </div>;
   };
@@ -93,14 +99,17 @@ let make = () => {
            | Data(data) =>
              <>
                <Button
-                 label="Request"
+                 label="request"
                  style=Button.Gray
                  onClick={_ => setModalState(_ => true)}
                />
                {switch (modalState) {
                 | false => React.null
                 | true =>
-                  <RequestCodaModal accounts=data##ownedWallets setModalState />
+                  <RequestCodaModal
+                    accounts=data##ownedWallets
+                    setModalState
+                  />
                 }}
                <Spacer width=1. />
                <SendButton />

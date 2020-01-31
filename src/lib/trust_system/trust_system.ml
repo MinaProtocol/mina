@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 (** The trust system, instantiated with Coda-specific stuff. *)
 open Core
@@ -39,6 +39,8 @@ module Actions = struct
     | Sent_invalid_signature
         (** Peer sent us something with a signature that doesn't check *)
     | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
+    | Has_invalid_genesis_protocol_state
+        (**Peer gossiped a transition that has a different genesis protocol state from that of mine*)
     | Sent_invalid_transition_chain_merkle_proof
         (** Peer sent us a transition chain witness that does not verify *)
     | Violated_protocol
@@ -79,7 +81,7 @@ module Actions = struct
     let old_gossip_increment = Peer_trust.max_rate 20. in
     match action with
     | Gossiped_old_transition slot_diff ->
-        (* NOTE: slot_diff here is [received_slot - (proposed_slot + Δ)]
+        (* NOTE: slot_diff here is [received_slot - (produced_slot + Δ)]
          *
          * We want to decrease the score exponentially based on how out of date the transition
          * we received was. We would like the base score decrease to be some constant
@@ -107,6 +109,9 @@ module Actions = struct
     | Sent_invalid_signature ->
         Insta_ban
     | Sent_invalid_proof ->
+        Insta_ban
+    (*Genesis ledger (and the genesis protocol state) is now a runtime config, so we should ban nodes that are running using a different genesis ledger*)
+    | Has_invalid_genesis_protocol_state ->
         Insta_ban
     | Sent_invalid_transition_chain_merkle_proof ->
         Insta_ban

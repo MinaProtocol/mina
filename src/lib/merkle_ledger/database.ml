@@ -56,10 +56,11 @@ module Make (Inputs : Inputs_intf) :
       | Some name ->
           name
     in
+    Unix.mkdir_p directory ;
     let kvdb = Kvdb.create directory in
     {uuid; kvdb}
 
-  let close {uuid= _; kvdb} = Kvdb.close kvdb
+  let close {kvdb; uuid= _} = Kvdb.close kvdb
 
   let with_ledger ~f =
     let t = create () in

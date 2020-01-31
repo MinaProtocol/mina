@@ -20,18 +20,20 @@ Currently, Coda builds/runs on Linux & macOS. MacOS may have some issues that yo
 The short version:
 
  1. Start with Ubuntu 18 or run it in a [virtual machine](https://www.osboxes.org/ubuntu/)
- 2. Pull in our submodules: `git submodule update --init`. This might fail with
-    `git@github.com: Permission denied (publickey).`, if that happens it means
+ 2. Set github repos to pull and push over ssh: `git config --global url.ssh://git@github.com/.insteadOf https://github.com/`
+     - To push branches to repos in the CodaProtocol or o1-labs organisations, you must complete this step. These repositories do not accept the password authentication used by the https URLs.
+ 3. Pull in our submodules: `git submodule update --init`
+     - This might fail with `git@github.com: Permission denied (publickey).`. If that happens it means
     you need to [set up SSH keys on your machine](https://help.github.com/en/articles/generating-a-new-ssh-key-and-adding-it-to-the-ssh-agent).
- 3. Install Docker, GNU make, and bash
- 4. `make USEDOCKER=TRUE dev`
- 5. `make USEDOCKER=TRUE deb`
+ 4. Install Docker, GNU make, and bash
+ 5. `make USEDOCKER=TRUE dev`
+ 6. `make USEDOCKER=TRUE deb`
 
 Now you'll have a `src/_build/codaclient.deb` ready to install on Ubuntu or Debian!
 
 You should also run:
 
- 6. `git config --local --add submodule.recurse true`
+ 7. `git config --local --add submodule.recurse true`
 
 so that the submodules get updated automatically when updating your local copy
 of the repo.
@@ -57,7 +59,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-6cc080c12524db09ab6d62f6dd85e9248377eb98`
+`docker pull codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e`
 
 * Create local builder image
 
@@ -126,7 +128,7 @@ You should probably use `USEDOCKER=TRUE` unless you've done the [building withou
 
 These are the most important `make` targets:
 
-* `kademlia`: build the kademlia helper
+* `libp2p_helper`: build the libp2p helper
 * `build`: build everything
 * `docker`: build the container
 * `container`: restart the development container (or start it if it's not yet)

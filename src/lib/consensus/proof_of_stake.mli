@@ -8,9 +8,8 @@ include Intf.S
 module Exported : sig
   module Global_slot = Global_slot
 
-  module Proposal_data : sig
-    include
-      module type of Data.Proposal_data with type t = Data.Proposal_data.t
+  module Block_data : sig
+    include module type of Data.Block_data with type t = Data.Block_data.t
 
     val global_slot : t -> Global_slot.t
   end
@@ -18,7 +17,9 @@ module Exported : sig
   module Consensus_state : sig
     include
       module type of Data.Consensus_state
-      with type Value.t = Data.Consensus_state.Value.t
+      with type Value.Stable.V1.t = Data.Consensus_state.Value.Stable.V1.t
+
+    val global_slot : Value.t -> Global_slot.t
 
     (* unsafe modules for creating dummy states when doing vrf evaluations *)
     (* TODO: refactor code so that [Hooks.next_proposal] does not require a full [Consensus_state] *)

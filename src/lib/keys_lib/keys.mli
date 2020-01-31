@@ -7,6 +7,7 @@ module type S = sig
       { wrap_vk: Tock.Verification_key.t
       ; prev_proof: Tock.Proof.t
       ; prev_state: Protocol_state.value
+      ; genesis_state_hash: Coda_base.State_hash.t
       ; expected_next_state: Protocol_state.value option
       ; update: Snark_transition.value }
   end

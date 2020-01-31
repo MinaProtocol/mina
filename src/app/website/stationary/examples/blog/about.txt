@@ -1,3 +1,0 @@
-This is an example site for the OCaml library stationary.
-This about page was generated from a plain text file containing
-only this paragraph.

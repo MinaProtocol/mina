@@ -39,6 +39,12 @@
   (libraries core_kernel)
   (modules versioned_module_good))
 
+(executable
+  (name versioned_sig_good)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (libraries core_kernel)
+  (modules versioned_sig_good))
+
 ;;; should fail
 
 ;; expiration

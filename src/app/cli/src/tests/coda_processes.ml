@@ -1,5 +1,5 @@
 [%%import
-"../../../../config.mlh"]
+"/src/config.mlh"]
 
 open Core
 open Async
@@ -44,8 +44,9 @@ let offset =
         ( Consensus.Constants.genesis_state_timestamp
         |> Coda_base.Block_time.to_time ))
 
-let local_configs ?proposal_interval ?(proposers = Fn.const None)
-    ?(is_archive_node = Fn.const false) n ~acceptable_delay ~program_dir
+let local_configs ?block_production_interval
+    ?(block_production_keys = Fn.const None)
+    ?(is_archive_rocksdb = Fn.const false) n ~acceptable_delay ~program_dir
     ~snark_worker_public_keys ~work_selection_method ~trace_dir
     ~max_concurrent_connections =
   let addrs_and_ports_list, peers = net_configs n in
@@ -57,11 +58,12 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None)
           Option.bind snark_worker_public_keys ~f:(fun keys ->
               List.nth_exn keys i )
         in
-        Coda_process.local_config ?proposal_interval ~addrs_and_ports ~peers
-          ~snark_worker_key:public_key ~program_dir ~acceptable_delay
-          ~proposer:(proposers i) ~work_selection_method ~trace_dir
-          ~is_archive_node:(is_archive_node i) ~offset:(Lazy.force offset)
-          ~max_concurrent_connections () )
+        Coda_process.local_config ?block_production_interval ~addrs_and_ports
+          ~peers ~snark_worker_key:public_key ~program_dir ~acceptable_delay
+          ~block_production_key:(block_production_keys i)
+          ~work_selection_method ~trace_dir
+          ~is_archive_rocksdb:(is_archive_rocksdb i)
+          ~offset:(Lazy.force offset) ~max_concurrent_connections () )
   in
   configs
 

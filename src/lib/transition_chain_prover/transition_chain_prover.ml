@@ -4,15 +4,22 @@ open Coda_state
 open Coda_transition
 
 module type Inputs_intf = sig
-  include Transition_frontier.Inputs_intf
-
-  module Transition_frontier : Coda_intf.Transition_frontier_intf
+  module Transition_frontier : module type of Transition_frontier
 end
 
 module Make (Inputs : Inputs_intf) :
   Coda_intf.Transition_chain_prover_intf
   with type transition_frontier := Inputs.Transition_frontier.t = struct
   open Inputs
+
+  let find_in_root_history frontier state_hash =
+    let open Transition_frontier.Extensions in
+    let open Option.Let_syntax in
+    let root_history =
+      get_extension (Transition_frontier.extensions frontier) Root_history
+    in
+    let%map root_data = Root_history.lookup root_history state_hash in
+    root_data.transition
 
   module Merkle_list = Merkle_list_prover.Make_ident (struct
     type value = External_transition.Validated.t
@@ -30,25 +37,21 @@ module Make (Inputs : Inputs_intf) :
         transition |> External_transition.Validated.parent_hash
       in
       let open Option.Let_syntax in
-      let%map breadcrumb =
-        Option.merge
-          (Transition_frontier.find context parent_hash)
-          (Transition_frontier.find_in_root_history context parent_hash)
-          ~f:Fn.const
-      in
-      Transition_frontier.Breadcrumb.validated_transition breadcrumb
+      Option.merge
+        Transition_frontier.(
+          find context parent_hash >>| Breadcrumb.validated_transition)
+        (find_in_root_history context parent_hash)
+        ~f:Fn.const
   end)
 
   let prove ?length ~frontier state_hash =
     let open Option.Let_syntax in
-    let%map requested_breadcrumb =
+    let%map requested_transition =
       Option.merge
-        (Transition_frontier.find frontier state_hash)
-        (Transition_frontier.find_in_root_history frontier state_hash)
+        Transition_frontier.(
+          find frontier state_hash >>| Breadcrumb.validated_transition)
+        (find_in_root_history frontier state_hash)
         ~f:Fn.const
-    in
-    let requested_transition =
-      Transition_frontier.Breadcrumb.validated_transition requested_breadcrumb
     in
     let first_transition, merkle_list =
       Merkle_list.prove ?length ~context:frontier requested_transition
@@ -57,6 +60,5 @@ module Make (Inputs : Inputs_intf) :
 end
 
 include Make (struct
-  include Transition_frontier.Inputs
   module Transition_frontier = Transition_frontier
 end)

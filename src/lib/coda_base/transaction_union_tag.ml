@@ -1,6 +1,4 @@
 open Core_kernel
-open Fold_lib
-open Tuple_lib
 open Snark_params.Tick
 
 type t = Payment | Stake_delegation | Fee_transfer | Coinbase
@@ -40,22 +38,12 @@ let%test_unit "to_bool of_bool inv" =
 let typ =
   Typ.transport Typ.(Boolean.typ * Boolean.typ) ~there:to_bits ~back:of_bits
 
-let fold (t : t) : bool Triple.t Fold.t =
-  { fold=
-      (fun ~init ~f ->
-        let b0, b1 = to_bits t in
-        f init (b0, b1, false) ) }
-
-let length_in_triples = 1
-
 module Checked = struct
   open Let_syntax
 
   let constant t =
     let x, y = to_bits t in
     Boolean.(var_of_value x, var_of_value y)
-
-  let to_triples ((x, y) : var) = [(x, y, Boolean.false_)]
 
   (* someday: Make these all cached *)
 

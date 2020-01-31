@@ -1,6 +1,16 @@
-open Core
+(* receipt.ml *)
+
+[%%import
+"/src/config.mlh"]
+
+open Core_kernel
+
+[%%if
+defined consensus_mechanism]
+
 open Snark_params.Tick
-open Fold_lib
+
+[%%endif]
 
 module Chain_hash = struct
   include Data_hash.Make_full_size ()
@@ -28,10 +38,19 @@ module Chain_hash = struct
   let empty =
     of_hash (Pedersen.(State.salt "CodaReceiptEmpty") |> Pedersen.State.digest)
 
-  let cons payload t =
-    Pedersen.digest_fold Hash_prefix.receipt_chain
-      Fold.(User_command.Payload.fold payload +> fold t)
+  let cons payload (t : t) =
+    let open Random_oracle in
+    hash ~init:Hash_prefix.receipt_chain
+      (pack_input
+         Input.(
+           append
+             Transaction_union_payload.(
+               to_input (of_user_command_payload payload))
+             (field (t :> Field.t))))
     |> of_hash
+
+  [%%if
+  defined consensus_mechanism]
 
   module Checked = struct
     let constant (t : t) =
@@ -42,24 +61,13 @@ module Chain_hash = struct
     let if_ = if_
 
     let cons ~payload t =
-      let init =
-        Pedersen.Checked.Section.create
-          ~acc:(`Value Hash_prefix.receipt_chain.acc)
-          ~support:
-            (Interval_union.of_interval (0, Hash_prefix.length_in_triples))
-      in
-      let%bind with_t =
-        let%bind bs = var_to_triples t in
-        Pedersen.Checked.Section.extend init bs
-          ~start:
-            ( Hash_prefix.length_in_triples
-            + User_command.Payload.length_in_triples )
-      in
-      let%map s = Pedersen.Checked.Section.disjoint_union_exn payload with_t in
-      let digest, _ =
-        Pedersen.Checked.Section.to_initial_segment_digest s |> Or_error.ok_exn
-      in
-      var_of_hash_packed digest
+      let open Random_oracle in
+      let open Checked in
+      let%bind payload = Transaction_union_payload.Checked.to_input payload in
+      make_checked (fun () ->
+          hash ~init:Hash_prefix.receipt_chain
+            (pack_input Input.(append payload (var_to_input t)))
+          |> var_of_hash_packed )
   end
 
   let%test_unit "checked-unchecked equivalence" =
@@ -70,10 +78,9 @@ module Chain_hash = struct
         let checked =
           let comp =
             let open Snark_params.Tick.Checked.Let_syntax in
-            let%bind payload =
-              Schnorr.Message.var_of_payload
-                Transaction_union_payload.(
-                  Checked.constant (of_user_command_payload payload))
+            let payload =
+              Transaction_union_payload.(
+                Checked.constant (of_user_command_payload payload))
             in
             let%map res = Checked.cons ~payload (var_of_t base) in
             As_prover.read typ res
@@ -82,6 +89,8 @@ module Chain_hash = struct
           x
         in
         assert (equal unchecked checked) )
+
+  [%%endif]
 
   let%test_unit "json" =
     Quickcheck.test ~trials:20 gen ~sexp_of:sexp_of_t ~f:(fun t ->

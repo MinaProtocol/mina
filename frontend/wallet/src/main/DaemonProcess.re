@@ -11,23 +11,24 @@ module Command = {
 
 let (^/) = Filename.concat;
 
-let codaPath = "_build/coda-daemon-macos";
 let codaCommand = (~port, ~extraArgs) => {
+  let env = ChildProcess.Process.env;
+  let path = Js.Dict.get(env, "PATH") |> Option.with_default(~default="");
+  Js.Dict.set(env, "PATH", path ++ Node.Path.delimiter ++ "/usr/local/bin");
   {
-    // Assume coda is installed globally
     Command.executable: "coda",
     args:
-      Js.Array.concat(
-        extraArgs,
+      Array.append(
         [|
           "daemon",
           "-rest-port",
           Js.Int.toString(port),
           "-config-directory",
-          ProjectRoot.userData ^/ "coda" ^/ "config",
+          ProjectRoot.userData ^/ "coda-config",
         |],
+        extraArgs,
       ),
-    env: ChildProcess.Process.env,
+    env,
   };
 };
 
@@ -46,15 +47,11 @@ let fakerCommand = (~port) => {
   env: ChildProcess.Process.env,
 };
 
-[@bs.module "os"] external tmpdir: unit => string = "";
-
 module Process = {
-  let logfileName = tmpdir() ++ "/daemon.log";
+  let logfileName = ProjectRoot.userData ^/ "coda-wallet.log";
   let start = (command: Command.t) => {
     let {Command.executable, args} = command;
-    print_endline(
-      {j|Starting $executable with $args. Logging to `$logfileName`|j},
-    );
+    print_endline({j|Logging to `$logfileName`|j});
 
     /*
      child_process.spawn communicates with processes using sockets.
@@ -71,8 +68,13 @@ module Process = {
      https://github.com/janestreet/async_unix/issues/15
      */
 
-    let log = Fs.openSync(logfileName, "w");
-    Fs.writeSync(log, {j|Started with $args\n|j});
+    let logFile = Fs.openSync(logfileName, "w");
+    let log = s => {
+      let str = "Wallet: " ++ s ++ "\n";
+      Fs.writeSync(logFile, str);
+      print_endline(str);
+    };
+    log({j|Started $executable with $args|j});
     let process =
       ChildProcess.spawn(
         command.executable,
@@ -80,13 +82,17 @@ module Process = {
         ChildProcess.spawnOptions(
           ~env=command.env,
           ~stdio=
-            ChildProcess.makeIOTriple(`Ignore, `Stream(log), `Stream(log)),
+            ChildProcess.makeIOTriple(
+              `Ignore,
+              `Stream(logFile),
+              `Stream(logFile),
+            ),
           (),
         ),
       );
 
     ChildProcess.Process.onError(process, e =>
-      prerr_endline(
+      log(
         "Daemon process "
         ++ command.executable
         ++ " crashed. Logs are in `"
@@ -101,25 +107,19 @@ module Process = {
       fun
       | `Code(code) =>
         if (code != 0) {
-          Printf.fprintf(
-            stderr,
-            "Daemon process %s died with non-zero exit code: %d. Logs are in `%s`\n",
-            command.executable,
-            code,
-            logfileName,
+          log(
+            Printf.sprintf(
+              "Daemon process %s died with non-zero exit code: %d. Logs are in `%s`\n",
+              command.executable,
+              code,
+              logfileName,
+            ),
           );
         } else {
-          print_endline(
-            "Shutting down daemon process: " ++ command.executable,
-          );
+          log("Shutting down daemon process: " ++ command.executable);
         }
       | `Signal(signal) => {
-          Printf.fprintf(
-            stderr,
-            "Daemon process %s died via signal: %s\n",
-            command.executable,
-            signal,
-          );
+          log({j|"Daemon process $executable died via signal: $signal"|j});
         },
     );
 
@@ -136,6 +136,19 @@ module CodaProcess = {
   let kill: t => unit = t => ChildProcess.Process.kill(t, "SIGINT");
 
   let port = 0xc0d;
+
+  let defaultPeers = [
+    "/dns4/peer1-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWHMmfuS9DmmK9eH4GC31arDhbtHEBQzX6PwPtQftxzwJs",
+    "/dns4/peer2-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWAux9MAW1yAdD8gsDbYHmgVjRvdfYkpkfX7AnyGvQaRPF",
+    "/dns4/peer3-rising-phoenix.o1test.net/tcp/8303/ipfs/12D3KooWCZA4pPWmDAkQf6riDQ3XMRN5k99tCsiRhBAPZCkA8re7",
+  ];
+
+  let defaultArgs =
+    List.foldr(
+      ~f=(peer, acc) => List.concat([["-peer", peer], acc]),
+      defaultPeers,
+      ~init=["-discovery-port", "8303"],
+    );
 
   let start: list(string) => t =
     args => {

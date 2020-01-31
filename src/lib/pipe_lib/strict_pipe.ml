@@ -78,6 +78,22 @@ module Reader0 = struct
        in
        go init)
 
+  let fold_until reader ~init ~f =
+    enforce_single_reader reader
+      (let rec go b =
+         match%bind Pipe.read reader.reader with
+         | `Eof ->
+             return (`Eof b)
+         | `Ok a -> (
+             (* The async scheduler could yield here *)
+             match%bind f b a with
+             | `Stop x ->
+                 return (`Terminated x)
+             | `Continue b' ->
+                 go b' )
+       in
+       go init)
+
   let fold_without_pushback ?consumer reader ~init ~f =
     Pipe.fold_without_pushback ?consumer reader.reader ~init ~f
 

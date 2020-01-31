@@ -44,6 +44,13 @@ module Reader : sig
    * model. *)
   val fold : 'a t -> init:'b -> f:('b -> 'a -> 'b Deferred.t) -> 'b Deferred.t
 
+  (** Like `fold`, except that `f` can terminate the fold early *)
+  val fold_until :
+       'a t
+    -> init:'b
+    -> f:('b -> 'a -> [`Continue of 'b | `Stop of 'c] Deferred.t)
+    -> [`Eof of 'b | `Terminated of 'c] Deferred.t
+
   (** This has similar semantics to [fold reader ~init ~f], but f isn't
    * deferred. This function delegates to [Pipe.fold_without_pushback] *)
   val fold_without_pushback :

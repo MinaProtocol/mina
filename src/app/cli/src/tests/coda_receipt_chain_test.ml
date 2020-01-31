@@ -16,30 +16,34 @@ let main () =
   let open Keypair in
   let logger = Logger.create () in
   let largest_account_keypair =
-    Genesis_ledger.largest_account_keypair_exn ()
+    Test_genesis_ledger.largest_account_keypair_exn ()
   in
   let another_account_keypair =
-    Genesis_ledger.find_new_account_record_exn
+    Test_genesis_ledger.find_new_account_record_exn
       [largest_account_keypair.public_key]
-    |> Genesis_ledger.keypair_of_account_record_exn
+    |> Test_genesis_ledger.keypair_of_account_record_exn
   in
-  let proposal_interval = Consensus.Constants.block_window_duration_ms in
+  let block_production_interval =
+    Consensus.Constants.block_window_duration_ms
+  in
   let acceptable_delay =
     Time.Span.of_ms
-      (proposal_interval * Consensus.Constants.delta |> Float.of_int)
+      (block_production_interval * Consensus.Constants.delta |> Float.of_int)
   in
   let n = 2 in
   let receiver_pk = Public_key.compress another_account_keypair.public_key in
   let sender_sk = largest_account_keypair.private_key in
   let send_amount = Currency.Amount.of_int 10 in
-  let fee = Currency.Fee.of_int 0 in
+  let fee = User_command.minimum_fee in
   let%bind program_dir = Unix.getcwd () in
-  let work_selection_method = Cli_lib.Arg_type.Sequence in
+  let work_selection_method =
+    Cli_lib.Arg_type.Work_selection_method.Sequence
+  in
   Parallel.init_master () ;
   let configs =
-    Coda_processes.local_configs n ~program_dir ~proposal_interval
+    Coda_processes.local_configs n ~program_dir ~block_production_interval
       ~acceptable_delay ~snark_worker_public_keys:None
-      ~proposers:(Fn.const None) ~work_selection_method
+      ~block_production_keys:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections:None
   in

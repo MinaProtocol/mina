@@ -15,6 +15,12 @@ let to_yojson conv t = display_to_yojson conv (to_display t)
 let of_yojson conv json =
   Result.map ~f:of_display (display_of_yojson conv json)
 
+let rec print ?(whitespace = 0) ~element_to_string (T (root, branches)) =
+  Printf.printf "%s- %s\n"
+    (String.make whitespace ' ')
+    (element_to_string root) ;
+  List.iter branches ~f:(print ~whitespace:(whitespace + 2) ~element_to_string)
+
 let rec of_list_exn ?(subtrees = []) = function
   | [] ->
       raise

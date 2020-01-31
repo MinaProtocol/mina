@@ -37,9 +37,8 @@ module Styles = {
 
 [@react.component]
 let make = () => {
+  let codaSvg = Hooks.useAsset("CodaLogo.svg");
   <header className=Styles.header>
-    <div className=Styles.logo>
-      <img src="CodaLogo.svg" alt="Coda logo" />
-    </div>
+    <div className=Styles.logo> <img src=codaSvg alt="Coda logo" /> </div>
   </header>;
 };

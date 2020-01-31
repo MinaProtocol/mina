@@ -1,6 +1,4 @@
 open Core_kernel
-open Fold_lib
-open Tuple_lib
 open Signature_lib
 open Snark_params.Tick
 open Currency
@@ -20,12 +18,6 @@ module Body = struct
     let {Public_key.Compressed.Poly.x; is_odd} = t.public_key in
     { Random_oracle.Input.bitstrings= [|[t1; t2]; amount t.amount; [is_odd]|]
     ; field_elements= [|x|] }
-
-  let fold ({tag; public_key; amount} : t) =
-    Fold.(
-      Tag.fold tag
-      +> Public_key.Compressed.fold public_key
-      +> Currency.Amount.fold amount)
 
   let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in
@@ -52,10 +44,6 @@ module Body = struct
       Amount.gen_incl min max
     and public_key = Public_key.Compressed.gen in
     {tag; public_key; amount}
-
-  let length_in_triples =
-    Tag.length_in_triples + Public_key.Compressed.length_in_triples
-    + Currency.Amount.length_in_triples
 
   let to_hlist {tag; public_key; amount} = H_list.[tag; public_key; amount]
 
@@ -86,11 +74,6 @@ module Body = struct
     let to_input t =
       to_input t ~tag:Fn.id ~amount:(fun x ->
           (Currency.Amount.var_to_bits x :> Boolean.var list) )
-
-    let to_triples ({tag; public_key; amount} : var) =
-      let%map public_key = Public_key.Compressed.var_to_triples public_key in
-      Tag.Checked.to_triples tag @ public_key
-      @ Currency.Amount.var_to_triples amount
   end
 
   let to_input (t : t) =
@@ -128,9 +111,6 @@ let typ : (var, t) Typ.t =
 
 let of_user_command_payload ({common; body} : User_command_payload.t) : t =
   {common; body= Body.of_user_command_payload_body body}
-
-let fold ({common; body} : t) =
-  Fold.(User_command_payload.Common.fold common +> Body.fold body)
 
 let payload_typ = typ
 
@@ -237,7 +217,7 @@ module Changes = struct
       let%bind receiver_increase =
         let%bind coinbase_receiver_increase =
           with_label __LOC__
-            (let%bind proposer_reward, `Underflow underflowed =
+            (let%bind producer_reward, `Underflow underflowed =
                Amount.Checked.sub_flagged coinbase_amount
                  (Amount.Checked.of_fee fee)
              in
@@ -245,7 +225,7 @@ module Changes = struct
                Boolean.Assert.any
                  [Boolean.not underflowed; Boolean.not is_coinbase]
              in
-             proposer_reward)
+             producer_reward)
         in
         if_amount is_stake_delegation
           ~then_:(Amount.var_of_t Amount.zero)
@@ -302,11 +282,6 @@ module Changes = struct
 end
 
 module Checked = struct
-  let to_triples ({common; body} : var) =
-    let%map common = User_command_payload.Common.Checked.to_triples common
-    and body = Body.Checked.to_triples body in
-    common @ body
-
   let to_input ({common; body} : var) =
     let%map common = User_command_payload.Common.Checked.to_input common in
     Random_oracle.Input.append common (Body.Checked.to_input body)
@@ -343,9 +318,3 @@ let supply_increase (payload : payload) =
       payload.body.amount
   | Payment | Stake_delegation | Fee_transfer ->
       Amount.zero
-
-let%test_unit "fold_compatibility" =
-  Quickcheck.test User_command_payload.gen ~f:(fun t ->
-      [%test_eq: bool Triple.t list]
-        (Fold.to_list (User_command_payload.fold t))
-        (Fold.to_list (fold (of_user_command_payload t))) )

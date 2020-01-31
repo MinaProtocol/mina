@@ -1,8 +1,0 @@
-(library
- (name stationary)
- (public_name stationary)
- (library_flags -linkall)
- (libraries core async)
- (preprocess
-  (pps ppx_coda ppx_jane))
- (synopsis "Library for html"))

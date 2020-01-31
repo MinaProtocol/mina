@@ -75,6 +75,12 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       ('a, 'b, 'c) Work_spec.t One_or_two.t list =
     List.filter jobs ~f:(does_not_have_better_fee ~snark_pool ~fee)
 
+  let all_pending_work ~snark_pool jobs =
+    List.filter jobs ~f:(fun st ->
+        Option.is_none
+          (Inputs.Snark_pool.get_completed_work snark_pool
+             (One_or_two.map ~f:Work_spec.statement st)) )
+
   let all_unseen_works (staged_ledger : Inputs.Staged_ledger.t)
       (state : State.t) =
     let all_jobs = Inputs.Staged_ledger.all_work_pairs_exn staged_ledger in
@@ -87,9 +93,14 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     unseen_jobs
 
   (*Seen/Unseen jobs that are not in the snark pool yet*)
-  let pending_work_statements ~snark_pool ~fee ~staged_ledger =
+  let pending_work_statements ~snark_pool ~fee_opt ~staged_ledger =
     let all_jobs = Inputs.Staged_ledger.all_work_pairs_exn staged_ledger in
-    List.map
-      (get_expensive_work ~snark_pool ~fee all_jobs)
-      ~f:(One_or_two.map ~f:Work_spec.statement)
+    let filtered_jobs =
+      match fee_opt with
+      | None ->
+          all_pending_work ~snark_pool all_jobs
+      | Some fee ->
+          get_expensive_work ~snark_pool ~fee all_jobs
+    in
+    List.map filtered_jobs ~f:(One_or_two.map ~f:Work_spec.statement)
 end

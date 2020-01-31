@@ -26,6 +26,10 @@ let make = () => {
      | ["settings"] => <SettingsPage />
      | ["settings", publicKey] =>
        <AccountSettings publicKey={PublicKey.uriDecode(publicKey)} />
+     | ["settings", publicKey, "delegate"] =>
+       <DelegationSettings publicKey={PublicKey.uriDecode(publicKey)} />
+     | ["settings", publicKey, "stake"] =>
+       <StakingSettings publicKey={PublicKey.uriDecode(publicKey)} />
      | ["account", _pk, ..._] => <Transactions />
      | _ =>
        <AccountQuery>

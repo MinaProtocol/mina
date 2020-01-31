@@ -123,13 +123,13 @@ module SendForm = {
             validated,
             fun
             | Belt.Result.Error(e) => setError(e)
-            | Ok() => onClose(),
+            | Ok () => onClose(),
           )
         };
       }}>
       {switch (errorOpt) {
        | None => React.null
-       | Some(err) => <Alert kind=`Danger message=err />
+       | Some(err) => <Alert kind=`Danger defaultMessage=err />
        }}
       spacer
       // Disable dropdown, only show active Account

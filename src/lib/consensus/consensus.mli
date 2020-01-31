@@ -1,15 +1,15 @@
 [%%import "../../config.mlh"]
 
-include module type of Intf
+module Intf : module type of Intf
 
 [%%if consensus_mechanism = "proof_of_stake"]
 
 include
   module type of Proof_of_stake
   with module Exported := Proof_of_stake.Exported
-   and type Data.Proposal_data.t = Proof_of_stake.Data.Proposal_data.t
-   and type Data.Consensus_state.Value.t =
-              Proof_of_stake.Data.Consensus_state.Value.t
+   and type Data.Block_data.t = Proof_of_stake.Data.Block_data.t
+   and type Data.Consensus_state.Value.Stable.V1.t =
+              Proof_of_stake.Data.Consensus_state.Value.Stable.V1.t
 
 [%%else]
 

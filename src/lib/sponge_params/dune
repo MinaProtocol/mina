@@ -1,7 +1,8 @@
 (library
   (name sponge_params)
   (public_name sponge_params)
-  (preprocess (pps ppx_coda ppx_jane ppx_deriving.eq))
+  (preprocessor_deps ../../config.mlh)
+  (preprocess (pps ppx_coda ppx_inline_test ppx_optcomp ppx_deriving.eq))
   (inline_tests)
   (libraries
     curve_choice ))

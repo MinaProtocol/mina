@@ -1,8 +1,7 @@
+open Async_kernel
 open Core_kernel
 open Snark_params
 open Snark_bits
-open Tuple_lib
-open Fold_lib
 
 module Time : sig
   type t [@@deriving sexp, compare, yojson]
@@ -28,11 +27,7 @@ module Time : sig
     end
   end
 
-  val length_in_triples : int
-
   module Bits : Bits_intf.Convertible_bits with type t := t
-
-  val fold : t -> bool Triple.t Fold.t
 
   include
     Tick.Snarkable.Bits.Faithful
@@ -141,5 +136,14 @@ module Timeout :
     val cancel : Controller.t -> 'a t -> 'a -> unit
 
     val remaining_time : 'a t -> Span.t
+
+    val await :
+         timeout_duration:Span.t
+      -> Controller.t
+      -> 'a Deferred.t
+      -> [`Ok of 'a | `Timeout] Deferred.t
+
+    val await_exn :
+      timeout_duration:Span.t -> Controller.t -> 'a Deferred.t -> 'a Deferred.t
   end
   with type time := t

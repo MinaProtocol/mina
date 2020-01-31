@@ -23,6 +23,6 @@ module Chain_hash : sig
 
     val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
 
-    val cons : payload:Pedersen.Checked.Section.t -> t -> (t, _) Checked.t
+    val cons : payload:Transaction_union_payload.var -> t -> (t, _) Checked.t
   end
 end

@@ -26,6 +26,17 @@ type t =
       Optional_public_key.Table.t
   ; mutable reorganization_subscription: [`Changed] reader_and_writer list }
 
+(* idempotent *)
+let add_new_subscription (t : t) ~pk =
+  (* add a new subscribed block user for this pk if we're not already tracking it *)
+  Optional_public_key.Table.find_or_add t.subscribed_block_users (Some pk)
+    ~default:(fun () -> [Pipe.create ()])
+  |> ignore ;
+  (* add a new payment user if we're not already tracking it *)
+  Public_key.Compressed.Table.find_or_add t.subscribed_payment_users pk
+    ~default:Pipe.create
+  |> ignore
+
 let create ~logger ~wallets ~time_controller ~external_transition_database
     ~new_blocks ~transition_frontier ~is_storing_all =
   let subscribed_block_users =
@@ -152,7 +163,11 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
          (Option.value_map ~default:Deferred.unit
             ~f:(fun transition_frontier ->
               let best_tip_diff_pipe =
-                Transition_frontier.best_tip_diff_pipe transition_frontier
+                Transition_frontier.(
+                  Extensions.(
+                    get_view_pipe
+                      (extensions transition_frontier)
+                      Best_tip_diff))
               in
               Broadcast_pipe.Reader.iter best_tip_diff_pipe
                 ~f:(fun {reorg_best_tip; _} ->
@@ -181,7 +196,9 @@ let add_block_subscriber t public_key =
          match
            List.filter pipes ~f:(fun rw_pair' ->
                (* Intentionally using pointer equality *)
-               rw_pair <> rw_pair' )
+               not
+               @@ Tuple2.equal ~eq1:Pipe.equal ~eq2:Pipe.equal rw_pair rw_pair'
+           )
          with
          | [] ->
              None
