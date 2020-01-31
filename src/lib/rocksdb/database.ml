@@ -106,7 +106,7 @@ let%test_unit "to_alist (of_alist l) = l" =
               [%test_result: (Bigstring.t * Bigstring.t) list] ~expect:sorted
                 alist ;
               close db ;
-              Async.after (Time.Span.of_ns 10.) ) )
+              Async.Deferred.unit ) )
 
 (*
 let%test_unit "checkpoint read" =
