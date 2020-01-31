@@ -108,6 +108,7 @@ let%test_unit "to_alist (of_alist l) = l" =
               close db ;
               Async.after (Time.Span.of_ns 10.) ) )
 
+(*
 let%test_unit "checkpoint read" =
   let open Async in
   Thread_safe.block_on_async_exn
@@ -170,3 +171,4 @@ let%test_unit "checkpoint read" =
               Deferred.unit
           | _ ->
               Deferred.unit ) )
+*)

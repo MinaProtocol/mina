@@ -355,7 +355,7 @@ module Data = struct
           let ledger = Ledger.Db.create ~directory_name:location () in
           ignore
           @@ Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger ;
-          !t.staking_epoch_snapshot <- {delegatee_table; ledger; location}
+          !t.next_epoch_snapshot <- {delegatee_table; ledger; location}
 
     let next_epoch_ledger (t : t) =
       Snapshot.ledger @@ get_snapshot t Next_epoch_snapshot
