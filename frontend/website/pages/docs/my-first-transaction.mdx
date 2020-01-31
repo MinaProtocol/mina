@@ -79,7 +79,7 @@ Since the public key is quite long and difficult to remember, let's save it as a
 
 Now we can access this everywhere as `$CODA_PUBLIC_KEY` -- see if it saved properly by trying `echo $CODA_PUBLIC_KEY`. Let's also save the file path to our private key:
 
-    export PRIVATE_KEY_FILE=~/.coda-config/wallets/store/$CODA_PUBLIC_KEY
+    export CODA_PRIVATE_KEY_FILE=~/.coda-config/wallets/store/$CODA_PUBLIC_KEY
 
 Note that these environment variables will only be saved for the current shell session, so if you want to save them for future use, you can add them to `~/.profile` or `~/.bash_profile`.
 
