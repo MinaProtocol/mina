@@ -45,7 +45,7 @@ module Vrf_distribution = struct
    *  [ep + 2R/3 - 1].
    *)
   let create ~stakers ~epoch ~initial_consensus_state =
-    Core.Printf.printf
+    Core_kernel.Printf.printf
       !"[%d] Evaluating %d VRFs for %d stakers\n%!"
       (UInt32.to_int epoch)
       (List.length stakers * UInt32.to_int Constants.slots_per_epoch)
@@ -491,7 +491,7 @@ let main () =
              (External_transition.consensus_state base_transition)
        in
        let proposal_chain = Vrf_distribution.pick_chain_unrealistically dist in
-       Core.Printf.printf
+       Core_kernel.Printf.printf
          !"[%d] proposing chain of length %d\n%!"
          (UInt32.to_int epoch)
          (List.length proposal_chain) ;
