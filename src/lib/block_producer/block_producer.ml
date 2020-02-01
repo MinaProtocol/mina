@@ -365,7 +365,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                           [ ( "proving_time"
                             , `Int (Time.Span.to_ms span |> Int64.to_int_exn)
                             ) ]
-                        !"Protocol_state_proof proving time took: \
+                        !"Protocol_state_proof proving time(ms): \
                           $proving_time%!" ;
                       let staged_ledger_diff =
                         Internal_transition.staged_ledger_diff

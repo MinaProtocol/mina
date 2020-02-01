@@ -509,7 +509,7 @@ jobs:
                   path: test_logs
     {%- endfor %}
 
-    {%- for profile in medium_curves_tests.keys() | sort %}
+    {%- for profile in medium_curves_and_other_tests.keys() | sort %}
     test--{{profile}}:
         resource_class: xlarge
         docker:
@@ -519,7 +519,7 @@ jobs:
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
-            {%- for test in medium_curves_tests[profile] %}
+            {%- for test in medium_curves_and_other_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
@@ -569,6 +569,6 @@ workflows:
           {%- for profile in unit_test_profiles_medium_curves %}
           - test-unit--{{profile}}
           {%- endfor %}
-          {%- for profile in medium_curves_tests.keys() | sort %}
+          {%- for profile in medium_curves_and_other_tests.keys() | sort %}
           - test--{{profile}}
           {%- endfor %}

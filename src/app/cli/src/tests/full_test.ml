@@ -50,6 +50,9 @@ let medium_curves = false
 [%%if
 time_offsets = true]
 
+[%%inject
+"test_full_epoch", test_full_epoch]
+
 let setup_time_offsets () =
   Unix.putenv ~key:"CODA_TIME_OFFSET"
     ~data:
@@ -217,14 +220,14 @@ let run_test () : unit Deferred.t =
            (Coda_lib.validated_transitions coda)
            ~f:ignore) ;
       let%bind () = Ivar.read @@ Coda_lib.initialization_finish_signal coda in
-      let wait_until_cond ~(f : Coda_lib.t -> bool) ~(timeout : Float.t) =
+      let wait_until_cond ~(f : Coda_lib.t -> bool) ~(timeout_min : Float.t) =
         let rec go () =
           if f coda then return ()
           else
             let%bind () = after (Time.Span.of_sec 10.) in
             go ()
         in
-        Deferred.any [after (Time.Span.of_min timeout); go ()]
+        Deferred.any [after (Time.Span.of_min timeout_min); go ()]
       in
       let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
         let cond t =
@@ -238,7 +241,7 @@ let run_test () : unit Deferred.t =
           | _ ->
               false
         in
-        wait_until_cond ~f:cond ~timeout:3.
+        wait_until_cond ~f:cond ~timeout_min:3.
       in
       let assert_balance pk amount =
         match
@@ -374,11 +377,11 @@ let run_test () : unit Deferred.t =
         |> Participating_state.active_exn |> Protocol_state.consensus_state
         |> Consensus.Data.Consensus_state.blockchain_length
       in
-      let wait_for_proof_or_timeout timeout () =
+      let wait_for_proof_or_timeout timeout_min () =
         let cond t = Option.is_some @@ Coda_lib.staged_ledger_ledger_proof t in
-        wait_until_cond ~f:cond ~timeout
+        wait_until_cond ~f:cond ~timeout_min
       in
-      let test_multiple_payments accounts ~txn_count timeout =
+      let test_multiple_payments accounts ~txn_count timeout_min =
         let balance_sheet =
           Public_key.Compressed.Map.of_alist_exn
             (List.map accounts
@@ -391,7 +394,7 @@ let run_test () : unit Deferred.t =
               Currency.Amount.of_int ((i + 1) * 10) )
         in
         (*After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
-        let%map () = wait_for_proof_or_timeout timeout () in
+        let%map () = wait_for_proof_or_timeout timeout_min () in
         assert (Option.is_some @@ Coda_lib.staged_ledger_ledger_proof coda) ;
         Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
             assert_balance key data ) ;
@@ -443,23 +446,40 @@ let run_test () : unit Deferred.t =
         else if with_snark then 15.
         else 7.
       in
+      let wait_till_length =
+        if medium_curves then Coda_numbers.Length.of_int 1
+        else if test_full_epoch then
+          (*Note: wait to produce (2*slots_per_epoch) blocks. This could take a while depending on what k and c are*)
+          Coda_numbers.Length.of_int
+            (Unsigned.UInt32.to_int
+               Consensus.Constants.(
+                 Unsigned.UInt32.(mul slots_per_epoch (of_int 2))))
+        else Coda_numbers.Length.of_int 5
+      in
       let%map () =
         if with_snark then
           let accounts = List.take other_accounts 2 in
           let%bind blockchain_length' =
             test_multiple_payments accounts ~txn_count:2 timeout_mins
           in
-          (*wait for a block after the ledger_proof is emitted*)
+          (*wait for some blocks after the ledger_proof is emitted*)
           let%map () =
             wait_until_cond
-              ~f:(fun t -> blockchain_length t > blockchain_length')
-              ~timeout:
+              ~f:(fun t ->
+                blockchain_length t
+                > Coda_numbers.Length.add blockchain_length' wait_till_length
+                )
+              ~timeout_min:
                 ( Consensus.Constants.(
-                    (delta + c) * Consensus.Constants.block_window_duration_ms)
+                    (delta + c)
+                    * ( block_window_duration_ms
+                      * (Coda_numbers.Length.to_int wait_till_length + 1) ))
                   / 1000 / 60
                 |> Float.of_int )
           in
-          assert (blockchain_length coda > blockchain_length')
+          assert (
+            blockchain_length coda
+            > Coda_numbers.Length.add blockchain_length' wait_till_length )
         else if with_check then
           let%map _ =
             test_multiple_payments other_accounts

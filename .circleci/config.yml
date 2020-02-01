@@ -676,9 +676,6 @@ jobs:
                   name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-produces 1
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-prefix-test -who-produces 1"'
             - run:
-                  name: Running test -- test_postake_split_snarkless:coda-restart-node-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
-            - run:
                   name: Running test -- test_postake_split_snarkless:coda-change-snark-worker-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-change-snark-worker-test"'
             - run:
@@ -715,6 +712,20 @@ jobs:
             - run:
                   name: Running test -- test_postake_txns:coda-batch-payment-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-batch-payment-test"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_full_epoch:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+        steps:
+            - checkout
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Running test -- test_postake_full_epoch:full-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_full_epoch:full-test"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_medium_curves:
@@ -810,6 +821,7 @@ workflows:
                     - /release\/.*/
         jobs:
           - test-unit--dev_medium_curves
+          - test--test_postake_full_epoch
           - test--test_postake_medium_curves
           - test--test_postake_snarkless_medium_curves
           - test--test_postake_split_medium_curves
