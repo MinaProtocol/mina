@@ -50,9 +50,6 @@ let medium_curves = false
 [%%if
 time_offsets = true]
 
-[%%inject
-"test_full_epoch", test_full_epoch]
-
 let setup_time_offsets () =
   Unix.putenv ~key:"CODA_TIME_OFFSET"
     ~data:
@@ -68,6 +65,9 @@ let setup_time_offsets () = ()
 [%%endif]
 
 let heartbeat_flag = ref true
+
+[%%inject
+"test_full_epoch", test_full_epoch]
 
 let print_heartbeat logger =
   let rec loop () =
