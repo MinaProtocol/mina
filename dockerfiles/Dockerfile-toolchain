@@ -122,6 +122,7 @@ RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda
 # we now leave it intact, in case updating OPAM in CI requires pinned package sources
 
 # Get coda-kademlia from packages repo
+RUN touch /tmp/foo
 RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
       echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
       sudo apt-get update && \
