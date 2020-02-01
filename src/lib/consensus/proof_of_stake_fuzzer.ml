@@ -38,7 +38,7 @@ module Vrf_distribution = struct
    *  the ~for_epoch refers to the epoch after the epoch where the vrf
    *  distribution is locked in at the lock checkpoint. This means that,
    *  for all epoch except for the genesis epoch, a vrf distribution for
-   *  some epoch [ep] is actually the vrf distribution for [ep-1 + 2R/3]
+   *  some epoch [ep] is actually the vrf distribution for [ep-1 + R/3]
    *  to [ep + 2R/3 - 1] (inclusive). In the case of the genesis epoch,
    *  since there is no [ep-1] and the vrf distribution is already
    *  locked, the vrf distribution created is for the range [ep] to
