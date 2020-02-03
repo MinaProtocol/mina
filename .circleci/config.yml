@@ -375,6 +375,9 @@ jobs:
                   name: Pin external packages
                   command: ./scripts/pin-external-packages.sh
             - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
                 name: Build libp2p_helper using cachix
                 command: |
                     . ~/.nix-profile/etc/profile.d/nix.sh
@@ -482,6 +485,9 @@ jobs:
                      #Do the build
                     #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
                 name: Build libp2p_helper using cachix
                 command: |
                     . ~/.nix-profile/etc/profile.d/nix.sh
@@ -531,6 +537,9 @@ jobs:
                     #chmod -R 777 src/app/libp2p_helper
                      #Do the build
                     #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
+            - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
