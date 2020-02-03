@@ -133,10 +133,8 @@ fn main() {
     let mut contents = Vec::new();
     for filename in inputs {
         contents.clear();
-        std::fs::File::open(filename)
-            .unwrap()
-            .read_to_end(&mut contents)
-            .unwrap();
+        let file = std::fs::File::open(filename).unwrap();
+
         let mut seen_tids = HashMap::<Tid, String>::new();
         let mut recurring_map = HashMap::<String, Tid>::new();
         let mut tidmap = HashMap::<Tid, Tid>::new();
