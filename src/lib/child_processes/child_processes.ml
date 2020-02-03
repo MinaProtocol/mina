@@ -299,10 +299,11 @@ let start_custom :
     let%bind termination_status = Process.wait process in
     Logger.trace logger "child process %s died" name ~module_:__MODULE__
       ~location:__LOC__ ;
+    don't_wait_for (
     let%bind () = after (Time.Span.of_sec 1.) in
     let%bind () = Writer.close @@ Process.stdin process in
     let%bind () = Reader.close @@ Process.stdout process in
-    let%bind () = Reader.close @@ Process.stderr process in
+    Reader.close @@ Process.stderr process) ;
     let%bind () = Sys.remove lock_path in
     Ivar.fill terminated_ivar termination_status ;
     let log_bad_termination () =
@@ -351,7 +352,7 @@ let kill : t -> Unix.Exit_or_signal.t Deferred.Or_error.t =
 
 let%test_module _ =
   ( module struct
-    let logger = Logger.null ()
+    let logger = Logger.create ()
 
     let async_with_temp_dir f =
       Async.Thread_safe.block_on_async_exn (fun () ->
@@ -362,6 +363,8 @@ let%test_module _ =
     let name = "tester.sh"
 
     let git_root_relative_path = "src/lib/child_processes/tester.sh"
+
+    let process_wait_timeout = Time.Span.of_sec 2.1
 
     let%test_unit "can launch and get stdout" =
       async_with_temp_dir (fun conf_dir ->
@@ -381,7 +384,7 @@ let%test_module _ =
           in
           (* Pipe will be closed before the ivar is filled, so we need to wait a
              bit. *)
-          let%bind () = after @@ Time.Span.of_sec 0.1 in
+          let%bind () = after process_wait_timeout in
           [%test_eq: Unix.Exit_or_signal.t option] (Some (Ok ()))
             (termination_status process) ;
           Deferred.unit )
@@ -420,7 +423,7 @@ let%test_module _ =
           in
           let%bind () = go () in
           [%test_eq: string list] !output (List.init 10 ~f:(fun _ -> "hello")) ;
-          let%bind () = after @@ Time.Span.of_sec 0.1 in
+          let%bind () = after process_wait_timeout in
           assert (Option.is_none @@ termination_status process) ;
           let%bind kill_res = kill process in
           let%bind () = assert_lock_does_not_exist () in
@@ -446,6 +449,7 @@ let%test_module _ =
           let%bind process2 =
             mk_process () |> Deferred.map ~f:Or_error.ok_exn
           in
+          let%bind () = after process_wait_timeout in
           [%test_eq: Unix.Exit_or_signal.t option]
             (termination_status process1)
             (Some (Error (`Signal Core.Signal.term))) ;
