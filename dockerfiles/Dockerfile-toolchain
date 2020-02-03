@@ -120,12 +120,6 @@ RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda
 # repo no longer needed
 RUN sudo rm -rf /coda
 
-# Get coda-discovery from packages
-RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
-      echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
-      sudo apt-get update && \
-      sudo apt-get install --yes coda-discovery
-
 # The Ocaml images are set to London time for reason. UTC makes reading the logs
 # easier.
 RUN sudo ln -sf /usr/share/zoneinfo/UTC /etc/localtime
