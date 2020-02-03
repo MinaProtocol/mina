@@ -52,6 +52,7 @@ type app struct {
 	OutLock         sync.Mutex
 	Out             *bufio.Writer
 	UnsafeNoTrustIP bool
+	Extra           *os.File
 }
 
 var seqs = make(chan int)
@@ -98,6 +99,7 @@ func (app *app) writeMsg(msg interface{}) {
 	app.OutLock.Lock()
 	defer app.OutLock.Unlock()
 	bytes, err := json.Marshal(msg)
+	app.Extra.Write(bytes)
 	if err == nil {
 		n, err := app.Out.Write(bytes)
 		if err != nil {
@@ -651,9 +653,9 @@ func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
 	}
 
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
-		_, err := stream.Write(data)
+		n, err := stream.Write(data)
 		if err != nil {
-			return nil, badp2p(err)
+			return nil, wrapError(badp2p(err), fmt.Sprintf("only wrote %d out of %d bytes", n, len(data)))
 		}
 		return "sendStreamMsg success", nil
 	}
@@ -970,7 +972,11 @@ type successResult struct {
 
 func main() {
 	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
-	log.SetOutput(os.Stderr)
+	logfile, err := os.Create("/tmp/artifacts/helper.log")
+	if err != nil {
+		panic(err)
+	}
+	log.SetOutput(logfile)
 	logging.SetAllLoggers(logging2.INFO)
 	helperLog := logging.Logger("helper top-level JSON handling")
 
@@ -983,9 +989,8 @@ func main() {
 	}()
 
 	lines := bufio.NewScanner(os.Stdin)
-	bufsize := (1024 * 1024) * 12
-	// 12MiB buffer size, generously over the 8MiB max pubsub message size, to
-	// account for encoding inefficiencies.
+	// 11MiB buffer size, larger than the 10.66MB minimum for 8MiB to be b64'd
+	bufsize := (1024 * 1024) * 11
 	lines.Buffer(make([]byte, bufsize), bufsize)
 	out := bufio.NewWriter(os.Stdout)
 
@@ -996,6 +1001,7 @@ func main() {
 		ValidatorMutex: &sync.Mutex{},
 		Validators:     make(map[int]chan bool),
 		Streams:        make(map[int]net.Stream),
+		Extra:          logfile,
 		// OutLock doesn't need to be initialized
 		Out: out,
 	}
