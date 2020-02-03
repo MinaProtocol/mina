@@ -548,7 +548,7 @@ let send_payment =
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
 
-let hardware_wallet_script = "sign.py"
+let hardware_wallet_script = "cli/sign.py"
 
 let decode_field : string -> Snark_params.Tick.Field.t =
  fun field ->
