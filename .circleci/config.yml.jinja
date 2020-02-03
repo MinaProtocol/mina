@@ -526,6 +526,9 @@ jobs:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
             - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
+            - run:
                 name: Build libp2p_helper using cachix
                 command: |
                     . ~/.nix-profile/etc/profile.d/nix.sh
@@ -555,6 +558,9 @@ jobs:
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
@@ -586,6 +592,9 @@ jobs:
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
