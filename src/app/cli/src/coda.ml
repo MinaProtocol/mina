@@ -30,8 +30,6 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
-let () = Async.Scheduler.set_record_backtraces true
-
 let chain_id ~genesis_state_hash =
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
   let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
