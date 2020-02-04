@@ -3,7 +3,7 @@ export default Page({title: "My First Transaction"});
 
 # My First Transaction
 
-In this section, we'll make our first transaction on the Coda network. After [installing the software](https://codaprotocol.com/docs/getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
+In this section, we'll make our first transaction on the Coda network. After [installing the software](./getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
 
 ## Start up a node
 
@@ -14,7 +14,7 @@ Run the following command to start up a Coda node instance and connect to the ne
         -peer /dns4/seed-one.genesis.o1test.net/tcp/10002/ipfs/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH \
         -peer /dns4/seed-two.genesis.o1test.net/tcp/10002/ipfs/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA
 
-The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](https://codaprotocol.com/docs/glossary) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8303 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>`.
+The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](./glossary) protocol, there is no single centralized server we rely on. If you forwarded custom ports (other than 8303 for TCP), you'll need to pass an extra flag to the above command: `-external-port <custom-TCP-port>`.
 
 <Alert>
 
