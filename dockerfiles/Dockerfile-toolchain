@@ -134,3 +134,6 @@ RUN sudo ln -sf /usr/share/zoneinfo/UTC /etc/localtime
 
 # Unlimit stack for future shells that might use spacetime
 RUN echo ulimit -s unlimited >> ~/.bashrc
+
+# nix.sh won't work if there's no USER env var
+RUN echo "export USER=opam" >> ~/.bashrc
