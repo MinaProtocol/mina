@@ -30,7 +30,7 @@ module Make (Inputs : Inputs_intf) :
 
     let to_proof_elem transition =
       transition |> External_transition.Validated.protocol_state
-      |> Protocol_state.body |> Protocol_state.Body.hash
+      |> Protocol_state.body_hash
 
     let get_previous ~context transition =
       let parent_hash =

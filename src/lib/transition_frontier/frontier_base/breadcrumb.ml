@@ -263,7 +263,7 @@ module For_tests = struct
             ~state_body_hash:
               ( validated_transition parent_breadcrumb
               |> External_transition.Validated.protocol_state
-              |> Protocol_state.body |> Protocol_state.Body.hash )
+              |> Protocol_state.body_hash )
         with
         | Ok r ->
             return r

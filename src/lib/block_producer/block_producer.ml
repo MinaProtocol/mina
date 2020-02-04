@@ -107,7 +107,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
   let previous_protocol_state_body_hash =
-    Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
+    Protocol_state.body_hash previous_protocol_state
   in
   let%bind res =
     Interruptible.uninterruptible
