@@ -183,9 +183,9 @@ jobs:
 
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                 name: Create package dir
@@ -300,9 +300,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
 
             ### dune
@@ -389,9 +389,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Install awscli
@@ -500,9 +500,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Run unit tests
@@ -554,9 +554,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Run unit tests
@@ -586,9 +586,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Run unit tests
@@ -617,9 +617,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- fake_hash:full-test
@@ -647,9 +647,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake:full-test
@@ -680,9 +680,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
@@ -713,9 +713,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
@@ -743,9 +743,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_delegation:coda-delegation-test
@@ -773,9 +773,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5
@@ -803,9 +803,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments
@@ -833,9 +833,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_snarkless:full-test
@@ -866,9 +866,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2
@@ -896,9 +896,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-peers-test
@@ -947,9 +947,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_three_proposers:coda-txns-and-restart-non-proposers
@@ -977,9 +977,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_txns:coda-shared-state-test
@@ -1010,9 +1010,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_medium_curves:full-test
@@ -1045,9 +1045,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
@@ -1078,9 +1078,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2

@@ -183,9 +183,9 @@ jobs:
 
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                 name: Create package dir
@@ -300,9 +300,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
 
             ### dune
@@ -391,9 +391,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Install awscli
@@ -507,9 +507,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Run unit tests
@@ -542,9 +542,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
                   name: Run unit tests
@@ -576,9 +576,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             {%- for test in small_curves_tests[profile] %}
             - run:
@@ -611,9 +611,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             {%- for test in medium_curves_tests[profile] %}
             - run:
