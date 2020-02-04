@@ -40,8 +40,8 @@ module Make (Inputs : Inputs_intf) :
     type proof_elem = State_body_hash.t
 
     let hash acc body_hash =
-      Protocol_state.hash_abstract ~hash_body:Fn.id
-        {previous_state_hash= acc; body= body_hash}
+      Protocol_state.hash_abstract
+        {previous_state_hash= acc; body= body_hash; body_hash}
   end)
 
   let prove ~logger frontier =

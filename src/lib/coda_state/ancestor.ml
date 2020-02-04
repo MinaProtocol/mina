@@ -36,9 +36,10 @@ let verify =
     | [] ->
         acc
     | h :: hs ->
+        let open Protocol_state in
+        let body_hash = (h :> State_body_hash.t) in
         let acc =
-          Protocol_state.hash_abstract ~hash_body:Fn.id
-            {previous_state_hash= acc; body= h}
+          hash_abstract {previous_state_hash= acc; body= h; body_hash}
         in
         go acc hs
   in
@@ -88,8 +89,9 @@ end = struct
       | body :: bs ->
           let length = Coda_numbers.Length.succ length in
           let full_state_hash =
-            Protocol_state.hash_abstract ~hash_body:Fn.id
-              {previous_state_hash= acc; body}
+            let body_hash = (body :> State_body_hash.t) in
+            Protocol_state.hash_abstract
+              {previous_state_hash= acc; body; body_hash}
           in
           go
             ((acc, full_state_hash, length, body) :: hs)
@@ -125,8 +127,9 @@ let%test_unit "completeness" =
           ~f:(fun (prev, length) body ->
             let length = Length.succ length in
             let h =
-              Protocol_state.hash_abstract ~hash_body:Fn.id
-                {previous_state_hash= prev; body}
+              let body_hash = (body :> State_body_hash.t) in
+              Protocol_state.hash_abstract
+                {previous_state_hash= prev; body; body_hash}
             in
             Prover.add prover ~prev_hash:prev ~hash:h ~length ~body_hash:body ;
             ((h, length), h) )

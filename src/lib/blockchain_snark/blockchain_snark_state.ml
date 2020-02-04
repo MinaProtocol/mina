@@ -170,14 +170,14 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         result
       in
       let%bind genesis_state_hash =
-        (*get the genesis state hash from previous state unless previous state is the genesis state itslef*)
+        (* get the genesis state hash from previous state unless previous state is the genesis state itself *)
         Protocol_state.genesis_state_hash_checked
           ~state_hash:previous_state_hash previous_state
       in
       let new_state =
         Protocol_state.create_var ~previous_state_hash ~genesis_state_hash
           ~blockchain_state:(Snark_transition.blockchain_state transition)
-          ~consensus_state
+          ~consensus_state ~body_hash:previous_state_body_hash
       in
       let%map state_hash, _ = Protocol_state.hash_checked new_state in
       (state_hash, new_state, `Success success)
