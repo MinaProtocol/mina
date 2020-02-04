@@ -94,6 +94,10 @@ let daemon logger =
        flag "bind-ip"
          ~doc:"IP IP of network interface to use for peer connections"
          (optional string)
+      and working_dir =
+        flag "working-dir"
+        ~doc:"PATH path to chdir into before starting"
+        (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
      and is_archive_rocksdb =
@@ -165,6 +169,7 @@ let daemon logger =
        let compute_conf_dir home =
          Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
        in
+       ignore (Option.map working_dir ~f:Caml.Sys.chdir) ;
        let%bind conf_dir =
          if is_background then
            let home = Core.Sys.home_directory () in

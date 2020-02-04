@@ -22,6 +22,8 @@ let%test_module "Command line tests" =
      *)
     let coda_exe = "../../app/cli/src/coda.exe"
 
+    let _ = ()
+
     let runtime_genesis_ledger_exe =
       "../../app/runtime_genesis_ledger/runtime_genesis_ledger.exe"
 
@@ -48,11 +50,15 @@ let%test_module "Command line tests" =
       Ok ()
 
     let start_daemon config_dir genesis_ledger_dir port =
+      let%bind working_dir = Sys.getcwd () in
+      Core.printf "Starting daemon inside %s\n" working_dir ;
       let%map _ =
         match%map
           Process.run ~prog:coda_exe
             ~args:
               [ "daemon"
+              ; "-working-dir"
+              ; working_dir
               ; "-background"
               ; "-client-port"
               ; sprintf "%d" port

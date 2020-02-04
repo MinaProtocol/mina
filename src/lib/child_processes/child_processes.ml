@@ -51,9 +51,10 @@ let keep_trying :
 (* Unfortunately, `dune runtest` runs in a pwd deep inside the build directory.
    This hack finds the project root by recursively looking for the dune-project
    file. *)
-let get_project_root () =
+let get_project_root logger =
   let open Filename in
   let rec go dir =
+    Logger.fatal logger "examining %s" dir ~module_:__MODULE__ ~location:__LOC__ ;
     if Core.Sys.file_exists_exn @@ dir ^/ "src/dune-project" then Some dir
     else if String.equal dir "/" then None
     else go @@ fst @@ split dir
@@ -97,8 +98,8 @@ let get_coda_binary () =
   else
     (* FIXME for finding the executable relative to the install path this should
        deference the symlink if possible. *)
-    Deferred.Or_error.return
-      (Unix.getpid () |> Pid.to_int |> sprintf "/proc/%d/exe")
+      Deferred.map ~f:(fun x -> Ok x)
+      (Unix.getpid () |> Pid.to_int |> sprintf "/proc/%d/exe" |> Unix.readlink)
 
 (* Check the PID file, and if it exists and corresponds to a currently running
    process, kill that process. This runs when the daemon starts, and should
@@ -257,12 +258,12 @@ let start_custom :
     "Starting custom child process %s with args $args" name
     ~metadata:[("args", `List (List.map args ~f:(fun a -> `String a)))] ;
   let%bind coda_binary_path = get_coda_binary () in
+  let project_root = get_project_root logger |> Option.map ~f:(fun root -> root ^/ git_root_relative_path) in
   let%bind process =
     keep_trying
       (List.filter_opt
          [ Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
-         ; get_project_root ()
-           |> Option.map ~f:(fun root -> root ^/ git_root_relative_path)
+         ; project_root
          ; Some (Filename.dirname coda_binary_path ^/ name)
          ; Some ("coda-" ^ name) ])
       ~f:(fun prog -> Process.create ~prog ~args ())
