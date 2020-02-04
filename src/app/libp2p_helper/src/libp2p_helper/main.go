@@ -971,7 +971,8 @@ type successResult struct {
 }
 
 func main() {
-	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
+    logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
+    os.Mkdir("/tmp/artifacts", os.ModePerm)
 	logfile, err := os.Create("/tmp/artifacts/helper.log")
 	if err != nil {
 		panic(err)
