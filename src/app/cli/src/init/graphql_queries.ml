@@ -89,7 +89,7 @@ query pendingSnarkWork {
       work_id: workId
       }
     }
-    }
+  }
 |}]
 
 module Set_staking =

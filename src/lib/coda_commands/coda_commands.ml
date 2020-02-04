@@ -191,6 +191,121 @@ let setup_user_command ~fee ~nonce ~valid_until ~memo ~sender_kp
   let signed_user_command = User_command.sign sender_kp payload in
   User_command.forget_check signed_user_command
 
+module Hardware_wallet = struct
+  open Snark_params
+
+  let hardware_wallet_script = "cli/sign.py"
+
+  let decode_field : string -> Snark_params.Tick.Field.t =
+   fun field ->
+    Bytes.of_string field
+    |> B58.decode Base58_check.coda_alphabet
+    |> Bytes.to_string
+    |> String.foldi ~init:Bigint.zero ~f:(fun i acc byte ->
+           Bigint.(acc lor (of_int (Char.to_int byte) lsl Int.( * ) 8 i)) )
+    |> Tick.Bigint.of_bignum_bigint |> Tick.Bigint.to_field
+
+  let decode_scalar : string -> Snark_params.Tock.Field.t =
+   fun scalar ->
+    Bytes.of_string scalar
+    |> B58.decode Base58_check.coda_alphabet
+    |> Bytes.to_string
+    |> String.foldi ~init:Bigint.zero ~f:(fun i acc byte ->
+           Bigint.(acc lor (of_int (Char.to_int byte) lsl Int.( * ) 8 i)) )
+    |> Tock.Bigint.of_bignum_bigint |> Tock.Bigint.to_field
+
+  type public_key = {x: string; y: string} [@@deriving yojson]
+
+  let decode_public_key : string -> (Public_key.t, string) result =
+   fun public_key ->
+    Yojson.Safe.from_string public_key
+    |> public_key_of_yojson
+    |> Result.map ~f:(fun {x; y} -> (decode_field x, decode_field y))
+
+  type signature = {field: string; scalar: string} [@@deriving yojson]
+
+  let decode_signature : string -> (Signature.t, string) result =
+   fun signature ->
+    Yojson.Safe.from_string signature
+    |> signature_of_yojson
+    |> Result.map ~f:(fun {field; scalar} ->
+           (decode_field field, decode_scalar scalar) )
+
+  let get_public_key ~hardware_wallet_nonce =
+    let open Deferred.Let_syntax in
+    let prog, args =
+      ( "python3"
+      , [ hardware_wallet_script
+        ; "--request=publickey"
+        ; "--nonce="
+          ^ Coda_numbers.Hardware_wallet_nonce.to_string hardware_wallet_nonce
+        ] )
+    in
+    match%bind Process.run ~prog ~args () with
+    | Ok public_key_str -> (
+      match decode_public_key public_key_str with
+      | Ok public_key ->
+          return public_key
+      | Error e ->
+          eprintf
+            "Failed to parse public key returned by hardware wallet. Error: %s"
+            e ;
+          exit 22 )
+    | Error e ->
+        eprintf "Failed to communicate with %s. Error: %s"
+          hardware_wallet_script (Error.to_string_hum e) ;
+        exit 22
+
+  let sign ~hardware_wallet_nonce ~public_key ~user_command_payload =
+    let open Deferred.Let_syntax in
+    let input =
+      Transaction_union_payload.to_input
+      @@ Transaction_union_payload.of_user_command_payload user_command_payload
+    in
+    let fields = Random_oracle.pack_input input in
+    let messages =
+      Array.map fields ~f:(fun field -> Tick.Field.to_string field)
+    in
+    if Array.length messages <= 2 then (
+      eprintf "Malformed user command" ;
+      exit 22 )
+    else
+      let prog, args =
+        ( "python3"
+        , [ hardware_wallet_script
+          ; "--request=sign"
+          ; "--msgx=" ^ messages.(0)
+          ; "--msgm=" ^ messages.(1)
+          ; "--nonce="
+            ^ Coda_numbers.Hardware_wallet_nonce.to_string
+                hardware_wallet_nonce ] )
+      in
+      match%bind Process.run ~prog ~args () with
+      | Ok signature_str -> (
+        match decode_signature signature_str with
+        | Ok signature ->
+            if
+              Coda_base.Schnorr.verify signature
+                (Tick.Inner_curve.of_affine public_key)
+                user_command_payload
+            then
+              return
+                Coda_base.User_command.Poly.
+                  {payload= user_command_payload; sender= public_key; signature}
+            else (
+              eprintf "Failed to verify signature returned by hardware wallet." ;
+              exit 22 )
+        | Error e ->
+            eprintf
+              "Failed to parse signature returned by hardware wallet. Error: %s"
+              e ;
+            exit 22 )
+      | Error e ->
+          eprintf "Failed to communicate with %s. Error: %s"
+            hardware_wallet_script (Error.to_string_hum e) ;
+          exit 22
+end
+
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
   include Receipt.Chain_hash.Stable.V1

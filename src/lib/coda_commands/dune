@@ -6,4 +6,4 @@
     core
     ; libs
     coda_base coda_lib coda_version daemon_rpcs)
-  (preprocess (pps ppx_coda ppx_jane)))
+  (preprocess (pps ppx_coda ppx_jane ppx_deriving_yojson)))

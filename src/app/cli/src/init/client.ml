@@ -548,104 +548,14 @@ let send_payment =
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
 
-let hardware_wallet_script = "cli/sign.py"
-
-let decode_field : string -> Snark_params.Tick.Field.t =
- fun field ->
-  Bytes.of_string field
-  |> B58.decode Base58_check.coda_alphabet
-  |> Bytes.to_string
-  |> String.foldi ~init:Bigint.zero ~f:(fun i acc byte ->
-         Bigint.(acc lor (of_int (Char.to_int byte) lsl Int.( * ) 8 i)) )
-  |> Snark_params.Tick.Bigint.of_bignum_bigint
-  |> Snark_params.Tick.Bigint.to_field
-
-let decode_scalar : string -> Snark_params.Tock.Field.t =
- fun scalar ->
-  Bytes.of_string scalar
-  |> B58.decode Base58_check.coda_alphabet
-  |> Bytes.to_string
-  |> String.foldi ~init:Bigint.zero ~f:(fun i acc byte ->
-         Bigint.(acc lor (of_int (Char.to_int byte) lsl Int.( * ) 8 i)) )
-  |> Snark_params.Tock.Bigint.of_bignum_bigint
-  |> Snark_params.Tock.Bigint.to_field
-
-type public_key = {x: string; y: string} [@@deriving yojson]
-
-let decode_public_key : string -> Public_key.t Or_error.t =
- fun public_key ->
-  Yojson.Safe.from_string public_key
-  |> public_key_of_yojson
-  |> Result.map_error ~f:(fun _ ->
-         Error.of_string ("Failed to parse public_key: " ^ public_key) )
-  |> Or_error.map ~f:(fun {x; y} -> (decode_field x, decode_field y))
-
-type signature = {field: string; scalar: string} [@@deriving yojson]
-
-let decode_signature : string -> Signature.t Or_error.t =
- fun signature ->
-  Yojson.Safe.from_string signature
-  |> signature_of_yojson
-  |> Result.map_error ~f:(fun _ ->
-         Error.of_string ("Failed to parse signature: " ^ signature) )
-  |> Or_error.map ~f:(fun {field; scalar} ->
-         (decode_field field, decode_scalar scalar) )
-
-let get_public_key hardware_wallet_nonce =
-  let open Deferred.Let_syntax in
-  let prog, args =
-    ( "python3"
-    , [ hardware_wallet_script
-      ; "--request=publickey"
-      ; "--nonce="
-        ^ Coda_numbers.Hardware_wallet_nonce.to_string hardware_wallet_nonce ]
-    )
-  in
-  match%bind
-    Process.run ~prog ~args () >>| Or_error.bind ~f:decode_public_key
-  with
-  | Ok public_key ->
-      return public_key
-  | Error e ->
-      eprintf "Error: %s" (Error.to_string_hum e) ;
-      exit 22
-
-let get_signature hardware_wallet_nonce user_command =
-  let open Deferred.Let_syntax in
-  let input =
-    Transaction_union_payload.to_input
-    @@ Transaction_union_payload.of_user_command_payload user_command
-  in
-  let fields = Random_oracle.pack_input input in
-  let messages =
-    Array.map fields ~f:(fun field -> Snark_params.Tick.Field.to_string field)
-  in
-  assert (Array.length messages >= 2) ;
-  let prog, args =
-    ( "python3"
-    , [ hardware_wallet_script
-      ; "--request=sign"
-      ; "--msgx=" ^ messages.(0)
-      ; "--msgm=" ^ messages.(1)
-      ; "--nonce="
-        ^ Coda_numbers.Hardware_wallet_nonce.to_string hardware_wallet_nonce ]
-    )
-  in
-  match%bind
-    Process.run ~prog ~args () >>| Or_error.bind ~f:decode_signature
-  with
-  | Ok signature ->
-      return signature
-  | Error e ->
-      eprintf "Error: %s" (Error.to_string_hum e) ;
-      exit 22
-
 let get_pk_from_hardware_wallet =
   Command.async ~summary:"Get public key from hardware wallet"
     (Command.Param.map Cli_lib.Flag.User_command.hardware_wallet_nonce
        ~f:(fun hardware_wallet_nonce () ->
          let open Deferred.Let_syntax in
-         let%bind pk = get_public_key hardware_wallet_nonce in
+         let%bind pk =
+           Coda_commands.Hardware_wallet.get_public_key ~hardware_wallet_nonce
+         in
          Core.print_endline
          @@ Public_key.Compressed.to_base58_check (Public_key.compress pk) ;
          Deferred.unit ))
@@ -667,7 +577,9 @@ let test_sign_payment =
           ()
           ->
          let open Deferred.Let_syntax in
-         let%bind sender = get_public_key hardware_wallet_nonce in
+         let%bind public_key =
+           Coda_commands.Hardware_wallet.get_public_key ~hardware_wallet_nonce
+         in
          let nonce = Option.value_exn nonce_opt in
          let fee =
            Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
@@ -680,7 +592,7 @@ let test_sign_payment =
            Option.value valid_until_opt
              ~default:Coda_numbers.Global_slot.max_value
          in
-         let payload =
+         let user_command_payload =
            User_command_payload.Poly.
              { common=
                  User_command_payload.Common.Poly.
@@ -689,13 +601,10 @@ let test_sign_payment =
                  User_command_payload.Body.Payment
                    Payment_payload.Poly.{receiver; amount} }
          in
-         let%bind (signature : Signature.t) =
-           get_signature hardware_wallet_nonce payload
+         let%bind (_payment : User_command.t) =
+           Coda_commands.Hardware_wallet.sign ~hardware_wallet_nonce
+             ~public_key ~user_command_payload
          in
-         assert (
-           Schnorr.verify signature
-             (Snark_params.Tick.Inner_curve.of_affine sender)
-             payload ) ;
          Core.print_endline
            "Hardware wallet signed the transaction successfully" ;
          Deferred.unit ))
@@ -717,13 +626,15 @@ let send_payment_hardware_wallet =
           , memo_opt )
           ->
          let open Deferred.Let_syntax in
-         let%bind sender = get_public_key hardware_wallet_nonce in
+         let%bind public_key =
+           Coda_commands.Hardware_wallet.get_public_key ~hardware_wallet_nonce
+         in
          let%bind nonce =
            match nonce_opt with
            | Some nonce ->
                return nonce
            | None ->
-               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc sender
+               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc public_key
                  port
          in
          let fee =
@@ -743,7 +654,7 @@ let send_payment_hardware_wallet =
              Option.value valid_until_opt
                ~default:Coda_numbers.Global_slot.max_value
            in
-           let payload =
+           let user_command_payload =
              User_command_payload.Poly.
                { common=
                    User_command_payload.Common.Poly.
@@ -752,23 +663,17 @@ let send_payment_hardware_wallet =
                    User_command_payload.Body.Payment
                      Payment_payload.Poly.{receiver; amount} }
            in
-           let%bind (signature : Signature.t) =
-             get_signature hardware_wallet_nonce payload
-           in
-           assert (
-             Schnorr.verify signature
-               (Snark_params.Tick.Inner_curve.of_affine sender)
-               payload ) ;
-           let command =
-             Coda_base.User_command.Poly.{payload; sender; signature}
+           let%bind (payment : User_command.t) =
+             Coda_commands.Hardware_wallet.sign ~hardware_wallet_nonce
+               ~public_key ~user_command_payload
            in
            Daemon_rpcs.Client.dispatch_with_message
-             Daemon_rpcs.Send_user_command.rpc command port
+             Daemon_rpcs.Send_user_command.rpc payment port
              ~success:(fun receipt_chain_hash ->
                sprintf
                  "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
                  "label"
-                 (User_command.to_base58_check command)
+                 (User_command.to_base58_check payment)
                  (Receipt.Chain_hash.to_string receipt_chain_hash) )
              ~error:(fun e -> sprintf "%s: %s" "error" (Error.to_string_hum e))
              ~join_error:Or_error.join ))
