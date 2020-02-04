@@ -381,7 +381,7 @@ jobs:
                   command: ./scripts/pin-external-packages.sh
             - run:
                 name: Install cachix
-                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
@@ -496,7 +496,7 @@ jobs:
                     #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
                 name: Install cachix
-                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
@@ -531,7 +531,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Install cachix
-                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
@@ -565,7 +565,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Install cachix
-                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
@@ -600,7 +600,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Install cachix
-                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env -iA cachix -f https://cachix.org/api/v1/install
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
