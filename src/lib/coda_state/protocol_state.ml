@@ -30,6 +30,9 @@ end
 let hash_abstract
     ({previous_state_hash; body_hash; _} :
       (State_hash.t, _, State_body_hash.t) Poly.t) =
+  (* the body hash has already been computed, so the body
+     is ignored here, and may be of any type
+   *)
   Random_oracle.hash ~init:Hash_prefix.protocol_state
     [|(previous_state_hash :> Field.t); (body_hash :> Field.t)|]
   |> State_hash.of_hash

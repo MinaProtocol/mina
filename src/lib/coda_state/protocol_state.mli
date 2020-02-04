@@ -19,6 +19,7 @@ module Poly : sig
   [@@deriving sexp]
 end
 
+(** N.B.: the body may be of any type *)
 val hash_abstract :
   (State_hash.t, 'body, State_body_hash.t) Poly.t -> State_hash.t
 
@@ -130,4 +131,5 @@ val negative_one : genesis_ledger:Coda_base.Ledger.t Lazy.t -> Value.t
 
 val hash_checked : var -> (State_hash.var * State_body_hash.var, _) Checked.t
 
+(** unlike hash_abstract, the type of the input commits to a type for the body *)
 val hash : Value.t -> State_hash.t
