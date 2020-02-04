@@ -54,7 +54,8 @@ let keep_trying :
 let get_project_root logger =
   let open Filename in
   let rec go dir =
-    Logger.fatal logger "examining %s" dir ~module_:__MODULE__ ~location:__LOC__ ;
+    Logger.fatal logger "examining %s" dir ~module_:__MODULE__
+      ~location:__LOC__ ;
     if Core.Sys.file_exists_exn @@ dir ^/ "src/dune-project" then Some dir
     else if String.equal dir "/" then None
     else go @@ fst @@ split dir
@@ -98,7 +99,8 @@ let get_coda_binary () =
   else
     (* FIXME for finding the executable relative to the install path this should
        deference the symlink if possible. *)
-      Deferred.map ~f:(fun x -> Ok x)
+    Deferred.map
+      ~f:(fun x -> Ok x)
       (Unix.getpid () |> Pid.to_int |> sprintf "/proc/%d/exe" |> Unix.readlink)
 
 (* Check the PID file, and if it exists and corresponds to a currently running
@@ -258,7 +260,10 @@ let start_custom :
     "Starting custom child process %s with args $args" name
     ~metadata:[("args", `List (List.map args ~f:(fun a -> `String a)))] ;
   let%bind coda_binary_path = get_coda_binary () in
-  let project_root = get_project_root logger |> Option.map ~f:(fun root -> root ^/ git_root_relative_path) in
+  let project_root =
+    get_project_root logger
+    |> Option.map ~f:(fun root -> root ^/ git_root_relative_path)
+  in
   let%bind process =
     keep_trying
       (List.filter_opt

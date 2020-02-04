@@ -94,10 +94,9 @@ let daemon logger =
        flag "bind-ip"
          ~doc:"IP IP of network interface to use for peer connections"
          (optional string)
-      and working_dir =
-        flag "working-dir"
-        ~doc:"PATH path to chdir into before starting"
-        (optional string)
+     and working_dir =
+       flag "working-dir" ~doc:"PATH path to chdir into before starting"
+         (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
      and is_archive_rocksdb =
