@@ -385,7 +385,8 @@ jobs:
             - run:
                 name: Build libp2p_helper using cachix
                 command: |
-                    USER=opam . ~/.nix-profile/etc/profile.d/nix.sh
+                    export USER=opam 
+                    . ~/.nix-profile/etc/profile.d/nix.sh
                     cachix use codaprotocol
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
