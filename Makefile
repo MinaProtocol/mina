@@ -157,7 +157,7 @@ docker-toolchain:
 		docker push codaprotocol/coda:toolchain-$(GITLONGHASH) && \
 		docker push codaprotocol/coda:toolchain-latest ;\
 	else \
-	    echo "Repo has uncommited changes, commit first to set hash." ;\
+		echo "Repo has uncommited changes, commit first to set hash." ;\
 	fi
 
 docker-toolchain-rust:
@@ -172,10 +172,10 @@ docker-toolchain-rust:
 
 docker-toolchain-discovery:
 	@echo "Building codaprotocol/coda:toolchain-discovery-$(LIBP2P_HELPER_SIG)" ;\
-    docker build --file dockerfiles/Dockerfile-toolchain-discovery --tag codaprotocol/coda:toolchain-discovery-$(LIBP2P_HELPER_SIG) . ;\
-    echo  'Extracting deb package' ;\
-    mkdir -p _build ;\
-    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-discovery-$(LIBP2P_HELPER_SIG) /src/coda-discovery.deb > _build/coda-discovery.deb
+	docker build --file dockerfiles/Dockerfile-toolchain-discovery --tag codaprotocol/coda:toolchain-discovery-$(LIBP2P_HELPER_SIG) . ;\
+	echo  'Extracting deb package' ;\
+	mkdir -p _build ;\
+	docker run --rm --entrypoint cat codaprotocol/coda:toolchain-discovery-$(LIBP2P_HELPER_SIG) /src/coda-discovery.deb > _build/coda-discovery.deb
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
