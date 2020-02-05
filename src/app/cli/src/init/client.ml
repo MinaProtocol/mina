@@ -1351,7 +1351,7 @@ let lock_account =
 
 let generate_libp2p_keypair =
   Command.async
-    ~summary:"Generate a new libp2p keypair and print it out the peer ID"
+    ~summary:"Generate a new libp2p keypair and print out the peer ID"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
     Cli_lib.Exceptions.handle_nicely
