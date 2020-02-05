@@ -46,7 +46,7 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None)
   let peers = [] :: List.drop peers 1 in
   let args = List.zip_exn addrs_and_ports_list peers in
   let configs =
-    List.mapi args ~f:(fun i (addrs_and_ports, _peers) ->
+    List.mapi args ~f:(fun i (addrs_and_ports, peers) ->
         let public_key =
           Option.bind snark_worker_public_keys ~f:(fun keys ->
               List.nth_exn keys i )
@@ -56,7 +56,7 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None)
         in
         Coda_process.local_config ?proposal_interval ~addrs_and_ports
           ~snark_worker_key:public_key ~program_dir ~acceptable_delay ~chain_id
-          ~proposer:(proposers i) ~work_selection_method ~trace_dir
+          ~peers ~proposer:(proposers i) ~work_selection_method ~trace_dir
           ~is_archive_rocksdb:(is_archive_rocksdb i)
           ~offset:(Lazy.force offset) ~max_concurrent_connections () )
   in

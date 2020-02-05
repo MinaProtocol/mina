@@ -18,7 +18,7 @@ let spawn_exn (config : Coda_worker.Input.t) =
   File_system.dup_stderr process ;
   return (conn, process, config)
 
-let local_config ?proposal_interval:_ ~addrs_and_ports ~acceptable_delay
+let local_config ?proposal_interval:_ ~addrs_and_ports ~acceptable_delay ~peers
     ~chain_id ~program_dir ~proposer ~snark_worker_key ~work_selection_method
     ~offset ~trace_dir ~max_concurrent_connections ~is_archive_rocksdb () =
   let conf_dir =
@@ -44,7 +44,7 @@ let local_config ?proposal_interval:_ ~addrs_and_ports ~acceptable_delay
     ; work_selection_method
     ; conf_dir
     ; chain_id
-    ; peers= []
+    ; peers
     ; trace_dir
     ; program_dir
     ; acceptable_delay
