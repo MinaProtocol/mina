@@ -56,7 +56,7 @@ Practically speaking, the limiting factor ends up being bandwidth, so it depends
 
 #### Why did you develop a new protocol, rather than augmenting existing cryptocurrencies?
 
-The reason for developing a new protocol instead of offering services to other blockchains is because adding SNARKs post-mortem to a Layer 1 project is not trivial. Even basic operations need to be optimized for performance inside a SNARK, and existing implementations are not able to be retrofit as such. If we look at hashing functions for example, SHA256 (used by Bitcoin) or Keccak (used by Ethereum) are extremely expensive inside a SNARK circuit, but Poseidon (what Coda uses) is optimized for performance. This and many other technical considerations make it infeasible to easily add recursive SNARKs to existing Layer 1’s, without entirely overhauling the base protocol.
+The reason for developing a new protocol instead of offering services to other blockchains is because adding SNARKs after the fact to a Layer 1 project is not trivial. Even basic operations need to be optimized for performance inside a SNARK, and existing implementations are not able to be retrofit as such. If we look at hashing functions for example, SHA256 (used by Bitcoin) or Keccak (used by Ethereum) are extremely expensive inside a SNARK circuit, but Poseidon (what Coda uses) is optimized for performance. This and many other technical considerations make it infeasible to easily add recursive SNARKs to existing Layer 1’s, without entirely overhauling the base protocol.
 
 #### Will you require a trusted setup?
 
