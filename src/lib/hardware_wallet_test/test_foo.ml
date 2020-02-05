@@ -48,6 +48,31 @@ let%test_unit "decoding field" =
 *)
 
 let%test_unit "ledger verify" =
+  let user_command_payload =
+    User_command_payload.Poly.
+      { common=
+          User_command_payload.Common.Poly.
+            { fee= Currency.Fee.of_int 5
+            ; nonce= Coda_numbers.Account_nonce.of_int 1
+            ; valid_until= Coda_numbers.Global_slot.max_value
+            ; memo= User_command_memo.empty }
+      ; body=
+          User_command_payload.Body.Payment
+            Payment_payload.Poly.
+              { receiver=
+                  Signature_lib.Public_key.Compressed.of_base58_check_exn
+                    "4vsRCVjvjUfikBmtaMqqU87vwqjoBzi4nFnjqhFEeW8MoPjb5WXE7QtkNugyP9DaTZf52uD2Yh6uCJExzHgQaFDiniREyPLGtBXUuv9zNnQw3mQTr7GXN2BGDeVKmk2cjmbJsXFGN9mm1Eu5"
+              ; amount= Currency.Amount.of_int 100 } }
+  in
+  let input =
+    Transaction_union_payload.to_input
+    @@ Transaction_union_payload.of_user_command_payload user_command_payload
+  in
+  let fields = Random_oracle.pack_input input in
+  Array.iter fields ~f:(fun field ->
+      eprintf "%s\n" (Tick.Field.to_string field) )
+
+let%test_unit "ledger verify" =
   let _alphabet =
     B58.make_alphabet
       "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz"

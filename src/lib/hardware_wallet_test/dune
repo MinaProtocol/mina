@@ -2,6 +2,6 @@
   (name hardware_wallet_test)
   (public_name hardware_wallet_test)
   (inline_tests)
-  (libraries core signature_lib coda_base base58_check async bignum_bigint coda_numbers)
+  (libraries coda_commands core signature_lib coda_base base58_check async bignum_bigint coda_numbers)
   (preprocess
   (pps ppx_snarky ppx_base ppx_let ppx_coda ppx_deriving_yojson ppx_inline_test)))

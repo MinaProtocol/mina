@@ -229,6 +229,10 @@ module Hardware_wallet = struct
     Yojson.Safe.from_string signature
     |> signature_of_yojson
     |> Result.map ~f:(fun {field; scalar} ->
+           let r = decode_field field in
+           let s = decode_scalar scalar in
+           eprintf "r in decode_signature: %s\n" (Tick.Field.to_string r) ;
+           eprintf "s in decode_signature: %s\n" (Tock.Field.to_string s) ;
            (decode_field field, decode_scalar scalar) )
 
   let get_public_key ~hardware_wallet_nonce =
@@ -266,7 +270,7 @@ module Hardware_wallet = struct
     let messages =
       Array.map fields ~f:(fun field -> Tick.Field.to_string field)
     in
-    if Array.length messages <= 2 then (
+    if Array.length messages <> 2 then (
       eprintf "Malformed user command" ;
       exit 22 )
     else
