@@ -23,4 +23,5 @@
 [%%define print_versioned_types true]
 
 [%%define daemon_expiry "never"]
+[%%define test_full_epoch false]
 
