@@ -8,18 +8,11 @@ module type S = sig
   module Resource_pool : sig
     include
       Intf.Snark_resource_pool_intf
-      with type ledger_proof := Ledger_proof.t
-       and type work := Transaction_snark_work.Statement.t
-       and type transition_frontier := transition_frontier
-       and type work_info := Transaction_snark_work.Info.t
+      with type transition_frontier := transition_frontier
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
-    module Diff :
-      Intf.Snark_pool_diff_intf
-      with type ledger_proof := Ledger_proof.t
-       and type work := Transaction_snark_work.Statement.t
-       and type resource_pool := t
+    module Diff : Intf.Snark_pool_diff_intf with type resource_pool := t
   end
 
   module For_tests : sig
@@ -306,13 +299,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
     end
 
     include T
-    module Diff =
-      Snark_pool_diff.Make
-        (Ledger_proof.Stable.V1)
-        (Transaction_snark_work.Statement)
-        (Transaction_snark_work.Info)
-        (Transition_frontier)
-        (T)
+    module Diff = Snark_pool_diff.Make (Transition_frontier) (T)
 
     let get_rebroadcastable t ~is_expired =
       Hashtbl.filteri_inplace t.snark_tables.rebroadcastable
