@@ -34,14 +34,24 @@ end)
           "Pool diff apply feedback: %s" (Error.to_string_hum e) ;
         Deferred.unit
 
-  let of_resource_pool_and_diffs resource_pool ~logger ~incoming_diffs =
+  let of_resource_pool_and_diffs resource_pool ~logger ~incoming_diffs
+      ~local_diffs =
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
     let network_pool =
       {resource_pool; logger; read_broadcasts; write_broadcasts}
     in
-    Linear_pipe.iter incoming_diffs ~f:(fun diff ->
-        apply_and_broadcast network_pool diff )
-    |> ignore ;
+    Linear_pipe.merge_unordered
+      [ Linear_pipe.map incoming_diffs ~f:(fun diff -> `Incoming diff)
+      ; Linear_pipe.map local_diffs ~f:(fun diff -> `Local diff) ]
+    |> Linear_pipe.iter ~f:(fun diff_source ->
+           match diff_source with
+           | `Incoming diff ->
+               apply_and_broadcast network_pool diff
+           | `Local diff ->
+               (*Should this be coming from resource pool instead?*)
+               apply_and_broadcast network_pool (Envelope.Incoming.local diff)
+       )
+    |> Deferred.don't_wait_for ;
     network_pool
 
   (* Rebroadcast locally generated pool items every 10 minutes. Do so for 50
@@ -90,11 +100,12 @@ end)
     in
     go ()
 
-  let create ~config ~incoming_diffs ~frontier_broadcast_pipe ~logger =
+  let create ~config ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe
+      ~logger =
     let t =
       of_resource_pool_and_diffs
         (Resource_pool.create ~config ~logger ~frontier_broadcast_pipe)
-        ~incoming_diffs ~logger
+        ~incoming_diffs ~local_diffs ~logger
     in
     don't_wait_for (rebroadcast_loop t logger) ;
     t

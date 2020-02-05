@@ -107,10 +107,11 @@ let%test_module "transaction_status" =
 
     let create_pool ~frontier_broadcast_pipe =
       let incoming_diffs, _ = Linear_pipe.create () in
+      let local_diffs_reader, local_diffs_writer = Linear_pipe.create () in
       let config = Transaction_pool.Resource_pool.make_config ~trust_system in
       let transaction_pool =
         Transaction_pool.create ~config ~incoming_diffs ~logger
-          ~frontier_broadcast_pipe
+          ~local_diffs:local_diffs_reader ~frontier_broadcast_pipe
       in
       don't_wait_for
       @@ Linear_pipe.iter (Transaction_pool.broadcasts transaction_pool)
@@ -126,20 +127,22 @@ let%test_module "transaction_status" =
              Deferred.unit ) ;
       (* Need to wait for transaction_pool to see the transition_frontier *)
       let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
-      transaction_pool
+      (transaction_pool, local_diffs_writer)
 
     let%test_unit "If the transition frontier currently doesn't exist, the \
                    status of a sent transaction will be unknown" =
       Quickcheck.test ~trials:1 gen_user_command ~f:(fun user_command ->
           Async.Thread_safe.block_on_async_exn (fun () ->
               let frontier_broadcast_pipe, _ = Broadcast_pipe.create None in
-              let%bind transaction_pool =
+              let%bind transaction_pool, local_diffs_writer =
                 create_pool ~frontier_broadcast_pipe
               in
-              let%map () =
-                Transaction_pool.add transaction_pool [user_command]
+              let%bind () =
+                Linear_pipe.write local_diffs_writer [user_command]
               in
-              Logger.info logger "Hello" ~module_:__MODULE__ ~location:__LOC__ ;
+              let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
+              Logger.info logger "Checking status" ~module_:__MODULE__
+                ~location:__LOC__ ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown
                 ( Or_error.ok_exn
                 @@ get_status ~frontier_broadcast_pipe ~transaction_pool
@@ -155,18 +158,21 @@ let%test_module "transaction_status" =
               let frontier_broadcast_pipe, _ =
                 Broadcast_pipe.create (Some frontier)
               in
-              let%bind transaction_pool =
+              let%bind transaction_pool, local_diffs_writer =
                 create_pool ~frontier_broadcast_pipe
               in
-              let%map () =
-                Transaction_pool.add transaction_pool [user_command]
+              let%bind () =
+                Linear_pipe.write local_diffs_writer [user_command]
+              in
+              let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
+              let status =
+                Or_error.ok_exn
+                @@ get_status ~frontier_broadcast_pipe ~transaction_pool
+                     user_command
               in
               Logger.info logger "Computing status" ~module_:__MODULE__
                 ~location:__LOC__ ;
-              [%test_eq: State.t] ~equal:State.equal State.Pending
-                ( Or_error.ok_exn
-                @@ get_status ~frontier_broadcast_pipe ~transaction_pool
-                     user_command ) ) )
+              [%test_eq: State.t] ~equal:State.equal State.Pending status ) )
 
     let%test_unit "An unknown transaction does not appear in the transition \
                    frontier or transaction pool " =
@@ -186,16 +192,16 @@ let%test_module "transaction_status" =
               let frontier_broadcast_pipe, _ =
                 Broadcast_pipe.create (Some frontier)
               in
-              let%bind transaction_pool =
+              let%bind transaction_pool, local_diffs_writer =
                 create_pool ~frontier_broadcast_pipe
               in
               let unknown_user_command, pool_user_commands =
                 Non_empty_list.uncons user_commands
               in
-              let%map () =
-                Deferred.List.iter pool_user_commands ~f:(fun user_command ->
-                    Transaction_pool.add transaction_pool [user_command] )
+              let%bind () =
+                Linear_pipe.write local_diffs_writer pool_user_commands
               in
+              let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               Logger.info logger "Computing status" ~module_:__MODULE__
                 ~location:__LOC__ ;
               [%test_eq: State.t] ~equal:State.equal State.Unknown

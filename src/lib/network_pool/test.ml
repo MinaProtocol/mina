@@ -16,6 +16,7 @@ let%test_module "network pool test" =
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
       let pool_reader, _pool_writer = Linear_pipe.create () in
+      let local_reader, _local_writer = Linear_pipe.create () in
       let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create None in
       let work =
         `One
@@ -38,6 +39,7 @@ let%test_module "network pool test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~config ~logger ~incoming_diffs:pool_reader
+              ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let command =
@@ -57,29 +59,35 @@ let%test_module "network pool test" =
           | None ->
               failwith "There should have been a proof here" )
 
-    let%test_unit "when creating a network, the incoming diffs in reader pipe \
-                   will automatically get process" =
+    let%test_unit "when creating a network, the incoming diffs and local \
+                   diffs in the reader pipes will automatically get process" =
+      let work_count = 10 in
       let works =
         Quickcheck.random_sequence ~seed:(`Deterministic "works")
           Transaction_snark.Statement.gen
-        |> Fn.flip Sequence.take 10
+        |> Fn.flip Sequence.take work_count
         |> Sequence.map ~f:(fun x -> `One x)
         |> Sequence.to_list
       in
+      let per_reader = work_count / 2 in
+      let create_work work =
+        Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
+          ( work
+          , Priced_proof.
+              { proof=
+                  One_or_two.map ~f:Ledger_proof.For_tests.mk_dummy_proof work
+              ; fee=
+                  { fee= Currency.Fee.of_int 0
+                  ; prover= Signature_lib.Public_key.Compressed.empty } } )
+      in
       let verify_unsolved_work () =
         let work_diffs =
-          List.map works ~f:(fun work ->
-              Envelope.Incoming.local
-                (Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
-                   ( work
-                   , Priced_proof.
-                       { proof=
-                           One_or_two.map
-                             ~f:Ledger_proof.For_tests.mk_dummy_proof work
-                       ; fee=
-                           { fee= Currency.Fee.of_int 0
-                           ; prover= Signature_lib.Public_key.Compressed.empty
-                           } } )) )
+          List.map (List.take works per_reader) ~f:create_work
+          |> List.map ~f:Envelope.Incoming.local
+          |> Linear_pipe.of_list
+        in
+        let local_diffs =
+          List.map (List.drop works per_reader) ~f:create_work
           |> Linear_pipe.of_list
         in
         let frontier_broadcast_pipe_r, _ =
@@ -93,7 +101,7 @@ let%test_module "network pool test" =
         let config = config verifier in
         let network_pool =
           Mock_snark_pool.create ~config ~logger ~incoming_diffs:work_diffs
-            ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+            ~local_diffs ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         don't_wait_for
         @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)

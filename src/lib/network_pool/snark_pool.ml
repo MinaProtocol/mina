@@ -47,6 +47,7 @@ module type S = sig
     -> disk_location:string
     -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
                       Linear_pipe.Reader.t
+    -> local_diffs:Resource_pool.Diff.t Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier option
                                Broadcast_pipe.Reader.t
     -> t Deferred.t
@@ -353,7 +354,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         Transaction_snark_work.Checked.create_unsafe
           {Transaction_snark_work.fee; proofs= proof; prover} )
 
-  let load ~config ~logger ~disk_location ~incoming_diffs
+  let load ~config ~logger ~disk_location ~incoming_diffs ~local_diffs
       ~frontier_broadcast_pipe =
     match%map
       Async.Reader.load_bin_prot disk_location
@@ -362,13 +363,14 @@ module Make (Transition_frontier : Transition_frontier_intf) :
     | Ok snark_table ->
         let pool = Resource_pool.of_serializable snark_table ~config ~logger in
         let network_pool =
-          of_resource_pool_and_diffs pool ~logger ~incoming_diffs
+          of_resource_pool_and_diffs pool ~logger ~incoming_diffs ~local_diffs
         in
         Resource_pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
           pool ;
         network_pool
     | Error _e ->
-        create ~config ~logger ~incoming_diffs ~frontier_broadcast_pipe
+        create ~config ~logger ~incoming_diffs ~local_diffs
+          ~frontier_broadcast_pipe
 
   open Snark_work_lib.Work
 
@@ -572,6 +574,7 @@ let%test_module "random set test" =
                    received in the pool's reader" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let pool_reader, _pool_writer = Linear_pipe.create () in
+          let local_reader, _local_writer = Linear_pipe.create () in
           let frontier_broadcast_pipe_r, _ =
             Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
           in
@@ -582,7 +585,8 @@ let%test_module "random set test" =
           in
           let config = config verifier in
           let network_pool =
-            Mock_snark_pool.create ~config ~incoming_diffs:pool_reader ~logger
+            Mock_snark_pool.create ~config ~incoming_diffs:pool_reader
+              ~local_diffs:local_reader ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let priced_proof =
@@ -615,30 +619,37 @@ let%test_module "random set test" =
           Mock_snark_pool.apply_and_broadcast network_pool
             (Envelope.Incoming.local command) )
 
-    let%test_unit "when creating a network, the incoming diffs in reader pipe \
-                   will automatically get process" =
+    let%test_unit "when creating a network, the incoming diffs and locally \
+                   generated diffs in reader pipes will automatically get \
+                   process" =
       Async.Thread_safe.block_on_async_exn (fun () ->
+          let work_count = 10 in
           let works =
             Quickcheck.random_sequence ~seed:(`Deterministic "works")
               Transaction_snark.Statement.gen
-            |> Fn.flip Sequence.take 10
+            |> Fn.flip Sequence.take work_count
             |> Sequence.map ~f:(fun x -> `One x)
             |> Sequence.to_list
           in
+          let per_reader = work_count / 2 in
+          let create_work work =
+            Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
+              ( work
+              , Priced_proof.
+                  { proof= One_or_two.map ~f:mk_dummy_proof work
+                  ; fee=
+                      { fee= Currency.Fee.of_int 0
+                      ; prover= Signature_lib.Public_key.Compressed.empty } }
+              )
+          in
           let verify_unsolved_work () =
             let work_diffs =
-              List.map works ~f:(fun work ->
-                  Envelope.Incoming.local
-                    (Mock_snark_pool.Resource_pool.Diff.Stable.V1
-                     .Add_solved_work
-                       ( work
-                       , Priced_proof.
-                           { proof= One_or_two.map ~f:mk_dummy_proof work
-                           ; fee=
-                               { fee= Currency.Fee.of_int 0
-                               ; prover=
-                                   Signature_lib.Public_key.Compressed.empty }
-                           } )) )
+              List.map (List.take works per_reader) ~f:create_work
+              |> List.map ~f:Envelope.Incoming.local
+              |> Linear_pipe.of_list
+            in
+            let local_diffs =
+              List.map (List.drop works per_reader) ~f:create_work
               |> Linear_pipe.of_list
             in
             let frontier_broadcast_pipe_r, _ =
@@ -653,7 +664,7 @@ let%test_module "random set test" =
             let config = config verifier in
             let network_pool =
               Mock_snark_pool.create ~logger ~config ~incoming_diffs:work_diffs
-                ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+                ~local_diffs ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             in
             don't_wait_for
             @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
@@ -672,6 +683,7 @@ let%test_module "random set test" =
 
     let%test_unit "rebroadcast behavior" =
       let pool_reader, _pool_writer = Linear_pipe.create () in
+      let local_reader, _local_writer = Linear_pipe.create () in
       let frontier_broadcast_pipe_r, _w = Broadcast_pipe.create None in
       let stmt1, stmt2 =
         Quickcheck.random_value ~seed:(`Deterministic "")
@@ -699,7 +711,7 @@ let%test_module "random set test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
-              ~incoming_diffs:pool_reader
+              ~incoming_diffs:pool_reader ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in

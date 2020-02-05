@@ -81,6 +81,7 @@ module type Network_pool_base_intf = sig
        config:config
     -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
                       Linear_pipe.Reader.t
+    -> local_diffs:resource_pool_diff Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> logger:Logger.t
@@ -91,6 +92,7 @@ module type Network_pool_base_intf = sig
     -> logger:Logger.t
     -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
                       Linear_pipe.Reader.t
+    -> local_diffs:resource_pool_diff Linear_pipe.Reader.t
     -> t
 
   val resource_pool : t -> resource_pool
