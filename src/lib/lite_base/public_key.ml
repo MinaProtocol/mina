@@ -11,22 +11,20 @@ module Field = Crypto_params.Tock.Fq
 type t = Crypto_params.Tock.G1.t
 
 module Compressed = struct
+  [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = {x: Field.t; is_odd: bool}
-        [@@deriving bin_io, eq, sexp, version {asserted}]
+      type t = {x: Field.t; is_odd: bool}
+      [@@deriving bin_io, eq, sexp, version {asserted}]
 
-        module Display = struct
-          type t = {x: string; is_odd: bool} [@@deriving to_yojson]
-        end
+      let to_latest = Fn.id
 
-        let to_yojson {x; is_odd} =
-          Display.to_yojson {Display.x= Field.to_string x; is_odd}
+      module Display = struct
+        type t = {x: string; is_odd: bool} [@@deriving to_yojson]
       end
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_yojson {x; is_odd} =
+        Display.to_yojson {Display.x= Field.to_string x; is_odd}
 
       let gen =
         let open Quickcheck.Let_syntax in
@@ -35,19 +33,7 @@ module Compressed = struct
         {x; is_odd}
     end
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "public_key"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-
-    (* see lib/module_version/README-version-asserted.md *)
-    module For_tests = struct
+    module Tests = struct
       [%%if
       curve_size = 298]
 
@@ -78,7 +64,7 @@ module Compressed = struct
 
       [%%endif]
     end
-  end
+  end]
 
   type t = Stable.Latest.t = {x: Field.t; is_odd: bool} [@@deriving eq, sexp]
 
