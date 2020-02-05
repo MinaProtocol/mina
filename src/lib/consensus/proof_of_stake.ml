@@ -1667,7 +1667,7 @@ module Data = struct
             ; staking_epoch_data: 'staking_epoch_data
             ; next_epoch_data: 'next_epoch_data
             ; has_ancestor_in_same_checkpoint_window: 'bool }
-          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+          [@@deriving sexp, eq, compare, hash, to_yojson]
         end
       end]
 
