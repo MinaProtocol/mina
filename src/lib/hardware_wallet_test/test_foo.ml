@@ -1,7 +1,6 @@
 open Coda_base
 open Core_kernel
 open Snark_params
-open Coda_base.Schnorr
 
 (* this format will change in the future *)
 type user_command =
@@ -47,6 +46,44 @@ let%test_unit "decoding field" =
   ()
 *)
 
+let%test_unit "decoding test" =
+  let field_str =
+    "113BbGK8KghQV7Agy8W9YDev1rnQWFncJNbX6FNk5xt3i85ArogCLyxcAFmtCQXdqW1N83mmzxPjTEbk2ZSJ2HBQXb296kVvCg5ntqkFQTj7W15dcccHbSc4YwFwhBiwQpx"
+  in
+  let scalar_str =
+    "113JiNkNmUXjoZFZkfB17UfkgU6qwXjseCJY7u8iTw8j9c5b3Gjh2YTkCU1XQVYS9r4xQEcUwz7AMtH247VgEBaweRQZRAqEYkYmMwzGPvPyfiiJ6DNFY93pv83T9zRCDvF"
+  in
+  let field = Coda_commands.Hardware_wallet.decode_field field_str in
+  let scalar = Coda_commands.Hardware_wallet.decode_scalar scalar_str in
+  let pk_compressed =
+    Signature_lib.Public_key.Compressed.of_base58_check_exn
+      "4vsRCVjvjUfikBmtaMqqU87vwqjoBzi4nFnjqhFEeW8MoPjb5WXE7QtkNugyP9DaTZf52uD2Yh6uCJExzHgQaFDiniREyPLGtBXUuv9zNnQw3mQTr7GXN2BGDeVKmk2cjmbJsXFGN9mm1Eu5"
+  in
+  let user_command_payload =
+    User_command_payload.Poly.
+      { common=
+          User_command_payload.Common.Poly.
+            { fee= Currency.Fee.of_int 5
+            ; nonce= Coda_numbers.Account_nonce.of_int 1
+            ; valid_until= Coda_numbers.Global_slot.max_value
+            ; memo= User_command_memo.empty }
+      ; body=
+          User_command_payload.Body.Payment
+            Payment_payload.Poly.
+              { receiver=
+                  Signature_lib.Public_key.Compressed.of_base58_check_exn
+                    "4vsRCVjvjUfikBmtaMqqU87vwqjoBzi4nFnjqhFEeW8MoPjb5WXE7QtkNugyP9DaTZf52uD2Yh6uCJExzHgQaFDiniREyPLGtBXUuv9zNnQw3mQTr7GXN2BGDeVKmk2cjmbJsXFGN9mm1Eu5"
+              ; amount= Currency.Amount.of_int 100 } }
+  in
+  let public_key = Signature_lib.Public_key.(decompress_exn pk_compressed) in
+  eprintf "field: %s\n" (Tick.Field.to_string field) ;
+  eprintf "scalar: %s\n" (Tock.Field.to_string scalar) ;
+  assert (
+    Coda_base.Schnorr.verify (field, scalar)
+      (Tick.Inner_curve.of_affine public_key)
+      user_command_payload )
+
+(*
 let%test_unit "ledger verify" =
   let user_command_payload =
     User_command_payload.Poly.
@@ -184,3 +221,4 @@ let%test_unit "ledger verify" =
   eprintf "world: %s\n"
     (B58.encode _alphabet (Bytes.of_string "world") |> Bytes.to_string) ;
   assert (verify (r', s') (Tick.Inner_curve.of_affine pk) m)
+*)
