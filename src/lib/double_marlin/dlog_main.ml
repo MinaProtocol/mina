@@ -189,10 +189,6 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
           Types.Dlog_based.Proof_state.Me_only.t
           t
       | Prev_x_hat : Field.Constant.t Tuple_lib.Triple.t t
-
-    (*
-      | Prev_pairing_acc : G1.Constant.t Accumulator.t t
-      | Prev_bulletproof_challenges : Fq.t array t *)
   end
 
   let multiscale scalars elts = ()
@@ -437,6 +433,10 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   module Marlin_checks = Marlin_checks.Make (Impl)
 
+  let print_bool lab x =
+    as_prover (fun () ->
+        printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
+
   (* The sg challenge point should be hash(sg) (or some variant thereof)
      We have this in the form of the hashed pass_through!
 
@@ -485,6 +485,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       (* Sample new sg challenge point here *)
       Boolean.all [equal (pack xi_actual) xi; equal (pack r_actual) r]
     in
+    print_bool "xi_and_r_correct" xi_and_r_correct ;
     let combined_inner_product_correct =
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       let actual_combined_inner_product =
@@ -507,6 +508,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       in
       equal combined_inner_product actual_combined_inner_product
     in
+    print_bool "combined_inner_product_correct" combined_inner_product_correct ;
     let marlin_checks_passed =
       Marlin_checks.check ~input_domain:Input_domain.domain ~domain_h ~domain_k
         ~x_hat_beta_1:x_hat1
@@ -526,6 +528,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
         ; rc= beta_3_evals.rc
         }
     in
+    print_bool "marlin_checks_passed" marlin_checks_passed ;
     ( Boolean.all
         [xi_and_r_correct; combined_inner_product_correct; marlin_checks_passed]
     , compute_challenges bulletproof_challenges )
@@ -634,6 +637,11 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
         ~old_bulletproof_challenges:prev_me_only.old_bulletproof_challenges
     in
     Boolean.Assert.(was_base_case = prev_statement.proof_state.was_base_case);
+    (* On the second wrap, if we start the process off with a bad sg,
+       prev_proof_finalized will be false.
+    *)
+    print_bool "prev_proof_finalized" prev_proof_finalized ;
+    print_bool "prev_statement.proof_state.was_base_case" prev_statement.proof_state.was_base_case ;
     Boolean.Assert.any
       [prev_proof_finalized; prev_statement.proof_state.was_base_case] ;
     let ( sponge_digest_before_evaluations_actual

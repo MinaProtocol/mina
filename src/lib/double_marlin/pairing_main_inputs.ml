@@ -159,6 +159,17 @@ module G = struct
 
   (* TODO: Make real *)
   let scale t bs =
+    let res =
+      exists T.typ
+        ~compute:
+          As_prover.(
+            fun () ->
+              G.scale
+                (G.of_affine (read typ t))
+                (Snarky_bn382_backend.Fq.of_bits
+                   (List.map bs ~f:(read Boolean.typ)))
+              |> G.to_affine_exn)
+    in
     let x, y = t in
     let constraints_per_bit =
       if Option.is_some (Field.to_constant x) then 2 else 6
@@ -174,7 +185,7 @@ module G = struct
         for _ = 1 to constraints_per_bit * num_bits do
           assert_r1cs x x x2
         done ;
-        (x, y) )
+        res )
 
   (*         T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) *)
   let to_field_elements (x, y) = [x; y]

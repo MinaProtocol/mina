@@ -94,12 +94,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
             Sponge.absorb sponge (`Field x) )
     | Scalar ->
         let low_bits, high_bit = t in
-        as_prover As_prover.(fun () ->
-            Core.printf "low_bits\n%!";
-            Fp.Constant.print (read_var low_bits) ;
-            Core.printf "high_bit %b\n%!"
-              (read Boolean.typ high_bit)) ;
-
         Sponge.absorb sponge (`Field low_bits) ;
         Sponge.absorb sponge (`Bits [high_bit])
     | ty1 :: ty2 ->
@@ -111,22 +105,8 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let absorb t = absorb sponge t in
     let prechallenges =
       Array.mapi gammas ~f:(fun i gammas_i ->
-          as_prover As_prover.(fun () ->
-            printf "Oabout to absorb: %d\n%!" i;
-            Array.iter (Sponge.state sponge) ~f:(fun x ->
-                Field.Constant.print (read_var x) ;
-                printf "%!") );
           absorb (PC :: PC) gammas_i ;
-          as_prover As_prover.(fun () ->
-            printf "Oabout to squeeze: %d\n%!" i;
-            Array.iter (Sponge.state sponge) ~f:(fun x ->
-                Field.Constant.print (read_var x) ;
-                printf "%!") );
           let pre = Sponge.squeeze sponge ~length:Challenge.length  in
-          as_prover As_prover.(fun () ->
-              printf "Opre %!";
-              Field.Constant.print (read_var (Field.pack pre)) ;
-              printf "\n%!" ) ;
           pre
         )
     in
@@ -174,7 +154,12 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
 
   let dlog_pcs_batch = Common.dlog_pcs_batch ~domain_h ~domain_k
 
-  let check_bulletproof ~sponge ~xi ~sg_old ~combined_inner_product
+  let print_chal lab chal =
+    as_prover As_prover.(fun () ->
+        printf !"%s: %{sexp:Challenge.Constant.t}\n%!" lab
+        (read Challenge.typ chal) )
+
+  let check_bulletproof ~sponge ~xi ~combined_inner_product
       ~
       (* Corresponds to y in figure 7 of WTS *)
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
@@ -190,37 +175,61 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     in
     (* TODO: Absorb (combined_polynomial, inner_product_result/tau *)
     let open G in
+    let state = ref [] in
     let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
-      Pcs_batch.combine_commitments dlog_pcs_batch ~scale ~add:( + ) ~xi
-        (sg_old :: without_degree_bound)
+      Pcs_batch.combine_commitments dlog_pcs_batch ~scale:(fun acc xi ->
+          (if !state = []
+           then state := [ (acc, 0) ] );
+          state := List.map !state ~f:(fun (g, i) -> Int.(g, i + 1));
+          scale acc xi )
+        ~add:( fun p scaled_acc -> 
+            state := (p, 0) :: !state ;
+            p + scaled_acc
+          ) ~xi
+        without_degree_bound
         with_degree_bound
     in
-    print_g "combined_polynomial" combined_polynomial ;
+    print_chal "Oxi" xi ;
+    List.iter !state ~f:(fun (g, i) ->
+        print_g (sprintf "Oadding in shifted xi^%d" i) g ) ;
+
+    print_g "Ocombined_polynomial" combined_polynomial ;
+    print_g "Osg" sg;
     (* TODO: Absorb challenges into the sponge and expose it as another input *)
     let lr_prod, challenges = bullet_reduce sponge lr in
     let p_prime = combined_polynomial + scale u (Fq.to_bits combined_inner_product) in
     let q = p_prime + lr_prod in
     absorb sponge PC delta ;
     let c = Sponge.squeeze sponge ~length:Challenge.length in
+    print_chal "Oc" c ;
+    print_g "Olr_prod" lr_prod ;
 
     (* c Q + delta = z1 (G + b U) + z2 H *)
     let lhs = scale q c + delta in
     let rhs =
       let scale t x = scale t (Fq.to_bits x) in
-      scale (sg + scale u advice.b) z_1
+      let b_u = scale u advice.b in
+      let z_1_g_plus_b_u = scale (sg + b_u) z_1 in
+      print_g "Ou" u;
+      print_g "Ob_u" b_u;
+      print_g "Oz1 (g + b u)" z_1_g_plus_b_u;
+      let z2_h = scale Generators.h z_2 in
+      print_g "Oz2 h" z2_h;
+      z_1_g_plus_b_u
         (* TODO: Use scale_known *)
-      + scale Generators.h z_2
+      + z2_h
+      (*
+      scale (sg + b_u) z_1
+        (* TODO: Use scale_known *)
+      + scale Generators.h z_2 *)
     in
+    print_g "Olhs" lhs ;
+    print_g "Orhs" rhs ;
     (`Success (equal_g lhs rhs), challenges)
 
   let lagrange_precomputations =
     Array.map Input_domain.lagrange_commitments
       ~f:G.Scaling_precomputation.create
-
-  let print_chal lab chal =
-    as_prover As_prover.(fun () ->
-        printf !"%s: %{sexp:Challenge.Constant.t}\n%!" lab
-        (read Challenge.typ chal) )
 
   (* How to advance the proof state in "dlog main"
 
@@ -307,11 +316,11 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       check_bulletproof
         ~sponge:sponge_before_evaluations
         ~xi
-        ~sg_old
         ~combined_inner_product ~advice
         ~openings_proof
         ~polynomials:
-          ( [ x_hat
+          ( [ sg_old
+            ; x_hat
             ; w_hat
             ; z_hat_a
             ; z_hat_b
@@ -554,7 +563,11 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       let prev_proof_finalized =
         Boolean.(prev_proof_finalized || prev_statement.proof_state.was_base_case)
       in
+      let bulletproof_success =
+        Boolean.(bulletproof_success || prev_statement.proof_state.was_base_case)
+      in
       print_bool "prev_proof_finalized'" prev_proof_finalized;
+      print_bool "bulletproof_success''" bulletproof_success;
       Boolean.all [bulletproof_success; prev_proof_finalized]
     in
     let update_succeeded =A.check_update prev_app_state app_state in
