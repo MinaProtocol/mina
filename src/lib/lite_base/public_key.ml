@@ -14,8 +14,7 @@ module Compressed = struct
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = {x: Field.t; is_odd: bool}
-      [@@deriving bin_io, eq, sexp, version {asserted}]
+      type t = {x: Field.t; is_odd: bool} [@@deriving eq, sexp]
 
       let to_latest = Fn.id
 
