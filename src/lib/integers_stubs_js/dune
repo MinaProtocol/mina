@@ -1,0 +1,8 @@
+(library
+ (name integers_stubs_js)
+ (public_name integers_stubs_js)
+ (js_of_ocaml
+  (javascript_files ./runtime.js)
+  )
+ (libraries zarith_stubs_js)
+ (preprocess no_preprocessing))

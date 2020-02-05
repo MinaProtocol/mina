@@ -1,0 +1,11 @@
+The subdirectories of this directory, src/lib/nonconsensus/, contain
+symlinks to files in the corresponding directories in /src/lib/, so
+that there's just one instance of each such file. Some of the
+subdirectories may contain symlinks to fewer files than actual files
+in the corresponding directories, because not all files are needed.
+
+Each subdirectory contains its own dune file. The name of the library
+created is suffixed with "_nonconsensus". In the "libraries" clause,
+each named library must be a nonconsensus library, if available. Not
+all libraries have a nonconsensus version; in that case, the usual
+library may be mentioned.

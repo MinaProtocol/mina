@@ -1,0 +1,10 @@
+(library
+ (name non_zero_curve_point_nonconsensus)
+ (public_name non_zero_curve_point_nonconsensus)
+ (flags :standard -short-paths)
+ (inline_tests)
+ (library_flags -linkall)
+ (libraries core_kernel snark_params_nonconsensus random_oracle_nonconsensus fold_lib codable module_version)
+ (preprocessor_deps ../../../config.mlh)
+ (preprocess
+  (pps ppx_coda ppx_optcomp ppx_let ppx_hash ppx_compare ppx_sexp_conv ppx_bin_prot ppx_inline_test ppx_deriving_yojson ppx_deriving.eq)))

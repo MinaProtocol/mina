@@ -1,0 +1,7 @@
+(executable
+ (name client_sdk)
+ (modes js)
+ (libraries snark_params_nonconsensus coda_base_nonconsensus random_oracle_nonconsensus signature_lib_nonconsensus
+            zarith_stubs_js integers_stubs_js js_of_ocaml)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_coda ppx_optcomp integers js_of_ocaml.ppx)))

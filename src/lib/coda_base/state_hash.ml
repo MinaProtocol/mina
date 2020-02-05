@@ -1,5 +1,17 @@
 (* state_hash.ml -- defines the type for the protocol state hash *)
 
+[%%import
+"/src/config.mlh"]
+
+[%%ifndef
+consensus_mechanism]
+
+module Outside_pedersen_image =
+  Outside_pedersen_image_nonconsensus.Outside_pedersen_image
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
+
 include Data_hash.Make_full_size ()
 
 module Base58_check = Codable.Make_base58_check (struct

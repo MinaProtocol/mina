@@ -1,0 +1,1 @@
+../../random_oracle/intf.ml

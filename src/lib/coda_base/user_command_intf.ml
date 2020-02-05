@@ -1,6 +1,22 @@
+(* user_command_intf.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Import
-open Core
+open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Coda_numbers
+
+[%%else]
+
+open Coda_numbers_nonconsensus.Coda_numbers
+module Currency = Currency_nonconsensus.Currency
+
+[%%endif]
 
 module type Gen_intf = sig
   type t
@@ -56,10 +72,7 @@ module type Gen_intf = sig
     val sequence :
          ?length:int
       -> ?sign_type:[`Fake | `Real]
-      -> ( Signature_lib.Keypair.t
-         * Currency.Amount.t
-         * Coda_numbers.Account_nonce.t )
-         array
+      -> (Signature_lib.Keypair.t * Currency.Amount.t * Account_nonce.t) array
       -> t list Quickcheck.Generator.t
   end
 end
@@ -85,7 +98,7 @@ module type S = sig
 
   val memo : t -> User_command_memo.t
 
-  val valid_until : t -> Coda_numbers.Global_slot.t
+  val valid_until : t -> Global_slot.t
 
   (* for filtering *)
   val minimum_fee : Currency.Fee.t

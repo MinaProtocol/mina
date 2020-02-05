@@ -1,0 +1,21 @@
+(library
+ (name coda_base_nonconsensus)
+ (public_name coda_base_nonconsensus)
+ (library_flags -linkall)
+ (libraries
+    coda_numbers_nonconsensus
+    currency_nonconsensus
+    hash_prefix_states_nonconsensus
+    outside_pedersen_image_nonconsensus
+    signature_lib_nonconsensus
+    snark_params_nonconsensus
+    quickcheck_lib_nonconsensus
+    random_oracle_nonconsensus
+    yojson
+    )
+ (preprocessor_deps ../../../config.mlh)
+ (preprocess
+  (pps ppx_coda -lint-version-syntax-warnings ppx_deriving.eq ppx_deriving.enum ppx_deriving.ord
+    ppx_base ppx_bench ppx_let ppx_optcomp ppx_sexp_conv ppx_bin_prot ppx_fields_conv ppx_custom_printf ppx_assert ppx_deriving_yojson ppx_inline_test
+    bisect_ppx -- -conditional))
+ (synopsis "Snarks and friends necessary for keypair generation"))
