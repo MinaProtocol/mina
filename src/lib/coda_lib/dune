@@ -6,7 +6,7 @@
  (libraries core coda_intf envelope pipe_lib logger async async_extra
   kademlia unix_timestamp debug_assert o1trace consensus
   incremental secrets auxiliary_database work_selector
-  coda_networking proposer sync_handler transition_router
+  coda_networking block_producer sync_handler transition_router
   otp_lib snark_worker participating_state transaction_status
   receipt_chain_database sync_status daemon_rpcs archive_lib
   exit_handlers)

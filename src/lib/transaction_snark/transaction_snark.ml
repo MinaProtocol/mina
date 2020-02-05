@@ -1684,7 +1684,7 @@ let%test_module "transaction_snark" =
       Public_key.(compress (of_private_key_exn (Private_key.create ())))
 
     let coinbase_test state_body_hash_opt =
-      let proposer = mk_pubkey () in
+      let producer = mk_pubkey () in
       let receiver = mk_pubkey () in
       let other = mk_pubkey () in
       let pending_coinbase_init = Pending_coinbase.Stack.empty in
@@ -1705,11 +1705,11 @@ let%test_module "transaction_snark" =
           state_body_hash_opt pending_coinbase_init
       in
       Ledger.with_ledger ~f:(fun ledger ->
-          Ledger.create_new_account_exn ledger proposer
-            (Account.create proposer Balance.zero) ;
+          Ledger.create_new_account_exn ledger producer
+            (Account.create producer Balance.zero) ;
           let sparse_ledger =
             Sparse_ledger.of_ledger_subset_exn ledger
-              [proposer; receiver; other]
+              [producer; receiver; other]
           in
           check_transaction txn_in_block
             (unstage (Sparse_ledger.handler sparse_ledger))
