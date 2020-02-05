@@ -394,6 +394,7 @@ let daemon logger =
            or_from_config json_to_currency_fee_option "snark-worker-fee"
              ~default:Cli_lib.Default.snark_worker_fee snark_work_fee
          in
+         (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
          let _max_concurrent_connections =
            if
              or_from_config YJ.Util.to_bool_option "max-concurrent-connections"

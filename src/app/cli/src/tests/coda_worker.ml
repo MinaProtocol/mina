@@ -405,7 +405,7 @@ module T = struct
         ; trace_dir
         ; chain_id
         ; peers
-        ; max_concurrent_connections= _
+        ; max_concurrent_connections= _ (* FIXME #4095: use this *)
         ; is_archive_rocksdb
         ; _ } =
       let logger =
