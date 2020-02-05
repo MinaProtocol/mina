@@ -171,6 +171,13 @@ module type Snark_pool_diff_intf = sig
   val compact_json : t -> Yojson.Safe.json
 
   val apply : resource_pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
+
+  val of_result :
+       ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
+         Snark_work_lib.Work.Spec.t
+       , Ledger_proof.t )
+       Snark_work_lib.Work.Result.t
+    -> t
 end
 
 module type Transaction_pool_diff_intf = sig

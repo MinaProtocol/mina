@@ -1495,14 +1495,13 @@ module Mutations = struct
     in
     match Coda_commands.send_user_command coda command with
     | `Active f -> (
-        let open Deferred.Let_syntax in
-        match%map f with
-        | Ok _receipt ->
-            Ok command
-        | Error e ->
-            Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
+      match f with
+      | Ok _receipt ->
+          Ok command
+      | Error e ->
+          Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
-        return @@ Error "Daemon is bootstrapping"
+        Error "Daemon is bootstrapping"
 
   let parse_user_command_input ~kind coda from to_ fee memo_opt =
     let open Result.Let_syntax in
@@ -1570,7 +1569,8 @@ module Mutations = struct
             ~default:sender_nonce
         in
         let valid_until = with_default_expiry valid_until_opt in
-        build_user_command coda nonce sender_kp memo body fee valid_until )
+        Deferred.return
+        @@ build_user_command coda nonce sender_kp memo body fee valid_until )
 
   let send_payment =
     io_field "sendPayment" ~doc:"Send a payment"
@@ -1594,7 +1594,8 @@ module Mutations = struct
             ~default:sender_nonce
         in
         let valid_until = with_default_expiry valid_until_opt in
-        build_user_command coda nonce sender_kp memo body fee valid_until )
+        Deferred.return
+        @@ build_user_command coda nonce sender_kp memo body fee valid_until )
 
   let add_payment_receipt =
     result_field "addPaymentReceipt"

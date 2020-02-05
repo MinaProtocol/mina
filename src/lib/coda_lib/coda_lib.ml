@@ -572,7 +572,12 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   let spec = work.spec.instances in
   set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
-  Network_pool.Snark_pool.add_completed_work (snark_pool t) work
+  Linear_pipe.write t.pipes.local_snark_work_writer
+    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work)
+  |> Deferred.don't_wait_for
+
+let add_transactions t (txns : User_command.t list) =
+  Linear_pipe.write t.pipes.local_txns_writer txns |> Deferred.don't_wait_for
 
 let next_producer_timing t = t.next_producer_timing
 
