@@ -52,6 +52,21 @@ let of_display (d : Display.t) : t =
   ; libp2p_port= d.libp2p_port
   ; client_port= d.client_port }
 
+let to_multiaddr (t : t) =
+  match t.peer with
+  | Some peer ->
+      Some
+        (sprintf "/ip4/%s/tcp/%d/ipfs/%s"
+           (Unix.Inet_addr.to_string t.external_ip)
+           t.libp2p_port peer.peer_id)
+  | None ->
+      None
+
+let to_multiaddr_exn t =
+  Option.value_exn
+    ~message:"cannot format peer as multiaddr before libp2p key generated"
+    (to_multiaddr t)
+
 let to_yojson = Fn.compose Display.Stable.V1.to_yojson to_display
 
 let to_peer_exn : t -> Peer.t = function

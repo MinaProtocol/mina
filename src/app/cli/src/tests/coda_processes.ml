@@ -54,6 +54,7 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None)
         let addrs_and_ports =
           Node_addrs_and_ports.to_display addrs_and_ports
         in
+        let peers = List.map ~f:Node_addrs_and_ports.to_multiaddr_exn peers in
         Coda_process.local_config ?proposal_interval ~addrs_and_ports
           ~snark_worker_key:public_key ~program_dir ~acceptable_delay ~chain_id
           ~peers ~proposer:(proposers i) ~work_selection_method ~trace_dir
