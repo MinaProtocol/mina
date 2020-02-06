@@ -127,7 +127,26 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     let pack : Unpacked.t -> Packed.t = Field.project
   end
 
-  module Opening_proof = G1
+  let print_g1 lab (x, y) =
+    as_prover
+      As_prover.(
+        fun () ->
+          Core.printf "in-snark: %s (%s, %s)\n%!" lab
+            (Field.Constant.to_string (read_var x))
+            (Field.Constant.to_string (read_var y)))
+
+  let print_chal lab x =
+    as_prover
+      As_prover.(
+        fun () ->
+          Core.printf "in-snark %s: %s\n%!" lab
+            (Field.Constant.to_string
+               (Field.Constant.project (List.map ~f:(read Boolean.typ) x))))
+
+  let print_bool lab x =
+    as_prover (fun () ->
+        printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
+
   module PC = G1
   module Fq = Field
   module Challenge = Challenge.Make (Impl)
@@ -197,22 +216,6 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     Array.map Input_domain.lagrange_commitments
       ~f:G1.Scaling_precomputation.create
 
-  let print_g1 lab (x, y) =
-    as_prover
-      As_prover.(
-        fun () ->
-          Core.printf "in-snark: %s (%s, %s)\n%!" lab
-            (Field.Constant.to_string (read_var x))
-            (Field.Constant.to_string (read_var y)))
-
-  let print_chal lab x =
-    as_prover
-      As_prover.(
-        fun () ->
-          Core.printf "in-snark %s: %s\n%!" lab
-            (Field.Constant.to_string
-               (Field.Constant.project (List.map ~f:(read Boolean.typ) x))))
-
   let incrementally_verify_pairings
       ~verification_key:(m : _ Abc.t Matrix_evals.t) ~sponge ~public_input
       ~pairing_acc:{Accumulator.opening_check; degree_bound_checks}
@@ -224,50 +227,17 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     in
     let sample () = Sponge.squeeze sponge ~length:Challenge.length in
     let open Pairing_marlin_types.Messages in
-    Core.printf "Input size = %d\n%!" (Array.length public_input) ;
     let x_hat =
       assert (Int.ceil_pow2 (Array.length public_input) = Domain.size Input_domain.domain);
-      let pairs =
-        Array.mapi public_input ~f:(fun i x ->
-            (x, Input_domain.lagrange_commitments.(i)) )
-      in
-      as_prover
-        As_prover.(
-          fun () ->
-            Core.printf "in-snark xhat multiscale\n%!" ;
-            Array.iter pairs ~f:(fun (a, p) ->
-                let x, y = G1.Constant.to_affine_exn p in
-                let bits = List.map a ~f:(read Boolean.typ) in
-                let a =
-                  List.foldi bits ~init:B.zero ~f:(fun i acc b ->
-                      if not b then acc else B.(acc lor (one lsl i)) )
-                in
-                Core.printf "%s\n%!" (B.to_string a) )) ;
-      (*
-              (Field.Constant.to_string (x))
-              (Field.Constant.to_string (y)) ));
-*)
-      (* Must handle 1 ! *)
       G1.multiscale_known
         (Array.mapi public_input ~f:(fun i x ->
              (x, lagrange_precomputations.(i)) ))
     in
-    print_g1 "x_hat" x_hat ;
     absorb sponge PC x_hat ;
     let w_hat = receive PC w_hat in
     let z_hat_a = receive PC z_hat_a in
     let z_hat_b = receive PC z_hat_b in
-    print_g1 "w" w_hat ;
-    print_g1 "za" z_hat_a ;
-    print_g1 "zb" z_hat_b ;
     let alpha = sample () in
-    as_prover
-      As_prover.(
-        fun () ->
-          Core.printf "Just computed alpha = %!" ;
-          Snarky_bn382_backend.Fp.(
-            print (of_bits (List.map alpha ~f:(read Boolean.typ)))) ;
-          Core.printf "%!\n%!") ;
     let eta_a = sample () in
     let eta_b = sample () in
     let eta_c = sample () in
@@ -282,61 +252,27 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     in
     let beta_3 = sample () in
     let r_k = sample () in
-    List.iter
-      [ ("alpha", alpha)
-      ; ("eta_a", eta_a)
-      ; ("eta_b", eta_b)
-      ; ("eta_c", eta_c)
-      ; ("r_k", r_k)
-      ; ("beta_1", beta_1)
-      ; ("beta_2", beta_2)
-      ; ("beta_3", beta_3) ] ~f:(fun (lab, x) -> print_chal lab x) ;
+    begin
+      print_g1 "x_hat" x_hat ;
+      print_g1 "w" w_hat ;
+      print_g1 "za" z_hat_a ;
+      print_g1 "zb" z_hat_b ;
+      List.iter
+        [ ("alpha", alpha)
+        ; ("eta_a", eta_a)
+        ; ("eta_b", eta_b)
+        ; ("eta_c", eta_c)
+        ; ("r_k", r_k)
+        ; ("beta_1", beta_1)
+        ; ("beta_2", beta_2)
+        ; ("beta_3", beta_3) ] ~f:(fun (lab, x) -> print_chal lab x) ;
+    end;
     let digest_before_evaluations =
       Sponge.squeeze sponge ~length:Digest.length
     in
-    (* xi, r should be sampled here in the prover/CPU verifier using
-
-       let sponge = Fp_based_sponge.create () in
-       Sponge.absorb sponge digest_before_evaluations;
-       let xi = Sponge.squeeze sponge in
-       let r = Sponge.squeeze sponge in
-       ...
-    *)
     let open Vector in
     let combine_commitments t =
-      Core.printf "snark combine\n%!" ;
-      let module Impl =
-        Snarky.Snark.Run.Make (Snarky_bn382_backend.Pairing_based) (Unit)
-      in
-      let scale acc xi =
-        let x, y = acc in
-        as_prover
-          As_prover.(
-            fun () ->
-              let xi =
-                Snarky_bn382_backend.Fp.(
-                  of_bits (List.map xi ~f:(read Boolean.typ)))
-              in
-              Core.printf "snark scale: acc=(%s, %s), xi=%s\n%!"
-                (Inputs.Impl.Field.Constant.to_string (read_var x))
-                (Inputs.Impl.Field.Constant.to_string (read_var y))
-                (Impl.Field.Constant.to_string xi)) ;
-        G1.scale acc xi
-      in
-      let add p scaled =
-        let px, py = p in
-        let sx, sy = scaled in
-        as_prover
-          As_prover.(
-            fun () ->
-              Core.printf "snark add: p=(%s, %s), scaled=(%s, %s)\n%!"
-                (Inputs.Impl.Field.Constant.to_string (read_var px))
-                (Inputs.Impl.Field.Constant.to_string (read_var py))
-                (Inputs.Impl.Field.Constant.to_string (read_var sx))
-                (Inputs.Impl.Field.Constant.to_string (read_var sy))) ;
-        G1.( + ) p scaled
-      in
-      Pcs_batch.combine_commitments ~scale ~add ~xi t
+      Pcs_batch.combine_commitments ~scale:G1.scale ~add:G1.(+) ~xi t
     in
     let pairing_acc =
       let (g1, g1_s), (g2, g2_s), (g3, g3_s) = (g_1, g_2, g_3) in
@@ -363,19 +299,12 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
           ; m.value.c ]
           []
       in
-      print_g1 "f_1" f_1 ;
-      print_g1 "f_2" f_2 ;
-      print_g1 "f_3" f_3 ;
       { Accumulator.degree_bound_checks=
           accumulate_degree_bound_checks degree_bound_checks ~r_h:r ~r_k g_1
             g_2 g_3
       ; opening_check=
           accumulate_opening_check opening_check ~r ~r_xi_sum
             (f_1, beta_1, pi_1) (f_2, beta_2, pi_2) (f_3, beta_3, pi_3) }
-      (*
-      accumulate_pairing_state ~r ~r_xi_sum
-        pairing_acc
-*)
     in
     let deferred =
       { Types.Dlog_based.Proof_state.Deferred_values.Marlin.sigma_2
@@ -397,10 +326,6 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       ~crs_max_degree ~mul:Fq.mul ~add:Fq.add ~one:Fq.one ~evaluation_point ~xi
       without_degree_bound with_degree_bound
 
-  (*
-    List.fold_left (Vector.to_list evals) ~init:eval0 ~f:(fun acc eval ->
-        Fq.((xi * acc) + eval) ) *)
-
   (* x^{2 ^ k} - 1 *)
   let vanishing_polynomial domain x =
     let k = Domain.log2_size domain in
@@ -411,18 +336,10 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   let prod xs f = List.reduce_exn (List.map xs ~f) ~f:Fq.( * )
 
-  (* TODO: Put this in the functor argument. *)
-  let nonresidue = Fq.of_int 7
-
-  let pow_two_pows x k =
-    let res = Array.init k ~f:(fun _ -> x) in
-    for i = 1 to k - 1 do
-      res.(i) <- Fq.square res.(i - 1)
-    done ;
-    res
-
   (* TODO: Check a_hat! *)
   let compute_challenges chals =
+    (* TODO: Put this in the functor argument. *)
+    let nonresidue = Fq.of_int 7 in
     Array.map chals
       ~f:(fun {Types.Bulletproof_challenge.prechallenge; is_square} ->
         let sq =
@@ -433,24 +350,8 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   module Marlin_checks = Marlin_checks.Make (Impl)
 
-  let print_bool lab x =
-    as_prover (fun () ->
-        printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
-
-  (* The sg challenge point should be hash(sg) (or some variant thereof)
-     We have this in the form of the hashed pass_through!
-
-     the bulletproof_challenges and the pass_through.sg correspond.
-     So we compute f_{bulletproof_challenges}(pass_through.sg)
-     and expose that when computing the next combined_inner_product.
-
-     sg_evalution_point can be the pass_through hash
-   *)
   let finalize_other_proof ~domain_k ~domain_h ~sponge
-      ~(*
-      ~old_sg_challenge_point
-      ~old_sg_evaluation *)
-      old_bulletproof_challenges
+      ~old_bulletproof_challenges
       ({xi; r; combined_inner_product; bulletproof_challenges; b; marlin} :
         _ Types.Pairing_based.Proof_state.Deferred_values.t) =
     let open Vector in
@@ -462,7 +363,6 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
        f_tilde(h) = f(h), for each h in h 
        f_tilde(beta_1) = 0
     *)
-    (* Also have to get evals on old sg_challenge_goint. *)
     let beta_1_evals, beta_2_evals, beta_3_evals =
       let ty = Evals.typ Fq.typ in
       exists (Typ.tuple3 ty ty ty) ~request:(fun () -> Requests.Prev_evals)
@@ -485,7 +385,6 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       (* Sample new sg challenge point here *)
       Boolean.all [equal (pack xi_actual) xi; equal (pack r_actual) r]
     in
-    print_bool "xi_and_r_correct" xi_and_r_correct ;
     let combined_inner_product_correct =
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       let actual_combined_inner_product =
@@ -508,7 +407,6 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       in
       equal combined_inner_product actual_combined_inner_product
     in
-    print_bool "combined_inner_product_correct" combined_inner_product_correct ;
     let marlin_checks_passed =
       Marlin_checks.check ~input_domain:Input_domain.domain ~domain_h ~domain_k
         ~x_hat_beta_1:x_hat1
@@ -528,6 +426,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
         ; rc= beta_3_evals.rc
         }
     in
+    print_bool "combined_inner_product_correct" combined_inner_product_correct ;
     print_bool "marlin_checks_passed" marlin_checks_passed ;
     ( Boolean.all
         [xi_and_r_correct; combined_inner_product_correct; marlin_checks_passed]
@@ -566,15 +465,12 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     ; r= f r
     ; b }
 
-  let split_last = Common.split_last
-
-  (* TODO: The way this handles fq elts is wrong. Fix. *)
   let pack_data (bool, fq, digest, challenge, bulletproof_challenges) =
     Array.concat
       [ Array.map (Vector.to_array bool) ~f:List.return
       ; Array.concat_map (Vector.to_array fq) ~f:(fun x ->
             let low_bits, high_bit =
-              split_last
+              Common.split_last
                 (Bitstring_lib.Bitstring.Lsb_first.to_list (Fq.unpack_full x))
             in
             [|low_bits; [high_bit]|] )
@@ -594,12 +490,6 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
            }
        ; pass_through } :
         (Challenge.t, _, _, _, _, _, _, _) Types.Dlog_based.Statement.t) =
-    (* 
-    Need the old sg_challenge_point and old sg_evaluation to correctly compute
-       the combined_inner_product.
-
-    Perhaps it should be in the prev me only?
-    *)
     let ( prev_deferred_values
         , prev_sponge_digest_before_evaluations
         , prev_proof_state ) =
@@ -637,9 +527,6 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
         ~old_bulletproof_challenges:prev_me_only.old_bulletproof_challenges
     in
     Boolean.Assert.(was_base_case = prev_statement.proof_state.was_base_case);
-    (* On the second wrap, if we start the process off with a bad sg,
-       prev_proof_finalized will be false.
-    *)
     print_bool "prev_proof_finalized" prev_proof_finalized ;
     print_bool "prev_statement.proof_state.was_base_case" prev_statement.proof_state.was_base_case ;
     Boolean.Assert.any
@@ -688,521 +575,4 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     , unpack Challenge.length challenge (*     , fq_challenge *)
     , digest )
     |> Types.Dlog_based.Statement.of_data |> main
-
-  (*
-
-  (* Inside here we have F_q arithmetic, so we can incrementally check
-   the polynomial commitments from the pairing-based Marlin *)
-  let dlog_main statement
-      (*
-      { Dlog_marlin_statement.deferred_values
-      ; pairing_marlin_index
-      ; sponge_digest
-          (* I don't think most of b stuff should be a public input for this proof,
-   it should be a public input for the pairing proof.
-
-   Specifically, the pairing proof should have as public inputs:
-
-   bp_challenges_old
-   g_old
-
-   Then, we pick a random point b_challenge,
-   evaluate b_u_x := b_{bp_challenges}(b_challenge) and
-   
-   expose in our public input: b_u_x, b_challenge, g_old. The
-   next guy is responsible for checking this evaluation (it will actually
-   need the old bp_challenges though to compute evaluations of
-   g_old on all the other challenge points for the multi-polynomial,
-   multi-point batched proof)
-*)
-      ; bp_challenges_old
-      ; b_challenge_old
-      ; b_u_x_old (* All this could be a hash which we unhash *)
-      ; pairing_marlin_acc
-      ; app_state
-      ; g_old
-      ; dlog_marlin_index } = *)
-    =
-    let 
-      { Types.Dlog_based.Statement.proof_state
-      ; pass_through
-      }
-      =
-      Types.Dlog_based.Statement.of_data statement
-    in
-    let prev : _ Types.Pairing_based.Statement.t =
-      exists (failwith "TIODO")
-    in
-    let open Requests in
-    let exists typ r = exists typ ~request:(fun () -> r) in
-    (* This is kind of a special case of deferred fq arithmetic. *)
-    Field.Assert.equal (b bp_challenges_old b_challenge_old) b_u_x_old ;
-    let prev_sponge_digest = exists Fp.Unpacked.typ Prev.Sponge_digest in
-    let sponge =
-      let sponge = Sponge.create sponge_params in
-      Sponge.absorb sponge (Fp.pack prev_sponge_digest) ;
-      sponge
-    in
-    let updated_pairing_marlin_acc, deferred_fp_arithmetic =
-      let prev_marlin_proof =
-        exists
-          (Proof.typ PC.typ Fp.Unpacked.typ
-             (Pairing_marlin_types.Openings.typ Opening_proof.typ
-                Fp.Unpacked.typ))
-          Prev.Pairing_marlin_proof
-      and prev_pairing_marlin_acc =
-        exists (Accumulator.typ G1.typ)
-          Requests.Prev.Pairing_marlin_accumulator
-      in
-      let public_input =
-        (* TODO *)
-        Array.init 26 ~f:(fun _ ->
-            L.Fp_repr.of_bits ~chunk_size:124
-              (Impl.exists (Typ.list ~length:382 Boolean.typ)) )
-      in
-      incrementally_verify_pairings ~verification_key:pairing_marlin_index
-        ~sponge ~proof:prev_marlin_proof ~pairing_acc:prev_pairing_marlin_acc
-        ~public_input
-      (*
-      prev_marlin_proof
-      ~public_input:[
-        pairing_marlin_vk; (* This may need to be passed in using the hashing trick. It could be hashed together with prev_pairing_marlin_acc since they're both just passed through anyway.  *)
-        prev_pairing_marlin_acc;
-        dlog_marlin_vk;
-        g_old;
-
-        prev_dlog_marlin_acc;
-
-        prev_deferred_fq_arithmetic;
-      ] *)
-    in
-    (* TODO: Just squeeze a field element here *)
-    let actual_sponge_digest =
-      Field.pack (Sponge.squeeze sponge ~length:digest_length)
-    in
-    Field.Assert.equal sponge_digest actual_sponge_digest ;
-    Accumulator.assert_equal
-      (fun x y ->
-        List.iter2_exn ~f:Field.Assert.equal (G1.to_field_elements x)
-          (G1.to_field_elements y) )
-      updated_pairing_marlin_acc pairing_marlin_acc ;
-    Dlog_marlin_statement.Deferred_values.assert_equal Fp.Unpacked.assert_equal
-      deferred_values deferred_fp_arithmetic
-     *)
 end
-
-(*
-let%test_unit "count-constraints" =
-  let module Impl =
-    Snarky.Snark.Run.Make (Snarky.Backends.Bn128.Default) (Unit)
-  in
-  let module Poseidon_inputs = struct
-    module Field = struct
-      open Impl
-
-      (* The linear combinations involved in computing Poseidon do not involve very many
-   variables, but if they are represented as arithmetic expressions (that is, "Cvars"
-   which is what Field.t is under the hood) the expressions grow exponentially in
-   in the number of rounds. Thus, we compute with Field elements represented by
-   a "reduced" linear combination. That is, a coefficient for each variable and an
-   constant term.
-*)
-      type t = Impl.field Int.Map.t * Impl.field
-
-      let to_cvar ((m, c) : t) : Field.t =
-        Map.fold m ~init:(Field.constant c) ~f:(fun ~key ~data acc ->
-            let x =
-              let v = Snarky.Cvar.Var key in
-              if Field.Constant.equal data Field.Constant.one then v
-              else Scale (data, v)
-            in
-            match acc with
-            | Constant c when Field.Constant.equal Field.Constant.zero c ->
-                x
-            | _ ->
-                Add (x, acc) )
-
-      let constant c = (Int.Map.empty, c)
-
-      let of_cvar (x : Field.t) =
-        match x with
-        | Constant c ->
-            constant c
-        | Var v ->
-            (Int.Map.singleton v Field.Constant.one, Field.Constant.zero)
-        | x ->
-            let c, ts = Field.to_constant_and_terms x in
-            ( Int.Map.of_alist_reduce
-                (List.map ts ~f:(fun (f, v) -> (Impl.Var.index v, f)))
-                ~f:Field.Constant.add
-            , Option.value ~default:Field.Constant.zero c )
-
-      let ( + ) (t1, c1) (t2, c2) =
-        ( Map.merge t1 t2 ~f:(fun ~key:_ t ->
-              match t with
-              | `Left x ->
-                  Some x
-              | `Right y ->
-                  Some y
-              | `Both (x, y) ->
-                  Some Field.Constant.(x + y) )
-        , Field.Constant.add c1 c2 )
-
-      let ( * ) (t1, c1) (t2, c2) =
-        assert (Int.Map.is_empty t1) ;
-        (Map.map t2 ~f:(Field.Constant.mul c1), Field.Constant.mul c1 c2)
-
-      let zero : t = constant Field.Constant.zero
-    end
-
-    let rounds_full = 8
-
-    let rounds_partial = 55
-
-    let to_the_alpha x = Impl.Field.(square (square x) * x)
-
-    let to_the_alpha x = Field.of_cvar (to_the_alpha (Field.to_cvar x))
-
-    module Operations = Sponge.Make_operations (Field)
-  end in
-  let module S = Sponge.Make_sponge (Sponge.Poseidon (Poseidon_inputs)) in
-  let module Inputs = struct
-    module Impl = Impl
-
-    let sponge_params =
-      Sponge.Params.(
-        map bn128 ~f:Impl.Field.(Fn.compose constant Constant.of_string))
-
-    module Sponge = struct
-      module S = struct
-        type t = S.t
-
-        let create ?init params =
-          S.create
-            ?init:
-              (Option.map init
-                 ~f:(Sponge.State.map ~f:Poseidon_inputs.Field.of_cvar))
-            (Sponge.Params.map params ~f:Poseidon_inputs.Field.of_cvar)
-
-        let absorb t input =
-          ksprintf Impl.with_label "absorb: %s" __LOC__ (fun () ->
-              S.absorb t (Poseidon_inputs.Field.of_cvar input) )
-
-        let squeeze t =
-          ksprintf Impl.with_label "squeeze: %s" __LOC__ (fun () ->
-              Poseidon_inputs.Field.to_cvar (S.squeeze t) )
-      end
-
-      include Sponge.Make_bit_sponge (struct
-                  type t = Impl.Boolean.var
-                end)
-                (struct
-                  include Impl.Field
-
-                  let to_bits t =
-                    Bitstring_lib.Bitstring.Lsb_first.to_list
-                      (Impl.Field.unpack_full t)
-                end)
-                (S)
-    end
-
-    module Fp_params = struct
-      let size_in_bits = 382
-
-      let p =
-        Bigint.of_string
-          "5543634365110765627805495722742127385843376434033820803590214255538854698464778703795540858859767700241957783601153"
-    end
-
-    module G1 = struct
-      module Inputs = struct
-        module Impl = Impl
-
-        module F = struct
-          include struct
-            open Impl.Field
-
-            type nonrec t = t
-
-            let ( * ), ( + ), ( - ), inv_exn, square, scale, if_, typ, constant
-                =
-              (( * ), ( + ), ( - ), inv, square, scale, if_, typ, constant)
-
-            let negate x = scale x Constant.(negate one)
-          end
-
-          module Constant = struct
-            open Impl.Field.Constant
-
-            type nonrec t = t
-
-            let ( * ), ( + ), ( - ), inv_exn, square, negate =
-              (( * ), ( + ), ( - ), inv, square, negate)
-          end
-
-          let assert_square x y = Impl.assert_square x y
-
-          let assert_r1cs x y z = Impl.assert_r1cs x y z
-        end
-
-        module Params = struct
-          open Impl.Field.Constant
-
-          let a = zero
-
-          let b = of_int 14
-
-          let one =
-            (* Fake *)
-            (of_int 1, of_int 1)
-        end
-
-        module Constant = struct
-          type t = F.Constant.t * F.Constant.t
-
-          let to_affine_exn = Fn.id
-
-          let of_affine = Fn.id
-
-          let random () = Params.one
-        end
-      end
-
-      module Constant = Inputs.Constant
-      module T = Snarky_curve.Make_checked (Inputs)
-
-      type t = T.t
-
-      let typ = T.typ
-
-      let ( + ) = T.add_exn
-
-      let scale t bs =
-        ksprintf Impl.with_label "scale %s" __LOC__ (fun () ->
-            (* Dummy constraints *)
-            let x, y = t in
-            let constraints_per_bit = 6 in
-            let num_bits = List.length bs in
-            for _ = 1 to constraints_per_bit * num_bits do
-              Impl.assert_r1cs x y x
-            done ;
-            t )
-
-      (*         T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) *)
-      let to_field_elements (x, y) = [x; y]
-
-      let negate = T.negate
-    end
-  end in
-  let module M = Dlog_main (Inputs) in
-  let typ =
-    Dlog_marlin_statement.typ M.Challenge.typ M.Fp.Unpacked.typ Impl.Field.typ
-      Inputs.G1.typ M.PC.typ
-      (Snarky.Typ.tuple2 M.Fp.Unpacked.typ M.Fp.Unpacked.typ)
-      Impl.Field.typ Impl.Field.typ
-  in
-  let c () =
-    (* Writing down the input takes 39000 constriants *)
-    let open Impl in
-    M.dlog_main (exists typ)
-  in
-  printf "count = %d\n%!" (Impl.constraint_count c)
-    *)
-
-(*
-  let module I = Snarky.Snark0.Make(Snarky.Backends.Bn128.Default) in
-  let c () =
-    let open I in
-    let%bind stmt = exists typ in
-    Impl.make_checked (fun () -> M.dlog_main stmt)
-  in
-  let module L = Snarky_log.Constraints(I) in
-  Snarky_log.to_file "double_marlin.perf"
-    (L.log (c ()));
-  printf "logged"
-     *)
-(*
-*)
-
-(*
-module Pairing_main (Inputs : Pairing_main_inputs_intf) = struct
-  open Inputs
-  open Impl
-
-  (* Inside here we have F_p arithmetic so we can incrementally check the
-    polynomial commitments from the DLog-based marlin *)
-  let pairing_main app_state pairing_marlin_vk prev_pairing_marlin_acc
-      dlog_marlin_vk g_new u_new x_new next_dlog_marlin_acc
-      next_deferred_fq_arithmetic =
-    (* The actual computation *)
-    let prev_app_state = exists Prev_app_state in
-    let transition = exists Transition in
-    assert (transition_function prev_app_state transition = app_state) ;
-    let prev_dlog_marlin_acc = exists Dlog_marlin_acc
-    and prev_deferred_fp_arithmetic = exists Deferred_fp_arithmetic in
-    List.iter prev_deferred_fp_arithmetic ~f:perform ;
-    let (actual_g_new, actual_u_new), deferred_fq_arithmetic =
-      let g_old, x_old, u_old, b_u_old = exists G_old in
-      let ( updated_dlog_marlin_acc
-          , deferred_fq_arithmetic
-          , polynomial_evaluation_checks ) =
-        let prev_dlog_marlin_proof = exists Prev_dlog_marlin_proof in
-        Dlog_marlin.incrementally_execute_protocol dlog_marlin_vk
-          prev_dlog_marlin_proof
-          ~public_input:
-            [ prev_app_state
-            ; pairing_marlin_vk
-            ; prev_pairing_marlin_acc
-            ; dlog_marlin_vk
-            ; g_old
-            ; x_old
-            ; u_old
-            ; b_u_old_x
-            ; prev_dlog_marlin_acc
-            ; prev_deferred_fp_arithmetic ]
-      in
-      let g_new_u_new =
-        batched_inner_product_argument
-          ((g_old, x_old, b_u_old_x) :: polynomial_evaluation_checks)
-      in
-      (g_new_u_new, deferred_fq_arithmetic)
-    in
-    (* This should be sampled using the hash state at the end of 
-          "Dlog_marlin.incrementally_execute_protocol" *)
-    let x_new = sample () in
-    assert (actual_g_new = g_new) ;
-    assert (actual_u_new = u_new) ;
-    assert (actual_x_new = x_new)
-end *)
-(*
-  module Fp_constant = struct
-    include Snarkette.Fields.Make_fp (struct
-                include B
-
-                let num_bits _ = 382
-
-                let log_and = ( land )
-
-                let log_or = ( lor )
-
-                let test_bit x (i : int) = shift_right x i land one = one
-
-                let to_yojson t = `String (to_string t)
-
-                let of_yojson _ = failwith "todo"
-
-                let ( // ) = ( / )
-              end)
-              (struct
-                let order = Fp_params.p
-              end)
-
-    let of_bits bs = Option.value_exn (of_bits bs)
-
-    let size_in_bits = 382
-  end
-
-  module L = Eval_lagrange.Eval_lagrange (Impl) (Sponge) (Fp_constant) *)
-
-(* TODO: Could save 3 scalar muls at the cost of
-     (I think) 3 more public inputs here by witnessing
-
-     vr_i == value_i * randomness_i.
-
-     Actually can avoid both!
-  *)
-
-(*
-  module Accumulation_deferred_values = struct
-    type t =
-      {
-      }
-  end *)
-(* I think we need to absorb the evaluations to sample r properly.
-
-     OTOH -- the evaluations are completely determined subject to the proof verifying...
-  *)
-
-(* The xi sum scheme HAS to be
-
-     say v_0 : Fq
-
-     // let xi = witness() // == Fq_friendly_hash(sponge_digest_at_this_moment, v_0, ..., v_n)
-     let c = witness(); // sum_i xi^i v_i
-
-     expose c := sum_i 
-  *)
-
-(* Accumulate
-
-     sum_{i=1}^3 r^i f_i
-     = f_1 + r * (f_2 + r * f_3)
-
-     sum_{i=1}^3 r^i v_i g
-
-     Option 1:
-      compute
-      
-      f_1 - v_1 * g + r * (f_2 - v_2 * g + r * (f_3 - v_3 g))
-
-     cost:
-      3 fixed base scalar muls
-      3 variable base scalar muls
-
-     public inputs:
-      v_1, v_2, v_3
-
-     Option 2:
-     compute
-      f_1 + r * (f_2 + r * f_3)
-      and
-      (sum_{i=1}^3 r^i v_i) g
-
-     cost:
-      1 fixed base scalar mul
-      3 variable base
-
-     public inputs:
-        s := (sum_{i=1}^3 r^i v_i), digest_at_that_point
-
-        in the other snark do:
-          let evals = exists()
-          sponge = sponge(digest_at_that_point);
-          sponge.absorb(evals);
-          let xi = squeeze();
-          let r = squeeze();
-          let v_j = sum_i xi^i evals.beta_j[i] 
-          assert (s == sum_{j=1}^3 sum_i xi^i evals.beta_j[i])
-  *)
-(*
-  module Requests = struct
-    open Snarky.Request
-
-    module Prev = struct
-      type _ t +=
-        | Pairing_marlin_accumulator : G1.Constant.t Accumulator.t t
-        | Pairing_marlin_proof :
-            ( PC.Constant.t
-            , Fp.Unpacked.constant
-            , ( Opening_proof.Constant.t
-              , Fp.Unpacked.constant )
-              Pairing_marlin_types.Openings.t )
-            Proof.t
-            t
-        | Sponge_digest : Fp.Unpacked.constant t
-    end
-
-    type _ t +=
-      | Fp_mul : bool list * bool list -> bool list t
-      | Mul_scalars : bool list * bool list -> bool list t
-  end *)
-(*
-  let accumulate_and_defer
-      ~(defer : [`Mul of Fp.Unpacked.t * Fp.Unpacked.t] -> Boolean.var list)
-      r_i f_i z_i ({values; proof} : _ Opening.t) acc
-    =
-    let zr_i = defer (`Mul (z_i, r_i)) in
-    let acc = accumuluate_pairing_state r_i zr_i proof f_i acc in
-    (acc, {Accumulator.Input.zr= zr_i; z= z_i; v= values})
-
-*)

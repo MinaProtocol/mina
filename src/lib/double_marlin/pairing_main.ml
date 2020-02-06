@@ -85,6 +85,21 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         | _ -> assert false
       )
 
+  let print_chal lab chal =
+    as_prover As_prover.(fun () ->
+        printf !"%s: %{sexp:Challenge.Constant.t}\n%!" lab
+        (read Challenge.typ chal) )
+
+  let print_fp lab x =
+    as_prover (fun () ->
+    printf "%s: %!" lab;
+    Fp.Constant.print (As_prover.read Field.typ x) ;
+    printf "\n%!" )
+
+  let print_bool lab x =
+    as_prover (fun () ->
+        printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
+
   let rec absorb : type a.
       Sponge.t -> (a, < scalar: Fq.t ; g1: G.t >) Type.t -> a -> unit =
    fun sponge ty t ->
@@ -106,9 +121,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let prechallenges =
       Array.mapi gammas ~f:(fun i gammas_i ->
           absorb (PC :: PC) gammas_i ;
-          let pre = Sponge.squeeze sponge ~length:Challenge.length  in
-          pre
-        )
+          Sponge.squeeze sponge ~length:Challenge.length )
     in
     let term_and_challenge (l, r) pre =
       let pre_is_square =
@@ -154,11 +167,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
 
   let dlog_pcs_batch = Common.dlog_pcs_batch ~domain_h ~domain_k
 
-  let print_chal lab chal =
-    as_prover As_prover.(fun () ->
-        printf !"%s: %{sexp:Challenge.Constant.t}\n%!" lab
-        (read Challenge.typ chal) )
-
   let check_bulletproof ~sponge ~xi ~combined_inner_product
       ~
       (* Corresponds to y in figure 7 of WTS *)
@@ -175,51 +183,38 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     in
     (* TODO: Absorb (combined_polynomial, inner_product_result/tau *)
     let open G in
-    let state = ref [] in
     let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
-      Pcs_batch.combine_commitments dlog_pcs_batch ~scale:(fun acc xi ->
-          (if !state = []
-           then state := [ (acc, 0) ] );
-          state := List.map !state ~f:(fun (g, i) -> Int.(g, i + 1));
-          scale acc xi )
-        ~add:( fun p scaled_acc -> 
-            state := (p, 0) :: !state ;
-            p + scaled_acc
-          ) ~xi
+      Pcs_batch.combine_commitments dlog_pcs_batch ~scale
+        ~add:(+)
+        ~xi
         without_degree_bound
         with_degree_bound
     in
-    print_chal "Oxi" xi ;
-    print_g "Ocombined_polynomial" combined_polynomial ;
-    print_g "Osg" sg;
     (* TODO: Absorb challenges into the sponge and expose it as another input *)
     let lr_prod, challenges = bullet_reduce sponge lr in
     let p_prime = combined_polynomial + scale u (Fq.to_bits combined_inner_product) in
     let q = p_prime + lr_prod in
     absorb sponge PC delta ;
     let c = Sponge.squeeze sponge ~length:Challenge.length in
-    print_chal "Oc" c ;
-    print_g "Olr_prod" lr_prod ;
-
     (* c Q + delta = z1 (G + b U) + z2 H *)
     let lhs = scale q c + delta in
     let rhs =
       let scale t x = scale t (Fq.to_bits x) in
       let b_u = scale u advice.b in
       let z_1_g_plus_b_u = scale (sg + b_u) z_1 in
+      (* TODO: Use scale_known *)
+      let z2_h = scale Generators.h z_2 in
       print_g "Ou" u;
       print_g "Ob_u" b_u;
       print_g "Oz1 (g + b u)" z_1_g_plus_b_u;
-      let z2_h = scale Generators.h z_2 in
       print_g "Oz2 h" z2_h;
-      z_1_g_plus_b_u
-        (* TODO: Use scale_known *)
-      + z2_h
-      (*
-      scale (sg + b_u) z_1
-        (* TODO: Use scale_known *)
-      + scale Generators.h z_2 *)
+      z_1_g_plus_b_u + z2_h
     in
+    print_chal "Oxi" xi ;
+    print_g "Ocombined_polynomial" combined_polynomial ;
+    print_g "Osg" sg;
+    print_chal "Oc" c ;
+    print_g "Olr_prod" lr_prod ;
     print_g "Olhs" lhs ;
     print_g "Orhs" rhs ;
     (`Success (equal_g lhs rhs), challenges)
@@ -228,11 +223,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     Array.map Input_domain.lagrange_commitments
       ~f:G.Scaling_precomputation.create
 
-  (* How to advance the proof state in "dlog main"
-
-   exists g_old challenges_old.
-   Sample a challenge point for g_old. Compute b_challenges_old(g_old).
-   Then compute the combined_inner_product using this. *)
   let incrementally_verify_proof ~verification_key:(m : _ Abc.t Matrix_evals.t)
       ~xi ~sponge ~public_input ~sg_old ~combined_inner_product ~advice
       ~messages ~openings_proof =
@@ -249,8 +239,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
              (x, lagrange_precomputations.(i)) ))
     in
     absorb sponge PC x_hat ;
-    (* No need to absorb the public input into the sponge as we've already
-      absorbed x'_hat, a0, and y0 *)
     let w_hat = receive PC w_hat in
     let z_hat_a = receive PC z_hat_a in
     let z_hat_b = receive PC z_hat_b in
@@ -267,32 +255,16 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let sigma_2, (g_2, h_2) =
       receive (Scalar :: Type.degree_bounded_pc :: PC) sigma_gh_2
     in
-    print_chal "beta_1" beta_1;
     let beta_2 = sample () in
-    print_chal "beta_2" beta_2;
     let sigma_3, (g_3, h_3) =
       receive (Scalar :: Type.degree_bounded_pc :: PC) sigma_gh_3
     in
     let beta_3 = sample () in
-    print_chal "beta_3" beta_3;
     let sponge_before_evaluations = Sponge.copy sponge in
     let sponge_digest_before_evaluations =
       Sponge.squeeze sponge ~length:Digest.length
     in
     (* xi, r are sampled here using the other sponge. *)
-
-    (* At this point we would be able to compute combined inner product,
-       using bulletproof_challenges_old (corresponding to sg_old).
-
-       However, that requires access to the old bulletproof challenges,
-       which we no longer have here. We need to somehow pass thru the old bp
-       challenges to the next verifier so that they can compute
-
-       f_{old bullet proof challenges}(beta_i).
-
-       Perhaps it was handed to us as a hash / we pass it thru the me only?
-    *)
-
     (* No need to expose the polynomial evaluations as deferred values as they're
        not needed here for the incremental verification. All we need is a_hat and
        "combined_inner_product".
@@ -309,7 +281,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
          It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
          the combined inner product. 
       *)
-      (* TODO: What is Generators.h *)
       check_bulletproof
         ~sponge:sponge_before_evaluations
         ~xi
@@ -373,34 +344,13 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         Data.bits (is_square :: prechallenge) )
     |> Array.reduce_exn ~f:Data.append
 
-  (* The problem is having inputs which are used non opaquely.
-     Maybe we can do that with the x_hat evaluation?
-  *)
-
   module Marlin_checks = Marlin_checks.Make (Impl)
-
-  let print_fp lab x =
-    as_prover (fun () ->
-    printf "%s: %!" lab;
-    Fp.Constant.print (As_prover.read Field.typ x) ;
-    printf "\n%!"
-      )
-
-  let print_bool lab x =
-    as_prover (fun () ->
-        printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
 
   let finalize_other_proof ~domain_k ~domain_h ~sponge
       ({xi; r; r_xi_sum; marlin} :
         _ Types.Dlog_based.Proof_state.Deferred_values.t) =
     let open Vector in
     let open Pairing_marlin_types in
-    (*
-    let sponge =
-      let s = Sponge.create sponge_params in
-      Sponge.absorb s (`Bits digest_before_evaluations) ;
-      s
-    in *)
     let evals =
       exists (Evals.typ Field.typ) ~request:(fun () -> Requests.Prev_evals)
     in
@@ -408,7 +358,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       exists Field.typ ~request:(fun () -> Requests.Prev_x_hat_beta_1)
     in
     let absorb_field x =
-      print_fp "POabsorb" x ;
       Sponge.absorb sponge (`Field x)
     in
     absorb_field x_hat_beta_1 ;
@@ -447,26 +396,28 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       Marlin_checks.check ~x_hat_beta_1 ~input_domain:Input_domain.domain
         ~domain_h ~domain_k marlin evals 
     in
-    as_prover As_prover.(fun () ->
-        if not (read Boolean.typ r_correct)
-        then begin
-          print_fp "r" r ;
-          print_fp "r_actual" (Field.pack r_actual) ;
-        end
-      );
-    as_prover As_prover.(fun () ->
-        if not (read Boolean.typ xi_correct)
-        then begin
-          print_fp "xi" xi ;
-          print_fp "xi_actual" (Field.pack xi_actual) ;
-        end
-      );
-    List.iter ~f:(Tuple2.uncurry (Fn.flip print_bool))
-      [ xi_correct, "xi_correct"
-      ; r_correct, "r_correct"
-      ; r_xi_sum_correct, "r_xi_sum_correct"
-      ; marlin_checks , "marlin_checks"
-      ] ;
+    begin
+      as_prover As_prover.(fun () ->
+          if not (read Boolean.typ r_correct)
+          then begin
+            print_fp "r" r ;
+            print_fp "r_actual" (Field.pack r_actual) ;
+          end
+        );
+      as_prover As_prover.(fun () ->
+          if not (read Boolean.typ xi_correct)
+          then begin
+            print_fp "xi" xi ;
+            print_fp "xi_actual" (Field.pack xi_actual) ;
+          end
+        );
+      List.iter ~f:(Tuple2.uncurry (Fn.flip print_bool))
+        [ xi_correct, "xi_correct"
+        ; r_correct, "r_correct"
+        ; r_xi_sum_correct, "r_xi_sum_correct"
+        ; marlin_checks , "marlin_checks"
+        ] ;
+    end;
     Boolean.all
       [ xi_correct
       ; r_correct
@@ -556,15 +507,10 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       let prev_me_only =
         hash_me_only {app_state= prev_app_state; dlog_marlin_index; sg= sg_old}
       in
-      (* This statement needs to have exposed f_{old challenges}(old_challenge_point).
-         But then I think we need to expose that for the next guy who will compute
-         the combined_inner_product?
-      *)
       { Types.Dlog_based.Statement.pass_through= prev_me_only
       ; proof_state= prev_proof_state }
     in
     let prev_proof_finalized =
-      print_fp "POsponge_digest_vefore_evaluations" prev_sponge_digest_before_evaluations;
       let sponge =
         let s = Sponge.create sponge_params in
         Sponge.absorb s (`Field prev_sponge_digest_before_evaluations) ;
@@ -604,7 +550,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       print_bool "prev-was-base" prev_statement.proof_state.was_base_case;
       let prev_proof_finalized =
         Boolean.(prev_proof_finalized || is_base_case)
-(*         Boolean.(prev_proof_finalized || prev_statement.proof_state.was_base_case) *)
       in
       let bulletproof_success =
         Boolean.(bulletproof_success || prev_statement.proof_state.was_base_case)
@@ -618,6 +563,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     print_bool "update succeeded" update_succeeded ;
     print_bool "is base" is_base_case ;
     begin
+      (* TODO Use the Data module here instead *)
       let fq (x1, b1) (x2, b2) =
         Field.Assert.equal x1 x2;
         Boolean.Assert.(b1 = b2)
@@ -635,13 +581,17 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       chal marlin.beta_2 marlin_actual.beta_2 ;
       chal marlin.beta_3 marlin_actual.beta_3 ;
       Array.iteri bulletproof_challenges ~f:(fun i c1 ->
+          let c2 = bulletproof_challenges_actual.(i) in
+          Boolean.Assert.(=)
+            c1.is_square
+            (Boolean.if_ is_base_case
+               ~then_:c1.is_square
+               ~else_:c2.is_square) ;
           let c1 = Field.pack c1.prechallenge in
           let c2 = 
-            Field.if_ is_base_case ~then_:c1 ~else_:(Field.pack bulletproof_challenges_actual.(i).prechallenge)
+            Field.if_ is_base_case ~then_:c1 ~else_:(Field.pack c2.prechallenge)
           in
-          printf "bp_chals_%d\n%!" i;
           Field.Assert.equal c1 c2
-(*           Boolean.Assert.(c1.is_square = c2.is_square) ; *)
         );
       Field.Assert.equal sponge_digest_before_evaluations
         (Field.pack sponge_digest_before_evaluations_actual) ;
@@ -650,6 +600,26 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       Assert.any
         [ prev_proof_correct && update_succeeded
         ; is_base_case ])
+
+  (* TODO: The code here and in [pack_data] in dlog_main should be unified into
+   one piece of code from which both functions are derived. *)
+  let main am
+      ( bool
+      , fq
+      , (digest : (Fp.t, _) Vector.t)
+      , (challenge : (Fp.t, _) Vector.t)
+      , (bulletproof_challenges : Fp.t array) ) =
+    let unpack length = Vector.map ~f:(Fp.unpack ~length) in
+    ( bool
+    , fq
+    , digest
+    , unpack Challenge.length challenge
+    , Array.map bulletproof_challenges ~f:(fun t ->
+          Types.Bulletproof_challenge.unpack
+            (Fp.unpack ~length:(1 + Challenge.length) t) ) )
+    |> Types.Pairing_based.Statement.of_data |> main am
+end
+
     (*
     Data.(
       (* TODO: Other stuff too... *)
@@ -694,86 +664,3 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         ~field_size:Field.size_in_bits
         (chals_data bulletproof_challenges @ marlin_data marlin)
         (chals_data bulletproof_challenges_actual @ marlin_data marlin_actual)) ; *)
-
-  (* TODO: Turn this on -- think about what to do in the base case.
-     Also need to expose base_case_ness for the next proof. 
-    ;
-    Field.Assert.equal sponge_digest_before_evaluations
-      (Field.pack sponge_digest_before_evaluations_actual) ;
-         *)
-
-  (* TODO: The code here and in [pack_data] in dlog_main should be unified into
-   one piece of code from which both functions are derived. *)
-  let main am
-      ( bool
-      , fq
-      , (digest : (Fp.t, _) Vector.t)
-      , (challenge : (Fp.t, _) Vector.t)
-      , (bulletproof_challenges : Fp.t array) ) =
-    let unpack length = Vector.map ~f:(Fp.unpack ~length) in
-    ( bool
-    , fq
-    , digest
-    , unpack Challenge.length challenge
-    , Array.map bulletproof_challenges ~f:(fun t ->
-          Types.Bulletproof_challenge.unpack
-            (Fp.unpack ~length:(1 + Challenge.length) t) ) )
-    |> Types.Pairing_based.Statement.of_data |> main am
-end
-
-(* Evaluations:
-
-       | g_1 | h_1 | z_A | z_B | w   | s   | g_2 | h_2 | g_3 | h_3 | indexpolys
-beta_1 |  *  |  *  |  *  |  *  |  *  |  *  |     |     |     |     |
-beta_2 |     |     |     |     |     |     |  *  |  *  |     |     |
-beta_3 |     |     |     |     |     |     |     |     |  *  |  *  |  *
-
-* = proof element in vanilla marlin
-*)
-
-(* The ideal thing to do would be to sample
-
-   two 382 / 2 bit numbers c, d such that
-
-   (1) c * d = 1
-   (2) c is a square (this implies d is a square)
-
-   note that (1) implies int(c) * int(d) > p, so
-   the combined bit size of c, d is at least 382 bits.
-
-   d * c + e * p = 1
-
-   C * D = 1 + k * p
-*)
-
-(* TODO: Compute the number of pieces that we should chop
-
-   the h_3 polynomial up into. At a certain point, chopping it up doesn't help
-   because we take a ceil_log2
-
-   This should be done by setting iteratively making it higher.
-*)
-(* TODO: Remove this if I decide not to do it..
-       
-       We set all the deferred values in our public input to zero if
-        we are in the base case.
-
-        In the other proof, we will have
-
-        prev_proof.deferred_values.marlin.alpha = 0
-
-        iff
-
-        that proof was a base case. Why?
-    
-        If prev_proof.deferred_values.marlin.alpha = 0, then either
-        
-        1. The previous proof was a base case.
-        2. The actual alpha from the previous proof was 0.
-
-        Let us argue that (2) is impossible (WOP).
-
-        Inspecting the definition of incrementally_verify_proof,
-        we see that marlin_actual.alpha is the output of a random oracle. Thus (WOP),
-        marlin_actual.alpha is not 0.
-    *)

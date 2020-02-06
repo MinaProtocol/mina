@@ -17,8 +17,6 @@ let hash_dlog_me_only t =
 
 open Core_kernel
 
-(* let bulletproof_log2 = 15 *)
-
 let dlog_pcs_batch ~domain_h ~domain_k =
   let h = Domain.size domain_h in
   let k = Domain.size domain_k in

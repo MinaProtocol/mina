@@ -23,9 +23,9 @@ module Statement = struct
   module Pairing_based = Types.Pairing_based.Statement
 end
 
-let nonresidue = Fq.of_int 7 
 
 let compute_challenge ~is_square x =
+  let nonresidue = Fq.of_int 7 in
   Fq.sqrt (if is_square then x else Fq.(nonresidue * x))
 
 let compute_challenges chals =
@@ -45,8 +45,6 @@ let compute_sg chals =
 
 module State = Impls.Pairing_based.Field
 
-(* TODO: consider including the commitment to the s polynomial on the wire
-   so it doesn't need to be recomputed when wrapping a proof. *)
 module Pairing_based_reduced_me_only = struct
   type t = {app_state: State.Constant.t; sg: Snarky_bn382_backend.G.Affine.t}
   [@@deriving bin_io]
@@ -164,18 +162,15 @@ module Dlog_based_proof = struct
         : dlog_based_proof)
       : pairing_based_proof
     =
-    printf "%s\n%!" __LOC__ ;
     let prev_challenges =
       (* TODO: This is redone in the call to Dlog_based_reduced_me_only.prepare *)
       compute_challenges
         prev_statement.proof_state.me_only.old_bulletproof_challenges
     in
-    printf "%s\n%!" __LOC__ ;
     let prev_me_only : _ Me_only.Pairing_based.t =
       Pairing_based_reduced_me_only.prepare ~dlog_marlin_index
         prev_statement.pass_through
     in
-    printf "%s\n%!" __LOC__ ;
     let prev_statement_with_hashes : _ Statement.Dlog_based.t =
       { pass_through=Common.hash_pairing_me_only prev_me_only
       ; proof_state=
@@ -189,12 +184,9 @@ module Dlog_based_proof = struct
           }
       }
     in
-    printf "%s\n%!" __LOC__ ;
     let module O = Snarky_bn382_backend.Dlog_based.Oracles in
     let o = 
-    printf "%s\n%!" __LOC__ ;
       let public_input = public_input_of_statement prev_statement_with_hashes in
-    printf "%s\n%!" __LOC__ ;
       O.create
         dlog_vk
         { commitment= prev_statement.pass_through.sg
@@ -210,15 +202,6 @@ module Dlog_based_proof = struct
     let beta_1 = O.beta1 o in
     let beta_2 = O.beta2 o in
     let beta_3 = O.beta3 o in
-    Core.printf !"beta_1 from the oracle = %{sexp: Impls.Dlog_based.Field.Constant.t} / %{sexp: Challenge.Constant.t}" 
-      beta_1 
-      (Challenge.Constant.of_fq beta_1) ;
-    Core.printf !"beta_2 from the oracle = %{sexp: Impls.Dlog_based.Field.Constant.t} / %{sexp: Challenge.Constant.t}" 
-      beta_2 
-      (Challenge.Constant.of_fq beta_2) ;
-    Core.printf !"beta_3 from the oracle = %{sexp: Impls.Dlog_based.Field.Constant.t} / %{sexp: Challenge.Constant.t}" 
-      beta_3 
-      (Challenge.Constant.of_fq beta_3) ;
     let alpha = O.alpha o in
     let eta_a = O.eta_a o in
     let eta_b = O.eta_b o in
@@ -236,17 +219,11 @@ module Dlog_based_proof = struct
           Array.map prechals ~f:(fun (x, is_square) ->
             compute_challenge ~is_square x )
       in
-      Array.iteri chals ~f:(fun i x ->
-          print_fq (sprintf "chal_%d" i) x ) ;
       let b_poly = b_poly chals in
       let b =
         let open Fq in
         b_poly beta_1 + r * (b_poly beta_2 + r * (b_poly beta_3))
       in
-      printf "Ob_poly beta_1: %!"; Fq.print (b_poly beta_1) ; printf "%!";
-      printf "Ob_poly beta_2: %!"; Fq.print (b_poly beta_2) ; printf "%!";
-      printf "Ob_poly beta_3: %!"; Fq.print (b_poly beta_3) ; printf "%!";
-      printf "Ob: %!"; Fq.print b ; printf "%!";
       let prechals = Array.map prechals ~f:(fun (x, is_square) ->
           { Bulletproof_challenge.prechallenge=
               Challenge.Constant.of_fq x; is_square })
@@ -260,12 +237,9 @@ module Dlog_based_proof = struct
             proof=
               { prev_proof.openings.proof with
                 sg =
-            (* If it "is base case" we should recompute this based on
-               the new_bulletproof_challenges
-            *)
-            if was_base_case
-            then compute_sg new_bulletproof_challenges
-            else prev_proof.openings.proof.sg
+                  if was_base_case
+                  then compute_sg new_bulletproof_challenges
+                  else prev_proof.openings.proof.sg
               }
           }
       }
@@ -288,8 +262,6 @@ module Dlog_based_proof = struct
         in
         combine x_hat_1 beta_1 e1 + r * (combine x_hat_2 beta_2 e2 + r * combine x_hat_3 beta_3 e3)
       in
-      printf "Ocrs_max_degree %d\n%!" dlog_crs_max_degree ;
-      print_fq "Ocombined_inner_product" combined_inner_product ;
       let chal = Challenge.Constant.of_fq in
       let me_only : Pairing_based_reduced_me_only.t =
         (* Have the sg be available in the opening proof and verify it. *)
@@ -347,8 +319,6 @@ module Dlog_based_proof = struct
       | Prev_x_hat_beta_1 -> k prev_x_hat_beta_1
       | Me_only Pairing_main_inputs.App_state.Tag -> k next_me_only_prepared
       | Prev_proof_state -> k prev_statement_with_hashes.proof_state
-      | Me_only _ -> failwith "meeonly; some other tag!"
-      | Prev_app_state _ -> failwith "preav; some other tag!"
       | Compute.Fq_is_square x ->
         k Fq.(is_square (of_bits x))
     in
@@ -678,9 +648,6 @@ let%test_unit "concrete" =
   in
   let chal =
     ro "chal" Challenge.Constant.length Challenge.Constant.of_bits
-  in
-  let digest =
-    ro "digest" Digest.Constant.length Digest.Constant.of_bits
   in
   let fp =
     ro "fp" Digest.Constant.length Fp.of_bits
