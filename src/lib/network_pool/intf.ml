@@ -11,24 +11,11 @@ open Signature_lib
 module type Resource_pool_base_intf = sig
   type t [@@deriving sexp_of]
 
-  type transition_frontier
-
-  (** Diff from a transition frontier extension that would update the resource pool*)
   type transition_frontier_diff
 
   module Config : sig
     type t [@@deriving sexp_of]
   end
-
-  val create :
-       frontier_broadcast_pipe:transition_frontier Option.t
-                               Broadcast_pipe.Reader.t
-    -> config:Config.t
-    -> logger:Logger.t
-    -> tf_diff_writer:transition_frontier_diff Linear_pipe.Writer.t
-    -> t
-
-  val handle_tf_diff : transition_frontier_diff -> t -> unit Deferred.t
 end
 
 (** A [Resource_pool_diff_intf] is a representation of a mutation to
@@ -115,11 +102,7 @@ end
 (** A [Snark_resource_pool_intf] is a superset of a
  *  [Resource_pool_intf] specifically for handling snarks. *)
 module type Snark_resource_pool_intf = sig
-  type transition_frontier
-
-  include
-    Resource_pool_base_intf
-    with type transition_frontier := transition_frontier
+  include Resource_pool_base_intf
 
   val make_config :
     trust_system:Trust_system.t -> verifier:Verifier.t -> Config.t
@@ -205,14 +188,7 @@ end
 module type Transaction_resource_pool_intf = sig
   type t
 
-  type best_tip_diff
-
-  type transition_frontier
-
-  include
-    Resource_pool_base_intf
-    with type transition_frontier := transition_frontier
-     and type t := t
+  include Resource_pool_base_intf with type t := t
 
   val make_config : trust_system:Trust_system.t -> Config.t
 

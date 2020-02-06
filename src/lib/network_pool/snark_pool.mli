@@ -5,9 +5,7 @@ module type S = sig
   type transition_frontier
 
   module Resource_pool : sig
-    include
-      Intf.Snark_resource_pool_intf
-      with type transition_frontier := transition_frontier
+    include Intf.Snark_resource_pool_intf
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 

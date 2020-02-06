@@ -37,13 +37,8 @@ module type S = sig
 
   type transition_frontier
 
-  type best_tip_diff
-
   module Resource_pool : sig
-    include
-      Transaction_resource_pool_intf
-      with type best_tip_diff := best_tip_diff
-       and type transition_frontier := transition_frontier
+    include Transaction_resource_pool_intf
 
     module Diff : Transaction_pool_diff_intf
   end
@@ -160,7 +155,7 @@ struct
             Currency.Fee.(User_command.fee cmd > min_fee)
           else true
 
-    let handle_tf_diff
+    let handle_transition_frontier_diff
         ( ({new_user_commands; removed_user_commands; reorg_best_tip= _} :
             Transition_frontier.best_tip_diff)
         , best_tip_ledger ) t =
@@ -720,9 +715,7 @@ module Make (Staged_ledger : sig
 end)
 (Transition_frontier : Transition_frontier_intf
                        with type staged_ledger := Staged_ledger.t) :
-  S
-  with type transition_frontier := Transition_frontier.t
-   and type best_tip_diff := Transition_frontier.best_tip_diff =
+  S with type transition_frontier := Transition_frontier.t =
   Make0
     (Coda_base.Ledger)
     (struct

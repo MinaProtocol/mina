@@ -6,9 +6,7 @@ module type S = sig
   type transition_frontier
 
   module Resource_pool : sig
-    include
-      Intf.Snark_resource_pool_intf
-      with type transition_frontier := transition_frontier
+    include Intf.Snark_resource_pool_intf
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
@@ -154,7 +152,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
           | Some _ ->
               true )
 
-      let handle_tf_diff (removed, refcount_table) t =
+      let handle_transition_frontier_diff (removed, refcount_table) t =
         t.ref_table <- Some refcount_table ;
         t.removed_counter <- t.removed_counter + removed ;
         if t.removed_counter < removed_breadcrumb_wait then return ()

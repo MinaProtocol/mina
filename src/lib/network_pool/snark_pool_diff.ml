@@ -5,10 +5,7 @@ module Work = Transaction_snark_work.Statement
 module Ledger_proof = Ledger_proof
 module Work_info = Transaction_snark_work.Info
 
-module Make
-    (Transition_frontier : T)
-    (Pool : Intf.Snark_resource_pool_intf
-            with type transition_frontier := Transition_frontier.t) :
+module Make (Transition_frontier : T) (Pool : Intf.Snark_resource_pool_intf) :
   Intf.Snark_pool_diff_intf with type resource_pool := Pool.t = struct
   module Stable = struct
     module V1 = struct

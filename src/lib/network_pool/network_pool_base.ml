@@ -4,9 +4,21 @@ open Pipe_lib
 
 module Make (Transition_frontier : sig
   type t
-end)
-(Resource_pool : Intf.Resource_pool_intf
-                 with type transition_frontier := Transition_frontier.t) :
+end) (Resource_pool : sig
+  include Intf.Resource_pool_intf
+
+  (** Diff from a transition frontier extension that would update the resource pool*)
+  val handle_transition_frontier_diff :
+    transition_frontier_diff -> t -> unit Deferred.t
+
+  val create :
+       frontier_broadcast_pipe:Transition_frontier.t Option.t
+                               Broadcast_pipe.Reader.t
+    -> config:Config.t
+    -> logger:Logger.t
+    -> tf_diff_writer:transition_frontier_diff Linear_pipe.Writer.t
+    -> t
+end) :
   Intf.Network_pool_base_intf
   with type resource_pool := Resource_pool.t
    and type resource_pool_diff := Resource_pool.Diff.t
@@ -54,7 +66,8 @@ end)
                (*Should this be coming from resource pool instead?*)
                apply_and_broadcast network_pool (Envelope.Incoming.local diff)
            | `Transition_frontier_extension diff ->
-               Resource_pool.handle_tf_diff diff resource_pool )
+               Resource_pool.handle_transition_frontier_diff diff resource_pool
+       )
     |> Deferred.don't_wait_for ;
     network_pool
 
