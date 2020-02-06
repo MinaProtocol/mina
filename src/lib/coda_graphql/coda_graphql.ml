@@ -130,12 +130,12 @@ module Types = struct
                 "The transaction has either been snarked, reached finality \
                  through consensus or has been dropped" ]
 
-  let block_proposal :
+  let block_producer_timing :
       ( _
-      , [`Check_again of Block_time.t | `Propose of Block_time.t | `Propose_now]
+      , [`Check_again of Block_time.t | `Produce of Block_time.t | `Produce_now]
         option )
       typ =
-    obj "BlockProposals" ~fields:(fun _ ->
+    obj "BlockProducerTimings" ~fields:(fun _ ->
         let of_time = Consensus.Data.Consensus_time.of_time_exn in
         [ field "times"
             ~typ:
@@ -143,7 +143,7 @@ module Types = struct
               @@ Consensus.Data.Consensus_time.graphql_type () )
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} -> function `Check_again _time -> []
-              | `Propose time -> [of_time time] | `Propose_now ->
+              | `Produce time -> [of_time time] | `Produce_now ->
                   [ of_time
                     @@ Block_time.now (Coda_lib.config coda).time_controller ]
               ) ] )
@@ -232,14 +232,15 @@ module Types = struct
           let open Reflection.Shorthand in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
-               ~next_proposal:(id ~typ:block_proposal) ~blockchain_length:int
-               ~uptime_secs:nn_int ~ledger_merkle_root:string
-               ~state_hash:string ~commit_id:nn_string ~conf_dir:nn_string
+               ~next_block_production:(id ~typ:block_producer_timing)
+               ~blockchain_length:int ~uptime_secs:nn_int
+               ~ledger_merkle_root:string ~state_hash:string
+               ~commit_id:nn_string ~conf_dir:nn_string
                ~peers:(id ~typ:Schema.(non_null @@ list (non_null string)))
                ~user_commands_sent:nn_int ~snark_worker:string
                ~snark_work_fee:nn_int
                ~sync_status:(id ~typ:(non_null sync_status))
-               ~propose_pubkeys:
+               ~block_production_keys:
                  (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms)
                ~consensus_time_best_tip:
@@ -529,12 +530,12 @@ module Types = struct
       ; path: string }
 
     let lift coda pk account =
-      let propose_public_keys = Coda_lib.propose_public_keys coda in
+      let block_production_pubkeys = Coda_lib.block_production_pubkeys coda in
       let accounts = Coda_lib.wallets coda in
       { account
       ; locked= Secrets.Wallets.check_locked accounts ~needle:pk
       ; is_actively_staking=
-          Public_key.Compressed.Set.mem propose_public_keys pk
+          Public_key.Compressed.Set.mem block_production_pubkeys pk
       ; path= Secrets.Wallets.get_path accounts pk }
 
     let get_best_ledger_account coda pk =
@@ -1632,9 +1633,11 @@ module Mutations = struct
       ~typ:(non_null Types.Payload.set_staking)
       ~resolve:(fun {ctx= coda; _} () pks ->
         (* TODO: Handle errors like: duplicates, etc *)
-        let old_propose_keys = Coda_lib.propose_public_keys coda in
-        ignore @@ Coda_commands.replace_proposers coda pks ;
-        Public_key.Compressed.Set.to_list old_propose_keys )
+        let old_block_production_keys =
+          Coda_lib.block_production_pubkeys coda
+        in
+        ignore @@ Coda_commands.replace_block_production_keys coda pks ;
+        Public_key.Compressed.Set.to_list old_block_production_keys )
 
   let set_snark_worker =
     io_field "setSnarkWorker"
@@ -1756,14 +1759,14 @@ module Queries = struct
 
   let tracked_accounts_resolver {ctx= coda; _} () =
     let wallets = Coda_lib.wallets coda in
-    let propose_public_keys = Coda_lib.propose_public_keys coda in
+    let block_production_pubkeys = Coda_lib.block_production_pubkeys coda in
     wallets |> Secrets.Wallets.pks
     |> List.map ~f:(fun pk ->
            { Types.AccountObj.account=
                Types.AccountObj.Partial_account.of_pk coda pk
            ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
            ; is_actively_staking=
-               Public_key.Compressed.Set.mem propose_public_keys pk
+               Public_key.Compressed.Set.mem block_production_pubkeys pk
            ; path= Secrets.Wallets.get_path wallets pk } )
 
   let owned_wallets =
@@ -1782,13 +1785,13 @@ module Queries = struct
       ~resolve:tracked_accounts_resolver
 
   let account_resolver {ctx= coda; _} () pk =
-    let propose_public_keys = Coda_lib.propose_public_keys coda in
+    let block_production_pubkeys = Coda_lib.block_production_pubkeys coda in
     let wallets = Coda_lib.wallets coda in
     Some
       { Types.AccountObj.account= Types.AccountObj.Partial_account.of_pk coda pk
       ; locked= Secrets.Wallets.check_locked wallets ~needle:pk
       ; is_actively_staking=
-          Public_key.Compressed.Set.mem propose_public_keys pk
+          Public_key.Compressed.Set.mem block_production_pubkeys pk
       ; path= Secrets.Wallets.get_path wallets pk }
 
   let wallet =

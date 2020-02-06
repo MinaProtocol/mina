@@ -18,10 +18,11 @@ let spawn_exn (config : Coda_worker.Input.t) =
   File_system.dup_stderr process ;
   return (conn, process, config)
 
-let local_config ?proposal_interval:_ ~addrs_and_ports ~acceptable_delay ~peers
+let local_config ?block_production_interval:_ ~peers ~addrs_and_ports
     ~libp2p_keypair ~net_configs:(addrs_and_ports_list, all_peers_list)
-    ~chain_id ~program_dir ~proposer ~snark_worker_key ~work_selection_method
-    ~offset ~trace_dir ~max_concurrent_connections ~is_archive_rocksdb () =
+    ~acceptable_delay ~program_dir ~block_production_key ~snark_worker_key
+    ~work_selection_method ~offset ~trace_dir ~max_concurrent_connections
+    ~is_archive_rocksdb () =
   let conf_dir =
     Filename.temp_dir_name
     ^/ String.init 16 ~f:(fun _ -> (Int.to_string (Random.int 10)).[0])
@@ -48,7 +49,7 @@ let local_config ?proposal_interval:_ ~addrs_and_ports ~acceptable_delay ~peers
                   (Fn.compose
                      (function [a; b] -> Some (a, b) | _ -> None)
                      (String.split ~on:'=')) )
-    ; proposer
+    ; block_production_key
     ; snark_worker_key
     ; work_selection_method
     ; conf_dir

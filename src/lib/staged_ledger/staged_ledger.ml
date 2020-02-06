@@ -1357,7 +1357,7 @@ module T = struct
             Transaction_snark_work.Statement.t
          -> Transaction_snark_work.Checked.t option) =
     let coinbase_receiver =
-      match coinbase_receiver with `Proposer -> self | `Other pk -> pk
+      match coinbase_receiver with `Producer -> self | `Other pk -> pk
     in
     O1trace.trace_event "curr_hash" ;
     let validating_ledger = Transaction_validator.create t.ledger in
@@ -1496,12 +1496,12 @@ let%test_module "test" =
           in
           let sl = ref @@ Sl.create_exn ~ledger in
           Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
-          ignore @@ Ledger.Maskable.unregister_mask_exn casted test_mask )
+          ignore @@ Ledger.Maskable.unregister_mask_exn test_mask )
 
     (* Assert the given staged ledger is in the correct state after applying
          the first n user commands passed to the given base ledger. Checks the
-         states of the proposer account and user accounts but ignores snark
-         workers for simplicity. *)
+         states of the block producer account and user accounts but ignores
+         snark workers for simplicity. *)
     let assert_ledger :
            Ledger.t
         -> coinbase_cost:Currency.Fee.t
@@ -1512,14 +1512,14 @@ let%test_module "test" =
         -> unit =
      fun test_ledger ~coinbase_cost staged_ledger cmds_all cmds_used
          pks_to_check ->
-      let proposer_account =
+      let producer_account =
         Option.bind
           (Ledger.location_of_key test_ledger coinbase_receiver)
           ~f:(Ledger.get test_ledger)
       in
-      let is_proposer_acc_new = Option.is_none proposer_account in
-      let old_proposer_balance =
-        Option.value_map proposer_account ~default:Currency.Balance.zero
+      let is_producer_acc_new = Option.is_none producer_account in
+      let old_producer_balance =
+        Option.value_map producer_account ~default:Currency.Balance.zero
           ~f:(fun a -> a.balance)
       in
       let rec apply_cmds =
@@ -1544,11 +1544,11 @@ let%test_module "test" =
           let expect = get_account_exn test_ledger pk in
           let actual = get_account_exn (Sl.ledger staged_ledger) pk in
           [%test_result: Account.t] ~expect actual ) ;
-      (* We only test that the proposer got the coinbase reward here, since calculating the exact correct amount depends on the snark fees and tx fees. *)
-      let proposer_balance_with_coinbase =
+      (* We only test that the block producer got the coinbase reward here, since calculating the exact correct amount depends on the snark fees and tx fees. *)
+      let producer_balance_with_coinbase =
         (let open Option.Let_syntax in
         let%bind total_cost =
-          if is_proposer_acc_new then
+          if is_producer_acc_new then
             Currency.Fee.add coinbase_cost
               Coda_compile_config.account_creation_fee
           else Some coinbase_cost
@@ -1557,15 +1557,15 @@ let%test_module "test" =
           Coda_compile_config.(
             Currency.Amount.(sub coinbase (of_fee total_cost)))
         in
-        Currency.Balance.add_amount old_proposer_balance reward)
+        Currency.Balance.add_amount old_producer_balance reward)
         |> Option.value_exn
       in
-      let new_proposer_balance =
+      let new_producer_balance =
         (get_account_exn (Sl.ledger staged_ledger) coinbase_receiver).balance
       in
       assert (
         Currency.Balance.(
-          new_proposer_balance >= proposer_balance_with_coinbase) )
+          new_producer_balance >= producer_balance_with_coinbase) )
 
     let work_fee = Coda_compile_config.account_creation_fee
 

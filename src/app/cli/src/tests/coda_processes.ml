@@ -49,7 +49,8 @@ let offset =
         ( Consensus.Constants.genesis_state_timestamp
         |> Coda_base.Block_time.to_time ))
 
-let local_configs ?proposal_interval ?(proposers = Fn.const None)
+let local_configs ?block_production_interval
+    ?(block_production_keys = Fn.const None)
     ?(is_archive_rocksdb = Fn.const false) n ~acceptable_delay ~chain_id
     ~program_dir ~snark_worker_public_keys ~work_selection_method ~trace_dir
     ~max_concurrent_connections =
@@ -67,10 +68,10 @@ let local_configs ?proposal_interval ?(proposers = Fn.const None)
           Node_addrs_and_ports.to_display addrs_and_ports
         in
         let peers = List.map ~f:Node_addrs_and_ports.to_multiaddr_exn peers in
-        Coda_process.local_config ?proposal_interval ~addrs_and_ports
-          ~libp2p_keypair ~net_configs ~snark_worker_key:public_key
-          ~program_dir ~acceptable_delay ~chain_id ~peers
-          ~proposer:(proposers i) ~work_selection_method ~trace_dir
+        Coda_process.local_config ?block_production_interval ~addrs_and_ports ~libp2p_keypair ~net_configs
+          ~peers ~snark_worker_key:public_key ~program_dir ~acceptable_delay
+          ~block_production_key:(block_production_keys i)
+          ~work_selection_method ~trace_dir
           ~is_archive_rocksdb:(is_archive_rocksdb i)
           ~offset:(Lazy.force offset) ~max_concurrent_connections () )
   in

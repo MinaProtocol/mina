@@ -23,10 +23,12 @@ let main () =
       [largest_account_keypair.public_key]
     |> Test_genesis_ledger.keypair_of_account_record_exn
   in
-  let proposal_interval = Consensus.Constants.block_window_duration_ms in
+  let block_production_interval =
+    Consensus.Constants.block_window_duration_ms
+  in
   let acceptable_delay =
     Time.Span.of_ms
-      (proposal_interval * Consensus.Constants.delta |> Float.of_int)
+      (block_production_interval * Consensus.Constants.delta |> Float.of_int)
   in
   let n = 2 in
   let receiver_pk = Public_key.compress another_account_keypair.public_key in
@@ -39,9 +41,9 @@ let main () =
   in
   Parallel.init_master () ;
   let%bind configs =
-    Coda_processes.local_configs n ~program_dir ~proposal_interval
+    Coda_processes.local_configs n ~program_dir ~block_production_interval
       ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
-      ~proposers:(Fn.const None) ~work_selection_method
+      ~block_production_keys:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections:None
   in

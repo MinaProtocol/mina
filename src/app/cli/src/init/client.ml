@@ -1055,7 +1055,7 @@ let stop_tracing =
 
 let set_staking =
   let privkey_path = Cli_lib.Flag.privkey_read_path in
-  Command.async ~summary:"Set new block proposer keys"
+  Command.async ~summary:"Set new keys for block production"
     (Cli_lib.Background_daemon.rpc_init privkey_path
        ~f:(fun port privkey_path ->
          let%bind ({Keypair.public_key; _} as keypair) =
@@ -1069,7 +1069,7 @@ let set_staking =
              Daemon_rpcs.Client.print_rpc_error e
          | Ok () ->
              printf
-               !"New block proposer public key : %s\n"
+               !"New block producer public key : %s\n"
                (Public_key.Compressed.to_base58_check
                   (Public_key.compress public_key)) ))
 

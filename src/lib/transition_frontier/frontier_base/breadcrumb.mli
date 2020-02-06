@@ -56,7 +56,7 @@ val state_hash : t -> State_hash.t
 
 val parent_hash : t -> State_hash.t
 
-val proposer : t -> Signature_lib.Public_key.Compressed.t
+val block_producer : t -> Signature_lib.Public_key.Compressed.t
 
 val user_commands : t -> User_command.t list
 

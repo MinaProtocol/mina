@@ -26,7 +26,7 @@ let is_transition_for_bootstrap ~logger frontier new_transition =
            , `String "Transition_router.is_transition_for_bootstrap" ) ])
 
 let start_transition_frontier_controller ~logger ~trust_system ~verifier
-    ~network ~time_controller ~proposer_transition_reader
+    ~network ~time_controller ~producer_transition_reader
     ~verified_transition_writer ~clear_reader ~collected_transitions
     ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -43,7 +43,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
         Transition_frontier_controller.run ~logger ~trust_system ~verifier
           ~network ~time_controller ~collected_transitions ~frontier
           ~network_transition_reader:!transition_reader_ref
-          ~proposer_transition_reader ~clear_reader )
+          ~producer_transition_reader ~clear_reader )
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -52,7 +52,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
   |> don't_wait_for
 
 let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
-    ~time_controller ~proposer_transition_reader ~verified_transition_writer
+    ~time_controller ~producer_transition_reader ~verified_transition_writer
     ~clear_reader ~transition_reader_ref ~transition_writer_ref
     ~consensus_local_state ~frontier_w ~initial_root_transition
     ~persistent_root ~persistent_frontier ~genesis_state_hash ~genesis_ledger =
@@ -73,7 +73,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
         (fun (new_frontier, collected_transitions) ->
           Strict_pipe.Writer.kill !transition_writer_ref ;
           start_transition_frontier_controller ~logger ~trust_system ~verifier
-            ~network ~time_controller ~proposer_transition_reader
+            ~network ~time_controller ~producer_transition_reader
             ~verified_transition_writer ~clear_reader ~collected_transitions
             ~transition_reader_ref ~transition_writer_ref ~frontier_w
             new_frontier ) )
@@ -189,7 +189,7 @@ let wait_for_high_connectivity ~logger ~network =
     ]
 
 let initialize ~logger ~network ~verifier ~trust_system ~time_controller
-    ~frontier_w ~proposer_transition_reader ~clear_reader
+    ~frontier_w ~producer_transition_reader ~clear_reader
     ~verified_transition_writer ~transition_reader_ref ~transition_writer_ref
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
     ~consensus_local_state ~genesis_state_hash ~genesis_ledger ~base_proof =
@@ -208,7 +208,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
         >>| Result.ok_or_failwith
       in
       start_bootstrap_controller ~logger ~trust_system ~verifier ~network
-        ~time_controller ~proposer_transition_reader
+        ~time_controller ~producer_transition_reader
         ~verified_transition_writer ~clear_reader ~transition_reader_ref
         ~consensus_local_state ~transition_writer_ref ~frontier_w
         ~persistent_root ~persistent_frontier ~initial_root_transition
@@ -216,7 +216,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
   | None, Some frontier ->
       return
       @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
-           ~network ~time_controller ~proposer_transition_reader
+           ~network ~time_controller ~producer_transition_reader
            ~verified_transition_writer ~clear_reader ~collected_transitions:[]
            ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier
   | Some best_tip, Some frontier ->
@@ -229,7 +229,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
         in
         let%map () = Transition_frontier.close frontier in
         start_bootstrap_controller ~logger ~trust_system ~verifier ~network
-          ~time_controller ~proposer_transition_reader
+          ~time_controller ~producer_transition_reader
           ~verified_transition_writer ~clear_reader ~transition_reader_ref
           ~consensus_local_state ~transition_writer_ref ~frontier_w
           ~persistent_root ~persistent_frontier ~initial_root_transition
@@ -264,7 +264,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
                   () )
         in
         start_transition_frontier_controller ~logger ~trust_system ~verifier
-          ~network ~time_controller ~proposer_transition_reader
+          ~network ~time_controller ~producer_transition_reader
           ~verified_transition_writer ~clear_reader
           ~collected_transitions:[best_tip] ~transition_reader_ref
           ~transition_writer_ref ~frontier_w frontier
@@ -307,7 +307,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~consensus_local_state ~persistent_root_location
     ~persistent_frontier_location
     ~frontier_broadcast_pipe:(frontier_r, frontier_w)
-    ~network_transition_reader ~proposer_transition_reader
+    ~network_transition_reader ~producer_transition_reader
     ~most_recent_valid_block:( most_recent_valid_block_reader
                              , most_recent_valid_block_writer )
     ~genesis_state_hash ~genesis_ledger ~base_proof =
@@ -341,7 +341,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       upon
         (initialize ~logger ~network ~verifier ~trust_system
            ~persistent_frontier ~persistent_root ~time_controller ~frontier_w
-           ~proposer_transition_reader ~clear_reader
+           ~producer_transition_reader ~clear_reader
            ~verified_transition_writer ~transition_reader_ref
            ~transition_writer_ref ~most_recent_valid_block_writer
            ~consensus_local_state ~genesis_state_hash ~genesis_ledger
@@ -400,7 +400,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                        let%map () = Transition_frontier.close frontier in
                        start_bootstrap_controller ~logger ~trust_system
                          ~verifier ~network ~time_controller
-                         ~proposer_transition_reader
+                         ~producer_transition_reader
                          ~verified_transition_writer ~clear_reader
                          ~transition_reader_ref ~transition_writer_ref
                          ~consensus_local_state ~frontier_w ~persistent_root

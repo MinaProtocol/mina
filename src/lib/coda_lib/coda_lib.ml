@@ -46,7 +46,7 @@ type components =
 type pipes =
   { validated_transitions_reader:
       External_transition.Validated.t Strict_pipe.Reader.t
-  ; proposer_transition_writer:
+  ; producer_transition_writer:
       (Transition_frontier.Breadcrumb.t, synchronous, unit Deferred.t) Writer.t
   ; external_transitions_writer:
       ( External_transition.t Envelope.Incoming.t
@@ -61,11 +61,11 @@ type t =
   ; initialization_finish_signal: unit Ivar.t
   ; pipes: pipes
   ; wallets: Secrets.Wallets.t
-  ; coinbase_receiver: [`Proposer | `Other of Public_key.Compressed.t]
-  ; propose_keypairs:
+  ; coinbase_receiver: [`Producer | `Other of Public_key.Compressed.t]
+  ; block_production_keypairs:
       (Agent.read_write Agent.flag, Keypair.And_compressed_pk.Set.t) Agent.t
   ; mutable seen_jobs: Work_selector.State.t
-  ; mutable next_proposal: Consensus.Hooks.proposal option
+  ; mutable next_producer_timing: Consensus.Hooks.block_producer_timing option
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
 [@@deriving fields]
@@ -86,11 +86,12 @@ let client_port t =
   client_port
 
 (* Get the most recently set public keys  *)
-let propose_public_keys t : Public_key.Compressed.Set.t =
-  let public_keys, _ = Agent.get t.propose_keypairs in
+let block_production_pubkeys t : Public_key.Compressed.Set.t =
+  let public_keys, _ = Agent.get t.block_production_keypairs in
   Public_key.Compressed.Set.map public_keys ~f:snd
 
-let replace_propose_keypairs t kps = Agent.update t.propose_keypairs kps
+let replace_block_production_keypairs t kps =
+  Agent.update t.block_production_keypairs kps
 
 module Snark_worker = struct
   let run_process ~logger client_port kill_ivar =
@@ -573,7 +574,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Network_pool.Snark_pool.add_completed_work (snark_pool t) work
 
-let next_proposal t = t.next_proposal
+let next_producer_timing t = t.next_producer_timing
 
 let staking_ledger t =
   let open Option.Let_syntax in
@@ -615,8 +616,8 @@ let last_epoch_delegators t ~pk =
   find_delegators last_epoch_delegatee_table pk
 
 let start t =
-  Proposer.run ~logger:t.config.logger ~verifier:t.processes.verifier
-    ~set_next_proposal:(fun p -> t.next_proposal <- Some p)
+  Block_producer.run ~logger:t.config.logger ~verifier:t.processes.verifier
+    ~set_next_producer_timing:(fun p -> t.next_producer_timing <- Some p)
     ~prover:t.processes.prover ~trust_system:t.config.trust_system
     ~transaction_resource_pool:
       (Network_pool.Transaction_pool.resource_pool
@@ -624,11 +625,11 @@ let start t =
     ~get_completed_work:
       (Network_pool.Snark_pool.get_completed_work t.components.snark_pool)
     ~time_controller:t.config.time_controller
-    ~keypairs:(Agent.read_only t.propose_keypairs)
+    ~keypairs:(Agent.read_only t.block_production_keypairs)
     ~coinbase_receiver:t.coinbase_receiver
     ~consensus_local_state:t.config.consensus_local_state
     ~frontier_reader:t.components.transition_frontier
-    ~transition_writer:t.pipes.proposer_transition_writer ;
+    ~transition_writer:t.pipes.producer_transition_writer ;
   Snark_worker.start t
 
 let create (config : Config.t) ~genesis_ledger ~base_proof =
@@ -679,7 +680,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
           in
-          let proposer_transition_reader, proposer_transition_writer =
+          let producer_transition_reader, producer_transition_writer =
             Strict_pipe.create Synchronous
           in
           let frontier_broadcast_pipe_r, frontier_broadcast_pipe_w =
@@ -801,7 +802,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm, cb) ->
                          (`Transition tn, `Time_received tm, `Valid_cb cb) ))
-                  ~proposer_transition_reader:
+                  ~producer_transition_reader:
                     (Strict_pipe.Reader.map proposer_transition_reader
                        ~f:(fun breadcrumb ->
                          let et =
@@ -916,14 +917,14 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 ~f:(fun x ->
                   Coda_networking.broadcast_snark_pool_diff net x ;
                   Deferred.unit ) ) ;
-          let propose_keypairs =
+          let block_production_keypairs =
             Agent.create
               ~f:(fun kps ->
                 Keypair.Set.to_list kps
                 |> List.map ~f:(fun kp ->
                        (kp, Public_key.compress kp.Keypair.public_key) )
                 |> Keypair.And_compressed_pk.Set.of_list )
-              config.initial_propose_keypairs
+              config.initial_block_production_keypairs
           in
           Option.iter config.archive_process_location
             ~f:(fun archive_process_port ->
@@ -975,7 +976,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           in
           Deferred.return
             { config
-            ; next_proposal= None
+            ; next_producer_timing= None
             ; processes= {prover; verifier; snark_worker}
             ; initialization_finish_signal
             ; components=
@@ -986,12 +987,12 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 ; most_recent_valid_block= most_recent_valid_block_reader }
             ; pipes=
                 { validated_transitions_reader= valid_transitions_for_api
-                ; proposer_transition_writer
+                ; producer_transition_writer
                 ; external_transitions_writer=
                     Strict_pipe.Writer.to_linear_pipe
                       external_transitions_writer }
             ; wallets
-            ; propose_keypairs
+            ; block_production_keypairs
             ; coinbase_receiver= config.coinbase_receiver
             ; seen_jobs=
                 Work_selector.State.init

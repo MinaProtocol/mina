@@ -283,7 +283,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               ~f:(fun ({Keypair.Stable.Latest.public_key; _} as keypair) ->
                 (keypair, Public_key.compress public_key) )
           in
-          Coda_lib.replace_propose_keypairs coda
+          Coda_lib.replace_block_production_keypairs coda
             (Keypair.And_compressed_pk.Set.of_list keypair_and_compressed_key) ;
           Deferred.unit )
     ; implement Daemon_rpcs.Add_trustlist.rpc (fun () ip ->

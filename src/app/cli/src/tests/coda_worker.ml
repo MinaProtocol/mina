@@ -17,7 +17,7 @@ module Input = struct
         * Node_addrs_and_ports.Display.Stable.V1.t list list
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
-    ; proposer: int option
+    ; block_production_key: int option
     ; work_selection_method: Cli_lib.Arg_type.Work_selection_method.Stable.V1.t
     ; conf_dir: string
     ; trace_dir: string option
@@ -405,7 +405,7 @@ module T = struct
     let init_worker_state
         { addrs_and_ports
         ; libp2p_keypair
-        ; proposer
+        ; block_production_key
         ; snark_worker_key
         ; work_selection_method
         ; conf_dir
@@ -468,23 +468,23 @@ module T = struct
           let time_controller =
             Block_time.Controller.create (Block_time.Controller.basic ~logger)
           in
-          let propose_keypair =
-            Option.map proposer ~f:(fun i ->
+          let block_production_keypair =
+            Option.map block_production_key ~f:(fun i ->
                 List.nth_exn Test_genesis_ledger.accounts i
                 |> Test_genesis_ledger.keypair_of_account_record_exn )
           in
-          let initial_propose_keypairs =
-            Keypair.Set.of_list (propose_keypair |> Option.to_list)
+          let initial_block_production_keypairs =
+            Keypair.Set.of_list (block_production_keypair |> Option.to_list)
           in
-          let initial_propose_keys =
+          let initial_block_production_keys =
             Public_key.Compressed.Set.of_list
-              ( Option.map propose_keypair ~f:(fun keypair ->
+              ( Option.map block_production_keypair ~f:(fun keypair ->
                     let open Keypair in
                     Public_key.compress keypair.public_key )
               |> Option.to_list )
           in
           let consensus_local_state =
-            Consensus.Data.Local_state.create initial_propose_keys
+            Consensus.Data.Local_state.create initial_block_production_keys
               ~genesis_ledger:Test_genesis_ledger.t
           in
           let gossip_net_params =
@@ -529,7 +529,7 @@ module T = struct
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~coinbase_receiver:`Proposer ~net_config ~gossip_net_params
+                 ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
@@ -543,10 +543,10 @@ module T = struct
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
-                 ~initial_propose_keypairs ~monitor ~consensus_local_state
-                 ~transaction_database ~external_transition_database
-                 ~is_archive_rocksdb ~work_reassignment_wait:420000
-                 ~genesis_state_hash ())
+                 ~initial_block_production_keypairs ~monitor
+                 ~consensus_local_state ~transaction_database
+                 ~external_transition_database ~is_archive_rocksdb
+                 ~work_reassignment_wait:420000 ~genesis_state_hash ())
               ~genesis_ledger:Test_genesis_ledger.t
               ~base_proof:Precomputed_values.base_proof
           in

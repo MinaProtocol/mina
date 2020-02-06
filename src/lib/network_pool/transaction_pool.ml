@@ -1,6 +1,7 @@
 (** A pool of transactions that can be included in future blocks. Combined with
     the Network_pool module, this handles storing and gossiping the correct
-    transactions (user commands) and providing them to the proposer code. *)
+    transactions (user commands) and providing them to the block producer code.
+*)
 
 open Core
 open Async

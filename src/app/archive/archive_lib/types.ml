@@ -327,7 +327,7 @@ module Blocks = struct
 
       method creator =
         some @@ Public_key.encode_as_obj_rel_insert_input
-        @@ External_transition.proposer external_transition
+        @@ External_transition.block_producer external_transition
 
       method parent_hash =
         some @@ State_hashes.encode_as_obj_rel_insert_input

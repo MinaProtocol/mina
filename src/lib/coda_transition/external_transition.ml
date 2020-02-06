@@ -67,7 +67,7 @@ module Stable = struct
     let parent_hash {protocol_state; _} =
       Protocol_state.previous_state_hash protocol_state
 
-    let proposer {staged_ledger_diff; _} =
+    let block_producer {staged_ledger_diff; _} =
       Staged_ledger_diff.creator staged_ledger_diff
 
     let transactions {staged_ledger_diff; _} =
@@ -140,7 +140,7 @@ Stable.Latest.
   , consensus_state
   , state_hash
   , parent_hash
-  , proposer
+  , block_producer
   , transactions
   , user_commands
   , payments
@@ -624,7 +624,7 @@ module With_validation = struct
 
   let parent_hash t = lift parent_hash t
 
-  let proposer t = lift proposer t
+  let block_producer t = lift block_producer t
 
   let user_commands t = lift user_commands t
 
@@ -787,7 +787,7 @@ module Validated = struct
     , consensus_state
     , state_hash
     , parent_hash
-    , proposer
+    , block_producer
     , transactions
     , user_commands
     , payments

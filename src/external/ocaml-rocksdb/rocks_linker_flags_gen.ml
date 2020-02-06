@@ -8,7 +8,11 @@ let () =
   C.Flags.write_sexp "flags.sexp"
     ( match l with
     | "Darwin" ->
-        [sprintf "-Wl,-force_load,%s/librocksdb_stubs.a" cwd; "-lz"; "-lbz2"; "-lc++abi"; "-lc++"]
+        [ sprintf "-Wl,-force_load,%s/librocksdb_stubs.a" cwd
+        ; "-lz"
+        ; "-lbz2"
+        ; "-lc++abi"
+        ; "-lc++" ]
     | "Linux" ->
         [ "-Wl,--push-state,-whole-archive"
         ; "-lrocksdb_stubs"
@@ -16,4 +20,5 @@ let () =
         ; "-lz"
         ; "-lbz2"
         ; "-lstdc++" ]
-    | s -> failwith (sprintf "don't know how to link on %s yet" s) )
+    | s ->
+        failwith (sprintf "don't know how to link on %s yet" s) )

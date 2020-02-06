@@ -38,19 +38,9 @@ jobs:
             - run:
                   name: Publish dist wallet
                   command: (env HOMEBREW_NO_AUTO_UPDATE=1 brew install awscli) && ./scripts/publish-wallet.sh
-            - run: cd frontend/website && yarn install
-            - run:
-                  name: Decrypt PragmataPro font
-                  command: cd frontend/website && yarn run decrypt-ci
             - run:
                   name: Lint website
-                  command: cd frontend/website && yarn run reformat && git diff --exit-code src
-            - run:
-                  name: Build website
-                  command: cd frontend/website && (env HOMEBREW_NO_AUTO_UPDATE=1 brew install pandoc) && pip install mkdocs && yarn run build
-            - run:
-                  name: Deploy staging
-                  command: cd frontend/website && (if [ "$CIRCLE_BRANCH" == "develop" ]; then yarn run deploy-ci; fi)
+                  command: cd frontend/website && yarn install && yarn run reformat && git diff --exit-code src
             - run: cd frontend/bot && yarn
             - run:
                   name: Lint bot
@@ -321,7 +311,7 @@ jobs:
             - run:
                   name: Generate runtime ledger with 10k accounts
                   command: |
-                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000'
+                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000 -account-file genesis_ledgers/phase_three/genesis_ledger.json'
                   no_output_timeout: 20m
             ### collection
             - run:
@@ -394,9 +384,6 @@ jobs:
                         nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
-                  name: Install awscli
-                  command: sudo pip install awscli
-            - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
@@ -416,7 +403,7 @@ jobs:
             - run:
                   name: Generate runtime ledger with 10k accounts
                   command: |
-                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000'
+                    ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000 -account-file genesis_ledgers/phase_three/genesis_ledger.json'
                   no_output_timeout: 20m
             - run:
                   name: Build deb package with PV keys and PV key tar
@@ -688,8 +675,8 @@ jobs:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-bootstrap-test"'
             - run:
-                  name: Running test -- test_postake_bootstrap:coda-long-fork -num-proposers 2
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-long-fork -num-proposers 2"'
+                  name: Running test -- test_postake_bootstrap:coda-long-fork -num-block-producers 2
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-long-fork -num-block-producers 2"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_catchup:
@@ -778,8 +765,8 @@ jobs:
                         nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
-                  name: Running test -- test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproposer-test -num-proposers 5"'
+                  name: Running test -- test_postake_five_even_snarkless:coda-shared-prefix-multiproducer-test -num-block-producers 5
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproducer-test -num-block-producers 5"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_five_even_txns:
@@ -808,8 +795,8 @@ jobs:
                         nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
-                  name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproposer-test -num-proposers 5 -payments"'
+                  name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_snarkless:
@@ -871,8 +858,8 @@ jobs:
                         nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
-                  name: Running test -- test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split:coda-shared-prefix-multiproposer-test -num-proposers 2"'
+                  name: Running test -- test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_split_snarkless:
@@ -910,14 +897,11 @@ jobs:
                   name: Running test -- test_postake_split_snarkless:coda-block-production-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-block-production-test"'
             - run:
-                  name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 0"'
+                  name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-produces 0
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-prefix-test -who-produces 0"'
             - run:
-                  name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-prefix-test -who-proposes 1"'
-            - run:
-                  name: Running test -- test_postake_split_snarkless:coda-restart-node-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
+                  name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-produces 1
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-prefix-test -who-produces 1"'
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-change-snark-worker-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-change-snark-worker-test"'
@@ -926,7 +910,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-archive-node-test"'
             - store_artifacts:
                   path: test_logs
-    test--test_postake_three_proposers:
+    test--test_postake_three_producers:
         resource_class: large
         docker:
             - image: codaprotocol/coda:toolchain-c89c98bb29afb981c3269487bedd8b7c9898d553
@@ -952,8 +936,8 @@ jobs:
                         nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
-                  name: Running test -- test_postake_three_proposers:coda-txns-and-restart-non-proposers
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_three_proposers:coda-txns-and-restart-non-proposers"'
+                  name: Running test -- test_postake_three_producers:coda-txns-and-restart-non-producers
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_three_producers:coda-txns-and-restart-non-producers"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_txns:
@@ -987,6 +971,36 @@ jobs:
             - run:
                   name: Running test -- test_postake_txns:coda-batch-payment-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-batch-payment-test"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_full_epoch:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-c89c98bb29afb981c3269487bedd8b7c9898d553
+        steps:
+            - checkout
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
+            - run:
+                  name: Running test -- test_postake_full_epoch:full-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_full_epoch:full-test"'
             - store_artifacts:
                   path: test_logs
     test--test_postake_medium_curves:
@@ -1083,8 +1097,8 @@ jobs:
                         nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
             - run:
-                  name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_medium_curves:coda-shared-prefix-multiproposer-test -num-proposers 2"'
+                  name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
             - store_artifacts:
                   path: test_logs
 
@@ -1116,7 +1130,7 @@ workflows:
             - test--test_postake_snarkless
             - test--test_postake_split
             - test--test_postake_split_snarkless
-            - test--test_postake_three_proposers
+            - test--test_postake_three_producers
             - test--test_postake_txns
 
     daily:
@@ -1130,6 +1144,7 @@ workflows:
                     - /release\/.*/
         jobs:
           - test-unit--dev_medium_curves
+          - test--test_postake_full_epoch
           - test--test_postake_medium_curves
           - test--test_postake_snarkless_medium_curves
           - test--test_postake_split_medium_curves

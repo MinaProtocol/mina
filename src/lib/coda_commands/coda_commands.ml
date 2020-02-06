@@ -169,7 +169,7 @@ let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let trust_system = config.trust_system in
   Trust_system.reset trust_system ip_address
 
-let replace_proposers keys pks =
+let replace_block_production_keys keys pks =
   let kps =
     List.filter_map pks ~f:(fun pk ->
         let open Option.Let_syntax in
@@ -178,7 +178,7 @@ let replace_proposers keys pks =
         in
         (kps, pk) )
   in
-  Coda_lib.replace_propose_keypairs keys
+  Coda_lib.replace_block_production_keypairs keys
     (Keypair.And_compressed_pk.Set.of_list kps) ;
   kps |> List.map ~f:snd
 
@@ -273,7 +273,7 @@ let get_status ~flag t =
       ~f:Public_key.Compressed.to_base58_check
   in
   let snark_work_fee = Currency.Fee.to_int @@ Coda_lib.snark_work_fee t in
-  let propose_pubkeys = Coda_lib.propose_public_keys t in
+  let block_production_keys = Coda_lib.block_production_pubkeys t in
   let consensus_mechanism = Consensus.name in
   let time_controller = (Coda_lib.config t).time_controller in
   let consensus_time_now =
@@ -382,13 +382,13 @@ let get_status ~flag t =
           ; state_hash= None
           ; consensus_time_best_tip= None } )
   in
-  let next_proposal =
+  let next_block_production =
     let open Block_time in
-    Option.map (Coda_lib.next_proposal t) ~f:(function
-      | `Propose_now _ ->
-          `Propose_now
-      | `Propose (time, _, _) ->
-          `Propose (time |> Span.of_ms |> of_span_since_epoch)
+    Option.map (Coda_lib.next_producer_timing t) ~f:(function
+      | `Produce_now _ ->
+          `Produce_now
+      | `Produce (time, _, _) ->
+          `Produce (time |> Span.of_ms |> of_span_since_epoch)
       | `Check_again time ->
           `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
   in
@@ -410,11 +410,11 @@ let get_status ~flag t =
   ; user_commands_sent
   ; snark_worker
   ; snark_work_fee
-  ; propose_pubkeys=
-      Public_key.Compressed.Set.to_list propose_pubkeys
+  ; block_production_keys=
+      Public_key.Compressed.Set.to_list block_production_keys
       |> List.map ~f:Public_key.Compressed.to_base58_check
   ; histograms
-  ; next_proposal
+  ; next_block_production
   ; consensus_time_now
   ; consensus_mechanism
   ; consensus_configuration
