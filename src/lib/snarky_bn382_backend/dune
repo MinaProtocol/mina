@@ -1,0 +1,15 @@
+(library
+  (inline_tests)
+  (name snarky_bn382_backend)
+  (public_name snarky_bn382_backend)
+  (flags -warn-error -27)
+  (preprocess (pps ppx_coda ppx_jane ppx_deriving.std))
+  (libraries
+    pickles_types
+    snarky_bn382
+    sgn_type
+    snarky
+    sponge
+    snarkette
+    core ))
+
