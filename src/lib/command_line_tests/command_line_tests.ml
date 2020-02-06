@@ -22,8 +22,6 @@ let%test_module "Command line tests" =
      *)
     let coda_exe = "../../app/cli/src/coda.exe"
 
-    let _ = ()
-
     let runtime_genesis_ledger_exe =
       "../../app/runtime_genesis_ledger/runtime_genesis_ledger.exe"
 

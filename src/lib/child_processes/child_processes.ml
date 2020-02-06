@@ -99,9 +99,8 @@ let get_coda_binary () =
   else
     (* FIXME for finding the executable relative to the install path this should
        deference the symlink if possible. *)
-    Deferred.map
-      ~f:(fun x -> Ok x)
-      (Unix.getpid () |> Pid.to_int |> sprintf "/proc/%d/exe" |> Unix.readlink)
+    Deferred.Or_error.return
+      (Unix.getpid () |> Pid.to_int |> sprintf "/proc/%d/exe")
 
 (* Check the PID file, and if it exists and corresponds to a currently running
    process, kill that process. This runs when the daemon starts, and should
@@ -260,7 +259,7 @@ let start_custom :
     "Starting custom child process %s with args $args" name
     ~metadata:[("args", `List (List.map args ~f:(fun a -> `String a)))] ;
   let%bind coda_binary_path = get_coda_binary () in
-  let project_root =
+  let relative_to_root =
     get_project_root logger
     |> Option.map ~f:(fun root -> root ^/ git_root_relative_path)
   in
@@ -268,7 +267,7 @@ let start_custom :
     keep_trying
       (List.filter_opt
          [ Unix.getenv @@ "CODA_" ^ String.uppercase name ^ "_PATH"
-         ; project_root
+         ; relative_to_root
          ; Some (Filename.dirname coda_binary_path ^/ name)
          ; Some ("coda-" ^ name) ])
       ~f:(fun prog -> Process.create ~prog ~args ())
