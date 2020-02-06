@@ -1,7 +1,6 @@
 open Tuple_lib
 open Core_kernel
 
-(* TODO: Remove x_hat *)
 module Evals = struct
   type 'a t =
     { 
@@ -125,8 +124,6 @@ module Openings = struct
   module Bulletproof = struct
     type ('fq, 'g) t =
       {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g
-      (* TODO: Could move this back to "advice" rather than putting it
-        on the wire. *)
         ; sg : 'g
       }
     [@@deriving bin_io]

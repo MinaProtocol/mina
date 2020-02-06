@@ -19,28 +19,6 @@ let crs_max_degree = 1 lsl 22
 open Impl
 module Fq = Snarky_bn382_backend.Fq
 
-module App_state = struct
-  type t = Field.t
-
-  type _ Tag.t += Tag : Field.Constant.t Tag.t
-
-  module Constant = struct
-    include Field.Constant
-
-    let tag = Tag
-
-    let is_base_case = Field.Constant.(equal zero)
-  end
-
-  let to_field_elements x = [|x|]
-
-  let typ = Typ.field
-
-  let check_update x0 x1 = Field.(equal x1 (x0 + one))
-
-  let is_base_case x = Field.(equal x zero)
-end
-
 let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
 
@@ -68,6 +46,8 @@ module Sponge = struct
 end
 
 module Input_domain = struct
+  let self = Domain.Pow_2_roots_of_unity 6
+
   let domain = Domain.Pow_2_roots_of_unity 5
 
   (* TODO: Make the real values *)

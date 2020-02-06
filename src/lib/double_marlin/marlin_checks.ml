@@ -82,6 +82,8 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
       let b = prod ms term in
       (a, b)
     in
+    Core.printf "domain h = %d\n%!" (Domain.size domain_h);
+    Core.printf "domain k = %d\n%!" (Domain.size domain_k);
     List.mapi ~f:(fun i (x, y) ->
         as_prover As_prover.(fun () ->
             let x = read_var x in
@@ -100,16 +102,17 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
           ,
           ( a_beta_3
           - b_beta_3
-            * ((beta_3 * g_3) + (sigma_3 / of_int (Domain.size domain_k))) )
+            * ((beta_3 * g_3) + (sigma_3 )) )
       ; 
-          (r_alpha beta_2 * sigma_3)
+          (r_alpha beta_2 * sigma_3 * of_int (Domain.size domain_k) )
           ,
-          ( (h_2 * v_h_beta_2) + (beta_2 * g_2)
-          + (sigma_2 / of_int (Domain.size domain_h)) )
+          ( h_2 * v_h_beta_2 + sigma_2 + g_2 * beta_2
+          )
       ; 
           ( (r_alpha beta_1 * sum ms (fun m -> eta m * z_ m))
-          - (sigma_2 * z_hat) )
+          - (sigma_2 * of_int (Domain.size domain_h) *  z_hat) )
           ,
-          ((h_1 * v_h_beta_1) + (beta_1 * g_1)) ]
+          ((h_1 * v_h_beta_1) + (beta_1 * g_1)) 
+    ]
     |> Boolean.all
 end

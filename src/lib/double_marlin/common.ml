@@ -1,10 +1,10 @@
 open Pickles_types
 
-let hash_pairing_me_only t =
+let hash_pairing_me_only ~app_state t =
   Fp_sponge.digest Fp_sponge.params
     (Types.Pairing_based.Proof_state.Me_only.to_field_elements t
        ~g:(fun ((x, y) : Snarky_bn382_backend.G.Affine.t) -> [x; y])
-       ~app_state:(fun x -> [|x|]))
+       ~app_state)
   |> Digest.Constant.of_bits
 
 let hash_dlog_me_only t =

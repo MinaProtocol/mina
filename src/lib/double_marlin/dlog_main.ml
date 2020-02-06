@@ -127,8 +127,10 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     let pack : Unpacked.t -> Packed.t = Field.project
   end
 
+  let debug = false
+
   let print_g1 lab (x, y) =
-    as_prover
+    if debug then as_prover
       As_prover.(
         fun () ->
           Core.printf "in-snark: %s (%s, %s)\n%!" lab
@@ -136,7 +138,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
             (Field.Constant.to_string (read_var y)))
 
   let print_chal lab x =
-    as_prover
+    if debug then as_prover
       As_prover.(
         fun () ->
           Core.printf "in-snark %s: %s\n%!" lab
@@ -144,7 +146,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
                (Field.Constant.project (List.map ~f:(read Boolean.typ) x))))
 
   let print_bool lab x =
-    as_prover (fun () ->
+    if debug then as_prover (fun () ->
         printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
 
   module PC = G1
@@ -408,7 +410,8 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       equal combined_inner_product actual_combined_inner_product
     in
     let marlin_checks_passed =
-      Marlin_checks.check ~input_domain:Input_domain.domain ~domain_h ~domain_k
+      Marlin_checks.check
+        ~input_domain:Input_domain.self ~domain_h ~domain_k
         ~x_hat_beta_1:x_hat1
         marlin
         { w_hat= beta_1_evals.w_hat

@@ -6,7 +6,7 @@ module type S = Intf.Dlog_main_inputs.S
 open Snarky_bn382_backend
 module Impl = Impls.Dlog_based
 
-let crs_max_degree = 1 lsl 22
+let crs_max_degree = (1 lsl 20)
 
 let fq_random_oracle ?length s = Fq.of_bits (bits_random_oracle ?length s)
 
@@ -18,6 +18,8 @@ let unrelated_g (x, y) =
 
 module Input_domain = struct
   let domain = Domain.Pow_2_roots_of_unity 6
+
+  let self = Domain.Pow_2_roots_of_unity 5
 
   (* TODO: Make the real values *)
   let lagrange_commitments =
@@ -210,7 +212,7 @@ end
 
 let domain_k = Domain.Pow_2_roots_of_unity 18
 
-let domain_h = Domain.Pow_2_roots_of_unity 18
+let domain_h = Domain.Pow_2_roots_of_unity 17
 
 let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)

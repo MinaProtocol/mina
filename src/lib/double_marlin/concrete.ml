@@ -1,3 +1,4 @@
+module I = Intf
 open Types
 open Pickles_types
 module D = Digest
@@ -23,6 +24,8 @@ module Statement = struct
   module Pairing_based = Types.Pairing_based.Statement
 end
 
+module type App_state_intf = 
+  I.App_state_intf with module Impl := Impls.Pairing_based
 
 let compute_challenge ~is_square x =
   let nonresidue = Fq.of_int 7 in
@@ -43,10 +46,8 @@ let compute_sg chals =
           (compute_challenges chals) )
   |> G.Affine.of_backend
 
-module State = Impls.Pairing_based.Field
-
 module Pairing_based_reduced_me_only = struct
-  type t = {app_state: State.Constant.t; sg: Snarky_bn382_backend.G.Affine.t}
+  type 's t = {app_state: 's; sg: Snarky_bn382_backend.G.Affine.t}
   [@@deriving bin_io]
 
   let prepare ~dlog_marlin_index {app_state; sg} =
@@ -69,13 +70,13 @@ module Dlog_based_reduced_me_only = struct
     }
 end
 
-type pairing_based_proof =
+type 's pairing_based_proof =
   { statement:
       ( Challenge.Constant.t
       , Fq.t
       , bool
       , (Challenge.Constant.t, bool) Bulletproof_challenge.t
-      , Pairing_based_reduced_me_only.t
+      , 's Pairing_based_reduced_me_only.t
       , Dlog_based_reduced_me_only.t
       , Digest.Constant.t )
       Statement.Pairing_based.t
@@ -84,7 +85,7 @@ type pairing_based_proof =
   ; proof: Pairing_based.Proof.t }
 [@@deriving bin_io]
 
-type dlog_based_proof =
+type 's dlog_based_proof =
   { statement:
       ( Challenge.Constant.t
       , Fp.t
@@ -93,7 +94,7 @@ type dlog_based_proof =
       , Fq.t
       , Dlog_based_reduced_me_only.t
       , Digest.Constant.t
-      , Pairing_based_reduced_me_only.t )
+      , 's Pairing_based_reduced_me_only.t )
       Statement.Dlog_based.t
   ; prev_evals: Fp.t Pairing_marlin_types.Evals.t
   ; prev_x_hat_beta_1 : Fp.t
@@ -101,7 +102,7 @@ type dlog_based_proof =
 [@@deriving bin_io]
 
 module Dlog_based_proof = struct
-  type t = dlog_based_proof [@@deriving bin_io]
+  type 's t = 's dlog_based_proof [@@deriving bin_io]
 
   module M = Pairing_main.Main (Pairing_main_inputs)
 
@@ -130,7 +131,7 @@ module Dlog_based_proof = struct
     let nonzero_entries = 135457 in
     Domain.Pow_2_roots_of_unity (Int.ceil_log2 nonzero_entries)
 
-  let dlog_crs_max_degree = (1 lsl 20)
+  let dlog_crs_max_degree = Dlog_main_inputs.crs_max_degree
 
   let public_input_of_statement prev_statement =
     let input =
@@ -149,18 +150,20 @@ module Dlog_based_proof = struct
     printf "%s: %!" lab; Fq.print x ; printf "%!"
 
   let step
+    (type state)
+    ((module State) : (module App_state_intf with type Constant.t = state))
       ~dlog_marlin_index
       ~pairing_marlin_index
       pk
       dlog_vk
-      next_app_state
+      (next_app_state: state)
       ( { proof=prev_proof
         ; statement=prev_statement
         ; prev_evals
         ; prev_x_hat_beta_1
         }
-        : dlog_based_proof)
-      : pairing_based_proof
+        : state dlog_based_proof)
+      : state pairing_based_proof
     =
     let prev_challenges =
       (* TODO: This is redone in the call to Dlog_based_reduced_me_only.prepare *)
@@ -172,7 +175,9 @@ module Dlog_based_proof = struct
         prev_statement.pass_through
     in
     let prev_statement_with_hashes : _ Statement.Dlog_based.t =
-      { pass_through=Common.hash_pairing_me_only prev_me_only
+      { pass_through=
+          Common.hash_pairing_me_only prev_me_only
+            ~app_state:State.Constant.to_field_elements
       ; proof_state=
           { prev_statement.proof_state with
             me_only=
@@ -194,10 +199,7 @@ module Dlog_based_proof = struct
         public_input
         prev_proof
     in
-    let was_base_case =
-      Pairing_main_inputs.App_state.Constant.is_base_case
-        next_app_state
-    in
+    let was_base_case = State.Constant.is_base_case next_app_state in
     let (x_hat_1, x_hat_2, x_hat_3) as x_hat = O.x_hat o in
     let beta_1 = O.beta1 o in
     let beta_2 = O.beta2 o in
@@ -263,7 +265,7 @@ module Dlog_based_proof = struct
         combine x_hat_1 beta_1 e1 + r * (combine x_hat_2 beta_2 e2 + r * combine x_hat_3 beta_3 e3)
       in
       let chal = Challenge.Constant.of_fq in
-      let me_only : Pairing_based_reduced_me_only.t =
+      let me_only : state Pairing_based_reduced_me_only.t =
         (* Have the sg be available in the opening proof and verify it. *)
         { app_state= next_app_state
         ; sg=
@@ -314,10 +316,10 @@ module Dlog_based_proof = struct
       | Prev_evals -> k prev_evals
       | Prev_messages -> k proof.messages
       | Prev_openings_proof -> k proof.openings.proof
-      | Prev_app_state Pairing_main_inputs.App_state.Tag -> k prev_statement.pass_through.app_state
+      | Prev_app_state State.Tag -> k prev_statement.pass_through.app_state
       | Prev_sg -> k prev_statement.pass_through.sg
       | Prev_x_hat_beta_1 -> k prev_x_hat_beta_1
-      | Me_only Pairing_main_inputs.App_state.Tag -> k next_me_only_prepared
+      | Me_only State.Tag -> k next_me_only_prepared
       | Prev_proof_state -> k prev_statement_with_hashes.proof_state
       | Compute.Fq_is_square x ->
         k Fq.(is_square (of_bits x))
@@ -330,7 +332,7 @@ module Dlog_based_proof = struct
         (fun x () ->
           Impls.Pairing_based.handle
             (fun () ->
-                M.main (module Pairing_main_inputs.App_state)
+                M.main (module State)
                   x )
             handler
         )
@@ -340,6 +342,7 @@ module Dlog_based_proof = struct
                { next_statement.proof_state with
                  me_only=
                    Common.hash_pairing_me_only
+                     ~app_state:State.Constant.to_field_elements
                      next_me_only_prepared
                }
            ; pass_through=
@@ -356,11 +359,12 @@ end
 module Pairing_based_proof = struct
   module M = Dlog_main.Make (Dlog_main_inputs)
 
-  type t = pairing_based_proof [@@deriving bin_io]
+  type 's t = 's pairing_based_proof [@@deriving bin_io]
 
   (* TODO: Perform finalization as well *)
-  let verify ~dlog_marlin_index ~pairing_marlin_index vk app_state :
-      pairing_based_proof -> bool =
+  let verify  (type s) (module App : App_state_intf with type Constant.t = s)
+      ~dlog_marlin_index ~pairing_marlin_index vk :
+      s pairing_based_proof -> bool =
    fun {statement; prev_evals; proof} ->
     Impls.Pairing_based.verify proof vk
       [ Impls.Pairing_based.input
@@ -372,6 +376,7 @@ module Pairing_based_proof = struct
              { statement.proof_state with
                me_only=
                  Common.hash_pairing_me_only
+                   ~app_state:App.Constant.to_field_elements
                    (Pairing_based_reduced_me_only.prepare ~dlog_marlin_index
                       statement.proof_state.me_only) }
          ; pass_through=
@@ -503,9 +508,11 @@ module Pairing_based_proof = struct
     in
     Fp.one :: List.init (Fp.Vector.length input) ~f:(Fp.Vector.get input)
 
-  let wrap ~dlog_marlin_index ~pairing_marlin_index pairing_vk pk
+  let wrap (type s)
+      (module App : App_state_intf with type Constant.t = s)
+      ~dlog_marlin_index ~pairing_marlin_index pairing_vk pk
       ({statement= prev_statement; prev_x_hat; prev_evals; proof} :
-        pairing_based_proof) =
+        s pairing_based_proof) =
     let prev_me_only : _ Me_only.Dlog_based.t =
       Dlog_based_reduced_me_only.prepare ~pairing_marlin_index
         prev_statement.pass_through
@@ -515,6 +522,7 @@ module Pairing_based_proof = struct
           { prev_statement.proof_state with
             me_only=
               Common.hash_pairing_me_only
+                ~app_state:App.Constant.to_field_elements
                 (Pairing_based_reduced_me_only.prepare ~dlog_marlin_index
                    prev_statement.proof_state.me_only) }
       ; pass_through= Common.hash_dlog_me_only prev_me_only }
@@ -623,47 +631,73 @@ module Pairing_based_proof = struct
       ; prev_evals= proof.openings.evals 
       ; prev_x_hat_beta_1= x_hat_beta_1
       }
-      : dlog_based_proof )
+      : s dlog_based_proof )
 end
 
-let%test_unit "concrete" =
-  let bulletproof_log2 = 20 in
+module Make (State : App_state_intf) : sig
+  val negative_one : State.Constant.t Dlog_based_proof.t
+
+  val step : State.Constant.t Dlog_based_proof.t -> State.Constant.t -> State.Constant.t Pairing_based_proof.t
+  val wrap : State.Constant.t Pairing_based_proof.t -> State.Constant.t  Dlog_based_proof.t
+end = struct
+
+  let bulletproof_log2 = 20
+
   let wrap_kp =
     Impls.Dlog_based.generate_keypair
       ~exposing:[Impls.Dlog_based.input]
       (fun x () -> 
          let () = Pairing_based_proof.M.main ~bulletproof_log2 x in ())
-  in
+
   let step_kp =
     Impls.Pairing_based.generate_keypair
       ~exposing:[Impls.Pairing_based.input ~bulletproof_log2]
-      (fun x () -> let () = Dlog_based_proof.M.main (module Pairing_main_inputs.App_state) x in ())
-  in
-  let step_pk = Impls.Pairing_based.Keypair.pk step_kp in
-  let ro lab length f =
-    let r = ref 0 in
-    fun () ->
-      incr r ;
-      f (Common.bits_random_oracle ~length (sprintf "%s_%d" lab !r))
-  in
-  let chal =
-    ro "chal" Challenge.Constant.length Challenge.Constant.of_bits
-  in
-  let fp =
-    ro "fp" Digest.Constant.length Fp.of_bits
-  in
-  let fq =
-    ro "fq" Digest.Constant.length Fq.of_bits
-  in
-  let old_bulletproof_challenges =
-    let f = ro "bpchal" Challenge.Constant.length Challenge.Constant.of_bits in
-    Array.init bulletproof_log2 ~f:(fun _ ->
-        let prechallenge = f () in
-        { Bulletproof_challenge.prechallenge
-        ; is_square = Fq.is_square (Fq.of_bits (Challenge.Constant.to_bits prechallenge)) } )
-  in
-  let old_sg = compute_sg old_bulletproof_challenges in
-  let dummy_dlog_proof : dlog_based_proof =
+      (fun x () ->
+         let () =
+           Dlog_based_proof.M.main
+             (module State) x
+         in
+         ())
+
+  let step_pk = Impls.Pairing_based.Keypair.pk step_kp
+
+  let pairing_marlin_index =
+    Snarky_bn382_backend.Pairing_based.Keypair.vk_commitments
+      step_pk
+
+  let wrap_pk = Impls.Dlog_based.Keypair.pk wrap_kp
+
+  let dlog_marlin_index =
+    Snarky_bn382_backend.Dlog_based.Keypair.vk_commitments
+      wrap_pk
+
+  let wrap_vk = Impls.Dlog_based.Keypair.vk wrap_kp
+  let step_vk = Impls.Pairing_based.Keypair.vk step_kp
+
+  let negative_one : State.Constant.t dlog_based_proof =
+    let ro lab length f =
+      let r = ref 0 in
+      fun () ->
+        incr r ;
+        f (Common.bits_random_oracle ~length (sprintf "%s_%d" lab !r))
+    in
+    let chal =
+      ro "chal" Challenge.Constant.length Challenge.Constant.of_bits
+    in
+    let fp =
+      ro "fp" Digest.Constant.length Fp.of_bits
+    in
+    let fq =
+      ro "fq" Digest.Constant.length Fq.of_bits
+    in
+    let old_bulletproof_challenges =
+      let f = ro "bpchal" Challenge.Constant.length Challenge.Constant.of_bits in
+      Array.init bulletproof_log2 ~f:(fun _ ->
+          let prechallenge = f () in
+          { Bulletproof_challenge.prechallenge
+          ; is_square = Fq.is_square (Fq.of_bits (Challenge.Constant.to_bits prechallenge)) } )
+    in
+    let old_sg = compute_sg old_bulletproof_challenges in
     let opening_check : _ Pairing_marlin_types.Accumulator.Opening_check.t =
       (* TODO: Leaky *)
       let t = Snarky_bn382.Fp_urs.dummy_opening_check
@@ -780,7 +814,7 @@ let%test_unit "concrete" =
               }
           }
         ; pass_through=
-            { app_state= Fp.zero
+            { app_state= State.Constant.dummy
             ; sg=old_sg
             }
         }
@@ -804,67 +838,69 @@ let%test_unit "concrete" =
            }
          )
     }
-  in
-  let pairing_marlin_index =
-    Snarky_bn382_backend.Pairing_based.Keypair.vk_commitments
+
+  let step dlog_proof next_state =
+    Dlog_based_proof.step
+      (module State)
+      ~dlog_marlin_index
+      ~pairing_marlin_index
       step_pk
-  in
-  let wrap_pk = Impls.Dlog_based.Keypair.pk wrap_kp in
-  let dlog_marlin_index =
-    Snarky_bn382_backend.Dlog_based.Keypair.vk_commitments
-      wrap_pk
-  in
-  let wrap_vk = Impls.Dlog_based.Keypair.vk wrap_kp in
-  let step_vk = Impls.Pairing_based.Keypair.vk step_kp in
-  let before = Time.now () in
-  Core.printf "Entering step\n%!";
-  let proof =
-  Dlog_based_proof.step
-    ~dlog_marlin_index
-    ~pairing_marlin_index
-    step_pk
-    wrap_vk
-    Fp.zero
-    dummy_dlog_proof in
-  let after = Time.now () in
-  printf !"took %s\n%!"
-    (Time.Span.to_string_hum (Time.diff after before)) ;
-  let before = Time.now () in
-  Core.printf "Entering wrap\n%!";
-  let proof =
+      wrap_vk
+      next_state
+      dlog_proof
+
+  let wrap proof =
     Pairing_based_proof.wrap
+      (module State)
       ~dlog_marlin_index
       ~pairing_marlin_index
       step_vk
       wrap_pk
       proof
+end
+
+let%test_unit "concrete" =
+  let module State = struct
+    open Impls.Pairing_based
+
+    type t = Field.t
+
+    type _ Tag.t += Tag : Field.Constant.t Tag.t
+
+    module Constant = struct
+      include Field.Constant
+
+      let is_base_case = Field.Constant.(equal zero)
+
+      let to_field_elements x = [|x|]
+
+      let dummy = Field.Constant.zero
+    end
+
+    let to_field_elements x = [|x|]
+
+    let typ = Typ.field
+
+    let check_update x0 x1 = Field.(equal x1 (x0 + one))
+
+    let is_base_case x = Field.(equal x zero)
+  end
   in
-  let after = Time.now () in
-  printf !"took %s\n%!"
-    (Time.Span.to_string_hum (Time.diff after before))  ;
-  let before = Time.now () in
+  let module M = Make(State) in
+  let open Common in
   let proof =
-  Dlog_based_proof.step
-    ~dlog_marlin_index
-    ~pairing_marlin_index
-    step_pk
-    wrap_vk
-    Fp.one
-    proof
+    time "first step" (fun () ->
+      M.step M.negative_one Fp.zero )
   in
-  let after = Time.now () in
-  printf !"nextstep took %s\n%!"
-    (Time.Span.to_string_hum (Time.diff after before))  ;
-  let before = Time.now () in
-  Core.printf "Entering wrap\n%!";
   let proof =
-    Pairing_based_proof.wrap
-      ~dlog_marlin_index
-      ~pairing_marlin_index
-      step_vk
-      wrap_pk
-      proof
+    time "first wrap" (fun () ->
+        M.wrap proof ) 
   in
-  let after = Time.now () in
-  printf !"nextwrap took %s\n%!"
-    (Time.Span.to_string_hum (Time.diff after before))  ;
+  let proof =
+    time "second step" (fun () ->
+      M.step proof Fp.one ) in
+  let proof =
+    time "second wrap" (fun () ->
+        M.wrap proof )
+  in
+  ()

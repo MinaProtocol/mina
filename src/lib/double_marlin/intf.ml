@@ -10,8 +10,14 @@ module type App_state_intf = sig
   module Constant : sig
     type t
 
-    val tag : t Tag.t
+    val is_base_case : t -> bool
+
+    val to_field_elements : t -> Impl.Field.Constant.t array
+
+    val dummy : t
   end
+
+  type _ Tag.t += Tag : Constant.t Tag.t
 
   (* This function should be collision resistant. *)
   val to_field_elements : t -> Impl.Field.t array
@@ -233,6 +239,8 @@ module Dlog_main_inputs = struct
     module Input_domain : sig
       val domain : Domain.t
 
+      val self : Domain.t
+
       val lagrange_commitments : G1.Constant.t array
     end
 
@@ -284,6 +292,8 @@ module Pairing_main_inputs = struct
 
     module Input_domain : sig
       val domain : Domain.t
+
+      val self : Domain.t
 
       val lagrange_commitments : G.Constant.t array
     end

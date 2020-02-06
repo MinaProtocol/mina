@@ -393,7 +393,8 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
           Fp.equal r_xi_sum r_xi_sum_actual
     in
     let marlin_checks =
-      Marlin_checks.check ~x_hat_beta_1 ~input_domain:Input_domain.domain
+      Marlin_checks.check ~x_hat_beta_1
+        ~input_domain:Input_domain.self
         ~domain_h ~domain_k marlin evals 
     in
     begin
@@ -473,7 +474,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         _ Statement.t) =
     let me_only =
       exists
-        ~request:(fun () -> Requests.Me_only A.Constant.tag)
+        ~request:(fun () -> Requests.Me_only A.Tag)
         (Types.Pairing_based.Proof_state.Me_only.typ G.typ A.typ)
     in
     let { Types.Pairing_based.Proof_state.Me_only.app_state
@@ -482,9 +483,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       me_only
     in
     let hash_me_only = unstage (hash_me_only am ~index:dlog_marlin_index) in
-    let () =
-      Field.Assert.equal me_only_digest (Field.pack (hash_me_only me_only))
-    in
+    Field.Assert.equal me_only_digest (Field.pack (hash_me_only me_only)) ;
     let ( prev_deferred_values
         , prev_sponge_digest_before_evaluations
         , prev_proof_state ) =
@@ -500,7 +499,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       , state )
     in
     let prev_app_state =
-      exists A.typ ~request:(fun () -> Requests.Prev_app_state A.Constant.tag)
+      exists A.typ ~request:(fun () -> Requests.Prev_app_state A.Tag)
     in
     let sg_old = exists G.typ ~request:(fun () -> Requests.Prev_sg) in
     let prev_statement =
