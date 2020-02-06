@@ -51,11 +51,9 @@ let keep_trying :
 (* Unfortunately, `dune runtest` runs in a pwd deep inside the build directory.
    This hack finds the project root by recursively looking for the dune-project
    file. *)
-let get_project_root logger =
+let get_project_root () =
   let open Filename in
   let rec go dir =
-    Logger.fatal logger "examining %s" dir ~module_:__MODULE__
-      ~location:__LOC__ ;
     if Core.Sys.file_exists_exn @@ dir ^/ "src/dune-project" then Some dir
     else if String.equal dir "/" then None
     else go @@ fst @@ split dir
@@ -260,7 +258,7 @@ let start_custom :
     ~metadata:[("args", `List (List.map args ~f:(fun a -> `String a)))] ;
   let%bind coda_binary_path = get_coda_binary () in
   let relative_to_root =
-    get_project_root logger
+    get_project_root ()
     |> Option.map ~f:(fun root -> root ^/ git_root_relative_path)
   in
   let%bind process =
