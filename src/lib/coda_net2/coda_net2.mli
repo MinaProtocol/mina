@@ -40,7 +40,7 @@ asynchronous and post-hoc. In the background, once per minute it checks the
 connection count. If it is above the "high water mark", it will close
 ("trim") eligible connections until it reaches the "low water mark". All
 connections start with a "grace period" where they won't be closed. Peer IDs
-can be marked as "protected" which prevents them being trimmed. cmr believes this
+can be marked as "protected" which prevents them being trimmed. Ember believes this
 is vulnerable to resource exhaustion by opening many new connections.
 
 *)

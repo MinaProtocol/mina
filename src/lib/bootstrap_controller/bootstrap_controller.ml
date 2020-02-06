@@ -292,7 +292,11 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               Consensus.Hooks.sync_local_state
                 ~local_state:consensus_local_state ~logger ~trust_system
                 ~random_peers:(fun n ->
-                  Coda_networking.random_peers t.network n )
+                  (* This port is completely made up but we only use the peer_id when doing a query, so it shouldn't matter. *)
+                  let%map peers = Coda_networking.random_peers t.network n in
+                  Network_peer.Peer.create sender_host ~libp2p_port:0
+                    ~peer_id:sender_peer_id
+                  :: peers )
                 ~query_peer:
                   { Consensus.Hooks.Rpcs.query=
                       (fun peer rpc query ->

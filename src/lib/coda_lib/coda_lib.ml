@@ -856,7 +856,6 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                             , External_transition.Validated.to_yojson
                                 transition ) ]
                         "Rebroadcasting $state_hash" ;
-                      (* remove verified status for network broadcast *)
                       External_transition.Validated.broadcast transition
                   | Error reason ->
                       let timing_error_json =

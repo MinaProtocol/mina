@@ -42,23 +42,10 @@ struct
     let second_hash = get ctx3 |> to_raw_string in
     second_hash |> String.sub ~pos:0 ~len:checksum_len
 
-  let logger = Logger.create ()
-
   let encode payload =
     let checksum = compute_checksum payload in
     let bytes = version_string ^ payload ^ checksum |> Bytes.of_string in
-    let before = Time.now () in
-    let res = B58.encode coda_alphabet bytes in
-    let after = Time.now () in
-    if
-      String.length payload > 4096
-      || Time.Span.(Time.diff after before >= of_sec 1.)
-    then
-      Logger.warn logger "Base58_check.encode %d bytes took %s"
-        (String.length payload)
-        (Time.Span.to_string (Time.diff after before))
-        ~module_:__MODULE__ ~location:__LOC__ ;
-    Bytes.to_string res
+    B58.encode coda_alphabet bytes |> Bytes.to_string
 
   let decode_exn s =
     let bytes = Bytes.of_string s in
