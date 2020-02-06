@@ -805,7 +805,6 @@ end = struct
               Digest.Constant.of_fq Fq.zero
           ; was_base_case= true
           ; me_only=
-              (* TODO: Gotta make this stuff real *)
               { pairing_marlin_acc=
                   { opening_check
                   ; degree_bound_checks

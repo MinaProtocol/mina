@@ -21,7 +21,6 @@ module Input_domain = struct
 
   let self = Domain.Pow_2_roots_of_unity 5
 
-  (* TODO: Make the real values *)
   let lagrange_commitments =
     let x = 64 in
     let u = Unsigned.Size_t.of_int in
@@ -162,7 +161,6 @@ module G1 = struct
                 (Fp.inv (Fp.of_bits (List.map ~f:(read Boolean.typ) bs)))
               |> G1.to_affine_exn)
     in
-    (* TODO: assert_equal t (scale res bs) ; *)
     ignore (scale res bs) ;
     res
 
@@ -182,12 +180,10 @@ module G1 = struct
             fun () ->
               G1.(to_affine_exn (scale (of_affine (read typ t)) one_seventh)))
     in
-    (*TODO:assert_equal t (scale_by_quadratic_nonresidue res) ; *)
     ignore (scale_by_quadratic_nonresidue res) ;
     res
 
-  let if_ b ~then_:(tx, ty) ~else_:(ex, ey) =
-    (Field.if_ b ~then_:tx ~else_:ex, Field.if_ b ~then_:ty ~else_:ey)
+  let if_ = T.if_
 end
 
 module Generators = struct

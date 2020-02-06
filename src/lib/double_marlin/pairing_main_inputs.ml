@@ -50,7 +50,6 @@ module Input_domain = struct
 
   let domain = Domain.Pow_2_roots_of_unity 5
 
-  (* TODO: Make the real values *)
   let lagrange_commitments =
     let domain_size = Domain.size domain in
     let u = Unsigned.Size_t.of_int in
@@ -167,7 +166,6 @@ module G = struct
         done ;
         res )
 
-  (*         T.scale t (Bitstring_lib.Bitstring.Lsb_first.of_list bs) *)
   let to_field_elements (x, y) = [x; y]
 
   let assert_equal (x1, y1) (x2, y2) =
@@ -184,7 +182,6 @@ module G = struct
                 (Fq.inv (Fq.of_bits (List.map ~f:(read Boolean.typ) bs)))
               |> G.to_affine_exn)
     in
-    (* TODO: assert_equal t (scale res bs) ; *)
     ignore (scale res bs) ;
     res
 
@@ -204,7 +201,6 @@ module G = struct
             fun () ->
               G.to_affine_exn (G.scale (G.of_affine (read typ t)) one_seventh))
     in
-    (*TODO:assert_equal t (scale_by_quadratic_nonresidue res) ; *)
     ignore (scale_by_quadratic_nonresidue res) ;
     res
 
@@ -212,8 +208,7 @@ module G = struct
 
   let one = T.one
 
-  let if_ b ~then_:(tx, ty) ~else_:(ex, ey) =
-    (Field.if_ b ~then_:tx ~else_:ex, Field.if_ b ~then_:ty ~else_:ey)
+  let if_ = T.if_
 end
 
 let domain_k = Domain.Pow_2_roots_of_unity 18
@@ -221,11 +216,8 @@ let domain_k = Domain.Pow_2_roots_of_unity 18
 let domain_h = Domain.Pow_2_roots_of_unity 17
 
 module Generators = struct
-  let g = G.one
-
   let h =
     Snarky_bn382.Fq_urs.h
       (Lazy.force Snarky_bn382_backend.Dlog_based.Keypair.urs)
     |> Snarky_bn382_backend.G.Affine.of_backend
-    |> G.constant
 end

@@ -28,22 +28,17 @@ end
 module Dlog_based = struct
   module Proof_state = struct
     module Deferred_values = struct
-      (* For each evaluation point beta_i, just expose the value of
-        \sum_j xi^i f_j(beta_i). The next person can exists in
-        the actualy values f_j(beta_i) and check them against that
-        value and xi.
-      *)
       module Marlin = struct
         type ('challenge, 'fp) t =
           { sigma_2: 'fp
           ; sigma_3: 'fp
-          ; alpha: 'challenge (* 128 bits *)
-          ; eta_a: 'challenge (* 128 bits *)
-          ; eta_b: 'challenge (* 128 bits *)
-          ; eta_c: 'challenge (* 128 bits *)
-          ; beta_1: 'challenge (* 128 bits *)
-          ; beta_2: 'challenge (* 128 bits *)
-          ; beta_3: 'challenge (* 128 bits *) }
+          ; alpha: 'challenge 
+          ; eta_a: 'challenge 
+          ; eta_b: 'challenge 
+          ; eta_c: 'challenge 
+          ; beta_1: 'challenge 
+          ; beta_2: 'challenge 
+          ; beta_3: 'challenge  }
         [@@deriving bin_io]
 
         let map_challenges
@@ -254,38 +249,6 @@ module Dlog_based = struct
       ; pass_through: 'pass_through }
     [@@deriving bin_io]
 
-    (*
-    let reader ~fp ~challenge ()  =
-      let deferred_values () =
-        let marlin () =
-          let sigma_2 = fp () in
-          let sigma_3 = fp () in
-          let alpha = challenge () in
-          let eta_a = challenge () in
-          let eta_b = challenge () in
-          let eta_c = challenge () in
-          let beta_1 = challenge () in
-          let beta_2 = challenge () in
-          let beta_3 = challenge () in
-          { Proof_state.Deferred_values.Marlin.sigma_2
-          ; sigma_3
-          ; alpha
-          ; eta_a
-          ; eta_b
-          ; eta_c
-          ; beta_1
-          ; beta_2
-          ; beta_3
-          }
-        in
-        let xi = challenge () in
-        let 
-        let marlin = marlin () in
-      in
-
-*)
-    (* An isomorphism with bool list * field list.
-    *)
     let to_data
         { proof_state=
             { deferred_values=
@@ -382,20 +345,6 @@ module Pairing_based = struct
 
     type ('fq, 'g) t =
       {evaluations: 'fq Evaluations.t; proof: ('fq, 'g) Bulletproof.t}
-
-    (* TODO
-    open Snarky.H_list
-    let to_hlist {evaluations; proof} = [evaluations; proof]
-    let of_hlist ([evaluations; proof] : (unit, _) t) = {evaluations; proof}
-
-    let typ fq g ~length =
-      let open Snarky.Typ in
-      of_hlistable
-        [ B
-        ]
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-        ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-*)
   end
 
   module Proof_state = struct

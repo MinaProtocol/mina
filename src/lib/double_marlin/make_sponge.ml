@@ -26,7 +26,6 @@ module Make (Field : Snarky_bn382_backend.Field.S) = struct
     module Operations = struct
       let add_assign ~state i x = Field.(state.(i) += x)
 
-    (* TODO: Clean this up to use the near mds matrix properly *)
       let apply_affine_map (_rows, c) v =
         let open Field in
         let res = [| v.(0) + v.(2); v.(0) + v.(1); v.(1) + v.(2) |] in
@@ -41,7 +40,6 @@ module Make (Field : Snarky_bn382_backend.Field.S) = struct
   module Field = Sponge.Make_sponge (Sponge.Poseidon (Inputs))
   module Bits = Sponge.Make_bit_sponge (Bool) (Inputs.Field) (Field)
 
-  (* TODO: Check digest length here *)
   let digest params elts =
     let sponge = Bits.create params in
     Array.iter elts ~f:(Bits.absorb sponge) ;

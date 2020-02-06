@@ -71,8 +71,10 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
           t
   end
 
+  let debug = false
+
   let print_g lab g =
-    as_prover As_prover.(fun () ->
+    if debug then as_prover As_prover.(fun () ->
         match G.to_field_elements g with
         | [x; y ] ->
           printf !"%s: %!"
@@ -86,18 +88,18 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       )
 
   let print_chal lab chal =
-    as_prover As_prover.(fun () ->
+    if debug then as_prover As_prover.(fun () ->
         printf !"%s: %{sexp:Challenge.Constant.t}\n%!" lab
         (read Challenge.typ chal) )
 
   let print_fp lab x =
-    as_prover (fun () ->
+    if debug then as_prover (fun () ->
     printf "%s: %!" lab;
     Fp.Constant.print (As_prover.read Field.typ x) ;
     printf "\n%!" )
 
   let print_bool lab x =
-    as_prover (fun () ->
+    if debug then as_prover (fun () ->
         printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
 
   let rec absorb : type a.
@@ -167,6 +169,8 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
 
   let dlog_pcs_batch = Common.dlog_pcs_batch ~domain_h ~domain_k
 
+  let h_precomp = G.Scaling_precomputation.create Generators.h
+
   let check_bulletproof ~sponge ~xi ~combined_inner_product
       ~
       (* Corresponds to y in figure 7 of WTS *)
@@ -181,7 +185,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       (* TODO sample u randomly *)
       G.one
     in
-    (* TODO: Absorb (combined_polynomial, inner_product_result/tau *)
     let open G in
     let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
       Pcs_batch.combine_commitments dlog_pcs_batch ~scale
@@ -190,7 +193,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         without_degree_bound
         with_degree_bound
     in
-    (* TODO: Absorb challenges into the sponge and expose it as another input *)
     let lr_prod, challenges = bullet_reduce sponge lr in
     let p_prime = combined_polynomial + scale u (Fq.to_bits combined_inner_product) in
     let q = p_prime + lr_prod in
@@ -202,8 +204,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       let scale t x = scale t (Fq.to_bits x) in
       let b_u = scale u advice.b in
       let z_1_g_plus_b_u = scale (sg + b_u) z_1 in
-      (* TODO: Use scale_known *)
-      let z2_h = scale Generators.h z_2 in
+      let z2_h = G.multiscale_known [| (Fq.to_bits z_2, h_precomp) |] in
       print_g "Ou" u;
       print_g "Ob_u" b_u;
       print_g "Oz1 (g + b u)" z_1_g_plus_b_u;

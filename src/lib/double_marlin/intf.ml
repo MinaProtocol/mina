@@ -281,9 +281,7 @@ module Pairing_main_inputs = struct
     end
 
     module Generators : sig
-      val g : G.t
-
-      val h : G.t
+      val h : G.Constant.t
     end
 
     val domain_h : Domain.t

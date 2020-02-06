@@ -338,7 +338,6 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   let prod xs f = List.reduce_exn (List.map xs ~f) ~f:Fq.( * )
 
-  (* TODO: Check a_hat! *)
   let compute_challenges chals =
     (* TODO: Put this in the functor argument. *)
     let nonresidue = Fq.of_int 7 in
@@ -351,6 +350,11 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
         Fq.sqrt sq )
 
   module Marlin_checks = Marlin_checks.Make (Impl)
+
+  let b_poly chals =
+    let open Fq in
+    let chal_invs = Array.map chals ~f:inv in
+    fun x -> sg_polynomial ~add ~mul chals chal_invs x
 
   let finalize_other_proof ~domain_k ~domain_h ~sponge
       ~old_bulletproof_challenges
@@ -390,13 +394,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     let combined_inner_product_correct =
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       let actual_combined_inner_product =
-        let sg_old =
-          let old_bulletproof_challenges_inv =
-            Array.map old_bulletproof_challenges ~f:Field.inv
-          in
-          sg_polynomial ~add:Field.add ~mul:Field.mul
-            old_bulletproof_challenges old_bulletproof_challenges_inv
-        in
+        let sg_old = b_poly old_bulletproof_challenges in
         let combine pt x_hat e =
           let a, b = Evals.to_vectors e in
           combined_evaluation ~xi ~evaluation_point:pt
@@ -408,6 +406,12 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
             + (r * combine marlin.beta_3 x_hat3 beta_3_evals) )
       in
       equal combined_inner_product actual_combined_inner_product
+    in
+    let bulletproof_challenges = compute_challenges bulletproof_challenges in
+    let b_correct =
+      let b_poly = b_poly bulletproof_challenges in
+      let b_actual = b_poly marlin.beta_1 + r * (b_poly marlin.beta_2 + r * (b_poly marlin.beta_3)) in
+      equal b b_actual
     in
     let marlin_checks_passed =
       Marlin_checks.check
@@ -431,9 +435,10 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     in
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;
     print_bool "marlin_checks_passed" marlin_checks_passed ;
+    print_bool "b_correct" b_correct ;
     ( Boolean.all
-        [xi_and_r_correct; combined_inner_product_correct; marlin_checks_passed]
-    , compute_challenges bulletproof_challenges )
+        [xi_and_r_correct; b_correct; combined_inner_product_correct; marlin_checks_passed]
+    , bulletproof_challenges )
 
   (* TODO: No need to hash the entire bulletproof challenges. Could
    just hash the segment of the public input LDE corresponding to them
@@ -571,11 +576,10 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
        *)
 
   let main (bool, fp, challenge, digest) =
-    (* TODO: Use unpack? *)
     let unpack length = Vector.map ~f:(Fq.choose_preimage_var ~length) in
     ( bool
-    , unpack Fq.size_in_bits fp (*     , fq *)
-    , unpack Challenge.length challenge (*     , fq_challenge *)
+    , unpack Fq.size_in_bits fp
+    , unpack Challenge.length challenge
     , digest )
     |> Types.Dlog_based.Statement.of_data |> main
 end
