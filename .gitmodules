@@ -25,3 +25,6 @@
 [submodule "src/lib/zexe"]
 	path = src/lib/zexe
 	url = git@github.com:o1-labs/zexe.git
+[submodule "src/lib/marlin"]
+	path = src/lib/marlin
+	url = git@github.com:o1-labs/marlin.git
