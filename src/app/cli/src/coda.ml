@@ -130,12 +130,13 @@ let daemon logger =
            "Have REST server listen on all addresses, not just localhost \
             (this is INSECURE, make sure your firewall is configured \
             correctly!)"
+     (* FIXME #4095
      and limit_connections =
        flag "limit-concurrent-connections"
          ~doc:
            "true|false Limit the number of concurrent connections per IP \
             address (default: true)"
-         (optional bool)
+         (optional bool)*)
      (*TODO: This is being added to log all the snark works received for the
      beta-testnet challenge. We might want to remove this later?*)
      and log_received_snark_pool_diff =
@@ -398,11 +399,12 @@ let daemon logger =
          in
          (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
          let _max_concurrent_connections =
-           if
+           (*if
              or_from_config YJ.Util.to_bool_option "max-concurrent-connections"
                ~default:true limit_connections
            then Some 40
-           else None
+           else *)
+           None
          in
          let work_selection_method =
            or_from_config
