@@ -74,33 +74,40 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
   let debug = false
 
   let print_g lab g =
-    if debug then as_prover As_prover.(fun () ->
-        match G.to_field_elements g with
-        | [x; y ] ->
-          printf !"%s: %!"
-            lab;
-          Field.Constant.print (read_var x);
-          printf ", %!";
-          Field.Constant.print (read_var y);
-          printf "\n%!"
-
-        | _ -> assert false
-      )
+    if debug then
+      as_prover
+        As_prover.(
+          fun () ->
+            match G.to_field_elements g with
+            | [x; y] ->
+                printf !"%s: %!" lab ;
+                Field.Constant.print (read_var x) ;
+                printf ", %!" ;
+                Field.Constant.print (read_var y) ;
+                printf "\n%!"
+            | _ ->
+                assert false)
 
   let print_chal lab chal =
-    if debug then as_prover As_prover.(fun () ->
-        printf !"%s: %{sexp:Challenge.Constant.t}\n%!" lab
-        (read Challenge.typ chal) )
+    if debug then
+      as_prover
+        As_prover.(
+          fun () ->
+            printf
+              !"%s: %{sexp:Challenge.Constant.t}\n%!"
+              lab (read Challenge.typ chal))
 
   let print_fp lab x =
-    if debug then as_prover (fun () ->
-    printf "%s: %!" lab;
-    Fp.Constant.print (As_prover.read Field.typ x) ;
-    printf "\n%!" )
+    if debug then
+      as_prover (fun () ->
+          printf "%s: %!" lab ;
+          Fp.Constant.print (As_prover.read Field.typ x) ;
+          printf "\n%!" )
 
   let print_bool lab x =
-    if debug then as_prover (fun () ->
-        printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
+    if debug then
+      as_prover (fun () ->
+          printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x) )
 
   let rec absorb : type a.
       Sponge.t -> (a, < scalar: Fq.t ; g1: G.t >) Type.t -> a -> unit =
@@ -136,8 +143,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       in
       let left_term =
         let base =
-          G.if_ pre_is_square
-            ~then_:l
+          G.if_ pre_is_square ~then_:l
             ~else_:(G.scale_by_quadratic_nonresidue l)
         in
         G.scale base pre
@@ -177,24 +183,24 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       (advice : _ Openings.Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
-      ~openings_proof:({ lr; delta; z_1; z_2; sg } : (Fq.t, G.t) Openings.Bulletproof.t) =
+      ~openings_proof:({lr; delta; z_1; z_2; sg} :
+                        (Fq.t, G.t) Openings.Bulletproof.t) =
     (* a_hat should be equal to
        sum_i < t, r^i pows(beta_i) >
        = sum_i r^i < t, pows(beta_i) > *)
-    let u = 
+    let u =
       (* TODO sample u randomly *)
       G.one
     in
     let open G in
     let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
-      Pcs_batch.combine_commitments dlog_pcs_batch ~scale
-        ~add:(+)
-        ~xi
-        without_degree_bound
-        with_degree_bound
+      Pcs_batch.combine_commitments dlog_pcs_batch ~scale ~add:( + ) ~xi
+        without_degree_bound with_degree_bound
     in
     let lr_prod, challenges = bullet_reduce sponge lr in
-    let p_prime = combined_polynomial + scale u (Fq.to_bits combined_inner_product) in
+    let p_prime =
+      combined_polynomial + scale u (Fq.to_bits combined_inner_product)
+    in
     let q = p_prime + lr_prod in
     absorb sponge PC delta ;
     let c = Sponge.squeeze sponge ~length:Challenge.length in
@@ -204,16 +210,16 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       let scale t x = scale t (Fq.to_bits x) in
       let b_u = scale u advice.b in
       let z_1_g_plus_b_u = scale (sg + b_u) z_1 in
-      let z2_h = G.multiscale_known [| (Fq.to_bits z_2, h_precomp) |] in
-      print_g "Ou" u;
-      print_g "Ob_u" b_u;
-      print_g "Oz1 (g + b u)" z_1_g_plus_b_u;
-      print_g "Oz2 h" z2_h;
+      let z2_h = G.multiscale_known [|(Fq.to_bits z_2, h_precomp)|] in
+      print_g "Ou" u ;
+      print_g "Ob_u" b_u ;
+      print_g "Oz1 (g + b u)" z_1_g_plus_b_u ;
+      print_g "Oz2 h" z2_h ;
       z_1_g_plus_b_u + z2_h
     in
     print_chal "Oxi" xi ;
     print_g "Ocombined_polynomial" combined_polynomial ;
-    print_g "Osg" sg;
+    print_g "Osg" sg ;
     print_chal "Oc" c ;
     print_g "Olr_prod" lr_prod ;
     print_g "Olhs" lhs ;
@@ -234,7 +240,9 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let sample () = Sponge.squeeze sponge ~length:Challenge.length in
     let open Pairing_marlin_types.Messages in
     let x_hat =
-      assert (Int.ceil_pow2 (Array.length public_input) = Domain.size Input_domain.domain);
+      assert (
+        Int.ceil_pow2 (Array.length public_input)
+        = Domain.size Input_domain.domain ) ;
       G.multiscale_known
         (Array.mapi public_input ~f:(fun i x ->
              (x, lagrange_precomputations.(i)) ))
@@ -247,7 +255,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let eta_a = sample () in
     let eta_b = sample () in
     let eta_c = sample () in
-    let g_1, h_1 = receive ( (PC :: PC) :: PC) gh_1 in
+    let g_1, h_1 = receive ((PC :: PC) :: PC) gh_1 in
     let beta_1 = sample () in
     (* At this point, we should use the previous "bulletproof_challenges" to
        compute to compute f(beta_1) outside the snark
@@ -282,11 +290,8 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
          It should be sufficient to fork the sponge after squeezing beta_3 and then to absorb
          the combined inner product. 
       *)
-      check_bulletproof
-        ~sponge:sponge_before_evaluations
-        ~xi
-        ~combined_inner_product ~advice
-        ~openings_proof
+      check_bulletproof ~sponge:sponge_before_evaluations ~xi
+        ~combined_inner_product ~advice ~openings_proof
         ~polynomials:
           ( [ sg_old
             ; x_hat
@@ -304,11 +309,10 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
             ; m.col.c
             ; m.value.a
             ; m.value.b
-            ; m.value.c 
+            ; m.value.c
             ; m.rc.a
             ; m.rc.b
-            ; m.rc.c 
-            ]
+            ; m.rc.c ]
           , [g_1; g_2; g_3] )
     in
     ( sponge_digest_before_evaluations
@@ -358,9 +362,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let x_hat_beta_1 =
       exists Field.typ ~request:(fun () -> Requests.Prev_x_hat_beta_1)
     in
-    let absorb_field x =
-      Sponge.absorb sponge (`Field x)
-    in
+    let absorb_field x = Sponge.absorb sponge (`Field x) in
     absorb_field x_hat_beta_1 ;
     Vector.iter (Evals.to_vector evals) ~f:absorb_field ;
     let open Fp in
@@ -373,59 +375,45 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let beta1, beta2, beta3 =
       Evals.to_combined_vectors ~x_hat:x_hat_beta_1 evals
     in
-    let xi_correct =
-      Fp.equal (Field.pack xi_actual) xi
-    in
-    let r_correct =
-      Fp.equal (Field.pack r_actual) r
-    in
+    let xi_correct = Fp.equal (Field.pack xi_actual) xi in
+    let r_correct = Fp.equal (Field.pack r_actual) r in
     let r_xi_sum_correct =
       let r_xi_sum_actual =
-            r
-            * ( combined_evaluation Common.pairing_beta_1_pcs_batch
-                  marlin.beta_1 beta1
+        r
+        * ( combined_evaluation Common.pairing_beta_1_pcs_batch marlin.beta_1
+              beta1
+          + r
+            * ( combined_evaluation Common.pairing_beta_2_pcs_batch
+                  marlin.beta_2 beta2
               + r
-                * ( combined_evaluation Common.pairing_beta_2_pcs_batch
-                      marlin.beta_2 beta2
-                  + r
-                    * combined_evaluation Common.pairing_beta_3_pcs_batch
-                        marlin.beta_3 beta3 ) )
-          in
-          Fp.equal r_xi_sum r_xi_sum_actual
+                * combined_evaluation Common.pairing_beta_3_pcs_batch
+                    marlin.beta_3 beta3 ) )
+      in
+      Fp.equal r_xi_sum r_xi_sum_actual
     in
     let marlin_checks =
-      Marlin_checks.check ~x_hat_beta_1
-        ~input_domain:Input_domain.self
-        ~domain_h ~domain_k marlin evals 
+      Marlin_checks.check ~x_hat_beta_1 ~input_domain:Input_domain.self
+        ~domain_h ~domain_k marlin evals
     in
-    begin
-      as_prover As_prover.(fun () ->
-          if not (read Boolean.typ r_correct)
-          then begin
+    as_prover
+      As_prover.(
+        fun () ->
+          if not (read Boolean.typ r_correct) then (
             print_fp "r" r ;
-            print_fp "r_actual" (Field.pack r_actual) ;
-          end
-        );
-      as_prover As_prover.(fun () ->
-          if not (read Boolean.typ xi_correct)
-          then begin
+            print_fp "r_actual" (Field.pack r_actual) )) ;
+    as_prover
+      As_prover.(
+        fun () ->
+          if not (read Boolean.typ xi_correct) then (
             print_fp "xi" xi ;
-            print_fp "xi_actual" (Field.pack xi_actual) ;
-          end
-        );
-      List.iter ~f:(Tuple2.uncurry (Fn.flip print_bool))
-        [ xi_correct, "xi_correct"
-        ; r_correct, "r_correct"
-        ; r_xi_sum_correct, "r_xi_sum_correct"
-        ; marlin_checks , "marlin_checks"
-        ] ;
-    end;
-    Boolean.all
-      [ xi_correct
-      ; r_correct
-      ; r_xi_sum_correct
-      ; marlin_checks ]
-          
+            print_fp "xi_actual" (Field.pack xi_actual) )) ;
+    List.iter
+      ~f:(Tuple2.uncurry (Fn.flip print_bool))
+      [ (xi_correct, "xi_correct")
+      ; (r_correct, "r_correct")
+      ; (r_xi_sum_correct, "r_xi_sum_correct")
+      ; (marlin_checks, "marlin_checks") ] ;
+    Boolean.all [xi_correct; r_correct; r_xi_sum_correct; marlin_checks]
 
   module type App_state_intf = Intf.App_state_intf with module Impl := Impl
 
@@ -490,8 +478,8 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         , prev_proof_state ) =
       let state =
         exists
-          (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Boolean.typ Fq.typ
-             Digest.typ Digest.typ) ~request:(fun () ->
+          (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Boolean.typ
+             Fq.typ Digest.typ Digest.typ) ~request:(fun () ->
             Requests.Prev_proof_state )
       in
       ( Types.Dlog_based.Proof_state.Deferred_values.map_challenges ~f:Fp.pack
@@ -535,71 +523,63 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       assert_equal_g openings_proof.sg sg ;
       let public_input =
         Array.append
-          [| [Boolean.true_] |]
+          [|[Boolean.true_]|]
           (pack_data (Types.Dlog_based.Statement.to_data prev_statement))
       in
       let sponge = Sponge.create sponge_params in
       incrementally_verify_proof ~xi ~verification_key:dlog_marlin_index
-        ~sponge ~public_input ~sg_old ~combined_inner_product
-        ~advice:{b} ~messages ~openings_proof
+        ~sponge ~public_input ~sg_old ~combined_inner_product ~advice:{b}
+        ~messages ~openings_proof
     in
     Boolean.Assert.(is_base_case = was_base_case) ;
     let prev_proof_correct =
-      print_bool "bulletproof_success" bulletproof_success;
-      print_bool "prev_proof_finalized" prev_proof_finalized;
-      print_bool "prev-was-base" prev_statement.proof_state.was_base_case;
+      print_bool "bulletproof_success" bulletproof_success ;
+      print_bool "prev_proof_finalized" prev_proof_finalized ;
+      print_bool "prev-was-base" prev_statement.proof_state.was_base_case ;
       let prev_proof_finalized =
         Boolean.(prev_proof_finalized || is_base_case)
       in
       let bulletproof_success =
-        Boolean.(bulletproof_success || prev_statement.proof_state.was_base_case)
+        Boolean.(
+          bulletproof_success || prev_statement.proof_state.was_base_case)
       in
-      print_bool "prev_proof_finalized'" prev_proof_finalized;
-      print_bool "bulletproof_success''" bulletproof_success;
+      print_bool "prev_proof_finalized'" prev_proof_finalized ;
+      print_bool "bulletproof_success''" bulletproof_success ;
       Boolean.all [bulletproof_success; prev_proof_finalized]
     in
-    let update_succeeded =A.check_update prev_app_state app_state in
+    let update_succeeded = A.check_update prev_app_state app_state in
     print_bool "prev_proof_correct" prev_proof_correct ;
     print_bool "update succeeded" update_succeeded ;
     print_bool "is base" is_base_case ;
-    begin
-      (* TODO Use the Data module here instead *)
-      let fq (x1, b1) (x2, b2) =
-        Field.Assert.equal x1 x2;
-        Boolean.Assert.(b1 = b2)
-      in
-      let chal c1 c2 =
-        Field.Assert.equal (Field.project c1) (Field.project c2)
-      in
-      fq marlin.sigma_2 marlin_actual.sigma_2 ;
-      fq marlin.sigma_3 marlin_actual.sigma_3 ;
-      chal marlin.alpha marlin_actual.alpha ;
-      chal marlin.eta_a marlin_actual.eta_a ;
-      chal marlin.eta_b marlin_actual.eta_b ;
-      chal marlin.eta_c marlin_actual.eta_c ;
-      chal marlin.beta_1 marlin_actual.beta_1 ;
-      chal marlin.beta_2 marlin_actual.beta_2 ;
-      chal marlin.beta_3 marlin_actual.beta_3 ;
-      Array.iteri bulletproof_challenges ~f:(fun i c1 ->
-          let c2 = bulletproof_challenges_actual.(i) in
-          Boolean.Assert.(=)
-            c1.is_square
-            (Boolean.if_ is_base_case
-               ~then_:c1.is_square
-               ~else_:c2.is_square) ;
-          let c1 = Field.pack c1.prechallenge in
-          let c2 = 
-            Field.if_ is_base_case ~then_:c1 ~else_:(Field.pack c2.prechallenge)
-          in
-          Field.Assert.equal c1 c2
-        );
-      Field.Assert.equal sponge_digest_before_evaluations
-        (Field.pack sponge_digest_before_evaluations_actual) ;
-    end;
-    Boolean.(
-      Assert.any
-        [ prev_proof_correct && update_succeeded
-        ; is_base_case ])
+    ((* TODO Use the Data module here instead *)
+     let fq (x1, b1) (x2, b2) =
+       Field.Assert.equal x1 x2 ;
+       Boolean.Assert.(b1 = b2)
+     in
+     let chal c1 c2 =
+       Field.Assert.equal (Field.project c1) (Field.project c2)
+     in
+     fq marlin.sigma_2 marlin_actual.sigma_2 ;
+     fq marlin.sigma_3 marlin_actual.sigma_3 ;
+     chal marlin.alpha marlin_actual.alpha ;
+     chal marlin.eta_a marlin_actual.eta_a ;
+     chal marlin.eta_b marlin_actual.eta_b ;
+     chal marlin.eta_c marlin_actual.eta_c ;
+     chal marlin.beta_1 marlin_actual.beta_1 ;
+     chal marlin.beta_2 marlin_actual.beta_2 ;
+     chal marlin.beta_3 marlin_actual.beta_3 ;
+     Array.iteri bulletproof_challenges ~f:(fun i c1 ->
+         let c2 = bulletproof_challenges_actual.(i) in
+         Boolean.Assert.( = ) c1.is_square
+           (Boolean.if_ is_base_case ~then_:c1.is_square ~else_:c2.is_square) ;
+         let c1 = Field.pack c1.prechallenge in
+         let c2 =
+           Field.if_ is_base_case ~then_:c1 ~else_:(Field.pack c2.prechallenge)
+         in
+         Field.Assert.equal c1 c2 ) ;
+     Field.Assert.equal sponge_digest_before_evaluations
+       (Field.pack sponge_digest_before_evaluations_actual)) ;
+    Boolean.(Assert.any [prev_proof_correct && update_succeeded; is_base_case])
 
   (* TODO: The code here and in [pack_data] in dlog_main should be unified into
    one piece of code from which both functions are derived. *)
@@ -620,7 +600,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     |> Types.Pairing_based.Statement.of_data |> main am
 end
 
-    (*
+(*
     Data.(
       (* TODO: Other stuff too... *)
         assert_equal
@@ -651,7 +631,7 @@ end
           (marlin_data marlin)
           (marlin_data marlin_actual))
        *)
-    (*
+(*
     Data.(
       assert_equal (fun public_input computed ->
           (* To make our lives a bit easier in the base case. *)

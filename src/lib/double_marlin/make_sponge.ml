@@ -28,9 +28,8 @@ module Make (Field : Snarky_bn382_backend.Field.S) = struct
 
       let apply_affine_map (_rows, c) v =
         let open Field in
-        let res = [| v.(0) + v.(2); v.(0) + v.(1); v.(1) + v.(2) |] in
-        Array.iteri res ~f:(fun i ri ->
-            ri += c.(i) );
+        let res = [|v.(0) + v.(2); v.(0) + v.(1); v.(1) + v.(2)|] in
+        Array.iteri res ~f:(fun i ri -> ri += c.(i)) ;
         res
 
       let copy a = Array.map a ~f:(fun x -> Field.(x + zero))

@@ -2,8 +2,7 @@ open Core_kernel
 open Pickles_types
 
 module Constant = struct
-  type 'n t = (Int64.t, 'n) Vector.t
-  [@@deriving sexp_of]
+  type 'n t = (Int64.t, 'n) Vector.t [@@deriving sexp_of]
 
   let to_bits t =
     Vector.to_list t
@@ -25,7 +24,9 @@ module Constant = struct
 
       let to_hex t =
         let mask = of_int 0xffffffff in
-        let lo, hi = to_int_exn (t land mask), to_int_exn ( (t lsr 32) land mask) in
+        let lo, hi =
+          (to_int_exn (t land mask), to_int_exn ((t lsr 32) land mask))
+        in
         sprintf "%08x%08x" hi lo
 
       let sexp_of_t = Fn.compose String.sexp_of_t to_hex

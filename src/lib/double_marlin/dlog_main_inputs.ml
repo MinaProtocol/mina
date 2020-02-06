@@ -6,7 +6,7 @@ module type S = Intf.Dlog_main_inputs.S
 open Snarky_bn382_backend
 module Impl = Impls.Dlog_based
 
-let crs_max_degree = (1 lsl 20)
+let crs_max_degree = 1 lsl 20
 
 let fq_random_oracle ?length s = Fq.of_bits (bits_random_oracle ?length s)
 

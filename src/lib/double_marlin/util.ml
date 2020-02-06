@@ -5,7 +5,7 @@ module M = struct
   type t = A | B | C [@@deriving eq]
 end
 
-type m = M.t = A | B |C 
+type m = M.t = A | B | C
 
 let ms = [A; B; C]
 

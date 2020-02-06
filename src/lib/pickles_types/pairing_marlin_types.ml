@@ -17,9 +17,8 @@ module Evals = struct
     ; h_3: 'a
     ; row: 'a Abc.t
     ; col: 'a Abc.t
-    ; value: 'a Abc.t 
-    ; rc: 'a Abc.t 
-    }
+    ; value: 'a Abc.t
+    ; rc: 'a Abc.t }
   [@@deriving fields, bin_io]
 
   (* This is just the order used for iterating when absorbing the evaluations
@@ -33,12 +32,11 @@ module Evals = struct
       ; h_3
       ; row= {a= row_a; b= row_b; c= row_c}
       ; col= {a= col_a; b= col_b; c= col_c}
-      ; value= {a= value_a; b= value_b; c= value_c} 
-      ; rc= {a= rc_a; b= rc_b; c= rc_c} 
+      ; value= {a= value_a; b= value_b; c= value_c}
+      ; rc= {a= rc_a; b= rc_b; c= rc_c}
       ; g_1
       ; g_2
-      ; g_3
-      } =
+      ; g_3 } =
     Vector.
       [ w_hat
       ; z_hat_a
@@ -60,8 +58,7 @@ module Evals = struct
       ; rc_c
       ; g_1
       ; g_2
-      ; g_3 
-      ]
+      ; g_3 ]
 
   let of_vector
       Vector.
@@ -85,8 +82,7 @@ module Evals = struct
         ; rc_c
         ; g_1
         ; g_2
-        ; g_3 
-        ] =
+        ; g_3 ] =
     { w_hat
     ; z_hat_a
     ; z_hat_b
@@ -98,9 +94,8 @@ module Evals = struct
     ; h_3
     ; row= {a= row_a; b= row_b; c= row_c}
     ; col= {a= col_a; b= col_b; c= col_c}
-    ; value= {a= value_a; b= value_b; c= value_c} 
-    ; rc= {a= rc_a; b= rc_b; c= rc_c} 
-    }
+    ; value= {a= value_a; b= value_b; c= value_c}
+    ; rc= {a= rc_a; b= rc_b; c= rc_c} }
 
   let to_vectors
       { w_hat
@@ -171,11 +166,10 @@ module Evals = struct
             ; col_c
             ; value_a
             ; value_b
-            ; value_c 
+            ; value_c
             ; rc_a
             ; rc_b
-            ; rc_c 
-            ]
+            ; rc_c ]
           , [g_3] ) )) =
     { w_hat
     ; z_hat_a
@@ -188,9 +182,8 @@ module Evals = struct
     ; h_3
     ; row= {a= row_a; b= row_b; c= row_c}
     ; col= {a= col_a; b= col_b; c= col_c}
-    ; value= {a= value_a; b= value_b; c= value_c} 
-    ; rc= {a= rc_a; b= rc_b; c= rc_c} 
-    }
+    ; value= {a= value_a; b= value_b; c= value_c}
+    ; rc= {a= rc_a; b= rc_b; c= rc_c} }
 
   let typ fq =
     let there = to_vector in

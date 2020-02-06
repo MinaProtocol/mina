@@ -35,8 +35,6 @@ let combine_evaluations {without_degree_bound; with_degree_bound}
     @ List.concat
         (Vector.to_list
            (Vector.map2 with_degree_bound evals1 ~f:(fun deg fx ->
-                [ fx
-                ; mul (pow evaluation_point (crs_max_degree - deg)) fx
-                ] )))
+                [fx; mul (pow evaluation_point (crs_max_degree - deg)) fx] )))
   in
   List.fold_left evals ~init ~f:(fun acc fx -> add fx (mul acc xi))

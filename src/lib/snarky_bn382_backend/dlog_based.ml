@@ -18,12 +18,9 @@ let field_size : Bigint.R.t = Snarky_bn382.Fp.size ()
 
 module Field = Fq
 module R1CS_constraint_system =
-  R1cs_constraint_system.Make
-    (Fq)
-    (Snarky_bn382.Fq.Constraint_matrix)
+  R1cs_constraint_system.Make (Fq) (Snarky_bn382.Fq.Constraint_matrix)
 module Var = Var
 open Core_kernel
-
 module Proof = Dlog_based_proof
 
 module Verification_key = struct
@@ -82,8 +79,7 @@ module Oracles = struct
   let x_hat t =
     let t = x_hat_nocopy t in
     let fq f = field f t in
-    Snarky_bn382.Fq_triple.(
-      fq f0, fq f1, fq f2)
+    Snarky_bn382.Fq_triple.(fq f0, fq f1, fq f2)
 
   let digest_before_evaluations = field digest_before_evaluations
 end
@@ -132,7 +128,9 @@ module Keypair = struct
       ; auxiliary_input_size
       ; m= {a; b; c}
       ; weight } =
-    Core.printf !"dlog weight is %{sexp:R1cs_constraint_system.Weight.t}\n%!" weight ;
+    Core.printf
+      !"dlog weight is %{sexp:R1cs_constraint_system.Weight.t}\n%!"
+      weight ;
     let vars = 1 + public_input_size + auxiliary_input_size in
     Fq_index.create a b c
       (Unsigned.Size_t.of_int vars)
@@ -157,11 +155,10 @@ module Keypair = struct
     ; value=
         { a= Fq_index.a_val_comm t
         ; b= Fq_index.b_val_comm t
-        ; c= Fq_index.c_val_comm t } 
+        ; c= Fq_index.c_val_comm t }
     ; rc=
         { a= Fq_index.a_rc_comm t
         ; b= Fq_index.b_rc_comm t
-        ; c= Fq_index.c_rc_comm t } 
-    }
+        ; c= Fq_index.c_rc_comm t } }
     |> Matrix_evals.map ~f:(Abc.map ~f:G.Affine.of_backend)
 end

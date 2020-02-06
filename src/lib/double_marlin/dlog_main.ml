@@ -130,24 +130,27 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
   let debug = false
 
   let print_g1 lab (x, y) =
-    if debug then as_prover
-      As_prover.(
-        fun () ->
-          Core.printf "in-snark: %s (%s, %s)\n%!" lab
-            (Field.Constant.to_string (read_var x))
-            (Field.Constant.to_string (read_var y)))
+    if debug then
+      as_prover
+        As_prover.(
+          fun () ->
+            Core.printf "in-snark: %s (%s, %s)\n%!" lab
+              (Field.Constant.to_string (read_var x))
+              (Field.Constant.to_string (read_var y)))
 
   let print_chal lab x =
-    if debug then as_prover
-      As_prover.(
-        fun () ->
-          Core.printf "in-snark %s: %s\n%!" lab
-            (Field.Constant.to_string
-               (Field.Constant.project (List.map ~f:(read Boolean.typ) x))))
+    if debug then
+      as_prover
+        As_prover.(
+          fun () ->
+            Core.printf "in-snark %s: %s\n%!" lab
+              (Field.Constant.to_string
+                 (Field.Constant.project (List.map ~f:(read Boolean.typ) x))))
 
   let print_bool lab x =
-    if debug then as_prover (fun () ->
-        printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
+    if debug then
+      as_prover (fun () ->
+          printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x) )
 
   module PC = G1
   module Fq = Field
@@ -230,7 +233,9 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     let sample () = Sponge.squeeze sponge ~length:Challenge.length in
     let open Pairing_marlin_types.Messages in
     let x_hat =
-      assert (Int.ceil_pow2 (Array.length public_input) = Domain.size Input_domain.domain);
+      assert (
+        Int.ceil_pow2 (Array.length public_input)
+        = Domain.size Input_domain.domain ) ;
       G1.multiscale_known
         (Array.mapi public_input ~f:(fun i x ->
              (x, lagrange_precomputations.(i)) ))
@@ -254,27 +259,25 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     in
     let beta_3 = sample () in
     let r_k = sample () in
-    begin
-      print_g1 "x_hat" x_hat ;
-      print_g1 "w" w_hat ;
-      print_g1 "za" z_hat_a ;
-      print_g1 "zb" z_hat_b ;
-      List.iter
-        [ ("alpha", alpha)
-        ; ("eta_a", eta_a)
-        ; ("eta_b", eta_b)
-        ; ("eta_c", eta_c)
-        ; ("r_k", r_k)
-        ; ("beta_1", beta_1)
-        ; ("beta_2", beta_2)
-        ; ("beta_3", beta_3) ] ~f:(fun (lab, x) -> print_chal lab x) ;
-    end;
+    print_g1 "x_hat" x_hat ;
+    print_g1 "w" w_hat ;
+    print_g1 "za" z_hat_a ;
+    print_g1 "zb" z_hat_b ;
+    List.iter
+      [ ("alpha", alpha)
+      ; ("eta_a", eta_a)
+      ; ("eta_b", eta_b)
+      ; ("eta_c", eta_c)
+      ; ("r_k", r_k)
+      ; ("beta_1", beta_1)
+      ; ("beta_2", beta_2)
+      ; ("beta_3", beta_3) ] ~f:(fun (lab, x) -> print_chal lab x) ;
     let digest_before_evaluations =
       Sponge.squeeze sponge ~length:Digest.length
     in
     let open Vector in
     let combine_commitments t =
-      Pcs_batch.combine_commitments ~scale:G1.scale ~add:G1.(+) ~xi t
+      Pcs_batch.combine_commitments ~scale:G1.scale ~add:G1.( + ) ~xi t
     in
     let pairing_acc =
       let (g1, g1_s), (g2, g2_s), (g3, g3_s) = (g_1, g_2, g_3) in
@@ -373,13 +376,16 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       let ty = Evals.typ Fq.typ in
       exists (Typ.tuple3 ty ty ty) ~request:(fun () -> Requests.Prev_evals)
     in
-    let (x_hat1, x_hat2, x_hat3) =
-      exists (Typ.tuple3 Fq.typ Fq.typ Fq.typ) ~request:(fun () -> Requests.Prev_x_hat)
+    let x_hat1, x_hat2, x_hat3 =
+      exists (Typ.tuple3 Fq.typ Fq.typ Fq.typ) ~request:(fun () ->
+          Requests.Prev_x_hat )
     in
     let open Fq in
     let absorb_evals x_hat e =
       let xs, ys = Evals.to_vectors e in
-      List.iter Vector.(x_hat :: (to_list xs @ to_list ys)) ~f:(Sponge.absorb sponge)
+      List.iter
+        Vector.(x_hat :: (to_list xs @ to_list ys))
+        ~f:(Sponge.absorb sponge)
     in
     (* A lot of hashing. *)
     absorb_evals x_hat1 beta_1_evals ;
@@ -410,14 +416,15 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     let bulletproof_challenges = compute_challenges bulletproof_challenges in
     let b_correct =
       let b_poly = b_poly bulletproof_challenges in
-      let b_actual = b_poly marlin.beta_1 + r * (b_poly marlin.beta_2 + r * (b_poly marlin.beta_3)) in
+      let b_actual =
+        b_poly marlin.beta_1
+        + (r * (b_poly marlin.beta_2 + (r * b_poly marlin.beta_3)))
+      in
       equal b b_actual
     in
     let marlin_checks_passed =
-      Marlin_checks.check
-        ~input_domain:Input_domain.self ~domain_h ~domain_k
-        ~x_hat_beta_1:x_hat1
-        marlin
+      Marlin_checks.check ~input_domain:Input_domain.self ~domain_h ~domain_k
+        ~x_hat_beta_1:x_hat1 marlin
         { w_hat= beta_1_evals.w_hat
         ; g_1= beta_1_evals.g_1
         ; h_1= beta_1_evals.h_1
@@ -429,15 +436,17 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
         ; h_3= beta_3_evals.h_3
         ; row= beta_3_evals.row
         ; col= beta_3_evals.col
-        ; value=beta_3_evals.value
-        ; rc= beta_3_evals.rc
-        }
+        ; value= beta_3_evals.value
+        ; rc= beta_3_evals.rc }
     in
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;
     print_bool "marlin_checks_passed" marlin_checks_passed ;
     print_bool "b_correct" b_correct ;
     ( Boolean.all
-        [xi_and_r_correct; b_correct; combined_inner_product_correct; marlin_checks_passed]
+        [ xi_and_r_correct
+        ; b_correct
+        ; combined_inner_product_correct
+        ; marlin_checks_passed ]
     , bulletproof_challenges )
 
   (* TODO: No need to hash the entire bulletproof challenges. Could
@@ -488,14 +497,12 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
           ~f:(fun {Types.Bulletproof_challenge.prechallenge; is_square} ->
             is_square :: prechallenge ) ]
 
-  let main
-      ~bulletproof_log2
+  let main ~bulletproof_log2
       ({ proof_state=
            { deferred_values= {marlin; xi; r; r_xi_sum}
            ; sponge_digest_before_evaluations
-           ; me_only= me_only_digest 
-           ; was_base_case
-           }
+           ; me_only= me_only_digest
+           ; was_base_case }
        ; pass_through } :
         (Challenge.t, _, _, _, _, _, _, _) Types.Dlog_based.Statement.t) =
     let ( prev_deferred_values
@@ -514,8 +521,8 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     let prev_me_only =
       exists
         (Types.Dlog_based.Proof_state.Me_only.typ G1.typ Fq.typ
-           ~length:bulletproof_log2) ~request:(fun () ->
-          Requests.Prev_me_only )
+           ~length:bulletproof_log2) ~request:(fun () -> Requests.Prev_me_only
+      )
     in
     let pairing_marlin_index = prev_me_only.pairing_marlin_index in
     let prev_pairing_acc = prev_me_only.pairing_marlin_acc in
@@ -534,9 +541,10 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       finalize_other_proof ~domain_k ~domain_h ~sponge prev_deferred_values
         ~old_bulletproof_challenges:prev_me_only.old_bulletproof_challenges
     in
-    Boolean.Assert.(was_base_case = prev_statement.proof_state.was_base_case);
+    Boolean.Assert.(was_base_case = prev_statement.proof_state.was_base_case) ;
     print_bool "prev_proof_finalized" prev_proof_finalized ;
-    print_bool "prev_statement.proof_state.was_base_case" prev_statement.proof_state.was_base_case ;
+    print_bool "prev_statement.proof_state.was_base_case"
+      prev_statement.proof_state.was_base_case ;
     Boolean.Assert.any
       [prev_proof_finalized; prev_statement.proof_state.was_base_case] ;
     let ( sponge_digest_before_evaluations_actual
@@ -577,9 +585,6 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   let main (bool, fp, challenge, digest) =
     let unpack length = Vector.map ~f:(Fq.choose_preimage_var ~length) in
-    ( bool
-    , unpack Fq.size_in_bits fp
-    , unpack Challenge.length challenge
-    , digest )
+    (bool, unpack Fq.size_in_bits fp, unpack Challenge.length challenge, digest)
     |> Types.Dlog_based.Statement.of_data |> main
 end

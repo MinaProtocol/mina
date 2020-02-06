@@ -81,7 +81,7 @@ module Keypair = struct
   type t = Fp_index.t
 
   let urs =
-    let path ="/home/izzy/pickles/urs" in
+    let path = "/home/izzy/pickles/urs" in
     (*
       let res = Snarky_bn382.Fp_urs.create (Unsigned.Size_t.of_int (2 * 786_433)) in
     Snarky_bn382.Fp_urs.write res path;
@@ -100,7 +100,9 @@ module Keypair = struct
       ; auxiliary_input_size
       ; m= {a; b; c}
       ; weight } =
-    Core.printf !"pairing weight is %{sexp:R1cs_constraint_system.Weight.t}\n%!" weight ;
+    Core.printf
+      !"pairing weight is %{sexp:R1cs_constraint_system.Weight.t}\n%!"
+      weight ;
     let vars = 1 + public_input_size + auxiliary_input_size in
     Fp_index.create a b c
       (Unsigned.Size_t.of_int vars)
@@ -125,12 +127,11 @@ module Keypair = struct
     ; value=
         { a= Fp_index.a_val_comm t
         ; b= Fp_index.b_val_comm t
-        ; c= Fp_index.c_val_comm t } 
+        ; c= Fp_index.c_val_comm t }
     ; rc=
         { a= Fp_index.a_rc_comm t
         ; b= Fp_index.b_rc_comm t
-        ; c= Fp_index.c_rc_comm t } 
-    }
+        ; c= Fp_index.c_rc_comm t } }
     |> Matrix_evals.map ~f:(Abc.map ~f:G1.Affine.of_backend)
 end
 

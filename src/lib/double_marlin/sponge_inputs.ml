@@ -27,11 +27,10 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
 
     (* TODO: Clean this up to use the near mds matrix properly *)
     let apply_affine_map (_matrix, constants) v =
-      let near_mds_matrix_v = 
-        [| v.(0) + v.(2); v.(0) + v.(1); v.(1) + v.(2) |]
+      let near_mds_matrix_v =
+        [|v.(0) + v.(2); v.(0) + v.(1); v.(1) + v.(2)|]
       in
-      Array.mapi near_mds_matrix_v ~f:(fun i x ->
-          seal (constants.(i) + x))
+      Array.mapi near_mds_matrix_v ~f:(fun i x -> seal (constants.(i) + x))
 
     let copy = Array.copy
   end

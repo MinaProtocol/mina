@@ -59,7 +59,6 @@ module Input_domain = struct
               (Snarky_bn382.Fq_urs.lagrange_commitment
                  (Lazy.force Snarky_bn382_backend.Dlog_based.Keypair.urs)
                  (u domain_size) (u i)) ) )
-
 end
 
 module G = struct

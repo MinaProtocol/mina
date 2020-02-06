@@ -92,13 +92,13 @@ struct
         (Fp.(sub c one), 0) :: terms
     | (_, _) :: _ as terms ->
         (Fp.(sub zero one), 0) :: terms
-    | [] -> [ (Fp.(sub zero one), 0) ]
+    | [] ->
+        [(Fp.(sub zero one), 0)]
 
   let canonicalize x =
     let c, terms =
       Fp.(
-        Snarky.Cvar.to_constant_and_terms ~add ~mul ~zero:(of_int 0)
-          ~equal
+        Snarky.Cvar.to_constant_and_terms ~add ~mul ~zero:(of_int 0) ~equal
           ~one:(of_int 1))
         x
     in
@@ -109,7 +109,7 @@ struct
     let terms = match c with None -> terms | Some c -> (c, 0) :: terms in
     match terms with
     | [] ->
-      Some ([], 0, false)
+        Some ([], 0, false)
     | (c0, i0) :: terms ->
         let acc, i, ts, n =
           Sequence.of_list terms
