@@ -2,7 +2,6 @@
  (name kademlia)
  (public_name kademlia)
  (library_flags -linkall)
- (inline_tests)
  (libraries core child_processes logger pipe_lib async async_extra file_system
    network_peer trust_system)
  (preprocess
