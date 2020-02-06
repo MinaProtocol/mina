@@ -18,26 +18,30 @@ let main () =
   Coda_processes.init () ;
   let trace_dir = Unix.getenv "CODA_TRACING" in
   let max_concurrent_connections = None in
-  let configs =
+  let%bind configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
       ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~proposers:(Fn.const None) ~work_selection_method ~trace_dir
       ~max_concurrent_connections
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
-  let addrs_and_ports_list, peers = Coda_processes.net_configs (n + 1) in
+  let%bind net_configs = Coda_processes.net_configs (n + 1) in
+  let addrs_and_ports_list, peers = net_configs in
   let expected_peers = List.nth_exn peers n in
   let peers = [List.hd_exn expected_peers] in
   let addrs_and_ports =
-    List.nth_exn addrs_and_ports_list n |> Node_addrs_and_ports.to_display
+    List.nth_exn addrs_and_ports_list n
+    |> fst |> Node_addrs_and_ports.to_display
   in
+  let libp2p_keypair = List.nth_exn addrs_and_ports_list n |> snd in
   Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
     !"connecting to peers %{sexp: Node_addrs_and_ports.t list}\n"
     peers ;
   let config =
     Coda_process.local_config ~addrs_and_ports ~acceptable_delay ~chain_id:name
-      ~snark_worker_key:None ~proposer:None ~program_dir ~work_selection_method
-      ~trace_dir ~offset:Time.Span.zero () ~max_concurrent_connections
+      ~peers:[] ~libp2p_keypair ~snark_worker_key:None ~proposer:None
+      ~net_configs ~program_dir ~work_selection_method ~trace_dir
+      ~offset:Time.Span.zero () ~max_concurrent_connections
       ~is_archive_rocksdb:false
   in
   let%bind worker = Coda_process.spawn_exn config in

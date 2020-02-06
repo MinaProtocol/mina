@@ -34,7 +34,18 @@ let to_int_res x =
   | None ->
       Or_error.error_string "needed an int"
 
-type keypair = {secret: string; public: string; peer_id: Peer.Id.t}
+module Keypair0 = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = {secret: string; public: string; peer_id: Peer.Id.Stable.V1.t}
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t
+end
 
 type stream_state =
   | FullyOpen  (** Streams start in this state. Both sides can still write *)
@@ -65,7 +76,7 @@ module Helper = struct
     *)
     ; mutable seqno: int
     ; logger: Logger.t
-    ; me_keypair: keypair Ivar.t
+    ; me_keypair: Keypair0.t Ivar.t
     ; subscriptions: (int, erased_magic subscription) Hashtbl.t
     ; streams: (int, stream) Hashtbl.t
     ; protocol_handlers: (string, protocol_handler) Hashtbl.t
@@ -851,7 +862,7 @@ end [@(* Warning 30 is about field labels being defined in multiple types.
 type net = Helper.t
 
 module Keypair = struct
-  type t = keypair
+  include Keypair0
 
   let random net =
     match%map Helper.do_rpc net (module Helper.Rpcs.Generate_keypair) () with
@@ -859,15 +870,15 @@ module Keypair = struct
         (let open Or_error.Let_syntax in
         let%bind secret = of_b58_data (`String sk) in
         let%map public = of_b58_data (`String pk) in
-        {secret; public; peer_id= Peer.Id.unsafe_of_string peer_id})
+        ({secret; public; peer_id= Peer.Id.unsafe_of_string peer_id} : t))
         |> Or_error.ok_exn
     | Error e ->
         failwithf "other RPC error generateKeypair: %s" (Error.to_string_hum e)
           ()
 
-  let secret_key_base58 {secret; _} = to_b58_data secret
+  let secret_key_base58 ({secret; _} : t) = to_b58_data secret
 
-  let to_string {secret; public; peer_id} =
+  let to_string ({secret; public; peer_id} : t) =
     String.concat ~sep:","
       [to_b58_data secret; to_b58_data public; Peer.Id.to_string peer_id]
 
@@ -878,7 +889,7 @@ module Keypair = struct
           let open Or_error.Let_syntax in
           let%map secret = of_b58_data (`String secret_b58)
           and public = of_b58_data (`String public_b58) in
-          {secret; public; peer_id= Peer.Id.unsafe_of_string peer_id}
+          ({secret; public; peer_id= Peer.Id.unsafe_of_string peer_id} : t)
       | _ ->
           Or_error.errorf "%s is not a valid Keypair.to_string output" s
     in
@@ -886,7 +897,7 @@ module Keypair = struct
     let with_comma = parse_with_sep ',' in
     if Or_error.is_error with_semicolon then with_comma else with_semicolon
 
-  let to_peer_id {peer_id; _} = peer_id
+  let to_peer_id ({peer_id; _} : t) = peer_id
 end
 
 module Multiaddr = struct

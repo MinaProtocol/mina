@@ -38,7 +38,7 @@ let main () =
     Cli_lib.Arg_type.Work_selection_method.Sequence
   in
   Parallel.init_master () ;
-  let configs =
+  let%bind configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
       ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~proposers:(Fn.const None) ~work_selection_method

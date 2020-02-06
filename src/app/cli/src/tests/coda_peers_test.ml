@@ -16,7 +16,7 @@ let main () =
     Cli_lib.Arg_type.Work_selection_method.Sequence
   in
   Coda_processes.init () ;
-  let configs =
+  let%bind configs =
     Coda_processes.local_configs n ~program_dir ~proposal_interval
       ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~proposers:(Fn.const None) ~work_selection_method
@@ -24,7 +24,7 @@ let main () =
       ~max_concurrent_connections:None
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
-  let _, expected_peers = Coda_processes.net_configs n in
+  let _, expected_peers = (List.hd_exn configs).net_configs in
   let%bind _ = after (Time.Span.of_sec 60.) in
   let%bind () =
     Deferred.all_unit

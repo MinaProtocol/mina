@@ -19,6 +19,7 @@ let spawn_exn (config : Coda_worker.Input.t) =
   return (conn, process, config)
 
 let local_config ?proposal_interval:_ ~addrs_and_ports ~acceptable_delay ~peers
+    ~libp2p_keypair ~net_configs:(addrs_and_ports_list, all_peers_list)
     ~chain_id ~program_dir ~proposer ~snark_worker_key ~work_selection_method
     ~offset ~trace_dir ~max_concurrent_connections ~is_archive_rocksdb () =
   let conf_dir =
@@ -27,6 +28,14 @@ let local_config ?proposal_interval:_ ~addrs_and_ports ~acceptable_delay ~peers
   in
   let config =
     { Coda_worker.Input.addrs_and_ports
+    ; libp2p_keypair
+    ; net_configs=
+        ( List.map
+            ~f:(fun (na, kp) -> (Node_addrs_and_ports.to_display na, kp))
+            addrs_and_ports_list
+        , List.map
+            ~f:(List.map ~f:Node_addrs_and_ports.to_display)
+            all_peers_list )
     ; env=
         ( "CODA_TIME_OFFSET"
         , Time.Span.to_int63_seconds_round_down_exn offset

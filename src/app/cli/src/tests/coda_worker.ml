@@ -9,6 +9,12 @@ open Init
 module Input = struct
   type t =
     { addrs_and_ports: Node_addrs_and_ports.Display.Stable.V1.t
+    ; libp2p_keypair: Coda_net2.Keypair.Stable.V1.t
+    ; net_configs:
+        ( Node_addrs_and_ports.Display.Stable.V1.t
+        * Coda_net2.Keypair.Stable.Latest.t )
+        list
+        * Node_addrs_and_ports.Display.Stable.V1.t list list
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
     ; proposer: int option
@@ -398,6 +404,7 @@ module T = struct
 
     let init_worker_state
         { addrs_and_ports
+        ; libp2p_keypair
         ; proposer
         ; snark_worker_key
         ; work_selection_method
@@ -491,7 +498,7 @@ module T = struct
               ; logger
               ; unsafe_no_trust_ip= true
               ; trust_system
-              ; keypair= None }
+              ; keypair= Some libp2p_keypair }
           in
           let net_config =
             { Coda_networking.Config.logger

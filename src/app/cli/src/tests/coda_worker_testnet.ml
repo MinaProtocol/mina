@@ -455,7 +455,7 @@ let test ?is_archive_rocksdb ~name logger n proposers snark_work_public_keys
   in
   let%bind program_dir = Unix.getcwd () in
   Coda_processes.init () ;
-  let configs =
+  let%bind configs =
     Coda_processes.local_configs n ~proposal_interval ~program_dir ~proposers
       ~acceptable_delay ~chain_id:name
       ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))

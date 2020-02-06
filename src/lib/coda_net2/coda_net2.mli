@@ -54,7 +54,14 @@ open Network_peer
 type net
 
 module Keypair : sig
-  type t
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t
+    end
+  end]
+
+  type t = Stable.Latest.t
 
   (** Securely generate a new keypair. *)
   val random : net -> t Deferred.t
