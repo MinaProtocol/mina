@@ -2610,7 +2610,7 @@ module Hooks = struct
                   {ledger= snapshot_ledger; delegatee_table} ;
                 return true
             | Connected {data= Ok (Error err); _} ->
-            (* TODO figure out punishments here. *)
+                (* TODO figure out punishments here. *)
                 Logger.faulty_peer_without_punishment logger
                   ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:

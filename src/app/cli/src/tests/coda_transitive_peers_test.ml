@@ -30,21 +30,24 @@ let main () =
   let%bind net_configs = Coda_processes.net_configs (n + 1) in
   let addrs_and_ports_list, peers = net_configs in
   let expected_peers = List.nth_exn peers n in
-  let peers = [List.hd_exn expected_peers] in
+  let peers =
+    List.map ~f:Node_addrs_and_ports.to_multiaddr_exn
+      [List.hd_exn expected_peers]
+  in
   let addrs_and_ports =
     List.nth_exn addrs_and_ports_list n
     |> fst |> Node_addrs_and_ports.to_display
   in
   let libp2p_keypair = List.nth_exn addrs_and_ports_list n |> snd in
   Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-    !"connecting to peers %{sexp: Node_addrs_and_ports.t list}\n"
+    !"connecting to peers %{sexp: string list}\n"
     peers ;
   let config =
     Coda_process.local_config ~peers ~addrs_and_ports ~acceptable_delay
-    ~chain_id:name ~peers ~libp2p_keypair ~net_configs
-      ~snark_worker_key:None ~block_production_key:None ~program_dir
-      ~work_selection_method ~trace_dir ~offset:Time.Span.zero ()
-      ~max_concurrent_connections ~is_archive_rocksdb:false
+      ~chain_id:name ~libp2p_keypair ~net_configs ~snark_worker_key:None
+      ~block_production_key:None ~program_dir ~work_selection_method ~trace_dir
+      ~offset:Time.Span.zero () ~max_concurrent_connections
+      ~is_archive_rocksdb:false
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in

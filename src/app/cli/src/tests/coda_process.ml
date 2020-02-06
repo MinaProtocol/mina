@@ -18,7 +18,7 @@ let spawn_exn (config : Coda_worker.Input.t) =
   File_system.dup_stderr process ;
   return (conn, process, config)
 
-let local_config ?block_production_interval:_ ~peers ~addrs_and_ports
+let local_config ?block_production_interval:_ ~peers ~addrs_and_ports ~chain_id
     ~libp2p_keypair ~net_configs:(addrs_and_ports_list, all_peers_list)
     ~acceptable_delay ~program_dir ~block_production_key ~snark_worker_key
     ~work_selection_method ~offset ~trace_dir ~max_concurrent_connections

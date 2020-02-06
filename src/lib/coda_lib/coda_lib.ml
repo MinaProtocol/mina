@@ -803,7 +803,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                        ~f:(fun (tn, tm, cb) ->
                          (`Transition tn, `Time_received tm, `Valid_cb cb) ))
                   ~producer_transition_reader:
-                    (Strict_pipe.Reader.map proposer_transition_reader
+                    (Strict_pipe.Reader.map producer_transition_reader
                        ~f:(fun breadcrumb ->
                          let et =
                            Transition_frontier.Breadcrumb.validated_transition
