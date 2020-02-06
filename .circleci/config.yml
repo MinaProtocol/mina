@@ -717,7 +717,7 @@ jobs:
     test--test_postake_full_epoch:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-6ff457bec7d862c23578b86b3722261cc6fed7fe
         steps:
             - checkout
             - run:
