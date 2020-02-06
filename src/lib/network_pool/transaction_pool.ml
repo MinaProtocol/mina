@@ -54,6 +54,8 @@ module type S = sig
      and type transition_frontier := transition_frontier
      and type resource_pool_diff := Resource_pool.Diff.t
      and type config := Resource_pool.Config.t
+     and type transition_frontier_diff :=
+                Resource_pool.transition_frontier_diff
 
   val add : t -> User_command.t list -> unit Deferred.t
 end
@@ -85,6 +87,9 @@ struct
   module Resource_pool = struct
     include Max_size
 
+    type transition_frontier_diff =
+      Transition_frontier.best_tip_diff * Base_ledger.t
+
     module Config = struct
       type t = {trust_system: Trust_system.t sexp_opaque}
       [@@deriving sexp_of, make]
@@ -103,7 +108,7 @@ struct
             (** Ones that are included in the current best tip. *)
       ; config: Config.t
       ; logger: Logger.t sexp_opaque
-      ; mutable diff_reader: unit Deferred.t sexp_opaque Option.t
+      ; mutable best_tip_diff_relay: unit Deferred.t sexp_opaque Option.t
       ; mutable best_tip_ledger: Base_ledger.t sexp_opaque option }
     [@@deriving sexp_of]
 
@@ -128,14 +133,10 @@ struct
 
     let all_from_user {pool; _} = Indexed_pool.all_from_user pool
 
-    (** Get the best tip ledger and update our cache. *)
-    let get_best_tip_ledger_and_update t frontier =
-      let best_tip_ledger =
-        Transition_frontier.best_tip frontier
-        |> Breadcrumb.staged_ledger |> Staged_ledger.ledger
-      in
-      t.best_tip_ledger <- Some best_tip_ledger ;
-      best_tip_ledger
+    (** Get the best tip ledger*)
+    let get_best_tip_ledger frontier =
+      Transition_frontier.best_tip frontier
+      |> Breadcrumb.staged_ledger |> Staged_ledger.ledger
 
     let drop_until_below_max_size :
            Indexed_pool.t
@@ -159,9 +160,10 @@ struct
             Currency.Fee.(User_command.fee cmd > min_fee)
           else true
 
-    let handle_diff t frontier
-        ({new_user_commands; removed_user_commands; reorg_best_tip= _} :
-          Transition_frontier.best_tip_diff) =
+    let handle_tf_diff
+        ( ({new_user_commands; removed_user_commands; reorg_best_tip= _} :
+            Transition_frontier.best_tip_diff)
+        , best_tip_ledger ) t =
       (* This runs whenever the best tip changes. The simple case is when the
          new best tip is an extension of the old one. There, we just remove any
          user commands that were included in it from the transaction pool.
@@ -176,7 +178,7 @@ struct
          locally_generated_uncommitted to locally_generated_committed and vice
          versa so those hashtables remain in sync with reality.
       *)
-      let validation_ledger = get_best_tip_ledger_and_update t frontier in
+      t.best_tip_ledger <- Some best_tip_ledger ;
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
           [ ( "removed"
@@ -231,14 +233,14 @@ struct
           ~f:(fun (p, dropped_so_far) cmd ->
             let sender = User_command.sender cmd in
             let balance =
-              match Base_ledger.location_of_key validation_ledger sender with
+              match Base_ledger.location_of_key best_tip_ledger sender with
               | None ->
                   Currency.Balance.zero
               | Some loc ->
                   let acc =
                     Option.value_exn
                       ~message:"public key has location but no account"
-                      (Base_ledger.get validation_ledger loc)
+                      (Base_ledger.get best_tip_ledger loc)
                   in
                   acc.balance
             in
@@ -309,9 +311,9 @@ struct
             else
               match
                 Option.bind
-                  (Base_ledger.location_of_key validation_ledger
+                  (Base_ledger.location_of_key best_tip_ledger
                      (User_command.sender (cmd :> User_command.t)))
-                  ~f:(Base_ledger.get validation_ledger)
+                  ~f:(Base_ledger.get best_tip_ledger)
               with
               | Some acct -> (
                 match
@@ -332,7 +334,7 @@ struct
                   log_invalid () ) ;
       Deferred.unit
 
-    let create ~frontier_broadcast_pipe ~config ~logger =
+    let create ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
       let t =
         { pool= Indexed_pool.empty
         ; locally_generated_uncommitted=
@@ -341,7 +343,7 @@ struct
             Hashtbl.create (module User_command.With_valid_signature)
         ; config
         ; logger
-        ; diff_reader= None
+        ; best_tip_diff_relay= None
         ; best_tip_ledger= None }
       in
       don't_wait_for
@@ -353,7 +355,7 @@ struct
                    "no frontier" ;
                  (* Sanity check: the view pipe should have been closed before
                     the frontier was destroyed. *)
-                 match t.diff_reader with
+                 match t.best_tip_diff_relay with
                  | None ->
                      Deferred.unit
                  | Some hdl ->
@@ -361,7 +363,7 @@ struct
                      t.best_tip_ledger <- None ;
                      Deferred.any_unit
                        [ (let%map () = hdl in
-                          t.diff_reader <- None ;
+                          t.best_tip_diff_relay <- None ;
                           is_finished := true)
                        ; (let%map () = Async.after (Time.Span.of_sec 5.) in
                           if not !is_finished then (
@@ -374,9 +376,9 @@ struct
              | Some frontier ->
                  Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
                    "Got frontier!" ;
-                 let validation_ledger =
-                   get_best_tip_ledger_and_update t frontier
-                 in
+                 let validation_ledger = get_best_tip_ledger frontier in
+                 (*update our cache*)
+                 t.best_tip_ledger <- Some validation_ledger ;
                  (* The frontier has changed, so transactions in the pool may
                     not be valid against the current best tip. *)
                  let new_pool, dropped =
@@ -432,11 +434,15 @@ struct
                      of %i previously in pool"
                    (Sequence.length dropped) (Indexed_pool.size t.pool) ;
                  t.pool <- new_pool ;
-                 t.diff_reader
+                 t.best_tip_diff_relay
                  <- Some
                       (Broadcast_pipe.Reader.iter
                          (Transition_frontier.best_tip_diff_pipe frontier)
-                         ~f:(handle_diff t frontier)) ;
+                         ~f:(fun diff ->
+                           Linear_pipe.write tf_diff_writer
+                             (diff, get_best_tip_ledger frontier)
+                           |> Deferred.don't_wait_for ;
+                           Deferred.unit )) ;
                  Deferred.unit )) ;
       t
 
@@ -847,12 +853,15 @@ let%test_module _ =
     let setup_test () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
+      let incoming_diff_r, _incoming_diff_w = Linear_pipe.create () in
+      let local_diff_r, _local_diff_w = Linear_pipe.create () in
       let trust_system = Trust_system.null () in
       let logger = Logger.null () in
       let config = Test.Resource_pool.make_config ~trust_system in
       let pool =
-        Test.Resource_pool.create ~config ~logger
-          ~frontier_broadcast_pipe:tf_pipe_r
+        Test.create ~config ~logger ~incoming_diffs:incoming_diff_r
+          ~local_diffs:local_diff_r ~frontier_broadcast_pipe:tf_pipe_r
+        |> Test.resource_pool
       in
       let%map () = Async.Scheduler.yield () in
       ( (fun txs ->
@@ -904,6 +913,7 @@ let%test_module _ =
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
+          let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
           assert_pool_txs (List.tl_exn independent_cmds) ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
@@ -911,6 +921,7 @@ let%test_module _ =
               ; removed_user_commands= []
               ; reorg_best_tip= false }
           in
+          let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
           assert_pool_txs (List.drop independent_cmds 3) ;
           Deferred.unit )
 
@@ -1045,12 +1056,16 @@ let%test_module _ =
       Thread_safe.block_on_async_exn (fun () ->
           (* Set up initial frontier *)
           let frontier_pipe_r, frontier_pipe_w = Broadcast_pipe.create None in
+          let incoming_diff_r, _incoming_diff_w = Linear_pipe.create () in
+          let local_diff_r, _local_diff_w = Linear_pipe.create () in
           let logger = Logger.null () in
           let trust_system = Trust_system.null () in
           let config = Test.Resource_pool.make_config ~trust_system in
           let pool =
-            Test.Resource_pool.create ~config ~logger
+            Test.create ~config ~logger ~incoming_diffs:incoming_diff_r
+              ~local_diffs:local_diff_r
               ~frontier_broadcast_pipe:frontier_pipe_r
+            |> Test.resource_pool
           in
           let assert_pool_txs txs =
             [%test_eq: User_command.t List.t]

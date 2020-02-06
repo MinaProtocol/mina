@@ -13,6 +13,9 @@ module type Resource_pool_base_intf = sig
 
   type transition_frontier
 
+  (** Diff from a transition frontier extension that would update the resource pool*)
+  type transition_frontier_diff
+
   module Config : sig
     type t [@@deriving sexp_of]
   end
@@ -22,7 +25,10 @@ module type Resource_pool_base_intf = sig
                                Broadcast_pipe.Reader.t
     -> config:Config.t
     -> logger:Logger.t
+    -> tf_diff_writer:transition_frontier_diff Linear_pipe.Writer.t
     -> t
+
+  val handle_tf_diff : transition_frontier_diff -> t -> unit Deferred.t
 end
 
 (** A [Resource_pool_diff_intf] is a representation of a mutation to
@@ -73,6 +79,8 @@ module type Network_pool_base_intf = sig
 
   type resource_pool_diff
 
+  type transition_frontier_diff
+
   type config
 
   type transition_frontier
@@ -93,6 +101,7 @@ module type Network_pool_base_intf = sig
     -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
                       Linear_pipe.Reader.t
     -> local_diffs:resource_pool_diff Linear_pipe.Reader.t
+    -> tf_diff:transition_frontier_diff Linear_pipe.Reader.t
     -> t
 
   val resource_pool : t -> resource_pool

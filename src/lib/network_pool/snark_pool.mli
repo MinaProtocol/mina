@@ -27,6 +27,8 @@ module type S = sig
      and type resource_pool_diff := Resource_pool.Diff.t
      and type transition_frontier := transition_frontier
      and type config := Resource_pool.Config.t
+     and type transition_frontier_diff :=
+                Resource_pool.transition_frontier_diff
 
   val get_completed_work :
        t

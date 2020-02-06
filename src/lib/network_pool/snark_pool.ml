@@ -28,6 +28,8 @@ module type S = sig
      and type resource_pool_diff := Resource_pool.Diff.t
      and type transition_frontier := transition_frontier
      and type config := Resource_pool.Config.t
+     and type transition_frontier_diff :=
+                Resource_pool.transition_frontier_diff
 
   val get_completed_work :
        t
@@ -93,19 +95,29 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         [@@deriving sexp, make]
       end
 
+      type transition_frontier_diff =
+        int * int Transaction_snark_work.Statement.Table.t
+
       type t =
         { snark_tables: serializable
         ; mutable ref_table: int Statement_table.t option
         ; config: Config.t
-        ; logger: Logger.t sexp_opaque }
+        ; logger: Logger.t sexp_opaque
+        ; mutable removed_counter: int
+              (*A counter for transition frontier breadcrumbs removed. When this reaches a certain value, unreferenced snark work is removed from ref_table*)
+        }
       [@@deriving sexp]
 
       let make_config = Config.make
 
-      let of_serializable tables ~config ~logger : t =
-        {snark_tables= tables; ref_table= None; config; logger}
-
       let removed_breadcrumb_wait = 10
+
+      let of_serializable tables ~config ~logger : t =
+        { snark_tables= tables
+        ; ref_table= None
+        ; config
+        ; logger
+        ; removed_counter= removed_breadcrumb_wait }
 
       let snark_pool_json t : Yojson.Safe.json =
         `List
@@ -142,7 +154,27 @@ module Make (Transition_frontier : Transition_frontier_intf) :
           | Some _ ->
               true )
 
-      let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t) =
+      let handle_tf_diff (removed, refcount_table) t =
+        t.ref_table <- Some refcount_table ;
+        t.removed_counter <- t.removed_counter + removed ;
+        if t.removed_counter < removed_breadcrumb_wait then return ()
+        else (
+          t.removed_counter <- 0 ;
+          Statement_table.filter_keys_inplace t.snark_tables.rebroadcastable
+            ~f:(fun work ->
+              (* Rebroadcastable should always be a subset of all. *)
+              assert (Hashtbl.mem t.snark_tables.all work) ;
+              work_is_referenced t work ) ;
+          Statement_table.filter_keys_inplace t.snark_tables.all
+            ~f:(work_is_referenced t) ;
+          return
+            (*when snark works removed from the pool*)
+            Coda_metrics.(
+              Gauge.set Snark_work.snark_pool_size
+                (Float.of_int @@ Hashtbl.length t.snark_tables.all)) )
+
+      let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t)
+          ~tf_diff_writer =
         (* start with empty ref table *)
         t.ref_table <- None ;
         let tf_deferred =
@@ -150,12 +182,13 @@ module Make (Transition_frontier : Transition_frontier_intf) :
             | Some tf ->
                 (* Start the count at the max so we flush after reconstructing
                    the transition_frontier *)
-                let removedCounter = ref removed_breadcrumb_wait in
+                t.removed_counter <- removed_breadcrumb_wait ;
                 let pipe = Transition_frontier.snark_pool_refcount_pipe tf in
-                let deferred =
-                  Broadcast_pipe.Reader.iter pipe
-                    ~f:(fun (removed, refcount_table) ->
-                      t.ref_table <- Some refcount_table ;
+                Broadcast_pipe.Reader.iter pipe
+                  ~f:(Linear_pipe.write tf_diff_writer)
+                |> Deferred.don't_wait_for ;
+                return ()
+                (*t.ref_table <- Some refcount_table ;
                       removedCounter := !removedCounter + removed ;
                       if !removedCounter < removed_breadcrumb_wait then
                         return ()
@@ -173,25 +206,25 @@ module Make (Transition_frontier : Transition_frontier_intf) :
                           Coda_metrics.(
                             Gauge.set Snark_work.snark_pool_size
                               ( Float.of_int
-                              @@ Hashtbl.length t.snark_tables.all )) ) )
-                in
-                deferred
+                              @@ Hashtbl.length t.snark_tables.all )) ) )*)
             | None ->
                 t.ref_table <- None ;
                 return () )
         in
         Deferred.don't_wait_for tf_deferred
 
-      let create ~frontier_broadcast_pipe ~config ~logger =
+      let create ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
         let t =
           { snark_tables=
               { all= Statement_table.create ()
               ; rebroadcastable= Statement_table.create () }
           ; logger
           ; config
-          ; ref_table= None }
+          ; ref_table= None
+          ; removed_counter= removed_breadcrumb_wait }
         in
-        listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t ;
+        listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t
+          ~tf_diff_writer ;
         t
 
       let get_logger t = t.logger
@@ -343,6 +376,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
 
   let load ~config ~logger ~disk_location ~incoming_diffs ~local_diffs
       ~frontier_broadcast_pipe =
+    let tf_diff_reader, tf_diff_writer = Linear_pipe.create () in
     match%map
       Async.Reader.load_bin_prot disk_location
         Resource_pool.bin_reader_serializable
@@ -351,9 +385,10 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         let pool = Resource_pool.of_serializable snark_table ~config ~logger in
         let network_pool =
           of_resource_pool_and_diffs pool ~logger ~incoming_diffs ~local_diffs
+            ~tf_diff:tf_diff_reader
         in
         Resource_pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
-          pool ;
+          pool ~tf_diff_writer ;
         network_pool
     | Error _e ->
         create ~config ~logger ~incoming_diffs ~local_diffs
@@ -418,6 +453,8 @@ let%test_module "random set test" =
       and there are no best tip diffs being fed into this pipe from the mock
       transition frontier*)
       let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create None in
+      let incoming_diff_r, _incoming_diff_w = Linear_pipe.create () in
+      let local_diff_r, _local_diff_w = Linear_pipe.create () in
       let res =
         let open Deferred.Let_syntax in
         let%bind verifier =
@@ -427,8 +464,10 @@ let%test_module "random set test" =
         in
         let config = config verifier in
         let resource_pool =
-          Mock_snark_pool.Resource_pool.create ~config ~logger
+          Mock_snark_pool.create ~config ~logger
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+            ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
+          |> Mock_snark_pool.resource_pool
         in
         let%map () =
           let open Deferred.Let_syntax in

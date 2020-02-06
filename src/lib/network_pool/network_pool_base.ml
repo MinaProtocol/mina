@@ -11,6 +11,7 @@ end)
   with type resource_pool := Resource_pool.t
    and type resource_pool_diff := Resource_pool.Diff.t
    and type transition_frontier := Transition_frontier.t
+   and type transition_frontier_diff := Resource_pool.transition_frontier_diff
    and type config := Resource_pool.Config.t = struct
   type t =
     { resource_pool: Resource_pool.t
@@ -35,14 +36,16 @@ end)
         Deferred.unit
 
   let of_resource_pool_and_diffs resource_pool ~logger ~incoming_diffs
-      ~local_diffs =
+      ~local_diffs ~tf_diff =
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
     let network_pool =
       {resource_pool; logger; read_broadcasts; write_broadcasts}
     in
     Linear_pipe.merge_unordered
       [ Linear_pipe.map incoming_diffs ~f:(fun diff -> `Incoming diff)
-      ; Linear_pipe.map local_diffs ~f:(fun diff -> `Local diff) ]
+      ; Linear_pipe.map local_diffs ~f:(fun diff -> `Local diff)
+      ; Linear_pipe.map tf_diff ~f:(fun diff ->
+            `Transition_frontier_extension diff ) ]
     |> Linear_pipe.iter ~f:(fun diff_source ->
            match diff_source with
            | `Incoming diff ->
@@ -50,7 +53,8 @@ end)
            | `Local diff ->
                (*Should this be coming from resource pool instead?*)
                apply_and_broadcast network_pool (Envelope.Incoming.local diff)
-       )
+           | `Transition_frontier_extension diff ->
+               Resource_pool.handle_tf_diff diff resource_pool )
     |> Deferred.don't_wait_for ;
     network_pool
 
@@ -102,10 +106,13 @@ end)
 
   let create ~config ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe
       ~logger =
+    (*Diffs from tansition frontier extensions*)
+    let tf_diff_reader, tf_diff_writer = Linear_pipe.create () in
     let t =
       of_resource_pool_and_diffs
-        (Resource_pool.create ~config ~logger ~frontier_broadcast_pipe)
-        ~incoming_diffs ~local_diffs ~logger
+        (Resource_pool.create ~config ~logger ~frontier_broadcast_pipe
+           ~tf_diff_writer)
+        ~incoming_diffs ~local_diffs ~logger ~tf_diff:tf_diff_reader
     in
     don't_wait_for (rebroadcast_loop t logger) ;
     t
