@@ -17,6 +17,6 @@ let is_initialized _ = `Yes
 
 let set_constraint_system _ _ = ()
 
-let to_string _ = ""
+let to_string _ = failwith "TODO"
 
 let of_string _ = failwith "TODO"

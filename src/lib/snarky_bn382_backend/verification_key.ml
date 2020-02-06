@@ -1,2 +1,0 @@
-open Core
-include String

@@ -50,7 +50,7 @@ struct
   let set_primary_input_size t x = t.public_input_size <- x
 
   (* TODO *)
-  let digest _ = Md5.digest_string ""
+  let digest _ = failwith "TODO"
 
   let finalize = ignore
 
@@ -177,14 +177,6 @@ struct
     let var_exn t = Option.value_exn (var t) in
     let choose_best opts terms =
       let constr, new_weight = choose_best t.weight opts terms in
-      (* TODO: Delete
-      if label = Some "special" then begin
-        let (a, b, c) = constr in
-        printf !"ABC:\n%{sexp:int list}\n%{sexp:int list}\n%{sexp: int list}\n%!"
-          (List.map ~f:(fun (_, x) -> x) a)
-          (List.map ~f:(fun (_, x) -> x) b)
-          (List.map ~f:(fun (_, x) -> x) c) ;
-      end; *)
       t.weight <- new_weight ;
       add_r1cs t constr
     in

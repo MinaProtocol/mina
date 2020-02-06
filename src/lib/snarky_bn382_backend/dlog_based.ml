@@ -37,11 +37,8 @@ module Oracles = struct
   open Snarky_bn382
 
   let create vk prev_challenge input (pi : Proof.t) =
-    printf "%s\n%!" __LOC__ ;
     let pi = Proof.to_backend prev_challenge input pi in
-    printf "%s\n%!" __LOC__ ;
     let t = Fq_oracles.create vk pi in
-    printf "%s\n%!" __LOC__ ;
     Caml.Gc.finalise Fq_oracles.delete t ;
     t
 
@@ -94,14 +91,14 @@ module Proving_key = struct
 
               let to_binable _ = ()
 
-              let of_binable () = failwith "todo"
+              let of_binable () = failwith "TODO"
             end)
 
   let is_initialized _ = `Yes
 
   let set_constraint_system _ _ = ()
 
-  let to_string _ = ""
+  let to_string _ = failwith "TODO"
 
   let of_string _ = failwith "TODO"
 end
@@ -114,23 +111,13 @@ module Keypair = struct
 
   let urs =
     let path = "/home/izzy/pickles/dlog-urs" in
-    lazy
-      (let start = Time.now () in
-       let res = Snarky_bn382.Fq_urs.read path in
-       let stop = Time.now () in
-       Core.printf
-         !"read urs in %{sexp:Time.Span.t}\n%!"
-         (Time.diff stop start) ;
-       res)
+    lazy (Snarky_bn382.Fq_urs.read path)
 
   let create
       { R1CS_constraint_system.public_input_size
       ; auxiliary_input_size
       ; m= {a; b; c}
       ; weight } =
-    Core.printf
-      !"dlog weight is %{sexp:R1cs_constraint_system.Weight.t}\n%!"
-      weight ;
     let vars = 1 + public_input_size + auxiliary_input_size in
     Fq_index.create a b c
       (Unsigned.Size_t.of_int vars)

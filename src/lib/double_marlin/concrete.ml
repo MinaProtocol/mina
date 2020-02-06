@@ -305,6 +305,8 @@ module Dlog_based_proof = struct
           k prev_statement_with_hashes.proof_state
       | Compute.Fq_is_square x ->
           k Fq.(is_square (of_bits x))
+      | _ ->
+          Snarky.Request.unhandled
     in
     let (next_proof : Pairing_based.Proof.t) =
       Impls.Pairing_based.prove pk
@@ -823,4 +825,4 @@ let%test_unit "concrete" =
   let proof = time "first wrap" (fun () -> M.wrap proof) in
   let proof = time "second step" (fun () -> M.step proof Fp.one) in
   let proof = time "second wrap" (fun () -> M.wrap proof) in
-  ()
+  ignore proof

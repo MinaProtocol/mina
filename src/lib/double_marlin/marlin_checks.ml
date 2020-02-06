@@ -55,14 +55,7 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
     let sum = sum' in
     let r_alpha =
       let v_h_alpha = vanishing_polynomial domain_h alpha in
-      fun x ->
-        as_prover
-          As_prover.(
-            fun () ->
-              Core.printf
-                !"%{sexp:Field.Constant.t * Field.Constant.t}\n%!"
-                (read_var alpha, read_var x)) ;
-        (v_h_alpha - vanishing_polynomial domain_h x) / (alpha - x)
+      fun x -> (v_h_alpha - vanishing_polynomial domain_h x) / (alpha - x)
     in
     let v_h_beta_1 = vanishing_polynomial domain_h beta_1 in
     let v_h_beta_2 = vanishing_polynomial domain_h beta_2 in
@@ -79,22 +72,8 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
       let b = prod ms term in
       (a, b)
     in
-    Core.printf "domain h = %d\n%!" (Domain.size domain_h) ;
-    Core.printf "domain k = %d\n%!" (Domain.size domain_k) ;
-    List.mapi
-      ~f:(fun i (x, y) ->
-        as_prover
-          As_prover.(
-            fun () ->
-              let x = read_var x in
-              let y = read_var y in
-              if not (Field.Constant.equal x y) then (
-                printf "Bad marlin equation %d\n%!" i ;
-                printf "lhs\n%!" ;
-                Field.Constant.print x ;
-                printf "rhs\n%!" ;
-                Field.Constant.print y )) ;
-        equal x y )
+    List.map
+      ~f:(fun (x, y) -> equal x y)
       [ ( h_3 * vanishing_polynomial domain_k beta_3
         , a_beta_3 - (b_beta_3 * ((beta_3 * g_3) + sigma_3)) )
       ; ( r_alpha beta_2 * sigma_3 * of_int (Domain.size domain_k)
