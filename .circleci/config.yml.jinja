@@ -81,19 +81,19 @@ jobs:
                   command:  bash -c 'eval `opam config env` && make build_archive'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
-            # NOTE: If we were using a machine executor we would be able to mount the sql file in 
+            # NOTE: If we were using a machine executor we would be able to mount the sql file in
             # as a volume for the container to seed itself, this is the workaround.
-            # Ideally this DB setup step would be handled by the archive process itself. 
+            # Ideally this DB setup step would be handled by the archive process itself.
             - run:
                   name: Set Up Database
-                  command: | 
-                    sudo apt-get install -y postgresql 
+                  command: |
+                    sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
                   name: Configure Hasura
                   command: ./scripts/archive/make_hasura_configurations.sh
             - setup_remote_docker
-            - run: 
+            - run:
                   name: Build and Release Archives
                   command: ./scripts/archive/build-release-archives.sh
     lint:
@@ -298,6 +298,29 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             - store_artifacts:
                   path: package
+
+    build-client-sdk:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+        steps:
+            - checkout
+            - run:
+                  name: Artifacts Path
+                  command: |
+                      mkdir -p /tmp/artifacts
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
+            - run:
+                  name: Build client SDK for Javascript
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
+                  environment:
+                    DUNE_PROFILE: nonconsensus_dev
+                  no_output_timeout: 10m
 
     {%- for profile in build_artifact_profiles %}
     build-artifacts--{{profile}}:
@@ -575,6 +598,7 @@ workflows:
             - build-wallet
             - build-archive
             - build-macos
+            - build-client-sdk
             {%- for profile in build_artifact_profiles %}
             - build-artifacts--{{profile}}
             {%- endfor %}

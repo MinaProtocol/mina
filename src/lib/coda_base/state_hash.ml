@@ -30,7 +30,21 @@ Base58_check.String_ops.(to_string, of_string)]
 
 let dummy = of_hash Outside_pedersen_image.t
 
+[%%ifdef
+consensus_mechanism]
+
 let zero = Snark_params.Tick.Pedersen.zero_hash
+
+[%%else]
+
+(* in the nonconsensus world, we don't have the Pedersen machinery available,
+   so just inline the value for zero
+*)
+let zero =
+  Snark_params_nonconsensus.Field.of_string
+    "332637027557984585263317650500984572911029666110240270052776816409842001629441009391914692"
+
+[%%endif]
 
 let raw_hash_bytes = to_bytes
 
