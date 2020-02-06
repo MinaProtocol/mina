@@ -95,7 +95,10 @@ let daemon logger =
          ~doc:"IP IP of network interface to use for peer connections"
          (optional string)
      and working_dir =
-       flag "working-dir" ~doc:"PATH path to chdir into before starting"
+       flag "working-dir"
+         ~doc:
+           "PATH path to chdir into before starting (useful for background \
+            mode, defaults to cwd, or / if -background)"
          (optional string)
      and is_background =
        flag "background" no_arg ~doc:"Run process on the background"
@@ -168,7 +171,6 @@ let daemon logger =
        let compute_conf_dir home =
          Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
        in
-       ignore (Option.map working_dir ~f:Caml.Sys.chdir) ;
        let%bind conf_dir =
          if is_background then
            let home = Core.Sys.home_directory () in
@@ -181,9 +183,9 @@ let daemon logger =
          if is_background then (
            Core.printf "Starting background coda daemon. (Log Dir: %s)\n%!"
              conf_dir ;
-           Daemon.daemonize ~redirect_stdout:`Dev_null
+           Daemon.daemonize ~redirect_stdout:`Dev_null ?cd:working_dir
              ~redirect_stderr:`Dev_null () )
-         else ()
+         else ignore (Option.map working_dir ~f:Caml.Sys.chdir)
        in
        Stdout_log.setup log_json log_level ;
        (* 512MB logrotate max size = 1GB max filesystem usage *)
