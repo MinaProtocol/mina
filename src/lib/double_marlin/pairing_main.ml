@@ -190,9 +190,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
         with_degree_bound
     in
     print_chal "Oxi" xi ;
-    List.iter !state ~f:(fun (g, i) ->
-        print_g (sprintf "Oadding in shifted xi^%d" i) g ) ;
-
     print_g "Ocombined_polynomial" combined_polynomial ;
     print_g "Osg" sg;
     (* TODO: Absorb challenges into the sponge and expose it as another input *)
@@ -382,6 +379,17 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
 
   module Marlin_checks = Marlin_checks.Make (Impl)
 
+  let print_fp lab x =
+    as_prover (fun () ->
+    printf "%s: %!" lab;
+    Fp.Constant.print (As_prover.read Field.typ x) ;
+    printf "\n%!"
+      )
+
+  let print_bool lab x =
+    as_prover (fun () ->
+        printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
+
   let finalize_other_proof ~domain_k ~domain_h ~sponge
       ({xi; r; r_xi_sum; marlin} :
         _ Types.Dlog_based.Proof_state.Deferred_values.t) =
@@ -399,7 +407,11 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let x_hat_beta_1 =
       exists Field.typ ~request:(fun () -> Requests.Prev_x_hat_beta_1)
     in
-    let absorb_field x = Sponge.absorb sponge (`Field x) in
+    let absorb_field x =
+      print_fp "POabsorb" x ;
+      Sponge.absorb sponge (`Field x)
+    in
+    absorb_field x_hat_beta_1 ;
     Vector.iter (Evals.to_vector evals) ~f:absorb_field ;
     let open Fp in
     let xi_actual = Sponge.squeeze sponge ~length:Challenge.length in
@@ -411,23 +423,56 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
     let beta1, beta2, beta3 =
       Evals.to_combined_vectors ~x_hat:x_hat_beta_1 evals
     in
+    let xi_correct =
+      Fp.equal (Field.pack xi_actual) xi
+    in
+    let r_correct =
+      Fp.equal (Field.pack r_actual) r
+    in
+    let r_xi_sum_correct =
+      let r_xi_sum_actual =
+            r
+            * ( combined_evaluation Common.pairing_beta_1_pcs_batch
+                  marlin.beta_1 beta1
+              + r
+                * ( combined_evaluation Common.pairing_beta_2_pcs_batch
+                      marlin.beta_2 beta2
+                  + r
+                    * combined_evaluation Common.pairing_beta_3_pcs_batch
+                        marlin.beta_3 beta3 ) )
+          in
+          Fp.equal r_xi_sum r_xi_sum_actual
+    in
+    let marlin_checks =
+      Marlin_checks.check ~x_hat_beta_1 ~input_domain:Input_domain.domain
+        ~domain_h ~domain_k marlin evals 
+    in
+    as_prover As_prover.(fun () ->
+        if not (read Boolean.typ r_correct)
+        then begin
+          print_fp "r" r ;
+          print_fp "r_actual" (Field.pack r_actual) ;
+        end
+      );
+    as_prover As_prover.(fun () ->
+        if not (read Boolean.typ xi_correct)
+        then begin
+          print_fp "xi" xi ;
+          print_fp "xi_actual" (Field.pack xi_actual) ;
+        end
+      );
+    List.iter ~f:(Tuple2.uncurry (Fn.flip print_bool))
+      [ xi_correct, "xi_correct"
+      ; r_correct, "r_correct"
+      ; r_xi_sum_correct, "r_xi_sum_correct"
+      ; marlin_checks , "marlin_checks"
+      ] ;
     Boolean.all
-      [ Fp.equal (Field.pack xi_actual) xi
-      ; Fp.equal (Field.pack r_actual) r
-      ; (let r_xi_sum_actual =
-           r
-           * ( combined_evaluation Common.pairing_beta_1_pcs_batch
-                 marlin.beta_1 beta1
-             + r
-               * ( combined_evaluation Common.pairing_beta_2_pcs_batch
-                     marlin.beta_2 beta2
-                 + r
-                   * combined_evaluation Common.pairing_beta_3_pcs_batch
-                       marlin.beta_3 beta3 ) )
-         in
-         Fp.equal r_xi_sum r_xi_sum_actual)
-      ; Marlin_checks.check ~x_hat_beta_1 ~input_domain:Input_domain.domain
-          ~domain_h ~domain_k marlin evals ]
+      [ xi_correct
+      ; r_correct
+      ; r_xi_sum_correct
+      ; marlin_checks ]
+          
 
   module type App_state_intf = Intf.App_state_intf with module Impl := Impl
 
@@ -459,10 +504,6 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
             t )
       ; Vector.to_array challenge
       ; Vector.to_array digest ]
-
-  let print_bool lab x =
-    as_prover (fun () ->
-        printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x))
 
   let main (type s) ((module A) as am : s app_state)
       ({ proof_state=
@@ -523,6 +564,7 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       ; proof_state= prev_proof_state }
     in
     let prev_proof_finalized =
+      print_fp "POsponge_digest_vefore_evaluations" prev_sponge_digest_before_evaluations;
       let sponge =
         let s = Sponge.create sponge_params in
         Sponge.absorb s (`Field prev_sponge_digest_before_evaluations) ;
@@ -561,7 +603,8 @@ module Main (Inputs : Intf.Pairing_main_inputs.S) = struct
       print_bool "prev_proof_finalized" prev_proof_finalized;
       print_bool "prev-was-base" prev_statement.proof_state.was_base_case;
       let prev_proof_finalized =
-        Boolean.(prev_proof_finalized || prev_statement.proof_state.was_base_case)
+        Boolean.(prev_proof_finalized || is_base_case)
+(*         Boolean.(prev_proof_finalized || prev_statement.proof_state.was_base_case) *)
       in
       let bulletproof_success =
         Boolean.(bulletproof_success || prev_statement.proof_state.was_base_case)

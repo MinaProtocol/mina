@@ -28,25 +28,23 @@ module Evals = struct
       { w_hat
       ; z_hat_a
       ; z_hat_b
-      ; g_1
       ; h_1
-      ; g_2
       ; h_2
-      ; g_3
       ; h_3
       ; row= {a= row_a; b= row_b; c= row_c}
       ; col= {a= col_a; b= col_b; c= col_c}
       ; value= {a= value_a; b= value_b; c= value_c} 
       ; rc= {a= rc_a; b= rc_b; c= rc_c} 
+      ; g_1
+      ; g_2
+      ; g_3
       } =
     Vector.
       [ w_hat
       ; z_hat_a
       ; z_hat_b
       ; h_1
-      ; g_1
       ; h_2
-      ; g_2
       ; h_3
       ; row_a
       ; row_b
@@ -60,7 +58,10 @@ module Evals = struct
       ; rc_a
       ; rc_b
       ; rc_c
-      ; g_3 ]
+      ; g_1
+      ; g_2
+      ; g_3 
+      ]
 
   let of_vector
       Vector.
@@ -68,9 +69,7 @@ module Evals = struct
         ; z_hat_a
         ; z_hat_b
         ; h_1
-        ; g_1
         ; h_2
-        ; g_2
         ; h_3
         ; row_a
         ; row_b
@@ -84,7 +83,10 @@ module Evals = struct
         ; rc_a
         ; rc_b
         ; rc_c
-        ; g_3 ] =
+        ; g_1
+        ; g_2
+        ; g_3 
+        ] =
     { w_hat
     ; z_hat_a
     ; z_hat_b

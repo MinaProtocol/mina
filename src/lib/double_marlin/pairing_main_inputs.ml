@@ -238,7 +238,7 @@ end
 
 let domain_k = Domain.Pow_2_roots_of_unity 18
 
-let domain_h = Domain.Pow_2_roots_of_unity 18
+let domain_h = Domain.Pow_2_roots_of_unity 17
 
 module Generators = struct
   let g = G.one
