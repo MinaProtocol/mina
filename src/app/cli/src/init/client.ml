@@ -1610,6 +1610,7 @@ let accounts =
     ~preserve_subcommand_order:()
     [ ("list", list_accounts)
     ; ("create", create_account)
+    ; ("register_hardware_wallet", register_hardware_wallet)
     ; ("import", import_key)
     ; ("unlock", unlock_account)
     ; ("lock", lock_account) ]
