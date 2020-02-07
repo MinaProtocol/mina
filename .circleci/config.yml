@@ -154,59 +154,6 @@ jobs:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
 
-    build-auxiliary:
-        docker:
-            - image: nixos/nix
-        steps:
-            - checkout
-            - run:
-                name: Install tools
-                command: apk add patchelf dpkg tar
-            - run:
-                name: Install cachix
-                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
-            - run:
-                name: Build libp2p_helper using cachix
-                command: |
-                    cachix use codaprotocol
-                    cd src/app/libp2p_helper
-
-                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
-                        echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build --option sandbox false default.nix
-                    else
-                        nix-build --option sandbox false default.nix | cachix push codaprotocol
-                    fi
-            - run:
-                name: Create package dir
-                command: mkdir -p package
-            - run:
-                name: Collect and strip binary
-                command: |
-                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
-                    chmod +w package/coda-libp2p_helper
-                    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 package/coda-libp2p_helper
-            - run:
-                name: Create deb
-                command: |
-                    mkdir -p package/deb/usr/local/sbin
-                    cp package/coda-libp2p_helper package/deb/usr/local/sbin/.
-                    mkdir -p package/deb/DEBIAN
-                    cp src/app/libp2p_helper/build/DEBIAN/control package/deb/DEBIAN/control
-                    DATE=$(date +%Y-%m-%d)
-                    sed -i "s/DATE/${DATE}/" package/deb/DEBIAN/control
-                    find src/app/libp2p_helper -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ' > /tmp/sha1sig
-                    HASH=$(cat /tmp/sha1sig)
-                    sed -i "s/HASH/${HASH}/" package/deb/DEBIAN/control
-                    echo "------------------------------------"
-                    cat package/deb/DEBIAN/control
-                    echo "------------------------------------"
-                    find package/deb/
-                    echo "------------------------------------"
-                    dpkg-deb -v --build package/deb/ package/coda-discovery-${HASH}.deb
-            - store_artifacts:
-                  path: package
-
     build-macos:
         macos:
             xcode: "10.2.1"
@@ -1108,7 +1055,6 @@ workflows:
         jobs:
             - lint
             - lint-opt
-            - build-auxiliary
             - update-branch-protection:
                 filters:
                   branches:
