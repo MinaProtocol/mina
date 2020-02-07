@@ -2841,6 +2841,22 @@
                   "ofType": null
                 }
               },
+              "isDeprecated": true,
+              "deprecationReason": "use blockHeight instead"
+            },
+            {
+              "name": "blockHeight",
+              "description": "Height of the blockchain at this block",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             },
@@ -3167,7 +3183,7 @@
             },
             {
               "name": "stateHashField",
-              "description": "Bigint field-element representation of stateHash",
+              "description": "Experimental: Bigint field-element representation of stateHash",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -3506,6 +3522,22 @@
                   "ofType": null
                 }
               },
+              "isDeprecated": true,
+              "deprecationReason": null
+            },
+            {
+              "name": "blockHeight",
+              "description": "Block height at which balance was measured",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
               "isDeprecated": false,
               "deprecationReason": null
             }
@@ -3630,6 +3662,46 @@
                 "kind": "OBJECT",
                 "name": "Account",
                 "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "delegators",
+              "description": "The list of accounts which are delegating to you (note that the info is recorded in the last epoch so it might not be up to date with the current account status)",
+              "args": [],
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "OBJECT",
+                    "name": "Account",
+                    "ofType": null
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "lastEpochDelegators",
+              "description": "The list of accounts which are delegating to you in the last epoch (note that the info is recorded in the one before last epoch epoch so it might not be up to date with the current account status)",
+              "args": [],
+              "type": {
+                "kind": "LIST",
+                "name": null,
+                "ofType": {
+                  "kind": "NON_NULL",
+                  "name": null,
+                  "ofType": {
+                    "kind": "OBJECT",
+                    "name": "Account",
+                    "ofType": null
+                  }
+                }
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -4647,7 +4719,7 @@
               "deprecationReason": null
             },
             {
-              "name": "blockProducerPubkeys",
+              "name": "blockProductionKeys",
               "description": null,
               "args": [],
               "type": {
@@ -4960,8 +5032,8 @@
                 "name": "Account",
                 "ofType": null
               },
-              "isDeprecated": false,
-              "deprecationReason": null
+              "isDeprecated": true,
+              "deprecationReason": "use account instead"
             },
             {
               "name": "account",
@@ -5065,6 +5137,33 @@
                   "name": "BlockConnection",
                   "ofType": null
                 }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "block",
+              "description": "Get information about a single block or null if no block can be found",
+              "args": [
+                {
+                  "name": "stateHash",
+                  "description": "State hash of the block",
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "String",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "OBJECT",
+                "name": "Block",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
