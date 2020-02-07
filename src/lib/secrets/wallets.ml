@@ -23,7 +23,8 @@ let get_path {path; cache} public_key =
          | Locked file | Unlocked (file, _) ->
              Option.return file
          | Hardware_wallet _ ->
-             Option.return (Public_key.Compressed.to_base58_check public_key) )
+             Option.return
+               (Public_key.Compressed.to_base58_check public_key ^ ".nonce") )
     |> Option.value ~default:(get_privkey_filename public_key)
   in
   path ^/ filename
@@ -121,7 +122,9 @@ let register_hardware_wallet t ~hardware_wallet_nonce :
     Hardware_wallets.compute_public_key ~hardware_wallet_nonce
   in
   let compressed_pk = Public_key.compress public_key in
-  let nonce_path = get_path t compressed_pk in
+  let nonce_path =
+    t.path ^/ Public_key.Compressed.to_base58_check compressed_pk ^ ".nonce"
+  in
   let%bind () =
     Hardware_wallets.write_exn ~hardware_wallet_nonce ~nonce_path
     |> Deferred.map ~f:Result.return
