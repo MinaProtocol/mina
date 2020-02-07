@@ -21,7 +21,7 @@ Follow the steps below to use [MiniUPnP](https://github.com/miniupnp/miniupnp) t
 
 Run the following command:
 
-        $ sudo upnpc -r 8302 TCP 8303 TCP
+        sudo upnpc -r 8302 TCP 8303 TCP
 
 If this command succeeds, you'll see a response indicating that the ports have been successfully redirected:
 
@@ -41,7 +41,7 @@ AddPortMapping(8303, 8303, 192.168.101.7) failed with code 718 (ConflictInMappin
 
 If this happens, you can forward different ports, as long as they are unused by another application:
 
-        $ sudo upnpc -r <custom-port> TCP
+        sudo upnpc -r <custom-port> TCP
 
 If you forward custom ports, keep in mind:
 
