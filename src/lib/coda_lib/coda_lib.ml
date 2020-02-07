@@ -50,9 +50,15 @@ type pipes =
   ; external_transitions_writer:
       (External_transition.t Envelope.Incoming.t * Block_time.t) Pipe.Writer.t
   ; local_txns_writer:
-      Network_pool.Transaction_pool.Resource_pool.Diff.t Linear_pipe.Writer.t
+      ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+      , Strict_pipe.synchronous
+      , unit Deferred.t )
+      Strict_pipe.Writer.t
   ; local_snark_work_writer:
-      Network_pool.Snark_pool.Resource_pool.Diff.t Linear_pipe.Writer.t }
+      ( Network_pool.Snark_pool.Resource_pool.Diff.t
+      , Strict_pipe.synchronous
+      , unit Deferred.t )
+      Strict_pipe.Writer.t }
 
 type t =
   { config: Config.t
@@ -572,12 +578,13 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   let spec = work.spec.instances in
   set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
-  Linear_pipe.write t.pipes.local_snark_work_writer
+  Strict_pipe.Writer.write t.pipes.local_snark_work_writer
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work)
   |> Deferred.don't_wait_for
 
 let add_transactions t (txns : User_command.t list) =
-  Linear_pipe.write t.pipes.local_txns_writer txns |> Deferred.don't_wait_for
+  Strict_pipe.Writer.write t.pipes.local_txns_writer txns
+  |> Deferred.don't_wait_for
 
 let next_producer_timing t = t.next_producer_timing
 
@@ -776,9 +783,11 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
           in
-          let local_txns_reader, local_txns_writer = Linear_pipe.create () in
+          let local_txns_reader, local_txns_writer =
+            Strict_pipe.(create ~name:"local transactions" Synchronous)
+          in
           let local_snark_work_reader, local_snark_work_writer =
-            Linear_pipe.create ()
+            Strict_pipe.(create ~name:"local snark work" Synchronous)
           in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config

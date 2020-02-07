@@ -15,8 +15,12 @@ let%test_module "network pool test" =
 
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
-      let pool_reader, _pool_writer = Linear_pipe.create () in
-      let local_reader, _local_writer = Linear_pipe.create () in
+      let pool_reader, _pool_writer =
+        Strict_pipe.(create ~name:"Network pool test" Synchronous)
+      in
+      let local_reader, _local_writer =
+        Strict_pipe.(create ~name:"Network pool test" Synchronous)
+      in
       let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create None in
       let work =
         `One
@@ -81,14 +85,20 @@ let%test_module "network pool test" =
                   ; prover= Signature_lib.Public_key.Compressed.empty } } )
       in
       let verify_unsolved_work () =
-        let work_diffs =
+        let pool_reader, pool_writer =
+          Strict_pipe.(create ~name:"Network pool test" Synchronous)
+        in
+        let local_reader, local_writer =
+          Strict_pipe.(create ~name:"Network pool test" Synchronous)
+        in
+        let%bind () =
           List.map (List.take works per_reader) ~f:create_work
           |> List.map ~f:Envelope.Incoming.local
-          |> Linear_pipe.of_list
+          |> Deferred.List.iter ~f:(Strict_pipe.Writer.write pool_writer)
         in
-        let local_diffs =
+        let%bind () =
           List.map (List.drop works per_reader) ~f:create_work
-          |> Linear_pipe.of_list
+          |> Deferred.List.iter ~f:(Strict_pipe.Writer.write local_writer)
         in
         let frontier_broadcast_pipe_r, _ =
           Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
@@ -100,8 +110,9 @@ let%test_module "network pool test" =
         in
         let config = config verifier in
         let network_pool =
-          Mock_snark_pool.create ~config ~logger ~incoming_diffs:work_diffs
-            ~local_diffs ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+          Mock_snark_pool.create ~config ~logger ~incoming_diffs:pool_reader
+            ~local_diffs:local_reader
+            ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
         in
         don't_wait_for
         @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)

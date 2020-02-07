@@ -432,7 +432,7 @@ struct
                       (Broadcast_pipe.Reader.iter
                          (Transition_frontier.best_tip_diff_pipe frontier)
                          ~f:(fun diff ->
-                           Linear_pipe.write tf_diff_writer
+                           Strict_pipe.Writer.write tf_diff_writer
                              (diff, get_best_tip_ledger frontier)
                            |> Deferred.don't_wait_for ;
                            Deferred.unit )) ;
@@ -840,8 +840,12 @@ let%test_module _ =
     let setup_test () =
       let tf, best_tip_diff_w = Mock_transition_frontier.create () in
       let tf_pipe_r, _tf_pipe_w = Broadcast_pipe.create @@ Some tf in
-      let incoming_diff_r, _incoming_diff_w = Linear_pipe.create () in
-      let local_diff_r, _local_diff_w = Linear_pipe.create () in
+      let incoming_diff_r, _incoming_diff_w =
+        Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
+      in
+      let local_diff_r, _local_diff_w =
+        Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
+      in
       let trust_system = Trust_system.null () in
       let logger = Logger.null () in
       let config = Test.Resource_pool.make_config ~trust_system in
@@ -1043,8 +1047,12 @@ let%test_module _ =
       Thread_safe.block_on_async_exn (fun () ->
           (* Set up initial frontier *)
           let frontier_pipe_r, frontier_pipe_w = Broadcast_pipe.create None in
-          let incoming_diff_r, _incoming_diff_w = Linear_pipe.create () in
-          let local_diff_r, _local_diff_w = Linear_pipe.create () in
+          let incoming_diff_r, _incoming_diff_w =
+            Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
+          in
+          let local_diff_r, _local_diff_w =
+            Strict_pipe.(create ~name:"Transaction pool test" Synchronous)
+          in
           let logger = Logger.null () in
           let trust_system = Trust_system.null () in
           let config = Test.Resource_pool.make_config ~trust_system in

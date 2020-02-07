@@ -166,12 +166,12 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
 val snark_pool_diffs :
-  t -> Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t Linear_pipe.Reader.t
+  t -> Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t Strict_pipe.Reader.t
 
 val transaction_pool_diffs :
      t
   -> Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
-     Linear_pipe.Reader.t
+     Strict_pipe.Reader.t
 
 val broadcast_state : t -> External_transition.t -> unit
 

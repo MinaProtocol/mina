@@ -38,8 +38,8 @@ module type S = sig
     -> logger:Logger.t
     -> disk_location:string
     -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
-                      Linear_pipe.Reader.t
-    -> local_diffs:Resource_pool.Diff.t Linear_pipe.Reader.t
+                      Strict_pipe.Reader.t
+    -> local_diffs:Resource_pool.Diff.t Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier option
                                Broadcast_pipe.Reader.t
     -> t Deferred.t

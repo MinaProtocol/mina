@@ -39,8 +39,8 @@ module type S = sig
     -> logger:Logger.t
     -> disk_location:string
     -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
-                      Linear_pipe.Reader.t
-    -> local_diffs:Resource_pool.Diff.t Linear_pipe.Reader.t
+                      Strict_pipe.Reader.t
+    -> local_diffs:Resource_pool.Diff.t Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier option
                                Broadcast_pipe.Reader.t
     -> t Deferred.t
@@ -175,7 +175,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
                 t.removed_counter <- removed_breadcrumb_wait ;
                 let pipe = Transition_frontier.snark_pool_refcount_pipe tf in
                 Broadcast_pipe.Reader.iter pipe
-                  ~f:(Linear_pipe.write tf_diff_writer)
+                  ~f:(Strict_pipe.Writer.write tf_diff_writer)
                 |> Deferred.don't_wait_for ;
                 return ()
             | None ->
@@ -347,7 +347,10 @@ module Make (Transition_frontier : Transition_frontier_intf) :
 
   let load ~config ~logger ~disk_location ~incoming_diffs ~local_diffs
       ~frontier_broadcast_pipe =
-    let tf_diff_reader, tf_diff_writer = Linear_pipe.create () in
+    let tf_diff_reader, tf_diff_writer =
+      Strict_pipe.(
+        create ~name:"Snark pool Transition frontier diffs" Synchronous)
+    in
     match%map
       Async.Reader.load_bin_prot disk_location
         Resource_pool.bin_reader_serializable
@@ -411,8 +414,12 @@ let%test_module "random set test" =
       and there are no best tip diffs being fed into this pipe from the mock
       transition frontier*)
       let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create None in
-      let incoming_diff_r, _incoming_diff_w = Linear_pipe.create () in
-      let local_diff_r, _local_diff_w = Linear_pipe.create () in
+      let incoming_diff_r, _incoming_diff_w =
+        Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+      in
+      let local_diff_r, _local_diff_w =
+        Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+      in
       let res =
         let open Deferred.Let_syntax in
         let%bind verifier =
@@ -557,8 +564,12 @@ let%test_module "random set test" =
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let pool_reader, _pool_writer = Linear_pipe.create () in
-          let local_reader, _local_writer = Linear_pipe.create () in
+          let pool_reader, _pool_writer =
+            Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+          in
+          let local_reader, _local_writer =
+            Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+          in
           let frontier_broadcast_pipe_r, _ =
             Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
           in
@@ -627,14 +638,20 @@ let%test_module "random set test" =
               )
           in
           let verify_unsolved_work () =
-            let work_diffs =
+            let pool_reader, pool_writer =
+              Strict_pipe.(create ~name:"Network pool test" Synchronous)
+            in
+            let local_reader, local_writer =
+              Strict_pipe.(create ~name:"Network pool test" Synchronous)
+            in
+            let%bind () =
               List.map (List.take works per_reader) ~f:create_work
               |> List.map ~f:Envelope.Incoming.local
-              |> Linear_pipe.of_list
+              |> Deferred.List.iter ~f:(Strict_pipe.Writer.write pool_writer)
             in
-            let local_diffs =
+            let%bind () =
               List.map (List.drop works per_reader) ~f:create_work
-              |> Linear_pipe.of_list
+              |> Deferred.List.iter ~f:(Strict_pipe.Writer.write local_writer)
             in
             let frontier_broadcast_pipe_r, _ =
               Broadcast_pipe.create
@@ -647,8 +664,9 @@ let%test_module "random set test" =
             in
             let config = config verifier in
             let network_pool =
-              Mock_snark_pool.create ~logger ~config ~incoming_diffs:work_diffs
-                ~local_diffs ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+              Mock_snark_pool.create ~logger ~config
+                ~incoming_diffs:pool_reader ~local_diffs:local_reader
+                ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             in
             don't_wait_for
             @@ Linear_pipe.iter (Mock_snark_pool.broadcasts network_pool)
@@ -666,8 +684,12 @@ let%test_module "random set test" =
           verify_unsolved_work () )
 
     let%test_unit "rebroadcast behavior" =
-      let pool_reader, _pool_writer = Linear_pipe.create () in
-      let local_reader, _local_writer = Linear_pipe.create () in
+      let pool_reader, _pool_writer =
+        Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+      in
+      let local_reader, _local_writer =
+        Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+      in
       let frontier_broadcast_pipe_r, _w = Broadcast_pipe.create None in
       let stmt1, stmt2 =
         Quickcheck.random_value ~seed:(`Deterministic "")
