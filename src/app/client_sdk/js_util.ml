@@ -17,7 +17,7 @@ type payload_common_js =
   ; memo: string_js Js.prop >
   Js.t
 
-let get_payload_common (payload_common_js : payload_common_js) =
+let payload_common_of_js (payload_common_js : payload_common_js) =
   let fee_js = payload_common_js##.fee in
   let fee = Js.to_string fee_js |> Currency.Fee.of_string in
   let nonce_js = payload_common_js##.nonce in

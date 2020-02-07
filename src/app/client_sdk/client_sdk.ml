@@ -74,7 +74,7 @@ let _ =
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let User_command_payload.Common.Poly.{fee; nonce; valid_until; memo} =
-           get_payload_common payment_js##.common
+           payload_common_of_js payment_js##.common
          in
          let payment_payload = payment_js##.paymentPayload in
          let receiver =
@@ -108,7 +108,7 @@ let _ =
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let User_command_payload.Common.Poly.{fee; nonce; valid_until; memo} =
-           get_payload_common stake_delegation_js##.common
+           payload_common_of_js stake_delegation_js##.common
          in
          let new_delegate =
            Js.to_string stake_delegation_js##.newDelegate
