@@ -221,12 +221,29 @@ let daemon logger =
        Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
          "Booting may take several seconds, please wait" ;
        let%bind libp2p_keypair =
-         match libp2p_keypair with
-         | None ->
-             return None
-         | Some s ->
-             Secrets.Libp2p_keypair.Terminal_stdin.read_exn s
-             |> Deferred.map ~f:Option.some
+         let libp2p_keypair_old_format =
+           Option.bind libp2p_keypair ~f:(fun s ->
+               match Coda_net2.Keypair.of_string s with
+               | Ok kp ->
+                   Some kp
+               | Error _ ->
+                   if String.contains s ',' then
+                     Logger.warn logger
+                       "I think -discovery-keypair is in the old format, but \
+                        I failed to parse it! Using it as a path..."
+                       ~module_:__MODULE__ ~location:__LOC__ ;
+                   None )
+         in
+         match libp2p_keypair_old_format with
+         | Some kp ->
+             return (Some kp)
+         | None -> (
+           match libp2p_keypair with
+           | None ->
+               return None
+           | Some s ->
+               Secrets.Libp2p_keypair.Terminal_stdin.read_exn s
+               |> Deferred.map ~f:Option.some )
        in
        (* Check if the config files are for the current version.
         * WARNING: Deleting ALL the files in the config directory if there is
