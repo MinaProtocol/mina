@@ -44,19 +44,19 @@ let daemon logger =
   let open Cli_lib.Arg_type in
   Command.async ~summary:"Coda daemon"
     (let%map_open conf_dir = Cli_lib.Flag.conf_dir
-     and propose_key =
-       flag "propose-key"
+     and block_production_key =
+       flag "block-producer-key"
          ~doc:
            "KEYFILE Private key file for the block producer. You cannot \
-            provide both `propose-key` and `propose-public-key`. (default: \
-            don't produce blocks)"
+            provide both `block-producer-key` and `block-producer-pubkey`. \
+            (default: don't produce blocks)"
          (optional string)
      and coinbase_receiver_flag =
        flag "coinbase-receiver"
          ~doc:
            "PUBLICKEY Address to send coinbase rewards to (if this node is \
-            proposing blocks). If not provided, coinbase rewards will be sent \
-            to the proposer of a block."
+            producing blocks). If not provided, coinbase rewards will be sent \
+            to the producer of a block."
          (optional public_key_compressed)
      and genesis_ledger_dir_flag =
        flag "genesis-ledger-dir"
@@ -510,8 +510,8 @@ let daemon logger =
            ; client_port
            ; libp2p_port= discovery_port }
          in
-         let%bind propose_keypair =
-           match propose_key with
+         let%bind block_production_keypair =
+           match block_production_key with
            | Some sk_file ->
                let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
                Some kp
@@ -572,12 +572,12 @@ let daemon logger =
          let time_controller =
            Block_time.Controller.create @@ Block_time.Controller.basic ~logger
          in
-         let initial_propose_keypairs =
-           propose_keypair |> Option.to_list |> Keypair.Set.of_list
+         let initial_block_production_keypairs =
+           block_production_keypair |> Option.to_list |> Keypair.Set.of_list
          in
          let consensus_local_state =
            Consensus.Data.Local_state.create ~genesis_ledger
-             ( Option.map propose_keypair ~f:(fun keypair ->
+             ( Option.map block_production_keypair ~f:(fun keypair ->
                    let open Keypair in
                    Public_key.compress keypair.public_key )
              |> Option.to_list |> Public_key.Compressed.Set.of_list )
@@ -689,7 +689,7 @@ let daemon logger =
          in
          O1trace.trace_task "terminated child loop" terminated_child_loop ;
          let coinbase_receiver =
-           Option.value_map coinbase_receiver_flag ~default:`Proposer
+           Option.value_map coinbase_receiver_flag ~default:`Producer
              ~f:(fun pk -> `Other pk)
          in
          let%map coda =
@@ -708,7 +708,7 @@ let daemon logger =
                 ~persistent_root_location:(conf_dir ^/ "root")
                 ~persistent_frontier_location:(conf_dir ^/ "frontier")
                 ~snark_work_fee:snark_work_fee_flag ~receipt_chain_database
-                ~time_controller ~initial_propose_keypairs ~monitor
+                ~time_controller ~initial_block_production_keypairs ~monitor
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
@@ -879,7 +879,7 @@ let coda_commands logger =
         ; (module Coda_shared_state_test)
         ; (module Coda_transitive_peers_test)
         ; (module Coda_shared_prefix_test)
-        ; (module Coda_shared_prefix_multiproposer_test)
+        ; (module Coda_shared_prefix_multiproducer_test)
         ; (module Coda_five_nodes_test)
         ; (module Coda_restart_node_test)
         ; (module Coda_receipt_chain_test)
@@ -887,7 +887,7 @@ let coda_commands logger =
         ; (module Coda_bootstrap_test)
         ; (module Coda_batch_payment_test)
         ; (module Coda_long_fork)
-        ; (module Coda_txns_and_restart_non_proposers)
+        ; (module Coda_txns_and_restart_non_producers)
         ; (module Coda_delegation_test)
         ; (module Coda_change_snark_worker_test)
         ; (module Full_test)

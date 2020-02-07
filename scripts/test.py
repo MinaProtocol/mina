@@ -10,8 +10,7 @@ import time
 from itertools import chain
 
 build_artifact_profiles = [
-    'testnet_postake_medium_curves',
-    'net_10k'
+    'testnet_postake_medium_curves'
 ]
 
 unit_test_profiles = ['test_postake_snarkless_unittest', 'dev']
@@ -27,9 +26,8 @@ integration_tests = [
     'coda-peers-test',
     'coda-transitive-peers-test',
     'coda-block-production-test',
-    'coda-shared-prefix-test -who-proposes 0',
-    'coda-shared-prefix-test -who-proposes 1',
-    'coda-restart-node-test',
+    'coda-shared-prefix-test -who-produces 0',
+    'coda-shared-prefix-test -who-produces 1',
     'coda-change-snark-worker-test',
     'coda-archive-node-test'
 ]
@@ -44,34 +42,34 @@ small_curves_tests = {
     'test_postake_split_snarkless':
     integration_tests,
     'test_postake_split':
-    ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
+    ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
     'test_postake':
     simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_bootstrap':
-    ['coda-bootstrap-test', 'coda-long-fork -num-proposers 2'],
-    'test_postake_three_proposers': ['coda-txns-and-restart-non-proposers'],
-    'test_postake_holy_grail': ['coda-restarts-and-txns-holy-grail -num-proposers 5'],
+    ['coda-bootstrap-test', 'coda-long-fork -num-block-producers 2'],
+    'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
     'test_postake_five_even_snarkless':
-    ['coda-shared-prefix-multiproposer-test -num-proposers 5'],
+    ['coda-shared-prefix-multiproducer-test -num-block-producers 5'],
     'test_postake_five_even_txns':
-    ['coda-shared-prefix-multiproposer-test -num-proposers 5 -payments'],
+    ['coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments'],
 }
 
-medium_curves_tests = {
+medium_curves_and_other_tests = {
     'test_postake_medium_curves':
     simple_tests,
     'test_postake_snarkless_medium_curves':
     simple_tests,
     'test_postake_split_medium_curves':
-    ['coda-shared-prefix-multiproposer-test -num-proposers 2'],
+    ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
+    'test_postake_full_epoch': ['full-test'],
 }
 
 medium_curve_profiles_full = [
     'test_postake_medium_curves', 'testnet_postake_medium_curves',
-    'testnet_postake_many_proposers_medium_curves'
+    'testnet_postake_many_producers_medium_curves'
 ]
 
 ci_excludes = [
@@ -82,7 +80,7 @@ ci_excludes = [
 required_excludes = [
     'test_postake_five_even_snarkless:*',
     'test_postake_catchup:*',
-    'test_postake_holy_grail:*',
+    'test_postake_three_producers:*'
 ]
 
 # these extra jobs are not filters, they are full status check names
@@ -192,7 +190,7 @@ def run(args):
             build_targets = '%s %s' % (coda_exe, logproc_exe)
 
     all_tests = small_curves_tests
-    all_tests.update(medium_curves_tests)
+    all_tests.update(medium_curves_and_other_tests)
     all_tests = filter_tests(all_tests, args.includes_patterns,
                              args.excludes_patterns)
     if len(all_tests) == 0:
@@ -287,7 +285,7 @@ def render(args):
         unit_test_profiles=unit_test_profiles,
         unit_test_profiles_medium_curves=unit_test_profiles_medium_curves,
         small_curves_tests=tests,
-        medium_curves_tests=medium_curves_tests,
+        medium_curves_and_other_tests=medium_curves_and_other_tests,
         medium_curve_profiles=medium_curve_profiles_full)
 
     if args.check:
@@ -321,7 +319,7 @@ def render(args):
 
 def list_tests(_args):
     all_tests = small_curves_tests
-    all_tests.update(medium_curves_tests)
+    all_tests.update(medium_curves_and_other_tests)
     for profile in all_tests.keys():
         print('- ' + profile)
         for test in small_curves_tests[profile]:

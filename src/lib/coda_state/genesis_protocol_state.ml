@@ -48,10 +48,10 @@ let t ~genesis_ledger =
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state
 
-let compile_time_genesis = t ~genesis_ledger:Test_genesis_ledger.t
+let compile_time_genesis () = t ~genesis_ledger:Test_genesis_ledger.t
 
 module For_tests = struct
   (*Use test_ledger generated at compile time*)
-  let genesis_state_hash =
+  let genesis_state_hash () =
     t ~genesis_ledger:Test_genesis_ledger.t |> With_hash.hash
 end

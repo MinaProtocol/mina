@@ -1,0 +1,75 @@
+import Page from '@reason/pages/Docs';
+export default Page({title: "SNARK Constructions"});
+
+# Which SNARK construction should I use?
+
+There are many different SNARK constructions which have tradeoffs in performance and security.
+This page gives an overview of some of the important criteria to have in mind when selecting a scheme.
+
+## Non-malleability
+
+For many applications, it is important for SNARKs to be *non-malleable*. 
+Intuitively, a SNARK is *non-malleable* if seeing proofs doesn't help you produce proofs on new statements.
+
+A bit more in detail, a SNARK construction is *non-malleable* if
+it is impossible to modify a proof **p** which verifies against input **x** into a proof **p'** which verifies
+against an input **x'**, unless you could have done so without seeing **(p, x)**. 
+
+The technical phrase for this kind of non-malleability is *simulation extractable*.
+
+### When do I need non-malleability?
+In applications where the witness or part of the witness should remain secret, you probably need
+non-malleability. There are techniques for achieving the same security while still using a
+malleable SNARK, but they are best left to the experts.
+
+In practice, there is only a small performance penalty to using a non-malleable SNARK so unless
+one is confident one doesn't need it, there is no harm in using such a SNARK.
+
+## Setup type
+
+This is one of the biggest practical considerations to keep in mind when selecting a SNARK construction.
+Some SNARKs require a "setup" which involves either a trusted party or group of parties (one of whom you can
+trust) running a computation to generate keys for a SNARK. This is the much publicized "ceremony" as was
+done for ZCash.
+
+There are two kinds of setups:
+
+1. **Universal.** Universal setups only need to be performed once and the resulting keys can be re-used for all future SNARK programs.
+2. **Per-program.** Per-program setups must be run once per SNARK program.
+
+Universal setups are much more convenient, but SNARK constructions with per-program setups have better performance.
+
+There are also SNARKs with no setup at all. In general these SNARKs have much larger proof sizes: 50-200kB compared
+to 100s of bytes for SNARKs with setup.
+
+## Performance
+
+The following efficiency characteristics are important to keep in mind when selecting a SNARK construction:
+
+- **Prover time.** How long does generating a proof take?
+- **Proof size.** How large is each proof?
+- **Verifier time.** How long does it take to check a proof?
+
+There are other performance criteria that are of interest if one intends to use recursive SNARKs, but
+that is outside the scope of this document.
+
+# Overview of the landscape
+
+Let's evaluate some of the existing SNARK constructions according to our criteria.
+Performance descriptions for some of the parameters will remain subjective until someone gets
+around to running a proper, fair benchmark. There are many holes  in the below table, so please
+make a PR if you are so moved :)
+
+| Construction | Setup | Non-malleable | Prover time | Proof size | Verifier time |
+| --- | --- | --- | --- | --- | --- |
+| Groth16 | Per-program | No | Excellent | 100-300 bytes | 1-10ms |
+| Bowe--Gabizon18 | Per-program | Yes | Excellent | 100-300 bytes | 1-10ms |
+| Marlin | Universal | ? | Good | 1-2kB | 8-20ms |
+| PLONK | Universal | ? | ? | ? | ? |
+| Sonic | Universal | ? | Fair | 1-2kB | ? |
+| Fractal | None | ? | Good | 80-250kB | ? |
+
+# Footnotes
+
+In this document, by "no setup", I mean a transparent setup, which in practice amounts to a choice of a hash function
+like SHA256, blake2s, etc.

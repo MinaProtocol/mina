@@ -147,6 +147,8 @@ module type S = sig
       val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Tick.Checked.t
 
       val empty : t
+
+      val create_with : t -> t
     end
   end
 
