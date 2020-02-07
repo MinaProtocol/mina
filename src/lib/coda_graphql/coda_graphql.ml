@@ -103,6 +103,8 @@ module Types = struct
 
   let public_key = public_key ()
 
+  let hardware_wallet_nonce = hardware_wallet_nonce ()
+
   let uint64 = uint64 ()
 
   let uint32 = uint32 ()
@@ -942,6 +944,15 @@ module Types = struct
               ~resolve:(fun {ctx= coda; _} key ->
                 AccountObj.get_best_ledger_account coda key ) ] )
 
+    let register_hardware_wallet :
+        (Coda_lib.t, Coda_numbers.Hardware_wallet_nonce.t option) typ =
+      obj "RegisterHardwareWallet" ~fields:(fun _ ->
+          [ field "hardware_wallet_nonce"
+              ~typ:(non_null hardware_wallet_nonce)
+              ~doc:"Nonce of the account in hardware wallet"
+              ~args:Arg.[]
+              ~resolve:(fun _ -> Fn.id) ] )
+
     let lock_account : (Coda_lib.t, Account.key option) typ =
       obj "LockPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
@@ -1053,6 +1064,15 @@ module Types = struct
           | _ ->
               Error "Invalid format for public key." )
 
+    let hardware_wallet_nonce_arg =
+      scalar "HardwareWalletNonce"
+        ~doc:"Nonce of the account in hardware wallet" ~coerce:(fun nonce ->
+          match nonce with
+          | `Int n ->
+              Ok (Coda_numbers.Hardware_wallet_nonce.of_int n)
+          | _ ->
+              Error "Invalid format for hardware wallet nonce." )
+
     module type Numeric_type = sig
       type t
 
@@ -1149,6 +1169,14 @@ module Types = struct
           ; arg "publicKey"
               ~doc:"Public key specifying which account to unlock"
               ~typ:(non_null public_key_arg) ]
+
+    let register_hardware_wallet =
+      obj "RegisterHardwareWalletInput"
+        ~coerce:(fun nonce -> nonce)
+        ~fields:
+          [ arg "hardwareWalletNonce"
+              ~doc:"Nonce of the account in hardware wallet"
+              ~typ:(non_null hardware_wallet_nonce_arg) ]
 
     let lock_account =
       obj "LockInput" ~coerce:Fn.id
@@ -1380,6 +1408,21 @@ module Mutations = struct
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_account)]
       ~resolve:create_account_resolver
 
+  let register_hardware_wallet : (Coda_lib.t, unit) field =
+    io_field "registerHardwareWallet"
+      ~doc:
+        "Register an account with hardware wallet - this will let the \
+         hardware wallet generate a keypair corresponds to the nonce you give \
+         and store this nonce and the generated public key in the daemon. \
+         Registering with the same nonce and the same hardware wallet will \
+         always generate the same keypair."
+      ~typ:(non_null Types.Payload.create_account)
+      ~args:
+        Arg.[arg "input" ~typ:(non_null Types.Input.register_hardware_wallet)]
+      ~resolve:(fun {ctx= coda; _} () hardware_wallet_nonce ->
+        Coda_lib.wallets coda
+        |> Secrets.Wallets.register_hardware_wallet ~hardware_wallet_nonce )
+
   let unlock_account_resolver {ctx= t; _} () (password, pk) =
     let password = lazy (return (Bytes.of_string password)) in
     match%map
@@ -1486,22 +1529,35 @@ module Mutations = struct
         in
         (ip_address, Coda_commands.reset_trust_status coda ip_address) )
 
-  let build_user_command coda nonce sender_kp memo payment_body fee valid_until
-      =
-    let command =
-      Coda_commands.setup_user_command ~fee ~nonce ~valid_until ~memo
-        ~sender_kp payment_body
-    in
-    match Coda_commands.send_user_command coda command with
+  let send_user_command coda user_command =
+    match Coda_commands.send_user_command coda user_command with
     | `Active f -> (
         let open Deferred.Let_syntax in
         match%map f with
         | Ok _receipt ->
-            Ok command
+            Ok user_command
         | Error e ->
             Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
         return @@ Error "Daemon is bootstrapping"
+
+  let find_identity ~kind ~public_key coda =
+    Result.of_option
+      (Secrets.Wallets.find_identity (Coda_lib.wallets coda) ~needle:public_key)
+      ~error:
+        (sprintf
+           "Couldn't find an unlocked key for specified `sender`. Did you \
+            unlock the account you're making a %s from?"
+           kind)
+
+  let find_unlocked ~kind ~public_key coda =
+    Result.of_option
+      (Secrets.Wallets.find_unlocked (Coda_lib.wallets coda) ~needle:public_key)
+      ~error:
+        (sprintf
+           "Couldn't find an unlocked key for specified `sender`. Did you \
+            unlock the account you're making a %s from?"
+           kind)
 
   let parse_user_command_input ~kind coda from to_ fee memo_opt =
     let open Result.Let_syntax in
@@ -1524,22 +1580,13 @@ module Mutations = struct
       result_of_exn Currency.Fee.of_uint64 fee
         ~error:(sprintf "Invalid %s `fee` provided." kind)
     in
-    let%bind sender_kp =
-      Result.of_option
-        (Secrets.Wallets.find_unlocked (Coda_lib.wallets coda) ~needle:from)
-        ~error:
-          (sprintf
-             "Couldn't find an unlocked key for specified `sender`. Did you \
-              unlock the account you're making a %s from?"
-             kind)
-    in
     let%map memo =
       Option.value_map memo_opt ~default:(Ok User_command_memo.empty)
         ~f:(fun memo ->
           result_of_exn User_command_memo.create_from_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
-    (sender_nonce, sender_kp, memo, to_, fee)
+    (sender_nonce, memo, to_, fee)
 
   let with_default_expiry =
     Option.value_map (* TODO: We should put a more sensible default here. *)
@@ -1555,7 +1602,7 @@ module Mutations = struct
         (fun {ctx= coda; _} ()
              (from, to_, fee, valid_until_opt, memo_opt, nonce_opt) ->
         let open Deferred.Result.Let_syntax in
-        let%bind sender_nonce, sender_kp, memo, new_delegate, fee =
+        let%bind sender_nonce, memo, new_delegate, fee =
           Deferred.return
           @@ parse_user_command_input ~kind:"stake delegation" coda from to_
                fee memo_opt
@@ -1569,7 +1616,18 @@ module Mutations = struct
             ~default:sender_nonce
         in
         let valid_until = with_default_expiry valid_until_opt in
-        build_user_command coda nonce sender_kp memo body fee valid_until )
+        let%bind sender_kp =
+          Deferred.return
+          @@ find_unlocked ~kind:"stake delegation" ~public_key:from coda
+        in
+        let user_command_payload =
+          User_command.Payload.create ~fee ~nonce ~valid_until ~memo ~body
+        in
+        let user_command =
+          User_command.sign sender_kp user_command_payload
+          |> User_command.forget_check
+        in
+        send_user_command coda user_command )
 
   let send_payment =
     io_field "sendPayment" ~doc:"Send a payment"
@@ -1579,7 +1637,7 @@ module Mutations = struct
         (fun {ctx= coda; _} ()
              (from, to_, amount, fee, valid_until_opt, memo_opt, nonce_opt) ->
         let open Deferred.Result.Let_syntax in
-        let%bind sender_nonce, sender_kp, memo, receiver, fee =
+        let%bind sender_nonce, memo, receiver, fee =
           Deferred.return
           @@ parse_user_command_input ~kind:"payment" coda from to_ fee
                memo_opt
@@ -1593,7 +1651,23 @@ module Mutations = struct
             ~default:sender_nonce
         in
         let valid_until = with_default_expiry valid_until_opt in
-        build_user_command coda nonce sender_kp memo body fee valid_until )
+        let user_command_payload =
+          User_command.Payload.create ~fee ~nonce ~valid_until ~memo ~body
+        in
+        let%bind user_command =
+          match%bind
+            Deferred.return
+            @@ find_identity ~kind:"payment" ~public_key:from coda
+          with
+          | `Keypair sender_kp ->
+              User_command.sign sender_kp user_command_payload
+              |> User_command.forget_check |> Deferred.Result.return
+          | `Hardware_wallet hardware_wallet_nonce ->
+              Secrets.Hardware_wallets.sign ~hardware_wallet_nonce
+                ~public_key:(Public_key.decompress_exn from)
+                ~user_command_payload
+        in
+        send_user_command coda user_command )
 
   let add_payment_receipt =
     result_field "addPaymentReceipt"

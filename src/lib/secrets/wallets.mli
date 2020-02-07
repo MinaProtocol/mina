@@ -19,9 +19,21 @@ val import_keypair_terminal_stdin :
 val generate_new :
   t -> password:Secret_file.password -> Public_key.Compressed.t Deferred.t
 
+val register_hardware_wallet :
+     t
+  -> hardware_wallet_nonce:Coda_numbers.Hardware_wallet_nonce.t
+  -> (Public_key.Compressed.t, string) Deferred.Result.t
+
 val pks : t -> Public_key.Compressed.t list
 
 val find_unlocked : t -> needle:Public_key.Compressed.t -> Keypair.t option
+
+val find_identity :
+     t
+  -> needle:Public_key.Compressed.t
+  -> [ `Keypair of Keypair.t
+     | `Hardware_wallet of Coda_numbers.Hardware_wallet_nonce.t ]
+     option
 
 val check_locked : t -> needle:Public_key.Compressed.t -> bool option
 

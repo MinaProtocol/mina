@@ -222,13 +222,7 @@ module Schnorr
     | None ->
         false
     | Some (rx, ry) ->
-        let is_even_ry = is_even ry in
-        let field_equal = Field.(equal rx r) in
-        eprintf "is_even_ry: %b\n" is_even_ry ;
-        eprintf "field_equal: %b\n" field_equal ;
-        eprintf "rx: %s\n" (Field.to_string rx) ;
-        eprintf "r: %s\n" (Field.to_string r) ;
-        is_even_ry && field_equal
+        is_even ry && Field.equal rx r
 
   [%%if
   call_logger]

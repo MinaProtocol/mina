@@ -553,12 +553,15 @@ let get_pk_from_hardware_wallet =
     (Command.Param.map Cli_lib.Flag.User_command.hardware_wallet_nonce
        ~f:(fun hardware_wallet_nonce () ->
          let open Deferred.Let_syntax in
-         let%bind pk =
-           Coda_commands.Hardware_wallet.get_public_key ~hardware_wallet_nonce
-         in
-         Core.print_endline
-         @@ Public_key.Compressed.to_base58_check (Public_key.compress pk) ;
-         Deferred.unit ))
+         match%bind
+           Secrets.Hardware_wallets.compute_public_key ~hardware_wallet_nonce
+         with
+         | Ok pk ->
+             Core.print_endline
+             @@ Public_key.Compressed.to_base58_check (Public_key.compress pk) ;
+             Deferred.unit
+         | Error s ->
+             eprintf !"%s" s ; exit 22 ))
 
 let test_sign_payment =
   let flags =
@@ -576,38 +579,38 @@ let test_sign_payment =
                , memo_opt )
           ()
           ->
-         let open Deferred.Let_syntax in
-         let%bind public_key =
-           Coda_commands.Hardware_wallet.get_public_key ~hardware_wallet_nonce
-         in
-         let nonce = Option.value_exn nonce_opt in
-         let fee =
-           Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
-         in
-         let memo =
-           Option.value_map memo_opt ~default:User_command_memo.empty
-             ~f:User_command_memo.create_from_string_exn
-         in
-         let valid_until =
-           Option.value valid_until_opt
-             ~default:Coda_numbers.Global_slot.max_value
-         in
-         let user_command_payload =
-           User_command_payload.Poly.
-             { common=
-                 User_command_payload.Common.Poly.
-                   {fee; nonce; valid_until; memo}
-             ; body=
-                 User_command_payload.Body.Payment
-                   Payment_payload.Poly.{receiver; amount} }
-         in
-         let%bind (_payment : User_command.t) =
-           Coda_commands.Hardware_wallet.sign ~hardware_wallet_nonce
-             ~public_key ~user_command_payload
-         in
-         Core.print_endline
-           "Hardware wallet signed the transaction successfully" ;
-         Deferred.unit ))
+         match%bind
+           let open Deferred.Result.Let_syntax in
+           let%bind public_key =
+             Secrets.Hardware_wallets.compute_public_key ~hardware_wallet_nonce
+           in
+           let nonce = Option.value_exn nonce_opt in
+           let fee =
+             Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
+           in
+           let memo =
+             Option.value_map memo_opt ~default:User_command_memo.empty
+               ~f:User_command_memo.create_from_string_exn
+           in
+           let valid_until =
+             Option.value valid_until_opt
+               ~default:Coda_numbers.Global_slot.max_value
+           in
+           let user_command_payload =
+             User_command_payload.create ~fee ~nonce ~valid_until ~memo
+               ~body:
+                 (User_command_payload.Body.Payment
+                    Payment_payload.Poly.{receiver; amount})
+           in
+           Secrets.Hardware_wallets.sign ~hardware_wallet_nonce ~public_key
+             ~user_command_payload
+         with
+         | Ok _ ->
+             Core.print_endline
+               "Hardware wallet signed the transaction successfully" ;
+             Deferred.unit
+         | Error s ->
+             eprintf !"%s" s ; exit 22 ))
 
 let send_payment_hardware_wallet =
   let flags =
@@ -625,58 +628,63 @@ let send_payment_hardware_wallet =
           , valid_until_opt
           , memo_opt )
           ->
-         let open Deferred.Let_syntax in
-         let%bind public_key =
-           Coda_commands.Hardware_wallet.get_public_key ~hardware_wallet_nonce
-         in
-         let%bind nonce =
-           match nonce_opt with
-           | Some nonce ->
-               return nonce
-           | None ->
-               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc public_key
-                 port
-         in
-         let fee =
-           Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
-         in
-         if Currency.Fee.( < ) fee User_command.minimum_fee then (
-           printf "Fee %d is less than the minimum, %d\n%!"
-             (Currency.Fee.to_int fee)
-             (Currency.Fee.to_int User_command.minimum_fee) ;
-           exit 29 )
-         else
-           let memo =
-             Option.value_map memo_opt ~default:User_command_memo.empty
-               ~f:User_command_memo.create_from_string_exn
+         match%bind
+           let open Deferred.Result.Let_syntax in
+           let%bind public_key =
+             Secrets.Hardware_wallets.compute_public_key ~hardware_wallet_nonce
            in
-           let valid_until =
-             Option.value valid_until_opt
-               ~default:Coda_numbers.Global_slot.max_value
+           let%bind nonce =
+             match nonce_opt with
+             | Some nonce ->
+                 Deferred.Result.return nonce
+             | None ->
+                 get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
+                   public_key port
+                 |> Deferred.map ~f:Result.return
            in
-           let user_command_payload =
-             User_command_payload.Poly.
-               { common=
-                   User_command_payload.Common.Poly.
-                     {fee; nonce; valid_until; memo}
-               ; body=
-                   User_command_payload.Body.Payment
-                     Payment_payload.Poly.{receiver; amount} }
+           let fee =
+             Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
            in
-           let%bind (payment : User_command.t) =
-             Coda_commands.Hardware_wallet.sign ~hardware_wallet_nonce
-               ~public_key ~user_command_payload
-           in
-           Daemon_rpcs.Client.dispatch_with_message
-             Daemon_rpcs.Send_user_command.rpc payment port
-             ~success:(fun receipt_chain_hash ->
-               sprintf
-                 "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
-                 "label"
-                 (User_command.to_base58_check payment)
-                 (Receipt.Chain_hash.to_string receipt_chain_hash) )
-             ~error:(fun e -> sprintf "%s: %s" "error" (Error.to_string_hum e))
-             ~join_error:Or_error.join ))
+           if Currency.Fee.( < ) fee User_command.minimum_fee then (
+             printf "Fee %d is less than the minimum, %d\n%!"
+               (Currency.Fee.to_int fee)
+               (Currency.Fee.to_int User_command.minimum_fee) ;
+             exit 29 )
+           else
+             let memo =
+               Option.value_map memo_opt ~default:User_command_memo.empty
+                 ~f:User_command_memo.create_from_string_exn
+             in
+             let valid_until =
+               Option.value valid_until_opt
+                 ~default:Coda_numbers.Global_slot.max_value
+             in
+             let user_command_payload =
+               User_command_payload.Poly.
+                 { common=
+                     User_command_payload.Common.Poly.
+                       {fee; nonce; valid_until; memo}
+                 ; body=
+                     User_command_payload.Body.Payment
+                       Payment_payload.Poly.{receiver; amount} }
+             in
+             Secrets.Hardware_wallets.sign ~hardware_wallet_nonce ~public_key
+               ~user_command_payload
+         with
+         | Ok payment ->
+             Daemon_rpcs.Client.dispatch_with_message
+               Daemon_rpcs.Send_user_command.rpc payment port
+               ~success:(fun receipt_chain_hash ->
+                 sprintf
+                   "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
+                   "label"
+                   (User_command.to_base58_check payment)
+                   (Receipt.Chain_hash.to_string receipt_chain_hash) )
+               ~error:(fun e ->
+                 sprintf "%s: %s" "error" (Error.to_string_hum e) )
+               ~join_error:Or_error.join
+         | Error s ->
+             eprintf "%s" s ; exit 22 ))
 
 let send_payment_graphql =
   let open Command.Param in
@@ -1382,6 +1390,33 @@ let create_account =
              (response#addWallet)#public_key
          in
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ))
+
+let register_hardware_wallet =
+  let open Command.Param in
+  Command.async
+    ~summary:
+      "Register an account with hardware wallet - this will let the hardware \
+       wallet generate a keypair corresponds to the nonce you give and store \
+       this nonce and the generated public key in the daemon. Registering \
+       with the same nonce and the same hardware wallet will always generate \
+       the same keypair."
+    (Cli_lib.Background_daemon.graphql_init
+       Cli_lib.Flag.User_command.hardware_wallet_nonce
+       ~f:(fun graphql_endpoint hardware_wallet_nonce ->
+         let%map response =
+           Graphql_client.query_exn
+             (Graphql_queries.Register_hardware_wallet.make
+                ~hardware_wallet_nonce ())
+             graphql_endpoint
+         in
+         let pk_string =
+           Public_key.Compressed.to_base58_check
+             (response#registerHardwareWallet)#public_key
+         in
+         printf
+           "\n😄 Registered hardware wallet with nonce %s!\nPublic key: %s\n"
+           (Coda_numbers.Hardware_wallet_nonce.to_string hardware_wallet_nonce)
+           pk_string ))
 
 let unlock_account =
   let open Command.Param in

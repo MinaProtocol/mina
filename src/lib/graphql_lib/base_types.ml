@@ -18,6 +18,11 @@ let public_key () =
   scalar "PublicKey" ~doc:"Base58Check-encoded public key string"
     ~coerce:(fun key -> `String (Public_key.Compressed.to_base58_check key))
 
+let hardware_wallet_nonce () =
+  scalar "HardwareWalletNonce" ~doc:"Nonce of the account in hardware wallet"
+    ~coerce:(fun nonce ->
+      `Int (Coda_numbers.Hardware_wallet_nonce.to_int nonce) )
+
 let uint32 () =
   unsigned_scalar_scalar ~to_string:Unsigned.UInt32.to_string "UInt32"
 

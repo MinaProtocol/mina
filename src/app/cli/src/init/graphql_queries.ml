@@ -37,6 +37,16 @@ mutation ($password: String) {
 }
 |}]
 
+module Register_hardware_wallet =
+[%graphql
+{|
+mutation ($hardware_wallet_nonce: UInt32) {
+  registerHardwareWallet(input: {hardware_wallet_nonce: $hardware_wallet_nonce}) {
+    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+  }
+}
+|}]
+
 module Unlock_wallet =
 [%graphql
 {|
