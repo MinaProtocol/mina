@@ -563,55 +563,6 @@ let get_pk_from_hardware_wallet =
          | Error s ->
              eprintf !"%s" s ; exit 22 ))
 
-let test_sign_payment =
-  let flags =
-    let open Cli_lib.Flag.User_command in
-    Args.zip7 hardware_wallet_nonce receiver amount fee nonce valid_until memo
-  in
-  Command.async ~summary:"Test signing function of hardware wallet"
-    (Command.Param.map flags
-       ~f:(fun ( hardware_wallet_nonce
-               , receiver
-               , amount
-               , fee_opt
-               , nonce_opt
-               , valid_until_opt
-               , memo_opt )
-          ()
-          ->
-         match%bind
-           let open Deferred.Result.Let_syntax in
-           let%bind public_key =
-             Secrets.Hardware_wallets.compute_public_key ~hardware_wallet_nonce
-           in
-           let nonce = Option.value_exn nonce_opt in
-           let fee =
-             Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
-           in
-           let memo =
-             Option.value_map memo_opt ~default:User_command_memo.empty
-               ~f:User_command_memo.create_from_string_exn
-           in
-           let valid_until =
-             Option.value valid_until_opt
-               ~default:Coda_numbers.Global_slot.max_value
-           in
-           let user_command_payload =
-             User_command_payload.create ~fee ~nonce ~valid_until ~memo
-               ~body:
-                 (User_command_payload.Body.Payment
-                    Payment_payload.Poly.{receiver; amount})
-           in
-           Secrets.Hardware_wallets.sign ~hardware_wallet_nonce ~public_key
-             ~user_command_payload
-         with
-         | Ok _ ->
-             Core.print_endline
-               "Hardware wallet signed the transaction successfully" ;
-             Deferred.unit
-         | Error s ->
-             eprintf !"%s" s ; exit 22 ))
-
 let send_payment_hardware_wallet =
   let flags =
     let open Cli_lib.Flag.User_command in
@@ -1636,7 +1587,6 @@ let command =
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
     ; ("send-payment-hardware-wallet", send_payment_hardware_wallet)
-    ; ("test-sign-payment", test_sign_payment)
     ; ("get-public-key", get_pk_from_hardware_wallet)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("delegate-stake", delegate_stake)

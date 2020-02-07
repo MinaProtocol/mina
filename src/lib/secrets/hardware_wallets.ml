@@ -6,26 +6,21 @@ open Async
 
 let hardware_wallet_script = "cli/sign.py"
 
-let decode_field : string -> Snark_params.Tick.Field.t =
+let to_bigint : string -> Bigint.t =
  fun field ->
   Bytes.of_string field
   |> B58.decode Base58_check.coda_alphabet
   |> Bytes.to_list |> List.rev |> Bytes.of_char_list |> Bytes.to_string
   |> String.foldi ~init:Bigint.zero ~f:(fun i acc byte ->
          Bigint.(acc lor (of_int (Char.to_int byte) lsl Int.( * ) 8 i)) )
-  |> (fun bigint ->
-       eprintf "bigint: %s" (Bigint.to_string bigint) ;
-       bigint )
-  |> Tick.Bigint.of_bignum_bigint |> Tick.Bigint.to_field
+
+let decode_field : string -> Snark_params.Tick.Field.t =
+ fun field ->
+  to_bigint field |> Tick.Bigint.of_bignum_bigint |> Tick.Bigint.to_field
 
 let decode_scalar : string -> Snark_params.Tock.Field.t =
  fun scalar ->
-  Bytes.of_string scalar
-  |> B58.decode Base58_check.coda_alphabet
-  |> Bytes.to_list |> List.rev |> Bytes.of_char_list |> Bytes.to_string
-  |> String.foldi ~init:Bigint.zero ~f:(fun i acc byte ->
-         Bigint.(acc lor (of_int (Char.to_int byte) lsl Int.( * ) 8 i)) )
-  |> Tock.Bigint.of_bignum_bigint |> Tock.Bigint.to_field
+  to_bigint scalar |> Tock.Bigint.of_bignum_bigint |> Tock.Bigint.to_field
 
 type public_key = {status: string; x: string; y: string} [@@deriving yojson]
 
