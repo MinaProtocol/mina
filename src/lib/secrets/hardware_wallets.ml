@@ -4,7 +4,7 @@ open Signature_lib
 open Coda_base
 open Async
 
-let hardware_wallet_script = "cli/sign.py"
+let hardware_wallet_script = "coda_sign"
 
 let to_bigint : string -> Bigint.t =
  fun field ->
@@ -65,9 +65,8 @@ let decode_signature : string -> (Signature.t, string) Result.t =
 
 let compute_public_key ~hardware_wallet_nonce =
   let prog, args =
-    ( "python3"
-    , [ hardware_wallet_script
-      ; "--request=publickey"
+    ( hardware_wallet_script
+    , [ "--request=publickey"
       ; "--nonce="
         ^ Coda_numbers.Hardware_wallet_nonce.to_string hardware_wallet_nonce ]
     )
@@ -89,9 +88,8 @@ let sign ~hardware_wallet_nonce ~public_key ~user_command_payload =
     Deferred.Result.fail "Malformed user command"
   else
     let prog, args =
-      ( "python3"
-      , [ hardware_wallet_script
-        ; "--request=sign"
+      ( hardware_wallet_script
+      , [ "--request=sign"
         ; "--msgx=" ^ messages.(0)
         ; "--msgm=" ^ messages.(1)
         ; "--nonce="
