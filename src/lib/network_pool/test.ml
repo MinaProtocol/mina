@@ -91,15 +91,16 @@ let%test_module "network pool test" =
         let local_reader, local_writer =
           Strict_pipe.(create ~name:"Network pool test" Synchronous)
         in
-        let%bind () =
-          List.map (List.take works per_reader) ~f:create_work
-          |> List.map ~f:Envelope.Incoming.local
-          |> Deferred.List.iter ~f:(Strict_pipe.Writer.write pool_writer)
-        in
-        let%bind () =
-          List.map (List.drop works per_reader) ~f:create_work
-          |> Deferred.List.iter ~f:(Strict_pipe.Writer.write local_writer)
-        in
+        List.map (List.take works per_reader) ~f:create_work
+        |> List.map ~f:Envelope.Incoming.local
+        |> List.iter ~f:(fun diff ->
+               Strict_pipe.Writer.write pool_writer diff
+               |> Deferred.don't_wait_for ) ;
+        List.map (List.drop works per_reader) ~f:create_work
+        |> List.iter ~f:(fun diff ->
+               Strict_pipe.Writer.write local_writer diff
+               |> Deferred.don't_wait_for ) ;
+        let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
         let frontier_broadcast_pipe_r, _ =
           Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
         in
