@@ -57,7 +57,7 @@ echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
-cp "${SCRIPTPATH}/../src/libp2p_helper/result/bin/libp2p_helper" "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+cp "../src/libp2p_helper/result/bin/libp2p_helper" "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
 
