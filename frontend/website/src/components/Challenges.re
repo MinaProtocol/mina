@@ -14,7 +14,7 @@ external parseTestnet: Js.Json.t => testnet = "%identity";
 
 let fetchArray = endpoint => {
   ReFetch.fetch(
-    "http://points.o1test.net/api/v1/" ++ endpoint,
+    "https://points.o1test.net/api/v1/" ++ endpoint,
     ~method_=Get,
     ~headers={
       "Accept": "application/json",
