@@ -131,3 +131,7 @@ val read' :
 val read : 'a Reader.t -> [`Eof | `Ok of 'a] Deferred.t
 
 val read_exn : 'a Reader.t -> 'a Deferred.t
+
+module Merge : sig
+  val iter : 'a Reader.t list -> f:('a -> unit Deferred.t) -> unit Deferred.t
+end

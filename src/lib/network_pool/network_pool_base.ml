@@ -53,21 +53,21 @@ end) :
     let network_pool =
       {resource_pool; logger; read_broadcasts; write_broadcasts}
     in
-    Linear_pipe.merge_unordered
-      [ Linear_pipe.map incoming_diffs ~f:(fun diff -> `Incoming diff)
+    (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
+    Linear_pipe.Merge.iter
+      [ Linear_pipe.map tf_diff ~f:(fun diff ->
+            `Transition_frontier_extension diff )
       ; Linear_pipe.map local_diffs ~f:(fun diff -> `Local diff)
-      ; Linear_pipe.map tf_diff ~f:(fun diff ->
-            `Transition_frontier_extension diff ) ]
-    |> Linear_pipe.iter ~f:(fun diff_source ->
-           match diff_source with
-           | `Incoming diff ->
-               apply_and_broadcast network_pool diff
-           | `Local diff ->
-               (*Should this be coming from resource pool instead?*)
-               apply_and_broadcast network_pool (Envelope.Incoming.local diff)
-           | `Transition_frontier_extension diff ->
-               Resource_pool.handle_transition_frontier_diff diff resource_pool
-       )
+      ; Linear_pipe.map incoming_diffs ~f:(fun diff -> `Incoming diff) ]
+      ~f:(fun diff_source ->
+        match diff_source with
+        | `Incoming diff ->
+            apply_and_broadcast network_pool diff
+        | `Local diff ->
+            (*Should this be coming from resource pool instead?*)
+            apply_and_broadcast network_pool (Envelope.Incoming.local diff)
+        | `Transition_frontier_extension diff ->
+            Resource_pool.handle_transition_frontier_diff diff resource_pool )
     |> Deferred.don't_wait_for ;
     network_pool
 

@@ -249,3 +249,39 @@ let read_exn reader =
       failwith "Expecting a value from reader"
   | `Ok value ->
       value
+
+module Merge = struct
+  let iter (rs : 'a Reader.t list) ~f =
+    let not_empty (r : 'a Reader.t) = not @@ Pipe.is_empty r.pipe in
+    let is_closed (r : 'a Reader.t) = Pipe.is_closed r.pipe in
+    let rec read_deferred (readers : 'a Reader.t list) =
+      let%bind ready_reader =
+        match List.find readers ~f:not_empty with
+        | Some reader ->
+            Deferred.return (Some reader)
+        | None ->
+            let%map () =
+              Deferred.choose
+                (List.map readers ~f:(fun r ->
+                     Deferred.choice (values_available r) (fun _ -> ()) ))
+            in
+            List.find readers ~f:not_empty
+      in
+      match ready_reader with
+      | Some reader -> (
+        match read_now reader with
+        | `Nothing_available ->
+            failwith "impossible"
+        | `Eof ->
+            Deferred.unit
+        | `Ok value ->
+            Deferred.bind (f value) ~f:(fun () -> read_deferred readers) )
+      | None -> (
+        match List.filter readers ~f:(fun r -> not @@ is_closed r) with
+        | [] ->
+            Deferred.unit
+        | open_readers ->
+            read_deferred open_readers )
+    in
+    read_deferred rs
+end
