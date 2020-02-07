@@ -1172,8 +1172,7 @@ module Types = struct
               ~typ:(non_null public_key_arg) ]
 
     let register_hardware_wallet =
-      obj "RegisterHardwareWalletInput"
-        ~coerce:(fun nonce -> nonce)
+      obj "RegisterHardwareWalletInput" ~coerce:Fn.id
         ~fields:
           [ arg "hardwareWalletNonce"
               ~doc:"Nonce of the account in hardware wallet"
