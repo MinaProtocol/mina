@@ -111,7 +111,7 @@ let _ =
            get_payload_common stake_delegation_js##.common
          in
          let new_delegate =
-           Js.to_string stake_delegation_js##.new_delegate
+           Js.to_string stake_delegation_js##.newDelegate
            |> Public_key.Compressed.of_base58_check_exn
          in
          let body =

@@ -26,7 +26,7 @@ type payment_js =
   Js.t
 
 type stake_delegation_js =
-  < common: payload_common_js Js.prop ; new_delegate: string_js Js.prop > Js.t
+  < common: payload_common_js Js.prop ; newDelegate: string_js Js.prop > Js.t
 
 let get_payload_common (payload_common_js : payload_common_js) =
   let fee_js = payload_common_js##.fee in
