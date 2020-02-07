@@ -211,9 +211,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                           () ) )
             in
             let message_reader, message_writer =
-              Strict_pipe.create
+              Strict_pipe.(create
                 ~name:"Gossip_net.Libp2p messages with validation callbacks"
-                Strict_pipe.(Buffered (`Capacity 64, `Overflow Crash))
+                Synchronous)
             in
             let%bind subscription =
               Coda_net2.Pubsub.subscribe_encode net2
@@ -230,9 +230,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   | Remote (_, sender_peer_id) ->
                       if not (Peer.Id.equal sender_peer_id my_peer_id) then (
                         let valid_ivar = Ivar.create () in
-                        Strict_pipe.Writer.write message_writer
-                          (envelope, Ivar.fill valid_ivar) ;
-                        Ivar.read valid_ivar )
+                        Deferred.bind (Strict_pipe.Writer.write message_writer
+                          (envelope, Ivar.fill valid_ivar))
+                        ~f:(fun () -> Ivar.read valid_ivar ))
                       else Deferred.return true )
                 ~bin_prot:Message.V1.T.bin_msg
                 ~on_decode_failure:
