@@ -44,14 +44,6 @@ module type S = sig
     -> frontier_broadcast_pipe:transition_frontier option
                                Broadcast_pipe.Reader.t
     -> t Deferred.t
-
-  val add_completed_work :
-       t
-    -> ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
-         Snark_work_lib.Work.Spec.t
-       , Ledger_proof.t )
-       Snark_work_lib.Work.Result.t
-    -> unit Deferred.t
 end
 
 module type Transition_frontier_intf = sig
@@ -186,25 +178,6 @@ module Make (Transition_frontier : Transition_frontier_intf) :
                   ~f:(Linear_pipe.write tf_diff_writer)
                 |> Deferred.don't_wait_for ;
                 return ()
-                (*t.ref_table <- Some refcount_table ;
-                      removedCounter := !removedCounter + removed ;
-                      if !removedCounter < removed_breadcrumb_wait then
-                        return ()
-                      else (
-                        removedCounter := 0 ;
-                        Statement_table.filter_keys_inplace
-                          t.snark_tables.rebroadcastable ~f:(fun work ->
-                            (* Rebroadcastable should always be a subset of all. *)
-                            assert (Hashtbl.mem t.snark_tables.all work) ;
-                            work_is_referenced t work ) ;
-                        Statement_table.filter_keys_inplace t.snark_tables.all
-                          ~f:(work_is_referenced t) ;
-                        return
-                          (*when snark works removed from the pool*)
-                          Coda_metrics.(
-                            Gauge.set Snark_work.snark_pool_size
-                              ( Float.of_int
-                              @@ Hashtbl.length t.snark_tables.all )) ) )*)
             | None ->
                 t.ref_table <- None ;
                 return () )
@@ -391,19 +364,6 @@ module Make (Transition_frontier : Transition_frontier_intf) :
     | Error _e ->
         create ~config ~logger ~incoming_diffs ~local_diffs
           ~frontier_broadcast_pipe
-
-  open Snark_work_lib.Work
-
-  let add_completed_work t
-      (res : (('a, 'b, 'c) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
-    apply_and_broadcast t
-      (Envelope.Incoming.wrap
-         ~data:
-           (Resource_pool.Diff.Stable.V1.Add_solved_work
-              ( One_or_two.map res.spec.instances ~f:Single.Spec.statement
-              , { proof= res.proofs
-                ; fee= {fee= res.spec.fee; prover= res.prover} } ))
-         ~sender:Envelope.Sender.Local)
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)

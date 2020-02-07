@@ -29,6 +29,9 @@ module type Resource_pool_diff_intf = sig
 
   val summary : t -> string
 
+  (** Warning: Using this directly could corrupt the resource pool if it
+  conincides with applying locally generated diffs or diffs from the network
+  or diffs from transition frontier extensions.*)
   val apply : pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
 end
 
@@ -156,13 +159,12 @@ module type Snark_pool_diff_intf = sig
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson]
+  type t = Stable.Latest.t [@@deriving compare, sexp]
 
-  val summary : t -> string
+  include
+    Resource_pool_diff_intf with type t := t and type pool := resource_pool
 
   val compact_json : t -> Yojson.Safe.json
-
-  val apply : resource_pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
 
   val of_result :
        ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t

@@ -51,8 +51,6 @@ module type S = sig
      and type config := Resource_pool.Config.t
      and type transition_frontier_diff :=
                 Resource_pool.transition_frontier_diff
-
-  val add : t -> User_command.t list -> unit Deferred.t
 end
 
 (* Functor over user command, base ledger and transaction validator for
@@ -701,10 +699,6 @@ struct
   end
 
   include Network_pool_base.Make (Transition_frontier) (Resource_pool)
-
-  (* TODO: This causes the signature to get checked twice as it is checked
-     below before feeding it to add *)
-  let add t txns = apply_and_broadcast t (Envelope.Incoming.local txns)
 end
 
 (* Use this one in downstream consumers *)

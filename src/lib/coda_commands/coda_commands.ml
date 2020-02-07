@@ -63,7 +63,6 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
 let schedule_user_command t (txn : User_command.t) account_opt :
     unit Or_error.t =
   (* FIXME #3457: return a status from Transaction_pool.add and use it instead
-     of is_valid_user_command
   *)
   if not (is_valid_user_command t txn account_opt) then
     Or_error.error_string "Invalid user command: account balance is too low"

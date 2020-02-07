@@ -43,14 +43,6 @@ module type S = sig
     -> frontier_broadcast_pipe:transition_frontier option
                                Broadcast_pipe.Reader.t
     -> t Deferred.t
-
-  val add_completed_work :
-       t
-    -> ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
-         Snark_work_lib.Work.Spec.t
-       , Ledger_proof.t )
-       Snark_work_lib.Work.Result.t
-    -> unit Deferred.t
 end
 
 module type Transition_frontier_intf = sig
