@@ -3,9 +3,15 @@ export default Page({title: "My First Transaction"});
 
 # My First Transaction
 
-In this section, we'll make our first transaction on the Coda network. After [installing the software](../getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
+In this section, we'll make our first transaction on the Coda network. After [installing the software](./getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
 
 ## Start up a node
+
+<Alert kind="status">
+
+  You can find the current status of the network and related services here: [status.codaprotocol.com](https://status.codaprotocol.com)
+
+</Alert>
 
 Run the following command to start up a Coda node instance and connect to the network:
 
@@ -18,6 +24,7 @@ Run the following command to start up a Coda node instance and connect to the ne
 The host and port specified above refer to the seed peer address - this is the initial peer we will connect to on the network. Since Coda is a [peer-to-peer](../glossary/#peer-to-peer) protocol, there is no single centralized server we rely on. 
 
 If you forwarded custom ports (other than 8302 and 8303), you'll need to replace the default ports above with the ones you forwarded.
+
 
 <Alert>
 

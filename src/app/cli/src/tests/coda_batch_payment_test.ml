@@ -9,7 +9,8 @@ let main () =
   Async.Scheduler.set_record_backtraces true ;
   let logger = Logger.create () in
   let keypairs =
-    List.map Test_genesis_ledger.accounts
+    List.map
+      (Lazy.force Test_genesis_ledger.accounts)
       ~f:Test_genesis_ledger.keypair_of_account_record_exn
   in
   let largest_account_keypair =
