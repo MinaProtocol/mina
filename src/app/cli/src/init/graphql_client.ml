@@ -67,6 +67,9 @@ module Encoders = struct
   let uint32 value = `String (Unsigned.UInt32.to_string value)
 
   let public_key value = `String (Public_key.Compressed.to_base58_check value)
+
+  let hardware_wallet_nonce value =
+    `String (Coda_numbers.Hardware_wallet_nonce.to_string value)
 end
 
 module Decoders = struct

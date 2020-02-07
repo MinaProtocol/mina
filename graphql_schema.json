@@ -1133,6 +1133,58 @@
           "possibleTypes": null
         },
         {
+          "kind": "SCALAR",
+          "name": "HardwareWalletNonce",
+          "description": "Nonce of the account in hardware wallet",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
+          "name": "RegisterHardwareWalletInput",
+          "description": null,
+          "fields": [
+            {
+              "name": "hardwareWalletNonce",
+              "description": "Nonce of the account in hardware wallet",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "HardwareWalletNonce",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "hardwareWalletNonce",
+              "description": "Nonce of the account in hardware wallet",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "HardwareWalletNonce",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
           "kind": "INPUT_OBJECT",
           "name": "AddAccountInput",
           "description": null,
@@ -1266,6 +1318,37 @@
                     "ofType": {
                       "kind": "INPUT_OBJECT",
                       "name": "AddAccountInput",
+                      "ofType": null
+                    }
+                  },
+                  "defaultValue": null
+                }
+              ],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "OBJECT",
+                  "name": "AddAccountPayload",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "registerHardwareWallet",
+              "description": "Register an account with hardware wallet - this will let the hardware wallet generate a keypair corresponds to the nonce you give and store this nonce and the generated public key in the daemon. Registering with the same nonce and the same hardware wallet will always generate the same keypair.",
+              "args": [
+                {
+                  "name": "input",
+                  "description": null,
+                  "type": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "INPUT_OBJECT",
+                      "name": "RegisterHardwareWalletInput",
                       "ofType": null
                     }
                   },

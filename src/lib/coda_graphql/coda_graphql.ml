@@ -1069,8 +1069,8 @@ module Types = struct
       scalar "HardwareWalletNonce"
         ~doc:"Nonce of the account in hardware wallet" ~coerce:(fun nonce ->
           match nonce with
-          | `Int n ->
-              Ok (Coda_numbers.Hardware_wallet_nonce.of_int n)
+          | `String n ->
+              Ok (Coda_numbers.Hardware_wallet_nonce.of_string n)
           | _ ->
               Error "Invalid format for hardware wallet nonce." )
 
@@ -1735,6 +1735,7 @@ module Mutations = struct
   let commands =
     [ add_wallet
     ; create_account
+    ; register_hardware_wallet
     ; unlock_account
     ; unlock_wallet
     ; lock_account

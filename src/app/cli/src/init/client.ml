@@ -1392,7 +1392,6 @@ let create_account =
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ))
 
 let register_hardware_wallet =
-  let open Command.Param in
   Command.async
     ~summary:
       "Register an account with hardware wallet - this will let the hardware \
@@ -1404,9 +1403,12 @@ let register_hardware_wallet =
        Cli_lib.Flag.User_command.hardware_wallet_nonce
        ~f:(fun graphql_endpoint hardware_wallet_nonce ->
          let%map response =
-           Graphql_client.query_exn
-             (Graphql_queries.Register_hardware_wallet.make
-                ~hardware_wallet_nonce ())
+           Graphql_client.(
+             query_exn
+               (Graphql_queries.Register_hardware_wallet.make
+                  ~hardware_wallet_nonce:
+                    (Encoders.hardware_wallet_nonce hardware_wallet_nonce)
+                  ()))
              graphql_endpoint
          in
          let pk_string =
@@ -1610,7 +1612,7 @@ let accounts =
     ~preserve_subcommand_order:()
     [ ("list", list_accounts)
     ; ("create", create_account)
-    ; ("register_hardware_wallet", register_hardware_wallet)
+    ; ("register-hardware-wallet", register_hardware_wallet)
     ; ("import", import_key)
     ; ("unlock", unlock_account)
     ; ("lock", lock_account) ]
