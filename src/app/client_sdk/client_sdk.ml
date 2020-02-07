@@ -15,7 +15,7 @@ open Js_of_ocaml
 open Snark_params_nonconsensus
 open Signature_lib_nonconsensus
 open Coda_base_nonconsensus
-open Js_types
+open Js_util
 
 let _ =
   Js.export "codaSDK"

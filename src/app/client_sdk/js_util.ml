@@ -1,4 +1,4 @@
-(* js_types.ml -- types for import, export from Javascript *)
+(* js_util.ml -- types and transformers for Javascript *)
 
 open Js_of_ocaml
 open Snark_params_nonconsensus
@@ -17,17 +17,6 @@ type payload_common_js =
   ; memo: string_js Js.prop >
   Js.t
 
-type payment_payload_js =
-  < receiver: string_js Js.prop ; amount: string_js Js.prop > Js.t
-
-type payment_js =
-  < common: payload_common_js Js.prop
-  ; paymentPayload: payment_payload_js Js.prop >
-  Js.t
-
-type stake_delegation_js =
-  < common: payload_common_js Js.prop ; newDelegate: string_js Js.prop > Js.t
-
 let get_payload_common (payload_common_js : payload_common_js) =
   let fee_js = payload_common_js##.fee in
   let fee = Js.to_string fee_js |> Currency.Fee.of_string in
@@ -38,6 +27,17 @@ let get_payload_common (payload_common_js : payload_common_js) =
   let memo_js = payload_common_js##.memo in
   let memo = Js.to_string memo_js |> Memo.create_from_string_exn in
   User_command_payload.Common.Poly.{fee; nonce; valid_until; memo}
+
+type payment_payload_js =
+  < receiver: string_js Js.prop ; amount: string_js Js.prop > Js.t
+
+type payment_js =
+  < common: payload_common_js Js.prop
+  ; paymentPayload: payment_payload_js Js.prop >
+  Js.t
+
+type stake_delegation_js =
+  < common: payload_common_js Js.prop ; newDelegate: string_js Js.prop > Js.t
 
 type signature_js =
   < field: string_js Js.readonly_prop ; scalar: string_js Js.readonly_prop >
