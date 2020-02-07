@@ -470,7 +470,7 @@ module T = struct
           in
           let block_production_keypair =
             Option.map block_production_key ~f:(fun i ->
-                List.nth_exn Test_genesis_ledger.accounts i
+                List.nth_exn (Lazy.force Test_genesis_ledger.accounts) i
                 |> Test_genesis_ledger.keypair_of_account_record_exn )
           in
           let initial_block_production_keypairs =

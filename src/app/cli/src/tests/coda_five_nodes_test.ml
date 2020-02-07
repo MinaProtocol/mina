@@ -10,7 +10,7 @@ let main () =
   let snark_work_public_keys = function
     | 0 ->
         Some
-          ( List.nth_exn Test_genesis_ledger.accounts 5
+          ( List.nth_exn (Lazy.force Test_genesis_ledger.accounts) 5
           |> snd |> Account.public_key )
     | _ ->
         None

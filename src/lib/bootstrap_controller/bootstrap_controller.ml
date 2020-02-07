@@ -449,7 +449,9 @@ let%test_module "Bootstrap_controller tests" =
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq
-            ~accounts_with_secret_keys:Test_genesis_ledger.accounts branch_size
+            ~accounts_with_secret_keys:
+              (Lazy.force Test_genesis_ledger.accounts)
+            branch_size
         in
         let [me; _] = fake_network.peer_networks in
         let branch =
