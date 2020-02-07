@@ -23,8 +23,7 @@ let get_path {path; cache} public_key =
          | Locked file | Unlocked (file, _) ->
              Option.return file
          | Hardware_wallet _ ->
-             Option.return
-               (Public_key.Compressed.to_base58_check public_key ^ ".nonce") )
+             Option.return (Public_key.Compressed.to_base58_check public_key) )
     |> Option.value ~default:(get_privkey_filename public_key)
   in
   path ^/ filename
