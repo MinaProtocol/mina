@@ -169,6 +169,13 @@ let daemon logger =
            "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             libp2p discovery"
          (listed string)
+     and curr_fork_id =
+       flag "current-fork-id" (optional string)
+         ~doc:
+           (sprintf
+              "HEX-STRING (%d characters) Current fork ID for this node, only \
+               blocks with the same ID accepted"
+              Fork_id.required_length)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -566,6 +573,7 @@ let daemon logger =
            Coda_state.Genesis_protocol_state.t ~genesis_ledger
            |> With_hash.hash
          in
+         Coda_run.set_current_fork_id ~conf_dir ~logger curr_fork_id ;
          let genesis_ledger_hash =
            Lazy.force genesis_ledger |> Ledger.merkle_root
          in

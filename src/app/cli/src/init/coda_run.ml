@@ -64,6 +64,62 @@ let get_lite_chain :
       let proof = Lite_compat.proof proof in
       {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
+let set_current_fork_id ~conf_dir ~logger =
+  let current_fork_id_file = conf_dir ^/ "current_fork_id" in
+  let read_fork_id () =
+    let open Stdlib in
+    let inp = open_in current_fork_id_file in
+    let res = input_line inp in
+    close_in inp ; res
+  in
+  let write_fork_id fork_id =
+    let open Stdlib in
+    let outp = open_out current_fork_id_file in
+    output_string outp (fork_id ^ "\n") ;
+    close_out outp
+  in
+  function
+  | None -> (
+    try
+      (* not provided on command line, read from config dir *)
+      let fork_id = read_fork_id () in
+      External_transition.set_current_fork_id fork_id ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Set current fork ID to $fork_id from config"
+        ~metadata:[("fork_id", `String fork_id)]
+    with Sys_error _ ->
+      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+        "No current fork ID provided on command line, and none available in \
+         config" ;
+      failwith "No current fork ID available" )
+  | Some fork_id -> (
+    try
+      (* it's an error if the command line value disagrees with the value in the config *)
+      let config_fork_id = read_fork_id () in
+      if String.equal config_fork_id fork_id then (
+        External_transition.set_current_fork_id fork_id ;
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Using current fork ID $fork_id from command line, which matches \
+           the one in the config"
+          ~metadata:[("fork_id", `String fork_id)] )
+      else (
+        External_transition.set_current_fork_id fork_id ;
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          "Current fork ID $fork_id from the command line disagrees with \
+           $config_fork_id from the config"
+          ~metadata:
+            [ ("fork_id", `String fork_id)
+            ; ("config_fork_id", `String config_fork_id) ] ;
+        failwith
+          "Current fork ID from command line disagrees with fork ID in config" )
+    with Sys_error _ ->
+      (* use value provided on command line, write to config dir, possibly overwriting existing entry *)
+      External_transition.set_current_fork_id fork_id ;
+      write_fork_id fork_id ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Using current fork ID $fork_id from command line, writing to config"
+        ~metadata:[("fork_id", `String fork_id)] )
+
 (*TODO check deferred now and copy theose files to the temp directory*)
 let log_shutdown ~conf_dir ~top_logger coda_ref =
   let logger =

@@ -12,7 +12,9 @@ module Stable = struct
       ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
       ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
       ; delta_transition_chain_proof:
-          State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list }
+          State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
+      ; current_fork_id: Fork_id.Stable.V1.t
+      ; next_fork_id: Fork_id.Stable.V1.t option }
     [@@deriving sexp, fields]
 
     let to_latest = Fn.id
@@ -21,12 +23,19 @@ module Stable = struct
         { protocol_state
         ; protocol_state_proof= _
         ; staged_ledger_diff= _
-        ; delta_transition_chain_proof= _ } =
+        ; delta_transition_chain_proof= _
+        ; current_fork_id
+        ; next_fork_id } =
       `Assoc
         [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
         ; ("protocol_state_proof", `String "<opaque>")
         ; ("staged_ledger_diff", `String "<opaque>")
-        ; ("delta_transition_chain_proof", `String "<opaque>") ]
+        ; ("delta_transition_chain_proof", `String "<opaque>")
+        ; ("current_fork_id", `String (Fork_id.to_string current_fork_id))
+        ; ( "next_fork_id"
+          , `String
+              (Option.value_map next_fork_id ~default:"<None>"
+                 ~f:Fork_id.to_string) ) ]
 
     let delta_transition_chain_proof {delta_transition_chain_proof; _} =
       delta_transition_chain_proof
@@ -95,7 +104,9 @@ type t = Stable.Latest.t =
   { protocol_state: Protocol_state.Value.Stable.V1.t
   ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
   ; staged_ledger_diff: Staged_ledger_diff.t
-  ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list }
+  ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
+  ; current_fork_id: Fork_id.t
+  ; next_fork_id: Fork_id.t option }
 [@@deriving sexp]
 
 type external_transition = t
@@ -119,12 +130,28 @@ Stable.Latest.
 
 include Comparable.Make (Stable.Latest)
 
+let (current_fork_id : Fork_id.t option ref) = ref None
+
+let set_current_fork_id s =
+  let fork_id = Fork_id.create s in
+  current_fork_id := Some fork_id
+
+(* we set current fork id on daemon startup, so we should not see errors
+   due to current_fork_id = None in get_current_fork_id and create
+ *)
+
+let get_current_fork_id () = Option.value_exn !current_fork_id
+
 let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-    ~delta_transition_chain_proof =
+    ~delta_transition_chain_proof ?next_fork_id () =
+  if Option.is_none !current_fork_id then
+    failwith "Cannot create external transition before setting current fork id" ;
   { protocol_state
   ; protocol_state_proof
   ; staged_ledger_diff
-  ; delta_transition_chain_proof }
+  ; delta_transition_chain_proof
+  ; current_fork_id= Option.value_exn !current_fork_id
+  ; next_fork_id }
 
 let timestamp {protocol_state; _} =
   Protocol_state.blockchain_state protocol_state |> Blockchain_state.timestamp
@@ -786,7 +813,8 @@ let genesis ~genesis_ledger ~base_proof =
            create ~protocol_state ~protocol_state_proof:base_proof
              ~staged_ledger_diff:empty_diff
              ~delta_transition_chain_proof:
-               (Protocol_state.previous_state_hash protocol_state, []) ))
+               (Protocol_state.previous_state_hash protocol_state, [])
+             () ))
   in
   transition
 

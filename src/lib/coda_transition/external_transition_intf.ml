@@ -254,11 +254,17 @@ module type S = sig
     val to_initial_validated : t -> Initial_validated.t
   end
 
+  val set_current_fork_id : string -> unit
+
+  val get_current_fork_id : unit -> Fork_id.t
+
   val create :
        protocol_state:Protocol_state.Value.t
     -> protocol_state_proof:Proof.t
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
+    -> ?next_fork_id:Fork_id.t
+    -> unit
     -> t
 
   val genesis :
