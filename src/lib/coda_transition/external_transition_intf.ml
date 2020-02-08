@@ -270,6 +270,20 @@ module type S = sig
   val genesis :
     genesis_ledger:Ledger.t Lazy.t -> base_proof:Proof.t -> Validated.t
 
+  module For_tests : sig
+    val create :
+         protocol_state:Protocol_state.Value.t
+      -> protocol_state_proof:Proof.t
+      -> staged_ledger_diff:Staged_ledger_diff.t
+      -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
+      -> ?next_fork_id:Fork_id.t
+      -> unit
+      -> t
+
+    val genesis :
+      genesis_ledger:Ledger.t Lazy.t -> base_proof:Proof.t -> Validated.t
+  end
+
   val timestamp : t -> Block_time.t
 
   val skip_time_received_validation :

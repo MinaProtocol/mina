@@ -305,8 +305,9 @@ module For_tests = struct
         Protocol_state.create_value ~genesis_state_hash ~previous_state_hash
           ~blockchain_state:next_blockchain_state ~consensus_state
       in
+      ignore (External_transition.set_current_fork_id (Fork_id.create "00000")) ;
       let next_external_transition =
-        External_transition.create ~protocol_state
+        External_transition.For_tests.create ~protocol_state
           ~protocol_state_proof:Proof.dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
           ~delta_transition_chain_proof:(previous_state_hash, []) ()

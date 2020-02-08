@@ -816,6 +816,18 @@ let genesis ~genesis_ledger ~base_proof =
   in
   transition
 
+module For_tests = struct
+  let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
+      ~delta_transition_chain_proof ?next_fork_id () =
+    set_current_fork_id (Fork_id.create "00000") ;
+    create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
+      ~delta_transition_chain_proof ?next_fork_id ()
+
+  let genesis ~genesis_ledger ~base_proof =
+    set_current_fork_id (Fork_id.create "00000") ;
+    genesis ~genesis_ledger ~base_proof
+end
+
 module Transition_frontier_validation (Transition_frontier : sig
   type t
 
