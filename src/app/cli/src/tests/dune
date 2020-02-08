@@ -6,7 +6,7 @@
     async core
     ; libs
     coda_base coda_graphql coda_lib coda_state
-    coda_transition coda_version parallel
+    coda_transition coda_version fork_id parallel
     transition_frontier
     ; internal deps
     init)

@@ -573,7 +573,6 @@ let daemon logger =
            Coda_state.Genesis_protocol_state.t ~genesis_ledger
            |> With_hash.hash
          in
-         Coda_run.set_current_fork_id ~conf_dir ~logger curr_fork_id ;
          let genesis_ledger_hash =
            Lazy.force genesis_ledger |> Ledger.merkle_root
          in
@@ -700,10 +699,15 @@ let daemon logger =
            Option.value_map coinbase_receiver_flag ~default:`Producer
              ~f:(fun pk -> `Other pk)
          in
+         let current_fork_id =
+           Coda_run.get_current_fork_id ~conf_dir ~logger curr_fork_id
+           |> Fork_id.create
+         in
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                 ~coinbase_receiver ~net_config ~gossip_net_params
+                ~current_fork_id
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)

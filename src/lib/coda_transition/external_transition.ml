@@ -132,9 +132,7 @@ include Comparable.Make (Stable.Latest)
 
 let (current_fork_id : Fork_id.t option ref) = ref None
 
-let set_current_fork_id s =
-  let fork_id = Fork_id.create s in
-  current_fork_id := Some fork_id
+let set_current_fork_id fork_id = current_fork_id := Some fork_id
 
 (* we set current fork id on daemon startup, so we should not see errors
    due to current_fork_id = None in get_current_fork_id and create

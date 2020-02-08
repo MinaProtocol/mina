@@ -25,6 +25,7 @@ type t =
   ; work_reassignment_wait: int
   ; gossip_net_params: Gossip_net.Real.Config.t
   ; net_config: Coda_networking.Config.t
+  ; current_fork_id: Fork_id.t
   ; snark_pool_disk_location: string
   ; wallets_disk_location: string
   ; persistent_root_location: string

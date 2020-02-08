@@ -254,7 +254,7 @@ module type S = sig
     val to_initial_validated : t -> Initial_validated.t
   end
 
-  val set_current_fork_id : string -> unit
+  val set_current_fork_id : Fork_id.t -> unit
 
   val get_current_fork_id : unit -> Fork_id.t
 
