@@ -74,8 +74,6 @@ let rec of_list : type a. a list -> a e = function
       let (T xs) = of_list xs in
       T (x :: xs)
 
-let reverse t =
-  let (T xs) = of_list (List.rev (to_list t)) in
 let reverse (t : ('a, 'n) t) : ('a, 'n) t =
   let (T xs) = of_list (List.rev (to_list t)) in
   (* Would need dependent typing for the length argument to be
