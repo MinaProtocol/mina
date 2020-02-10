@@ -281,20 +281,24 @@ module Status = struct
 
     let addrs_and_ports =
       let render conf =
-        let fmt_field name op field = (name, op (Field.get field conf)) in
-        Kademlia.Node_addrs_and_ports.Display.Stable.V1.Fields.to_list
+        let fmt_field name op field = [(name, op (Field.get field conf))] in
+        Node_addrs_and_ports.Display.Stable.V1.Fields.to_list
           ~external_ip:(fmt_field "External IP" Fn.id)
           ~bind_ip:(fmt_field "Bind IP" Fn.id)
-          ~discovery_port:(fmt_field "Haskell Kademlia port" string_of_int)
           ~client_port:(fmt_field "Client port" string_of_int)
-          ~libp2p_port:(fmt_field "Discovery (libp2p) port" string_of_int)
-          ~communication_port:(fmt_field "External port" string_of_int)
+          ~libp2p_port:(fmt_field "Libp2p port" string_of_int)
+          ~peer:(fun field ->
+            let peer = Field.get field conf in
+            match peer with
+            | Some peer ->
+                [("Libp2p PeerID", peer.peer_id)]
+            | None ->
+                [] )
+        |> List.concat
         |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
         |> digest_entries ~title:""
       in
       map_entry "Addresses and ports" ~f:render
-
-    let libp2p_peer_id = string_entry "Libp2p PeerID"
   end
 
   type t =
@@ -322,8 +326,7 @@ module Status = struct
     ; consensus_time_now: Consensus.Data.Consensus_time.Stable.V1.t
     ; consensus_mechanism: string
     ; consensus_configuration: Consensus.Configuration.t
-    ; addrs_and_ports: Kademlia.Node_addrs_and_ports.Display.Stable.V1.t
-    ; libp2p_peer_id: string }
+    ; addrs_and_ports: Node_addrs_and_ports.Display.Stable.V1.t }
   [@@deriving to_yojson, bin_io, fields]
 
   let entries (s : t) =
@@ -338,7 +341,7 @@ module Status = struct
       ~state_hash ~commit_id ~conf_dir ~peers ~user_commands_sent ~snark_worker
       ~block_production_keys ~histograms ~consensus_time_best_tip
       ~consensus_time_now ~consensus_mechanism ~consensus_configuration
-      ~next_block_production ~snark_work_fee ~addrs_and_ports ~libp2p_peer_id
+      ~next_block_production ~snark_work_fee ~addrs_and_ports
     |> List.filter_map ~f:Fn.id
 
   let to_text (t : t) =

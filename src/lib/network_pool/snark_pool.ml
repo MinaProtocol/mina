@@ -1,6 +1,7 @@
 open Core_kernel
 open Async
 open Pipe_lib
+open Network_peer
 
 module type S = sig
   type transition_frontier
@@ -45,7 +46,8 @@ module type S = sig
        config:Resource_pool.Config.t
     -> logger:Logger.t
     -> disk_location:string
-    -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
+    -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
+                      * (bool -> unit) )
                       Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier option
                                Broadcast_pipe.Reader.t
@@ -375,13 +377,14 @@ module Make (Transition_frontier : Transition_frontier_intf) :
   let add_completed_work t
       (res : (('a, 'b, 'c) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
     apply_and_broadcast t
-      (Envelope.Incoming.wrap
-         ~data:
-           (Resource_pool.Diff.Stable.V1.Add_solved_work
-              ( One_or_two.map res.spec.instances ~f:Single.Spec.statement
-              , { proof= res.proofs
-                ; fee= {fee= res.spec.fee; prover= res.prover} } ))
-         ~sender:Envelope.Sender.Local)
+      ( Envelope.Incoming.wrap
+          ~data:
+            (Resource_pool.Diff.Stable.V1.Add_solved_work
+               ( One_or_two.map res.spec.instances ~f:Single.Spec.statement
+               , { proof= res.proofs
+                 ; fee= {fee= res.spec.fee; prover= res.prover} } ))
+          ~sender:Envelope.Sender.Local
+      , Fn.const () )
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
@@ -445,7 +448,7 @@ let%test_module "random set test" =
           let open Deferred.Let_syntax in
           Deferred.List.iter sample_solved_work ~f:(fun (work, fee) ->
               let%map res = apply_diff resource_pool work fee in
-              assert (Or_error.is_ok res) ;
+              assert (Result.is_ok res) ;
               () )
         in
         resource_pool
@@ -505,7 +508,7 @@ let%test_module "random set test" =
                     let%map res =
                       apply_diff t statements ~proof:(fun _ -> proofs) fee
                     in
-                    assert (Or_error.is_error res) ;
+                    assert (Result.is_error res) ;
                     () )
               in
               [%test_eq: Transaction_snark_work.Info.t list] completed_works
@@ -555,7 +558,7 @@ let%test_module "random set test" =
               and cheap_fee = min fee_1 fee_2 in
               let%bind _ = apply_diff t work cheap_fee in
               let%map res = apply_diff t work expensive_fee in
-              assert (Or_error.is_error res) ;
+              assert (Result.is_error res) ;
               assert (
                 cheap_fee.fee
                 = (Option.value_exn
@@ -613,7 +616,7 @@ let%test_module "random set test" =
                      failwith "There should have been a proof here" ) ;
                  Deferred.unit ) ;
           Mock_snark_pool.apply_and_broadcast network_pool
-            (Envelope.Incoming.local command) )
+            (Envelope.Incoming.local command, Fn.const ()) )
 
     let%test_unit "when creating a network, the incoming diffs in reader pipe \
                    will automatically get process" =
@@ -628,17 +631,18 @@ let%test_module "random set test" =
           let verify_unsolved_work () =
             let work_diffs =
               List.map works ~f:(fun work ->
-                  Envelope.Incoming.local
-                    (Mock_snark_pool.Resource_pool.Diff.Stable.V1
-                     .Add_solved_work
-                       ( work
-                       , Priced_proof.
-                           { proof= One_or_two.map ~f:mk_dummy_proof work
-                           ; fee=
-                               { fee= Currency.Fee.of_int 0
-                               ; prover=
-                                   Signature_lib.Public_key.Compressed.empty }
-                           } )) )
+                  ( Envelope.Incoming.local
+                      (Mock_snark_pool.Resource_pool.Diff.Stable.V1
+                       .Add_solved_work
+                         ( work
+                         , Priced_proof.
+                             { proof= One_or_two.map ~f:mk_dummy_proof work
+                             ; fee=
+                                 { fee= Currency.Fee.of_int 0
+                                 ; prover=
+                                     Signature_lib.Public_key.Compressed.empty
+                                 } } ))
+                  , Fn.const () ) )
               |> Linear_pipe.of_list
             in
             let frontier_broadcast_pipe_r, _ =
@@ -687,7 +691,9 @@ let%test_module "random set test" =
           (Quickcheck.Generator.tuple2 Fee_with_prover.gen Fee_with_prover.gen)
       in
       let fake_sender =
-        Envelope.Sender.Remote (Unix.Inet_addr.of_string "1.2.4.8")
+        Envelope.Sender.Remote
+          ( Unix.Inet_addr.of_string "1.2.4.8"
+          , Peer.Id.unsafe_of_string "contents should be irrelevant" )
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
@@ -706,7 +712,15 @@ let%test_module "random set test" =
           let%bind res1 =
             apply_diff ~sender:fake_sender resource_pool stmt1 fee1
           in
-          Or_error.ok_exn res1 |> ignore ;
+          let ok_exn = function
+            | Ok e ->
+                e
+            | Error (`Other e) ->
+                Or_error.ok_exn (Error e)
+            | Error (`Locally_generated _) ->
+                failwith "rejected because locally generated"
+          in
+          ok_exn res1 |> ignore ;
           let rebroadcastable1 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~is_expired:(Fn.const `Ok)
@@ -715,7 +729,7 @@ let%test_module "random set test" =
             rebroadcastable1 [] ;
           let%bind res2 = apply_diff resource_pool stmt2 fee2 in
           let proof2 = One_or_two.map ~f:mk_dummy_proof stmt2 in
-          Or_error.ok_exn res2 |> ignore ;
+          ok_exn res2 |> ignore ;
           let rebroadcastable2 =
             Mock_snark_pool.For_tests.get_rebroadcastable resource_pool
               ~is_expired:(Fn.const `Ok)

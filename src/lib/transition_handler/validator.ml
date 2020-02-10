@@ -5,6 +5,7 @@ open Coda_base
 open Coda_state
 open Cache_lib
 open Coda_transition
+open Network_peer
 
 let validate_transition ~logger ~frontier ~unprocessed_transition_cache
     (enveloped_transition :

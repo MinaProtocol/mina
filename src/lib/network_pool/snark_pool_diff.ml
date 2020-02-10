@@ -1,6 +1,7 @@
 open Core_kernel
 open Async_kernel
 open Module_version
+open Network_peer
 
 module Make (Ledger_proof : sig
   type t [@@deriving bin_io, compare, sexp, to_yojson, version]
@@ -77,34 +78,35 @@ end)
           (Yojson.Safe.to_string @@ Work.compact_json work)
           (Yojson.Safe.to_string @@ Coda_base.Fee_with_prover.to_yojson fee)
 
-  let apply (pool : Pool.t) (t : t Envelope.Incoming.t) :
-      t Or_error.t Deferred.t =
-    let open Deferred.Or_error.Let_syntax in
+  let apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
     let {Envelope.Incoming.data= diff; sender} = t in
     let is_local = match sender with Local -> true | _ -> false in
     let to_or_error = function
       | `Statement_not_referenced ->
-          Or_error.error_string "statement not referenced"
+          Error (`Other (Error.of_string "statement not referenced"))
       | `Added ->
           Ok diff
     in
     match diff with
     | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) -> (
         let reject_and_log_if_local reason =
-          if is_local then
-            Logger.warn (Pool.get_logger pool) ~module_:__MODULE__
+          if is_local then (
+            Logger.trace (Pool.get_logger pool) ~module_:__MODULE__
               ~location:__LOC__
               "Rejecting locally generated snark work $work, %s" reason
               ~metadata:[("work", Work.compact_json work)] ;
-          Deferred.return (Or_error.error_string reason)
+            Deferred.return (Error (`Locally_generated diff)) )
+          else Deferred.return (Error (`Other (Error.of_string reason)))
         in
         let check_and_add () =
-          let%bind () =
+          match%map
             Pool.verify_and_act pool ~work:(work, p)
               ~sender:(Envelope.Incoming.sender t)
-          in
-          Pool.add_snark ~is_local pool ~work ~proof ~fee
-          |> to_or_error |> Deferred.return
+          with
+          | Ok () ->
+              Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
+          | Error e ->
+              Error (`Other e)
         in
         match Pool.request_proof pool work with
         | None ->

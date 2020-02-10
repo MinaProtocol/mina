@@ -23,7 +23,7 @@ type t =
   ; work_selection_method: (module Work_selector.Selection_method_intf)
   ; snark_worker_config: Snark_worker_config.t
   ; work_reassignment_wait: int
-  ; gossip_net_params: Gossip_net.Real.Config.t
+  ; gossip_net_params: Gossip_net.Libp2p.Config.t
   ; net_config: Coda_networking.Config.t
   ; snark_pool_disk_location: string
   ; wallets_disk_location: string

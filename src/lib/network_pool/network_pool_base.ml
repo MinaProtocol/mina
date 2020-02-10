@@ -22,16 +22,24 @@ end)
 
   let broadcasts {read_broadcasts; _} = read_broadcasts
 
-  let apply_and_broadcast t pool_diff =
+  let apply_and_broadcast t (pool_diff, valid_cb) =
+    let rebroadcast diff' =
+      valid_cb true ;
+      Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+        "Broadcasting %s"
+        (Resource_pool.Diff.summary diff') ;
+      Linear_pipe.write t.write_broadcasts diff'
+    in
     match%bind Resource_pool.Diff.apply t.resource_pool pool_diff with
     | Ok diff' ->
-        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Broadcasting %s"
-          (Resource_pool.Diff.summary diff') ;
-        Linear_pipe.write t.write_broadcasts diff'
-    | Error e ->
+        rebroadcast diff'
+    | Error (`Locally_generated diff') ->
+        rebroadcast diff'
+    | Error (`Other e) ->
+        valid_cb false ;
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Pool diff apply feedback: %s" (Error.to_string_hum e) ;
+          "Refusing to rebroadcast: pool diff apply feedback: %s"
+          (Error.to_string_hum e) ;
         Deferred.unit
 
   let of_resource_pool_and_diffs resource_pool ~logger ~incoming_diffs =
@@ -39,8 +47,8 @@ end)
     let network_pool =
       {resource_pool; logger; read_broadcasts; write_broadcasts}
     in
-    Linear_pipe.iter incoming_diffs ~f:(fun diff ->
-        apply_and_broadcast network_pool diff )
+    Linear_pipe.iter incoming_diffs ~f:(fun diff_and_cb ->
+        apply_and_broadcast network_pool diff_and_cb )
     |> ignore ;
     network_pool
 

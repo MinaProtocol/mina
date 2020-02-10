@@ -1,4 +1,4 @@
-open Core_kernel
+open Core
 open Async
 open Coda_base
 open Coda_state
@@ -505,6 +505,7 @@ module Config = struct
     ; consensus_local_state: Consensus.Data.Local_state.t
     ; genesis_ledger_hash: Ledger_hash.t
     ; creatable_gossip_net: Gossip_net.Any.creatable
+    ; is_seed: bool
     ; log_gossip_heard: log_gossip_heard }
   [@@deriving make]
 end
@@ -514,13 +515,17 @@ type t =
   ; trust_system: Trust_system.t
   ; gossip_net: Gossip_net.Any.t
   ; states:
-      (External_transition.t Envelope.Incoming.t * Block_time.t)
+      ( External_transition.t Envelope.Incoming.t
+      * Block_time.t
+      * (bool -> unit) )
       Strict_pipe.Reader.t
   ; transaction_pool_diffs:
-      Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
+      ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
+      * (bool -> unit) )
       Linear_pipe.Reader.t
   ; snark_pool_diffs:
-      Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t Linear_pipe.Reader.t
+      (Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t * (bool -> unit))
+      Linear_pipe.Reader.t
   ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
   ; first_received_message_signal: unit Ivar.t }
 [@@deriving fields]
@@ -548,9 +553,7 @@ let online_broadcaster time_controller received_messages =
   online_reader
 
 let wrap_rpc_data_in_envelope conn data =
-  let inet_addr = Unix.Inet_addr.of_string conn.Host_and_port.host in
-  let sender = Envelope.Sender.Remote inet_addr in
-  Envelope.Incoming.wrap ~data ~sender
+  Envelope.Incoming.wrap_peer ~data ~sender:conn
 
 let create (config : Config.t)
     ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
@@ -647,7 +650,8 @@ let create (config : Config.t)
   in
   let get_ancestry_rpc conn ~version:_ query =
     Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
-      "Sending root proof to peer with IP %s" conn.Host_and_port.host ;
+      "Sending root proof to peer with IP %s"
+      (Unix.Inet_addr.to_string conn.Peer.host) ;
     let action_msg = "Get_ancestry query: $query" in
     let msg_args = [("query", Rpcs.Get_ancestry.query_to_yojson query)] in
     let%bind result, sender =
@@ -657,7 +661,8 @@ let create (config : Config.t)
   in
   let get_best_tip_rpc conn ~version:_ query =
     Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
-      "Sending best_tip to peer with IP %s" conn.Host_and_port.host ;
+      "Sending best_tip to peer with IP %s"
+      (Unix.Inet_addr.to_string conn.Peer.host) ;
     let action_msg = "Get_best_tip. query: $query" in
     let msg_args = [("query", Rpcs.Get_best_tip.query_to_yojson query)] in
     let%bind result, sender =
@@ -668,7 +673,7 @@ let create (config : Config.t)
   let get_transition_chain_proof_rpc conn ~version:_ query =
     Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
       "Sending transition_chain_proof to peer with IP %s"
-      conn.Host_and_port.host ;
+      (Unix.Inet_addr.to_string conn.Peer.host) ;
     let action_msg = "Get_transition_chain_proof query: $query" in
     let msg_args =
       [("query", Rpcs.Get_transition_chain_proof.query_to_yojson query)]
@@ -681,7 +686,8 @@ let create (config : Config.t)
   in
   let get_transition_chain_rpc conn ~version:_ query =
     Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
-      "Sending transition_chain to peer with IP %s" conn.Host_and_port.host ;
+      "Sending transition_chain to peer with IP %s"
+      (Unix.Inet_addr.to_string conn.Peer.host) ;
     let action_msg = "Get_transition_chain query: $query" in
     let msg_args =
       [("query", Rpcs.Get_transition_chain.query_to_yojson query)]
@@ -696,7 +702,7 @@ let create (config : Config.t)
     Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
       "Node banned by peer $peer until $ban_until"
       ~metadata:
-        [ ("peer", `String conn.Host_and_port.host)
+        [ ("peer", `String (Unix.Inet_addr.to_string conn.Peer.host))
         ; ( "ban_until"
           , `String (Time.to_string_abs ~zone:Time.Zone.utc ban_until) ) ] ;
     (* no computation to do; we're just getting notification *)
@@ -728,11 +734,13 @@ let create (config : Config.t)
   don't_wait_for
     (Gossip_net.Any.on_first_connect gossip_net ~f:(fun () ->
          (* After first_connect this list will only be empty if we filtered out all the peers due to mismatched chain id. *)
-         let initial_peers = Gossip_net.Any.peers gossip_net in
-         if List.is_empty initial_peers then (
-           Logger.fatal config.logger "Failed to connect to any initial peers"
-             ~module_:__MODULE__ ~location:__LOC__ ;
-           raise No_initial_peers ) )) ;
+         don't_wait_for
+           (let%map initial_peers = Gossip_net.Any.peers gossip_net in
+            if List.is_empty initial_peers && not config.is_seed then (
+              Logger.fatal config.logger
+                "Failed to connect to any initial peers" ~module_:__MODULE__
+                ~location:__LOC__ ;
+              raise No_initial_peers )) )) ;
   (* TODO: Think about buffering:
      I.e., what do we do when too many messages are coming in, or going out.
      For example, some things you really want to not drop (like your outgoing
@@ -747,7 +755,8 @@ let create (config : Config.t)
   in
   let first_received_message_signal = Ivar.create () in
   let states, snark_pool_diffs, transaction_pool_diffs =
-    Strict_pipe.Reader.partition_map3 received_gossips ~f:(fun envelope ->
+    Strict_pipe.Reader.partition_map3 received_gossips
+      ~f:(fun (envelope, valid_cb) ->
         Ivar.fill_if_empty first_received_message_signal () ;
         match Envelope.Incoming.data envelope with
         | New_state state ->
@@ -767,7 +776,8 @@ let create (config : Config.t)
                   ] ;
             `Fst
               ( Envelope.Incoming.map envelope ~f:(fun _ -> state)
-              , Block_time.now config.time_controller )
+              , Block_time.now config.time_controller
+              , valid_cb )
         | Snark_pool_diff diff ->
             if config.log_gossip_heard.snark_pool_diff then
               Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -779,7 +789,7 @@ let create (config : Config.t)
                   ] ;
             Coda_metrics.(
               Counter.inc_one Snark_work.completed_snark_work_received_gossip) ;
-            `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff))
+            `Snd (Envelope.Incoming.map envelope ~f:(fun _ -> diff), valid_cb)
         | Transaction_pool_diff diff ->
             if config.log_gossip_heard.transaction_pool_diff then
               Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -804,7 +814,8 @@ let create (config : Config.t)
                     false )
                   else true )
             in
-            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff')) )
+            `Trd (Envelope.Incoming.map envelope ~f:(fun _ -> diff'), valid_cb)
+    )
   in
   { gossip_net
   ; logger= config.logger
@@ -832,14 +843,15 @@ include struct
 
   let random_peers_except = lift random_peers_except
 
-  let peers_by_ip = lift peers_by_ip
-
   (* these cannot be directly lifted due to the value restriction *)
   let query_peer t = lift query_peer t
 
   let on_first_connect t = lift on_first_connect t
 
   let on_first_high_connectivity t = lift on_first_high_connectivity t
+
+  let ip_for_peer t peer_id =
+    (lift ip_for_peer) t peer_id >>| Option.map ~f:(fun peer -> peer.Peer.host)
 end
 
 let on_first_received_message {first_received_message_signal; _} ~f =
@@ -898,14 +910,14 @@ let online_status t = t.online_status
 
 let make_rpc_request ~rpc ~label t peer input =
   let open Deferred.Let_syntax in
-  match%map query_peer t peer rpc input with
-  | Ok (Some response) ->
+  match%map query_peer t peer.Peer.peer_id rpc input with
+  | Connected {data= Ok (Some response); _} ->
       Ok response
-  | Ok None ->
+  | Connected {data= Ok None; _} ->
       Or_error.errorf
-        !"Peer %{sexp:Network_peer.Peer.t} doesn't have the requested %s"
-        peer label
-  | Error e ->
+        !"Peer %{sexp:Network_peer.Peer.Id.t} doesn't have the requested %s"
+        peer.peer_id label
+  | Connected {data= Error e; _} | Failed_to_connect e ->
       Error e
 
 let get_transition_chain_proof =
@@ -918,11 +930,13 @@ let get_best_tip t peer =
   make_rpc_request ~rpc:Rpcs.Get_best_tip ~label:"best tip" t peer ()
 
 let ban_notify t peer banned_until =
-  query_peer t peer Rpcs.Ban_notify banned_until
+  query_peer t peer.Peer.peer_id Rpcs.Ban_notify banned_until
+  >>| Fn.const (Ok ())
 
 let net2 t = Gossip_net.Any.net2 t.gossip_net
 
-let try_non_preferred_peers t input peers ~rpc =
+let try_non_preferred_peers (type b) t input peers ~rpc :
+    b Envelope.Incoming.t Deferred.Or_error.t =
   let max_current_peers = 8 in
   let rec loop peers num_peers =
     if num_peers > max_current_peers then
@@ -932,9 +946,11 @@ let try_non_preferred_peers t input peers ~rpc =
     else
       let current_peers, remaining_peers = List.split_n peers num_peers in
       find_map' current_peers ~f:(fun peer ->
-          let%bind response_or_error = query_peer t peer rpc input in
+          let%bind response_or_error =
+            query_peer t peer.Peer.peer_id rpc input
+          in
           match response_or_error with
-          | Ok (Some response) ->
+          | Connected ({data= Ok (Some data); _} as envelope) ->
               let%bind () =
                 Trust_system.(
                   record t.trust_system t.logger peer.host
@@ -943,67 +959,86 @@ let try_non_preferred_peers t input peers ~rpc =
                       , Some ("Nonpreferred peer returned valid response", [])
                       ))
               in
-              return (Ok response)
-          | Ok None ->
+              return (Ok (Envelope.Incoming.map envelope ~f:(Fn.const data)))
+          | Connected {data= Ok None; _} ->
               loop remaining_peers (2 * num_peers)
-          | Error _ ->
+          | _ ->
               loop remaining_peers (2 * num_peers) )
   in
   loop peers 1
 
-let try_preferred_peer t inet_addr input ~rpc =
-  let peers_at_addr = peers_by_ip t inet_addr in
-  (* if there's a single peer at inet_addr, call it the preferred peer *)
-  match peers_at_addr with
-  | [peer] -> (
-      let get_random_peers () =
-        let max_peers = 15 in
-        let except = Peer.Hash_set.of_list [peer] in
-        random_peers_except t max_peers ~except
-      in
-      let%bind response = query_peer t peer rpc input in
-      match response with
-      | Ok (Some data) ->
-          let%bind () =
+let rpc_peer_then_random (type b) t peer_id input ~rpc :
+    b Envelope.Incoming.t Deferred.Or_error.t =
+  let retry () =
+    let%bind peers = random_peers t 8 in
+    try_non_preferred_peers t input peers ~rpc
+  in
+  match%bind query_peer t peer_id rpc input with
+  | Connected {data= Ok (Some response); sender} ->
+      let%bind () =
+        match sender with
+        | Local ->
+            return ()
+        | Remote (sender, _) ->
             Trust_system.(
-              record t.trust_system t.logger peer.host
+              record t.trust_system t.logger sender
                 Actions.
                   ( Fulfilled_request
                   , Some ("Preferred peer returned valid response", []) ))
-          in
-          return (Ok data)
-      | Ok None ->
-          let%bind () =
+      in
+      return (Ok (Envelope.Incoming.wrap ~data:response ~sender))
+  | Connected {data= Ok None; sender} ->
+      let%bind () =
+        match sender with
+        | Remote (sender, _) ->
             Trust_system.(
-              record t.trust_system t.logger peer.host
+              record t.trust_system t.logger sender
                 Actions.
                   ( Violated_protocol
                   , Some ("When querying preferred peer, got no response", [])
                   ))
-          in
-          let peers = get_random_peers () in
-          try_non_preferred_peers t input peers ~rpc
-      | Error _ ->
-          (* TODO: determine what punishments apply here *)
-          Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
-            !"get error from %{sexp: Peer.t}"
-            peer ;
-          let peers = get_random_peers () in
-          try_non_preferred_peers t input peers ~rpc )
-  | _ ->
-      (* no preferred peer *)
-      let max_peers = 16 in
-      let peers = random_peers t max_peers in
-      try_non_preferred_peers t input peers ~rpc
+        | Local ->
+            return ()
+      in
+      retry ()
+  | Connected {data= Error e; sender} ->
+      (* FIXME #4094: determine if more specific actions apply here *)
+      let%bind () =
+        match sender with
+        | Remote (sender, _) ->
+            Trust_system.(
+              record t.trust_system t.logger sender
+                Actions.
+                  ( Outgoing_connection_error
+                  , Some
+                      ( "Error while doing RPC"
+                      , [("error", `String (Error.to_string_hum e))] ) ))
+        | Local ->
+            return ()
+      in
+      retry ()
+  | Failed_to_connect _ ->
+      (* Since we couldn't connect, we have no IP to ban. *)
+      retry ()
 
 let get_staged_ledger_aux_and_pending_coinbases_at_hash t inet_addr input =
-  try_preferred_peer t inet_addr input
+  rpc_peer_then_random t inet_addr input
     ~rpc:Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash
+  >>|? Envelope.Incoming.data
 
 let get_ancestry t inet_addr input =
-  try_preferred_peer t inet_addr input ~rpc:Rpcs.Get_ancestry
+  rpc_peer_then_random t inet_addr input ~rpc:Rpcs.Get_ancestry
 
-let glue_sync_ledger t query_reader response_writer =
+let glue_sync_ledger :
+       t
+    -> (Coda_base.Ledger_hash.t * Coda_base.Sync_ledger.Query.t)
+       Pipe_lib.Linear_pipe.Reader.t
+    -> ( Coda_base.Ledger_hash.t
+       * Coda_base.Sync_ledger.Query.t
+       * Coda_base.Sync_ledger.Answer.t Network_peer.Envelope.Incoming.t )
+       Pipe_lib.Linear_pipe.Writer.t
+    -> unit =
+ fun t query_reader response_writer ->
   (* We attempt to query 3 random peers, retry_max times. We keep track of the
      peers that couldn't answer a particular query and won't try them
      again. *)
@@ -1011,7 +1046,7 @@ let glue_sync_ledger t query_reader response_writer =
   let retry_interval = Core.Time.Span.of_ms 200. in
   let rec answer_query ctr peers_tried query =
     O1trace.trace_event "ask sync ledger query" ;
-    let peers = random_peers_except t 3 ~except:peers_tried in
+    let%bind peers = random_peers_except t 3 ~except:peers_tried in
     Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
       !"SL: Querying the following peers %{sexp: Peer.t list}"
       peers ;
@@ -1021,8 +1056,10 @@ let glue_sync_ledger t query_reader response_writer =
             !"Asking %{sexp: Peer.t} query regarding ledger_hash %{sexp: \
               Ledger_hash.t}"
             peer (fst query) ;
-          match%map query_peer t peer Rpcs.Answer_sync_ledger_query query with
-          | Ok (Ok answer) ->
+          match%map
+            query_peer t peer.peer_id Rpcs.Answer_sync_ledger_query query
+          with
+          | Connected {data= Ok (Ok answer); sender} ->
               Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
                 !"Received answer from peer %{sexp: Peer.t} on ledger_hash \
                   %{sexp: Ledger_hash.t}"
@@ -1030,18 +1067,22 @@ let glue_sync_ledger t query_reader response_writer =
               (* TODO : here is a place where an envelope could contain
                  a Peer.t, and not just an IP address, if desired
               *)
-              let inet_addr = peer.host in
-              Some
-                (Envelope.Incoming.wrap ~data:answer
-                   ~sender:(Envelope.Sender.Remote inet_addr))
-          | Ok (Error e) ->
+              Some (Envelope.Incoming.wrap ~data:answer ~sender)
+          | Connected {data= Ok (Error e); _} ->
               Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                 "Peer $peer didn't have enough information to answer \
                  ledger_hash query. See error for more details: $error"
                 ~metadata:[("error", `String (Error.to_string_hum e))] ;
               Hash_set.add peers_tried peer ;
               None
-          | Error err ->
+          | Connected {data= Error e; _} ->
+              Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
+                "RPC error during ledger_hash query See error for more \
+                 details: $error"
+                ~metadata:[("error", `String (Error.to_string_hum e))] ;
+              Hash_set.add peers_tried peer ;
+              None
+          | Failed_to_connect err ->
               Logger.warn t.logger ~module_:__MODULE__ ~location:__LOC__
                 "Network error: %s" (Error.to_string_mach err) ;
               None )

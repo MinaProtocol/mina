@@ -39,7 +39,8 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: coda-discovery, libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
+Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
+Conflicts: coda-discovery
 License: Apache-2.0
 Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
@@ -56,6 +57,7 @@ echo "------------------------------------------------------------"
 # Binaries
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
+cp "${SCRIPTPATH}/../src/app/libp2p_helper/result/bin/libp2p_helper" "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
 
@@ -145,7 +147,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: coda-discovery, libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
+Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
 License: Apache-2.0
 Homepage: https://codaprotocol.com/
 Maintainer: o(1)Labs <build@o1labs.org>
