@@ -475,7 +475,7 @@ module type S = sig
       type query =
         { query:
             'q 'r.    Network_peer.Peer.t -> ('q, 'r) rpc -> 'q
-            -> 'r Deferred.Or_error.t }
+            -> 'r Coda_base.Rpc_intf.rpc_response Deferred.t }
     end
 
     (* Check whether we are in the genesis epoch *)
@@ -563,7 +563,7 @@ module type S = sig
          logger:Logger.t
       -> trust_system:Trust_system.t
       -> local_state:Local_state.t
-      -> random_peers:(int -> Network_peer.Peer.t list)
+      -> random_peers:(int -> Network_peer.Peer.t list Deferred.t)
       -> query_peer:Rpcs.query
       -> local_state_sync Non_empty_list.t
       -> unit Deferred.Or_error.t

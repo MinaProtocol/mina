@@ -59,7 +59,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e`
+`docker pull codaprotocol/coda:toolchain-6728e849d78ccb9ca7c53d1b82609c8dd49b40f9`
 
 * Create local builder image
 
@@ -128,12 +128,12 @@ You should probably use `USEDOCKER=TRUE` unless you've done the [building withou
 
 These are the most important `make` targets:
 
-* `libp2p_helper`: build the libp2p helper
 * `build`: build everything
 * `docker`: build the container
 * `container`: restart the development container (or start it if it's not yet)
 * `dev`: does `docker`, `container`, and `build`
 * `test`: run the tests
+* `libp2p_helper`: build the libp2p helper
 * `web`: build the website, including the state explorer
 
 We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code.

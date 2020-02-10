@@ -137,6 +137,7 @@ fn main() {
             .unwrap()
             .read_to_end(&mut contents)
             .unwrap();
+
         let mut seen_tids = HashMap::<Tid, String>::new();
         let mut recurring_map = HashMap::<String, Tid>::new();
         let mut tidmap = HashMap::<Tid, Tid>::new();

@@ -106,16 +106,11 @@ module Port = struct
 
   let default_client = 8301
 
-  let default_external = 8302
-
   let default_rest = 0xc0d
 
   let default_archive = default_rest + 1
 
-  (* This is always computed as default_external+1 *)
-  let _default_discovery = 8303
-
-  let default_libp2p = 28675
+  let default_libp2p = 8302
 
   let default_hasura_port = 9000
 
@@ -135,8 +130,8 @@ module Port = struct
 
   module Daemon = struct
     let external_ =
-      create ~name:"external-port" ~default:default_external
-        "Base server port for daemon TCP (discovery UDP on port+1)"
+      create ~name:"external-port" ~default:default_libp2p
+        "Port to use for all libp2p communications (gossip and RPC)"
 
     let client =
       create ~name:"client-port" ~default:default_client
@@ -145,10 +140,6 @@ module Port = struct
     let rest_server =
       create ~name:"rest-port" ~default:default_rest
         "local REST-server for daemon interaction"
-
-    let discovery =
-      create ~name:"discovery-port" ~default:default_libp2p
-        "Daemon to archive process communication"
   end
 
   module Archive = struct
