@@ -11,6 +11,8 @@ module Styles = {
       transform(rotate(`deg(-90))),
       transformOrigin(`percent(50.), `percent(50.)),
     ]);
+  let progressText = 
+  merge([Theme.Text.Header.h1, style([fontSize(`rem(2.))])]);
 };
 
 [@react.component]
@@ -33,7 +35,7 @@ let make = (~keyName, ~onFinish) => {
   let circumference = radius *. 2. *. Js.Math._PI;
   let percent = float_of_int(downloaded) /. float_of_int(total);
   let offset = circumference -. percent *. circumference;
-  <div>
+  
     <svg width="120" height="120">
       <circle
         stroke="#D8D8D8"
@@ -58,14 +60,9 @@ let make = (~keyName, ~onFinish) => {
         cx="60"
         cy="60"
       />
+      <text x="50%" y="55%" textAnchor="middle" className=Styles.progressText fill="white"> 
+         {React.string(Printf.sprintf("%.0f%%", total == 0 ? 0. : float_of_int(downloaded) /. float_of_int(total) *. 100.))}
+      </text> 
     </svg>
-    {React.string(
-       Printf.sprintf(
-         "Downloaded %.1f%% of %dmb.",
-         total == 0
-           ? 0. : float_of_int(downloaded) /. float_of_int(total) *. 100.,
-         total / 1000000,
-       ),
-     )}
-  </div>;
+  ;
 };
