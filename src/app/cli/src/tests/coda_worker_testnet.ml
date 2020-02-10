@@ -445,7 +445,7 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test ?is_archive_rocksdb logger n block_production_keys
+let test ?is_archive_rocksdb ~name logger n block_production_keys
     snark_work_public_keys work_selection_method ~max_concurrent_connections =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
   let block_production_interval =
@@ -457,9 +457,9 @@ let test ?is_archive_rocksdb logger n block_production_keys
   in
   let%bind program_dir = Unix.getcwd () in
   Coda_processes.init () ;
-  let configs =
+  let%bind configs =
     Coda_processes.local_configs n ~block_production_interval ~program_dir
-      ~block_production_keys ~acceptable_delay
+      ~block_production_keys ~acceptable_delay ~chain_id:name
       ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))
       ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")

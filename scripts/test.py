@@ -87,7 +87,6 @@ required_excludes = [
 extra_required_status_checks = [
     "ci/circleci: lint",
     "ci/circleci: tracetool",
-    "ci/circleci: build-auxiliary",
     "ci/circleci: build-wallet",
 ]
 

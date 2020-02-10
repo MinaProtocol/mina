@@ -32,6 +32,10 @@ module type External_transition_common_intf = sig
   val payments : t -> User_command.t list
 
   val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
+
+  val broadcast : t -> unit
+
+  val don't_broadcast : t -> unit
 end
 
 module type External_transition_base_intf = sig
@@ -52,6 +56,8 @@ end
 
 module type S = sig
   include External_transition_base_intf
+
+  val poke_validation_callback : t -> (bool -> unit) -> unit
 
   type external_transition = t
 
@@ -259,6 +265,7 @@ module type S = sig
     -> protocol_state_proof:Proof.t
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
+    -> validation_callback:(bool -> unit)
     -> t
 
   val genesis :

@@ -136,31 +136,24 @@ let run_test () : unit Deferred.t =
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
-      let discovery_port = 8001 in
-      let communication_port = 8000 in
       let client_port = 8123 in
       let libp2p_port = 8002 in
       let gossip_net_params =
-        Gossip_net.Real.Config.
+        Gossip_net.Libp2p.Config.
           { timeout= Time.Span.of_sec 3.
           ; logger
-          ; target_peer_count= 8
           ; initial_peers= []
+          ; unsafe_no_trust_ip= true
           ; conf_dir= temp_conf_dir
           ; chain_id= "bogus chain id for testing"
           ; addrs_and_ports=
               { external_ip= Unix.Inet_addr.localhost
               ; bind_ip= Unix.Inet_addr.localhost
-              ; discovery_port
-              ; communication_port
+              ; peer= None
               ; libp2p_port
               ; client_port }
           ; trust_system
-          ; enable_libp2p= false
-          ; disable_haskell= false
-          ; libp2p_keypair= None
-          ; libp2p_peers= []
-          ; max_concurrent_connections= Some 10 }
+          ; keypair= None }
       in
       let net_config =
         Coda_networking.Config.
@@ -168,6 +161,7 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; time_controller
           ; consensus_local_state
+          ; is_seed= true
           ; genesis_ledger_hash=
               Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
           ; log_gossip_heard=
@@ -176,7 +170,7 @@ let run_test () : unit Deferred.t =
               ; new_state= false }
           ; creatable_gossip_net=
               Coda_networking.Gossip_net.(
-                Any.Creatable ((module Real), Real.create gossip_net_params))
+                Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
           }
       in
       Core.Backtrace.elide := false ;

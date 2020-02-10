@@ -117,14 +117,16 @@ RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda
       cd $EXTERNAL_PKG_DIR/$pkg && opam pin -y add . ; \
     done
 
+# Install nix
+
+RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://nixos.org/nix/install && \
+    curl -o install-nix-2.3.2.sig https://nixos.org/nix/install.sig && \
+    gpg2 --recv-keys B541D55301270E0BCF15CA5D8170B4726D7198DE && \
+    gpg2 --verify ./install-nix-2.3.2.sig && \
+    sh ./install-nix-2.3.2
+
 # repo no longer needed
 RUN sudo rm -rf /coda
-
-# Get coda-kademlia from packages repo
-RUN sudo apt-get install --yes apt-transport-https ca-certificates && \
-      echo "deb [trusted=yes] https://packages.o1test.net unstable main" | sudo tee -a /etc/apt/sources.list.d/coda.list && \
-      sudo apt-get update && \
-      sudo apt-get install --yes coda-discovery
 
 # The Ocaml images are set to London time for reason. UTC makes reading the logs
 # easier.

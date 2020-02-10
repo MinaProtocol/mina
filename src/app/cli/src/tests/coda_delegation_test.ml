@@ -16,7 +16,7 @@ let main () =
     |> fun (_, acct) -> Some (Account.public_key acct)
   in
   let%bind testnet =
-    Coda_worker_testnet.test logger num_block_producers Option.some
+    Coda_worker_testnet.test ~name logger num_block_producers Option.some
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in

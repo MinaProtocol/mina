@@ -1,7 +1,7 @@
 open Core
 
 type t =
-  [ `Corrupted_privkey of Error.t
+  [ `Corrupted_privkey of Error.t * string
   | `Incorrect_password_or_corrupted_privkey
   | `Cannot_open_file of string
   | `Parent_directory_does_not_exist of string ]
@@ -9,8 +9,8 @@ type t =
 exception Privkey_exn of t
 
 let to_string : t -> string = function
-  | `Corrupted_privkey e ->
-      sprintf !"Corrupted_privkey: %s" (Error.to_string_hum e)
+  | `Corrupted_privkey (e, which) ->
+      sprintf !"Corrupted %s: %s" which (Error.to_string_hum e)
   | `Incorrect_password_or_corrupted_privkey ->
       "Incorrect_password_or_corrupted_privkey"
   | `Cannot_open_file path ->
@@ -22,4 +22,4 @@ let to_string : t -> string = function
 
 let raise t = Error.raise (Error.of_string (to_string t))
 
-let corrupted_privkey error = Error (`Corrupted_privkey error)
+let corrupted_privkey error which = Error (`Corrupted_privkey (error, which))

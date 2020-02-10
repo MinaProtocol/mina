@@ -1,6 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Pipe_lib
+open Network_peer
 
 let%test_module "network pool test" =
   ( module struct
@@ -46,7 +47,7 @@ let%test_module "network pool test" =
           in
           don't_wait_for
             (Mock_snark_pool.apply_and_broadcast network_pool
-               (Envelope.Incoming.local command)) ;
+               (Envelope.Incoming.local command, Fn.const ())) ;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
@@ -69,17 +70,19 @@ let%test_module "network pool test" =
       let verify_unsolved_work () =
         let work_diffs =
           List.map works ~f:(fun work ->
-              Envelope.Incoming.local
-                (Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
-                   ( work
-                   , Priced_proof.
-                       { proof=
-                           One_or_two.map
-                             ~f:Ledger_proof.For_tests.mk_dummy_proof work
-                       ; fee=
-                           { fee= Currency.Fee.of_int 0
-                           ; prover= Signature_lib.Public_key.Compressed.empty
-                           } } )) )
+              ( Envelope.Incoming.local
+                  (Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
+                     ( work
+                     , Priced_proof.
+                         { proof=
+                             One_or_two.map
+                               ~f:Ledger_proof.For_tests.mk_dummy_proof work
+                         ; fee=
+                             { fee= Currency.Fee.of_int 0
+                             ; prover=
+                                 Signature_lib.Public_key.Compressed.empty } }
+                     ))
+              , Fn.const () ) )
           |> Linear_pipe.of_list
         in
         let frontier_broadcast_pipe_r, _ =

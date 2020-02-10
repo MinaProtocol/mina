@@ -11,6 +11,7 @@ open Signature_lib
 open O1trace
 open Otp_lib
 open Module_version
+open Network_peer
 module Config = Config
 module Subscriptions = Coda_subscriptions
 module Snark_worker_lib = Snark_worker
@@ -48,8 +49,10 @@ type pipes =
   ; producer_transition_writer:
       (Transition_frontier.Breadcrumb.t, synchronous, unit Deferred.t) Writer.t
   ; external_transitions_writer:
-      (External_transition.t Envelope.Incoming.t * Block_time.t) Pipe.Writer.t
-  }
+      ( External_transition.t Envelope.Incoming.t
+      * Block_time.t
+      * (bool -> unit) )
+      Pipe.Writer.t }
 
 type t =
   { config: Config.t
@@ -77,7 +80,7 @@ let peek_frontier frontier_broadcast_pipe =
             "Cannot retrieve transition frontier now. Bootstrapping right now.")
 
 let client_port t =
-  let {Kademlia.Node_addrs_and_ports.client_port; _} =
+  let {Node_addrs_and_ports.client_port; _} =
     t.config.gossip_net_params.addrs_and_ports
   in
   client_port
@@ -797,8 +800,22 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     (frontier_broadcast_pipe_r, frontier_broadcast_pipe_w)
                   ~network_transition_reader:
                     (Strict_pipe.Reader.map external_transitions_reader
-                       ~f:(fun (tn, tm) -> (`Transition tn, `Time_received tm)))
-                  ~producer_transition_reader ~most_recent_valid_block
+                       ~f:(fun (tn, tm, cb) ->
+                         (`Transition tn, `Time_received tm, `Valid_cb cb) ))
+                  ~producer_transition_reader:
+                    (Strict_pipe.Reader.map producer_transition_reader
+                       ~f:(fun breadcrumb ->
+                         let et =
+                           Transition_frontier.Breadcrumb.validated_transition
+                             breadcrumb
+                           |> External_transition.Validation.forget_validation
+                         in
+                         External_transition.poke_validation_callback et
+                           (fun v ->
+                             if v then Coda_networking.broadcast_state net et
+                         ) ;
+                         breadcrumb ))
+                  ~most_recent_valid_block
                   ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
                   ~base_proof )
           in
@@ -840,10 +857,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                             , External_transition.Validated.to_yojson
                                 transition ) ]
                         "Rebroadcasting $state_hash" ;
-                      (* remove verified status for network broadcast *)
-                      Coda_networking.broadcast_state net
-                        (External_transition.Validation.forget_validation
-                           transition)
+                      External_transition.Validated.broadcast transition
                   | Error reason ->
                       let timing_error_json =
                         match reason with
@@ -852,6 +866,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                         | `Too_late slots ->
                             `String (sprintf "%Lu slots too late" slots)
                       in
+                      External_transition.Validated.don't_broadcast transition ;
                       Logger.warn config.logger ~module_:__MODULE__
                         ~location:__LOC__
                         ~metadata:
@@ -866,7 +881,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
             (Strict_pipe.transfer
                (Coda_networking.states net)
                external_transitions_writer ~f:ident) ;
-          trace_task "ban notification loop" (fun () ->
+          (* FIXME #4093: augment ban_notifications with a Peer.ID so we can implement ban_notify
+           trace_task "ban notification loop" (fun () ->
               Linear_pipe.iter (Coda_networking.ban_notification_reader net)
                 ~f:(fun notification ->
                   let open Gossip_net in
@@ -876,7 +892,11 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   let%map _ =
                     Coda_networking.ban_notify net peer banned_until
                   in
-                  () ) ) ;
+                  () ) ) ; *)
+          don't_wait_for
+            (Linear_pipe.iter
+               (Coda_networking.ban_notification_reader net)
+               ~f:(Fn.const Deferred.unit)) ;
           let snark_pool_config =
             Network_pool.Snark_pool.Resource_pool.make_config ~verifier
               ~trust_system:config.trust_system

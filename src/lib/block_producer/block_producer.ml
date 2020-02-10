@@ -397,6 +397,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             ; data=
                                 External_transition.create ~protocol_state
                                   ~protocol_state_proof ~staged_ledger_diff
+                                  ~validation_callback:Fn.ignore
                                   ~delta_transition_chain_proof }
                           |> External_transition.skip_time_received_validation
                                `This_transition_was_not_received_via_gossip
