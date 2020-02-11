@@ -74,6 +74,7 @@ type jsSignature = {privateKey: Field.t; publicKey: Inner_curve.Scalar.t}
 
 (* output format matches signatures in client SDK *)
 let print_signature payload =
+  eprintf !"PAYLOAD: %{sexp: User_command_payload.t}\n%!" payload ;
   let User_command.Poly.{signature= field, scalar; _} =
     (User_command.sign keypair payload :> User_command.t)
   in
