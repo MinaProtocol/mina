@@ -1,0 +1,8 @@
+(executable
+  (package client_sdk)
+  (name test_signatures)
+  (public_name test_signatures)
+  (modes native)
+  (libraries core_kernel coda_base coda_numbers currency signature_lib snark_params)
+  (preprocess (pps ppx_coda))
+  (flags -short-paths -g -w @a-4-29-40-41-42-44-45-48-58-59-60))
