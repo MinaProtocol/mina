@@ -91,8 +91,8 @@ build_archive: git_hooks reformat-diff
 
 client_sdk :
 	$(info Starting Build)
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_dev
-	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures.exe
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/client_sdk.bc.js --profile=nonconsensus_medium_curves
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
 dev: codabuilder containerstart build

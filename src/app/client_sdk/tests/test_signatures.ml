@@ -9,27 +9,27 @@ open Signature_lib
 
 (* signer *)
 let keypair =
+  let private_key =
+    Private_key.of_base58_check_exn
+      "6BnSDyt3FKhJSt5oDk1HHeM5J8uKSnp7eaSYndj53y7g7oYzUEhHFrkpk6po4XfNFyjtoJK4ovVHvmCgdUqXVEfTXoAC1CNpaGLAKtu7ah9i4dTi3FtcoKpZhtiTGrRQkEN6Q95cb39Kp"
+  in
   let public_key =
     Public_key.(
       Compressed.of_base58_check_exn
-        "ZsMSUqsVQiPRHMi5LxTfVD1kNA6sizLAgixPMqgUA58jmyZZzizF916WMJ6agSRurXN"
+        "4vsRCVnc5xmYJhaVbUgkg6po6nR3Mu7KEFunP3uQL67qZmPNnJKev57TRvMfuJ15XDP8MjaLSh7THG7CpTiTkfgRcQAKGmFo1XGMStCucmWAxBUiXjycDbx7hbVCqkDYiezM8Lvr1NMdTEGU"
       |> decompress_exn)
-  in
-  let private_key =
-    Private_key.of_base58_check_exn
-      "kPKzZFyKSFQ3J6fyAMwiQWEZSjrCGHt8y2FU7bJQiBNJvn9kfqHEFsvr8py62meN"
   in
   Keypair.{public_key; private_key}
 
 (* payment receiver *)
 let receiver =
   Public_key.Compressed.of_base58_check_exn
-    "ZsMSUprkT3XHExH7NwgLdfMavFgPQDmBHPuBqUWq9Wh5dwSzLWoYGeCBih6soRmNHm2"
+    "4vsRCVHzeYYbneMkHR3u445f8zYwo6nhx3UHKZQH7B2txTV5Shz66Ds9PdxoRKCiALWtuwPQDwpm2Kj22QPcZpKCLr6rnHmUMztKpWxL9meCPQcTkKhmK5HyM4Y9dMnTKrEjD1MX71kLTUaP"
 
 (* delegatee *)
 let new_delegate =
   Public_key.Compressed.of_base58_check_exn
-    "ZsMSUuQ7X6vVZfZUyFAa6Fsxg54zV6Ha5geDaPUb4z3VKqjtZTCeRwzh9fYkq9YyMrF"
+    "4vsRCVQNkGihARy4Jg9FsJ6NFtnwDsRnTqi2gQnPAoCNUoyLveY6FEnicGMmwEumPx3GjLxAb5fAivVSLnYRPPMfb5HdkhLdjHunjgqp6g7gYi8cWy4avdmHMRomaKkWyWeWn91w7baaFnUk"
 
 let make_common ~fee ~nonce ~valid_until memo =
   let fee = Currency.Fee.of_int fee in
