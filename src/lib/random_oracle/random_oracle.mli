@@ -5,6 +5,8 @@ module State : sig
   type 'a t [@@deriving eq, sexp, compare]
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
+
+  val map2 : 'a t -> 'b t -> f:('a -> 'b -> 'c) -> 'c t
 end
 
 include

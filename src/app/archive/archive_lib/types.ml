@@ -41,13 +41,13 @@ module Public_key = struct
     object
       method blocks = None
 
-      method fee_transfers = None
+      method receiver_for_fee_transfers = None
 
       method snark_jobs = None
 
-      method userCommandsByReceiver = None
+      method receiver_for_user_commands = None
 
-      method user_commands = None
+      method sender_for_user_commands = None
 
       method value =
         Option.some
@@ -74,7 +74,7 @@ module User_command = struct
     object
       method hash = some @@ Transaction_hash.to_base58_check hash
 
-      method blocks_user_commands = None
+      method blocks = None
 
       method amount =
         some
@@ -96,11 +96,11 @@ module User_command = struct
       method nonce =
         some @@ Nonce.serialize @@ User_command_payload.nonce payload
 
-      method public_key =
+      method sender =
         some @@ Public_key.encode_as_obj_rel_insert_input
         @@ User_command.sender user_command
 
-      method publicKeyByReceiver =
+      method receiver =
         some @@ Public_key.encode_as_obj_rel_insert_input
         @@ receiver user_command
 
@@ -120,8 +120,8 @@ module User_command = struct
       Ast.On_conflict.user_commands
 
   let decode obj =
-    let receiver = (obj#publicKeyByReceiver)#value in
-    let sender = (obj#public_key)#value in
+    let receiver = (obj#receiver)#value in
+    let sender = (obj#sender)#value in
     let body =
       let open User_command_payload.Body in
       match obj#typ with
@@ -132,7 +132,8 @@ module User_command = struct
     in
     let payload =
       User_command_payload.create ~fee:obj#fee ~nonce:obj#nonce ~memo:obj#memo
-        ~body
+        ~body (* TODO: We should actually be passing obj#valid_until *)
+        ~valid_until:Coda_numbers.Global_slot.max_value
     in
     ( Coda_base.{User_command.Poly.Stable.V1.payload; sender; signature= ()}
     , obj#first_seen )
@@ -149,12 +150,10 @@ module Fee_transfer = struct
 
       method first_seen = Option.map first_seen ~f:Block_time.serialize
 
-      method public_key =
+      method receiver =
         some @@ Public_key.encode_as_obj_rel_insert_input receiver
 
-      method receiver = None
-
-      method blocks_fee_transfers = None
+      method blocks = None
     end
 
   let encode_as_obj_rel_insert_input fee_transfer_with_hash first_seen =
@@ -174,7 +173,7 @@ module Snark_job = struct
           (Some job1, Some job2)
     in
     object
-      method blocks_snark_jobs = None
+      method blocks = None
 
       method fee = some @@ Fee.serialize fee
 
@@ -182,10 +181,7 @@ module Snark_job = struct
 
       method job2 = job2
 
-      method prover = None
-
-      method public_key =
-        some @@ Public_key.encode_as_obj_rel_insert_input prover
+      method prover = some @@ Public_key.encode_as_obj_rel_insert_input prover
     end
 
   let encode_as_obj_rel_insert_input transaction_snark_work =
@@ -199,13 +195,11 @@ module Receipt_chain_hash = struct
 
   let to_obj value parent =
     object
-      method blocks_user_commands = None
-
       method hash = value
 
-      method receipt_chain_hash = None
+      method parent = parent
 
-      method receipt_chain_hashes = parent
+      method block = None
     end
 
   let encode t =
@@ -217,7 +211,7 @@ module Receipt_chain_hash = struct
     let encoded_receipt_chain =
       to_obj value
         ( some
-        @@ encode_as_arr_rel_insert_input [parent]
+        @@ encode_as_obj_rel_insert_input parent
              Ast.On_conflict.receipt_chain_hash )
     in
     encode_as_obj_rel_insert_input encoded_receipt_chain
@@ -251,13 +245,9 @@ module Blocks_fee_transfers = struct
     object
       method block = None
 
-      method block_id = None
-
       method fee_transfer =
         Some
           (Fee_transfer.encode_as_obj_rel_insert_input fee_transfer first_seen)
-
-      method fee_transfer_id = None
     end
 
   let encode_as_arr_rel_insert_input fee_transfers =
@@ -273,12 +263,8 @@ module Blocks_snark_job = struct
       object
         method block = None
 
-        method block_id = None
-
         method snark_job =
           Option.some @@ Snark_job.encode_as_obj_rel_insert_input snark_job
-
-        method snark_job_id = None
       end
     in
     obj
@@ -323,8 +309,8 @@ module Blocks = struct
     let consensus_state =
       External_transition.consensus_state external_transition
     in
-    let global_slot =
-      Consensus.Data.Consensus_state.global_slot consensus_state
+    let consensus_time =
+      Consensus.Data.Consensus_state.consensus_time consensus_state
     in
     let staged_ledger_diff =
       External_transition.staged_ledger_diff external_transition
@@ -336,14 +322,14 @@ module Blocks = struct
     in
     let open Option in
     object
-      method stateHashByStateHash =
+      method state_hash =
         some @@ State_hashes.encode_as_obj_rel_insert_input hash
 
-      method public_key =
+      method creator =
         some @@ Public_key.encode_as_obj_rel_insert_input
-        @@ External_transition.proposer external_transition
+        @@ External_transition.block_producer external_transition
 
-      method stateHashByParentHash =
+      method parent_hash =
         some @@ State_hashes.encode_as_obj_rel_insert_input
         @@ External_transition.parent_hash external_transition
 
@@ -355,7 +341,9 @@ module Blocks = struct
         some @@ Ledger_hash.to_string @@ Staged_ledger_hash.ledger_hash
         @@ Blockchain_state.staged_ledger_hash blockchain_state
 
-      method global_slot = some @@ Unsigned.UInt32.to_int global_slot
+      method global_slot =
+        some @@ Unsigned.UInt32.to_int
+        @@ Consensus.Data.Consensus_time.to_uint32 consensus_time
 
       (* TODO: Need to implement *)
       method ledger_proof_nonce = some 0
@@ -372,14 +360,14 @@ module Blocks = struct
         some @@ Block_time.serialize
         @@ External_transition.timestamp external_transition
 
-      method blocks_fee_transfers =
+      method fee_transfers =
         some
         @@ Blocks_fee_transfers.encode_as_arr_rel_insert_input fee_transfers
 
-      method blocks_snark_jobs =
+      method snark_jobs =
         some @@ Blocks_snark_job.encode_as_arr_rel_insert_input snark_jobs
 
-      method blocks_user_commands =
+      method user_commands =
         some
         @@ Blocks_user_commands.encode_as_arr_rel_insert_input user_commands
     end

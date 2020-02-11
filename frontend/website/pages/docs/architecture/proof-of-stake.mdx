@@ -1,0 +1,31 @@
+import Page from '@reason/pages/Docs';
+export default Page({title: "Proof of Stake"});
+
+Proof of Stake
+==============
+
+The proof of stake consensus mechanism implemented in Coda is a version of the [Ouroboros Praos](https://iohk.io/research/papers/#XJ6MHFXX) protocol, extended and modified slightly for our succinct blockchain. This document will provide an high level overview of how Ouroboros proof of stake works with detailed sections on our changes and additions. For a full description of the Ouroboros protocol, please refer to the original Ouroboros papers: [the original](https://eprint.iacr.org/2016/889.pdf) and [Praos](https://eprint.iacr.org/2017/573.pdf).
+
+### A note on Praos, Genesis, and Coda
+
+Formally, our implementation of Ouroboros is an extension of Praos. There is, however, a newer paper which extends Praos, called Ouroboros Genesis. This extension fixes a vulnerability involving long fork attacks, but this cannot be implemented in a succinct blockchain protocol as described in that paper. Instead, we introduce a new, succinct method for protecting against long fork attacks, which is detailed [in another section of this document](#long-fork-attack-prevention).
+
+## Additions to Praos
+
+### Epoch Ledger Optimization
+
+In Ouroboros, nodes need to materialize/keep a ledger at the beginning of the previous epoch in order to VRF evaluations. This is because just having a VRF output is not enough to know that a block was proposed honestly. In order to know that a block was won by the node that proposed it, the VRF output must be such that it is underneath a threshold determined by the proposer's stake, proportional to the total currency in the ledger. In a succinct protocol, such as Coda, materializing/keeping such a ledger in the past is not an easy task. Unlike a non succinct blockchain, nodes cannot arbitrarily request pieces of the chain in the past in order to reconstruct the information they are interested in. This means if we were to implement this feature in a naive manner, we would need to keep in total 3 copies of the entire ledger at any point in time, as well as wait online for at least 2 whole epochs before we could access that information. With some thought, though, we can do much better.
+
+There is a big difference between how Ouroboros proves block winners and how Coda proves them. In Ouroboros, every node needs to validate that a block proposer actually won a block when they receive it, meaning they must look up the balance for the public key that evaluated the VRF themselves. In Coda, however, the correctness of the VRF evaluation can be calculated in the SNARK, so other nodes only need to verify the SNARK to know that the block was proposed by a winner. Since a proposer proves this itself, it can limit the information it needs to store about epoch ledgers to only the account record and the merkle path for any account it can propose for (itself and all of its delegated accounts). Furthermore, since Ouroboros guarantees us that the point of finality will be reached before two epochs, the proposer can wait to capture this information after finalization, futher limiting the information it needs to store. This information is then fed into the SNARK, which proves that: 1) the VRF evaluation is accurate for the provided public key, and 2) the account for the public key exists in the epoch ledger with a balance that creates a VRF threshold greater than the VRF output (using the merkle path to prove the epoch ledger's merkle root from the account). This does not immediately address the issue of a proposer node needing to be online long enough in order to store this necessary information, but it does open up other avenues of the proposer acquiring that information. Mainly, the proposer could request an account record and merkle path proving it's existence at a given epoch ledger. In the current implementation, no nodes store this information and make it available for access, but one could imagine in the future a service being built that would allow proposers to get online and active quicker by providing this information, possibly for some sort of fee.
+
+### Long Fork Attack Prevention
+
+**TODO**
+
+## Configuration Constant Modifications
+
+**TODO**
+
+## Implementation Details
+
+**TODO**

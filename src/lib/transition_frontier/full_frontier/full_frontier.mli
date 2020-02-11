@@ -34,7 +34,10 @@ val hash : t -> Frontier_hash.t
 val calculate_diffs : t -> Breadcrumb.t -> Diff.Full.E.t list
 
 val apply_diffs :
-  t -> Diff.Full.E.t list -> [`New_root of Root_identifier.t option]
+     t
+  -> Diff.Full.E.t list
+  -> ignore_consensus_local_state:bool
+  -> [`New_root of Root_identifier.t option]
 
 module For_tests : sig
   val equal : t -> t -> bool

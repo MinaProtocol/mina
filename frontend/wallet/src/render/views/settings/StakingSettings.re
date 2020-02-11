@@ -8,7 +8,7 @@ module Styles = {
       Theme.Text.Body.semiBold,
       style([color(Theme.Colors.midnight), marginBottom(`rem(0.5))]),
     ]);
-    
+
   let fields = style([maxWidth(`rem(40.))]);
 };
 
@@ -124,7 +124,7 @@ let make = (~publicKey, ~stakingActive=false) => {
       | Error(err) =>
         <Alert
           kind=`Danger
-          message={
+          defaultMessage={
             err##message;
           }
         />
@@ -136,7 +136,8 @@ let make = (~publicKey, ~stakingActive=false) => {
                 {switch (result) {
                  | NotCalled
                  | Loading => React.null
-                 | Error(err) => <Alert kind=`Danger message=err##message />
+                 | Error(err) =>
+                   <Alert kind=`Danger defaultMessage=err##message />
                  | Data(_) =>
                    goBack();
                    React.null;
@@ -160,8 +161,7 @@ let make = (~publicKey, ~stakingActive=false) => {
                        <div className=Styles.label>
                          {React.string("Transaction fee")}
                        </div>
-                       <div
-                         className=Styles.fields>
+                       <div className=Styles.fields>
                          <ToggleButton
                            options=[|"Standard: 5 Coda", "Custom Amount"|]
                            selected=feeSelectedValue

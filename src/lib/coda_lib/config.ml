@@ -18,11 +18,12 @@ type t =
   ; pids: Child_processes.Termination.t
   ; trust_system: Trust_system.t
   ; monitor: Monitor.t option
-  ; initial_propose_keypairs: Keypair.Set.t
+  ; initial_block_production_keypairs: Keypair.Set.t
+  ; coinbase_receiver: [`Producer | `Other of Public_key.Compressed.t]
   ; work_selection_method: (module Work_selector.Selection_method_intf)
   ; snark_worker_config: Snark_worker_config.t
   ; work_reassignment_wait: int
-  ; gossip_net_params: Gossip_net.Real.Config.t
+  ; gossip_net_params: Gossip_net.Libp2p.Config.t
   ; net_config: Coda_networking.Config.t
   ; snark_pool_disk_location: string
   ; wallets_disk_location: string
@@ -35,5 +36,9 @@ type t =
   ; external_transition_database: External_transition_database.t
   ; snark_work_fee: Currency.Fee.t
   ; consensus_local_state: Consensus.Data.Local_state.t
-  ; is_archive_node: bool [@default false] }
+  ; is_archive_rocksdb: bool [@default false]
+  ; archive_process_location:
+      Core.Host_and_port.t Cli_lib.Flag.Types.with_name option
+        [@default None]
+  ; genesis_state_hash: State_hash.t }
 [@@deriving make]

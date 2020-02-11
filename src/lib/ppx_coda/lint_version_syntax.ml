@@ -95,7 +95,7 @@ let is_version_module vn =
 let is_versioned_module_inc_decl inc_decl =
   match inc_decl.pincl_mod.pmod_desc with
   | Pmod_ident {txt= Ldot (Lident "Stable", name); _}
-    when String.equal name "Latest" || is_version_module name ->
+    when is_version_module name ->
       true
   | _ ->
       false
@@ -143,12 +143,26 @@ let is_versioned_type_lident =
     | _ ->
         false
   in
+  let is_stable_prefix = is_longident_with_id "Stable" in
+  let is_jane_street_prefix prefix =
+    match Longident.flatten_exn prefix with
+    (* N.B.: Uuid is in core_kernel library, but not in Core_kernel module *)
+    | core :: _
+      when List.mem ["Core_kernel"; "Core"; "Uuid"] core ~equal:String.equal ->
+        true
+    | _ ->
+        false
+  in
   function
   | Ldot (Ldot (prefix, vn), "t")
-    when is_version_module vn && is_longident_with_id "Stable" prefix ->
+    when is_version_module vn
+         && (not @@ is_jane_street_prefix prefix)
+         && is_stable_prefix prefix ->
       true
   | Ldot (Ldot (Ldot (prefix, vn), "T"), "t")
-    when is_version_module vn && is_longident_with_id "Stable" prefix ->
+    when is_version_module vn
+         && (not @@ is_jane_street_prefix prefix)
+         && is_stable_prefix prefix ->
       (* this case goes away when all versioned types use %%versioned *)
       true
   | _ ->
@@ -210,6 +224,30 @@ and get_core_type_versioned_type_misuses core_type =
   | Ptyp_var _ ->
       []
 
+let types_of_constructor_args args =
+  match args with
+  | Pcstr_tuple tys ->
+      tys
+  | Pcstr_record label_decls ->
+      List.map label_decls ~f:(fun decl -> decl.pld_type)
+
+let types_of_type_kind kind =
+  match kind with
+  | Ptype_abstract ->
+      []
+  | Ptype_variant cstr_decls ->
+      List.concat_map cstr_decls ~f:(fun decl ->
+          let args_types = types_of_constructor_args decl.pcd_args in
+          match decl.pcd_res with
+          | None ->
+              args_types
+          | Some ty ->
+              ty :: args_types )
+  | Ptype_record label_decls ->
+      List.map label_decls ~f:(fun decl -> decl.pld_type)
+  | Ptype_open ->
+      []
+
 let get_versioned_type_misuses type_decl =
   let params_types =
     List.map type_decl.ptype_params ~f:(fun (ty, _variance) -> ty)
@@ -217,9 +255,10 @@ let get_versioned_type_misuses type_decl =
   let cstr_types =
     List.concat_map type_decl.ptype_cstrs ~f:(fun (ty1, ty2, _loc) -> [ty1; ty2])
   in
+  let kind_types = types_of_type_kind type_decl.ptype_kind in
   let manifest_types = Option.to_list type_decl.ptype_manifest in
   List.concat_map
-    (params_types @ cstr_types @ manifest_types)
+    (params_types @ cstr_types @ kind_types @ manifest_types)
     ~f:get_core_type_versioned_type_misuses
 
 let include_versioned_module_error loc =

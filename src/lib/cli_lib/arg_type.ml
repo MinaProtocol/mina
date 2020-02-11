@@ -1,11 +1,14 @@
 open Core
 open Signature_lib
 
-let int16 =
+let validate_int16 x =
   let max_port = 1 lsl 16 in
-  Command.Arg_type.map Command.Param.int ~f:(fun x ->
-      if 0 <= x && x < max_port then x
-      else failwithf "Port not between 0 and %d" max_port () )
+  if 0 <= x && x < max_port then Ok x
+  else Or_error.errorf !"Port not between 0 and %d" max_port
+
+let int16 =
+  Command.Arg_type.map Command.Param.int
+    ~f:(Fn.compose Or_error.ok_exn validate_int16)
 
 module Key_arg_type (Key : sig
   type t
@@ -57,6 +60,9 @@ let receipt_chain_hash =
 let peer : Host_and_port.t Command.Arg_type.t =
   Command.Arg_type.create (fun s -> Host_and_port.of_string s)
 
+let global_slot =
+  Command.Arg_type.map Command.Param.int ~f:Coda_numbers.Global_slot.of_int
+
 let txn_fee =
   Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_string
 
@@ -69,6 +75,21 @@ let txn_nonce =
 
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
+
+let log_level =
+  Command.Arg_type.map Command.Param.string ~f:(fun log_level_str_with_case ->
+      let open Logger in
+      let log_level_str = String.lowercase log_level_str_with_case in
+      match Level.of_string log_level_str with
+      | Error _ ->
+          eprintf "Received unknown log-level %s. Expected one of: %s\n"
+            log_level_str
+            ( Level.all |> List.map ~f:Level.show
+            |> List.map ~f:String.lowercase
+            |> String.concat ~sep:", " ) ;
+          exit 14
+      | Ok ll ->
+          ll )
 
 let user_command =
   Command.Arg_type.create (fun s ->

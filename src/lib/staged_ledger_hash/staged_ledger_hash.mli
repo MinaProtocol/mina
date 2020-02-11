@@ -16,11 +16,9 @@ val typ : (var, t) Typ.t
 
 val var_to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
-val length_in_triples : int
-
 val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
-val genesis : t Lazy.t
+val genesis : genesis_ledger_hash:Ledger_hash.t -> t
 
 module Stable : sig
   module V1 : sig

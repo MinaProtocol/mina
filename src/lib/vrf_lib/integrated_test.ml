@@ -42,7 +42,8 @@ module Message = struct
     Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
       ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-  let fold {state_hash} = Coda_base.State_hash.fold state_hash
+  let fold {state_hash} =
+    Fold_lib.Fold.group3 ~default:false (Coda_base.State_hash.fold state_hash)
 
   let gen =
     let open Quickcheck.Let_syntax in
@@ -59,7 +60,9 @@ module Message = struct
 
   module Checked = struct
     let var_to_triples {state_hash} =
-      Coda_base.State_hash.var_to_triples state_hash
+      let open Snark_params.Tick in
+      let%map bits = Coda_base.State_hash.var_to_bits state_hash in
+      Bitstring_lib.Bitstring.pad_to_triple_list ~default:Boolean.false_ bits
 
     let hash_to_group msg =
       let open Snark_params.Tick in

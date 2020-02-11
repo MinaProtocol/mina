@@ -1,3 +1,4 @@
+open ReactIntl;
 open Tc;
 
 module Styles = {
@@ -38,6 +39,7 @@ module Styles = {
       style([
         margin2(~v=`rem(0.5), ~h=`zero),
         color(Theme.Colors.midnight),
+        textTransform(`capitalize),
       ]),
     ]);
 
@@ -106,7 +108,8 @@ module Version = {
 
     <div className=Styles.versionText>
       <span className=Css.(style([color(Theme.Colors.slateAlpha(0.3))]))>
-        {React.string("Version:")}
+        <FormattedMessage id="version" defaultMessage="Version" />
+        {React.string(":")}
       </span>
       <Spacer width=0.5 />
       <span className=Css.(style([color(Theme.Colors.slateAlpha(0.7))]))>
@@ -193,15 +196,14 @@ module AccountsQuery = ReasonApollo.CreateQuery(AccountsQueryString);
 let make = () => {
   <div className=Styles.container>
     <div className=Styles.headerContainer>
-      <div className=Theme.Text.Header.h3>
-        {React.string("Node Settings")}
+      <div className=Styles.label>
+        <FormattedMessage
+          id="account-settings"
+          defaultMessage="Account Settings"
+        />
       </div>
       <Version />
     </div>
-    <Spacer height=1. />
-    <NetworkDropdown />
-    <Spacer height=1. />
-    <div className=Styles.label> {React.string("Account Settings")} </div>
     <Spacer height=0.5 />
     <div className=Styles.accountSettings>
       <AccountsQuery>

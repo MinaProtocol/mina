@@ -1,15 +1,12 @@
 open Async_kernel
 open Core
 open Coda_base
-open Coda_state
 open Frontier_base
 module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db)
 
-let genesis_root_identifier =
-  lazy
-    (let open Root_identifier.Stable.Latest in
-    { state_hash= With_hash.hash (Lazy.force Genesis_protocol_state.t)
-    ; frontier_hash= Frontier_hash.empty })
+let genesis_root_identifier ~genesis_state_hash =
+  let open Root_identifier.Stable.Latest in
+  {state_hash= genesis_state_hash; frontier_hash= Frontier_hash.empty}
 
 let with_file ?size filename access_level ~f =
   let open Unix in
@@ -78,8 +75,7 @@ module Instance = struct
   let set_root_identifier t new_root_identifier =
     Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
-        [ ( "root_identifier"
-          , Root_identifier.Stable.Latest.to_yojson new_root_identifier ) ]
+        [("root_identifier", Root_identifier.to_yojson new_root_identifier)]
       "Setting persistent root identifier" ;
     let size = Root_identifier.Stable.Latest.bin_size_t new_root_identifier in
     with_file (Locations.root_identifier t.factory.directory) `Write ~size
@@ -101,16 +97,14 @@ module Instance = struct
             in
             Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
-                [ ( "root_identifier"
-                  , Root_identifier.Stable.Latest.to_yojson root_identifier )
-                ]
+                [("root_identifier", Root_identifier.to_yojson root_identifier)]
               "Loaded persistent root identifier" ;
             Some root_identifier )
 
-  let set_root_state_hash t state_hash =
+  let set_root_state_hash t state_hash ~genesis_state_hash =
     let root_identifier =
       load_root_identifier t
-      |> Option.value ~default:(Lazy.force genesis_root_identifier)
+      |> Option.value ~default:(genesis_root_identifier ~genesis_state_hash)
     in
     set_root_identifier t {root_identifier with state_hash}
 end
@@ -130,14 +124,14 @@ let with_instance_exn t ~f =
   let x = f instance in
   Instance.destroy instance ; x
 
-let reset_to_genesis_exn t =
+let reset_to_genesis_exn t ~genesis_ledger ~genesis_state_hash =
   let open Deferred.Let_syntax in
   assert (t.instance = None) ;
   let%map () = File_system.remove_dir t.directory in
   with_instance_exn t ~f:(fun instance ->
       ignore
         (Ledger_transfer.transfer_accounts
-           ~src:(Lazy.force Genesis_ledger.t)
+           ~src:(Lazy.force genesis_ledger)
            ~dest:(Instance.snarked_ledger instance)) ;
       Instance.set_root_identifier instance
-        (Lazy.force genesis_root_identifier) )
+        (genesis_root_identifier ~genesis_state_hash) )

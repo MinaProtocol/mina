@@ -39,15 +39,14 @@ module Digest = struct
                       s
                   end)
 
-        let fold = Fold_lib.Fold.string_triples
+        let to_input t =
+          Random_oracle.Input.bitstring Fold_lib.Fold.(to_list (string_bits t))
 
         let typ =
           let open Snark_params.Tick in
           Typ.array ~length:Blake2.digest_size_in_bits Boolean.typ
           |> Typ.transport ~there:Blake2.string_to_bits
                ~back:Blake2.bits_to_string
-
-        let length_in_triples = (Blake2.digest_size_in_bits + 2) / 3
       end
 
       include T
@@ -74,12 +73,11 @@ module Digest = struct
 
     type t = Boolean.var array
 
-    let to_triples x =
-      Fold_lib.Fold.(to_list (group3 ~default:Boolean.false_ (of_array x)))
+    let to_input t = Random_oracle.Input.bitstring (Array.to_list t)
   end
 
   [%%define_locally
-  Stable.Latest.(fold, typ, length_in_triples)]
+  Stable.Latest.(to_input, typ)]
 
   let default = String.init length_in_bytes ~f:(fun _ -> '\000')
 end

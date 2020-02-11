@@ -4,6 +4,7 @@ open Coda_base
 open Coda_state
 open Pipe_lib.Strict_pipe
 open Coda_transition
+open Network_peer
 
 type t =
   { logger: Logger.t
@@ -25,9 +26,9 @@ let worth_getting_root t candidate =
         |> External_transition.Initial_validated.consensus_state )
       ~candidate
 
-let received_bad_proof t sender_host e =
+let received_bad_proof t host e =
   Trust_system.(
-    record t.trust_system t.logger sender_host
+    record t.trust_system t.logger host
       Actions.
         ( Violated_protocol
         , Some
@@ -45,7 +46,7 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip
     peer_root =
   let%bind () =
     Trust_system.(
-      record t.trust_system t.logger sender
+      record t.trust_system t.logger (fst sender)
         Actions.
           ( Fulfilled_request
           , Some ("Received verified peer root and best tip", []) ))
@@ -79,7 +80,7 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip
   | `Repeat ->
       `Ignored
 
-let on_transition t ~sender ~root_sync_ledger
+let on_transition t ~sender:(host, peer_id) ~root_sync_ledger
     (candidate_transition : External_transition.t) =
   let candidate_state =
     External_transition.consensus_state candidate_transition
@@ -88,7 +89,7 @@ let on_transition t ~sender ~root_sync_ledger
     Deferred.return `Ignored
   else
     match%bind
-      Coda_networking.get_ancestry t.network sender candidate_state
+      Coda_networking.get_ancestry t.network peer_id candidate_state
     with
     | Error e ->
         Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
@@ -99,15 +100,15 @@ let on_transition t ~sender ~root_sync_ledger
     | Ok peer_root_with_proof -> (
         match%bind
           Sync_handler.Root.verify ~logger:t.logger ~verifier:t.verifier
-            candidate_state peer_root_with_proof
+            candidate_state peer_root_with_proof.data
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
             else
-              start_sync_job_with_peer ~sender ~root_sync_ledger t best_tip
-                root
+              start_sync_job_with_peer ~sender:(host, peer_id)
+                ~root_sync_ledger t best_tip root
         | Error e ->
-            return (received_bad_proof t sender e |> Fn.const `Ignored) )
+            return (received_bad_proof t host e |> Fn.const `Ignored) )
 
 let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
@@ -119,15 +120,7 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
         Envelope.Incoming.data incoming_transition
       in
       let previous_state_hash = External_transition.parent_hash transition in
-      let sender =
-        match Envelope.Incoming.sender incoming_transition with
-        | Envelope.Sender.Local ->
-            failwith
-              "Unexpected, we should be syncing only to remote nodes in sync \
-               ledger"
-        | Envelope.Sender.Remote inet_addr ->
-            inet_addr
-      in
+      let sender = Envelope.Incoming.remote_sender_exn incoming_transition in
       Transition_cache.add transition_graph ~parent:previous_state_hash
         incoming_transition ;
       (* TODO: Efficiently limiting the number of green threads in #1337 *)
@@ -143,89 +136,12 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
         Deferred.ignore @@ on_transition t ~sender ~root_sync_ledger transition )
       else Deferred.unit )
 
-let download_best_tip ~root_sync_ledger ~transition_graph t
-    ({With_hash.data= initial_root_transition; _}, _) =
-  let num_peers = 8 in
-  let peers = Coda_networking.random_peers t.network num_peers in
-  Logger.info t.logger
-    "Requesting peers for their best tip to eagerly start bootstrap"
-    ~module_:__MODULE__ ~location:__LOC__ ;
-  Logger.info t.logger
-    !"Number of peers that we are sampling: %i"
-    (List.length peers) ~module_:__MODULE__ ~location:__LOC__ ;
-  Deferred.List.iter peers ~f:(fun peer ->
-      let initial_consensus_state =
-        External_transition.consensus_state initial_root_transition
-      in
-      match%bind
-        Coda_networking.get_bootstrappable_best_tip t.network peer
-          initial_consensus_state
-      with
-      | Error e ->
-          Logger.debug t.logger
-            !"Could not get bootstrappable best tip from peer: %{sexp:Error.t}"
-            ~metadata:[("peer", Network_peer.Peer.to_yojson peer)]
-            e ~location:__LOC__ ~module_:__MODULE__ ;
-          Deferred.unit
-      | Ok peer_best_tip -> (
-          match%bind
-            Sync_handler.Bootstrappable_best_tip.verify ~logger:t.logger
-              ~verifier:t.verifier initial_consensus_state peer_best_tip
-          with
-          | Ok
-              ( `Root root_with_validation
-              , `Best_tip ((best_tip_with_hash, _) as best_tip_with_validation)
-              ) ->
-              let best_tip = With_hash.data best_tip_with_hash in
-              let logger =
-                Logger.extend t.logger
-                  [ ("peer", Network_peer.Peer.to_yojson peer)
-                  ; ("best tip", External_transition.to_yojson @@ best_tip)
-                  ; ( "hash"
-                    , State_hash.to_yojson @@ With_hash.hash best_tip_with_hash
-                    ) ]
-              in
-              Transition_cache.add transition_graph
-                ~parent:(External_transition.parent_hash best_tip)
-                {data= best_tip_with_validation; sender= Remote peer.host} ;
-              if
-                should_sync ~root_sync_ledger t
-                @@ External_transition.consensus_state best_tip
-              then (
-                Logger.debug logger
-                  "Syncing with peer's bootstrappable best tip"
-                  ~module_:__MODULE__ ~location:__LOC__ ;
-                (* TODO: Efficiently limiting the number of green threads in #1337 *)
-                Deferred.ignore
-                  (start_sync_job_with_peer ~sender:peer.host ~root_sync_ledger
-                     t best_tip_with_validation root_with_validation) )
-              else (
-                Logger.debug logger
-                  !"Will not sync with peer's bootstrappable best tip "
-                  ~location:__LOC__ ~module_:__MODULE__ ;
-                Deferred.unit )
-          | Error e ->
-              let error_msg =
-                sprintf
-                  !"Peer %{sexp:Network_peer.Peer.t} sent us bad proof for \
-                    their best tip"
-                  peer
-              in
-              Logger.warn t.logger !"%s" error_msg ~module_:__MODULE__
-                ~location:__LOC__
-                ~metadata:[("error", `String (Error.to_string_hum e))] ;
-              ignore
-                Trust_system.(
-                  record t.trust_system t.logger peer.host
-                    Actions.(Violated_protocol, Some (error_msg, []))) ;
-              Deferred.unit ) )
-
 (* We conditionally ask other peers for their best tip. This is for testing
    eager bootstrapping and the regular functionalities of bootstrapping in
    isolation *)
 let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
-    ~transition_reader ~should_ask_best_tip ~persistent_root
-    ~persistent_frontier ~initial_root_transition =
+    ~transition_reader ~persistent_root ~persistent_frontier
+    ~initial_root_transition ~genesis_state_hash ~genesis_ledger =
   let rec loop () =
     let sync_ledger_reader, sync_ledger_writer =
       create ~name:"sync ledger pipe"
@@ -255,16 +171,10 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       Transition_frontier.Persistent_root.Instance.snarked_ledger
         temp_persistent_root_instance
     in
-    let%bind hash, sender, expected_staged_ledger_hash =
+    let%bind hash, (sender_host, sender_peer_id), expected_staged_ledger_hash =
       let root_sync_ledger =
         Sync_ledger.Db.create temp_snarked_ledger ~logger:t.logger
           ~trust_system
-      in
-      let%bind () =
-        if should_ask_best_tip then
-          download_best_tip ~root_sync_ledger ~transition_graph t
-            initial_root_transition
-        else Deferred.unit
       in
       don't_wait_for
         (sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader) ;
@@ -279,7 +189,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       let open Deferred.Or_error.Let_syntax in
       let%bind scan_state, expected_merkle_root, pending_coinbases =
         Coda_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
-          t.network sender hash
+          t.network sender_peer_id hash
       in
       let received_staged_ledger_hash =
         Staged_ledger_hash.of_aux_ledger_and_coinbase_hash
@@ -314,10 +224,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             ~logger ~verifier ~scan_state ~snarked_ledger:temp_mask
             ~expected_merkle_root ~pending_coinbases
         in
-        ignore
-          (Ledger.Maskable.unregister_mask_exn
-             (Ledger.Mask.Attached.get_parent temp_mask)
-             temp_mask) ;
+        ignore (Ledger.Maskable.unregister_mask_exn temp_mask) ;
         result
       in
       (scan_state, pending_coinbases, new_root)
@@ -328,9 +235,9 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     | Error e ->
         let%bind () =
           Trust_system.(
-            record t.trust_system t.logger sender
+            record t.trust_system t.logger sender_host
               Actions.
-                ( Violated_protocol
+                ( Outgoing_connection_error
                 , Some
                     ( "Can't find scan state from the peer or received faulty \
                        scan state from the peer."
@@ -350,13 +257,14 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     | Ok (scan_state, pending_coinbase, new_root) -> (
         let%bind () =
           Trust_system.(
-            record t.trust_system t.logger sender
+            record t.trust_system t.logger sender_host
               Actions.
                 ( Fulfilled_request
                 , Some ("Received valid scan state from peer", []) ))
         in
         let consensus_state =
-          new_root |> External_transition.Validated.consensus_state
+          t.best_seen_transition
+          |> External_transition.Initial_validated.consensus_state
         in
         (* Synchronize consensus local state if necessary *)
         match%bind
@@ -381,15 +289,17 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               Consensus.Hooks.sync_local_state
                 ~local_state:consensus_local_state ~logger ~trust_system
                 ~random_peers:(fun n ->
-                  List.append
-                    (Coda_networking.peers_by_ip t.network sender)
-                    (Coda_networking.random_peers t.network n) )
+                  (* This port is completely made up but we only use the peer_id when doing a query, so it shouldn't matter. *)
+                  let%map peers = Coda_networking.random_peers t.network n in
+                  Network_peer.Peer.create sender_host ~libp2p_port:0
+                    ~peer_id:sender_peer_id
+                  :: peers )
                 ~query_peer:
                   { Consensus.Hooks.Rpcs.query=
                       (fun peer rpc query ->
                         Coda_networking.(
-                          query_peer t.network peer (Rpcs.Consensus_rpc rpc)
-                            query) ) }
+                          query_peer t.network peer.peer_id
+                            (Rpcs.Consensus_rpc rpc) query) ) }
                 sync_jobs
         with
         | Error e ->
@@ -411,7 +321,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             (* TODO: lazy load db in persistent root to avoid unecessary opens like this *)
             Transition_frontier.Persistent_root.(
               with_instance_exn persistent_root ~f:(fun instance ->
-                  Instance.set_root_state_hash instance
+                  Instance.set_root_state_hash instance ~genesis_state_hash
                     (External_transition.Validated.state_hash new_root) )) ;
             let%map new_frontier =
               let fail msg =
@@ -421,7 +331,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               in
               Transition_frontier.load ~retry_with_fresh_db:false ~logger
                 ~verifier ~consensus_local_state ~persistent_root
-                ~persistent_frontier ()
+                ~persistent_frontier ~genesis_state_hash ~genesis_ledger ()
               >>| function
               | Ok frontier ->
                   frontier
@@ -493,7 +403,7 @@ let%test_module "Bootstrap_controller tests" =
 
     let pids = Child_processes.Termination.create_pid_table ()
 
-    let downcast_transition transition =
+    let downcast_transition ~sender transition =
       let transition =
         transition
         |> External_transition.Validation
@@ -501,10 +411,12 @@ let%test_module "Bootstrap_controller tests" =
         |> External_transition.Validation.reset_staged_ledger_diff_validation
       in
       Envelope.Incoming.wrap ~data:transition
-        ~sender:(Envelope.Sender.Remote Network_peer.Peer.local.host)
+        ~sender:
+          (Envelope.Sender.Remote
+             (sender.Network_peer.Peer.host, sender.peer_id))
 
-    let downcast_breadcrumb breadcrumb =
-      downcast_transition
+    let downcast_breadcrumb ~sender breadcrumb =
+      downcast_transition ~sender
         (Transition_frontier.Breadcrumb.validated_transition breadcrumb)
 
     let make_non_running_bootstrap ~genesis_root ~network =
@@ -537,7 +449,9 @@ let%test_module "Bootstrap_controller tests" =
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq
-            ~accounts_with_secret_keys:Genesis_ledger.accounts branch_size
+            ~accounts_with_secret_keys:
+              (Lazy.force Test_genesis_ledger.accounts)
+            branch_size
         in
         let [me; _] = fake_network.peer_networks in
         let branch =
@@ -571,7 +485,7 @@ let%test_module "Bootstrap_controller tests" =
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->
                     Strict_pipe.Writer.write sync_ledger_writer
-                      (downcast_breadcrumb breadcrumb) )
+                      (downcast_breadcrumb ~sender:me.peer breadcrumb) )
               in
               Strict_pipe.Writer.close sync_ledger_writer ;
               sync_deferred ) ;
@@ -662,7 +576,7 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "reconstruct staged_ledgers using of_scan_state_and_snarked_ledger" =
       let pids = Child_processes.Termination.create_pid_table () in
       let num_breadcrumbs = 10 in
-      let accounts = Genesis_ledger.accounts in
+      let accounts = Test_genesis_ledger.accounts in
       heartbeat_flag := true ;
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
@@ -716,8 +630,8 @@ let%test_module "Bootstrap_controller tests" =
           let%bind syncing_frontier, peer, network =
             Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
               ~num_breadcrumbs
-              ~source_accounts:[List.hd_exn Genesis_ledger.accounts]
-              ~target_accounts:Genesis_ledger.accounts
+              ~source_accounts:[List.hd_exn Test_genesis_ledger.accounts]
+              ~target_accounts:Test_genesis_ledger.accounts
           in
           let transition_reader, _ = make_transition_pipe () in
           let ledger_db =
@@ -747,11 +661,11 @@ let%test_module "Bootstrap_controller tests" =
       let pids = Child_processes.Termination.create_pid_table () in
       let unsynced_peer_num_breadcrumbs = 6 in
       let unsynced_peers_accounts =
-        List.take Genesis_ledger.accounts
-          (List.length Genesis_ledger.accounts / 2)
+        List.take Test_genesis_ledger.accounts
+          (List.length Test_genesis_ledger.accounts / 2)
       in
       let synced_peer_num_breadcrumbs = unsynced_peer_num_breadcrumbs * 2 in
-      let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
+      let source_accounts = [List.hd_exn Test_genesis_ledger.accounts] in
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
           let%bind {me; peers; network} =
@@ -759,7 +673,7 @@ let%test_module "Bootstrap_controller tests" =
               [ { num_breadcrumbs= unsynced_peer_num_breadcrumbs
                 ; accounts= unsynced_peers_accounts }
               ; { num_breadcrumbs= synced_peer_num_breadcrumbs
-                ; accounts= Genesis_ledger.accounts } ]
+                ; accounts= Test_genesis_ledger.accounts } ]
           in
           let transition_reader, _ = make_transition_pipe () in
           let ledger_db =
@@ -793,14 +707,14 @@ let%test_module "Bootstrap_controller tests" =
       let pids = Child_processes.Termination.create_pid_table () in
       let small_peer_num_breadcrumbs = 6 in
       let large_peer_num_breadcrumbs = small_peer_num_breadcrumbs * 2 in
-      let source_accounts = [List.hd_exn Genesis_ledger.accounts] in
+      let source_accounts = [List.hd_exn Test_genesis_ledger.accounts] in
       let small_peer_accounts =
-        List.take Genesis_ledger.accounts
-          (List.length Genesis_ledger.accounts / 2)
+        List.take Test_genesis_ledger.accounts
+          (List.length Test_genesis_ledger.accounts / 2)
       in
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
-          let large_peer_accounts = Genesis_ledger.accounts in
+          let large_peer_accounts = Test_genesis_ledger.accounts in
           let%bind {me; peers; network} =
             Network_builder.setup ~source_accounts ~logger ~pids ~trust_system
               [ { num_breadcrumbs= small_peer_num_breadcrumbs
@@ -853,8 +767,8 @@ let%test_module "Bootstrap_controller tests" =
           print_heartbeat hb_logger |> don't_wait_for ;
           let%bind syncing_frontier, peer_with_frontier, network =
             Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
-              ~num_breadcrumbs ~source_accounts:Genesis_ledger.accounts
-              ~target_accounts:Genesis_ledger.accounts
+              ~num_breadcrumbs ~source_accounts:Test_genesis_ledger.accounts
+              ~target_accounts:Test_genesis_ledger.accounts
           in
           let root_sync_ledger =
             Root_sync_ledger.create
@@ -901,5 +815,3 @@ let%test_module "Bootstrap_controller tests" =
           should_not_sync = `Ignored )
     *)
   end )
-
-let run = run ~should_ask_best_tip:true

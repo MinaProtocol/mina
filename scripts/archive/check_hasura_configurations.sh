@@ -9,7 +9,7 @@ if [ "$SOURCE_INTROSPECTION_CONTENTS" == "$GENERTATED_INTROSPECTION_CONTENTS" ];
     echo "Introspection file in source match with Hasura's generated introspection file"
 else
     echo "Introspection file in source does not match with Hasura's generated introspection file";
-    echo "Make sure that you the generated graphql schema in $SOURCE_INTROSPECTION_FILE_PATH is checked in";
+    echo "Make sure that the generated graphql schema in $SOURCE_INTROSPECTION_FILE_PATH is checked in";
     diff $SOURCE_INTROSPECTION_FILE_PATH $GENERTATED_INTROSPECTION_FILE_PATH;
     exit 1
 fi

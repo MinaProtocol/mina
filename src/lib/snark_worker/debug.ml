@@ -9,7 +9,7 @@ module Inputs = struct
 
     let create () = Deferred.unit
 
-    let worker_wait_time = 0.1
+    let worker_wait_time = 0.5
   end
 
   let perform_single () ~message s =

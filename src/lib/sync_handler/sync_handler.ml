@@ -2,6 +2,7 @@ open Core_kernel
 open Async
 open Coda_base
 open Coda_transition
+open Network_peer
 
 module type Inputs_intf = sig
   module Transition_frontier : module type of Transition_frontier
@@ -23,28 +24,16 @@ module Make (Inputs : Inputs_intf) :
     in
     Root_history.lookup root_history state_hash
 
-  let get_breadcrumb_ledgers frontier =
-    List.map (Transition_frontier.all_breadcrumbs frontier)
-      ~f:(fun breadcrumb ->
-        Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-        |> Staged_ledger.ledger
-        |> Ledger.Any_ledger.cast (module Ledger) )
-
   let get_ledger_by_hash ~frontier ledger_hash =
-    let ledger_breadcrumbs =
-      Sequence.of_lazy
-        (lazy (Sequence.of_list @@ get_breadcrumb_ledgers frontier))
-    in
     let root_ledger =
-      Ledger.Any_ledger.cast
-        (module Ledger.Db)
-        (Transition_frontier.root_snarked_ledger frontier)
+      Ledger.Any_ledger.cast (module Ledger.Db)
+      @@ Transition_frontier.root_snarked_ledger frontier
     in
-    Sequence.append (Sequence.singleton root_ledger) ledger_breadcrumbs
-    |> Sequence.find ~f:(fun ledger ->
-           Ledger_hash.equal
-             (Ledger.Any_ledger.M.merkle_root ledger)
-             ledger_hash )
+    if
+      Ledger_hash.equal ledger_hash
+        (Ledger.Any_ledger.M.merkle_root root_ledger)
+    then Some root_ledger
+    else None
 
   let answer_query :
          frontier:Inputs.Transition_frontier.t
@@ -144,55 +133,6 @@ module Make (Inputs : Inputs_intf) :
       in
       verified_witness
   end
-
-  module Bootstrappable_best_tip = struct
-    let prove ~logger ~should_select_tip ~frontier clients_consensus_state =
-      let open Option.Let_syntax in
-      let%bind best_tip_with_witness =
-        Best_tip_prover.prove ~logger frontier
-      in
-      let%map () =
-        Option.some_if
-          (should_select_tip ~existing:clients_consensus_state
-             ~candidate:
-               (External_transition.consensus_state best_tip_with_witness.data)
-             ~logger:
-               (Logger.extend logger
-                  [ ( "selection_context"
-                    , `String "Bootstrappable_best_tip.prove" ) ]))
-          ()
-      in
-      best_tip_with_witness
-
-    let verify ~logger ~should_select_tip ~verifier existing_state
-        ( {Proof_carrying_data.data= best_tip; proof= _merkle_list, _root} as
-        peer_best_tip ) =
-      let open Deferred.Or_error.Let_syntax in
-      let%bind () =
-        Deferred.return
-          (Result.ok_if_true
-             ~error:
-               (Error.of_string
-                  "Peer's best tip did not cause you to bootstrap")
-             (should_select_tip ~existing:existing_state
-                ~candidate:(External_transition.consensus_state best_tip)
-                ~logger:
-                  (Logger.extend logger
-                     [ ( "selection_context"
-                       , `String "Bootstrappable_best_tip.verify" ) ])))
-      in
-      Best_tip_prover.verify ~verifier peer_best_tip
-
-    module For_tests = struct
-      let prove = prove
-
-      let verify = verify
-    end
-
-    let prove = prove ~should_select_tip:Consensus.Hooks.should_bootstrap
-
-    let verify = verify ~should_select_tip:Consensus.Hooks.should_bootstrap
-  end
 end
 
 include Make (struct
@@ -224,7 +164,7 @@ let%test_module "Sync_handler" =
           Thread_safe.block_on_async_exn (fun () ->
               print_heartbeat hb_logger |> don't_wait_for ;
               let%bind frontier =
-                create_root_frontier ~logger ~pids Genesis_ledger.accounts
+                create_root_frontier ~logger ~pids Test_genesis_ledger.accounts
               in
               let source_ledger =
                 Transition_frontier.For_tests.root_snarked_ledger frontier
@@ -277,14 +217,14 @@ let%test_module "Sync_handler" =
       Thread_safe.block_on_async_exn (fun () ->
           print_heartbeat hb_logger |> don't_wait_for ;
           let%bind frontier =
-            create_root_frontier ~logger ~pids Genesis_ledger.accounts
+            create_root_frontier ~logger ~pids Test_genesis_ledger.accounts
           in
           let%bind () =
             build_frontier_randomly frontier
               ~gen_root_breadcrumb_builder:
                 (gen_linear_breadcrumbs ~logger ~pids ~trust_system
                    ~size:num_breadcrumbs
-                   ~accounts_with_secret_keys:Genesis_ledger.accounts)
+                   ~accounts_with_secret_keys:Test_genesis_ledger.accounts)
           in
           let seen_transition =
             Transition_frontier.(
@@ -315,45 +255,5 @@ let%test_module "Sync_handler" =
                  (With_hash.data best_tip_transition)
                  (to_external_transition
                     (Transition_frontier.best_tip frontier))) )
-
-    let%test "a node that is synced to the network should be able to provide \
-              its best tip to an offline node" =
-      let num_breadcrumbs_to_cause_bootstrap =
-        (2 * max_length) + Consensus.Constants.delta + 1
-      in
-      heartbeat_flag := true ;
-      Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat hb_logger |> don't_wait_for ;
-          let%bind frontier =
-            create_root_frontier ~logger ~pids Genesis_ledger.accounts
-          in
-          let root_breadcrumb = Transition_frontier.root frontier in
-          let root_transition =
-            Transition_frontier.Breadcrumb.validated_transition root_breadcrumb
-          in
-          let%bind () =
-            build_frontier_randomly frontier
-              ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~pids ~trust_system
-                   ~size:num_breadcrumbs_to_cause_bootstrap
-                   ~accounts_with_secret_keys:Genesis_ledger.accounts)
-          in
-          let root_consensus_state =
-            External_transition.Validated.consensus_state root_transition
-          in
-          let peer_best_tip_with_witness =
-            Option.value_exn
-              (Sync_handler.Bootstrappable_best_tip.prove ~logger ~frontier
-                 root_consensus_state)
-          in
-          let%bind verify =
-            f_with_verifier ~f:Sync_handler.Bootstrappable_best_tip.verify
-              ~logger ~pids
-          in
-          let%map verification_result =
-            verify root_consensus_state peer_best_tip_with_witness
-          in
-          heartbeat_flag := false ;
-          Result.is_ok verification_result )
   end )
 *)

@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 open Core
 open Import
@@ -73,6 +73,16 @@ let is_trivial t = Fee.(fee t < minimum_fee)
 
 let sender t = Public_key.compress Poly.(t.sender)
 
+let receiver = Fn.compose Payload.receiver payload
+
+let amount = Fn.compose Payload.amount payload
+
+let memo = Fn.compose Payload.memo payload
+
+let valid_until = Fn.compose Payload.valid_until payload
+
+let is_payment = Fn.compose Payload.is_payment payload
+
 let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
   ; sender= kp.public_key
@@ -93,7 +103,7 @@ module Gen = struct
     and memo = String.quickcheck_generator in
     let%map body = create_body receiver in
     let payload : Payload.t =
-      Payload.create ~fee ~nonce
+      Payload.create ~fee ~nonce ~valid_until:Global_slot.max_value
         ~memo:(User_command_memo.create_by_digesting_string_exn memo)
         ~body
     in
@@ -219,7 +229,7 @@ module Gen = struct
           account_nonces.(sender) <- Account_nonce.succ nonce ;
           let%bind fee =
             Currency.Fee.(
-              gen_incl (of_int 3)
+              gen_incl (of_int 6)
                 (min (of_int 10) @@ Currency.Amount.to_fee this_split))
           in
           let amount =
@@ -233,7 +243,8 @@ module Gen = struct
           in
           let memo = User_command_memo.dummy in
           let payload =
-            Payload.create ~fee ~nonce ~memo ~body:(Payment {receiver; amount})
+            Payload.create ~fee ~valid_until:Global_slot.max_value ~nonce ~memo
+              ~body:(Payment {receiver; amount})
           in
           let sign' =
             match sign_type with `Fake -> For_tests.fake_sign | `Real -> sign

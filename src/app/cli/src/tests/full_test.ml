@@ -1,5 +1,5 @@
 [%%import
-"../../../../config.mlh"]
+"/src/config.mlh"]
 
 open Core
 open Async
@@ -66,6 +66,9 @@ let setup_time_offsets () = ()
 
 let heartbeat_flag = ref true
 
+[%%inject
+"test_full_epoch", test_full_epoch]
+
 let print_heartbeat logger =
   let rec loop () =
     if !heartbeat_flag then (
@@ -85,7 +88,7 @@ let run_test () : unit Deferred.t =
   Parallel.init_master () ;
   File_system.with_temp_dir (Filename.temp_dir_name ^/ "full_test_config")
     ~f:(fun temp_conf_dir ->
-      let keypair = Genesis_ledger.largest_account_keypair_exn () in
+      let keypair = Test_genesis_ledger.largest_account_keypair_exn () in
       let%bind () =
         match Unix.getenv "CODA_TRACING" with
         | Some trace_dir ->
@@ -129,35 +132,28 @@ let run_test () : unit Deferred.t =
       in
       let time_controller = Block_time.Controller.(create @@ basic ~logger) in
       let consensus_local_state =
-        Consensus.Data.Local_state.create
+        Consensus.Data.Local_state.create ~genesis_ledger:Test_genesis_ledger.t
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
-      let discovery_port = 8001 in
-      let communication_port = 8000 in
       let client_port = 8123 in
       let libp2p_port = 8002 in
       let gossip_net_params =
-        Gossip_net.Real.Config.
+        Gossip_net.Libp2p.Config.
           { timeout= Time.Span.of_sec 3.
           ; logger
-          ; target_peer_count= 8
           ; initial_peers= []
+          ; unsafe_no_trust_ip= true
           ; conf_dir= temp_conf_dir
           ; chain_id= "bogus chain id for testing"
           ; addrs_and_ports=
               { external_ip= Unix.Inet_addr.localhost
               ; bind_ip= Unix.Inet_addr.localhost
-              ; discovery_port
-              ; communication_port
+              ; peer= None
               ; libp2p_port
               ; client_port }
           ; trust_system
-          ; enable_libp2p= false
-          ; disable_haskell= false
-          ; libp2p_keypair= None
-          ; libp2p_peers= []
-          ; max_concurrent_connections= Some 10 }
+          ; keypair= None }
       in
       let net_config =
         Coda_networking.Config.
@@ -165,19 +161,22 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; time_controller
           ; consensus_local_state
+          ; is_seed= true
+          ; genesis_ledger_hash=
+              Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
           ; log_gossip_heard=
               { snark_pool_diff= false
               ; transaction_pool_diff= false
               ; new_state= false }
           ; creatable_gossip_net=
               Coda_networking.Gossip_net.(
-                Any.Creatable ((module Real), Real.create gossip_net_params))
+                Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
           }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
       let largest_account_keypair =
-        Genesis_ledger.largest_account_keypair_exn ()
+        Test_genesis_ledger.largest_account_keypair_exn ()
       in
       let fee = Currency.Fee.of_int in
       let snark_work_fee, transaction_fee =
@@ -186,10 +185,11 @@ let run_test () : unit Deferred.t =
       let%bind coda =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
-             ~conf_dir:temp_conf_dir ~gossip_net_params
+             ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
+             ~gossip_net_params
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
-             ~initial_propose_keypairs:(Keypair.Set.singleton keypair)
+             ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
              ~snark_worker_config:
                Coda_lib.Config.Snark_worker_config.
                  { initial_snark_worker_key=
@@ -202,20 +202,27 @@ let run_test () : unit Deferred.t =
              ~persistent_frontier_location:(temp_conf_dir ^/ "frontier")
              ~time_controller ~receipt_chain_database ~snark_work_fee
              ~consensus_local_state ~transaction_database
-             ~external_transition_database ~work_reassignment_wait:420000 ())
+             ~external_transition_database ~work_reassignment_wait:420000
+             ~genesis_state_hash:
+               (Coda_state.Genesis_protocol_state.For_tests.genesis_state_hash
+                  ())
+             ())
+          ~genesis_ledger:Test_genesis_ledger.t
+          ~base_proof:Precomputed_values.base_proof
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
            (Coda_lib.validated_transitions coda)
            ~f:ignore) ;
-      let wait_until_cond ~(f : Coda_lib.t -> bool) ~(timeout : Float.t) =
+      let%bind () = Ivar.read @@ Coda_lib.initialization_finish_signal coda in
+      let wait_until_cond ~(f : Coda_lib.t -> bool) ~(timeout_min : Float.t) =
         let rec go () =
           if f coda then return ()
           else
             let%bind () = after (Time.Span.of_sec 10.) in
             go ()
         in
-        Deferred.any [after (Time.Span.of_min timeout); go ()]
+        Deferred.any [after (Time.Span.of_min timeout_min); go ()]
       in
       let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
         let cond t =
@@ -229,7 +236,7 @@ let run_test () : unit Deferred.t =
           | _ ->
               false
         in
-        wait_until_cond ~f:cond ~timeout:3.
+        wait_until_cond ~f:cond ~timeout_min:3.
       in
       let assert_balance pk amount =
         match
@@ -270,6 +277,7 @@ let run_test () : unit Deferred.t =
             in
             let payload : User_command.Payload.t =
               User_command.Payload.create ~fee ~nonce ~memo
+                ~valid_until:Coda_numbers.Global_slot.max_value
                 ~body:(Payment {receiver= receiver_pk; amount})
             in
             (* verify memo is in the payload *)
@@ -364,11 +372,11 @@ let run_test () : unit Deferred.t =
         |> Participating_state.active_exn |> Protocol_state.consensus_state
         |> Consensus.Data.Consensus_state.blockchain_length
       in
-      let wait_for_proof_or_timeout timeout () =
+      let wait_for_proof_or_timeout timeout_min () =
         let cond t = Option.is_some @@ Coda_lib.staged_ledger_ledger_proof t in
-        wait_until_cond ~f:cond ~timeout
+        wait_until_cond ~f:cond ~timeout_min
       in
-      let test_multiple_payments accounts ~txn_count timeout =
+      let test_multiple_payments accounts ~txn_count timeout_min =
         let balance_sheet =
           Public_key.Compressed.Map.of_alist_exn
             (List.map accounts
@@ -381,7 +389,7 @@ let run_test () : unit Deferred.t =
               Currency.Amount.of_int ((i + 1) * 10) )
         in
         (*After mining a few blocks and emitting a ledger_proof (by the parallel scan), check if the balances match *)
-        let%map () = wait_for_proof_or_timeout timeout () in
+        let%map () = wait_for_proof_or_timeout timeout_min () in
         assert (Option.is_some @@ Coda_lib.staged_ledger_ledger_proof coda) ;
         Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
             assert_balance key data ) ;
@@ -400,20 +408,21 @@ let run_test () : unit Deferred.t =
         sending multiple payments*)
       let receiver_keypair =
         let receiver =
-          Genesis_ledger.find_new_account_record_exn
+          Test_genesis_ledger.find_new_account_record_exn
             [largest_account_keypair.public_key]
         in
-        Genesis_ledger.keypair_of_account_record_exn receiver
+        Test_genesis_ledger.keypair_of_account_record_exn receiver
       in
       let sender_keypair =
         let sender =
-          Genesis_ledger.find_new_account_record_exn
+          Test_genesis_ledger.find_new_account_record_exn
             [largest_account_keypair.public_key; receiver_keypair.public_key]
         in
-        Genesis_ledger.keypair_of_account_record_exn sender
+        Test_genesis_ledger.keypair_of_account_record_exn sender
       in
       let other_accounts =
-        List.filter Genesis_ledger.accounts ~f:(fun (_, account) ->
+        List.filter (Lazy.force Test_genesis_ledger.accounts)
+          ~f:(fun (_, account) ->
             let reserved_public_keys =
               [ largest_account_keypair.public_key
               ; receiver_keypair.public_key
@@ -425,7 +434,7 @@ let run_test () : unit Deferred.t =
                      (Public_key.decompress_exn @@ Account.public_key account)
                )) )
         |> List.map ~f:(fun (sk, account) ->
-               ( Genesis_ledger.keypair_of_account_record_exn (sk, account)
+               ( Test_genesis_ledger.keypair_of_account_record_exn (sk, account)
                , account ) )
       in
       let timeout_mins =
@@ -433,23 +442,40 @@ let run_test () : unit Deferred.t =
         else if with_snark then 15.
         else 7.
       in
+      let wait_till_length =
+        if medium_curves then Coda_numbers.Length.of_int 1
+        else if test_full_epoch then
+          (*Note: wait to produce (2*slots_per_epoch) blocks. This could take a while depending on what k and c are*)
+          Coda_numbers.Length.of_int
+            (Unsigned.UInt32.to_int
+               Consensus.Constants.(
+                 Unsigned.UInt32.(mul slots_per_epoch (of_int 2))))
+        else Coda_numbers.Length.of_int 5
+      in
       let%map () =
         if with_snark then
           let accounts = List.take other_accounts 2 in
           let%bind blockchain_length' =
             test_multiple_payments accounts ~txn_count:2 timeout_mins
           in
-          (*wait for a block after the ledger_proof is emitted*)
+          (*wait for some blocks after the ledger_proof is emitted*)
           let%map () =
             wait_until_cond
-              ~f:(fun t -> blockchain_length t > blockchain_length')
-              ~timeout:
+              ~f:(fun t ->
+                blockchain_length t
+                > Coda_numbers.Length.add blockchain_length' wait_till_length
+                )
+              ~timeout_min:
                 ( Consensus.Constants.(
-                    (delta + c) * Consensus.Constants.block_window_duration_ms)
+                    (delta + c)
+                    * ( block_window_duration_ms
+                      * (Coda_numbers.Length.to_int wait_till_length + 1) ))
                   / 1000 / 60
                 |> Float.of_int )
           in
-          assert (blockchain_length coda > blockchain_length')
+          assert (
+            blockchain_length coda
+            > Coda_numbers.Length.add blockchain_length' wait_till_length )
         else if with_check then
           let%map _ =
             test_multiple_payments other_accounts

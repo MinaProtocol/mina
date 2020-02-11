@@ -4,59 +4,10 @@ open Signature_lib
 open Coda_base
 
 module Client = Graphql_lib.Client.Make (struct
-  let address = "graphql"
-
   let preprocess_variables_string = Fn.id
 
   let headers = String.Map.empty
 end)
-
-let print_rpc_error error =
-  eprintf "RPC connection error: %s\n" (Error.to_string_hum error)
-
-let dispatch rpc query port =
-  Tcp.with_connection
-    (Tcp.Where_to_connect.of_host_and_port (Cli_lib.Port.of_local port))
-    ~timeout:(Time.Span.of_sec 1.)
-    (fun _ r w ->
-      let open Deferred.Let_syntax in
-      match%bind Rpc.Connection.create r w ~connection_state:(fun _ -> ()) with
-      | Error exn ->
-          return
-            (Or_error.errorf
-               !"Error connecting to the daemon on port %d using the RPC \
-                 call, %s,: %s"
-               port (Rpc.Rpc.name rpc) (Exn.to_string exn))
-      | Ok conn ->
-          Rpc.Rpc.dispatch rpc conn query )
-
-let dispatch_join_errors rpc query port =
-  let open Deferred.Let_syntax in
-  let%map res = dispatch rpc query port in
-  Or_error.join res
-
-(** Call an RPC, passing handlers for a successful call and a failing one. Note
-    that a successful *call* may have failed on the server side and returned a
-    failing result. To deal with that, the success handler returns an
-    Or_error. *)
-let dispatch_with_message rpc query port ~success ~error
-    ~(join_error : 'a Or_error.t -> 'b Or_error.t) =
-  let fail err = eprintf "%s\n%!" err ; exit 18 in
-  let%bind res = dispatch rpc query port in
-  match join_error res with
-  | Ok x ->
-      printf "%s\n" (success x) ;
-      Deferred.unit
-  | Error e ->
-      fail (error e)
-
-let dispatch_pretty_message (type t)
-    (module Print : Cli_lib.Render.Printable_intf with type t = t)
-    ?(json = true) ~(join_error : 'a Or_error.t -> t Or_error.t) ~error_ctx rpc
-    query port =
-  let%bind res = dispatch rpc query port in
-  Cli_lib.Render.print (module Print) json (join_error res) ~error_ctx
-  |> Deferred.return
 
 module Args = struct
   open Command.Param
@@ -71,6 +22,10 @@ module Args = struct
   let zip5 arg1 arg2 arg3 arg4 arg5 =
     return (fun a b c d e -> (a, b, c, d, e))
     <*> arg1 <*> arg2 <*> arg3 <*> arg4 <*> arg5
+
+  let zip6 arg1 arg2 arg3 arg4 arg5 arg6 =
+    return (fun a b c d e f -> (a, b, c, d, e, f))
+    <*> arg1 <*> arg2 <*> arg3 <*> arg4 <*> arg5 <*> arg6
 end
 
 let or_error_str ~f_ok ~error = function
@@ -85,7 +40,7 @@ let stop_daemon =
   let open Command.Param in
   Command.async ~summary:"Stop the daemon"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
-         let%map res = dispatch Stop_daemon.rpc () port in
+         let%map res = Daemon_rpcs.Client.dispatch Stop_daemon.rpc () port in
          printf "%s"
            (or_error_str res
               ~f_ok:(fun _ -> "Daemon stopping\n")
@@ -102,7 +57,7 @@ let get_balance =
   Command.async ~summary:"Get balance associated with a public key"
     (Cli_lib.Background_daemon.rpc_init address_flag ~f:(fun port address ->
          let%map res =
-           dispatch_join_errors Daemon_rpcs.Get_balance.rpc
+           Daemon_rpcs.Client.dispatch_join_errors Daemon_rpcs.Get_balance.rpc
              (Public_key.compress address)
              port
          in
@@ -124,13 +79,14 @@ let get_balance_graphql =
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Get balance associated with a public key"
-    (Cli_lib.Background_daemon.graphql_init pk_flag ~f:(fun port public_key ->
+    (Cli_lib.Background_daemon.graphql_init pk_flag
+       ~f:(fun graphql_endpoint public_key ->
          let%map response =
            Graphql_client.query_exn
              (Graphql_queries.Get_wallet.make
                 ~public_key:(Graphql_client.Encoders.public_key public_key)
                 ())
-             port
+             graphql_endpoint
          in
          match response#wallet with
          | Some wallet ->
@@ -174,7 +130,8 @@ let get_trust_status =
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (ip_address, json) ->
          match%map
-           dispatch Daemon_rpcs.Get_trust_status.rpc ip_address port
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_trust_status.rpc
+             ip_address port
          with
          | Ok status ->
              print_trust_status (round_trust_score status) json
@@ -212,7 +169,10 @@ let get_trust_status_all =
   Command.async
     ~summary:"Get trust statuses for all peers known to the trust system"
     (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (nonzero, json) ->
-         match%map dispatch Daemon_rpcs.Get_trust_status_all.rpc () port with
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_trust_status_all.rpc ()
+             port
+         with
          | Ok ip_trust_statuses ->
              (* always round the trust scores for display *)
              let ip_rounded_trust_statuses =
@@ -247,7 +207,8 @@ let reset_trust_status =
     (Cli_lib.Background_daemon.rpc_init flags
        ~f:(fun port (ip_address, json) ->
          match%map
-           dispatch Daemon_rpcs.Reset_trust_status.rpc ip_address port
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Reset_trust_status.rpc
+             ip_address port
          with
          | Ok status ->
              print_trust_status status json
@@ -268,11 +229,13 @@ let get_public_keys =
        (Args.zip2 with_details_flag Cli_lib.Flag.json)
        ~f:(fun port (is_balance_included, json) ->
          if is_balance_included then
-           dispatch_pretty_message ~json ~join_error:Or_error.join ~error_ctx
+           Daemon_rpcs.Client.dispatch_pretty_message ~json
+             ~join_error:Or_error.join ~error_ctx
              (module Cli_lib.Render.Public_key_with_details)
              Get_public_keys_with_details.rpc () port
          else
-           dispatch_pretty_message ~json ~join_error:Or_error.join ~error_ctx
+           Daemon_rpcs.Client.dispatch_pretty_message ~json
+             ~join_error:Or_error.join ~error_ctx
              (module Cli_lib.Render.String_list_formatter)
              Get_public_keys.rpc () port ))
 
@@ -295,7 +258,8 @@ let generate_receipt =
     (Cli_lib.Background_daemon.rpc_init
        (Args.zip2 receipt_hash_flag address_flag)
        ~f:(fun port (receipt_chain_hash, pk) ->
-         dispatch_with_message Prove_receipt.rpc (receipt_chain_hash, pk) port
+         Daemon_rpcs.Client.dispatch_with_message Prove_receipt.rpc
+           (receipt_chain_hash, pk) port
            ~success:Cli_lib.Render.Prove_receipt.to_text
            ~error:Error.to_string_hum ~join_error:Or_error.join ))
 
@@ -359,7 +323,8 @@ let verify_receipt =
                   ~error:
                     (sprintf "Proof file %s has invalid json format" proof_path)
            in
-           dispatch Verify_proof.rpc (pk, payment, proof) port
+           Daemon_rpcs.Client.dispatch Verify_proof.rpc (pk, payment, proof)
+             port
          in
          match%map dispatch_result with
          | Ok (Ok ()) ->
@@ -373,11 +338,13 @@ let get_nonce :
            , Account.Nonce.t option Or_error.t )
            Rpc.Rpc.t
     -> Public_key.t
-    -> int
+    -> Host_and_port.t
     -> (Account.Nonce.t, string) Deferred.Result.t =
  fun ~rpc addr port ->
   let open Deferred.Let_syntax in
-  let%map res = dispatch rpc (Public_key.compress addr) port in
+  let%map res =
+    Daemon_rpcs.Client.dispatch rpc (Public_key.compress addr) port
+  in
   match Or_error.join res with
   | Ok (Some n) ->
       Ok n
@@ -408,7 +375,7 @@ let status =
   Command.async ~summary:"Get running daemon status"
     (Cli_lib.Background_daemon.rpc_init flag
        ~f:(fun port (json, performance) ->
-         dispatch_pretty_message ~json ~join_error:Fn.id
+         Daemon_rpcs.Client.dispatch_pretty_message ~json ~join_error:Fn.id
            ~error_ctx:"Failed to get status"
            (module Daemon_rpcs.Types.Status)
            Get_status.rpc
@@ -421,7 +388,7 @@ let status_clear_hist =
   Command.async ~summary:"Clear histograms reported in status"
     (Cli_lib.Background_daemon.rpc_init flag
        ~f:(fun port (json, performance) ->
-         dispatch_pretty_message ~json ~join_error:Fn.id
+         Daemon_rpcs.Client.dispatch_pretty_message ~json ~join_error:Fn.id
            ~error_ctx:"Failed to clear histograms reported in status"
            (module Daemon_rpcs.Types.Status)
            Clear_hist_status.rpc
@@ -436,18 +403,13 @@ let get_nonce_exn ~rpc public_key port =
   | Ok nonce ->
       return nonce
 
-let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
-    a Deferred.t =
-  match%bind Deferred.Or_error.try_with ~extract_exn:true f with
-  | Ok e ->
-      return e
-  | Error e ->
-      eprintf "Error: %s" (Error.to_string_hum e) ;
-      exit 4
-
 let batch_send_payments =
   let module Payment_info = struct
-    type t = {receiver: string; amount: Currency.Amount.t; fee: Currency.Fee.t}
+    type t =
+      { receiver: string
+      ; amount: Currency.Amount.t
+      ; fee: Currency.Fee.t
+      ; valid_until: Coda_numbers.Global_slot.t sexp_option }
     [@@deriving sexp]
   end in
   let payment_path_flag =
@@ -465,12 +427,14 @@ let batch_send_payments =
           { Payment_info.receiver=
               Public_key.(
                 Compressed.to_base58_check (compress keypair.public_key))
+          ; valid_until= Some (Coda_numbers.Global_slot.random ())
           ; amount= Currency.Amount.of_int (Random.int 100)
           ; fee= Currency.Fee.of_int (Random.int 100) }
         in
         eprintf "Could not read payments from %s.\n" payments_path ;
         eprintf
-          "The file should be a sexp list of payments. Here is an example file:\n\
+          "The file should be a sexp list of payments with optional expiry \
+           slot number \"valid_until\". Here is an example file:\n\
            %s\n"
           (Sexp.to_string_hum
              ([%sexp_of: Payment_info.t list]
@@ -485,18 +449,22 @@ let batch_send_payments =
       get_nonce_exn ~rpc:Daemon_rpcs.Get_nonce.rpc keypair.public_key port
     in
     let _, ts =
-      List.fold_map ~init:nonce0 infos ~f:(fun nonce {receiver; amount; fee} ->
+      List.fold_map ~init:nonce0 infos
+        ~f:(fun nonce {receiver; valid_until; amount; fee} ->
           ( Account.Nonce.succ nonce
           , User_command.sign keypair
               (User_command_payload.create ~fee ~nonce
                  ~memo:User_command_memo.empty
+                 ~valid_until:
+                   (Option.value valid_until
+                      ~default:Coda_numbers.Global_slot.max_value)
                  ~body:
                    (Payment
                       { receiver=
                           Public_key.Compressed.of_base58_check_exn receiver
                       ; amount })) ) )
     in
-    dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
+    Daemon_rpcs.Client.dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
       (ts :> User_command.t list)
       port
       ~success:(fun _ -> "Successfully enqueued payments in pool")
@@ -523,6 +491,15 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
            (Currency.Fee.to_int User_command.minimum_fee))
       (optional txn_fee)
   in
+  let valid_until_flag =
+    flag "valid-until"
+      ~doc:
+        "GLOBAL-SLOT The last global-slot at which this transaction will be \
+         considered valid. This makes it possible to have transactions which \
+         expire if they are not applied before this time. If omitted, the \
+         transaction will never expire."
+      (optional global_slot)
+  in
   let nonce_flag =
     flag "nonce"
       ~doc:
@@ -541,12 +518,14 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
       (optional string)
   in
   let flag =
-    Args.zip5 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
-      memo_flag
+    Args.zip6 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
+      valid_until_flag memo_flag
   in
   Command.async ~summary
     (Cli_lib.Background_daemon.rpc_init flag
-       ~f:(fun port (body, from_account, fee_opt, nonce_opt, memo_opt) ->
+       ~f:(fun port
+          (body, from_account, fee_opt, nonce_opt, valid_until_opt, memo_opt)
+          ->
          let open Deferred.Let_syntax in
          let%bind sender_kp =
            Secrets.Keypair.Terminal_stdin.read_exn from_account
@@ -572,10 +551,16 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
              Option.value_map memo_opt ~default:User_command_memo.empty
                ~f:User_command_memo.create_from_string_exn
            in
-           let command =
-             Coda_commands.setup_user_command ~fee ~nonce ~memo ~sender_kp body
+           let valid_until =
+             Option.value valid_until_opt
+               ~default:Coda_numbers.Global_slot.max_value
            in
-           dispatch_with_message Daemon_rpcs.Send_user_command.rpc command port
+           let command =
+             Coda_commands.setup_user_command ~fee ~nonce ~memo ~valid_until
+               ~sender_kp body
+           in
+           Daemon_rpcs.Client.dispatch_with_message
+             Daemon_rpcs.Send_user_command.rpc command port
              ~success:(fun receipt_chain_hash ->
                sprintf
                  "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
@@ -618,7 +603,7 @@ let send_payment_graphql =
   in
   Command.async ~summary:"Send payment to an address"
     (Cli_lib.Background_daemon.graphql_init args
-       ~f:(fun rest_port
+       ~f:(fun graphql_endpoint
           ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver, amount)
           ->
          let%map response =
@@ -630,7 +615,7 @@ let send_payment_graphql =
                   ~amount:(Encoders.amount amount) ~fee:(Encoders.fee fee)
                   ?nonce:(Option.map nonce ~f:Encoders.nonce)
                   ?memo ()))
-             rest_port
+             graphql_endpoint
          in
          printf "Dispatched payment with ID %s\n"
            ((response#sendPayment)#payment)#id ))
@@ -646,7 +631,9 @@ let delegate_stake_graphql =
   let args = Args.zip2 Cli_lib.Flag.user_command_common receiver_flag in
   Command.async ~summary:"Delegate your stake to another public key"
     (Cli_lib.Background_daemon.graphql_init args
-       ~f:(fun rest_port ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver) ->
+       ~f:(fun graphql_endpoint
+          ({Cli_lib.Flag.sender; fee; nonce; memo}, receiver)
+          ->
          let%map response =
            Graphql_client.(
              Graphql_client.query_exn
@@ -656,7 +643,7 @@ let delegate_stake_graphql =
                   ~fee:(Encoders.fee fee)
                   ?nonce:(Option.map nonce ~f:Encoders.nonce)
                   ?memo ()))
-             rest_port
+             graphql_endpoint
          in
          printf "Dispatched stake delegation with ID %s\n"
            ((response#sendDelegation)#delegation)#id ))
@@ -729,10 +716,11 @@ let cancel_transaction =
              let command =
                Coda_commands.setup_user_command ~fee:cancel_fee
                  ~nonce:cancelled_nonce ~memo:User_command_memo.empty
+                 ~valid_until:user_command.payload.common.valid_until
                  ~sender_kp body
              in
-             dispatch_with_message Daemon_rpcs.Send_user_command.rpc command
-               port
+             Daemon_rpcs.Client.dispatch_with_message
+               Daemon_rpcs.Send_user_command.rpc command port
                ~success:(fun receipt_chain_hash ->
                  sprintf
                    "Dispatched cancel transaction with ID %s\n\
@@ -758,7 +746,7 @@ let cancel_transaction_graphql =
       "Cancel a transaction -- this submits a replacement transaction with a \
        fee larger than the cancelled transaction."
     (Cli_lib.Background_daemon.graphql_init txn_id_flag
-       ~f:(fun rest_port user_command ->
+       ~f:(fun graphql_endpoint user_command ->
          let receiver =
            match
              User_command.Payload.body (User_command.payload user_command)
@@ -775,7 +763,7 @@ let cancel_transaction_graphql =
              (Graphql_queries.Get_inferred_nonce.make
                 ~public_key:(public_key (User_command.sender user_command))
                 ())
-             rest_port
+             graphql_endpoint
          in
          let maybe_inferred_nonce =
            let open Option.Let_syntax in
@@ -816,7 +804,7 @@ let cancel_transaction_graphql =
              ()
          in
          let%map cancel_response =
-           Graphql_client.query_exn cancel_query rest_port
+           Graphql_client.query_exn cancel_query graphql_endpoint
          in
          printf "🛑 Cancelled transaction! Cancel ID: %s\n"
            ((cancel_response#sendPayment)#payment)#id ))
@@ -828,8 +816,8 @@ let get_transaction_status =
        ~f:(fun port serialized_transaction ->
          match User_command.of_base58_check serialized_transaction with
          | Ok user_command ->
-             dispatch_with_message Daemon_rpcs.Get_transaction_status.rpc
-               user_command port
+             Daemon_rpcs.Client.dispatch_with_message
+               Daemon_rpcs.Get_transaction_status.rpc user_command port
                ~success:(fun status ->
                  sprintf !"Transaction status : %s\n"
                  @@ Transaction_status.State.to_string status )
@@ -862,7 +850,7 @@ let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%bind privkey =
@@ -876,32 +864,14 @@ let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
-    handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
-    let%map kp =
-      Secrets.Keypair.read_exn ~privkey_path
-        ~password:
-          (lazy (Secrets.Password.read "Password for private key file: "))
-    in
+    let%map kp = Secrets.Keypair.Terminal_stdin.read_exn privkey_path in
     printf "Public key: %s\nPrivate key: %s\n"
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check )
       (kp.private_key |> Private_key.to_base58_check))
-
-let generate_keypair =
-  Command.async ~summary:"Generate a new public-key/private-key pair"
-    (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
-    @@ fun () ->
-    let open Deferred.Let_syntax in
-    let kp = Keypair.create () in
-    let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
-    printf "Keypair generated\nPublic key: %s\n"
-      ( kp.public_key |> Public_key.compress
-      |> Public_key.Compressed.to_base58_check ) ;
-    exit 0)
 
 let dump_ledger =
   let sl_hash_flag =
@@ -919,10 +889,11 @@ let dump_ledger =
                Sexp.of_string_conv_exn s Staged_ledger_hash.Stable.V1.t_of_sexp
            )
          in
-         dispatch Daemon_rpcs.Get_ledger.rpc staged_ledger_hash port
+         Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_ledger.rpc
+           staged_ledger_hash port
          >>| function
          | Error e ->
-             print_rpc_error e
+             Daemon_rpcs.Client.print_rpc_error e
          | Ok (Error e) ->
              printf !"Ledger not found: %s\n" (Error.to_string_hum e)
          | Ok (Ok accounts) ->
@@ -956,19 +927,23 @@ let snark_job_list =
        blocks"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
          match%map
-           dispatch_join_errors Daemon_rpcs.Snark_job_list.rpc () port
+           Daemon_rpcs.Client.dispatch_join_errors
+             Daemon_rpcs.Snark_job_list.rpc () port
          with
          | Ok str ->
              printf "%s" str
          | Error e ->
-             print_rpc_error e ))
+             Daemon_rpcs.Client.print_rpc_error e ))
 
 let snark_pool_list =
   let open Command.Param in
   Command.async ~summary:"List of snark works in the snark pool in JSON format"
-    (Cli_lib.Background_daemon.graphql_init (return ()) ~f:(fun port () ->
+    (Cli_lib.Background_daemon.graphql_init (return ())
+       ~f:(fun graphql_endpoint () ->
          Deferred.map
-           (Graphql_client.query_exn (Graphql_queries.Snark_pool.make ()) port)
+           (Graphql_client.query_exn
+              (Graphql_queries.Snark_pool.make ())
+              graphql_endpoint)
            ~f:(fun response ->
              let lst =
                [%to_yojson: Cli_lib.Graphql_types.Completed_works.t]
@@ -993,7 +968,7 @@ let pooled_user_commands =
       "Retrieve all the user commands submitted by the current daemon that \
        are pending inclusion"
     (Cli_lib.Background_daemon.graphql_init public_key_flag
-       ~f:(fun port maybe_public_key ->
+       ~f:(fun graphql_endpoint maybe_public_key ->
          let public_key =
            Yojson.Safe.to_basic
            @@ [%to_yojson: Public_key.Compressed.t option] maybe_public_key
@@ -1001,7 +976,9 @@ let pooled_user_commands =
          let graphql =
            Graphql_queries.Pooled_user_commands.make ~public_key ()
          in
-         let%map response = Graphql_client.query_exn graphql port in
+         let%map response =
+           Graphql_client.query_exn graphql graphql_endpoint
+         in
          let json_response : Yojson.Safe.json =
            `List
              ( List.map ~f:Graphql_client.User_command.to_yojson
@@ -1020,11 +997,12 @@ let pending_snark_work =
     ~summary:
       "List of snark works in JSON format that are not available in the pool \
        yet"
-    (Cli_lib.Background_daemon.graphql_init (return ()) ~f:(fun port () ->
+    (Cli_lib.Background_daemon.graphql_init (return ())
+       ~f:(fun graphql_endpoint () ->
          Deferred.map
            (Graphql_client.query_exn
               (Graphql_queries.Pending_snark_work.make ())
-              port)
+              graphql_endpoint)
            ~f:(fun response ->
              let lst =
                [%to_yojson: Cli_lib.Graphql_types.Pending_snark_work.t]
@@ -1054,37 +1032,44 @@ let start_tracing =
   let open Command.Param in
   Command.async ~summary:"Start async tracing to $config-directory/$pid.trace"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
-         match%map dispatch Daemon_rpcs.Start_tracing.rpc () port with
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Start_tracing.rpc () port
+         with
          | Ok () ->
              printf "Daemon started tracing!"
          | Error e ->
-             print_rpc_error e ))
+             Daemon_rpcs.Client.print_rpc_error e ))
 
 let stop_tracing =
   let open Deferred.Let_syntax in
   let open Command.Param in
   Command.async ~summary:"Stop async tracing"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
-         match%map dispatch Daemon_rpcs.Stop_tracing.rpc () port with
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Stop_tracing.rpc () port
+         with
          | Ok () ->
              printf "Daemon stopped printing!"
          | Error e ->
-             print_rpc_error e ))
+             Daemon_rpcs.Client.print_rpc_error e ))
 
 let set_staking =
   let privkey_path = Cli_lib.Flag.privkey_read_path in
-  Command.async ~summary:"Set new block proposer keys"
+  Command.async ~summary:"Set new keys for block production"
     (Cli_lib.Background_daemon.rpc_init privkey_path
        ~f:(fun port privkey_path ->
          let%bind ({Keypair.public_key; _} as keypair) =
            Secrets.Keypair.Terminal_stdin.read_exn privkey_path
          in
-         match%map dispatch Daemon_rpcs.Set_staking.rpc [keypair] port with
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Set_staking.rpc [keypair]
+             port
+         with
          | Error e ->
-             print_rpc_error e
+             Daemon_rpcs.Client.print_rpc_error e
          | Ok () ->
              printf
-               !"New block proposer public key : %s\n"
+               !"New block producer public key : %s\n"
                (Public_key.Compressed.to_base58_check
                   (Public_key.compress public_key)) ))
 
@@ -1098,14 +1083,14 @@ let set_staking_graphql =
   in
   Command.async ~summary:"Start producing blocks"
     (Cli_lib.Background_daemon.graphql_init pk_flag
-       ~f:(fun rest_port public_key ->
+       ~f:(fun graphql_endpoint public_key ->
          let%map _ =
            Graphql_client.(
-             Graphql_client.query
+             Graphql_client.query_exn
                (Graphql_queries.Set_staking.make
                   ~public_key:(Encoders.public_key public_key)
                   ()))
-             rest_port
+             graphql_endpoint
          in
          printf "New block producer public key: %s\n"
            (Public_key.Compressed.to_base58_check public_key) ))
@@ -1122,7 +1107,7 @@ let set_snark_worker =
   Command.async
     ~summary:"Set key you wish to snark work with or disable snark working"
     (Cli_lib.Background_daemon.graphql_init public_key_flag
-       ~f:(fun port optional_public_key ->
+       ~f:(fun graphql_endpoint optional_public_key ->
          let graphql =
            Graphql_queries.Set_snark_worker.make
              ~wallet:
@@ -1130,7 +1115,7 @@ let set_snark_worker =
                  optional optional_public_key ~f:public_key)
              ()
          in
-         Deferred.map (Graphql_client.query_exn graphql port)
+         Deferred.map (Graphql_client.query_exn graphql graphql_endpoint)
            ~f:(fun response ->
              ( match optional_public_key with
              | Some public_key ->
@@ -1148,13 +1133,13 @@ let set_snark_work_fee =
   Command.async ~summary:"Set fee reward for doing transaction snark work"
   @@ Cli_lib.Background_daemon.graphql_init
        Command.Param.(anon @@ ("fee" %: Cli_lib.Arg_type.txn_fee))
-       ~f:(fun port fee ->
+       ~f:(fun graphql_endpoint fee ->
          let graphql =
            Graphql_queries.Set_snark_work_fee.make
              ~fee:(Graphql_client.Encoders.uint64 @@ Currency.Fee.to_uint64 fee)
              ()
          in
-         Deferred.map (Graphql_client.query_exn graphql port)
+         Deferred.map (Graphql_client.query_exn graphql graphql_endpoint)
            ~f:(fun response ->
              printf
                !"Updated snark work fee: %i\nOld snark work fee: %i\n"
@@ -1216,7 +1201,7 @@ let import_key =
     ~summary:
       "Import a password protected private key to be tracked by the daemon."
     (Cli_lib.Background_daemon.graphql_init flags
-       ~f:(fun port (privkey_path, conf_dir) ->
+       ~f:(fun graphql_endpoint (privkey_path, conf_dir) ->
          let open Deferred.Let_syntax in
          let%bind home = Sys.home_directory () in
          let conf_dir =
@@ -1247,9 +1232,9 @@ let import_key =
                Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
              in
              let%map _response =
-               Graphql_client.query
+               Graphql_client.query_exn
                  (Graphql_queries.Reload_wallets.make ())
-                 port
+                 graphql_endpoint
              in
              printf
                !"\n😄 Imported account!\nPublic key: %s\n"
@@ -1259,9 +1244,12 @@ let import_key =
 let list_accounts =
   let open Command.Param in
   Command.async ~summary:"List all owned accounts"
-    (Cli_lib.Background_daemon.graphql_init (return ()) ~f:(fun port () ->
+    (Cli_lib.Background_daemon.graphql_init (return ())
+       ~f:(fun graphql_endpoint () ->
          let%map response =
-           Graphql_client.query_exn (Graphql_queries.Get_wallets.make ()) port
+           Graphql_client.query_exn
+             (Graphql_queries.Get_wallets.make ())
+             graphql_endpoint
          in
          match response#ownedWallets with
          | [||] ->
@@ -1283,15 +1271,17 @@ let list_accounts =
 let create_account =
   let open Command.Param in
   Command.async ~summary:"Create new account"
-    (Cli_lib.Background_daemon.graphql_init (return ()) ~f:(fun port () ->
+    (Cli_lib.Background_daemon.graphql_init (return ())
+       ~f:(fun graphql_endpoint () ->
          let%bind password =
-           Secrets.Keypair.prompt_password "Password for new account: "
+           Secrets.Keypair.Terminal_stdin.prompt_password
+             "Password for new account: "
          in
          let%map response =
            Graphql_client.query_exn
              (Graphql_queries.Add_wallet.make
                 ~password:(Bytes.to_string password) ())
-             port
+             graphql_endpoint
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
@@ -1306,12 +1296,14 @@ let unlock_account =
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Unlock a tracked account"
-    (Cli_lib.Background_daemon.graphql_init pk_flag ~f:(fun port pk_str ->
+    (Cli_lib.Background_daemon.graphql_init pk_flag
+       ~f:(fun graphql_endpoint pk_str ->
          let args =
            let open Deferred.Or_error.Let_syntax in
            let%map password =
              Deferred.map ~f:Or_error.return
-               (Secrets.Password.read "Password to unlock account: ")
+               (Secrets.Password.hidden_line_or_env
+                  "Password to unlock account: " ~env:Secrets.Keypair.env)
            in
            password
          in
@@ -1323,7 +1315,7 @@ let unlock_account =
                     ~public_key:(Graphql_client.Encoders.public_key pk_str)
                     ~password:(Bytes.to_string password_bytes)
                     ())
-                 port
+                 graphql_endpoint
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
@@ -1342,13 +1334,14 @@ let lock_account =
       (required Cli_lib.Arg_type.public_key_compressed)
   in
   Command.async ~summary:"Lock a tracked account"
-    (Cli_lib.Background_daemon.graphql_init pk_flag ~f:(fun port pk ->
+    (Cli_lib.Background_daemon.graphql_init pk_flag
+       ~f:(fun graphql_endpoint pk ->
          let%map response =
            Graphql_client.query_exn
              (Graphql_queries.Lock_wallet.make
                 ~public_key:(Graphql_client.Encoders.public_key pk)
                 ())
-             port
+             graphql_endpoint
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
@@ -1358,30 +1351,88 @@ let lock_account =
 
 let generate_libp2p_keypair =
   Command.async
-    ~summary:
-      "Generate a new libp2p keypair and print it out (this contains the \
-       secret key!)"
-    (Command.Param.return
-       ( handle_exception_nicely
-       @@ fun () ->
-       Deferred.ignore
-         (let open Deferred.Let_syntax in
-         (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
-         let logger = Logger.null () in
-         (* Using the helper only for keypair generation requires no state. *)
-         File_system.with_temp_dir "coda-generate-libp2p-keypair"
-           ~f:(fun tmpd ->
-             match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
-             | Ok net ->
-                 let%bind me = Coda_net2.Keypair.random net in
-                 let%map () = Coda_net2.shutdown net in
-                 printf "libp2p keypair:\n%s\n"
-                   (Coda_net2.Keypair.to_string me)
-             | Error e ->
-                 Logger.fatal logger "failed to generate libp2p keypair: $err"
-                   ~module_:__MODULE__ ~location:__LOC__
-                   ~metadata:[("err", `String (Error.to_string_hum e))] ;
-                 exit 20 )) ))
+    ~summary:"Generate a new libp2p keypair and print out the peer ID"
+    (let open Command.Let_syntax in
+    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
+    Cli_lib.Exceptions.handle_nicely
+    @@ fun () ->
+    Deferred.ignore
+      (let open Deferred.Let_syntax in
+      (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
+      let logger = Logger.null () in
+      (* Using the helper only for keypair generation requires no state. *)
+      File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
+          match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
+          | Ok net ->
+              let%bind me = Coda_net2.Keypair.random net in
+              let%bind () = Coda_net2.shutdown net in
+              let%map () =
+                Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path
+                  me
+              in
+              printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
+          | Error e ->
+              Logger.fatal logger "failed to generate libp2p keypair: $err"
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("err", `String (Error.to_string_hum e))] ;
+              exit 20 )))
+
+let trustlist_ip_flag =
+  Command.Param.(
+    flag "ip-address"
+      ~doc:"IP An IPv4 or IPv6 address for the client trustlist"
+      (required Cli_lib.Arg_type.ip_address))
+
+let trustlist_add =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  Command.async ~summary:"Add an IP to the trustlist"
+    (Cli_lib.Background_daemon.rpc_init trustlist_ip_flag
+       ~f:(fun port trustlist_ip ->
+         let trustlist_ip_string = Unix.Inet_addr.to_string trustlist_ip in
+         match%map Client.dispatch Add_trustlist.rpc trustlist_ip port with
+         | Ok (Ok ()) ->
+             printf "Added %s to client trustlist" trustlist_ip_string
+         | Ok (Error e) ->
+             eprintf "Error adding %s to client trustlist: %s"
+               trustlist_ip_string (Error.to_string_hum e)
+         | Error e ->
+             eprintf "Unknown error doing daemon RPC: %s"
+               (Error.to_string_hum e) ))
+
+let trustlist_remove =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  Command.async ~summary:"Add an IP to the trustlist"
+    (Cli_lib.Background_daemon.rpc_init trustlist_ip_flag
+       ~f:(fun port trustlist_ip ->
+         let trustlist_ip_string = Unix.Inet_addr.to_string trustlist_ip in
+         match%map Client.dispatch Remove_trustlist.rpc trustlist_ip port with
+         | Ok (Ok ()) ->
+             printf "Removed %s to client trustlist" trustlist_ip_string
+         | Ok (Error e) ->
+             eprintf "Error removing %s from client trustlist: %s"
+               trustlist_ip_string (Error.to_string_hum e)
+         | Error e ->
+             eprintf "Unknown error doing daemon RPC: %s"
+               (Error.to_string_hum e) ))
+
+let trustlist_list =
+  let open Deferred.Let_syntax in
+  let open Daemon_rpcs in
+  let open Command.Param in
+  Command.async ~summary:"Add an IP to the trustlist"
+    (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
+         match%map Client.dispatch Get_trustlist.rpc () port with
+         | Ok ips ->
+             printf
+               "The following IPs are permitted to connect to the daemon \
+                control port:\n" ;
+             List.iter ips ~f:(fun ip ->
+                 printf "%s\n" (Unix.Inet_addr.to_string ip) )
+         | Error e ->
+             eprintf "Unknown error doing daemon RPC: %s"
+               (Error.to_string_hum e) ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -1393,7 +1444,7 @@ module Visualization = struct
          Command.Param.(anon @@ ("output-filepath" %: string))
          ~f:(fun port filename ->
            let%map message =
-             match%map dispatch rpc filename port with
+             match%map Daemon_rpcs.Client.dispatch rpc filename port with
              | Ok response ->
                  f filename response
              | Error e ->
@@ -1437,19 +1488,24 @@ let accounts =
     ; ("lock", lock_account) ]
 
 let client =
-  Command.group ~summary:"Simple client commands" ~preserve_subcommand_order:()
+  Command.group ~summary:"Lightweight client commands"
+    ~preserve_subcommand_order:()
     [ ("get-balance", get_balance_graphql)
     ; ("send-payment", send_payment_graphql)
     ; ("delegate-stake", delegate_stake_graphql)
     ; ("cancel-transaction", cancel_transaction_graphql)
-    ; ("set-staking", set_staking_graphql) ]
+    ; ("set-staking", set_staking_graphql)
+    ; ("set-snark-worker", set_snark_worker)
+    ; ("set-snark-work-fee", set_snark_work_fee)
+    ; ("stop-daemon", stop_daemon)
+    ; ("status", status) ]
 
 let command =
-  Command.group ~summary:"Lightweight client commands"
+  Command.group ~summary:"[Deprecated] Lightweight client commands"
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
-    ; ("generate-keypair", generate_keypair)
+    ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("cancel-transaction", cancel_transaction)
     ; ("set-staking", set_staking)
@@ -1460,9 +1516,17 @@ let command =
     ; ("stop-daemon", stop_daemon)
     ; ("status", status) ]
 
+let client_trustlist_group =
+  Command.group ~summary:"Client trustlist management"
+    ~preserve_subcommand_order:()
+    [ ("add", trustlist_add)
+    ; ("list", trustlist_list)
+    ; ("remove", trustlist_remove) ]
+
 let advanced =
   Command.group ~summary:"Advanced client commands"
     [ ("get-nonce", get_nonce_cmd)
+    ; ("client-trustlist", client_trustlist_group)
     ; ("get-trust-status", get_trust_status)
     ; ("get-trust-status-all", get_trust_status_all)
     ; ("get-public-keys", get_public_keys)

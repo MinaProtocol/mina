@@ -2,4 +2,5 @@
   (name coda_compile_config)
   (public_name coda_compile_config)
   (libraries currency)
+  (preprocessor_deps ../../config.mlh)
   (preprocess (pps ppx_coda ppx_base ppx_optcomp)))

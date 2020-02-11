@@ -18,6 +18,8 @@ end)
 struct
   type t = N.t [@@deriving sexp, compare, hash, yojson]
 
+  let max_value = N.max_int
+
   include Comparable.Make (N)
 
   include (N : module type of N with type t := t)
@@ -40,18 +42,11 @@ struct
         (sprintf "to_bits: %s" __LOC__)
         (make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t))
 
-    let to_triples t =
-      Checked.map (to_bits t)
-        ~f:
-          Bitstring.(
-            Fn.compose
-              (pad_to_triple_list ~default:Boolean.false_)
-              Lsb_first.to_list)
-
     let constant n =
       Integer.constant ~length:N.length_in_bits ~m
         (Bignum_bigint.of_int (N.to_int n))
 
+    (* warning: this typ does not work correctly with the generic if_ *)
     let typ : (field Integer.t, t) Typ.t =
       let typ = Typ.list ~length:N.length_in_bits Boolean.typ in
       let of_bits bs = of_bits (Bitstring.Lsb_first.of_list bs) in
@@ -120,6 +115,7 @@ struct
     let zero = zero_checked
   end
 
+  (* warning: this typ does not work correctly with the generic if_ *)
   let typ = Checked.typ
 
   module Bits = Bits
@@ -128,9 +124,11 @@ struct
 
   let of_bits = Bits.of_bits
 
-  let fold t = Fold.group3 ~default:false (Bits.fold t)
+  let var_to_bits var =
+    Snarky_integer.Integer.to_bits ~length:N.length_in_bits
+      ~m:Snark_params.Tick.m var
 
-  let length_in_triples = (length_in_bits + 2) / 3
+  let fold t = Fold.group3 ~default:false (Bits.fold t)
 
   let gen =
     Quickcheck.Generator.map

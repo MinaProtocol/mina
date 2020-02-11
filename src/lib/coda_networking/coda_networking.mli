@@ -4,6 +4,7 @@ open Coda_base
 open Coda_transition
 open Network_pool
 open Pipe_lib
+open Network_peer
 
 exception No_initial_peers
 
@@ -55,9 +56,8 @@ module Rpcs : sig
     type response = unit
   end
 
-  module Get_bootstrappable_best_tip : sig
-    type query = Consensus.Data.Consensus_state.Value.t
-    [@@deriving sexp, to_yojson]
+  module Get_best_tip : sig
+    type query = unit [@@deriving sexp, to_yojson]
 
     type response =
       ( External_transition.Stable.V1.t
@@ -83,10 +83,7 @@ module Rpcs : sig
           rpc
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
-    | Get_bootstrappable_best_tip
-        : ( Get_bootstrappable_best_tip.query
-          , Get_bootstrappable_best_tip.response )
-          rpc
+    | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   include Rpc_intf.Rpc_interface_intf with type ('q, 'r) rpc := ('q, 'r) rpc
@@ -104,7 +101,9 @@ module Config : sig
     ; trust_system: Trust_system.t
     ; time_controller: Block_time.Controller.t
     ; consensus_local_state: Consensus.Data.Local_state.t
+    ; genesis_ledger_hash: Ledger_hash.t
     ; creatable_gossip_net: Gossip_net.Any.creatable
+    ; is_seed: bool
     ; log_gossip_heard: log_gossip_heard }
   [@@deriving make]
 end
@@ -113,12 +112,14 @@ type t
 
 val states :
      t
-  -> (External_transition.t Envelope.Incoming.t * Block_time.t)
+  -> (External_transition.t Envelope.Incoming.t * Block_time.t * (bool -> unit))
      Strict_pipe.Reader.t
 
-val peers : t -> Network_peer.Peer.t list
+val peers : t -> Network_peer.Peer.t list Deferred.t
 
 val on_first_received_message : t -> f:(unit -> 'a) -> 'a Deferred.t
+
+val fill_first_received_message_signal : t -> unit
 
 val on_first_connect : t -> f:(unit -> 'a) -> 'a Deferred.t
 
@@ -126,21 +127,21 @@ val on_first_high_connectivity : t -> f:(unit -> 'a) -> 'a Deferred.t
 
 val online_status : t -> [`Online | `Offline] Broadcast_pipe.Reader.t
 
-val random_peers : t -> int -> Network_peer.Peer.t list
+val random_peers : t -> int -> Network_peer.Peer.t list Deferred.t
 
 val get_ancestry :
      t
-  -> Unix.Inet_addr.t
+  -> Peer.Id.t
   -> Consensus.Data.Consensus_state.Value.t
   -> ( External_transition.t
      , State_body_hash.t list * External_transition.t )
      Proof_carrying_data.t
+     Envelope.Incoming.t
      Deferred.Or_error.t
 
-val get_bootstrappable_best_tip :
+val get_best_tip :
      t
   -> Network_peer.Peer.t
-  -> Consensus.Data.Consensus_state.Value.t
   -> ( External_transition.t
      , State_body_hash.t list * External_transition.t )
      Proof_carrying_data.t
@@ -160,7 +161,7 @@ val get_transition_chain :
 
 val get_staged_ledger_aux_and_pending_coinbases_at_hash :
      t
-  -> Unix.Inet_addr.t
+  -> Peer.Id.t
   -> State_hash.t
   -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
      Deferred.Or_error.t
@@ -168,11 +169,14 @@ val get_staged_ledger_aux_and_pending_coinbases_at_hash :
 val ban_notify : t -> Network_peer.Peer.t -> Time.t -> unit Deferred.Or_error.t
 
 val snark_pool_diffs :
-  t -> Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t Linear_pipe.Reader.t
+     t
+  -> (Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t * (bool -> unit))
+     Linear_pipe.Reader.t
 
 val transaction_pool_diffs :
      t
-  -> Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
+  -> ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
+     * (bool -> unit) )
      Linear_pipe.Reader.t
 
 val broadcast_state : t -> External_transition.t -> unit
@@ -192,11 +196,16 @@ val glue_sync_ledger :
   -> unit
 
 val query_peer :
-  t -> Network_peer.Peer.t -> ('q, 'r) Rpcs.rpc -> 'q -> 'r Deferred.Or_error.t
+     t
+  -> Network_peer.Peer.Id.t
+  -> ('q, 'r) Rpcs.rpc
+  -> 'q
+  -> 'r Coda_base.Rpc_intf.rpc_response Deferred.t
 
-val initial_peers : t -> Host_and_port.t list
+val ip_for_peer :
+  t -> Network_peer.Peer.Id.t -> Unix.Inet_addr.t option Deferred.t
 
-val peers_by_ip : t -> Unix.Inet_addr.t -> Network_peer.Peer.t list
+val initial_peers : t -> Coda_net2.Multiaddr.t list
 
 val net2 : t -> Coda_net2.net option
 
@@ -223,13 +232,11 @@ val create :
                       , State_body_hash.t list * External_transition.t )
                       Proof_carrying_data.t
                       Deferred.Option.t)
-  -> get_bootstrappable_best_tip:(   Consensus.Data.Consensus_state.Value.t
-                                     Envelope.Incoming.t
-                                  -> ( External_transition.t
-                                     , State_body_hash.t list
-                                       * External_transition.t )
-                                     Proof_carrying_data.t
-                                     Deferred.Option.t)
+  -> get_best_tip:(   unit Envelope.Incoming.t
+                   -> ( External_transition.t
+                      , State_body_hash.t list * External_transition.t )
+                      Proof_carrying_data.t
+                      Deferred.Option.t)
   -> get_transition_chain_proof:(   State_hash.t Envelope.Incoming.t
                                  -> (State_hash.t * State_body_hash.t list)
                                     Deferred.Option.t)

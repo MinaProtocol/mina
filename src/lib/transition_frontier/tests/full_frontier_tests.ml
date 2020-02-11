@@ -14,7 +14,7 @@ let%test_module "Full_frontier tests" =
 
     let logger = Logger.null ()
 
-    let accounts_with_secret_keys = Genesis_ledger.accounts
+    let accounts_with_secret_keys = Lazy.force Test_genesis_ledger.accounts
 
     let max_length = 5
 
@@ -30,7 +30,9 @@ let%test_module "Full_frontier tests" =
 
     let add_breadcrumb frontier breadcrumb =
       let diffs = Full_frontier.calculate_diffs frontier breadcrumb in
-      ignore (Full_frontier.apply_diffs frontier diffs)
+      ignore
+        (Full_frontier.apply_diffs frontier diffs
+           ~ignore_consensus_local_state:false)
 
     let add_breadcrumbs frontier = List.iter ~f:(add_breadcrumb frontier)
 
@@ -38,16 +40,19 @@ let%test_module "Full_frontier tests" =
       let base_hash = Frontier_hash.empty in
       let consensus_local_state =
         Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
+          ~genesis_ledger:Test_genesis_ledger.t
       in
       let root_ledger =
         Or_error.ok_exn
           (Transfer.transfer_accounts
-             ~src:(Lazy.force Genesis_ledger.t)
+             ~src:(Lazy.force Test_genesis_ledger.t)
              ~dest:(Ledger.create ()))
       in
       let root_data =
         let open Root_data in
-        { transition= Lazy.force External_transition.genesis
+        { transition=
+            External_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
+              ~base_proof:Precomputed_values.base_proof
         ; staged_ledger= Staged_ledger.create_exn ~ledger:root_ledger }
       in
       Full_frontier.create ~logger ~root_data

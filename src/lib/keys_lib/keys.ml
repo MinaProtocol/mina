@@ -8,6 +8,7 @@ module type S = sig
       { wrap_vk: Tock.Verification_key.t
       ; prev_proof: Tock.Proof.t
       ; prev_state: Protocol_state.value
+      ; genesis_state_hash: Coda_base.State_hash.t
       ; expected_next_state: Protocol_state.value option
       ; update: Snark_transition.value }
   end
@@ -88,6 +89,7 @@ let create () : (module S) Async.Deferred.t =
             { wrap_vk: Tock.Verification_key.t
             ; prev_proof: Tock.Proof.t
             ; prev_state: Protocol_state.value
+            ; genesis_state_hash: Coda_base.State_hash.t
             ; expected_next_state: Protocol_state.value option
             ; update: Snark_transition.value }
         end
@@ -117,11 +119,13 @@ let create () : (module S) Async.Deferred.t =
                 { Prover_state.wrap_vk
                 ; prev_proof
                 ; prev_state
+                ; genesis_state_hash
                 ; update
                 ; expected_next_state } =
               { Step.Prover_state.wrap_vk
               ; prev_proof
               ; prev_state
+              ; genesis_state_hash
               ; update
               ; expected_next_state }
             in
@@ -129,11 +133,13 @@ let create () : (module S) Async.Deferred.t =
                 { Step.Prover_state.wrap_vk
                 ; prev_proof
                 ; prev_state
+                ; genesis_state_hash
                 ; update
                 ; expected_next_state } =
               { Prover_state.wrap_vk
               ; prev_proof
               ; prev_state
+              ; genesis_state_hash
               ; update
               ; expected_next_state }
             in

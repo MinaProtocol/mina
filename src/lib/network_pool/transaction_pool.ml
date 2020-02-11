@@ -1,6 +1,7 @@
 (** A pool of transactions that can be included in future blocks. Combined with
     the Network_pool module, this handles storing and gossiping the correct
-    transactions (user commands) and providing them to the proposer code. *)
+    transactions (user commands) and providing them to the block producer code.
+*)
 
 open Core
 open Async
@@ -8,6 +9,7 @@ open Coda_base
 open Module_version
 open Pipe_lib
 open Signature_lib
+open Network_peer
 
 (* TEMP HACK UNTIL DEFUNCTORING: transition frontier interface is simplified *)
 module type Transition_frontier_intf = sig
@@ -655,6 +657,9 @@ struct
                             go txs'' pool accepted ) )
             in
             go txs t.pool []
+
+      let apply t env =
+        match%map apply t env with Ok e -> Ok e | Error e -> Error (`Other e)
     end
 
     let get_rebroadcastable (t : t) ~is_expired =
@@ -702,7 +707,8 @@ struct
 
   (* TODO: This causes the signature to get checked twice as it is checked
      below before feeding it to add *)
-  let add t txns = apply_and_broadcast t (Envelope.Incoming.local txns)
+  let add t txns =
+    apply_and_broadcast t (Envelope.Incoming.local txns, Fn.const ())
 end
 
 (* Use this one in downstream consumers *)
@@ -884,6 +890,19 @@ let%test_module _ =
       in
       Quickcheck.random_value ~seed:(`Deterministic "constant") (go 0 [])
 
+    module Result = struct
+      include Result
+
+      (*let equal ok_eq err_eq a b =
+      match a, b with
+      | Ok a, Ok b -> ok_eq a b
+      | Error a, Error b -> err_eq a b
+      | _ -> false*)
+    end
+
+    type pool_apply = (User_command.t list, [`Other of Error.t]) Result.t
+    [@@deriving sexp, compare]
+
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
@@ -894,8 +913,7 @@ let%test_module _ =
             Test.Resource_pool.Diff.apply pool
               (Envelope.Incoming.local independent_cmds)
           in
-          [%test_eq: User_command.t list Or_error.t] apply_res
-            (Ok independent_cmds) ;
+          [%test_eq: pool_apply] apply_res (Ok independent_cmds) ;
           assert_pool_txs independent_cmds ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
@@ -934,7 +952,8 @@ let%test_module _ =
           ; delegate= Public_key.Compressed.empty
           ; voting_for=
               Quickcheck.random_value ~seed:(`Deterministic "constant")
-                State_hash.gen } )
+                State_hash.gen
+          ; timing= Account.Timing.Untimed } )
 
     let%test_unit "Transactions are removed and added back in fork changes" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -948,7 +967,7 @@ let%test_module _ =
               @@ (List.hd_exn independent_cmds :: List.drop independent_cmds 2)
               )
           in
-          [%test_eq: User_command.t list Or_error.t] apply_res
+          [%test_eq: pool_apply] apply_res
             (Ok (List.hd_exn independent_cmds :: List.drop independent_cmds 2)) ;
           best_tip_ref := map_set_multi !best_tip_ref [mk_account 1 1_000 1] ;
           let%bind () =
@@ -979,9 +998,7 @@ let%test_module _ =
             Test.Resource_pool.Diff.apply pool
             @@ Envelope.Incoming.local independent_cmds
           in
-          [%test_eq: User_command.t list Or_error.t]
-            (Ok (List.drop independent_cmds 2))
-            apply_res ;
+          [%test_eq: pool_apply] (Ok (List.drop independent_cmds 2)) apply_res ;
           assert_pool_txs (List.drop independent_cmds 2) ;
           Deferred.unit )
 
@@ -989,6 +1006,7 @@ let%test_module _ =
       User_command.forget_check
       @@ User_command.sign test_keys.(sender_idx)
            (User_command_payload.create ~fee:(Currency.Fee.of_int fee)
+              ~valid_until:Coda_numbers.Global_slot.max_value
               ~nonce:(Account.Nonce.of_int nonce)
               ~memo:(User_command_memo.create_by_digesting_string_exn "foo")
               ~body:
@@ -1024,7 +1042,7 @@ let%test_module _ =
           let%bind apply_res =
             Test.Resource_pool.Diff.apply pool @@ Envelope.Incoming.local [cmd1]
           in
-          [%test_eq: User_command.t list Or_error.t] apply_res (Ok [cmd1]) ;
+          [%test_eq: pool_apply] apply_res (Ok [cmd1]) ;
           assert_pool_txs [cmd1] ;
           let cmd2 = mk_payment 0 1 0 5 999 in
           best_tip_ref := map_set_multi !best_tip_ref [mk_account 0 0 1] ;
@@ -1106,7 +1124,7 @@ let%test_module _ =
       let%bind apply_res =
         Test.Resource_pool.Diff.apply pool (Envelope.Incoming.local txs_all)
       in
-      [%test_eq: User_command.t list Or_error.t] (Ok txs_all) apply_res ;
+      [%test_eq: pool_apply] (Ok txs_all) apply_res ;
       assert_pool_txs @@ txs_all ;
       let replace_txs =
         [ (* sufficient fee *)
@@ -1122,7 +1140,7 @@ let%test_module _ =
         Test.Resource_pool.Diff.apply pool
           (Envelope.Incoming.local replace_txs)
       in
-      [%test_eq: User_command.t list Or_error.t]
+      [%test_eq: pool_apply]
         (Ok [List.nth_exn replace_txs 0; List.nth_exn replace_txs 2])
         apply_res_2 ;
       Deferred.unit
@@ -1141,7 +1159,7 @@ let%test_module _ =
       let%bind apply_res =
         Test.Resource_pool.Diff.apply pool @@ Envelope.Incoming.local txs
       in
-      [%test_eq: User_command.t list Or_error.t] (Ok txs) apply_res ;
+      [%test_eq: pool_apply] (Ok txs) apply_res ;
       assert_pool_txs @@ txs ;
       best_tip_ref := map_set_multi !best_tip_ref [mk_account 0 970 1] ;
       let%bind () =
@@ -1230,7 +1248,9 @@ let%test_module _ =
         expected
 
     let mock_sender =
-      Envelope.Sender.Remote (Unix.Inet_addr.of_string "1.2.3.4")
+      Envelope.Sender.Remote
+        ( Unix.Inet_addr.of_string "1.2.3.4"
+        , Peer.Id.unsafe_of_string "contents should be irrelevant" )
 
     let%test_unit "rebroadcastable transaction behavior" =
       Thread_safe.block_on_async_exn (fun () ->
@@ -1245,8 +1265,7 @@ let%test_module _ =
             Test.Resource_pool.Diff.apply pool
               (Envelope.Incoming.local local_cmds)
           in
-          [%test_eq: User_command.t list Or_error.t] apply_res_1
-            (Ok local_cmds) ;
+          [%test_eq: pool_apply] apply_res_1 (Ok local_cmds) ;
           assert_pool_txs local_cmds ;
           assert_rebroadcastable pool local_cmds ;
           (* Adding non-locally-generated transactions doesn't affect
@@ -1255,8 +1274,7 @@ let%test_module _ =
             Test.Resource_pool.Diff.apply pool
               (Envelope.Incoming.wrap ~data:remote_cmds ~sender:mock_sender)
           in
-          [%test_eq: User_command.t list Or_error.t] apply_res_2
-            (Ok remote_cmds) ;
+          [%test_eq: pool_apply] apply_res_2 (Ok remote_cmds) ;
           assert_pool_txs (local_cmds @ remote_cmds) ;
           assert_rebroadcastable pool local_cmds ;
           (* When locally generated transactions are committed they are no

@@ -1,11 +1,12 @@
-[%%import "config/ledger_depth/full.mlh"]
-[%%import "config/curve/small.mlh"]
-[%%import "config/coinbase/standard.mlh"]
-[%%import "config/consensus/postake_short.mlh"]
-[%%import "config/scan_state/standard.mlh"]
-[%%import "config/debug_level/some.mlh"]
-[%%import "config/proof_level/check.mlh"]
-[%%import "config/txpool_size.mlh"]
+[%%import "/src/config/ledger_depth/full.mlh"]
+[%%import "/src/config/curve/small.mlh"]
+[%%import "/src/config/coinbase/standard.mlh"]
+[%%import "/src/config/consensus/postake_short.mlh"]
+[%%import "/src/config/scan_state/standard.mlh"]
+[%%import "/src/config/debug_level/some.mlh"]
+[%%import "/src/config/proof_level/check.mlh"]
+[%%import "/src/config/txpool_size.mlh"]
+[%%import "/src/config/account_creation_fee/standard.mlh"]
 
 [%%define time_offsets false]
 [%%define fake_hash false]
@@ -22,3 +23,5 @@
 [%%define print_versioned_types false]
 
 [%%define daemon_expiry "never"]
+[%%define test_full_epoch false]
+

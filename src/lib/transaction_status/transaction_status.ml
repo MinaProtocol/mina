@@ -91,9 +91,11 @@ let%test_module "transaction_status" =
     let key_gen =
       let open Quickcheck.Generator in
       let open Quickcheck.Generator.Let_syntax in
-      let keypairs = List.map Genesis_ledger.accounts ~f:fst in
+      let keypairs =
+        List.map (Lazy.force Test_genesis_ledger.accounts) ~f:fst
+      in
       let%map random_key_opt = of_list keypairs in
-      ( Genesis_ledger.largest_account_keypair_exn ()
+      ( Test_genesis_ledger.largest_account_keypair_exn ()
       , Signature_lib.Keypair.of_private_key_exn
           (Option.value_exn random_key_opt) )
 

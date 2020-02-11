@@ -1,8 +1,8 @@
+[%%import "/src/config.mlh"]
+
 open Core
 open Snark_params
 open Tick
-open Tuple_lib
-open Fold_lib
 
 type t = Field.t * Field.t [@@deriving sexp, hash]
 
@@ -19,6 +19,8 @@ end
 
 include Comparable.S_binable with type t := t
 
+[%%if defined consensus_mechanism]
+
 type var = Field.Var.t * Field.Var.t
 
 val typ : (var, t) Typ.t
@@ -26,6 +28,8 @@ val typ : (var, t) Typ.t
 val var_of_t : t -> var
 
 val assert_equal : var -> var -> (unit, 'a) Checked.t
+
+[%%endif]
 
 val of_private_key_exn : Private_key.t -> t
 
@@ -62,21 +66,11 @@ module Compressed : sig
 
   val empty : t
 
-  val length_in_triples : int
-
-  type var = (Field.Var.t, Boolean.var) Poly.t
-
-  val typ : (var, t) Typ.t
-
-  val var_of_t : t -> var
-
   include Comparable.S with type t := t
 
   include Hashable.S_binable with type t := t
 
-  val fold : t -> bool Triple.t Fold.t
-
-  val var_to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
+  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
   val to_string : t -> string
 
@@ -86,8 +80,18 @@ module Compressed : sig
 
   val of_base58_check : string -> t Or_error.t
 
+  [%%if defined consensus_mechanism]
+
+  type var = (Field.Var.t, Boolean.var) Poly.t
+
+  val typ : (var, t) Typ.t
+
+  val var_of_t : t -> var
+
   module Checked : sig
     val equal : var -> var -> (Boolean.var, _) Checked.t
+
+    val to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
     val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t
 
@@ -95,6 +99,8 @@ module Compressed : sig
       val equal : var -> var -> (unit, _) Checked.t
     end
   end
+
+  [%%endif]
 end
 
 val gen : t Quickcheck.Generator.t
@@ -109,6 +115,10 @@ val decompress : Compressed.t -> t option
 
 val decompress_exn : Compressed.t -> t
 
+[%%if defined consensus_mechanism]
+
 val compress_var : var -> (Compressed.var, _) Checked.t
 
 val decompress_var : Compressed.var -> (var, _) Checked.t
+
+[%%endif]

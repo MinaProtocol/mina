@@ -17,13 +17,20 @@ exception Snark_worker_signal_interrupt of Signal.t
 val subscription : t -> Coda_subscriptions.t
 
 (** Derived from local state (aka they may not reflect the latest public keys to which you've attempted to change *)
-val propose_public_keys : t -> Public_key.Compressed.Set.t
+val block_production_pubkeys : t -> Public_key.Compressed.Set.t
 
-val replace_propose_keypairs : t -> Keypair.And_compressed_pk.Set.t -> unit
+val replace_block_production_keypairs :
+  t -> Keypair.And_compressed_pk.Set.t -> unit
 
-val next_proposal : t -> Consensus.Hooks.proposal option
+val next_producer_timing : t -> Consensus.Hooks.block_producer_timing option
 
 val staking_ledger : t -> Sparse_ledger.t option
+
+val current_epoch_delegators :
+  t -> pk:Public_key.Compressed.t -> Coda_base.Account.t list option
+
+val last_epoch_delegators :
+  t -> pk:Public_key.Compressed.t -> Coda_base.Account.t list option
 
 val replace_snark_worker_key :
   t -> Public_key.Compressed.t option -> unit Deferred.t
@@ -64,9 +71,9 @@ val sync_status : t -> Sync_status.t Coda_incremental.Status.Observer.t
 
 val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
-val peers : t -> Network_peer.Peer.t list
+val peers : t -> Network_peer.Peer.t list Deferred.t
 
-val initial_peers : t -> Host_and_port.t list
+val initial_peers : t -> Coda_net2.Multiaddr.t list
 
 val client_port : t -> int
 
@@ -88,6 +95,8 @@ end
 
 val root_diff : t -> Root_diff.t Strict_pipe.Reader.t
 
+val initialization_finish_signal : t -> unit Ivar.t
+
 val dump_tf : t -> string Or_error.t
 
 val best_path : t -> State_hash.t list option
@@ -105,7 +114,11 @@ val start : t -> unit Deferred.t
 
 val stop_snark_worker : ?should_wait_kill:bool -> t -> unit Deferred.t
 
-val create : Config.t -> t Deferred.t
+val create :
+     Config.t
+  -> genesis_ledger:Ledger.t Lazy.t
+  -> base_proof:Proof.t
+  -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option
 
@@ -119,8 +132,10 @@ val receipt_chain_database : t -> Receipt_chain_database.t
 
 val wallets : t -> Secrets.Wallets.t
 
+val subscriptions : t -> Coda_subscriptions.t
+
 val most_recent_valid_transition :
-  t -> External_transition.t Broadcast_pipe.Reader.t
+  t -> External_transition.Initial_validated.t Broadcast_pipe.Reader.t
 
 val top_level_logger : t -> Logger.t
 

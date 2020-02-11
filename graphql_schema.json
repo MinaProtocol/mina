@@ -12,6 +12,23 @@
       },
       "types": [
         {
+          "kind": "ENUM",
+          "name": "ChainReorganizationStatus",
+          "description": "Status for whenever the blockchain is reorganized",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": [
+            {
+              "name": "CHANGED",
+              "description": null,
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "possibleTypes": null
+        },
+        {
           "kind": "OBJECT",
           "name": "subscription",
           "description": null,
@@ -53,6 +70,22 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "Block",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "chainReorganization",
+              "description": "Event that triggers when the best tip changes in a way that is not a trivial extension of the existing one",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "ENUM",
+                  "name": "ChainReorganizationStatus",
                   "ofType": null
                 }
               },
@@ -413,6 +446,18 @@
               "deprecationReason": null
             },
             {
+              "name": "valid_until",
+              "description": "The global slot number after which this transaction cannot be applied.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "fee",
               "description": "Fee amount in order to send a stake delegation",
               "args": [],
@@ -478,6 +523,16 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "valid_until",
+              "description": "The global slot number after which this transaction cannot be applied.",
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
                 "ofType": null
               },
               "defaultValue": null
@@ -586,6 +641,18 @@
               "deprecationReason": null
             },
             {
+              "name": "valid_until",
+              "description": "The global slot number after which this transaction cannot be applied.",
+              "args": [],
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
+                "ofType": null
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
               "name": "fee",
               "description": "Fee amount in order to send payment",
               "args": [],
@@ -667,6 +734,16 @@
               "type": {
                 "kind": "SCALAR",
                 "name": "String",
+                "ofType": null
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "valid_until",
+              "description": "The global slot number after which this transaction cannot be applied.",
+              "type": {
+                "kind": "SCALAR",
+                "name": "UInt32",
                 "ofType": null
               },
               "defaultValue": null
@@ -2747,16 +2824,6 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "UInt32",
-          "description": "String representing a uint32 number in base 10",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "OBJECT",
           "name": "ConsensusState",
           "description": null,
@@ -2794,7 +2861,7 @@
               "deprecationReason": null
             },
             {
-              "name": "minEpochLength",
+              "name": "minWindowDensity",
               "description": null,
               "args": [],
               "type": {
@@ -2883,22 +2950,6 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Boolean",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "checkpoints",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
                   "ofType": null
                 }
               },
@@ -3537,7 +3588,7 @@
             },
             {
               "name": "epochDelegateAccount",
-              "description": "The account that you delegated on the staking ledger of the current block",
+              "description": "The account that you delegated on the staking ledger of the current block's epoch",
               "args": [],
               "type": {
                 "kind": "OBJECT",
@@ -3879,6 +3930,142 @@
                 "ofType": {
                   "kind": "SCALAR",
                   "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "BlockProducerTimings",
+          "description": null,
+          "fields": [
+            {
+              "name": "times",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "OBJECT",
+                      "name": "ConsensusTime",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "SCALAR",
+          "name": "UInt32",
+          "description": "String representing a uint32 number in base 10",
+          "fields": null,
+          "inputFields": null,
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
+          "name": "ConsensusTime",
+          "description": null,
+          "fields": [
+            {
+              "name": "epoch",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "slot",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "globalSlot",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "UInt32",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "startTime",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "endTime",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
                   "ofType": null
                 }
               },
@@ -4460,7 +4647,7 @@
               "deprecationReason": null
             },
             {
-              "name": "proposePubkeys",
+              "name": "blockProducerPubkeys",
               "description": null,
               "args": [],
               "type": {
@@ -4500,20 +4687,20 @@
               "description": null,
               "args": [],
               "type": {
-                "kind": "SCALAR",
-                "name": "String",
+                "kind": "OBJECT",
+                "name": "ConsensusTime",
                 "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
             },
             {
-              "name": "nextProposal",
+              "name": "nextBlockProduction",
               "description": null,
               "args": [],
               "type": {
-                "kind": "SCALAR",
-                "name": "String",
+                "kind": "OBJECT",
+                "name": "BlockProducerTimings",
                 "ofType": null
               },
               "isDeprecated": false,
@@ -4527,8 +4714,8 @@
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
+                  "kind": "OBJECT",
+                  "name": "ConsensusTime",
                   "ofType": null
                 }
               },

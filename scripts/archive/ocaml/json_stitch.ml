@@ -2,12 +2,9 @@ open Core
 
 module Combinators = struct
   module Scalar = struct
-    type t =
-      | Int of int
-      | String of string
-      | Null 
+    type t = Int of int | String of string | Null
 
-    let is_json_equal  : t -> Yojson.Basic.json -> bool = function
+    let is_json_equal : t -> Yojson.Basic.json -> bool = function
       | Int int_value -> (
           function
           | `Int json_int_value ->

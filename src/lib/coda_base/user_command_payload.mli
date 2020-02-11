@@ -1,7 +1,5 @@
 open Core_kernel
 open Signature_lib
-open Tuple_lib
-open Fold_lib
 open Snark_params.Tick
 
 module Body : sig
@@ -21,19 +19,21 @@ end
 
 module Common : sig
   module Poly : sig
-    type ('fee, 'nonce, 'memo) t = {fee: 'fee; nonce: 'nonce; memo: 'memo}
+    type ('fee, 'nonce, 'global_slot, 'memo) t =
+      {fee: 'fee; nonce: 'nonce; valid_until: 'global_slot; memo: 'memo}
     [@@deriving eq, sexp, hash, yojson]
 
     module Stable :
       sig
         module V1 : sig
-          type ('fee, 'nonce, 'memo) t
+          type ('fee, 'nonce, 'global_slot, 'memo) t
           [@@deriving bin_io, eq, sexp, hash, yojson, version]
         end
 
         module Latest = V1
       end
-      with type ('fee, 'nonce, 'memo) V1.t = ('fee, 'nonce, 'memo) t
+      with type ('fee, 'nonce, 'global_slot, 'memo) V1.t =
+                  ('fee, 'nonce, 'global_slot, 'memo) t
   end
 
   module Stable : sig
@@ -41,6 +41,7 @@ module Common : sig
       type t =
         ( Currency.Fee.Stable.V1.t
         , Coda_numbers.Account_nonce.Stable.V1.t
+        , Coda_numbers.Global_slot.Stable.V1.t
         , User_command_memo.t )
         Poly.Stable.V1.t
       [@@deriving bin_io, eq, sexp, hash]
@@ -56,6 +57,7 @@ module Common : sig
   type var =
     ( Currency.Fee.var
     , Coda_numbers.Account_nonce.Checked.t
+    , Coda_numbers.Global_slot.Checked.t
     , User_command_memo.Checked.t )
     Poly.t
 
@@ -63,11 +65,7 @@ module Common : sig
 
   val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
-  val fold : t -> bool Triple.t Fold.t
-
   module Checked : sig
-    val to_triples : var -> (Boolean.var Triple.t list, _) Checked.t
-
     val to_input :
       var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
 
@@ -105,23 +103,26 @@ type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 val create :
      fee:Currency.Fee.t
   -> nonce:Coda_numbers.Account_nonce.t
+  -> valid_until:Coda_numbers.Global_slot.t
   -> memo:User_command_memo.t
   -> body:Body.t
   -> t
 
-val length_in_triples : int
-
 val dummy : t
-
-val fold : t -> bool Triple.t Fold.t
 
 val fee : t -> Currency.Fee.t
 
 val nonce : t -> Coda_numbers.Account_nonce.t
 
+val valid_until : t -> Coda_numbers.Global_slot.t
+
 val memo : t -> User_command_memo.t
 
 val body : t -> Body.t
+
+val receiver : t -> Public_key.Compressed.t
+
+val amount : t -> Currency.Amount.t option
 
 val is_payment : t -> bool
 

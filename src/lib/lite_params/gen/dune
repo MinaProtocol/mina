@@ -9,5 +9,5 @@
      ppxlib
      lite_compat_algebra)
    (preprocessor_deps "../../../config.mlh")
-   (preprocess (pps ppx_jane ppxlib.metaquot ppxlib.runner))
+   (preprocess (pps ppx_optcomp ppxlib.metaquot ppxlib.runner))
    (modes native))

@@ -133,14 +133,14 @@ module Api = struct
     let%bind () = wait_for_no_rpcs () in
     Coda_process.disconnect t.workers.(i) ~logger
 
-  let run_user_command t i (sk : Private_key.t) fee ~body =
+  let run_user_command t i (sk : Private_key.t) fee valid_until ~body =
     let open Deferred.Option.Let_syntax in
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
     let%bind nonce = Coda_process.get_nonce_exn worker pk_of_sk in
     let payload =
       User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
-        ~body
+        ~valid_until ~body
     in
     let user_cmd =
       ( User_command.sign (Keypair.of_private_key_exn sk) payload
@@ -152,12 +152,12 @@ module Api = struct
     in
     user_cmd
 
-  let delegate_stake t i delegator_sk delegate_pk fee =
-    run_user_command t i delegator_sk fee
+  let delegate_stake t i delegator_sk delegate_pk fee valid_until =
+    run_user_command t i delegator_sk fee valid_until
       ~body:(Stake_delegation (Set_delegate {new_delegate= delegate_pk}))
 
-  let send_payment t i sender_sk receiver_pk amount fee =
-    run_user_command t i sender_sk fee
+  let send_payment t i sender_sk receiver_pk amount fee valid_until =
+    run_user_command t i sender_sk fee valid_until
       ~body:(Payment {receiver= receiver_pk; amount})
 
   (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
@@ -404,14 +404,15 @@ let events workers start_reader =
             workers.(i) <- worker ;
             started () ;
             don't_wait_for
-              (let ms_to_catchup =
-                 (Consensus.Constants.c + Consensus.Constants.delta)
-                 * Consensus.Constants.block_window_duration_ms
-                 + 60_000
-                 (* time for peer discovery *)
+              (let%bind () =
+                 Coda_process.initialization_finish_signal_exn worker
+                 >>= Linear_pipe.read >>| ignore
+               in
+               let ms_to_sync =
+                 Consensus.Constants.(delta * block_window_duration_ms) + 6_000
                  |> Float.of_int
                in
-               let%map () = after (Time.Span.of_ms ms_to_catchup) in
+               let%map () = after (Time.Span.of_ms ms_to_sync) in
                synced ()) ;
             connect_worker i worker) ;
          Deferred.unit )) ;
@@ -421,6 +422,19 @@ let events workers start_reader =
 let start_checks logger (workers : Coda_process.t array) start_reader testnet
     ~acceptable_delay =
   let event_reader, root_reader = events workers start_reader in
+  let%bind initialization_finish_signals =
+    Deferred.Array.map workers ~f:(fun worker ->
+        Coda_process.initialization_finish_signal_exn worker )
+  in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "downloaded initialization signal" ;
+  let%map () =
+    Deferred.all_unit
+      (List.map (Array.to_list initialization_finish_signals) ~f:(fun p ->
+           Linear_pipe.read p >>| ignore ))
+  in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    "initialization finishes, start check" ;
   don't_wait_for
     (start_prefix_check logger workers event_reader testnet ~acceptable_delay) ;
   start_payment_check logger root_reader testnet
@@ -431,29 +445,33 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test ?is_archive_node logger n proposers snark_work_public_keys
-    work_selection_method ~max_concurrent_connections =
+let test ?is_archive_rocksdb ~name logger n block_production_keys
+    snark_work_public_keys work_selection_method ~max_concurrent_connections =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
-  let proposal_interval = Consensus.Constants.block_window_duration_ms in
+  let block_production_interval =
+    Consensus.Constants.block_window_duration_ms
+  in
   let acceptable_delay =
     Time.Span.of_ms
-      (proposal_interval * Consensus.Constants.delta |> Float.of_int)
+      (block_production_interval * Consensus.Constants.delta |> Float.of_int)
   in
   let%bind program_dir = Unix.getcwd () in
   Coda_processes.init () ;
-  let configs =
-    Coda_processes.local_configs n ~proposal_interval ~program_dir ~proposers
-      ~acceptable_delay
+  let%bind configs =
+    Coda_processes.local_configs n ~block_production_interval ~program_dir
+      ~block_production_keys ~acceptable_delay ~chain_id:name
       ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))
       ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
-      ~max_concurrent_connections ?is_archive_node
+      ~max_concurrent_connections ?is_archive_rocksdb
   in
-  let%map workers = Coda_processes.spawn_local_processes_exn configs in
+  let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let workers = List.to_array workers in
   let start_reader, start_writer = Linear_pipe.create () in
   let testnet = Api.create configs workers start_writer in
-  start_checks logger workers start_reader testnet ~acceptable_delay ;
+  let%map () =
+    start_checks logger workers start_reader testnet ~acceptable_delay
+  in
   testnet
 
 module Delegation : sig
@@ -467,12 +485,13 @@ module Delegation : sig
 end = struct
   let delegate_stake ?acceptable_delay:(delay = 7) (testnet : Api.t) ~node
       ~delegator ~delegatee =
+    let valid_until = Coda_numbers.Global_slot.max_value in
     let fee = User_command.minimum_fee in
     let worker = testnet.workers.(node) in
     let%bind _ =
       let open Deferred.Option.Let_syntax in
       let%bind user_cmd =
-        Api.delegate_stake testnet node delegator delegatee fee
+        Api.delegate_stake testnet node delegator delegatee fee valid_until
       in
       let%map (all_passed_root : unit Ivar.t list) =
         let open Deferred.Let_syntax in
@@ -518,6 +537,7 @@ end = struct
   let send_several_payments ?acceptable_delay:(delay = 7) (testnet : Api.t)
       ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
+    let valid_until = Coda_numbers.Global_slot.max_value in
     let fee = User_command.minimum_fee in
     let%bind (_ : unit option list) =
       Deferred.List.init n ~f:(fun _ ->
@@ -534,7 +554,7 @@ end = struct
                 let worker = testnet.workers.(node) in
                 let%bind user_cmd =
                   Api.send_payment testnet node sender_sk receiver_pk amount
-                    fee
+                    fee valid_until
                 in
                 let%map (all_passed_root : unit Ivar.t list) =
                   let open Deferred.Let_syntax in
@@ -571,6 +591,7 @@ end = struct
       ~(keypairs : Keypair.t list) ~n =
     let amount = Currency.Amount.of_int 10 in
     let fee = User_command.minimum_fee in
+    let valid_until = Coda_numbers.Global_slot.max_value in
     let%bind new_payment_readers =
       Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
           let pk = Public_key.(compress @@ of_private_key_exn sender) in
@@ -584,6 +605,7 @@ end = struct
         let%bind user_command =
           let%map payment =
             Api.send_payment testnet node sender receiver_pk amount fee
+              valid_until
           in
           Option.value_exn payment
         in

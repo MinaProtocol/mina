@@ -255,7 +255,7 @@ module M14 = struct
   end
 end
 
-(* Jane Street whitelisting *)
+(* Jane Street trustlisting *)
 module M15 = struct
   module Stable = struct
     module V1 = struct

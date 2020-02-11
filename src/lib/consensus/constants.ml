@@ -1,5 +1,12 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
+
+open Coda_base
+open Signed
+open Unsigned
+module Time = Block_time
+
+let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64
 
 [%%inject
 "genesis_state_timestamp_string", genesis_state_timestamp]
@@ -42,3 +49,34 @@ let slots_per_window =
 
 (** Number of slots =24k in ouroboros praos *)
 let slots_per_epoch = Unsigned.UInt32.(of_int (3 * c * k))
+
+module Slot = struct
+  let duration_ms = Int64.of_int block_window_duration_ms
+end
+
+module Epoch = struct
+  let size = slots_per_epoch
+
+  (** Amount of time in total for an epoch *)
+  let duration =
+    Time.Span.of_ms Int64.Infix.(Slot.duration_ms * int64_of_uint32 size)
+end
+
+module Checkpoint_window = struct
+  let per_year = 12
+
+  let slots_per_year =
+    let one_year_ms =
+      Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int |> Int.to_int64
+    in
+    Int64.Infix.(one_year_ms / Slot.duration_ms) |> Int64.to_int
+
+  let size_in_slots =
+    assert (slots_per_year mod per_year = 0) ;
+    slots_per_year / per_year
+end
+
+let epoch_size = UInt32.to_int Epoch.size
+
+let delta_duration =
+  Time.Span.of_ms (Int64.of_int (Int64.to_int Slot.duration_ms * delta))

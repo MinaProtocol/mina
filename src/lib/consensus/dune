@@ -9,7 +9,7 @@
     core_kernel
     coda_base
     with_hash
-    genesis_ledger
+    test_genesis_ledger
     snark_params
     perf_histograms
     rc_pool

@@ -7,11 +7,11 @@ open Coda_base
 open Signature_lib
 
 module Make (Config : Graphql_lib.Client.Config_intf) = struct
-  type t = {port: int}
+  type t = {hasura_endpoint: Uri.t}
 
   module Client = Graphql_lib.Client.Make (Config)
 
-  let added_transactions {port; _} added =
+  let added_transactions {hasura_endpoint; _} added =
     let open Deferred.Result.Let_syntax in
     let user_commands_with_times = Map.to_alist added in
     let user_commands_with_hashes_and_times =
@@ -32,7 +32,7 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
             |> Array.of_list )
           ()
       in
-      let%map obj = Client.query graphql port in
+      let%map obj = Client.query graphql hasura_endpoint in
       let list =
         Array.map obj#user_commands ~f:(fun obj -> (obj#hash, obj#first_seen))
         |> Array.to_list
@@ -56,7 +56,7 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
         ~user_commands:(Array.of_list user_commands)
         ()
     in
-    let%map _result = Client.query graphql port in
+    let%map _result = Client.query graphql hasura_endpoint in
     ()
 
   let compute_with_receipt_chains
@@ -117,7 +117,7 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
       ~(get_obj :
             'output
          -> < hash: Transaction_hash.t ; first_seen: Block_time.t option ; .. >
-            array) transactions_with_hash default_block_time port =
+            array) transactions_with_hash default_block_time hasura_endpoint =
     let open Deferred.Result.Let_syntax in
     let hashes =
       List.map transactions_with_hash
@@ -125,7 +125,7 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
     in
     let graphql = get_first_seen (Array.of_list hashes) in
     let%map first_query_response =
-      let%map result = Client.query graphql port in
+      let%map result = Client.query graphql hasura_endpoint in
       Array.to_list (get_obj result)
       |> List.map ~f:(fun obj -> (obj#hash, obj#first_seen))
     in
@@ -146,7 +146,7 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
           ()
       in
       let%map state_block_confirmations =
-        Client.query graphql t.port
+        Client.query graphql t.hasura_endpoint
         >>| fun response -> response#get_stale_block_confirmations
       in
       Array.to_list state_block_confirmations
@@ -164,7 +164,7 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
             Graphql_query.Blocks.Update_block_confirmations.make ~hash
               ~status:new_block_confirmation ()
           in
-          Client.query graphql t.port )
+          Client.query graphql t.hasura_endpoint )
     in
     Deferred.Result.all results |> Deferred.Result.ignore
 
@@ -174,7 +174,7 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
         ~blocks:(Array.of_list [encoded_block])
         ()
     in
-    Client.query graphql t.port |> Deferred.Result.ignore
+    Client.query graphql t.hasura_endpoint |> Deferred.Result.ignore
 
   let added_transition t
       ({With_hash.data= block; hash= _} as block_with_hash :
@@ -214,14 +214,14 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
         ~get_first_seen:(fun hashes ->
           Graphql_query.User_commands.Query_first_seen.make ~hashes () )
         ~get_obj:(fun result -> result#user_commands)
-        user_commands block_time t.port
+        user_commands block_time t.hasura_endpoint
     in
     let%bind fee_transfers_with_time =
       tag_with_first_seen
         ~get_first_seen:(fun hashes ->
           Graphql_query.Fee_transfers.Query_first_seen.make ~hashes () )
         ~get_obj:(fun result -> result#fee_transfers)
-        fee_transfers block_time t.port
+        fee_transfers block_time t.hasura_endpoint
     in
     let encoded_block =
       Types.Blocks.serialize block_with_hash
@@ -234,7 +234,7 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
     in
     update_new_block t encoded_block
 
-  let create port = {port}
+  let create hasura_endpoint = {hasura_endpoint}
 
   let run t reader =
     Strict_pipe.Reader.iter reader ~f:(function
@@ -242,7 +242,9 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
           (Breadcrumb_added {block; sender_receipt_chains_from_parent_ledger})
         -> (
           match%bind
-            added_transition t block sender_receipt_chains_from_parent_ledger
+            added_transition t block
+              (Public_key.Compressed.Map.of_alist_exn
+                 sender_receipt_chains_from_parent_ledger)
           with
           | Error e ->
               Graphql_lib.Client.Connection_error.ok_exn e
@@ -252,7 +254,9 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
           (* TODO: Implement *)
           Deferred.return ()
       | Transaction_pool {added; removed= _} -> (
-          match%bind added_transactions t added with
+          match%bind
+            added_transactions t @@ User_command.Map.of_alist_exn added
+          with
           | Ok result ->
               Deferred.return result
           | Error e ->
