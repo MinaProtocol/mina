@@ -5,4 +5,4 @@
   (javascript_files ./runtime.js)
   )
  (libraries zarith_stubs_js)
- (preprocess no_preprocessing))
+ (preprocess (pps ppx_coda)))
