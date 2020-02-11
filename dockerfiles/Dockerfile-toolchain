@@ -125,7 +125,7 @@ RUN echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
 
 RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://nixos.org/nix/install && \
     curl -o install-nix-2.3.2.sig https://nixos.org/nix/install.sig && \
-    gpg2 --recv-keys B541D55301270E0BCF15CA5D8170B4726D7198DE && \
+    gpg2 --import < $CODA_DIR/.nix-key.gpg.asc && \
     gpg2 --verify ./install-nix-2.3.2.sig && \
     sh ./install-nix-2.3.2
 
