@@ -1,1 +1,0 @@
-../../quickcheck_lib/quickcheck_lib.mli

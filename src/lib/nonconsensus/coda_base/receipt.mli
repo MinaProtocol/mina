@@ -1,1 +1,0 @@
-../../coda_base/receipt.mli

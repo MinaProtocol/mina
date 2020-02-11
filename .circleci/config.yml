@@ -551,7 +551,7 @@ jobs:
                     fi
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile= -j8 && (dune runtest src/lib/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile= -j8 && (dune runtest src/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
