@@ -319,7 +319,7 @@ jobs:
                   name: Build client SDK for Javascript
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
                   environment:
-                    DUNE_PROFILE: nonconsensus_dev
+                    DUNE_PROFILE: nonconsensus_medium_curves
                   no_output_timeout: 10m
 
     {%- for profile in build_artifact_profiles %}
@@ -477,7 +477,7 @@ jobs:
     {%- endfor %}
 
     # like the other unit test builds, but only runs tests in src/lib/nonconsensus
-    test-unit--nonconsensus:
+    test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
