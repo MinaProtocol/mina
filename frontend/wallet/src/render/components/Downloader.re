@@ -16,7 +16,7 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~keyName, ~onFinish) => {
+let make = (~keyName, ~onFinish, ~finished) => {
   let ((downloaded, total), updateState) = React.useState(() => (0, 0));
 
   React.useEffect0(() => {
@@ -36,6 +36,19 @@ let make = (~keyName, ~onFinish) => {
   let percent = float_of_int(downloaded) /. float_of_int(total);
   let offset = circumference -. percent *. circumference;
   
+  {finished ?  <svg width="120" height="120">
+      <circle
+        stroke="#3CFF64"
+        strokeWidth="4"
+        fill="transparent"
+        r={Js.Float.toString(radius)}
+        cx="60"
+        cy="60"
+      />
+      <path transform="translate(35,40)" fillRule="evenodd" clipRule="evenodd" d="M18.3265 38.15L0 19.8439L5.16806 14.6815L18.3265 27.7887L46.146 0L51.3141 5.19894L18.3265 38.15Z" fill="#00D400"/>
+
+    </svg> : 
+    
     <svg width="120" height="120">
       <circle
         stroke="#D8D8D8"
@@ -64,5 +77,9 @@ let make = (~keyName, ~onFinish) => {
          {React.string(Printf.sprintf("%.0f%%", total == 0 ? 0. : float_of_int(downloaded) /. float_of_int(total) *. 100.))}
       </text> 
     </svg>
+    
+    
+    
+      } 
   ;
 };
