@@ -1,26 +1,25 @@
 module Styles = {
   open Css;
   let hero = {
-    style([display(`flex), flexDirection(`row)]);
+    style([display(`flex), flexDirection(`row), paddingTop(`rem(5.))]);
   };
   let heroLeft = {
     style([
       display(`flex),
       flexDirection(`column),
-      justifyContent(`center),
+      justifyContent(`flexStart),
       width(`percent(100.0)),
       maxWidth(`rem(32.0)),
       marginLeft(`rem(5.)),
-      marginRight(`rem(5.)),
-      marginTop(`rem(3.5)),
+      paddingTop(`rem(7.)),
     ]);
   };
   let heroRight = {
     style([
       display(`flex),
       flexDirection(`column),
-      justifyContent(`center),
-      marginTop(`rem(3.5)),
+      justifyContent(`flexStart),
+      paddingTop(`rem(7.)),
     ]);
   };
   let header = {
@@ -48,8 +47,7 @@ module Styles = {
       left(`zero),
       display(`flex),
       flexDirection(`row),
-      paddingTop(Theme.Spacing.headerHeight),
-      paddingBottom(Theme.Spacing.footerHeight),
+      paddingTop(`rem(7.5)),
       height(`vh(100.)),
       width(`vw(100.)),
       zIndex(100),
@@ -76,21 +74,19 @@ let make = (~heading, ~description, ~miscLeft, ~miscRight=?) => {
     </div>
     <OnboardingHeader />
     <div className=Theme.Onboarding.main>
-      <div className=Styles.hero>
-        <div className=Styles.heroLeft>
-          <FadeIn duration=500 delay=0>
-            <h1 className=Styles.header> {React.string(heading)} </h1>
-          </FadeIn>
-          <FadeIn duration=500 delay=150>
-            <div className=Styles.heroBody> description </div>
-          </FadeIn>
-          <div className=Styles.heroBody> miscLeft </div>
-        </div>
-        {switch (miscRight) {
-         | Some(items) => <div className=Styles.heroRight> items </div>
-         | None => React.null
-         }}
+      <div className=Styles.heroLeft>
+        <FadeIn duration=500 delay=0>
+          <h1 className=Styles.header> {React.string(heading)} </h1>
+        </FadeIn>
+        <FadeIn duration=500 delay=150>
+          <div className=Styles.heroBody> description </div>
+        </FadeIn>
+        <div className=Styles.heroBody> miscLeft </div>
       </div>
+      {switch (miscRight) {
+       | Some(items) => <div className=Styles.heroRight> items </div>
+       | None => React.null
+       }}
     </div>
   </div>;
 };
