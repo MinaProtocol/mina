@@ -203,8 +203,7 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-v7-{{ checksum "opam_ci_cache.sig" }}
-                    - opam-v7-igyglTvPBxMMa2HOSyL8o7xJusIN4L6cuLaccWdS7pY=
+                    - opam-v8-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Ensure/Fix opam permisssions
                 command: |
