@@ -476,6 +476,40 @@ jobs:
                 path: core_dumps
     {%- endfor %}
 
+    # like the other unit test builds, but only runs tests in src/lib/nonconsensus
+    test-unit--nonconsensus:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
+        steps:
+            - checkout
+            - run: ulimit -c unlimited
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
+            - run:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest src/lib/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 30m
+            - store_artifacts:
+                path: core_dumps
+
     {%- for profile in unit_test_profiles_medium_curves %}
     test-unit--{{profile}}:
         resource_class: xlarge
@@ -605,6 +639,7 @@ workflows:
             {%- for profile in unit_test_profiles %}
             - test-unit--{{profile}}
             {%- endfor %}
+            - test-unit--nonconsensus_medium_curves
             {%- for profile in small_curves_tests.keys() | sort %}
             - test--{{profile}}
             {%- endfor %}

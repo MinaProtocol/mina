@@ -94,9 +94,29 @@ module Inner_curve = struct
     type _unused = unit constraint t = Tock.Field.t
 
     (* the Inner_curve.Scalar.size for the consensus case is derived from a C++ call; here, we inline the value *)
+    [%%if
+    curve_size = 298]
+
     let size =
       Mnt4.Fq.of_string
         "475922286169261325753349249653048451545124879242694725395555128576210262817955800483758081"
+
+    [%%elif
+    curve_size = 753]
+
+    let size =
+      Mnt4.Fq.of_string
+        "41898490967918953402344214791240637128170709919953949071783502921025352812571106773058893763790338921418070971888253786114353726529584385201591605722013126468931404347949840543007986327743462853720628051692141265303114721689601"
+
+    [%%else]
+
+    [%%show
+    curve_size]
+
+    [%%error
+    "invalid value for \"curve_size\""]
+
+    [%%endif]
 
     [%%define_locally
     Mnt4.Fq.
