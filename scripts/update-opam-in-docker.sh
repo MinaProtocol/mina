@@ -7,6 +7,10 @@ if [ ! -f /.dockerenv ]; then
     exit 1
 fi
 
+# fail if any command fails
+
+set -e
+
 # update not-pinned OPAM packages
 
 opam update

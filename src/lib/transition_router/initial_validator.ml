@@ -5,6 +5,7 @@ open Coda_base
 open Coda_state
 open Signature_lib
 open Coda_transition
+open Network_peer
 
 let max_blocklength_observed = ref 0
 
@@ -144,7 +145,9 @@ let run ~logger ~trust_system ~verifier ~transition_reader
   don't_wait_for
     (Reader.iter transition_reader ~f:(fun network_transition ->
          if Ivar.is_full initialization_finish_signal then (
-           let `Transition transition_env, `Time_received time_received =
+           let ( `Transition transition_env
+               , `Time_received time_received
+               , `Valid_cb is_valid_cb ) =
              network_transition
            in
            let transition_with_hash =
@@ -168,10 +171,14 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                >>= defer validate_delta_transition_chain)
            with
            | Ok verified_transition ->
+               External_transition.poke_validation_callback
+                 (Envelope.Incoming.data transition_env)
+                 is_valid_cb ;
                Envelope.Incoming.wrap ~data:verified_transition ~sender
                |> Writer.write valid_transition_writer ;
                return ()
            | Error error ->
+               is_valid_cb false ;
                handle_validation_error ~logger ~trust_system ~sender
                  ~state_hash:(With_hash.hash transition_with_hash)
                  error )

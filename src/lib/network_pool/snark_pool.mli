@@ -1,5 +1,6 @@
 open Async_kernel
 open Pipe_lib
+open Network_peer
 
 module type S = sig
   type transition_frontier
@@ -44,7 +45,8 @@ module type S = sig
        config:Resource_pool.Config.t
     -> logger:Logger.t
     -> disk_location:string
-    -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
+    -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
+                      * (bool -> unit) )
                       Linear_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier option
                                Broadcast_pipe.Reader.t

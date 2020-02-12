@@ -14,6 +14,7 @@ open Coda_state
 open Cache_lib
 open O1trace
 open Coda_transition
+open Network_peer
 module Transition_frontier_validation =
   External_transition.Transition_frontier_validation (Transition_frontier)
 

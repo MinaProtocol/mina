@@ -40,9 +40,9 @@ let main () =
     Cli_lib.Arg_type.Work_selection_method.Sequence
   in
   Parallel.init_master () ;
-  let configs =
+  let%bind configs =
     Coda_processes.local_configs n ~program_dir ~block_production_interval
-      ~acceptable_delay ~snark_worker_public_keys:None
+      ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~block_production_keys:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections:None
