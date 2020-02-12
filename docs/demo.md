@@ -13,4 +13,7 @@ The public key of the demo account is `4vsRCVMNTrCx4NpN6kKTkFKLcFN4vXUP5RB9PqSZe
 
 This account has 100% of the stake.
 
-The demo container will run a block producer and a snark worker.
+The demo container will run a block producer and a snark worker. You need to
+make sure the `--publish` at least the GraphQL port, for example `docker run
+--publish 3085:3085 -it codaprotocol/coda-demo`. Any additional arguments will
+be passed to the daemon.
