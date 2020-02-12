@@ -70,7 +70,7 @@ module Tock = struct
 end
 
 module Inner_curve = struct
-  type t = Mnt6.G1.t
+  type t = Mnt6.G1.t [@@deriving sexp]
 
   module Coefficients = Mnt6.G1.Coefficients
 

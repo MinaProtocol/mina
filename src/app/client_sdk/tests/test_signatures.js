@@ -45,7 +45,14 @@ let delegations = [
 
 let printSignature = s => console.log(`  { field: '${s.field}'\n  , scalar: '${s.scalar}'\n  },`);
 
-console.log("[");
-payments.forEach(t => printSignature(coda.signPayment(keypair.privateKey, t).signature));
-delegations.forEach(t => printSignature(coda.signStakeDelegation(keypair.privateKey, t).signature));
-console.log("]");
+let trans = { 
+    paymentPayload: {receiver, amount: "42"},
+    common: {fee: "3", nonce: "200", validUntil:"10000", memo: "this is a memo"},
+}
+
+printSignature (coda.signPayment(keypair.privateKey,trans).signature)
+
+// console.log("[");
+//payments.forEach(t => printSignature(coda.signPayment(keypair.privateKey, t).signature));
+// delegations.forEach(t => printSignature(coda.signStakeDelegation(keypair.privateKey, t).signature));
+//console.log("]");
