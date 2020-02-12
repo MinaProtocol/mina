@@ -182,15 +182,15 @@ jobs:
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
-                    - homebrew-v7-{{ checksum "brew_ci_cache.sig" }}
-                    - homebrew-v7-6+7C2dsmcJjRMux2kVt_DCKFQf7t_bD4Fd_ZOiogIMw=
+                    - homebrew-v9-{{ checksum "brew_ci_cache.sig" }}
+                    - homebrew-v8-{{ checksum "brew_ci_cache.sig" }}
             - run:
                 name: Install macos dependencies - homebrew - macos-setup-brew.sh
                 command: |
                     ./scripts/skip_if_only_frontend.sh ./scripts/macos-setup-brew.sh
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v7-{{ checksum "brew_ci_cache.sig" }}
+                key: homebrew-v9-{{ checksum "brew_ci_cache.sig" }}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
@@ -204,21 +204,13 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-v7-{{ checksum "opam_ci_cache.sig" }}
-                    - opam-v7-igyglTvPBxMMa2HOSyL8o7xJusIN4L6cuLaccWdS7pY=
-            - run:
-                name: Ensure/Fix opam permisssions
-                command: |
-                    set +e
-                    sudo mkdir -p /Users/distiller/.opam
-                    sudo chown -R distiller /Users/distiller/.opam | true
-                    sudo chmod -R u+w /Users/distiller/.opam | true
+                    - opam-v8-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install macos dependencies - opam -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
                 name: Save cache - opam
-                key: opam-v7-{{ checksum "opam_ci_cache.sig" }}
+                key: opam-v8-{{ checksum "opam_ci_cache.sig" }}
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
