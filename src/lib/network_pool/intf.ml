@@ -3,6 +3,7 @@ open Core_kernel
 open Coda_base
 open Pipe_lib
 open Signature_lib
+open Network_peer
 
 (** A [Resource_pool_base_intf] is a mutable pool of resources that supports
  *  mutation via some [Resource_pool_diff_intf]. A [Resource_pool_base_intf]
@@ -32,7 +33,10 @@ module type Resource_pool_diff_intf = sig
   (** Warning: Using this directly could corrupt the resource pool if it
   conincides with applying locally generated diffs or diffs from the network
   or diffs from transition frontier extensions.*)
-  val apply : pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
+  val apply :
+       pool
+    -> t Envelope.Incoming.t
+    -> (t, [`Locally_generated of t | `Other of Error.t]) Result.t Deferred.t
 end
 
 (** A [Resource_pool_intf] ties together an associated pair of
@@ -77,7 +81,7 @@ module type Network_pool_base_intf = sig
 
   val create :
        config:config
-    -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
+    -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
     -> local_diffs:resource_pool_diff Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
@@ -88,7 +92,7 @@ module type Network_pool_base_intf = sig
   val of_resource_pool_and_diffs :
        resource_pool
     -> logger:Logger.t
-    -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
+    -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
     -> local_diffs:resource_pool_diff Strict_pipe.Reader.t
     -> tf_diff:transition_frontier_diff Strict_pipe.Reader.t
@@ -99,7 +103,9 @@ module type Network_pool_base_intf = sig
   val broadcasts : t -> resource_pool_diff Linear_pipe.Reader.t
 
   val apply_and_broadcast :
-    t -> resource_pool_diff Envelope.Incoming.t -> unit Deferred.t
+       t
+    -> resource_pool_diff Envelope.Incoming.t * (bool -> unit)
+    -> unit Deferred.t
 end
 
 (** A [Snark_resource_pool_intf] is a superset of a

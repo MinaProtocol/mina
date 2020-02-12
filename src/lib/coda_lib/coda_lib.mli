@@ -73,9 +73,9 @@ val sync_status : t -> Sync_status.t Coda_incremental.Status.Observer.t
 
 val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
-val peers : t -> Network_peer.Peer.t list
+val peers : t -> Network_peer.Peer.t list Deferred.t
 
-val initial_peers : t -> Host_and_port.t list
+val initial_peers : t -> Coda_net2.Multiaddr.t list
 
 val client_port : t -> int
 

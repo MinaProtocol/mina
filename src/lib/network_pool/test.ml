@@ -1,6 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Pipe_lib
+open Network_peer
 
 let%test_module "network pool test" =
   ( module struct
@@ -52,7 +53,7 @@ let%test_module "network pool test" =
           in
           don't_wait_for
             (Mock_snark_pool.apply_and_broadcast network_pool
-               (Envelope.Incoming.local command)) ;
+               (Envelope.Incoming.local command, Fn.const ())) ;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
@@ -92,7 +93,7 @@ let%test_module "network pool test" =
           Strict_pipe.(create ~name:"Network pool test" Synchronous)
         in
         List.map (List.take works per_reader) ~f:create_work
-        |> List.map ~f:Envelope.Incoming.local
+        |> List.map ~f:(fun work -> (Envelope.Incoming.local work, Fn.const ()))
         |> List.iter ~f:(fun diff ->
                Strict_pipe.Writer.write pool_writer diff
                |> Deferred.don't_wait_for ) ;
