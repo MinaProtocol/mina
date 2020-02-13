@@ -9,7 +9,12 @@ module Styles = {
       display(`inlineFlex),
       justifyContent(`center),
     ]);
-  let link = style([textDecoration(`none), display(`inline)]);
+  let link =
+    style([
+      textDecoration(`none),
+      display(`inline),
+      margin2(~v=`zero, ~h=`rem(0.5)),
+    ]);
 };
 
 let url = "https://status.codaprotocol.com";
