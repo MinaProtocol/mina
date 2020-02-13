@@ -4,6 +4,7 @@ open Coda_state
 open Pipe_lib
 open Coda_transition
 open O1trace
+open Network_peer
 
 let create_bufferred_pipe ?name () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
@@ -80,7 +81,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer =
   let num_peers = 8 in
-  let peers = Coda_networking.random_peers network num_peers in
+  let%bind peers = Coda_networking.random_peers network num_peers in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Requesting peers for their best tip to do initialization" ;
   let open Deferred.Option.Let_syntax in
@@ -115,7 +116,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
             | Ok (`Root _, `Best_tip candidate_best_tip) ->
                 let enveloped_candidate_best_tip =
                   Envelope.Incoming.wrap ~data:candidate_best_tip
-                    ~sender:(Envelope.Sender.Remote peer.host)
+                    ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
                 in
                 return
                 @@ Option.merge acc
@@ -136,6 +137,13 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                            candidate_best_tip existing_best_tip
                          > 0
                        then (
+                         let best_tip_length =
+                           External_transition.Initial_validated
+                           .blockchain_length candidate_best_tip
+                           |> Coda_numbers.Length.to_int
+                         in
+                         Coda_metrics.Transition_frontier
+                         .update_max_blocklength_observed best_tip_length ;
                          don't_wait_for
                          @@ Broadcast_pipe.Writer.write
                               most_recent_valid_block_writer candidate_best_tip ;
@@ -175,11 +183,13 @@ let wait_for_high_connectivity ~logger ~network =
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Already connected to enough peers, start initialization" )
     ; ( after (Time_ns.Span.of_sec connectivity_time_upperbound)
-      >>| fun () ->
+      >>= fun () ->
+      Coda_networking.peers network
+      >>| fun peers ->
       if not @@ Deferred.is_determined high_connectivity then
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
-            [ ("num peers", `Int (List.length @@ Coda_networking.peers network))
+            [ ("num peers", `Int (List.length peers))
             ; ( "max seconds to wait for high connectivity"
               , `Float connectivity_time_upperbound ) ]
           "Will start initialization without connecting with too many peers" )
@@ -251,8 +261,8 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
                     { Consensus.Hooks.Rpcs.query=
                         (fun peer rpc query ->
                           Coda_networking.(
-                            query_peer network peer (Rpcs.Consensus_rpc rpc)
-                              query) ) }
+                            query_peer network peer.peer_id
+                              (Rpcs.Consensus_rpc rpc) query) ) }
                   sync_jobs
               with
               | Error e ->

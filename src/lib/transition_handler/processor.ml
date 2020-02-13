@@ -14,6 +14,7 @@ open Coda_state
 open Cache_lib
 open O1trace
 open Coda_transition
+open Network_peer
 module Transition_frontier_validation =
   External_transition.Transition_frontier_validation (Transition_frontier)
 
@@ -327,7 +328,7 @@ let%test_module "Transition_handler.Processor tests" =
       Printexc.record_backtrace true ;
       Async.Scheduler.set_record_backtraces true
 
-    let logger = Logger.null ()
+    let logger = Logger.create ()
 
     let time_controller = Block_time.Controller.basic ~logger
 
@@ -387,7 +388,7 @@ let%test_module "Transition_handler.Processor tests" =
                     |> Strict_pipe.Writer.write valid_transition_writer ) ;
                 match%map
                   Block_time.Timeout.await
-                    ~timeout_duration:(Block_time.Span.of_ms 5000L)
+                    ~timeout_duration:(Block_time.Span.of_ms 30000L)
                     time_controller
                     (Strict_pipe.Reader.fold_until processed_transition_reader
                        ~init:branch
@@ -400,6 +401,16 @@ let%test_module "Transition_handler.Processor tests" =
                                     next_expected_breadcrumb)
                                  (External_transition.Validated.state_hash
                                     newly_added_transition) ;
+                               Logger.info logger ~module_:__MODULE__
+                                 ~location:__LOC__
+                                 ~metadata:
+                                   [ ( "height"
+                                     , `Int
+                                         ( External_transition.Validated
+                                           .blockchain_length
+                                             newly_added_transition
+                                         |> Unsigned.UInt32.to_int ) ) ]
+                                 "transition of $height passed processor" ;
                                if tail = [] then `Stop true else `Continue tail
                            | [] ->
                                `Stop false ) ))

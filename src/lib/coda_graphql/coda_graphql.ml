@@ -211,15 +211,21 @@ module Types = struct
                ~slot_duration:nn_int ~epoch_duration:nn_int
                ~acceptable_network_delay:nn_int )
 
+    let peer : (_, Network_peer.Peer.Display.Stable.V1.t option) typ =
+      obj "Peer" ~fields:(fun _ ->
+          let open Reflection.Shorthand in
+          List.rev
+          @@ Network_peer.Peer.Display.Stable.V1.Fields.fold ~init:[]
+               ~host:nn_string ~libp2p_port:nn_int ~peer_id:nn_string )
+
     let addrs_and_ports :
-        (_, Kademlia.Node_addrs_and_ports.Display.Stable.V1.t option) typ =
+        (_, Node_addrs_and_ports.Display.Stable.V1.t option) typ =
       obj "AddrsAndPorts" ~fields:(fun _ ->
           let open Reflection.Shorthand in
           List.rev
-          @@ Kademlia.Node_addrs_and_ports.Display.Stable.V1.Fields.fold
-               ~init:[] ~external_ip:nn_string ~bind_ip:nn_string
-               ~discovery_port:nn_int ~client_port:nn_int ~libp2p_port:nn_int
-               ~communication_port:nn_int )
+          @@ Node_addrs_and_ports.Display.Stable.V1.Fields.fold ~init:[]
+               ~external_ip:nn_string ~bind_ip:nn_string ~client_port:nn_int
+               ~libp2p_port:nn_int ~peer:(id ~typ:peer) )
 
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
@@ -247,7 +253,6 @@ module Types = struct
                           (Consensus.Data.Consensus_time.graphql_type ())))
                ~consensus_mechanism:nn_string
                ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
-               ~libp2p_peer_id:nn_string
                ~consensus_configuration:
                  (id ~typ:(non_null consensus_configuration))
                ~highest_block_length_received:nn_int )
@@ -1715,9 +1720,9 @@ module Queries = struct
           ~f:Error.to_string_hum )
 
   let daemon_status =
-    field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
+    io_field "daemonStatus" ~doc:"Get running daemon status" ~args:[]
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun {ctx= coda; _} () ->
-        Coda_commands.get_status ~flag:`Performance coda )
+        Coda_commands.get_status ~flag:`Performance coda >>| Result.return )
 
   let trust_status =
     field "trustStatus" ~typ:Types.Payload.trust_status
@@ -1863,8 +1868,8 @@ module Queries = struct
       ~args:Arg.[]
       ~typ:(non_null @@ list @@ non_null string)
       ~resolve:(fun {ctx= coda; _} () ->
-        List.map (Coda_lib.initial_peers coda)
-          ~f:(fun {Host_and_port.host; port} -> sprintf !"%s:%i" host port) )
+        List.map (Coda_lib.initial_peers coda) ~f:Coda_net2.Multiaddr.to_string
+        )
 
   let snark_pool =
     field "snarkPool"

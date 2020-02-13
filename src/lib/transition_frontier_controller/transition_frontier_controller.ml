@@ -34,7 +34,11 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     Strict_pipe.create ~name:"block producer transition copy" Synchronous
   in
   Strict_pipe.transfer_while_writer_alive producer_transition_reader
-    producer_transition_writer_copy ~f:Fn.id
+    producer_transition_writer_copy ~f:(fun new_breadcrumb ->
+      Coda_networking.broadcast_state network
+        ( Transition_frontier.Breadcrumb.validated_transition new_breadcrumb
+        |> Coda_transition.External_transition.Validation.forget_validation ) ;
+      new_breadcrumb )
   |> don't_wait_for ;
   let unprocessed_transition_cache =
     Transition_handler.Unprocessed_transition_cache.create ~logger

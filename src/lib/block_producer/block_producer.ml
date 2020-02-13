@@ -130,7 +130,6 @@ let generate_next_state ~previous_protocol_state ~time_controller
           (*staged_ledger remains unchanged and transitioned_staged_ledger is discarded because the external transtion created out of this diff will be applied in Transition_frontier*)
           ignore
           @@ Ledger.unregister_mask_exn
-               (Staged_ledger.ledger staged_ledger)
                (Staged_ledger.ledger transitioned_staged_ledger) ;
           Some
             ( diff
@@ -366,7 +365,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                           [ ( "proving_time"
                             , `Int (Time.Span.to_ms span |> Int64.to_int_exn)
                             ) ]
-                        !"Protocol_state_proof proving time took: \
+                        !"Protocol_state_proof proving time(ms): \
                           $proving_time%!" ;
                       let staged_ledger_diff =
                         Internal_transition.staged_ledger_diff
@@ -398,6 +397,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             ; data=
                                 External_transition.create ~protocol_state
                                   ~protocol_state_proof ~staged_ledger_diff
+                                  ~validation_callback:Fn.ignore
                                   ~delta_transition_chain_proof }
                           |> External_transition.skip_time_received_validation
                                `This_transition_was_not_received_via_gossip

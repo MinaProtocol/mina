@@ -48,9 +48,6 @@ module Port : sig
 
     val rest_server :
       int Types.with_name_and_displayed_default Command.Spec.param
-
-    val discovery :
-      int Types.with_name_and_displayed_default Command.Spec.param
   end
 
   module Archive : sig

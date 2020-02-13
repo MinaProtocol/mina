@@ -592,9 +592,18 @@ end
 module Transition_frontier = struct
   let subsystem = "Transition_frontier"
 
-  let max_blocklength_observed : Gauge.t =
+  let max_blocklength_observed = ref 0
+
+  let max_blocklength_observed_metrics : Gauge.t =
     let help = "max blocklength observed by the system" in
     Gauge.v "max_blocklength_observed" ~help ~namespace ~subsystem
+
+  let update_max_blocklength_observed : int -> unit =
+   fun blockchain_length ->
+    if blockchain_length > !max_blocklength_observed then (
+      Gauge.set max_blocklength_observed_metrics
+      @@ Int.to_float blockchain_length ;
+      max_blocklength_observed := blockchain_length )
 
   let slot_fill_rate : Gauge.t =
     let help = "number of blocks / total slots since genesis" in
