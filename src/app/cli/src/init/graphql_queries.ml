@@ -41,7 +41,7 @@ module Register_hardware_wallet =
 [%graphql
 {|
 mutation ($hardware_wallet_nonce: HardwareWalletNonce) {
-  registerHardwareWallet(input: {hardwareWalletNonce: $hardware_wallet_nonce}) {
+  registerHardwareWallet(input: {nonce: $hardware_wallet_nonce}) {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
   }
 }

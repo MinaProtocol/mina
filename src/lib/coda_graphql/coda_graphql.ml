@@ -103,8 +103,6 @@ module Types = struct
 
   let public_key = public_key ()
 
-  let hardware_wallet_nonce = hardware_wallet_nonce ()
-
   let uint64 = uint64 ()
 
   let uint32 = uint32 ()
@@ -950,15 +948,6 @@ module Types = struct
               ~resolve:(fun {ctx= coda; _} key ->
                 AccountObj.get_best_ledger_account coda key ) ] )
 
-    let register_hardware_wallet :
-        (Coda_lib.t, Coda_numbers.Hardware_wallet_nonce.t option) typ =
-      obj "RegisterHardwareWallet" ~fields:(fun _ ->
-          [ field "hardware_wallet_nonce"
-              ~typ:(non_null hardware_wallet_nonce)
-              ~doc:"Nonce of the account in hardware wallet"
-              ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
-
     let lock_account : (Coda_lib.t, Account.key option) typ =
       obj "LockPayload" ~fields:(fun _ ->
           [ field "publicKey" ~typ:(non_null public_key)
@@ -1070,15 +1059,6 @@ module Types = struct
           | _ ->
               Error "Invalid format for public key." )
 
-    let hardware_wallet_nonce_arg =
-      scalar "HardwareWalletNonce"
-        ~doc:"Nonce of the account in hardware wallet" ~coerce:(fun nonce ->
-          match nonce with
-          | `String n ->
-              Ok (Coda_numbers.Hardware_wallet_nonce.of_string n)
-          | _ ->
-              Error "Invalid format for hardware wallet nonce." )
-
     module type Numeric_type = sig
       type t
 
@@ -1179,9 +1159,8 @@ module Types = struct
     let register_hardware_wallet =
       obj "RegisterHardwareWalletInput" ~coerce:Fn.id
         ~fields:
-          [ arg "hardwareWalletNonce"
-              ~doc:"Nonce of the account in hardware wallet"
-              ~typ:(non_null hardware_wallet_nonce_arg) ]
+          [ arg "nonce" ~doc:"Nonce of the account in hardware wallet"
+              ~typ:(non_null uint32_arg) ]
 
     let lock_account =
       obj "LockInput" ~coerce:Fn.id
