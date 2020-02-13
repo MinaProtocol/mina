@@ -90,6 +90,7 @@ module Styles = {
         hover([
           backgroundColor(buttonHoverBgColor(mode)),
           color(buttonHoverColor(mode)),
+          cursor(`pointer),
         ]),
         focus([backgroundColor(buttonHoverBgColor(mode))]),
         active([backgroundColor(buttonHoverBgColor(mode))]),

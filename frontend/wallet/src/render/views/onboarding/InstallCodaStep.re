@@ -19,6 +19,7 @@ module Styles = {
         textDecoration(`underline),
         marginTop(`zero),
         fontSize(`px(13)),
+        hover([cursor(`pointer)]),
       ]),
     ]);
 };
