@@ -1,3 +1,5 @@
+open Coda_base
+
 type ('t, 'ledger_proof) provider =
   (module Verifier_intf.Base.S
      with type t = 't
@@ -22,13 +24,14 @@ let verify_blockchain_snark (type ledger_proof)
   | Prod, (module M) ->
       M.verify_blockchain_snark t blockchain
 
-let verify_transaction_snark (type ledger_proof)
-    (Any (t, w, m) : ledger_proof t) (proof : ledger_proof) ~message =
+let verify_transaction_snarks (type ledger_proof)
+    (Any (t, w, m) : ledger_proof t)
+    (proofs : (ledger_proof * Sok_message.t) list) =
   match (w, m) with
   | Debug, (module M) ->
-      M.verify_transaction_snark t proof ~message
+      M.verify_transaction_snarks t proofs
   | Prod, (module M) ->
-      M.verify_transaction_snark t proof ~message
+      M.verify_transaction_snarks t proofs
 
 (* TEMP: hack to eschew compile time type safety temporarily, to be fixed in (#3518) *)
 module E = struct
@@ -39,13 +42,13 @@ module E = struct
   let verify_blockchain_snark (E t) blockchain =
     verify_blockchain_snark t blockchain
 
-  let verify_transaction_snark (E (Any (_, any_witness, _) as t))
-      (Ledger_proof.With_witness (proof, witness)) ~message =
+  let verify_transaction_snarks (E (Any (_, any_witness, _) as t))
+      (Ledger_proof.Witnessed_list_with_messages (proofs, witness)) =
     match (any_witness, witness) with
     | Debug, Debug ->
-        verify_transaction_snark t proof ~message
+        verify_transaction_snarks t proofs
     | Prod, Prod ->
-        verify_transaction_snark t proof ~message
+        verify_transaction_snarks t proofs
     | _, _ ->
         failwith "invalid"
 end

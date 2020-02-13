@@ -11,3 +11,4 @@ end]
 
 type 'proof t = 'proof Stable.Latest.t =
   {proof: 'proof; fee: Fee_with_prover.Stable.V1.t}
+[@@deriving fields]

@@ -173,7 +173,7 @@ module Merge : sig
 end
 
 (** An available job is an incomplete job that has enough information for one
-* to process it into a completed job *)
+  * to process it into a completed job *)
 module Available_job : sig
   module Stable : sig
     module V1 : sig
@@ -311,6 +311,9 @@ end
 
 (** The initial state of the parallel scan at some parallelism *)
 val empty : max_base_jobs:int -> delay:int -> ('merge, 'base) State.t
+
+(** Get all inputs to incomplete merge jobs, both partial an full *)
+val all_merge_inputs : ('merge, _) State.t -> 'merge list list
 
 (** Get all the available jobs *)
 val all_jobs :

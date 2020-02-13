@@ -1,7 +1,7 @@
 [%%import
 "/src/config.mlh"]
 
-open Core_kernel
+open Core
 open Async_kernel
 open Coda_base
 open Currency
@@ -16,13 +16,43 @@ module T = struct
   module Pre_diff_info = Pre_diff_info
 
   module Staged_ledger_error = struct
+    type diff_error =
+      | Invalid_statement of Transaction_snark.Statement.t
+      | Invalid_proofs of
+          ( Ledger_proof.t
+          * Transaction_snark.Statement.t
+          * Public_key.Compressed.t )
+          list
+      | Verifier_error of Error.t
+    [@@deriving sexp]
+
+    let diff_error_to_string = function
+      | Invalid_statement s ->
+          Format.asprintf
+            !"Invalid statement in diff: %{sexp: Transaction_snark.Statement.t}"
+            s
+      | Invalid_proofs proofs ->
+          let provers = List.map proofs ~f:(fun (_, _, prover) -> prover) in
+          let unique_provers =
+            Public_key.Compressed.Set.(to_list @@ of_list provers)
+          in
+          Format.asprintf
+            "Verification failed for %d proofs, including the following \
+             proofs from the following provers: %s"
+            (List.length proofs)
+            (String.concat ~sep:", "
+               (List.map unique_provers
+                  ~f:
+                    (Fn.compose Yojson.Safe.to_string
+                       Public_key.Compressed.to_yojson)))
+      | Verifier_error err ->
+          Format.asprintf "Verifier threw an error: %s"
+            (Error.to_string_hum err)
+
     type t =
       | Non_zero_fee_excess of
           Scan_state.Space_partition.t * Transaction.t list
-      | Invalid_proof of
-          Ledger_proof.t
-          * Transaction_snark.Statement.t
-          * Public_key.Compressed.t
+      | Invalid_diff of diff_error
       | Pre_diff of Pre_diff_info.Error.t
       | Insufficient_work of string
       | Unexpected of Error.t
@@ -39,13 +69,8 @@ module T = struct
           Format.asprintf
             !"Pre_diff_info.Error error: %{sexp:Pre_diff_info.Error.t}"
             pre_diff_error
-      | Invalid_proof (_p, s, prover) ->
-          Format.asprintf
-            !"Verification failed for proof with statement: %{sexp: \
-              Transaction_snark.Statement.t} work_id: %i Prover:%s}\n"
-            s
-            (Transaction_snark.Statement.hash s)
-            (Yojson.Safe.to_string @@ Public_key.Compressed.to_yojson prover)
+      | Invalid_diff diff_error ->
+          "Invalid diff: " ^ diff_error_to_string diff_error
       | Insufficient_work str ->
           str
       | Unexpected e ->
@@ -61,83 +86,6 @@ module T = struct
         Error (Staged_ledger_error.Unexpected e)
 
   type job = Scan_state.Available_job.t [@@deriving sexp]
-
-  let verify_proof ~logger ~verifier ~proof ~statement ~message =
-    let log_error err_str ~metadata =
-      Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:
-          ( [ ("statement", Transaction_snark.Statement.to_yojson statement)
-            ; ("error", `String err_str)
-            ; ("sok_message", Sok_message.to_yojson message) ]
-          @ metadata )
-        "Invalid transaction snark for statement $statement: $error" ;
-      Deferred.return false
-    in
-    let statement_eq a b = Int.(Transaction_snark.Statement.compare a b = 0) in
-    if not (statement_eq (Ledger_proof.statement proof) statement) then
-      log_error "Statement and proof do not match"
-        ~metadata:
-          [ ( "statement_from_proof"
-            , Transaction_snark.Statement.to_yojson
-                (Ledger_proof.statement proof) ) ]
-    else
-      let start = Time.now () in
-      match%bind Verifier.verify_transaction_snark verifier proof ~message with
-      | Ok b ->
-          let time_ms = Time.abs_diff (Time.now ()) start |> Time.Span.to_ms in
-          Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:
-              [ ("work_id", `Int (Transaction_snark.Statement.hash statement))
-              ; ("time", `Float time_ms) ]
-            "Verification in apply_diff for work $work_id took $time ms" ;
-          Deferred.return b
-      | Error e ->
-          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-            ~metadata:
-              [ ("statement", Transaction_snark.Statement.to_yojson statement)
-              ; ("error", `String (Error.to_string_hum e)) ]
-            "Verifier error when checking transaction snark for statement \
-             $statement: $error" ;
-          exit 21
-
-  let verify ~logger ~verifier ~message job proof prover =
-    let open Deferred.Let_syntax in
-    match Scan_state.statement_of_job job with
-    | None ->
-        Deferred.return
-          ( Or_error.errorf !"Error creating statement from job %{sexp:job}" job
-          |> to_staged_ledger_or_error )
-    | Some statement -> (
-        match%map
-          verify_proof ~logger ~verifier ~proof ~statement ~message
-        with
-        | true ->
-            Ok ()
-        | _ ->
-            Error
-              (Staged_ledger_error.Invalid_proof (proof, statement, prover)) )
-
-  module Statement_scanner = struct
-    include Scan_state.Make_statement_scanner
-              (Deferred)
-              (struct
-                type t = unit
-
-                let verify ~verifier:() ~proof:_ ~statement:_ ~message:_ =
-                  Deferred.return true
-              end)
-  end
-
-  module Statement_scanner_proof_verifier = struct
-    type t = {logger: Logger.t; verifier: Verifier.t}
-
-    let verify ~verifier:{logger; verifier} = verify_proof ~logger ~verifier
-  end
-
-  module Statement_scanner_with_proofs =
-    Scan_state.Make_statement_scanner
-      (Deferred)
-      (Statement_scanner_proof_verifier)
 
   type t =
     { scan_state: Scan_state.t
@@ -168,18 +116,14 @@ module T = struct
     let error_prefix =
       "Error verifying the parallel scan state after applying the diff."
     in
-    match Scan_state.latest_ledger_proof scan_state with
-    | None ->
-        Statement_scanner.check_invariants scan_state ~verifier:()
-          ~error_prefix ~ledger_hash_end:ledger ~ledger_hash_begin:None
-    | Some proof ->
-        Statement_scanner.check_invariants scan_state ~verifier:()
-          ~error_prefix ~ledger_hash_end:ledger
-          ~ledger_hash_begin:(Some (get_target proof))
+    let ledger_hash_begin =
+      Scan_state.latest_ledger_proof scan_state |> Option.map ~f:get_target
+    in
+    Scan_state.check_invariants scan_state ~error_prefix
+      ~ledger_hash_end:ledger ~ledger_hash_begin
 
   let statement_exn t =
-    let open Deferred.Let_syntax in
-    match%map Statement_scanner.scan_statement t.scan_state ~verifier:() with
+    match Scan_state.scan_statement t.scan_state with
     | Ok s ->
         `Non_empty s
     | Error `Empty ->
@@ -189,30 +133,34 @@ module T = struct
 
   let of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash ~ledger
       ~scan_state ~pending_coinbase_collection =
-    let open Deferred.Or_error.Let_syntax in
-    let t = {ledger; scan_state; pending_coinbase_collection} in
-    let%bind () =
-      Statement_scanner_with_proofs.check_invariants scan_state
-        ~verifier:{Statement_scanner_proof_verifier.logger; verifier}
+    let open Deferred.Let_syntax in
+    match
+      Scan_state.check_invariants scan_state
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
-    in
-    return t
+    with
+    | Ok () ->
+        let%map all_valid =
+          Scan_state.verify_proofs_exn scan_state ~logger ~verifier
+        in
+        if all_valid then Ok {ledger; scan_state; pending_coinbase_collection}
+        else Or_error.error_string "not all proofs were valid"
+    | Error err ->
+        return (Error err)
 
   let of_scan_state_and_ledger_unchecked ~snarked_ledger_hash ~ledger
       ~scan_state ~pending_coinbase_collection =
-    let open Deferred.Or_error.Let_syntax in
-    let t = {ledger; scan_state; pending_coinbase_collection} in
-    let%bind () =
-      Statement_scanner.check_invariants scan_state ~verifier:()
+    let open Or_error.Let_syntax in
+    let%map () =
+      Scan_state.check_invariants scan_state
         ~error_prefix:"Staged_ledger.of_scan_state_and_ledger"
         ~ledger_hash_end:
           (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root ledger))
         ~ledger_hash_begin:(Some snarked_ledger_hash)
     in
-    return t
+    {ledger; scan_state; pending_coinbase_collection}
 
   let of_scan_state_pending_coinbases_and_snarked_ledger ~logger ~verifier
       ~scan_state ~snarked_ledger ~expected_merkle_root ~pending_coinbases =
@@ -394,25 +342,67 @@ module T = struct
     in
     go current_stack state_body_hash [] ts
 
+  (* TODO: re-evaluate error propagation strategy *)
   let check_completed_works ~logger ~verifier scan_state
-      (completed_works : Transaction_snark_work.t list) =
+      (completed_works : Transaction_snark_work.t list) :
+      (unit, Staged_ledger_error.diff_error) Deferred.Result.t =
+    let open Deferred.Result.Let_syntax in
+    let statement_eq a b = Int.(Transaction_snark.Statement.compare a b = 0) in
     let work_count = List.length completed_works in
     let job_pairs =
       Scan_state.k_work_pairs_for_new_diff scan_state ~k:work_count
     in
-    let check job_proofs prover message =
-      One_or_two.Deferred_result.map job_proofs ~f:(fun (job, proof) ->
-          verify ~logger ~verifier ~message job proof prover )
+    let%bind snarks_with_data =
+      List.zip_exn job_pairs completed_works
+      |> List.fold_left ~init:(Ok []) ~f:(fun acc (jobs, work) ->
+             let open Result.Let_syntax in
+             let%bind snarks = acc in
+             let message =
+               Sok_message.create ~fee:work.fee ~prover:work.prover
+             in
+             let%map new_snarks =
+               One_or_two.Result.map (One_or_two.zip_exn jobs work.proofs)
+                 ~f:(fun (job, proof) ->
+                   let statement =
+                     Option.value_exn (Scan_state.statement_of_job job)
+                   in
+                   if
+                     not
+                       (statement_eq (Ledger_proof.statement proof) statement)
+                   then (
+                     Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                       ~metadata:
+                         [ ( "statement"
+                           , Transaction_snark.Statement.to_yojson statement )
+                         ; ("sok_message", Sok_message.to_yojson message)
+                         ; ( "statement_from_proof"
+                           , Transaction_snark.Statement.to_yojson
+                               (Ledger_proof.statement proof) ) ]
+                       "Invalid transaction snark for statement $statement: \
+                        statement and proof do not match" ;
+                     Error (Staged_ledger_error.Invalid_statement statement) )
+                   else Ok ((proof, message), (statement, work.prover)) )
+             in
+             One_or_two.to_list new_snarks @ snarks )
+      |> Result.map ~f:List.rev |> Deferred.return
     in
-    let open Deferred.Let_syntax in
-    let%map result =
-      Deferred.List.find_map (List.zip_exn job_pairs completed_works)
-        ~f:(fun (jobs, work) ->
-          let message = Sok_message.create ~fee:work.fee ~prover:work.prover in
-          Deferred.map ~f:Result.error
-          @@ check (One_or_two.zip_exn jobs work.proofs) work.prover message )
+    let snarks, _ = List.unzip snarks_with_data in
+    let%bind verification_results =
+      Verifier.verify_transaction_snarks verifier snarks
+      |> Deferred.map
+           ~f:
+             (Result.map_error ~f:(fun err ->
+                  Staged_ledger_error.Verifier_error err ))
     in
-    Option.value_map result ~default:(Ok ()) ~f:(fun e -> Error e)
+    if not (List.for_all verification_results ~f:Fn.id) then
+      let invalid_snarks_with_provers =
+        List.filter_map (List.zip_exn verification_results snarks_with_data)
+          ~f:(fun (is_valid, ((proof, _), (statement, prover))) ->
+            if is_valid then None else Some (proof, statement, prover) )
+      in
+      Deferred.return
+        (Error (Staged_ledger_error.Invalid_proofs invalid_snarks_with_provers))
+    else return ()
 
   (**The total fee excess caused by any diff should be zero. In the case where
      the slots are split into two partitions, total fee excess of the transactions
@@ -679,11 +669,10 @@ module T = struct
       coinbase_for_blockchain_snark coinbases |> Deferred.return
     in
     let%map () =
-      Deferred.(
-        verify_scan_state_after_apply
-          (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
-          scan_state'
-        >>| to_staged_ledger_or_error)
+      verify_scan_state_after_apply
+        (Frozen_ledger_hash.of_ledger_hash (Ledger.merkle_root new_ledger))
+        scan_state'
+      |> to_staged_ledger_or_error |> Deferred.return
     in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
@@ -729,7 +718,13 @@ module T = struct
   let apply t witness ~logger ~verifier ~state_body_hash =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
-    let%bind () = check_completed_works ~logger ~verifier t.scan_state work in
+    let%bind () =
+      check_completed_works ~logger ~verifier t.scan_state work
+      |> Deferred.map
+           ~f:
+             (Result.map_error ~f:(fun err ->
+                  Staged_ledger_error.Invalid_diff err ))
+    in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
       @@ Pre_diff_info.get witness

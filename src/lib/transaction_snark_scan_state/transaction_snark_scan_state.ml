@@ -1,3 +1,4 @@
+open Async_kernel
 open Core_kernel
 open Coda_base
 open Module_version
@@ -260,171 +261,128 @@ let total_proofs (works : Transaction_snark_work.t list) =
 
 (*************exposed functions*****************)
 
-module Make_statement_scanner
-    (M : Monad_with_Or_error_intf) (Verifier : sig
-        type t
+module Fold = Parallel_scan.State.Make_foldable (Monad.Ident)
 
-        val verify :
-             verifier:t
-          -> proof:Ledger_proof.t
-          -> statement:Transaction_snark.Statement.t
-          -> message:Sok_message.t
-          -> sexp_bool M.t
-    end) =
-struct
-  module Fold = Parallel_scan.State.Make_foldable (M)
+(*TODO: fold over the pending_coinbase tree and validate the statements?*)
+let scan_statement tree :
+    (Transaction_snark.Statement.t, [`Error of Error.t | `Empty]) Result.t =
+  let open Or_error.Let_syntax in
+  let write_error description =
+    sprintf !"Staged_ledger.scan_statement: %s\n" description
+  in
+  let decorate_error message result =
+    Result.map_error result ~f:(fun e ->
+        Error.createf !"%s: %{sexp:Error.t}" (write_error message) e )
+  in
+  let merge_acc acc s2 =
+    match acc with
+    | None ->
+        Ok (Some s2)
+    | Some s1 ->
+        let%map s12 = Transaction_snark.Statement.merge s1 s2 in
+        Some s12
+  in
+  let fold_merge_job acc_statement job =
+    let open Parallel_scan.Merge.Job in
+    match job with
+    | Part (proof, _message) ->
+        let statement = Ledger_proof.statement proof in
+        merge_acc acc_statement statement
+    | Empty | Full {status= Parallel_scan.Job_status.Done; _} ->
+        return acc_statement
+    | Full {left= proof_1, _message_1; right= proof_2, _message_2; _} ->
+        let%bind merged_statement =
+          Transaction_snark.Statement.merge
+            (Ledger_proof.statement proof_1)
+            (Ledger_proof.statement proof_2)
+        in
+        merge_acc acc_statement merged_statement
+  in
+  let fold_base_job acc_statement job =
+    let open Parallel_scan.Base.Job in
+    match job with
+    | Empty | Full {status= Parallel_scan.Job_status.Done; _} ->
+        return acc_statement
+    | Full {job= transaction; _} ->
+        let%bind expected_statement =
+          decorate_error "Bad base satement"
+            (create_expected_statement transaction)
+        in
+        if
+          Transaction_snark.Statement.equal transaction.statement
+            expected_statement
+        then merge_acc acc_statement transaction.statement
+        else Or_error.error_string (write_error "Bad base statement")
+  in
+  let continue_if_ok ~f acc (_weight, job) =
+    let open Container.Continue_or_stop in
+    match f acc job with Ok next -> Continue next | e -> Stop e
+  in
+  match
+    Fold.fold_chronological_until tree ~init:None
+      ~f_merge:(continue_if_ok ~f:fold_merge_job)
+      ~f_base:(continue_if_ok ~f:fold_base_job)
+      ~finish:return
+  with
+  | Ok (Some res) ->
+      Ok res
+  | Ok None ->
+      Error `Empty
+  | Error e ->
+      Error (`Error e)
 
-  (*TODO: fold over the pending_coinbase tree and validate the statements?*)
-  let scan_statement tree ~verifier :
-      (Transaction_snark.Statement.t, [`Error of Error.t | `Empty]) Result.t
-      M.t =
-    let write_error description =
-      sprintf !"Staged_ledger.scan_statement: %s\n" description
-    in
-    let open M.Let_syntax in
-    let with_error ~f message =
-      let%map result = f () in
-      Result.map_error result ~f:(fun e ->
-          Error.createf !"%s: %{sexp:Error.t}" (write_error message) e )
-    in
-    let merge_acc ~verify_proof (acc : Transaction_snark.Statement.t option) s2
-        : Transaction_snark.Statement.t option M.Or_error.t =
-      let with_verification ~f =
-        M.map (verify_proof ()) ~f:(fun is_verified ->
-            if not is_verified then
-              Or_error.error_string (write_error "Bad merge proof")
-            else f () )
-      in
+let check_invariants t ~error_prefix ~ledger_hash_end:current_ledger_hash
+    ~ledger_hash_begin:snarked_ledger_hash =
+  let clarify_error cond err =
+    if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
+  in
+  match scan_statement t with
+  | Error (`Error e) ->
+      Error e
+  | Error `Empty ->
+      let current_ledger_hash = current_ledger_hash in
+      Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
+          clarify_error
+            (Frozen_ledger_hash.equal hash current_ledger_hash)
+            "did not connect with snarked ledger hash" )
+  | Ok
+      { fee_excess
+      ; source
+      ; target
+      ; supply_increase= _
+      ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
+      ; proof_type= _ } ->
       let open Or_error.Let_syntax in
-      with_error "Bad merge proof" ~f:(fun () ->
-          match acc with
-          | None ->
-              with_verification ~f:(fun () -> return (Some s2))
-          | Some s1 ->
-              with_verification ~f:(fun () ->
-                  let%map merged_statement =
-                    Transaction_snark.Statement.merge s1 s2
-                  in
-                  Some merged_statement ) )
-    in
-    let fold_step_a acc_statement job =
-      match job with
-      | Parallel_scan.Merge.Job.Part (proof, message) ->
-          let statement = Ledger_proof.statement proof in
-          merge_acc
-            ~verify_proof:(fun () ->
-              Verifier.verify ~verifier ~message ~proof ~statement )
-            acc_statement statement
-      | Empty | Full {status= Parallel_scan.Job_status.Done; _} ->
-          M.Or_error.return acc_statement
-      | Full {left= proof_1, message_1; right= proof_2, message_2; _} ->
-          let open M.Or_error.Let_syntax in
-          let%bind merged_statement =
-            M.return
-            @@ Transaction_snark.Statement.merge
-                 (Ledger_proof.statement proof_1)
-                 (Ledger_proof.statement proof_2)
-          in
-          merge_acc acc_statement merged_statement ~verify_proof:(fun () ->
-              let open M.Let_syntax in
-              let%map verified_list =
-                M.all
-                  (List.map [(proof_1, message_1); (proof_2, message_2)]
-                     ~f:(fun (proof, message) ->
-                       Verifier.verify ~verifier ~proof
-                         ~statement:(Ledger_proof.statement proof)
-                         ~message ))
-              in
-              List.for_all verified_list ~f:Fn.id )
-    in
-    let fold_step_d acc_statement job =
-      match job with
-      | Parallel_scan.Base.Job.Empty
-      | Full {status= Parallel_scan.Job_status.Done; _} ->
-          M.Or_error.return acc_statement
-      | Full {job= transaction; _} ->
-          with_error "Bad base statement" ~f:(fun () ->
-              let open M.Or_error.Let_syntax in
-              let%bind expected_statement =
-                M.return (create_expected_statement transaction)
-              in
-              if
-                Transaction_snark.Statement.equal transaction.statement
-                  expected_statement
-              then
-                merge_acc
-                  ~verify_proof:(fun () -> M.return true)
-                  acc_statement transaction.statement
-              else
-                M.return
-                @@ Or_error.error_string (write_error "Bad base statement") )
-    in
-    let res =
-      Fold.fold_chronological_until tree ~init:None
-        ~f_merge:(fun acc (_weight, job) ->
-          let open Container.Continue_or_stop in
-          match%map fold_step_a acc job with
-          | Ok next ->
-              Continue next
-          | e ->
-              Stop e )
-        ~f_base:(fun acc (_weight, job) ->
-          let open Container.Continue_or_stop in
-          match%map fold_step_d acc job with
-          | Ok next ->
-              Continue next
-          | e ->
-              Stop e )
-        ~finish:(Fn.compose M.return Result.return)
-    in
-    match%map res with
-    | Ok None ->
-        Error `Empty
-    | Ok (Some res) ->
-        Ok res
-    | Error e ->
-        Error (`Error e)
-
-  let check_invariants t ~verifier ~error_prefix
-      ~ledger_hash_end:current_ledger_hash
-      ~ledger_hash_begin:snarked_ledger_hash =
-    let clarify_error cond err =
-      if not cond then Or_error.errorf "%s : %s" error_prefix err else Ok ()
-    in
-    let open M.Let_syntax in
-    match%map scan_statement ~verifier t with
-    | Error (`Error e) ->
-        Error e
-    | Error `Empty ->
-        let current_ledger_hash = current_ledger_hash in
+      let%map () =
         Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
             clarify_error
-              (Frozen_ledger_hash.equal hash current_ledger_hash)
+              (Frozen_ledger_hash.equal hash source)
               "did not connect with snarked ledger hash" )
-    | Ok
-        { fee_excess
-        ; source
-        ; target
-        ; supply_increase= _
-        ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
-        ; proof_type= _ } ->
-        let open Or_error.Let_syntax in
-        let%map () =
-          Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
-              clarify_error
-                (Frozen_ledger_hash.equal hash source)
-                "did not connect with snarked ledger hash" )
-        and () =
-          clarify_error
-            (Frozen_ledger_hash.equal current_ledger_hash target)
-            "incorrect statement target hash"
-        and () =
-          clarify_error
-            (Currency.Fee.Signed.equal Currency.Fee.Signed.zero fee_excess)
-            "nonzero fee excess"
-        in
-        ()
-end
+      and () =
+        clarify_error
+          (Frozen_ledger_hash.equal current_ledger_hash target)
+          "incorrect statement target hash"
+      and () =
+        clarify_error
+          (Currency.Fee.Signed.equal Currency.Fee.Signed.zero fee_excess)
+          "nonzero fee excess"
+      in
+      ()
+
+let verify_proofs_exn t ~logger ~verifier =
+  let open Deferred.Let_syntax in
+  let all_snarks = List.concat (Parallel_scan.all_merge_inputs t) in
+  match%map Verifier.verify_transaction_snarks verifier all_snarks with
+  | Error err ->
+      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("error", `String (Error.to_string_hum err))]
+        "Verifier error when checking transaction snarks: $error" ;
+      exit 21
+  | Ok results ->
+      if List.exists results ~f:not then
+        (* TODO: return error with invalid provers? -- need to make sure the provers signature is valid first *)
+        false
+      else true
 
 module Staged_undos = struct
   type undo = Ledger.Undo.t

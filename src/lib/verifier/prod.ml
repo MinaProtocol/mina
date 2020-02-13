@@ -22,8 +22,8 @@ module Worker_state = struct
   module type S = sig
     val verify_wrap : Protocol_state.Value.t -> Tock.Proof.t -> bool
 
-    val verify_transaction_snark :
-      Transaction_snark.t -> message:Sok_message.t -> bool
+    val verify_transaction_snarks :
+      (Transaction_snark.t * Sok_message.t) list -> bool list
   end
 
   type init_arg = {conf_dir: string option; logger: Logger.Stable.Latest.t}
@@ -57,9 +57,11 @@ module Worker_state = struct
                  "Verifier threw an exception while verifying blockchain snark" ;
                failwith "Verifier crashed"
 
-         let verify_transaction_snark ledger_proof ~message =
+         let verify_transaction_snarks proofs_and_messages =
            match
-             Or_error.try_with (fun () -> T.verify ledger_proof ~message)
+             Or_error.try_with (fun () ->
+                 List.map proofs_and_messages ~f:(fun (proof, message) ->
+                     T.verify proof ~message ) )
            with
            | Ok result ->
                result
@@ -80,8 +82,8 @@ module Worker = struct
 
     type 'w functions =
       { verify_blockchain: ('w, Blockchain.t, bool) F.t
-      ; verify_transaction_snark:
-          ('w, Transaction_snark.t * Sok_message.t, bool) F.t }
+      ; verify_transaction_snarks:
+          ('w, (Transaction_snark.t * Sok_message.t) list, bool list) F.t }
 
     module Worker_state = Worker_state
 
@@ -106,13 +108,13 @@ module Worker = struct
         | _ ->
             failwith "unknown proof_level"
 
-      let verify_transaction_snark (w : Worker_state.t) (p, message) =
+      let verify_transaction_snarks (w : Worker_state.t) snarks =
         match Coda_compile_config.proof_level with
         | "full" ->
             let%map (module M) = Worker_state.get w in
-            M.verify_transaction_snark p ~message
+            M.verify_transaction_snarks snarks
         | "check" | "none" ->
-            Deferred.return true
+            Deferred.return @@ List.map snarks ~f:(Fn.const true)
         | _ ->
             failwith "unknown proof_level"
 
@@ -124,12 +126,13 @@ module Worker = struct
         in
         { verify_blockchain=
             f (Blockchain.Stable.Latest.bin_t, Bool.bin_t, verify_blockchain)
-        ; verify_transaction_snark=
+        ; verify_transaction_snarks=
             f
               ( [%bin_type_class:
-                  Transaction_snark.Stable.V1.t * Sok_message.Stable.V1.t]
-              , Bool.bin_t
-              , verify_transaction_snark ) }
+                  (Transaction_snark.Stable.V1.t * Sok_message.Stable.V1.t)
+                  list]
+              , [%bin_type_class: bool list]
+              , verify_transaction_snarks ) }
 
       let init_worker_state Worker_state.{conf_dir; logger} =
         ( if Option.is_some conf_dir then
@@ -196,6 +199,6 @@ let create ~logger ~pids ~conf_dir =
 let verify_blockchain_snark t chain =
   Worker.Connection.run t ~f:Worker.functions.verify_blockchain ~arg:chain
 
-let verify_transaction_snark t snark ~message =
-  Worker.Connection.run t ~f:Worker.functions.verify_transaction_snark
-    ~arg:(snark, message)
+let verify_transaction_snarks t snarks =
+  Worker.Connection.run t ~f:Worker.functions.verify_transaction_snarks
+    ~arg:snarks

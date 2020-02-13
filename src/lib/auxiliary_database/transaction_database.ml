@@ -59,7 +59,7 @@ struct
 end
 
 module Block_time = Coda_base.Block_time
-module T = Make (User_command.Stable.V1) (Block_time.Time.Stable.V1)
+module T = Make (User_command.Stable.V1) (Block_time.Stable.V1)
 include T
 
 module For_tests = struct
@@ -110,15 +110,14 @@ module For_tests = struct
     in
     let time_gen =
       let time_now =
-        Block_time.Time.to_span_since_epoch
-          (Block_time.Time.now @@ Block_time.Time.Controller.basic ~logger)
+        Block_time.to_span_since_epoch
+          (Block_time.now @@ Block_time.Controller.basic ~logger)
       in
-      let time_max = Block_time.Time.Span.to_ms time_now in
+      let time_max = Block_time.Span.to_ms time_now in
       let time_min = Int64.(time_max - of_year 5) in
       let open Quickcheck.Generator.Let_syntax in
       let%map time_span_gen = Int64.gen_incl time_min time_max in
-      Block_time.Time.of_span_since_epoch
-      @@ Block_time.Time.Span.of_ms time_span_gen
+      Block_time.of_span_since_epoch @@ Block_time.Span.of_ms time_span_gen
     in
     let gen =
       let open Quickcheck.Generator.Let_syntax in

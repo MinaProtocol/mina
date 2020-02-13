@@ -39,6 +39,8 @@ module Actions = struct
     | Sent_invalid_signature
         (** Peer sent us something with a signature that doesn't check *)
     | Sent_invalid_proof  (** Peer sent us a proof that does not verify. *)
+    | Sent_invalid_scan_state_diff_statement
+        (** Peer sent us a scan state with an invalid transaction statement. *)
     | Has_invalid_genesis_protocol_state
         (**Peer gossiped a transition that has a different genesis protocol state from that of mine*)
     | Sent_invalid_transition_chain_merkle_proof
@@ -109,6 +111,8 @@ module Actions = struct
     | Sent_invalid_signature ->
         Insta_ban
     | Sent_invalid_proof ->
+        Insta_ban
+    | Sent_invalid_scan_state_diff_statement ->
         Insta_ban
     (*Genesis ledger (and the genesis protocol state) is now a runtime config, so we should ban nodes that are running using a different genesis ledger*)
     | Has_invalid_genesis_protocol_state ->

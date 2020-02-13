@@ -1,3 +1,4 @@
+open Async_kernel
 open Core_kernel
 open Coda_base
 
@@ -40,42 +41,31 @@ module Job_view : sig
   type t [@@deriving sexp, to_yojson]
 end
 
-module type Monad_with_Or_error_intf = sig
-  type 'a t
+(** Validates and merges statements in the scan state chronologically,
+  * returning an error if the statements are not correctly ordered, and
+  * otherwise returning a statement which represents the full statement of the
+  * entire scan state (all the way from the earliest source to the latest
+  * target)
+  *)
+val scan_statement :
+  t -> (Transaction_snark.Statement.t, [`Empty | `Error of Error.t]) Result.t
 
-  include Monad.S with type 'a t := 'a t
+(** Checks structural invariants of the scan state. Does not verify proofs
+  * contained in statements.
+  *)
+val check_invariants :
+     t
+  -> error_prefix:string
+  -> ledger_hash_end:Frozen_ledger_hash.t
+  -> ledger_hash_begin:Frozen_ledger_hash.t option
+  -> unit Or_error.t
 
-  module Or_error : sig
-    type nonrec 'a t = 'a Or_error.t t
-
-    include Monad.S with type 'a t := 'a t
-  end
-end
-
-module Make_statement_scanner
-    (M : Monad_with_Or_error_intf) (Verifier : sig
-        type t
-
-        val verify :
-             verifier:t
-          -> proof:Ledger_proof.t
-          -> statement:Transaction_snark.Statement.t
-          -> message:Sok_message.t
-          -> sexp_bool M.t
-    end) : sig
-  val scan_statement :
-       t
-    -> verifier:Verifier.t
-    -> (Transaction_snark.Statement.t, [`Empty | `Error of Error.t]) result M.t
-
-  val check_invariants :
-       t
-    -> verifier:Verifier.t
-    -> error_prefix:string
-    -> ledger_hash_end:Frozen_ledger_hash.t
-    -> ledger_hash_begin:Frozen_ledger_hash.t option
-    -> (unit, Error.t) result M.t
-end
+(** Verify all the proofs contained in the the scan state. Throws an
+  * exception if the Verifier returns an error (not if verification
+  * fails).
+  *)
+val verify_proofs_exn :
+  t -> logger:Logger.t -> verifier:Verifier.t -> bool Deferred.t
 
 (*All the transactions with undos*)
 module Staged_undos : sig

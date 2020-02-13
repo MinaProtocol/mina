@@ -155,4 +155,6 @@ end
 
 type create_args = Worker.t = {db: Database.t; logger: Logger.t}
 
+type input = Worker.input
+
 include Worker_supervisor.Make (Worker)

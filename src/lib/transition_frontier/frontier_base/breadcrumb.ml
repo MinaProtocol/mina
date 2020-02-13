@@ -88,13 +88,15 @@ let build ~logger ~verifier ~trust_system ~parent
                 let open Staged_ledger.Pre_diff_info.Error in
                 let action =
                   match staged_ledger_error with
-                  | Invalid_proof _ ->
+                  | Invalid_diff (Invalid_statement _) ->
+                      make_actions Sent_invalid_scan_state_diff_statement
+                  | Invalid_diff (Invalid_proofs _) ->
                       make_actions Sent_invalid_proof
                   | Pre_diff (Bad_signature _) ->
                       make_actions Sent_invalid_signature
                   | Pre_diff _ | Non_zero_fee_excess _ | Insufficient_work _ ->
                       make_actions Gossiped_invalid_transition
-                  | Unexpected _ ->
+                  | Invalid_diff (Verifier_error _) | Unexpected _ ->
                       failwith
                         "build: Unexpected staged ledger error should have \
                          been caught in another pattern"

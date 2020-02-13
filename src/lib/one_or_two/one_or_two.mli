@@ -46,6 +46,8 @@ module Deferred : Intfs.Monadic with type 'a m := 'a Deferred.t
 
 module Option : Intfs.Monadic with type 'a m := 'a option
 
+module Result : Intfs.Monadic2 with type ('a, 'e) m := ('a, 'e) Result.t
+
 module Or_error : Intfs.Monadic with type 'a m := 'a Or_error.t
 
 val gen : 'a Quickcheck.Generator.t -> 'a t Quickcheck.Generator.t

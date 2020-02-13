@@ -119,7 +119,10 @@ type _ type_witness =
   | Debug : Debug.t type_witness
   | Prod : Prod.t type_witness
 
-type with_witness = With_witness : 't * 't type_witness -> with_witness
+type witnessed_list_with_messages =
+  | Witnessed_list_with_messages :
+      ('t * Sok_message.t) list * 't type_witness
+      -> witnessed_list_with_messages
 
 module For_tests = struct
   let mk_dummy_proof statement =

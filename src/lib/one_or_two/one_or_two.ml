@@ -93,6 +93,7 @@ module Deferred_result = Monadic2 (Deferred.Result)
 module Ident = Monadic (Monad.Ident)
 module Deferred = Monadic (Deferred)
 module Option = Monadic (Option)
+module Result = Monadic2 (Result)
 module Or_error = Monadic (Or_error)
 
 let map = Ident.map

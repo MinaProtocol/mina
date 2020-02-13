@@ -4,7 +4,7 @@ open Signature_lib
 
 include
   Intf.Transaction
-  with type time := Block_time.Time.Stable.V1.t
+  with type time := Block_time.Stable.V1.t
    and type transaction := User_command.Stable.V1.t
 
 module For_tests : sig

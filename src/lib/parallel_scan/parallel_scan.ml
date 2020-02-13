@@ -758,6 +758,23 @@ module Tree = struct
       tree
     |> List.rev
 
+  let all_merge_inputs : ('merge_t, 'base_t) t -> 'merge_job list =
+   fun tree ->
+    let open Job_status in
+    let open Merge.Job in
+    fold ~init:[]
+      ~f_merge:(fun acc (_weight, job) ->
+        match job with
+        | Empty | Full {status= Done; _} ->
+            acc
+        | Part left ->
+            left :: acc
+        | Full {left; right; _} ->
+            [left; right] @ acc )
+      ~f_base:(fun acc _ -> acc)
+      tree
+    |> List.rev
+
   let base_jobs : ('merge_t, _ * 'base_job Base.Job.t) t -> 'base_job list =
    fun tree ->
     fold_depth ~init:[]
@@ -1469,6 +1486,9 @@ let update :
   State_or_error.run_state (update_helper ~data ~completed_jobs) ~state
 
 let all_jobs t = all_work t
+
+let all_merge_inputs t =
+  Non_empty_list.map t.trees ~f:Tree.all_merge_inputs |> Non_empty_list.to_list
 
 let jobs_for_next_update t = work_for_next_update t ~data_count:t.max_base_jobs
 

@@ -49,12 +49,21 @@ end
 module Pre_diff_info : Pre_diff_info.S
 
 module Staged_ledger_error : sig
+  type diff_error =
+    | Invalid_statement of Transaction_snark.Statement.t
+    | Invalid_proofs of
+        ( Ledger_proof.t
+        * Transaction_snark.Statement.t
+        * Public_key.Compressed.t )
+        list
+    | Verifier_error of Error.t
+  [@@deriving sexp]
+
+  val diff_error_to_string : diff_error -> string
+
   type t =
     | Non_zero_fee_excess of Scan_state.Space_partition.t * Transaction.t list
-    | Invalid_proof of
-        Ledger_proof.t
-        * Transaction_snark.Statement.t
-        * Public_key.Compressed.t
+    | Invalid_diff of diff_error
     | Pre_diff of Pre_diff_info.Error.t
     | Insufficient_work of string
     | Unexpected of Error.t
@@ -87,7 +96,7 @@ val of_scan_state_and_ledger_unchecked :
   -> ledger:Ledger.t
   -> scan_state:Scan_state.t
   -> pending_coinbase_collection:Pending_coinbase.t
-  -> t Or_error.t Deferred.t
+  -> t Or_error.t
 
 val replace_ledger_exn : t -> Ledger.t -> t
 
@@ -136,8 +145,7 @@ val create_diff :
                          -> Transaction_snark_work.Checked.t option)
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
 
-val statement_exn :
-  t -> [`Non_empty of Transaction_snark.Statement.t | `Empty] Deferred.t
+val statement_exn : t -> [`Non_empty of Transaction_snark.Statement.t | `Empty]
 
 val of_scan_state_pending_coinbases_and_snarked_ledger :
      logger:Logger.t

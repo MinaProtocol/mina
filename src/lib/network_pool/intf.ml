@@ -4,6 +4,32 @@ open Coda_base
 open Pipe_lib
 open Signature_lib
 
+type 'a valid = private 'a
+
+type 'a invalid = private 'a
+
+(*
+module Valid : sig
+  type 'a t = private 'a
+  val get : 'a t -> 'a
+  val cast : [`This_value_is_valid of 'a] -> 'a t
+end = struct
+  type 'a t = private 'a
+  let get x = x
+  let cast (`This_value_is_valid x) = x
+end
+
+module Invalid : sig
+  type 'a t
+  val get : 'a t -> 'a
+  val cast : [`This_value_is_invalid of 'a] -> 'a t
+end = struct
+  type 'a t
+  let get x = x
+  let cast (`This_value_is_invalid x) = x
+end
+*)
+
 (** A [Resource_pool_base_intf] is a mutable pool of resources that supports
  *  mutation via some [Resource_pool_diff_intf]. A [Resource_pool_base_intf]
  *  can only be initialized, and any interaction with it must go through
@@ -11,14 +37,12 @@ open Signature_lib
 module type Resource_pool_base_intf = sig
   type t [@@deriving sexp_of]
 
-  type transition_frontier
-
   module Config : sig
     type t [@@deriving sexp_of]
   end
 
   val create :
-       frontier_broadcast_pipe:transition_frontier Option.t
+       frontier_broadcast_pipe:Transition_frontier.t Option.t
                                Broadcast_pipe.Reader.t
     -> config:Config.t
     -> logger:Logger.t
@@ -30,13 +54,27 @@ end
  *  processing this mutation and applying it to an underlying
  *  [Resource_pool_base_intf]. *)
 module type Resource_pool_diff_intf = sig
-  type pool
-
   type t [@@deriving sexp, to_yojson]
+
+  type validation_error
 
   val summary : t -> string
 
-  val apply : pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
+  val size : t -> int
+
+  val batch_validate :
+       t
+    -> verifier:Verifier.t
+    -> t Envelope.Incoming.t list
+    -> ( [ `Invalid_diffs of
+           (t Envelope.Incoming.t invalid * validation_error) list ]
+       * [`Valid_diffs of t Envelope.Incoming.t valid list] )
+       Deferred.Or_error.t
+
+  val handle_validation_error :
+       trust_system:Trust_system.t
+    -> t invalid Envelope.Incoming.t * validation_error
+    -> unit
 end
 
 (** A [Resource_pool_intf] ties together an associated pair of
@@ -44,7 +82,10 @@ end
 module type Resource_pool_intf = sig
   include Resource_pool_base_intf
 
-  module Diff : Resource_pool_diff_intf with type pool := t
+  module Diff : Resource_pool_diff_intf
+
+  val apply_diff :
+    t -> Diff.t Envelope.Incoming.t valid -> unit Deferred.Or_error.t
 
   (** Locally generated items (user commands and snarks) should be periodically
       rebroadcast, to ensure network unreliability doesn't mean they're never
@@ -57,6 +98,33 @@ module type Resource_pool_intf = sig
   val get_rebroadcastable :
     t -> is_expired:(Time.t -> [`Expired | `Ok]) -> Diff.t list
 end
+
+module type Applicable_pool_intf = sig
+  type t
+
+  module Resource_pool : Resource_pool_intf
+
+  val apply_diffs :
+    t -> Resource_pool.Diff.t Envelope.Incoming.t list -> unit Deferred.t
+end
+
+module type Diff_intake_intf = sig
+  type t
+
+  type pool
+
+  type diff
+
+  val create : pool -> t
+
+  val add_diff : t -> diff Envelope.Incoming.t -> unit
+end
+
+module type Diff_intake_creator_intf = functor
+  (Pool : Applicable_pool_intf)
+  -> Diff_intake_intf
+     with type pool := Pool.t
+      and type diff := Pool.Resource_pool.Diff.t
 
 (** A [Network_pool_base_intf] is the core implementation of a
  *  network pool on top of a [Resource_pool_intf]. It wraps
@@ -75,30 +143,18 @@ module type Network_pool_base_intf = sig
 
   type config
 
-  type transition_frontier
-
   val create :
        config:config
     -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
                       Linear_pipe.Reader.t
-    -> frontier_broadcast_pipe:transition_frontier Option.t
+    -> frontier_broadcast_pipe:Transition_frontier.t Option.t
                                Broadcast_pipe.Reader.t
     -> logger:Logger.t
-    -> t
-
-  val of_resource_pool_and_diffs :
-       resource_pool
-    -> logger:Logger.t
-    -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
-                      Linear_pipe.Reader.t
     -> t
 
   val resource_pool : t -> resource_pool
 
   val broadcasts : t -> resource_pool_diff Linear_pipe.Reader.t
-
-  val apply_and_broadcast :
-    t -> resource_pool_diff Envelope.Incoming.t -> unit Deferred.t
 end
 
 (** A [Snark_resource_pool_intf] is a superset of a
@@ -108,13 +164,9 @@ module type Snark_resource_pool_intf = sig
 
   type work
 
-  type transition_frontier
-
   type work_info
 
-  include
-    Resource_pool_base_intf
-    with type transition_frontier := transition_frontier
+  include Resource_pool_base_intf
 
   val make_config :
     trust_system:Trust_system.t -> verifier:Verifier.t -> Config.t
@@ -194,12 +246,7 @@ module type Transaction_resource_pool_intf = sig
 
   type best_tip_diff
 
-  type transition_frontier
-
-  include
-    Resource_pool_base_intf
-    with type transition_frontier := transition_frontier
-     and type t := t
+  include Resource_pool_base_intf with type t := t
 
   val make_config : trust_system:Trust_system.t -> Config.t
 

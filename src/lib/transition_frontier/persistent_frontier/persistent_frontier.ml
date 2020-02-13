@@ -9,24 +9,22 @@ module Database = Database
 exception Invalid_genesis_state_hash of External_transition.Validated.t
 
 let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root =
-  let open Deferred.Or_error.Let_syntax in
+  let open Or_error.Let_syntax in
   let open Root_data.Minimal.Stable.Latest in
   let snarked_ledger_hash =
     External_transition.Validated.blockchain_state root_transition
     |> Blockchain_state.snarked_ledger_hash
   in
   let%bind transactions =
-    Deferred.return
-      (Staged_ledger.Scan_state.staged_transactions root.scan_state)
+    Staged_ledger.Scan_state.staged_transactions root.scan_state
   in
   let mask = Ledger.of_database root_ledger in
   let%bind () =
-    Deferred.return
-      (List.fold transactions ~init:(Or_error.return ()) ~f:(fun acc txn ->
-           let open Or_error.Let_syntax in
-           let%bind () = acc in
-           let%map _ = Ledger.apply_transaction mask txn in
-           () ))
+    List.fold transactions ~init:(Or_error.return ()) ~f:(fun acc txn ->
+        let open Or_error.Let_syntax in
+        let%bind () = acc in
+        let%map _ = Ledger.apply_transaction mask txn in
+        () )
   in
   Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash
     ~ledger:mask ~scan_state:root.scan_state
@@ -187,14 +185,13 @@ module Instance = struct
     in
     (* construct the root staged ledger in memory *)
     let%bind root_staged_ledger =
-      let open Deferred.Let_syntax in
-      match%map
+      match
         construct_staged_ledger_at_root ~root_ledger ~root_transition ~root
       with
       | Error err ->
-          Error (`Failure (Error.to_string_hum err))
+          Deferred.return (Error (`Failure (Error.to_string_hum err)))
       | Ok staged_ledger ->
-          Ok staged_ledger
+          return staged_ledger
     in
     (* initialize the new in memory frontier and extensions *)
     let frontier =
@@ -226,10 +223,11 @@ module Instance = struct
                  downgrade_transition transition root_genesis_state_hash
                with
                | Ok t ->
-                   Deferred.Result.return t
+                   return t
                | Error `Invalid_genesis_protocol_state ->
-                   Error (`Fatal_error (Invalid_genesis_state_hash transition))
-                   |> Deferred.return
+                   Deferred.return
+                     (Error
+                        (`Fatal_error (Invalid_genesis_state_hash transition)))
              in
              let%bind breadcrumb =
                Breadcrumb.build ~logger:t.factory.logger

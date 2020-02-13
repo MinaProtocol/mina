@@ -2,5 +2,5 @@
   (name otp_lib)
   (public_name otp_lib)
   (inline_tests)
-  (libraries core_kernel async_kernel pipe_lib)
+  (libraries core_kernel async_kernel coda_base pipe_lib)
   (preprocess (pps ppx_coda ppx_jane)))

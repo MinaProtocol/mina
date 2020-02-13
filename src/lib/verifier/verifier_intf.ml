@@ -1,5 +1,6 @@
 open Async_kernel
 open Core_kernel
+open Coda_base
 
 module Base = struct
   module type S = sig
@@ -10,11 +11,10 @@ module Base = struct
     val verify_blockchain_snark :
       t -> Blockchain_snark.Blockchain.t -> bool Or_error.t Deferred.t
 
-    val verify_transaction_snark :
+    val verify_transaction_snarks :
          t
-      -> ledger_proof
-      -> message:Coda_base.Sok_message.t
-      -> bool Or_error.t Deferred.t
+      -> (ledger_proof * Sok_message.t) list
+      -> bool list Or_error.t Deferred.t
   end
 end
 
@@ -34,11 +34,10 @@ module Any = struct
     val verify_blockchain_snark :
       _ t -> Blockchain_snark.Blockchain.t -> bool Or_error.t Deferred.t
 
-    val verify_transaction_snark :
+    val verify_transaction_snarks :
          'ledger_proof t
-      -> 'ledger_proof
-      -> message:Coda_base.Sok_message.t
-      -> bool Or_error.t Deferred.t
+      -> ('ledger_proof * Sok_message.t) list
+      -> bool list Or_error.t Deferred.t
 
     module E : sig
       type e = E : _ t -> e
@@ -48,11 +47,10 @@ module Any = struct
       val verify_blockchain_snark :
         t -> Blockchain_snark.Blockchain.t -> bool Or_error.t Deferred.t
 
-      val verify_transaction_snark :
+      val verify_transaction_snarks :
            t
-        -> Ledger_proof.with_witness
-        -> message:Coda_base.Sok_message.t
-        -> bool Or_error.t Deferred.t
+        -> Ledger_proof.witnessed_list_with_messages
+        -> bool list Or_error.t Deferred.t
     end
   end
 end

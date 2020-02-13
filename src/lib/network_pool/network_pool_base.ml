@@ -2,47 +2,52 @@ open Async_kernel
 open Core_kernel
 open Pipe_lib
 
-module Make (Transition_frontier : sig
-  type t
-end)
-(Resource_pool : Intf.Resource_pool_intf
-                 with type transition_frontier := Transition_frontier.t) :
+module Make
+    (Resource_pool : Intf.Resource_pool_intf)
+    (Make_diff_intake : Intf.Diff_intake_creator_intf) :
   Intf.Network_pool_base_intf
   with type resource_pool := Resource_pool.t
    and type resource_pool_diff := Resource_pool.Diff.t
-   and type transition_frontier := Transition_frontier.t
    and type config := Resource_pool.Config.t = struct
-  type t =
-    { resource_pool: Resource_pool.t
-    ; logger: Logger.t
-    ; write_broadcasts: Resource_pool.Diff.t Linear_pipe.Writer.t
-    ; read_broadcasts: Resource_pool.Diff.t Linear_pipe.Reader.t }
+  module Network_pool = struct
+    module Resource_pool = Resource_pool
 
-  let resource_pool {resource_pool; _} = resource_pool
+    type t =
+      { resource_pool: Resource_pool.t
+      ; logger: Logger.t
+      ; write_broadcasts: Resource_pool.Diff.t Linear_pipe.Writer.t
+      ; read_broadcasts: Resource_pool.Diff.t Linear_pipe.Reader.t }
+    [@@deriving fields]
 
-  let broadcasts {read_broadcasts; _} = read_broadcasts
+    let apply_and_broadcast t pool_diff =
+      match%bind Resource_pool.Diff.apply t.resource_pool pool_diff with
+      | Ok diff' ->
+          Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+            "Broadcasting %s"
+            (Resource_pool.Diff.summary diff') ;
+          Linear_pipe.write t.write_broadcasts diff'
+      | Error e ->
+          Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+            "Pool diff apply feedback: %s" (Error.to_string_hum e) ;
+          Deferred.unit
 
-  let apply_and_broadcast t pool_diff =
-    match%bind Resource_pool.Diff.apply t.resource_pool pool_diff with
-    | Ok diff' ->
-        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Broadcasting %s"
-          (Resource_pool.Diff.summary diff') ;
-        Linear_pipe.write t.write_broadcasts diff'
-    | Error e ->
-        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Pool diff apply feedback: %s" (Error.to_string_hum e) ;
-        Deferred.unit
+    let apply_diffs t =
+      let%bind `Invalid_diffs invalid_diffs, `Valid_diffs valid_diffs =
+        Resource_pool.validate_diffs t diffs
+      in
+      Deferred.all_unit
+        [ Deferred.List.iter ~how:`Parallel invalid_diffs ~f:handle_invalid_diff
+        ; Deffered.List.iter ~how:`Sequential valid_diffs
+            ~f:apply_and_broadcast ]
 
-  let of_resource_pool_and_diffs resource_pool ~logger ~incoming_diffs =
-    let read_broadcasts, write_broadcasts = Linear_pipe.create () in
-    let network_pool =
+    let create resource_pool ~logger =
+      let read_broadcasts, write_broadcasts = Linear_pipe.create () in
       {resource_pool; logger; read_broadcasts; write_broadcasts}
-    in
-    Linear_pipe.iter incoming_diffs ~f:(fun diff ->
-        apply_and_broadcast network_pool diff )
-    |> ignore ;
-    network_pool
+  end
+
+  module Diff_intake = Make_diff_intake (Network_pool)
+
+  type t = {pool: Network_pool.t; diff_intake: Diff_intake.t}
 
   (* Rebroadcast locally generated pool items every 10 minutes. Do so for 50
      minutes - at most 5 rebroadcasts - before giving up.
@@ -65,7 +70,7 @@ end)
     in
     let rec go () =
       let rebroadcastable =
-        Resource_pool.get_rebroadcastable t.resource_pool ~is_expired
+        Resource_pool.get_rebroadcastable t.pool.resource_pool ~is_expired
       in
       let log (log_func : 'a Logger.log_function) =
         log_func logger ~location:__LOC__ ~module_:__MODULE__
@@ -83,7 +88,7 @@ end)
             ] ;
       let%bind () =
         Deferred.List.iter rebroadcastable
-          ~f:(Linear_pipe.write t.write_broadcasts)
+          ~f:(Linear_pipe.write t.pool.write_broadcasts)
       in
       let%bind () = Async.after rebroadcast_interval in
       go ()
@@ -91,11 +96,21 @@ end)
     go ()
 
   let create ~config ~incoming_diffs ~frontier_broadcast_pipe ~logger =
-    let t =
-      of_resource_pool_and_diffs
+    let pool =
+      Network_pool.create
         (Resource_pool.create ~config ~logger ~frontier_broadcast_pipe)
-        ~incoming_diffs ~logger
+        ~logger
     in
+    let diff_intake = Diff_intake.create pool in
+    let t = {pool; diff_intake} in
+    don't_wait_for
+      (Linear_pipe.iter incoming_diffs ~f:(fun diff ->
+           Diff_intake.add_diff t.diff_intake diff ;
+           Deferred.unit )) ;
     don't_wait_for (rebroadcast_loop t logger) ;
     t
+
+  let resource_pool {pool= {resource_pool; _}; _} = resource_pool
+
+  let broadcasts {pool= {read_broadcasts; _}; _} = read_broadcasts
 end
