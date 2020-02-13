@@ -34,12 +34,18 @@ type service = [ | `Summary | `Network | `Faucet | `EchoBot | `GraphQLProxy];
 type status =
   | Unknown
   | Operational
-  | Maintenance;
+  | DegradedPerformance
+  | PartialOutage
+  | MajorOutage
+  | UnderMaintenance;
 
 let parseStatus = status =>
   switch (status) {
-  | "under_maintenance" => Maintenance
   | "operational" => Operational
+  | "degraded_performance" => DegradedPerformance
+  | "partial_outage" => PartialOutage
+  | "major_outage" => MajorOutage
+  | "under_maintenance" => UnderMaintenance
   | s =>
     Js.Console.warn("Unknown status `" ++ s ++ "`");
     Unknown;
@@ -73,9 +79,7 @@ module Inner = {
              |> List.filter(c => parseServiceName(c.name) == service);
            switch (components) {
            | [] => Js.Console.warn("Error retrieving status")
-           | [{status}, ..._] =>
-             Js.log2("test", status);
-             setStatus(_ => parseStatus(status));
+           | [{status}, ..._] => setStatus(_ => parseStatus(status))
            };
          });
       None;
@@ -84,7 +88,10 @@ module Inner = {
       switch (status) {
       | Unknown => ("Unknown", Theme.Colors.grey)
       | Operational => ("Operational", Theme.Colors.clover)
-      | Maintenance => ("Under Maintenance", Theme.Colors.rosebud)
+      | DegradedPerformance => ("Degraded", Theme.Colors.rosebud)
+      | PartialOutage => ("Partial Outage", Theme.Colors.rosebud)
+      | MajorOutage => ("Major Outage", Theme.Colors.rosebud)
+      | UnderMaintenance => ("Under Maintenance", Theme.Colors.rosebud)
       };
     <a href=url className=Styles.link>
       <span className={Styles.wrapper(bgColor, Theme.Colors.white)}>
