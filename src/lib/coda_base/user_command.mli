@@ -21,9 +21,9 @@ module Poly : sig
 end
 
 module Stable : sig
-  module V1 : sig
+  module V2 : sig
     type t =
-      ( Payload.Stable.V1.t
+      ( Payload.Stable.V2.t
       , Public_key.Stable.V1.t
       , Signature.Stable.V1.t )
       Poly.Stable.V1.t
@@ -35,10 +35,27 @@ module Stable : sig
 
     include Hashable.S with type t := t
 
-    val accounts_accessed : t -> Public_key.Compressed.t list
+    val accounts_accessed : t -> Account_id.t list
   end
 
-  module Latest = V1
+  module V1 : sig
+    type t =
+      ( Payload.Stable.V1.t
+      , Public_key.Stable.V1.t
+      , Signature.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving bin_io, sexp, hash, yojson, version]
+
+    val to_latest : t -> V2.t
+
+    val version_byte : char (* for base58_check *)
+
+    include Comparable.S with type t := t
+
+    include Hashable.S with type t := t
+  end
+
+  module Latest = V2
 end
 
 include User_command_intf.S with type t = Stable.Latest.t

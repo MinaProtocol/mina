@@ -6,11 +6,11 @@ open Module_version
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
       { protocol_state: Protocol_state.Value.Stable.V1.t
       ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
-      ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
+      ; staged_ledger_diff: Staged_ledger_diff.Stable.V2.t
       ; delta_transition_chain_proof:
           State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list }
     [@@deriving sexp, fields]
@@ -88,12 +88,33 @@ module Stable = struct
 
     include Comparable.Make (T)
   end
+
+  module V1 = struct
+    type t =
+      { protocol_state: Protocol_state.Value.Stable.V1.t
+      ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+      ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t
+      ; delta_transition_chain_proof:
+          State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list }
+    [@@deriving sexp, fields]
+
+    let to_latest
+        { protocol_state
+        ; protocol_state_proof
+        ; staged_ledger_diff
+        ; delta_transition_chain_proof } =
+      { V2.protocol_state
+      ; protocol_state_proof
+      ; staged_ledger_diff=
+          Staged_ledger_diff.Stable.V1.to_latest staged_ledger_diff
+      ; delta_transition_chain_proof }
+  end
 end]
 
 (* bin_io omitted *)
 type t = Stable.Latest.t =
-  { protocol_state: Protocol_state.Value.Stable.V1.t
-  ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+  { protocol_state: Protocol_state.Value.t
+  ; protocol_state_proof: Proof.t sexp_opaque
   ; staged_ledger_diff: Staged_ledger_diff.t
   ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list }
 [@@deriving sexp]
@@ -621,6 +642,107 @@ end
 
 module Validated = struct
   module Stable = struct
+    module V2 = struct
+      module T = struct
+        type t =
+          (Stable.V2.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
+          * ( [`Time_received] * (unit, Truth.True.t) Truth.t
+            , [`Genesis_state] * (unit, Truth.True.t) Truth.t
+            , [`Proof] * (unit, Truth.True.t) Truth.t
+            , [`Delta_transition_chain]
+              * ( State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
+                , Truth.True.t )
+                Truth.t
+            , [`Frontier_dependencies] * (unit, Truth.True.t) Truth.t
+            , [`Staged_ledger_diff] * (unit, Truth.True.t) Truth.t )
+            Validation.Stable.V1.t
+        [@@deriving version {of_binable}]
+
+        module Erased = struct
+          (* if this type receives a new version, that changes the serialization of
+             the type `t', so that type must also get a new version
+          *)
+          [%%versioned
+          module Stable = struct
+            module V2 = struct
+              type t =
+                (Stable.V2.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
+                * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
+              [@@deriving sexp]
+
+              let to_latest = Fn.id
+            end
+          end]
+        end
+
+        type erased = Erased.Stable.Latest.t [@@deriving sexp]
+
+        let erase (transition_with_hash, validation) =
+          ( transition_with_hash
+          , Validation.extract_delta_transition_chain_witness validation )
+
+        let elaborate (transition_with_hash, delta_transition_chain_witness) =
+          ( transition_with_hash
+          , ( (`Time_received, Truth.True ())
+            , (`Genesis_state, Truth.True ())
+            , (`Proof, Truth.True ())
+            , ( `Delta_transition_chain
+              , Truth.True delta_transition_chain_witness )
+            , (`Frontier_dependencies, Truth.True ())
+            , (`Staged_ledger_diff, Truth.True ()) ) )
+
+        include Sexpable.Of_sexpable (struct
+                    type t = erased [@@deriving sexp]
+                  end)
+                  (struct
+                    type nonrec t = t
+
+                    let of_sexpable = elaborate
+
+                    let to_sexpable = erase
+                  end)
+
+        include Binable.Of_binable (struct
+                    type t = Erased.Stable.Latest.t [@@deriving bin_io]
+                  end)
+                  (struct
+                    type nonrec t = t
+
+                    let of_binable = elaborate
+
+                    let to_binable = erase
+                  end)
+
+        let to_yojson (transition_with_hash, _) =
+          With_hash.to_yojson to_yojson State_hash.to_yojson
+            transition_with_hash
+
+        let create_unsafe_pre_hashed t =
+          `I_swear_this_is_safe_see_my_comment
+            ( Validation.wrap t
+            |> skip_time_received_validation
+                 `This_transition_was_not_received_via_gossip
+            |> skip_genesis_protocol_state_validation
+                 `This_transition_was_generated_internally
+            |> skip_proof_validation `This_transition_was_generated_internally
+            |> skip_delta_transition_chain_validation
+                 `This_transition_was_not_received_via_gossip
+            |> skip_frontier_dependencies_validation
+                 `This_transition_belongs_to_a_detached_subtree
+            |> skip_staged_ledger_diff_validation
+                 `This_transition_has_a_trusted_staged_ledger )
+
+        let create_unsafe t =
+          create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hash)
+
+        include With_validation
+      end
+
+      include T
+      include Comparable.Make (T)
+      include Registration.Make_latest_version (T)
+    end
+
     module V1 = struct
       module T = struct
         type t =
@@ -636,6 +758,13 @@ module Validated = struct
             , [`Staged_ledger_diff] * (unit, Truth.True.t) Truth.t )
             Validation.Stable.V1.t
         [@@deriving version {of_binable}]
+
+        type latest = V2.t
+
+        let to_latest (transition_with_hash, delta_transition_chain_witness) =
+          ( With_hash.Stable.V1.to_latest Stable.V1.to_latest
+              State_hash.Stable.V1.to_latest transition_with_hash
+          , delta_transition_chain_witness )
 
         module Erased = struct
           (* if this type receives a new version, that changes the serialization of
@@ -718,11 +847,10 @@ module Validated = struct
       end
 
       include T
-      include Comparable.Make (T)
-      include Registration.Make_latest_version (T)
+      include Registration.Make_version (T)
     end
 
-    module Latest = V1
+    module Latest = V2
 
     module Module_decl = struct
       let name = "external_transition_validated"
@@ -732,6 +860,7 @@ module Validated = struct
 
     module Registrar = Registration.Make (Module_decl)
     module Registered_V1 = Registrar.Register (V1)
+    module Registered_V2 = Registrar.Register (V2)
   end
 
   type t = Stable.Latest.t

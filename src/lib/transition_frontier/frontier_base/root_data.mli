@@ -7,6 +7,15 @@ open Coda_transition
  * created. *)
 module Historical : sig
   module Stable : sig
+    module V2 : sig
+      type t =
+        { transition: External_transition.Validated.Stable.V1.t
+        ; scan_state: Staged_ledger.Scan_state.Stable.V2.t
+        ; pending_coinbase: Pending_coinbase.Stable.V1.t
+        ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
+      [@@deriving bin_io, version]
+    end
+
     module V1 : sig
       type t =
         { transition: External_transition.Validated.Stable.V1.t
@@ -14,9 +23,11 @@ module Historical : sig
         ; pending_coinbase: Pending_coinbase.Stable.V1.t
         ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
       [@@deriving bin_io, version]
+
+      val to_latest : t -> V2.t
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 
   type t = Stable.Latest.t
@@ -28,15 +39,25 @@ end
  * the full validated transition at a root instead of just a pointer to one *)
 module Limited : sig
   module Stable : sig
+    module V2 : sig
+      type t =
+        { transition: External_transition.Validated.Stable.V1.t
+        ; scan_state: Staged_ledger.Scan_state.Stable.V2.t
+        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
+      [@@deriving bin_io, version]
+    end
+
     module V1 : sig
       type t =
         { transition: External_transition.Validated.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
       [@@deriving bin_io, version]
+
+      val to_latest : t -> V2.t
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 
   type t = Stable.Latest.t
@@ -49,15 +70,25 @@ end
  *)
 module Minimal : sig
   module Stable : sig
+    module V2 : sig
+      type t =
+        { hash: State_hash.Stable.V1.t
+        ; scan_state: Staged_ledger.Scan_state.Stable.V2.t
+        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
+      [@@deriving bin_io, version]
+    end
+
     module V1 : sig
       type t =
         { hash: State_hash.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
       [@@deriving bin_io, version]
+
+      val to_latest : t -> V2.t
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 
   type t = Stable.Latest.t

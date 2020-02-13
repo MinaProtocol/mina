@@ -65,7 +65,7 @@ module User_command = struct
     | Payment payment ->
         payment.receiver
     | Stake_delegation (Set_delegate delegation) ->
-        delegation.new_delegate
+        Account_id.create delegation.new_delegate Token_id.default
 
   let encode {With_hash.data= user_command; hash} first_seen =
     let payload = User_command.payload user_command in

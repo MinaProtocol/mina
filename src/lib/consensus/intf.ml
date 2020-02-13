@@ -341,6 +341,10 @@ module type S = sig
     module Prover_state : sig
       [%%versioned:
       module Stable : sig
+        module V2 : sig
+          type t [@@deriving sexp, to_yojson]
+        end
+
         module V1 : sig
           type t [@@deriving sexp, to_yojson]
         end

@@ -776,7 +776,7 @@ module Data = struct
         let dummy_sparse_ledger =
           Coda_base.Sparse_ledger.of_ledger_subset_exn
             (Lazy.force genesis_ledger)
-            [pk]
+            [Coda_base.(Account_id.create pk Token_id.default)]
         in
         let empty_pending_coinbase =
           Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
@@ -2345,6 +2345,36 @@ module Hooks = struct
         include Master
       end)
 
+      module V2 = struct
+        module T = struct
+          type query = Coda_base.Ledger_hash.Stable.V1.t [@@deriving bin_io]
+
+          type response =
+            ( Coda_base.Sparse_ledger.Stable.V2.t
+            , string )
+            Core_kernel.Result.Stable.V1.t
+          [@@deriving bin_io, version {rpc}]
+
+          let query_of_caller_model = Fn.id
+
+          let callee_model_of_query = Fn.id
+
+          let response_of_callee_model = Fn.id
+
+          let caller_model_of_response = Fn.id
+        end
+
+        module T' =
+          Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+              include M
+              include Master
+            end)
+            (T)
+
+        include T'
+        include Register (T')
+      end
+
       module V1 = struct
         module T = struct
           type query = Coda_base.Ledger_hash.Stable.V1.t [@@deriving bin_io]
@@ -2359,9 +2389,13 @@ module Hooks = struct
 
           let callee_model_of_query = Fn.id
 
-          let response_of_callee_model = Fn.id
+          let response_of_callee_model =
+            Core_kernel.Result.bind
+              ~f:Coda_base.Sparse_ledger.Stable.V1.of_latest
 
-          let caller_model_of_response = Fn.id
+          let caller_model_of_response =
+            Core_kernel.Result.map
+              ~f:Coda_base.Sparse_ledger.Stable.V1.to_latest
         end
 
         module T' =
@@ -3171,8 +3205,11 @@ let%test_module "Proof of stake tests" =
       let maybe_sk, account = Test_genesis_ledger.largest_account_exn () in
       let private_key = Option.value_exn maybe_sk in
       let public_key_compressed = Account.public_key account in
+      let account_id =
+        Account_id.create public_key_compressed Token_id.default
+      in
       let location =
-        Ledger.Any_ledger.M.location_of_key ledger public_key_compressed
+        Ledger.Any_ledger.M.location_of_account ledger account_id
       in
       let delegator =
         Option.value_exn location |> Ledger.Any_ledger.M.Location.to_path_exn

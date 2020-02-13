@@ -86,7 +86,7 @@ let get_account t (addr : Public_key.Compressed.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Coda_lib.best_ledger t in
   let open Option.Let_syntax in
-  let%bind loc = Ledger.location_of_key ledger addr in
+  let%bind loc = Ledger.location_of_account ledger addr in
   Ledger.get ledger loc
 
 let get_accounts t =

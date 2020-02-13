@@ -36,7 +36,9 @@ let get_lite_chain :
       let ledger =
         List.fold pks
           ~f:(fun acc key ->
-            let loc = Option.value_exn (Ledger.location_of_key ledger key) in
+            let loc =
+              Option.value_exn (Ledger.location_of_account ledger key)
+            in
             Lite_lib.Sparse_ledger.add_path acc
               (Lite_compat.merkle_path (Ledger.merkle_path ledger loc))
               (Lite_compat.public_key key)

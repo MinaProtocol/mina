@@ -15,8 +15,11 @@ module type Gen_intf = sig
          ?sign_type:[`Fake | `Real]
       -> key_gen:(Signature_keypair.t * Signature_keypair.t)
                  Quickcheck.Generator.t
+      -> ?fee_nonce:Account_nonce.t
       -> ?nonce:Account_nonce.t
       -> max_amount:int
+      -> ?fee_token:Token_id.t
+      -> ?payment_token:Token_id.t
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -29,8 +32,11 @@ module type Gen_intf = sig
     val payment_with_random_participants :
          ?sign_type:[`Fake | `Real]
       -> keys:Signature_keypair.t array
+      -> ?fee_nonce:Account_nonce.t
       -> ?nonce:Account_nonce.t
       -> max_amount:int
+      -> ?fee_token:Token_id.t
+      -> ?payment_token:Token_id.t
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -38,14 +44,18 @@ module type Gen_intf = sig
     val stake_delegation :
          key_gen:(Signature_keypair.t * Signature_keypair.t)
                  Quickcheck.Generator.t
+      -> ?fee_nonce:Account_nonce.t
       -> ?nonce:Account_nonce.t
+      -> ?fee_token:Token_id.t
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
 
     val stake_delegation_with_random_participants :
          keys:Signature_keypair.t array
+      -> ?fee_nonce:Account_nonce.t
       -> ?nonce:Account_nonce.t
+      -> ?fee_token:Token_id.t
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -75,9 +85,11 @@ module type S = sig
 
   val nonce : t -> Account_nonce.t
 
-  val sender : t -> Public_key.Compressed.t
+  val fee_sender : t -> Account_id.t
 
-  val receiver : t -> Public_key.Compressed.t
+  val sender : t -> Account_id.t
+
+  val receiver : t -> Account_id.t
 
   val amount : t -> Currency.Amount.t option
 
@@ -103,7 +115,13 @@ module type S = sig
         include Gen_intf with type t := t
       end
 
-      module V1 = Latest
+      module V2 = Latest
+
+      module V1 : sig
+        type t [@@deriving sexp, eq, bin_io, yojson, version, compare, hash]
+
+        val to_latest : t -> Latest.t
+      end
     end
 
     type t = Stable.Latest.t [@@deriving sexp, yojson, compare, hash]
@@ -126,7 +144,7 @@ module type S = sig
   (** Forget the signature check. *)
   val forget_check : With_valid_signature.t -> t
 
-  val accounts_accessed : t -> Public_key.Compressed.t list
+  val accounts_accessed : t -> Account_id.t list
 
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 

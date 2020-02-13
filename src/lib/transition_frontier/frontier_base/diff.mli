@@ -62,18 +62,21 @@ end
  *  by transitioning the root.
  *)
 module Root_transition : sig
-  type 'repr t =
-    {new_root: Root_data.Minimal.Stable.V1.t; garbage: 'repr Node_list.t}
+  type 'repr t = {new_root: Root_data.Minimal.t; garbage: 'repr Node_list.t}
 
   type 'repr root_transition = 'repr t
 
   module Lite : sig
     module Stable : sig
-      module V1 : sig
+      module V2 : sig
         type t = lite root_transition [@@deriving bin_io, version]
       end
 
-      module Latest = V1
+      module V1 : sig
+        type t [@@deriving bin_io, version]
+      end
+
+      module Latest = V2
     end
 
     type t = Stable.Latest.t

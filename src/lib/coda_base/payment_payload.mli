@@ -18,17 +18,24 @@ module Poly : sig
     with type ('pk, 'amount) V1.t = ('pk, 'amount) t
 end
 
+[%%versioned:
 module Stable : sig
+  module V2 : sig
+    type t =
+      (Account_id.Stable.V1.t, Currency.Amount.Stable.V1.t) Poly.Stable.V1.t
+    [@@deriving compare, eq, sexp, hash, compare, yojson]
+  end
+
   module V1 : sig
     type t =
       ( Public_key.Compressed.Stable.V1.t
       , Currency.Amount.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
-  end
 
-  module Latest = V1
-end
+    val to_latest : t -> V2.t
+  end
+end]
 
 type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
@@ -36,7 +43,7 @@ val dummy : t
 
 val gen : max_amount:Currency.Amount.t -> t Quickcheck.Generator.t
 
-type var = (Public_key.Compressed.var, Currency.Amount.var) Poly.t
+type var = (Account_id.var, Currency.Amount.var) Poly.t
 
 val typ : (var, t) Typ.t
 

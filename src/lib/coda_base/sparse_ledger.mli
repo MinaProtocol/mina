@@ -3,6 +3,15 @@ open Import
 open Snark_params.Tick
 
 module Stable : sig
+  module V2 : sig
+    type t =
+      ( Ledger_hash.Stable.V1.t
+      , Account_id.Stable.V1.t
+      , Account.Stable.V2.t )
+      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
+    [@@deriving bin_io, sexp, to_yojson, version]
+  end
+
   module V1 : sig
     type t =
       ( Ledger_hash.Stable.V1.t
@@ -10,9 +19,13 @@ module Stable : sig
       , Account.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
     [@@deriving bin_io, sexp, to_yojson, version]
+
+    val to_latest : t -> V2.t
+
+    val of_latest : V2.t -> (t, string) Result.t
   end
 
-  module Latest = V1
+  module Latest = V2
 end
 
 type t = Stable.Latest.t [@@deriving to_yojson, sexp]
@@ -24,7 +37,7 @@ val get_exn : t -> int -> Account.t
 val path_exn :
   t -> int -> [`Left of Ledger_hash.t | `Right of Ledger_hash.t] list
 
-val find_index_exn : t -> Account.key -> int
+val find_index_exn : t -> Account_id.t -> int
 
 val of_root : Ledger_hash.t -> t
 
@@ -34,7 +47,7 @@ val apply_transaction_exn : t -> Transaction.t -> t
 
 val of_any_ledger : Ledger.Any_ledger.M.t -> t
 
-val of_ledger_subset_exn : Ledger.t -> Public_key.Compressed.t list -> t
+val of_ledger_subset_exn : Ledger.t -> Account_id.t list -> t
 
 val of_ledger_index_subset_exn : Ledger.Any_ledger.witness -> int list -> t
 

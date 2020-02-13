@@ -19,7 +19,9 @@ module Make_from_base (Base : Base_intf) : Intf.S = struct
     lazy
       (let ledger = Ledger.create_ephemeral () in
        List.iter accounts ~f:(fun (_, account) ->
-           Ledger.create_new_account_exn ledger account.public_key account ) ;
+           Ledger.create_new_account_exn ledger
+             (Account.identifier account)
+             account ) ;
        ledger)
 
   let find_account_record_exn ~f =
@@ -74,7 +76,10 @@ module With_private = struct
     include Make_from_base (struct
       let accounts =
         List.map Source.accounts ~f:(fun {pk; sk; balance} ->
-            (Some sk, Account.create pk (Balance.of_int balance)) )
+            ( Some sk
+            , Account.create
+                (Account_id.create pk Token_id.default)
+                (Balance.of_int balance) ) )
     end)
   end
 end
@@ -93,7 +98,10 @@ module Without_private = struct
     include Make_from_base (struct
       let accounts =
         List.map Source.accounts ~f:(fun {pk; balance; delegate} ->
-            let base_acct = Account.create pk (Balance.of_int balance) in
+            let account_id = Account_id.create pk Token_id.default in
+            let base_acct =
+              Account.create account_id (Balance.of_int balance)
+            in
             (None, {base_acct with delegate= Option.value ~default:pk delegate})
         )
     end)

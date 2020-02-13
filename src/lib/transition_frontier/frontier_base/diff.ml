@@ -83,6 +83,32 @@ module Root_transition = struct
 
   module Lite = struct
     module Stable = struct
+      module V2 = struct
+        module T = struct
+          module T_binable = struct
+            type t =
+              { new_root: Root_data.Minimal.Stable.V2.t
+              ; garbage: Node_list.Lite.Stable.V1.t }
+            [@@deriving bin_io]
+          end
+
+          module T_nonbinable = struct
+            type t = lite root_transition
+
+            let to_binable {new_root; garbage} = {T_binable.new_root; garbage}
+
+            let of_binable {T_binable.new_root; garbage} = {new_root; garbage}
+          end
+
+          type t = T_nonbinable.t [@@deriving version {asserted}]
+
+          include Binable.Of_binable (T_binable) (T_nonbinable)
+        end
+
+        include T
+        include Registration.Make_latest_version (T)
+      end
+
       module V1 = struct
         module T = struct
           module T_binable = struct
@@ -106,10 +132,10 @@ module Root_transition = struct
         end
 
         include T
-        include Registration.Make_latest_version (T)
+        include Registration.Make_version (T)
       end
 
-      module Latest = V1
+      module Latest = V2
 
       module Module_decl = struct
         let name = "transition_frontier_root_transition"
@@ -119,6 +145,7 @@ module Root_transition = struct
 
       module Registrar = Registration.Make (Module_decl)
       module Registered_V1 = Registrar.Register (V1)
+      module Registered_V1 = Registrar.Register (V2)
     end
 
     include Stable.Latest

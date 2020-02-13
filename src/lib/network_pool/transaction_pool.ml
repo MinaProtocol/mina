@@ -67,7 +67,7 @@ module Make0 (Base_ledger : sig
     type t
   end
 
-  val location_of_key : t -> Public_key.Compressed.t -> Location.t option
+  val location_of_account : t -> Public_key.Compressed.t -> Location.t option
 
   val get : t -> Location.t -> Account.t option
 end) (Max_size : sig
@@ -231,7 +231,9 @@ struct
           ~f:(fun (p, dropped_so_far) cmd ->
             let sender = User_command.sender cmd in
             let balance =
-              match Base_ledger.location_of_key validation_ledger sender with
+              match
+                Base_ledger.location_of_account validation_ledger sender
+              with
               | None ->
                   Currency.Balance.zero
               | Some loc ->
@@ -309,7 +311,7 @@ struct
             else
               match
                 Option.bind
-                  (Base_ledger.location_of_key validation_ledger
+                  (Base_ledger.location_of_account validation_ledger
                      (User_command.sender (cmd :> User_command.t)))
                   ~f:(Base_ledger.get validation_ledger)
               with
@@ -382,7 +384,8 @@ struct
                  let new_pool, dropped =
                    Indexed_pool.revalidate t.pool (fun sender ->
                        match
-                         Base_ledger.location_of_key validation_ledger sender
+                         Base_ledger.location_of_account validation_ledger
+                           sender
                        with
                        | None ->
                            (Account.Nonce.zero, Currency.Amount.zero)
@@ -513,7 +516,7 @@ struct
                     else
                       match
                         Option.bind
-                          (Base_ledger.location_of_key ledger
+                          (Base_ledger.location_of_account ledger
                              (User_command.sender tx))
                           ~f:(Base_ledger.get ledger)
                       with
@@ -758,7 +761,7 @@ let%test_module _ =
         type t = Public_key.Compressed.t
       end
 
-      let location_of_key _t k = Some k
+      let location_of_account _t k = Some k
 
       let get t l = Map.find t l
     end

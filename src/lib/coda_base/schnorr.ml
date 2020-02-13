@@ -14,7 +14,12 @@ module Message = struct
 
   let derive t ~private_key ~public_key:pk =
     let { User_command_payload.Poly.common=
-            {User_command_payload.Common.Poly.fee; nonce; valid_until; memo}
+            { User_command_payload.Common.Poly.fee
+            ; fee_token
+            ; fee_nonce
+            ; nonce
+            ; valid_until
+            ; memo }
         ; body= {Transaction_union_payload.Body.amount; public_key; tag} } =
       Transaction_union_payload.of_user_command_payload t
     in
@@ -23,16 +28,23 @@ module Message = struct
     let pk_bits {Signature_lib.Public_key.Compressed.Poly.x; is_odd} =
       is_odd :: Field.unpack x
     in
+    let account_id_bits aid =
+      List.append
+        (pk_bits (Account_id.public_key aid))
+        (Token_id.unpack (Account_id.token_id aid))
+    in
     List.concat
       [ Tock.Field.unpack private_key
       ; pk_bits
           (Signature_lib.Public_key.compress (Inner_curve.to_affine_exn pk))
       ; Fee.to_bits fee
+      ; Token_id.unpack fee_token
+      ; Account_nonce.Bits.to_bits fee_nonce
       ; Account_nonce.Bits.to_bits nonce
       ; Global_slot.to_bits valid_until
       ; User_command_memo.to_bits memo
       ; Amount.to_bits amount
-      ; pk_bits public_key
+      ; account_id_bits public_key
       ; (let x, y = Transaction_union_tag.to_bits tag in
          [x; y]) ]
     |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string

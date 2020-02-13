@@ -50,6 +50,8 @@ module type Full_size = sig
       type t = Pedersen.Digest.Stable.V1.t
       [@@deriving sexp, compare, hash, yojson]
 
+      val to_latest : t -> t
+
       include Comparable.S with type t := t
 
       include Hashable_binable with type t := t

@@ -45,6 +45,8 @@ module Checked = struct
 
   let equal = Field.Checked.equal
 
+  let if_ = Field.Checked.if_
+
   module Assert = struct
     let equal = Field.Checked.Assert.equal
   end

@@ -56,7 +56,7 @@ let%test_module "test functor on in memory databases" =
             let location = create_new_account_exn mdb account in
             MT.set mdb location account ;
             let location' =
-              MT.location_of_key mdb (Account.public_key account)
+              MT.location_of_account mdb (Account.public_key account)
               |> Option.value_exn
             in
             MT.Location.equal location location'
@@ -117,7 +117,7 @@ let%test_module "test functor on in memory databases" =
             && action = `Existed
             && MT.get mdb location |> Option.value_exn <> account' )
 
-      let%test_unit "get_or_create_account t account = location_of_key \
+      let%test_unit "get_or_create_account t account = location_of_account \
                      account.key" =
         Test.with_instance (fun mdb ->
             let accounts_gen =
@@ -134,7 +134,7 @@ let%test_module "test functor on in memory databases" =
                      MT.get_or_create_account_exn mdb public_key account
                    in
                    let location' =
-                     MT.location_of_key mdb public_key |> Option.value_exn
+                     MT.location_of_account mdb public_key |> Option.value_exn
                    in
                    assert (location = location') ) )
 
@@ -267,7 +267,7 @@ let%test_module "test functor on in memory databases" =
             List.iter accounts ~f:(fun account ->
                 let key = Account.public_key account in
                 let location =
-                  MT.location_of_key mdb key |> Option.value_exn
+                  MT.location_of_account mdb key |> Option.value_exn
                 in
                 let queried_account =
                   MT.get mdb location |> Option.value_exn
@@ -330,7 +330,8 @@ let%test_module "test functor on in memory databases" =
             | `Added, _ ->
                 [%test_eq: Hash.t] start_hash (merkle_root ledger) )
 
-      let%test "get_at_index_exn t (index_of_key_exn t public_key) = account" =
+      let%test "get_at_index_exn t (index_of_account_exn t public_key) = \
+                account" =
         Test.with_instance (fun mdb ->
             let max_height = Int.min MT.depth 5 in
             let accounts = random_accounts max_height |> dedup_accounts in
@@ -339,7 +340,7 @@ let%test_module "test functor on in memory databases" =
             Sequence.of_list accounts
             |> Sequence.for_all ~f:(fun ({public_key; _} as account) ->
                    let indexed_account =
-                     MT.index_of_key_exn mdb public_key
+                     MT.index_of_account_exn mdb public_key
                      |> MT.get_at_index_exn mdb
                    in
                    Account.equal account indexed_account ) )

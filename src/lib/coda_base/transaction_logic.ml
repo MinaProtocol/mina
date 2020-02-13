@@ -10,17 +10,17 @@ module type Ledger_intf = sig
 
   val get : t -> location -> Account.t option
 
-  val location_of_key : t -> Account.key -> location option
+  val location_of_account : t -> Account_id.t -> location option
 
   val set : t -> location -> Account.t -> unit
 
   val get_or_create :
-    t -> Account.key -> [`Added | `Existed] * Account.t * location
+    t -> Account_id.t -> [`Added | `Existed] * Account.t * location
 
   val get_or_create_account_exn :
-    t -> Account.key -> Account.t -> [`Added | `Existed] * location
+    t -> Account_id.t -> Account.t -> [`Added | `Existed] * location
 
-  val remove_accounts_exn : t -> Account.key list -> unit
+  val remove_accounts_exn : t -> Account_id.t list -> unit
 
   val merkle_root : t -> Ledger_hash.t
 
@@ -34,13 +34,25 @@ module Undo = struct
     module Common = struct
       [%%versioned
       module Stable = struct
+        module V2 = struct
+          type t =
+            { user_command: User_command.Stable.V2.t
+            ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t }
+          [@@deriving sexp]
+
+          let to_latest = Fn.id
+        end
+
         module V1 = struct
           type t =
             { user_command: User_command.Stable.V1.t
             ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t }
           [@@deriving sexp]
 
-          let to_latest = Fn.id
+          let to_latest ({user_command; previous_receipt_chain_hash} : t) :
+              V2.t =
+            { user_command= User_command.Stable.V1.to_latest user_command
+            ; previous_receipt_chain_hash }
         end
       end]
 
@@ -53,6 +65,16 @@ module Undo = struct
     module Body = struct
       [%%versioned
       module Stable = struct
+        module V2 = struct
+          type t =
+            | Payment of {previous_empty_accounts: Account_id.Stable.V1.t list}
+            | Stake_delegation of
+                { previous_delegate: Public_key.Compressed.Stable.V1.t }
+          [@@deriving sexp]
+
+          let to_latest = Fn.id
+        end
+
         module V1 = struct
           type t =
             | Payment of
@@ -62,23 +84,39 @@ module Undo = struct
                 { previous_delegate: Public_key.Compressed.Stable.V1.t }
           [@@deriving sexp]
 
-          let to_latest = Fn.id
+          let to_latest = function
+            | Payment {previous_empty_accounts} ->
+                V2.Payment
+                  { previous_empty_accounts=
+                      List.map previous_empty_accounts ~f:(fun pk ->
+                          Account_id.create pk Token_id.default ) }
+            | Stake_delegation {previous_delegate} ->
+                V2.Stake_delegation {previous_delegate}
         end
       end]
 
       type t = Stable.Latest.t =
-        | Payment of {previous_empty_accounts: Public_key.Compressed.t list}
+        | Payment of {previous_empty_accounts: Account_id.t list}
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
       [@@deriving sexp]
     end
 
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t = {common: Common.Stable.V2.t; body: Body.Stable.V2.t}
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t = {common: Common.Stable.V1.t; body: Body.Stable.V1.t}
         [@@deriving sexp]
 
-        let to_latest = Fn.id
+        let to_latest ({common; body} : t) : V2.t =
+          { common= Common.Stable.V1.to_latest common
+          ; body= Body.Stable.V1.to_latest body }
       end
     end]
 
@@ -90,45 +128,79 @@ module Undo = struct
   module Fee_transfer_undo = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          { fee_transfer: Fee_transfer.Stable.V1.t
+          ; previous_empty_accounts: Account_id.Stable.V1.t list }
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           { fee_transfer: Fee_transfer.Stable.V1.t
           ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
         [@@deriving sexp]
 
-        let to_latest = Fn.id
+        let to_latest {fee_transfer; previous_empty_accounts} =
+          { V2.fee_transfer
+          ; previous_empty_accounts=
+              List.map previous_empty_accounts ~f:(fun pk ->
+                  Account_id.create pk Token_id.default ) }
       end
     end]
 
     type t = Stable.Latest.t =
-      { fee_transfer: Fee_transfer.t
-      ; previous_empty_accounts: Public_key.Compressed.t list }
+      {fee_transfer: Fee_transfer.t; previous_empty_accounts: Account_id.t list}
     [@@deriving sexp]
   end
 
   module Coinbase_undo = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          { coinbase: Coinbase.Stable.V1.t
+          ; previous_empty_accounts: Account_id.Stable.V1.t list }
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           { coinbase: Coinbase.Stable.V1.t
           ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
         [@@deriving sexp]
 
-        let to_latest = Fn.id
+        let to_latest {coinbase; previous_empty_accounts} =
+          { V2.coinbase
+          ; previous_empty_accounts=
+              List.map previous_empty_accounts ~f:(fun pk ->
+                  Account_id.create pk Token_id.default ) }
       end
     end]
 
     (* bin_io omitted *)
     type t = Stable.Latest.t =
-      { coinbase: Coinbase.t
-      ; previous_empty_accounts: Public_key.Compressed.t list }
+      {coinbase: Coinbase.t; previous_empty_accounts: Account_id.t list}
     [@@deriving sexp]
   end
 
   module Varying = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          | User_command of User_command_undo.Stable.V2.t
+          | Fee_transfer of Fee_transfer_undo.Stable.V2.t
+          | Coinbase of Coinbase_undo.Stable.V2.t
+        [@@deriving sexp]
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           | User_command of User_command_undo.Stable.V1.t
@@ -136,7 +208,13 @@ module Undo = struct
           | Coinbase of Coinbase_undo.Stable.V1.t
         [@@deriving sexp]
 
-        let to_latest = Fn.id
+        let to_latest = function
+          | User_command uc ->
+              V2.User_command (User_command_undo.Stable.V1.to_latest uc)
+          | Fee_transfer ft ->
+              V2.Fee_transfer (Fee_transfer_undo.Stable.V1.to_latest ft)
+          | Coinbase cb ->
+              V2.Coinbase (Coinbase_undo.Stable.V1.to_latest cb)
       end
     end]
 
@@ -150,12 +228,21 @@ module Undo = struct
 
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        {previous_hash: Ledger_hash.Stable.V1.t; varying: Varying.Stable.V2.t}
+      [@@deriving sexp]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
       type t =
         {previous_hash: Ledger_hash.Stable.V1.t; varying: Varying.Stable.V1.t}
       [@@deriving sexp]
 
-      let to_latest = Fn.id
+      let to_latest {previous_hash; varying} =
+        {V2.previous_hash; varying= Varying.Stable.V1.to_latest varying}
     end
   end]
 
@@ -178,7 +265,7 @@ module type S = sig
 
       module Body : sig
         type t = Undo.User_command_undo.Body.t =
-          | Payment of {previous_empty_accounts: Public_key.Compressed.t list}
+          | Payment of {previous_empty_accounts: Account_id.t list}
           | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
         [@@deriving sexp]
       end
@@ -190,14 +277,13 @@ module type S = sig
     module Fee_transfer_undo : sig
       type t = Undo.Fee_transfer_undo.t =
         { fee_transfer: Fee_transfer.t
-        ; previous_empty_accounts: Public_key.Compressed.t list }
+        ; previous_empty_accounts: Account_id.t list }
       [@@deriving sexp]
     end
 
     module Coinbase_undo : sig
       type t = Undo.Coinbase_undo.t =
-        { coinbase: Coinbase.t
-        ; previous_empty_accounts: Public_key.Compressed.t list }
+        {coinbase: Coinbase.t; previous_empty_accounts: Account_id.t list}
       [@@deriving sexp]
     end
 
@@ -246,10 +332,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   let get' ledger tag location =
     error_opt (sprintf "%s account not found" tag) (get ledger location)
 
-  let location_of_key' ledger tag key =
+  let location_of_account' ledger tag key =
     error_opt
       (sprintf "%s location not found" tag)
-      (location_of_key ledger key)
+      (location_of_account ledger key)
 
   let add_amount balance amount =
     error_opt "overflow" (Balance.add_amount balance amount)
@@ -267,6 +353,23 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
            fee amount)
         Amount.(sub amount (of_fee fee))
     else Ok amount
+
+  let sub_account_creation_fee_bal action balance =
+    let fee = Coda_compile_config.account_creation_fee in
+    if action = `Added then
+      error_opt
+        (sprintf
+           !"Error subtracting account creation fee %{sexp: Currency.Fee.t}; \
+             requesting account balance %{sexp: Currency.Balance.t} \
+             insufficient"
+           fee balance)
+        (Balance.sub_amount balance (Amount.of_fee fee))
+    else Ok balance
+
+  let add_account_creation_fee_bal action balance =
+    let fee = Coda_compile_config.account_creation_fee in
+    if action = `Added then add_amount balance (Amount.of_fee fee)
+    else Ok balance
 
   let check b =
     ksprintf (fun s -> if b then Ok () else Or_error.error_string s)
@@ -375,27 +478,68 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   we don't for now. *)
   let apply_user_command_unchecked ledger
       ({payload; sender; signature= _} as user_command : User_command.t) =
-    let sender = Public_key.compress sender in
-    let nonce = User_command.Payload.nonce payload in
     let open Or_error.Let_syntax in
-    let%bind sender_location = location_of_key' ledger "" sender in
+    let%bind () =
+      (* TODO: Disable this check and update the transaction snark. *)
+      if
+        Token_id.equal
+          (User_command.Payload.fee_token payload)
+          Token_id.default
+      then Ok ()
+      else
+        Error
+          (Error.createf
+             "Cannot create transactions with fee_token different from the \
+              default")
+    in
+    let sender = Public_key.compress sender in
+    (* Get account location for the sender. *)
+    let token = Account_id.token_id (User_command.Payload.receiver payload) in
+    let nonce = User_command.Payload.nonce payload in
+    let sender_id = Account_id.create sender token in
+    let%bind sender_location = location_of_account' ledger "" sender_id in
+    (* Get account location for the fee-payer. *)
+    let fee_token = User_command.Payload.fee_token payload in
+    let fee_nonce = User_command.Payload.fee_nonce payload in
+    let fee_sender_id = Account_id.create sender fee_token in
+    let%bind fee_sender_location =
+      location_of_account' ledger "" fee_sender_id
+    in
+    (* TODO: Put actual value here. See issue #4036. *)
+    let current_global_slot = Global_slot.zero in
+    let%bind () =
+      validate_time ~valid_until:payload.common.valid_until
+        ~current_global_slot
+    in
     (* We unconditionally deduct the fee if this transaction succeeds *)
-    let%bind sender_account, common =
-      let%bind account = get' ledger "sender" sender_location in
-      let%bind balance =
-        sub_amount account.balance
-          (Amount.of_fee (User_command.Payload.fee payload))
+    let%bind fee_sender_account =
+      let%bind account = get' ledger "fee sender" fee_sender_location in
+      let fee = Amount.of_fee (User_command.Payload.fee payload) in
+      let%bind balance = sub_amount account.balance fee in
+      let%bind () = validate_nonces fee_nonce account.nonce in
+      let%map timing =
+        validate_timing ~txn_amount:fee ~txn_global_slot:current_global_slot
+          ~account
       in
+      {account with balance; nonce= Account.Nonce.succ account.nonce; timing}
+    in
+    (* Retrieve the sender account, which may be the same as the sender fee
+       account.
+    *)
+    let%bind sender_account, common =
+      let%bind account =
+        if Token_id.equal token fee_token then return fee_sender_account
+        else get' ledger "sender" fee_sender_location
+      in
+      (* TODO: This may not be the right place for the receipt chain to be
+         attached when we support predicates: the 'sender' (ie. signer) may be
+         different for each transaction, which prevents anybody from being able
+         to build a chain.
+      *)
       let common : Undo.User_command_undo.Common.t =
         {user_command; previous_receipt_chain_hash= account.receipt_chain_hash}
       in
       let%bind () = validate_nonces nonce account.nonce in
-      (* TODO: Put actual value here. See issue #4036. *)
-      let current_global_slot = Global_slot.zero in
-      let%bind () =
-        validate_time ~valid_until:payload.common.valid_until
-          ~current_global_slot
-      in
       let%map timing =
         if User_command.Payload.is_payment payload then
           let txn_amount =
@@ -416,22 +560,24 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             Receipt.Chain_hash.cons payload account.receipt_chain_hash
         ; timing }
       in
-      ({account with balance}, common)
+      (account, common)
     in
     match User_command.Payload.body payload with
     | Stake_delegation (Set_delegate {new_delegate}) ->
+        set ledger fee_sender_location fee_sender_account ;
         set ledger sender_location {sender_account with delegate= new_delegate} ;
         return
           { Undo.User_command_undo.common
           ; body= Stake_delegation {previous_delegate= sender_account.delegate}
           }
     | Payment Payment_payload.Poly.{amount; receiver} ->
-        let%bind sender_balance' = sub_amount sender_account.balance amount in
         let undo emptys : Undo.User_command_undo.t =
           {common; body= Payment {previous_empty_accounts= emptys}}
         in
-        if Public_key.Compressed.equal sender receiver then (
-          ignore @@ set ledger sender_location sender_account ;
+        if Public_key.Compressed.equal sender (Account_id.public_key receiver)
+        then (
+          set ledger fee_sender_location fee_sender_account ;
+          set ledger sender_location sender_account ;
           return (undo []) )
         else
           let action, receiver_account, receiver_location =
@@ -440,43 +586,80 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let previous_empty_accounts =
             previous_empty_accounts action receiver
           in
-          let%map receiver_balance' =
-            (*deduct the account creation fee*)
-            let%bind amount' = sub_account_creation_fee action amount in
-            add_amount receiver_account.balance amount'
+          let%bind sender_balance' =
+            sub_amount sender_account.balance amount
           in
-          set ledger sender_location
-            {sender_account with balance= sender_balance'} ;
-          set ledger receiver_location
-            {receiver_account with balance= receiver_balance'} ;
-          undo previous_empty_accounts
+          if Token_id.equal fee_token token then (
+            (* sender_location = fee_sender_location *)
+            let%map receiver_balance' =
+              (* Subtract the account creation fee from the amount to be
+                 transferred.
+              *)
+              let%bind amount' = sub_account_creation_fee action amount in
+              add_amount receiver_account.balance amount'
+            in
+            set ledger sender_location
+              {sender_account with balance= sender_balance'} ;
+            set ledger receiver_location
+              {receiver_account with balance= receiver_balance'} ;
+            undo previous_empty_accounts )
+          else
+            (* Charge the fee sender for creating the account.
+               Note: We don't have a better choice here: there is no other
+               source of tokens in this transaction that is known to have
+               accepted value.
+             *)
+            let%bind fee_sender_balance' =
+              sub_account_creation_fee_bal action fee_sender_account.balance
+            in
+            let%map receiver_balance' =
+              add_amount receiver_account.balance amount
+            in
+            set ledger fee_sender_location
+              {fee_sender_account with balance= fee_sender_balance'} ;
+            set ledger sender_location
+              {sender_account with balance= sender_balance'} ;
+            set ledger receiver_location
+              {receiver_account with balance= receiver_balance'} ;
+            undo previous_empty_accounts
 
   let apply_user_command ledger
       (user_command : User_command.With_valid_signature.t) =
-    apply_user_command_unchecked ledger (user_command :> User_command.t)
+    apply_user_command_unchecked ledger
+      (User_command.forget_check user_command)
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
+    (* TODO: Allow token_id to vary from default. *)
     match transfer with
     | `One (pk, fee) ->
-        let action, a, loc = get_or_create t pk in
-        let emptys = previous_empty_accounts action pk in
-        let%map balance = modify_balance action pk a.balance fee in
+        let account_id = Account_id.create pk Token_id.default in
+        let action, a, loc = get_or_create t account_id in
+        let emptys = previous_empty_accounts action account_id in
+        let%map balance = modify_balance action account_id a.balance fee in
         set t loc {a with balance} ;
         emptys
     | `Two ((pk1, fee1), (pk2, fee2)) ->
-        let action1, a1, l1 = get_or_create t pk1 in
-        let emptys1 = previous_empty_accounts action1 pk1 in
+        let account_id1 = Account_id.create pk1 Token_id.default in
+        let action1, a1, l1 = get_or_create t account_id1 in
+        let emptys1 = previous_empty_accounts action1 account_id1 in
         if Public_key.Compressed.equal pk1 pk2 then (
           let%bind fee = error_opt "overflow" (Fee.add fee1 fee2) in
-          let%map balance = modify_balance action1 pk1 a1.balance fee in
+          let%map balance =
+            modify_balance action1 account_id1 a1.balance fee
+          in
           set t l1 {a1 with balance} ;
           emptys1 )
         else
-          let action2, a2, l2 = get_or_create t pk2 in
-          let emptys2 = previous_empty_accounts action2 pk2 in
-          let%bind balance1 = modify_balance action1 pk1 a1.balance fee1 in
-          let%map balance2 = modify_balance action2 pk1 a2.balance fee2 in
+          let account_id2 = Account_id.create pk2 Token_id.default in
+          let action2, a2, l2 = get_or_create t account_id2 in
+          let emptys2 = previous_empty_accounts action2 account_id2 in
+          let%bind balance1 =
+            modify_balance action1 account_id1 a1.balance fee1
+          in
+          let%map balance2 =
+            modify_balance action2 account_id2 a2.balance fee2
+          in
           set t l1 {a1 with balance= balance1} ;
           set t l2 {a2 with balance= balance2} ;
           emptys1 @ emptys2
@@ -497,9 +680,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ({previous_empty_accounts; fee_transfer} : Undo.Fee_transfer_undo.t) =
     let open Or_error.Let_syntax in
     let%map _ =
-      process_fee_transfer t fee_transfer ~modify_balance:(fun _ pk b f ->
+      process_fee_transfer t fee_transfer ~modify_balance:(fun _ aid b f ->
           let action =
-            if List.mem ~equal:Account.equal_key previous_empty_accounts pk
+            if List.mem ~equal:Account_id.equal previous_empty_accounts aid
             then `Added
             else `Existed
           in
@@ -520,15 +703,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           return (coinbase_amount, [], None)
       | Some (transferee, fee) ->
           assert (not @@ Public_key.Compressed.equal transferee receiver) ;
+          let transferee_id = Account_id.create transferee Token_id.default in
           let fee = Amount.of_fee fee in
           let%bind receiver_reward =
             error_opt "Coinbase fee transfer too large"
               (Amount.sub coinbase_amount fee)
           in
           let action, transferee_account, transferee_location =
-            get_or_create t transferee
+            get_or_create t transferee_id
           in
-          let emptys = previous_empty_accounts action transferee in
+          let emptys = previous_empty_accounts action transferee_id in
           let%map balance =
             let%bind amount = sub_account_creation_fee action fee in
             add_amount transferee_account.balance amount
@@ -537,10 +721,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , emptys
           , Some (transferee_location, {transferee_account with balance}) )
     in
+    let receiver_id = Account_id.create receiver Token_id.default in
     let action2, receiver_account, receiver_location =
-      get_or_create t receiver
+      get_or_create t receiver_id
     in
-    let emptys2 = previous_empty_accounts action2 receiver in
+    let emptys2 = previous_empty_accounts action2 receiver_id in
     let%map receiver_balance =
       let%bind amount = sub_account_creation_fee action2 receiver_reward in
       add_amount receiver_account.balance amount
@@ -562,8 +747,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           coinbase_amount
       | Some (transferee, fee) ->
           let fee = Amount.of_fee fee in
+          let transferee_id = Account_id.create transferee Token_id.default in
           let transferee_location =
-            Or_error.ok_exn (location_of_key' t "transferee" transferee)
+            Or_error.ok_exn (location_of_account' t "transferee" transferee_id)
           in
           let transferee_account =
             Or_error.ok_exn (get' t "transferee" transferee_location)
@@ -571,8 +757,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let transferee_balance =
             let action =
               if
-                List.mem previous_empty_accounts transferee
-                  ~equal:Account.equal_key
+                List.mem previous_empty_accounts transferee_id
+                  ~equal:Account_id.equal
               then `Added
               else `Existed
             in
@@ -586,15 +772,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             {transferee_account with balance= transferee_balance} ;
           Option.value_exn (Amount.sub coinbase_amount fee)
     in
+    let receiver_id = Account_id.create receiver Token_id.default in
     let receiver_location =
-      Or_error.ok_exn (location_of_key' t "receiver" receiver)
+      Or_error.ok_exn (location_of_account' t "receiver" receiver_id)
     in
     let receiver_account =
       Or_error.ok_exn (get' t "receiver" receiver_location)
     in
     let receiver_balance =
       let action =
-        if List.mem previous_empty_accounts receiver ~equal:Account.equal_key
+        if List.mem previous_empty_accounts receiver_id ~equal:Account_id.equal
         then `Added
         else `Existed
       in
@@ -611,57 +798,100 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           { user_command= {payload; sender; signature= _}
           ; previous_receipt_chain_hash }
       ; body } =
-    let sender = Public_key.compress sender in
-    let nonce = User_command.Payload.nonce payload in
     let open Or_error.Let_syntax in
-    let%bind sender_location = location_of_key' ledger "sender" sender in
+    let sender = Public_key.compress sender in
+    (* Get account location for the sender. *)
+    let token = Account_id.token_id (User_command.Payload.receiver payload) in
+    let nonce = User_command.Payload.nonce payload in
+    let sender_id = Account_id.create sender token in
+    let%bind sender_location = location_of_account' ledger "" sender_id in
+    (* Get account location for the fee-payer. *)
+    let fee_token = User_command.Payload.fee_token payload in
+    let fee_nonce = User_command.Payload.fee_nonce payload in
+    let fee_sender_id = Account_id.create sender fee_token in
+    let%bind fee_sender_location =
+      location_of_account' ledger "" fee_sender_id
+    in
+    (* NOTE: Access in the opposite order as applying, so that nonces get
+       updated correctly.
+    *)
     let%bind sender_account =
       let%bind account = get' ledger "sender" sender_location in
+      let%bind () = validate_nonces (Account.Nonce.succ nonce) account.nonce in
+      return
+        {account with nonce; receipt_chain_hash= previous_receipt_chain_hash}
+    in
+    let%bind fee_sender_account =
+      let%bind account =
+        if Token_id.equal token fee_token then return sender_account
+        else get' ledger "fee sender" fee_sender_location
+      in
+      let%bind () =
+        validate_nonces (Account.Nonce.succ fee_nonce) account.nonce
+      in
       let%bind balance =
         add_amount account.balance
           (Amount.of_fee (User_command.Payload.fee payload))
       in
-      let%bind () = validate_nonces (Account.Nonce.succ nonce) account.nonce in
-      return
-        { account with
-          balance
-        ; nonce
-        ; receipt_chain_hash= previous_receipt_chain_hash }
+      return {account with balance; nonce= fee_nonce}
     in
     match (User_command.Payload.body payload, body) with
     | Stake_delegation (Set_delegate _), Stake_delegation {previous_delegate}
       ->
         set ledger sender_location
           {sender_account with delegate= previous_delegate} ;
+        set ledger fee_sender_location fee_sender_account ;
         return ()
     | Payment {amount; receiver}, Payment {previous_empty_accounts} ->
-        let%bind sender_balance' = add_amount sender_account.balance amount in
-        if Public_key.Compressed.equal sender receiver then (
+        if Public_key.Compressed.equal sender (Account_id.public_key receiver)
+        then (
           set ledger sender_location sender_account ;
+          set ledger fee_sender_location fee_sender_account ;
           return () )
         else
           let%bind receiver_location =
-            location_of_key' ledger "receiver" receiver
+            location_of_account' ledger "receiver" receiver
           in
           let%bind receiver_account =
             get' ledger "receiver" receiver_location
           in
-          let%map receiver_balance' =
-            let action =
-              if
-                List.mem previous_empty_accounts receiver
-                  ~equal:Account.equal_key
-              then `Added
-              else `Existed
-            in
-            let%bind amount' = sub_account_creation_fee action amount in
-            sub_amount receiver_account.balance amount'
+          let action =
+            if
+              List.mem previous_empty_accounts receiver ~equal:Account_id.equal
+            then `Added
+            else `Existed
           in
-          set ledger sender_location
-            {sender_account with balance= sender_balance'} ;
-          set ledger receiver_location
-            {receiver_account with balance= receiver_balance'} ;
-          remove_accounts_exn ledger previous_empty_accounts
+          if Token_id.equal fee_token token then (
+            (* sender_location = fee_sender_location *)
+            let%bind fee_sender_balance' =
+              add_amount fee_sender_account.balance amount
+            in
+            let%map receiver_balance' =
+              let%bind amount' = sub_account_creation_fee action amount in
+              sub_amount receiver_account.balance amount'
+            in
+            set ledger fee_sender_location
+              {fee_sender_account with balance= fee_sender_balance'} ;
+            set ledger receiver_location
+              {receiver_account with balance= receiver_balance'} ;
+            remove_accounts_exn ledger previous_empty_accounts )
+          else
+            let%bind sender_balance' =
+              add_amount sender_account.balance amount
+            in
+            let%bind fee_sender_balance' =
+              add_account_creation_fee_bal action fee_sender_account.balance
+            in
+            let%map receiver_balance' =
+              add_amount receiver_account.balance amount
+            in
+            set ledger fee_sender_location
+              {fee_sender_account with balance= fee_sender_balance'} ;
+            set ledger sender_location
+              {sender_account with balance= sender_balance'} ;
+            set ledger receiver_location
+              {receiver_account with balance= receiver_balance'} ;
+            remove_accounts_exn ledger previous_empty_accounts
     | _, _ ->
         failwith "Undo/command mismatch"
 

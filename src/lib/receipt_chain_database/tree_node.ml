@@ -3,6 +3,16 @@ open Coda_base
 
 [%%versioned
 module Stable = struct
+  module V2 = struct
+    type t =
+      { key: Receipt.Chain_hash.Stable.V1.t
+      ; value: User_command.Stable.V2.t
+      ; parent: Receipt.Chain_hash.Stable.V1.t }
+    [@@deriving sexp]
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t =
       { key: Receipt.Chain_hash.Stable.V1.t
@@ -10,7 +20,8 @@ module Stable = struct
       ; parent: Receipt.Chain_hash.Stable.V1.t }
     [@@deriving sexp]
 
-    let to_latest = Fn.id
+    let to_latest {key; value; parent} =
+      {V2.key; value= User_command.Stable.V1.to_latest value; parent}
   end
 end]
 

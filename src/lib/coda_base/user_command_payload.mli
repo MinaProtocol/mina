@@ -1,53 +1,86 @@
 open Core_kernel
-open Signature_lib
 open Snark_params.Tick
 
 module Body : sig
   type t =
-    | Payment of Payment_payload.Stable.V1.t
-    | Stake_delegation of Stake_delegation.Stable.V1.t
+    | Payment of Payment_payload.t
+    | Stake_delegation of Stake_delegation.t
   [@@deriving eq, sexp, hash, yojson]
 
   module Stable : sig
-    module V1 : sig
-      type nonrec t = t [@@deriving bin_io, eq, sexp, hash, yojson]
+    module V2 : sig
+      type nonrec t = t
+      [@@deriving bin_io, version, compare, eq, sexp, hash, yojson]
     end
 
-    module Latest = V1
+    module V1 : sig
+      type t =
+        | Payment of Payment_payload.Stable.V1.t
+        | Stake_delegation of Stake_delegation.Stable.V1.t
+      [@@deriving bin_io, version, compare, eq, sexp, hash, yojson]
+
+      val to_latest : t -> V2.t
+    end
+
+    module Latest = V2
   end
 end
 
 module Common : sig
   module Poly : sig
-    type ('fee, 'nonce, 'global_slot, 'memo) t =
-      {fee: 'fee; nonce: 'nonce; valid_until: 'global_slot; memo: 'memo}
+    type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t =
+      { fee: 'fee
+      ; fee_token: 'token_id
+      ; fee_nonce: 'nonce
+      ; nonce: 'nonce
+      ; valid_until: 'global_slot
+      ; memo: 'memo }
     [@@deriving eq, sexp, hash, yojson]
 
     module Stable :
       sig
-        module V1 : sig
-          type ('fee, 'nonce, 'global_slot, 'memo) t
+        module V2 : sig
+          type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t
           [@@deriving bin_io, eq, sexp, hash, yojson, version]
         end
 
-        module Latest = V1
+        module V1 : sig
+          type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t
+          [@@deriving bin_io, eq, sexp, hash, yojson, version]
+        end
+
+        module Latest = V2
       end
-      with type ('fee, 'nonce, 'global_slot, 'memo) V1.t =
-                  ('fee, 'nonce, 'global_slot, 'memo) t
+      with type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) V2.t =
+                  ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t
   end
 
   module Stable : sig
+    module V2 : sig
+      type t =
+        ( Currency.Fee.Stable.V1.t
+        , Token_id.Stable.V1.t
+        , Coda_numbers.Account_nonce.Stable.V1.t
+        , Coda_numbers.Global_slot.Stable.V1.t
+        , User_command_memo.t )
+        Poly.Stable.V2.t
+      [@@deriving bin_io, eq, sexp, hash]
+    end
+
     module V1 : sig
       type t =
         ( Currency.Fee.Stable.V1.t
+        , Token_id.Stable.V1.t
         , Coda_numbers.Account_nonce.Stable.V1.t
         , Coda_numbers.Global_slot.Stable.V1.t
         , User_command_memo.t )
         Poly.Stable.V1.t
       [@@deriving bin_io, eq, sexp, hash]
+
+      val to_latest : t -> V2.t
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 
   type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
@@ -56,6 +89,7 @@ module Common : sig
 
   type var =
     ( Currency.Fee.var
+    , Token_id.var
     , Coda_numbers.Account_nonce.Checked.t
     , Coda_numbers.Global_slot.Checked.t
     , User_command_memo.Checked.t )
@@ -90,18 +124,27 @@ module Poly : sig
 end
 
 module Stable : sig
-  module V1 : sig
-    type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
+  module V2 : sig
+    type t = (Common.Stable.V2.t, Body.Stable.V2.t) Poly.Stable.V1.t
     [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
   end
 
-  module Latest = V1
+  module V1 : sig
+    type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
+    [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
+
+    val to_latest : t -> V2.t
+  end
+
+  module Latest = V2
 end
 
 type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 
 val create :
      fee:Currency.Fee.t
+  -> fee_token:Token_id.t
+  -> fee_nonce:Coda_numbers.Account_nonce.t
   -> nonce:Coda_numbers.Account_nonce.t
   -> valid_until:Coda_numbers.Global_slot.t
   -> memo:User_command_memo.t
@@ -112,6 +155,10 @@ val dummy : t
 
 val fee : t -> Currency.Fee.t
 
+val fee_token : t -> Token_id.t
+
+val fee_nonce : t -> Coda_numbers.Account_nonce.t
+
 val nonce : t -> Coda_numbers.Account_nonce.t
 
 val valid_until : t -> Coda_numbers.Global_slot.t
@@ -120,12 +167,14 @@ val memo : t -> User_command_memo.t
 
 val body : t -> Body.t
 
-val receiver : t -> Public_key.Compressed.t
+val receiver : t -> Account_id.t
+
+val token : t -> Token_id.t
 
 val amount : t -> Currency.Amount.t option
 
 val is_payment : t -> bool
 
-val accounts_accessed : t -> Public_key.Compressed.t list
+val accounts_accessed : t -> Account_id.t list
 
 val gen : t Quickcheck.Generator.t

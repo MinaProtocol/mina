@@ -465,7 +465,7 @@ module Types = struct
                    Transition_frontier.Breadcrumb.staged_ledger tip
                    |> Staged_ledger.ledger
                  in
-                 Ledger.location_of_key ledger pk
+                 Ledger.location_of_account ledger pk
                  |> Option.bind ~f:(Ledger.get ledger)
                  |> Option.map ~f:(fun account ->
                         ( account

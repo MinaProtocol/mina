@@ -51,10 +51,15 @@ let of_transaction : Transaction.t -> t = function
       { payload=
           { common=
               { fee= other_amount
+              ; fee_token= Token_id.default
+              ; fee_nonce= Account.Nonce.zero
               ; nonce= Account.Nonce.zero
               ; valid_until= Coda_numbers.Global_slot.max_value
               ; memo= User_command_memo.empty }
-          ; body= {public_key= receiver; amount; tag= Tag.Coinbase} }
+          ; body=
+              { public_key= Account_id.create receiver Token_id.default
+              ; amount
+              ; tag= Tag.Coinbase } }
       ; sender= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
   | Fee_transfer tr -> (
@@ -62,11 +67,13 @@ let of_transaction : Transaction.t -> t = function
         { payload=
             { common=
                 { fee= fee2
+                ; fee_token= Token_id.default
+                ; fee_nonce= Account.Nonce.zero
                 ; nonce= Account.Nonce.zero
                 ; valid_until= Coda_numbers.Global_slot.max_value
                 ; memo= User_command_memo.empty }
             ; body=
-                { public_key= pk1
+                { public_key= Account_id.create pk1 Token_id.default
                 ; amount= Amount.of_fee fee1
                 ; tag= Tag.Fee_transfer } }
         ; sender= Public_key.decompress_exn pk2

@@ -274,7 +274,7 @@ module Make (Test : Test_intf) = struct
             let a1 = List.nth_exn accounts i in
             let key = Account.public_key a1 in
             let location =
-              Mask.Attached.location_of_key attached_mask key
+              Mask.Attached.location_of_account attached_mask key
               |> Option.value_exn
             in
             let addr = Test.Location.to_path_exn location in

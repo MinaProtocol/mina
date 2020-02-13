@@ -25,9 +25,9 @@ end
 
 [%%versioned
 module Stable = struct
-  module V1 = struct
+  module V2 = struct
     type t =
-      ( Payload.Stable.V1.t
+      ( Payload.Stable.V2.t
       , Public_key.Stable.V1.t
       , Signature.Stable.V1.t )
       Poly.Stable.V1.t
@@ -50,7 +50,42 @@ module Stable = struct
     include Hashable.Make (T)
 
     let accounts_accessed ({payload; sender; _} : t) =
-      Public_key.compress sender :: Payload.accounts_accessed payload
+      let sender = Public_key.compress sender in
+      let fee_token_id = Payload.fee_token payload in
+      let fee_sender = Account_id.create sender fee_token_id in
+      let payload_accounts = Payload.accounts_accessed payload in
+      (* Add the corresponding sender accounts for each token kind. *)
+      let sender_accounts =
+        List.filter_map payload_accounts ~f:(fun account_id ->
+            let token_id = Account_id.token_id account_id in
+            if Token_id.equal fee_token_id token_id then None
+            else Some (Account_id.create sender token_id) )
+      in
+      fee_sender :: List.append sender_accounts payload_accounts
+  end
+
+  module V1 = struct
+    type t =
+      ( Payload.Stable.V1.t
+      , Public_key.Stable.V1.t
+      , Signature.Stable.V1.t )
+      Poly.Stable.V1.t
+    [@@deriving compare, sexp, hash, yojson]
+
+    let to_latest ({payload; sender; signature} : t) : V2.t =
+      {payload= Payload.Stable.V1.to_latest payload; sender; signature}
+
+    let version_byte = Base58_check.Version_bytes.user_command
+
+    module T = struct
+      (* can't use nonrec + deriving *)
+      type typ = t [@@deriving compare, sexp, hash]
+
+      type t = typ [@@deriving compare, sexp, hash]
+    end
+
+    include Comparable.Make (T)
+    include Hashable.Make (T)
   end
 end]
 
@@ -71,9 +106,13 @@ let minimum_fee = Fee.of_int 2
 
 let is_trivial t = Fee.(fee t < minimum_fee)
 
-let sender t = Public_key.compress Poly.(t.sender)
+let fee_sender {Poly.sender; payload; _} =
+  Account_id.create (Public_key.compress sender) (Payload.fee_token payload)
 
 let receiver = Fn.compose Payload.receiver payload
+
+let sender {Poly.sender; payload; _} =
+  Account_id.create (Public_key.compress sender) (Payload.token payload)
 
 let amount = Fn.compose Payload.amount payload
 
@@ -96,14 +135,16 @@ end
 
 module Gen = struct
   let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
-      ?(nonce = Account_nonce.zero) ~max_fee create_body =
+      ?(fee_nonce = Account_nonce.zero) ?(nonce = Account_nonce.zero)
+      ?(fee_token = Token_id.default) ~max_fee create_body =
     let open Quickcheck.Generator.Let_syntax in
     let%bind sender, (receiver : Signature_keypair.t) = key_gen
     and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int
     and memo = String.quickcheck_generator in
     let%map body = create_body receiver in
     let payload : Payload.t =
-      Payload.create ~fee ~nonce ~valid_until:Global_slot.max_value
+      Payload.create ~fee ~fee_token ~fee_nonce ~nonce
+        ~valid_until:Global_slot.max_value
         ~memo:(User_command_memo.create_by_digesting_string_exn memo)
         ~body
     in
@@ -115,13 +156,16 @@ module Gen = struct
 
   module Payment = struct
     let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
-        ?(nonce = Account_nonce.zero) ~max_amount ~max_fee () =
-      gen_inner sign' ~key_gen ~nonce ~max_fee
+        ?fee_nonce ?nonce ~max_amount ?fee_token
+        ?(payment_token = Token_id.default) ~max_fee () =
+      gen_inner sign' ~key_gen ?fee_nonce ?nonce ?fee_token ~max_fee
       @@ fun {public_key= receiver; _} ->
       let open Quickcheck.Generator.Let_syntax in
       let%map amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int in
       User_command_payload.Body.Payment
-        {receiver= Public_key.compress receiver; amount}
+        { receiver=
+            Account_id.create (Public_key.compress receiver) payment_token
+        ; amount }
 
     let gen ?(sign_type = `Fake) =
       match sign_type with
@@ -130,23 +174,26 @@ module Gen = struct
       | `Real ->
           gen_inner sign
 
-    let gen_with_random_participants ?sign_type ~keys ?nonce ~max_amount
-        ~max_fee =
+    let gen_with_random_participants ?sign_type ~keys ?fee_nonce ?nonce
+        ~max_amount ?fee_token ?payment_token ~max_fee =
       with_random_participants ~keys ~gen:(fun ~key_gen ->
-          gen ?sign_type ~key_gen ?nonce ~max_amount ~max_fee )
+          gen ?sign_type ~key_gen ?fee_nonce ?nonce ~max_amount ?fee_token
+            ?payment_token ~max_fee )
   end
 
   module Stake_delegation = struct
-    let gen ~key_gen ?nonce ~max_fee () =
-      gen_inner For_tests.fake_sign ~key_gen ?nonce ~max_fee
-        (fun {public_key= new_delegate; _} ->
+    let gen ~key_gen ?fee_nonce ?nonce ?fee_token ~max_fee () =
+      gen_inner For_tests.fake_sign ~key_gen ?fee_nonce ?nonce ?fee_token
+        ~max_fee (fun {public_key= new_delegate; _} ->
           Quickcheck.Generator.return
           @@ User_command_payload.Body.Stake_delegation
                (Set_delegate {new_delegate= Public_key.compress new_delegate})
       )
 
-    let gen_with_random_participants ~keys ?nonce ~max_fee =
-      with_random_participants ~keys ~gen:(gen ?nonce ~max_fee)
+    let gen_with_random_participants ~keys ?fee_nonce ?nonce ?fee_token
+        ~max_fee =
+      with_random_participants ~keys
+        ~gen:(gen ?fee_nonce ?nonce ?fee_token ~max_fee)
   end
 
   let payment = Payment.gen
@@ -243,8 +290,12 @@ module Gen = struct
           in
           let memo = User_command_memo.dummy in
           let payload =
-            Payload.create ~fee ~valid_until:Global_slot.max_value ~nonce ~memo
-              ~body:(Payment {receiver; amount})
+            Payload.create ~fee ~fee_token:Token_id.default
+              ~valid_until:Global_slot.max_value ~fee_nonce:nonce ~nonce ~memo
+              ~body:
+                (Payment
+                   { receiver= Account_id.create receiver Token_id.default
+                   ; amount })
           in
           let sign' =
             match sign_type with `Fake -> For_tests.fake_sign | `Real -> sign
@@ -255,14 +306,22 @@ end
 module With_valid_signature = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t = Stable.V2.t [@@deriving sexp, eq, yojson, hash]
+
+      let to_latest = Stable.V2.to_latest
+
+      let compare = Stable.V2.compare
+
+      module Gen = Gen
+    end
+
     module V1 = struct
       type t = Stable.V1.t [@@deriving sexp, eq, yojson, hash]
 
-      let to_latest = Fn.id
+      let to_latest = Stable.V1.to_latest
 
       let compare = Stable.V1.compare
-
-      module Gen = Gen
     end
   end]
 
@@ -313,6 +372,9 @@ let forget_check t = t
 
 let filter_by_participant user_commands public_key =
   List.filter user_commands ~f:(fun user_command ->
-      List.mem
+      Core_kernel.List.exists
         (accounts_accessed user_command)
-        public_key ~equal:Public_key.Compressed.equal )
+        ~f:
+          (Fn.compose
+             (Public_key.Compressed.equal public_key)
+             Account_id.public_key) )

@@ -20,26 +20,34 @@ end
 
 [%%versioned
 module Stable = struct
+  module V2 = struct
+    type t = (Account_id.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
+    [@@deriving compare, eq, sexp, hash, compare, yojson]
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t =
       (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
     [@@deriving compare, eq, sexp, hash, compare, yojson]
 
-    let to_latest = Fn.id
+    let to_latest ({receiver; amount} : t) : V2.t =
+      {receiver= Account_id.create receiver Token_id.default; amount}
   end
 end]
 
 (* bin_io, version omitted *)
 type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
-let dummy = Poly.{receiver= Public_key.Compressed.empty; amount= Amount.zero}
+let dummy = Poly.{receiver= Account_id.empty; amount= Amount.zero}
 
-type var = (Public_key.Compressed.var, Amount.var) Poly.t
+type var = (Account_id.var, Amount.var) Poly.t
 
 let typ : (var, t) Typ.t =
   let spec =
     let open Data_spec in
-    [Public_key.Compressed.typ; Amount.typ]
+    [Account_id.typ; Amount.typ]
   in
   let of_hlist : 'a 'b. (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) Poly.t =
     let open H_list in
@@ -51,23 +59,20 @@ let typ : (var, t) Typ.t =
 
 let to_input {Poly.receiver; amount} =
   Random_oracle.Input.(
-    append
-      (Public_key.Compressed.to_input receiver)
-      (bitstring (Amount.to_bits amount)))
+    append (Account_id.to_input receiver) (bitstring (Amount.to_bits amount)))
 
 let var_to_input {Poly.receiver; amount} =
   Random_oracle.Input.(
     append
-      (Public_key.Compressed.Checked.to_input receiver)
+      (Account_id.Checked.to_input receiver)
       (bitstring
          (Bitstring_lib.Bitstring.Lsb_first.to_list (Amount.var_to_bits amount))))
 
 let gen ~max_amount =
   let open Quickcheck.Generator.Let_syntax in
-  let%map receiver = Public_key.Compressed.gen
+  let%map receiver = Account_id.gen
   and amount = Amount.gen_incl Amount.zero max_amount in
   Poly.{receiver; amount}
 
 let var_of_t ({receiver; amount} : t) : var =
-  { receiver= Public_key.Compressed.var_of_t receiver
-  ; amount= Amount.var_of_t amount }
+  {receiver= Account_id.var_of_t receiver; amount= Amount.var_of_t amount}

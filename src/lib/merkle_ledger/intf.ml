@@ -20,6 +20,34 @@ module type Key = sig
   include Comparable.S with type t := t
 end
 
+module type Token_id = sig
+  type t [@@deriving sexp]
+end
+
+module type Account_id = sig
+  type t [@@deriving sexp]
+
+  type key
+
+  type token_id
+
+  module Stable :
+    sig
+      module V1 : sig
+        type t [@@deriving sexp, bin_io]
+      end
+    end
+    with type V1.t = t
+
+  val public_key : t -> key
+
+  val token_id : t -> token_id
+
+  include Hashable.S_binable with type t := t
+
+  include Comparable.S with type t := t
+end
+
 module type Balance = sig
   type t [@@deriving eq]
 
@@ -31,11 +59,11 @@ end
 module type Account = sig
   type t [@@deriving bin_io, eq, sexp, compare]
 
-  type key
+  type account_id
 
   type balance
 
-  val public_key : t -> key
+  val identifier : t -> account_id
 
   val balance : t -> balance
 

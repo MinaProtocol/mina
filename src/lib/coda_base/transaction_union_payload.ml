@@ -1,5 +1,4 @@
 open Core_kernel
-open Signature_lib
 open Snark_params.Tick
 open Currency
 module Tag = Transaction_union_tag
@@ -8,16 +7,9 @@ module Body = struct
   type ('tag, 'pk, 'amount) t_ = {tag: 'tag; public_key: 'pk; amount: 'amount}
   [@@deriving sexp]
 
-  type var = (Tag.var, Public_key.Compressed.var, Currency.Amount.var) t_
+  type var = (Tag.var, Account_id.var, Currency.Amount.var) t_
 
-  type t = (Tag.t, Public_key.Compressed.t, Currency.Amount.t) t_
-  [@@deriving sexp]
-
-  let to_input ~tag ~amount t =
-    let t1, t2 = tag t.tag in
-    let {Public_key.Compressed.Poly.x; is_odd} = t.public_key in
-    { Random_oracle.Input.bitstrings= [|[t1; t2]; amount t.amount; [is_odd]|]
-    ; field_elements= [|x|] }
+  type t = (Tag.t, Account_id.t, Currency.Amount.t) t_ [@@deriving sexp]
 
   let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in
@@ -42,13 +34,12 @@ module Body = struct
             (Amount.of_fee fee, Amount.max_int)
       in
       Amount.gen_incl min max
-    and public_key = Public_key.Compressed.gen in
+    and public_key = Account_id.gen in
     {tag; public_key; amount}
 
   let to_hlist {tag; public_key; amount} = H_list.[tag; public_key; amount]
 
-  let spec =
-    Data_spec.[Tag.typ; Public_key.Compressed.typ; Currency.Amount.typ]
+  let spec = Data_spec.[Tag.typ; Account_id.typ; Currency.Amount.typ]
 
   let typ =
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
@@ -62,22 +53,29 @@ module Body = struct
         {tag= Tag.Payment; public_key= receiver; amount}
     | Stake_delegation (Set_delegate {new_delegate}) ->
         { tag= Tag.Stake_delegation
-        ; public_key= new_delegate
+        ; public_key= Account_id.create new_delegate Token_id.default
         ; amount= Currency.Amount.zero }
 
   module Checked = struct
     let constant ({tag; public_key; amount} : t) : var =
       { tag= Tag.Checked.constant tag
-      ; public_key= Public_key.Compressed.var_of_t public_key
+      ; public_key= Account_id.var_of_t public_key
       ; amount= Currency.Amount.var_of_t amount }
 
-    let to_input t =
-      to_input t ~tag:Fn.id ~amount:(fun x ->
-          (Currency.Amount.var_to_bits x :> Boolean.var list) )
+    let to_input {tag; public_key; amount} =
+      let open Random_oracle.Input in
+      let tag1, tag2 = tag in
+      append (bitstring [tag1; tag2])
+      @@ append (Account_id.Checked.to_input public_key)
+      @@ bitstring (Currency.Amount.var_to_bits amount :> Boolean.var list)
   end
 
-  let to_input (t : t) =
-    to_input t ~tag:Tag.to_bits ~amount:Currency.Amount.to_bits
+  let to_input {tag; public_key; amount} =
+    let open Random_oracle.Input in
+    let tag1, tag2 = Tag.to_bits tag in
+    append (bitstring [tag1; tag2])
+    @@ append (Account_id.to_input public_key)
+    @@ bitstring (Currency.Amount.to_bits amount)
 end
 
 type t = (User_command_payload.Common.t, Body.t) User_command_payload.Poly.t

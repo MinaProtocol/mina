@@ -2,6 +2,16 @@ open Core
 
 [%%versioned
 module Stable = struct
+  module V2 = struct
+    type t =
+      | User_command of User_command.With_valid_signature.Stable.V2.t
+      | Fee_transfer of Fee_transfer.Stable.V1.t
+      | Coinbase of Coinbase.Stable.V1.t
+    [@@deriving sexp, compare, eq, hash, yojson]
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t =
       | User_command of User_command.With_valid_signature.Stable.V1.t
@@ -9,16 +19,23 @@ module Stable = struct
       | Coinbase of Coinbase.Stable.V1.t
     [@@deriving sexp, compare, eq, hash, yojson]
 
-    let to_latest = Fn.id
+    let to_latest = function
+      | User_command uc ->
+          V2.User_command
+            (User_command.With_valid_signature.Stable.V1.to_latest uc)
+      | Fee_transfer ft ->
+          Fee_transfer ft
+      | Coinbase cb ->
+          Coinbase cb
   end
 end]
 
 module T = struct
   module T0 = struct
     type t = Stable.Latest.t =
-      | User_command of User_command.With_valid_signature.Stable.Latest.t
-      | Fee_transfer of Fee_transfer.Stable.Latest.t
-      | Coinbase of Coinbase.Stable.Latest.t
+      | User_command of User_command.With_valid_signature.t
+      | Fee_transfer of Fee_transfer.t
+      | Coinbase of Coinbase.t
     [@@deriving sexp, compare, eq, hash, yojson]
   end
 

@@ -40,11 +40,15 @@ module type External_transition_base_intf = sig
   include Comparable.S with type t := t
 
   module Stable : sig
-    module V1 : sig
+    module V2 : sig
       type nonrec t = t [@@deriving sexp, eq, bin_io, to_yojson, version]
     end
 
-    module Latest = V1
+    module V1 : sig
+      type nonrec t [@@deriving bin_io, version]
+    end
+
+    module Latest = V2
   end
 
   include External_transition_common_intf with type t := t

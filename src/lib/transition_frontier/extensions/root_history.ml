@@ -37,7 +37,6 @@ module T = struct
       List.exists diffs ~f:(function
         (* TODO: send full diffs to extensions to avoid extra lookups in frontier *)
         | Full.E.E (Root_transitioned {new_root; _}) ->
-            let open Root_data.Minimal.Stable.Latest in
             Full_frontier.find_exn frontier new_root.hash
             |> Root_data.Historical.of_breadcrumb |> enqueue root_history ;
             true

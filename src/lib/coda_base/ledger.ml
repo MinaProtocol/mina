@@ -55,16 +55,22 @@ module Ledger_inner = struct
   module Account = struct
     [%%versioned
     module Stable = struct
-      module V1 = struct
-        type t = Account.Stable.V1.t [@@deriving eq, compare, sexp]
+      module V2 = struct
+        type t = Account.Stable.V2.t [@@deriving eq, compare, sexp]
 
         let to_latest = Fn.id
 
-        let public_key = Account.public_key
+        let identifier = Account.identifier
 
         let balance Account.Poly.{balance; _} = balance
 
         let empty = Account.empty
+      end
+
+      module V1 = struct
+        type t = Account.Stable.V1.t [@@deriving sexp]
+
+        let to_latest = Account.Stable.V1.to_latest
       end
     end]
 
@@ -77,6 +83,8 @@ module Ledger_inner = struct
 
   module Inputs = struct
     module Key = Public_key.Compressed
+    module Token_id = Token_id
+    module Account_id = Account_id
     module Balance = Currency.Balance
     module Account = Account.Stable.Latest
     module Hash = Hash.Stable.Latest
@@ -93,8 +101,8 @@ module Ledger_inner = struct
     with type root_hash := Ledger_hash.t
      and type hash := Ledger_hash.t
      and type account := Account.t
-     and type key_set := Public_key.Compressed.Set.t
-     and type key := Public_key.Compressed.t =
+     and type account_id_set := Account_id.Set.t
+     and type account_id := Account_id.t =
     Database.Make (Inputs)
 
   module Null = Null_ledger.Make (Inputs)
@@ -103,8 +111,8 @@ module Ledger_inner = struct
     Merkle_ledger.Any_ledger.S
     with module Location = Location_at_depth
     with type account := Account.t
-     and type key := Public_key.Compressed.t
-     and type key_set := Public_key.Compressed.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
      and type hash := Hash.t =
     Merkle_ledger.Any_ledger.Make_base (Inputs)
 
@@ -113,8 +121,8 @@ module Ledger_inner = struct
     with module Location = Location_at_depth
      and module Attached.Addr = Location_at_depth.Addr
     with type account := Account.t
-     and type key := Public_key.Compressed.t
-     and type key_set := Public_key.Compressed.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
      and type hash := Hash.t
      and type location := Location_at_depth.t
      and type parent := Any_ledger.M.t =
@@ -128,8 +136,8 @@ module Ledger_inner = struct
     with module Location = Location_at_depth
     with module Addr = Location_at_depth.Addr
     with type account := Account.t
-     and type key := Public_key.Compressed.t
-     and type key_set := Public_key.Compressed.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
      and type hash := Hash.t
      and type root_hash := Hash.t
      and type unattached_mask := Mask.t
@@ -221,15 +229,16 @@ module Ledger_inner = struct
   let merkle_root t =
     Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t)
 
-  let get_or_create ledger key =
+  let get_or_create ledger account_id =
     let action, loc =
-      get_or_create_account_exn ledger key (Account.initialize key)
+      get_or_create_account_exn ledger account_id
+        (Account.initialize account_id)
     in
     (action, Option.value_exn (get ledger loc), loc)
 
-  let create_empty ledger key =
+  let create_empty ledger account_id =
     let start_hash = merkle_root ledger in
-    match get_or_create_account_exn ledger key Account.empty with
+    match get_or_create_account_exn ledger account_id Account.empty with
     | `Existed, _ ->
         failwith "create_empty for a key already present"
     | `Added, new_loc ->
@@ -259,7 +268,7 @@ module Ledger_inner = struct
             set_at_index_exn t idx account ;
             respond (Provide ())
         | Ledger_hash.Find_index pk ->
-            let index = index_of_key_exn t pk in
+            let index = index_of_account_exn t pk in
             respond (Provide index)
         | _ ->
             unhandled )
@@ -306,10 +315,11 @@ let apply_initial_ledger_state : t -> init_state -> unit =
  fun t accounts ->
   Array.iter accounts ~f:(fun (kp, balance, nonce) ->
       let pk_compressed = Public_key.compress kp.public_key in
-      let account = Account.initialize pk_compressed in
+      let account_id = Account_id.create pk_compressed Token_id.default in
+      let account = Account.initialize account_id in
       let account' =
         { account with
           balance= Currency.Balance.of_int (Currency.Amount.to_int balance)
         ; nonce }
       in
-      create_new_account_exn t pk_compressed account' )
+      create_new_account_exn t account_id account' )

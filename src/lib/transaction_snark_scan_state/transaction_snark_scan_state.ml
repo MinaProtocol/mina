@@ -33,8 +33,19 @@ end
 module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
+    module V2 = struct
+      type t =
+        { transaction_with_info:
+            Transaction_logic.Undo.Stable.V2.t
+            Transaction_protocol_state.Stable.V1.t
+        ; statement: Transaction_snark.Statement.Stable.V1.t
+        ; witness: Transaction_witness.Stable.V2.t sexp_opaque }
+      [@@deriving sexp]
+
+      let to_latest = Fn.id
+    end
+
     module V1 = struct
-      (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
       type t =
         { transaction_with_info:
             Transaction_logic.Undo.Stable.V1.t
@@ -43,10 +54,19 @@ module Transaction_with_witness = struct
         ; witness: Transaction_witness.Stable.V1.t sexp_opaque }
       [@@deriving sexp]
 
-      let to_latest = Fn.id
+      let to_latest
+          {transaction_with_info= {transaction; block_data}; statement; witness}
+          : V2.t =
+        { transaction_with_info=
+            { transaction=
+                Transaction_logic.Undo.Stable.V1.to_latest transaction
+            ; block_data }
+        ; statement
+        ; witness= Transaction_witness.Stable.V1.to_latest witness }
     end
   end]
 
+  (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t = Stable.Latest.t =
     { transaction_with_info: Ledger.Undo.t Transaction_protocol_state.t
     ; statement: Transaction_snark.Statement.t
@@ -128,7 +148,36 @@ end
 type job = Available_job.t [@@deriving sexp]
 
 module Stable = struct
+  module V2 = struct
+    module T = struct
+      type t =
+        ( Ledger_proof_with_sok_message.Stable.V1.t
+        , Transaction_with_witness.Stable.V2.t )
+        Parallel_scan.State.Stable.V1.t
+      [@@deriving sexp, bin_io, version]
+    end
+
+    include T
+    include Registration.Make_latest_version (T)
+
+    (* TODO: Review this. The version bytes for the underlying types are
+       included in the hash, so it can never be stable between versions.
+    *)
+    let hash t =
+      let state_hash =
+        Parallel_scan.State.hash t
+          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
+          (Binable.to_string (module Transaction_with_witness.Stable.V2))
+      in
+      Staged_ledger_hash.Aux_hash.of_bytes
+        (state_hash |> Digestif.SHA256.to_raw_string)
+  end
+
   module V1 = struct
+    (* NOTE: This type was never versioned correctly. Do not including it in
+       the versioning mechanism, or back-compatability will break.
+    *)
+    (* TODO: Retire this version. *)
     module T = struct
       type t =
         ( Ledger_proof_with_sok_message.Stable.V1.t
@@ -138,29 +187,14 @@ module Stable = struct
     end
 
     include T
-    include Registration.Make_latest_version (T)
 
-    let hash t =
-      let state_hash =
-        Parallel_scan.State.hash t
-          (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
-          (Binable.to_string (module Transaction_with_witness.Stable.V1))
-      in
-      Staged_ledger_hash.Aux_hash.of_bytes
-        (state_hash |> Digestif.SHA256.to_raw_string)
-
-    include Binable.Of_binable
-              (T)
-              (struct
-                type nonrec t = t
-
-                let to_binable = Fn.id
-
-                let of_binable = Fn.id
-              end)
+    let to_latest : t -> V2.t =
+      Parallel_scan.State.Stable.V1.to_latest
+        Ledger_proof_with_sok_message.Stable.V1.to_latest
+        Transaction_with_witness.Stable.V1.to_latest
   end
 
-  module Latest = V1
+  module Latest = V2
 
   module Module_decl = struct
     let name = "transaction_snark_scan_state"
@@ -169,7 +203,7 @@ module Stable = struct
   end
 
   module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
+  module Registered_V2 = Registrar.Register (V2)
 end
 
 type t = Stable.Latest.t [@@deriving sexp]
