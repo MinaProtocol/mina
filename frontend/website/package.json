@@ -6,7 +6,7 @@
     "dev:reason": "bsb -clean-world -make-world -w",
     "dev:next": "next dev -p 8000",
     "clean": "bsb -clean-world",
-    "build": "bsb -make-world && next build",
+    "build": "graphdoc -s ../../graphql_schema.json -o ./public/graphql-docs --force && bsb -make-world && next build",
     "export": "yarn build && next export",
     "start": "next start -p 8000",
     "reformat": "bsrefmt --in-place src/*.re"
@@ -41,6 +41,7 @@
     "unified": "^8.4.2"
   },
   "devDependencies": {
+    "@2fd/graphdoc": "^2.4.0",
     "@babel/core": "^7.4.3",
     "@next/bundle-analyzer": "^9.1.4",
     "bs-platform": "7.0.0-dev.1",
