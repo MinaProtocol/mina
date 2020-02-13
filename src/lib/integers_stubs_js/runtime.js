@@ -118,13 +118,15 @@ function integers_uint32_rem(x, y) {
 //Provides: integers_uint32_shift_left
 //Requires: UInt32
 function integers_uint32_shift_left(x, y) {
-    return new UInt32(x.value << y.value);
+    debugger;
+    return new UInt32(x.value << y);
 }
 
 //Provides: integers_uint32_shift_right
 //Requires: UInt32
 function integers_uint32_shift_right(x, y) {
-    return new UInt32(x.value >>> y.value);
+    debugger;
+    return new UInt32(x.value >>> y);
 }
 
 //Provides: integers_uint32_sub
