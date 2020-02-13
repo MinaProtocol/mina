@@ -37,7 +37,6 @@ curve_size]
 [%%endif]
 
 module Field0 = Mnt6.Fq
-module G1 = Mnt6.G1
 
 [%%inject
 "ledger_depth", ledger_depth]
@@ -70,7 +69,10 @@ module Tock = struct
 end
 
 module Inner_curve = struct
-  type t = Mnt6.G1.t [@@deriving sexp]
+  (* in snarkette, the G1 modules are contained the opposite (Mnt4 vs. Mnt6) module
+     vis-a-vis libsnark
+  *)
+  type t = Mnt4.G1.t [@@deriving sexp]
 
   module Coefficients = Mnt6.G1.Coefficients
 
@@ -80,9 +82,14 @@ module Inner_curve = struct
     if is_square y2 then Some (sqrt y2) else None
 
   [%%define_locally
-  Mnt6.G1.(to_affine, to_affine_exn, of_affine, scale, one, ( + ), negate)]
+  Mnt4.G1.(of_affine, one, ( + ), negate)]
 
-  let scale_field t x = scale t (Mnt4.Fq.of_bigint x :> Snarkette.Nat.t)
+  let to_affine_exn ({x; y; z} : t) =
+    let z_inv = Mnt6.Fq.inv z in
+    Mnt6.Fq.(x * z_inv, y * z_inv)
+
+  let to_affine t =
+    if false (* is_zero t *) then None else Some (to_affine_exn t)
 
   module Scalar = struct
     (* though we have bin_io, not versioned here; this type exists for Private_key.t,
@@ -138,4 +145,8 @@ module Inner_curve = struct
 
     let of_bits bits = Tock.Field.project bits
   end
+
+  let scale t (scalar : Scalar.t) = Mnt4.G1.scale t (scalar :> Nat.t)
+
+  let scale_field t x = scale t (Mnt4.Fq.of_bigint x :> Scalar.t)
 end

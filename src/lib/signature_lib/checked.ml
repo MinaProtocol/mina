@@ -194,12 +194,6 @@ module Schnorr
     type t = Curve.Scalar.t [@@deriving sexp]
   end
 
-  let compress (t : Curve.t) =
-    let x, _ = Curve.to_affine_exn t in
-    Field.unpack x
-
-  let is_even (t : Field.t) = not (Bigint.test_bit (Bigint.of_field t) 0)
-
   module Public_key : sig
     type t = Curve.t [@@deriving sexp]
 
@@ -207,13 +201,20 @@ module Schnorr
   end =
     Curve
 
+  let compress (t : Curve.t) =
+    let x, _ = Curve.to_affine_exn t in
+    Field.unpack x
+
+  let is_even (t : Field.t) = not (Bigint.test_bit (Bigint.of_field t) 0)
+
+  module Foo = Snarky.Libsnark.Mnt753.Mnt6.G1
+
   let sign (d_prime : Private_key.t) m =
     eprintf "CONSENSUS\n%!" ;
     eprintf !"PRIVATE KEY: %{sexp: Private_key.t}\n%!" d_prime ;
     let public_key =
       (* TODO: Don't recompute this. *) Curve.scale Curve.one d_prime
     in
-    (* FIX!!! are native, js reps of pub keys the same? *)
     eprintf !"PUBLIC KEY: %{sexp: Public_key.t}\n%!" public_key ;
     (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
     let d = d_prime in
@@ -355,20 +356,51 @@ let%test_unit "schnorr checked + unchecked" =
 
 module Schnorr
     (Impl : module type of Snark_params_nonconsensus) (Curve : sig
-        include module type of Snark_params_nonconsensus.Inner_curve
+        open Impl
+
+        module Scalar : sig
+          type t [@@deriving sexp, eq]
+
+          val zero : t
+
+          val ( * ) : t -> t -> t
+
+          val ( + ) : t -> t -> t
+
+          val negate : t -> t
+        end
+
+        type t [@@deriving sexp]
+
+        val one : t
+
+        val ( + ) : t -> t -> t
+
+        val negate : t -> t
+
+        val scale : t -> Scalar.t -> t
+
+        val to_affine_exn : t -> Field.t * Field.t
+
+        val to_affine : t -> (Field.t * Field.t) option
     end)
     (Message : Message_intf
                with type curve := Curve.t
                 and type curve_scalar := Curve.Scalar.t
                 and type field := Impl.Field.t) =
 struct
+  module Private_key = struct
+    type t = Curve.Scalar.t [@@deriving sexp]
+  end
+
   module Signature = struct
     type t = Impl.Field.t * Curve.Scalar.t [@@deriving sexp]
   end
 
-  module Public_key = struct
+  module Public_key : sig
     type t = Curve.t [@@deriving sexp]
-  end
+  end =
+    Curve
 
   (* TODO is this correct? *)
   let is_even (t : Impl.Field.t) = not @@ Impl.Field.parity t
@@ -378,7 +410,7 @@ struct
     eprintf !"PRIVATE KEY: %{sexp: Private_key.t}\n%!" d_prime ;
     let public_key =
       (* TODO: Don't recompute this. *)
-      Curve.scale Curve.one (d_prime :> Snarkette.Nat.t)
+      Curve.scale Curve.one d_prime
     in
     eprintf !"PUBLIC KEY: %{sexp: Public_key.t}\n%!" public_key ;
     (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
@@ -387,7 +419,7 @@ struct
     eprintf !"K PRIME: %{sexp: Private_key.t}\n%!" k_prime ;
     assert (not Curve.Scalar.(equal k_prime zero)) ;
     let r, (ry : Impl.Field.t) =
-      Curve.(to_affine_exn (scale Curve.one (k_prime :> Snarkette.Nat.t)))
+      Curve.(to_affine_exn (scale Curve.one k_prime))
     in
     (*    eprintf !"R: %s RY: %s\n%!" (Snark_params_nonconsensus.G1.to_string r) (Field.to_string ry); *)
     let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
@@ -401,11 +433,7 @@ struct
 
   let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
     let e = Message.hash ~public_key:pk ~r m in
-    let r_pt =
-      Curve.(
-        scale one (s :> Snarkette.Nat.t)
-        + negate (scale pk (e :> Snarkette.Nat.t)))
-    in
+    let r_pt = Curve.(scale one s + negate (scale pk e)) in
     match Curve.to_affine r_pt with
     | None ->
         false

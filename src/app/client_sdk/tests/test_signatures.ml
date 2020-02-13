@@ -1,5 +1,5 @@
 (* test_signatures.ml -- generate signatures for some transactions,
-    for comparison against signatures generated in client SDK 
+    for comparison against signatures generated in client SDK
  *)
 
 open Core_kernel
@@ -19,7 +19,10 @@ let keypair =
         "4vsRCVnc5xmYJhaVbUgkg6po6nR3Mu7KEFunP3uQL67qZmPNnJKev57TRvMfuJ15XDP8MjaLSh7THG7CpTiTkfgRcQAKGmFo1XGMStCucmWAxBUiXjycDbx7hbVCqkDYiezM8Lvr1NMdTEGU"
       |> decompress_exn)
   in
-  eprintf !"PUBLIC KEY ORIG: %{sexp: Public_key.t}\n%!" public_key ;
+  let fld1, fld2 = public_key in
+  eprintf
+    !"PUBLIC KEY ORIG: (x: %s, y: %s)\n%!"
+    (Field.to_string fld1) (Field.to_string fld2) ;
   Keypair.{public_key; private_key}
 
 (* payment receiver *)
