@@ -207,8 +207,6 @@ module Schnorr
 
   let is_even (t : Field.t) = not (Bigint.test_bit (Bigint.of_field t) 0)
 
-  module Foo = Snarky.Libsnark.Mnt753.Mnt6.G1
-
   let sign (d_prime : Private_key.t) m =
     eprintf "CONSENSUS\n%!" ;
     eprintf !"PRIVATE KEY: %{sexp: Private_key.t}\n%!" d_prime ;

@@ -15,13 +15,9 @@ consensus_mechanism]
 open Snarkette
 
 [%%if
-curve_size = 298]
-
-module Mnt4 = Mnt4_80
-module Mnt6 = Mnt6_80
-
-[%%elif
 curve_size = 753]
+
+(* only size we should be building nonconsensus code for *)
 
 module Mnt4 = Mnt4753
 module Mnt6 = Mnt6753
@@ -69,10 +65,7 @@ module Tock = struct
 end
 
 module Inner_curve = struct
-  (* in snarkette, the G1 modules are contained the opposite (Mnt4 vs. Mnt6) module
-     vis-a-vis libsnark
-  *)
-  type t = Mnt4.G1.t [@@deriving sexp]
+  type t = Mnt6.G1.t [@@deriving sexp]
 
   module Coefficients = Mnt6.G1.Coefficients
 
@@ -82,14 +75,7 @@ module Inner_curve = struct
     if is_square y2 then Some (sqrt y2) else None
 
   [%%define_locally
-  Mnt4.G1.(of_affine, one, ( + ), negate)]
-
-  let to_affine_exn ({x; y; z} : t) =
-    let z_inv = Mnt6.Fq.inv z in
-    Mnt6.Fq.(x * z_inv, y * z_inv)
-
-  let to_affine t =
-    if false (* is_zero t *) then None else Some (to_affine_exn t)
+  Mnt6.G1.(of_affine, to_affine, to_affine_exn, one, ( + ), negate)]
 
   module Scalar = struct
     (* though we have bin_io, not versioned here; this type exists for Private_key.t,
@@ -102,13 +88,6 @@ module Inner_curve = struct
 
     (* the Inner_curve.Scalar.size for the consensus case is derived from a C++ call; here, we inline the value *)
     [%%if
-    curve_size = 298]
-
-    let size =
-      Mnt4.Fq.of_string
-        "475922286169261325753349249653048451545124879242694725395555128576210262817955800483758081"
-
-    [%%elif
     curve_size = 753]
 
     let size =
@@ -146,7 +125,7 @@ module Inner_curve = struct
     let of_bits bits = Tock.Field.project bits
   end
 
-  let scale t (scalar : Scalar.t) = Mnt4.G1.scale t (scalar :> Nat.t)
+  let scale t (scalar : Scalar.t) = Mnt6.G1.scale t (scalar :> Nat.t)
 
   let scale_field t x = scale t (Mnt4.Fq.of_bigint x :> Scalar.t)
 end

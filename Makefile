@@ -99,6 +99,11 @@ client_sdk_test_sigs :
 	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures.exe --profile=testnet_postake_medium_curves
 	$(info Build complete)
 
+client_sdk_test_sigs_nonconsensus :
+	$(info Starting Build)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && dune build src/app/client_sdk/tests/test_signatures_nonconsensus.exe --profile=nonconsensus_medium_curves
+	$(info Build complete)
+
 dev: codabuilder containerstart build
 
 # update OPAM, pinned packages in Docker
