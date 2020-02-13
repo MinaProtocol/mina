@@ -88,10 +88,7 @@ installed: [
   "ctypes.0.14.0"
   "ctypes-foreign.0.4.0"
   "depext.transition"
-<<<<<<< HEAD
-=======
   "digestif.0.7.1"
->>>>>>> 5806d34a36be7ccf8249e40790f11279e0f0fb1c
   "dune.1.11.4"
   "easy-format.1.3.1"
   "eqaf.0.2"
