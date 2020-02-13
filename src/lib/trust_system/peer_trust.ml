@@ -146,10 +146,13 @@ module Make0 (Inputs : Input_intf) = struct
                   , `String (Time.to_string_abs expiration ~zone:Time.Zone.utc)
                   ) ]
               @ action_metadata )
-            "Banning peer $peer_id until $expiration due to %s" action_fmt ;
+            "Would ban peer $peer_id until $expiration due to %s, refusing \
+             due to trust system being disabled"
+            action_fmt ;
           if Option.is_some db then (
             Coda_metrics.Gauge.inc_one Coda_metrics.Trust_system.banned_peers ;
-            Strict_pipe.Writer.write bans_writer (peer, expiration) )
+            Deferred.unit
+            (* Strict_pipe.Writer.write bans_writer (peer, expiration) *) )
           else Deferred.unit
       | Banned_until _, Unbanned ->
           Coda_metrics.Gauge.dec_one Coda_metrics.Trust_system.banned_peers ;
