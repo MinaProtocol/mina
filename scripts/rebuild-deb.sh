@@ -58,8 +58,11 @@ echo "------------------------------------------------------------"
 mkdir -p "${BUILDDIR}/usr/local/bin"
 cp ./default/src/app/cli/src/coda.exe "${BUILDDIR}/usr/local/bin/coda"
 ls -l ../src/app/libp2p_helper/result/bin
-cp ../src/app/libp2p_helper/result/bin/libp2p_helper "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+p2p_path="${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+cp ../src/app/libp2p_helper/result/bin/libp2p_helper $p2p_path
+chmod +w $p2p_path
 patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 "${BUILDDIR}/usr/local/bin/coda-libp2p_helper"
+chmod -w $p2p_path
 cp ./default/src/app/logproc/logproc.exe "${BUILDDIR}/usr/local/bin/coda-logproc"
 cp ./default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe "${BUILDDIR}/usr/local/bin/coda-create-genesis"
 
