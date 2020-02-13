@@ -114,7 +114,8 @@ let%test_unit "Block: read and write" =
          (Transition_frontier.For_tests.gen_genesis_breadcrumb ())
          (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
             ?logger:None ?verifier:None ?trust_system:None
-            ~accounts_with_secret_keys:Test_genesis_ledger.accounts) )
+            ~accounts_with_secret_keys:
+              (Lazy.force Test_genesis_ledger.accounts)) )
     ~f:(fun breadcrumbs ->
       Thread_safe.block_on_async_exn
       @@ fun () ->
