@@ -2,33 +2,33 @@ package main
 
 import (
 	crypto "github.com/libp2p/go-libp2p-crypto"
-	b58 "github.com/mr-tron/base58/base58"
+	"encoding/base64"
 	"os"
 )
 
 func main() {
 	if len(os.Args) != 2 {
-		println("usage: libp2p-priv-to-pub PRIVKEY_BASE58_STRING")
+		println("usage: libp2p-priv-to-pub PRIVKEY_BASE64_STRING")
 	}
-	privk_enc := os.Args[1]
-	privk_raw, err := b58.Decode(privk_enc)
+	privkEnc := os.Args[1]
+	privkRaw, err := base64.Decode(privkEnc)
 	if err != nil {
 		panic(err)
 	}
 
-	priv, err := crypto.UnmarshalPrivateKey(privk_raw)
+	priv, err := crypto.UnmarshalPrivateKey(privkRaw)
 	if err != nil {
 		panic(err)
 	}
 
 	pub := priv.GetPublic()
 
-	pubk_raw, err := crypto.MarshalPublicKey(pub)
+	pubkRaw, err := crypto.MarshalPublicKey(pub)
 	if err != nil {
 		panic(err)
 	}
 
-	pubk_enc := b58.Encode(pubk_raw)
+	pubkEnc := base64.Encode(pubkRaw)
 
-	println(pubk_enc)
+	println(pubkEnc)
 }
