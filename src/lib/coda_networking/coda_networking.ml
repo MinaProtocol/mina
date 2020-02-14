@@ -522,10 +522,10 @@ type t =
   ; transaction_pool_diffs:
       ( Transaction_pool.Resource_pool.Diff.t Envelope.Incoming.t
       * (bool -> unit) )
-      Linear_pipe.Reader.t
+      Strict_pipe.Reader.t
   ; snark_pool_diffs:
       (Snark_pool.Resource_pool.Diff.t Envelope.Incoming.t * (bool -> unit))
-      Linear_pipe.Reader.t
+      Strict_pipe.Reader.t
   ; online_status: [`Offline | `Online] Broadcast_pipe.Reader.t
   ; first_received_message_signal: unit Ivar.t }
 [@@deriving fields]
@@ -758,6 +758,7 @@ let create (config : Config.t)
     Strict_pipe.Reader.partition_map3 received_gossips
       ~f:(fun (envelope, valid_cb) ->
         Ivar.fill_if_empty first_received_message_signal () ;
+        Coda_metrics.(Counter.inc_one Network.gossip_messages_received) ;
         match Envelope.Incoming.data envelope with
         | New_state state ->
             Perf_histograms.add_span ~name:"external_transition_latency"
@@ -821,9 +822,8 @@ let create (config : Config.t)
   ; logger= config.logger
   ; trust_system= config.trust_system
   ; states
-  ; snark_pool_diffs= Strict_pipe.Reader.to_linear_pipe snark_pool_diffs
-  ; transaction_pool_diffs=
-      Strict_pipe.Reader.to_linear_pipe transaction_pool_diffs
+  ; snark_pool_diffs
+  ; transaction_pool_diffs
   ; online_status
   ; first_received_message_signal }
 

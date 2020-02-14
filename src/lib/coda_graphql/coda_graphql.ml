@@ -1519,14 +1519,13 @@ module Mutations = struct
   let send_user_command coda user_command =
     match Coda_commands.send_user_command coda user_command with
     | `Active f -> (
-        let open Deferred.Let_syntax in
-        match%map f with
-        | Ok _receipt ->
-            Ok user_command
-        | Error e ->
-            Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
+      match f with
+      | Ok _receipt ->
+          Ok command
+      | Error e ->
+          Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
-        return @@ Error "Daemon is bootstrapping"
+        Error "Daemon is bootstrapping"
 
   let find_identity ~kind ~public_key coda =
     Result.of_option
@@ -1614,7 +1613,7 @@ module Mutations = struct
           User_command.sign sender_kp user_command_payload
           |> User_command.forget_check
         in
-        send_user_command coda user_command )
+        Deferred.return @@ send_user_command coda user_command )
 
   let send_payment =
     io_field "sendPayment" ~doc:"Send a payment"
@@ -1654,7 +1653,7 @@ module Mutations = struct
                 ~public_key:(Public_key.decompress_exn from)
                 ~user_command_payload
         in
-        send_user_command coda user_command )
+        Deferred.return @@ send_user_command coda user_command )
 
   let add_payment_receipt =
     result_field "addPaymentReceipt"
