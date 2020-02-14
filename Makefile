@@ -160,12 +160,6 @@ docker-toolchain:
 		echo "Repo has uncommited changes, commit first to set hash." ;\
 	fi
 
-docker-toolchain-cache:
-	docker build --file dockerfiles/Dockerfile-toolchain --tag codaprotocol/coda:toolchain-$(GITLONGHASH) . && \
-	        docker tag  codaprotocol/coda:toolchain-$(GITLONGHASH) codaprotocol/coda:toolchain-latest && \
-		docker push codaprotocol/coda:toolchain-$(GITLONGHASH) && \
-		docker push codaprotocol/coda:toolchain-latest
-
 docker-toolchain-rust:
 	@if git diff-index --quiet HEAD ; then \
 		docker build --file dockerfiles/Dockerfile-toolchain-rust --tag codaprotocol/coda:toolchain-rust-$(GITLONGHASH) . && \
