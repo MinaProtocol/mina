@@ -7,8 +7,6 @@ open Signature_lib
 open Coda_transition
 open Network_peer
 
-let max_blocklength_observed = ref 0
-
 type validation_error =
   [ `Invalid_time_received of [`Too_early | `Too_late of int64]
   | `Invalid_genesis_protocol_state
@@ -176,6 +174,14 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                  is_valid_cb ;
                Envelope.Incoming.wrap ~data:verified_transition ~sender
                |> Writer.write valid_transition_writer ;
+               let blockchain_length =
+                 External_transition.Initial_validated.consensus_state
+                   verified_transition
+                 |> Consensus.Data.Consensus_state.blockchain_length
+                 |> Coda_numbers.Length.to_int
+               in
+               Coda_metrics.Transition_frontier.update_max_blocklength_observed
+                 blockchain_length ;
                return ()
            | Error error ->
                is_valid_cb false ;
