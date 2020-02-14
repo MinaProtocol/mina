@@ -22,7 +22,7 @@ let main () =
     else None
   in
   let%bind testnet =
-    Coda_worker_testnet.test logger n block_production_keys
+    Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in
@@ -67,7 +67,8 @@ let main () =
     wait_for_snark_worker_proof new_block_pipe1 largest_public_key
   in
   let new_snark_worker =
-    List.find_map_exn Test_genesis_ledger.accounts ~f:(fun (_, account) ->
+    List.find_map_exn (Lazy.force Test_genesis_ledger.accounts)
+      ~f:(fun (_, account) ->
         let public_key = Account.public_key account in
         Option.some_if
           (not @@ Public_key.Compressed.equal largest_public_key public_key)

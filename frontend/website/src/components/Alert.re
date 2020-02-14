@@ -32,6 +32,7 @@ let make = (~kind="", ~children) => {
     | "warning" => ("warning", Theme.Colors.rosebudAlpha(0.8))
     | "danger" => ("danger", Theme.Colors.rosebudAlpha(0.8))
     | "welcome" => ("welcome", Theme.Colors.tealBlueAlpha(0.8))
+    | "status" => ("status", Theme.Colors.indiaAlpha(0.8))
     | _ => ("note", Theme.Colors.marineAlpha(0.8))
     };
   <div className={Style.main(color)}>

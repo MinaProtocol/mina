@@ -7,14 +7,15 @@ let name = "coda-shared-prefix-multiproducer-test"
 let main n enable_payments () =
   let logger = Logger.create () in
   let keypairs =
-    List.map Test_genesis_ledger.accounts
+    List.map
+      (Lazy.force Test_genesis_ledger.accounts)
       ~f:Test_genesis_ledger.keypair_of_account_record_exn
   in
   let snark_work_public_keys i =
     Some ((List.nth_exn keypairs i).public_key |> Public_key.compress)
   in
   let%bind testnet =
-    Coda_worker_testnet.test logger n Option.some snark_work_public_keys
+    Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in

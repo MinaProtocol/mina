@@ -1,5 +1,6 @@
 open Async_kernel
 open Pipe_lib
+open Network_peer
 
 module type S = sig
   type transition_frontier
@@ -7,18 +8,11 @@ module type S = sig
   module Resource_pool : sig
     include
       Intf.Snark_resource_pool_intf
-      with type ledger_proof := Ledger_proof.t
-       and type work := Transaction_snark_work.Statement.t
-       and type transition_frontier := transition_frontier
-       and type work_info := Transaction_snark_work.Info.t
+      with type transition_frontier := transition_frontier
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
-    module Diff :
-      Intf.Snark_pool_diff_intf
-      with type ledger_proof := Ledger_proof.t
-       and type work := Transaction_snark_work.Statement.t
-       and type resource_pool := t
+    module Diff : Intf.Snark_pool_diff_intf with type resource_pool := t
   end
 
   module For_tests : sig
@@ -34,6 +28,8 @@ module type S = sig
      and type resource_pool_diff := Resource_pool.Diff.t
      and type transition_frontier := transition_frontier
      and type config := Resource_pool.Config.t
+     and type transition_frontier_diff :=
+                Resource_pool.transition_frontier_diff
 
   val get_completed_work :
        t
@@ -44,19 +40,13 @@ module type S = sig
        config:Resource_pool.Config.t
     -> logger:Logger.t
     -> disk_location:string
-    -> incoming_diffs:Resource_pool.Diff.t Envelope.Incoming.t
-                      Linear_pipe.Reader.t
+    -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
+                      * (bool -> unit) )
+                      Strict_pipe.Reader.t
+    -> local_diffs:Resource_pool.Diff.t Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier option
                                Broadcast_pipe.Reader.t
     -> t Deferred.t
-
-  val add_completed_work :
-       t
-    -> ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
-         Snark_work_lib.Work.Spec.t
-       , Ledger_proof.t )
-       Snark_work_lib.Work.Result.t
-    -> unit Deferred.t
 end
 
 module type Transition_frontier_intf = sig

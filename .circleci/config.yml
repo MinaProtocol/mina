@@ -52,7 +52,7 @@ jobs:
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -98,7 +98,7 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
@@ -127,9 +127,12 @@ jobs:
                   command: ./scripts/require-ppx-coda.py
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
+            - run:
+                name: Show USER
+                command: echo $USER
             - run:
                   name: Update Submodules
                   command: git submodule sync && git submodule update --init --recursive
@@ -150,59 +153,6 @@ jobs:
             - run:
                   name: Update branch protection rule from test configuration
                   command: ./scripts/test.py required-status >required_status && cat required_status && ./scripts/update_branch_rule.py required_status
-
-    build-auxiliary:
-        docker:
-            - image: nixos/nix
-        steps:
-            - checkout
-            - run:
-                name: Install tools
-                command: apk add patchelf dpkg tar
-            - run:
-                name: Install cachix
-                command: nix-env -iA cachix -f https://cachix.org/api/v1/install
-            - run:
-                name: Build libp2p_helper using cachix
-                command: |
-                    cachix use codaprotocol
-                    cd src/app/libp2p_helper
-
-                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
-                        echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
-                    else
-                        nix-build default.nix | cachix push codaprotocol
-                    fi
-            - run:
-                name: Create package dir
-                command: mkdir -p package
-            - run:
-                name: Collect and strip binary
-                command: |
-                    cp src/app/libp2p_helper/result/bin/libp2p_helper package/coda-libp2p_helper
-                    chmod +w package/coda-libp2p_helper
-                    patchelf --set-interpreter /lib64/ld-linux-x86-64.so.2 package/coda-libp2p_helper
-            - run:
-                name: Create deb
-                command: |
-                    mkdir -p package/deb/usr/local/sbin
-                    cp package/coda-libp2p_helper package/deb/usr/local/sbin/.
-                    mkdir -p package/deb/DEBIAN
-                    cp src/app/libp2p_helper/build/DEBIAN/control package/deb/DEBIAN/control
-                    DATE=$(date +%Y-%m-%d)
-                    sed -i "s/DATE/${DATE}/" package/deb/DEBIAN/control
-                    find src/app/libp2p_helper -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ' > /tmp/sha1sig
-                    HASH=$(cat /tmp/sha1sig)
-                    sed -i "s/HASH/${HASH}/" package/deb/DEBIAN/control
-                    echo "------------------------------------"
-                    cat package/deb/DEBIAN/control
-                    echo "------------------------------------"
-                    find package/deb/
-                    echo "------------------------------------"
-                    dpkg-deb -v --build package/deb/ package/coda-discovery-${HASH}.deb
-            - store_artifacts:
-                  path: package
 
     build-macos:
         macos:
@@ -232,15 +182,15 @@ jobs:
             - restore_cache:
                 name: Restore cache - homebrew
                 keys:
-                    - homebrew-v7-{{ checksum "brew_ci_cache.sig" }}
-                    - homebrew-v7-6+7C2dsmcJjRMux2kVt_DCKFQf7t_bD4Fd_ZOiogIMw=
+                    - homebrew-v9-{{ checksum "brew_ci_cache.sig" }}
+                    - homebrew-v8-{{ checksum "brew_ci_cache.sig" }}
             - run:
                 name: Install macos dependencies - homebrew - macos-setup-brew.sh
                 command: |
                     ./scripts/skip_if_only_frontend.sh ./scripts/macos-setup-brew.sh
             - save_cache:
                 name: Save cache - homebrew
-                key: homebrew-v7-{{ checksum "brew_ci_cache.sig" }}
+                key: homebrew-v9-{{ checksum "brew_ci_cache.sig" }}
                 paths:
                     - "/usr/local/Homebrew"
                     - "/Users/distiller/Library/Caches/Homebrew"
@@ -254,21 +204,13 @@ jobs:
             - restore_cache:
                 name: Restore cache - opam
                 keys:
-                    - opam-v7-{{ checksum "opam_ci_cache.sig" }}
-                    - opam-v7-igyglTvPBxMMa2HOSyL8o7xJusIN4L6cuLaccWdS7pY=
-            - run:
-                name: Ensure/Fix opam permisssions
-                command: |
-                    set +e
-                    sudo mkdir -p /Users/distiller/.opam
-                    sudo chown -R distiller /Users/distiller/.opam | true
-                    sudo chmod -R u+w /Users/distiller/.opam | true
+                    - opam-v8-{{ checksum "opam_ci_cache.sig" }}
             - run:
                 name: Install macos dependencies - opam -- make macos-setup-compile
                 command: ./scripts/skip_if_only_frontend.sh make macos-setup-compile
             - save_cache:
                 name: Save cache - opam
-                key: opam-v7-{{ checksum "opam_ci_cache.sig" }}
+                key: opam-v8-{{ checksum "opam_ci_cache.sig" }}
                 paths:
                     - "/Users/distiller/.opam"
                 no_output_timeout: 1h
@@ -287,9 +229,9 @@ jobs:
                     cd src/app/libp2p_helper
                     if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
                         echo "CACHIX_SIGNING_KEY is not set"
-                        nix-build default.nix
+                        nix-build --option sandbox false default.nix
                     else
-                        nix-build default.nix | cachix push codaprotocol
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
 
             ### dune
@@ -351,7 +293,7 @@ jobs:
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
@@ -364,6 +306,22 @@ jobs:
             - run:
                   name: Pin external packages
                   command: ./scripts/pin-external-packages.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam 
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
@@ -427,7 +385,7 @@ jobs:
     test-unit--test_postake_snarkless_unittest:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -456,6 +414,22 @@ jobs:
                     #chmod -R 777 src/app/libp2p_helper
                      #Do the build
                     #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest src/lib --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
@@ -465,7 +439,7 @@ jobs:
     test-unit--dev:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -495,6 +469,22 @@ jobs:
                      #Do the build
                     #sudo -H -u nix bash -c '. ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && nix-build default.nix'
             - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
+            - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
@@ -503,13 +493,29 @@ jobs:
     test-unit--dev_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run: ulimit -c unlimited
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev_medium_curves -j8 && (dune runtest src/lib --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
@@ -519,12 +525,28 @@ jobs:
     test--fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- fake_hash:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "fake_hash:full-test"'
@@ -533,12 +555,28 @@ jobs:
     test--test_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:full-test"'
@@ -550,12 +588,28 @@ jobs:
     test--test_postake_bootstrap:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-bootstrap-test"'
@@ -567,12 +621,28 @@ jobs:
     test--test_postake_catchup:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test"'
@@ -581,12 +651,28 @@ jobs:
     test--test_postake_delegation:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_delegation:coda-delegation-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation:coda-delegation-test"'
@@ -595,12 +681,28 @@ jobs:
     test--test_postake_five_even_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_five_even_snarkless:coda-shared-prefix-multiproducer-test -num-block-producers 5
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproducer-test -num-block-producers 5"'
@@ -609,12 +711,28 @@ jobs:
     test--test_postake_five_even_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments"'
@@ -623,12 +741,28 @@ jobs:
     test--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_snarkless:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:full-test"'
@@ -640,12 +774,28 @@ jobs:
     test--test_postake_split:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
@@ -654,12 +804,28 @@ jobs:
     test--test_postake_split_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-peers-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-peers-test"'
@@ -676,9 +842,6 @@ jobs:
                   name: Running test -- test_postake_split_snarkless:coda-shared-prefix-test -who-produces 1
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-shared-prefix-test -who-produces 1"'
             - run:
-                  name: Running test -- test_postake_split_snarkless:coda-restart-node-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-restart-node-test"'
-            - run:
                   name: Running test -- test_postake_split_snarkless:coda-change-snark-worker-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-change-snark-worker-test"'
             - run:
@@ -689,12 +852,28 @@ jobs:
     test--test_postake_three_producers:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_three_producers:coda-txns-and-restart-non-producers
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_three_producers:coda-txns-and-restart-non-producers"'
@@ -703,12 +882,28 @@ jobs:
     test--test_postake_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_txns:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-shared-state-test"'
@@ -717,15 +912,61 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-batch-payment-test"'
             - store_artifacts:
                   path: test_logs
-    test--test_postake_medium_curves:
+    test--test_postake_full_epoch:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
+            - run:
+                  name: Running test -- test_postake_full_epoch:full-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_full_epoch:full-test"'
+            - store_artifacts:
+                  path: test_logs
+    test--test_postake_medium_curves:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
+        steps:
+            - checkout
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_medium_curves:full-test"'
@@ -739,12 +980,28 @@ jobs:
     test--test_postake_snarkless_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:full-test"'
@@ -756,12 +1013,28 @@ jobs:
     test--test_postake_split_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
         steps:
             - checkout
             - run:
                   name: Update OPAM
                   command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Install cachix
+                command: USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
+            - run:
+                name: Build libp2p_helper using cachix
+                command: |
+                    export USER=opam
+                    . ~/.nix-profile/etc/profile.d/nix.sh
+                    cachix use codaprotocol
+                    cd src/app/libp2p_helper
+                    if [ -z ${CACHIX_SIGNING_KEY+x} ]; then
+                        echo "CACHIX_SIGNING_KEY is not set"
+                        nix-build --option sandbox false default.nix
+                    else
+                        nix-build --option sandbox false default.nix | cachix push codaprotocol
+                    fi
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
@@ -774,7 +1047,6 @@ workflows:
         jobs:
             - lint
             - lint-opt
-            - build-auxiliary
             - update-branch-protection:
                 filters:
                   branches:
@@ -810,6 +1082,7 @@ workflows:
                     - /release\/.*/
         jobs:
           - test-unit--dev_medium_curves
+          - test--test_postake_full_epoch
           - test--test_postake_medium_curves
           - test--test_postake_snarkless_medium_curves
           - test--test_postake_split_medium_curves
