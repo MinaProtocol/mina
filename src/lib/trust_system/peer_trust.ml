@@ -99,7 +99,7 @@ module Make0 (Inputs : Input_intf) = struct
     Option.iter db ~f:Db.close ;
     Strict_pipe.Writer.close bans_writer
 
-  let record ({db; bans_writer; _} as t) logger peer action =
+  let record ({db; _} as t) logger peer action =
     t.actions_writers
     <- List.filter t.actions_writers ~f:(Fn.compose not Pipe.is_closed) ;
     List.iter t.actions_writers
