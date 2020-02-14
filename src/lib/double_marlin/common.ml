@@ -17,10 +17,14 @@ let hash_dlog_me_only t =
 
 open Core_kernel
 
-let dlog_pcs_batch ~domain_h ~domain_k =
+let dlog_pcs_batch (type n_branching total)
+    ((without_degree_bound, pi) :
+      total Nat.t * (n_branching, Nat.N19.n, total) Nat.Adds.t) ~domain_h
+    ~domain_k =
   let h = Domain.size domain_h in
   let k = Domain.size domain_k in
-  Pcs_batch.create ~without_degree_bound:Nat.N20.n
+  (*   let without_degree_bound, pi = Branching.add Nat.N20.n in *)
+  Pcs_batch.create ~without_degree_bound
     ~with_degree_bound:[h - 1; h - 1; k - 1]
 
 let pairing_beta_1_pcs_batch =

@@ -210,10 +210,6 @@ module G = struct
   let if_ = T.if_
 end
 
-let domain_k = Domain.Pow_2_roots_of_unity 18
-
-let domain_h = Domain.Pow_2_roots_of_unity 17
-
 module Generators = struct
   let h =
     Snarky_bn382.Fq_urs.h

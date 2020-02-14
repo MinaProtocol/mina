@@ -114,7 +114,7 @@ module Keypair = struct
     lazy (Snarky_bn382.Fq_urs.read path)
 
   let create
-      { R1CS_constraint_system.public_input_size
+      { R1cs_constraint_system.public_input_size
       ; auxiliary_input_size
       ; m= {a; b; c}
       ; weight } =

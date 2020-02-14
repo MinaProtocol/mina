@@ -5,7 +5,7 @@ module Challenge_polynomial = struct
   type t = {challenges: Fq.t array; commitment: G.Affine.t} [@@deriving bin_io]
 end
 
-type message = Challenge_polynomial.t
+type message = Challenge_polynomial.t list
 
 type t =
   ( G.Affine.t
@@ -102,7 +102,7 @@ let eval_to_backend
     h_3 g_3 row_a row_b row_c col_a col_b col_c value_a value_b value_c rc_a
     rc_b rc_c
 
-let to_backend {Challenge_polynomial.challenges; commitment} primary_input
+let to_backend chal_polys primary_input
     ({ messages=
          { w_hat= w_comm
          ; z_hat_a= za_comm
@@ -131,24 +131,40 @@ let to_backend {Challenge_polynomial.challenges; commitment} primary_input
           (Snarky_bn382.G.Affine.Pair.make (g l) (g r)) ) ;
     v
   in
+  let challenges =
+    List.map chal_polys ~f:(fun {Challenge_polynomial.challenges; _} ->
+        challenges )
+    |> Array.concat |> Fq.Vector.of_array
+  in
+  let commitments =
+    Array.of_list_map chal_polys
+      ~f:(fun {Challenge_polynomial.commitment; _} ->
+        G.Affine.to_backend commitment )
+    |> G.Affine.Vector.of_array
+  in
   Snarky_bn382.Fq_proof.make primary_input (g w_comm) (g za_comm) (g zb_comm)
     (g h1_comm) (g g1_comm_0) (g g1_comm_1) (g h2_comm) (g g2_comm_0)
     (g g2_comm_1) (g h3_comm) (g g3_comm_0) (g g3_comm_1) sigma2 sigma3 lr z_1
     z_2 (g delta) (g sg)
     (* Leaky! *)
     (eval_to_backend evals0)
-    (eval_to_backend evals1) (eval_to_backend evals2)
-    (Fq.Vector.of_array challenges)
-    (G.Affine.to_backend commitment)
+    (eval_to_backend evals1) (eval_to_backend evals2) challenges commitments
 
 let create ?message pk ~primary ~auxiliary =
-  let {Challenge_polynomial.challenges; commitment} =
-    Option.value_exn message
+  let chal_polys = Option.value_exn message in
+  let challenges =
+    List.map chal_polys ~f:(fun {Challenge_polynomial.challenges; _} ->
+        challenges )
+    |> Array.concat |> Fq.Vector.of_array
+  in
+  let commitments =
+    Array.of_list_map chal_polys
+      ~f:(fun {Challenge_polynomial.commitment; _} ->
+        G.Affine.to_backend commitment )
+    |> G.Affine.Vector.of_array
   in
   let res =
-    Snarky_bn382.Fq_proof.create pk primary auxiliary
-      (Fq.Vector.of_array challenges)
-      (G.Affine.to_backend commitment)
+    Snarky_bn382.Fq_proof.create pk primary auxiliary challenges commitments
   in
   let t = of_backend res in
   Snarky_bn382.Fq_proof.delete res ;

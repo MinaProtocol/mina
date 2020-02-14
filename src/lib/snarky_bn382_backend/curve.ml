@@ -20,6 +20,8 @@ module type Input_intf = sig
     val create : BaseField.t -> BaseField.t -> t
 
     val delete : t -> unit
+
+    module Vector : Snarky.Vector.S with type elt := t
   end
 
   type t
@@ -70,6 +72,18 @@ struct
       let y = C.Affine.y t in
       Caml.Gc.finalise BaseField.delete y ;
       (x, y)
+
+    module Vector = struct
+      type elt = t
+
+      include C.Affine.Vector
+
+      (* TODO: Leaky *)
+      let of_array a =
+        let t = create () in
+        Array.iter a ~f:(emplace_back t) ;
+        t
+    end
   end
 
   let op1 f x =

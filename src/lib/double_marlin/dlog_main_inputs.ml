@@ -6,8 +6,6 @@ module type S = Intf.Dlog_main_inputs.S
 open Snarky_bn382_backend
 module Impl = Impls.Dlog_based
 
-let crs_max_degree = 1 lsl 20
-
 let fq_random_oracle ?length s = Fq.of_bits (bits_random_oracle ?length s)
 
 let group_map = unstage (group_map (module Fq) ~a:Fq.zero ~b:(Fq.of_int 14))
@@ -17,19 +15,19 @@ let unrelated_g (x, y) =
   group_map (fq_random_oracle (str x ^ str y))
 
 module Input_domain = struct
-  let domain = Domain.Pow_2_roots_of_unity 6
-
-  let self = Domain.Pow_2_roots_of_unity 5
-
-  let lagrange_commitments =
-    let x = 64 in
+  let lagrange_commitments domain =
+    let domain_size = Domain.size domain in
     let u = Unsigned.Size_t.of_int in
     time "lagrange" (fun () ->
-        Array.init (Domain.size domain) ~f:(fun i ->
+        Array.init domain_size ~f:(fun i ->
             Snarky_bn382_backend.G1.Affine.of_backend
               (Snarky_bn382.Fp_urs.lagrange_commitment
                  (Lazy.force Snarky_bn382_backend.Pairing_based.Keypair.urs)
-                 (u x) (u i)) ) )
+                 (u domain_size) (u i)) ) )
+
+  let domain = Domain.Pow_2_roots_of_unity 6
+
+  let self = Domain.Pow_2_roots_of_unity 5
 end
 
 let group_map_fq =
@@ -205,10 +203,6 @@ module Fp = struct
 
   let of_bigint = Fp.of_bigint
 end
-
-let domain_k = Domain.Pow_2_roots_of_unity 18
-
-let domain_h = Domain.Pow_2_roots_of_unity 17
 
 let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)

@@ -72,8 +72,20 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
       let b = prod ms term in
       (a, b)
     in
-    List.map
-      ~f:(fun (x, y) -> equal x y)
+    List.mapi
+      ~f:(fun i (x, y) ->
+        as_prover
+          As_prover.(
+            fun () ->
+              let x = read_var x in
+              let y = read_var y in
+              if not (Field.Constant.equal x y) then (
+                Core.printf "bad marlin %d\n%!" i ;
+                Field.Constant.print x ;
+                Core.printf "%!" ;
+                Field.Constant.print y ;
+                Core.printf "%!" )) ;
+        equal x y )
       [ ( h_3 * vanishing_polynomial domain_k beta_3
         , a_beta_3 - (b_beta_3 * ((beta_3 * g_3) + sigma_3)) )
       ; ( r_alpha beta_2 * sigma_3 * of_int (Domain.size domain_k)

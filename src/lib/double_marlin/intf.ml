@@ -5,6 +5,8 @@ module Sponge_lib = Sponge
 module type App_state_intf = sig
   module Impl : Snarky.Snark_intf.Run
 
+  module Branching : Nat.Add.Intf_transparent
+
   type t
 
   module Constant : sig
@@ -24,7 +26,7 @@ module type App_state_intf = sig
 
   val typ : (t, Constant.t) Impl.Typ.t
 
-  val check_update : t -> t -> Impl.Boolean.var
+  val check_update : (t, Branching.n) Vector.t -> t -> Impl.Boolean.var
 
   val is_base_case : t -> Impl.Boolean.var
 end
@@ -212,6 +214,10 @@ module Dlog_main_inputs = struct
   module type S = sig
     val crs_max_degree : int
 
+    module Branching_pred : Nat.Add.Intf_transparent
+
+    module Bulletproof_rounds : Nat.Add.Intf_transparent
+
     module Impl : Snarky.Snark_intf.Run with type prover_state = unit
 
     module Fp : sig
@@ -226,22 +232,42 @@ module Dlog_main_inputs = struct
       val of_bigint : Impl.Bigint.t -> t
     end
 
-    module G1 : Group(Impl).S with type t = Impl.Field.t * Impl.Field.t
+    module G1 : sig
+      include Group(Impl).S with type t = Impl.Field.t * Impl.Field.t
+
+      open Impl
+
+      module type Shifted_intf = sig
+        type t
+
+        val zero : t
+
+        val unshift_nonzero : t -> Field.t * Field.t
+
+        val add : t -> Field.t * Field.t -> t
+
+        val if_ : Boolean.var -> then_:t -> else_:t -> t
+      end
+
+      val shifted : unit -> (module Shifted_intf)
+    end
 
     module Generators : sig
       val g : G1.t
     end
 
+    (*
     val domain_h : Domain.t
 
     val domain_k : Domain.t
+       *)
 
     module Input_domain : sig
       val domain : Domain.t
 
       val self : Domain.t
 
-      val lagrange_commitments : G1.Constant.t array
+      val lagrange_commitments : Domain.t -> G1.Constant.t array
     end
 
     val sponge_params : Impl.Field.t Sponge_lib.Params.t
@@ -253,6 +279,8 @@ end
 module Pairing_main_inputs = struct
   module type S = sig
     val crs_max_degree : int
+
+    module Branching_pred : Nat.Add.Intf_transparent
 
     module Impl : Snarky.Snark_intf.Run with type prover_state = unit
 
@@ -284,9 +312,10 @@ module Pairing_main_inputs = struct
       val h : G.Constant.t
     end
 
+    (*
     val domain_h : Domain.t
 
-    val domain_k : Domain.t
+    val domain_k : Domain.t *)
 
     module Input_domain : sig
       val domain : Domain.t

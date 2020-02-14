@@ -1,3 +1,4 @@
+open Pickles_types
 module D = Digest
 open Core_kernel
 module Digest = D
@@ -34,6 +35,43 @@ module Pairing_based = struct
   module Digest = D.Make (Impl)
   module Challenge = Challenge.Make (Impl)
 
+  let input ~branching ~bulletproof_log2 =
+    let open Types.Pairing_based.Statement in
+    let spec = spec branching bulletproof_log2 in
+    let (T (typ, f)) =
+      Spec.packed_typ (module Impl) (T (Fq.typ, Fn.id)) spec
+    in
+    let typ = Typ.transport typ ~there:to_data ~back:of_data in
+    Spec.ETyp.T (typ, fun x -> of_data (f x))
+end
+
+module Dlog_based = struct
+  module Impl = Snarky.Snark.Run.Make (Dlog_based) (Unit)
+  include Impl
+  module Challenge = Challenge.Make (Impl)
+  module Digest = D.Make (Impl)
+  module Fq = Fq
+
+  let input () =
+    let fp_as_fq (x : Fp.t) = Fq.of_bigint (Fp.to_bigint x) in
+    let fp =
+      Typ.transport Field.typ ~there:fp_as_fq ~back:(fun (x : Fq.t) ->
+          Fp.of_bigint (Fq.to_bigint x) )
+    in
+    let open Types.Dlog_based.Statement in
+    let (T (typ, f)) = Spec.packed_typ (module Impl) (T (fp, Fn.id)) spec in
+    let typ = Typ.transport typ ~there:to_data ~back:of_data in
+    Spec.ETyp.T (typ, fun x -> of_data (f x))
+end
+
+(*
+    Snarky.Typ.tuple4
+      (typ Impl.Boolean.typ Nat.N1.n)
+      (typ fp Nat.N3.n)
+      (typ Challenge.packed_typ Nat.N9.n)
+      (typ Digest.packed_typ Nat.N3.n)
+*)
+(*
   let input ~bulletproof_log2 =
     let open Pickles_types in
     let v = Vector.typ in
@@ -54,25 +92,4 @@ module Pairing_based = struct
       (v Digest.packed_typ Nat.N3.n)
       (v Challenge.packed_typ Nat.N9.n)
       (Typ.array ~length:bulletproof_log2 bulletproof_challenge)
-end
-
-module Dlog_based = struct
-  module Impl = Snarky.Snark.Run.Make (Dlog_based) (Unit)
-  include Impl
-  module Challenge = Challenge.Make (Impl)
-  module Digest = D.Make (Impl)
-  module Fq = Fq
-
-  let input =
-    let open Pickles_types.Vector in
-    let fp_as_fq (x : Fp.t) = Fq.of_bigint (Fp.to_bigint x) in
-    let fp =
-      Typ.transport Field.typ ~there:fp_as_fq ~back:(fun (x : Fq.t) ->
-          Fp.of_bigint (Fq.to_bigint x) )
-    in
-    Snarky.Typ.tuple4
-      (typ Impl.Boolean.typ Nat.N1.n)
-      (typ fp Nat.N3.n)
-      (typ Challenge.packed_typ Nat.N9.n)
-      (typ Digest.packed_typ Nat.N3.n)
-end
+*)
