@@ -474,11 +474,11 @@ jobs:
                     else
                         nix-build --option sandbox false default.nix | cachix push codaprotocol
                     fi
-            # build coda.exe before running tests
+            # build executables before running tests
             # dune build without a target will try to build nonconsensus code, which fails and would be wasteful
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 src/app/cli/src/coda.exe && (dune runtest src/lib --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 src/app/cli/src/coda.exe src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe && (dune runtest src/lib --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
