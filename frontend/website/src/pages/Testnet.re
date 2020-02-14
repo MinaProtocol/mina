@@ -341,8 +341,9 @@ let make = (~challenges, ~testnetName) => {
             <h1 className=Theme.H1.hero>
               {React.string("Testnet Leaderboard")}
             </h1>
+            // href="https://testnet-points-frontend-dot-o1labs-192920.appspot.com/"
             <a
-              href="https://testnet-points-frontend-dot-o1labs-192920.appspot.com/"
+              href="https://docs.google.com/spreadsheets/d/1FlRe-RqPqla9iUQuX0McSbgM7Io7Y5LmvJDieQWgpDk"
               target="_blank"
               className=Styles.headerLink>
               {React.string({j|View Full Leaderboard\u00A0→|j})}
@@ -397,10 +398,10 @@ let make = (~challenges, ~testnetName) => {
 
 Next.injectGetInitialProps(make, _ =>
   Challenges.fetchAllChallenges()
-  |> Promise.map(((testnetName, ranking, continuous, threshold)) => {
+  |> Promise.map(((testnetName, ranking, continuous, threshold)) =>
        {
          "challenges": (ranking, continuous, threshold),
          "testnetName": testnetName,
        }
-     })
+     )
 );
