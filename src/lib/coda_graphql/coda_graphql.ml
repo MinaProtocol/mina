@@ -1521,7 +1521,7 @@ module Mutations = struct
     | `Active f -> (
       match f with
       | Ok _receipt ->
-          Ok command
+          Ok user_command
       | Error e ->
           Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
