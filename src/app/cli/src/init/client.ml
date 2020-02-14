@@ -1232,7 +1232,7 @@ let import_key =
                Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
              in
              let%map _response =
-               Graphql_client.query_exn
+               Graphql_client.query
                  (Graphql_queries.Reload_wallets.make ())
                  graphql_endpoint
              in
