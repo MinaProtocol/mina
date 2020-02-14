@@ -158,9 +158,13 @@ module Index
 struct
   open F
 
-  type t = unit ptr
+  include (
+    struct
+        type t = unit ptr
 
-  let typ = ptr void
+        let typ = ptr void
+      end :
+      Type )
 
   let prefix = P.prefix
 
@@ -509,6 +513,8 @@ module Dlog_marlin_proof
     (P : Prefix) (AffineCurve : sig
         include Type
 
+        module Vector : Type
+
         module Pair : sig
           include Type
 
@@ -604,12 +610,12 @@ struct
       @-> AffineCurve.Pair.Vector.typ @-> ScalarField.typ @-> ScalarField.typ
       @-> AffineCurve.typ @-> AffineCurve.typ @-> Evaluations.typ
       @-> Evaluations.typ @-> Evaluations.typ @-> FieldVector.typ
-      @-> AffineCurve.typ @-> returning typ )
+      @-> AffineCurve.Vector.typ @-> returning typ )
 
   let create =
     foreign (prefix "create")
       ( Index.typ @-> FieldVector.typ @-> FieldVector.typ @-> FieldVector.typ
-      @-> AffineCurve.typ @-> returning typ )
+      @-> AffineCurve.Vector.typ @-> returning typ )
 
   let delete = foreign (prefix "delete") (typ @-> returning void)
 

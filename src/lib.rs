@@ -80,9 +80,6 @@ fn index_to_witness_position(public_inputs: usize, h_to_x_ratio: usize, i: usize
         let intra_block = aux_index % m;
         h_to_x_ratio * block + 1 + intra_block
     };
-    if res == 6603 || res == 6557 {
-        println!("{} pre index {} ({}, {})", res, i, public_inputs, h_to_x_ratio);
-    }
     assert_eq!(witness_position_to_index(public_inputs, h_to_x_ratio, res), i);
     res
 }
@@ -2207,11 +2204,6 @@ pub extern "C" fn camlsnark_bn382_fq_constraint_matrix_append_row(
 ) {
     let m_ = unsafe { &mut (*m) };
     let indices_ = unsafe { &mut (*indices) };
-    for i in indices_.iter() {
-        if *i == 114688 {
-            panic!("the bad index.")
-        }
-    }
     let coefficients_ = unsafe { &mut (*coefficients) };
     m_.push((indices_.clone(), coefficients_.clone()));
 }
@@ -2527,7 +2519,7 @@ pub extern "C" fn camlsnark_bn382_fq_proof_create(
     primary_input: *const Vec<Fq>,
     auxiliary_input: *const Vec<Fq>,
     prev_challenges: *const Vec<Fq>,
-    prev_sg : *const GAffine,
+    prev_sgs : *const Vec<GAffine>,
 ) -> *const DlogProof<GAffine> {
     let index = unsafe { &(*index) };
     let primary_input = unsafe { &(*primary_input) };
@@ -2535,12 +2527,19 @@ pub extern "C" fn camlsnark_bn382_fq_proof_create(
 
     let witness = prepare_witness(index.domains, primary_input, auxiliary_input);
 
-    let prev = ((unsafe { &*prev_challenges }).clone(), unsafe { *prev_sg });
+    let prev : Vec<(Vec<Fq>, GAffine)> = {
+        let prev_challenges = unsafe { &*prev_challenges};
+        let prev_sgs = unsafe { &*prev_sgs };
+        let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
+        prev_sgs.iter().enumerate().map( |(i, sg)| {
+            (prev_challenges[(i * challenges_per_sg)..(i+1)*challenges_per_sg].iter().map(|x| *x).collect(), sg.clone())
+        }).collect()
+    };
 
     let rng = &mut rand_core::OsRng;
 
     let proof = DlogProof::create::<DefaultFqSponge<Bn_382GParameters>, DefaultFrSponge<Fq> >
-        (&witness, &index, Some(prev), rng).unwrap();
+        (&witness, &index, prev, rng).unwrap();
 
     return Box::into_raw(Box::new(proof));
 }
@@ -2576,13 +2575,20 @@ pub extern "C" fn camlsnark_bn382_fq_proof_make(
     evals2 : *const DlogProofEvaluations<Fq>,
 
     prev_challenges: *const Vec<Fq>,
-    prev_sg : *const GAffine,
+    prev_sgs : *const Vec<GAffine>,
     ) -> *const DlogProof<GAffine> {
 
-    let prev = ((unsafe { &*prev_challenges }).clone(), unsafe { *prev_sg });
+    let prev : Vec<(Vec<Fq>, GAffine)> = {
+        let prev_challenges = unsafe { &*prev_challenges};
+        let prev_sgs = unsafe { &*prev_sgs };
+        let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
+        prev_sgs.iter().enumerate().map( |(i, sg)| {
+            (prev_challenges[(i * challenges_per_sg)..(i+1)*challenges_per_sg].iter().map(|x| *x).collect(), sg.clone())
+        }).collect()
+    };
 
     let res = DlogProof {
-        prev_challenges: Some(prev),
+        prev_challenges: prev,
         proof: OpeningProof {
             lr: (unsafe { &*lr }).clone(),
             z1: (unsafe { *z1 }).clone(),
