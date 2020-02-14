@@ -690,20 +690,21 @@ module Transition_frontier_controller = struct
     Counter.v "breadcrumbs_built_by_builder" ~help ~namespace ~subsystem
 end
 
+(* these block latency metrics are recomputed every half a slot, and the averages span 20 slots *)
 module Block_latency = struct
   let subsystem = "Block_latency"
 
   module Latency_time_spec = struct
-    let tick_interval = Core.Time.Span.of_min 1.
+    let tick_interval = Core.Time.Span.of_min (block_window_duration / 2)
 
-    let rolling_interval = Core.Time.Span.of_min 30.
+    let rolling_interval = Core.Time.Span.of_min (block_window_duration * 20)
   end
 
   module Gossip_slots =
     Moving_bucketed_average (struct
-        let bucket_interval = Core.Time.Span.of_min 1.0
+        let bucket_interval = Core.Time.Span.of_ms (block_window_duration / 2)
 
-        let num_buckets = 30
+        let num_buckets = 40
 
         let subsystem = subsystem
 
