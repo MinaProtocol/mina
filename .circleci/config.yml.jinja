@@ -155,7 +155,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Compare test signatures for consensus, nonconsensus code
-                  command: ./scripts/compare_test_signatures.sh
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./scripts/compare_test_signatures.sh'
     update-branch-protection:
         docker:
             - image: python:3
