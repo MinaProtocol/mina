@@ -1548,6 +1548,7 @@ module Mutations = struct
 
   let parse_user_command_input ~kind coda from to_ fee memo_opt =
     let open Result.Let_syntax in
+    (*    
     let%bind sender_nonce =
       match
         Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger coda
@@ -1562,7 +1563,8 @@ module Mutations = struct
              transaction pool."
       | `Bootstrapping ->
           Error "Node is still bootstrapping"
-    in
+    *)
+    let sender_nonce = Coda_numbers.Account_nonce.of_int 3 in
     let%bind fee =
       result_of_exn Currency.Fee.of_uint64 fee
         ~error:(sprintf "Invalid %s `fee` provided." kind)
