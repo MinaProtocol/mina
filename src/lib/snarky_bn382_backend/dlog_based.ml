@@ -128,7 +128,7 @@ module Keypair = struct
 
   let pk = Fn.id
 
-  open Pickles_types
+  open Rugelach_types
 
   let vk_commitments t : G.Affine.t Abc.t Matrix_evals.t =
     { row=

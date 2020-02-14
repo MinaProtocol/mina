@@ -1,4 +1,4 @@
-open Pickles_types
+open Rugelach_types
 open Core_kernel
 
 let index_to_field_elements ({row; col; value} : _ Abc.t Matrix_evals.t)
@@ -6,31 +6,6 @@ let index_to_field_elements ({row; col; value} : _ Abc.t Matrix_evals.t)
   Array.concat_map [|row; col; value|] ~f:(fun {a; b; c} ->
       Array.concat_map [|a; b; c|] ~f:(fun g ->
           Array.of_list (g_to_field_elements g) ) )
-
-(*
-module Bulletproof_challenge = struct
-  type ('challenge, 'bool) t = {prechallenge: 'challenge; is_square: 'bool}
-  [@@deriving bin_io]
-
-  let pack {prechallenge; is_square} = is_square :: prechallenge
-
-  let unpack = function
-    | is_square :: prechallenge ->
-        {is_square; prechallenge}
-    | _ ->
-        failwith "Bulletproof_challenge.unpack"
-
-  open Snarky.H_list
-
-  let to_hlist {prechallenge; is_square} = [is_square; prechallenge]
-
-  let of_hlist ([is_square; prechallenge] : (unit, _) t) =
-    {prechallenge; is_square}
-
-  let typ chal bool =
-    Snarky.Typ.of_hlistable [bool; chal] ~var_to_hlist:to_hlist
-      ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-end *)
 
 module Dlog_based = struct
   module Proof_state = struct
@@ -346,7 +321,7 @@ module Pairing_based = struct
     end
 
     module Bulletproof = struct
-      include Pickles_types.Dlog_marlin_types.Openings.Bulletproof
+      include Dlog_marlin_types.Openings.Bulletproof
 
       module Advice = struct
         (* This is data that can be computed in linear time from the above plus the statement.
@@ -384,30 +359,6 @@ module Pairing_based = struct
         ; bulletproof_challenges: 'bulletproof_challenges
         ; b: 'fq }
       [@@deriving bin_io]
-
-      (*
-      open Snarky.H_list
-
-      let to_hlist
-          {marlin; combined_inner_product; xi; r; bulletproof_challenges; b} =
-        [marlin; combined_inner_product; xi; r; bulletproof_challenges; b]
-
-      let of_hlist
-          ([marlin; combined_inner_product; xi; r; bulletproof_challenges; b] :
-            (unit, _) t) =
-        {marlin; combined_inner_product; xi; r; bulletproof_challenges; b}
-
-      let typ chal fq bool ~length =
-        Snarky.Typ.of_hlistable
-          [ Marlin.typ chal fq
-          ; fq
-          ; chal
-          ; chal
-          ; Snarky.Typ.array (Bulletproof_challenge.typ chal bool) ~length
-          ; fq ]
-          ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
-          ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-         *)
     end
 
     module Pass_through = Dlog_based.Proof_state.Me_only
@@ -483,36 +434,6 @@ module Pairing_based = struct
                 ; beta_2
                 ; beta_3 } }
         ; sponge_digest_before_evaluations }
-
-      (*
-
-    open Snarky.H_list
-
-    let of_hlist
-        ([ deferred_values
-         ; was_base_case
-         ; sponge_digest_before_evaluations
-         ] :
-          (unit, _) t) =
-      { deferred_values
-      ; was_base_case
-      ; sponge_digest_before_evaluations }
-
-    let to_hlist
-        { deferred_values
-        ; was_base_case
-        ; sponge_digest_before_evaluations } =
-      [ deferred_values
-      ; was_base_case
-      ; sponge_digest_before_evaluations
-      ]
-
-    let typ challenge fq bool digest ~length =
-      Snarky.Typ.of_hlistable
-        [Deferred_values.typ challenge fq bool ~length; bool; digest]
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
-*)
     end
 
     type ('unfinalized_proofs, 'me_only, 'bool) t =
@@ -603,47 +524,5 @@ module Pairing_based = struct
         ; B Digest
         ; B Bool
         ; Vector (B Digest, branching) ]
-
-    (*
-      let open Vector in
-
-      let bool = [was_base_case] in
-      let fq = [sigma_2; sigma_3; combined_inner_product; b] in
-      let challenge =
-        [alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3; xi; r]
-      in
-      let digest = [sponge_digest_before_evaluations; me_only; pass_through] in
-      (bool, fq, digest, challenge, bulletproof_challenges)
-
-    let of_data (bool, fq, digest, challenge, bulletproof_challenges) =
-      let open Vector in
-      let [was_base_case] = bool in
-      let [sigma_2; sigma_3; combined_inner_product; b] = fq in
-      let [alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3; xi; r] =
-        challenge
-      in
-      let [sponge_digest_before_evaluations; me_only; pass_through] = digest in
-      { proof_state=
-          { deferred_values=
-              { xi
-              ; r
-              ; bulletproof_challenges
-              ; b
-              ; combined_inner_product
-              ; marlin=
-                  { sigma_2
-                  ; sigma_3
-                  ; alpha
-                  ; eta_a
-                  ; eta_b
-                  ; eta_c
-                  ; beta_1
-                  ; beta_2
-                  ; beta_3 } }
-          ; was_base_case
-          ; sponge_digest_before_evaluations
-          ; me_only }
-      ; pass_through }
-       *)
   end
 end

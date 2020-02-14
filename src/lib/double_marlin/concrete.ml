@@ -1,6 +1,6 @@
 module I = Intf
 open Types
-open Pickles_types
+open Rugelach_types
 module D = Digest
 open Core_kernel
 module Digest = D
@@ -60,7 +60,7 @@ struct
     module Branching_pred = Branching_pred
     module Bulletproof_rounds = Bp_rounds
 
-    let crs_max_degree = 1 lsl Pickles_types.Nat.to_int Bulletproof_rounds.n
+    let crs_max_degree = 1 lsl Rugelach_types.Nat.to_int Bulletproof_rounds.n
 
     include Dlog_main_inputs
   end
@@ -428,10 +428,11 @@ struct
         (proof : Pairing_based.Proof.t) =
       let combine t v =
         let open G1 in
-        Pickles_types.Pcs_batch.combine_commitments t ~scale ~add ~xi
-          (Pickles_types.Vector.map v ~f:G1.of_affine)
+        let open Rugelach_types in
+        Pcs_batch.combine_commitments t ~scale ~add ~xi
+          (Vector.map v ~f:G1.of_affine)
       in
-      let { Pickles_types.Pairing_marlin_types.Messages.w_hat
+      let { Pairing_marlin_types.Messages.w_hat
           ; z_hat_a
           ; z_hat_b
           ; gh_1= (g1, _), h1
@@ -468,7 +469,7 @@ struct
 
     let combined_evaluation (proof : Pairing_based.Proof.t) ~r ~xi ~beta_1
         ~beta_2 ~beta_3 ~x_hat_beta_1 =
-      let { Pickles_types.Pairing_marlin_types.Evals.w_hat
+      let { Pairing_marlin_types.Evals.w_hat
           ; z_hat_a
           ; z_hat_b
           ; h_1
@@ -484,7 +485,7 @@ struct
       in
       let combine t (pt : Fp.t) =
         let open Fp in
-        Pickles_types.Pcs_batch.combine_evaluations
+        Pcs_batch.combine_evaluations
           ~crs_max_degree:Inputs.Dlog.crs_max_degree ~mul ~add ~one
           ~evaluation_point:pt ~xi t
       in
@@ -516,8 +517,7 @@ struct
         ~beta_1 ~beta_2 ~beta_3 (f_1, f_2, f_3) =
       let open G1 in
       let prev_acc =
-        Pickles_types.Pairing_marlin_types.Accumulator.map ~f:of_affine
-          prev_acc
+        Pairing_marlin_types.Accumulator.map ~f:of_affine prev_acc
       in
       let proof1, proof2, proof3 =
         Triple.map proof.openings.proofs ~f:of_affine
@@ -526,7 +526,7 @@ struct
       let g1 = conv (fst proof.messages.gh_1) in
       let g2 = conv (fst (snd proof.messages.sigma_gh_2)) in
       let g3 = conv (fst (snd proof.messages.sigma_gh_3)) in
-      Pickles_types.Pairing_marlin_types.Accumulator.map ~f:to_affine_exn
+      Pairing_marlin_types.Accumulator.map ~f:to_affine_exn
         { degree_bound_checks=
             Dlog_main.accumulate_degree_bound_checks
               prev_acc.degree_bound_checks ~add ~scale ~r_h:r ~r_k g1 g2 g3
@@ -975,7 +975,7 @@ let%test_unit "concrete" =
       let to_field_elements x = [|x|]
 
       let update prevs =
-        Pickles_types.Vector.fold ~init:Field.Constant.one
+        Rugelach_types.Vector.fold ~init:Field.Constant.one
           ~f:Field.Constant.( + ) prevs
 
       let dummy = Field.Constant.zero

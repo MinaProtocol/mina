@@ -2,7 +2,7 @@ module D = Digest
 open Core_kernel
 open Import
 open Util
-open Pickles_types
+open Rugelach_types
 open Dlog_marlin_types
 module Accumulator = Pairing_marlin_types.Accumulator
 
@@ -542,7 +542,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
   let print_me_only lab t =
     let module T = struct
       module Nvector (N : Nat.Intf) = struct
-        open Pickles_types
+        open Rugelach_types
 
         type 'a t = ('a, N.n) Vector.t
 
@@ -568,7 +568,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
                 (Types.Dlog_based.Proof_state.Me_only.typ
                    (Typ.transport G1.typ ~there:G1.Constant.of_affine
                       ~back:G1.Constant.to_affine_exn)
-                   (Pickles_types.Vector.typ Fq.typ Bulletproof_rounds.n)
+                   (Rugelach_types.Vector.typ Fq.typ Bulletproof_rounds.n)
                    ~length:Branching.n)
                 t
             in

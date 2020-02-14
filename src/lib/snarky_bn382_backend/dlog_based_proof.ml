@@ -1,5 +1,5 @@
 open Core_kernel
-open Pickles_types
+open Rugelach_types
 
 module Challenge_polynomial = struct
   type t = {challenges: Fq.t array; commitment: G.Affine.t} [@@deriving bin_io]
@@ -60,7 +60,7 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
              {Abc.a= fq f0; b= fq f1; c= fq f2}
            in
            let fq = fq e in
-           { Pickles_types.Dlog_marlin_types.Evals.w_hat= fq w
+           { Dlog_marlin_types.Evals.w_hat= fq w
            ; z_hat_a= fq za
            ; z_hat_b= fq zb
            ; h_1= fq h1
@@ -85,7 +85,7 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
   ; openings= {proof; evals} }
 
 let eval_to_backend
-    { Pickles_types.Dlog_marlin_types.Evals.w_hat
+    { Dlog_marlin_types.Evals.w_hat
     ; z_hat_a
     ; z_hat_b
     ; h_1

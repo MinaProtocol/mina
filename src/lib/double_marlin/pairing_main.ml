@@ -4,7 +4,7 @@ open Core_kernel
 open Import
 open Util
 open Types.Pairing_based
-open Pickles_types
+open Rugelach_types
 open Common
 
 module Main (Inputs : Intf.Pairing_main_inputs.S) = struct

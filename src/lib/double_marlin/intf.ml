@@ -1,5 +1,5 @@
 open Core_kernel
-open Pickles_types
+open Rugelach_types
 module Sponge_lib = Sponge
 
 module type App_state_intf = sig
@@ -256,12 +256,6 @@ module Dlog_main_inputs = struct
       val g : G1.t
     end
 
-    (*
-    val domain_h : Domain.t
-
-    val domain_k : Domain.t
-       *)
-
     module Input_domain : sig
       val domain : Domain.t
 
@@ -311,11 +305,6 @@ module Pairing_main_inputs = struct
     module Generators : sig
       val h : G.Constant.t
     end
-
-    (*
-    val domain_h : Domain.t
-
-    val domain_k : Domain.t *)
 
     module Input_domain : sig
       val domain : Domain.t
