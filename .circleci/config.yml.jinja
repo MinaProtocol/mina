@@ -142,6 +142,20 @@ jobs:
             - run:
                   name: Compare versioned types in PR
                   command: ./scripts/compare_pr_diff_types.sh
+    compare-test-signatures:
+        docker:
+            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
+        steps:
+            - checkout
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Compare test signatures for consensus, nonconsensus code
+                  command: ./scripts/compare_test_signatures.sh
     update-branch-protection:
         docker:
             - image: python:3
@@ -624,6 +638,7 @@ workflows:
         jobs:
             - lint
             - lint-opt
+            - compare-test-signatures
             - update-branch-protection:
                 filters:
                   branches:
