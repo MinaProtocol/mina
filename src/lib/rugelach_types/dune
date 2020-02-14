@@ -1,8 +1,8 @@
 
 (library
   (inline_tests)
-  (name pickles_types)
-  (public_name pickles_types)
+  (name rugelach_types)
+  (public_name rugelach_types)
   (flags -warn-error -27)
   (preprocess (pps ppx_jane ppx_deriving.std))
   (libraries
