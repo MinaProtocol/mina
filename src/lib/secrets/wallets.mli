@@ -19,7 +19,7 @@ val import_keypair_terminal_stdin :
 val generate_new :
   t -> password:Secret_file.password -> Public_key.Compressed.t Deferred.t
 
-val register_hardware_wallet :
+val create_account_hardware_wallet :
      t
   -> hardware_wallet_nonce:Coda_numbers.Hardware_wallet_nonce.t
   -> (Public_key.Compressed.t, string) Deferred.Result.t

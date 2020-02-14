@@ -115,7 +115,7 @@ let generate_new t ~password : Public_key.Compressed.t Deferred.t =
   let keypair = Keypair.create () in
   import_keypair t keypair ~password
 
-let register_hardware_wallet t ~hardware_wallet_nonce :
+let create_account_hardware_wallet t ~hardware_wallet_nonce :
     (Public_key.Compressed.t, string) Deferred.Result.t =
   let open Deferred.Result.Let_syntax in
   let%bind public_key =

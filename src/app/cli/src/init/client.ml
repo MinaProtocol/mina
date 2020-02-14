@@ -1339,21 +1339,21 @@ let create_account =
          in
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ))
 
-let register_hardware_wallet =
+let create_account_hardware_wallet =
   Command.async
     ~summary:
-      "Register an account with hardware wallet - this will let the hardware \
+      "Create an account with hardware wallet - this will let the hardware \
        wallet generate a keypair corresponds to the nonce you give and store \
-       this nonce and the generated public key in the daemon. Registering \
-       with the same nonce and the same hardware wallet will always generate \
-       the same keypair."
+       this nonce and the generated public key in the daemon. Calling this \
+       command with the same nonce and the same hardware wallet will always \
+       generate the same keypair."
     (Cli_lib.Background_daemon.graphql_init
        Cli_lib.Flag.User_command.hardware_wallet_nonce
        ~f:(fun graphql_endpoint hardware_wallet_nonce ->
          let%map response =
            Graphql_client.(
              query_exn
-               (Graphql_queries.Register_hardware_wallet.make
+               (Graphql_queries.Create_account_hardware_wallet.make
                   ~hardware_wallet_nonce:
                     (Encoders.hardware_wallet_nonce hardware_wallet_nonce)
                   ()))
@@ -1361,10 +1361,12 @@ let register_hardware_wallet =
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             (response#registerHardwareWallet)#public_key
+             (response#createAccountHardwareWallet)#public_key
          in
          printf
-           "\n😄 Registered hardware wallet with nonce %s!\nPublic key: %s\n"
+           "\n\
+            😄 created hardware wallet account with nonce %s!\n\
+            Public key: %s\n"
            (Coda_numbers.Hardware_wallet_nonce.to_string hardware_wallet_nonce)
            pk_string ))
 
@@ -1562,7 +1564,7 @@ let accounts =
     ~preserve_subcommand_order:()
     [ ("list", list_accounts)
     ; ("create", create_account)
-    ; ("register-hardware-wallet", register_hardware_wallet)
+    ; ("create-account-hardware-wallet", create_account_hardware_wallet)
     ; ("import", import_key)
     ; ("unlock", unlock_account)
     ; ("lock", lock_account) ]

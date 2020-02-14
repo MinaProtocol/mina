@@ -1156,8 +1156,8 @@ module Types = struct
               ~doc:"Public key specifying which account to unlock"
               ~typ:(non_null public_key_arg) ]
 
-    let register_hardware_wallet =
-      obj "RegisterHardwareWalletInput" ~coerce:Fn.id
+    let create_account_hardware_wallet =
+      obj "CreateAccountHardwareWalletInput" ~coerce:Fn.id
         ~fields:
           [ arg "nonce" ~doc:"Nonce of the account in hardware wallet"
               ~typ:(non_null uint32_arg) ]
@@ -1392,20 +1392,23 @@ module Mutations = struct
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_account)]
       ~resolve:create_account_resolver
 
-  let register_hardware_wallet : (Coda_lib.t, unit) field =
-    io_field "registerHardwareWallet"
+  let create_account_hardware_wallet : (Coda_lib.t, unit) field =
+    io_field "createAccountHardwareWallet"
       ~doc:
-        "Register an account with hardware wallet - this will let the \
-         hardware wallet generate a keypair corresponds to the nonce you give \
-         and store this nonce and the generated public key in the daemon. \
-         Registering with the same nonce and the same hardware wallet will \
+        "Create an account with hardware wallet - this will let the hardware \
+         wallet generate a keypair corresponds to the nonce you give and \
+         store this nonce and the generated public key in the daemon. Calling \
+         this command with the same nonce and the same hardware wallet will \
          always generate the same keypair."
       ~typ:(non_null Types.Payload.create_account)
       ~args:
-        Arg.[arg "input" ~typ:(non_null Types.Input.register_hardware_wallet)]
+        Arg.
+          [ arg "input"
+              ~typ:(non_null Types.Input.create_account_hardware_wallet) ]
       ~resolve:(fun {ctx= coda; _} () hardware_wallet_nonce ->
         Coda_lib.wallets coda
-        |> Secrets.Wallets.register_hardware_wallet ~hardware_wallet_nonce )
+        |> Secrets.Wallets.create_account_hardware_wallet
+             ~hardware_wallet_nonce )
 
   let unlock_account_resolver {ctx= t; _} () (password, pk) =
     let password = lazy (return (Bytes.of_string password)) in
@@ -1719,7 +1722,7 @@ module Mutations = struct
   let commands =
     [ add_wallet
     ; create_account
-    ; register_hardware_wallet
+    ; create_account_hardware_wallet
     ; unlock_account
     ; unlock_wallet
     ; lock_account

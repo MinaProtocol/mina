@@ -1133,22 +1133,12 @@
           "possibleTypes": null
         },
         {
-          "kind": "SCALAR",
-          "name": "HardwareWalletNonce",
-          "description": "Nonce of the account in hardware wallet",
-          "fields": null,
-          "inputFields": null,
-          "interfaces": null,
-          "enumValues": null,
-          "possibleTypes": null
-        },
-        {
           "kind": "INPUT_OBJECT",
-          "name": "RegisterHardwareWalletInput",
+          "name": "CreateAccountHardwareWalletInput",
           "description": null,
           "fields": [
             {
-              "name": "hardwareWalletNonce",
+              "name": "nonce",
               "description": "Nonce of the account in hardware wallet",
               "args": [],
               "type": {
@@ -1156,7 +1146,7 @@
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "HardwareWalletNonce",
+                  "name": "UInt32",
                   "ofType": null
                 }
               },
@@ -1166,14 +1156,14 @@
           ],
           "inputFields": [
             {
-              "name": "hardwareWalletNonce",
+              "name": "nonce",
               "description": "Nonce of the account in hardware wallet",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
                 "ofType": {
                   "kind": "SCALAR",
-                  "name": "HardwareWalletNonce",
+                  "name": "UInt32",
                   "ofType": null
                 }
               },
@@ -1337,8 +1327,8 @@
               "deprecationReason": null
             },
             {
-              "name": "registerHardwareWallet",
-              "description": "Register an account with hardware wallet - this will let the hardware wallet generate a keypair corresponds to the nonce you give and store this nonce and the generated public key in the daemon. Registering with the same nonce and the same hardware wallet will always generate the same keypair.",
+              "name": "createAccountHardwareWallet",
+              "description": "Create an account with hardware wallet - this will let the hardware wallet generate a keypair corresponds to the nonce you give and store this nonce and the generated public key in the daemon. Calling this command with the same nonce and the same hardware wallet will always generate the same keypair.",
               "args": [
                 {
                   "name": "input",
@@ -1348,7 +1338,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "RegisterHardwareWalletInput",
+                      "name": "CreateAccountHardwareWalletInput",
                       "ofType": null
                     }
                   },
@@ -3853,6 +3843,65 @@
         },
         {
           "kind": "OBJECT",
+          "name": "Peer",
+          "description": null,
+          "fields": [
+            {
+              "name": "host",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "libp2pPort",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "Int",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "peerId",
+              "description": null,
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": null,
+          "interfaces": [],
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "OBJECT",
           "name": "AddrsAndPorts",
           "description": null,
           "fields": [
@@ -3889,33 +3938,13 @@
               "deprecationReason": null
             },
             {
-              "name": "discoveryPort",
+              "name": "peer",
               "description": null,
               "args": [],
               "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "clientPort",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "Int",
-                  "ofType": null
-                }
+                "kind": "OBJECT",
+                "name": "Peer",
+                "ofType": null
               },
               "isDeprecated": false,
               "deprecationReason": null
@@ -3937,7 +3966,7 @@
               "deprecationReason": null
             },
             {
-              "name": "communicationPort",
+              "name": "clientPort",
               "description": null,
               "args": [],
               "type": {
@@ -4919,22 +4948,6 @@
                 "ofType": {
                   "kind": "OBJECT",
                   "name": "AddrsAndPorts",
-                  "ofType": null
-                }
-              },
-              "isDeprecated": false,
-              "deprecationReason": null
-            },
-            {
-              "name": "libp2pPeerId",
-              "description": null,
-              "args": [],
-              "type": {
-                "kind": "NON_NULL",
-                "name": null,
-                "ofType": {
-                  "kind": "SCALAR",
-                  "name": "String",
                   "ofType": null
                 }
               },
