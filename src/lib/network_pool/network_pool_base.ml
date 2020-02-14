@@ -5,24 +5,9 @@ open Network_peer
 
 module Make (Transition_frontier : sig
   type t
-end) (Resource_pool : sig
-  include Intf.Resource_pool_intf
-
-  (** Diff from a transition frontier extension that would update the resource pool*)
-  val handle_transition_frontier_diff :
-    transition_frontier_diff -> t -> unit Deferred.t
-
-  val create :
-       frontier_broadcast_pipe:Transition_frontier.t Option.t
-                               Broadcast_pipe.Reader.t
-    -> config:Config.t
-    -> logger:Logger.t
-    -> tf_diff_writer:( transition_frontier_diff
-                      , Strict_pipe.synchronous
-                      , unit Deferred.t )
-                      Strict_pipe.Writer.t
-    -> t
-end) :
+end)
+(Resource_pool : Intf.Resource_pool_intf
+                 with type transition_frontier := Transition_frontier.t) :
   Intf.Network_pool_base_intf
   with type resource_pool := Resource_pool.t
    and type resource_pool_diff := Resource_pool.Diff.t
@@ -47,7 +32,7 @@ end) :
         (Resource_pool.Diff.summary diff') ;
       Linear_pipe.write t.write_broadcasts diff'
     in
-    match%bind Resource_pool.Diff.apply t.resource_pool pool_diff with
+    match%bind Resource_pool.Diff.unsafe_apply t.resource_pool pool_diff with
     | Ok diff' ->
         rebroadcast diff'
     | Error (`Locally_generated diff') ->
@@ -60,14 +45,14 @@ end) :
         Deferred.unit
 
   let of_resource_pool_and_diffs resource_pool ~logger ~incoming_diffs
-      ~local_diffs ~tf_diff =
+      ~local_diffs ~tf_diffs =
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
     let network_pool =
       {resource_pool; logger; read_broadcasts; write_broadcasts}
     in
     (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
     Strict_pipe.Reader.Merge.iter
-      [ Strict_pipe.Reader.map tf_diff ~f:(fun diff ->
+      [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
             `Transition_frontier_extension diff )
       ; Strict_pipe.Reader.map local_diffs ~f:(fun diff -> `Local diff)
       ; Strict_pipe.Reader.map incoming_diffs ~f:(fun diff -> `Incoming diff)
@@ -142,7 +127,7 @@ end) :
       of_resource_pool_and_diffs
         (Resource_pool.create ~config ~logger ~frontier_broadcast_pipe
            ~tf_diff_writer)
-        ~incoming_diffs ~local_diffs ~logger ~tf_diff:tf_diff_reader
+        ~incoming_diffs ~local_diffs ~logger ~tf_diffs:tf_diff_reader
     in
     don't_wait_for (rebroadcast_loop t logger) ;
     t

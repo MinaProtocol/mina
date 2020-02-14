@@ -7,7 +7,9 @@ module type S = sig
   type transition_frontier
 
   module Resource_pool : sig
-    include Intf.Snark_resource_pool_intf
+    include
+      Intf.Snark_resource_pool_intf
+      with type transition_frontier := transition_frontier
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
@@ -208,7 +210,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
           ~(proof : Ledger_proof.t One_or_two.t) ~fee =
         if work_is_referenced t work then (
           (*Note: fee against existing proofs and the new proofs are checked in
-          Diff.apply which calls this function*)
+          Diff.unsafe_apply which calls this function*)
           Hashtbl.set t.snark_tables.all ~key:work ~data:{proof; fee} ;
           if is_local then
             Hashtbl.set t.snark_tables.rebroadcastable ~key:work
@@ -361,7 +363,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         let pool = Resource_pool.of_serializable snark_table ~config ~logger in
         let network_pool =
           of_resource_pool_and_diffs pool ~logger ~incoming_diffs ~local_diffs
-            ~tf_diff:tf_diff_reader
+            ~tf_diffs:tf_diff_reader
         in
         Resource_pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
           pool ~tf_diff_writer ;
@@ -397,7 +399,7 @@ let%test_module "random set test" =
         Mock_snark_pool.Resource_pool.Diff.Stable.Latest.Add_solved_work
           (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
       in
-      Mock_snark_pool.Resource_pool.Diff.apply resource_pool
+      Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
         {Envelope.Incoming.data= diff; sender}
 
     let config verifier =
