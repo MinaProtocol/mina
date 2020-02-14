@@ -52,7 +52,17 @@ type pipes =
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
       * (bool -> unit) )
-      Pipe.Writer.t }
+      Pipe.Writer.t
+  ; local_txns_writer:
+      ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+      , Strict_pipe.synchronous
+      , unit Deferred.t )
+      Strict_pipe.Writer.t
+  ; local_snark_work_writer:
+      ( Network_pool.Snark_pool.Resource_pool.Diff.t
+      , Strict_pipe.synchronous
+      , unit Deferred.t )
+      Strict_pipe.Writer.t }
 
 type t =
   { config: Config.t
@@ -572,7 +582,14 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   let spec = work.spec.instances in
   set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
-  Network_pool.Snark_pool.add_completed_work (snark_pool t) work
+  Strict_pipe.Writer.write t.pipes.local_snark_work_writer
+    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work)
+  |> Deferred.don't_wait_for
+
+(*TODO: Synchronize this*)
+let add_transactions t (txns : User_command.t list) =
+  Strict_pipe.Writer.write t.pipes.local_txns_writer txns
+  |> Deferred.don't_wait_for
 
 let next_producer_timing t = t.next_producer_timing
 
@@ -771,6 +788,12 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
           in
+          let local_txns_reader, local_txns_writer =
+            Strict_pipe.(create ~name:"local transactions" Synchronous)
+          in
+          let local_snark_work_reader, local_snark_work_writer =
+            Strict_pipe.(create ~name:"local snark work" Synchronous)
+          in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config
               ~trust_system:config.trust_system
@@ -779,6 +802,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
               ~logger:config.logger
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
+              ~local_diffs:local_txns_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
@@ -906,6 +930,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               ~logger:config.logger
               ~disk_location:config.snark_pool_disk_location
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
+              ~local_diffs:local_snark_work_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let%bind wallets =
@@ -990,7 +1015,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 ; producer_transition_writer
                 ; external_transitions_writer=
                     Strict_pipe.Writer.to_linear_pipe
-                      external_transitions_writer }
+                      external_transitions_writer
+                ; local_txns_writer
+                ; local_snark_work_writer }
             ; wallets
             ; block_production_keypairs
             ; coinbase_receiver= config.coinbase_receiver
