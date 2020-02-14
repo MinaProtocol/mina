@@ -152,6 +152,10 @@ you need, you run `opam switch import src/opam.export`.
 Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually, by running `scripts/pin-external-packages.sh`.
 
+You will need to install [Nix](https://nixos.org/nix/download.html) and also
+[cachix](https://cachix.org) with `nix-env -iA cachix -f
+https://cachix.org/api/v1/install`.
+
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,
 which are installed using `apt` in the dockerfiles, the libraries for RocksDB are
