@@ -85,7 +85,9 @@ end)
     let ( = ) = Float.equal in
     let ( mod ) = Float.mod_float in
     if not (to_ns rolling_interval mod to_ns tick_interval = 0.0) then
-      failwith "invalid intervals provided to Moving_time_average"
+      failwith
+        "invalid intervals provided to Moving_time_average -- the \
+         tick_interval does not evenly divide the rolling_interval"
 
   include Moving_bucketed_average (struct
               include Spec
