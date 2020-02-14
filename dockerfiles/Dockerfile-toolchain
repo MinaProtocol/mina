@@ -39,10 +39,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     python-pip \
     rubygems \
     zlib1g-dev \
-    libbz2-dev \
-    python3
-
-RUN sudo python3 -m pip install coda-ledger-cli
+    libbz2-dev
 
 RUN sudo pip install sexpdata awscli
 

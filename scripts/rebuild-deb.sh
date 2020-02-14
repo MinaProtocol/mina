@@ -39,7 +39,7 @@ Version: ${VERSION}
 Section: base
 Priority: optional
 Architecture: amd64
-Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc, python3
+Depends: libffi6, libgmp10, libgomp1, libjemalloc1, libprocps6, libssl1.1, miniupnpc
 Conflicts: coda-discovery
 License: Apache-2.0
 Homepage: https://codaprotocol.com/
@@ -105,9 +105,6 @@ done
 for f in /tmp/coda_cache_dir/coda_genesis*; do
     cp /tmp/coda_cache_dir/coda_genesis* "${BUILDDIR}/var/lib/coda/."
 done
-
-# Hardware wallet cli
-python3 -m pip install coda-ledger-cli
 
 # Bash autocompletion
 # NOTE: We do not list bash-completion as a required package,
