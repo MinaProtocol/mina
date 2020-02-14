@@ -37,4 +37,3 @@ tail -q -f coda.log -f .coda-config/coda-prover.log -f .coda-config/coda-verifie
 RUN chmod +x init_coda.sh
 
 ENTRYPOINT ["/usr/bin/dumb-init", "/init_coda.sh"]
-# ENTRYPOINT ["/bin/bash", "-c"]
