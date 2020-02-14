@@ -9,18 +9,11 @@ module type S = sig
   module Resource_pool : sig
     include
       Intf.Snark_resource_pool_intf
-      with type ledger_proof := Ledger_proof.t
-       and type work := Transaction_snark_work.Statement.t
-       and type transition_frontier := transition_frontier
-       and type work_info := Transaction_snark_work.Info.t
+      with type transition_frontier := transition_frontier
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
-    module Diff :
-      Intf.Snark_pool_diff_intf
-      with type ledger_proof := Ledger_proof.t
-       and type work := Transaction_snark_work.Statement.t
-       and type resource_pool := t
+    module Diff : Intf.Snark_pool_diff_intf with type resource_pool := t
   end
 
   module For_tests : sig
@@ -36,6 +29,8 @@ module type S = sig
      and type resource_pool_diff := Resource_pool.Diff.t
      and type transition_frontier := transition_frontier
      and type config := Resource_pool.Config.t
+     and type transition_frontier_diff :=
+                Resource_pool.transition_frontier_diff
 
   val get_completed_work :
        t
@@ -48,18 +43,11 @@ module type S = sig
     -> disk_location:string
     -> incoming_diffs:( Resource_pool.Diff.t Envelope.Incoming.t
                       * (bool -> unit) )
-                      Linear_pipe.Reader.t
+                      Strict_pipe.Reader.t
+    -> local_diffs:Resource_pool.Diff.t Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier option
                                Broadcast_pipe.Reader.t
     -> t Deferred.t
-
-  val add_completed_work :
-       t
-    -> ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
-         Snark_work_lib.Work.Spec.t
-       , Ledger_proof.t )
-       Snark_work_lib.Work.Result.t
-    -> unit Deferred.t
 end
 
 module type Transition_frontier_intf = sig
@@ -101,19 +89,29 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         [@@deriving sexp, make]
       end
 
+      type transition_frontier_diff =
+        int * int Transaction_snark_work.Statement.Table.t
+
       type t =
         { snark_tables: serializable
         ; mutable ref_table: int Statement_table.t option
         ; config: Config.t
-        ; logger: Logger.t sexp_opaque }
+        ; logger: Logger.t sexp_opaque
+        ; mutable removed_counter: int
+              (*A counter for transition frontier breadcrumbs removed. When this reaches a certain value, unreferenced snark work is removed from ref_table*)
+        }
       [@@deriving sexp]
 
       let make_config = Config.make
 
-      let of_serializable tables ~config ~logger : t =
-        {snark_tables= tables; ref_table= None; config; logger}
-
       let removed_breadcrumb_wait = 10
+
+      let of_serializable tables ~config ~logger : t =
+        { snark_tables= tables
+        ; ref_table= None
+        ; config
+        ; logger
+        ; removed_counter= removed_breadcrumb_wait }
 
       let snark_pool_json t : Yojson.Safe.json =
         `List
@@ -150,7 +148,27 @@ module Make (Transition_frontier : Transition_frontier_intf) :
           | Some _ ->
               true )
 
-      let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t) =
+      let handle_transition_frontier_diff (removed, refcount_table) t =
+        t.ref_table <- Some refcount_table ;
+        t.removed_counter <- t.removed_counter + removed ;
+        if t.removed_counter < removed_breadcrumb_wait then return ()
+        else (
+          t.removed_counter <- 0 ;
+          Statement_table.filter_keys_inplace t.snark_tables.rebroadcastable
+            ~f:(fun work ->
+              (* Rebroadcastable should always be a subset of all. *)
+              assert (Hashtbl.mem t.snark_tables.all work) ;
+              work_is_referenced t work ) ;
+          Statement_table.filter_keys_inplace t.snark_tables.all
+            ~f:(work_is_referenced t) ;
+          return
+            (*when snark works removed from the pool*)
+            Coda_metrics.(
+              Gauge.set Snark_work.snark_pool_size
+                (Float.of_int @@ Hashtbl.length t.snark_tables.all)) )
+
+      let listen_to_frontier_broadcast_pipe frontier_broadcast_pipe (t : t)
+          ~tf_diff_writer =
         (* start with empty ref table *)
         t.ref_table <- None ;
         let tf_deferred =
@@ -158,48 +176,30 @@ module Make (Transition_frontier : Transition_frontier_intf) :
             | Some tf ->
                 (* Start the count at the max so we flush after reconstructing
                    the transition_frontier *)
-                let removedCounter = ref removed_breadcrumb_wait in
+                t.removed_counter <- removed_breadcrumb_wait ;
                 let pipe = Transition_frontier.snark_pool_refcount_pipe tf in
-                let deferred =
-                  Broadcast_pipe.Reader.iter pipe
-                    ~f:(fun (removed, refcount_table) ->
-                      t.ref_table <- Some refcount_table ;
-                      removedCounter := !removedCounter + removed ;
-                      if !removedCounter < removed_breadcrumb_wait then
-                        return ()
-                      else (
-                        removedCounter := 0 ;
-                        Statement_table.filter_keys_inplace
-                          t.snark_tables.rebroadcastable ~f:(fun work ->
-                            (* Rebroadcastable should always be a subset of all. *)
-                            assert (Hashtbl.mem t.snark_tables.all work) ;
-                            work_is_referenced t work ) ;
-                        Statement_table.filter_keys_inplace t.snark_tables.all
-                          ~f:(work_is_referenced t) ;
-                        return
-                          (*when snark works removed from the pool*)
-                          Coda_metrics.(
-                            Gauge.set Snark_work.snark_pool_size
-                              ( Float.of_int
-                              @@ Hashtbl.length t.snark_tables.all )) ) )
-                in
-                deferred
+                Broadcast_pipe.Reader.iter pipe
+                  ~f:(Strict_pipe.Writer.write tf_diff_writer)
+                |> Deferred.don't_wait_for ;
+                return ()
             | None ->
                 t.ref_table <- None ;
                 return () )
         in
         Deferred.don't_wait_for tf_deferred
 
-      let create ~frontier_broadcast_pipe ~config ~logger =
+      let create ~frontier_broadcast_pipe ~config ~logger ~tf_diff_writer =
         let t =
           { snark_tables=
               { all= Statement_table.create ()
               ; rebroadcastable= Statement_table.create () }
           ; logger
           ; config
-          ; ref_table= None }
+          ; ref_table= None
+          ; removed_counter= removed_breadcrumb_wait }
         in
-        listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t ;
+        listen_to_frontier_broadcast_pipe frontier_broadcast_pipe t
+          ~tf_diff_writer ;
         t
 
       let get_logger t = t.logger
@@ -210,7 +210,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
           ~(proof : Ledger_proof.t One_or_two.t) ~fee =
         if work_is_referenced t work then (
           (*Note: fee against existing proofs and the new proofs are checked in
-          Diff.apply which calls this function*)
+          Diff.unsafe_apply which calls this function*)
           Hashtbl.set t.snark_tables.all ~key:work ~data:{proof; fee} ;
           if is_local then
             Hashtbl.set t.snark_tables.rebroadcastable ~key:work
@@ -307,13 +307,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
     end
 
     include T
-    module Diff =
-      Snark_pool_diff.Make
-        (Ledger_proof.Stable.V1)
-        (Transaction_snark_work.Statement)
-        (Transaction_snark_work.Info)
-        (Transition_frontier)
-        (T)
+    module Diff = Snark_pool_diff.Make (Transition_frontier) (T)
 
     let get_rebroadcastable t ~is_expired =
       Hashtbl.filteri_inplace t.snark_tables.rebroadcastable
@@ -355,8 +349,12 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         Transaction_snark_work.Checked.create_unsafe
           {Transaction_snark_work.fee; proofs= proof; prover} )
 
-  let load ~config ~logger ~disk_location ~incoming_diffs
+  let load ~config ~logger ~disk_location ~incoming_diffs ~local_diffs
       ~frontier_broadcast_pipe =
+    let tf_diff_reader, tf_diff_writer =
+      Strict_pipe.(
+        create ~name:"Snark pool Transition frontier diffs" Synchronous)
+    in
     match%map
       Async.Reader.load_bin_prot disk_location
         Resource_pool.bin_reader_serializable
@@ -364,27 +362,15 @@ module Make (Transition_frontier : Transition_frontier_intf) :
     | Ok snark_table ->
         let pool = Resource_pool.of_serializable snark_table ~config ~logger in
         let network_pool =
-          of_resource_pool_and_diffs pool ~logger ~incoming_diffs
+          of_resource_pool_and_diffs pool ~logger ~incoming_diffs ~local_diffs
+            ~tf_diffs:tf_diff_reader
         in
         Resource_pool.listen_to_frontier_broadcast_pipe frontier_broadcast_pipe
-          pool ;
+          pool ~tf_diff_writer ;
         network_pool
     | Error _e ->
-        create ~config ~logger ~incoming_diffs ~frontier_broadcast_pipe
-
-  open Snark_work_lib.Work
-
-  let add_completed_work t
-      (res : (('a, 'b, 'c) Single.Spec.t Spec.t, Ledger_proof.t) Result.t) =
-    apply_and_broadcast t
-      ( Envelope.Incoming.wrap
-          ~data:
-            (Resource_pool.Diff.Stable.V1.Add_solved_work
-               ( One_or_two.map res.spec.instances ~f:Single.Spec.statement
-               , { proof= res.proofs
-                 ; fee= {fee= res.spec.fee; prover= res.prover} } ))
-          ~sender:Envelope.Sender.Local
-      , Fn.const () )
+        create ~config ~logger ~incoming_diffs ~local_diffs
+          ~frontier_broadcast_pipe
 end
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
@@ -413,7 +399,7 @@ let%test_module "random set test" =
         Mock_snark_pool.Resource_pool.Diff.Stable.Latest.Add_solved_work
           (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
       in
-      Mock_snark_pool.Resource_pool.Diff.apply resource_pool
+      Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
         {Envelope.Incoming.data= diff; sender}
 
     let config verifier =
@@ -432,6 +418,12 @@ let%test_module "random set test" =
       and there are no best tip diffs being fed into this pipe from the mock
       transition frontier*)
       let frontier_broadcast_pipe_r, _ = Broadcast_pipe.create None in
+      let incoming_diff_r, _incoming_diff_w =
+        Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+      in
+      let local_diff_r, _local_diff_w =
+        Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+      in
       let res =
         let open Deferred.Let_syntax in
         let%bind verifier =
@@ -441,8 +433,10 @@ let%test_module "random set test" =
         in
         let config = config verifier in
         let resource_pool =
-          Mock_snark_pool.Resource_pool.create ~config ~logger
+          Mock_snark_pool.create ~config ~logger
             ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
+            ~incoming_diffs:incoming_diff_r ~local_diffs:local_diff_r
+          |> Mock_snark_pool.resource_pool
         in
         let%map () =
           let open Deferred.Let_syntax in
@@ -574,7 +568,12 @@ let%test_module "random set test" =
     let%test_unit "Work that gets fed into apply_and_broadcast will be \
                    received in the pool's reader" =
       Async.Thread_safe.block_on_async_exn (fun () ->
-          let pool_reader, _pool_writer = Linear_pipe.create () in
+          let pool_reader, _pool_writer =
+            Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+          in
+          let local_reader, _local_writer =
+            Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+          in
           let frontier_broadcast_pipe_r, _ =
             Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
           in
@@ -585,7 +584,8 @@ let%test_module "random set test" =
           in
           let config = config verifier in
           let network_pool =
-            Mock_snark_pool.create ~config ~incoming_diffs:pool_reader ~logger
+            Mock_snark_pool.create ~config ~incoming_diffs:pool_reader
+              ~local_diffs:local_reader ~logger
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let priced_proof =
@@ -618,33 +618,49 @@ let%test_module "random set test" =
           Mock_snark_pool.apply_and_broadcast network_pool
             (Envelope.Incoming.local command, Fn.const ()) )
 
-    let%test_unit "when creating a network, the incoming diffs in reader pipe \
-                   will automatically get process" =
+    let%test_unit "when creating a network, the incoming diffs and locally \
+                   generated diffs in reader pipes will automatically get \
+                   process" =
       Async.Thread_safe.block_on_async_exn (fun () ->
+          let work_count = 10 in
           let works =
             Quickcheck.random_sequence ~seed:(`Deterministic "works")
               Transaction_snark.Statement.gen
-            |> Fn.flip Sequence.take 10
+            |> Fn.flip Sequence.take work_count
             |> Sequence.map ~f:(fun x -> `One x)
             |> Sequence.to_list
           in
+          let per_reader = work_count / 2 in
+          let create_work work =
+            Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
+              ( work
+              , Priced_proof.
+                  { proof= One_or_two.map ~f:mk_dummy_proof work
+                  ; fee=
+                      { fee= Currency.Fee.of_int 0
+                      ; prover= Signature_lib.Public_key.Compressed.empty } }
+              )
+          in
           let verify_unsolved_work () =
-            let work_diffs =
-              List.map works ~f:(fun work ->
-                  ( Envelope.Incoming.local
-                      (Mock_snark_pool.Resource_pool.Diff.Stable.V1
-                       .Add_solved_work
-                         ( work
-                         , Priced_proof.
-                             { proof= One_or_two.map ~f:mk_dummy_proof work
-                             ; fee=
-                                 { fee= Currency.Fee.of_int 0
-                                 ; prover=
-                                     Signature_lib.Public_key.Compressed.empty
-                                 } } ))
-                  , Fn.const () ) )
-              |> Linear_pipe.of_list
+            let pool_reader, pool_writer =
+              Strict_pipe.(create ~name:"Snark pool test" Synchronous)
             in
+            let local_reader, local_writer =
+              Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+            in
+            (*incomming diffs*)
+            List.map (List.take works per_reader) ~f:create_work
+            |> List.map ~f:(fun work ->
+                   (Envelope.Incoming.local work, Fn.const ()) )
+            |> List.iter ~f:(fun diff ->
+                   Strict_pipe.Writer.write pool_writer diff
+                   |> Deferred.don't_wait_for ) ;
+            (* locally generated diffs *)
+            List.map (List.drop works per_reader) ~f:create_work
+            |> List.iter ~f:(fun diff ->
+                   Strict_pipe.Writer.write local_writer diff
+                   |> Deferred.don't_wait_for ) ;
+            let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
             let frontier_broadcast_pipe_r, _ =
               Broadcast_pipe.create
                 (Some (Mocks.Transition_frontier.create ()))
@@ -656,7 +672,8 @@ let%test_module "random set test" =
             in
             let config = config verifier in
             let network_pool =
-              Mock_snark_pool.create ~logger ~config ~incoming_diffs:work_diffs
+              Mock_snark_pool.create ~logger ~config
+                ~incoming_diffs:pool_reader ~local_diffs:local_reader
                 ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
             in
             don't_wait_for
@@ -675,7 +692,12 @@ let%test_module "random set test" =
           verify_unsolved_work () )
 
     let%test_unit "rebroadcast behavior" =
-      let pool_reader, _pool_writer = Linear_pipe.create () in
+      let pool_reader, _pool_writer =
+        Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+      in
+      let local_reader, _local_writer =
+        Strict_pipe.(create ~name:"Snark pool test" Synchronous)
+      in
       let frontier_broadcast_pipe_r, _w = Broadcast_pipe.create None in
       let stmt1, stmt2 =
         Quickcheck.random_value ~seed:(`Deterministic "")
@@ -705,7 +727,7 @@ let%test_module "random set test" =
           let config = config verifier in
           let network_pool =
             Mock_snark_pool.create ~logger:(Logger.null ()) ~config
-              ~incoming_diffs:pool_reader
+              ~incoming_diffs:pool_reader ~local_diffs:local_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let resource_pool = Mock_snark_pool.resource_pool network_pool in
