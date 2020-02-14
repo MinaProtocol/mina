@@ -30,7 +30,7 @@ RUN echo '#!/bin/bash\n\
 mkdir -p .coda-config\n\
 touch .coda-config/coda-prover.log\n\
 touch .coda-config/coda-verifier.log\n\
-coda daemon -log-json -log-level Info "$@" 2>&1 >coda.log &\n\
+coda "$@" 2>&1 >coda.log &\n\
 tail -q -f coda.log -f .coda-config/coda-prover.log -f .coda-config/coda-verifier.log'\
 > init_coda.sh
 
