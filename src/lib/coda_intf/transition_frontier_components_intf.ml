@@ -111,7 +111,10 @@ module type Transition_handler_processor_intf = sig
                                   , Strict_pipe.crash Strict_pipe.buffered
                                   , unit )
                                   Strict_pipe.Writer.t
-    -> processed_transition_writer:( External_transition.Validated.t
+    -> processed_transition_writer:( [ `Transition of
+                                       External_transition.Validated.t ]
+                                     * [ `Source of
+                                         [`Gossip | `Catchup | `Internal] ]
                                    , Strict_pipe.crash Strict_pipe.buffered
                                    , unit )
                                    Strict_pipe.Writer.t
@@ -358,5 +361,8 @@ module type Transition_router_intf = sig
     -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
     -> base_proof:Coda_base.Proof.t
-    -> External_transition.Validated.t Strict_pipe.Reader.t * unit Ivar.t
+    -> ( [`Transition of External_transition.Validated.t]
+       * [`Source of [`Gossip | `Catchup | `Internal]] )
+       Strict_pipe.Reader.t
+       * unit Ivar.t
 end
