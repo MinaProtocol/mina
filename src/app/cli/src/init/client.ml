@@ -1355,7 +1355,7 @@ let create_account_hardware_wallet =
              query_exn
                (Graphql_queries.Create_account_hardware_wallet.make
                   ~hardware_wallet_nonce:
-                    (Encoders.hardware_wallet_nonce hardware_wallet_nonce)
+                    (Encoders.uint32 hardware_wallet_nonce)
                   ()))
              graphql_endpoint
          in
