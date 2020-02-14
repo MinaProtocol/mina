@@ -388,6 +388,8 @@ module type S = sig
 
       val to_string_hum : t -> string
 
+      val to_time : t -> Block_time.t
+
       val of_time_exn : Block_time.t -> t
 
       (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)

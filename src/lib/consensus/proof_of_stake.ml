@@ -1209,6 +1209,9 @@ module Data = struct
     let delay =
       UInt32.of_int @@ Configuration.acceptable_network_delay Configuration.t
 
+    (* externally, we are only interested in when the slot starts *)
+    let to_time = start_time
+
     open UInt32
     open Infix
 

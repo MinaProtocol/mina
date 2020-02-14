@@ -31,7 +31,8 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
-    ~processed_transition_writer ~only_if_present cached_breadcrumb =
+    ~processed_transition_writer ~only_if_present ~time_controller
+    ~was_internally_generated cached_breadcrumb =
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb
@@ -55,12 +56,23 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
           Deferred.unit )
     else Transition_frontier.add_breadcrumb_exn frontier breadcrumb
   in
+  ( if not was_internally_generated then
+    let transition_time =
+      External_transition.Validated.consensus_time_produced_at transition
+    in
+    let time_elapsed =
+      Block_time.diff
+        (Block_time.now time_controller)
+        (Consensus.Data.Consensus_time.to_time transition_time)
+    in
+    Coda_metrics.Block_latency.Inclusion_time.update
+      (Block_time.Span.to_time_span time_elapsed) ) ;
   Writer.write processed_transition_writer transition ;
   Catchup_scheduler.notify catchup_scheduler
     ~hash:(External_transition.Validated.state_hash transition)
 
 let process_transition ~logger ~trust_system ~verifier ~frontier
-    ~catchup_scheduler ~processed_transition_writer
+    ~catchup_scheduler ~processed_transition_writer ~time_controller
     ~transition:cached_initially_validated_transition =
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
@@ -183,7 +195,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
         Transition_frontier_controller.breadcrumbs_built_by_processor) ;
     Deferred.map ~f:Result.return
       (add_and_finalize ~logger ~frontier ~catchup_scheduler
-         ~processed_transition_writer ~only_if_present:false breadcrumb))
+         ~processed_transition_writer ~only_if_present:false ~time_controller
+         ~was_internally_generated:false breadcrumb))
 
 let run ~logger ~verifier ~trust_system ~time_controller ~frontier
     ~(primary_transition_reader :
@@ -222,10 +235,11 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
   in
   let add_and_finalize =
     add_and_finalize ~frontier ~catchup_scheduler ~processed_transition_writer
+      ~time_controller
   in
   let process_transition =
     process_transition ~logger ~trust_system ~verifier ~frontier
-      ~catchup_scheduler ~processed_transition_writer
+      ~catchup_scheduler ~processed_transition_writer ~time_controller
   in
   ignore
     (Reader.Merge.iter
@@ -259,8 +273,9 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
                            (* It could be the case that by the time we try and
                            * add the breadcrumb, it's no longer relevant when
                            * we're catching up *)
-                           ~f:(add_and_finalize ~logger ~only_if_present:true)
-                     )
+                           ~f:
+                             (add_and_finalize ~logger ~only_if_present:true
+                                ~was_internally_generated:false) )
                    with
                  | Ok () ->
                      ()
@@ -296,7 +311,8 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
                       transition_time) ;
                  let%map () =
                    match%map
-                     add_and_finalize ~logger ~only_if_present:false breadcrumb
+                     add_and_finalize ~logger ~only_if_present:false
+                       ~was_internally_generated:true breadcrumb
                    with
                    | Ok () ->
                        ()
