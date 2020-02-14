@@ -91,9 +91,6 @@ let _ =
          let payload =
            User_command_payload.create ~fee ~nonce ~valid_until ~memo ~body
          in
-         Core_kernel.eprintf
-           !"PAYLOAD: %{sexp: User_command_payload.t}\n%!"
-           payload ;
          let signature = Schnorr.sign sk payload |> signature_to_js_object in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
@@ -124,9 +121,6 @@ let _ =
          let payload =
            User_command_payload.create ~fee ~nonce ~valid_until ~memo ~body
          in
-         Core_kernel.eprintf
-           !"PAYLOAD: %{sexp: User_command_payload.t}\n%!"
-           payload ;
          let signature = Schnorr.sign sk payload |> signature_to_js_object in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js

@@ -208,26 +208,17 @@ module Schnorr
   let is_even (t : Field.t) = not (Bigint.test_bit (Bigint.of_field t) 0)
 
   let sign (d_prime : Private_key.t) m =
-    eprintf "CONSENSUS\n%!" ;
-    eprintf !"PRIVATE KEY: %{sexp: Private_key.t}\n%!" d_prime ;
     let public_key =
       (* TODO: Don't recompute this. *) Curve.scale Curve.one d_prime
     in
-    eprintf !"PUBLIC KEY: %{sexp: Public_key.t}\n%!" public_key ;
     (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
     let d = d_prime in
     let k_prime = Message.derive m ~public_key ~private_key:d in
-    eprintf !"K PRIME: %{sexp: Private_key.t}\n%!" k_prime ;
     assert (not Curve.Scalar.(equal k_prime zero)) ;
     let r, ry = Curve.(to_affine_exn (scale Curve.one k_prime)) in
-    eprintf !"R: %{sexp: Field.t} RY: %{sexp: Field.t}\n%!" r ry ;
     let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
-    eprintf "IS EVEN RY: %B\n%!" (is_even ry) ;
-    eprintf !"K: %{sexp: Private_key.t}\n%!" k ;
     let e = Message.hash m ~public_key ~r in
-    eprintf !"E: %{sexp: Curve.Scalar.t}\n%!" e ;
     let s = Curve.Scalar.(k + (e * d)) in
-    eprintf !"S: %{sexp: Curve.Scalar.t}\n%!" s ;
     (r, s)
 
   let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
@@ -352,6 +343,40 @@ let%test_unit "schnorr checked + unchecked" =
 
 [%%else]
 
+(* nonconsensus version of the functor; yes, there's some repeated code,
+   but seems difficult to abstract over the functors and signatures
+ *)
+
+module type S = sig
+  open Snark_params_nonconsensus
+
+  type curve
+
+  type curve_scalar
+
+  module Message :
+    Message_intf
+    with type curve_scalar := curve_scalar
+     and type curve := curve
+     and type field := Field.t
+
+  module Signature : sig
+    type t = Field.t * curve_scalar [@@deriving sexp]
+  end
+
+  module Private_key : sig
+    type t = curve_scalar [@@deriving sexp]
+  end
+
+  module Public_key : sig
+    type t = curve [@@deriving sexp]
+  end
+
+  val sign : Private_key.t -> Message.t -> Signature.t
+
+  val verify : Signature.t -> Public_key.t -> Message.t -> bool
+end
+
 module Schnorr
     (Impl : module type of Snark_params_nonconsensus) (Curve : sig
         open Impl
@@ -385,8 +410,11 @@ module Schnorr
     (Message : Message_intf
                with type curve := Curve.t
                 and type curve_scalar := Curve.Scalar.t
-                and type field := Impl.Field.t) =
-struct
+                and type field := Impl.Field.t) :
+  S
+  with type curve := Curve.t
+   and type curve_scalar := Curve.Scalar.t
+   and module Message := Message = struct
   module Private_key = struct
     type t = Curve.Scalar.t [@@deriving sexp]
   end
@@ -400,33 +428,23 @@ struct
   end =
     Curve
 
-  (* TODO is this correct? *)
   let is_even (t : Impl.Field.t) = not @@ Impl.Field.parity t
 
   let sign (d_prime : Private_key.t) m =
-    eprintf "NONCONSENSUS\n%!" ;
-    eprintf !"PRIVATE KEY: %{sexp: Private_key.t}\n%!" d_prime ;
     let public_key =
       (* TODO: Don't recompute this. *)
       Curve.scale Curve.one d_prime
     in
-    eprintf !"PUBLIC KEY: %{sexp: Public_key.t}\n%!" public_key ;
     (* TODO: Once we switch to implicit sign-bit we'll have to conditionally negate d_prime. *)
     let d = d_prime in
     let k_prime = Message.derive m ~public_key ~private_key:d in
-    eprintf !"K PRIME: %{sexp: Private_key.t}\n%!" k_prime ;
     assert (not Curve.Scalar.(equal k_prime zero)) ;
     let r, (ry : Impl.Field.t) =
       Curve.(to_affine_exn (scale Curve.one k_prime))
     in
-    (*    eprintf !"R: %s RY: %s\n%!" (Snark_params_nonconsensus.G1.to_string r) (Field.to_string ry); *)
     let k = if is_even ry then k_prime else Curve.Scalar.negate k_prime in
-    eprintf "IS EVEN RY: %B\n%!" (is_even ry) ;
-    eprintf !"K: %{sexp: Private_key.t}\n%!" k ;
     let e = Message.hash m ~public_key ~r in
-    eprintf !"E: %{sexp: Curve.Scalar.t}\n%!" e ;
     let s = Curve.Scalar.(k + (e * d)) in
-    eprintf !"S: %{sexp: Curve.Scalar.t}\n%!" s ;
     (r, s)
 
   let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =

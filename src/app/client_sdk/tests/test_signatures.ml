@@ -37,10 +37,6 @@ let keypair =
         "4vsRCVnc5xmYJhaVbUgkg6po6nR3Mu7KEFunP3uQL67qZmPNnJKev57TRvMfuJ15XDP8MjaLSh7THG7CpTiTkfgRcQAKGmFo1XGMStCucmWAxBUiXjycDbx7hbVCqkDYiezM8Lvr1NMdTEGU"
       |> decompress_exn)
   in
-  let fld1, fld2 = public_key in
-  eprintf
-    !"PUBLIC KEY ORIG: (x: %s, y: %s)\n%!"
-    (Field.to_string fld1) (Field.to_string fld2) ;
   Keypair.{public_key; private_key}
 
 (* payment receiver *)
@@ -92,13 +88,10 @@ let delegations =
 
 let transactions = payments @ delegations
 
-let transactions = [List.hd_exn transactions] (* TEMP *)
-
 type jsSignature = {privateKey: Field.t; publicKey: Inner_curve.Scalar.t}
 
 (* output format matches signatures in client SDK *)
 let print_signature payload =
-  eprintf !"PAYLOAD: %{sexp: User_command_payload.t}\n%!" payload ;
   let User_command.Poly.{signature= field, scalar; _} =
     (User_command.sign keypair payload :> User_command.t)
   in
