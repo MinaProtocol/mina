@@ -6,6 +6,6 @@
   name = "libp2p_helper-${version}";
   version = "0.1";
   src = ./src;
-  modSha256 = "0wrqxik9z713w50w49ivy5c2vapk07fdmd0zsvk6kfkchkq1nsdy";
+  modSha256 = "06121zifvdx7dx611ang07wjclz7wvcccvaw4kk0nrwgn6gsd1q3";
 }
 
