@@ -1564,7 +1564,7 @@ let accounts =
     ~preserve_subcommand_order:()
     [ ("list", list_accounts)
     ; ("create", create_account)
-    ; ("create-account-hardware-wallet", create_account_hardware_wallet)
+    ; ("create-hardware-wallet", create_account_hardware_wallet)
     ; ("import", import_key)
     ; ("unlock", unlock_account)
     ; ("lock", lock_account) ]
