@@ -57,7 +57,7 @@ let make = (~keyName, ~onFinish, ~finished) => {
     : <svg width="120" height="120">
         <circle
           stroke="#D8D8D8"
-          strokeWidth="4"
+          strokeWidth="7"
           fill="transparent"
           r="52"
           cx="60"
@@ -66,7 +66,7 @@ let make = (~keyName, ~onFinish, ~finished) => {
         <circle
           className=Styles.progressRingCircle
           stroke="#3CFF64"
-          strokeWidth="4"
+          strokeWidth="7"
           strokeDasharray={
             Js.Float.toString(circumference)
             ++ " "

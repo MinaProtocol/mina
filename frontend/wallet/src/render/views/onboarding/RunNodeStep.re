@@ -28,5 +28,6 @@ let make = (~prevStep, ~createAccount) => {
           />
         </div>
       </>
+    miscRight={<LoaderRing />}
   />;
 };
