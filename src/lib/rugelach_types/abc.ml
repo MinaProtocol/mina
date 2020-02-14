@@ -1,9 +1,8 @@
+type 'a t = {a: 'a; b: 'a; c: 'a} [@@deriving fields, bin_io, sexp]
+
 module H_list = Snarky.H_list
-open H_list
 
-type 'a t = {a: 'a; b: 'a; c: 'a} [@@deriving fields, bin_io]
-
-let to_hlist {a; b; c} = [a; b; c]
+let to_hlist {a; b; c} = H_list.[a; b; c]
 
 let of_hlist ([a; b; c] : (unit, _) H_list.t) = {a; b; c}
 

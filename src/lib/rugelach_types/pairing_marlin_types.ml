@@ -214,12 +214,13 @@ module Accumulator = struct
       type 'a t = ('a, N.n) Vector.t
 
       include Vector.Binable (N)
+      include Vector.Sexpable (N)
     end
 
     type 'g t =
       { shifted_accumulator: 'g
       ; unshifted_accumulators: 'g Unshifted_accumulators.t }
-    [@@deriving fields, bin_io]
+    [@@deriving fields, bin_io, sexp]
 
     let to_hlist {shifted_accumulator; unshifted_accumulators} =
       H_list.[shifted_accumulator; unshifted_accumulators]
@@ -241,6 +242,11 @@ module Accumulator = struct
     let map {shifted_accumulator; unshifted_accumulators} ~f =
       { shifted_accumulator= f shifted_accumulator
       ; unshifted_accumulators= Vector.map ~f unshifted_accumulators }
+
+    let map2 t1 t2 ~f =
+      { shifted_accumulator= f t1.shifted_accumulator t2.shifted_accumulator
+      ; unshifted_accumulators=
+          Vector.map2 ~f t1.unshifted_accumulators t2.unshifted_accumulators }
   end
 
   module Opening_check = struct
@@ -255,7 +261,7 @@ module Accumulator = struct
        e(f - [v] + z pi, H) = e(pi, beta*H)
     *)
     type 'g t = {r_f_minus_r_v_plus_rz_pi: 'g; r_pi: 'g}
-    [@@deriving fields, bin_io]
+    [@@deriving fields, bin_io, sexp]
 
     let to_hlist {r_f_minus_r_v_plus_rz_pi; r_pi} =
       H_list.[r_f_minus_r_v_plus_rz_pi; r_pi]
@@ -274,12 +280,17 @@ module Accumulator = struct
 
     let map {r_f_minus_r_v_plus_rz_pi; r_pi} ~f =
       {r_f_minus_r_v_plus_rz_pi= f r_f_minus_r_v_plus_rz_pi; r_pi= f r_pi}
+
+    let map2 t1 t2 ~f =
+      { r_f_minus_r_v_plus_rz_pi=
+          f t1.r_f_minus_r_v_plus_rz_pi t2.r_f_minus_r_v_plus_rz_pi
+      ; r_pi= f t1.r_pi t2.r_pi }
   end
 
   type 'g t =
     { opening_check: 'g Opening_check.t
     ; degree_bound_checks: 'g Degree_bound_checks.t }
-  [@@deriving fields, bin_io]
+  [@@deriving fields, bin_io, sexp]
 
   let to_hlist {opening_check; degree_bound_checks} =
     H_list.[opening_check; degree_bound_checks]
@@ -301,6 +312,12 @@ module Accumulator = struct
   let map {opening_check; degree_bound_checks} ~f =
     { opening_check= Opening_check.map ~f opening_check
     ; degree_bound_checks= Degree_bound_checks.map ~f degree_bound_checks }
+
+  let map2 t1 t2 ~f =
+    { opening_check= Opening_check.map2 ~f t1.opening_check t2.opening_check
+    ; degree_bound_checks=
+        Degree_bound_checks.map2 ~f t1.degree_bound_checks
+          t2.degree_bound_checks }
 end
 
 module Opening = struct

@@ -4,6 +4,8 @@ type _ s = S
 
 type _ t = Z : z t | S : 'n t -> 'n s t
 
+type 'a nat = 'a t
+
 let to_int : type n. n t -> int =
   let rec go : type n. int -> n t -> int =
    fun acc n -> match n with Z -> acc | S n -> go (acc + 1) n
@@ -16,16 +18,69 @@ module type Intf = sig
   val n : n t
 end
 
-module S (N : Intf) : Intf with type n = N.n s = struct
-  type n = N.n s
+module Adds = struct
+  type ('a, 'b, 'c) t =
+    | Z : (z, 'n, 'n) t
+    | S : ('a, 'b, 'c) t -> ('a s, 'b, 'c s) t
 
-  let n = S N.n
+  let rec add_zr : type n. n nat -> (n, z, n) t = function
+    | Z ->
+        Z
+    | S n ->
+        let pi = add_zr n in
+        S pi
+end
+
+module Add = struct
+  module type Intf = sig
+    type _ plus_n
+
+    type n
+
+    val eq : (n, z plus_n) Core_kernel.Type_equal.t
+
+    val n : z plus_n t
+
+    val add : 'm nat -> 'm plus_n nat * (z plus_n, 'm, 'm plus_n) Adds.t
+  end
+
+  module type Intf_transparent = sig
+    type _ plus_n
+
+    type n = z plus_n
+
+    val eq : (n, z plus_n) Core_kernel.Type_equal.t
+
+    val n : z plus_n t
+
+    val add : 'm nat -> 'm plus_n nat * (z plus_n, 'm, 'm plus_n) Adds.t
+  end
 end
 
 module N0 = struct
+  type 'a plus_n = 'a
+
   type n = z
 
   let n = Z
+
+  let add m = (m, Adds.Z)
+
+  let eq = Core_kernel.Type_equal.T
+end
+
+module S (N : Add.Intf) = struct
+  type 'a plus_n = 'a N.plus_n s
+
+  type n = z plus_n
+
+  let n = S N.n
+
+  let add m =
+    let k, pi = N.add m in
+    (S k, Adds.S pi)
+
+  let eq = match N.eq with T -> Core_kernel.Type_equal.T
 end
 
 module N1 = S (N0)
@@ -58,3 +113,35 @@ module N27 = S (N26)
 module N28 = S (N27)
 module N29 = S (N28)
 module N30 = S (N29)
+
+module Empty = struct
+  type t = T of t
+
+  let rec elim : type a. t -> a = function T t -> elim t
+end
+
+module Not = struct
+  type 'a t = 'a -> Empty.t
+end
+
+open Core_kernel
+
+let rec eq : type n m.
+       n nat
+    -> m nat
+    -> [`Equal of (n, m) Type_equal.t | `Not_equal of (n, m) Type_equal.t Not.t]
+    =
+ fun n m ->
+  match (n, m) with
+  | Z, Z ->
+      `Equal T
+  | S _, Z ->
+      `Not_equal (function _ -> .)
+  | Z, S _ ->
+      `Not_equal (function _ -> .)
+  | S n, S m -> (
+    match eq n m with
+    | `Equal T ->
+        `Equal T
+    | `Not_equal f ->
+        `Not_equal (function T -> f T) )

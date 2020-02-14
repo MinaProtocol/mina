@@ -8,7 +8,11 @@ type 'a s = 'a Nat.s
 
 type 'a nat = 'a Nat.t = Z : z nat | S : 'n nat -> 'n s nat
 
-type ('a, _) t = [] : ('a, z) t | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n s) t
+module T = struct
+  type ('a, _) t = [] : ('a, z) t | ( :: ) : 'a * ('a, 'n) t -> ('a, 'n s) t
+end
+
+include T
 
 let rec iter : type a n. (a, n) t -> f:(a -> unit) -> unit =
  fun t ~f -> match t with [] -> () | x :: xs -> f x ; iter xs ~f
@@ -30,6 +34,29 @@ let rec map2 : type a b c n.
       []
   | x :: xs, y :: ys ->
       f x y :: map2 xs ys ~f
+
+let rec head_off : type xs y n.
+       (xs, n s) Hlist.Hlist2(T).t
+    -> xs Hlist.HlistId.t * (xs, n) Hlist.Hlist2(T).t =
+ fun xss ->
+  match xss with
+  | [] ->
+      ([], [])
+  | (x :: xs) :: xss ->
+      let hds, tls = head_off xss in
+      (x :: hds, xs :: tls)
+
+let rec mapn : type xs y n.
+    (xs, n) Hlist.Hlist2(T).t -> f:(xs Hlist.HlistId.t -> y) -> (y, n) t =
+ fun xss ~f ->
+  match xss with
+  | [] :: xss ->
+      []
+  | (_ :: _) :: _ ->
+      let hds, tls = head_off xss in
+      f hds :: mapn tls ~f
+  | [] ->
+      failwith "mapn: Empty args"
 
 let zip xs ys = map2 xs ys ~f:(fun x y -> (x, y))
 
@@ -65,6 +92,13 @@ let rec fold_map : type acc a b n.
 let rec map : type a b n. (a, n) t -> f:(a -> b) -> (b, n) t =
  fun t ~f -> match t with [] -> [] | x :: xs -> f x :: map xs ~f
 
+let unzip ts = (map ts ~f:fst, map ts ~f:snd)
+
+let unzip3 ts =
+  ( map ts ~f:Core_kernel.Tuple3.get1
+  , map ts ~f:Core_kernel.Tuple3.get2
+  , map ts ~f:Core_kernel.Tuple3.get3 )
+
 type _ e = T : ('a, 'n) t -> 'a e
 
 let rec of_list : type a. a list -> a e = function
@@ -74,9 +108,22 @@ let rec of_list : type a. a list -> a e = function
       let (T xs) = of_list xs in
       T (x :: xs)
 
+let rec of_list_and_length_exn : type a n. a list -> n nat -> (a, n) t =
+ fun xs n ->
+  match (xs, n) with
+  | [], Z ->
+      []
+  | x :: xs, S n ->
+      x :: of_list_and_length_exn xs n
+  | _ ->
+      failwith "Length mismatch"
+
+let of_list_and_length xs n =
+  Core_kernel.Option.try_with (fun () -> of_list_and_length_exn xs n)
+
 let reverse (t : ('a, 'n) t) : ('a, 'n) t =
   let (T xs) = of_list (List.rev (to_list t)) in
-  (* Would need dependent typing for the length argument to be
+  (* Would need to build GADT witnesses with for the length argument to be
      correct, so we just magic. *)
   Obj.magic xs
 
@@ -99,6 +146,8 @@ let rec fold : type acc a n. (a, n) t -> f:(acc -> a -> acc) -> init:acc -> acc
   | x :: xs ->
       let acc = f init x in
       fold xs ~f ~init:acc
+
+let reduce (init :: xs) ~f = fold xs ~f ~init
 
 open Core_kernel
 
@@ -123,6 +172,13 @@ struct
           (function x :: xs -> (x, xs))
           (fun (x, xs) -> x :: xs)
           (F.pair tc tl)
+end
+
+module Sexpable (N : Nat_intf) : Sexpable.S1 with type 'a t := ('a, N.n) t =
+struct
+  let sexp_of_t f t = List.sexp_of_t f (to_list t)
+
+  let t_of_sexp f s = of_list_and_length_exn (List.t_of_sexp f s) N.n
 end
 
 module Binable (N : Nat_intf) : Binable.S1 with type 'a t := ('a, N.n) t =
@@ -234,3 +290,12 @@ let rec typ : type f var value n.
         let there [] = () in
         let back () = [] in
         transport (unit ()) ~there ~back |> transport_var ~there ~back
+
+let rec append : type n m n_m a.
+    (a, n) t -> (a, m) t -> (n, m, n_m) Nat.Adds.t -> (a, n_m) t =
+ fun t1 t2 adds ->
+  match (t1, adds) with
+  | [], Z ->
+      t2
+  | x :: t1, S adds ->
+      x :: append t1 t2 adds
