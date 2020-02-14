@@ -1,4 +1,4 @@
-open Pickles_types
+open Rugelach_types
 
 type t =
   ( G1.Affine.t

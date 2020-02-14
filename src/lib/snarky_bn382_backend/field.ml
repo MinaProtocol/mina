@@ -46,9 +46,7 @@ module type Input_intf = sig
 
   val copy : t -> t -> unit
 
-  module Vector : sig
-    include Snarky.Vector.S with type elt := t
-  end
+  module Vector : Snarky.Vector.S with type elt := t
 end
 
 module type S = sig

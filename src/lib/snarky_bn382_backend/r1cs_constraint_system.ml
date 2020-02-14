@@ -20,20 +20,24 @@ module Weight = struct
   let norm {a; b; c} = Int.(max a (max b c))
 end
 
+type 'a t =
+  { m: 'a abc
+  ; mutable constraints: int
+  ; mutable weight: Weight.t
+  ; mutable public_input_size: int
+  ; mutable auxiliary_input_size: int }
+
 module Make
     (Fp : Field.S)
     (Mat : Constraint_matrix_intf with module Field := Fp) =
 struct
   open Core
 
-  type t =
-    { m: Mat.t abc
-    ; mutable weight: Weight.t
-    ; mutable public_input_size: int
-    ; mutable auxiliary_input_size: int }
+  type nonrec t = Mat.t t
 
   let create () =
     { public_input_size= 0
+    ; constraints= 0
     ; auxiliary_input_size= 0
     ; weight= {a= 0; b= 0; c= 0}
     ; m= {a= Mat.create (); b= Mat.create (); c= Mat.create ()} }
@@ -169,7 +173,10 @@ struct
           Fp.Vector.emplace_back coeffs x ) ;
       Mat.append_row m indices coeffs
     in
-    append t.m.a a ; append t.m.b b ; append t.m.c c
+    t.constraints <- t.constraints + 1 ;
+    append t.m.a a ;
+    append t.m.b b ;
+    append t.m.c c
 
   let add_constraint ?label:_ t
       (constr : Fp.t Snarky.Cvar.t Snarky.Constraint.basic) =
