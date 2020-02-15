@@ -26,4 +26,14 @@ RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/ap
   && apt-get update \
   && apt-get install --force-yes coda-testnet-postake-medium-curves=$coda_version -y
 
-ENTRYPOINT ["/usr/bin/dumb-init", "coda" ]
+RUN echo '#!/bin/bash\n\
+mkdir -p .coda-config\n\
+touch .coda-config/coda-prover.log\n\
+touch .coda-config/coda-verifier.log\n\
+coda "$@" 2>&1 >coda.log &\n\
+tail -q -f coda.log -f .coda-config/coda-prover.log -f .coda-config/coda-verifier.log'\
+> init_coda.sh
+
+RUN chmod +x init_coda.sh
+
+ENTRYPOINT ["/usr/bin/dumb-init", "/init_coda.sh"]
