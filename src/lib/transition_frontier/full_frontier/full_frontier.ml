@@ -510,8 +510,9 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
       ~local_state:t.consensus_local_state
     |> Option.is_none
   in
-  let new_root =
-    List.fold diffs ~init:None ~f:(fun prev_root (Diff.Full.E.E diff) ->
+  let new_root, _diffs_with_mutants =
+    List.fold diffs ~init:(None, [])
+      ~f:(fun (prev_root, diffs_with_mutant) (Diff.Full.E.E diff) ->
         let mutant, new_root =
           apply_diff t diff ~ignore_consensus_local_state
         in
@@ -519,9 +520,11 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
         update_metrics_with_diff t diff ;
         match new_root with
         | None ->
-            prev_root
+            ( prev_root
+            , Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutant )
         | Some state_hash ->
-            Some {state_hash; frontier_hash= t.hash} )
+            ( Some {state_hash; frontier_hash= t.hash}
+            , Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutant ) )
   in
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
     "Reached state %s after applying diffs to full frontier"
