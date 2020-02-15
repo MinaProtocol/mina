@@ -536,6 +536,14 @@ let best_path t =
     Transition_frontier.(root tf |> Breadcrumb.state_hash)
     (Transition_frontier.hash_path tf bt)
 
+let best_tip_path t =
+  let open Option.Let_syntax in
+  let%map frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  Transition_frontier.root frontier
+  :: Transition_frontier.best_tip_path frontier
+
 let request_work t =
   let open Option.Let_syntax in
   let (module Work_selection_method) = t.config.work_selection_method in
