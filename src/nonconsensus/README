@@ -1,4 +1,4 @@
-The subdirectories of this directory, src/lib/nonconsensus/, contain
+The subdirectories of this directory, src/nonconsensus/, contain
 symlinks to files in the corresponding directories in /src/lib/, so
 that there's just one instance of each such file. Some of the
 subdirectories may contain symlinks to fewer files than actual files
