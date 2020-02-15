@@ -144,7 +144,7 @@ jobs:
                   command: ./scripts/compare_pr_diff_types.sh
     compare-test-signatures:
         docker:
-            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
+            - image: codaprotocol/coda:toolchain-cf3d5dc87c195afd8eec14a2c4eaf9980004ee26
         steps:
             - checkout
             - run:
@@ -308,7 +308,7 @@ jobs:
     build-client-sdk:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
+            - image: codaprotocol/coda:toolchain-cf3d5dc87c195afd8eec14a2c4eaf9980004ee26
         steps:
             - checkout
             - run:
@@ -488,7 +488,7 @@ jobs:
     test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9
+            - image: codaprotocol/coda:toolchain-cf3d5dc87c195afd8eec14a2c4eaf9980004ee26
         steps:
             - checkout
             - run: ulimit -c unlimited
