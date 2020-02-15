@@ -6,6 +6,9 @@ open Prometheus
 open Namespace
 open Metric_generators
 
+[%%inject
+"block_window_duration", block_window_duration]
+
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
   let re_unquoted_escapes = Re.compile @@ Re.set "\\\n"
@@ -435,9 +438,6 @@ module Scan_state_metrics = struct
     [%%inject
     "tps_goal_x10", scan_state_tps_goal_x10]
 
-    [%%inject
-    "block_window_duration", block_window_duration]
-
     let max_coinbases = 2
 
     (* block_window_duration is in milliseconds, so divide by 1000
@@ -695,14 +695,17 @@ module Block_latency = struct
   let subsystem = "Block_latency"
 
   module Latency_time_spec = struct
-    let tick_interval = Core.Time.Span.of_min (block_window_duration / 2)
+    let tick_interval =
+      Core.Time.Span.of_min (Int.to_float (block_window_duration / 2))
 
-    let rolling_interval = Core.Time.Span.of_min (block_window_duration * 20)
+    let rolling_interval =
+      Core.Time.Span.of_min (Int.to_float (block_window_duration * 20))
   end
 
   module Gossip_slots =
     Moving_bucketed_average (struct
-        let bucket_interval = Core.Time.Span.of_ms (block_window_duration / 2)
+        let bucket_interval =
+          Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
 
         let num_buckets = 40
 
