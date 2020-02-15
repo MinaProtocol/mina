@@ -30,6 +30,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     libssl-dev \
     lsb \
     m4 \
+    nodejs \
     pandoc \
     patchelf \
     python \
