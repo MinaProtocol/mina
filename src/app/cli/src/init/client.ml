@@ -1199,7 +1199,9 @@ let import_key =
   let flags = Args.zip2 privkey_path conf_dir in
   Command.async
     ~summary:
-      "Import a password protected private key to be tracked by the daemon."
+      "Import a password protected private key to be tracked by the daemon.\n\
+       Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
+       (key will be imported using the same password)."
     (Cli_lib.Background_daemon.graphql_init flags
        ~f:(fun graphql_endpoint (privkey_path, conf_dir) ->
          let open Deferred.Let_syntax in
