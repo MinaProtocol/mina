@@ -55,7 +55,9 @@ val request_work : t -> Snark_worker.Work.Spec.t option
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
-val add_work : t -> Snark_worker.Work.Result.t -> unit Deferred.t
+val add_work : t -> Snark_worker.Work.Result.t -> unit
+
+val add_transactions : t -> User_command.t list -> unit
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 

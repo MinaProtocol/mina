@@ -31,8 +31,8 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
-    ~processed_transition_writer ~only_if_present ~time_controller
-    ~was_internally_generated cached_breadcrumb =
+    ~processed_transition_writer ~only_if_present ~time_controller ~source
+    cached_breadcrumb =
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb
@@ -56,18 +56,22 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
           Deferred.unit )
     else Transition_frontier.add_breadcrumb_exn frontier breadcrumb
   in
-  ( if not was_internally_generated then
-    let transition_time =
-      External_transition.Validated.consensus_time_produced_at transition
-    in
-    let time_elapsed =
-      Block_time.diff
-        (Block_time.now time_controller)
-        (Consensus.Data.Consensus_time.to_time transition_time)
-    in
-    Coda_metrics.Block_latency.Inclusion_time.update
-      (Block_time.Span.to_time_span time_elapsed) ) ;
-  Writer.write processed_transition_writer transition ;
+  ( match source with
+  | `Internal ->
+      ()
+  | _ ->
+      let transition_time =
+        External_transition.Validated.consensus_time_produced_at transition
+      in
+      let time_elapsed =
+        Block_time.diff
+          (Block_time.now time_controller)
+          (Consensus.Data.Consensus_time.to_time transition_time)
+      in
+      Coda_metrics.Block_latency.Inclusion_time.update
+        (Block_time.Span.to_time_span time_elapsed) ) ;
+  Writer.write processed_transition_writer
+    (`Transition transition, `Source source) ;
   Catchup_scheduler.notify catchup_scheduler
     ~hash:(External_transition.Validated.state_hash transition)
 
@@ -196,7 +200,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
     Deferred.map ~f:Result.return
       (add_and_finalize ~logger ~frontier ~catchup_scheduler
          ~processed_transition_writer ~only_if_present:false ~time_controller
-         ~was_internally_generated:false breadcrumb))
+         ~source:`Gossip breadcrumb))
 
 let run ~logger ~verifier ~trust_system ~time_controller ~frontier
     ~(primary_transition_reader :
@@ -275,7 +279,7 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
                            * we're catching up *)
                            ~f:
                              (add_and_finalize ~logger ~only_if_present:true
-                                ~was_internally_generated:false) )
+                                ~source:`Catchup) )
                    with
                  | Ok () ->
                      ()
@@ -312,7 +316,7 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
                  let%map () =
                    match%map
                      add_and_finalize ~logger ~only_if_present:false
-                       ~was_internally_generated:true breadcrumb
+                       ~source:`Internal breadcrumb
                    with
                    | Ok () ->
                        ()
@@ -408,7 +412,9 @@ let%test_module "Transition_handler.Processor tests" =
                     time_controller
                     (Strict_pipe.Reader.fold_until processed_transition_reader
                        ~init:branch
-                       ~f:(fun remaining_breadcrumbs newly_added_transition ->
+                       ~f:(fun remaining_breadcrumbs
+                          (`Transition newly_added_transition, _)
+                          ->
                          Deferred.return
                            ( match remaining_breadcrumbs with
                            | next_expected_breadcrumb :: tail ->
