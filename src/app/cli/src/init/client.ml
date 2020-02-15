@@ -1266,7 +1266,7 @@ let list_accounts =
                    \  Locked: %b\n"
                    (i + 1)
                    (Public_key.Compressed.to_base58_check w#public_key)
-                   (Unsigned.UInt64.to_string (w#balance)#total)
+                   (Currency.Balance.to_formatted_string (w#balance)#total)
                    (Option.value ~default:true w#locked) ) ))
 
 let create_account =
