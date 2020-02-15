@@ -1,19 +1,19 @@
-let coda = require("../../../../_build/default/src/app/client_sdk/client_sdk.bc.js").codaSDK;
+var coda = require("../../../../_build/default/src/app/client_sdk/client_sdk.bc.js").codaSDK;
 
-let keypair = {
+var keypair = {
   privateKey:
     "6BnSDyt3FKhJSt5oDk1HHeM5J8uKSnp7eaSYndj53y7g7oYzUEhHFrkpk6po4XfNFyjtoJK4ovVHvmCgdUqXVEfTXoAC1CNpaGLAKtu7ah9i4dTi3FtcoKpZhtiTGrRQkEN6Q95cb39Kp",
   publicKey:
     "4vsRCVnc5xmYJhaVbUgkg6po6nR3Mu7KEFunP3uQL67qZmPNnJKev57TRvMfuJ15XDP8MjaLSh7THG7CpTiTkfgRcQAKGmFo1XGMStCucmWAxBUiXjycDbx7hbVCqkDYiezM8Lvr1NMdTEGU",
 };
 
-let receiver =
+var receiver =
   "4vsRCVHzeYYbneMkHR3u445f8zYwo6nhx3UHKZQH7B2txTV5Shz66Ds9PdxoRKCiALWtuwPQDwpm2Kj22QPcZpKCLr6rnHmUMztKpWxL9meCPQcTkKhmK5HyM4Y9dMnTKrEjD1MX71kLTUaP";
 
-let newDelegate =
+var newDelegate =
   "4vsRCVQNkGihARy4Jg9FsJ6NFtnwDsRnTqi2gQnPAoCNUoyLveY6FEnicGMmwEumPx3GjLxAb5fAivVSLnYRPPMfb5HdkhLdjHunjgqp6g7gYi8cWy4avdmHMRomaKkWyWeWn91w7baaFnUk";
 
-let payments = [
+var payments = [
     {
       paymentPayload: {receiver, amount: "42"},
       common: {fee: "3", nonce: "200", validUntil:"10000", memo: "this is a memo"},
@@ -28,7 +28,7 @@ let payments = [
     },
   ];
 
-let delegations = [
+var delegations = [
     {
       newDelegate,
       common: {fee: "3", nonce: "10", validUntil:"4000", memo: "more delegates, more fun"},
@@ -43,7 +43,7 @@ let delegations = [
     },
   ];
 
-let printSignature = s => console.log(`  { field: '${s.field}'\n  , scalar: '${s.scalar}'\n  },`);
+var printSignature = s => console.log(`  { field: '${s.field}'\n  , scalar: '${s.scalar}'\n  },`);
 
 console.log("[");
 payments.forEach(t => printSignature(coda.signPayment(keypair.privateKey, t).signature));
