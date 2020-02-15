@@ -486,7 +486,7 @@ let%test_module "Ledger_catchup tests" =
       (* TODO: expose Strict_pipe.read *)
       let%map cached_catchup_breadcrumbs =
         Block_time.Timeout.await_exn time_controller
-          ~timeout_duration:(Block_time.Span.of_ms 15000L)
+          ~timeout_duration:(Block_time.Span.of_ms 30000L)
           ( match%map Strict_pipe.Reader.read breadcrumbs_reader with
           | `Eof ->
               failwith "unexpected EOF"
