@@ -68,7 +68,7 @@ end = struct
 
   let precision = 9
 
-  let precision_exp = Unsigned.of_int 1_000_000_000
+  let precision_exp = Unsigned.of_int @@ Int.pow 10 precision
 
   let to_formatted_string amount =
     let whole = Unsigned.div amount precision_exp in
@@ -82,15 +82,13 @@ end = struct
         of_string (whole ^ String.make precision '0')
     | [whole; decimal] ->
         let decimal_length = String.length decimal in
-        if
-          let open Int in
-          decimal_length > precision
-        then of_string (whole ^ String.sub decimal ~pos:0 ~len:precision)
+        if Int.(decimal_length > precision) then
+          of_string (whole ^ String.sub decimal ~pos:0 ~len:precision)
         else
           of_string
-            (whole ^ decimal ^ String.make (precision - decimal_length) '0')
+            (whole ^ decimal ^ String.make Int.(precision - decimal_length) '0')
     | [] | _ ->
-        failwith "Invalid currency input"
+        failwith "Currency.of_formatted_string: Invalid currency input"
 
   let gen_incl a b : t Quickcheck.Generator.t =
     let a = Bignum_bigint.of_string Unsigned.(to_string a) in
@@ -423,6 +421,24 @@ end = struct
               expect_failure
                 (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
                 (var_of_t x + var_of_t y) )
+
+        let%test_unit "formatting_roundtrip" =
+          let generator = gen_incl Unsigned.zero Unsigned.max_int in
+          qc_test_fast generator ~f:(fun num ->
+              match of_formatted_string (to_formatted_string num) with
+              | after_format ->
+                  if after_format = num then ()
+                  else
+                    Error.(
+                      raise
+                        (of_string (sprintf !"formatting: num=%{Unsigned}" num)))
+              | exception e ->
+                  let err = Error.of_exn e in
+                  Error.(
+                    raise
+                      (tag
+                         ~tag:(sprintf !"formatting: num=%{Unsigned}" num)
+                         err)) )
       end )
   end
 
