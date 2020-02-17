@@ -2,6 +2,7 @@
 !src/opam.export
 !coda.deb
 !coda-discovery.deb
+!scripts/run-demo.sh
 !src/external/**/*
 !src/app/libp2p_helper
 !src/app/trace-tool
