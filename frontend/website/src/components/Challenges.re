@@ -38,11 +38,11 @@ let fetchArray = endpoint => {
 let fetchTestnet = uri =>
   fetchArray(uri)
   |> Promise.map(Array.map(parseTestnet))
-  |> Promise.map(a => {
+  |> Promise.map(a =>
        Array.to_list(a)
        |> List.find_opt(t => t.is_active)
        |> Option.map(t => t.name)
-     });
+     );
 
 let fetchChallenges = uri =>
   Promise.map(Array.map(parseChallenge), fetchArray(uri));
@@ -61,11 +61,6 @@ module Styles = {
   open Css;
   let weekHeader =
     merge([Theme.H2.basic, style([padding2(~v=`rem(1.), ~h=`zero)])]);
-  let header =
-    merge([
-      Theme.H4.wide,
-      style([textAlign(`left), fontSize(`rem(1.)), fontWeight(`light)]),
-    ]);
 };
 
 let renderChallenges = (challenges: array(challenge)) => {
