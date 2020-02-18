@@ -14,6 +14,7 @@ open Coda_state
 open Cache_lib
 open O1trace
 open Coda_transition
+open Network_peer
 module Transition_frontier_validation =
   External_transition.Transition_frontier_validation (Transition_frontier)
 
@@ -30,7 +31,7 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
-    ~processed_transition_writer ~only_if_present cached_breadcrumb =
+    ~processed_transition_writer ~only_if_present ~source cached_breadcrumb =
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb
@@ -54,7 +55,8 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
           Deferred.unit )
     else Transition_frontier.add_breadcrumb_exn frontier breadcrumb
   in
-  Writer.write processed_transition_writer transition ;
+  Writer.write processed_transition_writer
+    (`Transition transition, `Source source) ;
   Catchup_scheduler.notify catchup_scheduler
     ~hash:(External_transition.Validated.state_hash transition)
 
@@ -182,7 +184,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
         Transition_frontier_controller.breadcrumbs_built_by_processor) ;
     Deferred.map ~f:Result.return
       (add_and_finalize ~logger ~frontier ~catchup_scheduler
-         ~processed_transition_writer ~only_if_present:false breadcrumb))
+         ~processed_transition_writer ~only_if_present:false ~source:`Gossip
+         breadcrumb))
 
 let run ~logger ~verifier ~trust_system ~time_controller ~frontier
     ~(primary_transition_reader :
@@ -258,8 +261,9 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
                            (* It could be the case that by the time we try and
                            * add the breadcrumb, it's no longer relevant when
                            * we're catching up *)
-                           ~f:(add_and_finalize ~logger ~only_if_present:true)
-                     )
+                           ~f:
+                             (add_and_finalize ~logger ~only_if_present:true
+                                ~source:`Catchup) )
                    with
                  | Ok () ->
                      ()
@@ -295,7 +299,8 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
                       transition_time) ;
                  let%map () =
                    match%map
-                     add_and_finalize ~logger ~only_if_present:false breadcrumb
+                     add_and_finalize ~logger ~only_if_present:false
+                       ~source:`Internal breadcrumb
                    with
                    | Ok () ->
                        ()
@@ -391,7 +396,9 @@ let%test_module "Transition_handler.Processor tests" =
                     time_controller
                     (Strict_pipe.Reader.fold_until processed_transition_reader
                        ~init:branch
-                       ~f:(fun remaining_breadcrumbs newly_added_transition ->
+                       ~f:(fun remaining_breadcrumbs
+                          (`Transition newly_added_transition, _)
+                          ->
                          Deferred.return
                            ( match remaining_breadcrumbs with
                            | next_expected_breadcrumb :: tail ->

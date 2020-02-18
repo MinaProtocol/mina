@@ -55,7 +55,9 @@ val request_work : t -> Snark_worker.Work.Spec.t option
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
-val add_work : t -> Snark_worker.Work.Result.t -> unit Deferred.t
+val add_work : t -> Snark_worker.Work.Result.t -> unit
+
+val add_transactions : t -> User_command.t list -> unit
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
@@ -71,9 +73,9 @@ val sync_status : t -> Sync_status.t Coda_incremental.Status.Observer.t
 
 val visualize_frontier : filename:string -> t -> unit Participating_state.t
 
-val peers : t -> Network_peer.Peer.t list
+val peers : t -> Network_peer.Peer.t list Deferred.t
 
-val initial_peers : t -> Host_and_port.t list
+val initial_peers : t -> Coda_net2.Multiaddr.t list
 
 val client_port : t -> int
 

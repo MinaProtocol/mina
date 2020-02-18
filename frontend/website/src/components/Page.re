@@ -94,7 +94,10 @@ module Footer = {
             <Link link="/jobs" name="hiring">
               {React.string("We're Hiring")}
             </Link>
-            <Link link="/static/presskit.zip" name="presskit" last=true>
+            <Link
+              link="https://s3.us-east-2.amazonaws.com/static.o1test.net/presskit.zip"
+              name="presskit"
+              last=true>
               {React.string("Press Kit")}
             </Link>
           </ul>

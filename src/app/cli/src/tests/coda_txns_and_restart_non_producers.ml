@@ -7,22 +7,19 @@ let name = "coda-txns-and-restart-non-producers"
 let main () =
   let wait_time = Time.Span.of_min 2. in
   let logger = Logger.create () in
+  let accounts = Lazy.force Test_genesis_ledger.accounts in
   let snark_work_public_keys =
-    Fn.const
-    @@ Some
-         ( List.nth_exn Test_genesis_ledger.accounts 5
-         |> snd |> Account.public_key )
+    Fn.const @@ Some (List.nth_exn accounts 5 |> snd |> Account.public_key)
   in
   let producers n = if n < 3 then Some n else None in
   let%bind testnet =
-    Coda_worker_testnet.test logger 5 producers snark_work_public_keys
+    Coda_worker_testnet.test ~name logger 5 producers snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in
   (* send txns *)
   let keypairs =
-    List.map Test_genesis_ledger.accounts
-      ~f:Test_genesis_ledger.keypair_of_account_record_exn
+    List.map accounts ~f:Test_genesis_ledger.keypair_of_account_record_exn
   in
   let%bind () = after wait_time in
   Coda_worker_testnet.Payments.send_several_payments testnet ~node:0 ~keypairs

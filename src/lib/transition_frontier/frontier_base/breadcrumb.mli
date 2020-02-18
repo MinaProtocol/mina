@@ -9,6 +9,7 @@ open Signature_lib
 open Coda_base
 open Coda_state
 open Coda_transition
+open Network_peer
 
 type t [@@deriving sexp, eq, compare, to_yojson]
 

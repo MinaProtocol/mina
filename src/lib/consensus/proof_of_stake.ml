@@ -2408,7 +2408,7 @@ module Hooks = struct
         Deferred.create (fun ivar ->
             Logger.info logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
-                [ ("peer", `String (Host_and_port.to_string conn))
+                [ ("peer", Network_peer.Peer.to_yojson conn)
                 ; ("ledger_hash", Coda_base.Ledger_hash.to_yojson ledger_hash)
                 ]
               "Serving epoch ledger query with hash $ledger_hash from $peer" ;
@@ -2433,7 +2433,7 @@ module Hooks = struct
             Result.iter_error response ~f:(fun err ->
                 Logger.info logger ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
-                    [ ("peer", `String (Host_and_port.to_string conn))
+                    [ ("peer", Network_peer.Peer.to_yojson conn)
                     ; ("error", `String err)
                     ; ( "ledger_hash"
                       , Coda_base.Ledger_hash.to_yojson ledger_hash ) ]
@@ -2454,7 +2454,7 @@ module Hooks = struct
     type query =
       { query:
           'q 'r.    Network_peer.Peer.t -> ('q, 'r) rpc -> 'q
-          -> 'r Deferred.Or_error.t }
+          -> 'r Coda_base.Rpc_intf.rpc_response Deferred.t }
 
     let implementation_of_rpc : type q r.
         (q, r) rpc -> (q, r) rpc_implementation = function
@@ -2614,12 +2614,13 @@ module Hooks = struct
           } ;
         return true )
       else
-        Deferred.List.exists (random_peers 3) ~f:(fun peer ->
+        let%bind peers = random_peers 3 in
+        Deferred.List.exists peers ~f:(fun peer ->
             match%bind
               query_peer.query peer Rpcs.Get_epoch_ledger
                 (Coda_base.Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
             with
-            | Ok (Ok snapshot_ledger) ->
+            | Connected {data= Ok (Ok snapshot_ledger); _} ->
                 let%bind () =
                   Trust_system.(
                     record trust_system logger peer.host
@@ -2633,8 +2634,8 @@ module Hooks = struct
                 set_snapshot local_state snapshot_id
                   {ledger= snapshot_ledger; delegatee_table} ;
                 return true
-            (* TODO figure out punishments here. *)
-            | Ok (Error err) ->
+            | Connected {data= Ok (Error err); _} ->
+                (* TODO figure out punishments here. *)
                 Logger.faulty_peer_without_punishment logger
                   ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
@@ -2642,13 +2643,21 @@ module Hooks = struct
                     ; ("error", `String err) ]
                   "Peer $peer failed to serve requested epoch ledger: $error" ;
                 return false
-            | Error err ->
+            | Connected {data= Error err; _} ->
+                Logger.faulty_peer_without_punishment logger
+                  ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:
+                    [ ("peer", Network_peer.Peer.to_yojson peer)
+                    ; ("error", `String (Error.to_string_mach err)) ]
+                  "Peer $peer failed to serve requested epoch ledger: $error" ;
+                return false
+            | Failed_to_connect err ->
                 Logger.faulty_peer_without_punishment logger
                   ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
                     [ ("peer", Network_peer.Peer.to_yojson peer)
                     ; ("error", `String (Error.to_string_hum err)) ]
-                  "Error when querying peer $peer for epoch ledger: $error" ;
+                  "Failed to connect to $peer to retrieve epoch ledger: $error" ;
                 return false )
     in
     if%map Deferred.List.for_all requested_syncs ~f:sync then Ok ()

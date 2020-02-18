@@ -24,6 +24,7 @@ import (
 	secio "github.com/libp2p/go-libp2p-secio"
 	p2pconfig "github.com/libp2p/go-libp2p/config"
 	mdns "github.com/libp2p/go-libp2p/p2p/discovery"
+	filters "github.com/libp2p/go-maddr-filter"
 	tcp "github.com/libp2p/go-tcp-transport"
 	ws "github.com/libp2p/go-ws-transport"
 	ma "github.com/multiformats/go-multiaddr"
@@ -38,9 +39,11 @@ type Helper struct {
 	Ctx             context.Context
 	Pubsub          *pubsub.PubSub
 	Logger          logging.EventLogger
+	Filters         *filters.Filters
 	DiscoveredPeers chan peer.AddrInfo
 	Rendezvous      string
 	Discovery       *discovery.RoutingDiscovery
+	Me              peer.ID
 }
 
 type customValidator struct {
@@ -62,6 +65,12 @@ func (cv customValidator) Select(key string, values [][]byte) (int, error) {
 // MakeHelper does all the initialization to run one host
 func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Multiaddr, statedir string, pk crypto.PrivKey, networkID string) (*Helper, error) {
 	logger := logging.Logger("codanet.Helper")
+
+	me, err := peer.IDFromPrivateKey(pk)
+	if err != nil {
+		return nil, err
+	}
+
 	dso := dsb.DefaultOptions
 
 	ds, err := dsb.NewDatastore(path.Join(statedir, "libp2p-peerstore-v0"), &dso)
@@ -93,6 +102,8 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 	// gross hack to exfiltrate the DHT from the side effect of option evaluation
 	kadch := make(chan *kad.IpfsDHT)
 
+	filters := filters.NewFilters()
+
 	// Make sure this doesn't get too out of sync with the defaults,
 	// NewWithoutDefaults is considered unstable.
 	host, err := p2p.NewWithoutDefaults(ctx,
@@ -108,6 +119,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 			as = append(as, externalAddr)
 			return as
 		}),
+		p2p.Filters(filters),
 		p2p.NATPortMap(),
 		p2p.Routing(
 			p2pconfig.RoutingC(func(host host.Host) (routing.PeerRouting, error) {
@@ -138,6 +150,8 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		Logger:          logger,
 		DiscoveredPeers: nil,
 		Rendezvous:      rendezvousString,
+		Filters:         filters,
 		Discovery:       nil,
+		Me:              me,
 	}, nil
 }

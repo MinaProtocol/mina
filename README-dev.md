@@ -59,7 +59,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-54430467ba429af285ea937d1c1da7d4b4cbde3e`
+`docker pull codaprotocol/coda:toolchain-cf3d5dc87c195afd8eec14a2c4eaf9980004ee26`
 
 * Create local builder image
 
@@ -128,12 +128,12 @@ You should probably use `USEDOCKER=TRUE` unless you've done the [building withou
 
 These are the most important `make` targets:
 
-* `libp2p_helper`: build the libp2p helper
 * `build`: build everything
 * `docker`: build the container
 * `container`: restart the development container (or start it if it's not yet)
 * `dev`: does `docker`, `container`, and `build`
 * `test`: run the tests
+* `libp2p_helper`: build the libp2p helper
 * `web`: build the website, including the state explorer
 
 We use the [dune](https://github.com/ocaml/dune/) buildsystem for our OCaml code.
@@ -155,7 +155,8 @@ with `dune`, so you need to add them manually, by running `scripts/pin-external-
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,
 which are installed using `apt` in the dockerfiles, the libraries for RocksDB are
-installed via the script `src/external/ocaml-rocksdb/install_rocksdb.sh`.
+automatically installed when building Coda via a `dune` rule in the library
+ocaml-rocksdb.
 
 ## Steps for adding a new dependency
 

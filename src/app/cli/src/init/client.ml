@@ -867,11 +867,7 @@ let dump_keypair =
     Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
-    let%map kp =
-      Secrets.Keypair.read_exn ~privkey_path
-        ~password:
-          (lazy (Secrets.Password.read "Password for private key file: "))
-    in
+    let%map kp = Secrets.Keypair.Terminal_stdin.read_exn privkey_path in
     printf "Public key: %s\nPrivate key: %s\n"
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check )
@@ -1278,7 +1274,8 @@ let create_account =
     (Cli_lib.Background_daemon.graphql_init (return ())
        ~f:(fun graphql_endpoint () ->
          let%bind password =
-           Secrets.Keypair.prompt_password "Password for new account: "
+           Secrets.Keypair.Terminal_stdin.prompt_password
+             "Password for new account: "
          in
          let%map response =
            Graphql_client.query_exn
@@ -1305,7 +1302,8 @@ let unlock_account =
            let open Deferred.Or_error.Let_syntax in
            let%map password =
              Deferred.map ~f:Or_error.return
-               (Secrets.Password.read "Password to unlock account: ")
+               (Secrets.Password.hidden_line_or_env
+                  "Password to unlock account: " ~env:Secrets.Keypair.env)
            in
            password
          in
@@ -1353,30 +1351,31 @@ let lock_account =
 
 let generate_libp2p_keypair =
   Command.async
-    ~summary:
-      "Generate a new libp2p keypair and print it out (this contains the \
-       secret key!)"
-    (Command.Param.return
-       ( Cli_lib.Exceptions.handle_nicely
-       @@ fun () ->
-       Deferred.ignore
-         (let open Deferred.Let_syntax in
-         (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
-         let logger = Logger.null () in
-         (* Using the helper only for keypair generation requires no state. *)
-         File_system.with_temp_dir "coda-generate-libp2p-keypair"
-           ~f:(fun tmpd ->
-             match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
-             | Ok net ->
-                 let%bind me = Coda_net2.Keypair.random net in
-                 let%map () = Coda_net2.shutdown net in
-                 printf "libp2p keypair:\n%s\n"
-                   (Coda_net2.Keypair.to_string me)
-             | Error e ->
-                 Logger.fatal logger "failed to generate libp2p keypair: $err"
-                   ~module_:__MODULE__ ~location:__LOC__
-                   ~metadata:[("err", `String (Error.to_string_hum e))] ;
-                 exit 20 )) ))
+    ~summary:"Generate a new libp2p keypair and print out the peer ID"
+    (let open Command.Let_syntax in
+    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
+    Cli_lib.Exceptions.handle_nicely
+    @@ fun () ->
+    Deferred.ignore
+      (let open Deferred.Let_syntax in
+      (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
+      let logger = Logger.null () in
+      (* Using the helper only for keypair generation requires no state. *)
+      File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
+          match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
+          | Ok net ->
+              let%bind me = Coda_net2.Keypair.random net in
+              let%bind () = Coda_net2.shutdown net in
+              let%map () =
+                Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path
+                  me
+              in
+              printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
+          | Error e ->
+              Logger.fatal logger "failed to generate libp2p keypair: $err"
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("err", `String (Error.to_string_hum e))] ;
+              exit 20 )))
 
 let trustlist_ip_flag =
   Command.Param.(
@@ -1434,6 +1433,13 @@ let trustlist_list =
          | Error e ->
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
+
+let compile_time_constants =
+  Command.basic
+    ~summary:"Print a JSON map of the compile-time consensus parameters"
+    (Command.Param.return (fun () ->
+         Core.printf "%s\n%!"
+           (Yojson.Safe.to_string Consensus.Constants.all_constants) ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -1547,4 +1553,5 @@ let advanced =
     ; ("unsafe-import", unsafe_import)
     ; ("import", import_key)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
+    ; ("compile-time-constants", compile_time_constants)
     ; ("visualization", Visualization.command_group) ]
