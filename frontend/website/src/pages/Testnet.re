@@ -252,7 +252,7 @@ module Section = {
 };
 
 [@react.component]
-let make = (~challenges, ~testnetName) => {
+let make = (~challenges as _, ~testnetName as _) => {
   let (expanded, setExpanded) = React.useState(() => false);
   <Page title="Coda Testnet">
     <Wrapped>
@@ -343,7 +343,7 @@ let make = (~challenges, ~testnetName) => {
             </h1>
             // href="https://testnet-points-frontend-dot-o1labs-192920.appspot.com/"
             <a
-              href="https://docs.google.com/spreadsheets/d/1FlRe-RqPqla9iUQuX0McSbgM7Io7Y5LmvJDieQWgpDk"
+              href="http://bit.ly/TestnetBetaLeaderboard"
               target="_blank"
               className=Styles.headerLink>
               {React.string({j|View Full Leaderboard\u00A0→|j})}
@@ -364,7 +364,67 @@ let make = (~challenges, ~testnetName) => {
                    " is to recognize Coda community members who are actively involved in the network. There will be regular challenges to make it fun, interesting, and foster some friendly competition! Points can be won in several ways like being first to complete a challenge, contributing code to Coda, or being an excellent community member and helping others out.",
                  )}
               </p>
-              <Challenges challenges testnetName />
+              // <Challenges challenges testnetName />
+              // Temporarily hardcode the following message instead of the "Challenge" component
+              <h4> {React.string("Genesis Token Program")} </h4>
+              <p className=Styles.markdownStyles>
+                {React.string(
+                   "By completing challenges on testnet, you're preparing to become the first block producers upon mainnet launch. You're demonstrating that you have the skills and know-how to operate the Coda Protocol, the main purpose of ",
+                 )}
+                <a href="http://codaprotocol.com/genesis">
+                  {React.string("Genesis")}
+                </a>
+                {React.string(".")}
+              </p>
+              <h4> {React.string("Testnet Challenges")} </h4>
+              <p className=Styles.markdownStyles>
+                {React.string(
+                   "Learn how to operate the protocol, while contributing to Coda's network resilience. There are different ways for everyone to be involved. There are three categories of testnet challenges to earn testnet points",
+                 )}
+                <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
+                  {React.string("*")}
+                </a>
+                {React.string(".")}
+              </p>
+              <ul className=Styles.markdownStyles>
+                <li>
+                  {React.string("Entry level challenges (up to 1000 pts")}
+                  <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
+                    {React.string("*")}
+                  </a>
+                  {React.string(") per challenge.")}
+                </li>
+                <li>
+                  {React.string(
+                     "Challenges for people who want to try out more features of the succinct blockchain (up to 4000 pts",
+                   )}
+                  <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
+                    {React.string("*")}
+                  </a>
+                  {React.string(") per challenge.")}
+                </li>
+                <li>
+                  {React.string(
+                     "Community challenges which require no technical skills (win Community MVP and up to 4000 pts",
+                   )}
+                  <a href="#disclaimer" onClick={_ => setExpanded(_ => true)}>
+                    {React.string("*")}
+                  </a>
+                  {React.string(") per challenge.")}
+                </li>
+              </ul>
+              <p className=Styles.markdownStyles>
+                {React.string("Check out all challenges ")}
+                <a
+                  href="https://forums.codaprotocol.com/t/testnet-beta-release-3-1-challenges/271">
+                  {React.string(" here ")}
+                </a>
+                {React.string("and join ")}
+                <a href="http://bit.ly/CodaDiscord">
+                  {React.string("http://bit.ly/CodaDiscord")}
+                </a>
+                {React.string(" for the latest updates!")}
+              </p>
               <p id="disclaimer" className=Css.(style([fontStyle(`italic)]))>
                 {React.string(
                    "* Testnet Points are designed solely to track contributions to the Testnet and Testnet Points have no cash or other monetary value. Testnet Points and are not transferable and are not redeemable or exchangeable for any cryptocurrency or digital assets. We may at any time amend or eliminate Testnet Points.",
