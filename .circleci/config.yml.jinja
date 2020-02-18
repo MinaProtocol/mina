@@ -356,6 +356,12 @@ jobs:
                               -s coda-daemon \
                               -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
                               --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
+
+                              echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+                              ./scripts/skip_if_only_frontend.sh scripts/release-docker.sh \
+                              -s coda-demo \
+                              -v $CODA_GIT_TAG-$CODA_GIT_BRANCH-$CODA_GIT_HASH \
+                              --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
                         fi
                     fi
             - store_artifacts:
@@ -411,7 +417,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-7cbdf96e55b931d564847bbb31a0d3cd70d5ed6e
+            - image: codaprotocol/coda:toolchain-cf3d5dc87c195afd8eec14a2c4eaf9980004ee26
         steps:
             - checkout
             - run:

@@ -299,9 +299,9 @@ let run_test () : unit Deferred.t =
           |> Participating_state.active_exn
           |> Option.value ~default:Currency.Balance.zero
         in
-        let%bind p1_res =
+        let p1_res =
           Coda_commands.send_user_command coda (payment :> User_command.t)
-          |> Participating_state.to_deferred_or_error
+          |> Participating_state.active_error
         in
         assert_ok (Or_error.join p1_res) ;
         (* Send a similar payment twice on purpose; this second one will be rejected
@@ -309,9 +309,9 @@ let run_test () : unit Deferred.t =
         let payment' =
           build_payment send_amount sender_sk receiver_pk transaction_fee
         in
-        let%bind p2_res =
+        let p2_res =
           Coda_commands.send_user_command coda (payment' :> User_command.t)
-          |> Participating_state.to_deferred_or_error
+          |> Participating_state.active_error
         in
         assert_ok @@ Or_error.join p2_res ;
         (* The payment fails, but the rpc command doesn't indicate that because that
@@ -344,9 +344,9 @@ let run_test () : unit Deferred.t =
               Option.value_exn
                 (Currency.Balance.add_amount (Option.value_exn v) amount) )
         in
-        let%map p_res =
+        let p_res =
           Coda_commands.send_user_command coda (payment :> User_command.t)
-          |> Participating_state.to_deferred_or_error
+          |> Participating_state.active_error
         in
         p_res |> Or_error.join |> assert_ok ;
         new_balance_sheet'
@@ -357,7 +357,7 @@ let run_test () : unit Deferred.t =
       in
       let send_payments accounts ~txn_count balance_sheet f_amount =
         let pks = pks accounts in
-        Deferred.List.foldi (List.take accounts txn_count) ~init:balance_sheet
+        List.foldi (List.take accounts txn_count) ~init:balance_sheet
           ~f:(fun i acc ((keypair : Signature_lib.Keypair.t), _) ->
             let sender_pk = Public_key.compress keypair.public_key in
             let receiver =
@@ -384,7 +384,7 @@ let run_test () : unit Deferred.t =
                  ( Public_key.compress keypair.public_key
                  , account.Account.Poly.balance ) ))
         in
-        let%bind updated_balance_sheet =
+        let updated_balance_sheet =
           send_payments accounts ~txn_count balance_sheet (fun i ->
               Currency.Amount.of_int ((i + 1) * 10) )
         in

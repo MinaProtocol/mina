@@ -52,7 +52,17 @@ type pipes =
       ( External_transition.t Envelope.Incoming.t
       * Block_time.t
       * (bool -> unit) )
-      Pipe.Writer.t }
+      Pipe.Writer.t
+  ; local_txns_writer:
+      ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+      , Strict_pipe.synchronous
+      , unit Deferred.t )
+      Strict_pipe.Writer.t
+  ; local_snark_work_writer:
+      ( Network_pool.Snark_pool.Resource_pool.Diff.t
+      , Strict_pipe.synchronous
+      , unit Deferred.t )
+      Strict_pipe.Writer.t }
 
 type t =
   { config: Config.t
@@ -494,12 +504,14 @@ let root_diff t =
                 Extensions.(get_view_pipe (extensions frontier) Identity))
               ~f:
                 (Deferred.List.iter ~f:(function
-                  | Transition_frontier.Diff.Full.E.E (New_node _) ->
+                  | Transition_frontier.Diff.Full.With_mutant.E (New_node _, _)
+                    ->
                       Deferred.unit
-                  | Transition_frontier.Diff.Full.E.E (Best_tip_changed _) ->
+                  | Transition_frontier.Diff.Full.With_mutant.E
+                      (Best_tip_changed _, _) ->
                       Deferred.unit
-                  | Transition_frontier.Diff.Full.E.E
-                      (Root_transitioned {new_root; _}) ->
+                  | Transition_frontier.Diff.Full.With_mutant.E
+                      (Root_transitioned {new_root; _}, _) ->
                       let new_root_breadcrumb =
                         Transition_frontier.find_exn frontier new_root.hash
                       in
@@ -572,7 +584,14 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   let spec = work.spec.instances in
   set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
-  Network_pool.Snark_pool.add_completed_work (snark_pool t) work
+  Strict_pipe.Writer.write t.pipes.local_snark_work_writer
+    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work)
+  |> Deferred.don't_wait_for
+
+(*TODO: Synchronize this*)
+let add_transactions t (txns : User_command.t list) =
+  Strict_pipe.Writer.write t.pipes.local_txns_writer txns
+  |> Deferred.don't_wait_for
 
 let next_producer_timing t = t.next_producer_timing
 
@@ -771,6 +790,12 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
           in
+          let local_txns_reader, local_txns_writer =
+            Strict_pipe.(create ~name:"local transactions" Synchronous)
+          in
+          let local_snark_work_reader, local_snark_work_writer =
+            Strict_pipe.(create ~name:"local snark work" Synchronous)
+          in
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config
               ~trust_system:config.trust_system
@@ -779,6 +804,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
               ~logger:config.logger
               ~incoming_diffs:(Coda_networking.transaction_pool_diffs net)
+              ~local_diffs:local_txns_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
@@ -822,7 +848,14 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           let ( valid_transitions_for_network
               , valid_transitions_for_api
               , new_blocks ) =
-            Strict_pipe.Reader.Fork.three valid_transitions
+            let network_pipe, downstream_pipe =
+              Strict_pipe.Reader.Fork.two valid_transitions
+            in
+            let api_pipe, new_blocks_pipe =
+              Strict_pipe.Reader.(
+                Fork.two (map downstream_pipe ~f:(fun (`Transition t, _) -> t)))
+            in
+            (network_pipe, api_pipe, new_blocks_pipe)
           in
           trace_task "transaction pool broadcast loop" (fun () ->
               Linear_pipe.iter
@@ -832,7 +865,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   Deferred.unit ) ) ;
           trace_task "valid_transitions_for_network broadcast loop" (fun () ->
               Strict_pipe.Reader.iter_without_pushback
-                valid_transitions_for_network ~f:(fun transition ->
+                valid_transitions_for_network
+                ~f:(fun (`Transition transition, `Source source) ->
                   let hash =
                     External_transition.Validated.state_hash transition
                   in
@@ -858,7 +892,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                                 transition ) ]
                         "Rebroadcasting $state_hash" ;
                       External_transition.Validated.broadcast transition
-                  | Error reason ->
+                  | Error reason -> (
                       let timing_error_json =
                         match reason with
                         | `Too_early ->
@@ -866,17 +900,28 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                         | `Too_late slots ->
                             `String (sprintf "%Lu slots too late" slots)
                       in
+                      let metadata =
+                        [ ("state_hash", State_hash.to_yojson hash)
+                        ; ( "external_transition"
+                          , External_transition.Validated.to_yojson transition
+                          )
+                        ; ("timing", timing_error_json) ]
+                      in
                       External_transition.Validated.don't_broadcast transition ;
-                      Logger.warn config.logger ~module_:__MODULE__
-                        ~location:__LOC__
-                        ~metadata:
-                          [ ("state_hash", State_hash.to_yojson hash)
-                          ; ( "external_transition"
-                            , External_transition.Validated.to_yojson
-                                transition )
-                          ; ("timing", timing_error_json) ]
-                        "Not rebroadcasting block $state_hash because it was \
-                         received $timing" ) ) ;
+                      match source with
+                      | `Catchup ->
+                          ()
+                      | `Internal ->
+                          Logger.error config.logger ~module_:__MODULE__
+                            ~location:__LOC__ ~metadata
+                            "Internally generated block $state_hash cannot be \
+                             rebroadcast because it's not a valid time to do \
+                             so ($timing)"
+                      | `Gossip ->
+                          Logger.warn config.logger ~module_:__MODULE__
+                            ~location:__LOC__ ~metadata
+                            "Not rebroadcasting block $state_hash because it \
+                             was received $timing" ) ) ) ;
           don't_wait_for
             (Strict_pipe.transfer
                (Coda_networking.states net)
@@ -906,6 +951,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               ~logger:config.logger
               ~disk_location:config.snark_pool_disk_location
               ~incoming_diffs:(Coda_networking.snark_pool_diffs net)
+              ~local_diffs:local_snark_work_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           let%bind wallets =
@@ -990,7 +1036,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 ; producer_transition_writer
                 ; external_transitions_writer=
                     Strict_pipe.Writer.to_linear_pipe
-                      external_transitions_writer }
+                      external_transitions_writer
+                ; local_txns_writer
+                ; local_snark_work_writer }
             ; wallets
             ; block_production_keypairs
             ; coinbase_receiver= config.coinbase_receiver

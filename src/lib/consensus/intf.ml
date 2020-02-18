@@ -40,6 +40,9 @@ module type Constants = sig
 
   (** Number of slots in one epoch *)
   val slots_per_epoch : Unsigned.UInt32.t
+
+  (** The names and values of all constants. *)
+  val all_constants : Yojson.Safe.json
 end
 
 module type Blockchain_state = sig
