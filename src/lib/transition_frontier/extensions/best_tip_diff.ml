@@ -40,25 +40,26 @@ module T = struct
     ( path_from_to (Full_frontier.find_exn frontier ancestor) bc1
     , path_from_to (Full_frontier.find_exn frontier ancestor) bc2 )
 
-  let handle_diffs t frontier diffs : view option =
-    let open Diff in
-    let old_best_tip = Full_frontier.best_tip frontier in
-    let view, _, should_broadcast =
-      List.fold diffs
+  let handle_diffs t frontier diffs_with_mutants : view option =
+    let open Diff.Full.With_mutant in
+    let view, should_broadcast =
+      List.fold diffs_with_mutants
         ~init:
           ( { new_user_commands= []
             ; removed_user_commands= []
             ; reorg_best_tip= false }
-          , old_best_tip
           , false )
         ~f:
           (fun ( ( {new_user_commands; removed_user_commands; reorg_best_tip= _}
                  as acc )
-               , old_best_tip
                , should_broadcast ) -> function
-          | Full.E.E (Best_tip_changed new_best_tip) ->
+          | E (Best_tip_changed new_best_tip, old_best_tip_hash) ->
               let new_best_tip_breadcrumb =
                 Full_frontier.find_exn frontier new_best_tip
+              in
+              let old_best_tip =
+                (*This should be present in the frontier because root did not transition*)
+                Full_frontier.find_exn frontier old_best_tip_hash
               in
               let added_to_best_tip_path, removed_from_best_tip_path =
                 get_path_diff t frontier new_best_tip_breadcrumb old_best_tip
@@ -90,13 +91,10 @@ module T = struct
               let reorg_best_tip =
                 not (List.is_empty removed_from_best_tip_path)
               in
-              ( {new_user_commands; removed_user_commands; reorg_best_tip}
-              , new_best_tip_breadcrumb
-              , true ) | Full.E.E (New_node (Full _)) ->
-              (acc, old_best_tip, should_broadcast)
-          | Full.E.E (Root_transitioned _) ->
-              (acc, old_best_tip, should_broadcast)
-          | Full.E.E (New_node (Lite _)) -> failwith "impossible" )
+              ({new_user_commands; removed_user_commands; reorg_best_tip}, true)
+          | E (New_node (Full _), _) -> (acc, should_broadcast)
+          | E (Root_transitioned _, _) -> (acc, should_broadcast)
+          | E (New_node (Lite _), _) -> failwith "impossible" )
     in
     Option.some_if should_broadcast view
 end
