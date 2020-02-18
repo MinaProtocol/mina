@@ -31,7 +31,8 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
-    ~processed_transition_writer ~only_if_present ~source cached_breadcrumb =
+    ~processed_transition_writer ~only_if_present ~time_controller ~source
+    cached_breadcrumb =
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb
@@ -55,13 +56,27 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
           Deferred.unit )
     else Transition_frontier.add_breadcrumb_exn frontier breadcrumb
   in
+  ( match source with
+  | `Internal ->
+      ()
+  | _ ->
+      let transition_time =
+        External_transition.Validated.consensus_time_produced_at transition
+      in
+      let time_elapsed =
+        Block_time.diff
+          (Block_time.now time_controller)
+          (Consensus.Data.Consensus_time.to_time transition_time)
+      in
+      Coda_metrics.Block_latency.Inclusion_time.update
+        (Block_time.Span.to_time_span time_elapsed) ) ;
   Writer.write processed_transition_writer
     (`Transition transition, `Source source) ;
   Catchup_scheduler.notify catchup_scheduler
     ~hash:(External_transition.Validated.state_hash transition)
 
 let process_transition ~logger ~trust_system ~verifier ~frontier
-    ~catchup_scheduler ~processed_transition_writer
+    ~catchup_scheduler ~processed_transition_writer ~time_controller
     ~transition:cached_initially_validated_transition =
   let enveloped_initially_validated_transition =
     Cached.peek cached_initially_validated_transition
@@ -184,8 +199,8 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
         Transition_frontier_controller.breadcrumbs_built_by_processor) ;
     Deferred.map ~f:Result.return
       (add_and_finalize ~logger ~frontier ~catchup_scheduler
-         ~processed_transition_writer ~only_if_present:false ~source:`Gossip
-         breadcrumb))
+         ~processed_transition_writer ~only_if_present:false ~time_controller
+         ~source:`Gossip breadcrumb))
 
 let run ~logger ~verifier ~trust_system ~time_controller ~frontier
     ~(primary_transition_reader :
@@ -224,10 +239,11 @@ let run ~logger ~verifier ~trust_system ~time_controller ~frontier
   in
   let add_and_finalize =
     add_and_finalize ~frontier ~catchup_scheduler ~processed_transition_writer
+      ~time_controller
   in
   let process_transition =
     process_transition ~logger ~trust_system ~verifier ~frontier
-      ~catchup_scheduler ~processed_transition_writer
+      ~catchup_scheduler ~processed_transition_writer ~time_controller
   in
   ignore
     (Reader.Merge.iter
