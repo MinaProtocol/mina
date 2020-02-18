@@ -876,7 +876,7 @@ module Keypair = struct
         failwithf "other RPC error generateKeypair: %s" (Error.to_string_hum e)
           ()
 
-  let secret_key_base58 ({secret; _} : t) = to_b64_data secret
+  let secret_key_base64 ({secret; _} : t) = to_b64_data secret
 
   let to_string ({secret; public; peer_id} : t) =
     String.concat ~sep:","
@@ -1067,7 +1067,7 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
-      { privk= Keypair.secret_key_base58 me
+      { privk= Keypair.secret_key_base64 me
       ; statedir= net.conf_dir
       ; ifaces= List.map ~f:Multiaddr.to_string maddrs
       ; external_maddr= Multiaddr.to_string external_maddr
