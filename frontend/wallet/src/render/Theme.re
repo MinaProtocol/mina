@@ -142,6 +142,13 @@ module Text = {
         fontSize(`rem(1.)),
         lineHeight(`rem(1.5)),
       ]);
+    let regularSmall =
+      style([
+        Typeface.plex,
+        fontWeight(`medium),
+        fontSize(`px(13)),
+        lineHeight(`rem(1.5)),
+      ]);
     let regularLight =
       style([
         Typeface.plex,

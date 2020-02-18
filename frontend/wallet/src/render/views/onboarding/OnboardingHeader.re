@@ -36,11 +36,12 @@ module Styles = {
     style([
       display(`flex),
       alignItems(`center),
-      justifyContent(`spaceAround),
+      justifyContent(`flexEnd),
       width(`rem(20.)),
     ]);
 
-  let helpText = merge([style([color(white)]), Theme.Text.Body.regular]);
+  let helpText =
+    merge([style([color(white)]), Theme.Text.Body.regularSmall]);
 };
 
 module HelpSection = {
@@ -48,22 +49,24 @@ module HelpSection = {
   let make = () => {
     <div className=Styles.helpContainer>
       <p className=Styles.helpText> {React.string("Need help?")} </p>
-      <Button
+      <Spacer width=1. />
+      <HelpButton
         label="Docs"
-        icon=Icon.Docs
-        width=2.
-        height=2.
-        padding=0.5
-        style=Button.OffWhite
+        icon=HelpIcon.Docs
+        width=4.
+        height=1.5
+        padding=0.4
+        style=HelpButton.OffWhite
         onClick={_ => openExternal("https://codaprotocol.com/docs/")}
       />
-      <Button
+      <Spacer width=0.37 />
+      <HelpButton
         label="Discord"
-        icon=Icon.Discord
-        width=3.5
-        height=2.
-        padding=0.6
-        style=Button.OffWhite
+        icon=HelpIcon.Discord
+        width=5.5
+        height=1.5
+        padding=0.4
+        style=HelpButton.OffWhite
         onClick={_ => openExternal("https://discordapp.com/invite/Vexf4ED")}
       />
     </div>;
