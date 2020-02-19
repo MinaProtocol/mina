@@ -77,6 +77,7 @@ let compute_public_key ~hardware_wallet_nonce =
   |> Deferred.map ~f:(Result.bind ~f:decode_public_key)
 
 let sign ~hardware_wallet_nonce ~public_key ~user_command_payload =
+  let open Deferred.Result.Let_syntax in
   let input =
     Transaction_union_payload.to_input
     @@ Transaction_union_payload.of_user_command_payload user_command_payload
@@ -98,27 +99,34 @@ let sign ~hardware_wallet_nonce ~public_key ~user_command_payload =
           ^ Coda_numbers.Hardware_wallet_nonce.to_string hardware_wallet_nonce
         ] )
     in
-    Process.run ~prog ~args ()
-    |> Deferred.Result.map_error ~f:report_process_error
-    |> Deferred.map
-         ~f:
-           (Result.bind ~f:(fun signature_str ->
-                let open Result.Let_syntax in
-                let%bind signature = decode_signature signature_str in
-                if
-                  Coda_base.Schnorr.verify signature
-                    (Tick.Inner_curve.of_affine public_key)
-                    user_command_payload
-                then
-                  Ok
-                    Coda_base.User_command.Poly.
-                      { payload= user_command_payload
-                      ; sender= public_key
-                      ; signature }
-                else
-                  Error
-                    "Failed to verify signature returned by hardware wallet."
-            ))
+    let%bind signature_str =
+      Process.run ~prog ~args ()
+      |> Deferred.Result.map_error ~f:report_process_error
+    in
+    let%bind signature = decode_signature signature_str |> Deferred.return in
+    if
+      Coda_base.Schnorr.verify signature
+        (Tick.Inner_curve.of_affine public_key)
+        user_command_payload
+    then
+      return
+        Coda_base.User_command.Poly.
+          {payload= user_command_payload; sender= public_key; signature}
+    else
+      let%bind computed_public_key =
+        compute_public_key ~hardware_wallet_nonce
+      in
+      if Public_key.equal computed_public_key public_key then
+        Deferred.Result.fail
+          "Failed to verify signature returned by hardware wallet."
+      else
+        Deferred.Result.fail
+          "The cached public doesn't match the one that is computed by the \
+           hardware wallet. Possible reason could be you are using a \
+           different hardware wallet or you reinitialized your hardware \
+           wallet using a different seed. If you want to use your new ledger, \
+           please first create an account by 'coda account \
+           create-hardware-wallet' command"
 
 let write_exn ~hardware_wallet_nonce ~nonce_path : unit Deferred.t =
   let%bind nonce_file = Writer.open_file nonce_path in
