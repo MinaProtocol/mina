@@ -171,23 +171,24 @@ module For_tests = struct
 
   (* Generate valid payments for each blockchain state by having
      each user send a payment of one coin to another random
-     user if they at least one coin*)
+     user if they have at least one coin*)
   let gen_payments staged_ledger accounts_with_secret_keys :
       User_command.With_valid_signature.t Sequence.t =
-    let public_keys =
+    let account_ids =
       List.map accounts_with_secret_keys ~f:(fun (_, account) ->
-          Account.public_key account )
+          Account.identifier account )
     in
     Sequence.filter_map (accounts_with_secret_keys |> Sequence.of_list)
       ~f:(fun (sender_sk, sender_account) ->
         let open Option.Let_syntax in
         let%bind sender_sk = sender_sk in
         let sender_keypair = Keypair.of_private_key_exn sender_sk in
-        let%bind receiver_pk = List.random_element public_keys in
+        let%bind receiver_aid = List.random_element account_ids in
         let nonce =
           let ledger = Staged_ledger.ledger staged_ledger in
           let status, account_location =
-            Ledger.get_or_create_account_exn ledger sender_account.public_key
+            Ledger.get_or_create_account_exn ledger
+              (Account.identifier sender_account)
               sender_account
           in
           assert (status = `Existed) ;
@@ -199,10 +200,10 @@ module For_tests = struct
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
         let payload : User_command.Payload.t =
-          User_command.Payload.create ~fee:Fee.zero ~nonce
-            ~valid_until:Coda_numbers.Global_slot.max_value
+          User_command.Payload.create ~fee:Fee.zero ~fee_token:Token_id.default
+            ~nonce ~valid_until:Coda_numbers.Global_slot.max_value
             ~memo:User_command_memo.dummy
-            ~body:(Payment {receiver= receiver_pk; amount= send_amount})
+            ~body:(Payment {receiver= receiver_aid; amount= send_amount})
         in
         User_command.sign sender_keypair payload )
 

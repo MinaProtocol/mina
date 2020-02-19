@@ -76,9 +76,9 @@ module Stable = struct
       ; proof: Proof.Stable.V1.t }
 
     let to_latest {creator; protocol_state; transactions; snark_jobs; proof} =
-      { creator
+      { V2.creator
       ; protocol_state
-      ; transactions= Transaction.Stable.V1.to_latest transactions
+      ; transactions= Transactions.Stable.V1.to_latest transactions
       ; snark_jobs
       ; proof }
   end
@@ -93,15 +93,18 @@ type t = Stable.Latest.t =
 
 let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
     =
-  let open Public_key.Compressed.Set in
+  let open Account_id.Set in
   let user_command_set =
     List.fold user_commands ~init:empty ~f:(fun set user_command ->
         union set (of_list @@ User_command.accounts_accessed user_command) )
   in
   let fee_transfer_participants =
-    List.fold fee_transfers ~init:empty ~f:(fun set (pk, _) -> add set pk)
+    List.fold fee_transfers ~init:empty ~f:(fun set (pk, _) ->
+        add set (Account_id.create pk Token_id.default) )
   in
-  add (union user_command_set fee_transfer_participants) creator
+  add
+    (union user_command_set fee_transfer_participants)
+    (Account_id.create creator Token_id.default)
 
 let user_commands {transactions= {Transactions.user_commands; _}; _} =
   user_commands
@@ -134,7 +137,7 @@ let of_transition external_transition tracked_participants
           let should_include_transaction user_command participants =
             List.exists
               (User_command.accounts_accessed user_command)
-              ~f:(Public_key.Compressed.Set.mem participants)
+              ~f:(Account_id.Set.mem participants)
           in
           match tracked_participants with
           | `Some interested_participants
@@ -155,7 +158,8 @@ let of_transition external_transition tracked_participants
             | `Some interested_participants ->
                 List.filter
                   ~f:(fun (pk, _) ->
-                    Public_key.Compressed.Set.mem interested_participants pk )
+                    Account_id.Set.mem interested_participants
+                      (Account_id.create pk Token_id.default) )
                   fee_transfer_list
           in
           { acc_transactions with

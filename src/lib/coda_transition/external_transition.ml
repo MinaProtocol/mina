@@ -821,28 +821,6 @@ module Validated = struct
                     let to_binable = erase
                   end)
 
-        let to_yojson (transition_with_hash, _) =
-          With_hash.to_yojson to_yojson State_hash.to_yojson
-            transition_with_hash
-
-        let create_unsafe_pre_hashed t =
-          `I_swear_this_is_safe_see_my_comment
-            ( Validation.wrap t
-            |> skip_time_received_validation
-                 `This_transition_was_not_received_via_gossip
-            |> skip_genesis_protocol_state_validation
-                 `This_transition_was_generated_internally
-            |> skip_proof_validation `This_transition_was_generated_internally
-            |> skip_delta_transition_chain_validation
-                 `This_transition_was_not_received_via_gossip
-            |> skip_frontier_dependencies_validation
-                 `This_transition_belongs_to_a_detached_subtree
-            |> skip_staged_ledger_diff_validation
-                 `This_transition_has_a_trusted_staged_ledger )
-
-        let create_unsafe t =
-          create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hash)
-
         include With_validation
       end
 

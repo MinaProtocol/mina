@@ -198,37 +198,31 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
   let sender = Public_key.compress sender in
   (* Get index for the sender. *)
   let token = Account_id.token_id (User_command.Payload.receiver payload) in
-  let nonce = User_command.Payload.nonce payload in
   let sender_id = Account_id.create sender token in
   let sender_idx = find_index_exn t sender_id in
   (* Get the index for the fee-payer. *)
+  let nonce = User_command.Payload.nonce payload in
   let fee_token = User_command.Payload.fee_token payload in
-  let fee_nonce = User_command.Payload.fee_nonce payload in
   let fee_sender_id = Account_id.create sender fee_token in
   let fee_sender_idx = find_index_exn t fee_sender_id in
   (* TODO: Disable this check and update the transaction snark. *)
   assert (Token_id.equal fee_token Token_id.default) ;
   let fee_sender_account =
     let account = get_exn t fee_sender_idx in
-    assert (Account.Nonce.equal account.nonce fee_nonce) ;
+    assert (Account.Nonce.equal account.nonce nonce) ;
     let fee = User_command.Payload.fee payload in
     let open Currency in
     { account with
       nonce= Account.Nonce.succ account.nonce
     ; balance=
         Balance.sub_amount account.balance (Amount.of_fee fee)
-        |> Option.value_exn ?here:None ?error:None ?message:None }
-  in
-  let sender_account =
-    let account =
-      if Token_id.equal fee_token token then fee_sender_account
-      else get_exn t sender_idx
-    in
-    assert (Account.Nonce.equal account.nonce nonce) ;
-    { account with
-      nonce= Account.Nonce.succ account.nonce
+        |> Option.value_exn ?here:None ?error:None ?message:None
     ; receipt_chain_hash=
         Receipt.Chain_hash.cons payload account.receipt_chain_hash }
+  in
+  let sender_account =
+    if Token_id.equal fee_token token then fee_sender_account
+    else get_exn t sender_idx
   in
   match User_command.Payload.body payload with
   | Stake_delegation (Set_delegate {new_delegate}) ->

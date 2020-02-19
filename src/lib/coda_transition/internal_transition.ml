@@ -6,13 +6,19 @@ module type S = sig
 
   module Stable :
     sig
-      module V1 : sig
+      module V2 : sig
         type t [@@deriving sexp, to_yojson, bin_io]
       end
 
-      module Latest = V1
+      module V1 : sig
+        type t [@@deriving bin_io]
+
+        val to_latest : t -> V2.t
+      end
+
+      module Latest = V2
     end
-    with type V1.t = t
+    with type V2.t = t
 
   val create :
        snark_transition:Snark_transition.Value.t
@@ -29,6 +35,16 @@ end
 
 [%%versioned
 module Stable = struct
+  module V2 = struct
+    type t =
+      { snark_transition: Snark_transition.Value.Stable.V1.t
+      ; prover_state: Consensus.Data.Prover_state.Stable.V2.t
+      ; staged_ledger_diff: Staged_ledger_diff.Stable.V2.t }
+    [@@deriving sexp, to_yojson, fields]
+
+    let to_latest = Fn.id
+  end
+
   module V1 = struct
     type t =
       { snark_transition: Snark_transition.Value.Stable.V1.t
@@ -36,15 +52,20 @@ module Stable = struct
       ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
     [@@deriving sexp, to_yojson, fields]
 
-    let to_latest = Fn.id
+    let to_latest {snark_transition; prover_state; staged_ledger_diff} =
+      { V2.snark_transition
+      ; prover_state=
+          Consensus.Data.Prover_state.Stable.V1.to_latest prover_state
+      ; staged_ledger_diff=
+          Staged_ledger_diff.Stable.V1.to_latest staged_ledger_diff }
   end
 end]
 
 (* bin_io, version omitted *)
 type t = Stable.Latest.t =
-  { snark_transition: Snark_transition.Value.Stable.V1.t
-  ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
-  ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
+  { snark_transition: Snark_transition.Value.t
+  ; prover_state: Consensus.Data.Prover_state.t
+  ; staged_ledger_diff: Staged_ledger_diff.t }
 [@@deriving sexp, fields, to_yojson]
 
 let create ~snark_transition ~prover_state ~staged_ledger_diff =

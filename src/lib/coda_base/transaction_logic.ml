@@ -500,7 +500,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%bind sender_location = location_of_account' ledger "" sender_id in
     (* Get account location for the fee-payer. *)
     let fee_token = User_command.Payload.fee_token payload in
-    let fee_nonce = User_command.Payload.fee_nonce payload in
     let fee_sender_id = Account_id.create sender fee_token in
     let%bind fee_sender_location =
       location_of_account' ledger "" fee_sender_id
@@ -512,25 +511,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ~current_global_slot
     in
     (* We unconditionally deduct the fee if this transaction succeeds *)
-    let%bind fee_sender_account =
+    let%bind fee_sender_account, common =
       let%bind account = get' ledger "fee sender" fee_sender_location in
       let fee = Amount.of_fee (User_command.Payload.fee payload) in
       let%bind balance = sub_amount account.balance fee in
-      let%bind () = validate_nonces fee_nonce account.nonce in
-      let%map timing =
-        validate_timing ~txn_amount:fee ~txn_global_slot:current_global_slot
-          ~account
-      in
-      {account with balance; nonce= Account.Nonce.succ account.nonce; timing}
-    in
-    (* Retrieve the sender account, which may be the same as the sender fee
-       account.
-    *)
-    let%bind sender_account, common =
-      let%bind account =
-        if Token_id.equal token fee_token then return fee_sender_account
-        else get' ledger "sender" fee_sender_location
-      in
+      let%bind () = validate_nonces nonce account.nonce in
       (* TODO: This may not be the right place for the receipt chain to be
          attached when we support predicates: the 'sender' (ie. signer) may be
          different for each transaction, which prevents anybody from being able
@@ -539,7 +524,26 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let common : Undo.User_command_undo.Common.t =
         {user_command; previous_receipt_chain_hash= account.receipt_chain_hash}
       in
-      let%bind () = validate_nonces nonce account.nonce in
+      let%map timing =
+        validate_timing ~txn_amount:fee ~txn_global_slot:current_global_slot
+          ~account
+      in
+      ( { account with
+          balance
+        ; nonce= Account.Nonce.succ account.nonce
+        ; timing
+        ; receipt_chain_hash=
+            Receipt.Chain_hash.cons payload account.receipt_chain_hash }
+      , common )
+    in
+    (* Retrieve the sender account, which may be the same as the sender fee
+       account.
+    *)
+    let%bind sender_account =
+      let%bind account =
+        if Token_id.equal token fee_token then return fee_sender_account
+        else get' ledger "sender" fee_sender_location
+      in
       let%map timing =
         if User_command.Payload.is_payment payload then
           let txn_amount =
@@ -553,14 +557,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ~account
         else return account.timing
       in
-      let account =
-        { account with
-          nonce= Account.Nonce.succ account.nonce
-        ; receipt_chain_hash=
-            Receipt.Chain_hash.cons payload account.receipt_chain_hash
-        ; timing }
-      in
-      (account, common)
+      {account with timing}
     in
     match User_command.Payload.body payload with
     | Stake_delegation (Set_delegate {new_delegate}) ->
@@ -807,33 +804,26 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let%bind sender_location = location_of_account' ledger "" sender_id in
     (* Get account location for the fee-payer. *)
     let fee_token = User_command.Payload.fee_token payload in
-    let fee_nonce = User_command.Payload.fee_nonce payload in
     let fee_sender_id = Account_id.create sender fee_token in
     let%bind fee_sender_location =
       location_of_account' ledger "" fee_sender_id
     in
-    (* NOTE: Access in the opposite order as applying, so that nonces get
-       updated correctly.
-    *)
-    let%bind sender_account =
-      let%bind account = get' ledger "sender" sender_location in
-      let%bind () = validate_nonces (Account.Nonce.succ nonce) account.nonce in
-      return
-        {account with nonce; receipt_chain_hash= previous_receipt_chain_hash}
-    in
+    let%bind sender_account = get' ledger "sender" sender_location in
     let%bind fee_sender_account =
       let%bind account =
         if Token_id.equal token fee_token then return sender_account
         else get' ledger "fee sender" fee_sender_location
       in
-      let%bind () =
-        validate_nonces (Account.Nonce.succ fee_nonce) account.nonce
-      in
+      let%bind () = validate_nonces (Account.Nonce.succ nonce) account.nonce in
       let%bind balance =
         add_amount account.balance
           (Amount.of_fee (User_command.Payload.fee payload))
       in
-      return {account with balance; nonce= fee_nonce}
+      return
+        { account with
+          balance
+        ; nonce
+        ; receipt_chain_hash= previous_receipt_chain_hash }
     in
     match (User_command.Payload.body payload, body) with
     | Stake_delegation (Set_delegate _), Stake_delegation {previous_delegate}

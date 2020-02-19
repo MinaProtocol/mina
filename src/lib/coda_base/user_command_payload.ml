@@ -12,7 +12,6 @@ module Common = struct
         type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t =
           { fee: 'fee
           ; fee_token: 'token_id
-          ; fee_nonce: 'nonce
           ; nonce: 'nonce
           ; valid_until: 'global_slot
           ; memo: 'memo }
@@ -30,7 +29,6 @@ module Common = struct
           ('fee, 'token_id, 'nonce, 'global_slot, 'memo) Stable.Latest.t =
       { fee: 'fee
       ; fee_token: 'token_id
-      ; fee_nonce: 'nonce
       ; nonce: 'nonce
       ; valid_until: 'global_slot
       ; memo: 'memo }
@@ -63,24 +61,18 @@ module Common = struct
       [@@deriving compare, eq, sexp, hash, yojson]
 
       let to_latest ({fee; nonce; valid_until; memo} : t) : V2.t =
-        { fee
-        ; fee_token= Token_id.default
-        ; nonce
-        ; fee_nonce= nonce
-        ; valid_until
-        ; memo }
+        {fee; fee_token= Token_id.default; nonce; valid_until; memo}
     end
   end]
 
   (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
-  let to_input ({fee; fee_token; fee_nonce; nonce; valid_until; memo} : t) =
+  let to_input ({fee; fee_token; nonce; valid_until; memo} : t) =
     let open Random_oracle.Input in
     append
       (bitstrings
          [| Currency.Fee.to_bits fee
-          ; Account_nonce.Bits.to_bits fee_nonce
           ; Account_nonce.Bits.to_bits nonce
           ; Global_slot.to_bits valid_until
           ; Memo.to_bits memo |])
@@ -90,7 +82,6 @@ module Common = struct
     let open Quickcheck.Generator.Let_syntax in
     let%map fee = Currency.Fee.gen
     and fee_token = Token_id.gen
-    and fee_nonce = Account_nonce.gen
     and nonce = Account_nonce.gen
     and valid_until = Global_slot.gen
     and memo =
@@ -103,7 +94,7 @@ module Common = struct
         String.gen_with_length Memo.max_input_length Char.quickcheck_generator
         >>| Memo.create_from_string_exn
     in
-    Poly.{fee; fee_token; fee_nonce; nonce; valid_until; memo}
+    Poly.{fee; fee_token; nonce; valid_until; memo}
 
   type var =
     ( Currency.Fee.var
@@ -113,22 +104,21 @@ module Common = struct
     , Memo.Checked.t )
     Poly.t
 
-  let to_hlist Poly.{fee; fee_token; fee_nonce; nonce; valid_until; memo} =
-    H_list.[fee; fee_token; fee_nonce; nonce; valid_until; memo]
+  let to_hlist Poly.{fee; fee_token; nonce; valid_until; memo} =
+    H_list.[fee; fee_token; nonce; valid_until; memo]
 
   let of_hlist : type fee token_id nonce memo global_slot.
          ( unit
-         , fee -> token_id -> nonce -> nonce -> global_slot -> memo -> unit )
+         , fee -> token_id -> nonce -> global_slot -> memo -> unit )
          H_list.t
       -> (fee, token_id, nonce, global_slot, memo) Poly.t =
-   fun H_list.[fee; fee_token; fee_nonce; nonce; valid_until; memo] ->
-    {fee; fee_token; fee_nonce; nonce; valid_until; memo}
+   fun H_list.[fee; fee_token; nonce; valid_until; memo] ->
+    {fee; fee_token; nonce; valid_until; memo}
 
   let typ =
     Typ.of_hlistable
       [ Currency.Fee.typ
       ; Token_id.typ
-      ; Account_nonce.typ
       ; Account_nonce.typ
       ; Global_slot.typ
       ; Memo.typ ]
@@ -136,26 +126,21 @@ module Common = struct
       ~value_of_hlist:of_hlist
 
   module Checked = struct
-    let constant ({fee; fee_token; fee_nonce; nonce; valid_until; memo} : t) :
-        var =
+    let constant ({fee; fee_token; nonce; valid_until; memo} : t) : var =
       { fee= Currency.Fee.var_of_t fee
       ; fee_token= Token_id.var_of_t fee_token
-      ; fee_nonce= Account_nonce.Checked.constant nonce
       ; nonce= Account_nonce.Checked.constant nonce
       ; memo= Memo.Checked.constant memo
       ; valid_until= Global_slot.Checked.constant valid_until }
 
-    let to_input ({fee; fee_token; fee_nonce; nonce; valid_until; memo} : var)
-        =
+    let to_input ({fee; fee_token; nonce; valid_until; memo} : var) =
       let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
-      let%map fee_nonce = Account_nonce.Checked.to_bits fee_nonce
-      and nonce = Account_nonce.Checked.to_bits nonce
+      let%map nonce = Account_nonce.Checked.to_bits nonce
       and valid_until = Global_slot.Checked.to_bits valid_until in
       let open Random_oracle.Input in
       append
         (bitstrings
            [| s (Currency.Fee.var_to_bits fee)
-            ; s fee_nonce
             ; s nonce
             ; s valid_until
             ; Array.to_list (memo :> Boolean.var array) |])
@@ -240,14 +225,12 @@ end]
 (* bin_io omitted *)
 type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
-let create ~fee ~fee_token ~fee_nonce ~nonce ~valid_until ~memo ~body : t =
-  {common= {fee; fee_token; fee_nonce; nonce; valid_until; memo}; body}
+let create ~fee ~fee_token ~nonce ~valid_until ~memo ~body : t =
+  {common= {fee; fee_token; nonce; valid_until; memo}; body}
 
 let fee (t : t) = t.common.fee
 
 let fee_token (t : t) = t.common.fee_token
-
-let fee_nonce (t : t) = t.common.fee_nonce
 
 let nonce (t : t) = t.common.nonce
 
@@ -287,7 +270,6 @@ let dummy : t =
   { common=
       { fee= Currency.Fee.zero
       ; fee_token= Token_id.default
-      ; fee_nonce= Account_nonce.zero
       ; nonce= Account_nonce.zero
       ; valid_until= Global_slot.max_value
       ; memo= Memo.dummy }

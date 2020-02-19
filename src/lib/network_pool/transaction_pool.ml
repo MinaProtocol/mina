@@ -67,7 +67,7 @@ module Make0 (Base_ledger : sig
     type t
   end
 
-  val location_of_account : t -> Public_key.Compressed.t -> Location.t option
+  val location_of_account : t -> Account_id.t -> Location.t option
 
   val get : t -> Location.t -> Account.t option
 end) (Max_size : sig
@@ -126,7 +126,7 @@ struct
 
     let transactions t = transactions' t.pool
 
-    let all_from_user {pool; _} = Indexed_pool.all_from_user pool
+    let all_from_account {pool; _} = Indexed_pool.all_from_account pool
 
     (** Get the best tip ledger and update our cache. *)
     let get_best_tip_ledger_and_update t frontier =
@@ -229,10 +229,10 @@ struct
       let pool'', dropped_commit_conflicts =
         List.fold new_user_commands ~init:(pool', Sequence.empty)
           ~f:(fun (p, dropped_so_far) cmd ->
-            let sender = User_command.sender cmd in
+            let fee_sender = User_command.fee_sender cmd in
             let balance =
               match
-                Base_ledger.location_of_account validation_ledger sender
+                Base_ledger.location_of_account validation_ledger fee_sender
               with
               | None ->
                   Currency.Balance.zero

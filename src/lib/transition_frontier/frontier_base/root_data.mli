@@ -6,14 +6,14 @@ open Coda_transition
  * were available on a breadcrumb in the transition frontier when this was
  * created. *)
 module Historical : sig
+  [%%versioned:
   module Stable : sig
     module V2 : sig
       type t =
-        { transition: External_transition.Validated.Stable.V1.t
+        { transition: External_transition.Validated.Stable.V2.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V2.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t
         ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
-      [@@deriving bin_io, version]
     end
 
     module V1 : sig
@@ -22,15 +22,16 @@ module Historical : sig
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t
         ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
-      [@@deriving bin_io, version]
 
       val to_latest : t -> V2.t
     end
+  end]
 
-    module Latest = V2
-  end
-
-  type t = Stable.Latest.t
+  type t =
+    { transition: External_transition.Validated.t
+    ; scan_state: Staged_ledger.Scan_state.t
+    ; pending_coinbase: Pending_coinbase.t
+    ; staged_ledger_target_ledger_hash: Ledger_hash.t }
 
   val of_breadcrumb : Breadcrumb.t -> t
 end
@@ -38,13 +39,13 @@ end
 (* Limited root data is similar to Minimal root data, except that it contains
  * the full validated transition at a root instead of just a pointer to one *)
 module Limited : sig
+  [%%versioned:
   module Stable : sig
     module V2 : sig
       type t =
-        { transition: External_transition.Validated.Stable.V1.t
+        { transition: External_transition.Validated.Stable.V2.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V2.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-      [@@deriving bin_io, version]
     end
 
     module V1 : sig
@@ -52,13 +53,10 @@ module Limited : sig
         { transition: External_transition.Validated.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-      [@@deriving bin_io, version]
 
       val to_latest : t -> V2.t
     end
-
-    module Latest = V2
-  end
+  end]
 
   type t = Stable.Latest.t
 end
@@ -69,13 +67,13 @@ end
  * pending_coinbase).
  *)
 module Minimal : sig
+  [%%versioned:
   module Stable : sig
     module V2 : sig
       type t =
         { hash: State_hash.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V2.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-      [@@deriving bin_io, version]
     end
 
     module V1 : sig
@@ -83,15 +81,15 @@ module Minimal : sig
         { hash: State_hash.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-      [@@deriving bin_io, version]
 
       val to_latest : t -> V2.t
     end
+  end]
 
-    module Latest = V2
-  end
-
-  type t = Stable.Latest.t
+  type t = Stable.Latest.t =
+    { hash: State_hash.t
+    ; scan_state: Staged_ledger.Scan_state.t
+    ; pending_coinbase: Pending_coinbase.t }
 
   val of_limited : Limited.t -> t
 

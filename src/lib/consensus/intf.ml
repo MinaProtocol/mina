@@ -347,6 +347,8 @@ module type S = sig
 
         module V1 : sig
           type t [@@deriving sexp, to_yojson]
+
+          val to_latest : t -> V2.t
         end
       end]
 

@@ -15,7 +15,6 @@ module type Gen_intf = sig
          ?sign_type:[`Fake | `Real]
       -> key_gen:(Signature_keypair.t * Signature_keypair.t)
                  Quickcheck.Generator.t
-      -> ?fee_nonce:Account_nonce.t
       -> ?nonce:Account_nonce.t
       -> max_amount:int
       -> ?fee_token:Token_id.t
@@ -32,7 +31,6 @@ module type Gen_intf = sig
     val payment_with_random_participants :
          ?sign_type:[`Fake | `Real]
       -> keys:Signature_keypair.t array
-      -> ?fee_nonce:Account_nonce.t
       -> ?nonce:Account_nonce.t
       -> max_amount:int
       -> ?fee_token:Token_id.t
@@ -44,7 +42,6 @@ module type Gen_intf = sig
     val stake_delegation :
          key_gen:(Signature_keypair.t * Signature_keypair.t)
                  Quickcheck.Generator.t
-      -> ?fee_nonce:Account_nonce.t
       -> ?nonce:Account_nonce.t
       -> ?fee_token:Token_id.t
       -> max_fee:int
@@ -53,7 +50,6 @@ module type Gen_intf = sig
 
     val stake_delegation_with_random_participants :
          keys:Signature_keypair.t array
-      -> ?fee_nonce:Account_nonce.t
       -> ?nonce:Account_nonce.t
       -> ?fee_token:Token_id.t
       -> max_fee:int

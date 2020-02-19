@@ -31,7 +31,6 @@ module Common : sig
     type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t =
       { fee: 'fee
       ; fee_token: 'token_id
-      ; fee_nonce: 'nonce
       ; nonce: 'nonce
       ; valid_until: 'global_slot
       ; memo: 'memo }
@@ -144,7 +143,6 @@ type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 val create :
      fee:Currency.Fee.t
   -> fee_token:Token_id.t
-  -> fee_nonce:Coda_numbers.Account_nonce.t
   -> nonce:Coda_numbers.Account_nonce.t
   -> valid_until:Coda_numbers.Global_slot.t
   -> memo:User_command_memo.t
@@ -156,8 +154,6 @@ val dummy : t
 val fee : t -> Currency.Fee.t
 
 val fee_token : t -> Token_id.t
-
-val fee_nonce : t -> Coda_numbers.Account_nonce.t
 
 val nonce : t -> Coda_numbers.Account_nonce.t
 

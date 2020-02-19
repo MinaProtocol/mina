@@ -393,11 +393,10 @@ module Base = struct
     let receiver = Account_id.Checked.public_key receiver_id in
     (* Information for the sender. *)
     let token = Account_id.Checked.token_id receiver_id in
-    let nonce = payload.common.nonce in
     let sender_id = Account_id.Checked.create sender token in
     (* Information for the fee-payer. *)
+    let nonce = payload.common.nonce in
     let fee_token = payload.common.fee_token in
-    let fee_nonce = payload.common.fee_nonce in
     let fee_sender_id = Account_id.Checked.create sender fee_token in
     (* Compute transaction kind. *)
     let tag = payload.body.tag in
@@ -560,10 +559,16 @@ module Base = struct
              let%bind () =
                [%with_label "Check fee nonce"]
                  (let%bind nonce_matches =
-                    Account.Nonce.Checked.equal fee_nonce account.nonce
+                    Account.Nonce.Checked.equal nonce account.nonce
                   in
                   Boolean.Assert.any
                     [Boolean.not is_user_command; nonce_matches])
+             in
+             let%bind receipt_chain_hash =
+               let current = account.receipt_chain_hash in
+               let%bind r = Receipt.Chain_hash.Checked.cons ~payload current in
+               Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
+                 ~else_:current
              in
              let%bind amount =
                [%with_label "Compute fee payer amount"]
@@ -610,7 +615,7 @@ module Base = struct
              ; public_key= Account_id.Checked.public_key fee_sender_id
              ; token_id= Account_id.Checked.token_id fee_sender_id
              ; nonce= next_nonce
-             ; receipt_chain_hash= account.receipt_chain_hash
+             ; receipt_chain_hash
              ; delegate
              ; voting_for= account.voting_for
              ; timing } ))
@@ -626,22 +631,6 @@ module Base = struct
                - the fee-receiver for a coinbase 
                - the second receiver for a fee transfer
              *)
-             let%bind next_nonce =
-               Account.Nonce.Checked.succ_if account.nonce is_user_command
-             in
-             let%bind () =
-               [%with_label "Check sender nonce"]
-                 (let%bind nonce_matches =
-                    Account.Nonce.Checked.equal nonce account.nonce
-                  in
-                  Boolean.Assert.any [Boolean.not is_payment; nonce_matches])
-             in
-             let%bind receipt_chain_hash =
-               let current = account.receipt_chain_hash in
-               let%bind r = Receipt.Chain_hash.Checked.cons ~payload current in
-               Receipt.Chain_hash.Checked.if_ is_user_command ~then_:r
-                 ~else_:current
-             in
              let%bind amount =
                (* Only payments should affect the balance at this stage. *)
                if_ is_payment ~typ:Amount.typ ~then_:payload.body.amount
@@ -665,8 +654,8 @@ module Base = struct
              { Account.Poly.balance
              ; public_key= account.public_key
              ; token_id= account.token_id
-             ; nonce= next_nonce
-             ; receipt_chain_hash
+             ; nonce= account.nonce
+             ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
              ; voting_for= account.voting_for
              ; timing } ))
@@ -1714,9 +1703,9 @@ let%test_module "transaction_snark" =
       in
       Array.init n ~f:(fun _ -> random_wallet ())
 
-    let user_command sender receiver amt fee fee_token fee_nonce nonce memo =
+    let user_command sender receiver amt fee fee_token nonce memo =
       let payload : User_command.Payload.t =
-        User_command.Payload.create ~fee ~fee_token ~fee_nonce ~nonce ~memo
+        User_command.Payload.create ~fee ~fee_token ~nonce ~memo
           ~valid_until:Global_slot.max_value
           ~body:
             (Payment
@@ -1731,11 +1720,10 @@ let%test_module "transaction_snark" =
           ; signature }
       |> Option.value_exn
 
-    let user_command_with_wallet wallets i j amt fee fee_token fee_nonce nonce
-        memo =
+    let user_command_with_wallet wallets i j amt fee fee_token nonce memo =
       let sender = wallets.(i) in
       let receiver = wallets.(j) in
-      user_command sender receiver amt fee fee_token fee_nonce nonce memo
+      user_command sender receiver amt fee fee_token nonce memo
 
     let keys = Keys.create ()
 
@@ -1875,7 +1863,6 @@ let%test_module "transaction_snark" =
                 user_command_with_wallet wallets 1 0 8
                   (Fee.of_int (Random.int 20))
                   Token_id.default Account.Nonce.zero
-                  Account.Nonce.(succ zero)
                   (User_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
                         ~len:User_command_memo.max_digestible_string_length))
@@ -1966,13 +1953,11 @@ let%test_module "transaction_snark" =
                 in
                 List.fold receivers ~init:(Account.Nonce.zero, [])
                   ~f:(fun (nonce, txns) receiver ->
-                    let fee_nonce = nonce in
-                    let command_nonce = Account.Nonce.succ fee_nonce in
                     let uc =
                       user_command sender receiver amount (Fee.of_int txn_fee)
-                        Token_id.default fee_nonce command_nonce memo
+                        Token_id.default nonce memo
                     in
-                    (Account.Nonce.succ command_nonce, txns @ [uc]) )
+                    (Account.Nonce.succ nonce, txns @ [uc]) )
               in
               Ledger.create_new_account_exn ledger
                 (Account.identifier sender.account)
@@ -2088,7 +2073,6 @@ let%test_module "transaction_snark" =
                 user_command_with_wallet wallets 0 1 8
                   (Fee.of_int (Random.int 20))
                   Token_id.default Account.Nonce.zero
-                  Account.Nonce.(succ zero)
                   (User_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
                         ~len:User_command_memo.max_digestible_string_length))
@@ -2097,7 +2081,6 @@ let%test_module "transaction_snark" =
                 user_command_with_wallet wallets 1 2 3
                   (Fee.of_int (Random.int 20))
                   Token_id.default Account.Nonce.zero
-                  Account.Nonce.(succ zero)
                   (User_command_memo.create_by_digesting_string_exn
                      (Test_util.arbitrary_string
                         ~len:User_command_memo.max_digestible_string_length))

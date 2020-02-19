@@ -135,16 +135,15 @@ end
 
 module Gen = struct
   let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
-      ?(fee_nonce = Account_nonce.zero) ?(nonce = Account_nonce.zero)
-      ?(fee_token = Token_id.default) ~max_fee create_body =
+      ?(nonce = Account_nonce.zero) ?(fee_token = Token_id.default) ~max_fee
+      create_body =
     let open Quickcheck.Generator.Let_syntax in
     let%bind sender, (receiver : Signature_keypair.t) = key_gen
     and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int
     and memo = String.quickcheck_generator in
     let%map body = create_body receiver in
     let payload : Payload.t =
-      Payload.create ~fee ~fee_token ~fee_nonce ~nonce
-        ~valid_until:Global_slot.max_value
+      Payload.create ~fee ~fee_token ~nonce ~valid_until:Global_slot.max_value
         ~memo:(User_command_memo.create_by_digesting_string_exn memo)
         ~body
     in
@@ -156,9 +155,9 @@ module Gen = struct
 
   module Payment = struct
     let gen_inner (sign' : Signature_lib.Keypair.t -> Payload.t -> t) ~key_gen
-        ?fee_nonce ?nonce ~max_amount ?fee_token
-        ?(payment_token = Token_id.default) ~max_fee () =
-      gen_inner sign' ~key_gen ?fee_nonce ?nonce ?fee_token ~max_fee
+        ?nonce ~max_amount ?fee_token ?(payment_token = Token_id.default)
+        ~max_fee () =
+      gen_inner sign' ~key_gen ?nonce ?fee_token ~max_fee
       @@ fun {public_key= receiver; _} ->
       let open Quickcheck.Generator.Let_syntax in
       let%map amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int in
@@ -174,26 +173,24 @@ module Gen = struct
       | `Real ->
           gen_inner sign
 
-    let gen_with_random_participants ?sign_type ~keys ?fee_nonce ?nonce
-        ~max_amount ?fee_token ?payment_token ~max_fee =
+    let gen_with_random_participants ?sign_type ~keys ?nonce ~max_amount
+        ?fee_token ?payment_token ~max_fee =
       with_random_participants ~keys ~gen:(fun ~key_gen ->
-          gen ?sign_type ~key_gen ?fee_nonce ?nonce ~max_amount ?fee_token
-            ?payment_token ~max_fee )
+          gen ?sign_type ~key_gen ?nonce ~max_amount ?fee_token ?payment_token
+            ~max_fee )
   end
 
   module Stake_delegation = struct
-    let gen ~key_gen ?fee_nonce ?nonce ?fee_token ~max_fee () =
-      gen_inner For_tests.fake_sign ~key_gen ?fee_nonce ?nonce ?fee_token
-        ~max_fee (fun {public_key= new_delegate; _} ->
+    let gen ~key_gen ?nonce ?fee_token ~max_fee () =
+      gen_inner For_tests.fake_sign ~key_gen ?nonce ?fee_token ~max_fee
+        (fun {public_key= new_delegate; _} ->
           Quickcheck.Generator.return
           @@ User_command_payload.Body.Stake_delegation
                (Set_delegate {new_delegate= Public_key.compress new_delegate})
       )
 
-    let gen_with_random_participants ~keys ?fee_nonce ?nonce ?fee_token
-        ~max_fee =
-      with_random_participants ~keys
-        ~gen:(gen ?fee_nonce ?nonce ?fee_token ~max_fee)
+    let gen_with_random_participants ~keys ?nonce ?fee_token ~max_fee =
+      with_random_participants ~keys ~gen:(gen ?nonce ?fee_token ~max_fee)
   end
 
   let payment = Payment.gen
@@ -291,7 +288,7 @@ module Gen = struct
           let memo = User_command_memo.dummy in
           let payload =
             Payload.create ~fee ~fee_token:Token_id.default
-              ~valid_until:Global_slot.max_value ~fee_nonce:nonce ~nonce ~memo
+              ~valid_until:Global_slot.max_value ~nonce ~memo
               ~body:
                 (Payment
                    { receiver= Account_id.create receiver Token_id.default

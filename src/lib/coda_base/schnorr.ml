@@ -16,7 +16,6 @@ module Message = struct
     let { User_command_payload.Poly.common=
             { User_command_payload.Common.Poly.fee
             ; fee_token
-            ; fee_nonce
             ; nonce
             ; valid_until
             ; memo }
@@ -39,7 +38,6 @@ module Message = struct
           (Signature_lib.Public_key.compress (Inner_curve.to_affine_exn pk))
       ; Fee.to_bits fee
       ; Token_id.unpack fee_token
-      ; Account_nonce.Bits.to_bits fee_nonce
       ; Account_nonce.Bits.to_bits nonce
       ; Global_slot.to_bits valid_until
       ; User_command_memo.to_bits memo

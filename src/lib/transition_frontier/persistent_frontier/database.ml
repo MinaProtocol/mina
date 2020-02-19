@@ -66,11 +66,11 @@ module Schema = struct
     | Db_version ->
         [%bin_type_class: int]
     | Transition _ ->
-        [%bin_type_class: External_transition.Stable.V1.t]
+        [%bin_type_class: External_transition.Stable.V2.t]
     | Arcs _ ->
         [%bin_type_class: State_hash.Stable.V1.t list]
     | Root ->
-        [%bin_type_class: Root_data.Minimal.Stable.V1.t]
+        [%bin_type_class: Root_data.Minimal.Stable.V2.t]
     | Best_tip ->
         [%bin_type_class: State_hash.Stable.V1.t]
     | Frontier_hash ->
@@ -294,7 +294,7 @@ let add t ~transition =
       Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs) )
 
 let move_root t ~new_root ~garbage =
-  let open Root_data.Minimal.Stable.V1 in
+  let open Root_data.Minimal in
   let%bind () =
     Result.ok_if_true
       (mem t.db ~key:(Transition new_root.hash))
