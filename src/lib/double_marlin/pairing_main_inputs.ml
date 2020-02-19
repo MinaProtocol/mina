@@ -57,7 +57,7 @@ module Input_domain = struct
         Array.init domain_size ~f:(fun i ->
             Snarky_bn382_backend.G.Affine.of_backend
               (Snarky_bn382.Fq_urs.lagrange_commitment
-                 (Lazy.force Snarky_bn382_backend.Dlog_based.Keypair.urs)
+                 (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
                  (u domain_size) (u i)) ) )
 end
 
@@ -213,6 +213,6 @@ end
 module Generators = struct
   let h =
     Snarky_bn382.Fq_urs.h
-      (Lazy.force Snarky_bn382_backend.Dlog_based.Keypair.urs)
+      (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
     |> Snarky_bn382_backend.G.Affine.of_backend
 end

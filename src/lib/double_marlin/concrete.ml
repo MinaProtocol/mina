@@ -21,7 +21,7 @@ let compute_challenges chals =
 
 let compute_sg chals =
   Snarky_bn382.Fq_urs.b_poly_commitment
-    (Lazy.force Snarky_bn382_backend.Dlog_based.Keypair.urs)
+    (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
     (Fq.Vector.of_array (Vector.to_array (compute_challenges chals)))
   |> G.Affine.of_backend
 
@@ -444,7 +444,7 @@ struct
         let v = Fp.Vector.create () in
         List.iter public_input ~f:(Fp.Vector.emplace_back v) ;
         Snarky_bn382.Fp_urs.commit_evaluations
-          (Lazy.force Snarky_bn382_backend.Pairing_based.Keypair.urs)
+          (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
           (Unsigned.Size_t.of_int 64)
           v
         |> Snarky_bn382_backend.G1.Affine.of_backend
@@ -827,7 +827,7 @@ struct
         (* TODO: Leaky *)
         let t =
           Snarky_bn382.Fp_urs.dummy_opening_check
-            (Lazy.force Snarky_bn382_backend.Pairing_based.Keypair.urs)
+            (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
         in
         { r_f_minus_r_v_plus_rz_pi=
             Snarky_bn382.G1.Affine.Pair.f0 t |> G1.Affine.of_backend
@@ -844,7 +844,7 @@ struct
         (* TODO: Leaky *)
         let t =
           Snarky_bn382.Fp_urs.dummy_degree_bound_checks
-            (Lazy.force Snarky_bn382_backend.Pairing_based.Keypair.urs)
+            (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
             (Unsigned.Size_t.of_int (h - 1))
             (Unsigned.Size_t.of_int (k - 1))
         in

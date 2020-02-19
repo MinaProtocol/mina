@@ -22,7 +22,7 @@ module Input_domain = struct
         Array.init domain_size ~f:(fun i ->
             Snarky_bn382_backend.G1.Affine.of_backend
               (Snarky_bn382.Fp_urs.lagrange_commitment
-                 (Lazy.force Snarky_bn382_backend.Pairing_based.Keypair.urs)
+                 (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
                  (u domain_size) (u i)) ) )
 
   let domain = Domain.Pow_2_roots_of_unity 6
