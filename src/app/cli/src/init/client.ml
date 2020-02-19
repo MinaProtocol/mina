@@ -1435,6 +1435,13 @@ let trustlist_list =
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
+let compile_time_constants =
+  Command.basic
+    ~summary:"Print a JSON map of the compile-time consensus parameters"
+    (Command.Param.return (fun () ->
+         Core.printf "%s\n%!"
+           (Yojson.Safe.to_string Consensus.Constants.all_constants) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1547,4 +1554,5 @@ let advanced =
     ; ("unsafe-import", unsafe_import)
     ; ("import", import_key)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
+    ; ("compile-time-constants", compile_time_constants)
     ; ("visualization", Visualization.command_group) ]
