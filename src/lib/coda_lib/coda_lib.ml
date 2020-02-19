@@ -3,6 +3,7 @@
 
 open Core_kernel
 open Async
+open Unsigned
 open Coda_base
 open Coda_transition
 open Pipe_lib
@@ -504,12 +505,14 @@ let root_diff t =
                 Extensions.(get_view_pipe (extensions frontier) Identity))
               ~f:
                 (Deferred.List.iter ~f:(function
-                  | Transition_frontier.Diff.Full.E.E (New_node _) ->
+                  | Transition_frontier.Diff.Full.With_mutant.E (New_node _, _)
+                    ->
                       Deferred.unit
-                  | Transition_frontier.Diff.Full.E.E (Best_tip_changed _) ->
+                  | Transition_frontier.Diff.Full.With_mutant.E
+                      (Best_tip_changed _, _) ->
                       Deferred.unit
-                  | Transition_frontier.Diff.Full.E.E
-                      (Root_transitioned {new_root; _}) ->
+                  | Transition_frontier.Diff.Full.With_mutant.E
+                      (Root_transitioned {new_root; _}, _) ->
                       let new_root_breadcrumb =
                         Transition_frontier.find_exn frontier new_root.hash
                       in
@@ -825,6 +828,30 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   ~network_transition_reader:
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm, cb) ->
+                         let lift_consensus_time =
+                           Fn.compose UInt32.to_int
+                             Consensus.Data.Consensus_time.to_uint32
+                         in
+                         let tn_production_consensus_time =
+                           External_transition.consensus_time_produced_at
+                             (Envelope.Incoming.data tn)
+                         in
+                         let tn_production_slot =
+                           lift_consensus_time tn_production_consensus_time
+                         in
+                         let tn_production_time =
+                           Consensus.Data.Consensus_time.to_time
+                             tn_production_consensus_time
+                         in
+                         let tm_slot =
+                           lift_consensus_time
+                             (Consensus.Data.Consensus_time.of_time_exn tm)
+                         in
+                         Coda_metrics.Block_latency.Gossip_slots.update
+                           (Float.of_int (tm_slot - tn_production_slot)) ;
+                         Coda_metrics.Block_latency.Gossip_time.update
+                           Block_time.(
+                             Span.to_time_span @@ diff tm tn_production_time) ;
                          (`Transition tn, `Time_received tm, `Valid_cb cb) ))
                   ~producer_transition_reader:
                     (Strict_pipe.Reader.map producer_transition_reader
