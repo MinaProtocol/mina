@@ -1,12 +1,15 @@
 [%%import
 "/src/config.mlh"]
 
-(* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 open Core_kernel
 open Prometheus
+open Namespace
+open Metric_generators
 
-let namespace = "Coda"
+[%%inject
+"block_window_duration", block_window_duration]
 
+(* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
   let re_unquoted_escapes = Re.compile @@ Re.set "\\\n"
 
@@ -91,34 +94,6 @@ module TextFormat_0_0_4 = struct
           metric_type
           (LabelSetMap.pp ~sep:Fmt.nop (output_metric ~name ~label_names))
           samples )
-end
-
-module Moving_average (Spec : sig
-  val tick_interval : Core.Time.Span.t
-
-  val rolling_interval : Core.Time.Span.t
-
-  val display : Float.t -> Float.t
-end) =
-struct
-  open Async
-
-  let total = ref 0.
-
-  let create () ~name ~subsystem ~namespace ~help =
-    let gauge = Gauge.v name ~subsystem ~namespace ~help in
-    let rec tick () =
-      upon (after Spec.tick_interval) (fun () ->
-          Gauge.set gauge (Spec.display !total) ;
-          tick () )
-    in
-    tick ()
-
-  let update datum =
-    total := !total +. datum ;
-    upon (after Spec.rolling_interval) (fun () -> total := !total -. datum)
-
-  let clear () = total := 0.
 end
 
 module Runtime = struct
@@ -463,9 +438,6 @@ module Scan_state_metrics = struct
     [%%inject
     "tps_goal_x10", scan_state_tps_goal_x10]
 
-    [%%inject
-    "block_window_duration", block_window_duration]
-
     let max_coinbases = 2
 
     (* block_window_duration is in milliseconds, so divide by 1000
@@ -629,22 +601,27 @@ module Transition_frontier = struct
     let help = "total # of staged txns that have been finalized" in
     Counter.v "finalized_staged_txns" ~help ~namespace ~subsystem
 
-  module TPS_30min = Moving_average (struct
-    let tick_interval = Core.Time.Span.of_min 3.
+  module TPS_30min =
+    Moving_bucketed_average (struct
+        let bucket_interval = Core.Time.Span.of_min 3.0
 
-    let rolling_interval = Core.Time.Span.of_min 30.
+        let num_buckets = 10
 
-    let display total_txns =
-      total_txns /. Core.Time.Span.to_sec rolling_interval
-  end)
+        let render_average buckets =
+          let total =
+            List.fold buckets ~init:0.0 ~f:(fun acc (n, _) -> acc +. n)
+          in
+          total /. Core.Time.Span.(of_min 30.0 |> to_sec)
 
-  let tps_30min =
-    let name = "tps_30min" in
-    let help =
-      "moving average for transaction per second, the rolling interval is set \
-       to 30 min"
-    in
-    TPS_30min.create ~name ~help ~namespace ~subsystem ()
+        let subsystem = subsystem
+
+        let name = "tps_30min"
+
+        let help =
+          "moving average for transaction per second, the rolling interval is \
+           set to 30 min"
+      end)
+      ()
 
   let recently_finalized_staged_txns : Gauge.t =
     let help =
@@ -711,6 +688,70 @@ module Transition_frontier_controller = struct
   let breadcrumbs_built_by_builder : Counter.t =
     let help = "breadcrumbs built by the breadcrumb builder" in
     Counter.v "breadcrumbs_built_by_builder" ~help ~namespace ~subsystem
+end
+
+(* these block latency metrics are recomputed every half a slot, and the averages span 20 slots *)
+module Block_latency = struct
+  let subsystem = "Block_latency"
+
+  module Latency_time_spec = struct
+    let tick_interval =
+      Core.Time.Span.of_min (Int.to_float (block_window_duration / 2))
+
+    let rolling_interval =
+      Core.Time.Span.of_min (Int.to_float (block_window_duration * 20))
+  end
+
+  module Gossip_slots =
+    Moving_bucketed_average (struct
+        let bucket_interval =
+          Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
+
+        let num_buckets = 40
+
+        let subsystem = subsystem
+
+        let name = "gossip_slots"
+
+        let help =
+          "average delay, in slots, after which produced blocks are received"
+
+        let render_average buckets =
+          let total_sum, count_sum =
+            List.fold buckets ~init:(0.0, 0)
+              ~f:(fun (total_sum, count_sum) (total, count) ->
+                (total_sum +. total, count_sum + count) )
+          in
+          total_sum /. Float.of_int count_sum
+      end)
+      ()
+
+  module Gossip_time =
+    Moving_time_sec_average (struct
+        include Latency_time_spec
+
+        let subsystem = subsystem
+
+        let name = "gossip_time"
+
+        let help =
+          "average delay, in seconds, after which produced blocks are received"
+      end)
+      ()
+
+  module Inclusion_time =
+    Moving_time_sec_average (struct
+        include Latency_time_spec
+
+        let subsystem = subsystem
+
+        let name = "inclusion_time"
+
+        let help =
+          "average delay, in seconds, after which produced blocks are \
+           included into our frontier"
+      end)
+      ()
 end
 
 let server ~port ~logger =
