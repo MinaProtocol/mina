@@ -40,8 +40,8 @@ mutation ($password: String) {
 module Create_account_hardware_wallet =
 [%graphql
 {|
-mutation ($hardware_wallet_nonce: UInt32) {
-  createAccountHardwareWallet(input: {nonce: $hardware_wallet_nonce}) {
+mutation ($hd_index: UInt32) {
+  createAccountHardwareWallet(input: {nonce: $hd_index}) {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
   }
 }

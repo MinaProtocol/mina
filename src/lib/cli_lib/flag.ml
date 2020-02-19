@@ -315,11 +315,10 @@ let user_command_common : user_command_common Command.Param.t =
 module User_command = struct
   open Arg_type
 
-  let hardware_wallet_nonce =
+  let hd_index =
     let open Command.Param in
-    flag "hardware-wallet-nonce"
-      ~doc:"HARDWARE-WALLET-NONCE Nonce used by hardware wallet"
-      (required hardware_wallet_nonce)
+    flag "HD-index" ~doc:"HD-INDEX Index used by hardware wallet"
+      (required hd_index)
 
   let receiver =
     let open Command.Param in

@@ -1405,10 +1405,9 @@ module Mutations = struct
         Arg.
           [ arg "input"
               ~typ:(non_null Types.Input.create_account_hardware_wallet) ]
-      ~resolve:(fun {ctx= coda; _} () hardware_wallet_nonce ->
+      ~resolve:(fun {ctx= coda; _} () hd_index ->
         Coda_lib.wallets coda
-        |> Secrets.Wallets.create_account_hardware_wallet
-             ~hardware_wallet_nonce )
+        |> Secrets.Wallets.create_account_hardware_wallet ~hd_index )
 
   let unlock_account_resolver {ctx= t; _} () (password, pk) =
     let password = lazy (return (Bytes.of_string password)) in
@@ -1648,8 +1647,8 @@ module Mutations = struct
           | `Keypair sender_kp ->
               User_command.sign sender_kp user_command_payload
               |> User_command.forget_check |> Deferred.Result.return
-          | `Hardware_wallet hardware_wallet_nonce ->
-              Secrets.Hardware_wallets.sign ~hardware_wallet_nonce
+          | `Hardware_wallet hd_index ->
+              Secrets.Hardware_wallets.sign ~hd_index
                 ~public_key:(Public_key.decompress_exn from)
                 ~user_command_payload
         in

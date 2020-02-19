@@ -70,8 +70,7 @@ type user_command_common =
 val user_command_common : user_command_common Command.Param.t
 
 module User_command : sig
-  val hardware_wallet_nonce :
-    Coda_numbers.Hardware_wallet_nonce.t Command.Spec.param
+  val hd_index : Coda_numbers.Hd_index.t Command.Spec.param
 
   val receiver : Signature_lib.Public_key.Compressed.t Command.Spec.param
 

@@ -7,7 +7,7 @@ open Signature_lib
 type locked_key =
   | Locked of string
   | Unlocked of (string * Keypair.t)
-  | Hardware_wallet of Coda_numbers.Hardware_wallet_nonce.t
+  | Hardware_wallet of Coda_numbers.Hd_index.t
 
 (* A simple cache on top of the fs *)
 type t = {cache: locked_key Public_key.Compressed.Table.t; path: string}
@@ -68,15 +68,15 @@ let reload ~logger {cache; path} : unit Deferred.t =
           | Some public_key -> (
               let%map lines = Reader.file_lines (path ^/ file) in
               match lines with
-              | hardware_wallet_nonce :: _ ->
+              | hd_index :: _ ->
                   decode_public_key public_key file path logger
                   |> Option.iter ~f:(fun pk ->
                          ignore
                          @@ Public_key.Compressed.Table.add cache ~key:pk
                               ~data:
                                 (Hardware_wallet
-                                   (Coda_numbers.Hardware_wallet_nonce
-                                    .of_string hardware_wallet_nonce)) )
+                                   (Coda_numbers.Hd_index.of_string hd_index))
+                     )
               | _ ->
                   () )
           | None ->
@@ -115,25 +115,23 @@ let generate_new t ~password : Public_key.Compressed.t Deferred.t =
   let keypair = Keypair.create () in
   import_keypair t keypair ~password
 
-let create_account_hardware_wallet t ~hardware_wallet_nonce :
+let create_account_hardware_wallet t ~hd_index :
     (Public_key.Compressed.t, string) Deferred.Result.t =
   let open Deferred.Result.Let_syntax in
-  let%bind public_key =
-    Hardware_wallets.compute_public_key ~hardware_wallet_nonce
-  in
+  let%bind public_key = Hardware_wallets.compute_public_key ~hd_index in
   let compressed_pk = Public_key.compress public_key in
   let nonce_path =
     t.path ^/ Public_key.Compressed.to_base58_check compressed_pk ^ ".nonce"
   in
   let%bind () =
-    Hardware_wallets.write_exn ~hardware_wallet_nonce ~nonce_path
+    Hardware_wallets.write_exn ~hd_index ~nonce_path
     |> Deferred.map ~f:Result.return
   in
   let%map () =
     Unix.chmod nonce_path ~perm:0o600 |> Deferred.map ~f:Result.return
   in
   Public_key.Compressed.Table.add t.cache ~key:compressed_pk
-    ~data:(Hardware_wallet hardware_wallet_nonce)
+    ~data:(Hardware_wallet hd_index)
   |> ignore ;
   compressed_pk
 

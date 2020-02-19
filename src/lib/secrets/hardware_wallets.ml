@@ -63,20 +63,18 @@ let decode_signature : string -> (Signature.t, string) Result.t =
          decode_status_code status ~f:(fun () ->
              (decode_field field, decode_scalar scalar) ) )
 
-let compute_public_key ~hardware_wallet_nonce =
+let compute_public_key ~hd_index =
   let prog, args =
     ( "python3"
     , [ "-m" ^ hardware_wallet_script
       ; "--request=publickey"
-      ; "--nonce="
-        ^ Coda_numbers.Hardware_wallet_nonce.to_string hardware_wallet_nonce ]
-    )
+      ; "--nonce=" ^ Coda_numbers.Hd_index.to_string hd_index ] )
   in
   Process.run ~prog ~args ()
   |> Deferred.Result.map_error ~f:report_process_error
   |> Deferred.map ~f:(Result.bind ~f:decode_public_key)
 
-let sign ~hardware_wallet_nonce ~public_key ~user_command_payload =
+let sign ~hd_index ~public_key ~user_command_payload =
   let open Deferred.Result.Let_syntax in
   let input =
     Transaction_union_payload.to_input
@@ -95,9 +93,7 @@ let sign ~hardware_wallet_nonce ~public_key ~user_command_payload =
         ; "--request=sign"
         ; "--msgx=" ^ messages.(0)
         ; "--msgm=" ^ messages.(1)
-        ; "--nonce="
-          ^ Coda_numbers.Hardware_wallet_nonce.to_string hardware_wallet_nonce
-        ] )
+        ; "--nonce=" ^ Coda_numbers.Hd_index.to_string hd_index ] )
     in
     let%bind signature_str =
       Process.run ~prog ~args ()
@@ -113,9 +109,7 @@ let sign ~hardware_wallet_nonce ~public_key ~user_command_payload =
         Coda_base.User_command.Poly.
           {payload= user_command_payload; sender= public_key; signature}
     else
-      let%bind computed_public_key =
-        compute_public_key ~hardware_wallet_nonce
-      in
+      let%bind computed_public_key = compute_public_key ~hd_index in
       if Public_key.equal computed_public_key public_key then
         Deferred.Result.fail
           "Failed to verify signature returned by hardware wallet."
@@ -128,8 +122,7 @@ let sign ~hardware_wallet_nonce ~public_key ~user_command_payload =
            please first create an account by 'coda account \
            create-hardware-wallet' command"
 
-let write_exn ~hardware_wallet_nonce ~nonce_path : unit Deferred.t =
+let write_exn ~hd_index ~nonce_path : unit Deferred.t =
   let%bind nonce_file = Writer.open_file nonce_path in
-  Writer.write_line nonce_file
-    (Coda_numbers.Hardware_wallet_nonce.to_string hardware_wallet_nonce) ;
+  Writer.write_line nonce_file (Coda_numbers.Hd_index.to_string hd_index) ;
   Writer.close nonce_file
