@@ -122,7 +122,7 @@ let sign ~hd_index ~public_key ~user_command_payload =
            please first create an account by 'coda account \
            create-hardware-wallet' command"
 
-let write_exn ~hd_index ~nonce_path : unit Deferred.t =
-  let%bind nonce_file = Writer.open_file nonce_path in
-  Writer.write_line nonce_file (Coda_numbers.Hd_index.to_string hd_index) ;
-  Writer.close nonce_file
+let write_exn ~hd_index ~index_path : unit Deferred.t =
+  let%bind index_file = Writer.open_file index_path in
+  Writer.write_line index_file (Coda_numbers.Hd_index.to_string hd_index) ;
+  Writer.close index_file

@@ -1134,12 +1134,12 @@
         },
         {
           "kind": "INPUT_OBJECT",
-          "name": "CreateAccountHardwareWalletInput",
+          "name": "CreateHDAccountInput",
           "description": null,
           "fields": [
             {
-              "name": "nonce",
-              "description": "Nonce of the account in hardware wallet",
+              "name": "index",
+              "description": "Index of the account in hardware wallet",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -1156,8 +1156,8 @@
           ],
           "inputFields": [
             {
-              "name": "nonce",
-              "description": "Nonce of the account in hardware wallet",
+              "name": "index",
+              "description": "Index of the account in hardware wallet",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1327,8 +1327,8 @@
               "deprecationReason": null
             },
             {
-              "name": "createAccountHardwareWallet",
-              "description": "Create an account with hardware wallet - this will let the hardware wallet generate a keypair corresponds to the nonce you give and store this nonce and the generated public key in the daemon. Calling this command with the same nonce and the same hardware wallet will always generate the same keypair.",
+              "name": "createHDAccount",
+              "description": "Create an account with hardware wallet - this will let the hardware wallet generate a keypair corresponds to the HD-index you give and store this HD-index and the generated public key in the daemon. Calling this command with the same HD-index and the same hardware wallet will always generate the same keypair.",
               "args": [
                 {
                   "name": "input",
@@ -1338,7 +1338,7 @@
                     "name": null,
                     "ofType": {
                       "kind": "INPUT_OBJECT",
-                      "name": "CreateAccountHardwareWalletInput",
+                      "name": "CreateHDAccountInput",
                       "ofType": null
                     }
                   },

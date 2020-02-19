@@ -1250,26 +1250,26 @@ let create_account =
          in
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ))
 
-let create_account_hardware_wallet =
+let create_hd_account =
   Command.async
     ~summary:
       "Create an account with hardware wallet - this will let the hardware \
-       wallet generate a keypair corresponds to the nonce you give and store \
-       this nonce and the generated public key in the daemon. Calling this \
-       command with the same nonce and the same hardware wallet will always \
-       generate the same keypair."
+       wallet generate a keypair corresponds to the HD-index you give and \
+       store this HD-index and the generated public key in the daemon. \
+       Calling this command with the same HD-index and the same hardware \
+       wallet will always generate the same keypair."
     (Cli_lib.Background_daemon.graphql_init Cli_lib.Flag.User_command.hd_index
        ~f:(fun graphql_endpoint hd_index ->
          let%map response =
            Graphql_client.(
              query_exn
-               (Graphql_queries.Create_account_hardware_wallet.make
+               (Graphql_queries.Create_hd_account.make
                   ~hd_index:(Encoders.uint32 hd_index) ()))
              graphql_endpoint
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             (response#createAccountHardwareWallet)#public_key
+             (response#createHDAccount)#public_key
          in
          printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
            (Coda_numbers.Hd_index.to_string hd_index)
@@ -1476,7 +1476,7 @@ let accounts =
     ~preserve_subcommand_order:()
     [ ("list", list_accounts)
     ; ("create", create_account)
-    ; ("create-hardware-wallet", create_account_hardware_wallet)
+    ; ("create-hd", create_hd_account)
     ; ("import", import_key)
     ; ("unlock", unlock_account)
     ; ("lock", lock_account) ]

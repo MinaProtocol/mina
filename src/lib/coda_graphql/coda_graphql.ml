@@ -1156,10 +1156,10 @@ module Types = struct
               ~doc:"Public key specifying which account to unlock"
               ~typ:(non_null public_key_arg) ]
 
-    let create_account_hardware_wallet =
-      obj "CreateAccountHardwareWalletInput" ~coerce:Fn.id
+    let create_hd_account =
+      obj "CreateHDAccountInput" ~coerce:Fn.id
         ~fields:
-          [ arg "nonce" ~doc:"Nonce of the account in hardware wallet"
+          [ arg "index" ~doc:"Index of the account in hardware wallet"
               ~typ:(non_null uint32_arg) ]
 
     let lock_account =
@@ -1392,22 +1392,18 @@ module Mutations = struct
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_account)]
       ~resolve:create_account_resolver
 
-  let create_account_hardware_wallet : (Coda_lib.t, unit) field =
-    io_field "createAccountHardwareWallet"
+  let create_hd_account : (Coda_lib.t, unit) field =
+    io_field "createHDAccount"
       ~doc:
         "Create an account with hardware wallet - this will let the hardware \
-         wallet generate a keypair corresponds to the nonce you give and \
-         store this nonce and the generated public key in the daemon. Calling \
-         this command with the same nonce and the same hardware wallet will \
-         always generate the same keypair."
+         wallet generate a keypair corresponds to the HD-index you give and \
+         store this HD-index and the generated public key in the daemon. \
+         Calling this command with the same HD-index and the same hardware \
+         wallet will always generate the same keypair."
       ~typ:(non_null Types.Payload.create_account)
-      ~args:
-        Arg.
-          [ arg "input"
-              ~typ:(non_null Types.Input.create_account_hardware_wallet) ]
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_hd_account)]
       ~resolve:(fun {ctx= coda; _} () hd_index ->
-        Coda_lib.wallets coda
-        |> Secrets.Wallets.create_account_hardware_wallet ~hd_index )
+        Coda_lib.wallets coda |> Secrets.Wallets.create_hd_account ~hd_index )
 
   let unlock_account_resolver {ctx= t; _} () (password, pk) =
     let password = lazy (return (Bytes.of_string password)) in
@@ -1647,7 +1643,7 @@ module Mutations = struct
           | `Keypair sender_kp ->
               User_command.sign sender_kp user_command_payload
               |> User_command.forget_check |> Deferred.Result.return
-          | `Hardware_wallet hd_index ->
+          | `Hd_index hd_index ->
               Secrets.Hardware_wallets.sign ~hd_index
                 ~public_key:(Public_key.decompress_exn from)
                 ~user_command_payload
@@ -1720,7 +1716,7 @@ module Mutations = struct
   let commands =
     [ add_wallet
     ; create_account
-    ; create_account_hardware_wallet
+    ; create_hd_account
     ; unlock_account
     ; unlock_wallet
     ; lock_account

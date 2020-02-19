@@ -7,7 +7,7 @@ open Signature_lib
 type locked_key =
   | Locked of string
   | Unlocked of (string * Keypair.t)
-  | Hardware_wallet of Coda_numbers.Hd_index.t
+  | Hd_account of Coda_numbers.Hd_index.t
 
 (* A simple cache on top of the fs *)
 type t = {cache: locked_key Public_key.Compressed.Table.t; path: string}
@@ -22,9 +22,9 @@ let get_path {path; cache} public_key =
     |> Option.bind ~f:(function
          | Locked file | Unlocked (file, _) ->
              Option.return file
-         | Hardware_wallet _ ->
+         | Hd_account _ ->
              Option.return
-               (Public_key.Compressed.to_base58_check public_key ^ ".nonce") )
+               (Public_key.Compressed.to_base58_check public_key ^ ".index") )
     |> Option.value ~default:(get_privkey_filename public_key)
   in
   path ^/ filename
@@ -64,7 +64,7 @@ let reload ~logger {cache; path} : unit Deferred.t =
             | _ ->
                 () )
         | None -> (
-          match String.chop_suffix file ~suffix:".nonce" with
+          match String.chop_suffix file ~suffix:".index" with
           | Some public_key -> (
               let%map lines = Reader.file_lines (path ^/ file) in
               match lines with
@@ -74,7 +74,7 @@ let reload ~logger {cache; path} : unit Deferred.t =
                          ignore
                          @@ Public_key.Compressed.Table.add cache ~key:pk
                               ~data:
-                                (Hardware_wallet
+                                (Hd_account
                                    (Coda_numbers.Hd_index.of_string hd_index))
                      )
               | _ ->
@@ -115,23 +115,23 @@ let generate_new t ~password : Public_key.Compressed.t Deferred.t =
   let keypair = Keypair.create () in
   import_keypair t keypair ~password
 
-let create_account_hardware_wallet t ~hd_index :
+let create_hd_account t ~hd_index :
     (Public_key.Compressed.t, string) Deferred.Result.t =
   let open Deferred.Result.Let_syntax in
   let%bind public_key = Hardware_wallets.compute_public_key ~hd_index in
   let compressed_pk = Public_key.compress public_key in
-  let nonce_path =
-    t.path ^/ Public_key.Compressed.to_base58_check compressed_pk ^ ".nonce"
+  let index_path =
+    t.path ^/ Public_key.Compressed.to_base58_check compressed_pk ^ ".index"
   in
   let%bind () =
-    Hardware_wallets.write_exn ~hd_index ~nonce_path
+    Hardware_wallets.write_exn ~hd_index ~index_path
     |> Deferred.map ~f:Result.return
   in
   let%map () =
-    Unix.chmod nonce_path ~perm:0o600 |> Deferred.map ~f:Result.return
+    Unix.chmod index_path ~perm:0o600 |> Deferred.map ~f:Result.return
   in
   Public_key.Compressed.Table.add t.cache ~key:compressed_pk
-    ~data:(Hardware_wallet hd_index)
+    ~data:(Hd_account hd_index)
   |> ignore ;
   compressed_pk
 
@@ -150,7 +150,7 @@ let find_unlocked ({cache; _} : t) ~needle =
            None
        | Unlocked (_, kp) ->
            Some kp
-       | Hardware_wallet _ ->
+       | Hd_account _ ->
            None )
 
 let find_identity ({cache; _} : t) ~needle =
@@ -160,8 +160,8 @@ let find_identity ({cache; _} : t) ~needle =
            None
        | Unlocked (_, kp) ->
            Some (`Keypair kp)
-       | Hardware_wallet nonce ->
-           Some (`Hardware_wallet nonce) )
+       | Hd_account index ->
+           Some (`Hd_index index) )
 
 let check_locked {cache; _} ~needle =
   Public_key.Compressed.Table.find cache needle
@@ -170,7 +170,7 @@ let check_locked {cache; _} ~needle =
            true
        | Unlocked _ ->
            false
-       | Hardware_wallet _ ->
+       | Hd_account _ ->
            true )
 
 let unlock {cache; path} ~needle ~password =
@@ -184,7 +184,7 @@ let unlock {cache; path} ~needle ~password =
         |> Deferred.Result.ignore
     | Unlocked _ ->
         Deferred.Result.return ()
-    | Hardware_wallet _ ->
+    | Hd_account _ ->
         Deferred.Result.return ()
   in
   Public_key.Compressed.Table.find cache needle

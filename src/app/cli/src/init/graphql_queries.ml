@@ -37,11 +37,11 @@ mutation ($password: String) {
 }
 |}]
 
-module Create_account_hardware_wallet =
+module Create_hd_account =
 [%graphql
 {|
 mutation ($hd_index: UInt32) {
-  createAccountHardwareWallet(input: {nonce: $hd_index}) {
+  createHDAccount(input: {index: $hd_index}) {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
   }
 }
