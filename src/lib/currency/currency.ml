@@ -71,9 +71,19 @@ end = struct
   let precision_exp = Unsigned.of_int @@ Int.pow 10 precision
 
   let to_formatted_string amount =
+    let rec go num_stripped_zeros num =
+      let open Int in
+      if num mod 10 = 0 && num <> 0 then go (num_stripped_zeros + 1) (num / 10)
+      else (num_stripped_zeros, num)
+    in
     let whole = Unsigned.div amount precision_exp in
     let remainder = Unsigned.to_int (Unsigned.rem amount precision_exp) in
-    Printf.sprintf "%s.%09d" (to_string whole) remainder
+    if Int.(remainder = 0) then to_string whole
+    else
+      let num_stripped_zeros, num = go 0 remainder in
+      Printf.sprintf "%s.%0*d" (to_string whole)
+        Int.(precision - num_stripped_zeros)
+        num
 
   let of_formatted_string input =
     let parts = String.split ~on:'.' input in
@@ -451,6 +461,20 @@ end = struct
                       (tag
                          ~tag:(sprintf !"formatting: num=%{Unsigned}" num)
                          err)) )
+
+        let%test_unit "formatting_trailing_zeros" =
+          let generator = gen_incl Unsigned.zero Unsigned.max_int in
+          qc_test_fast generator ~shrinker ~f:(fun num ->
+              let formatted = to_formatted_string num in
+              let has_decimal = String.contains formatted '.' in
+              let trailing_zero = String.is_suffix formatted ~suffix:"0" in
+              if has_decimal && trailing_zero then
+                Error.(
+                  raise
+                    (of_string
+                       (sprintf
+                          !"formatting: num=%{Unsigned} formatted=%{String}"
+                          num (to_formatted_string num)))) )
       end )
   end
 
