@@ -72,8 +72,8 @@ end = struct
 
   let to_formatted_string amount =
     let whole = Unsigned.div amount precision_exp in
-    let remainder = Unsigned.rem amount precision_exp in
-    to_string whole ^ "." ^ to_string remainder
+    let remainder = Unsigned.to_int (Unsigned.rem amount precision_exp) in
+    Printf.sprintf "%s.%09d" (to_string whole) remainder
 
   let of_formatted_string input =
     let parts = String.split ~on:'.' input in
@@ -87,7 +87,7 @@ end = struct
         else
           of_string
             (whole ^ decimal ^ String.make Int.(precision - decimal_length) '0')
-    | [] | _ ->
+    | _ ->
         failwith "Currency.of_formatted_string: Invalid currency input"
 
   let gen_incl a b : t Quickcheck.Generator.t =
@@ -369,6 +369,14 @@ end = struct
           Quickcheck.Generator.map ~f:of_bigint
             (Bignum_bigint.gen_incl (to_bigint x) (to_bigint y))
 
+        let shrinker =
+          Quickcheck.Shrinker.create (fun i ->
+              Sequence.unfold ~init:i ~f:(fun i ->
+                  if Unsigned.equal i Unsigned.zero then None
+                  else
+                    let n = Unsigned.div i (Unsigned.of_int 10) in
+                    Some (n, n) ) )
+
         (* TODO: When we do something to make snarks run fast for tests, increase the trials *)
         let qc_test_fast = Quickcheck.test ~trials:100
 
@@ -424,14 +432,18 @@ end = struct
 
         let%test_unit "formatting_roundtrip" =
           let generator = gen_incl Unsigned.zero Unsigned.max_int in
-          qc_test_fast generator ~f:(fun num ->
+          qc_test_fast generator ~shrinker ~f:(fun num ->
               match of_formatted_string (to_formatted_string num) with
               | after_format ->
                   if after_format = num then ()
                   else
                     Error.(
                       raise
-                        (of_string (sprintf !"formatting: num=%{Unsigned}" num)))
+                        (of_string
+                           (sprintf
+                              !"formatting: num=%{Unsigned} middle=%{String} \
+                                after=%{Unsigned}"
+                              num (to_formatted_string num) after_format)))
               | exception e ->
                   let err = Error.of_exn e in
                   Error.(
