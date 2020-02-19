@@ -22,13 +22,18 @@ num-bigint = { version = "0.2.3" }
 sprs = { version = "0.7.1" }
 rand_core = { version = "0.5" }
 
-oracle = { git = "https://github.com/o1-labs/marlin/" }
-evaluation_domains = { git = "https://github.com/o1-labs/marlin/" }
+oracle = { path = "../../marlin/oracle" }
+evaluation_domains = { path = "../../marlin/evaluation_domains" }
 
-circuits_pairing = { git = "https://github.com/o1-labs/marlin/" }
-commitment_pairing = { git = "https://github.com/o1-labs/marlin/" }
-protocol_pairing = { git = "https://github.com/o1-labs/marlin/" }
+circuits_pairing = { path = "../../marlin/pairing/circuits" }
+commitment_pairing = { path = "../../marlin/pairing/commitment" }
+protocol_pairing = { path = "../../marlin/pairing/protocol" }
 
-circuits_dlog = { git = "https://github.com/o1-labs/marlin/" }
-commitment_dlog = { git = "https://github.com/o1-labs/marlin/" }
-protocol_dlog = { git = "https://github.com/o1-labs/marlin/" }
+circuits_dlog = { path = "../../marlin/dlog/circuits" }
+commitment_dlog = { path = "../../marlin/dlog/commitment" }
+protocol_dlog = { path = "../../marlin/dlog/protocol" }
+
+#circuits = { git = "https://github.com/o1-labs/marlin/" }
+#oracle = { git = "https://github.com/o1-labs/marlin/" }
+#protocol = { git = "https://github.com/o1-labs/marlin/" }
+#commitment = { git = "https://github.com/o1-labs/marlin/" }
