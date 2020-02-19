@@ -80,15 +80,37 @@ module Keypair = struct
 
   type t = Fp_index.t
 
-  let urs_path = "/home/izzy/pickles/urs"
-
-  let create_and_write_urs () =
-    let res =
-      Snarky_bn382.Fp_urs.create (Unsigned.Size_t.of_int (2 * 786_433))
+  let set_urs_info, load_urs =
+    let urs_info = Set_once.create () in
+    let urs = ref None in
+    let set_urs_info ?(degree = 2 * 786_433) path =
+      Set_once.set_exn urs_info Lexing.dummy_pos (degree, path)
     in
-    Snarky_bn382.Fp_urs.write res urs_path
-
-  let urs = lazy (Snarky_bn382.Fp_urs.read urs_path)
+    let load () =
+      match !urs with
+      | Some urs ->
+          urs
+      | None ->
+          let degree, path =
+            match Set_once.get urs_info with
+            | None ->
+                failwith "Pairing_based.urs: Info not set"
+            | Some t ->
+                t
+          in
+          let u =
+            if Sys.file_exists path then Snarky_bn382.Fp_urs.read path
+            else
+              let urs =
+                Snarky_bn382.Fp_urs.create (Unsigned.Size_t.of_int degree)
+              in
+              Snarky_bn382.Fp_urs.write urs path ;
+              urs
+          in
+          urs := Some u ;
+          u
+    in
+    (set_urs_info, load)
 
   let create
       { R1cs_constraint_system.public_input_size
@@ -99,7 +121,7 @@ module Keypair = struct
     Fp_index.create a b c
       (Unsigned.Size_t.of_int vars)
       (Unsigned.Size_t.of_int (public_input_size + 1))
-      (Lazy.force urs)
+      (load_urs ())
 
   let vk t = Fp_verifier_index.create t
 
