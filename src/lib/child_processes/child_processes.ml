@@ -135,19 +135,23 @@ let maybe_kill_and_unlock : string -> Filename.t -> Logger.t -> unit Deferred.t
                   name pid_str ;
                 Deferred.unit )
       in
-      match%bind try_with (fun () -> Sys.remove lockpath) with
-      | Ok () ->
+      match%bind Sys.file_exists lockpath with
+      | `Yes ->
           Deferred.unit
-      | Error exn ->
-          Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-            !"Couldn't delete lock file for %s (pid $childPid) after killing \
-              it. If another Coda daemon was already running it may have \
-              cleaned it up for us. ($exn)"
-            name
-            ~metadata:
-              [ ("childPid", `Int (Pid.to_int pid))
-              ; ("exn", `String (Exn.to_string exn)) ] ;
-          Deferred.unit )
+      | `Unknown | `No -> (
+          match%bind try_with (fun () -> Sys.remove lockpath) with
+          | Ok () ->
+              Deferred.unit
+          | Error exn ->
+              Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                !"Couldn't delete lock file for %s (pid $childPid) after \
+                  killing it. If another Coda daemon was already running it \
+                  may have cleaned it up for us. ($exn)"
+                name
+                ~metadata:
+                  [ ("childPid", `Int (Pid.to_int pid))
+                  ; ("exn", `String (Exn.to_string exn)) ] ;
+              Deferred.unit ) )
   | `Unknown | `No ->
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
         "No PID file for %s" name ;
