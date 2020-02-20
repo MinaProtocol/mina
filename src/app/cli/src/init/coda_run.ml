@@ -197,13 +197,13 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   in
   let client_impls =
     [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
-          Deferred.map
+          return
             ( Coda_commands.send_user_command coda tx
-            |> Participating_state.to_deferred_or_error )
-            ~f:Or_error.join )
+            |> Participating_state.active_error |> Or_error.join ) )
     ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-          Coda_commands.schedule_user_commands coda ts
-          |> Participating_state.to_deferred_or_error )
+          return
+            ( Coda_commands.schedule_user_commands coda ts
+            |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
           return
             ( Coda_commands.get_balance coda pk
@@ -339,7 +339,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               | `Transition ->
                   Perf_histograms.add_span ~name:"snark_worker_transition_time"
                     total ) ;
-          Coda_lib.add_work coda work ) ]
+          Deferred.return @@ Coda_lib.add_work coda work ) ]
   in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       trace_task "REST server" (fun () ->
@@ -387,7 +387,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     >>| lift ))
           |> Deferred.map ~f:(fun _ ->
                  Logger.info logger
-                   !"Created GraphQL server and status endpoints at port : %i"
+                   !"Created GraphQL server at: http://localhost:%i/graphql"
                    rest_server_port ~module_:__MODULE__ ~location:__LOC__ ) )
   ) ;
   let where_to_listen =

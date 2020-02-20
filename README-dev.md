@@ -59,7 +59,7 @@ of the repo.
 
 * Pull down developer container image  (~2GB download, go stretch your legs)
 
-`docker pull codaprotocol/coda:toolchain-1680d590eef639b17af83db2bbf9ad21930360f9`
+`docker pull codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d`
 
 * Create local builder image
 
@@ -151,6 +151,10 @@ you need, you run `opam switch import src/opam.export`.
 
 Some of our dependencies aren't taken from `opam`, and aren't integrated
 with `dune`, so you need to add them manually, by running `scripts/pin-external-packages.sh`.
+
+You will need to install [Nix](https://nixos.org/nix/download.html) and also
+[cachix](https://cachix.org) with `nix-env -iA cachix -f
+https://cachix.org/api/v1/install`.
 
 There are a variety of C libraries we expect to be available in the system.
 These are also listed in the dockerfiles. Unlike most of the C libraries,
