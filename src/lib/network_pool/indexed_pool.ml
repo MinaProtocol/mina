@@ -445,7 +445,7 @@ let rec add_from_gossip_exn :
     -> Account_nonce.t
     -> Currency.Amount.t
     -> ( t * User_command.With_valid_signature.t Sequence.t
-       , [ `Invalid_nonce
+       , [> `Invalid_nonce
          | `Insufficient_funds
          | `Insufficient_replace_fee
          | `Overflow ] )
