@@ -42,9 +42,15 @@ let brew_install_path =
   | _ ->
       "/usr/local/var/coda"
 
+let env_path =
+  match Sys.getenv "CODA_KEYS_PATH" with
+  | Some path ->
+      path
+  | None ->
+      manual_install_path
+
 let possible_paths base =
-  List.map
-    [manual_install_path; brew_install_path; s3_install_path; autogen_path]
+  List.map [env_path; brew_install_path; s3_install_path; autogen_path]
     ~f:(fun d -> d ^/ base)
 
 let load_from_s3 s3_bucket_prefix s3_install_path ~logger =

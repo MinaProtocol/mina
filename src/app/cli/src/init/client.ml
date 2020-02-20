@@ -1199,7 +1199,9 @@ let import_key =
   let flags = Args.zip2 privkey_path conf_dir in
   Command.async
     ~summary:
-      "Import a password protected private key to be tracked by the daemon."
+      "Import a password protected private key to be tracked by the daemon.\n\
+       Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
+       (key will be imported using the same password)."
     (Cli_lib.Background_daemon.graphql_init flags
        ~f:(fun graphql_endpoint (privkey_path, conf_dir) ->
          let open Deferred.Let_syntax in
@@ -1232,7 +1234,7 @@ let import_key =
                Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
              in
              let%map _response =
-               Graphql_client.query_exn
+               Graphql_client.query
                  (Graphql_queries.Reload_wallets.make ())
                  graphql_endpoint
              in
@@ -1434,6 +1436,13 @@ let trustlist_list =
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
+let compile_time_constants =
+  Command.basic
+    ~summary:"Print a JSON map of the compile-time consensus parameters"
+    (Command.Param.return (fun () ->
+         Core.printf "%s\n%!"
+           (Yojson.Safe.to_string Consensus.Constants.all_constants) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1546,4 +1555,5 @@ let advanced =
     ; ("unsafe-import", unsafe_import)
     ; ("import", import_key)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
+    ; ("compile-time-constants", compile_time_constants)
     ; ("visualization", Visualization.command_group) ]

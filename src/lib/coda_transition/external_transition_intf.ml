@@ -23,6 +23,8 @@ module type External_transition_common_intf = sig
 
   val parent_hash : t -> State_hash.t
 
+  val consensus_time_produced_at : t -> Consensus.Data.Consensus_time.t
+
   val block_producer : t -> Public_key.Compressed.t
 
   val transactions : t -> Transaction.t list
