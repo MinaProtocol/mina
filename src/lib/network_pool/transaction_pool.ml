@@ -110,7 +110,7 @@ struct
 
     let member t = Indexed_pool.member t.pool
 
-    let transactions' p =
+    let transactions' ~logger p =
       Sequence.unfold ~init:p ~f:(fun pool ->
           match Indexed_pool.get_highest_fee pool with
           | Some cmd -> (
@@ -123,18 +123,22 @@ struct
             with
             | Ok (t, _) ->
                 Some (cmd, t)
-            | Error (`Queued_txns_by_sender (error_str, queued_txns)) ->
-                failwith
-                  (sprintf
-                     !"Error: %s Command: %{sexp: \
-                       User_command.With_valid_signature.t} Queued \
-                       transactions: %{sexp: \
-                       User_command.With_valid_signature.t Sequence.t}"
-                     error_str cmd queued_txns) )
+            | Error (`Queued_txns_by_sender (error_str, queued_cmds)) ->
+                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                  "Error handling committed transaction $cmd: $error "
+                  ~metadata:
+                    [ ("cmd", User_command.With_valid_signature.to_yojson cmd)
+                    ; ("error", `String error_str)
+                    ; ( "queue"
+                      , `List
+                          (List.map (Sequence.to_list queued_cmds) ~f:(fun c ->
+                               User_command.With_valid_signature.to_yojson c ))
+                      ) ] ;
+                failwith error_str )
           | None ->
               None )
 
-    let transactions t = transactions' t.pool
+    let transactions ~logger t = transactions' ~logger t.pool
 
     let all_from_user {pool; _} = Indexed_pool.all_from_user pool
 
@@ -278,9 +282,8 @@ struct
                         , `List
                             (List.map (Sequence.to_list queued_cmds)
                                ~f:(fun c ->
-                                 [%to_yojson:
-                                   User_command.With_valid_signature.t] c )) )
-                      ] ;
+                                 User_command.With_valid_signature.to_yojson c
+                             )) ) ] ;
                   failwith error_str
             in
             (p', Sequence.append dropped_so_far dropped) )
@@ -940,7 +943,7 @@ let%test_module _ =
           Indexed_pool.For_tests.assert_invariants pool.pool ;
           assert_locally_generated pool ;
           [%test_eq: User_command.t List.t]
-            ( Test.Resource_pool.transactions pool
+            ( Test.Resource_pool.transactions ~logger pool
             |> Sequence.map ~f:User_command.forget_check
             |> Sequence.to_list
             |> List.sort ~compare:User_command.compare )
@@ -1156,7 +1159,7 @@ let%test_module _ =
           in
           let assert_pool_txs txs =
             [%test_eq: User_command.t List.t]
-              ( Test.Resource_pool.transactions pool
+              ( Test.Resource_pool.transactions ~logger pool
               |> Sequence.map ~f:User_command.forget_check
               |> Sequence.to_list
               |> List.sort ~compare:User_command.compare )
