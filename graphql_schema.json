@@ -423,7 +423,7 @@
           "fields": [
             {
               "name": "nonce",
-              "description": "Desired nonce for delegating state",
+              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -446,8 +446,8 @@
               "deprecationReason": null
             },
             {
-              "name": "valid_until",
-              "description": "The global slot number after which this transaction cannot be applied.",
+              "name": "validUntil",
+              "description": "The global slot number after which this transaction cannot be applied",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -475,7 +475,7 @@
             },
             {
               "name": "to",
-              "description": "Public key of sender of a stake delegation",
+              "description": "Public key of the account being delegated to",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -491,7 +491,7 @@
             },
             {
               "name": "from",
-              "description": "Public key of recipient of a stake delegation",
+              "description": "Public key of sender of a stake delegation",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -509,7 +509,7 @@
           "inputFields": [
             {
               "name": "nonce",
-              "description": "Desired nonce for delegating state",
+              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
               "type": {
                 "kind": "SCALAR",
                 "name": "UInt32",
@@ -528,8 +528,8 @@
               "defaultValue": null
             },
             {
-              "name": "valid_until",
-              "description": "The global slot number after which this transaction cannot be applied.",
+              "name": "validUntil",
+              "description": "The global slot number after which this transaction cannot be applied",
               "type": {
                 "kind": "SCALAR",
                 "name": "UInt32",
@@ -553,7 +553,7 @@
             },
             {
               "name": "to",
-              "description": "Public key of sender of a stake delegation",
+              "description": "Public key of the account being delegated to",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -567,7 +567,7 @@
             },
             {
               "name": "from",
-              "description": "Public key of recipient of a stake delegation",
+              "description": "Public key of sender of a stake delegation",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -613,12 +613,84 @@
         },
         {
           "kind": "INPUT_OBJECT",
+          "name": "SignatureInput",
+          "description": "A cryptographic signature",
+          "fields": [
+            {
+              "name": "scalar",
+              "description": "Scalar component of signature",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "field",
+              "description": "Field component of signature",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            }
+          ],
+          "inputFields": [
+            {
+              "name": "scalar",
+              "description": "Scalar component of signature",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            },
+            {
+              "name": "field",
+              "description": "Field component of signature",
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "SCALAR",
+                  "name": "String",
+                  "ofType": null
+                }
+              },
+              "defaultValue": null
+            }
+          ],
+          "interfaces": null,
+          "enumValues": null,
+          "possibleTypes": null
+        },
+        {
+          "kind": "INPUT_OBJECT",
           "name": "SendPaymentInput",
           "description": null,
           "fields": [
             {
               "name": "nonce",
-              "description": "Desired nonce for sending a payment",
+              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -641,8 +713,8 @@
               "deprecationReason": null
             },
             {
-              "name": "valid_until",
-              "description": "The global slot number after which this transaction cannot be applied.",
+              "name": "validUntil",
+              "description": "The global slot number after which this transaction cannot be applied",
               "args": [],
               "type": {
                 "kind": "SCALAR",
@@ -686,7 +758,7 @@
             },
             {
               "name": "to",
-              "description": "Public key of sender of payment",
+              "description": "Public key of recipient of payment",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -702,7 +774,7 @@
             },
             {
               "name": "from",
-              "description": "Public key of recipient of payment",
+              "description": "Public key of sender of payment",
               "args": [],
               "type": {
                 "kind": "NON_NULL",
@@ -720,7 +792,7 @@
           "inputFields": [
             {
               "name": "nonce",
-              "description": "Desired nonce for sending a payment",
+              "description": "Should only be set when cancelling transactions, otherwise a nonce is determined automatically",
               "type": {
                 "kind": "SCALAR",
                 "name": "UInt32",
@@ -739,8 +811,8 @@
               "defaultValue": null
             },
             {
-              "name": "valid_until",
-              "description": "The global slot number after which this transaction cannot be applied.",
+              "name": "validUntil",
+              "description": "The global slot number after which this transaction cannot be applied",
               "type": {
                 "kind": "SCALAR",
                 "name": "UInt32",
@@ -778,7 +850,7 @@
             },
             {
               "name": "to",
-              "description": "Public key of sender of payment",
+              "description": "Public key of recipient of payment",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -792,7 +864,7 @@
             },
             {
               "name": "from",
-              "description": "Public key of recipient of payment",
+              "description": "Public key of sender of payment",
               "type": {
                 "kind": "NON_NULL",
                 "name": null,
@@ -1580,6 +1652,16 @@
               "description": "Send a payment",
               "args": [
                 {
+                  "name": "signature",
+                  "description": "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "SignatureInput",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
+                {
                   "name": "input",
                   "description": null,
                   "type": {
@@ -1610,6 +1692,16 @@
               "name": "sendDelegation",
               "description": "Change your delegate by sending a transaction",
               "args": [
+                {
+                  "name": "signature",
+                  "description": "If a signature is provided, this transaction is considered signed and will be broadcasted to the network without requiring a private key",
+                  "type": {
+                    "kind": "INPUT_OBJECT",
+                    "name": "SignatureInput",
+                    "ofType": null
+                  },
+                  "defaultValue": null
+                },
                 {
                   "name": "input",
                   "description": null,

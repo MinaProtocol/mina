@@ -74,7 +74,8 @@ let compute_public_key ~hd_index =
   |> Deferred.Result.map_error ~f:report_process_error
   |> Deferred.map ~f:(Result.bind ~f:decode_public_key)
 
-let sign ~hd_index ~public_key ~user_command_payload =
+let sign ~hd_index ~public_key ~user_command_payload :
+    (User_command.With_valid_signature.t, string) Deferred.Result.t =
   let open Deferred.Result.Let_syntax in
   let input =
     Transaction_union_payload.to_input
@@ -100,27 +101,26 @@ let sign ~hd_index ~public_key ~user_command_payload =
       |> Deferred.Result.map_error ~f:report_process_error
     in
     let%bind signature = decode_signature signature_str |> Deferred.return in
-    if
-      Coda_base.Schnorr.verify signature
-        (Tick.Inner_curve.of_affine public_key)
+    match
+      User_command.create_with_signature_checked signature
+        (Public_key.compress public_key)
         user_command_payload
-    then
-      return
-        Coda_base.User_command.Poly.
-          {payload= user_command_payload; sender= public_key; signature}
-    else
-      let%bind computed_public_key = compute_public_key ~hd_index in
-      if Public_key.equal computed_public_key public_key then
-        Deferred.Result.fail
-          "Failed to verify signature returned by hardware wallet."
-      else
-        Deferred.Result.fail
-          "The cached public doesn't match the one that is computed by the \
-           hardware wallet. Possible reason could be you are using a \
-           different hardware wallet or you reinitialized your hardware \
-           wallet using a different seed. If you want to use your new ledger, \
-           please first create an account by 'coda account \
-           create-hardware-wallet' command"
+    with
+    | Some signed_command ->
+        return signed_command
+    | None ->
+        let%bind computed_public_key = compute_public_key ~hd_index in
+        if Public_key.equal computed_public_key public_key then
+          Deferred.Result.fail
+            "Failed to verify signature returned by hardware wallet."
+        else
+          Deferred.Result.fail
+            "The cached public doesn't match the one that is computed by the \
+             hardware wallet. Possible reason could be you are using a \
+             different hardware wallet or you reinitialized your hardware \
+             wallet using a different seed. If you want to use your new \
+             ledger, please first create an account by 'coda account \
+             create-hd' command"
 
 let write_exn ~hd_index ~index_path : unit Deferred.t =
   let%bind index_file = Writer.open_file index_path in
