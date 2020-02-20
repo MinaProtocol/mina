@@ -144,4 +144,8 @@ module Full : sig
 
     val to_lite : t -> Lite.E.t
   end
+
+  module With_mutant : sig
+    type t = E : (full, 'mutant) diff * 'mutant -> t
+  end
 end

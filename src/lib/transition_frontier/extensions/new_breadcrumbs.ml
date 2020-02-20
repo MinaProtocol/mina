@@ -8,11 +8,11 @@ module T = struct
 
   let create ~logger:_ frontier = ((), [Full_frontier.root frontier])
 
-  let handle_diffs () _frontier diffs =
-    let open Diff in
+  let handle_diffs () _frontier diffs_with_mutants =
+    let open Diff.Full.With_mutant in
     let new_nodes =
-      List.filter_map diffs ~f:(function
-        | Full.E.E (New_node (Full breadcrumb)) ->
+      List.filter_map diffs_with_mutants ~f:(function
+        | E (New_node (Full breadcrumb), _) ->
             Some breadcrumb
         | _ ->
             None )
