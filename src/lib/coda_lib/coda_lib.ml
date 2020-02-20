@@ -3,6 +3,7 @@
 
 open Core_kernel
 open Async
+open Unsigned
 open Coda_base
 open Coda_transition
 open Pipe_lib
@@ -281,7 +282,7 @@ let root_length = compose_of_option root_length_opt
 [%%if
 mock_frontend_data]
 
-let create_sync_status_observer ~logger
+let create_sync_status_observer ~logger ~demo_mode:_
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let variable = Coda_incremental.Status.Var.create `Offline in
@@ -310,7 +311,7 @@ let create_sync_status_observer ~logger
 
 [%%else]
 
-let create_sync_status_observer ~logger
+let create_sync_status_observer ~logger ~demo_mode
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Coda_incremental.Status in
@@ -318,32 +319,35 @@ let create_sync_status_observer ~logger
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
       ~f:(fun online_status active_status first_connection first_message ->
-        match online_status with
-        | `Offline ->
-            if `Empty = first_connection then (
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Coda daemon is now connecting" ;
-              `Connecting )
-            else if `Empty = first_message then (
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Coda daemon is now listening" ;
-              `Listening )
-            else `Offline
-        | `Online -> (
-          match active_status with
-          | None ->
-              Logger.info (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__ "Coda daemon is now bootstrapping" ;
-              `Bootstrap
-          | Some (_, catchup_jobs) ->
-              if catchup_jobs > 0 then (
+        (* Always be synced in demo mode, we don't expect peers to connect to us *)
+        if demo_mode then `Synced
+        else
+          match online_status with
+          | `Offline ->
+              if `Empty = first_connection then (
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  "Coda daemon is now connecting" ;
+                `Connecting )
+              else if `Empty = first_message then (
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  "Coda daemon is now listening" ;
+                `Listening )
+              else `Offline
+          | `Online -> (
+            match active_status with
+            | None ->
                 Logger.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
-                `Catchup )
-              else (
-                Logger.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now synced" ;
-                `Synced ) ) )
+                  ~location:__LOC__ "Coda daemon is now bootstrapping" ;
+                `Bootstrap
+            | Some (_, catchup_jobs) ->
+                if catchup_jobs > 0 then (
+                  Logger.info (Logger.create ()) ~module_:__MODULE__
+                    ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
+                  `Catchup )
+                else (
+                  Logger.info (Logger.create ()) ~module_:__MODULE__
+                    ~location:__LOC__ "Coda daemon is now synced" ;
+                  `Synced ) ) )
   in
   let observer = observe incremental_status in
   stabilize () ; observer
@@ -827,6 +831,30 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   ~network_transition_reader:
                     (Strict_pipe.Reader.map external_transitions_reader
                        ~f:(fun (tn, tm, cb) ->
+                         let lift_consensus_time =
+                           Fn.compose UInt32.to_int
+                             Consensus.Data.Consensus_time.to_uint32
+                         in
+                         let tn_production_consensus_time =
+                           External_transition.consensus_time_produced_at
+                             (Envelope.Incoming.data tn)
+                         in
+                         let tn_production_slot =
+                           lift_consensus_time tn_production_consensus_time
+                         in
+                         let tn_production_time =
+                           Consensus.Data.Consensus_time.to_time
+                             tn_production_consensus_time
+                         in
+                         let tm_slot =
+                           lift_consensus_time
+                             (Consensus.Data.Consensus_time.of_time_exn tm)
+                         in
+                         Coda_metrics.Block_latency.Gossip_slots.update
+                           (Float.of_int (tm_slot - tn_production_slot)) ;
+                         Coda_metrics.Block_latency.Gossip_time.update
+                           Block_time.(
+                             Span.to_time_span @@ diff tm tn_production_time) ;
                          (`Transition tn, `Time_received tm, `Valid_cb cb) ))
                   ~producer_transition_reader:
                     (Strict_pipe.Reader.map producer_transition_reader
@@ -1009,6 +1037,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           in
           let sync_status =
             create_sync_status_observer ~logger:config.logger
+              ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:
                 ( Var.watch @@ of_broadcast_pipe

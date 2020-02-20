@@ -187,10 +187,17 @@ module T = struct
     | Error (`Error e) ->
         failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
+  let of_scan_state_and_ledger_unchecked ~ledger ~scan_state
+      ~pending_coinbase_collection =
+    {ledger; scan_state; pending_coinbase_collection}
+
   let of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash ~ledger
       ~scan_state ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
-    let t = {ledger; scan_state; pending_coinbase_collection} in
+    let t =
+      of_scan_state_and_ledger_unchecked ~ledger ~scan_state
+        ~pending_coinbase_collection
+    in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants scan_state
         ~verifier:{Statement_scanner_proof_verifier.logger; verifier}

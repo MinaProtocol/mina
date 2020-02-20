@@ -128,7 +128,9 @@ RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://nixos.org/n
     curl -o install-nix-2.3.2.sig https://nixos.org/nix/install.sig && \
     gpg2 --import < $CODA_DIR/.nix-key.gpg.asc && \
     gpg2 --verify ./install-nix-2.3.2.sig && \
-    sh ./install-nix-2.3.2
+    sh ./install-nix-2.3.2 && \
+    USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && \
+    nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
 
 # we used to delete the repo here
 # we now leave it intact, in case updating OPAM in CI requires pinned package sources

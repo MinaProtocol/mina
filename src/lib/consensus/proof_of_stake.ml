@@ -152,6 +152,8 @@ module Data = struct
       ; vrf_result: Random_oracle.Digest.t }
 
     let prover_state {stake_proof; _} = stake_proof
+
+    let global_slot {global_slot; _} = global_slot
   end
 
   module Local_state = struct
@@ -820,7 +822,7 @@ module Data = struct
        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
          "Checking VRF evaluations at epoch: $epoch, slot: $slot"
          ~metadata:
-           [ ("global_slot", `Int (Epoch.to_int epoch))
+           [ ("epoch", `Int (Epoch.to_int epoch))
            ; ("slot", `Int (Slot.to_int slot)) ]) ;
       with_return (fun {return} ->
           Hashtbl.iteri
@@ -1208,6 +1210,9 @@ module Data = struct
 
     let delay =
       UInt32.of_int @@ Configuration.acceptable_network_delay Configuration.t
+
+    (* externally, we are only interested in when the slot starts *)
+    let to_time = start_time
 
     open UInt32
     open Infix
@@ -1667,7 +1672,8 @@ module Data = struct
             ; staking_epoch_data: 'staking_epoch_data
             ; next_epoch_data: 'next_epoch_data
             ; has_ancestor_in_same_checkpoint_window: 'bool }
-          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
+          [@@deriving
+            sexp, bin_io, eq, compare, hash, to_yojson, version, fields]
         end
       end]
 
@@ -1697,7 +1703,7 @@ module Data = struct
         ; staking_epoch_data: 'staking_epoch_data
         ; next_epoch_data: 'next_epoch_data
         ; has_ancestor_in_same_checkpoint_window: 'bool }
-      [@@deriving sexp, compare, hash, to_yojson]
+      [@@deriving sexp, compare, hash, to_yojson, fields]
     end
 
     module Value = struct
@@ -1911,6 +1917,8 @@ module Data = struct
       and next_epoch_data = Epoch_data.Next.var_to_input next_epoch_data in
       List.reduce_exn ~f:Random_oracle.Input.append
         [input; staking_epoch_data; next_epoch_data]
+
+    let global_slot {Poly.curr_global_slot; _} = curr_global_slot
 
     let checkpoint_window slot =
       Global_slot.to_int slot / Constants.Checkpoint_window.size_in_slots
@@ -2211,7 +2219,27 @@ module Data = struct
 
     let consensus_time (t : Value.t) = t.curr_global_slot
 
-    let blockchain_length {Poly.blockchain_length; _} = blockchain_length
+    [%%define_locally
+    Poly.
+      ( blockchain_length
+      , epoch_count
+      , min_window_density
+      , last_vrf_output
+      , total_currency
+      , staking_epoch_data
+      , next_epoch_data
+      , has_ancestor_in_same_checkpoint_window )]
+
+    module Unsafe = struct
+      (* TODO: very unsafe, do not use unless you know what you are doing *)
+      let dummy_advance (t : Value.t) ?(increase_epoch_count = false)
+          ~new_global_slot : Value.t =
+        let new_epoch_count =
+          if increase_epoch_count then Global_slot.(t.epoch_count + 1)
+          else t.epoch_count
+        in
+        {t with epoch_count= new_epoch_count; curr_global_slot= new_global_slot}
+    end
 
     let graphql_type () : ('ctx, Value.t option) Graphql_async.Schema.typ =
       let open Graphql_async in
@@ -3270,3 +3298,9 @@ let%test_module "Proof of stake tests" =
              diff) ;
         failwith "Test failed" )
   end )
+
+module Exported = struct
+  module Global_slot = Global_slot
+  module Block_data = Data.Block_data
+  module Consensus_state = Data.Consensus_state
+end
