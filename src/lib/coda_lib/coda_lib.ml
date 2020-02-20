@@ -727,6 +727,39 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 in
                 f ~frontier input )
           in
+          (* knot-tying hack so we can pass a get_telemetry function before net created *)
+          let net_ref = ref None in
+          let block_producer_pubkeys =
+            config.initial_block_production_keypairs |> Keypair.Set.to_list
+            |> List.map ~f:(fun {Keypair.public_key; _} ->
+                   Public_key.compress public_key )
+          in
+          let get_telemetry_data _env =
+            match !net_ref with
+            | None ->
+                (* should be unreachable; without a network, we wouldn't receive this RPC call *)
+                Logger.info config.logger
+                  "Network not instantiated when telemetry data requested"
+                  ~module_:__MODULE__ ~location:__LOC__ ;
+                Deferred.return None
+            | Some net -> (
+              match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
+              | None ->
+                  Deferred.return None
+              | Some frontier ->
+                  let%bind peers = Coda_networking.peers net in
+                  let protocol_state_hash_opt =
+                    let tip = Transition_frontier.best_tip frontier in
+                    let state =
+                      Transition_frontier.Breadcrumb.protocol_state tip
+                    in
+                    Some (Coda_state.Protocol_state.hash state)
+                  in
+                  Deferred.return
+                    (Some
+                       (peers, block_producer_pubkeys, protocol_state_hash_opt))
+              )
+          in
           let%bind net =
             Coda_networking.create config.net_config
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
@@ -786,6 +819,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               ~get_best_tip:
                 (handle_request "get_best_tip" ~f:(fun ~frontier () ->
                      Best_tip_prover.prove ~logger:config.logger frontier ))
+              ~get_telemetry_data
               ~get_transition_chain_proof:
                 (handle_request "get_transition_chain_proof"
                    ~f:(fun ~frontier hash ->
@@ -794,6 +828,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
           in
+          (* tie the knot *)
+          net_ref := Some net ;
           let local_txns_reader, local_txns_writer =
             Strict_pipe.(create ~name:"local transactions" Synchronous)
           in

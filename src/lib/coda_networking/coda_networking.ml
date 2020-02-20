@@ -13,7 +13,7 @@ type exn += No_initial_peers
 
 (* INSTRUCTIONS FOR ADDING A NEW RPC:
  *   - define a new module under the Rpcs module
- *   - add an entry to the Rpcs.rpc GADT definition for the new module
+ *   - add an entry to the Rpcs.rpc GADT definition for the new module (type ('query, 'response) rpc, below)
  *   - add the new constructor for Rpcs.rpc to Rpcs.all_of_type_erased_rpc
  *   - add a pattern matching case to Rpcs.implementation_of_rpc mapping the
  *     new constructor to the new module for your RPC
@@ -419,6 +419,68 @@ module Rpcs = struct
     end
   end
 
+  module Get_telemetry_data = struct
+    module Master = struct
+      let name = "get_telemetry_data"
+
+      module T = struct
+        type query = unit [@@deriving sexp, to_yojson]
+
+        (* peers, block producer public keys, protocol state hash
+           the state hash is an option; we might be bootstrapping
+        *)
+        type response =
+          ( Network_peer.Peer.t list
+          * Signature_lib.Public_key.Compressed.t list
+          * State_hash.t option )
+          option
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+    include M
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include Master
+    end)
+
+    module V1 = struct
+      module T = struct
+        type query = unit [@@deriving bin_io, sexp, version {rpc}]
+
+        type response =
+          ( Network_peer.Peer.Stable.V1.t list
+          * Signature_lib.Public_key.Compressed.Stable.V1.t list
+          * State_hash.Stable.V1.t option )
+          option
+        [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+  end
+
   type ('query, 'response) rpc =
     | Get_staged_ledger_aux_and_pending_coinbases_at_hash
         : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
@@ -437,6 +499,8 @@ module Rpcs = struct
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
+    | Get_telemetry_data
+        : (Get_telemetry_data.query, Get_telemetry_data.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   type rpc_handler =
@@ -458,6 +522,8 @@ module Rpcs = struct
         (module Ban_notify)
     | Get_best_tip ->
         (module Get_best_tip)
+    | Get_telemetry_data ->
+        (module Get_telemetry_data)
     | Consensus_rpc rpc ->
         Consensus.Hooks.Rpcs.implementation_of_rpc rpc
 
@@ -577,6 +643,12 @@ let create (config : Config.t)
           , State_body_hash.t list * External_transition.t )
           Proof_carrying_data.t
           Deferred.Option.t)
+    ~(get_telemetry_data :
+          unit Envelope.Incoming.t
+       -> ( Network_peer.Peer.t list
+          * Signature_lib.Public_key.Compressed.t list
+          * State_hash.t option )
+          Deferred.Option.t)
     ~(get_transition_chain_proof :
           State_hash.t Envelope.Incoming.t
        -> (State_hash.t * State_body_hash.t list) Deferred.Option.t)
@@ -670,6 +742,17 @@ let create (config : Config.t)
     in
     record_unknown_item result sender action_msg msg_args
   in
+  let get_telemetry_data_rpc conn ~version:_ query =
+    Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
+      "Sending telemetry data to peer with IP %s"
+      (Unix.Inet_addr.to_string conn.Peer.host) ;
+    let action_msg = "Telemetry_data" in
+    let msg_args = [] in
+    let%bind result, sender =
+      run_for_rpc_result conn query ~f:get_telemetry_data action_msg msg_args
+    in
+    record_unknown_item result sender action_msg msg_args
+  in
   let get_transition_chain_proof_rpc conn ~version:_ query =
     Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
       "Sending transition_chain_proof to peer with IP %s"
@@ -715,6 +798,7 @@ let create (config : Config.t)
         , get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc )
     ; Rpc_handler (Answer_sync_ledger_query, answer_sync_ledger_query_rpc)
     ; Rpc_handler (Get_best_tip, get_best_tip_rpc)
+    ; Rpc_handler (Get_telemetry_data, get_telemetry_data_rpc)
     ; Rpc_handler (Get_ancestry, get_ancestry_rpc)
     ; Rpc_handler (Get_transition_chain, get_transition_chain_rpc)
     ; Rpc_handler (Get_transition_chain_proof, get_transition_chain_proof_rpc)

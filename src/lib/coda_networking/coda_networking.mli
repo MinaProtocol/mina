@@ -66,6 +66,16 @@ module Rpcs : sig
       option
   end
 
+  module Get_telemetry_data : sig
+    type query = unit [@@deriving sexp, to_yojson]
+
+    type response =
+      ( Network_peer.Peer.t list
+      * Signature_lib.Public_key.Compressed.t list
+      * State_hash.t option )
+      option
+  end
+
   type ('query, 'response) rpc =
     | Get_staged_ledger_aux_and_pending_coinbases_at_hash
         : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
@@ -84,6 +94,8 @@ module Rpcs : sig
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
+    | Get_telemetry_data
+        : (Get_telemetry_data.query, Get_telemetry_data.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   include Rpc_intf.Rpc_interface_intf with type ('q, 'r) rpc := ('q, 'r) rpc
@@ -237,6 +249,11 @@ val create :
                       , State_body_hash.t list * External_transition.t )
                       Proof_carrying_data.t
                       Deferred.Option.t)
+  -> get_telemetry_data:(   unit Envelope.Incoming.t
+                         -> ( Network_peer.Peer.t list
+                            * Signature_lib.Public_key.Compressed.t list
+                            * State_hash.t option )
+                            Deferred.Option.t)
   -> get_transition_chain_proof:(   State_hash.t Envelope.Incoming.t
                                  -> (State_hash.t * State_body_hash.t list)
                                     Deferred.Option.t)
