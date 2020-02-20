@@ -360,8 +360,13 @@ let handle_committed_txn :
       in
       if Account_nonce.(nonce_to_remove <> first_nonce) then
         failwith
-          "Tried to handle a committed transaction in the pool but its nonce \
-           doesn't match the head of the queue for that sender."
+          (sprintf
+             !"Tried to handle a committed transaction in the pool but its \
+               nonce doesn't match the head of the queue for that sender. \
+               Committed transaction: %{sexp: \
+               User_command.With_valid_signature.t} Head of the queue: \
+               %{sexp: User_command.With_valid_signature.t}"
+             committed first_cmd)
       else
         let first_cmd_consumed =
           (* safe since we checked this when we added it to the pool originally *)

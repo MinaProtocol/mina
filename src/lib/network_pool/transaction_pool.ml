@@ -475,6 +475,7 @@ struct
       let apply t env =
         let txs = Envelope.Incoming.data env in
         let sender = Envelope.Incoming.sender env in
+        let is_sender_local = Envelope.Sender.(equal sender Local) in
         match t.best_tip_ledger with
         | None ->
             Deferred.Or_error.error_string
@@ -529,7 +530,7 @@ struct
                           in
                           go txs'' pool accepted
                       | Some sender_account ->
-                          if has_sufficient_fee pool tx then
+                          if has_sufficient_fee pool tx then (
                             let validate_receiver =
                               match
                                 account ledger (User_command.receiver tx)
@@ -597,10 +598,7 @@ struct
                                         , [("cmd", User_command.to_yojson tx)]
                                         ) )
                                 in
-                                if
-                                  Envelope.Sender.equal sender
-                                    Envelope.Sender.Local
-                                then
+                                if is_sender_local then
                                   Hashtbl.add_exn
                                     t.locally_generated_uncommitted ~key:tx'
                                     ~data:(Time.now ()) ;
@@ -667,13 +665,24 @@ struct
                                    transactions at the same nonce to different
                                    nodes, which will then naturally gossip them.
                                 *)
-                                Logger.debug t.logger ~module_:__MODULE__
+                                let f_log =
+                                  if is_sender_local then Logger.error
+                                  else Logger.debug
+                                in
+                                f_log t.logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   "rejecting $cmd because of insufficient \
                                    replace fee"
                                   ~metadata:[("cmd", User_command.to_yojson tx)] ;
                                 go txs'' pool accepted
                             | Error err ->
+                                if is_sender_local then
+                                  Logger.error t.logger ~module_:__MODULE__
+                                    ~location:__LOC__
+                                    "rejecting $cmd because of $reason"
+                                    ~metadata:
+                                      [ ("cmd", User_command.to_yojson tx)
+                                      ; ("reason", yojson_fail_reason err) ] ;
                                 let%bind _ =
                                   trust_record
                                     ( Trust_system.Actions.Sent_useless_gossip
@@ -683,7 +692,7 @@ struct
                                           ; ("reason", yojson_fail_reason err)
                                           ] ) )
                                 in
-                                go txs'' pool accepted
+                                go txs'' pool accepted )
                           else
                             let%bind _ =
                               trust_record
