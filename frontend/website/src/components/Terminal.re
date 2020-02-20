@@ -124,7 +124,7 @@ module Line = {
       );
     let displayed = String.sub(value, 0, numDisplayed);
     <div className=Style.item>
-      {ReactUtils.fromOpt(
+      {ReactExt.fromOpt(
          ~f=
            prompt =>
              <span className=Style.prompt> {React.string(prompt)} </span>,

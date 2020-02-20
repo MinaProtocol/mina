@@ -69,11 +69,11 @@ module Style = {
 
 
 module CurrentSlugProvider = {
-  let (context, make, makeProps) = ReactUtils.createContext("");
+  let (context, make, makeProps) = ReactExt.createContext("");
 };
 
 module FolderSlugProvider = {
-  let (context, make, makeProps) = ReactUtils.createContext(None);
+  let (context, make, makeProps) = ReactExt.createContext(None);
 };
 
 let slugConcat = (n1, n2) => {
