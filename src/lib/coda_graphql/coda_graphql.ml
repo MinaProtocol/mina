@@ -1555,13 +1555,6 @@ module Mutations = struct
         "Couldn't find an unlocked key for specified `sender`. Did you unlock \
          the account you're making a transaction from?"
 
-  let find_unlocked ~public_key coda =
-    Result.of_option
-      (Secrets.Wallets.find_unlocked (Coda_lib.wallets coda) ~needle:public_key)
-      ~error:
-        "Couldn't find an unlocked key for specified `sender`. Did you unlock \
-         the account you're making a transaction from?"
-
   let create_user_command_payload ~coda ~fee ~nonce ~valid_until ~memo ~sender
       ~body : (User_command.Payload.t, string) result =
     let open Result.Let_syntax in
