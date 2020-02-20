@@ -1909,7 +1909,7 @@ module Queries = struct
     field "bestChain"
       ~doc:
         "Retrieve a list of blocks from transition frontier's root to the \
-         current best tip."
+         current best tip. Returns null if the system is bootstrapping."
       ~typ:(list @@ non_null Types.block)
       ~args:Arg.[]
       ~resolve:(fun {ctx= coda; _} () ->
