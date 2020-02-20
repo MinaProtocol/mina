@@ -51,6 +51,11 @@ let daemon logger =
             provide both `block-producer-key` and `block-producer-pubkey`. \
             (default: don't produce blocks)"
          (optional string)
+     and demo_mode =
+       flag "demo-mode" no_arg
+         ~doc:
+           "Run the daemon in demo-mode -- assume we're \"synced\" to the \
+            network instantly"
      and coinbase_receiver_flag =
        flag "coinbase-receiver"
          ~doc:
@@ -660,7 +665,7 @@ let daemon logger =
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~coinbase_receiver ~net_config ~gossip_net_params
+                ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
