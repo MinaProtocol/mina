@@ -542,7 +542,7 @@ let best_path t =
     Transition_frontier.(root tf |> Breadcrumb.state_hash)
     (Transition_frontier.hash_path tf bt)
 
-let best_tip_path t =
+let best_chain t =
   let open Option.Let_syntax in
   let%map frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier

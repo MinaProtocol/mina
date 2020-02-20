@@ -5190,8 +5190,8 @@
               "deprecationReason": null
             },
             {
-              "name": "bestTipPath",
-              "description": "Retrieve a list of blocks from transition frontier's root to the current best.",
+              "name": "bestChain",
+              "description": "Retrieve a list of blocks from transition frontier's root to the current best tip.",
               "args": [],
               "type": {
                 "kind": "LIST",

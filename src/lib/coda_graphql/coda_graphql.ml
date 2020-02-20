@@ -1905,17 +1905,17 @@ module Queries = struct
           Auxiliary_database.External_transition_database.get_value db
             state_hash) )
 
-  let best_tip_path =
-    field "bestTipPath"
+  let best_chain =
+    field "bestChain"
       ~doc:
         "Retrieve a list of blocks from transition frontier's root to the \
-         current best."
+         current best tip."
       ~typ:(list @@ non_null Types.block)
       ~args:Arg.[]
       ~resolve:(fun {ctx= coda; _} () ->
         let open Option.Let_syntax in
-        let%map best_tip_path = Coda_lib.best_tip_path coda in
-        List.map best_tip_path ~f:(fun breadcrumb ->
+        let%map best_chain = Coda_lib.best_chain coda in
+        List.map best_chain ~f:(fun breadcrumb ->
             let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
             let transition =
               Transition_frontier.Breadcrumb.validated_transition breadcrumb
@@ -1977,7 +1977,7 @@ module Queries = struct
     ; wallet (* deprecated *)
     ; account
     ; current_snark_worker
-    ; best_tip_path
+    ; best_chain
     ; blocks
     ; block
     ; initial_peers
