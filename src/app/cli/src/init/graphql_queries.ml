@@ -8,7 +8,7 @@ query {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
     locked
     balance {
-      total @bsDecoder(fn: "Decoders.uint64")
+      total @bsDecoder(fn: "Decoders.balance")
     }
   }
 }
