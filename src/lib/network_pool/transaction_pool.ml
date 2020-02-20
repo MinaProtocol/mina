@@ -113,15 +113,24 @@ struct
     let transactions' p =
       Sequence.unfold ~init:p ~f:(fun pool ->
           match Indexed_pool.get_highest_fee pool with
-          | Some cmd ->
-              Some
-                ( cmd
-                , fst
-                  @@ Indexed_pool.handle_committed_txn pool cmd
-                       (* we have the invariant that the transactions currently
+          | Some cmd -> (
+            match
+              Indexed_pool.handle_committed_txn pool cmd
+                (* we have the invariant that the transactions currently
                           in the pool are always valid against the best tip, so
                           no need to check balances here *)
-                       Currency.Amount.max_int )
+                Currency.Amount.max_int
+            with
+            | Ok (t, _) ->
+                Some (cmd, t)
+            | Error (`Queued_txns_by_sender (error_str, queued_txns)) ->
+                failwith
+                  (sprintf
+                     !"Error: %s Command: %{sexp: \
+                       User_command.With_valid_signature.t} Queued \
+                       transactions: %{sexp: \
+                       User_command.With_valid_signature.t Sequence.t}"
+                     error_str cmd queued_txns) )
           | None ->
               None )
 
@@ -253,8 +262,26 @@ struct
                 Hashtbl.add_exn t.locally_generated_committed ~key:cmd'
                   ~data:time_added ) ;
             let p', dropped =
-              Indexed_pool.handle_committed_txn p cmd'
-                (Currency.Balance.to_amount balance)
+              match
+                Indexed_pool.handle_committed_txn p cmd'
+                  (Currency.Balance.to_amount balance)
+              with
+              | Ok res ->
+                  res
+              | Error (`Queued_txns_by_sender (error_str, queued_cmds)) ->
+                  Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+                    "Error handling committed transaction $cmd: $error "
+                    ~metadata:
+                      [ ("cmd", User_command.to_yojson cmd)
+                      ; ("error", `String error_str)
+                      ; ( "queue"
+                        , `List
+                            (List.map (Sequence.to_list queued_cmds)
+                               ~f:(fun c ->
+                                 [%to_yojson:
+                                   User_command.With_valid_signature.t] c )) )
+                      ] ;
+                  failwith error_str
             in
             (p', Sequence.append dropped_so_far dropped) )
       in
