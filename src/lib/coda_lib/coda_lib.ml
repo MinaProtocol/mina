@@ -54,7 +54,7 @@ type pipes =
       * (bool -> unit) )
       Pipe.Writer.t
   ; local_txns_writer:
-      ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+      ( User_command_util.user_command_input
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -587,8 +587,8 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   |> Deferred.don't_wait_for
 
 (*TODO: Synchronize this*)
-let add_transactions t (txns : User_command.t list) =
-  Strict_pipe.Writer.write t.pipes.local_txns_writer txns
+let add_transactions t (uc_inputs : User_command_util.user_command_input) =
+  Strict_pipe.Writer.write t.pipes.local_txns_writer uc_inputs
   |> Deferred.don't_wait_for
 
 let next_producer_timing t = t.next_producer_timing
@@ -788,6 +788,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
           in
+          let user_command_input_reader, user_command_input_writer =
+            Strict_pipe.(create ~name:"local transactions" Synchronous)
+          in
           let local_txns_reader, local_txns_writer =
             Strict_pipe.(create ~name:"local transactions" Synchronous)
           in
@@ -805,6 +808,59 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               ~local_diffs:local_txns_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
+          Strict_pipe.Reader.iter user_command_input_reader
+            ~f:(fun (uc_input : User_command_util.user_command_input) ->
+              let setup_user_command
+                  (client_input : User_command_util.Client_input.t) =
+                let create_user_command fee nonce valid_until memo body
+                    sender_kp =
+                  let payload =
+                    User_command.Payload.create ~fee ~nonce ~valid_until ~memo
+                      ~body
+                  in
+                  let signed_user_command =
+                    User_command.sign sender_kp payload
+                  in
+                  User_command.forget_check signed_user_command
+                in
+                let open Option.Let_syntax in
+                let%map nonce =
+                  match client_input.nonce_opt with
+                  | Some nonce ->
+                      Some nonce
+                  | None ->
+                      (*get inferred nonce*)
+                      uc_input.inferred_nonce
+                        (Public_key.compress client_input.sender_kp.public_key)
+                in
+                create_user_command client_input.fee nonce
+                  client_input.valid_until client_input.memo client_input.body
+                  client_input.sender_kp
+              in
+              let res =
+                match uc_input.client_input with
+                | Either.First input -> (
+                  match setup_user_command input with
+                  | Some user_command ->
+                      (*let receipt = uc_input.record_payment user_command account*)
+                      Ok
+                        ( [user_command]
+                        , [(user_command, Receipt.Chain_hash.empty)] )
+                  | None ->
+                      Error (Error.of_string "Account not found") )
+                | Either.Second _inputs ->
+                    Ok ([], [])
+                (*List.map inputs and generate user comamnds and receipt hashes*)
+              in
+              match res with
+              | Ok (user_commands, receipts) ->
+                  let%map () =
+                    Strict_pipe.Writer.write local_txns_writer user_commands
+                  in
+                  Ivar.fill uc_input.result (Ok receipts)
+              | Error e ->
+                  return (Ivar.fill uc_input.result (Error e)) )
+          |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
             Broadcast_pipe.create
@@ -1035,7 +1091,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 ; external_transitions_writer=
                     Strict_pipe.Writer.to_linear_pipe
                       external_transitions_writer
-                ; local_txns_writer
+                ; local_txns_writer= user_command_input_writer
                 ; local_snark_work_writer }
             ; wallets
             ; block_production_keypairs

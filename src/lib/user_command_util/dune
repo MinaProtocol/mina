@@ -1,0 +1,9 @@
+(library
+  (name user_command_util)
+  (public_name user_command_util)
+  (libraries 
+    ; opam deps
+    core
+    ; libs
+    coda_base signature_lib coda_version daemon_rpcs node_addrs_and_ports)
+  (preprocess (pps ppx_coda ppx_jane ppx_deriving.make)))

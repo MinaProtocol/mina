@@ -72,7 +72,7 @@ let schedule_user_command t (txn : User_command.t) account_opt :
         (Coda_lib.top_level_logger t)
         [("coda_command", `String "scheduling a user command")]
     in
-    Coda_lib.add_transactions t [txn] ;
+    (*Coda_lib.add_transactions t [txn] ;*)
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("user_command", User_command.to_yojson txn)]
       "Submitted transaction $user_command to transaction pool" ;
@@ -106,32 +106,6 @@ let get_keys_with_details t =
       ( string_of_public_key account
       , account.Account.Poly.balance |> Currency.Balance.to_int
       , account.Account.Poly.nonce |> Account.Nonce.to_int ) )
-
-let get_inferred_nonce_from_transaction_pool_and_ledger t
-    (addr : Public_key.Compressed.t) =
-  let transaction_pool = Coda_lib.transaction_pool t in
-  let resource_pool =
-    Network_pool.Transaction_pool.resource_pool transaction_pool
-  in
-  let pooled_transactions =
-    Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
-      addr
-  in
-  let txn_pool_nonce =
-    let nonces =
-      List.map pooled_transactions
-        ~f:(Fn.compose User_command.nonce User_command.forget_check)
-    in
-    (* The last nonce gives us the maximum nonce in the transaction pool *)
-    List.last nonces
-  in
-  match txn_pool_nonce with
-  | Some nonce ->
-      Participating_state.Option.return (Account.Nonce.succ nonce)
-  | None ->
-      let open Participating_state.Option.Let_syntax in
-      let%map account = get_account t addr in
-      account.Account.Poly.nonce
 
 let get_nonce t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
@@ -179,14 +153,72 @@ let replace_block_production_keys keys pks =
     (Keypair.And_compressed_pk.Set.of_list kps) ;
   kps |> List.map ~f:snd
 
-let setup_user_command ~fee ~nonce ~valid_until ~memo ~sender_kp
-    user_command_body =
+let get_inferred_nonce_from_transaction_pool_and_ledger t
+    (addr : Public_key.Compressed.t) =
+  let transaction_pool = Coda_lib.transaction_pool t in
+  let resource_pool =
+    Network_pool.Transaction_pool.resource_pool transaction_pool
+  in
+  let pooled_transactions =
+    Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
+      addr
+  in
+  let txn_pool_nonce =
+    let nonces =
+      List.map pooled_transactions
+        ~f:(Fn.compose User_command.nonce User_command.forget_check)
+    in
+    (* The last nonce gives us the maximum nonce in the transaction pool *)
+    List.last nonces
+  in
+  match txn_pool_nonce with
+  | Some nonce ->
+      Participating_state.Option.return (Account.Nonce.succ nonce)
+  | None ->
+      let open Participating_state.Option.Let_syntax in
+      let%map account = get_account t addr in
+      account.Account.Poly.nonce
+
+let get_inferred_nonce_from_transaction_pool_and_ledger_exn t
+    (addr : Public_key.Compressed.t) =
+  get_inferred_nonce_from_transaction_pool_and_ledger t addr
+  |> Participating_state.active_exn
+
+(*let setup_user_command (input: Input.t) =
   let payload =
-    User_command.Payload.create ~fee ~nonce ~valid_until ~memo
+    User_command.Payload.create ~fee:input.fee ~nonce ~valid_until ~memo
       ~body:user_command_body
   in
   let signed_user_command = User_command.sign sender_kp payload in
-  User_command.forget_check signed_user_command
+  User_command.forget_check signed_user_command*)
+
+let add_transactions t user_commands =
+  let res_ivar = Ivar.create () in
+  Coda_lib.add_transactions t
+    { User_command_util.client_input= user_commands
+    ; inferred_nonce= get_inferred_nonce_from_transaction_pool_and_ledger_exn t
+    ; record_payment= record_payment t
+    ; result= res_ivar } ;
+  Ivar.read res_ivar
+
+(*TODO: add logs*)
+let setup_and_submit_user_command t user_command_input =
+  (*let user_command_input = User_command_util.Input.make ~fee ~nonce_opt ~valid_until ~memo ~sender_kp ~body
+    in*)
+  add_transactions t (Either.First user_command_input)
+
+(* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
+let setup_and_submit_user_commands t user_command_list =
+  (*let user_command_input = User_command_util.Input.make ~fee ~nonce_opt ~valid_until ~memo ~sender_kp ~body
+      in*)
+  let logger =
+    Logger.extend
+      (Coda_lib.top_level_logger t)
+      [("coda_command", `String "scheduling a batch of user transactions")]
+  in
+  Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+    "batch-send-payments does not yet report errors" ;
+  add_transactions t (Either.Second user_command_list)
 
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
@@ -216,7 +248,7 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
       verifying_txn
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
-let schedule_user_commands t (txns : User_command.t list) :
+let schedule_user_commands t (_txns : User_command.t list) :
     unit Participating_state.t =
   Participating_state.return
   @@
@@ -226,8 +258,9 @@ let schedule_user_commands t (txns : User_command.t list) :
       [("coda_command", `String "scheduling a batch of user transactions")]
   in
   Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-    "batch-send-payments does not yet report errors" ;
-  Coda_lib.add_transactions t txns
+    "batch-send-payments does not yet report errors"
+
+(*Coda_lib.add_transactions t txns*)
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in

@@ -477,6 +477,7 @@ let batch_send_payments =
        (Args.zip2 Cli_lib.Flag.privkey_read_path payment_path_flag)
        ~f:main)
 
+(*Deepthi: Deprecated*)
 let user_command (body_args : User_command_payload.Body.t Command.Param.t)
     ~label ~summary ~error =
   let open Command.Param in
@@ -570,6 +571,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
              ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e))
              ~join_error:Or_error.join ))
 
+(*Deepthi: Deprecated*)
 let send_payment =
   let body =
     let open Command.Let_syntax in
@@ -648,6 +650,7 @@ let delegate_stake_graphql =
          printf "Dispatched stake delegation with ID %s\n"
            ((response#sendDelegation)#delegation)#id ))
 
+(*Deepthi: Deprecated*)
 let cancel_transaction =
   let txn_id_flag =
     Command.Param.(
@@ -829,6 +832,7 @@ let get_transaction_status =
              eprintf "Could not deserialize user command" ;
              exit 16 ))
 
+(*Deepthi: Deprecated*)
 let delegate_stake =
   let body =
     let open Command.Let_syntax in

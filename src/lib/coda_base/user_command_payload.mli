@@ -10,7 +10,7 @@ module Body : sig
 
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving bin_io, eq, sexp, hash, yojson]
+      type nonrec t = t [@@deriving bin_io, eq, sexp, hash, yojson, version]
     end
 
     module Latest = V1
