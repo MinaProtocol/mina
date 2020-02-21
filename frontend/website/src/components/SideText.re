@@ -26,7 +26,7 @@ let make = (~className="", ~paragraphs) => {
            className=Css.(
              merge([Theme.Body.basic, style([marginBottom(`rem(1.5))])])
            )>
-           {ReactUtils.staticArray(content)}
+           {ReactExt.staticArray(content)}
          </p>;
        });
 
@@ -37,6 +37,6 @@ let make = (~className="", ~paragraphs) => {
         style([media(Theme.MediaQuery.notMobile, [width(`rem(20.625))])]),
       ])
     )>
-    {ReactUtils.staticArray(ps)}
+    {ReactExt.staticArray(ps)}
   </div>;
 };

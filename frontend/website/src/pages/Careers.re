@@ -229,7 +229,7 @@ module BenefitItem = {
       )>
       <h3 className=Style.benefitTitle> {React.string(title)} </h3>
       <ul className=Style.benefitsListItems>
-        {ReactUtils.staticArray(
+        {ReactExt.staticArray(
            Array.map(
              item =>
                <li className=Style.benefitDetails> {React.string(item)} </li>,
