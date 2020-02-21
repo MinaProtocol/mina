@@ -63,7 +63,8 @@ let get_balance =
          in
          let balance_str = function
            | Some b ->
-               sprintf "Balance: %s coda\n" (Currency.Balance.to_string b)
+               sprintf "Balance: %s coda\n"
+                 (Currency.Balance.to_formatted_string b)
            | None ->
                "There are no funds in this account\n"
          in
@@ -91,7 +92,7 @@ let get_balance_graphql =
          match response#wallet with
          | Some wallet ->
              printf "Balance: %s coda\n"
-               (Currency.Balance.to_string (wallet#balance)#total)
+               (Currency.Balance.to_formatted_string (wallet#balance)#total)
          | None ->
              printf "There are no funds in this account\n" ))
 
@@ -708,7 +709,7 @@ let cancel_transaction =
                Currency.Fee.of_uint64 (fee + (replace_fee * diff))
              in
              printf "Fee to cancel transaction is %s coda.\n"
-               (Currency.Fee.to_string cancel_fee) ;
+               (Currency.Fee.to_formatted_string cancel_fee) ;
              let body =
                User_command_payload.Body.Payment
                  {receiver; amount= Currency.Amount.zero}
@@ -790,7 +791,7 @@ let cancel_transaction_graphql =
            Currency.Fee.of_uint64 (fee + (replace_fee * diff))
          in
          printf "Fee to cancel transaction is %s coda.\n"
-           (Currency.Fee.to_string cancel_fee) ;
+           (Currency.Fee.to_formatted_string cancel_fee) ;
          let cancel_query =
            let open Graphql_client.Encoders in
            Graphql_queries.Send_payment.make
@@ -1199,7 +1200,9 @@ let import_key =
   let flags = Args.zip2 privkey_path conf_dir in
   Command.async
     ~summary:
-      "Import a password protected private key to be tracked by the daemon."
+      "Import a password protected private key to be tracked by the daemon.\n\
+       Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
+       (key will be imported using the same password)."
     (Cli_lib.Background_daemon.graphql_init flags
        ~f:(fun graphql_endpoint (privkey_path, conf_dir) ->
          let open Deferred.Let_syntax in
@@ -1232,7 +1235,7 @@ let import_key =
                Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
              in
              let%map _response =
-               Graphql_client.query_exn
+               Graphql_client.query
                  (Graphql_queries.Reload_wallets.make ())
                  graphql_endpoint
              in
@@ -1265,7 +1268,7 @@ let list_accounts =
                    \  Locked: %b\n"
                    (i + 1)
                    (Public_key.Compressed.to_base58_check w#public_key)
-                   (Unsigned.UInt64.to_string (w#balance)#total)
+                   (Currency.Balance.to_formatted_string (w#balance)#total)
                    (Option.value ~default:true w#locked) ) ))
 
 let create_account =

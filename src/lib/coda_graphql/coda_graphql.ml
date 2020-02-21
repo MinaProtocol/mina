@@ -1075,7 +1075,7 @@ module Types = struct
         ~doc:
           (sprintf
              "String or Integer representation of a %s number. If the input \
-              is String, the String must represent a the number in base 10"
+              is a string, it must represent the number in base 10"
              lower_name) ~coerce:(fun key ->
           match key with
           | `String s ->
@@ -1094,6 +1094,18 @@ module Types = struct
 
     let uint32_arg = make_numeric_arg ~name:"UInt32" (module Unsigned.UInt32)
 
+    let signature_arg =
+      obj "SignatureInput"
+        ~coerce:(fun field scalar ->
+          let open Snark_params.Tick in
+          (Field.of_string field, Inner_curve.Scalar.of_string scalar) )
+        ~doc:"A cryptographic signature"
+        ~fields:
+          [ arg "field" ~typ:(non_null string)
+              ~doc:"Field component of signature"
+          ; arg "scalar" ~typ:(non_null string)
+              ~doc:"Scalar component of signature" ]
+
     module Fields = struct
       let from ~doc = arg "from" ~typ:(non_null public_key_arg) ~doc
 
@@ -1101,15 +1113,28 @@ module Types = struct
 
       let fee ~doc = arg "fee" ~typ:(non_null uint64_arg) ~doc
 
-      let memo ~doc = arg "memo" ~typ:string ~doc
+      let memo =
+        arg "memo" ~typ:string
+          ~doc:"Short arbitrary message provided by the sender"
 
       let valid_until =
-        arg "valid_until" ~typ:uint32_arg
+        arg "validUntil" ~typ:uint32_arg
           ~doc:
             "The global slot number after which this transaction cannot be \
-             applied."
+             applied"
 
-      let nonce ~doc = arg "nonce" ~typ:uint32_arg ~doc
+      let nonce =
+        arg "nonce" ~typ:uint32_arg
+          ~doc:
+            "Should only be set when cancelling transactions, otherwise a \
+             nonce is determined automatically"
+
+      let signature =
+        arg "signature" ~typ:signature_arg
+          ~doc:
+            "If a signature is provided, this transaction is considered \
+             signed and will be broadcasted to the network without requiring \
+             a private key"
     end
 
     let send_payment =
@@ -1118,14 +1143,14 @@ module Types = struct
         ~coerce:(fun from to_ amount fee valid_until memo nonce ->
           (from, to_, amount, fee, valid_until, memo, nonce) )
         ~fields:
-          [ from ~doc:"Public key of recipient of payment"
-          ; to_ ~doc:"Public key of sender of payment"
+          [ from ~doc:"Public key of sender of payment"
+          ; to_ ~doc:"Public key of recipient of payment"
           ; arg "amount" ~doc:"Amount of coda to send to to receiver"
               ~typ:(non_null uint64_arg)
           ; fee ~doc:"Fee amount in order to send payment"
           ; valid_until
-          ; memo ~doc:"Short arbitrary message provided by the sender"
-          ; nonce ~doc:"Desired nonce for sending a payment" ]
+          ; memo
+          ; nonce ]
 
     let send_delegation =
       let open Fields in
@@ -1133,12 +1158,12 @@ module Types = struct
         ~coerce:(fun from to_ fee valid_until memo nonce ->
           (from, to_, fee, valid_until, memo, nonce) )
         ~fields:
-          [ from ~doc:"Public key of recipient of a stake delegation"
-          ; to_ ~doc:"Public key of sender of a stake delegation"
+          [ from ~doc:"Public key of sender of a stake delegation"
+          ; to_ ~doc:"Public key of the account being delegated to"
           ; fee ~doc:"Fee amount in order to send a stake delegation"
           ; valid_until
-          ; memo ~doc:"Short arbitrary message provided by the sender"
-          ; nonce ~doc:"Desired nonce for delegating state" ]
+          ; memo
+          ; nonce ]
 
     let create_account =
       obj "AddAccountInput" ~coerce:Fn.id
@@ -1492,12 +1517,10 @@ module Mutations = struct
         in
         (ip_address, Coda_commands.reset_trust_status coda ip_address) )
 
-  let build_user_command coda nonce sender_kp memo payment_body fee valid_until
-      =
-    let command =
-      Coda_commands.setup_user_command ~fee ~nonce ~valid_until ~memo
-        ~sender_kp payment_body
-    in
+  let send_user_command coda signed_command =
+    let command = User_command.forget_check signed_command in
+    Deferred.return
+    @@
     match Coda_commands.send_user_command coda command with
     | `Active f -> (
       match f with
@@ -1508,99 +1531,118 @@ module Mutations = struct
     | `Bootstrapping ->
         Error "Daemon is bootstrapping"
 
-  let parse_user_command_input ~kind coda from to_ fee memo_opt =
+  let create_user_command_payload ~coda ~fee ~nonce ~valid_until ~memo ~sender
+      ~body =
     let open Result.Let_syntax in
-    let%bind sender_nonce =
-      match
-        Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger coda
-          from
-      with
-      | `Active (Some nonce) ->
-          Ok nonce
-      | `Active None ->
-          Error
-            "Couldn't infer nonce for transaction from specified `sender` \
-             since `sender` is not in the ledger or sent a transaction in \
-             transaction pool."
-      | `Bootstrapping ->
-          Error "Node is still bootstrapping"
+    (* TODO: We should put a more sensible default here. *)
+    let valid_until =
+      Option.value_map ~default:Coda_numbers.Global_slot.max_value
+        ~f:Coda_numbers.Global_slot.of_uint32 valid_until
     in
     let%bind fee =
-      result_of_exn Currency.Fee.of_uint64 fee
-        ~error:(sprintf "Invalid %s `fee` provided." kind)
+      result_of_exn Currency.Fee.of_uint64 fee ~error:"Invalid `fee` provided."
     in
-    let%bind sender_kp =
-      Result.of_option
-        (Secrets.Wallets.find_unlocked (Coda_lib.wallets coda) ~needle:from)
-        ~error:
-          (sprintf
-             "Couldn't find an unlocked key for specified `sender`. Did you \
-              unlock the account you're making a %s from?"
-             kind)
-    in
-    let%map memo =
-      Option.value_map memo_opt ~default:(Ok User_command_memo.empty)
+    let%bind memo =
+      Option.value_map memo ~default:(Ok User_command_memo.empty)
         ~f:(fun memo ->
           result_of_exn User_command_memo.create_from_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
-    (sender_nonce, sender_kp, memo, to_, fee)
+    let%map nonce =
+      match nonce with
+      | Some nonce ->
+          Ok (Account.Nonce.of_uint32 nonce)
+      | None -> (
+        match
+          Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger
+            coda sender
+        with
+        | `Active (Some nonce) ->
+            Ok nonce
+        | `Active None ->
+            Error
+              "Couldn't infer nonce for transaction from specified `sender` \
+               since `sender` is not in the ledger or sent a transaction in \
+               transaction pool."
+        | `Bootstrapping ->
+            Error "Node is still bootstrapping" )
+    in
+    User_command.Payload.create ~fee ~nonce ~valid_until ~memo ~body
 
-  let with_default_expiry =
-    Option.value_map (* TODO: We should put a more sensible default here. *)
-      ~default:Coda_numbers.Global_slot.max_value
-      ~f:Coda_numbers.Global_slot.of_uint32
+  let send_signed_user_command ~coda ~sender ~payload ~signature =
+    let open Deferred.Result.Let_syntax in
+    let%bind command =
+      User_command.create_with_signature_checked signature sender payload
+      |> Result.of_option ~error:"Invalid signature"
+      |> Deferred.return
+    in
+    send_user_command coda command
+
+  let send_unsigned_user_command ~coda ~sender ~payload =
+    let open Deferred.Result.Let_syntax in
+    let%bind sender_kp =
+      Secrets.Wallets.find_unlocked (Coda_lib.wallets coda) ~needle:sender
+      |> Result.of_option
+           ~error:
+             "Couldn't find an unlocked key for specified `sender`. Did you \
+              unlock the account you're making a transaction from?"
+      |> Deferred.return
+    in
+    let command = User_command.sign sender_kp payload in
+    send_user_command coda command
 
   let send_delegation =
     io_field "sendDelegation"
       ~doc:"Change your delegate by sending a transaction"
       ~typ:(non_null Types.Payload.send_delegation)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.send_delegation)]
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.send_delegation)
+          ; Types.Input.Fields.signature ]
       ~resolve:
-        (fun {ctx= coda; _} ()
-             (from, to_, fee, valid_until_opt, memo_opt, nonce_opt) ->
+        (fun {ctx= coda; _} () (from, to_, fee, valid_until, memo, nonce)
+             signature ->
         let open Deferred.Result.Let_syntax in
-        let%bind sender_nonce, sender_kp, memo, new_delegate, fee =
-          Deferred.return
-          @@ parse_user_command_input ~kind:"stake delegation" coda from to_
-               fee memo_opt
-        in
         let body =
           User_command_payload.Body.Stake_delegation
-            (Set_delegate {new_delegate})
+            (Set_delegate {new_delegate= to_})
         in
-        let nonce =
-          Option.value_map nonce_opt ~f:Account.Nonce.of_uint32
-            ~default:sender_nonce
+        let%bind payload =
+          Deferred.return
+          @@ create_user_command_payload ~coda ~nonce ~sender:from ~memo ~fee
+               ~valid_until ~body
         in
-        let valid_until = with_default_expiry valid_until_opt in
-        Deferred.return
-        @@ build_user_command coda nonce sender_kp memo body fee valid_until )
+        match signature with
+        | None ->
+            send_unsigned_user_command ~coda ~sender:from ~payload
+        | Some signature ->
+            send_signed_user_command ~coda ~sender:from ~payload ~signature )
 
   let send_payment =
     io_field "sendPayment" ~doc:"Send a payment"
       ~typ:(non_null Types.Payload.send_payment)
-      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.send_payment)]
+      ~args:
+        Arg.
+          [ arg "input" ~typ:(non_null Types.Input.send_payment)
+          ; Types.Input.Fields.signature ]
       ~resolve:
         (fun {ctx= coda; _} ()
-             (from, to_, amount, fee, valid_until_opt, memo_opt, nonce_opt) ->
+             (from, to_, amount, fee, valid_until, memo, nonce) signature ->
         let open Deferred.Result.Let_syntax in
-        let%bind sender_nonce, sender_kp, memo, receiver, fee =
-          Deferred.return
-          @@ parse_user_command_input ~kind:"payment" coda from to_ fee
-               memo_opt
-        in
         let body =
           User_command_payload.Body.Payment
-            {receiver; amount= Amount.of_uint64 amount}
+            {receiver= to_; amount= Amount.of_uint64 amount}
         in
-        let nonce =
-          Option.value_map nonce_opt ~f:Account.Nonce.of_uint32
-            ~default:sender_nonce
+        let%bind payload =
+          Deferred.return
+          @@ create_user_command_payload ~coda ~nonce ~sender:from ~memo ~fee
+               ~valid_until ~body
         in
-        let valid_until = with_default_expiry valid_until_opt in
-        Deferred.return
-        @@ build_user_command coda nonce sender_kp memo body fee valid_until )
+        match signature with
+        | None ->
+            send_unsigned_user_command ~coda ~sender:from ~payload
+        | Some signature ->
+            send_signed_user_command ~coda ~sender:from ~payload ~signature )
 
   let add_payment_receipt =
     result_field "addPaymentReceipt"
@@ -1706,6 +1748,7 @@ module Queries = struct
         ( match opt_pk with
         | None ->
             Network_pool.Transaction_pool.Resource_pool.transactions
+              ~logger:(Coda_lib.top_level_logger coda)
               resource_pool
             |> Sequence.to_list
         | Some pk ->

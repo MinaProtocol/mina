@@ -49,7 +49,8 @@ let generate_base_proof ~ledger =
       ; update= Coda_state.Snark_transition.genesis ~genesis_ledger }
     in
     let main x =
-      Tick.handle (Keys.Step.main x)
+      Tick.handle
+        (Keys.Step.main ~logger:(Logger.create ()) x)
         (Consensus.Data.Prover_state.precomputed_handler ~genesis_ledger)
     in
     let tick =

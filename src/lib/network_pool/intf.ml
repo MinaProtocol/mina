@@ -219,7 +219,8 @@ module type Transaction_resource_pool_intf = sig
 
   val member : t -> User_command.With_valid_signature.t -> bool
 
-  val transactions : t -> User_command.With_valid_signature.t Sequence.t
+  val transactions :
+    logger:Logger.t -> t -> User_command.With_valid_signature.t Sequence.t
 
   val all_from_user :
     t -> Public_key.Compressed.t -> User_command.With_valid_signature.t list

@@ -61,7 +61,7 @@ clean:
 	@rm -rf src/$(COVERAGE_DIR)
 
 libp2p_helper:
-	bash -c "source ~/.profile && cd src/app/libp2p_helper && nix-build default.nix"
+	$(WRAPAPP) bash -c "if [ -z \"$${USER}\" ]; then export USER=opam ; fi && source ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && (if [ -z \"$${CACHIX_SIGNING_KEY+x}\" ]; then nix-build $${EXTRA_NIX_ARGS} default.nix;  else nix-build $${EXTRA_NIX_ARGS} default.nix | cachix push codaprotocol ; fi)"
 
 
 GENESIS_DIR := $(TMPDIR)/coda_cache_dir
@@ -79,7 +79,7 @@ genesis_ledger:
 	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/runtime_genesis_ledger/genesis_filename.txt && make genesis_tar
 	$(info Genesis ledger and genesis proof generated)
 
-build: git_hooks reformat-diff
+build: git_hooks reformat-diff libp2p_helper
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE) && make genesis_ledger
 	$(info Build complete)
