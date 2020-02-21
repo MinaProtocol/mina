@@ -103,6 +103,8 @@ val dump_tf : t -> string Or_error.t
 
 val best_path : t -> State_hash.t list option
 
+val best_chain : t -> Transition_frontier.Breadcrumb.t list option
+
 val transaction_pool : t -> Network_pool.Transaction_pool.t
 
 val transaction_database : t -> Auxiliary_database.Transaction_database.t
