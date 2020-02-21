@@ -13,21 +13,27 @@ let create_hd_account_summary =
 
 let hardware_wallet_script = "codaledgercli"
 
-let to_bigint : string -> Bigint.t =
+module type Tick_intf = sig
+  type field
+
+  module Bigint : sig
+    type t
+
+    val of_bignum_bigint : Bigint.t -> t
+
+    val to_field : t -> field
+  end
+end
+
+let decode_field (type field) (module Tick : Tick_intf with type field = field)
+    : string -> field =
  fun field ->
   Bytes.of_string field
   |> B58.decode Base58_check.coda_alphabet
   |> Bytes.to_list |> List.rev |> Bytes.of_char_list |> Bytes.to_string
   |> String.foldi ~init:Bigint.zero ~f:(fun i acc byte ->
          Bigint.(acc lor (of_int (Char.to_int byte) lsl Int.( * ) 8 i)) )
-
-let decode_field : string -> Snark_params.Tick.Field.t =
- fun field ->
-  to_bigint field |> Tick.Bigint.of_bignum_bigint |> Tick.Bigint.to_field
-
-let decode_scalar : string -> Snark_params.Tock.Field.t =
- fun scalar ->
-  to_bigint scalar |> Tock.Bigint.of_bignum_bigint |> Tock.Bigint.to_field
+  |> Tick.Bigint.of_bignum_bigint |> Tick.Bigint.to_field
 
 type public_key = {status: string; x: string; y: string} [@@deriving yojson]
 
@@ -59,7 +65,8 @@ let decode_public_key : string -> (Public_key.t, string) Result.t =
   |> Result.map_error ~f:report_json_error
   |> Result.bind ~f:(fun {status; x; y} ->
          decode_status_code status ~f:(fun () ->
-             (decode_field x, decode_field y) ) )
+             ( decode_field (module Snark_params.Tick) x
+             , decode_field (module Snark_params.Tick) y ) ) )
 
 type signature = {status: string; field: string; scalar: string}
 [@@deriving yojson]
@@ -71,7 +78,8 @@ let decode_signature : string -> (Signature.t, string) Result.t =
   |> Result.map_error ~f:report_json_error
   |> Result.bind ~f:(fun {status; field; scalar} ->
          decode_status_code status ~f:(fun () ->
-             (decode_field field, decode_scalar scalar) ) )
+             ( decode_field (module Snark_params.Tick) field
+             , decode_field (module Snark_params.Tock) scalar ) ) )
 
 let compute_public_key ~hd_index =
   let prog, args =
