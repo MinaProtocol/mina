@@ -34,6 +34,11 @@ module Stable = struct
 
     let to_latest ({receiver; amount} : t) : V2.t =
       {receiver= Account_id.create receiver Token_id.default; amount}
+
+    let of_latest ({receiver; amount} : V2.t) : (t, string) Result.t =
+      if Token_id.equal (Account_id.token_id receiver) Token_id.default then
+        Ok {receiver= Account_id.public_key receiver; amount}
+      else Error "Unhandled token ID"
   end
 end]
 

@@ -240,7 +240,6 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
         in
         let sender_balance' =
           Currency.Balance.sub_amount sender_account.balance amount
-          |> Option.value_exn ?here:None ?error:None ?message:None
         in
         if Token_id.equal fee_token token then
           (* sender_idx = fee_sender_idx *)
@@ -252,6 +251,7 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
             Option.value_exn
               (Currency.Balance.add_amount receiver_account.balance amount')
           in
+          let sender_balance' = Option.value_exn sender_balance' in
           let t =
             set_exn t sender_idx {sender_account with balance= sender_balance'}
           in
@@ -262,9 +262,21 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
           let fee_sender_balance' =
             sub_account_creation_fee_bal action fee_sender_account.balance
           in
-          let receiver_balance' =
-            Option.value_exn
-              (Currency.Balance.add_amount receiver_account.balance amount)
+          let receiver_balance', sender_balance' =
+            match sender_balance' with
+            | Some sender_balance' ->
+                (* Sending the tokens succeeds, move them into the receiver
+                   account.
+                *)
+                let receiver_balance' =
+                  Option.value_exn
+                    (Currency.Balance.add_amount receiver_account.balance
+                       amount)
+                in
+                (receiver_balance', sender_balance')
+            | None ->
+                (* Sending the tokens fails, do not move them. *)
+                (receiver_account.balance, sender_account.balance)
           in
           let t =
             set_exn t fee_sender_idx

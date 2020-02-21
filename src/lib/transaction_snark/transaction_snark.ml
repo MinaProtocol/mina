@@ -465,6 +465,57 @@ module Base = struct
             in
             Boolean.Assert.is_true correct_coinbase_stack))
     in
+    let%bind payment_insufficient_funds =
+      (* Here we 'forsee' whether there will be insufficient funds to send,
+         if this is a payment and the fee-payer is distinct from the sender
+         account.
+
+         In this case, we still charge the fee-payer, but don't modify the
+         sender or receiver balance.
+      *)
+      let%bind prover_account_idx =
+        (* TODO: Implement requests within [As_prover] blocks, so we don't need
+           this kind of wrapper.
+        *)
+        exists (Typ.Internal.ref ())
+          ~request:
+            As_prover.(
+              let%map sender_id = read Account_id.typ sender_id in
+              Ledger_hash.Find_index sender_id)
+      in
+      let%bind prover_sender_account =
+        (* TODO: Implement requests within [As_prover] blocks, so we don't need
+           this kind of wrapper.
+        *)
+        exists (Typ.Internal.ref ())
+          ~request:
+            As_prover.(
+              let%map account_idx =
+                read (Typ.Internal.ref ()) prover_account_idx
+              in
+              Ledger_hash.Get_element account_idx)
+      in
+      exists Boolean.typ
+        ~compute:
+          As_prover.(
+            let%bind account, _path =
+              read (Typ.Internal.ref ()) prover_sender_account
+            in
+            let%bind fee = read Fee.typ fee in
+            let%bind is_payment = read Boolean.typ is_payment in
+            let%bind sender_id = read Account_id.typ sender_id in
+            let%map fee_sender_id = read Account_id.typ fee_sender_id in
+            if is_payment && not (Account_id.equal sender_id fee_sender_id)
+            then
+              Option.is_none
+                (Balance.sub_amount account.balance (Amount.of_fee fee))
+            else false)
+    in
+    let%bind () =
+      [%with_label
+        "Predict sufficient funds for a payment if sender is the fee-payer"]
+        Boolean.(Assert.any [tokens_equal; not payment_insufficient_funds])
+    in
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
          - stake delegation: 0
@@ -477,13 +528,18 @@ module Base = struct
              ~then_:(Amount.var_of_t Amount.zero)
              ~else_:payload.body.amount
          in
+         let%bind base_amount' =
+           Amount.Checked.if_ payment_insufficient_funds
+             ~then_:(Amount.var_of_t Amount.zero)
+             ~else_:base_amount
+         in
          (* The fee for entering the coinbase transaction is paid up front. *)
          let%bind coinbase_receiver_fee =
            Amount.Checked.if_ is_coinbase
              ~then_:(Amount.Checked.of_fee fee)
              ~else_:(Amount.var_of_t Amount.zero)
          in
-         Amount.Checked.sub base_amount coinbase_receiver_fee)
+         Amount.Checked.sub base_amount' coinbase_receiver_fee)
     in
     let account_creation_amount =
       Amount.Checked.of_fee
@@ -515,6 +571,10 @@ module Base = struct
                - the receiver for a coinbase 
                - the first receiver for a fee transfer
              *)
+             let%bind is_empty_and_writeable =
+               Boolean.(
+                 is_empty_and_writeable && not payment_insufficient_funds)
+             in
              receiver_was_created := Some is_empty_and_writeable ;
              let%map balance =
                (* receiver_increase will be zero in the stake delegation case *)
@@ -534,8 +594,21 @@ module Base = struct
              and delegate =
                Public_key.Compressed.Checked.if_ is_empty_and_writeable
                  ~then_:receiver ~else_:account.delegate
+             and public_key =
+               Public_key.Compressed.Checked.if_ is_empty_and_writeable
+                 ~then_:receiver ~else_:account.public_key
+             and token_id =
+               Token_id.Checked.if_ is_empty_and_writeable ~then_:token
+                 ~else_:account.token_id
              in
-             {account with balance; delegate; public_key= receiver} ))
+             { Account.Poly.balance
+             ; public_key
+             ; token_id
+             ; nonce= account.nonce
+             ; receipt_chain_hash= account.receipt_chain_hash
+             ; delegate
+             ; voting_for= account.voting_for
+             ; timing= account.timing } ))
     in
     let fee_sender_amount =
       let sgn = Sgn.Checked.neg_if_true is_user_command in
@@ -631,9 +704,13 @@ module Base = struct
                - the fee-receiver for a coinbase 
                - the second receiver for a fee transfer
              *)
+             let%bind successful_payment =
+               Boolean.(is_payment && not payment_insufficient_funds)
+             in
              let%bind amount =
                (* Only payments should affect the balance at this stage. *)
-               if_ is_payment ~typ:Amount.typ ~then_:payload.body.amount
+               if_ successful_payment ~typ:Amount.typ
+                 ~then_:payload.body.amount
                  ~else_:Amount.(var_of_t zero)
              in
              (* TODO: use actual slot. See issue #4036. *)

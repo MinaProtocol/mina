@@ -75,6 +75,11 @@ module Stable = struct
     let to_latest ({payload; sender; signature} : t) : V2.t =
       {payload= Payload.Stable.V1.to_latest payload; sender; signature}
 
+    let of_latest ({payload; sender; signature} : V2.t) =
+      let open Result.Let_syntax in
+      let%map payload = Payload.Stable.V1.of_latest payload in
+      ({payload; sender; signature} : t)
+
     let version_byte = Base58_check.Version_bytes.user_command
 
     module T = struct
@@ -91,9 +96,7 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
-let accounts_accessed = Stable.Latest.accounts_accessed
-
-include Comparable.Make (Stable.Latest)
+include (Stable.Latest : module type of Stable.Latest with type t := t)
 
 let payload Poly.{payload; _} = payload
 
@@ -317,6 +320,8 @@ module With_valid_signature = struct
       type t = Stable.V1.t [@@deriving sexp, eq, yojson, hash]
 
       let to_latest = Stable.V1.to_latest
+
+      let of_latest = Stable.V1.of_latest
 
       let compare = Stable.V1.compare
     end

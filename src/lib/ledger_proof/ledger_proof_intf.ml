@@ -1,3 +1,4 @@
+open Core_kernel
 open Coda_base
 
 module type S = sig
@@ -8,6 +9,10 @@ module type S = sig
     sig
       module V1 : sig
         type t [@@deriving bin_io, compare, sexp, version, to_yojson]
+
+        val to_latest : t -> t
+
+        val of_latest : t -> (t, _) Result.t
       end
 
       module Latest = V1

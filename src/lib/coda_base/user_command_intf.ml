@@ -75,6 +75,8 @@ module type S = sig
 
   include Comparable.S with type t := t
 
+  include Hashable.S with type t := t
+
   val payload : t -> User_command_payload.t
 
   val fee : t -> Currency.Fee.t
@@ -117,6 +119,8 @@ module type S = sig
         type t [@@deriving sexp, eq, bin_io, yojson, version, compare, hash]
 
         val to_latest : t -> Latest.t
+
+        val of_latest : Latest.t -> (t, string) Result.t
       end
     end
 

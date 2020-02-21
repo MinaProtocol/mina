@@ -27,6 +27,15 @@ module Stable = struct
           Fee_transfer ft
       | Coinbase cb ->
           Coinbase cb
+
+    let of_latest = function
+      | V2.User_command uc ->
+          Result.map (User_command.With_valid_signature.Stable.V1.of_latest uc)
+            ~f:(fun uc -> User_command uc)
+      | Fee_transfer ft ->
+          Ok (Fee_transfer ft)
+      | Coinbase cb ->
+          Ok (Coinbase cb)
   end
 end]
 

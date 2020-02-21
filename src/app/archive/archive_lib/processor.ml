@@ -4,7 +4,6 @@ open Pipe_lib
 open Coda_transition
 open Coda_state
 open Coda_base
-open Signature_lib
 
 module Make (Config : Graphql_lib.Client.Config_intf) = struct
   type t = {hasura_endpoint: Uri.t}
@@ -64,7 +63,7 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
         ((User_command.t, Transaction_hash.t) With_hash.t * Block_time.t option)
         list)
       (sender_receipt_chains_from_parent_ledger :
-        Receipt.Chain_hash.t Public_key.Compressed.Map.t) :
+        Receipt.Chain_hash.t Account_id.Map.t) :
       ( (User_command.t, Transaction_hash.t) With_hash.t
       * Block_time.t option
       * Types.Receipt_chain_hash.t option )
@@ -84,7 +83,7 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
          , block_time )
          ->
         let user_command_payload = User_command.payload user_command in
-        let sender = User_command.sender user_command in
+        let sender = User_command.fee_sender user_command in
         let udpated_sender_receipt_chain, new_receipt_chain =
           Option.value_map ~default:(acc_sender_receipt_chains, None)
             (Map.find acc_sender_receipt_chains sender)
@@ -180,7 +179,7 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
       ({With_hash.data= block; hash= _} as block_with_hash :
         (External_transition.t, State_hash.t) With_hash.t)
       (sender_receipt_chains_from_parent_ledger :
-        Receipt.Chain_hash.t Public_key.Compressed.Map.t) =
+        Receipt.Chain_hash.t Account_id.Map.t) =
     let open Deferred.Result.Let_syntax in
     let transactions =
       List.bind (External_transition.transactions block) ~f:(function
@@ -243,7 +242,7 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
         -> (
           match%bind
             added_transition t block
-              (Public_key.Compressed.Map.of_alist_exn
+              (Account_id.Map.of_alist_exn
                  sender_receipt_chains_from_parent_ledger)
           with
           | Error e ->

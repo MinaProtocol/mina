@@ -77,10 +77,12 @@ let generate_ledger : directory_name:string -> Account_config.t -> t =
   let ledger = Ledger.create ~directory_name () in
   List.iter accounts ~f:(fun {pk; balance; delegate; _} ->
       let account =
-        let base_acct = Account.create pk balance in
+        let account_id = Account_id.create pk Token_id.default in
+        let base_acct = Account.create account_id balance in
         {base_acct with delegate= Option.value ~default:pk delegate}
       in
-      Ledger.create_new_account_exn ledger account.public_key account ) ;
+      Ledger.create_new_account_exn ledger (Account.identifier account) account
+  ) ;
   ledger
 
 let commit ledger = Ledger.commit ledger

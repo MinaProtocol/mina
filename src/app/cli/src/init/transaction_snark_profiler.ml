@@ -19,14 +19,18 @@ let create_ledger_and_transactions num_transitions =
   in
   Array.iter keys ~f:(fun k ->
       let public_key = Public_key.compress k.public_key in
-      Ledger.create_new_account_exn ledger public_key
-        (Account.create public_key (Currency.Balance.of_int 10_000)) ) ;
+      let account_id = Account_id.create public_key Token_id.default in
+      Ledger.create_new_account_exn ledger account_id
+        (Account.create account_id (Currency.Balance.of_int 10_000)) ) ;
   let txn from_kp (to_kp : Signature_lib.Keypair.t) amount fee nonce =
+    let receiver =
+      Account_id.create (Public_key.compress to_kp.public_key) Token_id.default
+    in
     let payload : User_command.Payload.t =
-      User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
+      User_command.Payload.create ~fee ~fee_token:Token_id.default ~nonce
+        ~memo:User_command_memo.dummy
         ~valid_until:Coda_numbers.Global_slot.max_value
-        ~body:
-          (Payment {receiver= Public_key.compress to_kp.public_key; amount})
+        ~body:(Payment {receiver; amount})
     in
     User_command.sign from_kp payload
   in
@@ -230,17 +234,21 @@ let generate_base_snarks_witness sparse_ledger0
 
 let run profiler num_transactions repeats preeval =
   let ledger, transitions = create_ledger_and_transactions num_transactions in
+  let aid_of_pk pk = Account_id.create pk Token_id.default in
   let sparse_ledger =
     Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
       (List.concat_map transitions ~f:(fun t ->
            match t with
            | Fee_transfer t ->
-               One_or_two.map t ~f:(fun (pk, _) -> pk) |> One_or_two.to_list
+               One_or_two.map t ~f:(fun (pk, _) -> aid_of_pk pk)
+               |> One_or_two.to_list
            | User_command t ->
                let t = (t :> User_command.t) in
                User_command.accounts_accessed t
            | Coinbase {receiver; fee_transfer; _} ->
-               receiver :: Option.to_list (Option.map fee_transfer ~f:fst) ))
+               List.map ~f:aid_of_pk
+                 (receiver :: Option.to_list (Option.map fee_transfer ~f:fst))
+       ))
   in
   for i = 1 to repeats do
     let message = profiler sparse_ledger transitions preeval in

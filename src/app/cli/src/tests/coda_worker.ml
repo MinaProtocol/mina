@@ -51,12 +51,12 @@ module T = struct
     ; start: ('worker, unit, unit) Rpc_parallel.Function.t
     ; get_balance:
         ( 'worker
-        , Public_key.Compressed.t
+        , Account_id.t
         , Currency.Balance.t option )
         Rpc_parallel.Function.t
     ; get_nonce:
         ( 'worker
-        , Public_key.Compressed.t
+        , Account_id.t
         , Coda_numbers.Account_nonce.t option )
         Rpc_parallel.Function.t
     ; root_length: ('worker, unit, int) Rpc_parallel.Function.t
@@ -81,7 +81,7 @@ module T = struct
         Rpc_parallel.Function.t
     ; get_all_transitions:
         ( 'worker
-        , Public_key.Compressed.t
+        , Account_id.t
         , ( Auxiliary_database.Filtered_external_transition.t
           , State_hash.t )
           With_hash.t
@@ -130,39 +130,32 @@ module T = struct
   type coda_functions =
     { coda_peers: unit -> Network_peer.Peer.t list Deferred.t
     ; coda_start: unit -> unit Deferred.t
-    ; coda_get_balance:
-           Public_key.Compressed.t
-        -> Currency.Balance.Stable.V1.t option Deferred.t
+    ; coda_get_balance: Account_id.t -> Currency.Balance.t option Deferred.t
     ; coda_get_nonce:
-           Public_key.Compressed.t
-        -> Coda_numbers.Account_nonce.t option Deferred.t
+        Account_id.t -> Coda_numbers.Account_nonce.t option Deferred.t
     ; coda_root_length: unit -> int Deferred.t
     ; coda_send_payment:
         Send_payment_input.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
     ; coda_process_user_command:
         User_command.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
     ; coda_verified_transitions: unit -> state_hashes Pipe.Reader.t Deferred.t
-    ; coda_sync_status:
-        unit -> Sync_status.Stable.V1.t Pipe.Reader.t Deferred.t
+    ; coda_sync_status: unit -> Sync_status.t Pipe.Reader.t Deferred.t
     ; coda_new_user_command:
-           Public_key.Compressed.Stable.V1.t
-        -> User_command.Stable.V1.t Pipe.Reader.t Deferred.t
+        Public_key.Compressed.t -> User_command.t Pipe.Reader.t Deferred.t
     ; coda_get_all_user_commands:
-           Public_key.Compressed.Stable.V1.t
-        -> User_command.Stable.V1.t list Deferred.t
+        Public_key.Compressed.t -> User_command.t list Deferred.t
     ; coda_replace_snark_worker_key:
-        Public_key.Compressed.Stable.V1.t option -> unit Deferred.t
+        Public_key.Compressed.t option -> unit Deferred.t
     ; coda_stop_snark_worker: unit -> unit Deferred.t
     ; coda_validated_transitions_keyswaptest:
-           unit
-        -> External_transition.Validated.Stable.V1.t Pipe.Reader.t Deferred.t
+        unit -> External_transition.Validated.t Pipe.Reader.t Deferred.t
     ; coda_root_diff: unit -> Coda_lib.Root_diff.t Pipe.Reader.t Deferred.t
     ; coda_initialization_finish_signal: unit -> unit Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
         -> (Receipt.Chain_hash.t * User_command.t list) Deferred.t
     ; coda_get_all_transitions:
-           Public_key.Compressed.t
+           Account_id.t
         -> ( Auxiliary_database.Filtered_external_transition.t
            , State_hash.t )
            With_hash.t
@@ -176,7 +169,7 @@ module T = struct
            Pipe.Reader.t
            Deferred.t
     ; coda_dump_tf: unit -> string Deferred.t
-    ; coda_best_path: unit -> State_hash.Stable.Latest.t list Deferred.t }
+    ; coda_best_path: unit -> State_hash.t list Deferred.t }
 
   module Worker_state = struct
     type init_arg = Input.t [@@deriving bin_io]
@@ -258,10 +251,10 @@ module T = struct
 
     let get_all_transitions =
       C.create_rpc ~f:get_all_transitions_impl ~name:"get_all_transitions"
-        ~bin_input:Public_key.Compressed.Stable.V1.bin_t
+        ~bin_input:Account_id.Stable.V1.bin_t
         ~bin_output:
           [%bin_type_class:
-            ( Auxiliary_database.Filtered_external_transition.Stable.V1.t
+            ( Auxiliary_database.Filtered_external_transition.Stable.Latest.t
             , State_hash.Stable.V1.t )
             With_hash.Stable.V1.t
             list] ()
@@ -276,12 +269,12 @@ module T = struct
 
     let get_balance =
       C.create_rpc ~f:get_balance_impl ~name:"get_balance"
-        ~bin_input:Public_key.Compressed.Stable.V1.bin_t
+        ~bin_input:Account_id.Stable.V1.bin_t
         ~bin_output:[%bin_type_class: Currency.Balance.Stable.V1.t option] ()
 
     let get_nonce =
       C.create_rpc ~f:get_nonce_impl ~name:"get_nonce"
-        ~bin_input:Public_key.Compressed.Stable.V1.bin_t
+        ~bin_input:Account_id.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class: Coda_numbers.Account_nonce.Stable.V1.t option] ()
 
@@ -296,14 +289,15 @@ module T = struct
             Receipt.Chain_hash.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t]
         ~bin_output:
           [%bin_type_class:
-            Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list] ()
+            Receipt.Chain_hash.Stable.V1.t * User_command.Stable.Latest.t list]
+        ()
 
     let new_block =
       C.create_pipe ~f:new_block_impl ~name:"new_block"
         ~bin_input:[%bin_type_class: Account.Key.Stable.V1.t]
         ~bin_output:
           [%bin_type_class:
-            ( Auxiliary_database.Filtered_external_transition.Stable.V1.t
+            ( Auxiliary_database.Filtered_external_transition.Stable.Latest.t
             , State_hash.Stable.V1.t )
             With_hash.Stable.V1.t] ()
 
@@ -326,7 +320,7 @@ module T = struct
 
     let root_diff =
       C.create_pipe ~name:"root_diff" ~f:root_diff_impl ~bin_input:Unit.bin_t
-        ~bin_output:[%bin_type_class: Coda_lib.Root_diff.Stable.V1.t] ()
+        ~bin_output:[%bin_type_class: Coda_lib.Root_diff.Stable.Latest.t] ()
 
     let initialization_finish_signal =
       C.create_pipe ~name:"initialization_finish_signal"
@@ -339,13 +333,13 @@ module T = struct
 
     let new_user_command =
       C.create_pipe ~name:"new_user_command" ~f:new_user_command_impl
-        ~bin_input:Public_key.Compressed.Stable.V1.bin_t
-        ~bin_output:User_command.Stable.V1.bin_t ()
+        ~bin_input:Public_key.Compressed.Stable.Latest.bin_t
+        ~bin_output:User_command.Stable.Latest.bin_t ()
 
     let get_all_user_commands =
       C.create_rpc ~name:"get_all_user_commands" ~f:get_all_user_commands_impl
         ~bin_input:Public_key.Compressed.Stable.V1.bin_t
-        ~bin_output:[%bin_type_class: User_command.Stable.V1.t list] ()
+        ~bin_output:[%bin_type_class: User_command.Stable.Latest.t list] ()
 
     let dump_tf =
       C.create_rpc ~name:"dump_tf" ~f:dump_tf_impl ~bin_input:Unit.bin_t
@@ -571,14 +565,14 @@ module T = struct
               external_transition_database (Some pk)
             |> Deferred.return
           in
-          let coda_get_balance pk =
+          let coda_get_balance account_id =
             return
-              ( Coda_commands.get_balance coda pk
+              ( Coda_commands.get_balance coda account_id
               |> Participating_state.active_exn )
           in
-          let coda_get_nonce pk =
+          let coda_get_nonce account_id =
             return
-              ( Coda_commands.get_nonce coda pk
+              ( Coda_commands.get_nonce coda account_id
               |> Participating_state.active_exn )
           in
           let coda_root_length () =
@@ -589,15 +583,21 @@ module T = struct
               Public_key.of_private_key_exn sk |> Public_key.compress
             in
             let build_txn amount sender_sk receiver_pk fee =
+              let sender_id =
+                Account_id.create (pk_of_sk sender_sk) Token_id.default
+              in
+              let receiver_id =
+                Account_id.create receiver_pk Token_id.default
+              in
               let nonce =
-                Coda_commands.get_nonce coda (pk_of_sk sender_sk)
+                Coda_commands.get_nonce coda sender_id
                 |> Participating_state.active_exn
                 |> Option.value_exn ?here:None ?message:None ?error:None
               in
               let payload : User_command.Payload.t =
-                User_command.Payload.create ~fee ~nonce ~memo
-                  ~valid_until:Coda_numbers.Global_slot.max_value
-                  ~body:(Payment {receiver= receiver_pk; amount})
+                User_command.Payload.create ~fee ~fee_token:Token_id.default
+                  ~nonce ~memo ~valid_until:Coda_numbers.Global_slot.max_value
+                  ~body:(Payment {receiver= receiver_id; amount})
               in
               User_command.sign (Keypair.of_private_key_exn sender_sk) payload
             in

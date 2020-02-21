@@ -42,13 +42,13 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
-    module V1 = struct
+    module V2 = struct
       module T = struct
         type query = unit [@@deriving bin_io, version {rpc}]
 
         type response =
-          ( ( Transaction.Stable.V1.t Transaction_protocol_state.Stable.V1.t
-            , Transaction_witness.Stable.V1.t
+          ( ( Transaction.Stable.V2.t Transaction_protocol_state.Stable.V1.t
+            , Transaction_witness.Stable.V2.t
             , Ledger_proof.Stable.V1.t )
             Work.Single.Spec.Stable.V1.t
             Work.Spec.Stable.V1.t
@@ -69,7 +69,63 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       include Register (T)
     end
 
-    module Latest = V1
+    module V1 = struct
+      module T = struct
+        type query = unit [@@deriving bin_io, version {rpc}]
+
+        type response =
+          ( ( Transaction.Stable.V1.t Transaction_protocol_state.Stable.V1.t
+            , Transaction_witness.Stable.V1.t
+            , Ledger_proof.Stable.V1.t )
+            Work.Single.Spec.Stable.V1.t
+            Work.Spec.Stable.V1.t
+          * Public_key.Compressed.Stable.V1.t )
+          option
+        [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model t =
+          let open Option.Let_syntax in
+          let%bind work, pk = t in
+          let%map work =
+            match
+              Work.Spec.Stable.V1.of_latest
+                (Work.Single.Spec.Stable.V1.of_latest
+                   (Transaction_protocol_state.Stable.V1.of_latest
+                      Transaction.Stable.V1.of_latest)
+                   Transaction_witness.Stable.V1.of_latest
+                   Ledger_proof.Stable.V1.of_latest)
+                work
+            with
+            | Ok work ->
+                Some work
+            | Error _ ->
+                None
+          in
+          (work, pk)
+
+        let caller_model_of_response =
+          Option.map ~f:(fun (work, pk) ->
+              let work =
+                Work.Spec.Stable.V1.to_latest
+                  (Work.Single.Spec.Stable.V1.to_latest
+                     (Transaction_protocol_state.Stable.V1.to_latest
+                        Transaction.Stable.V1.to_latest)
+                     Transaction_witness.Stable.V1.to_latest
+                     Ledger_proof.Stable.V1.to_latest)
+                  work
+              in
+              (work, pk) )
+      end
+
+      include T
+      include Register (T)
+    end
+
+    module Latest = V2
   end
 
   module Submit_work = struct
@@ -97,6 +153,34 @@ module Make (Inputs : Intf.Inputs_intf) = struct
     include Master.T
     include Versioned_rpc.Both_convert.Plain.Make (Master)
 
+    module V2 = struct
+      module T = struct
+        type query =
+          ( ( Transaction.Stable.V2.t Transaction_protocol_state.Stable.V1.t
+            , Transaction_witness.Stable.V2.t
+            , Ledger_proof.Stable.V1.t )
+            Work.Single.Spec.Stable.V1.t
+            Work.Spec.Stable.V1.t
+          , Ledger_proof.Stable.V1.t )
+          Work.Result.Stable.V1.t
+        [@@deriving bin_io, version {rpc}]
+
+        type response = unit [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model : Master.Caller.query -> query = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      include T
+      include Register (T)
+    end
+
+    (* TODO: Retire. We can't convert between this and the latest version. *)
     module V1 = struct
       module T = struct
         type query =
@@ -121,9 +205,8 @@ module Make (Inputs : Intf.Inputs_intf) = struct
       end
 
       include T
-      include Register (T)
     end
 
-    module Latest = V1
+    module Latest = V2
   end
 end

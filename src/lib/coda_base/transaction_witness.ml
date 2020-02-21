@@ -13,6 +13,11 @@ module Stable = struct
 
     let to_latest {ledger} =
       {V2.ledger= Sparse_ledger.Stable.V1.to_latest ledger}
+
+    let of_latest {V2.ledger} =
+      let open Result.Let_syntax in
+      let%map ledger = Sparse_ledger.Stable.V1.of_latest ledger in
+      {ledger}
   end
 end]
 

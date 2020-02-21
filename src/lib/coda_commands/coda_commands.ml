@@ -82,7 +82,7 @@ let schedule_user_command t (txn : User_command.t) account_opt :
     txn_count := !txn_count + 1 ;
     Or_error.return ()
 
-let get_account t (addr : Public_key.Compressed.t) =
+let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Coda_lib.best_ledger t in
   let open Option.Let_syntax in
@@ -110,14 +110,14 @@ let get_keys_with_details t =
       , account.Account.Poly.balance |> Currency.Balance.to_int
       , account.Account.Poly.nonce |> Account.Nonce.to_int ) )
 
-let get_inferred_nonce_from_transaction_pool_and_ledger t
-    (addr : Public_key.Compressed.t) =
+let get_inferred_nonce_from_transaction_pool_and_ledger t (addr : Account_id.t)
+    =
   let transaction_pool = Coda_lib.transaction_pool t in
   let resource_pool =
     Network_pool.Transaction_pool.resource_pool transaction_pool
   in
   let pooled_transactions =
-    Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
+    Network_pool.Transaction_pool.Resource_pool.all_from_account resource_pool
       addr
   in
   let txn_pool_nonce =
@@ -136,20 +136,20 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       let%map account = get_account t addr in
       account.Account.Poly.nonce
 
-let get_nonce t (addr : Public_key.Compressed.t) =
+let get_nonce t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
   account.Account.Poly.nonce
 
 let send_user_command t (txn : User_command.t) =
-  let public_key = Public_key.compress txn.sender in
+  let account_id = User_command.fee_sender txn in
   let open Participating_state.Let_syntax in
-  let%map account_opt = get_account t public_key in
+  let%map account_opt = get_account t account_id in
   let open Deferred.Or_error.Let_syntax in
   let%map () = schedule_user_command t txn account_opt in
   record_payment t txn (Option.value_exn account_opt)
 
-let get_balance t (addr : Public_key.Compressed.t) =
+let get_balance t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
   account.Account.Poly.balance
@@ -184,9 +184,10 @@ let replace_block_production_keys keys pks =
 
 let setup_user_command ~fee ~nonce ~valid_until ~memo ~sender_kp
     user_command_body =
+  (* TODO: Fees in tokens support. *)
   let payload =
-    User_command.Payload.create ~fee ~nonce ~valid_until ~memo
-      ~body:user_command_body
+    User_command.Payload.create ~fee ~fee_token:Token_id.default ~nonce
+      ~valid_until ~memo ~body:user_command_body
   in
   let signed_user_command = User_command.sign sender_kp payload in
   User_command.forget_check signed_user_command
@@ -199,8 +200,8 @@ module Receipt_chain_hash = struct
   Receipt.Chain_hash.(cons, empty)]
 end
 
-let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
-    (verifying_txn : User_command.t) (init_receipt, proof) =
+let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
+    (init_receipt, proof) =
   let open Participating_state.Let_syntax in
   let%map account = get_account t addr in
   let account = Option.value_exn account in
@@ -440,6 +441,7 @@ end
 
 module For_tests = struct
   let get_all_user_commands coda public_key =
+    let account_id = Account_id.create public_key Token_id.default in
     let external_transition_database =
       Coda_lib.external_transition_database coda
     in
@@ -450,7 +452,7 @@ module For_tests = struct
              Auxiliary_database.Filtered_external_transition.user_commands
              With_hash.data)
       @@ Auxiliary_database.External_transition_database.get_all_values
-           external_transition_database (Some public_key)
+           external_transition_database (Some account_id)
     in
     let participants_user_commands =
       User_command.filter_by_participant user_commands public_key

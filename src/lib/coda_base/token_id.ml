@@ -26,6 +26,10 @@ let to_input (x : t) = Random_oracle.Input.field x
 
 open Snark_params.Tick
 
+let to_string = Field.to_string
+
+let of_string = Field.of_string
+
 let typ = Field.typ
 
 let var_of_t = Field.Var.constant

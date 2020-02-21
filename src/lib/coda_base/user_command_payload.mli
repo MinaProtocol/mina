@@ -20,10 +20,16 @@ module Body : sig
       [@@deriving bin_io, version, compare, eq, sexp, hash, yojson]
 
       val to_latest : t -> V2.t
+
+      val of_latest : V2.t -> (t, string) Result.t
     end
 
     module Latest = V2
   end
+
+  val receiver : t -> Account_id.t
+
+  val token : t -> Token_id.t
 end
 
 module Common : sig
@@ -77,6 +83,8 @@ module Common : sig
       [@@deriving bin_io, eq, sexp, hash]
 
       val to_latest : t -> V2.t
+
+      val of_latest : V2.t -> (t, string) Result.t
     end
 
     module Latest = V2
@@ -133,6 +141,8 @@ module Stable : sig
     [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
 
     val to_latest : t -> V2.t
+
+    val of_latest : V2.t -> (t, string) Result.t
   end
 
   module Latest = V2

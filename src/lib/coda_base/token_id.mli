@@ -15,6 +15,10 @@ type var
 
 val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
+val to_string : t -> string
+
+val of_string : string -> t
+
 val typ : (var, t) Typ.t
 
 val var_of_t : t -> var

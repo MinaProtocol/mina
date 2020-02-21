@@ -137,10 +137,14 @@ module Api = struct
     let open Deferred.Option.Let_syntax in
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
-    let%bind nonce = Coda_process.get_nonce_exn worker pk_of_sk in
+    let account_id =
+      Account_id.create pk_of_sk (User_command.Payload.Body.token body)
+    in
+    let%bind nonce = Coda_process.get_nonce_exn worker account_id in
     let payload =
-      User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
-        ~valid_until ~body
+      (* TODO: Non-default tokens. *)
+      User_command.Payload.create ~fee ~fee_token:Token_id.default ~nonce
+        ~memo:User_command_memo.dummy ~valid_until ~body
     in
     let user_cmd =
       ( User_command.sign (Keypair.of_private_key_exn sk) payload
@@ -321,8 +325,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
   don't_wait_for
     (Linear_pipe.iter root_pipe ~f:(function
          | `Root
-             ( worker_id
-             , {Coda_lib.Root_diff.Stable.V1.user_commands; root_length} )
+             (worker_id, ({user_commands; root_length} : Coda_lib.Root_diff.t))
          ->
          ( match testnet.status.(worker_id) with
          | `On (`Synced user_cmds_under_inspection) ->
@@ -551,9 +554,12 @@ end = struct
                 let receiver_pk =
                   receiver_keypair.public_key |> Public_key.compress
                 in
+                let receiver_id =
+                  Account_id.create receiver_pk Token_id.default
+                in
                 let worker = testnet.workers.(node) in
                 let%bind user_cmd =
-                  Api.send_payment testnet node sender_sk receiver_pk amount
+                  Api.send_payment testnet node sender_sk receiver_id amount
                     fee valid_until
                 in
                 let%map (all_passed_root : unit Ivar.t list) =
@@ -601,10 +607,11 @@ end = struct
     Deferred.List.init ~how:`Sequential n ~f:(fun _i ->
         let receiver_keypair = List.random_element_exn keypairs in
         let receiver_pk = receiver_keypair.public_key |> Public_key.compress in
+        let receiver_id = Account_id.create receiver_pk Token_id.default in
         (* Everybody will be watching for a payment *)
         let%bind user_command =
           let%map payment =
-            Api.send_payment testnet node sender receiver_pk amount fee
+            Api.send_payment testnet node sender receiver_id amount fee
               valid_until
           in
           Option.value_exn payment
@@ -651,7 +658,7 @@ end = struct
           match user_command.payload.body with
           | Payment payment_payload ->
               ( Public_key.compress user_command.sender
-              , payment_payload.receiver )
+              , Account_id.public_key payment_payload.receiver )
           | Stake_delegation _ ->
               failwith "Expected a list of payments" )
       |> List.unzip

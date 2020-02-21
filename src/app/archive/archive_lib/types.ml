@@ -87,6 +87,10 @@ module User_command = struct
 
       method fee = some @@ Fee.serialize (User_command.fee user_command)
 
+      (* TODO: Enable when supported in transaction snark. *)
+      (*method fee_token =
+        Token_id.to_string @@ Account_id.token_id
+        @@ User_command_payload.fee_token payload*)
       method first_seen = Option.map first_seen ~f:Block_time.serialize
 
       method memo =
@@ -98,11 +102,12 @@ module User_command = struct
 
       method sender =
         some @@ Public_key.encode_as_obj_rel_insert_input
-        @@ User_command.sender user_command
+        @@ Account_id.public_key
+        @@ User_command.fee_sender user_command
 
       method receiver =
         some @@ Public_key.encode_as_obj_rel_insert_input
-        @@ receiver user_command
+        @@ Account_id.public_key @@ receiver user_command
 
       method typ =
         some
@@ -123,15 +128,22 @@ module User_command = struct
     let receiver = (obj#receiver)#value in
     let sender = (obj#sender)#value in
     let body =
-      let open User_command_payload.Body in
       match obj#typ with
       | `Delegation ->
-          Stake_delegation (Set_delegate {new_delegate= receiver})
+          User_command.Payload.Body.Stake_delegation
+            (Set_delegate {new_delegate= receiver})
       | `Payment ->
-          Payment {receiver; amount= obj#amount}
+          (* TODO: Allow GraphQL to send tokens other than the default. *)
+          User_command.Payload.Body.Payment
+            { receiver= Account_id.create receiver Token_id.default
+            ; amount= obj#amount }
     in
     let payload =
-      User_command_payload.create ~fee:obj#fee ~nonce:obj#nonce ~memo:obj#memo
+      User_command_payload.create ~fee:obj#fee ~nonce:obj#nonce
+        ~memo:
+          obj#memo
+          (* TODO: Allow GraphQL to send tokens other than the default. *)
+        ~fee_token:Token_id.default
         ~body (* TODO: We should actually be passing obj#valid_until *)
         ~valid_until:Coda_numbers.Global_slot.max_value
     in

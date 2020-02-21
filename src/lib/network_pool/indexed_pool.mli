@@ -7,7 +7,6 @@ open Core
 
 open Coda_base
 open Coda_numbers
-open Signature_lib
 
 val replace_fee : Currency.Fee.t
 
@@ -43,7 +42,8 @@ val get_highest_fee : t -> User_command.With_valid_signature.t option
 val handle_committed_txn :
      t
   -> User_command.With_valid_signature.t
-  -> Currency.Amount.t (** Current balance of sender account. *)
+  -> fee_sender_balance:Currency.Amount.t
+  -> sender_balance:Currency.Amount.t
   -> t * User_command.With_valid_signature.t Sequence.t
 
 (** Add a command to the pool. Pass the current nonce for the account and
@@ -85,7 +85,7 @@ val all_from_account :
 *)
 val revalidate :
      t
-  -> (Public_key.Compressed.t -> Account_nonce.t * Currency.Amount.t)
+  -> (Account_id.t -> Account_nonce.t * Currency.Amount.t)
      (** Lookup an account in the new ledger *)
   -> t * User_command.With_valid_signature.t Sequence.t
 

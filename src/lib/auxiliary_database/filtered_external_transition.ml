@@ -106,6 +106,20 @@ let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
     (union user_command_set fee_transfer_participants)
     (Account_id.create creator Token_id.default)
 
+let participant_pks
+    {transactions= {user_commands; fee_transfers; _}; creator; _} =
+  let open Public_key.Compressed.Set in
+  let user_command_set =
+    List.fold user_commands ~init:empty ~f:(fun set user_command ->
+        union set @@ of_list
+        @@ List.map ~f:Account_id.public_key
+        @@ User_command.accounts_accessed user_command )
+  in
+  let fee_transfer_participants =
+    List.fold fee_transfers ~init:empty ~f:(fun set (pk, _) -> add set pk)
+  in
+  add (union user_command_set fee_transfer_participants) creator
+
 let user_commands {transactions= {Transactions.user_commands; _}; _} =
   user_commands
 
@@ -135,9 +149,10 @@ let of_transition external_transition tracked_participants
       | User_command checked_user_command -> (
           let user_command = User_command.forget_check checked_user_command in
           let should_include_transaction user_command participants =
-            List.exists
-              (User_command.accounts_accessed user_command)
-              ~f:(Account_id.Set.mem participants)
+            List.exists (User_command.accounts_accessed user_command)
+              ~f:(fun account_id ->
+                Public_key.Compressed.Set.mem participants
+                  (Account_id.public_key account_id) )
           in
           match tracked_participants with
           | `Some interested_participants
@@ -158,8 +173,7 @@ let of_transition external_transition tracked_participants
             | `Some interested_participants ->
                 List.filter
                   ~f:(fun (pk, _) ->
-                    Account_id.Set.mem interested_participants
-                      (Account_id.create pk Token_id.default) )
+                    Public_key.Compressed.Set.mem interested_participants pk )
                   fee_transfer_list
           in
           { acc_transactions with

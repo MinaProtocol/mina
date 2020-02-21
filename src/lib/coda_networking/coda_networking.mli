@@ -11,46 +11,42 @@ val refused_answer_query_string : string
 
 module Rpcs : sig
   module Get_staged_ledger_aux_and_pending_coinbases_at_hash : sig
-    type query = State_hash.Stable.V1.t
+    type query = State_hash.t
 
     type response =
-      ( Staged_ledger.Scan_state.Stable.V1.t
-      * Ledger_hash.Stable.V1.t
-      * Pending_coinbase.Stable.V1.t )
-      option
+      (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t) option
   end
 
   module Answer_sync_ledger_query : sig
-    type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
+    type query = Ledger_hash.t * Sync_ledger.Query.t
 
-    type response = Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
+    type response = Sync_ledger.Answer.t Core.Or_error.t
   end
 
   module Get_transition_chain : sig
-    type query = State_hash.Stable.V1.t list
+    type query = State_hash.t list
 
-    type response = External_transition.Stable.V1.t list option
+    type response = External_transition.t list option
   end
 
   module Get_transition_chain_proof : sig
-    type query = State_hash.Stable.V1.t
+    type query = State_hash.t
 
-    type response =
-      (State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list) option
+    type response = (State_hash.t * State_body_hash.t list) option
   end
 
   module Get_ancestry : sig
     type query = Consensus.Data.Consensus_state.Value.t
 
     type response =
-      ( External_transition.Stable.V1.t
+      ( External_transition.t
       , State_body_hash.t list * External_transition.t )
-      Proof_carrying_data.Stable.V1.t
+      Proof_carrying_data.t
       option
   end
 
   module Ban_notify : sig
-    type query = Core.Time.Stable.V1.t
+    type query = Core.Time.t
 
     type response = unit
   end
@@ -59,9 +55,9 @@ module Rpcs : sig
     type query = unit [@@deriving sexp, to_yojson]
 
     type response =
-      ( External_transition.Stable.V1.t
-      , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t )
-      Proof_carrying_data.Stable.V1.t
+      ( External_transition.t
+      , State_body_hash.t list * External_transition.t )
+      Proof_carrying_data.t
       option
   end
 

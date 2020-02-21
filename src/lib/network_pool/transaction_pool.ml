@@ -6,7 +6,6 @@
 open Core
 open Async
 open Coda_base
-open Module_version
 open Pipe_lib
 open Signature_lib
 
@@ -116,11 +115,13 @@ struct
               Some
                 ( cmd
                 , fst
-                  @@ Indexed_pool.handle_committed_txn pool cmd
+                  @@ Indexed_pool.handle_committed_txn pool
+                       cmd
                        (* we have the invariant that the transactions currently
                           in the pool are always valid against the best tip, so
                           no need to check balances here *)
-                       Currency.Amount.max_int )
+                       ~fee_sender_balance:Currency.Amount.max_int
+                       ~sender_balance:Currency.Amount.max_int )
           | None ->
               None )
 
@@ -229,10 +230,9 @@ struct
       let pool'', dropped_commit_conflicts =
         List.fold new_user_commands ~init:(pool', Sequence.empty)
           ~f:(fun (p, dropped_so_far) cmd ->
-            let fee_sender = User_command.fee_sender cmd in
-            let balance =
+            let balance account_id =
               match
-                Base_ledger.location_of_account validation_ledger fee_sender
+                Base_ledger.location_of_account validation_ledger account_id
               with
               | None ->
                   Currency.Balance.zero
@@ -244,6 +244,12 @@ struct
                   in
                   acc.balance
             in
+            let fee_sender = User_command.fee_sender cmd in
+            let fee_sender_balance =
+              Currency.Balance.to_amount (balance fee_sender)
+            in
+            let sender = User_command.sender cmd in
+            let sender_balance = Currency.Balance.to_amount (balance sender) in
             let cmd' = User_command.check cmd |> Option.value_exn in
             ( match
                 Hashtbl.find_and_remove t.locally_generated_uncommitted cmd'
@@ -257,8 +263,8 @@ struct
                 Hashtbl.add_exn t.locally_generated_committed ~key:cmd'
                   ~data:time_added ) ;
             let p', dropped =
-              Indexed_pool.handle_committed_txn p cmd'
-                (Currency.Balance.to_amount balance)
+              Indexed_pool.handle_committed_txn p cmd' ~fee_sender_balance
+                ~sender_balance
             in
             (p', Sequence.append dropped_so_far dropped) )
       in
@@ -444,31 +450,23 @@ struct
       t
 
     module Diff = struct
+      [%%versioned
       module Stable = struct
+        module V2 = struct
+          type t = User_command.Stable.V2.t list [@@deriving sexp, yojson]
+
+          let to_latest = Fn.id
+        end
+
         module V1 = struct
-          module T = struct
-            type t = User_command.Stable.V1.t list
-            [@@deriving bin_io, sexp, yojson, version]
-          end
+          type t = User_command.Stable.V1.t list [@@deriving sexp, yojson]
 
-          include T
-          include Registration.Make_latest_version (T)
+          let to_latest = List.map ~f:User_command.Stable.V1.to_latest
         end
-
-        module Latest = V1
-
-        module Module_decl = struct
-          let name = "transaction_pool_diff"
-
-          type latest = Latest.t
-        end
-
-        module Registrar = Registration.Make (Module_decl)
-        module Registered_V1 = Registrar.Register (V1)
-      end
+      end]
 
       (* bin_io omitted *)
-      type t = Stable.Latest.t [@@deriving sexp, yojson]
+      type t = User_command.t list [@@deriving sexp, yojson]
 
       let summary t =
         Printf.sprintf "Transaction diff of length %d" (List.length t)
@@ -727,7 +725,7 @@ end)
        nodes with larger pools don't send nodes with smaller pools lots of
        low fee transactions the smaller-pooled nodes consider useless and get
        themselves banned.
-    *)
+      *)
       [%%import
       "../../config.mlh"]
 
@@ -755,10 +753,10 @@ include Make
 let%test_module _ =
   ( module struct
     module Mock_base_ledger = struct
-      type t = Account.t Public_key.Compressed.Map.t
+      type t = Account.t Account_id.Map.t
 
       module Location = struct
-        type t = Public_key.Compressed.t
+        type t = Account_id.t
       end
 
       let location_of_account _t k = Some k
@@ -799,10 +797,11 @@ let%test_module _ =
         let accounts =
           List.map (Array.to_list test_keys) ~f:(fun kp ->
               let compressed = Public_key.compress kp.public_key in
-              ( compressed
-              , Account.create compressed @@ Currency.Balance.of_int 1_000 ) )
+              let account_id = Account_id.create compressed Token_id.default in
+              ( account_id
+              , Account.create account_id @@ Currency.Balance.of_int 1_000 ) )
         in
-        let ledger = Public_key.Compressed.Map.of_alist_exn accounts in
+        let ledger = Account_id.Map.of_alist_exn accounts in
         ((pipe_r, ref ledger), pipe_w)
 
       let best_tip (_, best_tip_ref) = !best_tip_ref
@@ -920,11 +919,9 @@ let%test_module _ =
     let rec map_set_multi map pairs =
       match pairs with
       | (k, v) :: pairs' ->
-          map_set_multi
-            (Map.set map
-               ~key:(Public_key.compress test_keys.(k).public_key)
-               ~data:v)
-            pairs'
+          let pk = Public_key.compress test_keys.(k).public_key in
+          let key = Account_id.create pk Token_id.default in
+          map_set_multi (Map.set map ~key ~data:v) pairs'
       | [] ->
           map
 
@@ -932,6 +929,7 @@ let%test_module _ =
       ( i
       , Account.Poly.Stable.Latest.
           { public_key= Public_key.compress @@ test_keys.(i).public_key
+          ; token_id= Token_id.default
           ; balance= Currency.Balance.of_int balance
           ; nonce= Account.Nonce.of_int nonce
           ; receipt_chain_hash= Receipt.Chain_hash.empty
@@ -994,13 +992,17 @@ let%test_module _ =
       User_command.forget_check
       @@ User_command.sign test_keys.(sender_idx)
            (User_command_payload.create ~fee:(Currency.Fee.of_int fee)
+              ~fee_token:Token_id.default
               ~valid_until:Coda_numbers.Global_slot.max_value
               ~nonce:(Account.Nonce.of_int nonce)
               ~memo:(User_command_memo.create_by_digesting_string_exn "foo")
               ~body:
                 (User_command_payload.Body.Payment
                    { receiver=
-                       Public_key.compress test_keys.(receiver_idx).public_key
+                       Account_id.create
+                         (Public_key.compress
+                            test_keys.(receiver_idx).public_key)
+                         Token_id.default
                    ; amount= Currency.Amount.of_int amount }))
 
     let%test_unit "Now-invalid transactions are removed from the pool on fork \
@@ -1181,12 +1183,15 @@ let%test_module _ =
                 setup_test ()
               in
               let mock_ledger =
-                Public_key.Compressed.Map.of_alist_exn
+                Account_id.Map.of_alist_exn
                   ( init_ledger_state |> Array.to_sequence
                   |> Sequence.map ~f:(fun (kp, bal, nonce) ->
                          let public_key = Public_key.compress kp.public_key in
-                         ( public_key
-                         , { (Account.initialize public_key) with
+                         let account_id =
+                           Account_id.create public_key Token_id.default
+                         in
+                         ( account_id
+                         , { (Account.initialize account_id) with
                              balance=
                                Currency.Balance.of_int
                                  (Currency.Amount.to_int bal)

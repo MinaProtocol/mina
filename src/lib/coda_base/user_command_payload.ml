@@ -62,6 +62,11 @@ module Common = struct
 
       let to_latest ({fee; nonce; valid_until; memo} : t) : V2.t =
         {fee; fee_token= Token_id.default; nonce; valid_until; memo}
+
+      let of_latest ({fee; fee_token; nonce; valid_until; memo} : V2.t) :
+          (t, string) Result.t =
+        if fee_token = Token_id.default then Ok {fee; nonce; valid_until; memo}
+        else Error "Unhandled token ID"
     end
   end]
 
@@ -172,6 +177,13 @@ module Body = struct
             V2.Payment (Payment_payload.Stable.V1.to_latest p)
         | Stake_delegation d ->
             V2.Stake_delegation d
+
+      let of_latest = function
+        | V2.Payment p ->
+            Result.map (Payment_payload.Stable.V1.of_latest p) ~f:(fun p ->
+                Payment p )
+        | V2.Stake_delegation d ->
+            Ok (Stake_delegation d)
     end
   end]
 
@@ -187,6 +199,15 @@ module Body = struct
     map
       (variant2 (Payment_payload.gen ~max_amount) Stake_delegation.gen)
       ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
+
+  let receiver (t : t) =
+    match t with
+    | Payment payload ->
+        payload.Payment_payload.Poly.receiver
+    | Stake_delegation payload ->
+        Account_id.create (Stake_delegation.receiver payload) Token_id.default
+
+  let token t = Account_id.token_id (receiver t)
 end
 
 module Poly = struct
@@ -195,6 +216,11 @@ module Poly = struct
     module V1 = struct
       type ('common, 'body) t = {common: 'common; body: 'body}
       [@@deriving eq, sexp, hash, yojson, compare]
+
+      let of_latest common_latest body_latest {common; body} =
+        let open Result.Let_syntax in
+        let%map common = common_latest common and body = body_latest body in
+        {common; body}
     end
   end]
 
@@ -219,6 +245,10 @@ module Stable = struct
     let to_latest ({common; body} : t) : V2.t =
       { common= Common.Stable.V1.to_latest common
       ; body= Body.Stable.V1.to_latest body }
+
+    let of_latest =
+      Poly.Stable.V1.of_latest Common.Stable.V1.of_latest
+        Body.Stable.V1.of_latest
   end
 end]
 
@@ -240,12 +270,7 @@ let memo (t : t) = t.common.memo
 
 let body (t : t) = t.body
 
-let receiver (t : t) =
-  match t.body with
-  | Payment payload ->
-      payload.Payment_payload.Poly.receiver
-  | Stake_delegation payload ->
-      Account_id.create (Stake_delegation.receiver payload) Token_id.default
+let receiver (t : t) = Body.receiver t.body
 
 let token t = Account_id.token_id (receiver t)
 

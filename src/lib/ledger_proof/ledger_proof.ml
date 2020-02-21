@@ -3,7 +3,6 @@
 
 open Core_kernel
 open Coda_base
-open Module_version
 
 module type S = Ledger_proof_intf.S
 
@@ -14,28 +13,17 @@ let to_signed_amount signed_fee =
   Currency.Amount.Signed.create ~magnitude ~sgn
 
 module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Transaction_snark.Stable.V1.t
-        [@@deriving bin_io, compare, sexp, version, to_yojson]
-      end
+      type t = Transaction_snark.Stable.V1.t
+      [@@deriving bin_io, compare, sexp, version, to_yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
+
+      let of_latest t = Ok t
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "ledger_proof_prod"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
@@ -64,30 +52,19 @@ module Debug :
   Ledger_proof_intf.S
   with type t = Transaction_snark.Statement.t * Sok_message.Digest.Stable.V1.t =
 struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          Transaction_snark.Statement.Stable.V1.t
-          * Sok_message.Digest.Stable.V1.t
-        [@@deriving bin_io, compare, hash, sexp, version, yojson]
-      end
+      type t =
+        Transaction_snark.Statement.Stable.V1.t
+        * Sok_message.Digest.Stable.V1.t
+      [@@deriving bin_io, compare, hash, sexp, version, yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
+
+      let of_latest t = Ok t
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "ledger_proof_debug"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp, yojson]
 

@@ -6,11 +6,19 @@ module Database = struct
   module Value = struct
     [%%versioned
     module Stable = struct
+      module V2 = struct
+        type t =
+          Filtered_external_transition.Stable.V2.t * Block_time.Stable.V1.t
+
+        let to_latest = Fn.id
+      end
+
       module V1 = struct
         type t =
           Filtered_external_transition.Stable.V1.t * Block_time.Stable.V1.t
 
-        let to_latest = Fn.id
+        let to_latest (transition, time) =
+          (Filtered_external_transition.Stable.V1.to_latest transition, time)
       end
     end]
   end
@@ -22,7 +30,7 @@ end
 
 module Pagination =
   Pagination.Make
-    (State_hash.Stable.V1)
+    (State_hash)
     (struct
       type t = (Filtered_external_transition.t, State_hash.t) With_hash.t
     end)
@@ -33,7 +41,7 @@ module Pagination =
       let compare a b = -compare a b
     end)
 
-let fee_transfer_participants (pk, _) = [pk]
+let fee_transfer_participants (pk, _) = [Account_id.create pk Token_id.default]
 
 type t = {pagination: Pagination.t; database: Database.t; logger: Logger.t}
 
@@ -49,8 +57,9 @@ let add_user_blocks (pagination : Pagination.t)
     List.concat_map transactions.user_commands
       ~f:User_command.accounts_accessed
   in
+  let creator_aid = Account_id.create creator Token_id.default in
   Pagination.add pagination
-    ((creator :: fee_transfer_participants) @ user_command_participants)
+    ((creator_aid :: fee_transfer_participants) @ user_command_participants)
     state_hash external_transition time
 
 let create ~logger directory =

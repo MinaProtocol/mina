@@ -578,22 +578,26 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           return (undo []) )
         else
           let action, receiver_account, receiver_location =
+            (* TODO: Do not use get_or_create here; we should not create a new
+               account before we know that the transaction will go through and
+               thus the creation fee has been paid.
+            *)
             get_or_create ledger receiver
           in
           let previous_empty_accounts =
             previous_empty_accounts action receiver
           in
-          let%bind sender_balance' =
-            sub_amount sender_account.balance amount
-          in
           if Token_id.equal fee_token token then (
             (* sender_location = fee_sender_location *)
-            let%map receiver_balance' =
+            let%bind receiver_balance' =
               (* Subtract the account creation fee from the amount to be
                  transferred.
               *)
               let%bind amount' = sub_account_creation_fee action amount in
               add_amount receiver_account.balance amount'
+            in
+            let%map sender_balance' =
+              sub_amount sender_account.balance amount
             in
             set ledger sender_location
               {sender_account with balance= sender_balance'} ;
@@ -609,8 +613,19 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             let%bind fee_sender_balance' =
               sub_account_creation_fee_bal action fee_sender_account.balance
             in
-            let%map receiver_balance' =
-              add_amount receiver_account.balance amount
+            let%map receiver_balance', sender_balance' =
+              match Balance.sub_amount sender_account.balance amount with
+              | Some sender_balance ->
+                  (* Sender account has sufficient balance, increase the
+                     receiver balance by the same amount.
+                  *)
+                  let%map receiver_balance =
+                    add_amount receiver_account.balance amount
+                  in
+                  (receiver_balance, sender_balance)
+              | None ->
+                  (* Sender has insufficient balance, do not transfer*)
+                  return (receiver_account.balance, sender_account.balance)
             in
             set ledger fee_sender_location
               {fee_sender_account with balance= fee_sender_balance'} ;
@@ -631,6 +646,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     match transfer with
     | `One (pk, fee) ->
         let account_id = Account_id.create pk Token_id.default in
+        (* TODO: Do not use get_or_create here; we should not create a new
+           account before we know that the transaction will go through and thus
+           the creation fee has been paid.
+        *)
         let action, a, loc = get_or_create t account_id in
         let emptys = previous_empty_accounts action account_id in
         let%map balance = modify_balance action account_id a.balance fee in
@@ -638,6 +657,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         emptys
     | `Two ((pk1, fee1), (pk2, fee2)) ->
         let account_id1 = Account_id.create pk1 Token_id.default in
+        (* TODO: Do not use get_or_create here; we should not create a new
+           account before we know that the transaction will go through and thus
+           the creation fee has been paid.
+        *)
         let action1, a1, l1 = get_or_create t account_id1 in
         let emptys1 = previous_empty_accounts action1 account_id1 in
         if Public_key.Compressed.equal pk1 pk2 then (
@@ -649,6 +672,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           emptys1 )
         else
           let account_id2 = Account_id.create pk2 Token_id.default in
+          (* TODO: Do not use get_or_create here; we should not create a new
+             account before we know that the transaction will go through and
+             thus the creation fee has been paid.
+          *)
           let action2, a2, l2 = get_or_create t account_id2 in
           let emptys2 = previous_empty_accounts action2 account_id2 in
           let%bind balance1 =
@@ -707,6 +734,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               (Amount.sub coinbase_amount fee)
           in
           let action, transferee_account, transferee_location =
+            (* TODO: Do not use get_or_create here; we should not create a new
+               account before we know that the transaction will go through and
+               thus the creation fee has been paid.
+            *)
             get_or_create t transferee_id
           in
           let emptys = previous_empty_accounts action transferee_id in
@@ -720,6 +751,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     let receiver_id = Account_id.create receiver Token_id.default in
     let action2, receiver_account, receiver_location =
+      (* TODO: Do not use get_or_create here; we should not create a new
+         account before we know that the transaction will go through and thus
+         the creation fee has been paid.
+      *)
       get_or_create t receiver_id
     in
     let emptys2 = previous_empty_accounts action2 receiver_id in

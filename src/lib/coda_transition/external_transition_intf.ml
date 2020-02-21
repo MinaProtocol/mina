@@ -45,7 +45,7 @@ module type External_transition_base_intf = sig
     end
 
     module V1 : sig
-      type nonrec t [@@deriving bin_io, version]
+      type nonrec t [@@deriving sexp, bin_io, version]
 
       val to_latest : t -> V2.t
     end

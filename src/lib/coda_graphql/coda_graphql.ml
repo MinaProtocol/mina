@@ -417,6 +417,7 @@ module Types = struct
     module Partial_account = struct
       let to_full_account
           { Account.Poly.public_key
+          ; token_id
           ; nonce
           ; balance
           ; receipt_chain_hash
@@ -431,6 +432,7 @@ module Types = struct
         let%bind voting_for = voting_for in
         let%map timing = timing in
         { Account.Poly.public_key
+        ; token_id
         ; nonce
         ; balance
         ; receipt_chain_hash
@@ -440,6 +442,7 @@ module Types = struct
 
       let of_full_account
           { Account.Poly.public_key
+          ; token_id
           ; nonce
           ; balance
           ; receipt_chain_hash
@@ -447,6 +450,7 @@ module Types = struct
           ; voting_for
           ; timing } blockchain_length =
         { Account.Poly.public_key= Some public_key
+        ; token_id
         ; nonce= Some nonce
         ; balance=
             { AnnotatedBalance.total= balance
@@ -457,7 +461,7 @@ module Types = struct
         ; voting_for= Some voting_for
         ; timing }
 
-      let of_pk coda pk =
+      let of_account_id coda account_id =
         let account =
           coda |> Coda_lib.best_tip |> Participating_state.active
           |> Option.bind ~f:(fun tip ->
@@ -465,7 +469,7 @@ module Types = struct
                    Transition_frontier.Breadcrumb.staged_ledger tip
                    |> Staged_ledger.ledger
                  in
-                 Ledger.location_of_account ledger pk
+                 Ledger.location_of_account ledger account_id
                  |> Option.bind ~f:(Ledger.get ledger)
                  |> Option.map ~f:(fun account ->
                         ( account
@@ -475,6 +479,7 @@ module Types = struct
         match account with
         | Some
             ( { Account.Poly.public_key
+              ; token_id
               ; nonce
               ; balance
               ; receipt_chain_hash
@@ -483,6 +488,7 @@ module Types = struct
               ; timing }
             , blockchain_length ) ->
             { Account.Poly.public_key= Some public_key
+            ; token_id
             ; nonce= Some nonce
             ; delegate= Some delegate
             ; balance=
@@ -494,7 +500,8 @@ module Types = struct
             ; timing }
         | None ->
             Account.
-              { Poly.public_key= Some pk
+              { Poly.public_key= Some (Account_id.public_key account_id)
+              ; token_id= Account_id.token_id account_id
               ; nonce= None
               ; delegate= None
               ; balance=
@@ -504,6 +511,9 @@ module Types = struct
               ; receipt_chain_hash= None
               ; voting_for= None
               ; timing= Timing.Untimed }
+
+      let of_pk coda pk =
+        of_account_id coda (Account_id.create pk Token_id.default)
     end
 
     (** Hack: Account.Poly.t is only parameterized over 'pk once and so, in
@@ -514,6 +524,7 @@ module Types = struct
     type t =
       { account:
           ( Public_key.Compressed.t option
+          , Token_id.t
           , AnnotatedBalance.t
           , Account.Nonce.t option
           , Receipt.Chain_hash.t option
@@ -535,6 +546,9 @@ module Types = struct
 
     let get_best_ledger_account coda pk =
       lift coda pk (Partial_account.of_pk coda pk)
+
+    let account_id {Account.Poly.public_key; token_id; _} =
+      Account_id.create (Option.value_exn public_key) token_id
 
     let rec account =
       lazy
@@ -565,12 +579,11 @@ module Types = struct
                     (stringified uint32)"
                  ~args:Arg.[]
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
-                   let open Option.Let_syntax in
-                   let%bind public_key = account.Account.Poly.public_key in
+                   let account_id = account_id account in
                    match
                      Coda_commands
                      .get_inferred_nonce_from_transaction_pool_and_ledger coda
-                       public_key
+                       account_id
                    with
                    | `Active (Some nonce) ->
                        Some (Account.Nonce.to_string nonce)
@@ -583,11 +596,11 @@ module Types = struct
                  ~args:Arg.[]
                  ~resolve:(fun {ctx= coda; _} {account; _} ->
                    let open Option.Let_syntax in
-                   let%bind public_key = account.public_key in
+                   let account_id = account_id account in
                    let%bind staking_ledger = Coda_lib.staking_ledger coda in
                    try
                      let index =
-                       Sparse_ledger.find_index_exn staking_ledger public_key
+                       Sparse_ledger.find_index_exn staking_ledger account_id
                      in
                      let delegate_account =
                        Sparse_ledger.get_exn staking_ledger index
@@ -728,14 +741,15 @@ module Types = struct
             ~doc:"Public key of the sender"
             ~deprecated:(Deprecated (Some "use fromAccount field instead"))
             ~args:Arg.[]
-            ~resolve:(fun _ payment -> User_command.sender payment)
+            ~resolve:(fun _ payment ->
+              Account_id.public_key @@ User_command.sender payment )
         ; field "fromAccount"
             ~typ:(non_null AccountObj.account)
             ~doc:"Account of the sender"
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} payment ->
               AccountObj.get_best_ledger_account coda
-                (User_command.sender payment) )
+                (Account_id.public_key @@ User_command.sender payment) )
         ; field "to" ~typ:(non_null public_key)
             ~doc:"Public key of the receiver"
             ~deprecated:(Deprecated (Some "use toAccount field instead"))
@@ -745,7 +759,7 @@ module Types = struct
                 User_command_payload.body (User_command.payload payment)
               with
               | Payment {Payment_payload.Poly.receiver; _} ->
-                  receiver
+                  Account_id.public_key @@ receiver
               | Stake_delegation (Set_delegate {new_delegate}) ->
                   new_delegate )
         ; field "toAccount"
@@ -758,7 +772,7 @@ module Types = struct
                   User_command_payload.body (User_command.payload payment)
                 with
                 | Payment {Payment_payload.Poly.receiver; _} ->
-                    receiver
+                    Account_id.public_key @@ receiver
                 | Stake_delegation (Set_delegate {new_delegate}) ->
                     new_delegate
               in
@@ -1506,10 +1520,11 @@ module Mutations = struct
 
   let parse_user_command_input ~kind coda from to_ fee memo_opt =
     let open Result.Let_syntax in
+    let from_id = Account_id.create from Token_id.default in
     let%bind sender_nonce =
       match
         Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger coda
-          from
+          from_id
       with
       | `Active (Some nonce) ->
           Ok nonce
@@ -1585,9 +1600,10 @@ module Mutations = struct
           @@ parse_user_command_input ~kind:"payment" coda from to_ fee
                memo_opt
         in
+        let receiver_id = Account_id.create receiver Token_id.default in
         let body =
           User_command_payload.Body.Payment
-            {receiver; amount= Amount.of_uint64 amount}
+            {receiver= receiver_id; amount= Amount.of_uint64 amount}
         in
         let nonce =
           Option.value_map nonce_opt ~f:Account.Nonce.of_uint32
@@ -1703,8 +1719,9 @@ module Queries = struct
               resource_pool
             |> Sequence.to_list
         | Some pk ->
-            Network_pool.Transaction_pool.Resource_pool.all_from_user
-              resource_pool pk )
+            let account_id = Account_id.create pk Token_id.default in
+            Network_pool.Transaction_pool.Resource_pool.all_from_account
+              resource_pool account_id )
         |> List.map ~f:User_command.forget_check )
 
   let sync_state =

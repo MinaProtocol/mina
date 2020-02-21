@@ -36,8 +36,9 @@ let get_lite_chain :
       let ledger =
         List.fold pks
           ~f:(fun acc key ->
+            let aid = Account_id.create key Token_id.default in
             let loc =
-              Option.value_exn (Ledger.location_of_account ledger key)
+              Option.value_exn (Ledger.location_of_account ledger aid)
             in
             Lite_lib.Sparse_ledger.add_path acc
               (Lite_compat.merkle_path (Ledger.merkle_path ledger loc))
@@ -204,9 +205,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
           Coda_commands.schedule_user_commands coda ts
           |> Participating_state.to_deferred_or_error )
-    ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
+    ; implement Daemon_rpcs.Get_balance.rpc (fun () aid ->
           return
-            ( Coda_commands.get_balance coda pk
+            ( Coda_commands.get_balance coda aid
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_trust_status.rpc (fun () ip_address ->
           return (Coda_commands.get_trust_status coda ip_address) )
@@ -214,14 +215,14 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return (Coda_commands.get_trust_status_all coda) )
     ; implement Daemon_rpcs.Reset_trust_status.rpc (fun () ip_address ->
           return (Coda_commands.reset_trust_status coda ip_address) )
-    ; implement Daemon_rpcs.Verify_proof.rpc (fun () (pk, tx, proof) ->
+    ; implement Daemon_rpcs.Verify_proof.rpc (fun () (aid, tx, proof) ->
           return
-            ( Coda_commands.verify_payment coda pk tx proof
+            ( Coda_commands.verify_payment coda aid tx proof
             |> Participating_state.active_error |> Or_error.join ) )
-    ; implement Daemon_rpcs.Prove_receipt.rpc (fun () (proving_receipt, pk) ->
+    ; implement Daemon_rpcs.Prove_receipt.rpc (fun () (proving_receipt, aid) ->
           let open Deferred.Or_error.Let_syntax in
           let%bind acc_opt =
-            Coda_commands.get_account coda pk
+            Coda_commands.get_account coda aid
             |> Participating_state.active_error |> Deferred.return
           in
           let%bind account =
@@ -230,8 +231,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                 (Error.of_string
                    (sprintf
                       !"Could not find account of public key %{sexp: \
-                        Public_key.Compressed.t}"
-                      pk))
+                        Account_id.t}"
+                      aid))
             |> Deferred.return
           in
           Coda_commands.prove_receipt coda ~proving_receipt
@@ -244,14 +245,14 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           return
             ( Coda_commands.get_public_keys coda
             |> Participating_state.active_error ) )
-    ; implement Daemon_rpcs.Get_nonce.rpc (fun () pk ->
+    ; implement Daemon_rpcs.Get_nonce.rpc (fun () aid ->
           return
-            ( Coda_commands.get_nonce coda pk
+            ( Coda_commands.get_nonce coda aid
             |> Participating_state.active_error ) )
-    ; implement Daemon_rpcs.Get_inferred_nonce.rpc (fun () pk ->
+    ; implement Daemon_rpcs.Get_inferred_nonce.rpc (fun () aid ->
           return
             ( Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger
-                coda pk
+                coda aid
             |> Participating_state.active_error ) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
           return (Coda_commands.get_status ~flag coda) )

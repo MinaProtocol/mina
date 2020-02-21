@@ -34,6 +34,8 @@ module Stable : sig
     [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
 
     val to_latest : t -> V2.t
+
+    val of_latest : V2.t -> (t, string) Result.t
   end
 end]
 
