@@ -759,8 +759,8 @@ let create (config : Config.t)
       ~f:(fun (envelope, valid_cb) ->
         Ivar.fill_if_empty first_received_message_signal () ;
         Coda_metrics.(Counter.inc_one Network.gossip_messages_received) ;
-        match Envelope.Incoming.data envelope with
-        | New_state state ->
+        match Gossip_net.Message.data (Envelope.Incoming.data envelope) with
+        | Gossip_net.Message.Message_data.Stable.V1.New_state state ->
             Perf_histograms.add_span ~name:"external_transition_latency"
               (Core.Time.abs_diff
                  Block_time.(now config.time_controller |> to_time)

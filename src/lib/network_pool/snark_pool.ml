@@ -400,7 +400,7 @@ let%test_module "random set test" =
           (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
       in
       Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
-        {Envelope.Incoming.data= diff; sender}
+        (Envelope.Incoming.wrap ~data:diff ~sender)
 
     let config verifier =
       Mock_snark_pool.Resource_pool.make_config ~verifier ~trust_system

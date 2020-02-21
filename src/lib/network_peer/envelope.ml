@@ -41,7 +41,8 @@ module Sender = struct
 end
 
 module Incoming = struct
-  (* wrapped_at is stored as an int to avoid Time_ns.t missing yojson functions *)
+  (* wrapped_at is stored as an int to avoid Time_ns.t missing yojson
+     functions or pulling in Real_time from Coda_base (which depends on this library) *)
   type 'a t = {data: 'a; sender: Sender.t; wrapped_at: int}
   [@@deriving eq, sexp, yojson]
 

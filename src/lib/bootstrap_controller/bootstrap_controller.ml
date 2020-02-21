@@ -100,7 +100,8 @@ let on_transition t ~sender:(host, peer_id) ~root_sync_ledger
     | Ok peer_root_with_proof -> (
         match%bind
           Sync_handler.Root.verify ~logger:t.logger ~verifier:t.verifier
-            candidate_state peer_root_with_proof.data
+            candidate_state
+            (Envelope.Incoming.data peer_root_with_proof)
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored

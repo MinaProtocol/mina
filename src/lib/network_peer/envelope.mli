@@ -8,11 +8,13 @@ module Sender : sig
 end
 
 module Incoming : sig
-  type 'a t = {data: 'a; sender: Sender.t} [@@deriving eq, sexp, yojson]
+  type 'a t [@@deriving eq, sexp, yojson]
 
   val sender : 'a t -> Sender.t
 
   val data : 'a t -> 'a
+
+  val wrapped_at : 'a t -> Time_ns.t
 
   val wrap : data:'a -> sender:Sender.t -> 'a t
 

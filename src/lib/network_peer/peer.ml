@@ -8,13 +8,14 @@ module Id = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = string [@@deriving bin_io, compare, hash, equal, sexp, version]
+      type t = string
+      [@@deriving bin_io, compare, hash, equal, sexp, version, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving compare, hash, equal, sexp]
+  type t = Stable.Latest.t [@@deriving compare, hash, equal, sexp, yojson]
 
   (** Convert to the libp2p-defined base58 string *)
   let to_string (x : t) = x
