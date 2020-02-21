@@ -130,7 +130,7 @@ let make = (~post: option(ContentType.Post.t)) => {
       <Next.Head> Markdown.katexStylesheet </Next.Head>
       <div className=Style.wrapper>
         <div className=Style.title id="title"> {React.string(title)} </div>
-        {ReactUtils.fromOpt(Js.Undefined.toOption(subtitle), ~f=s =>
+        {ReactExt.fromOpt(Js.Undefined.toOption(subtitle), ~f=s =>
            <div className=Style.subtitle id="subtitle">
              {React.string(s)}
            </div>
