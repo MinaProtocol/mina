@@ -376,6 +376,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest src/lib --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
@@ -395,6 +397,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
@@ -414,6 +418,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev_medium_curves -j8 && (dune runtest src/lib --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
@@ -432,6 +438,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- fake_hash:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "fake_hash:full-test"'
@@ -449,6 +457,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake:full-test"'
@@ -469,6 +479,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_bootstrap:coda-bootstrap-test"'
@@ -489,6 +501,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_catchup:coda-restart-node-test"'
@@ -506,6 +520,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_delegation:coda-delegation-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_delegation:coda-delegation-test"'
@@ -523,6 +539,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_five_even_snarkless:coda-shared-prefix-multiproducer-test -num-block-producers 5
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_snarkless:coda-shared-prefix-multiproducer-test -num-block-producers 5"'
@@ -540,6 +558,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments"'
@@ -557,6 +577,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_snarkless:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless:full-test"'
@@ -577,6 +599,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
@@ -594,6 +618,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-peers-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_snarkless:coda-peers-test"'
@@ -629,6 +655,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_three_producers:coda-txns-and-restart-non-producers
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_three_producers:coda-txns-and-restart-non-producers"'
@@ -646,6 +674,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_txns:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_txns:coda-shared-state-test"'
@@ -666,6 +696,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_full_epoch:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_full_epoch:full-test"'
@@ -683,6 +715,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_medium_curves:full-test"'
@@ -705,6 +739,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_snarkless_medium_curves:full-test"'
@@ -725,6 +761,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
