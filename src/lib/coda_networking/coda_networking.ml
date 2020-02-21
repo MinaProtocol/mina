@@ -436,7 +436,8 @@ module Rpcs = struct
           ( Network_peer.Peer.t list
           * Signature_lib.Public_key.Compressed.t list
           * State_hash.t
-          * (Unix.Inet_addr.t * Trust_system.Peer_status.t) list )
+          * (Unix.Inet_addr.t * Trust_system.Peer_status.t) list
+          * State_hash.t list )
           option
       end
 
@@ -463,7 +464,8 @@ module Rpcs = struct
           * State_hash.Stable.V1.t
           * ( Core.Unix.Inet_addr.Stable.V1.t
             * Trust_system.Peer_status.Stable.V1.t )
-            list )
+            list
+          * State_hash.Stable.V1.t list )
           option
         [@@deriving bin_io, version {rpc}]
 
@@ -655,7 +657,8 @@ let create (config : Config.t)
        -> ( Network_peer.Peer.t list
           * Signature_lib.Public_key.Compressed.t list
           * State_hash.t
-          * (Unix.Inet_addr.t * Trust_system.Peer_status.t) list )
+          * (Unix.Inet_addr.t * Trust_system.Peer_status.t) list
+          * State_hash.t list )
           Deferred.Option.t)
     ~(get_transition_chain_proof :
           State_hash.t Envelope.Incoming.t

@@ -17,6 +17,9 @@ module Config = Config
 module Subscriptions = Coda_subscriptions
 module Snark_worker_lib = Snark_worker
 
+[%%inject
+"consensus_parameter_k", k]
+
 exception Snark_worker_error of int
 
 exception Snark_worker_signal_interrupt of Signal.t
@@ -758,12 +761,22 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   let peer_statuses =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
                   in
+                  let first_k_block_hashes =
+                    let k_breadcrumbs =
+                      List.take
+                        (Transition_frontier.best_tip_path frontier)
+                        consensus_parameter_k
+                    in
+                    List.map k_breadcrumbs
+                      ~f:Transition_frontier.Breadcrumb.state_hash
+                  in
                   Deferred.return
                     (Some
                        ( peers
                        , block_producer_pubkeys
                        , protocol_state_hash
-                       , peer_statuses )) )
+                       , peer_statuses
+                       , first_k_block_hashes )) )
           in
           let%bind net =
             Coda_networking.create config.net_config

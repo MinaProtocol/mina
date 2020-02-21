@@ -73,7 +73,8 @@ module Rpcs : sig
       ( Network_peer.Peer.t list
       * Signature_lib.Public_key.Compressed.t list
       * State_hash.t
-      * (Unix.Inet_addr.Stable.V1.t * Trust_system.Peer_status.t) list )
+      * (Unix.Inet_addr.Stable.V1.t * Trust_system.Peer_status.t) list
+      * State_hash.t list )
       option
   end
 
@@ -255,7 +256,8 @@ val create :
                             * Signature_lib.Public_key.Compressed.t list
                             * State_hash.t
                             * (Unix.Inet_addr.t * Trust_system.Peer_status.t)
-                              list )
+                              list
+                            * State_hash.t list )
                             Deferred.Option.t)
   -> get_transition_chain_proof:(   State_hash.t Envelope.Incoming.t
                                  -> (State_hash.t * State_body_hash.t list)
