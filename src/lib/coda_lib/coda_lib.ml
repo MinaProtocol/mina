@@ -748,17 +748,22 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   Deferred.return None
               | Some frontier ->
                   let%bind peers = Coda_networking.peers net in
-                  let protocol_state_hash_opt =
+                  let protocol_state_hash =
                     let tip = Transition_frontier.best_tip frontier in
                     let state =
                       Transition_frontier.Breadcrumb.protocol_state tip
                     in
-                    Some (Coda_state.Protocol_state.hash state)
+                    Coda_state.Protocol_state.hash state
+                  in
+                  let peer_statuses =
+                    Trust_system.Peer_trust.peer_statuses config.trust_system
                   in
                   Deferred.return
                     (Some
-                       (peers, block_producer_pubkeys, protocol_state_hash_opt))
-              )
+                       ( peers
+                       , block_producer_pubkeys
+                       , protocol_state_hash
+                       , peer_statuses )) )
           in
           let%bind net =
             Coda_networking.create config.net_config

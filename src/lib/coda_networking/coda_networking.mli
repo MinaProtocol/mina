@@ -72,7 +72,8 @@ module Rpcs : sig
     type response =
       ( Network_peer.Peer.t list
       * Signature_lib.Public_key.Compressed.t list
-      * State_hash.t option )
+      * State_hash.t
+      * (Unix.Inet_addr.Stable.V1.t * Trust_system.Peer_status.t) list )
       option
   end
 
@@ -252,7 +253,9 @@ val create :
   -> get_telemetry_data:(   unit Envelope.Incoming.t
                          -> ( Network_peer.Peer.t list
                             * Signature_lib.Public_key.Compressed.t list
-                            * State_hash.t option )
+                            * State_hash.t
+                            * (Unix.Inet_addr.t * Trust_system.Peer_status.t)
+                              list )
                             Deferred.Option.t)
   -> get_transition_chain_proof:(   State_hash.t Envelope.Incoming.t
                                  -> (State_hash.t * State_body_hash.t list)

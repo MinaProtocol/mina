@@ -426,13 +426,17 @@ module Rpcs = struct
       module T = struct
         type query = unit [@@deriving sexp, to_yojson]
 
-        (* peers, block producer public keys, protocol state hash
-           the state hash is an option; we might be bootstrapping
+        (* peers
+           block producer public keys
+           protocol state hash
+           (IP address, peer status) list
+           states hashes of up-to-k blocks in best tip
         *)
         type response =
           ( Network_peer.Peer.t list
           * Signature_lib.Public_key.Compressed.t list
-          * State_hash.t option )
+          * State_hash.t
+          * (Unix.Inet_addr.t * Trust_system.Peer_status.t) list )
           option
       end
 
@@ -456,7 +460,10 @@ module Rpcs = struct
         type response =
           ( Network_peer.Peer.Stable.V1.t list
           * Signature_lib.Public_key.Compressed.Stable.V1.t list
-          * State_hash.Stable.V1.t option )
+          * State_hash.Stable.V1.t
+          * ( Core.Unix.Inet_addr.Stable.V1.t
+            * Trust_system.Peer_status.Stable.V1.t )
+            list )
           option
         [@@deriving bin_io, version {rpc}]
 
@@ -647,7 +654,8 @@ let create (config : Config.t)
           unit Envelope.Incoming.t
        -> ( Network_peer.Peer.t list
           * Signature_lib.Public_key.Compressed.t list
-          * State_hash.t option )
+          * State_hash.t
+          * (Unix.Inet_addr.t * Trust_system.Peer_status.t) list )
           Deferred.Option.t)
     ~(get_transition_chain_proof :
           State_hash.t Envelope.Incoming.t
