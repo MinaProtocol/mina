@@ -1419,12 +1419,7 @@ module Mutations = struct
 
   let create_hd_account : (Coda_lib.t, unit) field =
     io_field "createHDAccount"
-      ~doc:
-        "Create an account with hardware wallet - this will let the hardware \
-         wallet generate a keypair corresponds to the HD-index you give and \
-         store this HD-index and the generated public key in the daemon. \
-         Calling this command with the same HD-index and the same hardware \
-         wallet will always generate the same keypair."
+      ~doc:Secrets.Hardware_wallets.create_hd_account_summary
       ~typ:(non_null Types.Payload.create_account)
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_hd_account)]
       ~resolve:(fun {ctx= coda; _} () hd_index ->
@@ -1735,7 +1730,6 @@ module Mutations = struct
   let commands =
     [ add_wallet
     ; create_account
-    ; create_hd_account
     ; unlock_account
     ; unlock_wallet
     ; lock_account

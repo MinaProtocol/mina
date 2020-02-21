@@ -1253,13 +1253,7 @@ let create_account =
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ))
 
 let create_hd_account =
-  Command.async
-    ~summary:
-      "Create an account with hardware wallet - this will let the hardware \
-       wallet generate a keypair corresponds to the HD-index you give and \
-       store this HD-index and the generated public key in the daemon. \
-       Calling this command with the same HD-index and the same hardware \
-       wallet will always generate the same keypair."
+  Command.async ~summary:Secrets.Hardware_wallets.create_hd_account_summary
     (Cli_lib.Background_daemon.graphql_init Cli_lib.Flag.User_command.hd_index
        ~f:(fun graphql_endpoint hd_index ->
          let%map response =
@@ -1478,7 +1472,6 @@ let accounts =
     ~preserve_subcommand_order:()
     [ ("list", list_accounts)
     ; ("create", create_account)
-    ; ("create-hd", create_hd_account)
     ; ("import", import_key)
     ; ("unlock", unlock_account)
     ; ("lock", lock_account) ]

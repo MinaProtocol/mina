@@ -4,6 +4,13 @@ open Signature_lib
 open Coda_base
 open Async
 
+let create_hd_account_summary =
+  "Create an account with hardware wallet - this will let the hardware wallet \
+   generate a keypair corresponds to the HD-index you give and store this \
+   HD-index and the generated public key in the daemon. Calling this command \
+   with the same HD-index and the same hardware wallet will always generate \
+   the same keypair."
+
 let hardware_wallet_script = "codaledgercli"
 
 let to_bigint : string -> Bigint.t =
@@ -28,7 +35,8 @@ let decode_status_code ~f = function
   | "Ok" ->
       Ok (f ())
   | "Hardware_wallet_not_found" ->
-      Error "Hardware wallet not found."
+      Error
+        "Hardware wallet not found. Is the device plugged in and activated?"
   | "Computation_aborted" ->
       Error "An internal error happens in hardware wallet."
   | s ->
@@ -39,7 +47,9 @@ let report_json_error s =
 
 let report_process_error e =
   sprintf
-    !"Failed to communicate with hardware wallet program %s: %s"
+    !"Failed to communicate with hardware wallet program %s: %s.\n\
+      Do you have the auxiliary dependencies required for using the hardware \
+      wallet?"
     hardware_wallet_script (Error.to_string_hum e)
 
 let decode_public_key : string -> (Public_key.t, string) Result.t =

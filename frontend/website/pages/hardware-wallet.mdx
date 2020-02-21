@@ -1,0 +1,70 @@
+# Hardware wallets
+
+If you have a hardware wallet product, you could use it with coda!
+
+## Requirements
+
+**Software**: Linux (currently supports Debian 9 and Ubuntu 18.04 LTS)
+
+Note: macOS and Windows is not officially supported at this time.
+
+**Hardware**: Currently only `Ledger Nano S` is supported
+
+## Installation
+
+**Disclaimer**: This is higher experimental now. Once the hardware wallet app is available on `Ledger Live`, the installation would be much eaiser.
+
+The following debian packages are needed to use hardware wallet on linux:
+```
+sudo apt install libusb-1.0-0-dev libudev1 libudev-dev
+```
+
+The coda hardware wallet command line tool is a python package called `coda-ledger-cli`:
+```
+python3 -mpip install coda-ledger-cli 
+```
+
+If you have connection issue with your hardware wallet, please take a look at https://support.ledger.com/hc/en-us/articles/115005165269-Fix-connection-issues,
+The above page suggests trying the following on your machine:
+```
+wget -q -O - https://raw.githubusercontent.com/LedgerHQ/udev-rules/master/add_udev_rules.sh | sudo bash
+```
+
+## Create a new account using hardware wallet
+
+Run the following command which will create a public and private keypair in the hardware wallet:
+
+    coda accounts create-hd HD-index
+
+HD-index is a number that works like a seed that you give to the hardware wallet to create your public and private keypair. If you use the same HD-index with the same hardware wallet, then public and private keypair that gets generated would always be the same. If you need to use the same account on another machine, then you just need to use this command with the same HD-index and the same ledger.
+
+During account creation, your hardware wallet may ask you to confirm the operation.
+
+The response from this command will look like this:
+
+    Keypair generated
+    Public key:  4vsRCVbLm6LvUyzYWT95WaCzyi4D4UHxRpLBhMn7q2mRPgNCgRG3Jr3tDuhgQdmzbvCcBxhUwB3REpY2Dyf1NAxSSs8Q2vdJX93pT7eyqcyRU2S9UpDddDgovj46BSknNjzydKoopebp5Kva
+
+Since the public key is quite long and difficult to remember, let's save it as an environment variable:
+
+    export CODA_PUBLIC_KEY=<YOUR-PUBLIC-KEY>
+
+Now we can access this everywhere as `$CODA_PUBLIC_KEY` -- see if it saved properly by trying `echo $CODA_PUBLIC_KEY`.
+
+## Make a payment
+
+Sending a payment using hardware wallet works almost the same as send a payment from an ordinary account.
+
+There're only 2 differences:
+1. You do not need to unlock your account before sending the transaction because your account is protected by your hardware wallet instead of coda daemon.
+2. Your hardware wallet may ask you to confirm the operation while signing the transaction.
+
+Your would use the same command as sending payments from an ordinary account: [sending a transaction](/docs/my-first-transaction/) and if everything goes on well, then the response would also looks the same as send payments from an ordinary account.
+
+## Trouble shooting
+
+### What if I lost my hardware wallet?
+You can buy another `Ledger Nano S` product and initialize it with the same 24-word seed. And the new `Ledger Nano S` would function exactly like the old one 
+
+### What if I forget the public key of my account?
+If you remember the HD-index which you use to generate your account, then you can use `coda accounts create-hd HD-index` with the same HD-index to regenerate the public_key.
