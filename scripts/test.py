@@ -13,7 +13,7 @@ build_artifact_profiles = [
     'testnet_postake_medium_curves'
 ]
 
-unit_test_profiles = ['test_postake_snarkless_unittest', 'dev']
+unit_test_profiles = ['test_postake_snarkless_unittest', 'dev', 'nonconsensus_medium_curves']
 
 unit_test_profiles_medium_curves = ['dev_medium_curves']
 
@@ -88,6 +88,7 @@ extra_required_status_checks = [
     "ci/circleci: lint",
     "ci/circleci: tracetool",
     "ci/circleci: build-wallet",
+    "ci/circleci: compare-test-signatures",
 ]
 
 # these are full status check names. they will not be required to succeed.
