@@ -7,6 +7,7 @@ module Currency = Currency_nonconsensus.Currency
 module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Global_slot = Coda_numbers_nonconsensus.Global_slot
 module Memo = User_command_memo
+module Signature_lib = Signature_lib_nonconsensus
 
 type string_js = Js.js_string Js.t
 
@@ -36,8 +37,35 @@ type payment_js =
   ; paymentPayload: payment_payload_js Js.prop >
   Js.t
 
+let payment_body_of_js payment_payload =
+  let receiver =
+    payment_payload##.receiver |> Js.to_string
+    |> Signature_lib.Public_key.Compressed.of_base58_check_exn
+  in
+  let amount =
+    payment_payload##.amount |> Js.to_string |> Currency.Amount.of_string
+  in
+  User_command_payload.Body.Payment Payment_payload.Poly.{receiver; amount}
+
+let payload_of_payment_js payment_js : User_command_payload.t =
+  let common = payload_common_of_js payment_js##.common in
+  let body = payment_body_of_js payment_js##.paymentPayload in
+  User_command_payload.Poly.{common; body}
+
 type stake_delegation_js =
   < common: payload_common_js Js.prop ; newDelegate: string_js Js.prop > Js.t
+
+let stake_delegation_body_of_js new_delegate =
+  let new_delegate =
+    Js.to_string new_delegate
+    |> Signature_lib.Public_key.Compressed.of_base58_check_exn
+  in
+  User_command_payload.Body.Stake_delegation (Set_delegate {new_delegate})
+
+let payload_of_stake_delegation_js payment_js : User_command_payload.t =
+  let common = payload_common_of_js payment_js##.common in
+  let body = stake_delegation_body_of_js payment_js##.newDelegate in
+  User_command_payload.Poly.{common; body}
 
 type signature_js =
   < field: string_js Js.readonly_prop ; scalar: string_js Js.readonly_prop >
@@ -50,12 +78,21 @@ let signature_to_js_object ((field, scalar) : Signature.t) =
     val scalar = Inner_curve.Scalar.to_string scalar |> Js.string
   end
 
+let signature_of_js_object (signature_js : signature_js) : Signature.t =
+  let field = signature_js##.field |> Js.to_string |> Field.of_string in
+  let scalar =
+    signature_js##.scalar |> Js.to_string |> Inner_curve.Scalar.of_string
+  in
+  (field, scalar)
+
 type signed_payment =
   < payment: payment_js Js.readonly_prop
   ; sender: string_js Js.readonly_prop
   ; signature: signature_js Js.readonly_prop >
+  Js.t
 
 type signed_stake_delegation =
   < stakeDelegation: stake_delegation_js Js.readonly_prop
   ; sender: string_js Js.readonly_prop
   ; signature: signature_js Js.readonly_prop >
+  Js.t

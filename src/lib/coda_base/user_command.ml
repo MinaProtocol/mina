@@ -66,6 +66,9 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
+type _unused = unit
+  constraint (Payload.t, Public_key.t, Signature.t) Poly.t = t
+
 let accounts_accessed = Stable.Latest.accounts_accessed
 
 include Comparable.Make (Stable.Latest)

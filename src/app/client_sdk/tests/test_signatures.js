@@ -45,7 +45,15 @@ var delegations = [
 
 var printSignature = s => console.log(`  { field: '${s.field}'\n  , scalar: '${s.scalar}'\n  },`);
 
+var payment_signatures = payments.map (t => coda.signPayment(keypair.privateKey, t))
+
+var delegation_signatures = delegations.map (t => coda.signStakeDelegation(keypair.privateKey, t))
+
+// verify signatures before printing them
+payment_signatures.forEach (t => { if (!coda.verifyPaymentSignature (t)) { console.error ("Payment signature did not verify"); process.exit (1) } })
+delegation_signatures.forEach (t => { if (!coda.verifyStakeDelegationSignature (t)) { console.error ("Delegation signature did not verify"); process.exit (1) } })
+
 console.log("[");
-payments.forEach(t => printSignature(coda.signPayment(keypair.privateKey, t).signature));
-delegations.forEach(t => printSignature(coda.signStakeDelegation(keypair.privateKey, t).signature));
+payment_signatures.forEach(t => printSignature (t.signature))
+delegation_signatures.forEach(t => printSignature (t.signature))
 console.log("]");

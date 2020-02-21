@@ -70,7 +70,7 @@ let _ =
 
        (** sign payment transaction payload with private key *)
        method signPayment (sk_base58_check_js : string_js)
-           (payment_js : payment_js) : signed_payment Js.t =
+           (payment_js : payment_js) : signed_payment =
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let User_command_payload.Common.Poly.{fee; nonce; valid_until; memo} =
@@ -101,10 +101,24 @@ let _ =
            val signature = signature
          end
 
+       (** verify signed payments *)
+       method verifyPaymentSignature (signed_payment : signed_payment) =
+         let payload : User_command_payload.t =
+           payload_of_payment_js signed_payment##.payment
+         in
+         let sender =
+           signed_payment##.sender |> Js.to_string
+           |> Public_key.Compressed.of_base58_check_exn
+           |> Public_key.decompress_exn
+         in
+         let signature = signature_of_js_object signed_payment##.signature in
+         let signed = User_command.Poly.{payload; sender; signature} in
+         User_command.check_signature signed
+
        (** sign payment transaction payload with private key *)
        method signStakeDelegation (sk_base58_check_js : string_js)
            (stake_delegation_js : stake_delegation_js)
-           : signed_stake_delegation Js.t =
+           : signed_stake_delegation =
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let User_command_payload.Common.Poly.{fee; nonce; valid_until; memo} =
@@ -130,4 +144,22 @@ let _ =
 
            val signature = signature
          end
+
+       (** verify signed delegations *)
+       method verifyStakeDelegationSignature
+             (signed_stake_delegation : signed_stake_delegation) =
+         let payload : User_command_payload.t =
+           payload_of_stake_delegation_js
+             signed_stake_delegation##.stakeDelegation
+         in
+         let sender =
+           signed_stake_delegation##.sender
+           |> Js.to_string |> Public_key.Compressed.of_base58_check_exn
+           |> Public_key.decompress_exn
+         in
+         let signature =
+           signature_of_js_object signed_stake_delegation##.signature
+         in
+         let signed = User_command.Poly.{payload; sender; signature} in
+         User_command.check_signature signed
     end)

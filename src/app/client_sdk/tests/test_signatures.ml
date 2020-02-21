@@ -90,18 +90,31 @@ let transactions = payments @ delegations
 
 type jsSignature = {privateKey: Field.t; publicKey: Inner_curve.Scalar.t}
 
+let get_signature payload =
+  (User_command.sign keypair payload :> User_command.With_valid_signature.t)
+
 (* output format matches signatures in client SDK *)
-let print_signature payload =
-  let User_command.Poly.{signature= field, scalar; _} =
-    (User_command.sign keypair payload :> User_command.t)
-  in
+let print_signature field scalar =
   printf "  { field: '%s'\n" (Field.to_string field) ;
   printf "  , scalar: '%s'\n" (Inner_curve.Scalar.to_string scalar) ;
   printf "  },\n%!"
 
 let main () =
+  let signatures = List.map transactions ~f:get_signature in
+  (* make sure signatures verify *)
+  List.iteri signatures ~f:(fun i signature ->
+      let signature = (signature :> User_command.t) in
+      if not (User_command.check_signature signature) then (
+        eprintf
+          !"Signature (%d) failed to verify: %{sexp: User_command.t}\n%!"
+          i signature ;
+        exit 1 ) ) ;
   printf "[\n" ;
-  List.iter transactions ~f:print_signature ;
+  List.iter signatures ~f:(fun signature ->
+      let User_command.Poly.{signature= field, scalar; _} =
+        (signature :> User_command.t)
+      in
+      print_signature field scalar ) ;
   printf "]\n"
 
 let _ = main ()

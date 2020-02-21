@@ -129,6 +129,8 @@ module type S = sig
   val sign :
     Signature_keypair.t -> User_command_payload.t -> With_valid_signature.t
 
+  val check_signature : t -> bool
+
   val create_with_signature_checked :
        Signature.t
     -> Public_key.Compressed.t
