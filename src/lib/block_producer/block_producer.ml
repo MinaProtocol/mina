@@ -282,7 +282,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               )
             in
             let transactions =
-              Network_pool.Transaction_pool.Resource_pool.transactions
+              Network_pool.Transaction_pool.Resource_pool.transactions ~logger
                 transaction_resource_pool
             in
             trace_event "waiting for ivar..." ;
