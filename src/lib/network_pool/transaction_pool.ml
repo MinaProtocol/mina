@@ -110,22 +110,35 @@ struct
 
     let member t = Indexed_pool.member t.pool
 
-    let transactions' p =
+    let transactions' ~logger p =
       Sequence.unfold ~init:p ~f:(fun pool ->
           match Indexed_pool.get_highest_fee pool with
-          | Some cmd ->
-              Some
-                ( cmd
-                , fst
-                  @@ Indexed_pool.handle_committed_txn pool cmd
-                       (* we have the invariant that the transactions currently
+          | Some cmd -> (
+            match
+              Indexed_pool.handle_committed_txn pool cmd
+                (* we have the invariant that the transactions currently
                           in the pool are always valid against the best tip, so
                           no need to check balances here *)
-                       Currency.Amount.max_int )
+                Currency.Amount.max_int
+            with
+            | Ok (t, _) ->
+                Some (cmd, t)
+            | Error (`Queued_txns_by_sender (error_str, queued_cmds)) ->
+                Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                  "Error handling committed transaction $cmd: $error "
+                  ~metadata:
+                    [ ("cmd", User_command.With_valid_signature.to_yojson cmd)
+                    ; ("error", `String error_str)
+                    ; ( "queue"
+                      , `List
+                          (List.map (Sequence.to_list queued_cmds) ~f:(fun c ->
+                               User_command.With_valid_signature.to_yojson c ))
+                      ) ] ;
+                failwith error_str )
           | None ->
               None )
 
-    let transactions t = transactions' t.pool
+    let transactions ~logger t = transactions' ~logger t.pool
 
     let all_from_user {pool; _} = Indexed_pool.all_from_user pool
 
@@ -253,8 +266,25 @@ struct
                 Hashtbl.add_exn t.locally_generated_committed ~key:cmd'
                   ~data:time_added ) ;
             let p', dropped =
-              Indexed_pool.handle_committed_txn p cmd'
-                (Currency.Balance.to_amount balance)
+              match
+                Indexed_pool.handle_committed_txn p cmd'
+                  (Currency.Balance.to_amount balance)
+              with
+              | Ok res ->
+                  res
+              | Error (`Queued_txns_by_sender (error_str, queued_cmds)) ->
+                  Logger.error t.logger ~module_:__MODULE__ ~location:__LOC__
+                    "Error handling committed transaction $cmd: $error "
+                    ~metadata:
+                      [ ("cmd", User_command.to_yojson cmd)
+                      ; ("error", `String error_str)
+                      ; ( "queue"
+                        , `List
+                            (List.map (Sequence.to_list queued_cmds)
+                               ~f:(fun c ->
+                                 User_command.With_valid_signature.to_yojson c
+                             )) ) ] ;
+                  failwith error_str
             in
             (p', Sequence.append dropped_so_far dropped) )
       in
@@ -475,6 +505,7 @@ struct
       let apply t env =
         let txs = Envelope.Incoming.data env in
         let sender = Envelope.Incoming.sender env in
+        let is_sender_local = Envelope.Sender.(equal sender Local) in
         match t.best_tip_ledger with
         | None ->
             Deferred.Or_error.error_string
@@ -513,12 +544,12 @@ struct
                       in
                       go txs'' pool accepted
                     else
-                      match
+                      let account ledger key =
                         Option.bind
-                          (Base_ledger.location_of_key ledger
-                             (User_command.sender tx))
+                          (Base_ledger.location_of_key ledger key)
                           ~f:(Base_ledger.get ledger)
-                      with
+                      in
+                      match account ledger (User_command.sender tx) with
                       | None ->
                           let%bind _ =
                             trust_record
@@ -528,12 +559,45 @@ struct
                                   , [("cmd", User_command.to_yojson tx)] ) )
                           in
                           go txs'' pool accepted
-                      | Some account ->
-                          if has_sufficient_fee pool tx then
+                      | Some sender_account ->
+                          if has_sufficient_fee pool tx then (
+                            let validate_receiver =
+                              match
+                                account ledger (User_command.receiver tx)
+                              with
+                              | None -> (
+                                (*receiver account is new*)
+                                match User_command.amount tx with
+                                | None ->
+                                    (* When tx is for stake delegation. The new Delegate should be in the ledger*)
+                                    Error `Delegate_not_found
+                                | Some receiver_amount ->
+                                    (*amount should be at least account_creation_fee for transactions that create new accounts*)
+                                    let receiver_amount_to_fee =
+                                      Currency.Amount.to_fee receiver_amount
+                                    in
+                                    if
+                                      Currency.Fee.(
+                                        receiver_amount_to_fee
+                                        >= Coda_compile_config
+                                           .account_creation_fee)
+                                    then Ok ()
+                                    else
+                                      Error
+                                        `Insufficient_amount_for_account_creation
+                                )
+                              | Some _ ->
+                                  Ok ()
+                            in
                             let add_res =
-                              Indexed_pool.add_from_gossip_exn pool tx'
-                                account.nonce
-                              @@ Currency.Balance.to_amount account.balance
+                              Result.bind
+                                ( Indexed_pool.add_from_gossip_exn pool tx'
+                                    sender_account.nonce
+                                @@ Currency.Balance.to_amount
+                                     sender_account.balance )
+                                ~f:(fun res ->
+                                  Result.map validate_receiver ~f:(fun _ -> res)
+                                  )
                             in
                             let yojson_fail_reason =
                               Fn.compose
@@ -546,7 +610,13 @@ struct
                                   | `Insufficient_replace_fee ->
                                       "insufficient replace fee"
                                   | `Overflow ->
-                                      "overflow" )
+                                      "overflow"
+                                  | `Delegate_not_found ->
+                                      "delegate not found"
+                                  | `Insufficient_amount_for_account_creation
+                                    ->
+                                      "insufficient amount for reciever \
+                                       account creation" )
                             in
                             match add_res with
                             | Ok (pool', dropped) ->
@@ -558,10 +628,7 @@ struct
                                         , [("cmd", User_command.to_yojson tx)]
                                         ) )
                                 in
-                                if
-                                  Envelope.Sender.equal sender
-                                    Envelope.Sender.Local
-                                then
+                                if is_sender_local then
                                   Hashtbl.add_exn
                                     t.locally_generated_uncommitted ~key:tx'
                                     ~data:(Time.now ()) ;
@@ -628,13 +695,24 @@ struct
                                    transactions at the same nonce to different
                                    nodes, which will then naturally gossip them.
                                 *)
-                                Logger.debug t.logger ~module_:__MODULE__
+                                let f_log =
+                                  if is_sender_local then Logger.error
+                                  else Logger.debug
+                                in
+                                f_log t.logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   "rejecting $cmd because of insufficient \
                                    replace fee"
                                   ~metadata:[("cmd", User_command.to_yojson tx)] ;
                                 go txs'' pool accepted
                             | Error err ->
+                                if is_sender_local then
+                                  Logger.error t.logger ~module_:__MODULE__
+                                    ~location:__LOC__
+                                    "rejecting $cmd because of $reason"
+                                    ~metadata:
+                                      [ ("cmd", User_command.to_yojson tx)
+                                      ; ("reason", yojson_fail_reason err) ] ;
                                 let%bind _ =
                                   trust_record
                                     ( Trust_system.Actions.Sent_useless_gossip
@@ -644,7 +722,7 @@ struct
                                           ; ("reason", yojson_fail_reason err)
                                           ] ) )
                                 in
-                                go txs'' pool accepted
+                                go txs'' pool accepted )
                           else
                             let%bind _ =
                               trust_record
@@ -865,7 +943,7 @@ let%test_module _ =
           Indexed_pool.For_tests.assert_invariants pool.pool ;
           assert_locally_generated pool ;
           [%test_eq: User_command.t List.t]
-            ( Test.Resource_pool.transactions pool
+            ( Test.Resource_pool.transactions ~logger pool
             |> Sequence.map ~f:User_command.forget_check
             |> Sequence.to_list
             |> List.sort ~compare:User_command.compare )
@@ -1081,7 +1159,7 @@ let%test_module _ =
           in
           let assert_pool_txs txs =
             [%test_eq: User_command.t List.t]
-              ( Test.Resource_pool.transactions pool
+              ( Test.Resource_pool.transactions ~logger pool
               |> Sequence.map ~f:User_command.forget_check
               |> Sequence.to_list
               |> List.sort ~compare:User_command.compare )

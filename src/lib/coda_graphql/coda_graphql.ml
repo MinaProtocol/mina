@@ -1768,6 +1768,7 @@ module Queries = struct
         ( match opt_pk with
         | None ->
             Network_pool.Transaction_pool.Resource_pool.transactions
+              ~logger:(Coda_lib.top_level_logger coda)
               resource_pool
             |> Sequence.to_list
         | Some pk ->
