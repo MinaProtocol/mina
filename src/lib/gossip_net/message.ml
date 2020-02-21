@@ -5,11 +5,17 @@ open Network_pool
 
 module Master = struct
   module T = struct
-    type msg =
+    type msg_data =
       | New_state of External_transition.t
       | Snark_pool_diff of Snark_pool.Resource_pool.Diff.t
       | Transaction_pool_diff of Transaction_pool.Resource_pool.Diff.t
     [@@deriving sexp, to_yojson]
+
+    type msg =
+      { data: msg_data
+            (* the first element of this list is the peer who sent the sender the
+         message, and the receipt timestamp. *)
+      ; path_rev: (Time_ns.t * Network_peer.Peer.Id.t) list }
   end
 
   let name = "message"
@@ -24,10 +30,8 @@ include Versioned_rpc.Both_convert.One_way.Make (Master)
 module V1 = struct
   module T = struct
     type msg = Master.T.msg =
-      | New_state of External_transition.Stable.V1.t
-      | Snark_pool_diff of Snark_pool.Resource_pool.Diff.Stable.V1.t
-      | Transaction_pool_diff of
-          Transaction_pool.Resource_pool.Diff.Stable.V1.t
+      { data: Master.T.msg_data
+      ; path_rev: (Time_ns.t * Network_peer.Peer.Id.t) list }
     [@@deriving bin_io, sexp, version {rpc}]
 
     let callee_model_of_msg = Fn.id

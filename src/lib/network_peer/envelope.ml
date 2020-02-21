@@ -41,21 +41,30 @@ module Sender = struct
 end
 
 module Incoming = struct
-  type 'a t = {data: 'a; sender: Sender.t} [@@deriving eq, sexp, yojson]
+  (* wrapped_at is stored as an int to avoid Time_ns.t missing yojson functions *)
+  type 'a t = {data: 'a; sender: Sender.t; wrapped_at: int}
+  [@@deriving eq, sexp, yojson]
 
   let sender t = t.sender
 
   let data t = t.data
 
-  let wrap ~data ~sender = {data; sender}
+  let wrapped_at t = t.wrapped_at |> Time_ns.of_int_ns_since_epoch
 
-  let wrap_peer ~data ~sender = {data; sender= Sender.of_peer sender}
+  let wrap ~data ~sender =
+    { data
+    ; sender
+    ; wrapped_at=
+        Time_ns.now () |> Time_ns.to_int63_ns_since_epoch |> Int63.to_int
+        |> Option.value_exn }
+
+  let wrap_peer ~data ~sender = wrap ~data ~sender:(Sender.of_peer sender)
 
   let map ~f t = {t with data= f t.data}
 
   let local data =
     let sender = Sender.Local in
-    {data; sender}
+    wrap ~data ~sender
 
   let remote_sender_exn t =
     match t.sender with
