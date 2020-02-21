@@ -383,6 +383,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest src/lib --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
@@ -405,6 +407,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 && (dune runtest src/lib --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
@@ -426,6 +430,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             {%- for test in small_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
@@ -448,6 +454,8 @@ jobs:
             - run:
                 name: Build libp2p_helper
                 command: make libp2p_helper
+                environment:
+                  EXTRA_NIX_ARGS: --option sandbox false
             {%- for test in medium_curves_and_other_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
