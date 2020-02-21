@@ -15,13 +15,13 @@
 [%%define delta 3]
 
 [%%define record_async_backtraces false]
-[%%define time_offsets true]
+[%%define time_offsets false]
 [%%define cache_exceptions false]
 [%%define fake_hash false]
 
 [%%define genesis_ledger "testnet_postake"]
 
-[%%define genesis_state_timestamp "2020-02-25 10:00:00-07:00"]
+[%%define genesis_state_timestamp "2020-03-05 14:00:00-08:00"]
 [%%define block_window_duration 180000]
 
 [%%define integration_tests false]
@@ -31,5 +31,5 @@
 
 [%%define print_versioned_types false]
 
-[%%define daemon_expiry "2024-12-10 14:00:00-07:00"]
 [%%define test_full_epoch false]
+[%%define daemon_expiry "2024-01-15 14:00:00-07:00"]
