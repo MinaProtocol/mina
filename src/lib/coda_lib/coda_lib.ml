@@ -282,7 +282,7 @@ let root_length = compose_of_option root_length_opt
 [%%if
 mock_frontend_data]
 
-let create_sync_status_observer ~logger
+let create_sync_status_observer ~logger ~demo_mode:_
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let variable = Coda_incremental.Status.Var.create `Offline in
@@ -311,7 +311,7 @@ let create_sync_status_observer ~logger
 
 [%%else]
 
-let create_sync_status_observer ~logger
+let create_sync_status_observer ~logger ~demo_mode
     ~transition_frontier_and_catchup_signal_incr ~online_status_incr
     ~first_connection_incr ~first_message_incr =
   let open Coda_incremental.Status in
@@ -319,32 +319,35 @@ let create_sync_status_observer ~logger
     map4 online_status_incr transition_frontier_and_catchup_signal_incr
       first_connection_incr first_message_incr
       ~f:(fun online_status active_status first_connection first_message ->
-        match online_status with
-        | `Offline ->
-            if `Empty = first_connection then (
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Coda daemon is now connecting" ;
-              `Connecting )
-            else if `Empty = first_message then (
-              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-                "Coda daemon is now listening" ;
-              `Listening )
-            else `Offline
-        | `Online -> (
-          match active_status with
-          | None ->
-              Logger.info (Logger.create ()) ~module_:__MODULE__
-                ~location:__LOC__ "Coda daemon is now bootstrapping" ;
-              `Bootstrap
-          | Some (_, catchup_jobs) ->
-              if catchup_jobs > 0 then (
+        (* Always be synced in demo mode, we don't expect peers to connect to us *)
+        if demo_mode then `Synced
+        else
+          match online_status with
+          | `Offline ->
+              if `Empty = first_connection then (
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  "Coda daemon is now connecting" ;
+                `Connecting )
+              else if `Empty = first_message then (
+                Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                  "Coda daemon is now listening" ;
+                `Listening )
+              else `Offline
+          | `Online -> (
+            match active_status with
+            | None ->
                 Logger.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
-                `Catchup )
-              else (
-                Logger.info (Logger.create ()) ~module_:__MODULE__
-                  ~location:__LOC__ "Coda daemon is now synced" ;
-                `Synced ) ) )
+                  ~location:__LOC__ "Coda daemon is now bootstrapping" ;
+                `Bootstrap
+            | Some (_, catchup_jobs) ->
+                if catchup_jobs > 0 then (
+                  Logger.info (Logger.create ()) ~module_:__MODULE__
+                    ~location:__LOC__ "Coda daemon is now doing ledger catchup" ;
+                  `Catchup )
+                else (
+                  Logger.info (Logger.create ()) ~module_:__MODULE__
+                    ~location:__LOC__ "Coda daemon is now synced" ;
+                  `Synced ) ) )
   in
   let observer = observe incremental_status in
   stabilize () ; observer
@@ -538,6 +541,14 @@ let best_path t =
   List.cons
     Transition_frontier.(root tf |> Breadcrumb.state_hash)
     (Transition_frontier.hash_path tf bt)
+
+let best_chain t =
+  let open Option.Let_syntax in
+  let%map frontier =
+    Broadcast_pipe.Reader.peek t.components.transition_frontier
+  in
+  Transition_frontier.root frontier
+  :: Transition_frontier.best_tip_path frontier
 
 let request_work t =
   let open Option.Let_syntax in
@@ -1034,6 +1045,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           in
           let sync_status =
             create_sync_status_observer ~logger:config.logger
+              ~demo_mode:config.demo_mode
               ~transition_frontier_and_catchup_signal_incr
               ~online_status_incr:
                 ( Var.watch @@ of_broadcast_pipe

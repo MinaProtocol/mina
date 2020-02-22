@@ -198,7 +198,7 @@ module NavWrapper = {
              </>;
            }
          )
-      |> ReactUtils.staticArray;
+      |> ReactExt.staticArray;
 
     <nav
       className=Css.(

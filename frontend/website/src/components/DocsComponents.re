@@ -134,18 +134,57 @@ module Strong =
       />;
   });
 
-module Pre =
-  Wrap({
-    let element =
-      <pre
+[@bs.scope ("navigator", "clipboard")] [@bs.val]
+external writeText: string => Js.Promise.t(unit) = "writeText";
+
+module Pre = {
+  let make = props => {
+    let text =
+      Js.String.trim(
+        Js.String.make(
+          {
+            let props =
+              ReactExt.Children.only(props##children) |> ReactExt.props;
+            props##children;
+          },
+        ),
+      );
+    <pre
+      className={style([
+        backgroundColor(Theme.Colors.slateAlpha(0.05)),
+        borderRadius(`px(9)),
+        padding2(~v=`rem(0.5), ~h=`rem(1.)),
+        overflow(`scroll),
+        position(`relative),
+      ])}>
+      <div
         className={style([
-          backgroundColor(Theme.Colors.slateAlpha(0.05)),
-          borderRadius(`px(9)),
-          padding2(~v=`rem(0.5), ~h=`rem(1.)),
-          overflow(`scroll),
+          position(`absolute),
+          top(`px(6)),
+          right(`px(6)),
+          width(`px(24)),
+          height(`px(24)),
+          height(`px(24)),
+          opacity(0.2),
+          cursor(`pointer),
+          backgroundImage(
+            `url(
+              "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgdmlld0JveD0iMCAwIDUxMiA1MTIiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxyZWN0IHdpZHRoPSI1MTIiIGhlaWdodD0iNTEyIiAvPgo8cGF0aCBmaWxsLXJ1bGU9ImV2ZW5vZGQiIGNsaXAtcnVsZT0iZXZlbm9kZCIgZD0iTTMwMSAxMzBIMTUzVjM3MUgxMzdWMTIyQzEzNyAxMTcuNTgyIDE0MC41ODIgMTE0IDE0NSAxMTRIMzAxVjEzMFpNMTg2IDM4NlYxNjJIMzI2VjM4NkgxODZaTTE3MCAxNTRDMTcwIDE0OS41ODIgMTczLjU4MiAxNDYgMTc4IDE0NkgzMzRDMzM4LjQxOCAxNDYgMzQyIDE0OS41ODIgMzQyIDE1NFYzOTRDMzQyIDM5OC40MTggMzM4LjQxOCA0MDIgMzM0IDQwMkgxNzhDMTczLjU4MiA0MDIgMTcwIDM5OC40MTggMTcwIDM5NFYxNTRaIiBmaWxsPSJibGFjayIvPgo8L3N2Zz4K",
+            ),
+          ),
+          backgroundSize(`cover),
+          hover([opacity(0.7)]),
         ])}
-      />;
-  });
+        onClick={_ => {
+          // TODO: Change copy icon to checkmark or something when copy
+          writeText(text)
+          |> Promise.iter(() => {Js.log("copied")})
+        }}
+      />
+      {props##children}
+    </pre>;
+  };
+};
 
 module Code =
   Wrap({
