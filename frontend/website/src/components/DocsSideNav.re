@@ -67,7 +67,6 @@ module Style = {
   let flip = style([transform(rotate(`deg(180.)))]);
 };
 
-
 module CurrentSlugProvider = {
   let (context, make, makeProps) = ReactUtils.createContext("");
 };

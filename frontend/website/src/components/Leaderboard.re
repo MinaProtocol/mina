@@ -4,16 +4,22 @@ type member = {
   id: int,
 };
 
-type entry = {
-  member,
-  score: int,
-};
+type entry = array(string);
+
+/*
+ type entry = {
+   member,
+   score: int,
+ };
+ */
 
 external parseEntry: Js.Json.t => entry = "%identity";
 
 let fetchLeaderboard = () => {
+  //"https://points.o1test.net/api/v1/leaderboard/?ordering=-score",
   ReFetch.fetch(
-    "https://points.o1test.net/api/v1/leaderboard/?ordering=-score",
+    "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/B3:C?key="
+    ++ Next.Config.google_api_key,
     ~method_=Get,
     ~headers={
       "Accept": "application/json",
@@ -23,12 +29,12 @@ let fetchLeaderboard = () => {
   |> Promise.bind(Bs_fetch.Response.json)
   |> Promise.map(r => {
        let results =
-         Option.bind(Js.Json.decodeObject(r), o =>
-           Js.Dict.get(o, "results")
-         );
+         Option.bind(Js.Json.decodeObject(r), o => Js.Dict.get(o, "values"));
 
        switch (Option.bind(results, Js.Json.decodeArray)) {
-       | Some(resultsArr) => Array.map(parseEntry, resultsArr)
+       | Some(resultsArr) =>
+         Array.map(parseEntry, resultsArr)
+         ->Array.sub(1, Array.length(resultsArr) - 1)
        | None => [||]
        };
      })
@@ -95,26 +101,25 @@ module LeaderboardRow = {
   let make = (~rank, ~entry) => {
     <>
       <div className=Styles.leaderboardRow>
-        <span className=Styles.rank>
-          {React.string(string_of_int(rank))}
-        </span>
-        <span className=Styles.username>
-          {React.string(entry.member.nickname)}
-        </span>
-        <span className=Styles.current>
-          {React.string(string_of_int(entry.score))}
-        </span>
-        <span className=Styles.total>
-          {React.string(string_of_int(entry.score))}
-        </span>
-      </div>
+
+          <span className=Styles.rank>
+            {React.string(string_of_int(rank))}
+          </span>
+          <span className=Styles.username> {React.string(entry[0])} </span>
+          //{React.string(entry.member.nickname)}
+          <span className=Styles.current> {React.string(entry[1])} </span>
+          //{React.string(string_of_int(entry.score))}
+          <span className=Styles.total> {React.string(entry[1])} </span>
+        </div>
+        //{React.string(string_of_int(entry.score))}
     </>;
   };
 };
 
 [@react.component]
 let make = () => {
-  let (entries, setEntries) = React.useState(() => [||]);
+  let (entries, setEntries) =
+    React.useState(() => [|[|"Loading...", ""|]|]);
 
   React.useEffect0(() => {
     fetchLeaderboard() |> Promise.iter(e => setEntries(_ => e));
@@ -133,7 +138,8 @@ let make = () => {
       {Array.mapi(
          (i, entry) =>
            <LeaderboardRow
-             key={string_of_int(entry.member.id)}
+             key={entry[0] ++ string_of_int(i)}
+             //key={string_of_int(entry.member.id)}
              rank={i + 1}
              entry
            />,
