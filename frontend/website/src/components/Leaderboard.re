@@ -101,17 +101,16 @@ module LeaderboardRow = {
   let make = (~rank, ~entry) => {
     <>
       <div className=Styles.leaderboardRow>
-
-          <span className=Styles.rank>
-            {React.string(string_of_int(rank))}
-          </span>
-          <span className=Styles.username> {React.string(entry[0])} </span>
-          //{React.string(entry.member.nickname)}
-          <span className=Styles.current> {React.string(entry[1])} </span>
-          //{React.string(string_of_int(entry.score))}
-          <span className=Styles.total> {React.string(entry[1])} </span>
-        </div>
+        <span className=Styles.rank>
+          {React.string(string_of_int(rank))}
+        </span>
+        <span className=Styles.username> {React.string(entry[0])} </span>
+        //{React.string(entry.member.nickname)}
+        <span className=Styles.current> {React.string(entry[1])} </span>
         //{React.string(string_of_int(entry.score))}
+        <span className=Styles.total> {React.string(entry[1])} </span>
+      </div>
+      //{React.string(string_of_int(entry.score))}
     </>;
   };
 };
