@@ -1542,6 +1542,15 @@ module Mutations = struct
     let%bind fee =
       result_of_exn Currency.Fee.of_uint64 fee ~error:"Invalid `fee` provided."
     in
+    let%bind () =
+      Result.ok_if_true
+        Currency.Fee.(fee >= User_command.minimum_fee)
+        ~error:
+          (sprintf
+             !"Invalid user command. Fee %d is less than the minimum fee, %d."
+             (Currency.Fee.to_int fee)
+             (Currency.Fee.to_int User_command.minimum_fee))
+    in
     let%bind memo =
       Option.value_map memo ~default:(Ok User_command_memo.empty)
         ~f:(fun memo ->
