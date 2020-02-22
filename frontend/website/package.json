@@ -9,7 +9,7 @@
     "build": "graphdoc -s ../../graphql_schema.json -o ./public/graphql-docs --force && bsb -make-world && next build",
     "export": "yarn build && next export",
     "start": "next start -p 8000",
-    "reformat": "bsrefmt --in-place src/*.re"
+    "reformat": "bsrefmt --in-place src/**/*.re"
   },
   "license": "ISC",
   "dependencies": {
