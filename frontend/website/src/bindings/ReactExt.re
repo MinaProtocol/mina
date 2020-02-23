@@ -34,7 +34,6 @@ let createContext = default => {
 let fromOpt = (~f, v) =>
   Option.map(f, v) |> Option.value(~default=React.null);
 
-
 let staticArray = a => {
   a
   |> Array.mapi((i, e) =>
