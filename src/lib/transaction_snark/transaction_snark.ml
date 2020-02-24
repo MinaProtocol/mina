@@ -1873,7 +1873,7 @@ let%test_module "transaction_snark" =
       let receiver = mk_pubkey () in
       let receiver_id = Account_id.create receiver Token_id.default in
       let other = mk_pubkey () in
-      let other_id = Account_id.create receiver Token_id.default in
+      let other_id = Account_id.create other Token_id.default in
       let pending_coinbase_init = Pending_coinbase.Stack.empty in
       let cb =
         Coinbase.create
