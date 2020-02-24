@@ -732,7 +732,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           in
           (* knot-tying hack so we can pass a get_telemetry function before net created *)
           let net_ref = ref None in
-          let block_producer_pubkeys =
+          let block_producers =
             config.initial_block_production_keypairs |> Keypair.Set.to_list
             |> List.map ~f:(fun {Keypair.public_key; _} ->
                    Public_key.compress public_key )
@@ -740,7 +740,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           let get_telemetry_data _env =
             match !net_ref with
             | None ->
-                (* should be unreachable; without a network, we wouldn't receive this RPC call *)
+                (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
                 Logger.info config.logger
                   "Network not instantiated when telemetry data requested"
                   ~module_:__MODULE__ ~location:__LOC__ ;
@@ -758,10 +758,10 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     in
                     Coda_state.Protocol_state.hash state
                   in
-                  let peer_statuses =
+                  let ban_statuses =
                     Trust_system.Peer_trust.peer_statuses config.trust_system
                   in
-                  let first_k_block_hashes =
+                  let k_block_hashes =
                     let k_breadcrumbs =
                       List.take
                         (Transition_frontier.best_tip_path frontier)
@@ -772,11 +772,12 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   in
                   Deferred.return
                     (Some
-                       ( peers
-                       , block_producer_pubkeys
-                       , protocol_state_hash
-                       , peer_statuses
-                       , first_k_block_hashes )) )
+                       Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
+                         { peers
+                         ; block_producers
+                         ; protocol_state_hash
+                         ; ban_statuses
+                         ; k_block_hashes }) )
           in
           let%bind net =
             Coda_networking.create config.net_config

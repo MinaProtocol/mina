@@ -420,25 +420,41 @@ module Rpcs = struct
   end
 
   module Get_telemetry_data = struct
+    module Telemetry_data = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t =
+            { peers: Network_peer.Peer.Stable.V1.t list
+            ; block_producers:
+                Signature_lib.Public_key.Compressed.Stable.V1.t list
+            ; protocol_state_hash: State_hash.Stable.V1.t
+            ; ban_statuses:
+                ( Core.Unix.Inet_addr.Stable.V1.t
+                * Trust_system.Peer_status.Stable.V1.t )
+                list
+            ; k_block_hashes: State_hash.Stable.V1.t list }
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      type t = Stable.Latest.t =
+        { peers: Network_peer.Peer.t list
+        ; block_producers: Signature_lib.Public_key.Compressed.t list
+        ; protocol_state_hash: State_hash.t
+        ; ban_statuses:
+            (Core.Unix.Inet_addr.t * Trust_system.Peer_status.t) list
+        ; k_block_hashes: State_hash.t list }
+    end
+
     module Master = struct
       let name = "get_telemetry_data"
 
       module T = struct
         type query = unit [@@deriving sexp, to_yojson]
 
-        (* peers
-           block producer public keys
-           protocol state hash
-           (IP address, peer status) list
-           states hashes of up-to-k blocks in best tip
-        *)
-        type response =
-          ( Network_peer.Peer.t list
-          * Signature_lib.Public_key.Compressed.t list
-          * State_hash.t
-          * (Unix.Inet_addr.t * Trust_system.Peer_status.t) list
-          * State_hash.t list )
-          option
+        type response = Telemetry_data.t option
       end
 
       module Caller = T
@@ -458,15 +474,7 @@ module Rpcs = struct
       module T = struct
         type query = unit [@@deriving bin_io, sexp, version {rpc}]
 
-        type response =
-          ( Network_peer.Peer.Stable.V1.t list
-          * Signature_lib.Public_key.Compressed.Stable.V1.t list
-          * State_hash.Stable.V1.t
-          * ( Core.Unix.Inet_addr.Stable.V1.t
-            * Trust_system.Peer_status.Stable.V1.t )
-            list
-          * State_hash.Stable.V1.t list )
-          option
+        type response = Telemetry_data.Stable.V1.t option
         [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id
@@ -632,40 +640,28 @@ let wrap_rpc_data_in_envelope conn data =
 
 let create (config : Config.t)
     ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
-          State_hash.t Envelope.Incoming.t
-       -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
-          option
+          Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
+          Envelope.Incoming.t
+       -> Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response
           Deferred.t)
     ~(answer_sync_ledger_query :
-          (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.Query.t)
-          Envelope.Incoming.t
-       -> Sync_ledger.Answer.t Deferred.Or_error.t)
+          Rpcs.Answer_sync_ledger_query.query Envelope.Incoming.t
+       -> Rpcs.Answer_sync_ledger_query.response Deferred.t)
     ~(get_ancestry :
-          Consensus.Data.Consensus_state.Value.t Envelope.Incoming.t
-       -> ( External_transition.t
-          , State_body_hash.t list * External_transition.t )
-          Proof_carrying_data.t
-          Deferred.Option.t)
+          Rpcs.Get_ancestry.query Envelope.Incoming.t
+       -> Rpcs.Get_ancestry.response Deferred.t)
     ~(get_best_tip :
-          unit Envelope.Incoming.t
-       -> ( External_transition.t
-          , State_body_hash.t list * External_transition.t )
-          Proof_carrying_data.t
-          Deferred.Option.t)
+          Rpcs.Get_best_tip.query Envelope.Incoming.t
+       -> Rpcs.Get_best_tip.response Deferred.t)
     ~(get_telemetry_data :
-          unit Envelope.Incoming.t
-       -> ( Network_peer.Peer.t list
-          * Signature_lib.Public_key.Compressed.t list
-          * State_hash.t
-          * (Unix.Inet_addr.t * Trust_system.Peer_status.t) list
-          * State_hash.t list )
-          Deferred.Option.t)
+          Rpcs.Get_telemetry_data.query Envelope.Incoming.t
+       -> Rpcs.Get_telemetry_data.response Deferred.t)
     ~(get_transition_chain_proof :
-          State_hash.t Envelope.Incoming.t
-       -> (State_hash.t * State_body_hash.t list) Deferred.Option.t)
+          Rpcs.Get_transition_chain_proof.query Envelope.Incoming.t
+       -> Rpcs.Get_transition_chain_proof.response Deferred.t)
     ~(get_transition_chain :
-          State_hash.t list Envelope.Incoming.t
-       -> External_transition.t list Deferred.Option.t) =
+          Rpcs.Get_transition_chain.query Envelope.Incoming.t
+       -> Rpcs.Get_transition_chain.response Deferred.t) =
   let run_for_rpc_result conn data ~f action_msg msg_args =
     let data_in_envelope = wrap_rpc_data_in_envelope conn data in
     let sender = Envelope.Incoming.sender data_in_envelope in
