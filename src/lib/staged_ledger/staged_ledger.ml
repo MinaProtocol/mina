@@ -1214,27 +1214,45 @@ module T = struct
       match count with `One -> by_one t | `Two -> by_one (by_one t)
   end
 
-  let rec check_constraints_and_update (resources : Resources.t) =
-    if Resources.slots_occupied resources = 0 then resources
+  let rec check_constraints_and_update (resources : Resources.t) summary_logs =
+    let end_summary_log () =
+      Create_diff_log.Summary.end_budget summary_logs
+        ~completed_work:init_resources.completed_work_rev
+        ~user_commands:init_resources.completed_work_rev
+        ~coinbase:init_resources.coinbase
+    in
+    if Resources.slots_occupied resources = 0 then
+      (resources, end_summary_log ())
     else if Resources.work_constraint_satisfied resources then
       if
         (*There's enough work. Check if they satisfy other constraints*)
         Resources.budget_sufficient resources
       then
-        if Resources.space_constraint_satisfied resources then resources
+        if Resources.space_constraint_satisfied resources then
+          (resources, end_summary_log ())
         else if Resources.worked_more resources then
           (*There are too many fee_transfers(from the proofs) occupying the slots. discard one and check*)
-          check_constraints_and_update (Resources.discard_last_work resources)
+          check_constraints_and_update
+            (Resources.discard_last_work resources)
+            (Create_diff_log.Summary.discard_completed_work `Extra_work
+               summary_logs)
         else
           (*Well, there's no space; discard a user command *)
           check_constraints_and_update
             (Resources.discard_user_command resources)
+            (Create_diff_log.Summary.discard_user_command `No_space
+               summary_logs)
       else
         (* insufficient budget; reduce the cost*)
-        check_constraints_and_update (Resources.discard_last_work resources)
+        check_constraints_and_update
+          (Resources.discard_last_work resources)
+          (Create_diff_log.Summary.discard_completed_work `Insufficient_fees
+             summary_logs)
     else
       (* There isn't enough work for the transactions. Discard a trasnaction and check again *)
-      check_constraints_and_update (Resources.discard_user_command resources)
+      check_constraints_and_update
+        (Resources.discard_user_command resources)
+        (Create_diff_log.Summary.discard_user_command `No_work summary_logs)
 
   let one_prediff cw_seq ts_seq ~receiver ~add_coinbase partition logger
       ~is_coinbase_reciever_new =
@@ -1243,7 +1261,13 @@ module T = struct
           Resources.init ts_seq cw_seq partition ~receiver_pk:receiver
             ~add_coinbase logger ~is_coinbase_reciever_new
         in
-        check_constraints_and_update init_resources )
+        let summary_log =
+          Create_diff_log.Summary.start
+            ~completed_work:init_resources.completed_work_rev
+            ~user_commands:init_resources.completed_work_rev
+            ~coinbase:init_resources.coinbase
+        in
+        check_constraints_and_update init_resource summary_logs )
 
   let generate logger cw_seq ts_seq ~receiver ~is_coinbase_reciever_new
       (partitions : Scan_state.Space_partition.t) =
@@ -1292,16 +1316,16 @@ module T = struct
     (*Partitioning explained in PR #687 *)
     match partitions.second with
     | None ->
-        let res =
+        let res, log =
           one_prediff cw_seq ts_seq ~receiver partitions.first
             ~add_coinbase:true logger ~is_coinbase_reciever_new
         in
-        make_diff res None
+        (make_diff res None, [("parition1", log)])
     | Some y ->
         assert (Sequence.length cw_seq <= snd partitions.first + snd y) ;
         let cw_seq_1 = Sequence.take cw_seq (snd partitions.first) in
         let cw_seq_2 = Sequence.drop cw_seq (snd partitions.first) in
-        let res =
+        let res, log1 =
           one_prediff cw_seq_1 ts_seq ~receiver partitions.first
             ~add_coinbase:false logger ~is_coinbase_reciever_new
         in
