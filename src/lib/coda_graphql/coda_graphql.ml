@@ -1906,6 +1906,31 @@ module Queries = struct
           Auxiliary_database.External_transition_database.get_value db
             state_hash) )
 
+  let best_chain =
+    field "bestChain"
+      ~doc:
+        "Retrieve a list of blocks from transition frontier's root to the \
+         current best tip. Returns null if the system is bootstrapping."
+      ~typ:(list @@ non_null Types.block)
+      ~args:Arg.[]
+      ~resolve:(fun {ctx= coda; _} () ->
+        let open Option.Let_syntax in
+        let%map best_chain = Coda_lib.best_chain coda in
+        List.map best_chain ~f:(fun breadcrumb ->
+            let hash = Transition_frontier.Breadcrumb.state_hash breadcrumb in
+            let transition =
+              Transition_frontier.Breadcrumb.validated_transition breadcrumb
+            in
+            let transactions =
+              Coda_transition.External_transition.Validated.transactions
+                transition
+            in
+            With_hash.Stable.Latest.
+              { data=
+                  Auxiliary_database.Filtered_external_transition.of_transition
+                    transition `All transactions
+              ; hash } ) )
+
   let initial_peers =
     field "initialPeers"
       ~doc:"List of peers that the daemon first used to connect to the network"
@@ -1953,6 +1978,7 @@ module Queries = struct
     ; wallet (* deprecated *)
     ; account
     ; current_snark_worker
+    ; best_chain
     ; blocks
     ; block
     ; initial_peers
