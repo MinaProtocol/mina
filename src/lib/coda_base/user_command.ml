@@ -355,6 +355,12 @@ let check_signature ({payload; sender; signature} : t) =
 
 [%%endif]
 
+let create_with_signature_checked signature sender payload =
+  let open Option.Let_syntax in
+  let%bind sender = Public_key.decompress sender in
+  let t = Poly.{payload; signature; sender} in
+  Option.some_if (check_signature t) t
+
 let gen_test =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
   Gen.payment_with_random_participants ~sign_type:`Real ~keys ~max_amount:10000

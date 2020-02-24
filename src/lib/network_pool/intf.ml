@@ -2,6 +2,7 @@ open Async_kernel
 open Core_kernel
 open Coda_base
 open Pipe_lib
+open Network_peer
 
 (** A [Resource_pool_base_intf] is a mutable pool of resources that supports
  *  mutation via some [Resource_pool_diff_intf]. A [Resource_pool_base_intf]
@@ -10,17 +11,27 @@ open Pipe_lib
 module type Resource_pool_base_intf = sig
   type t [@@deriving sexp_of]
 
+  type transition_frontier_diff
+
   type transition_frontier
 
   module Config : sig
     type t [@@deriving sexp_of]
   end
 
+  (** Diff from a transition frontier extension that would update the resource pool*)
+  val handle_transition_frontier_diff :
+    transition_frontier_diff -> t -> unit Deferred.t
+
   val create :
        frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> config:Config.t
     -> logger:Logger.t
+    -> tf_diff_writer:( transition_frontier_diff
+                      , Strict_pipe.synchronous
+                      , unit Deferred.t )
+                      Strict_pipe.Writer.t
     -> t
 end
 
@@ -35,7 +46,13 @@ module type Resource_pool_diff_intf = sig
 
   val summary : t -> string
 
-  val apply : pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
+  (** Warning: Using this directly could corrupt the resource pool if it
+  conincides with applying locally generated diffs or diffs from the network
+  or diffs from transition frontier extensions.*)
+  val unsafe_apply :
+       pool
+    -> t Envelope.Incoming.t
+    -> (t, [`Locally_generated of t | `Other of Error.t]) Result.t Deferred.t
 end
 
 (** A [Resource_pool_intf] ties together an associated pair of
@@ -72,14 +89,17 @@ module type Network_pool_base_intf = sig
 
   type resource_pool_diff
 
+  type transition_frontier_diff
+
   type config
 
   type transition_frontier
 
   val create :
        config:config
-    -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
-                      Linear_pipe.Reader.t
+    -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
+                      Strict_pipe.Reader.t
+    -> local_diffs:resource_pool_diff Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> logger:Logger.t
@@ -88,8 +108,10 @@ module type Network_pool_base_intf = sig
   val of_resource_pool_and_diffs :
        resource_pool
     -> logger:Logger.t
-    -> incoming_diffs:resource_pool_diff Envelope.Incoming.t
-                      Linear_pipe.Reader.t
+    -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
+                      Strict_pipe.Reader.t
+    -> local_diffs:resource_pool_diff Strict_pipe.Reader.t
+    -> tf_diffs:transition_frontier_diff Strict_pipe.Reader.t
     -> t
 
   val resource_pool : t -> resource_pool
@@ -97,23 +119,15 @@ module type Network_pool_base_intf = sig
   val broadcasts : t -> resource_pool_diff Linear_pipe.Reader.t
 
   val apply_and_broadcast :
-    t -> resource_pool_diff Envelope.Incoming.t -> unit Deferred.t
+       t
+    -> resource_pool_diff Envelope.Incoming.t * (bool -> unit)
+    -> unit Deferred.t
 end
 
 (** A [Snark_resource_pool_intf] is a superset of a
  *  [Resource_pool_intf] specifically for handling snarks. *)
 module type Snark_resource_pool_intf = sig
-  type ledger_proof
-
-  type work
-
-  type transition_frontier
-
-  type work_info
-
-  include
-    Resource_pool_base_intf
-    with type transition_frontier := transition_frontier
+  include Resource_pool_base_intf
 
   val make_config :
     trust_system:Trust_system.t -> verifier:Verifier.t -> Config.t
@@ -125,23 +139,26 @@ module type Snark_resource_pool_intf = sig
   val add_snark :
        ?is_local:bool
     -> t
-    -> work:work
-    -> proof:ledger_proof One_or_two.t
+    -> work:Transaction_snark_work.Statement.t
+    -> proof:Ledger_proof.t One_or_two.t
     -> fee:Fee_with_prover.t
     -> [`Added | `Statement_not_referenced]
 
   val verify_and_act :
        t
-    -> work:work * ledger_proof One_or_two.t Priced_proof.t
+    -> work:Transaction_snark_work.Statement.t
+            * Ledger_proof.t One_or_two.t Priced_proof.t
     -> sender:Envelope.Sender.t
     -> unit Deferred.Or_error.t
 
   val request_proof :
-    t -> work -> ledger_proof One_or_two.t Priced_proof.t option
+       t
+    -> Transaction_snark_work.Statement.t
+    -> Ledger_proof.t One_or_two.t Priced_proof.t option
 
   val snark_pool_json : t -> Yojson.Safe.json
 
-  val all_completed_work : t -> work_info list
+  val all_completed_work : t -> Transaction_snark_work.Info.t list
 
   val get_logger : t -> Logger.t
 end
@@ -149,30 +166,34 @@ end
 (** A [Snark_pool_diff_intf] is the resource pool diff for
  *  a [Snark_resource_pool_intf]. *)
 module type Snark_pool_diff_intf = sig
-  type ledger_proof
-
-  type work
-
   type resource_pool
 
   module Stable : sig
     module V1 : sig
       type t =
         | Add_solved_work of
-            work * ledger_proof One_or_two.Stable.V1.t Priced_proof.Stable.V1.t
+            Transaction_snark_work.Statement.Stable.V1.t
+            * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+              Priced_proof.Stable.V1.t
       [@@deriving bin_io, compare, sexp, to_yojson, version]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson]
+  type t = Stable.Latest.t [@@deriving compare, sexp]
 
-  val summary : t -> string
+  include
+    Resource_pool_diff_intf with type t := t and type pool := resource_pool
 
   val compact_json : t -> Yojson.Safe.json
 
-  val apply : resource_pool -> t Envelope.Incoming.t -> t Deferred.Or_error.t
+  val of_result :
+       ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
+         Snark_work_lib.Work.Spec.t
+       , Ledger_proof.t )
+       Snark_work_lib.Work.Result.t
+    -> t
 end
 
 module type Transaction_pool_diff_intf = sig
@@ -193,20 +214,14 @@ end
 module type Transaction_resource_pool_intf = sig
   type t
 
-  type best_tip_diff
-
-  type transition_frontier
-
-  include
-    Resource_pool_base_intf
-    with type transition_frontier := transition_frontier
-     and type t := t
+  include Resource_pool_base_intf with type t := t
 
   val make_config : trust_system:Trust_system.t -> Config.t
 
   val member : t -> User_command.With_valid_signature.t -> bool
 
-  val transactions : t -> User_command.With_valid_signature.t Sequence.t
+  val transactions :
+    logger:Logger.t -> t -> User_command.With_valid_signature.t Sequence.t
 
   val all_from_account :
     t -> Account_id.t -> User_command.With_valid_signature.t list

@@ -28,7 +28,6 @@ integration_tests = [
     'coda-block-production-test',
     'coda-shared-prefix-test -who-produces 0',
     'coda-shared-prefix-test -who-produces 1',
-    'coda-restart-node-test',
     'coda-change-snark-worker-test',
     'coda-archive-node-test'
 ]
@@ -58,13 +57,14 @@ small_curves_tests = {
     ['coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments'],
 }
 
-medium_curves_tests = {
+medium_curves_and_other_tests = {
     'test_postake_medium_curves':
     simple_tests,
     'test_postake_snarkless_medium_curves':
     simple_tests,
     'test_postake_split_medium_curves':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
+    'test_postake_full_epoch': ['full-test'],
 }
 
 medium_curve_profiles_full = [
@@ -87,7 +87,6 @@ required_excludes = [
 extra_required_status_checks = [
     "ci/circleci: lint",
     "ci/circleci: tracetool",
-    "ci/circleci: build-auxiliary",
     "ci/circleci: build-wallet",
 ]
 
@@ -190,7 +189,7 @@ def run(args):
             build_targets = '%s %s' % (coda_exe, logproc_exe)
 
     all_tests = small_curves_tests
-    all_tests.update(medium_curves_tests)
+    all_tests.update(medium_curves_and_other_tests)
     all_tests = filter_tests(all_tests, args.includes_patterns,
                              args.excludes_patterns)
     if len(all_tests) == 0:
@@ -285,7 +284,7 @@ def render(args):
         unit_test_profiles=unit_test_profiles,
         unit_test_profiles_medium_curves=unit_test_profiles_medium_curves,
         small_curves_tests=tests,
-        medium_curves_tests=medium_curves_tests,
+        medium_curves_and_other_tests=medium_curves_and_other_tests,
         medium_curve_profiles=medium_curve_profiles_full)
 
     if args.check:
@@ -319,7 +318,7 @@ def render(args):
 
 def list_tests(_args):
     all_tests = small_curves_tests
-    all_tests.update(medium_curves_tests)
+    all_tests.update(medium_curves_and_other_tests)
     for profile in all_tests.keys():
         print('- ' + profile)
         for test in small_curves_tests[profile]:

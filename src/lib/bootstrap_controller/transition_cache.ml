@@ -1,6 +1,7 @@
 open Coda_base
 open Core
 open Coda_transition
+open Network_peer
 
 (* Cache represents a graph. The key is a State_hash, which is the node in
    the graph, and the value is the children transitions of the node *)

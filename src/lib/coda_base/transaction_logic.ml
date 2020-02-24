@@ -561,12 +561,20 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     match User_command.Payload.body payload with
     | Stake_delegation (Set_delegate {new_delegate}) ->
+        (*new delegate should be in the ledger*)
+        (*TODO transaction snark doesn't check this*)
+        let new_delegate_id =
+          Account_id.create new_delegate Token_id.default
+        in
+        let%bind delegate_location =
+          location_of_account' ledger "" new_delegate_id
+        in
+        let%map _ = get' ledger "new_delegate" delegate_location in
         set ledger fee_sender_location fee_sender_account ;
         set ledger sender_location {sender_account with delegate= new_delegate} ;
-        return
-          { Undo.User_command_undo.common
-          ; body= Stake_delegation {previous_delegate= sender_account.delegate}
-          }
+        { Undo.User_command_undo.common
+        ; body= Stake_delegation {previous_delegate= sender_account.delegate}
+        }
     | Payment Payment_payload.Poly.{amount; receiver} ->
         let undo emptys : Undo.User_command_undo.t =
           {common; body= Payment {previous_empty_accounts= emptys}}

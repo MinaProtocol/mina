@@ -61,24 +61,21 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   Option.is_some remainder
 
 let schedule_user_command t (txn : User_command.t) account_opt :
-    unit Or_error.t Deferred.t =
+    unit Or_error.t =
   (* FIXME #3457: return a status from Transaction_pool.add and use it instead
-     of is_valid_user_command
   *)
   if not (is_valid_user_command t txn account_opt) then
-    Deferred.return
-    @@ Or_error.error_string "Invalid user command: account balance is too low"
+    Or_error.error_string "Invalid user command: account balance is too low"
   else
-    let txn_pool = Coda_lib.transaction_pool t in
-    let%map () = Network_pool.Transaction_pool.add txn_pool [txn] in
     let logger =
       Logger.extend
         (Coda_lib.top_level_logger t)
         [("coda_command", `String "scheduling a user command")]
     in
+    Coda_lib.add_transactions t [txn] ;
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("user_command", User_command.to_yojson txn)]
-      "Added transaction $user_command to transaction pool successfully" ;
+      "Submitted transaction $user_command to transaction pool" ;
     txn_count := !txn_count + 1 ;
     Or_error.return ()
 
@@ -145,7 +142,7 @@ let send_user_command t (txn : User_command.t) =
   let account_id = User_command.fee_sender txn in
   let open Participating_state.Let_syntax in
   let%map account_opt = get_account t account_id in
-  let open Deferred.Or_error.Let_syntax in
+  let open Or_error.Let_syntax in
   let%map () = schedule_user_command t txn account_opt in
   record_payment t txn (Option.value_exn account_opt)
 
@@ -221,10 +218,9 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
 let schedule_user_commands t (txns : User_command.t list) :
-    unit Deferred.t Participating_state.t =
+    unit Participating_state.t =
   Participating_state.return
   @@
-  let txn_pool = Coda_lib.transaction_pool t in
   let logger =
     Logger.extend
       (Coda_lib.top_level_logger t)
@@ -232,7 +228,7 @@ let schedule_user_commands t (txns : User_command.t list) :
   in
   Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
     "batch-send-payments does not yet report errors" ;
-  Network_pool.Transaction_pool.add txn_pool txns
+  Coda_lib.add_transactions t txns
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in
@@ -261,8 +257,9 @@ let get_status ~flag t =
   in
   let commit_id = Coda_version.commit_id in
   let conf_dir = (Coda_lib.config t).conf_dir in
+  let%map peers = Coda_lib.peers t in
   let peers =
-    List.map (Coda_lib.peers t) ~f:(fun peer ->
+    List.map peers ~f:(fun peer ->
         Network_peer.Peer.to_discovery_host_and_port peer
         |> Host_and_port.to_string )
   in
@@ -392,14 +389,8 @@ let get_status ~flag t =
       | `Check_again time ->
           `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
   in
-  let libp2p_peer_id =
-    Option.value ~default:"<not connected to libp2p>"
-      Option.(
-        Coda_lib.net t |> Coda_networking.net2 >>= Coda_net2.me
-        >>| Coda_net2.Keypair.to_peerid >>| Coda_net2.PeerID.to_string)
-  in
   let addrs_and_ports =
-    Kademlia.Node_addrs_and_ports.to_display
+    Node_addrs_and_ports.to_display
       (Coda_lib.config t).gossip_net_params.addrs_and_ports
   in
   { Daemon_rpcs.Types.Status.num_accounts
@@ -424,7 +415,6 @@ let get_status ~flag t =
   ; consensus_time_now
   ; consensus_mechanism
   ; consensus_configuration
-  ; libp2p_peer_id
   ; addrs_and_ports }
 
 let clear_hist_status ~flag t = Perf_histograms.wipe () ; get_status ~flag t

@@ -353,7 +353,10 @@ let handle_committed_txn :
     -> User_command.With_valid_signature.t
     -> fee_sender_balance:Currency.Amount.t
     -> sender_balance:Currency.Amount.t
-    -> t * User_command.With_valid_signature.t Sequence.t =
+    -> ( t * User_command.With_valid_signature.t Sequence.t
+       , [ `Queued_txns_by_sender of
+           string * User_command.With_valid_signature.t Sequence.t ] )
+       Result.t =
  fun t committed ~fee_sender_balance ~sender_balance ->
   let committed' = User_command.forget_check committed in
   let fee_sender = User_command.fee_sender committed' in
@@ -361,16 +364,18 @@ let handle_committed_txn :
   let nonce_to_remove = User_command.nonce committed' in
   match Map.find t.all_by_sender fee_sender with
   | None ->
-      (t, Sequence.empty)
+      Ok (t, Sequence.empty)
   | Some (cmds, currency_reserved) ->
       let first_cmd, rest_cmds = Option.value_exn (F_sequence.uncons cmds) in
       let first_nonce =
         first_cmd |> User_command.forget_check |> User_command.nonce
       in
       if Account_nonce.(nonce_to_remove <> first_nonce) then
-        failwith
-          "Tried to handle a committed transaction in the pool but its nonce \
-           doesn't match the head of the queue for that sender."
+        Error
+          (`Queued_txns_by_sender
+            ( "Tried to handle a committed transaction in the pool but its \
+               nonce doesn't match the head of the queue for that sender"
+            , F_sequence.to_seq cmds ))
       else
         let first_cmd_consumed =
           (* safe since we checked this when we added it to the pool originally *)
@@ -441,14 +446,16 @@ let handle_committed_txn :
                     t3''
                 , dropped_cmds )
         in
-        ( t4
-        , Sequence.append
-            (Sequence.append
-               ( if User_command.With_valid_signature.equal committed first_cmd
-               then Sequence.empty
-               else Sequence.singleton first_cmd )
-               dropped_cmds)
-            sender_dropped_cmds )
+        Ok
+          ( t4
+          , Sequence.append
+              (Sequence.append
+                 ( if
+                   User_command.With_valid_signature.equal committed first_cmd
+                 then Sequence.empty
+                 else Sequence.singleton first_cmd )
+                 dropped_cmds)
+              sender_dropped_cmds )
 
 let remove_lowest_fee : t -> User_command.With_valid_signature.t Sequence.t * t
     =
@@ -486,7 +493,7 @@ let rec add_from_gossip_exn :
     -> Account_nonce.t
     -> Currency.Amount.t
     -> ( t * User_command.With_valid_signature.t Sequence.t
-       , [ `Invalid_nonce
+       , [> `Invalid_nonce
          | `Insufficient_funds
          | `Insufficient_replace_fee
          | `Overflow ] )

@@ -187,10 +187,17 @@ module T = struct
     | Error (`Error e) ->
         failwithf !"statement_exn: %{sexp:Error.t}" e ()
 
+  let of_scan_state_and_ledger_unchecked ~ledger ~scan_state
+      ~pending_coinbase_collection =
+    {ledger; scan_state; pending_coinbase_collection}
+
   let of_scan_state_and_ledger ~logger ~verifier ~snarked_ledger_hash ~ledger
       ~scan_state ~pending_coinbase_collection =
     let open Deferred.Or_error.Let_syntax in
-    let t = {ledger; scan_state; pending_coinbase_collection} in
+    let t =
+      of_scan_state_and_ledger_unchecked ~ledger ~scan_state
+        ~pending_coinbase_collection
+    in
     let%bind () =
       Statement_scanner_with_proofs.check_invariants scan_state
         ~verifier:{Statement_scanner_proof_verifier.logger; verifier}
@@ -1497,7 +1504,7 @@ let%test_module "test" =
           in
           let sl = ref @@ Sl.create_exn ~ledger in
           Async.Thread_safe.block_on_async_exn (fun () -> f sl test_mask) ;
-          ignore @@ Ledger.Maskable.unregister_mask_exn casted test_mask )
+          ignore @@ Ledger.Maskable.unregister_mask_exn test_mask )
 
     (* Assert the given staged ledger is in the correct state after applying
          the first n user commands passed to the given base ledger. Checks the

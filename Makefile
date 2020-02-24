@@ -8,8 +8,7 @@ GITLONGHASH = $(shell git rev-parse HEAD)
 MYUID = $(shell id -u)
 DOCKERNAME = codabuilder-$(MYUID)
 
-# Unique signature of kademlia code tree
-KADEMLIA_SIG = $(shell cd src/app/kademlia-haskell ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
+# Unique signature of libp2p code tree
 LIBP2P_HELPER_SIG = $(shell cd src/app/libp2p_helper ; find . -type f -print0  | xargs -0 sha1sum | sort | sha1sum | cut -f 1 -d ' ')
 
 ifeq ($(DUNE_PROFILE),)
@@ -61,15 +60,9 @@ clean:
 	@rm -rf _build
 	@rm -rf src/$(COVERAGE_DIR)
 
-kademlia:
-	@# FIXME: Bash wrap here is awkward but required to get nix-env
-	bash -c "source ~/.profile && cd src/app/kademlia-haskell && nix-build release2.nix"
-
 libp2p_helper:
-	bash -c "source ~/.profile && cd src/app/libp2p_helper && nix-build default.nix"
+	$(WRAPAPP) bash -c "if [ -z \"$${USER}\" ]; then export USER=opam ; fi && source ~/.nix-profile/etc/profile.d/nix.sh && cachix use codaprotocol && cd src/app/libp2p_helper && (if [ -z \"$${CACHIX_SIGNING_KEY+x}\" ]; then nix-build $${EXTRA_NIX_ARGS} default.nix;  else nix-build $${EXTRA_NIX_ARGS} default.nix | cachix push codaprotocol ; fi)"
 
-# Alias
-dht: kademlia libp2p_helper
 
 GENESIS_DIR := $(TMPDIR)/coda_cache_dir
 
@@ -86,7 +79,7 @@ genesis_ledger:
 	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build --profile=$(DUNE_PROFILE) src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe src/app/runtime_genesis_ledger/genesis_filename.txt && make genesis_tar
 	$(info Genesis ledger and genesis proof generated)
 
-build: git_hooks reformat-diff
+build: git_hooks reformat-diff libp2p_helper
 	$(info Starting Build)
 	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune build src/app/logproc/logproc.exe src/app/cli/src/coda.exe --profile=$(DUNE_PROFILE) && make genesis_ledger
 	$(info Build complete)
@@ -105,7 +98,7 @@ update-opam:
 macos-portable:
 	@rm -rf _build/coda-daemon-macos/
 	@rm -rf _build/coda-daemon-macos.zip
-	@./scripts/macos-portable.sh src/_build/default/src/app/cli/src/coda.exe src/app/kademlia-haskell/result/bin/kademlia _build/coda-daemon-macos
+	@./scripts/macos-portable.sh src/_build/default/src/app/cli/src/coda.exe _build/coda-daemon-macos
 	@zip -r _build/coda-daemon-macos.zip _build/coda-daemon-macos/
 	@echo Find coda-daemon-macos.zip inside _build/
 
@@ -176,15 +169,6 @@ docker-toolchain-rust:
 	else \
 		echo "Repo has uncommited changes, commit first to set hash." ;\
 	fi
-
-# All in one step to build toolchain and binary for kademlia
-# TODO: Rename to docker-toolchain-discovery
-docker-toolchain-haskell:
-	@echo "Building codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG)" ;\
-    docker build --file dockerfiles/Dockerfile-toolchain-haskell --tag codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) . ;\
-    echo  'Extracting deb package' ;\
-    mkdir -p _build ;\
-    docker run --rm --entrypoint cat codaprotocol/coda:toolchain-haskell-$(KADEMLIA_SIG) /src/coda-discovery.deb > _build/coda-discovery.deb
 
 update-deps:
 	./scripts/update-toolchain-references.sh $(GITLONGHASH)
@@ -316,4 +300,4 @@ ml-docs:
 # unless there is a reason not to.
 # https://www.gnu.org/software/make/manual/html_node/Phony-Targets.html
 # HACK: cat Makefile | egrep '^\w.*' | sed 's/:/ /' | awk '{print $1}' | grep -v myprocs | sort | xargs
-.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder kademlia coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download macos-setup-compile
+.PHONY: all base-docker base-googlecloud base-minikube build check-format ci-base-docker clean codaslim containerstart deb dev codabuilder coda-docker coda-googlecloud coda-minikube ocaml407-googlecloud pull-ocaml407-googlecloud reformat test test-all test-coda-block-production-sig test-coda-block-production-stake test-codapeers-sig test-codapeers-stake test-full-sig test-full-stake test-runtest test-transaction-snark-profiler-sig test-transaction-snark-profiler-stake update-deps render-circleci check-render-circleci docker-toolchain-rust toolchains doc_diagrams ml-docs macos-setup macos-setup-download macos-setup-compile libp2p_helper

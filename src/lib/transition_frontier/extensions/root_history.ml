@@ -31,16 +31,17 @@ module T = struct
           t.current_root ) ;
     t.current_root <- new_root
 
-  let handle_diffs root_history frontier diffs =
-    let open Diff in
+  let handle_diffs root_history frontier diffs_with_mutants =
+    let open Diff.Full.With_mutant in
     let should_produce_view =
-      List.exists diffs ~f:(function
+      List.exists diffs_with_mutants ~f:(function
         (* TODO: send full diffs to extensions to avoid extra lookups in frontier *)
-        | Full.E.E (Root_transitioned {new_root; _}) ->
+        | E (Root_transitioned {new_root; _}, _) ->
+            let open Root_data.Minimal.Stable.Latest in
             Full_frontier.find_exn frontier new_root.hash
             |> Root_data.Historical.of_breadcrumb |> enqueue root_history ;
             true
-        | Full.E.E _ ->
+        | E _ ->
             false )
     in
     Option.some_if should_produce_view root_history

@@ -134,6 +134,12 @@ module type S = sig
   val sign :
     Signature_keypair.t -> User_command_payload.t -> With_valid_signature.t
 
+  val create_with_signature_checked :
+       Signature.t
+    -> Public_key.Compressed.t
+    -> User_command_payload.t
+    -> With_valid_signature.t option
+
   module For_tests : sig
     val fake_sign :
       Signature_keypair.t -> User_command_payload.t -> With_valid_signature.t

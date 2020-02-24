@@ -293,4 +293,8 @@ module Full = struct
 
     let to_lite (E diff) = Lite.E.E (to_lite diff)
   end
+
+  module With_mutant = struct
+    type t = E : (full, 'mutant) diff * 'mutant -> t
+  end
 end

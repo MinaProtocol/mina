@@ -18,7 +18,6 @@
 /src/app/cli/src/tests @emberian @bkase @ghost-not-in-the-shell @deepthiskumar
 /src/app/cli/src/coda.ml @nholland94 @bkase @emberian @imeckler
 /src/app/cli/src/init @nholland94 @bkase @emberian @imeckler
-/src/app/kademlia-haskell/ @bkase @emberian @psteckler
 /src/app/libp2p_helper @emberian @bkase @nholland94
 /src/app/reformat/ @bkase
 /src/app/trace-tool/ @emberian @mrmr1993
@@ -50,7 +49,6 @@
 /src/lib/group_map/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/hash_prefixes/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/interruptible/ @bkase @nholland94
-/src/lib/kademlia @bkase @emberian @psteckler
 /src/lib/key_value_database/ @bkase @nholland94 @psteckler
 /src/lib/keys_lib/ @emberian @mrmr1993 @imeckler
 /src/lib/ledger_catchup/ @nholland94 @ghost-not-in-the-shell
