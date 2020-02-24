@@ -121,7 +121,7 @@ module Inner = {
         }
       );
     };
-    <a href=url className=Styles.link>
+    <a href=url className=Styles.link target="_blank">
       <span className={Styles.wrapper(bgColor, fgColor)}>
         <span className=Styles.statusCircle />
         <span className=Css.(style([color(Theme.Colors.slate)]))>
