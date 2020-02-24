@@ -721,7 +721,7 @@ module Base = struct
              in
              let%bind balance =
                [%with_label "Check sender balance"]
-                 Balance.Checked.(account.balance + amount)
+                 Balance.Checked.(account.balance - amount)
              in
              let%map delegate =
                Public_key.Compressed.Checked.if_ is_stake_delegation
