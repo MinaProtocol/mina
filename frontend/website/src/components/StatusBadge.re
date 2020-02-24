@@ -2,12 +2,33 @@ module Styles = {
   open Css;
   let wrapper = (bgColor, fgColor) =>
     style([
-      backgroundColor(bgColor),
+      backgroundColor(white),
+      border(`px(2), `solid, fgColor),
       color(fgColor),
-      width(`rem(10.)),
+      fontWeight(`medium),
+      textTransform(`uppercase),
+      height(`rem(2.)),
       borderRadius(`px(5)),
       display(`inlineFlex),
       justifyContent(`center),
+      alignItems(`center),
+      padding2(~v=`zero, ~h=`rem(1.)),
+      selector(
+        "svg",
+        [marginLeft(`rem(0.5)), SVG.fill(Theme.Colors.slateAlpha(0.5))],
+      ),
+      hover([
+        backgroundColor(bgColor),
+        selector("svg", [SVG.fill(fgColor)]),
+      ]),
+    ]);
+  let statusCircle =
+    style([
+      width(`px(14)),
+      height(`px(14)),
+      borderRadius(`percent(50.)),
+      backgroundColor(`currentColor),
+      marginRight(`rem(0.5)),
     ]);
   let link =
     style([
@@ -84,18 +105,29 @@ module Inner = {
          });
       None;
     });
-    let (statusStr, bgColor) =
-      switch (status) {
-      | Unknown => ("Unknown", Theme.Colors.grey)
-      | Operational => ("Operational", Theme.Colors.clover)
-      | DegradedPerformance => ("Degraded", Theme.Colors.rosebud)
-      | PartialOutage => ("Partial Outage", Theme.Colors.rosebud)
-      | MajorOutage => ("Major Outage", Theme.Colors.rosebud)
-      | UnderMaintenance => ("Under Maintenance", Theme.Colors.rosebud)
-      };
+    let (statusStr, bgColor, fgColor) = {
+      Theme.Colors.(
+        switch (status) {
+        | Unknown => ("Unknown", greyishAlpha(0.1), grey)
+        | Operational => ("Operational", kernelAlpha(0.1), kernel)
+        | DegradedPerformance => ("Degraded", rosebudAlpha(0.1), rosebud)
+        | PartialOutage => ("Partial Outage", rosebudAlpha(0.1), rosebud)
+        | MajorOutage => ("Major Outage", rosebudAlpha(0.1), rosebud)
+        | UnderMaintenance => (
+            "Under Maintenance",
+            rosebudAlpha(0.1),
+            rosebud,
+          )
+        }
+      );
+    };
     <a href=url className=Styles.link>
-      <span className={Styles.wrapper(bgColor, Theme.Colors.white)}>
-        {React.string(statusStr)}
+      <span className={Styles.wrapper(bgColor, fgColor)}>
+        <span className=Styles.statusCircle />
+        <span className=Css.(style([color(Theme.Colors.slate)]))>
+          {React.string(statusStr)}
+        </span>
+        Icons.externalLink
       </span>
     </a>;
   };
