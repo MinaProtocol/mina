@@ -1,12 +1,12 @@
 # Hardware wallets
 
-If you have a hardware wallet product, you could use it with coda!
+Coda now supports the usage of hardware wallets such as Ledger to interact with the protocol, and sign transactions.
 
 ## Requirements
 
 **Software**: Linux (currently supports Debian 9 and Ubuntu 18.04 LTS)
 
-Note: macOS and Windows is not officially supported at this time.
+Note: macOS and Windows are not officially supported at this time.
 
 **Hardware**: Currently only `Ledger Nano S` is supported
 
@@ -14,7 +14,7 @@ Note: macOS and Windows is not officially supported at this time.
 
 **Disclaimer**: This is highly experimental now. Once the hardware wallet app is available on `Ledger Live`, the installation would be much eaiser.
 
-The following debian packages are needed to use hardware wallet on linux:
+The following debian packages are needed to use hardware wallets on linux:
 ```
 sudo apt install libusb-1.0-0-dev libudev1 libudev-dev
 ```
@@ -24,19 +24,19 @@ The coda hardware wallet command line tool is a python package called `coda-ledg
 python3 -mpip install coda-ledger-cli 
 ```
 
-If you have connection issue with your hardware wallet, please take a look at https://support.ledger.com/hc/en-us/articles/115005165269-Fix-connection-issues,
-The above page suggests trying the following on your machine:
+If you have connection issues with your hardware wallet, please take a look at [the troubleshooting help on the Ledger support page](https://support.ledger.com/hc/en-us/articles/115005165269-Fix-connection-issues).
+Oftentimes, connectivity issues can be resolved by adding udev rules. Enter the following command to automatically add the rules and reload udev:
 ```
 wget -q -O - https://raw.githubusercontent.com/LedgerHQ/udev-rules/master/add_udev_rules.sh | sudo bash
 ```
 
-## Create a new account using hardware wallet
+## Create a new account using the hardware wallet
 
 Run the following command which will create a public and private keypair in the hardware wallet:
 
     coda accounts create-hd HD-index
 
-HD-index is a number that works like a seed that you give to the hardware wallet to create your public and private keypair. If you use the same HD-index with the same hardware wallet, then public and private keypair that gets generated would always be the same. If you need to use the same account on another machine, then you just need to use this command with the same HD-index and the same ledger.
+HD-index is a number that works like a seed that you give to the hardware wallet to create your public and private keypair. If you use the same HD-index with the same hardware wallet twice, then public and private keypair that gets generated is the same. If you need to use the same account on another machine, then you just need to use this command with the same HD-index and the same hardware wallet.
 
 During account creation, your hardware wallet may ask you to confirm the operation.
 
@@ -53,18 +53,18 @@ Now we can access this everywhere as `$CODA_PUBLIC_KEY` -- see if it saved prope
 
 ## Make a payment
 
-Sending a payment using hardware wallet works almost the same as send a payment from an ordinary account.
+Sending a payment with a hardware wallet is almost the same as send a payment from an ordinary account.
 
-There're only 2 differences:
-1. You do not need to unlock your account before sending the transaction because your account is protected by your hardware wallet instead of coda daemon.
+There are only 2 differences:
+1. You do not need to unlock your account before sending the transaction because your account is protected by your hardware wallet already.
 2. Your hardware wallet may ask you to confirm the operation while signing the transaction.
 
-Your would use the same command as sending payments from an ordinary account: [sending a transaction](/docs/my-first-transaction/) and if everything goes on well, then the response would also looks the same as send payments from an ordinary account.
+You can simply use the same commands to send payments found in [the docs](/docs/my-first-transaction/).
 
-## Trouble shooting
+## Troubleshooting
 
-### What if I lost my hardware wallet?
-You can buy another `Ledger Nano S` product and initialize it with the same 24-word seed. And the new `Ledger Nano S` would function exactly like the old one 
+### What if I lose my hardware wallet?
+You can buy another `Ledger Nano S` and initialize it with the same 24-word seed to gain access to your existing account.
 
 ### What if I forget the public key of my account?
 If you remember the HD-index which you use to generate your account, then you can use `coda accounts create-hd HD-index` with the same HD-index to regenerate the public_key.
