@@ -1,6 +1,6 @@
 export declare type publicKey = string;
 export declare type privateKey = string;
-export declare type globalSlot = number;
+export declare type globalSlot = string;
 export declare type uint64 = string;
 export declare type key = {
     readonly privateKey: privateKey;
@@ -21,7 +21,7 @@ export declare type stakeDelegation = {
     readonly fee: uint64;
     readonly nonce: number;
     readonly memo?: string;
-    readonly validUntil: globalSlot;
+    readonly validUntil?: globalSlot;
 };
 export declare type payment = {
     readonly to: publicKey;
@@ -30,7 +30,7 @@ export declare type payment = {
     readonly amount: uint64;
     readonly nonce: number;
     readonly memo?: string;
-    readonly validUntil: globalSlot;
+    readonly validUntil?: globalSlot;
 };
 /**
   * Generates a public/private keypair

@@ -13,33 +13,40 @@ npm install --save @o1labs/client-sdk
 # Usage
 Typescript:
 ```typescript
-import * as Coda from "@o1labs/client-sdk";
+import * as CodaSDK from "@o1labs/client-sdk";
 
-let keys = Coda.genKeys();
-let signed = Coda.signMessage("hello", keys);
-if (Coda.verifyMessage(signed)) {
+let keys = CodaSDK.genKeys();
+let signed = CodaSDK.signMessage("hello", keys);
+if (CodaSDK.verifyMessage(signed)) {
     console.log("Message was verified successfully")
 };
 ```
 
 NodeJS:
 ```javascript
-const coda = require("@o1labs/client-sdk");
+const CodaSDK = require("@o1labs/client-sdk");
 
-let keys = coda.genKeys();
-let signed = coda.signMessage("hello", keys);
-if (coda.verifyMessage(signed)) {
+let keys = CodaSDK.genKeys();
+let signed = CodaSDK.signMessage("hello", keys);
+if (CodaSDK.verifyMessage(signed)) {
     console.log("Message was verified successfully")
 };
 ```
 
 ReasonML:
+- Install gentype: `yarn add -D gentype`
+- Install bs-platform: `yarn add -D bs-platform`
+- Build dependencies: `yarn bsb -make-world`
+
 ```reason
-let keys = CodaSdk.genKeys();
-let signed = CodaSdk.signMessage("hello", keys);
-if (CodaSdk.verifyMessage(signed)) {
-    Js.log("Message was verified successfully")
+module CodaSDK = O1labsClientSdk.CodaSDK;
+
+let keys = CodaSDK.genKeys();
+let signed = CodaSDK.signMessage(. "hello", keys);
+if (CodaSDK.verifyMessage(. signed)) {
+  Js.log("Message was verified successfully");
 };
+
 ```
 
 # API Reference

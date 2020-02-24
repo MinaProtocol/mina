@@ -7,7 +7,7 @@ type uint64 = string;
 let defaultValidUntil = "4294967295";
 
 [@genType]
-type key = {
+type keypair = {
   privateKey,
   publicKey,
 };
@@ -49,7 +49,7 @@ type payment = {
 type codaSDK;
 [@bs.module "./client_sdk.bc.js"] external codaSDK: codaSDK = "codaSDK";
 
-[@bs.send] external genKeys: (codaSDK, unit) => key = "genKeys";
+[@bs.send] external genKeys: (codaSDK, unit) => keypair = "genKeys";
 /**
   * Generates a public/private keypair
  */
@@ -67,7 +67,7 @@ external signString: (codaSDK, privateKey, string) => signature = "signString";
  */
 [@genType]
 let signMessage =
-  (. message: string, key: key) => {
+  (. message: string, key: keypair) => {
     publicKey: key.publicKey,
     signature: signString(codaSDK, key.privateKey, message),
     payload: message,
@@ -161,7 +161,7 @@ external signPayment: (codaSDK, privateKey, payment_js) => signed_js =
  */
 [@genType]
 let signPayment =
-  (. payment: payment, key: key) => {
+  (. payment: payment, key: keypair) => {
     let memo = value(~default="", payment.memo);
     let validUntil = value(~default=defaultValidUntil, payment.validUntil);
     {
@@ -211,7 +211,7 @@ external signStakeDelegation:
  */
 [@genType]
 let signStakeDelegation =
-  (. stakeDelegation: stakeDelegation, key: key) => {
+  (. stakeDelegation: stakeDelegation, key: keypair) => {
     let memo = value(~default="", stakeDelegation.memo);
     let validUntil = value(~default=defaultValidUntil, stakeDelegation.validUntil);
     {
