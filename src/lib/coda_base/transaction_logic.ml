@@ -599,10 +599,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             let%map sender_balance' =
               sub_amount sender_account.balance amount
             in
-            set ledger sender_location
-              {sender_account with balance= sender_balance'} ;
             set ledger receiver_location
               {receiver_account with balance= receiver_balance'} ;
+            set ledger sender_location
+              {sender_account with balance= sender_balance'} ;
             undo previous_empty_accounts )
           else
             (* Charge the fee sender for creating the account.
@@ -627,12 +627,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   (* Sender has insufficient balance, do not transfer*)
                   return (receiver_account.balance, sender_account.balance)
             in
+            set ledger receiver_location
+              {receiver_account with balance= receiver_balance'} ;
             set ledger fee_sender_location
               {fee_sender_account with balance= fee_sender_balance'} ;
             set ledger sender_location
               {sender_account with balance= sender_balance'} ;
-            set ledger receiver_location
-              {receiver_account with balance= receiver_balance'} ;
             undo previous_empty_accounts
 
   let apply_user_command ledger
