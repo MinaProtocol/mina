@@ -33,7 +33,8 @@ mkdir -p .coda-config\n\
 touch .coda-config/coda-prover.log\n\
 touch .coda-config/coda-verifier.log\n\
 coda "$@" 2>&1 >coda.log &\n\
-tail -q -f coda.log -f .coda-config/coda-prover.log -f .coda-config/coda-verifier.log'\
+tail -q -f coda.log -f .coda-config/coda-prover.log -f .coda-config/coda-verifier.log &\n\
+wait -n'\
 > init_coda.sh
 
 RUN chmod +x init_coda.sh
