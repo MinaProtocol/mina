@@ -5,9 +5,9 @@ open Pipe_lib
 module type Ledger_intf = sig
   include Merkle_ledger.Syncable_intf.S
 
-  type key
+  type account_id
 
-  val load_ledger : int -> int -> t * key list
+  val load_ledger : int -> int -> t * account_id list
 end
 
 module type Input_intf = sig
@@ -20,7 +20,7 @@ module type Input_intf = sig
   module Ledger :
     Ledger_intf
     with type root_hash := Root_hash.t
-     and type key := Merkle_ledger_tests.Test_stubs.Key.t
+     and type account_id := Merkle_ledger_tests.Test_stubs.Account_id.t
 
   module Sync_ledger :
     Syncable_ledger.S
@@ -204,12 +204,12 @@ module Db = struct
 
       let load_ledger num_accounts (balance : int) =
         let ledger = create () in
-        let keys = Key.gen_keys num_accounts in
+        let account_ids = Account_id.gen_accounts num_accounts in
         let currency_balance = Currency.Balance.of_int balance in
-        List.iter keys ~f:(fun key ->
-            let account = Account.create key currency_balance in
-            get_or_create_account_exn ledger key account |> ignore ) ;
-        (ledger, keys)
+        List.iter account_ids ~f:(fun aid ->
+            let account = Account.create aid currency_balance in
+            get_or_create_account_exn ledger aid account |> ignore ) ;
+        (ledger, account_ids)
     end
 
     module Syncable_ledger_inputs = struct
@@ -301,17 +301,17 @@ module Mask = struct
       let load_ledger num_accounts (balance : int) : t * 'a =
         let db = Base_db.create () in
         let maskable = Any_base.cast (module Base_db) db in
-        let keys = Key.gen_keys num_accounts in
+        let account_ids = Account_id.gen_accounts num_accounts in
         let initial_balance_multiplier =
           Int.pow 2 Input.mask_layers * balance
         in
-        List.iter keys ~f:(fun key ->
+        List.iter account_ids ~f:(fun account_id ->
             let account =
-              Account.create key
+              Account.create account_id
                 (Currency.Balance.of_int (initial_balance_multiplier * 2))
             in
             let action, _ =
-              Maskable.get_or_create_account_exn maskable key account
+              Maskable.get_or_create_account_exn maskable account_id account
             in
             assert (action = `Added) ) ;
         let mask = Mask.create () in
@@ -329,13 +329,14 @@ module Mask = struct
             let attached_mask =
               Maskable.register_mask parent_base child_mask
             in
-            List.iter keys ~f:(fun key ->
+            List.iter account_ids ~f:(fun account_id ->
                 let account =
-                  Account.create key (Currency.Balance.of_int child_balance)
+                  Account.create account_id
+                    (Currency.Balance.of_int child_balance)
                 in
                 let action, location =
-                  Mask.Attached.get_or_create_account_exn attached_mask key
-                    account
+                  Mask.Attached.get_or_create_account_exn attached_mask
+                    account_id account
                 in
                 match action with
                 | `Existed ->
@@ -347,7 +348,7 @@ module Mask = struct
         in
         ( construct_layered_masks Input.mask_layers initial_balance_multiplier
             attached_mask
-        , keys )
+        , account_ids )
 
       type addr = Addr.t
 

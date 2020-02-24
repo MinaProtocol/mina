@@ -16,8 +16,8 @@ module type Test_intf = sig
      and type account := Account.t
      and type root_hash := Hash.t
      and type hash := Hash.t
-     and type key := Key.t
-     and type key_set := Key.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
 
   module Mask :
     Merkle_mask.Masking_merkle_tree_intf.S
@@ -25,23 +25,23 @@ module type Test_intf = sig
      and module Attached.Addr = Location.Addr
     with type account := Account.t
      and type location := Location.t
-     and type key := Key.t
-     and type key_set := Key.Set.t
      and type hash := Hash.t
      and type parent := Base.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
 
   module Maskable :
     Merkle_mask.Maskable_merkle_tree_intf.S
     with module Location = Location
      and module Addr = Location.Addr
     with type account := Account.t
-     and type key := Key.t
-     and type key_set := Key.Set.t
      and type root_hash := Hash.t
      and type hash := Hash.t
      and type unattached_mask := Mask.t
      and type attached_mask := Mask.Attached.t
      and type t := Base.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
 
   val with_instances : (Base.t -> Mask.t -> 'a) -> 'a
 
@@ -76,7 +76,7 @@ module Make (Test : Test_intf) = struct
   let dummy_account = Quickcheck.random_value Account.gen
 
   let create_new_account_exn mask account =
-    let public_key = Account.public_key account in
+    let public_key = Account.identifier account in
     let action, location =
       Mask.Attached.get_or_create_account_exn mask public_key account
     in
@@ -87,7 +87,7 @@ module Make (Test : Test_intf) = struct
         location
 
   let create_existing_account_exn mask account =
-    let public_key = Account.public_key account in
+    let public_key = Account.identifier account in
     let action, location =
       Mask.Attached.get_or_create_account_exn mask public_key account
     in
@@ -99,7 +99,7 @@ module Make (Test : Test_intf) = struct
         failwith "Expected to re-use an existing account"
 
   let parent_create_new_account_exn parent account =
-    let public_key = Account.public_key account in
+    let public_key = Account.identifier account in
     let action, location =
       Maskable.get_or_create_account_exn parent public_key account
     in
@@ -261,10 +261,10 @@ module Make (Test : Test_intf) = struct
             Quickcheck.random_value
               (Quickcheck.Generator.list_with_length num_accounts gen)
           in
-          let public_keys = Key.gen_keys num_accounts in
+          let account_ids = Account_id.gen_accounts num_accounts in
           let balances = gen_values Balance.gen in
           let accounts =
-            List.map2_exn public_keys balances ~f:(fun public_key balance ->
+            List.map2_exn account_ids balances ~f:(fun public_key balance ->
                 Account.create public_key balance )
           in
           List.iter accounts ~f:(fun account ->
@@ -272,9 +272,9 @@ module Make (Test : Test_intf) = struct
           (* Set some inner hashes *)
           let reset_hash_of_parent_of_index i =
             let a1 = List.nth_exn accounts i in
-            let key = Account.public_key a1 in
+            let aid = Account.identifier a1 in
             let location =
-              Mask.Attached.location_of_account attached_mask key
+              Mask.Attached.location_of_account attached_mask aid
               |> Option.value_exn
             in
             let addr = Test.Location.to_path_exn location in
@@ -343,10 +343,10 @@ module Make (Test : Test_intf) = struct
             Quickcheck.random_value
               (Quickcheck.Generator.list_with_length num_accounts gen)
           in
-          let public_keys = Key.gen_keys num_accounts in
+          let account_ids = Account_id.gen_accounts num_accounts in
           let balances = gen_values Balance.gen in
           let accounts =
-            List.map2_exn public_keys balances ~f:(fun public_key balance ->
+            List.map2_exn account_ids balances ~f:(fun public_key balance ->
                 Account.create public_key balance )
           in
           List.iter accounts ~f:(fun account ->
@@ -369,10 +369,10 @@ module Make (Test : Test_intf) = struct
             Quickcheck.random_value
               (Quickcheck.Generator.list_with_length list_length gen)
           in
-          let public_keys = Key.gen_keys num_accounts in
+          let account_ids = Account_id.gen_accounts num_accounts in
           let balances = gen_values Balance.gen num_accounts in
           let base_accounts =
-            List.map2_exn public_keys balances ~f:(fun public_key balance ->
+            List.map2_exn account_ids balances ~f:(fun public_key balance ->
                 Account.create public_key balance )
           in
           List.iter base_accounts ~f:(fun account ->
@@ -421,19 +421,19 @@ module Make (Test : Test_intf) = struct
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in
         let num_accounts = 5 in
-        let keys = Key.gen_keys num_accounts in
+        let account_ids = Account_id.gen_accounts num_accounts in
         let balances =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
         in
-        let accounts = List.map2_exn keys balances ~f:Account.create in
+        let accounts = List.map2_exn account_ids balances ~f:Account.create in
         let merkle_root0 = Mask.Attached.merkle_root attached_mask in
         List.iter accounts ~f:(fun account ->
             ignore @@ create_new_account_exn attached_mask account ) ;
         let merkle_root1 = Mask.Attached.merkle_root attached_mask in
         (* adding accounts should change the Merkle root *)
         assert (not (Hash.equal merkle_root0 merkle_root1)) ;
-        Mask.Attached.remove_accounts_exn attached_mask keys ;
+        Mask.Attached.remove_accounts_exn attached_mask account_ids ;
         (* should see original Merkle root after removing the accounts *)
         let merkle_root2 = Mask.Attached.merkle_root attached_mask in
         assert (Hash.equal merkle_root2 merkle_root0) )
@@ -442,12 +442,12 @@ module Make (Test : Test_intf) = struct
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in
         let num_accounts = 5 in
-        let keys = Key.gen_keys num_accounts in
+        let account_ids = Account_id.gen_accounts num_accounts in
         let balances =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
         in
-        let accounts = List.map2_exn keys balances ~f:Account.create in
+        let accounts = List.map2_exn account_ids balances ~f:Account.create in
         let merkle_root0 = Mask.Attached.merkle_root attached_mask in
         (* add accounts to parent *)
         List.iter accounts ~f:(fun account ->
@@ -456,7 +456,7 @@ module Make (Test : Test_intf) = struct
         let merkle_root1 = Mask.Attached.merkle_root attached_mask in
         (* adding accounts should change the Merkle root *)
         assert (not (Hash.equal merkle_root0 merkle_root1)) ;
-        Mask.Attached.remove_accounts_exn attached_mask keys ;
+        Mask.Attached.remove_accounts_exn attached_mask account_ids ;
         (* should see original Merkle root after removing the accounts *)
         let merkle_root2 = Mask.Attached.merkle_root attached_mask in
         assert (Hash.equal merkle_root2 merkle_root0) )
@@ -467,12 +467,12 @@ module Make (Test : Test_intf) = struct
         let num_accounts_parent = 5 in
         let num_accounts_mask = 5 in
         let num_accounts = num_accounts_parent + num_accounts_mask in
-        let keys = Key.gen_keys num_accounts in
+        let account_ids = Account_id.gen_accounts num_accounts in
         let balances =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
         in
-        let accounts = List.map2_exn keys balances ~f:Account.create in
+        let accounts = List.map2_exn account_ids balances ~f:Account.create in
         let parent_accounts, mask_accounts =
           List.split_n accounts num_accounts_parent
         in
@@ -488,7 +488,7 @@ module Make (Test : Test_intf) = struct
         (* adding accounts should change the Merkle root *)
         assert (not (Hash.equal merkle_root0 merkle_root1)) ;
         (* remove accounts from mask and parent *)
-        Mask.Attached.remove_accounts_exn attached_mask keys ;
+        Mask.Attached.remove_accounts_exn attached_mask account_ids ;
         (* should see original Merkle root after removing the accounts *)
         let merkle_root2 = Mask.Attached.merkle_root attached_mask in
         assert (Hash.equal merkle_root2 merkle_root0) )
@@ -499,12 +499,12 @@ module Make (Test : Test_intf) = struct
         let num_accounts_parent = 5 in
         let num_accounts_mask = 5 in
         let num_accounts = num_accounts_parent + num_accounts_mask in
-        let keys = Key.gen_keys num_accounts in
+        let account_ids = Account_id.gen_accounts num_accounts in
         let balances =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
         in
-        let accounts = List.map2_exn keys balances ~f:Account.create in
+        let accounts = List.map2_exn account_ids balances ~f:Account.create in
         let total =
           List.fold balances ~init:0 ~f:(fun accum balance ->
               Balance.to_int balance + accum )
@@ -530,12 +530,14 @@ module Make (Test : Test_intf) = struct
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in
         let num_accounts = 10 in
-        let keys = Key.gen_keys num_accounts in
+        let account_ids = Account_id.gen_accounts num_accounts in
         (* parent balances all non-zero *)
         let balances =
           List.init num_accounts ~f:(fun n -> Balance.of_int (n + 1))
         in
-        let parent_accounts = List.map2_exn keys balances ~f:Account.create in
+        let parent_accounts =
+          List.map2_exn account_ids balances ~f:Account.create
+        in
         (* add accounts to parent *)
         List.iter parent_accounts ~f:(fun account ->
             ignore @@ parent_create_new_account_exn maskable account ) ;
@@ -555,9 +557,9 @@ module Make (Test : Test_intf) = struct
         let is_in_same_order =
           List.for_all2_exn parent_list mask_list
             ~f:(fun parent_account mask_account ->
-              Account.equal_key
-                (Account.public_key parent_account)
-                (Account.public_key mask_account) )
+              Account_id.equal
+                (Account.identifier parent_account)
+                (Account.identifier mask_account) )
         in
         assert is_in_same_order ;
         assert (
@@ -568,12 +570,14 @@ module Make (Test : Test_intf) = struct
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in
         let num_accounts = 10 in
-        let keys = Key.gen_keys num_accounts in
+        let account_ids = Account_id.gen_accounts num_accounts in
         (* parent balances all non-zero *)
         let balances =
           List.init num_accounts ~f:(fun n -> Balance.of_int (n + 1))
         in
-        let parent_accounts = List.map2_exn keys balances ~f:Account.create in
+        let parent_accounts =
+          List.map2_exn account_ids balances ~f:Account.create
+        in
         (* add accounts to parent *)
         List.iter parent_accounts ~f:(fun account ->
             ignore @@ parent_create_new_account_exn maskable account ) ;
@@ -600,7 +604,7 @@ module Make (Test : Test_intf) = struct
     Test.with_instances (fun maskable mask ->
         let open Mask.Attached in
         let ledger = Maskable.register_mask maskable mask in
-        let key = List.nth_exn (Key.gen_keys 1) 0 in
+        let key = List.nth_exn (Account_id.gen_accounts 1) 0 in
         let start_hash = merkle_root ledger in
         match get_or_create_account_exn ledger key Account.empty with
         | `Existed, _ ->
@@ -613,12 +617,12 @@ module Make (Test : Test_intf) = struct
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in
         let num_accounts = 5 in
-        let keys = Key.gen_keys num_accounts in
+        let account_ids = Account_id.gen_accounts num_accounts in
         let balances =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
         in
-        let accounts = List.map2_exn keys balances ~f:Account.create in
+        let accounts = List.map2_exn account_ids balances ~f:Account.create in
         assert (
           Option.is_none
             (Mask.Attached.For_testing.current_location attached_mask) ) ;
@@ -629,7 +633,7 @@ module Make (Test : Test_intf) = struct
           Option.is_some
             (Mask.Attached.For_testing.current_location attached_mask) ) ;
         (* remove accounts *)
-        Mask.Attached.remove_accounts_exn attached_mask keys ;
+        Mask.Attached.remove_accounts_exn attached_mask account_ids ;
         assert (
           Option.is_none
             (Mask.Attached.For_testing.current_location attached_mask) ) )
@@ -638,12 +642,12 @@ module Make (Test : Test_intf) = struct
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in
         let num_accounts = 5 in
-        let keys = Key.gen_keys num_accounts in
+        let account_ids = Account_id.gen_accounts num_accounts in
         let balances =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
         in
-        let accounts = List.map2_exn keys balances ~f:Account.create in
+        let accounts = List.map2_exn account_ids balances ~f:Account.create in
         (* add accounts to mask *)
         List.iter accounts ~f:(fun account ->
             ignore @@ create_new_account_exn attached_mask account ) ;
@@ -667,12 +671,12 @@ module Make (Test : Test_intf) = struct
   let%test_unit "Mask reparenting works" =
     Test.with_chain (fun base ~mask:m1 ~mask_as_base ~mask2:m2 ->
         let num_accounts = 3 in
-        let keys = Key.gen_keys num_accounts in
+        let account_ids = Account_id.gen_accounts num_accounts in
         let balances =
           Quickcheck.random_value
             (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
         in
-        let accounts = List.map2_exn keys balances ~f:Account.create in
+        let accounts = List.map2_exn account_ids balances ~f:Account.create in
         match accounts with
         | [a1; a2; a3] ->
             let loc1 = parent_create_new_account_exn base a1 in
@@ -706,7 +710,7 @@ module Make (Test : Test_intf) = struct
                  copy if the mask is still dirty for that account" =
     Test.with_instances (fun maskable mask ->
         let attached_mask = Maskable.register_mask maskable mask in
-        let k = Key.gen_keys 1 |> List.hd_exn in
+        let k = Account_id.gen_accounts 1 |> List.hd_exn in
         let acct1 = Account.create k (Balance.of_int 10) in
         let loc =
           snd (Mask.Attached.get_or_create_account_exn attached_mask k acct1)
@@ -744,8 +748,8 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
      and type account := Account.t
      and type root_hash := Hash.t
      and type hash := Hash.t
-     and type key := Key.t
-     and type key_set := Key.Set.t =
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t =
     Database.Make (Inputs)
 
   module Any_base = Merkle_ledger.Any_ledger.Make_base (Inputs)
@@ -758,8 +762,8 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
      and module Attached.Addr = Location.Addr
     with type account := Account.t
      and type location := Location.t
-     and type key := Key.t
-     and type key_set := Key.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
      and type hash := Hash.t
      and type parent := Base.t = Merkle_mask.Masking_merkle_tree.Make (struct
     include Inputs
@@ -772,8 +776,8 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
     with module Addr = Location.Addr
      and module Location = Location
     with type account := Account.t
-     and type key := Key.t
-     and type key_set := Key.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
      and type root_hash := Hash.t
      and type hash := Hash.t
      and type unattached_mask := Mask.t

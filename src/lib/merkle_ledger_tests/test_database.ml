@@ -8,8 +8,8 @@ let%test_module "test functor on in memory databases" =
 
     module type DB =
       Merkle_ledger.Database_intf.S
-      with type key := Key.t
-       and type key_set := Key.Set.t
+      with type account_id := Account_id.t
+       and type account_id_set := Account_id.Set.t
        and type account := Account.t
        and type root_hash := Hash.t
        and type hash := Hash.t
@@ -34,7 +34,7 @@ let%test_module "test functor on in memory databases" =
               ~f:(fun location -> assert (MT.get mdb location = None)) )
 
       let create_new_account_exn mdb account =
-        let public_key = Account.public_key account in
+        let public_key = Account.identifier account in
         let action, location =
           MT.get_or_create_account_exn mdb public_key account
         in
@@ -56,7 +56,7 @@ let%test_module "test functor on in memory databases" =
             let location = create_new_account_exn mdb account in
             MT.set mdb location account ;
             let location' =
-              MT.location_of_account mdb (Account.public_key account)
+              MT.location_of_account mdb (Account.identifier account)
               |> Option.value_exn
             in
             MT.Location.equal location location'
@@ -69,9 +69,9 @@ let%test_module "test functor on in memory databases" =
 
       let dedup_accounts accounts =
         List.dedup_and_sort accounts ~compare:(fun account1 account2 ->
-            Key.compare
-              (Account.public_key account1)
-              (Account.public_key account2) )
+            Account_id.compare
+              (Account.identifier account1)
+              (Account.identifier account2) )
 
       let%test_unit "length" =
         Test.with_instance (fun mdb ->
@@ -98,20 +98,20 @@ let%test_module "test functor on in memory databases" =
       let%test "get_or_create_acount does not update an account if key \
                 already exists" =
         Test.with_instance (fun mdb ->
-            let public_key = Quickcheck.random_value Key.gen in
+            let account_id = Quickcheck.random_value Account_id.gen in
             let balance =
               Quickcheck.random_value ~seed:(`Deterministic "balance 1")
                 Balance.gen
             in
-            let account = Account.create public_key balance in
+            let account = Account.create account_id balance in
             let balance' =
               Quickcheck.random_value ~seed:(`Deterministic "balance 2")
                 Balance.gen
             in
-            let account' = Account.create public_key balance' in
+            let account' = Account.create account_id balance' in
             let location = create_new_account_exn mdb account in
             let action, location' =
-              MT.get_or_create_account_exn mdb public_key account'
+              MT.get_or_create_account_exn mdb account_id account'
             in
             location = location'
             && action = `Existed
@@ -129,12 +129,12 @@ let%test_module "test functor on in memory databases" =
             let accounts = Quickcheck.random_value accounts_gen in
             Sequence.of_list accounts
             |> Sequence.iter ~f:(fun account ->
-                   let public_key = Account.public_key account in
+                   let account_id = Account.identifier account in
                    let _, location =
-                     MT.get_or_create_account_exn mdb public_key account
+                     MT.get_or_create_account_exn mdb account_id account
                    in
                    let location' =
-                     MT.location_of_account mdb public_key |> Option.value_exn
+                     MT.location_of_account mdb account_id |> Option.value_exn
                    in
                    assert (location = location') ) )
 
@@ -161,7 +161,7 @@ let%test_module "test functor on in memory databases" =
         |> List.iter ~f:(fun account ->
                let action, location =
                  MT.get_or_create_account_exn mdb
-                   (Account.public_key account)
+                   (Account.identifier account)
                    account
                in
                match action with
@@ -265,9 +265,9 @@ let%test_module "test functor on in memory databases" =
             in
             MT.set_batch_accounts mdb accounts_with_addresses ;
             List.iter accounts ~f:(fun account ->
-                let key = Account.public_key account in
+                let aid = Account.identifier account in
                 let location =
-                  MT.location_of_account mdb key |> Option.value_exn
+                  MT.location_of_account mdb aid |> Option.value_exn
                 in
                 let queried_account =
                   MT.get mdb location |> Option.value_exn
@@ -321,7 +321,7 @@ let%test_module "test functor on in memory databases" =
       let%test_unit "create_empty doesn't modify the hash" =
         Test.with_instance (fun ledger ->
             let open MT in
-            let key = List.nth_exn (Key.gen_keys 1) 0 in
+            let key = Quickcheck.random_value Account_id.gen in
             let start_hash = merkle_root ledger in
             match get_or_create_account_exn ledger key Account.empty with
             | `Existed, _ ->
@@ -338,9 +338,9 @@ let%test_module "test functor on in memory databases" =
             List.iter accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn mdb account ) ;
             Sequence.of_list accounts
-            |> Sequence.for_all ~f:(fun ({public_key; _} as account) ->
+            |> Sequence.for_all ~f:(fun account ->
                    let indexed_account =
-                     MT.index_of_account_exn mdb public_key
+                     MT.index_of_account_exn mdb (Account.identifier account)
                      |> MT.get_at_index_exn mdb
                    in
                    Account.equal account indexed_account ) )
@@ -398,13 +398,15 @@ let%test_module "test functor on in memory databases" =
         if Test.depth <= 8 then
           Test.with_instance (fun mdb ->
               let num_accounts = 1 lsl Test.depth in
-              let keys = Key.gen_keys num_accounts in
+              let account_ids = Account_id.gen_accounts num_accounts in
               let balances =
                 Quickcheck.random_value
                   (Quickcheck.Generator.list_with_length num_accounts
                      Balance.gen)
               in
-              let accounts = List.map2_exn keys balances ~f:Account.create in
+              let accounts =
+                List.map2_exn account_ids balances ~f:Account.create
+              in
               List.iter accounts ~f:(fun account ->
                   ignore @@ create_new_account_exn mdb account ) ;
               let retrieved_accounts =
@@ -417,19 +419,21 @@ let%test_module "test functor on in memory databases" =
       let%test_unit "removing accounts restores Merkle root" =
         Test.with_instance (fun mdb ->
             let num_accounts = 5 in
-            let keys = Key.gen_keys num_accounts in
+            let account_ids = Account_id.gen_accounts num_accounts in
             let balances =
               Quickcheck.random_value
                 (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
             in
-            let accounts = List.map2_exn keys balances ~f:Account.create in
+            let accounts =
+              List.map2_exn account_ids balances ~f:Account.create
+            in
             let merkle_root0 = MT.merkle_root mdb in
             List.iter accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn mdb account ) ;
             let merkle_root1 = MT.merkle_root mdb in
             (* adding accounts should change the Merkle root *)
             assert (not (Hash.equal merkle_root0 merkle_root1)) ;
-            MT.remove_accounts_exn mdb keys ;
+            MT.remove_accounts_exn mdb account_ids ;
             (* should see original Merkle root after removing the accounts *)
             let merkle_root2 = MT.merkle_root mdb in
             assert (Hash.equal merkle_root2 merkle_root0) )
@@ -437,7 +441,7 @@ let%test_module "test functor on in memory databases" =
       let%test_unit "fold over account balances" =
         Test.with_instance (fun mdb ->
             let num_accounts = 5 in
-            let keys = Key.gen_keys num_accounts in
+            let account_ids = Account_id.gen_accounts num_accounts in
             let balances =
               Quickcheck.random_value
                 (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
@@ -446,7 +450,9 @@ let%test_module "test functor on in memory databases" =
               List.fold balances ~init:0 ~f:(fun accum balance ->
                   Balance.to_int balance + accum )
             in
-            let accounts = List.map2_exn keys balances ~f:Account.create in
+            let accounts =
+              List.map2_exn account_ids balances ~f:Account.create
+            in
             List.iter accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn mdb account ) ;
             let retrieved_total =
@@ -459,9 +465,9 @@ let%test_module "test functor on in memory databases" =
         Test.with_instance (fun mdb ->
             let num_accounts = 5 in
             let some_num = 3 in
-            let keys = Key.gen_keys num_accounts in
-            let some_keys = List.take keys some_num in
-            let last_key = List.hd_exn (List.rev some_keys) in
+            let account_ids = Account_id.gen_accounts num_accounts in
+            let some_account_ids = List.take account_ids some_num in
+            let last_account_id = List.hd_exn (List.rev some_account_ids) in
             let balances =
               Quickcheck.random_value
                 (Quickcheck.Generator.list_with_length num_accounts Balance.gen)
@@ -471,17 +477,20 @@ let%test_module "test functor on in memory databases" =
               List.fold some_balances ~init:0 ~f:(fun accum balance ->
                   Balance.to_int balance + accum )
             in
-            let accounts = List.map2_exn keys balances ~f:Account.create in
+            let accounts =
+              List.map2_exn account_ids balances ~f:Account.create
+            in
             List.iter accounts ~f:(fun account ->
                 ignore @@ create_new_account_exn mdb account ) ;
-            (* stop folding on last_key, sum of balances in accounts should be same as some_balances *)
+            (* stop folding on last_account_id, sum of balances in accounts should be same as some_balances *)
             let retrieved_total =
               MT.fold_until mdb ~init:0
                 ~f:(fun total account ->
                   let current_balance = Account.balance account in
-                  let current_key = Account.public_key account in
+                  let current_account_id = Account.identifier account in
                   let new_total = Balance.to_int current_balance + total in
-                  if Key.equal current_key last_key then Stop new_total
+                  if Account_id.equal current_account_id last_account_id then
+                    Stop new_total
                   else Continue new_total )
                 ~finish:(fun total -> total)
             in
