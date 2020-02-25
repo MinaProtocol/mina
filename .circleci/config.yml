@@ -415,7 +415,7 @@ jobs:
                 command: make libp2p_helper
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 src/app/cli/src/coda.exe src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe && (dune runtest src/lib --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 src/lib && (dune runtest src/lib --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
@@ -434,7 +434,26 @@ jobs:
                 command: make libp2p_helper
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 src/app/cli/src/coda.exe src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 src/lib && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 30m
+            - store_artifacts:
+                path: core_dumps
+    test-unit--nonconsensus_medium_curves:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
+        steps:
+            - checkout
+            - run: ulimit -c unlimited
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Build libp2p_helper
+                command: make libp2p_helper
+            - run:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=nonconsensus_medium_curves -j8 src/lib && (dune runtest src/lib --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
@@ -808,6 +827,7 @@ workflows:
             - build-artifacts--testnet_postake_medium_curves
             - test-unit--test_postake_snarkless_unittest
             - test-unit--dev
+            - test-unit--nonconsensus_medium_curves
             - test-unit--nonconsensus_medium_curves
             - test--fake_hash
             - test--test_postake
