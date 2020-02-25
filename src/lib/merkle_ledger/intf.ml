@@ -25,19 +25,18 @@ module type Token_id = sig
 end
 
 module type Account_id = sig
-  type t [@@deriving sexp]
-
   type key
 
   type token_id
 
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving sexp, bin_io]
-      end
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving sexp, bin_io]
     end
-    with type V1.t = t
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp]
 
   val public_key : t -> key
 

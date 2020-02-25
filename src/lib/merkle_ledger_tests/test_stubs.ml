@@ -208,30 +208,23 @@ module Key = struct
 end
 
 module Token_id = struct
-  module Stable = struct
-    module V1 = struct
-      type t = Coda_base.Token_id.Stable.V1.t [@@deriving sexp, compare, hash]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
+  type t = Coda_base.Token_id.t [@@deriving sexp, compare]
 
   let default = Coda_base.Token_id.default
 end
 
 module Account_id = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
       type t = Coda_base.Account_id.Stable.V1.t
       [@@deriving sexp, bin_io, eq, compare, hash]
+
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash]
+  type t = Coda_base.Account_id.t [@@deriving sexp, compare, hash]
 
   include Hashable.Make_binable (Stable.Latest)
   include Comparable.Make (Stable.Latest)
