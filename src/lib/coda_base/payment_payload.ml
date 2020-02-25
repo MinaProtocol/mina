@@ -1,5 +1,21 @@
-open Core
+(* payment_payload.ml *)
+
+[%%import
+"/src/config.mlh"]
+
+open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params.Tick
+
+[%%else]
+
+module Currency = Currency_nonconsensus.Currency
+
+[%%endif]
+
 module Amount = Currency.Amount
 module Fee = Currency.Fee
 
@@ -27,10 +43,12 @@ module Stable = struct
   end
 end]
 
-(* bin_io, version omitted *)
 type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
 let dummy = Poly.{receiver= Account_id.empty; amount= Amount.zero}
+
+[%%ifdef
+consensus_mechanism]
 
 type var = (Account_id.var, Amount.var) Poly.t
 
@@ -58,11 +76,13 @@ let var_to_input {Poly.receiver; amount} =
       (bitstring
          (Bitstring_lib.Bitstring.Lsb_first.to_list (Amount.var_to_bits amount))))
 
+let var_of_t ({receiver; amount} : t) : var =
+  {receiver= Account_id.var_of_t receiver; amount= Amount.var_of_t amount}
+
+[%%endif]
+
 let gen ~max_amount =
   let open Quickcheck.Generator.Let_syntax in
   let%map receiver = Account_id.gen
   and amount = Amount.gen_incl Amount.zero max_amount in
   Poly.{receiver; amount}
-
-let var_of_t ({receiver; amount} : t) : var =
-  {receiver= Account_id.var_of_t receiver; amount= Amount.var_of_t amount}

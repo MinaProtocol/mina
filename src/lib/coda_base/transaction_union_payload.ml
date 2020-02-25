@@ -1,15 +1,40 @@
+(* transaction_union_payload.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params.Tick
+open Signature_lib
 open Currency
+
+[%%else]
+
+open Signature_lib_nonconsensus
+open Currency_nonconsensus.Currency
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
+
 module Tag = Transaction_union_tag
 
 module Body = struct
   type ('tag, 'pk, 'amount) t_ = {tag: 'tag; public_key: 'pk; amount: 'amount}
   [@@deriving sexp]
 
-  type var = (Tag.var, Account_id.var, Currency.Amount.var) t_
-
   type t = (Tag.t, Account_id.t, Currency.Amount.t) t_ [@@deriving sexp]
+
+  let of_user_command_payload_body = function
+    | User_command_payload.Body.Payment {receiver; amount} ->
+        {tag= Tag.Payment; public_key= receiver; amount}
+    | Stake_delegation (Set_delegate {new_delegate}) ->
+        { tag= Tag.Stake_delegation
+        ; public_key= Account_id.create new_delegate Token_id.default
+        ; amount= Currency.Amount.zero }
 
   let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in
@@ -37,6 +62,17 @@ module Body = struct
     and public_key = Account_id.gen in
     {tag; public_key; amount}
 
+  let to_input0 ~tag ~amount t =
+    let t1, t2 = tag t.tag in
+    let {Public_key.Compressed.Poly.x; is_odd} = t.public_key in
+    { Random_oracle.Input.bitstrings= [|[t1; t2]; amount t.amount; [is_odd]|]
+    ; field_elements= [|x|] }
+
+  [%%ifdef
+  consensus_mechanism]
+
+  type var = (Tag.var, Account_id.var, Currency.Amount.var) t_
+
   let to_hlist {tag; public_key; amount} = H_list.[tag; public_key; amount]
 
   let spec = Data_spec.[Tag.typ; Account_id.typ; Currency.Amount.typ]
@@ -47,14 +83,6 @@ module Body = struct
         {tag; public_key; amount} )
       ~value_of_hlist:(fun H_list.[tag; public_key; amount] ->
         {tag; public_key; amount} )
-
-  let of_user_command_payload_body = function
-    | User_command_payload.Body.Payment {receiver; amount} ->
-        {tag= Tag.Payment; public_key= receiver; amount}
-    | Stake_delegation (Set_delegate {new_delegate}) ->
-        { tag= Tag.Stake_delegation
-        ; public_key= Account_id.create new_delegate Token_id.default
-        ; amount= Currency.Amount.zero }
 
   module Checked = struct
     let constant ({tag; public_key; amount} : t) : var =
@@ -70,6 +98,8 @@ module Body = struct
       @@ bitstring (Currency.Amount.var_to_bits amount :> Boolean.var list)
   end
 
+  [%%endif]
+
   let to_input {tag; public_key; amount} =
     let open Random_oracle.Input in
     let tag1, tag2 = Tag.to_bits tag in
@@ -83,16 +113,22 @@ type t = (User_command_payload.Common.t, Body.t) User_command_payload.Poly.t
 
 type payload = t [@@deriving sexp]
 
-type var =
-  (User_command_payload.Common.var, Body.var) User_command_payload.Poly.t
-
-type payload_var = var
+let of_user_command_payload ({common; body} : User_command_payload.t) : t =
+  {common; body= Body.of_user_command_payload_body body}
 
 let gen =
   let open Quickcheck.Generator.Let_syntax in
   let%bind common = User_command_payload.Common.gen in
   let%map body = Body.gen ~fee:common.fee in
   User_command_payload.Poly.{common; body}
+
+[%%ifdef
+consensus_mechanism]
+
+type var =
+  (User_command_payload.Common.var, Body.var) User_command_payload.Poly.t
+
+type payload_var = var
 
 let to_hlist ({common; body} : (_, _) User_command_payload.Poly.t) =
   H_list.[common; body]
@@ -107,10 +143,9 @@ let typ : (var, t) Typ.t =
     ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
     ~value_of_hlist:of_hlist
 
-let of_user_command_payload ({common; body} : User_command_payload.t) : t =
-  {common; body= Body.of_user_command_payload_body body}
-
 let payload_typ = typ
+
+[%%endif]
 
 module Changes = struct
   type ('amount, 'signed_amount) t_ =
@@ -122,11 +157,6 @@ module Changes = struct
 
   type t = (Amount.t, Amount.Signed.t) t_ [@@deriving eq]
 
-  type var = (Amount.var, Amount.Signed.var) t_
-
-  let to_hlist {sender_delta; receiver_increase; excess; supply_increase} =
-    H_list.[sender_delta; receiver_increase; excess; supply_increase]
-
   let invariant
       ({sender_delta; receiver_increase; excess; supply_increase} : t) =
     let open Amount.Signed in
@@ -137,17 +167,6 @@ module Changes = struct
       + of_unsigned receiver_increase
       + excess
       - of_unsigned supply_increase )
-
-  let typ =
-    Typ.of_hlistable
-      [Amount.Signed.typ; Amount.typ; Amount.Signed.typ; Amount.typ]
-      ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
-      ~var_of_hlist:
-        (fun H_list.[sender_delta; receiver_increase; excess; supply_increase] ->
-        {sender_delta; receiver_increase; excess; supply_increase} )
-      ~value_of_hlist:
-        (fun H_list.[sender_delta; receiver_increase; excess; supply_increase] ->
-        {sender_delta; receiver_increase; excess; supply_increase} )
 
   let of_payload (payload : payload) : t =
     let tag = payload.body.tag in
@@ -186,6 +205,25 @@ module Changes = struct
 
   let%test_unit "invariant" =
     Quickcheck.test gen ~f:(fun t -> invariant (of_payload t))
+
+  [%%ifdef
+  consensus_mechanism]
+
+  type var = (Amount.var, Amount.Signed.var) t_
+
+  let to_hlist {sender_delta; receiver_increase; excess; supply_increase} =
+    H_list.[sender_delta; receiver_increase; excess; supply_increase]
+
+  let typ =
+    Typ.of_hlistable
+      [Amount.Signed.typ; Amount.typ; Amount.Signed.typ; Amount.typ]
+      ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
+      ~var_of_hlist:
+        (fun H_list.[sender_delta; receiver_increase; excess; supply_increase] ->
+        {sender_delta; receiver_increase; excess; supply_increase} )
+      ~value_of_hlist:
+        (fun H_list.[sender_delta; receiver_increase; excess; supply_increase] ->
+        {sender_delta; receiver_increase; excess; supply_increase} )
 
   module Checked = struct
     open Let_syntax
@@ -277,7 +315,12 @@ module Changes = struct
     Quickcheck.test gen ~trials:100 ~f:(fun (t : payload) ->
         Test_util.test_equal ~equal payload_typ typ Checked.of_payload
           of_payload t )
+
+  [%%endif]
 end
+
+[%%ifdef
+consensus_mechanism]
 
 module Checked = struct
   let to_input ({common; body} : var) =
@@ -288,6 +331,8 @@ module Checked = struct
     { common= User_command_payload.Common.Checked.constant common
     ; body= Body.Checked.constant body }
 end
+
+[%%endif]
 
 let to_input ({common; body} : t) =
   Random_oracle.Input.append

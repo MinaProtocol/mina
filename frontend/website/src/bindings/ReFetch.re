@@ -1,3 +1,5 @@
+include Bs_fetch;
+
 // Polyfill fetch during prerendering
 [%raw "require('isomorphic-unfetch')"];
 let fetch =
@@ -15,22 +17,20 @@ let fetch =
       ~keepalive=?,
       resource,
     ) =>
-  Bs_fetch.(
-    fetchWithInit(
-      resource,
-      Bs_fetch.RequestInit.make(
-        ~method_?,
-        ~headers=?Option.map(Bs_fetch.HeadersInit.make, headers),
-        ~body?,
-        ~referrer?,
-        ~referrerPolicy?,
-        ~mode?,
-        ~credentials?,
-        ~cache?,
-        ~redirect?,
-        ~integrity?,
-        ~keepalive?,
-        (),
-      ),
-    )
+  fetchWithInit(
+    resource,
+    RequestInit.make(
+      ~method_?,
+      ~headers=?Option.map(HeadersInit.make, headers),
+      ~body?,
+      ~referrer?,
+      ~referrerPolicy?,
+      ~mode?,
+      ~credentials?,
+      ~cache?,
+      ~redirect?,
+      ~integrity?,
+      ~keepalive?,
+      (),
+    ),
   );

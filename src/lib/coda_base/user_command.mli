@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Import
 module Payload = User_command_payload
 

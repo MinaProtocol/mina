@@ -1,5 +1,20 @@
+[%%import "/src/config.mlh"]
+
 open Core_kernel
+
+[%%ifdef consensus_mechanism]
+
 open Snark_params.Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+open Signature_lib_nonconsensus
+module Currency = Currency_nonconsensus.Currency
+module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
 
 module Body : sig
   type t =
@@ -61,7 +76,11 @@ module Common : sig
 
   type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 
+  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
+
   val gen : t Quickcheck.Generator.t
+
+  [%%ifdef consensus_mechanism]
 
   type var =
     ( Currency.Fee.var
@@ -73,14 +92,17 @@ module Common : sig
 
   val typ : (var, t) Typ.t
 
-  val to_input : t -> (Field.t, bool) Random_oracle.Input.t
-
   module Checked : sig
     val to_input :
-      var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
+         var
+      -> ( (Field.Var.t, Boolean.var) Random_oracle.Input.t
+         , _ )
+         Snark_params.Tick.Checked.t
 
     val constant : t -> var
   end
+
+  [%%endif]
 end
 
 module Poly : sig
