@@ -1,60 +1,33 @@
-(* TODO: rename length_in_bits -> bit_length *)
+(* data_hash.ml *)
 
-open Core
-open Util
-open Snark_params.Tick
+[%%import
+"/src/config.mlh"]
+
+open Core_kernel
 open Bitstring_lib
-open Fold_lib
-open Module_version
+open Util
 
-module type Basic = Data_hash_intf.Basic
+[%%if
+defined consensus_mechanism]
 
-module type Full_size = Data_hash_intf.Full_size
+open Snark_params.Tick
+
+[%%endif]
 
 module type Small = Data_hash_intf.Small
+
+module type Full_size = Data_hash_intf.Full_size
 
 module Make_basic (M : sig
   val length_in_bits : int
 end) =
 struct
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type t = Pedersen.Digest.Stable.V1.t
-        [@@deriving bin_io, sexp, compare, hash, yojson, version]
-      end
+  type t = Pedersen.Digest.t [@@deriving sexp, compare, yojson]
 
-      include T
-
-      let version_byte = Base58_check.Version_bytes.data_hash
-
-      include Registration.Make_latest_version (T)
-      include Hashable.Make_binable (T)
-      include Comparable.Make (T)
-    end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "data_hash_basic"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
-
-  include Comparable.Make (Stable.Latest)
-  include Hashable.Make (Stable.Latest)
-
-  let to_decimal_string (t : Pedersen.Digest.t) =
-    Crypto_params.Tick0.Field.to_string t
+  let to_decimal_string (t : Pedersen.Digest.t) = Field.to_string t
 
   let to_bytes t =
-    Fold_lib.Fold.bool_t_to_string (Fold.of_list (Field.unpack t))
+    Fold_lib.(Fold.bool_t_to_string (Fold.of_list (Field.unpack t)))
 
   let length_in_bits = M.length_in_bits
 
@@ -70,8 +43,12 @@ struct
       Bignum_bigint.(gen_incl zero m)
       ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
 
-  let ( = ) = Stable.Latest.equal
+  let to_input t = Random_oracle.Input.field t
 
+  [%%if
+  defined consensus_mechanism]
+
+  (* SNARK-dependent code *)
   type var =
     { digest: Pedersen.Checked.Digest.var
     ; mutable bits: Boolean.var Bitstring.Lsb_first.t option }
@@ -114,8 +91,6 @@ struct
 
   include Pedersen.Digest.Bits
 
-  let to_input t = Random_oracle.Input.field t
-
   let assert_equal x y = Field.Checked.Assert.equal x.digest y.digest
 
   let equal_var x y = Field.Checked.equal x.digest y.digest
@@ -151,6 +126,9 @@ struct
         ~f:Boolean.typ.check
     in
     {store; read; alloc; check}
+
+  (* end SNARK-dependent *)
+  [%%endif]
 end
 
 module Make_full_size () = struct
@@ -158,15 +136,45 @@ module Make_full_size () = struct
     let length_in_bits = Field.size_in_bits
   end)
 
-  let var_of_hash_packed digest = {digest; bits= None}
+  (* inside functor of no arguments, versioned types are allowed *)
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Pedersen.Digest.Stable.V1.t
+        [@@deriving sexp, compare, hash, yojson]
+      end
+
+      include T
+
+      let to_latest = Fn.id
+
+      include Comparable.Make (T)
+      include Hashable.Make_binable (T)
+    end
+  end]
+
+  type _unused = unit constraint t = Stable.Latest.t
+
+  include Comparable.Make (Stable.Latest)
+  include Hashable.Make (Stable.Latest)
 
   let of_hash = Fn.id
+
+  [%%if
+  defined consensus_mechanism]
+
+  (* SNARK-dependent *)
+  let var_of_hash_packed digest = {digest; bits= None}
 
   let if_ cond ~then_ ~else_ =
     let%map digest =
       Field.Checked.if_ cond ~then_:then_.digest ~else_:else_.digest
     in
     {digest; bits= None}
+
+  [%%endif]
 end
 
 module Make_small (M : sig
@@ -181,7 +189,7 @@ struct
     let%map bits = unpack digest in
     {digest; bits= Some (Bitstring.Lsb_first.of_list bits)}
 
-  let max_size = Bignum_bigint.(two_to_the length_in_bits - one)
+  let max_size = Bignum_bigint.(two_to_the M.length_in_bits - one)
 
   let of_hash x =
     if Bignum_bigint.( <= ) Bigint.(to_bignum_bigint (of_field x)) max_size

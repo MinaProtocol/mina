@@ -307,7 +307,7 @@ let is_jane_street_stable_module module_path =
   | _ ->
       false
 
-let whitelisted_prefix prefix ~loc =
+let trustlisted_prefix prefix ~loc =
   match prefix with
   | Lident id ->
       String.equal id "Bitstring"
@@ -369,7 +369,7 @@ let rec generate_core_type_version_decls type_name core_type =
             id
     | Ldot (prefix, "t") ->
         (* type t = A.B.t
-           if prefix not whitelisted, generate: let _ = A.B.__versioned__
+           if prefix not trustlisted, generate: let _ = A.B.__versioned__
            disallow Stable.Latest.t
         *)
         if is_stable_latest prefix then
@@ -379,7 +379,7 @@ let rec generate_core_type_version_decls type_name core_type =
         let core_type_decls =
           generate_version_lets_for_core_types type_name core_types
         in
-        if whitelisted_prefix prefix ~loc:core_type.ptyp_loc then
+        if trustlisted_prefix prefix ~loc:core_type.ptyp_loc then
           core_type_decls
         else
           let loc = core_type.ptyp_loc in

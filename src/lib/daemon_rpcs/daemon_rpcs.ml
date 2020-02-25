@@ -766,7 +766,7 @@ module Visualization = struct
   end
 end
 
-module Add_whitelist = struct
+module Add_trustlist = struct
   module Query = struct
     [%%versioned
     module Stable = struct
@@ -794,12 +794,12 @@ module Add_whitelist = struct
   end
 
   let rpc : (Query.t, Response.t) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Add_whitelist" ~version:0
+    Rpc.Rpc.create ~name:"Add_trustlist" ~version:0
       ~bin_query:Query.Stable.Latest.bin_t
       ~bin_response:Response.Stable.Latest.bin_t
 end
 
-module Remove_whitelist = struct
+module Remove_trustlist = struct
   module Query = struct
     [%%versioned
     module Stable = struct
@@ -827,12 +827,12 @@ module Remove_whitelist = struct
   end
 
   let rpc : (Query.t, Response.t) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Remove_whitelist" ~version:0
+    Rpc.Rpc.create ~name:"Remove_trustlist" ~version:0
       ~bin_query:Query.Stable.Latest.bin_t
       ~bin_response:Response.Stable.Latest.bin_t
 end
 
-module Get_whitelist = struct
+module Get_trustlist = struct
   module Query = struct
     [%%versioned
     module Stable = struct
@@ -860,7 +860,7 @@ module Get_whitelist = struct
   end
 
   let rpc : (Query.t, Response.t) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Get_whitelist" ~version:0
+    Rpc.Rpc.create ~name:"Get_trustlist" ~version:0
       ~bin_query:Query.Stable.Latest.bin_t
       ~bin_response:Response.Stable.Latest.bin_t
 end

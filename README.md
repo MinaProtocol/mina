@@ -1,5 +1,5 @@
 <a href="https://codaprotocol.com">
-	<img width="200" src="./frontend/website/static/img/coda-logo@3x.png" alt="Coda Logo" />
+	<img width="200" src="./frontend/website/public/static/img/coda-logo@3x.png" alt="Coda Logo" />
 </a>
 <hr/>
 

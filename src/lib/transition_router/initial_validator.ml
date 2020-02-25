@@ -5,11 +5,11 @@ open Coda_base
 open Coda_state
 open Signature_lib
 open Coda_transition
-
-let max_blocklength_observed = ref 0
+open Network_peer
 
 type validation_error =
   [ `Invalid_time_received of [`Too_early | `Too_late of int64]
+  | `Invalid_genesis_protocol_state
   | `Invalid_proof
   | `Invalid_delta_transition_chain_proof
   | `Verifier_error of Error.t ]
@@ -44,21 +44,23 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash
       punish Sent_invalid_transition_chain_merkle_proof None
   | `Invalid_time_received `Too_early ->
       punish Gossiped_future_transition None
+  | `Invalid_genesis_protocol_state ->
+      punish Has_invalid_genesis_protocol_state None
   | `Invalid_time_received (`Too_late slot_diff) ->
       punish (Gossiped_old_transition slot_diff)
         (Some
            ( "off by $slot_diff slots"
            , [("slot_diff", `String (Int64.to_string slot_diff))] ))
 
-module Duplicate_proposal_detector = struct
-  (* maintain a map from proposer, epoch, slot to state hashes *)
+module Duplicate_block_detector = struct
+  (* maintain a map from block producer key, epoch, slot to state hashes *)
 
-  module Proposals = struct
+  module Blocks = struct
     module T = struct
-      (* order of fields significant, compare by epoch, then slot, then proposer *)
+      (* order of fields significant, compare by epoch, then slot, then producer *)
       type t =
         { consensus_time: Consensus.Data.Consensus_time.t
-        ; proposer: Public_key.Compressed.t }
+        ; block_producer: Public_key.Compressed.t }
       [@@deriving sexp, compare]
     end
 
@@ -66,8 +68,7 @@ module Duplicate_proposal_detector = struct
     include Comparable.Make (T)
   end
 
-  type t =
-    {mutable table: State_hash.t Proposals.Map.t; mutable latest_epoch: int}
+  type t = {mutable table: State_hash.t Blocks.Map.t; mutable latest_epoch: int}
 
   let delay =
     let open Consensus in
@@ -84,22 +85,22 @@ module Duplicate_proposal_detector = struct
 
   let gc_count = ref 0
 
-  (* create dummy proposal to split map on *)
-  let make_splitting_proposal ({consensus_time; proposer= _} : Proposals.t) :
-      Proposals.t =
-    let proposer = Public_key.Compressed.empty in
+  (* create dummy block to split map on *)
+  let make_splitting_block ({consensus_time; block_producer= _} : Blocks.t) :
+      Blocks.t =
+    let block_producer = Public_key.Compressed.empty in
     { consensus_time= Consensus.Data.Consensus_time.get_old consensus_time
-    ; proposer }
+    ; block_producer }
 
-  (* every gc_interval proposals seen, discard proposals more than gc_width ago *)
-  let table_gc t proposal =
+  (* every gc_interval blocks seen, discard blocks more than gc_width ago *)
+  let table_gc t block =
     gc_count := (!gc_count + 1) mod gc_interval ;
     if Int.equal !gc_count 0 then
-      let splitting_proposal = make_splitting_proposal proposal in
-      let _, _, gt_map = Map.split t.table splitting_proposal in
+      let splitting_block = make_splitting_block block in
+      let _, _, gt_map = Map.split t.table splitting_block in
       t.table <- gt_map
 
-  let create () = {table= Map.empty (module Proposals); latest_epoch= 0}
+  let create () = {table= Map.empty (module Blocks); latest_epoch= 0}
 
   let check t logger external_transition_with_hash =
     let external_transition = external_transition_with_hash.With_hash.data in
@@ -109,18 +110,21 @@ module Duplicate_proposal_detector = struct
       External_transition.consensus_state external_transition
     in
     let consensus_time = consensus_time consensus_state in
-    let proposer = External_transition.proposer external_transition in
-    let proposal = Proposals.{consensus_time; proposer} in
+    let block_producer =
+      External_transition.block_producer external_transition
+    in
+    let block = Blocks.{consensus_time; block_producer} in
     (* try table GC *)
-    table_gc t proposal ;
-    match Map.find t.table proposal with
+    table_gc t block ;
+    match Map.find t.table block with
     | None ->
-        t.table <- Map.add_exn t.table ~key:proposal ~data:protocol_state_hash
+        t.table <- Map.add_exn t.table ~key:block ~data:protocol_state_hash
     | Some hash ->
         if not (State_hash.equal hash protocol_state_hash) then
           Logger.error logger ~module_:__MODULE__ ~location:__LOC__
             ~metadata:
-              [ ("block_producer", Public_key.Compressed.to_yojson proposer)
+              [ ( "block_producer"
+                , Public_key.Compressed.to_yojson block_producer )
               ; ( "consensus_time"
                 , Consensus.Data.Consensus_time.to_yojson consensus_time )
               ; ("hash", State_hash.to_yojson hash)
@@ -132,13 +136,16 @@ module Duplicate_proposal_detector = struct
 end
 
 let run ~logger ~trust_system ~verifier ~transition_reader
-    ~valid_transition_writer ~initialization_finish_signal =
+    ~valid_transition_writer ~initialization_finish_signal ~genesis_state_hash
+    =
   let open Deferred.Let_syntax in
-  let duplicate_checker = Duplicate_proposal_detector.create () in
+  let duplicate_checker = Duplicate_block_detector.create () in
   don't_wait_for
     (Reader.iter transition_reader ~f:(fun network_transition ->
-         if !initialization_finish_signal then (
-           let `Transition transition_env, `Time_received time_received =
+         if Ivar.is_full initialization_finish_signal then (
+           let ( `Transition transition_env
+               , `Time_received time_received
+               , `Valid_cb is_valid_cb ) =
              network_transition
            in
            let transition_with_hash =
@@ -148,23 +155,36 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                     (Fn.compose Protocol_state.hash
                        External_transition.protocol_state)
            in
-           Duplicate_proposal_detector.check duplicate_checker logger
+           Duplicate_block_detector.check duplicate_checker logger
              transition_with_hash ;
            let sender = Envelope.Incoming.sender transition_env in
+           let defer f = Fn.compose Deferred.return f in
            match%bind
              let open Deferred.Result.Monad_infix in
              External_transition.(
                Validation.wrap transition_with_hash
-               |> Fn.compose Deferred.return
-                    (validate_time_received ~time_received)
+               |> defer (validate_time_received ~time_received)
+               >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
                >>= validate_proof ~verifier
-               >>= Fn.compose Deferred.return validate_delta_transition_chain)
+               >>= defer validate_delta_transition_chain)
            with
            | Ok verified_transition ->
+               External_transition.poke_validation_callback
+                 (Envelope.Incoming.data transition_env)
+                 is_valid_cb ;
                Envelope.Incoming.wrap ~data:verified_transition ~sender
                |> Writer.write valid_transition_writer ;
+               let blockchain_length =
+                 External_transition.Initial_validated.consensus_state
+                   verified_transition
+                 |> Consensus.Data.Consensus_state.blockchain_length
+                 |> Coda_numbers.Length.to_int
+               in
+               Coda_metrics.Transition_frontier.update_max_blocklength_observed
+                 blockchain_length ;
                return ()
            | Error error ->
+               is_valid_cb false ;
                handle_validation_error ~logger ~trust_system ~sender
                  ~state_hash:(With_hash.hash transition_with_hash)
                  error )

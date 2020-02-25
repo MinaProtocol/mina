@@ -1,6 +1,7 @@
 open Core
 open Async_kernel
 open Pipe_lib
+open Network_peer
 
 (** Run f recursively n times, starting with value r.
     e.g. funpow 3 f r = f (f (f r)) *)
@@ -259,7 +260,12 @@ end = struct
           with
           | Ok answer ->
               Either.First answer
-          | Error _ ->
+          | Error e ->
+              Logger.error (Logger.create ()) ~module_:__MODULE__
+                ~location:__LOC__
+                ~metadata:[("error", `String (Error.to_string_hum e))]
+                "When handling What_child_hashes request, the following error \
+                 happended: $error" ;
               Either.Second
                 ( Actions.Violated_protocol
                 , Some

@@ -63,7 +63,8 @@ let get_balance =
          in
          let balance_str = function
            | Some b ->
-               sprintf "Balance: %s coda\n" (Currency.Balance.to_string b)
+               sprintf "Balance: %s coda\n"
+                 (Currency.Balance.to_formatted_string b)
            | None ->
                "There are no funds in this account\n"
          in
@@ -91,7 +92,7 @@ let get_balance_graphql =
          match response#wallet with
          | Some wallet ->
              printf "Balance: %s coda\n"
-               (Currency.Balance.to_string (wallet#balance)#total)
+               (Currency.Balance.to_formatted_string (wallet#balance)#total)
          | None ->
              printf "There are no funds in this account\n" ))
 
@@ -403,15 +404,6 @@ let get_nonce_exn ~rpc public_key port =
   | Ok nonce ->
       return nonce
 
-let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
-    a Deferred.t =
-  match%bind Deferred.Or_error.try_with ~extract_exn:true f with
-  | Ok e ->
-      return e
-  | Error e ->
-      eprintf "Error: %s" (Error.to_string_hum e) ;
-      exit 4
-
 let batch_send_payments =
   let module Payment_info = struct
     type t =
@@ -717,7 +709,7 @@ let cancel_transaction =
                Currency.Fee.of_uint64 (fee + (replace_fee * diff))
              in
              printf "Fee to cancel transaction is %s coda.\n"
-               (Currency.Fee.to_string cancel_fee) ;
+               (Currency.Fee.to_formatted_string cancel_fee) ;
              let body =
                User_command_payload.Body.Payment
                  {receiver; amount= Currency.Amount.zero}
@@ -799,7 +791,7 @@ let cancel_transaction_graphql =
            Currency.Fee.of_uint64 (fee + (replace_fee * diff))
          in
          printf "Fee to cancel transaction is %s coda.\n"
-           (Currency.Fee.to_string cancel_fee) ;
+           (Currency.Fee.to_formatted_string cancel_fee) ;
          let cancel_query =
            let open Graphql_client.Encoders in
            Graphql_queries.Send_payment.make
@@ -859,7 +851,7 @@ let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%bind privkey =
@@ -873,32 +865,14 @@ let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
-    handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
-    let%map kp =
-      Secrets.Keypair.read_exn ~privkey_path
-        ~password:
-          (lazy (Secrets.Password.read "Password for private key file: "))
-    in
+    let%map kp = Secrets.Keypair.Terminal_stdin.read_exn privkey_path in
     printf "Public key: %s\nPrivate key: %s\n"
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check )
       (kp.private_key |> Private_key.to_base58_check))
-
-let generate_keypair =
-  Command.async ~summary:"Generate a new public-key/private-key pair"
-    (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
-    @@ fun () ->
-    let open Deferred.Let_syntax in
-    let kp = Keypair.create () in
-    let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
-    printf "Keypair generated\nPublic key: %s\n"
-      ( kp.public_key |> Public_key.compress
-      |> Public_key.Compressed.to_base58_check ) ;
-    exit 0)
 
 let dump_ledger =
   let sl_hash_flag =
@@ -1082,7 +1056,7 @@ let stop_tracing =
 
 let set_staking =
   let privkey_path = Cli_lib.Flag.privkey_read_path in
-  Command.async ~summary:"Set new block proposer keys"
+  Command.async ~summary:"Set new keys for block production"
     (Cli_lib.Background_daemon.rpc_init privkey_path
        ~f:(fun port privkey_path ->
          let%bind ({Keypair.public_key; _} as keypair) =
@@ -1096,7 +1070,7 @@ let set_staking =
              Daemon_rpcs.Client.print_rpc_error e
          | Ok () ->
              printf
-               !"New block proposer public key : %s\n"
+               !"New block producer public key : %s\n"
                (Public_key.Compressed.to_base58_check
                   (Public_key.compress public_key)) ))
 
@@ -1226,7 +1200,9 @@ let import_key =
   let flags = Args.zip2 privkey_path conf_dir in
   Command.async
     ~summary:
-      "Import a password protected private key to be tracked by the daemon."
+      "Import a password protected private key to be tracked by the daemon.\n\
+       Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
+       (key will be imported using the same password)."
     (Cli_lib.Background_daemon.graphql_init flags
        ~f:(fun graphql_endpoint (privkey_path, conf_dir) ->
          let open Deferred.Let_syntax in
@@ -1259,7 +1235,7 @@ let import_key =
                Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
              in
              let%map _response =
-               Graphql_client.query_exn
+               Graphql_client.query
                  (Graphql_queries.Reload_wallets.make ())
                  graphql_endpoint
              in
@@ -1292,7 +1268,7 @@ let list_accounts =
                    \  Locked: %b\n"
                    (i + 1)
                    (Public_key.Compressed.to_base58_check w#public_key)
-                   (Unsigned.UInt64.to_string (w#balance)#total)
+                   (Currency.Balance.to_formatted_string (w#balance)#total)
                    (Option.value ~default:true w#locked) ) ))
 
 let create_account =
@@ -1301,7 +1277,8 @@ let create_account =
     (Cli_lib.Background_daemon.graphql_init (return ())
        ~f:(fun graphql_endpoint () ->
          let%bind password =
-           Secrets.Keypair.prompt_password "Password for new account: "
+           Secrets.Keypair.Terminal_stdin.prompt_password
+             "Password for new account: "
          in
          let%map response =
            Graphql_client.query_exn
@@ -1328,7 +1305,8 @@ let unlock_account =
            let open Deferred.Or_error.Let_syntax in
            let%map password =
              Deferred.map ~f:Or_error.return
-               (Secrets.Password.read "Password to unlock account: ")
+               (Secrets.Password.hidden_line_or_env
+                  "Password to unlock account: " ~env:Secrets.Keypair.env)
            in
            password
          in
@@ -1376,78 +1354,79 @@ let lock_account =
 
 let generate_libp2p_keypair =
   Command.async
-    ~summary:
-      "Generate a new libp2p keypair and print it out (this contains the \
-       secret key!)"
-    (Command.Param.return
-       ( handle_exception_nicely
-       @@ fun () ->
-       Deferred.ignore
-         (let open Deferred.Let_syntax in
-         (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
-         let logger = Logger.null () in
-         (* Using the helper only for keypair generation requires no state. *)
-         File_system.with_temp_dir "coda-generate-libp2p-keypair"
-           ~f:(fun tmpd ->
-             match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
-             | Ok net ->
-                 let%bind me = Coda_net2.Keypair.random net in
-                 let%map () = Coda_net2.shutdown net in
-                 printf "libp2p keypair:\n%s\n"
-                   (Coda_net2.Keypair.to_string me)
-             | Error e ->
-                 Logger.fatal logger "failed to generate libp2p keypair: $err"
-                   ~module_:__MODULE__ ~location:__LOC__
-                   ~metadata:[("err", `String (Error.to_string_hum e))] ;
-                 exit 20 )) ))
+    ~summary:"Generate a new libp2p keypair and print out the peer ID"
+    (let open Command.Let_syntax in
+    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
+    Cli_lib.Exceptions.handle_nicely
+    @@ fun () ->
+    Deferred.ignore
+      (let open Deferred.Let_syntax in
+      (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
+      let logger = Logger.null () in
+      (* Using the helper only for keypair generation requires no state. *)
+      File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
+          match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
+          | Ok net ->
+              let%bind me = Coda_net2.Keypair.random net in
+              let%bind () = Coda_net2.shutdown net in
+              let%map () =
+                Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path
+                  me
+              in
+              printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
+          | Error e ->
+              Logger.fatal logger "failed to generate libp2p keypair: $err"
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("err", `String (Error.to_string_hum e))] ;
+              exit 20 )))
 
-let whitelist_ip_flag =
+let trustlist_ip_flag =
   Command.Param.(
     flag "ip-address"
-      ~doc:"IP An IPv4 or IPv6 address for the client whitelist"
+      ~doc:"IP An IPv4 or IPv6 address for the client trustlist"
       (required Cli_lib.Arg_type.ip_address))
 
-let whitelist_add =
+let trustlist_add =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
-  Command.async ~summary:"Add an IP to the whitelist"
-    (Cli_lib.Background_daemon.rpc_init whitelist_ip_flag
-       ~f:(fun port whitelist_ip ->
-         let whitelist_ip_string = Unix.Inet_addr.to_string whitelist_ip in
-         match%map Client.dispatch Add_whitelist.rpc whitelist_ip port with
+  Command.async ~summary:"Add an IP to the trustlist"
+    (Cli_lib.Background_daemon.rpc_init trustlist_ip_flag
+       ~f:(fun port trustlist_ip ->
+         let trustlist_ip_string = Unix.Inet_addr.to_string trustlist_ip in
+         match%map Client.dispatch Add_trustlist.rpc trustlist_ip port with
          | Ok (Ok ()) ->
-             printf "Added %s to client whitelist" whitelist_ip_string
+             printf "Added %s to client trustlist" trustlist_ip_string
          | Ok (Error e) ->
-             eprintf "Error adding %s to client whitelist: %s"
-               whitelist_ip_string (Error.to_string_hum e)
+             eprintf "Error adding %s to client trustlist: %s"
+               trustlist_ip_string (Error.to_string_hum e)
          | Error e ->
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
-let whitelist_remove =
+let trustlist_remove =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
-  Command.async ~summary:"Add an IP to the whitelist"
-    (Cli_lib.Background_daemon.rpc_init whitelist_ip_flag
-       ~f:(fun port whitelist_ip ->
-         let whitelist_ip_string = Unix.Inet_addr.to_string whitelist_ip in
-         match%map Client.dispatch Remove_whitelist.rpc whitelist_ip port with
+  Command.async ~summary:"Add an IP to the trustlist"
+    (Cli_lib.Background_daemon.rpc_init trustlist_ip_flag
+       ~f:(fun port trustlist_ip ->
+         let trustlist_ip_string = Unix.Inet_addr.to_string trustlist_ip in
+         match%map Client.dispatch Remove_trustlist.rpc trustlist_ip port with
          | Ok (Ok ()) ->
-             printf "Removed %s to client whitelist" whitelist_ip_string
+             printf "Removed %s to client trustlist" trustlist_ip_string
          | Ok (Error e) ->
-             eprintf "Error removing %s from client whitelist: %s"
-               whitelist_ip_string (Error.to_string_hum e)
+             eprintf "Error removing %s from client trustlist: %s"
+               trustlist_ip_string (Error.to_string_hum e)
          | Error e ->
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
-let whitelist_list =
+let trustlist_list =
   let open Deferred.Let_syntax in
   let open Daemon_rpcs in
   let open Command.Param in
-  Command.async ~summary:"Add an IP to the whitelist"
+  Command.async ~summary:"Add an IP to the trustlist"
     (Cli_lib.Background_daemon.rpc_init (return ()) ~f:(fun port () ->
-         match%map Client.dispatch Get_whitelist.rpc () port with
+         match%map Client.dispatch Get_trustlist.rpc () port with
          | Ok ips ->
              printf
                "The following IPs are permitted to connect to the daemon \
@@ -1457,6 +1436,13 @@ let whitelist_list =
          | Error e ->
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
+
+let compile_time_constants =
+  Command.basic
+    ~summary:"Print a JSON map of the compile-time consensus parameters"
+    (Command.Param.return (fun () ->
+         Core.printf "%s\n%!"
+           (Yojson.Safe.to_string Consensus.Constants.all_constants) ))
 
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
@@ -1512,19 +1498,24 @@ let accounts =
     ; ("lock", lock_account) ]
 
 let client =
-  Command.group ~summary:"Simple client commands" ~preserve_subcommand_order:()
+  Command.group ~summary:"Lightweight client commands"
+    ~preserve_subcommand_order:()
     [ ("get-balance", get_balance_graphql)
     ; ("send-payment", send_payment_graphql)
     ; ("delegate-stake", delegate_stake_graphql)
     ; ("cancel-transaction", cancel_transaction_graphql)
-    ; ("set-staking", set_staking_graphql) ]
+    ; ("set-staking", set_staking_graphql)
+    ; ("set-snark-worker", set_snark_worker)
+    ; ("set-snark-work-fee", set_snark_work_fee)
+    ; ("stop-daemon", stop_daemon)
+    ; ("status", status) ]
 
 let command =
-  Command.group ~summary:"Lightweight client commands"
+  Command.group ~summary:"[Deprecated] Lightweight client commands"
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
-    ; ("generate-keypair", generate_keypair)
+    ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("cancel-transaction", cancel_transaction)
     ; ("set-staking", set_staking)
@@ -1535,17 +1526,17 @@ let command =
     ; ("stop-daemon", stop_daemon)
     ; ("status", status) ]
 
-let client_whitelist_group =
-  Command.group ~summary:"Client whitelist management"
+let client_trustlist_group =
+  Command.group ~summary:"Client trustlist management"
     ~preserve_subcommand_order:()
-    [ ("add", whitelist_add)
-    ; ("list", whitelist_list)
-    ; ("remove", whitelist_remove) ]
+    [ ("add", trustlist_add)
+    ; ("list", trustlist_list)
+    ; ("remove", trustlist_remove) ]
 
 let advanced =
   Command.group ~summary:"Advanced client commands"
     [ ("get-nonce", get_nonce_cmd)
-    ; ("client-whitelist", client_whitelist_group)
+    ; ("client-trustlist", client_trustlist_group)
     ; ("get-trust-status", get_trust_status)
     ; ("get-trust-status-all", get_trust_status_all)
     ; ("get-public-keys", get_public_keys)
@@ -1565,4 +1556,5 @@ let advanced =
     ; ("unsafe-import", unsafe_import)
     ; ("import", import_key)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
+    ; ("compile-time-constants", compile_time_constants)
     ; ("visualization", Visualization.command_group) ]

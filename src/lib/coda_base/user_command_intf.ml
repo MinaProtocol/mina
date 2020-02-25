@@ -77,6 +77,16 @@ module type S = sig
 
   val sender : t -> Public_key.Compressed.t
 
+  val receiver : t -> Public_key.Compressed.t
+
+  val amount : t -> Currency.Amount.t option
+
+  val is_payment : t -> bool
+
+  val memo : t -> User_command_memo.t
+
+  val valid_until : t -> Coda_numbers.Global_slot.t
+
   (* for filtering *)
   val minimum_fee : Currency.Fee.t
 
@@ -105,6 +115,12 @@ module type S = sig
 
   val sign :
     Signature_keypair.t -> User_command_payload.t -> With_valid_signature.t
+
+  val create_with_signature_checked :
+       Signature.t
+    -> Public_key.Compressed.t
+    -> User_command_payload.t
+    -> With_valid_signature.t option
 
   module For_tests : sig
     val fake_sign :

@@ -51,17 +51,15 @@ module Inputs = struct
     res
 
   module Operations = struct
-    let apply_matrix rows v =
-      Array.map rows ~f:(fun row ->
+    let add_assign ~state i x = Field.(state.(i) += x)
+
+    let apply_affine_map (rows, c) v =
+      Array.mapi rows ~f:(fun j row ->
           let open Field in
           let res = zero + zero in
           Array.iteri row ~f:(fun i r -> res += (r * v.(i))) ;
+          res += c.(j) ;
           res )
-
-    let add_block ~state block =
-      Array.iteri block ~f:(fun i b ->
-          let open Field in
-          state.(i) += b )
 
     (* TODO: Have an explicit function for making a copy of a field element. *)
     let copy a = Array.map a ~f:(fun x -> Field.(x + zero))
@@ -115,7 +113,7 @@ module Digest = struct
         List.take (unpack x) length
 end
 
-include Sponge.Make (Sponge.Poseidon (Inputs))
+include Sponge.Make_hash (Sponge.Poseidon (Inputs))
 
 let update ~state = update ~state params
 
@@ -205,7 +203,7 @@ module Checked = struct
       List.take (choose_preimage_var ~length:Field.size_in_bits x) length
   end
 
-  include Sponge.Make (Sponge.Poseidon (Inputs))
+  include Sponge.Make_hash (Sponge.Poseidon (Inputs))
 
   let params = Sponge.Params.map ~f:Inputs.Field.constant params
 

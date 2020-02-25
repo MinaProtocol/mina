@@ -2,6 +2,7 @@
   (name consensus)
   (public_name consensus)
   (inline_tests)
+  (modules (:standard \ proof_of_stake_fuzzer))
   (flags (-w -37))
   (library_flags (-linkall))
   (libraries
@@ -9,7 +10,7 @@
     core_kernel
     coda_base
     with_hash
-    genesis_ledger
+    test_genesis_ledger
     snark_params
     perf_histograms
     rc_pool
@@ -26,3 +27,10 @@
    (preprocessor_deps "../../config.mlh")
    (preprocess (pps ppx_base ppx_coda -lint-version-syntax-warnings ppx_let ppx_assert ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv bisect_ppx -conditional))
    (synopsis "Consensus mechanisms"))
+
+(executable
+  (name proof_of_stake_fuzzer)
+  (modules proof_of_stake_fuzzer)
+  (libraries core_kernel signature_lib coda_state coda_transition consensus prover blockchain_snark)
+  (preprocessor_deps "../../config.mlh")
+  (preprocess (pps ppx_coda ppx_jane)))

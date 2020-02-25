@@ -33,7 +33,24 @@ module Pending_coinbase_stack_state : sig
 end
 
 module Statement : sig
-  type t =
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t =
+        { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
+        ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
+        ; supply_increase: Currency.Amount.Stable.V1.t
+        ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
+        ; fee_excess:
+            ( Currency.Fee.Stable.V1.t
+            , Sgn.Stable.V1.t )
+            Currency.Signed_poly.Stable.V1.t
+        ; proof_type: Proof_type.Stable.V1.t }
+      [@@deriving compare, equal, hash, sexp, yojson]
+    end
+  end]
+
+  type t = Stable.Latest.t =
     { source: Coda_base.Frozen_ledger_hash.t
     ; target: Coda_base.Frozen_ledger_hash.t
     ; supply_increase: Currency.Amount.t
@@ -41,26 +58,6 @@ module Statement : sig
     ; fee_excess: Currency.Fee.Signed.t
     ; proof_type: Proof_type.t }
   [@@deriving compare, equal, hash, sexp, yojson]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type t =
-          { source: Coda_base.Frozen_ledger_hash.Stable.V1.t
-          ; target: Coda_base.Frozen_ledger_hash.Stable.V1.t
-          ; supply_increase: Currency.Amount.Stable.V1.t
-          ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
-          ; fee_excess:
-              ( Currency.Fee.Stable.V1.t
-              , Sgn.Stable.V1.t )
-              Currency.Signed.Stable.V1.t
-          ; proof_type: Proof_type.Stable.V1.t }
-        [@@deriving bin_io, compare, equal, hash, sexp, version, yojson]
-      end
-
-      module Latest = V1
-    end
-    with type V1.t = t
 
   val gen : t Quickcheck.Generator.t
 
@@ -71,17 +68,14 @@ module Statement : sig
   include Comparable.S with type t := t
 end
 
-type t [@@deriving sexp, to_yojson]
-
-module Stable :
-  sig
-    module V1 : sig
-      type t [@@deriving bin_io, compare, sexp, version, to_yojson]
-    end
-
-    module Latest = V1
+[%%versioned:
+module Stable : sig
+  module V1 : sig
+    type t [@@deriving compare, sexp, to_yojson]
   end
-  with type V1.t = t
+end]
+
+type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
 val create :
      source:Frozen_ledger_hash.t
@@ -177,7 +171,7 @@ val check_transaction :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-  -> Transaction.t
+  -> Transaction.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -186,7 +180,7 @@ val check_user_command :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase.Stack.t
-  -> User_command.With_valid_signature.t
+  -> User_command.With_valid_signature.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -196,7 +190,7 @@ val generate_transaction_witness :
   -> source:Frozen_ledger_hash.t
   -> target:Frozen_ledger_hash.t
   -> Pending_coinbase_stack_state.t
-  -> Transaction.t
+  -> Transaction.t Transaction_protocol_state.t
   -> Tick.Handler.t
   -> unit
 
@@ -209,7 +203,7 @@ module type S = sig
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
     -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
-    -> Transaction.t
+    -> Transaction.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 
@@ -217,8 +211,8 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_stack:Pending_coinbase.Stack.t
-    -> User_command.With_valid_signature.t
+    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> User_command.With_valid_signature.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 
@@ -226,8 +220,8 @@ module type S = sig
        sok_digest:Sok_message.Digest.t
     -> source:Frozen_ledger_hash.t
     -> target:Frozen_ledger_hash.t
-    -> pending_coinbase_stack:Pending_coinbase.Stack.t
-    -> Fee_transfer.t
+    -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
+    -> Fee_transfer.t Transaction_protocol_state.t
     -> Tick.Handler.t
     -> t
 

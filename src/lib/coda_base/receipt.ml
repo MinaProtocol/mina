@@ -1,5 +1,16 @@
-open Core
+(* receipt.ml *)
+
+[%%import
+"/src/config.mlh"]
+
+open Core_kernel
+
+[%%if
+defined consensus_mechanism]
+
 open Snark_params.Tick
+
+[%%endif]
 
 module Chain_hash = struct
   include Data_hash.Make_full_size ()
@@ -38,6 +49,9 @@ module Chain_hash = struct
              (field (t :> Field.t))))
     |> of_hash
 
+  [%%if
+  defined consensus_mechanism]
+
   module Checked = struct
     let constant (t : t) =
       var_of_hash_packed (Field.Var.constant (t :> Field.t))
@@ -75,6 +89,8 @@ module Chain_hash = struct
           x
         in
         assert (equal unchecked checked) )
+
+  [%%endif]
 
   let%test_unit "json" =
     Quickcheck.test ~trials:20 gen ~sexp_of:sexp_of_t ~f:(fun t ->

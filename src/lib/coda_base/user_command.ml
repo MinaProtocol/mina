@@ -73,6 +73,16 @@ let is_trivial t = Fee.(fee t < minimum_fee)
 
 let sender t = Public_key.compress Poly.(t.sender)
 
+let receiver = Fn.compose Payload.receiver payload
+
+let amount = Fn.compose Payload.amount payload
+
+let memo = Fn.compose Payload.memo payload
+
+let valid_until = Fn.compose Payload.valid_until payload
+
+let is_payment = Fn.compose Payload.is_payment payload
+
 let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
   ; sender= kp.public_key
@@ -219,7 +229,7 @@ module Gen = struct
           account_nonces.(sender) <- Account_nonce.succ nonce ;
           let%bind fee =
             Currency.Fee.(
-              gen_incl (of_int 3)
+              gen_incl (of_int 6)
                 (min (of_int 10) @@ Currency.Amount.to_fee this_split))
           in
           let amount =
@@ -283,6 +293,12 @@ let check_signature ({payload; sender; signature} : t) =
     payload
 
 [%%endif]
+
+let create_with_signature_checked signature sender payload =
+  let open Option.Let_syntax in
+  let%bind sender = Public_key.decompress sender in
+  let t = Poly.{payload; signature; sender} in
+  Option.some_if (check_signature t) t
 
 let gen_test =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
