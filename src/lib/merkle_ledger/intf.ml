@@ -32,7 +32,7 @@ module type Account_id = sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t [@@deriving sexp, bin_io]
+      type t [@@deriving sexp]
     end
   end]
 
