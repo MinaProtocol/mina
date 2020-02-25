@@ -433,7 +433,7 @@ module Rpcs = struct
       module Stable = struct
         module V1 = struct
           type t =
-            { node: Network_peer.Peer.Stable.V1.t
+            { node: Core.Unix.Inet_addr.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
@@ -444,9 +444,12 @@ module Rpcs = struct
                 list
             ; k_block_hashes: State_hash.Stable.V1.t list }
 
+          (* N.B.: the [@@to_yojson ...] per-field spec didn't seem to work, so we write
+             the full function in gory detail
+           *)
           let to_yojson t =
             `Assoc
-              [ ("node", Network_peer.Peer.Stable.V1.to_yojson t.node)
+              [ ("node", `String (Unix.Inet_addr.to_string t.node))
               ; ( "peers"
                 , `List
                     (List.map t.peers ~f:Network_peer.Peer.Stable.V1.to_yojson)
@@ -470,7 +473,7 @@ module Rpcs = struct
       end]
 
       type t = Stable.Latest.t =
-        { node: Network_peer.Peer.t
+        { node: Unix.Inet_addr.t
         ; peers: Network_peer.Peer.t list
         ; block_producers: Signature_lib.Public_key.Compressed.t list
         ; protocol_state_hash: State_hash.t

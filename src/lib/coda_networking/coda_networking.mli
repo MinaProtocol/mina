@@ -68,7 +68,7 @@ module Rpcs : sig
       module Stable : sig
         module V1 : sig
           type t =
-            { node: Network_peer.Peer.Stable.V1.t
+            { node: Core.Unix.Inet_addr.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
@@ -82,7 +82,7 @@ module Rpcs : sig
       end]
 
       type t = Stable.Latest.t =
-        { node: Network_peer.Peer.t
+        { node: Unix.Inet_addr.t
         ; peers: Network_peer.Peer.t list
         ; block_producers: Signature_lib.Public_key.Compressed.t list
         ; protocol_state_hash: State_hash.t
