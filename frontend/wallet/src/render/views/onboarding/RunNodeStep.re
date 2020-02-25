@@ -1,5 +1,30 @@
 [@bs.scope "window"] [@bs.val] external openExternal: string => unit = "";
 
+module Styles = {
+  open Css;
+  let elapsedTime =
+    style([
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`center),
+      alignContent(`center),
+    ]);
+  let downloaderText =
+    merge([
+      Theme.Text.Header.h3,
+      style([color(white), whiteSpace(`nowrap)]),
+    ]);
+  let smallText =
+    merge([
+      downloaderText,
+      style([
+        marginTop(`zero),
+        fontSize(`px(13)),
+        hover([cursor(`pointer)]),
+      ]),
+    ]);
+};
+
 [@react.component]
 let make = (~prevStep, ~createAccount) => {
   <OnboardingTemplate
@@ -28,6 +53,13 @@ let make = (~prevStep, ~createAccount) => {
           />
         </div>
       </>
-    miscRight={<LoaderRing />}
+    miscRight={
+      <div className=Styles.elapsedTime>
+        <LoaderRing />
+        <p className=Styles.smallText>
+          {React.string("Connecting to the network...")}
+        </p>
+      </div>
+    }
   />;
 };

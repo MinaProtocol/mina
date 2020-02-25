@@ -55,7 +55,7 @@ module HelpSection = {
         icon=HelpIcon.Docs
         width=4.
         height=1.5
-        padding=0.4
+        padding=0.4625
         style=HelpButton.OffWhite
         onClick={_ => openExternal("https://codaprotocol.com/docs/")}
       />
@@ -65,7 +65,7 @@ module HelpSection = {
         icon=HelpIcon.Discord
         width=5.5
         height=1.5
-        padding=0.4
+        padding=0.4625
         style=HelpButton.OffWhite
         onClick={_ => openExternal("https://discordapp.com/invite/Vexf4ED")}
       />

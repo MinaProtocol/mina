@@ -128,6 +128,7 @@ let make =
         Css.height(`rem(height)),
         Css.padding2(~v=`zero, ~h=`rem(padding)),
         Css.paddingLeft(`rem(0.1)),
+        Css.paddingTop(`px(1)),
       ]),
       Styles.buttonStyles(style),
     ])}
@@ -144,7 +145,7 @@ let make =
      | (None, Some(icon)) =>
        <>
          <HelpIcon kind=icon />
-         <Spacer width=0.2 />
+         <Spacer width=0.1375 />
          {React.string(label)}
        </>
      | (Some(link), None) =>

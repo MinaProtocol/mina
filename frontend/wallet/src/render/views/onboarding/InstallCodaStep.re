@@ -48,7 +48,7 @@ module InstallProgress = {
                }
                target="_blank"
                className=Styles.downloaderSubtext>
-               {React.string({j|Coda isn't installing properly \u00A0→|j})}
+               {React.string({j|Having problems installing Coda?|j})}
              </a>
            </>}
     </div>;

@@ -7,7 +7,7 @@ let make = (~kind) => {
   switch (kind) {
   | Discord =>
     <svg
-      height="22"
+      height="24"
       viewBox="0 0 24 24"
       fill="currentColor"
       stroke="currentColor"

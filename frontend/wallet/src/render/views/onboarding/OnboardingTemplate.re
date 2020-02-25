@@ -23,17 +23,14 @@ module Styles = {
     ]);
   };
   let header = {
-    merge([
-      Theme.Text.Header.h1,
-      style([color(white), fontSize(`rem(2.70))]),
-    ]);
+    merge([Theme.Text.title, style([color(white)])]);
   };
   let heroBody = {
     merge([
       Theme.Text.Body.regularLight,
       style([
         marginTop(`rem(1.)),
-        maxWidth(`rem(28.)),
+        maxWidth(`rem(23.125)),
         color(white),
         animationFillMode(`forwards),
       ]),
