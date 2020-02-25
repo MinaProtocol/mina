@@ -15,7 +15,6 @@ pull_request_rules:
           - "status-success=ci/circleci: test--test_postake_split_snarkless"
           - "status-success=ci/circleci: test--test_postake_txns"
           - "status-success=ci/circleci: test-unit--dev"
-          - "status-success=ci/circleci: test-unit--nonconsensus_medium_curves"
           - "status-success=ci/circleci: test-unit--test_postake_snarkless_unittest"
           - "status-success=ci/circleci: tracetool"
           - "#approved-reviews-by>=1"

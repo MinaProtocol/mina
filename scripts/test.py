@@ -13,7 +13,7 @@ build_artifact_profiles = [
     'testnet_postake_medium_curves'
 ]
 
-unit_test_profiles = ['test_postake_snarkless_unittest', 'dev', 'nonconsensus_medium_curves']
+unit_test_profiles = ['test_postake_snarkless_unittest', 'dev']
 
 unit_test_profiles_medium_curves = ['dev_medium_curves']
 
