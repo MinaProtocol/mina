@@ -421,11 +421,20 @@ module Rpcs = struct
 
   module Get_telemetry_data = struct
     module Telemetry_data = struct
+      let yojson_of_ban_status (inet_addr, peer_status) =
+        `Assoc
+          [ ("IP_address", `String (Unix.Inet_addr.to_string inet_addr))
+          ; ("peer_status", Trust_system.Peer_status.to_yojson peer_status) ]
+
+      let yojson_of_ban_statuses ban_statuses =
+        `List (List.map ban_statuses ~f:yojson_of_ban_status)
+
       [%%versioned
       module Stable = struct
         module V1 = struct
           type t =
-            { peers: Network_peer.Peer.Stable.V1.t list
+            { node: Network_peer.Peer.Stable.V1.t
+            ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
             ; protocol_state_hash: State_hash.Stable.V1.t
@@ -435,16 +444,37 @@ module Rpcs = struct
                 list
             ; k_block_hashes: State_hash.Stable.V1.t list }
 
+          let to_yojson t =
+            `Assoc
+              [ ("node", Network_peer.Peer.Stable.V1.to_yojson t.node)
+              ; ( "peers"
+                , `List
+                    (List.map t.peers ~f:Network_peer.Peer.Stable.V1.to_yojson)
+                )
+              ; ( "block_producers"
+                , `List
+                    (List.map t.block_producers
+                       ~f:
+                         Signature_lib.Public_key.Compressed.Stable.V1
+                         .to_yojson) )
+              ; ( "protocol_state_hash"
+                , State_hash.Stable.V1.to_yojson t.protocol_state_hash )
+              ; ("ban_statuses", yojson_of_ban_statuses t.ban_statuses)
+              ; ( "k_block_hashes"
+                , `List
+                    (List.map t.k_block_hashes
+                       ~f:State_hash.Stable.V1.to_yojson) ) ]
+
           let to_latest = Fn.id
         end
       end]
 
       type t = Stable.Latest.t =
-        { peers: Network_peer.Peer.t list
+        { node: Network_peer.Peer.t
+        ; peers: Network_peer.Peer.t list
         ; block_producers: Signature_lib.Public_key.Compressed.t list
         ; protocol_state_hash: State_hash.t
-        ; ban_statuses:
-            (Core.Unix.Inet_addr.t * Trust_system.Peer_status.t) list
+        ; ban_statuses: (Unix.Inet_addr.t * Trust_system.Peer_status.t) list
         ; k_block_hashes: State_hash.t list }
     end
 
@@ -454,7 +484,7 @@ module Rpcs = struct
       module T = struct
         type query = unit [@@deriving sexp, to_yojson]
 
-        type response = Telemetry_data.t option
+        type response = Telemetry_data.t Or_error.t
       end
 
       module Caller = T
@@ -465,6 +495,13 @@ module Rpcs = struct
     module M = Versioned_rpc.Both_convert.Plain.Make (Master)
     include M
 
+    let response_to_yojson response =
+      match response with
+      | Ok telem ->
+          Telemetry_data.Stable.V1.to_yojson telem
+      | Error err ->
+          `Assoc [("error", `String (Error.to_string_hum err))]
+
     include Perf_histograms.Rpc.Plain.Extend (struct
       include M
       include Master
@@ -474,7 +511,8 @@ module Rpcs = struct
       module T = struct
         type query = unit [@@deriving bin_io, sexp, version {rpc}]
 
-        type response = Telemetry_data.Stable.V1.t option
+        type response =
+          Telemetry_data.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
         [@@deriving bin_io, version {rpc}]
 
         let query_of_caller_model = Fn.id
@@ -674,14 +712,14 @@ let create (config : Config.t)
     return (result, sender)
   in
   let record_unknown_item result sender action_msg msg_args =
-    let%bind () =
+    let%map () =
       if Option.is_none result then
         Trust_system.(
           record_envelope_sender config.trust_system config.logger sender
             Actions.(Requested_unknown_item, Some (action_msg, msg_args)))
       else return ()
     in
-    return result
+    result
   in
   (* each of the passed-in procedures expects an enveloped input, so
      we wrap the data received via RPC *)
@@ -755,10 +793,11 @@ let create (config : Config.t)
       (Unix.Inet_addr.to_string conn.Peer.host) ;
     let action_msg = "Telemetry_data" in
     let msg_args = [] in
-    let%bind result, sender =
+    (* if peer doesn't return telemetry data, don't change trust score *)
+    let%map result, _sender =
       run_for_rpc_result conn query ~f:get_telemetry_data action_msg msg_args
     in
-    record_unknown_item result sender action_msg msg_args
+    result
   in
   let get_transition_chain_proof_rpc conn ~version:_ query =
     Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__

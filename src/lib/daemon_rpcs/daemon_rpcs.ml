@@ -873,7 +873,7 @@ module Get_telemetry_data = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Network_peer.Peer.Stable.V1.t list
+        type t = Network_peer.Peer.Id.Stable.V1.t list option
 
         let to_latest = Fn.id
       end
@@ -887,13 +887,8 @@ module Get_telemetry_data = struct
     module Stable = struct
       module V1 = struct
         type t =
-          ( Network_peer.Peer.Stable.V1.t list
-          * Signature_lib.Public_key.Compressed.Stable.V1.t list
-          * State_hash.Stable.V1.t
-          * ( Core.Unix.Inet_addr.Stable.V1.t
-            * Trust_system.Peer_status.Stable.V1.t )
-            list
-          * State_hash.Stable.V1.t list )
+          Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.Stable.V1.t
+          Core_kernel.Or_error.Stable.V1.t
           list
 
         let to_latest = Fn.id

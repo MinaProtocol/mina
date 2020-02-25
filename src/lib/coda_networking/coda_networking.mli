@@ -68,7 +68,8 @@ module Rpcs : sig
       module Stable : sig
         module V1 : sig
           type t =
-            { peers: Network_peer.Peer.Stable.V1.t list
+            { node: Network_peer.Peer.Stable.V1.t
+            ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
             ; protocol_state_hash: State_hash.Stable.V1.t
@@ -81,7 +82,8 @@ module Rpcs : sig
       end]
 
       type t = Stable.Latest.t =
-        { peers: Network_peer.Peer.t list
+        { node: Network_peer.Peer.t
+        ; peers: Network_peer.Peer.t list
         ; block_producers: Signature_lib.Public_key.Compressed.t list
         ; protocol_state_hash: State_hash.t
         ; ban_statuses:
@@ -91,7 +93,7 @@ module Rpcs : sig
 
     type query = unit [@@deriving sexp, to_yojson]
 
-    type response = Telemetry_data.t option
+    type response = Telemetry_data.t Or_error.t [@@deriving to_yojson]
   end
 
   type ('query, 'response) rpc =

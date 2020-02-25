@@ -744,13 +744,23 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 Logger.info config.logger
                   "Network not instantiated when telemetry data requested"
                   ~module_:__MODULE__ ~location:__LOC__ ;
-                Deferred.return None
+                Deferred.return
+                @@ Error
+                     (Error.of_string
+                        "Network not instantiated when telemetry data requested")
             | Some net -> (
               match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
               | None ->
-                  Deferred.return None
+                  Deferred.return
+                  @@ Error
+                       (Error.of_string
+                          "Could not get transition frontier for telemetry data")
               | Some frontier ->
-                  let%bind peers = Coda_networking.peers net in
+                  let node =
+                    Option.value_exn
+                      config.gossip_net_params.addrs_and_ports.peer
+                  in
+                  let%map peers = Coda_networking.peers net in
                   let protocol_state_hash =
                     let tip = Transition_frontier.best_tip frontier in
                     let state =
@@ -770,14 +780,14 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     List.map k_breadcrumbs
                       ~f:Transition_frontier.Breadcrumb.state_hash
                   in
-                  Deferred.return
-                    (Some
-                       Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
-                         { peers
-                         ; block_producers
-                         ; protocol_state_hash
-                         ; ban_statuses
-                         ; k_block_hashes }) )
+                  Ok
+                    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
+                      { node
+                      ; peers
+                      ; block_producers
+                      ; protocol_state_hash
+                      ; ban_statuses
+                      ; k_block_hashes } )
           in
           let%bind net =
             Coda_networking.create config.net_config
