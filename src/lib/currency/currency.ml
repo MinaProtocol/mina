@@ -50,19 +50,6 @@ end = struct
 
   type t = Unsigned.t [@@deriving sexp, compare, hash]
 
-  module Arg = struct
-    type typ = t [@@deriving sexp, hash, compare]
-
-    type t = typ [@@deriving sexp, hash, compare]
-
-    [%%define_locally
-    Unsigned.(of_int, to_int)]
-  end
-
-  include Codable.Make_of_int (Arg)
-  include Hashable.Make (Arg)
-  include Comparable.Make (Arg)
-
   [%%define_locally
   Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
 
@@ -99,6 +86,20 @@ end = struct
             (whole ^ decimal ^ String.make Int.(precision - decimal_length) '0')
     | _ ->
         failwith "Currency.of_formatted_string: Invalid currency input"
+
+  module Arg = struct
+    type typ = t [@@deriving sexp, hash, compare]
+
+    type t = typ [@@deriving sexp, hash, compare]
+
+    let to_string = to_formatted_string
+
+    let of_string = of_formatted_string
+  end
+
+  include Codable.Make_of_string (Arg)
+  include Hashable.Make (Arg)
+  include Comparable.Make (Arg)
 
   let gen_incl a b : t Quickcheck.Generator.t =
     let a = Bignum_bigint.of_string Unsigned.(to_string a) in
@@ -484,16 +485,6 @@ end
 let currency_length = 64
 
 module Fee = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Unsigned_extended.UInt64.Stable.V1.t
-      [@@deriving sexp, compare, hash, eq, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-
   module T =
     Make
       (Unsigned_extended.UInt64)
@@ -503,22 +494,26 @@ module Fee = struct
 
   include T
 
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Unsigned_extended.UInt64.Stable.V1.t
+      [@@deriving sexp, compare, hash, eq]
+
+      let to_yojson = to_yojson
+
+      let of_yojson = of_yojson
+
+      let to_latest = Fn.id
+    end
+  end]
+
   type _unused = unit constraint Signed.t = (t, Sgn.t) Signed_poly.t
 
   include Codable.Make_of_int (T)
 end
 
 module Amount = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Unsigned_extended.UInt64.Stable.V1.t
-      [@@deriving sexp, compare, hash, eq, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-
   module T =
     Make
       (Unsigned_extended.UInt64)
@@ -544,6 +539,20 @@ module Amount = struct
 
   include Codable.Make_of_int (T)
 
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Unsigned_extended.UInt64.Stable.V1.t
+      [@@deriving sexp, compare, hash, eq, yojson]
+
+      let to_yojson = to_yojson
+
+      let of_yojson = of_yojson
+
+      let to_latest = Fn.id
+    end
+  end]
+
   let of_fee (fee : Fee.t) : t = fee
 
   let to_fee (fee : t) : Fee.t = fee
@@ -568,15 +577,6 @@ module Amount = struct
 end
 
 module Balance = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Amount.Stable.V1.t [@@deriving sexp, compare, hash, yojson, eq]
-
-      let to_latest = Fn.id
-    end
-  end]
-
   [%%if
   defined consensus_mechanism]
 
@@ -587,6 +587,19 @@ module Balance = struct
   include (Amount : Basic with type t = Amount.t)
 
   [%%endif]
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Amount.Stable.V1.t [@@deriving sexp, compare, hash, yojson, eq]
+
+      let to_yojson = to_yojson
+
+      let of_yojson = of_yojson
+
+      let to_latest = Fn.id
+    end
+  end]
 
   let to_amount = Fn.id
 
