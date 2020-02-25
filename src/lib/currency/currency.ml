@@ -85,7 +85,7 @@ end = struct
           of_string
             (whole ^ decimal ^ String.make Int.(precision - decimal_length) '0')
     | _ ->
-        failwith "Currency.of_formatted_string: Invalid currency input" x
+        failwith "Currency.of_formatted_string: Invalid currency input"
 
   module Arg = struct
     type typ = t [@@deriving sexp, hash, compare]
