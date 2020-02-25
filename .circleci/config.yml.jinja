@@ -422,7 +422,7 @@ jobs:
                 command: make libp2p_helper
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 src/lib && (dune runtest src/lib --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile={{profile}} -j8 src/app/cli/src/coda.exe src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe && (dune runtest src/lib --profile={{profile}} -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
