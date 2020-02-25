@@ -88,6 +88,7 @@ extra_required_status_checks = [
     "ci/circleci: lint",
     "ci/circleci: tracetool",
     "ci/circleci: build-wallet",
+    "ci/circleci: compare-test-signatures",
 ]
 
 # these are full status check names. they will not be required to succeed.
