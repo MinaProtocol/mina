@@ -1453,8 +1453,8 @@ let get_telemetry =
   in
   let peer_ids_flag =
     flag "peer-ids"
+      (optional (Arg_type.comma_separated string))
       ~doc:"Comma-delimited list of peer IDs for obtaining telemetry data"
-      (optional string)
   in
   let show_errors_flag =
     flag "show-errors" no_arg ~doc:"Include error responses in output"
@@ -1467,15 +1467,12 @@ let get_telemetry =
            (Option.is_none peer_ids && not daemon_peers)
            || (Option.is_some peer_ids && daemon_peers)
          then (
-           eprintf "Must provide exactly one of daemon-peers or peer-ids flags" ;
+           eprintf
+             "Must provide exactly one of daemon-peers or peer-ids flags\n%!" ;
            don't_wait_for (exit 33) ) ;
          let peer_ids_opt =
-           match peer_ids with
-           | None ->
-               None
-           | Some s ->
-               let ids = String.split s ~on:',' in
-               Some (List.map ids ~f:Network_peer.Peer.Id.unsafe_of_string)
+           Option.map peer_ids ~f:(fun peer_ids ->
+               List.map peer_ids ~f:Network_peer.Peer.Id.unsafe_of_string )
          in
          match%map
            Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_telemetry_data.rpc
