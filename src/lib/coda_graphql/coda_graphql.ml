@@ -1547,9 +1547,9 @@ module Mutations = struct
         Currency.Fee.(fee >= User_command.minimum_fee)
         ~error:
           (sprintf
-             !"Invalid user command. Fee %d is less than the minimum fee, %d."
-             (Currency.Fee.to_int fee)
-             (Currency.Fee.to_int User_command.minimum_fee))
+             !"Invalid user command. Fee %s is less than the minimum fee, %s."
+             (Currency.Fee.to_string fee)
+             (Currency.Fee.to_string User_command.minimum_fee))
     in
     let%bind memo =
       Option.value_map memo ~default:(Ok User_command_memo.empty)
