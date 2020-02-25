@@ -738,6 +738,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                    Public_key.compress public_key )
           in
           let get_telemetry_data _env =
+            let node =
+              Option.value_exn config.gossip_net_params.addrs_and_ports.peer
+            in
             match !net_ref with
             | None ->
                 (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
@@ -747,19 +750,21 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 Deferred.return
                 @@ Error
                      (Error.of_string
-                        "Network not instantiated when telemetry data requested")
+                        (sprintf
+                           !"Node: %{sexp: Network_peer.Peer.t}, network not \
+                             instantiated when telemetry data requested"
+                           node))
             | Some net -> (
               match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
               | None ->
                   Deferred.return
                   @@ Error
                        (Error.of_string
-                          "Could not get transition frontier for telemetry data")
+                          (sprintf
+                             !"Node: %{sexp: Network_peer.Peer.t}, could not \
+                               get transition frontier for telemetry data"
+                             node))
               | Some frontier ->
-                  let node =
-                    Option.value_exn
-                      config.gossip_net_params.addrs_and_ports.peer
-                  in
                   let%map peers = Coda_networking.peers net in
                   let protocol_state_hash =
                     let tip = Transition_frontier.best_tip frontier in
