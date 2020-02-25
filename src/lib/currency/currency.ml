@@ -85,7 +85,7 @@ end = struct
           of_string
             (whole ^ decimal ^ String.make Int.(precision - decimal_length) '0')
     | _ ->
-        failwith "Currency.of_formatted_string: Invalid currency input"
+        failwith "Currency.of_formatted_string: Invalid currency input" x
 
   module Arg = struct
     type typ = t [@@deriving sexp, hash, compare]
@@ -509,8 +509,6 @@ module Fee = struct
   end]
 
   type _unused = unit constraint Signed.t = (t, Sgn.t) Signed_poly.t
-
-  include Codable.Make_of_int (T)
 end
 
 module Amount = struct
@@ -536,8 +534,6 @@ module Amount = struct
   include (T : module type of T with module Signed = T.Signed)
 
   [%%endif]
-
-  include Codable.Make_of_int (T)
 
   [%%versioned
   module Stable = struct

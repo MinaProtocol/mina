@@ -2,181 +2,181 @@
  {
   "pk": "4vsRCVLvMpfH3MGm1nwGyr2oQHBkP28KWDPgntwSbn7qnomBEG2s24MeMTNk7eVfTd7jwGgZSThB9XBZ5uoXYJ7Lopcx39UyMctkysyQRHBD7WPzYwCT3XUSqSg6A12wbZuAtMM9wQSqtWQw",
   "sk": null,
-  "balance": 839000,
+  "balance": "0.000839000",
   "delegate": "4vsRCVTf2NFD6KCR89iE5PfVPG9T6bS7wwt6vLD2QeouBtrnBzoMCjnrKhJYJTLH3hTwdvfbdXqnVdgyHBEaM75GEAk6UqJ7zRjHX5N1jtWpVymDZaXfUPxaZc2dtsd6rAJtFMkuUEcZFBeq"
  },
  {
   "pk": "4vsRCVTf2NFD6KCR89iE5PfVPG9T6bS7wwt6vLD2QeouBtrnBzoMCjnrKhJYJTLH3hTwdvfbdXqnVdgyHBEaM75GEAk6UqJ7zRjHX5N1jtWpVymDZaXfUPxaZc2dtsd6rAJtFMkuUEcZFBeq",
   "sk": null,
   "delegate": null,
-  "balance": 1000
+  "balance": "0.000001000"
  },
  {
   "pk": "4vsRCVWFtzpLvyfMd2ss9LMqZnHJf7RehTSqRLSdiG67tX3H7SvsKsxdbcBATA276A65j5pMm5gd7GSGNcvepSshyNZ3BqDvzgLDXLB9HfmWXZYSnoLEBPidvRMEy8gYrHMPc3c4gmDbq1Uf",
   "sk": null,
-  "balance": 839000,
+  "balance": "0.000839000",
   "delegate": "4vsRCVv7Sa559KHHQRDVgBm1QPh6d3Rb7J1F6698qGz9c3qeLq8BL8coqNpP7DKKkUqq2UAGhPUMSEn2zv9XEiMVDJNTA8y28YuQPpeLdsfbpnDG4Z7gCaWMnfFApvk8pcpDYzfQ3ocwpjT7"
  },
  {
   "pk": "4vsRCVv7Sa559KHHQRDVgBm1QPh6d3Rb7J1F6698qGz9c3qeLq8BL8coqNpP7DKKkUqq2UAGhPUMSEn2zv9XEiMVDJNTA8y28YuQPpeLdsfbpnDG4Z7gCaWMnfFApvk8pcpDYzfQ3ocwpjT7",
   "sk": null,
   "delegate": null,
-  "balance": 1000
+  "balance": "0.000001000"
  },
  {
   "pk": "4vsRCVqWvTSrEih3Db91b3eGTMxtQzvTcBwwgMPAszBJ4k73fWmpXdAtkbx1tZFEspHmLWmWuy6NafuQJi9GnajSoe53utGqHGtHGGyKNHE2gZh163Cei1voZqCAoa2EiXeuczaKcXoArktg",
   "sk": null,
-  "balance": 839000,
+  "balance": "0.000839000",
   "delegate": "4vsRCVR41jtmvLfTZnHjmpUQK38vksS1TenHqgpjvBuUyf1iiuLQhdZHbPwnSsgrsLDittzX4C7gqwz6L5nhu1pkNk2n8H37HRAE4hJDRCN1cPrVe2ZNtMNiPzJ2uA2yqUA7a4y9U1cxHonV"
  },
  {
   "pk": "4vsRCVR41jtmvLfTZnHjmpUQK38vksS1TenHqgpjvBuUyf1iiuLQhdZHbPwnSsgrsLDittzX4C7gqwz6L5nhu1pkNk2n8H37HRAE4hJDRCN1cPrVe2ZNtMNiPzJ2uA2yqUA7a4y9U1cxHonV",
   "sk": null,
   "delegate": null,
-  "balance": 1000
+  "balance": "0.000001000"
  },
  {
   "pk": "4vsRCVMuLfvixMyx2RYxN1mvHJT17q3k34jaM19UfZBAsTygJU2U9hC8qGHkz2pAXm7Qc5kBSx3QmvWYSHFyJFB25c9u5yxQApK6n8HiXeP1A6ZB51Z3ik8ofVswRRi4gATn4ZheebTaxDVQ",
   "sk": null,
-  "balance": 839000,
+  "balance": "0.000839000",
   "delegate": "4vsRCVMJ3ANtnRRXmmKXfYqHTtg6JbvS4fgjYGkCHQFKmm8Pgpp9quTBCpwXZp9TroAEwQE46hABEvJPfKcbPiRQu6bNm4pCXB6ZJspmUBepeh9TqbfSQS2faKSxJCmTE3e5PGSxi6mmz2cu"
  },
  {
   "pk": "4vsRCVMJ3ANtnRRXmmKXfYqHTtg6JbvS4fgjYGkCHQFKmm8Pgpp9quTBCpwXZp9TroAEwQE46hABEvJPfKcbPiRQu6bNm4pCXB6ZJspmUBepeh9TqbfSQS2faKSxJCmTE3e5PGSxi6mmz2cu",
   "sk": null,
   "delegate": null,
-  "balance": 1000
+  "balance": "0.000001000"
  },
  {
   "pk": "4vsRCVj2R3rGxfc8zti5GynEu7XvK4PYJnM6UUPhdiRLV1Vx6jtovMmeg3jHtNdYNetqaTTNnYE3RKWfsBQSsWPQzFpbvo9MvvzUVBN6KkfrCmuiFS7JPNPvNE4uaCqvfBaBUaumBEEj39aw",
   "sk": null,
-  "balance": 839000,
+  "balance": "0.000839000",
   "delegate": "4vsRCVcJrLv3e9TdQBJbWhheGjpP23UhhFdUUa9on6zXg63hHLpozzKP2q5y5S5JNK1g8swXw2dPc7eqHVvbjxagfZSfz7LCgFN6PbDSN7zjUiSRZkoxwBF6cNaDesm8ZQBmRmXto6kRj37h"
  },
  {
   "pk": "4vsRCVcJrLv3e9TdQBJbWhheGjpP23UhhFdUUa9on6zXg63hHLpozzKP2q5y5S5JNK1g8swXw2dPc7eqHVvbjxagfZSfz7LCgFN6PbDSN7zjUiSRZkoxwBF6cNaDesm8ZQBmRmXto6kRj37h",
   "sk": null,
   "delegate": null,
-  "balance": 1000
+  "balance": "0.000001000"
  },
  {
   "pk": "4vsRCVtsKHpu9cqTmEnfUV31UZdMAowEJbSkJqpdbvxeBh6ySYg6zGWYiFQeZdTTskH7TUmPuNb8EY1ECYUj4USG9KR194hTME1utbDPzA26QX2NJkeRcH9at2PtoLRTJnHWyKKMfENsDnmh",
   "sk": null,
-  "balance": 839000,
+  "balance": "0.000839000",
   "delegate": "4vsRCVaJrrYBxbiSqHmUhDd9Hh9Lmp3pPJLc6zLQdbDSBJbR5usWdh9xAEZDXWZrVWk8PujYafx2av1Sz6cn3FL3y3md9oMFwu2EFqFEUhCBF8gzkuJQJWi5AAtDtHuMigHSbvvWVqz4ks2N"
  },
  {
   "pk": "4vsRCVaJrrYBxbiSqHmUhDd9Hh9Lmp3pPJLc6zLQdbDSBJbR5usWdh9xAEZDXWZrVWk8PujYafx2av1Sz6cn3FL3y3md9oMFwu2EFqFEUhCBF8gzkuJQJWi5AAtDtHuMigHSbvvWVqz4ks2N",
   "sk": null,
   "delegate": null,
-  "balance": 1000
+  "balance": "0.000001000"
  },
  {
   "pk": "4vsRCVxpNMRGQZm4dFH1VaKa6mfhxnrBoM1iKv6eWQxFeQDwASL5cb7bC9vTwXPRG8eDgsqnPmWKaixox2WuBPSe8SBG6fygGjAfXs54PieGdcRS4mBR6eqLPCjykBGDNdQnfEcSnZxAsLCk",
   "sk": null,
-  "balance": 839000,
+  "balance": "0.000839000",
   "delegate": "4vsRCVyVkSRs89neWnKPrnz4FRPmXXrWtbsAQ31hUTSi41EkbptYaLkzmxezQEGCgZnjqY2pQ6mdeCytu7LrYMGx9NiUNNJh8XfJYbzprhhJmm1ZjVbW9ZLRvhWBXRqes6znuF7fWbECrCpQ"
  },
  {
   "pk": "4vsRCVyVkSRs89neWnKPrnz4FRPmXXrWtbsAQ31hUTSi41EkbptYaLkzmxezQEGCgZnjqY2pQ6mdeCytu7LrYMGx9NiUNNJh8XfJYbzprhhJmm1ZjVbW9ZLRvhWBXRqes6znuF7fWbECrCpQ",
   "sk": null,
   "delegate": null,
-  "balance": 1000
+  "balance": "0.000001000"
  },
  {
   "pk": "4vsRCVGWShNXy73CohQxkM95svGjNfu9vy8KtJ8WLiHYK4RkYxzfGGhNBdAFbUNgQGRM9wGMr963izra9fXetzSdeeyPbbffoiRWrFN3DGTkuR5odjTd42Ei8cVfLQL3pArTwA7gDkeAHzno",
   "sk": null,
-  "balance": 839000,
+  "balance": "0.000839000",
   "delegate": "4vsRCVf32uxAybcH3BcZEKkU7VeMSSEKJ5LZn381bf8JXXhWLRHcocgh9b6KQFGbfjfZ8tsNdZfiBBCeMcTFyUMtGXc1eY6WhG8DY94FjQUhwTHtCq1YqSjbJsWa76Ywf1qNWVHiW7bCFh24"
  },
  {
   "pk": "4vsRCVf32uxAybcH3BcZEKkU7VeMSSEKJ5LZn381bf8JXXhWLRHcocgh9b6KQFGbfjfZ8tsNdZfiBBCeMcTFyUMtGXc1eY6WhG8DY94FjQUhwTHtCq1YqSjbJsWa76Ywf1qNWVHiW7bCFh24",
   "sk": null,
   "delegate": null,
-  "balance": 1000
+  "balance": "0.000001000"
  },
  {
   "pk": "4vsRCVdCjUJuyazmU6iVnjEyMnjbgURYwctTygzq5SNRAfQ7AEnsPQQpho4PfuEhzyiGgatjnGjPH21YyPMCnN4phuuMCHbT54WxTPxbQEFthkk8gG9dTd7pDT3pBVc8aFXUN1Bc3XDn9S6g",
   "sk": null,
-  "balance": 839000,
+  "balance": "0.000839000",
   "delegate": "4vsRCVxYS7pNi5wamBNHvz4CmLPjZErZYp65fbnzXshHFZ8wNj1bsHz6vcoF9hxM6KJAQwZK21UzVgXmsT1EZJvTXeZY8EXAsBYwo1uVevqsGTHB4NrMBoCfUBijRBKoUkT7GXyMaH7HxMLg"
  },
  {
   "pk": "4vsRCVxYS7pNi5wamBNHvz4CmLPjZErZYp65fbnzXshHFZ8wNj1bsHz6vcoF9hxM6KJAQwZK21UzVgXmsT1EZJvTXeZY8EXAsBYwo1uVevqsGTHB4NrMBoCfUBijRBKoUkT7GXyMaH7HxMLg",
   "sk": null,
   "delegate": null,
-  "balance": 1000
+  "balance": "0.000001000"
  },
  {
   "pk": "4vsRCVk2aT6QbbspsWCRfEAHm72G4NGZ4pugFjYgaU7TFv3bUKR3htv2Dyh94G5zad2GQmuoHs2hKLyrfiAa62HnTRFwJ8AvbgvUhHFUdaiWkiqv7ca9VfUuoMpac4H5Acb4MmDFRCJKNXe7",
   "sk": null,
-  "balance": 839000,
+  "balance": "0.000839000",
   "delegate": "4vsRCVHDvZfDEjDpDik28iAvVKj2Lhy5Bf33xL1k5399TLWZN6zgpKkJahfTHNDK8EG59GdM2CaPLqM36kfL3c1D3kbTjUioAmx5A7Lt5y6xPMMEfTATeGNYdutX1H32TwFh7AZGtpEH8hV2"
  },
  {
   "pk": "4vsRCVHDvZfDEjDpDik28iAvVKj2Lhy5Bf33xL1k5399TLWZN6zgpKkJahfTHNDK8EG59GdM2CaPLqM36kfL3c1D3kbTjUioAmx5A7Lt5y6xPMMEfTATeGNYdutX1H32TwFh7AZGtpEH8hV2",
   "sk": null,
   "delegate": null,
-  "balance": 1000
+  "balance": "0.000001000"
  },
  {
   "pk": "4vsRCVHXUBWafWoZxkTty6c29YEVhHRCcDCieXDsPCYeEBaCPwA9rLzkSg3ajcsM2eCkukFVHJsZRWfc1TYh8cLHjjqQ5NXw5x12SiymckQms4E23zMT6ndjF46NRYpChaCR6u3kVke8VNEd",
   "sk": null,
-  "balance": 720000,
+  "balance": "0.000720000",
   "delegate": "4vsRCVj8WXDxr69NADm83NTpxu8RJExLv24L3viMSNDVtWpQgpsyCpgQoCQWXCbEKbk4mtxDy6YEm8Z3CJaAJ97S9Va1S1DuamYfxqVcbRzQyM8vo6KLB6Li7FojnYo4c92SgtoFhh9mrtwU"
  },
  {
   "pk": "4vsRCVj8WXDxr69NADm83NTpxu8RJExLv24L3viMSNDVtWpQgpsyCpgQoCQWXCbEKbk4mtxDy6YEm8Z3CJaAJ97S9Va1S1DuamYfxqVcbRzQyM8vo6KLB6Li7FojnYo4c92SgtoFhh9mrtwU",
   "sk": null,
-  "balance": 0,
+  "balance": "0.000000000",
   "delegate": null
  },
  {
   "pk": "4vsRCVdkKrhSrSonRNyVWSnwYRfwmQ4nfoNSt45LvKc8GHuaEcSAfeed2YudvA9sbhEn4qm5n8CPmaKavJtVbujBRGirEDz8GaCEbn49GDHTaFLSp5URKnkd7AobPZtD5gK7A8dRk62wUuC4",
   "sk": null,
-  "balance": 720000,
+  "balance": "0.000720000",
   "delegate": "4vsRCVMpahr8VuefjQpyBcYHsUYkujCTLQAJXzh5NUDMNtK2dWHrkvZfHVhTBT4BBh9YdUeMtHA6pK6rvBPMGSLuJMVTmYyXNZr8QR3i3Cz9qQDbCwYUoaKymFUVz6VAzz9fA6mJdd4CkPTE"
  },
  {
   "pk": "4vsRCVMpahr8VuefjQpyBcYHsUYkujCTLQAJXzh5NUDMNtK2dWHrkvZfHVhTBT4BBh9YdUeMtHA6pK6rvBPMGSLuJMVTmYyXNZr8QR3i3Cz9qQDbCwYUoaKymFUVz6VAzz9fA6mJdd4CkPTE",
   "sk": null,
-  "balance": 0,
+  "balance": "0.000000000",
   "delegate": null
  },
  {
   "pk": "4vsRCVamgA4ebAJKYKoE4nExoWC8nqCB1Z2JRvD649kMUzgbuPtxNb37nbmWCaQ1LgJKXLEB9zVhRX3ML9e4AV5BWftTahsEb8b2auRbF7msowKxMtSCk8hBogMeT3oNFLRLNnvgmvJ594F5",
   "sk": null,
-  "balance": 720000,
+  "balance": "0.000720000",
   "delegate": "4vsRCVJu2DiMjSgwBEWndNoxbN1UUUbyLoTBer6wEMWJL3GLagRbH7Tze7CUtk1MqfBTAHRfYh2Y7QBbtZr1omceHujQVjqUEMVNzMdtzesLaymRfVCTibN8RXN4caECr5mqJYTB3MivSTPz"
  },
  {
   "pk": "4vsRCVJu2DiMjSgwBEWndNoxbN1UUUbyLoTBer6wEMWJL3GLagRbH7Tze7CUtk1MqfBTAHRfYh2Y7QBbtZr1omceHujQVjqUEMVNzMdtzesLaymRfVCTibN8RXN4caECr5mqJYTB3MivSTPz",
   "sk": null,
-  "balance": 0,
+  "balance": "0.000000000",
   "delegate": null
  },
  {
   "pk": "4vsRCVtzyQot9eJPzGm64z2h4Az4uUeUZRLRdEkwSzH2HAy5cB7jK1yAvbtnSGbvNpFMEsX9MPL5AbwWhk5XYStPrG3mi8aqxHU3DoE3VtLtqJcK2rVnnGogS8itwiB61NjuUJj8ZNKaND1L",
   "sk": null,
-  "balance": 720000,
+  "balance": "0.000720000",
   "delegate": "4vsRCVpckvSocBRWaedCyJFHe3Q3Uq32oYYrkbqeE4TVymtcAPomY8TBMXqaZpHgJgdybzpQFtNR2zyyScPkoz62JWoj7RyTDN99bYWr4LtQLF6Q6ZeemLPmnz5amFtax33BxrP1KL3DXdU5"
  },
  {
   "pk": "4vsRCVpckvSocBRWaedCyJFHe3Q3Uq32oYYrkbqeE4TVymtcAPomY8TBMXqaZpHgJgdybzpQFtNR2zyyScPkoz62JWoj7RyTDN99bYWr4LtQLF6Q6ZeemLPmnz5amFtax33BxrP1KL3DXdU5",
   "sk": null,
-  "balance": 0,
+  "balance": "0.000000000",
   "delegate": null
  },
  {
   "pk": "4vsRCVaCEL3sYFNSPTTPQrTax5HmaqgqDrxN2S7aRjDZimD3RXqp7v8yk3RcoimLf55y71PZZKvzSqCQBuWA7osD7cGXv76DGUuai6oVhrHw2gELTrYnwDUHrmWgbH3sA4Xe3bD6gCZKCto5",
   "sk": null,
-  "balance": 720000,
+  "balance": "0.000720000",
   "delegate": "4vsRCVXd7YehQVVWPFEftqKAqkc2k1i6EUQmDKTavNm2PicarR5PQseMw9u4uUCirGsMxXFtkzRANe8oKS9GcXn7AfhkahTHJqYWzdhytjyGiGpg35ASN2oqGvZ9tBKXXNvvHCqHBpPyH9KX"
  },
  {
   "pk": "4vsRCVXd7YehQVVWPFEftqKAqkc2k1i6EUQmDKTavNm2PicarR5PQseMw9u4uUCirGsMxXFtkzRANe8oKS9GcXn7AfhkahTHJqYWzdhytjyGiGpg35ASN2oqGvZ9tBKXXNvvHCqHBpPyH9KX",
   "sk": null,
-  "balance": 0,
+  "balance": "0.000000000",
   "delegate": null
  }
 ]
