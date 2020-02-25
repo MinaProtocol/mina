@@ -56,7 +56,7 @@ module type S = sig
 
   module Rpcs : sig
     module Get_work : sig
-      module V2 : sig
+      module V1 : sig
         type query = unit
 
         type response = (Work.Spec.t * Public_key.Compressed.t) option
@@ -64,19 +64,11 @@ module type S = sig
         val rpc : (query, response) Rpc.Rpc.t
       end
 
-      module V1 : sig
-        type query
-
-        type response
-
-        val rpc : (query, response) Rpc.Rpc.t
-      end
-
-      module Latest = V2
+      module Latest = V1
     end
 
     module Submit_work : sig
-      module V2 : sig
+      module V1 : sig
         type query = Work.Result.t
 
         type response = unit
@@ -84,16 +76,7 @@ module type S = sig
         val rpc : (query, response) Rpc.Rpc.t
       end
 
-      module V1 : sig
-        type query
-
-        type response
-
-        (* Disabled; cannot convert to the latest version. *)
-        (*val rpc : (query, response) Rpc.Rpc.t*)
-      end
-
-      module Latest = V2
+      module Latest = V1
     end
   end
 

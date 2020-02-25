@@ -1,6 +1,5 @@
 open Core
 open Snark_params.Tick
-open Import
 
 module Poly : sig
   type ('pk, 'amount) t = {receiver: 'pk; amount: 'amount}
@@ -20,22 +19,10 @@ end
 
 [%%versioned:
 module Stable : sig
-  module V2 : sig
+  module V1 : sig
     type t =
       (Account_id.Stable.V1.t, Currency.Amount.Stable.V1.t) Poly.Stable.V1.t
     [@@deriving compare, eq, sexp, hash, compare, yojson]
-  end
-
-  module V1 : sig
-    type t =
-      ( Public_key.Compressed.Stable.V1.t
-      , Currency.Amount.Stable.V1.t )
-      Poly.Stable.V1.t
-    [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
-
-    val to_latest : t -> V2.t
-
-    val of_latest : V2.t -> (t, string) Result.t
   end
 end]
 

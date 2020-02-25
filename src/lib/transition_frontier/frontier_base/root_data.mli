@@ -8,22 +8,12 @@ open Coda_transition
 module Historical : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
-      type t =
-        { transition: External_transition.Validated.Stable.V2.t
-        ; scan_state: Staged_ledger.Scan_state.Stable.V2.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t
-        ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
-    end
-
     module V1 : sig
       type t =
         { transition: External_transition.Validated.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t
         ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
-
-      val to_latest : t -> V2.t
     end
   end]
 
@@ -41,20 +31,11 @@ end
 module Limited : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
-      type t =
-        { transition: External_transition.Validated.Stable.V2.t
-        ; scan_state: Staged_ledger.Scan_state.Stable.V2.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-    end
-
     module V1 : sig
       type t =
         { transition: External_transition.Validated.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-
-      val to_latest : t -> V2.t
     end
   end]
 
@@ -69,20 +50,11 @@ end
 module Minimal : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
-      type t =
-        { hash: State_hash.Stable.V1.t
-        ; scan_state: Staged_ledger.Scan_state.Stable.V2.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-    end
-
     module V1 : sig
       type t =
         { hash: State_hash.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-
-      val to_latest : t -> V2.t
     end
   end]
 

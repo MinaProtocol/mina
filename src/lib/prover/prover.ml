@@ -10,18 +10,6 @@ module type S = Intf.S
 module Extend_blockchain_input = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        { chain: Blockchain.Stable.V1.t
-        ; next_state: Protocol_state.Value.Stable.V1.t
-        ; block: Snark_transition.Value.Stable.V1.t
-        ; prover_state: Consensus.Data.Prover_state.Stable.V2.t
-        ; pending_coinbase: Pending_coinbase_witness.Stable.V1.t }
-      [@@deriving sexp]
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         { chain: Blockchain.Stable.V1.t
@@ -31,14 +19,7 @@ module Extend_blockchain_input = struct
         ; pending_coinbase: Pending_coinbase_witness.Stable.V1.t }
       [@@deriving sexp]
 
-      let to_latest {chain; next_state; block; prover_state; pending_coinbase}
-          =
-        { V2.chain
-        ; next_state
-        ; block
-        ; prover_state=
-            Consensus.Data.Prover_state.Stable.V1.to_latest prover_state
-        ; pending_coinbase }
+      let to_latest = Fn.id
     end
   end]
 

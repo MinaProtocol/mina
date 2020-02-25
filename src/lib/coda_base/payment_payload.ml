@@ -1,6 +1,5 @@
 open Core
 open Snark_params.Tick
-open Import
 module Amount = Currency.Amount
 module Fee = Currency.Fee
 
@@ -20,25 +19,11 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V1 = struct
     type t = (Account_id.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
     [@@deriving compare, eq, sexp, hash, compare, yojson]
 
     let to_latest = Fn.id
-  end
-
-  module V1 = struct
-    type t =
-      (Public_key.Compressed.Stable.V1.t, Amount.Stable.V1.t) Poly.Stable.V1.t
-    [@@deriving compare, eq, sexp, hash, compare, yojson]
-
-    let to_latest ({receiver; amount} : t) : V2.t =
-      {receiver= Account_id.create receiver Token_id.default; amount}
-
-    let of_latest ({receiver; amount} : V2.t) : (t, string) Result.t =
-      if Token_id.equal (Account_id.token_id receiver) Token_id.default then
-        Ok {receiver= Account_id.public_key receiver; amount}
-      else Error "Unhandled token ID"
   end
 end]
 

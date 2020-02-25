@@ -5,17 +5,6 @@ open Coda_transition
 module Historical = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        { transition: External_transition.Validated.Stable.V2.t
-        ; scan_state: Staged_ledger.Scan_state.Stable.V2.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t
-        ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
-      [@@deriving bin_io, version]
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         { transition: External_transition.Validated.Stable.V1.t
@@ -24,16 +13,7 @@ module Historical = struct
         ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
       [@@deriving bin_io, version]
 
-      let to_latest
-          { transition
-          ; scan_state
-          ; pending_coinbase
-          ; staged_ledger_target_ledger_hash } =
-        { V2.transition=
-            External_transition.Validated.Stable.V1.to_latest transition
-        ; scan_state= Staged_ledger.Scan_state.Stable.V1.to_latest scan_state
-        ; pending_coinbase
-        ; staged_ledger_target_ledger_hash }
+      let to_latest = Fn.id
     end
   end]
 
@@ -61,16 +41,6 @@ end
 module Limited = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        { transition: External_transition.Validated.Stable.V2.t
-        ; scan_state: Staged_ledger.Scan_state.Stable.V2.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-      [@@deriving bin_io, version]
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         { transition: External_transition.Validated.Stable.V1.t
@@ -78,11 +48,7 @@ module Limited = struct
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
       [@@deriving bin_io, version]
 
-      let to_latest {transition; scan_state; pending_coinbase} =
-        { V2.transition=
-            External_transition.Validated.Stable.V1.to_latest transition
-        ; scan_state= Staged_ledger.Scan_state.Stable.V1.to_latest scan_state
-        ; pending_coinbase }
+      let to_latest = Fn.id
     end
   end]
 
@@ -97,16 +63,6 @@ end
 module Minimal = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        { hash: State_hash.Stable.V1.t
-        ; scan_state: Staged_ledger.Scan_state.Stable.V2.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-      [@@deriving bin_io, version]
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         { hash: State_hash.Stable.V1.t
@@ -114,10 +70,7 @@ module Minimal = struct
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
       [@@deriving bin_io, version]
 
-      let to_latest {hash; scan_state; pending_coinbase} =
-        { V2.hash
-        ; scan_state= Staged_ledger.Scan_state.Stable.V1.to_latest scan_state
-        ; pending_coinbase }
+      let to_latest = Fn.id
     end
   end]
 

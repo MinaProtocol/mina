@@ -33,18 +33,6 @@ end
 module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        { transaction_with_info:
-            Transaction_logic.Undo.Stable.V2.t
-            Transaction_protocol_state.Stable.V1.t
-        ; statement: Transaction_snark.Statement.Stable.V1.t
-        ; witness: Transaction_witness.Stable.V2.t sexp_opaque }
-      [@@deriving sexp]
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         { transaction_with_info:
@@ -54,15 +42,7 @@ module Transaction_with_witness = struct
         ; witness: Transaction_witness.Stable.V1.t sexp_opaque }
       [@@deriving sexp]
 
-      let to_latest
-          {transaction_with_info= {transaction; block_data}; statement; witness}
-          : V2.t =
-        { transaction_with_info=
-            { transaction=
-                Transaction_logic.Undo.Stable.V1.to_latest transaction
-            ; block_data }
-        ; statement
-        ; witness= Transaction_witness.Stable.V1.to_latest witness }
+      let to_latest = Fn.id
     end
   end]
 
@@ -148,11 +128,11 @@ end
 type job = Available_job.t [@@deriving sexp]
 
 module Stable = struct
-  module V2 = struct
+  module V1 = struct
     module T = struct
       type t =
         ( Ledger_proof_with_sok_message.Stable.V1.t
-        , Transaction_with_witness.Stable.V2.t )
+        , Transaction_with_witness.Stable.V1.t )
         Parallel_scan.State.Stable.V1.t
       [@@deriving sexp, bin_io, version]
     end
@@ -167,34 +147,13 @@ module Stable = struct
       let state_hash =
         Parallel_scan.State.hash t
           (Binable.to_string (module Ledger_proof_with_sok_message.Stable.V1))
-          (Binable.to_string (module Transaction_with_witness.Stable.V2))
+          (Binable.to_string (module Transaction_with_witness.Stable.V1))
       in
       Staged_ledger_hash.Aux_hash.of_bytes
         (state_hash |> Digestif.SHA256.to_raw_string)
   end
 
-  module V1 = struct
-    (* NOTE: This type was never versioned correctly. Do not including it in
-       the versioning mechanism, or back-compatability will break.
-    *)
-    (* TODO: Retire this version. *)
-    module T = struct
-      type t =
-        ( Ledger_proof_with_sok_message.Stable.V1.t
-        , Transaction_with_witness.Stable.V1.t )
-        Parallel_scan.State.Stable.V1.t
-      [@@deriving sexp, bin_io, version]
-    end
-
-    include T
-
-    let to_latest : t -> V2.t =
-      Parallel_scan.State.Stable.V1.to_latest
-        Ledger_proof_with_sok_message.Stable.V1.to_latest
-        Transaction_with_witness.Stable.V1.to_latest
-  end
-
-  module Latest = V2
+  module Latest = V1
 
   module Module_decl = struct
     let name = "transaction_snark_scan_state"
@@ -203,7 +162,7 @@ module Stable = struct
   end
 
   module Registrar = Registration.Make (Module_decl)
-  module Registered_V2 = Registrar.Register (V2)
+  module Registered_V1 = Registrar.Register (V1)
 end
 
 type t = Stable.Latest.t [@@deriving sexp]

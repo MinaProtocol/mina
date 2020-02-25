@@ -52,16 +52,6 @@ end)
 module Answer = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        ( Ledger_hash.Stable.V1.t
-        , Account.Stable.V2.t )
-        Syncable_ledger.Answer.Stable.V1.t
-      [@@deriving sexp]
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         ( Ledger_hash.Stable.V1.t
@@ -69,14 +59,7 @@ module Answer = struct
         Syncable_ledger.Answer.Stable.V1.t
       [@@deriving sexp]
 
-      let to_latest (t : t) : V2.t =
-        match t with
-        | Child_hashes_are (x, y) ->
-            Child_hashes_are (x, y)
-        | Contents_are accs ->
-            Contents_are (List.map ~f:Account.Stable.V1.to_latest accs)
-        | Num_accounts (x, y) ->
-            Num_accounts (x, y)
+      let to_latest = Fn.id
     end
   end]
 

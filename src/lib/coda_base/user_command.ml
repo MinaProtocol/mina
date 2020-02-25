@@ -25,9 +25,9 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V1 = struct
     type t =
-      ( Payload.Stable.V2.t
+      ( Payload.Stable.V1.t
       , Public_key.Stable.V1.t
       , Signature.Stable.V1.t )
       Poly.Stable.V1.t
@@ -62,35 +62,6 @@ module Stable = struct
             else Some (Account_id.create sender token_id) )
       in
       fee_sender :: List.append sender_accounts payload_accounts
-  end
-
-  module V1 = struct
-    type t =
-      ( Payload.Stable.V1.t
-      , Public_key.Stable.V1.t
-      , Signature.Stable.V1.t )
-      Poly.Stable.V1.t
-    [@@deriving compare, sexp, hash, yojson]
-
-    let to_latest ({payload; sender; signature} : t) : V2.t =
-      {payload= Payload.Stable.V1.to_latest payload; sender; signature}
-
-    let of_latest ({payload; sender; signature} : V2.t) =
-      let open Result.Let_syntax in
-      let%map payload = Payload.Stable.V1.of_latest payload in
-      ({payload; sender; signature} : t)
-
-    let version_byte = Base58_check.Version_bytes.user_command
-
-    module T = struct
-      (* can't use nonrec + deriving *)
-      type typ = t [@@deriving compare, sexp, hash]
-
-      type t = typ [@@deriving compare, sexp, hash]
-    end
-
-    include Comparable.Make (T)
-    include Hashable.Make (T)
   end
 end]
 
@@ -306,24 +277,14 @@ end
 module With_valid_signature = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = Stable.V2.t [@@deriving sexp, eq, yojson, hash]
-
-      let to_latest = Stable.V2.to_latest
-
-      let compare = Stable.V2.compare
-
-      module Gen = Gen
-    end
-
     module V1 = struct
       type t = Stable.V1.t [@@deriving sexp, eq, yojson, hash]
 
       let to_latest = Stable.V1.to_latest
 
-      let of_latest = Stable.V1.of_latest
-
       let compare = Stable.V1.compare
+
+      module Gen = Gen
     end
   end]
 

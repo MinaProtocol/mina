@@ -108,16 +108,6 @@ end
 module Pre_diff_with_at_most_two_coinbase = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        ( Transaction_snark_work.Stable.V1.t
-        , User_command.Stable.V2.t )
-        Pre_diff_two.Stable.V1.t
-      [@@deriving sexp, to_yojson]
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         ( Transaction_snark_work.Stable.V1.t
@@ -125,11 +115,7 @@ module Pre_diff_with_at_most_two_coinbase = struct
         Pre_diff_two.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest ({completed_works; user_commands; coinbase} : t) : V2.t =
-        { completed_works
-        ; user_commands=
-            List.map user_commands ~f:User_command.Stable.V1.to_latest
-        ; coinbase }
+      let to_latest = Fn.id
     end
   end]
 
@@ -139,16 +125,6 @@ end
 module Pre_diff_with_at_most_one_coinbase = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        ( Transaction_snark_work.Stable.V1.t
-        , User_command.Stable.V2.t )
-        Pre_diff_one.Stable.V1.t
-      [@@deriving sexp, to_yojson]
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         ( Transaction_snark_work.Stable.V1.t
@@ -156,11 +132,7 @@ module Pre_diff_with_at_most_one_coinbase = struct
         Pre_diff_one.Stable.V1.t
       [@@deriving sexp, to_yojson]
 
-      let to_latest ({completed_works; user_commands; coinbase} : t) : V2.t =
-        { completed_works
-        ; user_commands=
-            List.map user_commands ~f:User_command.Stable.V1.to_latest
-        ; coinbase }
+      let to_latest = Fn.id
     end
   end]
 
@@ -170,25 +142,13 @@ end
 module Diff = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        Pre_diff_with_at_most_two_coinbase.Stable.V2.t
-        * Pre_diff_with_at_most_one_coinbase.Stable.V2.t option
-      [@@deriving sexp, to_yojson]
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         Pre_diff_with_at_most_two_coinbase.Stable.V1.t
         * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
       [@@deriving sexp, to_yojson]
 
-      let to_latest (at_most_2, at_most_1) =
-        ( Pre_diff_with_at_most_two_coinbase.Stable.V1.to_latest at_most_2
-        , Option.map ~f:Pre_diff_with_at_most_one_coinbase.Stable.V1.to_latest
-            at_most_1 )
+      let to_latest = Fn.id
     end
   end]
 
@@ -197,16 +157,6 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
-    type t =
-      { diff: Diff.Stable.V2.t
-      ; creator: Public_key.Compressed.Stable.V1.t
-      ; coinbase_receiver: Public_key.Compressed.Stable.V1.t }
-    [@@deriving sexp, to_yojson]
-
-    let to_latest = Fn.id
-  end
-
   module V1 = struct
     type t =
       { diff: Diff.Stable.V1.t
@@ -214,8 +164,7 @@ module Stable = struct
       ; coinbase_receiver: Public_key.Compressed.Stable.V1.t }
     [@@deriving sexp, to_yojson]
 
-    let to_latest {diff; creator; coinbase_receiver} =
-      {V2.diff= Diff.Stable.V1.to_latest diff; creator; coinbase_receiver}
+    let to_latest = Fn.id
   end
 end]
 

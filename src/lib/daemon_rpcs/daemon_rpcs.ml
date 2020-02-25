@@ -9,16 +9,10 @@ module Send_user_command = struct
   module Query = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t = User_command.Stable.V2.t
-
-        let to_latest = Fn.id
-      end
-
       module V1 = struct
         type t = User_command.Stable.V1.t
 
-        let to_latest = User_command.Stable.V1.to_latest
+        let to_latest = Fn.id
       end
     end]
 
@@ -49,16 +43,10 @@ module Get_transaction_status = struct
   module Query = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t = User_command.Stable.V2.t
-
-        let to_latest = Fn.id
-      end
-
       module V1 = struct
         type t = User_command.Stable.V1.t
 
-        let to_latest = User_command.Stable.V1.to_latest
+        let to_latest = Fn.id
       end
     end]
 
@@ -89,16 +77,10 @@ module Send_user_commands = struct
   module Query = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t = User_command.Stable.V2.t list
-
-        let to_latest = Fn.id
-      end
-
       module V1 = struct
         type t = User_command.Stable.V1.t list
 
-        let to_latest = List.map ~f:User_command.Stable.V1.to_latest
+        let to_latest = Fn.id
       end
     end]
 
@@ -141,17 +123,10 @@ module Get_ledger = struct
   module Response = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t = Account.Stable.V2.t list Core_kernel.Or_error.Stable.V1.t
-
-        let to_latest = Fn.id
-      end
-
       module V1 = struct
         type t = Account.Stable.V1.t list Core_kernel.Or_error.Stable.V1.t
 
-        let to_latest =
-          Or_error.map ~f:(List.map ~f:Account.Stable.V1.to_latest)
+        let to_latest = Fn.id
       end
     end]
 
@@ -168,16 +143,10 @@ module Get_balance = struct
   module Query = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V1 = struct
         type t = Account_id.Stable.V1.t
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t = Public_key.Compressed.Stable.V1.t
-
-        let to_latest t = Account_id.create t Token_id.default
       end
     end]
 
@@ -310,25 +279,13 @@ module Verify_proof = struct
   module Query = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t =
-          Account_id.Stable.V1.t
-          * User_command.Stable.V2.t
-          * (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V2.t list)
-
-        let to_latest = Fn.id
-      end
-
       module V1 = struct
         type t =
-          Public_key.Compressed.Stable.V1.t
+          Account_id.Stable.V1.t
           * User_command.Stable.V1.t
           * (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list)
 
-        let to_latest (pk, cmd, (rcpt, cmds)) =
-          ( Account_id.create pk Token_id.default
-          , User_command.Stable.V1.to_latest cmd
-          , (rcpt, List.map ~f:User_command.Stable.V1.to_latest cmds) )
+        let to_latest = Fn.id
       end
     end]
 
@@ -358,17 +315,10 @@ module Prove_receipt = struct
   module Query = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V1 = struct
         type t = Receipt.Chain_hash.Stable.V1.t * Account_id.Stable.V1.t
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t =
-          Receipt.Chain_hash.Stable.V1.t * Public_key.Compressed.Stable.V1.t
-
-        let to_latest (rcpt, pk) = (rcpt, Account_id.create pk Token_id.default)
       end
     end]
 
@@ -378,22 +328,12 @@ module Prove_receipt = struct
   module Response = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t =
-          (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V2.t list)
-          Core_kernel.Or_error.Stable.V1.t
-
-        let to_latest = Fn.id
-      end
-
       module V1 = struct
         type t =
           (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list)
           Core_kernel.Or_error.Stable.V1.t
 
-        let to_latest =
-          Or_error.map ~f:(fun (rcpt, cmds) ->
-              (rcpt, List.map ~f:User_command.Stable.V1.to_latest cmds) )
+        let to_latest = Fn.id
       end
     end]
 
@@ -410,16 +350,10 @@ module Get_inferred_nonce = struct
   module Query = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V1 = struct
         type t = Account_id.Stable.V1.t
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t = Public_key.Compressed.Stable.V1.t
-
-        let to_latest pk = Account_id.create pk Token_id.default
       end
     end]
 
@@ -450,16 +384,10 @@ module Get_nonce = struct
   module Query = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V1 = struct
         type t = Account_id.Stable.V1.t
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t = Public_key.Compressed.Stable.V1.t
-
-        let to_latest pk = Account_id.create pk Token_id.default
       end
     end]
 

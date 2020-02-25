@@ -75,22 +75,12 @@ module Root_transition = struct
   module Lite_binable = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t =
-          { new_root: Root_data.Minimal.Stable.V2.t
-          ; garbage: Node_list.Lite.Stable.V1.t }
-
-        let to_latest = Fn.id
-      end
-
       module V1 = struct
         type t =
           { new_root: Root_data.Minimal.Stable.V1.t
           ; garbage: Node_list.Lite.Stable.V1.t }
 
-        let to_latest {new_root; garbage} =
-          { V2.new_root= Root_data.Minimal.Stable.V1.to_latest new_root
-          ; garbage= Node_list.Lite.Stable.V1.to_latest garbage }
+        let to_latest = Fn.id
       end
     end]
 
@@ -103,10 +93,10 @@ module Root_transition = struct
   module Lite = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V1 = struct
         module T = struct
           (* Note: The versioning linter views this as the stable type. *)
-          type t = Lite_binable.Stable.V2.t
+          type t = Lite_binable.Stable.V1.t
         end
 
         (* Migrate this to a new latest version and expose the underlying
@@ -127,13 +117,6 @@ module Root_transition = struct
         include Binable.Of_binable (T) (T_nonbinable)
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t = Lite_binable.Stable.V1.t
-
-        let to_latest t =
-          V2.T_nonbinable.of_binable (Lite_binable.Stable.V1.to_latest t)
       end
     end]
 
@@ -194,28 +177,13 @@ let to_lite (type mutant) (diff : (full, mutant) t) : (lite, mutant) t =
 module Lite_binable = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        | New_node of External_transition.Validated.Stable.V2.t
-        | Root_transitioned of Root_transition.Lite.Stable.V2.t
-        | Best_tip_changed of State_hash.Stable.V1.t
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         | New_node of External_transition.Validated.Stable.V1.t
         | Root_transitioned of Root_transition.Lite.Stable.V1.t
         | Best_tip_changed of State_hash.Stable.V1.t
 
-      let to_latest = function
-        | New_node tr ->
-            V2.New_node (External_transition.Validated.Stable.V1.to_latest tr)
-        | Root_transitioned rt ->
-            Root_transitioned (Root_transition.Lite.Stable.V1.to_latest rt)
-        | Best_tip_changed sh ->
-            Best_tip_changed sh
+      let to_latest = Fn.id
     end
   end]
 
@@ -233,10 +201,10 @@ module Lite = struct
   module E = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V1 = struct
         module T = struct
           (* Note: The versioning linter views this as the stable type. *)
-          type t = Lite_binable.Stable.V2.t
+          type t = Lite_binable.Stable.V1.t
         end
 
         type t = E : (lite, 'mutant) diff -> t
@@ -249,14 +217,14 @@ module Lite = struct
 
           let to_binable = function
             | E (New_node (Lite x)) ->
-                Lite_binable.Stable.V2.New_node x
+                (New_node x : T.t)
             | E (Root_transitioned x) ->
                 Root_transitioned x
             | E (Best_tip_changed x) ->
                 Best_tip_changed x
 
           let of_binable = function
-            | Lite_binable.Stable.V2.New_node x ->
+            | (New_node x : T.t) ->
                 E (New_node (Lite x))
             | Root_transitioned x ->
                 E (Root_transitioned x)
@@ -269,13 +237,6 @@ module Lite = struct
         include Binable.Of_binable (T) (T_nonbinable)
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t = Lite_binable.Stable.V1.t
-
-        let to_latest t =
-          V2.T_nonbinable.of_binable (Lite_binable.Stable.V1.to_latest t)
       end
     end]
 

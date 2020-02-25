@@ -6,26 +6,13 @@ open Signature_lib
 module Transactions = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        { user_commands: User_command.Stable.V2.t list
-        ; fee_transfers: Fee_transfer.Single.Stable.V1.t list
-        ; coinbase: Currency.Amount.Stable.V1.t }
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         { user_commands: User_command.Stable.V1.t list
         ; fee_transfers: Fee_transfer.Single.Stable.V1.t list
         ; coinbase: Currency.Amount.Stable.V1.t }
 
-      let to_latest {user_commands; fee_transfers; coinbase} =
-        { V2.user_commands=
-            List.map ~f:User_command.Stable.V1.to_latest user_commands
-        ; fee_transfers
-        ; coinbase }
+      let to_latest = Fn.id
     end
   end]
 
@@ -56,17 +43,6 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
-    type t =
-      { creator: Public_key.Compressed.Stable.V1.t
-      ; protocol_state: Protocol_state.Stable.V1.t
-      ; transactions: Transactions.Stable.V2.t
-      ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list
-      ; proof: Proof.Stable.V1.t }
-
-    let to_latest = Fn.id
-  end
-
   module V1 = struct
     type t =
       { creator: Public_key.Compressed.Stable.V1.t
@@ -75,12 +51,7 @@ module Stable = struct
       ; snark_jobs: Transaction_snark_work.Info.Stable.V1.t list
       ; proof: Proof.Stable.V1.t }
 
-    let to_latest {creator; protocol_state; transactions; snark_jobs; proof} =
-      { V2.creator
-      ; protocol_state
-      ; transactions= Transactions.Stable.V1.to_latest transactions
-      ; snark_jobs
-      ; proof }
+    let to_latest = Fn.id
   end
 end]
 

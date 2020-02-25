@@ -6,19 +6,11 @@ module Database = struct
   module Value = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t =
-          Filtered_external_transition.Stable.V2.t * Block_time.Stable.V1.t
-
-        let to_latest = Fn.id
-      end
-
       module V1 = struct
         type t =
           Filtered_external_transition.Stable.V1.t * Block_time.Stable.V1.t
 
-        let to_latest (transition, time) =
-          (Filtered_external_transition.Stable.V1.to_latest transition, time)
+        let to_latest = Fn.id
       end
     end]
   end

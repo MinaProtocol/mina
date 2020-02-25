@@ -8,23 +8,12 @@ module Body : sig
   [@@deriving eq, sexp, hash, yojson]
 
   module Stable : sig
-    module V2 : sig
+    module V1 : sig
       type nonrec t = t
       [@@deriving bin_io, version, compare, eq, sexp, hash, yojson]
     end
 
-    module V1 : sig
-      type t =
-        | Payment of Payment_payload.Stable.V1.t
-        | Stake_delegation of Stake_delegation.Stable.V1.t
-      [@@deriving bin_io, version, compare, eq, sexp, hash, yojson]
-
-      val to_latest : t -> V2.t
-
-      val of_latest : V2.t -> (t, string) Result.t
-    end
-
-    module Latest = V2
+    module Latest = V1
   end
 
   val receiver : t -> Account_id.t
@@ -44,34 +33,18 @@ module Common : sig
 
     module Stable :
       sig
-        module V2 : sig
-          type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t
-          [@@deriving bin_io, eq, sexp, hash, yojson, version]
-        end
-
         module V1 : sig
           type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t
           [@@deriving bin_io, eq, sexp, hash, yojson, version]
         end
 
-        module Latest = V2
+        module Latest = V1
       end
-      with type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) V2.t =
+      with type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) V1.t =
                   ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t
   end
 
   module Stable : sig
-    module V2 : sig
-      type t =
-        ( Currency.Fee.Stable.V1.t
-        , Token_id.Stable.V1.t
-        , Coda_numbers.Account_nonce.Stable.V1.t
-        , Coda_numbers.Global_slot.Stable.V1.t
-        , User_command_memo.t )
-        Poly.Stable.V2.t
-      [@@deriving bin_io, eq, sexp, hash]
-    end
-
     module V1 : sig
       type t =
         ( Currency.Fee.Stable.V1.t
@@ -81,13 +54,9 @@ module Common : sig
         , User_command_memo.t )
         Poly.Stable.V1.t
       [@@deriving bin_io, eq, sexp, hash]
-
-      val to_latest : t -> V2.t
-
-      val of_latest : V2.t -> (t, string) Result.t
     end
 
-    module Latest = V2
+    module Latest = V1
   end
 
   type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
@@ -123,6 +92,12 @@ module Poly : sig
       module V1 : sig
         type ('common, 'body) t
         [@@deriving bin_io, eq, sexp, hash, yojson, compare, version]
+
+        val of_latest :
+             ('common1 -> ('common2, 'err) Result.t)
+          -> ('body1 -> ('body2, 'err) Result.t)
+          -> ('common1, 'body1) t
+          -> (('common2, 'body2) t, 'err) Result.t
       end
 
       module Latest = V1
@@ -131,21 +106,12 @@ module Poly : sig
 end
 
 module Stable : sig
-  module V2 : sig
-    type t = (Common.Stable.V2.t, Body.Stable.V2.t) Poly.Stable.V1.t
-    [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
-  end
-
   module V1 : sig
     type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
     [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
-
-    val to_latest : t -> V2.t
-
-    val of_latest : V2.t -> (t, string) Result.t
   end
 
-  module Latest = V2
+  module Latest = V1
 end
 
 type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]

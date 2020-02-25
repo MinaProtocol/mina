@@ -63,26 +63,6 @@ module Nonce = Account_nonce
 module Poly = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type ( 'pk
-           , 'tid
-           , 'amount
-           , 'nonce
-           , 'receipt_chain_hash
-           , 'state_hash
-           , 'timing )
-           t =
-        { public_key: 'pk
-        ; token_id: 'tid
-        ; balance: 'amount
-        ; nonce: 'nonce
-        ; receipt_chain_hash: 'receipt_chain_hash
-        ; delegate: 'pk
-        ; voting_for: 'state_hash
-        ; timing: 'timing }
-      [@@deriving sexp, eq, compare, hash, yojson]
-    end
-
     module V1 = struct
       type ( 'pk
            , 'tid
@@ -93,6 +73,7 @@ module Poly = struct
            , 'timing )
            t =
         { public_key: 'pk
+        ; token_id: 'tid
         ; balance: 'amount
         ; nonce: 'nonce
         ; receipt_chain_hash: 'receipt_chain_hash
@@ -413,7 +394,7 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
+  module V1 = struct
     type t =
       ( Public_key.Compressed.Stable.V1.t
       , Token_id.Stable.V1.t
@@ -422,62 +403,12 @@ module Stable = struct
       , Receipt.Chain_hash.Stable.V1.t
       , State_hash.Stable.V1.t
       , Timing.Stable.V1.t )
-      Poly.Stable.V2.t
+      Poly.Stable.V1.t
     [@@deriving sexp, eq, hash, compare, yojson]
 
     let to_latest = Fn.id
 
     let public_key (t : t) : key = t.public_key
-  end
-
-  module V1 = struct
-    type t =
-      ( Public_key.Compressed.Stable.V1.t
-      , Token_id.Stable.V1.t (* Unused parameter. *)
-      , Balance.Stable.V1.t
-      , Nonce.Stable.V1.t
-      , Receipt.Chain_hash.Stable.V1.t
-      , State_hash.Stable.V1.t
-      , Timing.Stable.V1.t )
-      Poly.Stable.V1.t
-    [@@deriving sexp, eq, hash, compare, yojson]
-
-    let to_latest
-        { Poly.Stable.V1.public_key
-        ; balance
-        ; nonce
-        ; receipt_chain_hash
-        ; delegate
-        ; voting_for
-        ; timing } =
-      { Poly.Stable.Latest.public_key
-      ; token_id= Token_id.default
-      ; balance
-      ; nonce
-      ; receipt_chain_hash
-      ; delegate
-      ; voting_for
-      ; timing }
-
-    let of_latest
-        { Poly.Stable.Latest.public_key
-        ; token_id
-        ; balance
-        ; nonce
-        ; receipt_chain_hash
-        ; delegate
-        ; voting_for
-        ; timing } =
-      if Token_id.equal token_id Token_id.default then
-        Ok
-          { Poly.Stable.V1.public_key
-          ; balance
-          ; nonce
-          ; receipt_chain_hash
-          ; delegate
-          ; voting_for
-          ; timing }
-      else Error "Unhandled token ID."
   end
 end]
 

@@ -55,8 +55,8 @@ module Ledger_inner = struct
   module Account = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t = Account.Stable.V2.t [@@deriving eq, compare, sexp]
+      module V1 = struct
+        type t = Account.Stable.V1.t [@@deriving eq, compare, sexp]
 
         let to_latest = Fn.id
 
@@ -65,12 +65,6 @@ module Ledger_inner = struct
         let balance Account.Poly.{balance; _} = balance
 
         let empty = Account.empty
-      end
-
-      module V1 = struct
-        type t = Account.Stable.V1.t [@@deriving sexp]
-
-        let to_latest = Account.Stable.V1.to_latest
       end
     end]
 

@@ -1,31 +1,17 @@
 open Core
-open Import
 open Snark_params.Tick
 
 module Stable : sig
-  module V2 : sig
-    type t =
-      ( Ledger_hash.Stable.V1.t
-      , Account_id.Stable.V1.t
-      , Account.Stable.V2.t )
-      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-    [@@deriving bin_io, sexp, to_yojson, version]
-  end
-
   module V1 : sig
     type t =
       ( Ledger_hash.Stable.V1.t
-      , Public_key.Compressed.Stable.V1.t
+      , Account_id.Stable.V1.t
       , Account.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
     [@@deriving bin_io, sexp, to_yojson, version]
-
-    val to_latest : t -> V2.t
-
-    val of_latest : V2.t -> (t, string) Result.t
   end
 
-  module Latest = V2
+  module Latest = V1
 end
 
 type t = Stable.Latest.t [@@deriving to_yojson, sexp]

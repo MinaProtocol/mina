@@ -68,14 +68,6 @@ end
 
 module type Tree_node = sig
   module Stable : sig
-    module V2 : sig
-      type t =
-        { key: Receipt.Chain_hash.Stable.V1.t
-        ; value: User_command.Stable.V2.t
-        ; parent: Receipt.Chain_hash.Stable.V1.t }
-      [@@deriving bin_io, sexp, version]
-    end
-
     module V1 : sig
       type t =
         { key: Receipt.Chain_hash.Stable.V1.t
@@ -84,12 +76,12 @@ module type Tree_node = sig
       [@@deriving bin_io, sexp, version]
     end
 
-    module Latest = V2
+    module Latest = V1
   end
 
   type t = Stable.Latest.t =
-    { key: Receipt.Chain_hash.Stable.V1.t
-    ; value: User_command.Stable.V2.t
-    ; parent: Receipt.Chain_hash.Stable.V1.t }
+    { key: Receipt.Chain_hash.t
+    ; value: User_command.t
+    ; parent: Receipt.Chain_hash.t }
   [@@deriving sexp]
 end

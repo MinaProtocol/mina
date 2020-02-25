@@ -85,10 +85,6 @@ val validated_transitions :
 module Root_diff : sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
-      type t = {user_commands: User_command.Stable.V2.t list; root_length: int}
-    end
-
     module V1 : sig
       type t = {user_commands: User_command.Stable.V1.t list; root_length: int}
     end

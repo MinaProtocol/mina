@@ -69,15 +69,11 @@ module Pre_diff_with_at_most_two_coinbase : sig
 
   module Stable :
     sig
-      module V2 : sig
-        type t [@@deriving sexp, to_yojson, bin_io, version]
-      end
-
       module V1 : sig
         type t [@@deriving sexp, to_yojson, bin_io, version]
       end
     end
-    with type V2.t = t
+    with type V1.t = t
 end
 
 module Pre_diff_with_at_most_one_coinbase : sig
@@ -86,15 +82,11 @@ module Pre_diff_with_at_most_one_coinbase : sig
 
   module Stable :
     sig
-      module V2 : sig
-        type t [@@deriving sexp, to_yojson, bin_io, version]
-      end
-
       module V1 : sig
         type t [@@deriving sexp, to_yojson, bin_io, version]
       end
     end
-    with type V2.t = t
+    with type V1.t = t
 end
 
 module Diff : sig
@@ -105,15 +97,11 @@ module Diff : sig
 
   module Stable :
     sig
-      module V2 : sig
-        type t [@@deriving sexp, bin_io, to_yojson, version]
-      end
-
       module V1 : sig
         type t [@@deriving sexp, bin_io, to_yojson, version]
       end
     end
-    with type V2.t = t
+    with type V1.t = t
 end
 
 type t =
@@ -124,7 +112,7 @@ type t =
 
 module Stable :
   sig
-    module V2 : sig
+    module V1 : sig
       type t =
         { diff: Diff.t
         ; creator: Public_key.Compressed.t
@@ -132,15 +120,9 @@ module Stable :
       [@@deriving sexp, to_yojson, bin_io, version]
     end
 
-    module V1 : sig
-      type t [@@deriving sexp, to_yojson, bin_io, version]
-
-      val to_latest : t -> V2.t
-    end
-
-    module Latest = V2
+    module Latest = V1
   end
-  with type V2.t = t
+  with type V1.t = t
 
 module With_valid_signatures_and_proofs : sig
   type pre_diff_with_at_most_two_coinbase =

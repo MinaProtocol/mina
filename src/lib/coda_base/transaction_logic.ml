@@ -34,25 +34,13 @@ module Undo = struct
     module Common = struct
       [%%versioned
       module Stable = struct
-        module V2 = struct
-          type t =
-            { user_command: User_command.Stable.V2.t
-            ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t }
-          [@@deriving sexp]
-
-          let to_latest = Fn.id
-        end
-
         module V1 = struct
           type t =
             { user_command: User_command.Stable.V1.t
             ; previous_receipt_chain_hash: Receipt.Chain_hash.Stable.V1.t }
           [@@deriving sexp]
 
-          let to_latest ({user_command; previous_receipt_chain_hash} : t) :
-              V2.t =
-            { user_command= User_command.Stable.V1.to_latest user_command
-            ; previous_receipt_chain_hash }
+          let to_latest = Fn.id
         end
       end]
 
@@ -65,7 +53,7 @@ module Undo = struct
     module Body = struct
       [%%versioned
       module Stable = struct
-        module V2 = struct
+        module V1 = struct
           type t =
             | Payment of {previous_empty_accounts: Account_id.Stable.V1.t list}
             | Stake_delegation of
@@ -73,25 +61,6 @@ module Undo = struct
           [@@deriving sexp]
 
           let to_latest = Fn.id
-        end
-
-        module V1 = struct
-          type t =
-            | Payment of
-                { previous_empty_accounts:
-                    Public_key.Compressed.Stable.V1.t list }
-            | Stake_delegation of
-                { previous_delegate: Public_key.Compressed.Stable.V1.t }
-          [@@deriving sexp]
-
-          let to_latest = function
-            | Payment {previous_empty_accounts} ->
-                V2.Payment
-                  { previous_empty_accounts=
-                      List.map previous_empty_accounts ~f:(fun pk ->
-                          Account_id.create pk Token_id.default ) }
-            | Stake_delegation {previous_delegate} ->
-                V2.Stake_delegation {previous_delegate}
         end
       end]
 
@@ -103,20 +72,11 @@ module Undo = struct
 
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t = {common: Common.Stable.V2.t; body: Body.Stable.V2.t}
-        [@@deriving sexp]
-
-        let to_latest = Fn.id
-      end
-
       module V1 = struct
         type t = {common: Common.Stable.V1.t; body: Body.Stable.V1.t}
         [@@deriving sexp]
 
-        let to_latest ({common; body} : t) : V2.t =
-          { common= Common.Stable.V1.to_latest common
-          ; body= Body.Stable.V1.to_latest body }
+        let to_latest = Fn.id
       end
     end]
 
@@ -128,26 +88,13 @@ module Undo = struct
   module Fee_transfer_undo = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V1 = struct
         type t =
           { fee_transfer: Fee_transfer.Stable.V1.t
           ; previous_empty_accounts: Account_id.Stable.V1.t list }
         [@@deriving sexp]
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t =
-          { fee_transfer: Fee_transfer.Stable.V1.t
-          ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
-        [@@deriving sexp]
-
-        let to_latest {fee_transfer; previous_empty_accounts} =
-          { V2.fee_transfer
-          ; previous_empty_accounts=
-              List.map previous_empty_accounts ~f:(fun pk ->
-                  Account_id.create pk Token_id.default ) }
       end
     end]
 
@@ -159,26 +106,13 @@ module Undo = struct
   module Coinbase_undo = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V1 = struct
         type t =
           { coinbase: Coinbase.Stable.V1.t
           ; previous_empty_accounts: Account_id.Stable.V1.t list }
         [@@deriving sexp]
 
         let to_latest = Fn.id
-      end
-
-      module V1 = struct
-        type t =
-          { coinbase: Coinbase.Stable.V1.t
-          ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
-        [@@deriving sexp]
-
-        let to_latest {coinbase; previous_empty_accounts} =
-          { V2.coinbase
-          ; previous_empty_accounts=
-              List.map previous_empty_accounts ~f:(fun pk ->
-                  Account_id.create pk Token_id.default ) }
       end
     end]
 
@@ -191,16 +125,6 @@ module Undo = struct
   module Varying = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
-        type t =
-          | User_command of User_command_undo.Stable.V2.t
-          | Fee_transfer of Fee_transfer_undo.Stable.V2.t
-          | Coinbase of Coinbase_undo.Stable.V2.t
-        [@@deriving sexp]
-
-        let to_latest = Fn.id
-      end
-
       module V1 = struct
         type t =
           | User_command of User_command_undo.Stable.V1.t
@@ -208,13 +132,7 @@ module Undo = struct
           | Coinbase of Coinbase_undo.Stable.V1.t
         [@@deriving sexp]
 
-        let to_latest = function
-          | User_command uc ->
-              V2.User_command (User_command_undo.Stable.V1.to_latest uc)
-          | Fee_transfer ft ->
-              V2.Fee_transfer (Fee_transfer_undo.Stable.V1.to_latest ft)
-          | Coinbase cb ->
-              V2.Coinbase (Coinbase_undo.Stable.V1.to_latest cb)
+        let to_latest = Fn.id
       end
     end]
 
@@ -228,21 +146,12 @@ module Undo = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        {previous_hash: Ledger_hash.Stable.V1.t; varying: Varying.Stable.V2.t}
-      [@@deriving sexp]
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         {previous_hash: Ledger_hash.Stable.V1.t; varying: Varying.Stable.V1.t}
       [@@deriving sexp]
 
-      let to_latest {previous_hash; varying} =
-        {V2.previous_hash; varying= Varying.Stable.V1.to_latest varying}
+      let to_latest = Fn.id
     end
   end]
 

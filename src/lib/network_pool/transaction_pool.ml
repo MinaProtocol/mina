@@ -484,16 +484,10 @@ struct
     module Diff = struct
       [%%versioned
       module Stable = struct
-        module V2 = struct
-          type t = User_command.Stable.V2.t list [@@deriving sexp, yojson]
-
-          let to_latest = Fn.id
-        end
-
         module V1 = struct
           type t = User_command.Stable.V1.t list [@@deriving sexp, yojson]
 
-          let to_latest = List.map ~f:User_command.Stable.V1.to_latest
+          let to_latest = Fn.id
         end
       end]
 

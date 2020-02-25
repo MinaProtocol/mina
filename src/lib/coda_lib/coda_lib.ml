@@ -450,19 +450,10 @@ let validated_transitions t = t.pipes.validated_transitions_reader
 module Root_diff = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t = {user_commands: User_command.Stable.V2.t list; root_length: int}
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t = {user_commands: User_command.Stable.V1.t list; root_length: int}
 
-      let to_latest {user_commands; root_length} =
-        { V2.user_commands=
-            List.map ~f:User_command.Stable.V1.to_latest user_commands
-        ; root_length }
+      let to_latest = Fn.id
     end
   end]
 

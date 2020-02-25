@@ -4,70 +4,15 @@ open Snark_params.Tick
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
-    type t =
-      ( Ledger_hash.Stable.V1.t
-      , Account_id.Stable.V1.t
-      , Account.Stable.V2.t )
-      Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
-    [@@deriving to_yojson, sexp]
-
-    let to_latest = Fn.id
-  end
-
   module V1 = struct
     type t =
       ( Ledger_hash.Stable.V1.t
-      , Public_key.Compressed.Stable.V1.t
+      , Account_id.Stable.V1.t
       , Account.Stable.V1.t )
       Sparse_ledger_lib.Sparse_ledger.T.Stable.V1.t
     [@@deriving to_yojson, sexp]
 
-    let to_latest ({indexes; depth; tree} : t) : V2.t =
-      let rec go (tree : _ Sparse_ledger_lib.Sparse_ledger.Tree.Stable.V1.t) :
-          _ Sparse_ledger_lib.Sparse_ledger.Tree.Stable.V1.t =
-        match tree with
-        | Account x ->
-            Account (Account.Stable.V1.to_latest x)
-        | Hash h ->
-            Hash h
-        | Node (h, tree1, tree2) ->
-            Node (h, go tree1, go tree2)
-      in
-      { indexes=
-          List.map indexes ~f:(fun (pk, i) ->
-              (Account_id.create pk Token_id.default, i) )
-      ; depth
-      ; tree= go tree }
-
-    let of_latest ({indexes; depth; tree} : V2.t) : (t, string) Result.t =
-      let exception Ret_error of string in
-      let rec go (tree : _ Sparse_ledger_lib.Sparse_ledger.Tree.Stable.V1.t) :
-          _ Sparse_ledger_lib.Sparse_ledger.Tree.Stable.V1.t =
-        match tree with
-        | Account x -> (
-          match Account.Stable.V1.of_latest x with
-          | Ok account ->
-              Account account
-          | Error str ->
-              raise (Ret_error str) )
-        | Hash h ->
-            Hash h
-        | Node (h, tree1, tree2) ->
-            Node (h, go tree1, go tree2)
-      in
-      try
-        Ok
-          { indexes=
-              List.map indexes ~f:(fun (account_id, i) ->
-                  if
-                    Token_id.equal Token_id.default
-                      (Account_id.token_id account_id)
-                  then (Account_id.public_key account_id, i)
-                  else raise (Ret_error "Unhandled token id.") )
-          ; depth
-          ; tree= go tree }
-      with Ret_error message -> Error message
+    let to_latest = Fn.id
   end
 end]
 

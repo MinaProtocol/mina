@@ -5,21 +5,15 @@ type t [@@deriving sexp]
 
 module Stable :
   sig
-    module V2 : sig
+    module V1 : sig
       type t [@@deriving sexp, bin_io, version]
 
       val hash : t -> Staged_ledger_hash.Aux_hash.t
     end
 
-    module V1 : sig
-      type t [@@deriving sexp, bin_io, version]
-
-      val to_latest : t -> V2.t
-    end
-
-    module Latest = V2
+    module Latest = V1
   end
-  with type V2.t = t
+  with type V1.t = t
 
 module Transaction_with_witness : sig
   (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)

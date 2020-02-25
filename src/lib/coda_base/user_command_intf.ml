@@ -113,15 +113,7 @@ module type S = sig
         include Gen_intf with type t := t
       end
 
-      module V2 = Latest
-
-      module V1 : sig
-        type t [@@deriving sexp, eq, bin_io, yojson, version, compare, hash]
-
-        val to_latest : t -> Latest.t
-
-        val of_latest : Latest.t -> (t, string) Result.t
-      end
+      module V1 = Latest
     end
 
     type t = Stable.Latest.t [@@deriving sexp, yojson, compare, hash]

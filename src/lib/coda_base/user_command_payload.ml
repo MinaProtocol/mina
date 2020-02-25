@@ -8,19 +8,13 @@ module Common = struct
   module Poly = struct
     [%%versioned
     module Stable = struct
-      module V2 = struct
+      module V1 = struct
         type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t =
           { fee: 'fee
           ; fee_token: 'token_id
           ; nonce: 'nonce
           ; valid_until: 'global_slot
           ; memo: 'memo }
-        [@@deriving compare, eq, sexp, hash, yojson]
-      end
-
-      module V1 = struct
-        type ('fee, 'token_id_, 'nonce, 'global_slot, 'memo) t =
-          {fee: 'fee; nonce: 'nonce; valid_until: 'global_slot; memo: 'memo}
         [@@deriving compare, eq, sexp, hash, yojson]
       end
     end]
@@ -37,19 +31,6 @@ module Common = struct
 
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        ( Currency.Fee.Stable.V1.t
-        , Token_id.Stable.V1.t
-        , Account_nonce.Stable.V1.t
-        , Global_slot.Stable.V1.t
-        , Memo.Stable.V1.t )
-        Poly.Stable.V2.t
-      [@@deriving compare, eq, sexp, hash, yojson]
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         ( Currency.Fee.Stable.V1.t
@@ -60,13 +41,7 @@ module Common = struct
         Poly.Stable.V1.t
       [@@deriving compare, eq, sexp, hash, yojson]
 
-      let to_latest ({fee; nonce; valid_until; memo} : t) : V2.t =
-        {fee; fee_token= Token_id.default; nonce; valid_until; memo}
-
-      let of_latest ({fee; fee_token; nonce; valid_until; memo} : V2.t) :
-          (t, string) Result.t =
-        if fee_token = Token_id.default then Ok {fee; nonce; valid_until; memo}
-        else Error "Unhandled token ID"
+      let to_latest = Fn.id
     end
   end]
 
@@ -157,33 +132,13 @@ end
 module Body = struct
   [%%versioned
   module Stable = struct
-    module V2 = struct
-      type t =
-        | Payment of Payment_payload.Stable.V2.t
-        | Stake_delegation of Stake_delegation.Stable.V1.t
-      [@@deriving compare, eq, sexp, hash, yojson]
-
-      let to_latest = Fn.id
-    end
-
     module V1 = struct
       type t =
         | Payment of Payment_payload.Stable.V1.t
         | Stake_delegation of Stake_delegation.Stable.V1.t
       [@@deriving compare, eq, sexp, hash, yojson]
 
-      let to_latest = function
-        | Payment p ->
-            V2.Payment (Payment_payload.Stable.V1.to_latest p)
-        | Stake_delegation d ->
-            V2.Stake_delegation d
-
-      let of_latest = function
-        | V2.Payment p ->
-            Result.map (Payment_payload.Stable.V1.of_latest p) ~f:(fun p ->
-                Payment p )
-        | V2.Stake_delegation d ->
-            Ok (Stake_delegation d)
+      let to_latest = Fn.id
     end
   end]
 
@@ -231,24 +186,11 @@ end
 
 [%%versioned
 module Stable = struct
-  module V2 = struct
-    type t = (Common.Stable.V2.t, Body.Stable.V2.t) Poly.Stable.V1.t
-    [@@deriving compare, eq, sexp, hash, yojson]
-
-    let to_latest = Fn.id
-  end
-
   module V1 = struct
     type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
     [@@deriving compare, eq, sexp, hash, yojson]
 
-    let to_latest ({common; body} : t) : V2.t =
-      { common= Common.Stable.V1.to_latest common
-      ; body= Body.Stable.V1.to_latest body }
-
-    let of_latest =
-      Poly.Stable.V1.of_latest Common.Stable.V1.of_latest
-        Body.Stable.V1.of_latest
+    let to_latest = Fn.id
   end
 end]
 

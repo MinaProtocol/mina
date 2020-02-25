@@ -199,12 +199,8 @@ end
 module type Transaction_pool_diff_intf = sig
   [%%versioned:
   module Stable : sig
-    module V2 : sig
-      type t = User_command.Stable.V2.t list [@@deriving sexp, to_yojson]
-    end
-
     module V1 : sig
-      type t [@@deriving sexp, to_yojson]
+      type t = User_command.Stable.V1.t list [@@deriving sexp, to_yojson]
     end
   end]
 
