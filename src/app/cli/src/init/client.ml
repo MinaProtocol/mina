@@ -708,7 +708,7 @@ let cancel_transaction =
              let%bind sender_kp =
                Secrets.Keypair.Terminal_stdin.read_exn privkey_read_path
              in
-             let cancel_sender = User_command.fee_sender user_command in
+             let cancel_sender = User_command.fee_payer user_command in
              let cancel_sender_pk = Account_id.public_key cancel_sender in
              if
                not
@@ -786,7 +786,7 @@ let cancel_transaction_graphql =
            |> User_command.Payload.Body.receiver
          in
          let receiver_pk = Account_id.public_key receiver in
-         let cancel_sender = User_command.fee_sender user_command in
+         let cancel_sender = User_command.fee_payer user_command in
          let cancel_sender_pk = Account_id.public_key cancel_sender in
          let open Deferred.Let_syntax in
          let%bind nonce_response =

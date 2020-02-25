@@ -6,7 +6,7 @@ module Tag = Transaction_union_tag
 module Payload = Transaction_union_payload
 
 type ('payload, 'pk, 'signature) t_ =
-  {payload: 'payload; sender: 'pk; signature: 'signature}
+  {payload: 'payload; signer: 'pk; signature: 'signature}
 [@@deriving bin_io, eq, sexp, hash]
 
 (* OK to use Latest, rather than Vn, because t is not bin_io'ed *)
@@ -19,10 +19,10 @@ let typ : (var, t) Typ.t =
   let of_hlist
         : 'a 'b 'c. (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) t_
       =
-    H_list.(fun [payload; sender; signature] -> {payload; sender; signature})
+    H_list.(fun [payload; signer; signature] -> {payload; signer; signature})
   in
-  let to_hlist {payload; sender; signature} =
-    H_list.[payload; sender; signature]
+  let to_hlist {payload; signer; signature} =
+    H_list.[payload; signer; signature]
   in
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -38,11 +38,11 @@ let typ : (var, t) Typ.t =
 *)
 let of_transaction : Transaction.t -> t = function
   | User_command cmd ->
-      let User_command.Poly.Stable.Latest.{sender; payload; signature} =
+      let User_command.Poly.Stable.Latest.{signer; payload; signature} =
         (cmd :> User_command.t)
       in
       { payload= Transaction_union_payload.of_user_command_payload payload
-      ; sender
+      ; signer
       ; signature }
   | Coinbase {receiver; fee_transfer; amount} ->
       let other_pk, other_amount =
@@ -59,7 +59,7 @@ let of_transaction : Transaction.t -> t = function
               { public_key= Account_id.create receiver Token_id.default
               ; amount
               ; tag= Tag.Coinbase } }
-      ; sender= Public_key.decompress_exn other_pk
+      ; signer= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
   | Fee_transfer tr -> (
       let two (pk1, fee1) (pk2, fee2) : t =
@@ -74,7 +74,7 @@ let of_transaction : Transaction.t -> t = function
                 { public_key= Account_id.create pk1 Token_id.default
                 ; amount= Amount.of_fee fee1
                 ; tag= Tag.Fee_transfer } }
-        ; sender= Public_key.decompress_exn pk2
+        ; signer= Public_key.decompress_exn pk2
         ; signature= Signature.dummy }
       in
       match tr with

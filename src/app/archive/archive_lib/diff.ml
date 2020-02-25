@@ -77,7 +77,7 @@ module Builder = struct
     let sender_receipt_chains_from_parent_ledger =
       let user_commands = User_command.Set.of_list user_commands in
       let senders =
-        Account_id.Set.map user_commands ~f:User_command.fee_sender
+        Account_id.Set.map user_commands ~f:User_command.fee_payer
       in
       let ledger =
         Staged_ledger.ledger @@ Breadcrumb.staged_ledger breadcrumb

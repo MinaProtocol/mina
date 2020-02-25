@@ -274,10 +274,10 @@ module Base = struct
   open Tick
   open Let_syntax
 
-  let%snarkydef check_signature shifted ~payload ~is_user_command ~sender
+  let%snarkydef check_signature shifted ~payload ~is_user_command ~signer
       ~signature =
     let%bind verifies =
-      Schnorr.Checked.verifies shifted signature sender payload
+      Schnorr.Checked.verifies shifted signature signer payload
     in
     Boolean.Assert.any [Boolean.not is_user_command; verifies]
 
@@ -376,28 +376,25 @@ module Base = struct
       (shifted : (module Inner_curve.Checked.Shifted.S with type t = shifted))
       root pending_coinbase_stack_before pending_coinbase_after
       state_body_hash_opt
-      ({sender; signature; payload} : Transaction_union.var) =
+      ({signer; signature; payload} : Transaction_union.var) =
     let%bind is_user_command =
       Transaction_union.Tag.Checked.is_user_command payload.body.tag
     in
     let%bind () =
       [%with_label "Check transaction signature"]
-        (check_signature shifted ~payload ~is_user_command ~sender ~signature)
+        (check_signature shifted ~payload ~is_user_command ~signer ~signature)
     in
-    (* From here on, everything uses the compressed version of the sender's pk.
-    *)
-    let%bind sender = Public_key.compress_var sender in
+    let%bind signer_pk = Public_key.compress_var signer in
     let fee = payload.common.fee in
     (* Information for the receiver. *)
-    let receiver_id = payload.body.public_key in
-    let receiver = Account_id.Checked.public_key receiver_id in
-    (* Information for the sender. *)
-    let token = Account_id.Checked.token_id receiver_id in
-    let sender_id = Account_id.Checked.create sender token in
+    let receiver = payload.body.public_key in
+    (* Information for the source. *)
+    let token = Account_id.Checked.token_id receiver in
+    let source = Account_id.Checked.create signer_pk token in
     (* Information for the fee-payer. *)
     let nonce = payload.common.nonce in
     let fee_token = payload.common.fee_token in
-    let fee_sender_id = Account_id.Checked.create sender fee_token in
+    let fee_payer = Account_id.Checked.create signer_pk fee_token in
     (* Compute transaction kind. *)
     let tag = payload.body.tag in
     let%bind is_payment = Transaction_union.Tag.Checked.is_payment tag in
@@ -450,7 +447,9 @@ module Base = struct
              ~else_:pending_coinbase_stack_before
          in
          let%bind computed_pending_coinbase_stack_after =
-           let coinbase = (receiver, payload.body.amount) in
+           let coinbase =
+             (Account_id.Checked.public_key receiver, payload.body.amount)
+           in
            let%bind stack' =
              Pending_coinbase.Stack.Checked.push_coinbase coinbase
                pending_coinbase_stack_with_state
@@ -467,26 +466,29 @@ module Base = struct
     in
     let%bind payment_insufficient_funds =
       (* Here we 'forsee' whether there will be insufficient funds to send,
-         if this is a payment and the fee-payer is distinct from the sender
+         if this is a payment and the fee-payer is distinct from the source
          account.
 
          In this case, we still charge the fee-payer, but don't modify the
-         sender or receiver balance.
+         source or receiver balances.
+      *)
+      let%bind prover_source =
+        exists (Typ.Internal.ref ())
+          ~compute:(As_prover.read Account_id.typ source)
+      in
+      (* TODO: Implement requests within [As_prover] blocks, so we don't need
+         these kinds of wrapper.
       *)
       let%bind prover_account_idx =
-        (* TODO: Implement requests within [As_prover] blocks, so we don't need
-           this kind of wrapper.
-        *)
         exists (Typ.Internal.ref ())
           ~request:
             As_prover.(
-              let%map sender_id = read Account_id.typ sender_id in
-              Ledger_hash.Find_index sender_id)
+              let%map prover_source =
+                read (Typ.Internal.ref ()) prover_source
+              in
+              Ledger_hash.Find_index prover_source)
       in
-      let%bind prover_sender_account =
-        (* TODO: Implement requests within [As_prover] blocks, so we don't need
-           this kind of wrapper.
-        *)
+      let%bind prover_source_account =
         exists (Typ.Internal.ref ())
           ~request:
             As_prover.(
@@ -499,21 +501,20 @@ module Base = struct
         ~compute:
           As_prover.(
             let%bind account, _path =
-              read (Typ.Internal.ref ()) prover_sender_account
+              read (Typ.Internal.ref ()) prover_source_account
             in
             let%bind fee = read Fee.typ fee in
             let%bind is_payment = read Boolean.typ is_payment in
-            let%bind sender_id = read Account_id.typ sender_id in
-            let%map fee_sender_id = read Account_id.typ fee_sender_id in
-            if is_payment && not (Account_id.equal sender_id fee_sender_id)
-            then
+            let%bind source = read (Typ.Internal.ref ()) prover_source in
+            let%map fee_payer = read Account_id.typ fee_payer in
+            if is_payment && not (Account_id.equal source fee_payer) then
               Option.is_none
                 (Balance.sub_amount account.balance (Amount.of_fee fee))
             else false)
     in
     let%bind () =
       [%with_label
-        "Predict sufficient funds for a payment if sender is the fee-payer"]
+        "Predict sufficient funds for a payment if source is the fee-payer"]
         Boolean.(Assert.any [tokens_equal; not payment_insufficient_funds])
     in
     let%bind receiver_increase =
@@ -546,8 +547,9 @@ module Base = struct
         Fee.(var_of_t Coda_compile_config.account_creation_fee)
     in
     let%bind self_account_creation_amount =
-      (* If the tokens are equal, the receiver pays the fee for account
-         creation. Otherwise, the fee-sender pays.
+      (* If the tokens are equal, the fee for account creation is paid by
+         subtracting it from the transferred amount. Otherwise, the fee-payer
+         pays.
       *)
       Amount.Checked.if_ tokens_equal ~then_:account_creation_amount
         ~else_:Amount.(var_of_t zero)
@@ -558,19 +560,20 @@ module Base = struct
     let receiver_was_created = ref None in
     let%bind root_after_receiver_update =
       [%with_label "Update receiver"]
-        (let%bind receiver_id =
-           (* Don't access the delegated-to account. *)
-           Account_id.Checked.if_ is_stake_delegation ~then_:sender_id
-             ~else_:receiver_id
-         in
-         Frozen_ledger_hash.modify_account_recv root receiver_id
+        (Frozen_ledger_hash.modify_account_recv root receiver
            ~f:(fun ~is_empty_and_writeable account ->
              (* this account is:
                - the receiver for payments
-               - the delegator for stake delegation
+               - the delegated-to account for stake delegation
                - the receiver for a coinbase 
                - the first receiver for a fee transfer
              *)
+             let%bind () =
+               (* Check that the account exists if it is a stake delegation. *)
+               Boolean.(
+                 Assert.any
+                   [not is_stake_delegation; not is_empty_and_writeable])
+             in
              let%bind is_empty_and_writeable =
                Boolean.(
                  is_empty_and_writeable && not payment_insufficient_funds)
@@ -593,10 +596,12 @@ module Base = struct
                Balance.Checked.(account.balance + receiver_amount)
              and delegate =
                Public_key.Compressed.Checked.if_ is_empty_and_writeable
-                 ~then_:receiver ~else_:account.delegate
+                 ~then_:(Account_id.Checked.public_key receiver)
+                 ~else_:account.delegate
              and public_key =
                Public_key.Compressed.Checked.if_ is_empty_and_writeable
-                 ~then_:receiver ~else_:account.public_key
+                 ~then_:(Account_id.Checked.public_key receiver)
+                 ~else_:account.public_key
              and token_id =
                Token_id.Checked.if_ is_empty_and_writeable ~then_:token
                  ~else_:account.token_id
@@ -610,15 +615,15 @@ module Base = struct
              ; voting_for= account.voting_for
              ; timing= account.timing } ))
     in
-    let fee_sender_amount =
+    let fee_payer_amount =
       let sgn = Sgn.Checked.neg_if_true is_user_command in
       Amount.Signed.create ~magnitude:(Amount.Checked.of_fee fee) ~sgn
     in
     let receiver_was_created = Option.value_exn !receiver_was_created in
-    let%bind root_after_fee_sender_update =
-      [%with_label "Update fee sender"]
+    let%bind root_after_fee_payer_update =
+      [%with_label "Update fee payer"]
         (Frozen_ledger_hash.modify_account_send root_after_receiver_update
-           ~is_writeable:(Boolean.not is_user_command) fee_sender_id
+           ~is_writeable:(Boolean.not is_user_command) fee_payer
            ~f:(fun ~is_empty_and_writeable account ->
              (* this account is:
                - the fee-payer for payments
@@ -662,7 +667,7 @@ module Base = struct
                     Amount.Signed.create ~magnitude ~sgn:Sgn.Checked.neg
                   in
                   Amount.Signed.Checked.(
-                    add fee_sender_amount account_creation_fee))
+                    add fee_payer_amount account_creation_fee))
              in
              (* TODO: use actual slot. See issue #4036. *)
              let txn_global_slot = Global_slot.Checked.zero in
@@ -682,24 +687,25 @@ module Base = struct
              in
              let%map delegate =
                Public_key.Compressed.Checked.if_ is_empty_and_writeable
-                 ~then_:sender ~else_:account.delegate
+                 ~then_:(Account_id.Checked.public_key source)
+                 ~else_:account.delegate
              in
              { Account.Poly.balance
-             ; public_key= Account_id.Checked.public_key fee_sender_id
-             ; token_id= Account_id.Checked.token_id fee_sender_id
+             ; public_key= Account_id.Checked.public_key fee_payer
+             ; token_id= Account_id.Checked.token_id fee_payer
              ; nonce= next_nonce
              ; receipt_chain_hash
              ; delegate
              ; voting_for= account.voting_for
              ; timing } ))
     in
-    let%bind root_after_sender_update =
-      [%with_label "Update sender"]
+    let%bind root_after_source_update =
+      [%with_label "Update source"]
         (Frozen_ledger_hash.modify_account_send ~is_writeable:Boolean.false_
-           root_after_fee_sender_update sender_id
+           root_after_fee_payer_update source
            ~f:(fun ~is_empty_and_writeable:_ account ->
              (* this account is:
-               - the sender for payments
+               - the source for payments
                - the delegator for stake delegation
                - the fee-receiver for a coinbase 
                - the second receiver for a fee transfer
@@ -716,11 +722,11 @@ module Base = struct
              (* TODO: use actual slot. See issue #4036. *)
              let txn_global_slot = Global_slot.Checked.zero in
              let%bind timing =
-               [%with_label "Check sender timing"]
+               [%with_label "Check source timing"]
                  (check_timing ~account ~txn_amount:amount ~txn_global_slot)
              in
              let%bind balance =
-               [%with_label "Check sender balance"]
+               [%with_label "Check source balance"]
                  Balance.Checked.(account.balance - amount)
              in
              let%map delegate =
@@ -763,7 +769,7 @@ module Base = struct
       Amount.Checked.if_ is_coinbase ~then_:payload.body.amount
         ~else_:Amount.(var_of_t zero)
     in
-    (root_after_sender_update, fee_excess, supply_increase)
+    (root_after_source_update, fee_excess, supply_increase)
 
   (* Someday:
    write the following soundness tests:
@@ -1793,7 +1799,7 @@ let%test_module "transaction_snark" =
       User_command.check
         User_command.Poly.Stable.Latest.
           { payload
-          ; sender= Public_key.of_private_key_exn sender.private_key
+          ; signer= Public_key.of_private_key_exn sender.private_key
           ; signature }
       |> Option.value_exn
 
@@ -1991,16 +1997,16 @@ let%test_module "transaction_snark" =
                      [Account_id.create (fst ft) Token_id.default] )
             , Pending_coinbase.Stack.push_coinbase cb pending_coinbase_stack )
       in
-      let sender =
+      let signer =
         let txn_union = Transaction_union.of_transaction txn in
-        txn_union.sender |> Public_key.compress
+        txn_union.signer |> Public_key.compress
       in
       let sparse_ledger =
         Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
       in
       let _undo = Ledger.apply_transaction ledger txn in
       let target = Ledger.merkle_root ledger in
-      let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sender in
+      let sok_message = Sok_message.create ~fee:Fee.zero ~prover:signer in
       check_transaction ~sok_message ~source ~target
         ~pending_coinbase_stack_state:
           { Pending_coinbase_stack_state.source= pending_coinbase_stack

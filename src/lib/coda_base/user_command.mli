@@ -4,14 +4,14 @@ module Payload = User_command_payload
 
 module Poly : sig
   type ('payload, 'pk, 'signature) t =
-    {payload: 'payload; sender: 'pk; signature: 'signature}
+    {payload: 'payload; signer: 'pk; signature: 'signature}
   [@@deriving sexp, hash, yojson, eq, compare]
 
   module Stable :
     sig
       module V1 : sig
         type ('payload, 'pk, 'signature) t =
-          {payload: 'payload; sender: 'pk; signature: 'signature}
+          {payload: 'payload; signer: 'pk; signature: 'signature}
         [@@deriving bin_io, sexp, hash, yojson, eq, compare]
       end
 

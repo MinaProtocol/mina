@@ -83,9 +83,11 @@ module type S = sig
 
   val nonce : t -> Account_nonce.t
 
-  val fee_sender : t -> Account_id.t
+  val signer : t -> Public_key.t
 
-  val sender : t -> Account_id.t
+  val fee_payer : t -> Account_id.t
+
+  val source : t -> Account_id.t
 
   val receiver : t -> Account_id.t
 

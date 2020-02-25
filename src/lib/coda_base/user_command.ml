@@ -12,14 +12,14 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('payload, 'pk, 'signature) t =
-        {payload: 'payload; sender: 'pk; signature: 'signature}
+        {payload: 'payload; signer: 'pk; signature: 'signature}
       [@@deriving compare, sexp, hash, yojson, eq]
     end
   end]
 
   type ('payload, 'pk, 'signature) t =
         ('payload, 'pk, 'signature) Stable.Latest.t =
-    {payload: 'payload; sender: 'pk; signature: 'signature}
+    {payload: 'payload; signer: 'pk; signature: 'signature}
   [@@deriving compare, eq, sexp, hash, yojson]
 end
 
@@ -49,19 +49,17 @@ module Stable = struct
     include Comparable.Make (T)
     include Hashable.Make (T)
 
-    let accounts_accessed ({payload; sender; _} : t) =
-      let sender = Public_key.compress sender in
+    let accounts_accessed ({payload; signer; _} : t) =
+      let signer_pk = Public_key.compress signer in
       let fee_token_id = Payload.fee_token payload in
-      let fee_sender = Account_id.create sender fee_token_id in
-      let payload_accounts = Payload.accounts_accessed payload in
-      (* Add the corresponding sender accounts for each token kind. *)
-      let sender_accounts =
-        List.filter_map payload_accounts ~f:(fun account_id ->
-            let token_id = Account_id.token_id account_id in
-            if Token_id.equal fee_token_id token_id then None
-            else Some (Account_id.create sender token_id) )
+      let token_id = Payload.token payload in
+      let fee_payer = Account_id.create signer_pk fee_token_id in
+      let source =
+        if Token_id.equal fee_token_id token_id then []
+        else [Account_id.create signer_pk token_id]
       in
-      fee_sender :: List.append sender_accounts payload_accounts
+      let payload_accounts = Payload.accounts_accessed payload in
+      fee_payer :: List.append source payload_accounts
   end
 end]
 
@@ -80,13 +78,15 @@ let minimum_fee = Fee.of_int 2
 
 let is_trivial t = Fee.(fee t < minimum_fee)
 
-let fee_sender {Poly.sender; payload; _} =
-  Account_id.create (Public_key.compress sender) (Payload.fee_token payload)
+let signer {Poly.signer; _} = signer
+
+let fee_payer {Poly.signer; payload; _} =
+  Account_id.create (Public_key.compress signer) (Payload.fee_token payload)
 
 let receiver = Fn.compose Payload.receiver payload
 
-let sender {Poly.sender; payload; _} =
-  Account_id.create (Public_key.compress sender) (Payload.token payload)
+let source {Poly.signer; payload; _} =
+  Account_id.create (Public_key.compress signer) (Payload.token payload)
 
 let amount = Fn.compose Payload.amount payload
 
@@ -98,13 +98,13 @@ let is_payment = Fn.compose Payload.is_payment payload
 
 let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
-  ; sender= kp.public_key
+  ; signer= kp.public_key
   ; signature= Schnorr.sign kp.private_key payload }
 
 module For_tests = struct
   (* Pretend to sign a command. Much faster than actually signing. *)
   let fake_sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
-    {payload; sender= kp.public_key; signature= Signature.dummy}
+    {payload; signer= kp.public_key; signature= Signature.dummy}
 end
 
 module Gen = struct
@@ -309,17 +309,17 @@ let check_signature _ = true
 
 [%%else]
 
-let check_signature ({payload; sender; signature} : t) =
+let check_signature ({payload; signer; signature} : t) =
   Schnorr.verify signature
-    (Snark_params.Tick.Inner_curve.of_affine sender)
+    (Snark_params.Tick.Inner_curve.of_affine signer)
     payload
 
 [%%endif]
 
-let create_with_signature_checked signature sender payload =
+let create_with_signature_checked signature signer payload =
   let open Option.Let_syntax in
-  let%bind sender = Public_key.decompress sender in
-  let t = Poly.{payload; signature; sender} in
+  let%bind signer = Public_key.decompress signer in
+  let t = Poly.{payload; signature; signer} in
   Option.some_if (check_signature t) t
 
 let gen_test =

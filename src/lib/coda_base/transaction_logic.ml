@@ -386,7 +386,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   in the case that the sender is equal to the receiver, but it complicates the SNARK, so
   we don't for now. *)
   let apply_user_command_unchecked ledger
-      ({payload; sender; signature= _} as user_command : User_command.t) =
+      ({payload; signer; signature= _} as user_command : User_command.t) =
     let open Or_error.Let_syntax in
     let%bind () =
       (* TODO: Disable this check and update the transaction snark. *)
@@ -401,18 +401,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
              "Cannot create transactions with fee_token different from the \
               default")
     in
-    let sender = Public_key.compress sender in
-    (* Get account location for the sender. *)
-    let token = Account_id.token_id (User_command.Payload.receiver payload) in
+    let signer_pk = Public_key.compress signer in
+    (* Get account location for the source. *)
+    let token = User_command.Payload.token payload in
     let nonce = User_command.Payload.nonce payload in
-    let sender_id = Account_id.create sender token in
-    let%bind sender_location = location_of_account' ledger "" sender_id in
+    let source = Account_id.create signer_pk token in
+    let%bind source_location = location_of_account' ledger "" source in
     (* Get account location for the fee-payer. *)
     let fee_token = User_command.Payload.fee_token payload in
-    let fee_sender_id = Account_id.create sender fee_token in
-    let%bind fee_sender_location =
-      location_of_account' ledger "" fee_sender_id
-    in
+    let fee_payer = Account_id.create signer_pk fee_token in
+    let%bind fee_payer_location = location_of_account' ledger "" fee_payer in
     (* TODO: Put actual value here. See issue #4036. *)
     let current_global_slot = Global_slot.zero in
     let%bind () =
@@ -420,16 +418,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         ~current_global_slot
     in
     (* We unconditionally deduct the fee if this transaction succeeds *)
-    let%bind fee_sender_account, common =
-      let%bind account = get' ledger "fee sender" fee_sender_location in
+    let%bind fee_payer_account, common =
+      let%bind account = get' ledger "fee payer" fee_payer_location in
       let fee = Amount.of_fee (User_command.Payload.fee payload) in
       let%bind balance = sub_amount account.balance fee in
       let%bind () = validate_nonces nonce account.nonce in
-      (* TODO: This may not be the right place for the receipt chain to be
-         attached when we support predicates: the 'sender' (ie. signer) may be
-         different for each transaction, which prevents anybody from being able
-         to build a chain.
-      *)
       let common : Undo.User_command_undo.Common.t =
         {user_command; previous_receipt_chain_hash= account.receipt_chain_hash}
       in
@@ -445,13 +438,13 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             Receipt.Chain_hash.cons payload account.receipt_chain_hash }
       , common )
     in
-    (* Retrieve the sender account, which may be the same as the sender fee
+    (* Retrieve the source account, which may be the same as the fee-payer
        account.
     *)
-    let%bind sender_account =
+    let%bind source_account =
       let%bind account =
-        if Token_id.equal token fee_token then return fee_sender_account
-        else get' ledger "sender" fee_sender_location
+        if Token_id.equal token fee_token then return fee_payer_account
+        else get' ledger "source" source_location
       in
       let%map timing =
         if User_command.Payload.is_payment payload then
@@ -470,8 +463,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     in
     match User_command.Payload.body payload with
     | Stake_delegation (Set_delegate {new_delegate}) ->
-        (*new delegate should be in the ledger*)
-        (*TODO transaction snark doesn't check this*)
+        (* Check that the new delegate is in the ledger. *)
         let new_delegate_id =
           Account_id.create new_delegate Token_id.default
         in
@@ -479,19 +471,18 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           location_of_account' ledger "" new_delegate_id
         in
         let%map _ = get' ledger "new_delegate" delegate_location in
-        set ledger fee_sender_location fee_sender_account ;
-        set ledger sender_location {sender_account with delegate= new_delegate} ;
+        set ledger fee_payer_location fee_payer_account ;
+        set ledger source_location {source_account with delegate= new_delegate} ;
         { Undo.User_command_undo.common
-        ; body= Stake_delegation {previous_delegate= sender_account.delegate}
+        ; body= Stake_delegation {previous_delegate= source_account.delegate}
         }
     | Payment Payment_payload.Poly.{amount; receiver} ->
         let undo emptys : Undo.User_command_undo.t =
           {common; body= Payment {previous_empty_accounts= emptys}}
         in
-        if Public_key.Compressed.equal sender (Account_id.public_key receiver)
-        then (
-          set ledger fee_sender_location fee_sender_account ;
-          set ledger sender_location sender_account ;
+        if Account_id.equal source receiver then (
+          set ledger fee_payer_location fee_payer_account ;
+          set ledger source_location source_account ;
           return (undo []) )
         else
           let action, receiver_account, receiver_location =
@@ -505,7 +496,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             previous_empty_accounts action receiver
           in
           if Token_id.equal fee_token token then (
-            (* sender_location = fee_sender_location *)
+            (* source_location = fee_payer_location *)
             let%bind receiver_balance' =
               (* Subtract the account creation fee from the amount to be
                  transferred.
@@ -513,43 +504,43 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               let%bind amount' = sub_account_creation_fee action amount in
               add_amount receiver_account.balance amount'
             in
-            let%map sender_balance' =
-              sub_amount sender_account.balance amount
+            let%map source_balance' =
+              sub_amount source_account.balance amount
             in
             set ledger receiver_location
               {receiver_account with balance= receiver_balance'} ;
-            set ledger sender_location
-              {sender_account with balance= sender_balance'} ;
+            set ledger source_location
+              {source_account with balance= source_balance'} ;
             undo previous_empty_accounts )
           else
-            (* Charge the fee sender for creating the account.
+            (* Charge the fee-payer for creating the account.
                Note: We don't have a better choice here: there is no other
                source of tokens in this transaction that is known to have
                accepted value.
              *)
-            let%bind fee_sender_balance' =
-              sub_account_creation_fee_bal action fee_sender_account.balance
+            let%bind fee_payer_balance' =
+              sub_account_creation_fee_bal action fee_payer_account.balance
             in
-            let%map receiver_balance', sender_balance' =
-              match Balance.sub_amount sender_account.balance amount with
-              | Some sender_balance ->
-                  (* Sender account has sufficient balance, increase the
+            let%map receiver_balance', source_balance' =
+              match Balance.sub_amount source_account.balance amount with
+              | Some source_balance ->
+                  (* Source account has sufficient balance, increase the
                      receiver balance by the same amount.
                   *)
                   let%map receiver_balance =
                     add_amount receiver_account.balance amount
                   in
-                  (receiver_balance, sender_balance)
+                  (receiver_balance, source_balance)
               | None ->
-                  (* Sender has insufficient balance, do not transfer*)
-                  return (receiver_account.balance, sender_account.balance)
+                  (* Source has insufficient balance, do not transfer*)
+                  return (receiver_account.balance, source_account.balance)
             in
             set ledger receiver_location
               {receiver_account with balance= receiver_balance'} ;
-            set ledger fee_sender_location
-              {fee_sender_account with balance= fee_sender_balance'} ;
-            set ledger sender_location
-              {sender_account with balance= sender_balance'} ;
+            set ledger fee_payer_location
+              {fee_payer_account with balance= fee_payer_balance'} ;
+            set ledger source_location
+              {source_account with balance= source_balance'} ;
             undo previous_empty_accounts
 
   let apply_user_command ledger
@@ -744,27 +735,25 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let undo_user_command ledger
       { Undo.User_command_undo.common=
-          { user_command= {payload; sender; signature= _}
+          { user_command= {payload; signer; signature= _}
           ; previous_receipt_chain_hash }
       ; body } =
     let open Or_error.Let_syntax in
-    let sender = Public_key.compress sender in
-    (* Get account location for the sender. *)
+    let signer_pk = Public_key.compress signer in
+    (* Get account location for the source. *)
     let token = Account_id.token_id (User_command.Payload.receiver payload) in
     let nonce = User_command.Payload.nonce payload in
-    let sender_id = Account_id.create sender token in
-    let%bind sender_location = location_of_account' ledger "" sender_id in
+    let source = Account_id.create signer_pk token in
+    let%bind source_location = location_of_account' ledger "" source in
     (* Get account location for the fee-payer. *)
     let fee_token = User_command.Payload.fee_token payload in
-    let fee_sender_id = Account_id.create sender fee_token in
-    let%bind fee_sender_location =
-      location_of_account' ledger "" fee_sender_id
-    in
-    let%bind sender_account = get' ledger "sender" sender_location in
-    let%bind fee_sender_account =
+    let fee_payer = Account_id.create signer_pk fee_token in
+    let%bind fee_payer_location = location_of_account' ledger "" fee_payer in
+    let%bind source_account = get' ledger "source" source_location in
+    let%bind fee_payer_account =
       let%bind account =
-        if Token_id.equal token fee_token then return sender_account
-        else get' ledger "fee sender" fee_sender_location
+        if Token_id.equal token fee_token then return source_account
+        else get' ledger "fee payer" fee_payer_location
       in
       let%bind () = validate_nonces (Account.Nonce.succ nonce) account.nonce in
       let%bind balance =
@@ -780,15 +769,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     match (User_command.Payload.body payload, body) with
     | Stake_delegation (Set_delegate _), Stake_delegation {previous_delegate}
       ->
-        set ledger sender_location
-          {sender_account with delegate= previous_delegate} ;
-        set ledger fee_sender_location fee_sender_account ;
+        set ledger source_location
+          {source_account with delegate= previous_delegate} ;
+        set ledger fee_payer_location fee_payer_account ;
         return ()
     | Payment {amount; receiver}, Payment {previous_empty_accounts} ->
-        if Public_key.Compressed.equal sender (Account_id.public_key receiver)
-        then (
-          set ledger sender_location sender_account ;
-          set ledger fee_sender_location fee_sender_account ;
+        if Account_id.equal source receiver then (
+          set ledger source_location source_account ;
+          set ledger fee_payer_location fee_payer_account ;
           return () )
         else
           let%bind receiver_location =
@@ -804,33 +792,33 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             else `Existed
           in
           if Token_id.equal fee_token token then (
-            (* sender_location = fee_sender_location *)
-            let%bind fee_sender_balance' =
-              add_amount fee_sender_account.balance amount
+            (* source_location = fee_payer_location *)
+            let%bind fee_payer_balance' =
+              add_amount fee_payer_account.balance amount
             in
             let%map receiver_balance' =
               let%bind amount' = sub_account_creation_fee action amount in
               sub_amount receiver_account.balance amount'
             in
-            set ledger fee_sender_location
-              {fee_sender_account with balance= fee_sender_balance'} ;
+            set ledger fee_payer_location
+              {fee_payer_account with balance= fee_payer_balance'} ;
             set ledger receiver_location
               {receiver_account with balance= receiver_balance'} ;
             remove_accounts_exn ledger previous_empty_accounts )
           else
-            let%bind sender_balance' =
-              add_amount sender_account.balance amount
+            let%bind source_balance' =
+              add_amount source_account.balance amount
             in
-            let%bind fee_sender_balance' =
-              add_account_creation_fee_bal action fee_sender_account.balance
+            let%bind fee_payer_balance' =
+              add_account_creation_fee_bal action fee_payer_account.balance
             in
             let%map receiver_balance' =
               add_amount receiver_account.balance amount
             in
-            set ledger fee_sender_location
-              {fee_sender_account with balance= fee_sender_balance'} ;
-            set ledger sender_location
-              {sender_account with balance= sender_balance'} ;
+            set ledger fee_payer_location
+              {fee_payer_account with balance= fee_payer_balance'} ;
+            set ledger source_location
+              {source_account with balance= source_balance'} ;
             set ledger receiver_location
               {receiver_account with balance= receiver_balance'} ;
             remove_accounts_exn ledger previous_empty_accounts

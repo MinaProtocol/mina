@@ -54,8 +54,8 @@ let%test_module "Processor" =
         ~expect:user_command.payload decoded_user_command.payload ;
       [%test_result: Public_key.Compressed.t]
         ~equal:Public_key.Compressed.equal
-        ~expect:(Public_key.compress user_command.sender)
-        decoded_user_command.sender ;
+        ~expect:(Public_key.compress user_command.signer)
+        decoded_user_command.signer ;
       [%test_result: Block_time.t option]
         ~equal:[%equal: Block_time.t Option.t] ~expect:block_time
         decoded_block_time

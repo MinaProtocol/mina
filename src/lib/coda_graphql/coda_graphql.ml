@@ -747,14 +747,14 @@ module Types = struct
             ~deprecated:(Deprecated (Some "use fromAccount field instead"))
             ~args:Arg.[]
             ~resolve:(fun _ payment ->
-              Account_id.public_key @@ User_command.sender payment )
+              Account_id.public_key @@ User_command.fee_payer payment )
         ; field "fromAccount"
             ~typ:(non_null AccountObj.account)
             ~doc:"Account of the sender"
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} payment ->
               AccountObj.get_best_ledger_account coda
-                (Account_id.public_key @@ User_command.sender payment) )
+                (Account_id.public_key @@ User_command.fee_payer payment) )
         ; field "to" ~typ:(non_null public_key)
             ~doc:"Public key of the receiver"
             ~deprecated:(Deprecated (Some "use toAccount field instead"))

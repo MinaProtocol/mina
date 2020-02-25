@@ -139,9 +139,9 @@ let get_nonce t (addr : Account_id.t) =
   account.Account.Poly.nonce
 
 let send_user_command t (txn : User_command.t) =
-  let account_id = User_command.fee_sender txn in
+  let fee_payer = User_command.fee_payer txn in
   let open Participating_state.Let_syntax in
-  let%map account_opt = get_account t account_id in
+  let%map account_opt = get_account t fee_payer in
   let open Or_error.Let_syntax in
   let%map () = schedule_user_command t txn account_opt in
   record_payment t txn (Option.value_exn account_opt)

@@ -138,22 +138,22 @@ let sub_account_creation_fee_bal action balance =
          (Amount.of_fee Coda_compile_config.account_creation_fee))
   else balance
 
-let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
+let apply_user_command_exn t ({signer; payload; signature= _} : User_command.t)
     =
-  let sender = Public_key.compress sender in
-  (* Get index for the sender. *)
-  let token = Account_id.token_id (User_command.Payload.receiver payload) in
-  let sender_id = Account_id.create sender token in
-  let sender_idx = find_index_exn t sender_id in
+  let signer_pk = Public_key.compress signer in
+  (* Get index for the source. *)
+  let token = User_command.Payload.token payload in
+  let source = Account_id.create signer_pk token in
+  let source_idx = find_index_exn t source in
   (* Get the index for the fee-payer. *)
   let nonce = User_command.Payload.nonce payload in
   let fee_token = User_command.Payload.fee_token payload in
-  let fee_sender_id = Account_id.create sender fee_token in
-  let fee_sender_idx = find_index_exn t fee_sender_id in
+  let fee_payer = Account_id.create signer_pk fee_token in
+  let fee_payer_idx = find_index_exn t fee_payer in
   (* TODO: Disable this check and update the transaction snark. *)
   assert (Token_id.equal fee_token Token_id.default) ;
-  let fee_sender_account =
-    let account = get_exn t fee_sender_idx in
+  let fee_payer_account =
+    let account = get_exn t fee_payer_idx in
     assert (Account.Nonce.equal account.nonce nonce) ;
     let fee = User_command.Payload.fee payload in
     let open Currency in
@@ -165,29 +165,28 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
     ; receipt_chain_hash=
         Receipt.Chain_hash.cons payload account.receipt_chain_hash }
   in
-  let sender_account =
-    if Token_id.equal fee_token token then fee_sender_account
-    else get_exn t sender_idx
+  let source_account =
+    if Account_id.equal fee_payer source then fee_payer_account
+    else get_exn t source_idx
   in
   match User_command.Payload.body payload with
   | Stake_delegation (Set_delegate {new_delegate}) ->
-      let t = set_exn t fee_sender_idx fee_sender_account in
-      set_exn t sender_idx {sender_account with delegate= new_delegate}
+      let t = set_exn t fee_payer_idx fee_payer_account in
+      set_exn t source_idx {source_account with delegate= new_delegate}
   | Payment {amount; receiver} ->
-      if Public_key.Compressed.equal sender (Account_id.public_key receiver)
-      then
-        let t = set_exn t fee_sender_idx fee_sender_account in
-        set_exn t sender_idx sender_account
+      if Account_id.equal source receiver then
+        let t = set_exn t fee_payer_idx fee_payer_account in
+        set_exn t source_idx source_account
       else
         let receiver_idx = find_index_exn t receiver in
         let action, receiver_account =
           get_or_initialize_exn receiver t receiver_idx
         in
-        let sender_balance' =
-          Currency.Balance.sub_amount sender_account.balance amount
+        let source_balance' =
+          Currency.Balance.sub_amount source_account.balance amount
         in
-        if Token_id.equal fee_token token then
-          (* sender_idx = fee_sender_idx *)
+        if Account_id.equal source fee_payer then
+          (* source_idx = fee_payer_idx *)
           let receiver_balance' =
             (* Subtract the account creation fee from the amount to be
                transferred.
@@ -196,20 +195,20 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
             Option.value_exn
               (Currency.Balance.add_amount receiver_account.balance amount')
           in
-          let sender_balance' = Option.value_exn sender_balance' in
+          let source_balance' = Option.value_exn source_balance' in
           let t =
-            set_exn t sender_idx {sender_account with balance= sender_balance'}
+            set_exn t source_idx {source_account with balance= source_balance'}
           in
           set_exn t receiver_idx
             {receiver_account with balance= receiver_balance'}
         else
-          (* Charge fee sender for creating the account. *)
-          let fee_sender_balance' =
-            sub_account_creation_fee_bal action fee_sender_account.balance
+          (* Charge fee-payer for creating the account. *)
+          let fee_payer_balance' =
+            sub_account_creation_fee_bal action fee_payer_account.balance
           in
-          let receiver_balance', sender_balance' =
-            match sender_balance' with
-            | Some sender_balance' ->
+          let receiver_balance', source_balance' =
+            match source_balance' with
+            | Some source_balance' ->
                 (* Sending the tokens succeeds, move them into the receiver
                    account.
                 *)
@@ -218,17 +217,17 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
                     (Currency.Balance.add_amount receiver_account.balance
                        amount)
                 in
-                (receiver_balance', sender_balance')
+                (receiver_balance', source_balance')
             | None ->
                 (* Sending the tokens fails, do not move them. *)
-                (receiver_account.balance, sender_account.balance)
+                (receiver_account.balance, source_account.balance)
           in
           let t =
-            set_exn t fee_sender_idx
-              {fee_sender_account with balance= fee_sender_balance'}
+            set_exn t fee_payer_idx
+              {fee_payer_account with balance= fee_payer_balance'}
           in
           let t =
-            set_exn t sender_idx {sender_account with balance= sender_balance'}
+            set_exn t source_idx {source_account with balance= source_balance'}
           in
           set_exn t receiver_idx
             {receiver_account with balance= receiver_balance'}

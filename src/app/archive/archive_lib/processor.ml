@@ -83,17 +83,17 @@ module Make (Config : Graphql_lib.Client.Config_intf) = struct
          , block_time )
          ->
         let user_command_payload = User_command.payload user_command in
-        let sender = User_command.fee_sender user_command in
+        let fee_payer = User_command.fee_payer user_command in
         let udpated_sender_receipt_chain, new_receipt_chain =
           Option.value_map ~default:(acc_sender_receipt_chains, None)
-            (Map.find acc_sender_receipt_chains sender)
+            (Map.find acc_sender_receipt_chains fee_payer)
             ~f:(fun previous_receipt_chain ->
               let new_receipt_chain =
                 Receipt.Chain_hash.cons user_command_payload
                   previous_receipt_chain
               in
               let updated_receipt_chain_hash =
-                Map.set acc_sender_receipt_chains ~key:sender
+                Map.set acc_sender_receipt_chains ~key:fee_payer
                   ~data:new_receipt_chain
               in
               let receipt_chain_input =

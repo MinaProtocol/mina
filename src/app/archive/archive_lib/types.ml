@@ -103,7 +103,7 @@ module User_command = struct
       method sender =
         some @@ Public_key.encode_as_obj_rel_insert_input
         @@ Account_id.public_key
-        @@ User_command.fee_sender user_command
+        @@ User_command.fee_payer user_command
 
       method receiver =
         some @@ Public_key.encode_as_obj_rel_insert_input
@@ -126,7 +126,7 @@ module User_command = struct
 
   let decode obj =
     let receiver = (obj#receiver)#value in
-    let sender = (obj#sender)#value in
+    let signer = (obj#sender)#value in
     let body =
       match obj#typ with
       | `Delegation ->
@@ -147,7 +147,7 @@ module User_command = struct
         ~body (* TODO: We should actually be passing obj#valid_until *)
         ~valid_until:Coda_numbers.Global_slot.max_value
     in
-    ( Coda_base.{User_command.Poly.Stable.V1.payload; sender; signature= ()}
+    ( Coda_base.{User_command.Poly.Stable.V1.payload; signer; signature= ()}
     , obj#first_seen )
 end
 

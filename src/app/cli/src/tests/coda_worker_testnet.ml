@@ -657,7 +657,7 @@ end = struct
       List.map expected_payments ~f:(fun user_command ->
           match user_command.payload.body with
           | Payment payment_payload ->
-              ( Public_key.compress user_command.sender
+              ( Public_key.compress user_command.signer
               , Account_id.public_key payment_payload.receiver )
           | Stake_delegation _ ->
               failwith "Expected a list of payments" )

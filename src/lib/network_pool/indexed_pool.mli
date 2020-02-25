@@ -42,8 +42,8 @@ val get_highest_fee : t -> User_command.With_valid_signature.t option
 val handle_committed_txn :
      t
   -> User_command.With_valid_signature.t
-  -> fee_sender_balance:Currency.Amount.t
-  -> sender_balance:Currency.Amount.t
+  -> fee_payer_balance:Currency.Amount.t
+  -> source_balance:Currency.Amount.t
   -> ( t * User_command.With_valid_signature.t Sequence.t
      , [ `Queued_txns_by_sender of
          string * User_command.With_valid_signature.t Sequence.t ] )

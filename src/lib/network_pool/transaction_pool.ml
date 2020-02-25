@@ -119,8 +119,8 @@ struct
                 (* we have the invariant that the transactions currently
                    in the pool are always valid against the best tip, so
                    no need to check balances here *)
-                ~fee_sender_balance:Currency.Amount.max_int
-                ~sender_balance:Currency.Amount.max_int
+                ~fee_payer_balance:Currency.Amount.max_int
+                ~source_balance:Currency.Amount.max_int
             with
             | Ok (t, _) ->
                 Some (cmd, t)
@@ -255,12 +255,12 @@ struct
                   in
                   acc.balance
             in
-            let fee_sender = User_command.fee_sender cmd in
-            let fee_sender_balance =
-              Currency.Balance.to_amount (balance fee_sender)
+            let fee_payer = User_command.fee_payer cmd in
+            let fee_payer_balance =
+              Currency.Balance.to_amount (balance fee_payer)
             in
-            let sender = User_command.sender cmd in
-            let sender_balance = Currency.Balance.to_amount (balance sender) in
+            let source = User_command.source cmd in
+            let source_balance = Currency.Balance.to_amount (balance source) in
             let cmd' = User_command.check cmd |> Option.value_exn in
             ( match
                 Hashtbl.find_and_remove t.locally_generated_uncommitted cmd'
@@ -275,8 +275,8 @@ struct
                   ~data:time_added ) ;
             let p', dropped =
               match
-                Indexed_pool.handle_committed_txn p cmd' ~fee_sender_balance
-                  ~sender_balance
+                Indexed_pool.handle_committed_txn p cmd' ~fee_payer_balance
+                  ~source_balance
               with
               | Ok res ->
                   res
@@ -331,22 +331,26 @@ struct
               "Couldn't re-add locally generated command $cmd, not valid \
                against new ledger."
               ~metadata:
-                [("cmd", User_command.to_yojson (cmd :> User_command.t))] ;
+                [ ( "cmd"
+                  , User_command.to_yojson (User_command.forget_check cmd) ) ] ;
             remove_cmd ()
           in
           if not (Hashtbl.mem t.locally_generated_committed cmd) then
-            if not (has_sufficient_fee t.pool (cmd :> User_command.t)) then (
+            if not (has_sufficient_fee t.pool (User_command.forget_check cmd))
+            then (
               Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                 "Not re-adding locally generated command $cmd to pool, \
                  insufficient fee"
                 ~metadata:
-                  [("cmd", User_command.to_yojson (cmd :> User_command.t))] ;
+                  [ ( "cmd"
+                    , User_command.to_yojson (User_command.forget_check cmd) )
+                  ] ;
               remove_cmd () )
             else
               match
                 Option.bind
                   (Base_ledger.location_of_account best_tip_ledger
-                     (User_command.sender (cmd :> User_command.t)))
+                     (User_command.source (User_command.forget_check cmd)))
                   ~f:(Base_ledger.get best_tip_ledger)
               with
               | Some acct -> (
@@ -362,7 +366,8 @@ struct
                        pool after reorg"
                       ~metadata:
                         [ ( "cmd"
-                          , User_command.to_yojson (cmd :> User_command.t) ) ] ;
+                          , User_command.to_yojson
+                              (User_command.forget_check cmd) ) ] ;
                     t.pool <- pool''' )
               | None ->
                   log_invalid () ) ;
@@ -544,7 +549,7 @@ struct
                           (Base_ledger.location_of_account ledger account_id)
                           ~f:(Base_ledger.get ledger)
                       in
-                      match account ledger (User_command.sender tx) with
+                      match account ledger (User_command.fee_payer tx) with
                       | None ->
                           let%bind _ =
                             trust_record
@@ -738,7 +743,7 @@ struct
 
     let get_rebroadcastable (t : t) ~is_expired =
       let metadata ~(key : User_command.With_valid_signature.t) ~data =
-        [ ("cmd", User_command.to_yojson (key :> User_command.t))
+        [ ("cmd", User_command.to_yojson (User_command.forget_check key))
         ; ("time", `String (Time.to_string_abs ~zone:Time.Zone.utc data)) ]
       in
       let added_str =
