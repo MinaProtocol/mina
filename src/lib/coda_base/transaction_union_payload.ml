@@ -9,7 +9,6 @@ open Core_kernel
 consensus_mechanism]
 
 open Snark_params.Tick
-open Signature_lib
 open Currency
 
 [%%else]
@@ -23,17 +22,18 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Tag = Transaction_union_tag
 
 module Body = struct
-  type ('tag, 'pk, 'amount) t_ = {tag: 'tag; public_key: 'pk; amount: 'amount}
+  type ('tag, 'account_id, 'amount) t_ =
+    {tag: 'tag; account: 'account_id; amount: 'amount}
   [@@deriving sexp]
 
   type t = (Tag.t, Account_id.t, Currency.Amount.t) t_ [@@deriving sexp]
 
   let of_user_command_payload_body = function
     | User_command_payload.Body.Payment {receiver; amount} ->
-        {tag= Tag.Payment; public_key= receiver; amount}
+        {tag= Tag.Payment; account= receiver; amount}
     | Stake_delegation (Set_delegate {new_delegate}) ->
         { tag= Tag.Stake_delegation
-        ; public_key= Account_id.create new_delegate Token_id.default
+        ; account= Account_id.create new_delegate Token_id.default
         ; amount= Currency.Amount.zero }
 
   let gen ~fee =
@@ -59,52 +59,46 @@ module Body = struct
             (Amount.of_fee fee, Amount.max_int)
       in
       Amount.gen_incl min max
-    and public_key = Account_id.gen in
-    {tag; public_key; amount}
-
-  let to_input0 ~tag ~amount t =
-    let t1, t2 = tag t.tag in
-    let {Public_key.Compressed.Poly.x; is_odd} = t.public_key in
-    { Random_oracle.Input.bitstrings= [|[t1; t2]; amount t.amount; [is_odd]|]
-    ; field_elements= [|x|] }
+    and account = Account_id.gen in
+    {tag; account; amount}
 
   [%%ifdef
   consensus_mechanism]
 
   type var = (Tag.var, Account_id.var, Currency.Amount.var) t_
 
-  let to_hlist {tag; public_key; amount} = H_list.[tag; public_key; amount]
+  let to_hlist {tag; account; amount} = H_list.[tag; account; amount]
 
   let spec = Data_spec.[Tag.typ; Account_id.typ; Currency.Amount.typ]
 
   let typ =
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
-      ~var_of_hlist:(fun H_list.[tag; public_key; amount] ->
-        {tag; public_key; amount} )
-      ~value_of_hlist:(fun H_list.[tag; public_key; amount] ->
-        {tag; public_key; amount} )
+      ~var_of_hlist:(fun H_list.[tag; account; amount] ->
+        {tag; account; amount} )
+      ~value_of_hlist:(fun H_list.[tag; account; amount] ->
+        {tag; account; amount} )
 
   module Checked = struct
-    let constant ({tag; public_key; amount} : t) : var =
+    let constant ({tag; account; amount} : t) : var =
       { tag= Tag.Checked.constant tag
-      ; public_key= Account_id.var_of_t public_key
+      ; account= Account_id.var_of_t account
       ; amount= Currency.Amount.var_of_t amount }
 
-    let to_input {tag; public_key; amount} =
+    let to_input {tag; account; amount} =
       let open Random_oracle.Input in
       let tag1, tag2 = tag in
       append (bitstring [tag1; tag2])
-      @@ append (Account_id.Checked.to_input public_key)
+      @@ append (Account_id.Checked.to_input account)
       @@ bitstring (Currency.Amount.var_to_bits amount :> Boolean.var list)
   end
 
   [%%endif]
 
-  let to_input {tag; public_key; amount} =
+  let to_input {tag; account; amount} =
     let open Random_oracle.Input in
     let tag1, tag2 = Tag.to_bits tag in
     append (bitstring [tag1; tag2])
-    @@ append (Account_id.to_input public_key)
+    @@ append (Account_id.to_input account)
     @@ bitstring (Currency.Amount.to_bits amount)
 end
 

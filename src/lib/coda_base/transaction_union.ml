@@ -56,7 +56,7 @@ let of_transaction : Transaction.t -> t = function
               ; valid_until= Coda_numbers.Global_slot.max_value
               ; memo= User_command_memo.empty }
           ; body=
-              { public_key= Account_id.create receiver Token_id.default
+              { account= Account_id.create receiver Token_id.default
               ; amount
               ; tag= Tag.Coinbase } }
       ; signer= Public_key.decompress_exn other_pk
@@ -71,7 +71,7 @@ let of_transaction : Transaction.t -> t = function
                 ; valid_until= Coda_numbers.Global_slot.max_value
                 ; memo= User_command_memo.empty }
             ; body=
-                { public_key= Account_id.create pk1 Token_id.default
+                { account= Account_id.create pk1 Token_id.default
                 ; amount= Amount.of_fee fee1
                 ; tag= Tag.Fee_transfer } }
         ; signer= Public_key.decompress_exn pk2

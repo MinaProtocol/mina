@@ -387,7 +387,7 @@ module Base = struct
     let%bind signer_pk = Public_key.compress_var signer in
     let fee = payload.common.fee in
     (* Information for the receiver. *)
-    let receiver = payload.body.public_key in
+    let receiver = payload.body.account in
     (* Information for the source. *)
     let token = Account_id.Checked.token_id receiver in
     let source = Account_id.Checked.create signer_pk token in
@@ -731,7 +731,7 @@ module Base = struct
              in
              let%map delegate =
                Public_key.Compressed.Checked.if_ is_stake_delegation
-                 ~then_:(Account_id.Checked.public_key payload.body.public_key)
+                 ~then_:(Account_id.Checked.public_key payload.body.account)
                  ~else_:account.delegate
              in
              { Account.Poly.balance
