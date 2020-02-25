@@ -4,13 +4,6 @@ open Signature_lib
 
 type count_and_fee = int * Currency.Fee.t [@@deriving sexp, to_yojson]
 
-(*type reason = [ `No_space
-| `No_work
-| `Insufficient_fees
-| `Extra_work
-| `Init
-| `Coinbase_update ] [@@deriving sexp, to_yojson]*)
-
 module Fee_Summable = struct
   open Currency
 
@@ -214,6 +207,10 @@ end
 type t = Summary.t * Detail.t [@@deriving sexp, to_yojson]
 
 type log_list = t list [@@deriving sexp, to_yojson]
+
+type summary_list = Summary.t list [@@deriving sexp, to_yojson]
+
+type detail_list = Detail.t list [@@deriving sexp, to_yojson]
 
 let init ~(completed_work : Transaction_snark_work.Checked.t Sequence.t)
     ~(user_commands : User_command.With_valid_signature.t Sequence.t)

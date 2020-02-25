@@ -1393,7 +1393,8 @@ module T = struct
           let res = try_with_coinbase () in
           make_diff res None
 
-  let create_diff t ~self ~coinbase_receiver ~logger
+  let create_diff ?(log_block_creation = false) t ~self ~coinbase_receiver
+      ~logger
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
@@ -1468,13 +1469,21 @@ module T = struct
           generate logger completed_works_seq valid_on_this_ledger
             ~receiver:coinbase_receiver ~is_coinbase_reciever_new partitions )
     in
+    let summaries, detailed = List.unzip log in
     Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
       "Number of proofs ready for purchase: $proof_count Number of user \
        commands ready to be included: $txn_count Diff creation log: $diff_log"
       ~metadata:
         [ ("proof_count", `Int proof_count)
         ; ("txn_count", `Int (Sequence.length valid_on_this_ledger))
-        ; ("diff_log", Diff_creation_log.log_list_to_yojson log) ] ;
+        ; ("diff_log", Diff_creation_log.summary_list_to_yojson summaries) ] ;
+    if log_block_creation then
+      Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+        "Detailed diff creation log: $diff_log"
+        ~metadata:
+          [ ( "diff_log"
+            , Diff_creation_log.detail_list_to_yojson
+                (List.map ~f:List.rev detailed) ) ] ;
     trace_event "prediffs done" ;
     { Staged_ledger_diff.With_valid_signatures_and_proofs.diff
     ; creator= self

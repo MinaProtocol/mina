@@ -660,7 +660,8 @@ let start t =
     ~coinbase_receiver:t.coinbase_receiver
     ~consensus_local_state:t.config.consensus_local_state
     ~frontier_reader:t.components.transition_frontier
-    ~transition_writer:t.pipes.producer_transition_writer ;
+    ~transition_writer:t.pipes.producer_transition_writer
+    ~log_block_creation:t.config.log_block_creation ;
   Snark_worker.start t
 
 let create (config : Config.t) ~genesis_ledger ~base_proof =
