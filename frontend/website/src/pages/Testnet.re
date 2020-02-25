@@ -276,6 +276,10 @@ let make = (~challenges as _, ~testnetName as _) => {
                  "By participating in the testnet, you'll be helping advance the first cryptocurrency that utilizes recursive zk-SNARKs and production-scale Ouroboros proof of stake consensus.",
                )}
             </p>
+            <p className=Theme.Body.basic>
+              {React.string("Testnet Status: ")}
+              <StatusBadge service=`Network />
+            </p>
           </div>
           <Terminal.Wrapper lineDelay=2000>
             <Terminal.Line prompt=">" value="coda daemon -peer ..." />
