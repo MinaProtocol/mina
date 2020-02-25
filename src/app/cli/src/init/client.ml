@@ -1454,7 +1454,7 @@ let get_telemetry =
   let peer_ids_flag =
     flag "peer-ids"
       (optional (Arg_type.comma_separated string))
-      ~doc:"Comma-delimited list of peer IDs for obtaining telemetry data"
+      ~doc:"CSV-LIST Peer IDs for obtaining telemetry data"
   in
   let show_errors_flag =
     flag "show-errors" no_arg ~doc:"Include error responses in output"
