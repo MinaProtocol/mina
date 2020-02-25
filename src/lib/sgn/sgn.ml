@@ -3,10 +3,14 @@
 
 open Core_kernel
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 open Snark_params.Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
 
 [%%endif]
 
@@ -38,8 +42,8 @@ let of_field_exn x =
   else if Field.equal x neg_one then Neg
   else failwith "Sgn.of_field: Expected positive or negative 1"
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 type var = Field.Var.t
 
