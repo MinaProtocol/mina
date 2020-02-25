@@ -21,7 +21,7 @@
 
 [%%define genesis_ledger "testnet_postake"]
 
-[%%define genesis_state_timestamp "2020-02-24 14:20:00-07:00"]
+[%%define genesis_state_timestamp "2020-02-24 18:30:00-07:00"]
 [%%define block_window_duration 20000]
 
 [%%define integration_tests false]
