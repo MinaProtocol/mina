@@ -80,7 +80,10 @@ module.exports.confirmEmail = async event => {
   const newContactRequest = {
     method: "POST",
     url: "/v3/marketing/contacts",
-    body: { list_ids: [""], contacts: [{ email }] },
+    body: {
+      list_ids: ["bcd755f4-53e9-4182-8c16-06d763408ffb"],
+      contacts: [{ email }]
+    }
   };
 
   try {
@@ -100,6 +103,7 @@ module.exports.confirmEmail = async event => {
       "Access-Control-Allow-Origin": "*",
       "Access-Control-Allow-Credentials": "true"
     },
-    body: "<html><head><meta http-equiv=\"Refresh\" content=\"3; url=https://codaprotocol.com\"></head><body><p>Thanks for subscribing!</p><p>You will be redirected shortly. If you are not redirected click <a href=\"https://codaprotocol.com\">here</a>.</p></body></html>"
+    body:
+      '<html><head><meta http-equiv="Refresh" content="3; url=https://codaprotocol.com"></head><body><p>Thanks for subscribing!</p><p>You will be redirected shortly. If you are not redirected click <a href="https://codaprotocol.com">here</a>.</p></body></html>'
   };
 };
