@@ -105,12 +105,14 @@ let get_current_fork_id ~conf_dir ~logger =
       else (
         Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
           "Current fork ID $fork_id from the command line disagrees with \
-           $config_fork_id from the config"
+           $config_fork_id from the Coda config"
           ~metadata:
             [ ("fork_id", `String fork_id)
             ; ("config_fork_id", `String config_fork_id) ] ;
         failwith
-          "Current fork ID from command line disagrees with fork ID in config" )
+          "Current fork ID from command line disagrees with fork ID in Coda \
+           config; please delete your Coda config if you wish to use a new \
+           fork ID" )
     with Sys_error _ ->
       (* use value provided on command line, write to config dir, possibly overwriting existing entry *)
       write_fork_id fork_id ;
