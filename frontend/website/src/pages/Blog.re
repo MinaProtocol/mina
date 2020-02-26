@@ -61,8 +61,7 @@ let make = (~posts) => {
                    passHref=true>
                    <a className=Style.title> {React.string(post.title)} </a>
                  </Next.Link>
-                 {ReactUtils.fromOpt(
-                    Js.Undefined.toOption(post.subtitle), ~f=s =>
+                 {ReactExt.fromOpt(Js.Undefined.toOption(post.subtitle), ~f=s =>
                     <div className=Style.subtitle> {React.string(s)} </div>
                   )}
                  <Spacer height=1. />

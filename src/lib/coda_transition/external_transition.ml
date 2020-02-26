@@ -4,6 +4,26 @@ open Coda_base
 open Coda_state
 open Module_version
 
+module Validate_content = struct
+  type t = bool -> unit
+
+  let bin_read_t buf ~pos_ref = bin_read_unit buf ~pos_ref ; Fn.ignore
+
+  let bin_write_t buf ~pos _ =
+    let pos = bin_write_unit buf ~pos () in
+    pos
+
+  let bin_shape_t = bin_shape_unit
+
+  let bin_size_t _ = bin_size_unit ()
+
+  let t_of_sexp _ = Fn.ignore
+
+  let sexp_of_t _ = sexp_of_unit ()
+
+  let __versioned__ = ()
+end
+
 [%%versioned
 module Stable = struct
   module V1 = struct
@@ -15,6 +35,7 @@ module Stable = struct
           State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
       ; current_fork_id: Fork_id.Stable.V1.t
       ; next_fork_id: Fork_id.Stable.V1.t option }
+      ; mutable validation_callback: Validate_content.t }
     [@@deriving sexp, fields]
 
     let to_latest = Fn.id
@@ -26,6 +47,7 @@ module Stable = struct
         ; delta_transition_chain_proof= _
         ; current_fork_id
         ; next_fork_id } =
+        ; validation_callback= _ } =
       `Assoc
         [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
         ; ("protocol_state_proof", `String "<opaque>")
@@ -53,6 +75,9 @@ module Stable = struct
 
     let parent_hash {protocol_state; _} =
       Protocol_state.previous_state_hash protocol_state
+
+    let consensus_time_produced_at t =
+      consensus_state t |> Consensus.Data.Consensus_state.consensus_time
 
     let block_producer {staged_ledger_diff; _} =
       Staged_ledger_diff.creator staged_ledger_diff
@@ -107,9 +132,16 @@ type t = Stable.Latest.t =
   ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
   ; current_fork_id: Fork_id.t
   ; next_fork_id: Fork_id.t option }
+  ; mutable validation_callback: Validate_content.t }
 [@@deriving sexp]
 
 type external_transition = t
+
+let broadcast {validation_callback; _} = validation_callback true
+
+let don't_broadcast {validation_callback; _} = validation_callback false
+
+let poke_validation_callback t cb = t.validation_callback <- cb
 
 [%%define_locally
 Stable.Latest.
@@ -122,6 +154,7 @@ Stable.Latest.
   , consensus_state
   , state_hash
   , parent_hash
+  , consensus_time_produced_at
   , block_producer
   , transactions
   , user_commands
@@ -141,7 +174,7 @@ let set_current_fork_id fork_id = current_fork_id := Some fork_id
 let get_current_fork_id () = Option.value_exn !current_fork_id
 
 let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-    ~delta_transition_chain_proof ?next_fork_id () =
+    ~delta_transition_chain_proof ~validation_callback ?next_fork_id () =
   if Option.is_none !current_fork_id then
     failwith "Cannot create external transition before setting current fork id" ;
   { protocol_state
@@ -150,6 +183,7 @@ let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
   ; delta_transition_chain_proof
   ; current_fork_id= Option.value_exn !current_fork_id
   ; next_fork_id }
+  ; validation_callback }
 
 let timestamp {protocol_state; _} =
   Protocol_state.blockchain_state protocol_state |> Blockchain_state.timestamp
@@ -619,6 +653,8 @@ module With_validation = struct
 
   let parent_hash t = lift parent_hash t
 
+  let consensus_time_produced_at t = lift consensus_time_produced_at t
+
   let block_producer t = lift block_producer t
 
   let user_commands t = lift user_commands t
@@ -628,6 +664,10 @@ module With_validation = struct
   let payments t = lift payments t
 
   let delta_transition_chain_proof t = lift delta_transition_chain_proof t
+
+  let broadcast t = lift broadcast t
+
+  let don't_broadcast t = lift don't_broadcast t
 end
 
 module Initial_validated = struct
@@ -769,6 +809,8 @@ module Validated = struct
     , create_unsafe
     , protocol_state
     , delta_transition_chain_proof
+    , broadcast
+    , don't_broadcast
     , protocol_state_proof
     , blockchain_state
     , blockchain_length
@@ -776,6 +818,7 @@ module Validated = struct
     , consensus_state
     , state_hash
     , parent_hash
+    , consensus_time_produced_at
     , block_producer
     , transactions
     , user_commands
@@ -809,7 +852,7 @@ let genesis ~genesis_ledger ~base_proof =
     Validated.create_unsafe_pre_hashed
       (With_hash.map genesis_protocol_state ~f:(fun protocol_state ->
            create ~protocol_state ~protocol_state_proof:base_proof
-             ~staged_ledger_diff:empty_diff
+             ~staged_ledger_diff:empty_diff ~validation_callback:Fn.ignore
              ~delta_transition_chain_proof:
                (Protocol_state.previous_state_hash protocol_state, [])
              () ))

@@ -14,7 +14,7 @@ let main n () =
   in
   let block_production_keys n = if n < 3 then Some n else None in
   let%bind testnet =
-    Coda_worker_testnet.test logger n block_production_keys
+    Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in

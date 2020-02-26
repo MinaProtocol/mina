@@ -282,7 +282,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               )
             in
             let transactions =
-              Network_pool.Transaction_pool.Resource_pool.transactions
+              Network_pool.Transaction_pool.Resource_pool.transactions ~logger
                 transaction_resource_pool
             in
             trace_event "waiting for ivar..." ;
@@ -397,7 +397,8 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             ; data=
                                 External_transition.create ~protocol_state
                                   ~protocol_state_proof ~staged_ledger_diff
-                                  ~delta_transition_chain_proof () }
+                                  ~validation_callback:Fn.ignore
+                                  ~delta_transition_chain_proof }
                           |> External_transition.skip_time_received_validation
                                `This_transition_was_not_received_via_gossip
                           |> External_transition

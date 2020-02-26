@@ -136,31 +136,24 @@ let run_test () : unit Deferred.t =
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
-      let discovery_port = 8001 in
-      let communication_port = 8000 in
       let client_port = 8123 in
       let libp2p_port = 8002 in
       let gossip_net_params =
-        Gossip_net.Real.Config.
+        Gossip_net.Libp2p.Config.
           { timeout= Time.Span.of_sec 3.
           ; logger
-          ; target_peer_count= 8
           ; initial_peers= []
+          ; unsafe_no_trust_ip= true
           ; conf_dir= temp_conf_dir
           ; chain_id= "bogus chain id for testing"
           ; addrs_and_ports=
               { external_ip= Unix.Inet_addr.localhost
               ; bind_ip= Unix.Inet_addr.localhost
-              ; discovery_port
-              ; communication_port
+              ; peer= None
               ; libp2p_port
               ; client_port }
           ; trust_system
-          ; enable_libp2p= false
-          ; disable_haskell= false
-          ; libp2p_keypair= None
-          ; libp2p_peers= []
-          ; max_concurrent_connections= Some 10 }
+          ; keypair= None }
       in
       let net_config =
         Coda_networking.Config.
@@ -168,6 +161,7 @@ let run_test () : unit Deferred.t =
           ; trust_system
           ; time_controller
           ; consensus_local_state
+          ; is_seed= true
           ; genesis_ledger_hash=
               Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
           ; log_gossip_heard=
@@ -176,7 +170,7 @@ let run_test () : unit Deferred.t =
               ; new_state= false }
           ; creatable_gossip_net=
               Coda_networking.Gossip_net.(
-                Any.Creatable ((module Real), Real.create gossip_net_params))
+                Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
           }
       in
       Core.Backtrace.elide := false ;
@@ -305,9 +299,9 @@ let run_test () : unit Deferred.t =
           |> Participating_state.active_exn
           |> Option.value ~default:Currency.Balance.zero
         in
-        let%bind p1_res =
+        let p1_res =
           Coda_commands.send_user_command coda (payment :> User_command.t)
-          |> Participating_state.to_deferred_or_error
+          |> Participating_state.active_error
         in
         assert_ok (Or_error.join p1_res) ;
         (* Send a similar payment twice on purpose; this second one will be rejected
@@ -315,9 +309,9 @@ let run_test () : unit Deferred.t =
         let payment' =
           build_payment send_amount sender_sk receiver_pk transaction_fee
         in
-        let%bind p2_res =
+        let p2_res =
           Coda_commands.send_user_command coda (payment' :> User_command.t)
-          |> Participating_state.to_deferred_or_error
+          |> Participating_state.active_error
         in
         assert_ok @@ Or_error.join p2_res ;
         (* The payment fails, but the rpc command doesn't indicate that because that
@@ -350,9 +344,9 @@ let run_test () : unit Deferred.t =
               Option.value_exn
                 (Currency.Balance.add_amount (Option.value_exn v) amount) )
         in
-        let%map p_res =
+        let p_res =
           Coda_commands.send_user_command coda (payment :> User_command.t)
-          |> Participating_state.to_deferred_or_error
+          |> Participating_state.active_error
         in
         p_res |> Or_error.join |> assert_ok ;
         new_balance_sheet'
@@ -363,7 +357,7 @@ let run_test () : unit Deferred.t =
       in
       let send_payments accounts ~txn_count balance_sheet f_amount =
         let pks = pks accounts in
-        Deferred.List.foldi (List.take accounts txn_count) ~init:balance_sheet
+        List.foldi (List.take accounts txn_count) ~init:balance_sheet
           ~f:(fun i acc ((keypair : Signature_lib.Keypair.t), _) ->
             let sender_pk = Public_key.compress keypair.public_key in
             let receiver =
@@ -390,7 +384,7 @@ let run_test () : unit Deferred.t =
                  ( Public_key.compress keypair.public_key
                  , account.Account.Poly.balance ) ))
         in
-        let%bind updated_balance_sheet =
+        let updated_balance_sheet =
           send_payments accounts ~txn_count balance_sheet (fun i ->
               Currency.Amount.of_int ((i + 1) * 10) )
         in

@@ -130,6 +130,8 @@ When you [start the daemon](/docs/my-first-transaction/#start-up-a-node), set th
         -run-snark-worker $CODA_PUBLIC_KEY \
         -snark-worker-fee <fee>
 
-As a snark-worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.
+As a snark worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.
+
+Snark workers can be fairly compute intensive, so if you need to limit their CPU usage, you can specify the number of threads snark workers use. Coda uses the OPENMP library to support parallel CPU processing of SNARKs. Thus each snark worker can be configured with the `OMP_NUM_THREADS` environment variable to determine how many threads to spawn. It defaults to the number of detected logical cores. The daemon also uses this environment variable when it is proving the blockchain snark. You can run `export OMP_NUM_THREAD=4` to set this environmental variable before you begin the daemon.
 
 That about covers the roles and responsibilities as a Code node operator. Since Coda is a permissionless peer-to-peer network, everything is managed and run in a decentralized manner by nodes all over the world. Similarly, the Coda project is also distributed and permissionless to join. The code is all open source, and there is much work to be done, both technical and non-technical. To learn more about how you can get involved with Coda, please check out the [Contributing to Coda section](./contributing).

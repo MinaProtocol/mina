@@ -3,6 +3,7 @@ open Core_kernel
 open Coda_base
 open Coda_state
 open Coda_transition
+open Network_peer
 
 type t =
   { validated_transition: External_transition.Validated.t
@@ -57,7 +58,7 @@ let build ~logger ~verifier ~trust_system ~parent
             match sender with
             | None | Some Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote inet_addr) ->
+            | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
                 Trust_system.(
                   record trust_system logger inet_addr
                     Actions.(Gossiped_invalid_transition, Some (message, [])))
@@ -72,7 +73,7 @@ let build ~logger ~verifier ~trust_system ~parent
             match sender with
             | None | Some Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote inet_addr) ->
+            | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
                 let error_string =
                   Staged_ledger.Staged_ledger_error.to_string
                     staged_ledger_error
@@ -310,7 +311,8 @@ module For_tests = struct
         External_transition.For_tests.create ~protocol_state
           ~protocol_state_proof:Proof.dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
-          ~delta_transition_chain_proof:(previous_state_hash, []) ()
+          ~validation_callback:Fn.ignore
+          ~delta_transition_chain_proof:(previous_state_hash, [])
       in
       (* We manually created a verified an external_transition *)
       let (`I_swear_this_is_safe_see_my_comment
