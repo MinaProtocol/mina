@@ -1,10 +1,12 @@
 module D = Digest
+module type Inputs = Intf.Dlog_main_inputs.S
 open Core_kernel
 open Import
 open Util
 open Rugelach_types
 open Dlog_marlin_types
 module Accumulator = Pairing_marlin_types.Accumulator
+open Tuple_lib
 
 let sg_polynomial ~add ~mul chals chal_invs pt =
   let ( + ) = add and ( * ) = mul in
@@ -30,20 +32,36 @@ let b_poly ~add ~mul ~inv chals =
   let chal_invs = Array.map chals ~f:inv in
   fun x -> sg_polynomial ~add ~mul chals chal_invs x
 
-let accumulate_degree_bound_checks ~add ~scale ~r_h ~r_k
+let accumulate_degree_bound_checks
+    ~update_unshifted
+    ~add ~scale ~r_h ~r_k
     { Accumulator.Degree_bound_checks.shifted_accumulator
-    ; unshifted_accumulators= [h; k] } (g1, g1_s) (g2, g2_s) (g3, g3_s) =
+    ; unshifted_accumulators  } (g1, g1_s) (g2, g2_s) (g3, g3_s) =
   let ( + ) = add in
   let ( * ) = Fn.flip scale in
   let shifted_accumulator =
     shifted_accumulator + (r_h * (g1 + (r_h * g2))) + (r_k * g3)
   in
+  let h_update = (r_h * (g1_s + (r_h * g2_s))) in
+  let k_update = (r_k * g3_s) in
   let unshifted_accumulators =
-    let h = h + (r_h * (g1_s + (r_h * g2_s))) in
-    let k = k + (r_k * g3_s) in
-    Vector.[h; k]
+    update_unshifted unshifted_accumulators 
+      (h_update, k_update)
+      (*
+    Map.update unshifted_accumulators (Domain.size domain_h)
+      ~f:(fun x -> h_update + Option.value_exn x)
+    |> Fn.flip Map.update (Domain.size domain_k)
+        ~f:(fun x -> k_update + Option.value_exn x) *)
   in
   {Accumulator.Degree_bound_checks.shifted_accumulator; unshifted_accumulators}
+
+let accumulate_degree_bound_checks' ~domain_h ~domain_k ~add =
+  accumulate_degree_bound_checks ~add ~update_unshifted:(fun unsh (h_update, k_update) ->
+    Map.update unsh (Domain.size domain_h - 1)
+      ~f:(fun x -> add h_update (Option.value_exn x))
+    |> Fn.flip Map.update (Domain.size domain_k - 1)
+      ~f:(fun x -> add k_update (Option.value_exn x))
+    )
 
 (*
    check that pi proves that U opens to v at z.
@@ -83,10 +101,9 @@ let accumulate_opening_check ~add ~negate ~scale ~generator ~r
   in
   {Accumulator.Opening_check.r_f_minus_r_v_plus_rz_pi; r_pi= r_pi + pi_term}
 
-module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
+module Make (Inputs : Inputs) = struct
   open Inputs
   open Impl
-  module Branching = Nat.S (Branching_pred)
 
   module Fp = struct
     (* For us, q > p, so one Field.t = fq can represent an fp *)
@@ -132,7 +149,7 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     let pack : Unpacked.t -> Packed.t = Field.project
   end
 
-  let debug = false
+  let debug = true
 
   let print_g1 lab (x, y) =
     if debug then
@@ -193,43 +210,78 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     let open G1 in
     accumulate_opening_check ~add:( + ) ~negate ~scale ~generator:Generators.g
 
-  type 'a vec = ('a, Branching.n) Vector.t
+  module One_hot_vector = struct
+    module Constant = struct
+      type t = int
+    end
 
-  module Requests = struct
-    open Snarky.Request
+    type 'n t = (Boolean.var, 'n) Vector.t
 
-    type 'a bp_vec = ('a, Bulletproof_rounds.n) Vector.t
-
-    type _ t +=
-      | Prev_evals :
-          (Field.Constant.t Dlog_marlin_types.Evals.t * Field.Constant.t)
-          Tuple_lib.Triple.t
-          vec
-          t
-      | Prev_messages :
-          (PC.Constant.t, Fp.Packed.Constant.t) Pairing_marlin_types.Messages.t
-          t
-      | Prev_openings_proof : G1.Constant.t Tuple_lib.Triple.t t
-      | Prev_proof_state :
-          ( ( Challenge.Constant.t
-            , Fq.Constant.t
-            , (Challenge.Constant.t, bool) Bulletproof_challenge.t bp_vec
-            , Digest.Constant.t )
-            Types.Pairing_based.Proof_state.Per_proof.t
-            vec
-          , Digest.Constant.t
-          , bool )
-          Types.Pairing_based.Proof_state.t
-          t
-      | Prev_me_onlys :
-          ( G1.Constant.t Pairing_marlin_types.Accumulator.t
-          * Field.Constant.t bp_vec vec )
-          vec
-          t
-      | Pairing_marlin_index : G1.Constant.t Abc.t Matrix_evals.t t
+    let typ (n : 'n Nat.t) : ('n t, Constant.t) Typ.t =
+      let typ = Vector.typ Boolean.typ n in
+      let typ =
+        { typ with
+          check = (fun x ->
+              Snarky.Checked.bind (typ.check x) ~f:(fun () ->
+                  make_checked (fun () ->
+                      Boolean.Assert.exactly_one
+                        (Vector.to_list x)))
+            )
+        }
+      in
+      Typ.transport typ
+        ~there:(fun i ->
+            Vector.init n ~f:((=) i))
+        ~back:(fun v -> 
+            let (i, _) =
+              List.findi (Vector.to_list v) ~f:(fun _ b ->
+                  b) |> Option.value_exn
+            in
+            i)
   end
 
+  type 'a index = 'a Abc.t Matrix_evals.t
+
+  let seal x =
+    match Field.to_constant x with
+    | Some x -> Field.constant x
+    | None ->
+      let y = exists Field.typ ~compute:As_prover.(fun () -> read_var x) in
+      Field.Assert.equal x y ;
+      y
+
+  let rec choose_key
+    : type n. n Nat.s One_hot_vector.t -> (G1.t index, n Nat.s) Vector.t
+      -> G1.t index
+    =
+    let open Tuple_lib in
+    let map ~f = Matrix_evals.map ~f:(Abc.map ~f:(Double.map ~f)) in
+    let map2 ~f = Matrix_evals.map2 ~f:(Abc.map2 ~f:(fun (x1, y1) (x2, y2) -> (f x1 x2, f y1 y2))) in
+    fun bs keys ->
+      Vector.reduce 
+        (Vector.map2 bs keys ~f:(fun b ->
+             map ~f:Field.( ( * ) (b :> t))))
+        ~f:(map2 ~f:Field.(+))
+      |> map ~f:seal
+
+  let choose_key (type n) (i : n One_hot_vector.t) (vec : (_, n) Vector.t) =
+    match vec with
+    | [] -> failwith "choose_key: empty list"
+    | (_::_) -> choose_key i vec
+
   let input_domain = Set_once.create ()
+
+  let print_pairing_acc domain_sizes lab t =
+    let open Rugelach_types.Pairing_marlin_types in
+    if debug then as_prover As_prover.(fun () ->
+        printf !"%s: %{sexp:((Field.Constant.t * Field.Constant.t), (Field.Constant.t * Field.Constant.t) Int.Map.t) Accumulator.t}\n%!"
+          lab
+          (read 
+            (Accumulator.typ domain_sizes
+             (Typ.transport G1.typ ~there:G1.Constant.of_affine
+                ~back:G1.Constant.to_affine_exn)) t
+          )
+      )
 
   let lagrange_precomputations =
     let input_domain = ref None in
@@ -248,7 +300,15 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
           [%test_eq: int] (Domain.size d) (Int.ceil_pow2 input_size) ) ;
       fun i -> Lazy.force (Lazy.force t).(i)
 
+  let mask_gs bs gs =
+    let open Field in
+    List.map2_exn bs gs ~f:(fun (b : Boolean.var) (x,y) ->
+        let b = (b :> t) in
+        (b * x, b * y))
+    |> List.reduce_exn ~f:(fun (x1, y1) (x2,y2) -> (x1+x2, y1+y2))
+
   let incrementally_verify_pairings
+      ~step_domains:(step_h, step_k)
       ~verification_key:(m : _ Abc.t Matrix_evals.t) ~sponge ~public_input
       ~pairing_acc:{Accumulator.opening_check; degree_bound_checks}
       ~(messages : _ Pairing_marlin_types.Messages.t)
@@ -263,6 +323,8 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       (Domain.Pow_2_roots_of_unity (Int.ceil_log2 (Array.length public_input))) ;
     let x_hat =
       let input_size = Array.length public_input in
+      Core.printf "dlog public input bits: %d\n%!"
+        (List.length (List.concat (Array.to_list public_input) )) ;
       G1.multiscale_known
         (Array.mapi public_input ~f:(fun i x ->
              (x, lagrange_precomputations ~input_size i) ))
@@ -331,13 +393,35 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
           ; m.value.c ]
           []
       in
+      List.iteri [f_1; f_2; f_3] ~f:(ksprintf print_g1 "f_%d") ;
       { Accumulator.degree_bound_checks=
-          accumulate_degree_bound_checks degree_bound_checks ~r_h:r ~r_k g_1
+          accumulate_degree_bound_checks
+            ~update_unshifted:(fun m (uh, uk) ->
+                let m = Map.to_sequence ~order:`Increasing_key m |> Sequence.to_list in
+                let keys = List.map m ~f:fst in
+                (* TODO: Potential off by one. *)
+                let add domain delta elts =
+                  let flags =
+                    let domain_size = domain#size in
+                    List.map keys ~f:(fun shift ->
+                        Field.(equal (domain_size - one) (of_int shift)))
+                  in
+                  let elt_plus_delta = G1.(+) (mask_gs flags elts) delta in
+                  List.map2_exn flags elts ~f:(fun b g ->
+                      G1.if_ b ~then_:elt_plus_delta ~else_:g)
+                in
+                add step_h uh (List.map m ~f:snd)
+                |> add step_k uk
+                |> List.zip_exn keys
+                |> Int.Map.of_alist_exn
+              )
+            degree_bound_checks ~r_h:r ~r_k g_1
             g_2 g_3
       ; opening_check=
           accumulate_opening_check opening_check ~r ~r_xi_sum
             (f_1, beta_1, pi_1) (f_2, beta_2, pi_2) (f_3, beta_3, pi_3) }
     in
+(*     print_pairing_acc "post acculmulattion" pairing_acc ; *)
     let deferred =
       { Types.Dlog_based.Proof_state.Deferred_values.Marlin.sigma_2
       ; sigma_3
@@ -351,18 +435,25 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     in
     (digest_before_evaluations, pairing_acc, deferred)
 
-  let combined_evaluation ~xi ~evaluation_point
-      (without_degree_bound, with_degree_bound) ~domain_h ~domain_k =
-    Pcs_batch.combine_evaluations
-      (Common.dlog_pcs_batch (Branching.add Nat.N19.n) ~domain_h ~domain_k)
-      ~crs_max_degree ~mul:Fq.mul ~add:Fq.add ~one:Fq.one ~evaluation_point ~xi
-      without_degree_bound with_degree_bound
+  let combined_evaluation
+      (type b b_plus_19)
 
-  (* x^{2 ^ k} - 1 *)
-  let vanishing_polynomial domain x =
-    let k = Domain.log2_size domain in
-    let rec pow acc i = if i = 0 then acc else pow (Fq.square acc) (i - 1) in
-    Fq.(pow x k - one)
+      b_plus_19
+      ~shifted_pow ~xi ~evaluation_point
+      ( (without_degree_bound : (_, b_plus_19) Vector.t)
+        , with_degree_bound
+      )
+      ~h_minus_1 ~k_minus_1
+    =
+    Pcs_batch.combine_evaluations'
+      (Common.dlog_pcs_batch
+         b_plus_19
+         ~h_minus_1 ~k_minus_1 )
+      ~shifted_pow
+      ~mul:Fq.mul
+      ~add:Fq.add ~one:Fq.one ~evaluation_point ~xi
+      without_degree_bound
+      with_degree_bound
 
   let sum' xs f = List.reduce_exn (List.map xs ~f) ~f:Fq.( + )
 
@@ -382,12 +473,37 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
 
   let b_poly = Fq.(b_poly ~add ~mul ~inv)
 
-  let finalize_other_proof ~domain_k ~domain_h ~sponge
-      ~old_bulletproof_challenges
+  let ones_vector
+    : type n. first_zero:Field.t -> n Nat.t -> (Boolean.var, n) Vector.t
+      =
+      fun ~first_zero n ->
+      let rec go
+        : type m. Boolean.var -> int -> m Nat.t -> (Boolean.var, m) Vector.t =
+        fun value i m ->
+          match m with
+          | Z -> []
+          | S m ->
+            let value = 
+              Boolean.(value && Boolean.not (Field.equal first_zero (Field.of_int i)))
+            in
+            value :: go value (i + 1) m
+      in
+      go Boolean.true_ 0 n
+
+  let finalize_other_proof
+      (type b)
+      (module Branching : Nat.Add.Intf with type n = b)
+      ?actual_branching
+      ~shifted_pow
+      ~domain_h ~domain_k 
+      ~h_minus_1 ~k_minus_1
+      ~sponge
+      ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({xi; r; combined_inner_product; bulletproof_challenges; b; marlin} :
         _ Types.Pairing_based.Proof_state.Deferred_values.t)
       ((beta_1_evals, x_hat1), (beta_2_evals, x_hat2), (beta_3_evals, x_hat3))
       =
+    let T = Branching.eq in
     let open Vector in
     (* You use the NEW bulletproof challenges to check b. Not the old ones. *)
     (* As a proof size optimization, we can probably rig each polynomial
@@ -422,15 +538,33 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
               b_poly (Vector.to_array chals) )
         in
         let combine pt x_hat e =
+          let pi = Branching.add Nat.N19.n in
           let a, b = Evals.to_vectors e in
+          let sg_evals =
+            match actual_branching with
+            | None -> Vector.map sg_olds ~f:(fun f -> f pt)
+            | Some branching ->
+              let mask =
+                ones_vector ~first_zero:branching 
+                  (Vector.length
+                     sg_olds)
+              in
+              Vector.map2 mask sg_olds ~f:(fun b f ->
+                  (b :> Field.t) * f pt)
+          in
           let v =
             Vector.append
-              (Vector.map sg_olds ~f:(fun f -> f pt))
+              sg_evals
               (x_hat :: a)
-              (snd (Branching.add Nat.N19.n))
+              (snd pi)
           in
-          combined_evaluation ~xi ~evaluation_point:pt (v, b) ~domain_h
-            ~domain_k
+          combined_evaluation
+            pi
+            ~shifted_pow
+            ~xi ~evaluation_point:pt 
+            (v, b)
+            ~h_minus_1
+            ~k_minus_1
         in
         combine marlin.beta_1 x_hat1 beta_1_evals
         + r
@@ -449,7 +583,9 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       equal b b_actual
     in
     let marlin_checks_passed =
-      Marlin_checks.check ~input_domain:Input_domain.self ~domain_h ~domain_k
+      Marlin_checks.check ~input_domain:Input_domain.self
+        ~domain_h
+        ~domain_k
         ~x_hat_beta_1:x_hat1 marlin
         { w_hat= beta_1_evals.w_hat
         ; g_1= beta_1_evals.g_1
@@ -524,21 +660,26 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
           ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
             is_square :: prechallenge ) ]
 
-  let hash_me_only ~index =
+  let hash_me_only =
+    (*
+    (* TODO: Since the index is a choice of constants, we can avoid computing
+       after_index by hashing and instead compute it as a choice of the statically
+       computed states of absorbing the static choice of indices. *)
     let after_index =
       let sponge = Sponge.create sponge_params in
       Array.iter
         (Types.index_to_field_elements ~g:G1.to_field_elements index)
         ~f:(Sponge.absorb sponge) ;
       sponge
-    in
-    stage (fun t ->
-        let sponge = Sponge.copy after_index in
+    in *)
+    fun t ->
+        let sponge = Sponge.create sponge_params in
         Array.iter ~f:(Sponge.absorb sponge)
-          (Types.Dlog_based.Proof_state.Me_only.to_field_elements_without_index
+          (Types.Dlog_based.Proof_state.Me_only.to_field_elements
              ~g1:G1.to_field_elements t) ;
-        Sponge.squeeze sponge ~length:Digest.length )
+        Sponge.squeeze sponge ~length:Digest.length 
 
+  (*
   let print_me_only lab t =
     let module T = struct
       module Nvector (N : Nat.Intf) = struct
@@ -573,8 +714,71 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
                 t
             in
             printf !"%s: %{sexp:T.t}\n%!" lab t)
+     *)
 
-  let main ~domain_h ~domain_k
+  let combine_pairing_accs : type n. (_, n) Vector.t -> _ =
+    function
+    | [] -> failwith "combine_pairing_accs: empty list"
+    | [acc] ->
+        acc
+    | a :: accs ->
+        let open Pairing_marlin_types.Accumulator in
+        let (module Shifted) = G1.shifted () in
+(*         print_pairing_acc "a" a ; *)
+        Vector.fold accs
+          ~init:(map a ~f:(fun x -> Shifted.(add zero x)))
+          ~f:(fun acc t -> 
+(*               print_pairing_acc "anotha" t ; *)
+              map2 acc t
+                ~f:Shifted.add)
+        |> map ~f:Shifted.unshift_nonzero
+
+  module Branching = Nat.S (Branching_pred)
+
+  type 'a vec = ('a, Branching.n) Vector.t
+
+  module Requests = struct
+    open Snarky.Request
+
+    type 'a bp_vec = ('a, Bulletproof_rounds.n) Vector.t
+
+    type _ t +=
+      | Prev_evals :
+          (Field.Constant.t Dlog_marlin_types.Evals.t * Field.Constant.t)
+          Tuple_lib.Triple.t
+          vec
+          t
+      | Prev_messages :
+          (PC.Constant.t, Fp.Packed.Constant.t) Pairing_marlin_types.Messages.t
+          t
+      | Prev_openings_proof : G1.Constant.t Tuple_lib.Triple.t t
+      | Prev_proof_state :
+          ( (( Challenge.Constant.t
+            , Fq.Constant.t
+            , (Challenge.Constant.t, bool) Bulletproof_challenge.t bp_vec
+            , Digest.Constant.t )
+            Types.Pairing_based.Proof_state.Per_proof.t
+            * bool)
+            vec
+          , Digest.Constant.t )
+          Types.Pairing_based.Proof_state.t
+          t
+      | Prev_me_onlys :
+          ( (G1.Constant.t,
+             G1.Constant.t Pairing_marlin_types.Accumulator.Degree_bound_checks.Unshifted_accumulators.t
+            )
+               Pairing_marlin_types.Accumulator.t
+          * Field.Constant.t bp_vec vec )
+          vec
+          t
+      | Pairing_marlin_index : One_hot_vector.Constant.t t
+(*       | Pairing_marlin_index : G1.Constant.t Abc.t Matrix_evals.t t *)
+  end
+
+  let main
+      ~pairing_marlin_indices
+      ~wrap_domains:(domain_h, domain_k)
+      ~step_domains
       ({ proof_state=
            { deferred_values= {marlin; xi; r; r_xi_sum}
            ; sponge_digest_before_evaluations
@@ -582,21 +786,34 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
            ; was_base_case }
        ; pass_through } :
         (Field.t, Field.t, _, _, _, _, _) Types.Dlog_based.Statement.t) =
+    (* TODO: prev_proof_state has a fixed size so it should be possible to 
+       just make this one of the public inputs.
+
+       prev_me_onlys also has a fixed size (and in fact it is not even necessary to hash it)
+    *)
     let prev_proof_state =
       let open Types.Pairing_based.Proof_state in
       let typ = typ (module Impl) Branching.n Bulletproof_rounds.n Fq.typ in
       exists typ ~request:(fun () -> Requests.Prev_proof_state)
     in
-    let pairing_marlin_index =
+    let which_index =
       exists
-        (Abc.typ G1.typ |> Matrix_evals.typ)
+        (One_hot_vector.typ (Vector.length pairing_marlin_indices))
         ~request:(fun () -> Requests.Pairing_marlin_index)
     in
+    let pairing_marlin_index =
+      choose_key which_index 
+        (Vector.map pairing_marlin_indices
+           ~f:(Matrix_evals.map ~f:(Abc.map ~f:G1.constant)))
+    in
     let prev_me_onlys =
+      let (h, k) = step_domains in
       exists
         (Vector.typ
            (Typ.tuple2
-              (Pairing_marlin_types.Accumulator.typ G1.typ)
+              (Pairing_marlin_types.Accumulator.typ
+                 (Int.Set.of_list [ Domain.size h - 1; Domain.size k - 1 ])
+                 G1.typ)
               (Vector.typ (Vector.typ Fq.typ Bulletproof_rounds.n) Branching.n))
            Branching.n)
         ~request:(fun () -> Requests.Prev_me_onlys)
@@ -605,18 +822,11 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       Vector.unzip prev_me_onlys
     in
     let prev_pairing_acc =
-      match prev_pairing_accs with
-      | [acc] ->
-          acc
-      | a :: accs ->
-          let open Pairing_marlin_types.Accumulator in
-          let (module Shifted) = G1.shifted () in
-          Vector.fold accs
-            ~init:(map a ~f:(fun x -> Shifted.(add zero x)))
-            ~f:(fun acc t -> map2 acc t ~f:Shifted.add)
-          |> map ~f:Shifted.unshift_nonzero
+      combine_pairing_accs
+        prev_pairing_accs
     in
-    let prev_proofs_finalized, new_bulletproof_challenges =
+(* print_pairing_acc "combined acc" prev_pairing_acc ; *)
+    let new_bulletproof_challenges =
       let evals =
         let ty =
           let ty = Typ.tuple2 (Evals.typ Fq.typ) Fq.typ in
@@ -625,12 +835,12 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
         exists (Vector.typ ty Branching.n) ~request:(fun () ->
             Requests.Prev_evals )
       in
-      let finalized, chals =
+      let chals =
         Vector.mapn
           [ prev_proof_state.unfinalized_proofs
           ; prev_old_bulletproof_challenges
           ; evals ]
-          ~f:(fun [ {deferred_values; sponge_digest_before_evaluations}
+          ~f:(fun [ ({deferred_values; sponge_digest_before_evaluations}, should_verify)
                   ; old_bulletproof_challenges
                   ; evals ]
              ->
@@ -639,14 +849,43 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
               Sponge.absorb s (Fq.pack sponge_digest_before_evaluations) ;
               s
             in
-            finalize_other_proof ~domain_k ~domain_h ~sponge
+            let verified, chals =
+              finalize_other_proof
+                (module Branching)
+                ~shifted_pow:(fun deg x ->
+                    Fq.(Pcs_batch.pow ~one ~mul ~add) x (crs_max_degree - deg))
+                ~domain_h:(Marlin_checks.domain domain_h)
+                ~domain_k:(Marlin_checks.domain domain_k)
+                ~h_minus_1:(Domain.size domain_h - 1)
+                ~k_minus_1:(Domain.size domain_k - 1)
+                ~sponge
               (map_challenges deferred_values ~f:Fq.pack)
-              ~old_bulletproof_challenges evals )
-        |> Vector.unzip
+              ~old_bulletproof_challenges evals 
+            in
+            as_prover As_prover.(fun () ->
+                Core.printf "should verify %b\n%!" (read Boolean.typ should_verify)
+              );
+            Boolean.(Assert.any [ not should_verify ; verified ]) ;
+            chals
+            )
       in
-      (Boolean.all (Vector.to_list finalized), chals)
+      chals
     in
-    let hash_me_only = unstage (hash_me_only ~index:pairing_marlin_index) in
+    Boolean.(
+      Assert.(=)
+        was_base_case
+        (all
+          Vector.(to_list
+                    (map prev_proof_state.unfinalized_proofs
+                       ~f:(fun (_, should_verify) -> not should_verify)))));
+    (* What do we actually need from prev_statement? 
+
+       1. The evaluations (or a commitment to the evaluations) used.
+       This is provided by digest_before_evaluations
+
+       2. The unfinalized challenge values
+    *)
+
     let prev_statement =
       (* TODO: A lot of repeated hashing happening here on the dlog_marlin_index *)
       let prev_me_onlys =
@@ -654,17 +893,18 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
             hash_me_only
               { pairing_marlin_acc= pacc
               ; old_bulletproof_challenges= chals
-              ; pairing_marlin_index } )
+               } )
       in
       { Types.Pairing_based.Statement.pass_through= prev_me_onlys
       ; proof_state= prev_proof_state }
     in
-    Boolean.Assert.(was_base_case = prev_statement.proof_state.was_base_case) ;
+    (* 
     print_bool "prev_proof_finalized" prev_proofs_finalized ;
     print_bool "prev_statement.proof_state.was_base_case"
       prev_statement.proof_state.was_base_case ;
     Boolean.Assert.any
       [prev_proofs_finalized; prev_statement.proof_state.was_base_case] ;
+      *)
     let ( sponge_digest_before_evaluations_actual
         , pairing_marlin_acc
         , marlin_actual ) =
@@ -698,7 +938,9 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
       let r_xi_sum =
         Field.choose_preimage_var r_xi_sum ~length:Field.size_in_bits
       in
-      incrementally_verify_pairings ~pairing_acc:prev_pairing_acc ~xi ~r
+      incrementally_verify_pairings 
+        ~step_domains:(Double.map step_domains ~f:Marlin_checks.domain)
+        ~pairing_acc:prev_pairing_acc ~xi ~r
         ~r_xi_sum ~verification_key:pairing_marlin_index ~sponge
         ~public_input:(Array.append [|[Boolean.true_]|] (pack prev_statement))
         ~messages ~opening_proofs
@@ -706,8 +948,8 @@ module Make (Inputs : Intf.Dlog_main_inputs.S) = struct
     Field.Assert.equal me_only_digest
       (Field.pack
          (hash_me_only
-            { Types.Dlog_based.Proof_state.Me_only.pairing_marlin_index
-            ; pairing_marlin_acc
+            { Types.Dlog_based.Proof_state.Me_only.
+              pairing_marlin_acc
             ; old_bulletproof_challenges= new_bulletproof_challenges })) ;
     Field.Assert.equal sponge_digest_before_evaluations
       (Field.pack sponge_digest_before_evaluations_actual)

@@ -1,6 +1,10 @@
 open Core_kernel
 open Common
 
+let () =
+  Snarky_bn382_backend.Pairing_based.Keypair.set_urs_info
+    "/home/izzy/pickles/urs"
+
 module type S = Intf.Dlog_main_inputs.S
 
 open Snarky_bn382_backend
@@ -22,7 +26,7 @@ module Input_domain = struct
         Array.init domain_size ~f:(fun i ->
             Snarky_bn382_backend.G1.Affine.of_backend
               (Snarky_bn382.Fp_urs.lagrange_commitment
-                 (Lazy.force Snarky_bn382_backend.Pairing_based.Keypair.urs)
+                 (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
                  (u domain_size) (u i)) ) )
 
   let domain = Domain.Pow_2_roots_of_unity 6

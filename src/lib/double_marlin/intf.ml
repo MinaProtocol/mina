@@ -19,7 +19,7 @@ module type App_state_intf = sig
     val dummy : t
   end
 
-  type _ Tag.t += Tag : Constant.t Tag.t
+  type _ App_state_tag.t += Tag : Constant.t App_state_tag.t
 
   (* This function should be collision resistant. *)
   val to_field_elements : t -> Impl.Field.t array
@@ -182,6 +182,8 @@ module Group (Impl : Snarky.Snark_intf.Run) = struct
 
     val scale : t -> Boolean.var list -> t
 
+    val if_ : Boolean.var -> then_:t -> else_:t -> t
+
     val negate : t -> t
 
     val to_field_elements : t -> Field.t list
@@ -284,6 +286,8 @@ module Pairing_main_inputs = struct
       val to_bits : t -> bool list
 
       val of_bits : bool list -> t
+
+      val is_square : t -> bool
     end
 
     module G : sig

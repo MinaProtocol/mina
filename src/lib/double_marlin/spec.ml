@@ -1,6 +1,7 @@
 module D = Digest
 open Core_kernel
 open Rugelach_types
+open Hlist
 
 module Basic = struct
   type (_, _, _) t = ..
@@ -34,7 +35,7 @@ module rec T : sig
         -> (('t1, 'n) Vector.t, ('t2, 'n) Vector.t, 'env) t
     | Array : ('t1, 't2, 'env) t * int -> ('t1 array, 't2 array, 'env) t
     | Struct :
-        ('xs1, 'xs2, 'env) Hlist.Hlist2_1(T).t
+        ('xs1, 'xs2, 'env) H2_1.T(T).t
         -> ('xs1 Hlist.HlistId.t, 'xs2 Hlist.HlistId.t, 'env) t
 end =
   T

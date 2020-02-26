@@ -102,18 +102,16 @@ module Dlog_based = struct
     end
 
     module Me_only = struct
-      type ('g1, 'bulletproof_challenges) t =
-        { pairing_marlin_index: 'g1 Abc.t Matrix_evals.t
-        ; pairing_marlin_acc: 'g1 Pairing_marlin_types.Accumulator.t
+      type ('g1, 'unshifted, 'bulletproof_challenges) t =
+        { pairing_marlin_acc: ('g1, 'unshifted) Pairing_marlin_types.Accumulator.t
         ; old_bulletproof_challenges: 'bulletproof_challenges }
-      [@@deriving sexp_of]
+      [@@deriving bin_io, sexp_of]
 
-      let to_field_elements_without_index
+      let to_field_elements
           { pairing_marlin_acc=
               { opening_check= {r_f_minus_r_v_plus_rz_pi; r_pi}
               ; degree_bound_checks=
                   {shifted_accumulator; unshifted_accumulators} }
-          ; pairing_marlin_index= _
           ; old_bulletproof_challenges } ~g1:g1_to_field_elements =
         Array.concat
           [ Vector.to_array old_bulletproof_challenges
@@ -121,8 +119,15 @@ module Dlog_based = struct
           ; Array.concat_map
               (Array.append
                  [|r_f_minus_r_v_plus_rz_pi; r_pi; shifted_accumulator|]
-                 (Vector.to_array unshifted_accumulators))
+                 (
+                    Map.to_sequence ~order:`Increasing_key unshifted_accumulators
+                    |> Sequence.map ~f:snd
+                    |> Sequence.to_array
+                  )
+                 )
+
               ~f:(fun g -> Array.of_list (g1_to_field_elements g)) ]
+(*
 
       let to_field_elements
           { pairing_marlin_acc=
@@ -140,25 +145,25 @@ module Dlog_based = struct
                  [|r_f_minus_r_v_plus_rz_pi; r_pi; shifted_accumulator|]
                  (Vector.to_array unshifted_accumulators))
               ~f:(fun g -> Array.of_list (g1_to_field_elements g)) ]
+*)
 
       open Snarky.H_list
 
       let to_hlist
-          {pairing_marlin_index; pairing_marlin_acc; old_bulletproof_challenges}
+          { pairing_marlin_acc; old_bulletproof_challenges}
           =
-        [pairing_marlin_index; pairing_marlin_acc; old_bulletproof_challenges]
+        [ pairing_marlin_acc; old_bulletproof_challenges]
 
       let of_hlist
-          ([ pairing_marlin_index
-           ; pairing_marlin_acc
+          ([
+             pairing_marlin_acc
            ; old_bulletproof_challenges ] :
             (unit, _) t) =
-        {pairing_marlin_index; pairing_marlin_acc; old_bulletproof_challenges}
+        { pairing_marlin_acc; old_bulletproof_challenges}
 
-      let typ g1 chal ~length =
+      let typ g1 chal domain_sizes ~length =
         Snarky.Typ.of_hlistable
-          [ g1 |> Abc.typ |> Matrix_evals.typ
-          ; Pairing_marlin_types.Accumulator.typ g1
+          [ Pairing_marlin_types.Accumulator.typ domain_sizes g1
           ; Vector.typ chal length ]
           ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
           ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
@@ -436,38 +441,46 @@ module Pairing_based = struct
         ; sponge_digest_before_evaluations }
     end
 
-    type ('unfinalized_proofs, 'me_only, 'bool) t =
+    type ('unfinalized_proofs, 'me_only) t =
       { unfinalized_proofs: 'unfinalized_proofs
-      ; me_only: 'me_only
-      ; was_base_case: 'bool }
+      ; me_only: 'me_only  }
+(*       ; was_base_case: 'bool } *)
     [@@deriving bin_io]
 
     let spec unfinalized_proofs me_only =
       let open Spec in
-      Struct [unfinalized_proofs; me_only; B Bool]
+      Struct [unfinalized_proofs; me_only]
 
     open Hlist.HlistId
 
-    let to_data {unfinalized_proofs; me_only; was_base_case} =
-      [ Vector.map unfinalized_proofs ~f:Per_proof.to_data
-      ; me_only
-      ; was_base_case ]
+    let to_data {unfinalized_proofs; me_only} =
+      [ Vector.map unfinalized_proofs ~f:(
+            fun (unfinalized, should_verify) ->
+              [ Per_proof.to_data unfinalized; should_verify ])
+      ; me_only ]
 
-    let of_data [unfinalized_proofs; me_only; was_base_case] =
-      { unfinalized_proofs= Vector.map unfinalized_proofs ~f:Per_proof.of_data
-      ; me_only
-      ; was_base_case }
+    let of_data [unfinalized_proofs; me_only] =
+      { unfinalized_proofs=
+          Vector.map unfinalized_proofs ~f:(
+            fun [ unfinalized; should_verify ] ->
+                    (Per_proof.of_data unfinalized, should_verify))
+      ; me_only }
 
     let typ impl branching bp_log2 fq =
-      spec (Vector (Per_proof.spec bp_log2, branching)) (B Spec.Digest)
+      let unfinalized_proofs =
+        let open Spec in
+        Vector
+          ( Struct [ Per_proof.spec bp_log2; B Bool ], branching )
+      in
+      spec unfinalized_proofs (B Spec.Digest)
       |> Spec.typ impl fq
       |> Snarky.Typ.transport ~there:to_data ~back:of_data
       |> Snarky.Typ.transport_var ~there:to_data ~back:of_data
   end
 
   module Statement = struct
-    type ('unfinalized_proofs, 'me_only, 'bool, 'pass_through) t =
-      { proof_state: ('unfinalized_proofs, 'me_only, 'bool) Proof_state.t
+    type ('unfinalized_proofs, 'me_only, 'pass_through) t =
+      { proof_state: ('unfinalized_proofs, 'me_only) Proof_state.t
       ; pass_through: 'pass_through }
     [@@deriving bin_io]
 
@@ -499,30 +512,32 @@ module Pairing_based = struct
     *)
 
     let to_data
-        { proof_state= {unfinalized_proofs; me_only; was_base_case}
+        { proof_state= {unfinalized_proofs; me_only}
         ; pass_through } =
       let open Hlist.HlistId in
-      [ Vector.map unfinalized_proofs ~f:Proof_state.Per_proof.to_data
+      [ Vector.map unfinalized_proofs ~f:(fun (pp, b) ->
+            Hlist.HlistId.[ Proof_state.Per_proof.to_data pp; b ])
       ; me_only
-      ; was_base_case
       ; pass_through ]
 
     let of_data
         Hlist.HlistId.
-          [unfinalized_proofs; me_only; was_base_case; pass_through] =
+          [unfinalized_proofs; me_only; pass_through] =
       { proof_state=
           { unfinalized_proofs=
-              Vector.map unfinalized_proofs ~f:Proof_state.Per_proof.of_data
-          ; me_only
-          ; was_base_case }
+              Vector.map unfinalized_proofs ~f:(fun ([pp; b] : _ Hlist.HlistId.t) ->
+                  (Proof_state.Per_proof.of_data pp, b))
+          ; me_only }
       ; pass_through }
 
     let spec branching bp_log2 =
       let open Spec in
+      let per_proof =
+        Struct [ Proof_state.Per_proof.spec bp_log2; B Bool ]
+      in
       Struct
-        [ Vector (Proof_state.Per_proof.spec bp_log2, branching)
+        [ Vector (per_proof, branching)
         ; B Digest
-        ; B Bool
         ; Vector (B Digest, branching) ]
   end
 end

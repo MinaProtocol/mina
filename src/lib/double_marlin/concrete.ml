@@ -21,7 +21,7 @@ let compute_challenges chals =
 
 let compute_sg chals =
   Snarky_bn382.Fq_urs.b_poly_commitment
-    (Lazy.force Snarky_bn382_backend.Dlog_based.Keypair.urs)
+    (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
     (Fq.Vector.of_array (Vector.to_array (compute_challenges chals)))
   |> G.Affine.of_backend
 
@@ -90,30 +90,31 @@ struct
     [@@deriving sexp, bin_io]
 
     type t =
-      { pairing_marlin_acc: g1 Pairing_marlin_types.Accumulator.t
+      { pairing_marlin_acc: (g1, g1 Int.Map.t) Pairing_marlin_types.Accumulator.t
       ; old_bulletproof_challenges:
           (Challenge.Constant.t, bool) Bulletproof_challenge.t Bp_vector.t
-          Branching_vector.t }
+            Branching_vector.t
+      }
     [@@deriving bin_io, sexp_of]
 
-    let prepare ~pairing_marlin_index
+    let prepare
         {pairing_marlin_acc; old_bulletproof_challenges} =
-      { Me_only.Dlog_based.pairing_marlin_index
-      ; pairing_marlin_acc
+      { Me_only.Dlog_based.
+        pairing_marlin_acc
       ; old_bulletproof_challenges=
           Vector.map ~f:compute_challenges old_bulletproof_challenges }
   end
 
   type 's pairing_based_proof =
     { statement:
-        ( ( Challenge.Constant.t
+        ( (( Challenge.Constant.t
           , Fq.t
           , (Challenge.Constant.t, bool) Bulletproof_challenge.t Bp_vector.t
           , Digest.Constant.t )
           Types.Pairing_based.Proof_state.Per_proof.t
+          * bool)
           Branching_vector.t
         , 's Pairing_based_reduced_me_only.t
-        , bool
         , Dlog_based_reduced_me_only.t Branching_vector.t )
         Statement.Pairing_based.t
     ; prev_evals:
@@ -139,7 +140,7 @@ struct
   module Dlog_based_proof = struct
     type 's t = 's dlog_based_proof [@@deriving bin_io]
 
-    module M = Pairing_main.Main (Inputs.Pairing)
+    module M = Pairing_main.Make (Inputs.Pairing)
 
     let bulletproof_challenges sponge lr =
       let absorb_g (x, y) =
@@ -192,8 +193,8 @@ struct
                   { statement.proof_state with
                     me_only=
                       Common.hash_dlog_me_only
-                        { pairing_marlin_index
-                        ; old_bulletproof_challenges= prev_challenges
+                        { 
+                          old_bulletproof_challenges= prev_challenges
                         ; pairing_marlin_acc=
                             statement.proof_state.me_only.pairing_marlin_acc }
                   } }
@@ -245,8 +246,11 @@ struct
                 let open Fq in
                 let domain_h, domain_k = dlog_domains in
                 Pcs_batch.combine_evaluations
-                  (Common.dlog_pcs_batch (Branching.add Nat.N19.n) ~domain_h
-                     ~domain_k)
+                  (Common.dlog_pcs_batch
+                     (Branching.add Nat.N19.n)
+                     ~h_minus_1:Int.(Domain.size domain_h - 1)
+                     ~k_minus_1:Int.(Domain.size domain_k - 1) 
+                  )
                   ~crs_max_degree:Inputs.Dlog.crs_max_degree ~xi ~mul ~add ~one
                   ~evaluation_point:pt v b
               in
@@ -316,7 +320,13 @@ struct
                     compute_sg u.deferred_values.bulletproof_challenges
                   else p.proof.openings.proof.sg ) }
         in
-        { proof_state= {unfinalized_proofs; me_only; was_base_case}
+        { proof_state= {
+              unfinalized_proofs=
+                Vector.map unfinalized_proofs
+                  ~f:(fun x -> 
+                  printf "was brase case: %b\n%!" was_base_case ;
+                      (x, not was_base_case) )
+            ; me_only }
         ; pass_through=
             Vector.map prev_proofs ~f:(fun {statement; _} ->
                 statement.proof_state.me_only ) }
@@ -351,8 +361,6 @@ struct
                    prev.statement.pass_through.sg ))
         | Me_only State.Tag ->
             k next_me_only_prepared
-        | Compute.Fq_is_square x ->
-            k Fq.(is_square (of_bits x))
         | _ ->
             Snarky.Request.unhandled
       in
@@ -365,8 +373,10 @@ struct
         Impls.Pairing_based.prove pk [input]
           (fun x () ->
             ( Impls.Pairing_based.handle
-                (fun () ->
-                  M.main ~bulletproof_log2:(Nat.to_int Bp_rounds.n) ~domain_h
+                (fun () : unit ->
+                   M.main 
+                     ~wrap_domains:(dlog_domains)
+                     ~bulletproof_log2:(Nat.to_int Bp_rounds.n) ~domain_h
                     ~domain_k
                     (module State)
                     (conv x) )
@@ -420,7 +430,8 @@ struct
         ; pass_through=
             Vector.map statement.pass_through ~f:(fun x ->
                 Common.hash_dlog_me_only
-                  (Dlog_based_reduced_me_only.prepare ~pairing_marlin_index x)
+                  (Dlog_based_reduced_me_only.prepare
+                     x)
             ) }
 
     let combined_polynomials ~xi
@@ -443,9 +454,12 @@ struct
       let x_hat =
         let v = Fp.Vector.create () in
         List.iter public_input ~f:(Fp.Vector.emplace_back v) ;
+        let domain_size =
+          Int.ceil_pow2 (List.length public_input )
+        in
         Snarky_bn382.Fp_urs.commit_evaluations
-          (Lazy.force Snarky_bn382_backend.Pairing_based.Keypair.urs)
-          (Unsigned.Size_t.of_int 64)
+          (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
+          (Unsigned.Size_t.of_int domain_size)
           v
         |> Snarky_bn382_backend.G1.Affine.of_backend
       in
@@ -513,7 +527,9 @@ struct
       Fp.(r * (f_1 + (r * (f_2 + (r * f_3)))))
 
     let accumulate_pairing_checks (proof : Pairing_based.Proof.t)
-        (prev_acc : _ Pairing_marlin_types.Accumulator.t) ~r ~r_k ~r_xi_sum
+        (prev_acc : _ Pairing_marlin_types.Accumulator.t)
+        ~domain_h ~domain_k
+        ~r ~r_k ~r_xi_sum
         ~beta_1 ~beta_2 ~beta_3 (f_1, f_2, f_3) =
       let open G1 in
       let prev_acc =
@@ -528,12 +544,22 @@ struct
       let g3 = conv (fst (snd proof.messages.sigma_gh_3)) in
       Pairing_marlin_types.Accumulator.map ~f:to_affine_exn
         { degree_bound_checks=
-            Dlog_main.accumulate_degree_bound_checks
+            Dlog_main.accumulate_degree_bound_checks'
+              ~domain_h ~domain_k
               prev_acc.degree_bound_checks ~add ~scale ~r_h:r ~r_k g1 g2 g3
-        ; opening_check=
+        ; opening_check= (
+            Core.printf !"Obetas: %{sexp:Impls.Pairing_based.Field.Constant.t} %{sexp:Impls.Pairing_based.Field.Constant.t} %{sexp:Impls.Pairing_based.Field.Constant.t}\n%!"
+              beta_1
+              beta_2
+              beta_3 ;
+            Core.printf !"Ofs: %{sexp:Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t}  %{sexp:Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t}  %{sexp:Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t}\n%!"
+              (G1.to_affine_exn f_1)
+              (G1.to_affine_exn f_2)
+              (G1.to_affine_exn f_3) ;
             Dlog_main.accumulate_opening_check ~add ~negate ~scale
               ~generator:one ~r ~r_xi_sum prev_acc.opening_check
               (f_1, beta_1, proof1) (f_2, beta_2, proof2) (f_3, beta_3, proof3)
+          )
         }
 
     let public_input_of_statement
@@ -550,19 +576,26 @@ struct
     module Me_only = struct
       type t =
         ( Dlog_based_reduced_me_only.g1
+        , Dlog_based_reduced_me_only.g1 Int.Map.t
         , Snarky_bn382_backend.Fq.t Bp_vector.t Branching_vector.t )
         Me_only.Dlog_based.t
       [@@deriving sexp_of]
     end
 
     let wrap (type s) (module App : App_state_intf with type Constant.t = s)
-        ~domain_h ~domain_k ~dlog_marlin_index ~pairing_marlin_index pairing_vk
+        ~wrap_domains ~step_domains ~dlog_marlin_index
+        ~pairing_marlin_indices
+        which_index 
+        pairing_vk
         pk
         ({statement= prev_statement; prev_evals; proof} :
           s pairing_based_proof) =
+      let pairing_marlin_index =
+        (Vector.to_array pairing_marlin_indices).(which_index)
+      in
       let prev_me_only =
         Vector.map
-          ~f:(Dlog_based_reduced_me_only.prepare ~pairing_marlin_index)
+          ~f:(Dlog_based_reduced_me_only.prepare)
           prev_statement.pass_through
       in
       let prev_statement_with_hashes : _ Statement.Pairing_based.t =
@@ -592,7 +625,7 @@ struct
               (Vector.map prev_me_only ~f:(fun t ->
                    (t.pairing_marlin_acc, t.old_bulletproof_challenges) ))
         | Pairing_marlin_index ->
-            k pairing_marlin_index
+            k which_index
         | _ ->
             Snarky.Request.unhandled
       in
@@ -625,17 +658,25 @@ struct
           let prev_pairing_acc =
             let open Pairing_marlin_types.Accumulator in
             Vector.map prev_statement.pass_through ~f:(fun t ->
+                printf !"vv %{sexp:(Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t, (Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t) Int.Map.t) Pairing_marlin_types.Accumulator.t}\n%!"
+                  t.pairing_marlin_acc ;
                 map ~f:G1.of_affine t.pairing_marlin_acc )
             |> Vector.reduce ~f:(fun t1 t2 -> map2 t1 t2 ~f:G1.( + ))
             |> map ~f:G1.to_affine_exn
           in
+              printf !"Ocombined_acc  %{sexp:(Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t, (Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t) Int.Map.t) Pairing_marlin_types.Accumulator.t}\n%!"
+                prev_pairing_acc ;
           { pairing_marlin_acc=
-              accumulate_pairing_checks proof prev_pairing_acc ~r ~r_k
-                ~r_xi_sum ~beta_1 ~beta_2 ~beta_3 combined_polys
+              (let (domain_h, domain_k) = step_domains in
+              accumulate_pairing_checks ~domain_h ~domain_k
+                proof prev_pairing_acc ~r ~r_k
+                ~r_xi_sum ~beta_1 ~beta_2 ~beta_3 combined_polys )
           ; old_bulletproof_challenges=
               Vector.map prev_statement.proof_state.unfinalized_proofs
-                ~f:(fun t -> t.deferred_values.bulletproof_challenges) }
+                ~f:(fun (t, _) -> t.deferred_values.bulletproof_challenges) }
         in
+              printf !"Opost_accumulatieon %{sexp:(Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t, (Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t) Int.Map.t) Pairing_marlin_types.Accumulator.t}\n%!"
+                me_only.pairing_marlin_acc ;
         let chal = Challenge.Constant.of_fp in
         { proof_state=
             { deferred_values=
@@ -652,14 +693,16 @@ struct
                     ; beta_1= chal beta_1
                     ; beta_2= chal beta_2
                     ; beta_3= chal beta_3 } }
-            ; was_base_case= prev_statement.proof_state.was_base_case
+            ; was_base_case=
+                List.for_all ~f:(fun (_, should_verify) -> not should_verify)
+                  (Vector.to_list prev_statement.proof_state.unfinalized_proofs)
             ; sponge_digest_before_evaluations=
                 D.Constant.of_fp sponge_digest_before_evaluations
             ; me_only }
         ; pass_through= prev_statement.proof_state.me_only }
       in
       let me_only_prepared =
-        Dlog_based_reduced_me_only.prepare ~pairing_marlin_index
+        Dlog_based_reduced_me_only.prepare
           next_statement.proof_state.me_only
       in
       let next_proof =
@@ -675,7 +718,11 @@ struct
           [input]
           (fun x () ->
             ( Impls.Dlog_based.handle
-                (fun () -> M.main ~domain_h ~domain_k (conv x))
+                (fun ()  : unit ->
+                   M.main 
+                     ~wrap_domains ~step_domains
+                     ~pairing_marlin_indices
+                     (conv x))
                 handler
               : unit ) )
           ()
@@ -718,13 +765,22 @@ struct
         let k = Pow_2_roots_of_unity (Int.ceil_log2 weight) in
         (h, k)
 
+      let rough_domains =
+        Domain.(Pow_2_roots_of_unity 17, Pow_2_roots_of_unity 17)
+
       module Dlog = struct
         let t =
           let (T (typ, conv)) = Impls.Dlog_based.input () in
           let main x () : unit =
             Pairing_based_proof.M.main (conv x)
-              ~domain_h:(Domain.Pow_2_roots_of_unity 17)
-              ~domain_k:(Domain.Pow_2_roots_of_unity 17)
+              ~pairing_marlin_indices:[
+                (let g = G1.(to_affine_exn one) in
+                let abc = { Abc.a=g;b=g;c=g } in
+                 { row=abc; value=abc; col= abc; rc=abc }
+                )
+              ]
+              ~wrap_domains:rough_domains
+              ~step_domains:rough_domains
           in
           domains (Impls.Dlog_based.constraint_system ~exposing:[typ] main)
 
@@ -743,20 +799,13 @@ struct
               (conv x) ~bulletproof_log2:(Nat.to_int Bp_rounds.n)
               ~domain_h:(Domain.Pow_2_roots_of_unity 17)
               ~domain_k:(Domain.Pow_2_roots_of_unity 17)
+              ~wrap_domains:rough_domains
           in
           domains (Impls.Pairing_based.constraint_system ~exposing:[typ] main)
 
         let h, k = t
       end
     end
-
-    let wrap_kp =
-      let (T (typ, conv)) = Impls.Dlog_based.input () in
-      let main x () : unit =
-        Pairing_based_proof.M.main (conv x) ~domain_h:Domains.Dlog.h
-          ~domain_k:Domains.Dlog.k
-      in
-      Impls.Dlog_based.generate_keypair ~exposing:[typ] main
 
     let step_kp =
       let (T (input, conv)) =
@@ -769,6 +818,7 @@ struct
               (module State)
               (conv x) ~domain_h:Domains.Pairing.h ~domain_k:Domains.Pairing.k
               ~bulletproof_log2:(Nat.to_int Bp_rounds.n)
+              ~wrap_domains:Domains.Dlog.(h, k)
           in
           () )
 
@@ -776,6 +826,16 @@ struct
 
     let pairing_marlin_index =
       Snarky_bn382_backend.Pairing_based.Keypair.vk_commitments step_pk
+
+    let wrap_kp =
+      let (T (typ, conv)) = Impls.Dlog_based.input () in
+      let main x () : unit =
+        Pairing_based_proof.M.main (conv x) 
+          ~pairing_marlin_indices:[ pairing_marlin_index ]
+          ~wrap_domains:Domains.Dlog.(h, k)
+          ~step_domains:Domains.Pairing.(h, k)
+      in
+      Impls.Dlog_based.generate_keypair ~exposing:[typ] main
 
     let wrap_pk = Impls.Dlog_based.Keypair.pk wrap_kp
 
@@ -827,7 +887,7 @@ struct
         (* TODO: Leaky *)
         let t =
           Snarky_bn382.Fp_urs.dummy_opening_check
-            (Lazy.force Snarky_bn382_backend.Pairing_based.Keypair.urs)
+            (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
         in
         { r_f_minus_r_v_plus_rz_pi=
             Snarky_bn382.G1.Affine.Pair.f0 t |> G1.Affine.of_backend
@@ -841,18 +901,27 @@ struct
         let k =
           Unsigned.Size_t.to_int (Snarky_bn382.Fp_index.domain_k_size step_pk)
         in
+        let shifts = List.sort ~compare:Int.compare [ h - 1; k - 1 ] in
         (* TODO: Leaky *)
         let t =
+          let v =
+            let open Snarky_bn382.Usize_vector in
+            let v = create () in
+            List.iter shifts ~f:(fun i ->
+                emplace_back v (Unsigned.Size_t.of_int i)) ;
+            v
+          in
           Snarky_bn382.Fp_urs.dummy_degree_bound_checks
-            (Lazy.force Snarky_bn382_backend.Pairing_based.Keypair.urs)
-            (Unsigned.Size_t.of_int (h - 1))
-            (Unsigned.Size_t.of_int (k - 1))
+            (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
+            v
         in
         { shifted_accumulator=
             Snarky_bn382.G1.Affine.Vector.get t 0 |> G1.Affine.of_backend
         ; unshifted_accumulators=
-            Vector.init Nat.N2.n ~f:(fun i ->
-                G1.Affine.of_backend (Snarky_bn382.G1.Affine.Vector.get t i) )
+            List.mapi shifts ~f:(fun i s -> 
+              (s, 
+              G1.Affine.of_backend (Snarky_bn382.G1.Affine.Vector.get t i) )
+              ) |> Int.Map.of_alist_exn
         }
       in
       let g = G.(to_affine_exn one) in
@@ -920,7 +989,8 @@ struct
               ; sponge_digest_before_evaluations= Digest.Constant.of_fq Fq.zero
               ; was_base_case= true
               ; me_only=
-                  { pairing_marlin_acc= {opening_check; degree_bound_checks}
+                  { pairing_marlin_acc= 
+                      {opening_check; degree_bound_checks}
                   ; old_bulletproof_challenges } }
           ; pass_through= {app_state= State.Constant.dummy; sg= old_sg} }
       ; prev_x_hat_beta_1= fp ()
@@ -950,10 +1020,35 @@ struct
     let wrap proof =
       Pairing_based_proof.wrap
         (module State)
-        ~domain_h:Domains.Dlog.h ~domain_k:Domains.Dlog.k ~dlog_marlin_index
-        ~pairing_marlin_index step_vk wrap_pk proof
+        ~wrap_domains:Domains.Dlog.(h, k)
+        ~step_domains:Domains.Pairing.(h, k)
+        ~dlog_marlin_index
+        ~pairing_marlin_indices:[ pairing_marlin_index ]
+        0
+        step_vk 
+        wrap_pk 
+        proof
   end
 end
+
+(*
+let transaction_snark =
+  Choice input_spec
+    [ mk [ Self; Self ] (fun [ l; r ] input ->
+          assert (l.target = r.source) ;
+          assert (l.amount_increase + r.amount_increase = input.amount_increase) )
+    ; mk [ ] (fun [] input ->
+          failwith "TODO")
+    ]
+
+   (* For each of the recursive inputs, the main function should return a boolean saying
+   whether it's ok for verification to fail. *)
+let blockchain_snark =
+  mk [ Self; transaction_snark ] (fun [ prev; transaction_snark ] input ->
+      ..
+    )
+*)
+
 
 let%test_unit "concrete" =
   let module Branching_pred = Nat.N0 in
@@ -963,7 +1058,7 @@ let%test_unit "concrete" =
 
     type t = Field.t
 
-    type _ Tag.t += Tag : Field.Constant.t Tag.t
+    type _ App_state_tag.t += Tag : Field.Constant.t App_state_tag.t
 
     let base = Field.Constant.one
 

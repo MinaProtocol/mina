@@ -19,21 +19,20 @@ open Core_kernel
 
 let dlog_pcs_batch (type n_branching total)
     ((without_degree_bound, pi) :
-      total Nat.t * (n_branching, Nat.N19.n, total) Nat.Adds.t) ~domain_h
-    ~domain_k =
-  let h = Domain.size domain_h in
-  let k = Domain.size domain_k in
-  (*   let without_degree_bound, pi = Branching.add Nat.N20.n in *)
+       total Nat.t * (n_branching, Nat.N19.n, total) Nat.Adds.t)
+    ~h_minus_1
+    ~k_minus_1
+  =
   Pcs_batch.create ~without_degree_bound
-    ~with_degree_bound:[h - 1; h - 1; k - 1]
+    ~with_degree_bound:[h_minus_1; h_minus_1; k_minus_1 ]
 
-let pairing_beta_1_pcs_batch =
+let pairing_beta_1_pcs_batch : (int, _, _) Pcs_batch.t =
   Pcs_batch.create ~without_degree_bound:Nat.N6.n ~with_degree_bound:[]
 
-let pairing_beta_2_pcs_batch =
+let pairing_beta_2_pcs_batch : (int, _, _) Pcs_batch.t =
   Pcs_batch.create ~without_degree_bound:Nat.N2.n ~with_degree_bound:[]
 
-let pairing_beta_3_pcs_batch =
+let pairing_beta_3_pcs_batch : (int, _, _) Pcs_batch.t =
   Pcs_batch.create ~without_degree_bound:Nat.N11.n ~with_degree_bound:[]
 
 let split_last xs =

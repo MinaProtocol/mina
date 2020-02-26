@@ -1,16 +1,28 @@
 open Core_kernel
 open Rugelach_types
 
+type 'field domain = < size : 'field; vanishing_polynomial : 'field -> 'field >
+
 module Make (Impl : Snarky.Snark_intf.Run) = struct
   open Impl
   open Util
   module F = Field
+
+  type nonrec domain = Field.t domain
 
   (* x^{2 ^ k} - 1 *)
   let vanishing_polynomial domain x =
     let k = Domain.log2_size domain in
     let rec pow acc i = if i = 0 then acc else pow (F.square acc) (i - 1) in
     F.(pow x k - one)
+
+  let domain (domain : Domain.t) : domain =
+    let size = Field.of_int (Domain.size domain) in
+    object
+      method size = size
+      method vanishing_polynomial x = vanishing_polynomial domain x
+    end
+
 
   let sum' xs f = List.reduce_exn (List.map xs ~f) ~f:F.( + )
 
@@ -54,11 +66,11 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
     in
     let sum = sum' in
     let r_alpha =
-      let v_h_alpha = vanishing_polynomial domain_h alpha in
-      fun x -> (v_h_alpha - vanishing_polynomial domain_h x) / (alpha - x)
+      let v_h_alpha = domain_h#vanishing_polynomial alpha in
+      fun x -> (v_h_alpha - domain_h#vanishing_polynomial x) / (alpha - x)
     in
-    let v_h_beta_1 = vanishing_polynomial domain_h beta_1 in
-    let v_h_beta_2 = vanishing_polynomial domain_h beta_2 in
+    let v_h_beta_1 = domain_h#vanishing_polynomial beta_1 in
+    let v_h_beta_2 = domain_h#vanishing_polynomial beta_2 in
     let a_beta_3, b_beta_3 =
       let beta_1_beta_2 = beta_1 * beta_2 in
       let term =
@@ -86,12 +98,12 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
                 Field.Constant.print y ;
                 Core.printf "%!" )) ;
         equal x y )
-      [ ( h_3 * vanishing_polynomial domain_k beta_3
+      [ ( h_3 * domain_k#vanishing_polynomial beta_3
         , a_beta_3 - (b_beta_3 * ((beta_3 * g_3) + sigma_3)) )
-      ; ( r_alpha beta_2 * sigma_3 * of_int (Domain.size domain_k)
+      ; ( r_alpha beta_2 * sigma_3 * domain_k#size
         , (h_2 * v_h_beta_2) + sigma_2 + (g_2 * beta_2) )
       ; ( (r_alpha beta_1 * sum ms (fun m -> eta m * z_ m))
-          - (sigma_2 * of_int (Domain.size domain_h) * z_hat)
+          - (sigma_2 * domain_h#size * z_hat)
         , (h_1 * v_h_beta_1) + (beta_1 * g_1) ) ]
     |> Boolean.all
 end

@@ -208,18 +208,15 @@ module Accumulator = struct
        = e(r_i U_i, beta^{N - d_i} H) - e(r_i V_i, H)
     *)
 
+    module Shift = Int
     module Unshifted_accumulators = struct
-      module N = Nat.N2
-
-      type 'a t = ('a, N.n) Vector.t
-
-      include Vector.Binable (N)
-      include Vector.Sexpable (N)
+      type 'a t = 'a Shift.Map.t [@@deriving sexp, bin_io]
     end
 
-    type 'g t =
+    type ('g, 'unshifted) t =
       { shifted_accumulator: 'g
-      ; unshifted_accumulators: 'g Unshifted_accumulators.t }
+      ; unshifted_accumulators: 'unshifted
+      }
     [@@deriving fields, bin_io, sexp]
 
     let to_hlist {shifted_accumulator; unshifted_accumulators} =
@@ -229,9 +226,31 @@ module Accumulator = struct
         ([shifted_accumulator; unshifted_accumulators] : (unit, _) H_list.t) =
       {shifted_accumulator; unshifted_accumulators}
 
-    let typ g =
+    let typ (shifts : Shift.Set.t) g =
+      let key_order = `Increasing in
+      let there (xs: _ Unshifted_accumulators.t) =
+        Map.to_alist ~key_order xs
+        |> List.map ~f:snd
+      in
+      let back xs = 
+        Set.to_sequence ~order:key_order shifts
+        |> Fn.flip Sequence.zip (Sequence.of_list xs)
+        |> Shift.Map.of_increasing_sequence
+        |> Or_error.ok_exn
+      in
       Snarky.Typ.of_hlistable
-        [g; Vector.typ g Unshifted_accumulators.N.n]
+        [g; 
+         Typ.transport
+           (Typ.list ~length:(Set.length shifts)
+              g)
+           ~there ~back
+       |> Typ.transport_var ~there ~back
+
+    (*
+         Vector.typ
+           (Vector.typ g Unshifted_accumulators_per_branch.n)
+           branches *)
+        ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
@@ -241,12 +260,16 @@ module Accumulator = struct
 
     let map {shifted_accumulator; unshifted_accumulators} ~f =
       { shifted_accumulator= f shifted_accumulator
-      ; unshifted_accumulators= Vector.map ~f unshifted_accumulators }
+      ; unshifted_accumulators= Map.map ~f unshifted_accumulators }
 
     let map2 t1 t2 ~f =
       { shifted_accumulator= f t1.shifted_accumulator t2.shifted_accumulator
       ; unshifted_accumulators=
-          Vector.map2 ~f t1.unshifted_accumulators t2.unshifted_accumulators }
+          Int.Map.merge ~f:(fun ~key:_ ->
+              function
+              | `Both (x, y) -> Some (f x y)
+              | _ -> failwith "map2: Key not present in both maps")
+            t1.unshifted_accumulators t2.unshifted_accumulators }
   end
 
   module Opening_check = struct
@@ -287,9 +310,9 @@ module Accumulator = struct
       ; r_pi= f t1.r_pi t2.r_pi }
   end
 
-  type 'g t =
+  type ('g, 'unshifted) t =
     { opening_check: 'g Opening_check.t
-    ; degree_bound_checks: 'g Degree_bound_checks.t }
+    ; degree_bound_checks: ('g, 'unshifted) Degree_bound_checks.t }
   [@@deriving fields, bin_io, sexp]
 
   let to_hlist {opening_check; degree_bound_checks} =
@@ -298,9 +321,9 @@ module Accumulator = struct
   let of_hlist ([opening_check; degree_bound_checks] : (unit, _) H_list.t) =
     {opening_check; degree_bound_checks}
 
-  let typ g =
+  let typ shifts g =
     Snarky.Typ.of_hlistable
-      [Opening_check.typ g; Degree_bound_checks.typ g]
+      [Opening_check.typ g; Degree_bound_checks.typ shifts g]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 
