@@ -407,7 +407,7 @@ module Base = struct
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
     let%bind tokens_equal = Token_id.Checked.equal token fee_token in
     let%bind token_default =
-      Boolean.(Token_id.(Checked.equal token (var_of_t default)))
+      Token_id.(Checked.equal token (var_of_t default))
     in
     let%bind () =
       [%with_label "Validate tokens"]
