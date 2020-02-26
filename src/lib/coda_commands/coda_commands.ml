@@ -166,19 +166,6 @@ let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let trust_system = config.trust_system in
   Trust_system.reset trust_system ip_address
 
-let replace_block_production_keys keys pks =
-  let kps =
-    List.filter_map pks ~f:(fun pk ->
-        let open Option.Let_syntax in
-        let%map kps =
-          Coda_lib.wallets keys |> Secrets.Wallets.find_unlocked ~needle:pk
-        in
-        (kps, pk) )
-  in
-  Coda_lib.replace_block_production_keypairs keys
-    (Keypair.And_compressed_pk.Set.of_list kps) ;
-  kps |> List.map ~f:snd
-
 let setup_user_command ~fee ~nonce ~valid_until ~memo ~sender_kp
     user_command_body =
   let payload =
