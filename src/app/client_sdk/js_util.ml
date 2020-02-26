@@ -21,13 +21,14 @@ type payload_common_js =
 let payload_common_of_js (payload_common_js : payload_common_js) =
   let fee_js = payload_common_js##.fee in
   let fee = Js.to_string fee_js |> Currency.Fee.of_string in
+  let fee_token = Token_id.default in
   let nonce_js = payload_common_js##.nonce in
   let nonce = Js.to_string nonce_js |> Coda_numbers.Account_nonce.of_string in
   let valid_until_js = payload_common_js##.validUntil in
   let valid_until = Js.to_string valid_until_js |> Global_slot.of_string in
   let memo_js = payload_common_js##.memo in
   let memo = Js.to_string memo_js |> Memo.create_from_string_exn in
-  User_command_payload.Common.Poly.{fee; nonce; valid_until; memo}
+  User_command_payload.Common.Poly.{fee; fee_token; nonce; valid_until; memo}
 
 type payment_payload_js =
   < receiver: string_js Js.prop ; amount: string_js Js.prop > Js.t
@@ -42,6 +43,7 @@ let payment_body_of_js payment_payload =
     payment_payload##.receiver |> Js.to_string
     |> Signature_lib.Public_key.Compressed.of_base58_check_exn
   in
+  let receiver = Account_id.create receiver Token_id.default in
   let amount =
     payment_payload##.amount |> Js.to_string |> Currency.Amount.of_string
   in
