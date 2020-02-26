@@ -97,8 +97,14 @@ module Style = {
       selector("ul > li", [paddingLeft(`rem(0.5))]),
       selector("ul > li > ul", [marginLeft(`rem(1.))]),
       selector(
-        "p > em",
-        [fontSize(`px(13)), color(`hex("757575")), textAlign(`center)],
+        "img + em",
+        [
+          fontSize(`px(13)),
+          color(`hex("757575")),
+          width(`percent(100.)),
+          display(`inlineBlock),
+          textAlign(`center),
+        ],
       ),
       mediaMedium([
         selector(".not-large, .not-mobile", [display(`block)]),
