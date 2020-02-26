@@ -33,7 +33,7 @@ end)
       Linear_pipe.write t.write_broadcasts diff'
     in
     match%bind Resource_pool.Diff.unsafe_apply t.resource_pool pool_diff with
-    | Ok diff' ->
+    | Ok (diff', _rejected) ->
         rebroadcast diff'
     | Error (`Locally_generated diff') ->
         rebroadcast diff'
@@ -62,7 +62,6 @@ end)
         | `Incoming diff_and_cb ->
             apply_and_broadcast network_pool diff_and_cb
         | `Local diff ->
-            (*Should this be coming from resource pool instead?*)
             apply_and_broadcast network_pool
               (Envelope.Incoming.local diff, Fn.const ())
         | `Transition_frontier_extension diff ->

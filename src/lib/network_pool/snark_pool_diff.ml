@@ -45,6 +45,21 @@ module Make
         * Ledger_proof.Stable.V1.t One_or_two.t Priced_proof.Stable.V1.t
   [@@deriving compare, sexp, to_yojson]
 
+  module Rejected = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t [@@deriving sexp, yojson]
+  end
+
+  type rejected = Rejected.t [@@deriving sexp, yojson]
+
   let compact_json = function
     | Add_solved_work (work, {proof= _; fee= {fee; prover}}) ->
         `Assoc
@@ -77,7 +92,7 @@ module Make
       | `Statement_not_referenced ->
           Error (`Other (Error.of_string "statement not referenced"))
       | `Added ->
-          Ok diff
+          Ok (diff, ())
     in
     match diff with
     | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) -> (

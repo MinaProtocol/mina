@@ -45,6 +45,9 @@ module type Resource_pool_diff_intf = sig
 
   type t [@@deriving sexp, to_yojson]
 
+  (** Part of the diff that was not added to the resource pool*)
+  type rejected [@@deriving sexp, to_yojson]
+
   val summary : t -> string
 
   (** Warning: Using this directly could corrupt the resource pool if it
@@ -53,7 +56,8 @@ module type Resource_pool_diff_intf = sig
   val unsafe_apply :
        pool
     -> t Envelope.Incoming.t
-    -> (t, [`Locally_generated of t | `Other of Error.t]) Result.t Deferred.t
+    -> (t * rejected, [`Locally_generated of t | `Other of Error.t]) Result.t
+       Deferred.t
 end
 
 (** A [Resource_pool_intf] ties together an associated pair of
