@@ -163,7 +163,7 @@ let daemon logger =
        flag "log-block-creation"
          ~doc:
            "true|false Log the steps involved in including transactions and \
-            snark work in a block (default: false)"
+            snark work in a block (default: true)"
          (optional bool)
      and libp2p_keypair =
        flag "discovery-keypair" (optional string)
@@ -461,7 +461,7 @@ let daemon logger =
          in
          let log_block_creation =
            or_from_config YJ.Util.to_bool_option "log-block-creation"
-             ~default:false log_block_creation
+             ~default:true log_block_creation
          in
          let log_gossip_heard =
            { Coda_networking.Config.snark_pool_diff=
