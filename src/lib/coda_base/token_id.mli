@@ -1,10 +1,8 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params
 open Tick
@@ -12,7 +10,6 @@ open Tick
 [%%else]
 
 module Random_oracle = Random_oracle_nonconsensus
-
 open Snark_params_nonconsensus
 
 [%%endif]
@@ -31,6 +28,7 @@ val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 val to_string : t -> string
 
 val of_string : string -> t
+
 (** The default token ID, associated with the native coda token.
 
     This key should be used for fee and coinbase transactions.
@@ -43,8 +41,7 @@ val unpack : t -> bool list
 
 include Comparable.S with type t := t
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 type var
 

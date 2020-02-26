@@ -14,7 +14,6 @@ open Currency
 [%%else]
 
 module Currency = Currency_nonconsensus.Currency
-
 open Currency_nonconsensus.Currency
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 

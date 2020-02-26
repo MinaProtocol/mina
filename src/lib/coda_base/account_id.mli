@@ -1,10 +1,8 @@
-[%%import
-"/src/config.mlh"]
+[%%import "/src/config.mlh"]
 
 open Core_kernel
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
 open Signature_lib
@@ -12,7 +10,6 @@ open Signature_lib
 [%%else]
 
 module Random_oracle = Random_oracle_nonconsensus
-
 open Snark_params_nonconsensus
 open Signature_lib_nonconsensus
 
@@ -43,8 +40,7 @@ include Comparable.S with type t := t
 
 include Hashable.S_binable with type t := t
 
-[%%ifdef
-consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 type var
 

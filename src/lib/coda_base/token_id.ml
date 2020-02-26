@@ -11,7 +11,6 @@ open Snark_params.Tick
 [%%else]
 
 module Random_oracle = Random_oracle_nonconsensus
-
 open Snark_params_nonconsensus
 
 [%%endif]
@@ -19,8 +18,7 @@ open Snark_params_nonconsensus
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Field.t
-    [@@deriving version {asserted}, sexp, eq, hash, compare]
+    type t = Field.t [@@deriving version {asserted}, sexp, eq, hash, compare]
 
     let to_latest = Fn.id
 
