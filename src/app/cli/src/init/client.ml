@@ -1444,7 +1444,7 @@ let compile_time_constants =
          Core.printf "%s\n%!"
            (Yojson.Safe.to_string Consensus.Constants.all_constants) ))
 
-let get_telemetry =
+let telemetry =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let daemon_peers_flag =
@@ -1607,5 +1607,5 @@ let advanced =
     ; ("import", import_key)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("compile-time-constants", compile_time_constants)
-    ; ("get-telemetry", get_telemetry)
+    ; ("telemetry", telemetry)
     ; ("visualization", Visualization.command_group) ]
