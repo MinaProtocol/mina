@@ -113,11 +113,7 @@ module Inner = {
         | DegradedPerformance => ("Degraded", amberAlpha(0.1), amber)
         | PartialOutage => ("Partial Outage", amberAlpha(0.1), amber)
         | MajorOutage => ("Major Outage", amberAlpha(0.1), amber)
-        | UnderMaintenance => (
-            "Under Maintenance",
-            amberAlpha(0.1),
-            amber,
-          )
+        | UnderMaintenance => ("Under Maintenance", amberAlpha(0.1), amber)
         }
       );
     };
