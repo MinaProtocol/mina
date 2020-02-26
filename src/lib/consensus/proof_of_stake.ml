@@ -42,7 +42,11 @@ let compute_delegatee_table keys ~iter_accounts =
   let open Coda_base in
   let outer_table = Public_key.Compressed.Table.create () in
   iter_accounts (fun i (acct : Account.t) ->
-      if Public_key.Compressed.Set.mem keys acct.delegate then
+      if
+        Public_key.Compressed.Set.mem keys acct.delegate
+        (* Only default tokens may delegate. *)
+        && Token_id.equal acct.token_id Token_id.default
+      then
         Public_key.Compressed.Table.update outer_table acct.delegate
           ~f:(function
           | None ->
@@ -729,6 +733,10 @@ module Data = struct
       let staker_addr = message.Message.delegator in
       let%bind account =
         with_label __LOC__ (Frozen_ledger_hash.get ledger staker_addr)
+      in
+      let%bind () =
+        [%with_label "Account is for the default token"]
+          Token_id.(Checked.Assert.equal account.token_id (var_of_t default))
       in
       let%bind delegate =
         with_label __LOC__ (Public_key.decompress_var account.delegate)
