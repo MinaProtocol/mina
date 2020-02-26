@@ -77,14 +77,14 @@ module.exports.confirmEmail = async event => {
 
   const email = cryptr.decrypt(encryptedEmail);
 
-  const request = {
+  const newContactRequest = {
     method: "POST",
-    url: "/v3/contactdb/recipients",
-    body: [{ email }]
+    url: "/v3/marketing/contacts",
+    body: { list_ids: [""], contacts: [{ email }] },
   };
 
   try {
-    await sendgrid.request(request);
+    await sendgrid.request(newContactRequest);
   } catch (e) {
     console.error(e);
     return {
