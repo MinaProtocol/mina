@@ -2,15 +2,20 @@
 "/src/config.mlh"]
 
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_bits
 open Bitstring_lib
-
-[%%if
-defined consensus_mechanism]
-
 open Snark_params
 open Tick
 open Let_syntax
+
+[%%else]
+
+open Snark_bits_nonconsensus
+module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 
 [%%endif]
 
@@ -28,7 +33,7 @@ module Make (Unsigned : sig
 end) (M : sig
   val length : int
 end) : sig
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   include S with type t = Unsigned.t and type var = Boolean.var list
 
@@ -126,11 +131,11 @@ end = struct
       else Infix.(v land lognot (one lsl i))
   end
 
-  [%%if
-  defined consensus_mechanism]
-
   include (
     Bits.Vector.Make (Vector) : Bits_intf.Convertible_bits with type t := t)
+
+  [%%ifdef
+  consensus_mechanism]
 
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
   include Unpacked
@@ -172,7 +177,7 @@ end = struct
 
   type magnitude = t [@@deriving sexp, hash, compare, yojson]
 
-  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+  let to_input t = Random_oracle.Input.bitstring @@ to_bits t
 
   module Signed = struct
     type ('magnitude, 'sgn) typ = ('magnitude, 'sgn) Signed_poly.t =
@@ -225,8 +230,8 @@ end = struct
 
     let ( + ) = add
 
-    [%%if
-    defined consensus_mechanism]
+    [%%ifdef
+    consensus_mechanism]
 
     type nonrec var = (var, Sgn.var) Signed_poly.t
 
@@ -311,8 +316,8 @@ end = struct
     [%%endif]
   end
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   module Checked = struct
     let if_ = if_
@@ -526,8 +531,8 @@ module Amount = struct
         let length = currency_length
       end)
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   include (
     T :
@@ -550,8 +555,8 @@ module Amount = struct
 
   let add_fee (t : t) (fee : Fee.t) = add t (of_fee fee)
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   module Checked = struct
     include T.Checked
@@ -577,8 +582,8 @@ module Balance = struct
     end
   end]
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   include (Amount : Basic with type t = Amount.t with type var = Amount.var)
 
@@ -598,8 +603,8 @@ module Balance = struct
 
   let ( - ) = sub_amount
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   module Checked = struct
     let add_signed_amount = Amount.Checked.add_signed
@@ -620,6 +625,9 @@ end
 
 let%test_module "sub_flagged module" =
   ( module struct
+    [%%ifdef
+    consensus_mechanism]
+
     open Tick
 
     module type Sub_flagged_S = sig
@@ -667,4 +675,6 @@ let%test_module "sub_flagged module" =
     let%test_unit "fee sub_flagged" = run_test (module Fee)
 
     let%test_unit "amount sub_flagged" = run_test (module Amount)
+
+    [%%endif]
   end )

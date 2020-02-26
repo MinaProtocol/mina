@@ -1,8 +1,27 @@
+(* user_command_payload.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params.Tick
+module Coda_numbers = Coda_numbers
+
+[%%else]
+
+module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Currency = Currency_nonconsensus.Currency
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
+
+module Memo = User_command_memo
 module Account_nonce = Coda_numbers.Account_nonce
 module Global_slot = Coda_numbers.Global_slot
-module Memo = User_command_memo
 
 module Common = struct
   module Poly = struct
@@ -36,7 +55,6 @@ module Common = struct
     end
   end]
 
-  (* bin_io omitted *)
   type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash, yojson]
 
   let to_input ({fee; nonce; valid_until; memo} : t) =
@@ -62,6 +80,9 @@ module Common = struct
         >>| Memo.create_from_string_exn
     in
     Poly.{fee; nonce; valid_until; memo}
+
+  [%%ifdef
+  consensus_mechanism]
 
   type var =
     ( Currency.Fee.var
@@ -101,6 +122,8 @@ module Common = struct
          ; s valid_until
          ; Array.to_list (memo :> Boolean.var array) |]
   end
+
+  [%%endif]
 end
 
 module Body = struct
@@ -117,8 +140,8 @@ module Body = struct
   end]
 
   type t = Stable.Latest.t =
-    | Payment of Payment_payload.Stable.V1.t
-    | Stake_delegation of Stake_delegation.Stable.V1.t
+    | Payment of Payment_payload.t
+    | Stake_delegation of Stake_delegation.t
   [@@deriving eq, sexp, hash, yojson]
 
   module Tag = Transaction_union_tag
