@@ -306,13 +306,13 @@ module For_tests = struct
         Protocol_state.create_value ~genesis_state_hash ~previous_state_hash
           ~blockchain_state:next_blockchain_state ~consensus_state
       in
-      ignore (External_transition.set_current_fork_id (Fork_id.create "00000")) ;
+      Fork_id.(set_current empty) ;
       let next_external_transition =
         External_transition.For_tests.create ~protocol_state
           ~protocol_state_proof:Proof.dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
           ~validation_callback:Fn.ignore
-          ~delta_transition_chain_proof:(previous_state_hash, [])
+          ~delta_transition_chain_proof:(previous_state_hash, []) ()
       in
       (* We manually created a verified an external_transition *)
       let (`I_swear_this_is_safe_see_my_comment

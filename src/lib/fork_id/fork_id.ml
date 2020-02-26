@@ -13,6 +13,7 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp]
 
+(* only allow lower-case a .. f *)
 let is_hex_char = function
   | '0' .. '9' ->
       true
@@ -22,6 +23,23 @@ let is_hex_char = function
       false
 
 let required_length = 5
+
+let (current_fork_id : t option ref) = ref None
+
+let set_current fork_id = current_fork_id := Some fork_id
+
+(* we set current fork id on daemon startup, so we should not see errors
+   due to current_fork_id = None in get_current_fork_id and create
+ *)
+
+let get_current () = Option.value_exn !current_fork_id
+
+(* when an external transition is deserialized, might
+   contain invalid fork id, some arbitrary string
+*)
+let is_valid t =
+  Int.equal (String.length t) required_length
+  && String.fold t ~init:true ~f:(fun accum c -> accum && is_hex_char c)
 
 let create s =
   let len = String.length s in

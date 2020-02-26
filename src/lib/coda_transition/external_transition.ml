@@ -34,7 +34,7 @@ module Stable = struct
       ; delta_transition_chain_proof:
           State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list
       ; current_fork_id: Fork_id.Stable.V1.t
-      ; next_fork_id: Fork_id.Stable.V1.t option }
+      ; next_fork_id: Fork_id.Stable.V1.t option
       ; mutable validation_callback: Validate_content.t }
     [@@deriving sexp, fields]
 
@@ -46,7 +46,7 @@ module Stable = struct
         ; staged_ledger_diff= _
         ; delta_transition_chain_proof= _
         ; current_fork_id
-        ; next_fork_id } =
+        ; next_fork_id
         ; validation_callback= _ } =
       `Assoc
         [ ("protocol_state", Protocol_state.value_to_yojson protocol_state)
@@ -131,7 +131,7 @@ type t = Stable.Latest.t =
   ; staged_ledger_diff: Staged_ledger_diff.t
   ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
   ; current_fork_id: Fork_id.t
-  ; next_fork_id: Fork_id.t option }
+  ; next_fork_id: Fork_id.t option
   ; mutable validation_callback: Validate_content.t }
 [@@deriving sexp]
 
@@ -163,26 +163,20 @@ Stable.Latest.
 
 include Comparable.Make (Stable.Latest)
 
-let (current_fork_id : Fork_id.t option ref) = ref None
-
-let set_current_fork_id fork_id = current_fork_id := Some fork_id
-
-(* we set current fork id on daemon startup, so we should not see errors
-   due to current_fork_id = None in get_current_fork_id and create
- *)
-
-let get_current_fork_id () = Option.value_exn !current_fork_id
-
 let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
     ~delta_transition_chain_proof ~validation_callback ?next_fork_id () =
-  if Option.is_none !current_fork_id then
-    failwith "Cannot create external transition before setting current fork id" ;
+  let current_fork_id =
+    try Fork_id.get_current ()
+    with _ ->
+      failwith
+        "Cannot create external transition before setting current fork id"
+  in
   { protocol_state
   ; protocol_state_proof
   ; staged_ledger_diff
   ; delta_transition_chain_proof
-  ; current_fork_id= Option.value_exn !current_fork_id
-  ; next_fork_id }
+  ; current_fork_id
+  ; next_fork_id
   ; validation_callback }
 
 let timestamp {protocol_state; _} =
@@ -861,13 +855,13 @@ let genesis ~genesis_ledger ~base_proof =
 
 module For_tests = struct
   let create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-      ~delta_transition_chain_proof ?next_fork_id () =
-    set_current_fork_id (Fork_id.create "00000") ;
+      ~delta_transition_chain_proof ~validation_callback ?next_fork_id () =
+    Fork_id.(set_current empty) ;
     create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
-      ~delta_transition_chain_proof ?next_fork_id ()
+      ~delta_transition_chain_proof ~validation_callback ?next_fork_id ()
 
   let genesis ~genesis_ledger ~base_proof =
-    set_current_fork_id (Fork_id.create "00000") ;
+    Fork_id.(set_current empty) ;
     genesis ~genesis_ledger ~base_proof
 end
 
