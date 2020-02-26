@@ -58,8 +58,23 @@ end)
       ; Strict_pipe.Reader.map incoming_diffs ~f:(fun diff -> `Incoming diff)
       ]
       ~f:(fun diff_source ->
+        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+          ~metadata:
+            [ ("tf_diffs_length", `Int (Strict_pipe.Reader.length tf_diffs))
+            ; ( "local_diffs_length"
+              , `Int (Strict_pipe.Reader.length local_diffs) )
+            ; ( "incoming_diffs_length"
+              , `Int (Strict_pipe.Reader.length incoming_diffs) ) ]
+          "Network pool merge pipe stats: $tf_diffs_length \
+           $local_diffs_length $incoming_diffs_length" ;
         match diff_source with
-        | `Incoming diff_and_cb ->
+        | `Incoming ((diff, _) as diff_and_cb) ->
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ( "diff"
+                  , Resource_pool.Diff.to_yojson (Envelope.Incoming.data diff)
+                  ) ]
+              "Processing incoming network pool diff: $diff" ;
             apply_and_broadcast network_pool diff_and_cb
         | `Local diff ->
             (*Should this be coming from resource pool instead?*)

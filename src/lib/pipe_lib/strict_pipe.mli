@@ -25,6 +25,8 @@ type (_, _) type_ =
 module Reader : sig
   type 't t
 
+  val length : _ t -> int
+
   (* Using [`Eof | `Ok of 't] to mirror interface of Jane Street's Pipe read *)
 
   (** Read a single value from the pipe or fail if the pipe is closed *)

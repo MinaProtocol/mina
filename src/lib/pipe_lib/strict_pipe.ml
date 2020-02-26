@@ -63,6 +63,8 @@ module Reader0 = struct
     reader.has_reader <- false ;
     result
 
+  let length {reader; _} = Pipe.length reader
+
   let read t = enforce_single_reader t (Pipe.read t.reader)
 
   let fold reader ~init ~f =
