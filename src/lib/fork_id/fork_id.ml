@@ -28,20 +28,14 @@ let (current_fork_id : t option ref) = ref None
 
 let set_current fork_id = current_fork_id := Some fork_id
 
+let empty = String.make required_length '0'
+
 (* we set current fork id on daemon startup, so we should not see errors
    due to current_fork_id = None in get_current_fork_id and create
  *)
-
 let get_current () = Option.value_exn !current_fork_id
 
-(* when an external transition is deserialized, might
-   contain invalid fork id, some arbitrary string
-*)
-let is_valid t =
-  Int.equal (String.length t) required_length
-  && String.fold t ~init:true ~f:(fun accum c -> accum && is_hex_char c)
-
-let create s =
+let create_exn s =
   let len = String.length s in
   if not (Int.equal len required_length) then
     failwith
@@ -58,4 +52,9 @@ let create s =
 
 let to_string = Fn.id
 
-let empty = create (String.make required_length '0')
+(* when an external transition is deserialized, might contain
+   some arbitrary string
+*)
+let is_valid t =
+  Int.equal (String.length t) required_length
+  && String.fold t ~init:true ~f:(fun accum c -> accum && is_hex_char c)

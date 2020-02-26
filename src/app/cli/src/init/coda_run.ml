@@ -64,17 +64,17 @@ let get_lite_chain :
       let proof = Lite_compat.proof proof in
       {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
-let get_current_fork_id ~conf_dir ~logger =
-  let current_fork_id_file = conf_dir ^/ "current_fork_id" in
+let get_initial_fork_id ~conf_dir ~logger =
+  let initial_fork_id_file = conf_dir ^/ "initial_fork_id" in
   let read_fork_id () =
     let open Stdlib in
-    let inp = open_in current_fork_id_file in
+    let inp = open_in initial_fork_id_file in
     let res = input_line inp in
     close_in inp ; res
   in
   let write_fork_id fork_id =
     let open Stdlib in
-    let outp = open_out current_fork_id_file in
+    let outp = open_out initial_fork_id_file in
     output_string outp (fork_id ^ "\n") ;
     close_out outp
   in
