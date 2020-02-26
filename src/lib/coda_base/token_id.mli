@@ -1,6 +1,21 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params
 open Tick
+
+[%%else]
+
+module Random_oracle = Random_oracle_nonconsensus
+
+open Snark_params_nonconsensus
+
+[%%endif]
 
 [%%versioned:
 module Stable : sig
@@ -11,18 +26,11 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp, compare]
 
-type var
-
 val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
 val to_string : t -> string
 
 val of_string : string -> t
-
-val typ : (var, t) Typ.t
-
-val var_of_t : t -> var
-
 (** The default token ID, associated with the native coda token.
 
     This key should be used for fee and coinbase transactions.
@@ -35,6 +43,15 @@ val unpack : t -> bool list
 
 include Comparable.S with type t := t
 
+[%%ifdef
+consensus_mechanism]
+
+type var
+
+val typ : (var, t) Typ.t
+
+val var_of_t : t -> var
+
 module Checked : sig
   val to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
@@ -46,3 +63,5 @@ module Checked : sig
     val equal : var -> var -> (unit, _) Checked.t
   end
 end
+
+[%%endif]

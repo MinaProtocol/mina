@@ -1,5 +1,20 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Signature_lib
+
+[%%else]
+
+module Random_oracle = Random_oracle_nonconsensus
+
+open Signature_lib_nonconsensus
+
+[%%endif]
 
 [%%versioned
 module Stable = struct
@@ -13,10 +28,6 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp, equal, compare, hash, yojson]
 
-type var = Public_key.Compressed.var * Token_id.var
-
-let typ = Snarky.Typ.(Public_key.Compressed.typ * Token_id.typ)
-
 let create key tid = (key, tid)
 
 let empty = (Public_key.Compressed.empty, Token_id.default)
@@ -24,9 +35,6 @@ let empty = (Public_key.Compressed.empty, Token_id.default)
 let public_key (key, _tid) = key
 
 let token_id (_key, tid) = tid
-
-let var_of_t (key, tid) =
-  (Public_key.Compressed.var_of_t key, Token_id.var_of_t tid)
 
 let to_input (key, tid) =
   Random_oracle.Input.append
@@ -40,6 +48,16 @@ let gen =
 
 include Comparable.Make_binable (Stable.Latest)
 include Hashable.Make_binable (Stable.Latest)
+
+[%%ifdef
+consensus_mechanism]
+
+type var = Public_key.Compressed.var * Token_id.var
+
+let typ = Snarky.Typ.(Public_key.Compressed.typ * Token_id.typ)
+
+let var_of_t (key, tid) =
+  (Public_key.Compressed.var_of_t key, Token_id.var_of_t tid)
 
 module Checked = struct
   open Snark_params
@@ -68,3 +86,5 @@ module Checked = struct
     let%map tid = Token_id.Checked.if_ b ~then_:tid_then ~else_:tid_else in
     (pk, tid)
 end
+
+[%%endif]

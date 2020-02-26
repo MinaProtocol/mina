@@ -9,7 +9,6 @@ open Snark_params.Tick
 [%%else]
 
 open Snark_params_nonconsensus
-open Signature_lib_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle

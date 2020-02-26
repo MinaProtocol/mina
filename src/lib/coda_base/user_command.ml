@@ -332,9 +332,9 @@ let check_signature ({payload; signer; signature} : t) =
 
 [%%else]
 
-let check_signature ({payload; sender; signature} : t) =
+let check_signature ({payload; signer; signature} : t) =
   Schnorr.verify signature
-    (Snark_params_nonconsensus.Inner_curve.of_affine sender)
+    (Snark_params_nonconsensus.Inner_curve.of_affine signer)
     payload
 
 [%%endif]

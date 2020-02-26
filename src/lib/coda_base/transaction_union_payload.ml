@@ -13,7 +13,8 @@ open Currency
 
 [%%else]
 
-open Signature_lib_nonconsensus
+module Currency = Currency_nonconsensus.Currency
+
 open Currency_nonconsensus.Currency
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 

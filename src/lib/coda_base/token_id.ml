@@ -1,18 +1,34 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
+open Snark_params.Tick
+
+[%%else]
+
+module Random_oracle = Random_oracle_nonconsensus
+
+open Snark_params_nonconsensus
+
+[%%endif]
 
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = Snark_params.Tick.Field.t
+    type t = Field.t
     [@@deriving version {asserted}, sexp, eq, hash, compare]
 
     let to_latest = Fn.id
 
-    let to_yojson x = `String (Snark_params.Tick.Field.to_string x)
+    let to_yojson x = `String (Field.to_string x)
 
     let of_yojson = function
       | `String x ->
-          Ok (Snark_params.Tick.Field.of_string x)
+          Ok (Field.of_string x)
       | _ ->
           Error "Coda_base.Account.Token_id.of_yojson"
   end
@@ -20,19 +36,11 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp, compare]
 
-type var = Snark_params.Tick.Field.Var.t
-
 let to_input (x : t) = Random_oracle.Input.field x
-
-open Snark_params.Tick
 
 let to_string = Field.to_string
 
 let of_string = Field.of_string
-
-let typ = Field.typ
-
-let var_of_t = Field.Var.constant
 
 let default = Field.one
 
@@ -41,6 +49,15 @@ let gen = Field.gen_uniform
 let unpack = Field.unpack
 
 include Comparable.Make (Stable.Latest)
+
+[%%ifdef
+consensus_mechanism]
+
+type var = Field.Var.t
+
+let typ = Field.typ
+
+let var_of_t = Field.Var.constant
 
 module Checked = struct
   open Snark_params.Tick
@@ -55,3 +72,5 @@ module Checked = struct
     let equal = Field.Checked.Assert.equal
   end
 end
+
+[%%endif]

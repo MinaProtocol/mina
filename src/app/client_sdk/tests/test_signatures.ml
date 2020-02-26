@@ -51,14 +51,16 @@ let new_delegate =
 
 let make_common ~fee ~nonce ~valid_until memo =
   let fee = Currency.Fee.of_int fee in
+  let fee_token = Token_id.default in
   let nonce = Account.Nonce.of_int nonce in
   let valid_until = Coda_numbers.Global_slot.of_int valid_until in
   let memo = User_command_memo.create_from_string_exn memo in
-  User_command_payload.Common.Poly.{fee; nonce; valid_until; memo}
+  User_command_payload.Common.Poly.{fee; fee_token; nonce; valid_until; memo}
 
 let make_payment ~receiver ~amount ~fee ~nonce ~valid_until memo =
   let common = make_common ~fee ~nonce ~valid_until memo in
   let amount = Currency.Amount.of_int amount in
+  let receiver = Account_id.create receiver Token_id.default in
   let body = User_command_payload.Body.Payment {receiver; amount} in
   User_command_payload.Poly.{common; body}
 
