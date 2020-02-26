@@ -94,19 +94,6 @@ let%test_unit "Coinbase: read and write" =
       | Error e ->
           failwith @@ Caqti_error.show e )
 
-let assert_parent_exist ~parent_id ~parent_hash =
-  let open Deferred.Result.Let_syntax in
-  match parent_id with
-  | Some id ->
-      let%map Processor_new.Block.{state_hash= actual; _} =
-        Processor_new.Block.load conn ~id
-      in
-      [%test_result: string]
-        ~expect:(parent_hash |> State_hash.to_base58_check)
-        actual
-  | None ->
-      failwith "Failed to find parent block in database"
-
 let%test_unit "Block: read and write" =
   Quickcheck.test ~trials:20
     ( Quickcheck.Generator.with_size ~size:10
@@ -153,9 +140,10 @@ let%test_unit "Block: read and write" =
                   Transition_frontier.Breadcrumb.blockchain_length breadcrumb
                   > Unsigned.UInt32.of_int 1
                 then
-                  assert_parent_exist ~parent_id
+                  Processor_new.For_test.assert_parent_exist ~parent_id
                     ~parent_hash:
                       (Transition_frontier.Breadcrumb.parent_hash breadcrumb)
+                    conn
                 else Deferred.Result.return ()
             | None ->
                 failwith "Failed to find saved block in database" )

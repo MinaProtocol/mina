@@ -196,7 +196,7 @@ module Host_and_port = struct
 
   module Daemon = struct
     let archive =
-      create ~name:"archive-port" ~arg_type
+      create ~name:"archive-address" ~arg_type
         (make_doc_builder "Daemon to archive process communication"
            Port.default_archive)
         Optional
@@ -248,7 +248,7 @@ module Uri = struct
             [Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"]
           "URI" "URI for postgresql database"
       in
-      create ~name:"postgres"
+      create ~name:"postgres-uri"
         ~arg_type:(Command.Arg_type.map Command.Param.string ~f:Uri.of_string)
         doc_builder
         (Resolve_with_default

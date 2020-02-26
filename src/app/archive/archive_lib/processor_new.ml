@@ -1,5 +1,6 @@
 module Archive_rpc = Rpc
 open Async
+open Core
 open Caqti_async
 open Coda_base
 open Coda_state
@@ -523,3 +524,16 @@ let setup_server ~logger ~postgres_address ~server_port =
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Archive process ready. Clients can now connect" ;
       Async.never ()
+
+module For_test = struct
+  let assert_parent_exist ~parent_id ~parent_hash conn =
+    let open Deferred.Result.Let_syntax in
+    match parent_id with
+    | Some id ->
+        let%map Block.{state_hash= actual; _} = Block.load conn ~id in
+        [%test_result: string]
+          ~expect:(parent_hash |> State_hash.to_base58_check)
+          actual
+    | None ->
+        failwith "Failed to find parent block in database"
+end
