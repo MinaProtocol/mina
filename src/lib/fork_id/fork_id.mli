@@ -11,6 +11,8 @@ type t = Stable.Latest.t [@@deriving sexp]
 
 val create_exn : string -> t
 
+val create_opt : string -> t option
+
 val get_current : unit -> t
 
 val set_current : t -> unit
