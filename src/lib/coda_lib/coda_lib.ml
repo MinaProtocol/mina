@@ -781,8 +781,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   in
                   let k_block_hashes =
                     List.map
-                      ( Transition_frontier.best_tip_path frontier
-                      @ [Transition_frontier.best_tip frontier] )
+                      ( Transition_frontier.root frontier
+                      :: Transition_frontier.best_tip_path frontier )
                       ~f:Transition_frontier.Breadcrumb.state_hash
                   in
                   Ok
