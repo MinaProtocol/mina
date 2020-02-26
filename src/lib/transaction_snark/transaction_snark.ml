@@ -467,7 +467,7 @@ module Base = struct
             in
             Boolean.Assert.is_true correct_coinbase_stack))
     in
-    let%bind payment_insufficient_funds =
+    let%bind payment_insufficient_funds, token_owner, token_whitelist =
       (* Here we 'forsee' whether there will be insufficient funds to send,
          if this is a payment and the fee-payer is distinct from the source
          account.
@@ -500,20 +500,39 @@ module Base = struct
               in
               Ledger_hash.Get_element account_idx)
       in
-      exists Boolean.typ
-        ~compute:
-          As_prover.(
-            let%bind account, _path =
-              read (Typ.Internal.ref ()) prover_source_account
-            in
-            let%bind fee = read Fee.typ fee in
-            let%bind is_payment = read Boolean.typ is_payment in
-            let%bind source = read (Typ.Internal.ref ()) prover_source in
-            let%map fee_payer = read Account_id.typ fee_payer in
-            if is_payment && not (Account_id.equal source fee_payer) then
-              Option.is_none
-                (Balance.sub_amount account.balance (Amount.of_fee fee))
-            else false)
+      let%bind payment_insufficient_funds =
+        exists Boolean.typ
+          ~compute:
+            As_prover.(
+              let%bind account, _path =
+                read (Typ.Internal.ref ()) prover_source_account
+              in
+              let%bind fee = read Fee.typ fee in
+              let%bind is_payment = read Boolean.typ is_payment in
+              let%bind source = read (Typ.Internal.ref ()) prover_source in
+              let%map fee_payer = read Account_id.typ fee_payer in
+              if is_payment && not (Account_id.equal source fee_payer) then
+                Option.is_none
+                  (Balance.sub_amount account.balance (Amount.of_fee fee))
+              else false)
+      in
+      let%bind token_owner =
+        (* TODO: This should be true if we're minting a new token. *)
+        return Boolean.false_
+      in
+      let%map token_whitelist =
+        (* TODO: This should be set by the transaction if we're minting a new
+           token.
+        *)
+        exists Boolean.typ
+          ~compute:
+            As_prover.(
+              let%map account, _path =
+                read (Typ.Internal.ref ()) prover_source_account
+              in
+              account.token_whitelist)
+      in
+      (payment_insufficient_funds, token_owner, token_whitelist)
     in
     let%bind () =
       [%with_label
@@ -612,10 +631,16 @@ module Base = struct
              and token_id =
                Token_id.Checked.if_ is_empty_and_writeable ~then_:token
                  ~else_:account.token_id
+             and token_blocked =
+               (* TODO: Block/unblock when the relevant commands are issued. *)
+               return Boolean.false_
              in
              { Account.Poly.balance
              ; public_key
              ; token_id
+             ; token_owner
+             ; token_whitelist
+             ; token_blocked
              ; nonce= account.nonce
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
@@ -648,6 +673,10 @@ module Base = struct
                   in
                   Boolean.Assert.any
                     [Boolean.not is_user_command; nonce_matches])
+             in
+             let%bind () =
+               [%with_label "Fee cannot be paid in a whitelist-only token"]
+                 Boolean.(Assert.is_true (not account.token_whitelist))
              in
              let%bind receipt_chain_hash =
                let current = account.receipt_chain_hash in
@@ -700,6 +729,9 @@ module Base = struct
              { Account.Poly.balance
              ; public_key= Account_id.Checked.public_key fee_payer
              ; token_id= Account_id.Checked.token_id fee_payer
+             ; token_owner= account.token_owner
+             ; token_whitelist= account.token_whitelist
+             ; token_blocked= account.token_blocked
              ; nonce= next_nonce
              ; receipt_chain_hash
              ; delegate
@@ -744,6 +776,9 @@ module Base = struct
              { Account.Poly.balance
              ; public_key= account.public_key
              ; token_id= account.token_id
+             ; token_owner= account.token_owner
+             ; token_whitelist= account.token_whitelist
+             ; token_blocked= account.token_blocked
              ; nonce= account.nonce
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate

@@ -423,6 +423,9 @@ module Types = struct
       let to_full_account
           { Account.Poly.public_key
           ; token_id
+          ; token_owner
+          ; token_whitelist
+          ; token_blocked
           ; nonce
           ; balance
           ; receipt_chain_hash
@@ -431,6 +434,9 @@ module Types = struct
           ; timing } =
         let open Option.Let_syntax in
         let%bind public_key = public_key in
+        let%bind token_owner = token_owner in
+        let%bind token_whitelist = token_whitelist in
+        let%bind token_blocked = token_blocked in
         let%bind nonce = nonce in
         let%bind receipt_chain_hash = receipt_chain_hash in
         let%bind delegate = delegate in
@@ -438,6 +444,9 @@ module Types = struct
         let%map timing = timing in
         { Account.Poly.public_key
         ; token_id
+        ; token_owner
+        ; token_whitelist
+        ; token_blocked
         ; nonce
         ; balance
         ; receipt_chain_hash
@@ -448,6 +457,9 @@ module Types = struct
       let of_full_account
           { Account.Poly.public_key
           ; token_id
+          ; token_owner
+          ; token_whitelist
+          ; token_blocked
           ; nonce
           ; balance
           ; receipt_chain_hash
@@ -456,6 +468,9 @@ module Types = struct
           ; timing } blockchain_length =
         { Account.Poly.public_key= Some public_key
         ; token_id
+        ; token_owner= Some token_owner
+        ; token_whitelist= Some token_whitelist
+        ; token_blocked= Some token_blocked
         ; nonce= Some nonce
         ; balance=
             { AnnotatedBalance.total= balance
@@ -485,6 +500,9 @@ module Types = struct
         | Some
             ( { Account.Poly.public_key
               ; token_id
+              ; token_owner
+              ; token_whitelist
+              ; token_blocked
               ; nonce
               ; balance
               ; receipt_chain_hash
@@ -494,6 +512,9 @@ module Types = struct
             , blockchain_length ) ->
             { Account.Poly.public_key= Some public_key
             ; token_id
+            ; token_owner= Some token_owner
+            ; token_whitelist= Some token_whitelist
+            ; token_blocked= Some token_blocked
             ; nonce= Some nonce
             ; delegate= Some delegate
             ; balance=
@@ -507,6 +528,9 @@ module Types = struct
             Account.
               { Poly.public_key= Some (Account_id.public_key account_id)
               ; token_id= Account_id.token_id account_id
+              ; token_owner= None
+              ; token_whitelist= None
+              ; token_blocked= None
               ; nonce= None
               ; delegate= None
               ; balance=
@@ -534,7 +558,8 @@ module Types = struct
           , Account.Nonce.t option
           , Receipt.Chain_hash.t option
           , State_hash.t option
-          , Account.Timing.t )
+          , Account.Timing.t
+          , bool option )
           Account.Poly.t
       ; locked: bool option
       ; is_actively_staking: bool
