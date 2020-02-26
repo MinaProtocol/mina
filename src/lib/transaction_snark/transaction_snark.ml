@@ -406,6 +406,9 @@ module Base = struct
     in
     let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
     let%bind tokens_equal = Token_id.Checked.equal token fee_token in
+    let%bind token_default =
+      Boolean.(Token_id.(Checked.equal token (var_of_t default)))
+    in
     let%bind () =
       [%with_label "Validate tokens"]
         (let%bind () =
@@ -579,6 +582,10 @@ module Base = struct
                  is_empty_and_writeable && not payment_insufficient_funds)
              in
              receiver_was_created := Some is_empty_and_writeable ;
+             let%bind may_delegate =
+               (* Only default tokens may participate in delegation. *)
+               Boolean.(is_empty_and_writeable && token_default)
+             in
              let%map balance =
                (* receiver_increase will be zero in the stake delegation case *)
                let%bind receiver_amount =
@@ -595,7 +602,7 @@ module Base = struct
                in
                Balance.Checked.(account.balance + receiver_amount)
              and delegate =
-               Public_key.Compressed.Checked.if_ is_empty_and_writeable
+               Public_key.Compressed.Checked.if_ may_delegate
                  ~then_:(Account_id.Checked.public_key receiver)
                  ~else_:account.delegate
              and public_key =
