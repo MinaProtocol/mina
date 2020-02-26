@@ -25,10 +25,10 @@ function isStakeDelegation(p: signable): p is SDK.stakeDelegation {
   * @param key - The keypair used to sign the transaction
   * @returns A signed payload
  */
-export function unsafeSignAny(payload: string, key: SDK.key): SDK.signed<string>;
-export function unsafeSignAny(payload: SDK.payment, key: SDK.key): SDK.signed<SDK.payment>;
-export function unsafeSignAny(payload: SDK.stakeDelegation, key: SDK.key): SDK.signed<SDK.stakeDelegation>;
-export function unsafeSignAny<T>(payload: signable, key: SDK.key): SDK.signed<signable> {
+export function unsafeSignAny(payload: string, key: SDK.keypair): SDK.signed<string>;
+export function unsafeSignAny(payload: SDK.payment, key: SDK.keypair): SDK.signed<SDK.payment>;
+export function unsafeSignAny(payload: SDK.stakeDelegation, key: SDK.keypair): SDK.signed<SDK.stakeDelegation>;
+export function unsafeSignAny<T>(payload: signable, key: SDK.keypair): SDK.signed<signable> {
   if (typeof payload === 'string') { return SDK.signMessage(payload, key); }
   if (isPayment(payload)) { return SDK.signPayment(payload, key); }
   if (isStakeDelegation(payload)) { return SDK.signStakeDelegation(payload, key); }

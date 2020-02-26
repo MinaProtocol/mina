@@ -1,12 +1,13 @@
 {
   "name": "@o1labs/client-sdk",
   "description": "Node API for signing transactions for Coda Protocol",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "scripts": {
     "build": "bsb -make-world && tsc src/SDKWrapper.ts -d",
     "start": "bsb -make-world -w",
     "clean": "bsb -clean-world",
-    "prepublishOnly": "make -C ../.. client_sdk && cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src && yarn build",
+    "make-jsoo": "make -C ../.. client_sdk && cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src",
+    "prepublishOnly": "yarn make-jsoo && yarn build",
     "test": "tsc test/Test.ts && node test/Test.js"
   },
   "keywords": [

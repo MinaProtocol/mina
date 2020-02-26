@@ -11,6 +11,6 @@ export declare type signable = SDK.payment | SDK.stakeDelegation | string;
   * @param key - The keypair used to sign the transaction
   * @returns A signed payload
  */
-export declare function unsafeSignAny(payload: string, key: SDK.key): SDK.signed<string>;
-export declare function unsafeSignAny(payload: SDK.payment, key: SDK.key): SDK.signed<SDK.payment>;
-export declare function unsafeSignAny(payload: SDK.stakeDelegation, key: SDK.key): SDK.signed<SDK.stakeDelegation>;
+export declare function unsafeSignAny(payload: string, key: SDK.keypair): SDK.signed<string>;
+export declare function unsafeSignAny(payload: SDK.payment, key: SDK.keypair): SDK.signed<SDK.payment>;
+export declare function unsafeSignAny(payload: SDK.stakeDelegation, key: SDK.keypair): SDK.signed<SDK.stakeDelegation>;

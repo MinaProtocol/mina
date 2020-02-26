@@ -2,7 +2,7 @@ export declare type publicKey = string;
 export declare type privateKey = string;
 export declare type globalSlot = string;
 export declare type uint64 = string;
-export declare type key = {
+export declare type keypair = {
     readonly privateKey: privateKey;
     readonly publicKey: publicKey;
 };
@@ -35,7 +35,7 @@ export declare type payment = {
 /**
   * Generates a public/private keypair
   */
-export declare const genKeys: () => key;
+export declare const genKeys: () => keypair;
 /**
   * Signs an arbitrary message
   *
@@ -43,7 +43,7 @@ export declare const genKeys: () => key;
   * @param message - An arbitrary string message to be signed
   * @returns A signed message
   */
-export declare const signMessage: (message: string, key: key) => signed<string>;
+export declare const signMessage: (message: string, key: keypair) => signed<string>;
 /**
   * Verifies that a signature matches a message.
   *
@@ -62,7 +62,7 @@ export declare const verifyMessage: (signedMessage: signed<string>) => boolean;
   * @param key - The keypair used to sign the transaction
   * @returns A signed payment transaction
   */
-export declare const signPayment: (payment: payment, key: key) => signed<payment>;
+export declare const signPayment: (payment: payment, key: keypair) => signed<payment>;
 /**
   * Signs a stake delegation transaction using a private key.
   *
@@ -75,4 +75,4 @@ export declare const signPayment: (payment: payment, key: key) => signed<payment
   * @param key - The keypair used to sign the transaction
   * @returns A signed stake delegation
   */
-export declare const signStakeDelegation: (stakeDelegation: stakeDelegation, key: key) => signed<stakeDelegation>;
+export declare const signStakeDelegation: (stakeDelegation: stakeDelegation, key: keypair) => signed<stakeDelegation>;
