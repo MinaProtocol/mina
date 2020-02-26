@@ -81,19 +81,19 @@ jobs:
                   command:  bash -c 'eval `opam config env` && make build_archive'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
-            # NOTE: If we were using a machine executor we would be able to mount the sql file in 
+            # NOTE: If we were using a machine executor we would be able to mount the sql file in
             # as a volume for the container to seed itself, this is the workaround.
-            # Ideally this DB setup step would be handled by the archive process itself. 
+            # Ideally this DB setup step would be handled by the archive process itself.
             - run:
                   name: Set Up Database
-                  command: | 
-                    sudo apt-get install -y postgresql 
+                  command: |
+                    sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
                   name: Configure Hasura
                   command: ./scripts/archive/make_hasura_configurations.sh
             - setup_remote_docker
-            - run: 
+            - run:
                   name: Build and Release Archives
                   command: ./scripts/archive/build-release-archives.sh
     lint:
@@ -142,6 +142,20 @@ jobs:
             - run:
                   name: Compare versioned types in PR
                   command: ./scripts/compare_pr_diff_types.sh
+    compare-test-signatures:
+        docker:
+            - image: codaprotocol/coda:toolchain-cf3d5dc87c195afd8eec14a2c4eaf9980004ee26
+        steps:
+            - checkout
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Compare test signatures for consensus, nonconsensus code
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && ./scripts/compare_test_signatures.sh'
     update-branch-protection:
         docker:
             - image: python:3
@@ -278,6 +292,29 @@ jobs:
                   command: ./scripts/skip_if_only_frontend.sh scripts/artifacts.sh
             - store_artifacts:
                   path: package
+
+    build-client-sdk:
+        resource_class: large
+        docker:
+            - image: codaprotocol/coda:toolchain-cf3d5dc87c195afd8eec14a2c4eaf9980004ee26
+        steps:
+            - checkout
+            - run:
+                  name: Artifacts Path
+                  command: |
+                      mkdir -p /tmp/artifacts
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                  name: Pin external packages
+                  command: ./scripts/pin-external-packages.sh
+            - run:
+                  name: Build client SDK for Javascript
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
+                  environment:
+                    DUNE_PROFILE: nonconsensus_medium_curves
+                  no_output_timeout: 10m
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
@@ -378,7 +415,7 @@ jobs:
                 command: make libp2p_helper
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 && (dune runtest src/lib --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=test_postake_snarkless_unittest -j8 src/app/cli/src/coda.exe src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe && (dune runtest src/lib --profile=test_postake_snarkless_unittest -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
@@ -397,7 +434,28 @@ jobs:
                 command: make libp2p_helper
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && dune build --profile=dev -j8 src/app/cli/src/coda.exe src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
+                  no_output_timeout: 30m
+            - store_artifacts:
+                path: core_dumps
+
+    # like the other unit test builds, but only runs tests in src/lib/nonconsensus
+    test-unit--nonconsensus_medium_curves:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
+        steps:
+            - checkout
+            - run: ulimit -c unlimited
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Build libp2p_helper
+                command: make libp2p_helper
+            - run:
+                  name: Run unit tests
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && (dune runtest src/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
@@ -737,6 +795,7 @@ workflows:
         jobs:
             - lint
             - lint-opt
+            - compare-test-signatures
             - update-branch-protection:
                 filters:
                   branches:
@@ -745,9 +804,11 @@ workflows:
             - build-wallet
             - build-archive
             - build-macos
+            - build-client-sdk
             - build-artifacts--testnet_postake_medium_curves
             - test-unit--test_postake_snarkless_unittest
             - test-unit--dev
+            - test-unit--nonconsensus_medium_curves
             - test--fake_hash
             - test--test_postake
             - test--test_postake_bootstrap

@@ -1,0 +1,7 @@
+(library
+ (name scan_state_constants)
+ (public_name scan_state_constants)
+ (libraries core_kernel)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_coda ppx_optcomp))
+ (synopsis "Scan state constants"))
