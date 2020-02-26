@@ -863,7 +863,8 @@ let coda_commands logger =
         ; (module Full_test)
         ; (module Transaction_snark_profiler)
         ; (module Snark_flame_graphs)
-        ; (module Coda_archive_node_test) ]
+        ; (module Coda_archive_node_test)
+        ; (module Coda_archive_processor_test) ]
         : (module Integration_test) list )
   in
   coda_commands logger

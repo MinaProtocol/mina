@@ -26,7 +26,8 @@ module Input = struct
     ; chain_id: string
     ; peers: string list
     ; max_concurrent_connections: int option
-    ; is_archive_rocksdb: bool }
+    ; is_archive_rocksdb: bool
+    ; archive_process_location: Core.Host_and_port.t option }
   [@@deriving bin_io]
 end
 
@@ -414,6 +415,7 @@ module T = struct
         ; peers
         ; max_concurrent_connections= _ (* FIXME #4095: use this *)
         ; is_archive_rocksdb
+        ; archive_process_location
         ; _ } =
       let logger =
         Logger.create
@@ -546,7 +548,12 @@ module T = struct
                  ~initial_block_production_keypairs ~monitor
                  ~consensus_local_state ~transaction_database
                  ~external_transition_database ~is_archive_rocksdb
-                 ~work_reassignment_wait:420000 ~genesis_state_hash ())
+                 ~work_reassignment_wait:420000 ~genesis_state_hash ()
+                 ~archive_process_location:
+                   (Option.map archive_process_location
+                      ~f:(fun host_and_port ->
+                        Cli_lib.Flag.Types.
+                          {name= "dummy"; value= host_and_port} )))
               ~genesis_ledger:Test_genesis_ledger.t
               ~base_proof:Precomputed_values.base_proof
           in
