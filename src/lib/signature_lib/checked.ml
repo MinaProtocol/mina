@@ -228,7 +228,7 @@ module Schnorr
     | None ->
         false
     | Some (rx, ry) ->
-        is_even ry && Field.(equal rx r)
+        is_even ry && Field.equal rx r
 
   [%%if
   call_logger]
