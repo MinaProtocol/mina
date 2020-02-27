@@ -61,18 +61,19 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   Option.is_some remainder
 
 let schedule_user_command t (txn : User_command.t) account_opt :
-    unit Or_error.t =
+    unit Or_error.t Deferred.t =
   (* FIXME #3457: return a status from Transaction_pool.add and use it instead
   *)
   if not (is_valid_user_command t txn account_opt) then
-    Or_error.error_string "Invalid user command: account balance is too low"
+    return
+      (Or_error.error_string "Invalid user command: account balance is too low")
   else
     let logger =
       Logger.extend
         (Coda_lib.top_level_logger t)
         [("coda_command", `String "scheduling a user command")]
     in
-    Coda_lib.add_transactions t [txn] ;
+    let%map () = Coda_lib.add_transactions t [txn] in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("user_command", User_command.to_yojson txn)]
       "Submitted transaction $user_command to transaction pool" ;
@@ -142,7 +143,7 @@ let send_user_command t (txn : User_command.t) =
   let public_key = Public_key.compress txn.sender in
   let open Participating_state.Let_syntax in
   let%map account_opt = get_account t public_key in
-  let open Or_error.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   let%map () = schedule_user_command t txn account_opt in
   record_payment t txn (Option.value_exn account_opt)
 
@@ -204,7 +205,7 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
 let schedule_user_commands t (txns : User_command.t list) :
-    unit Participating_state.t =
+    unit Deferred.t Participating_state.t =
   Participating_state.return
   @@
   let logger =

@@ -1193,6 +1193,12 @@ module Types = struct
               ~doc:"Public key specifying which account to unlock"
               ~typ:(non_null public_key_arg) ]
 
+    let create_hd_account =
+      obj "CreateHDAccountInput" ~coerce:Fn.id
+        ~fields:
+          [ arg "index" ~doc:"Index of the account in hardware wallet"
+              ~typ:(non_null uint32_arg) ]
+
     let lock_account =
       obj "LockInput" ~coerce:Fn.id
         ~fields:
@@ -1423,6 +1429,14 @@ module Mutations = struct
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_account)]
       ~resolve:create_account_resolver
 
+  let create_hd_account : (Coda_lib.t, unit) field =
+    io_field "createHDAccount"
+      ~doc:Secrets.Hardware_wallets.create_hd_account_summary
+      ~typ:(non_null Types.Payload.create_account)
+      ~args:Arg.[arg "input" ~typ:(non_null Types.Input.create_hd_account)]
+      ~resolve:(fun {ctx= coda; _} () hd_index ->
+        Coda_lib.wallets coda |> Secrets.Wallets.create_hd_account ~hd_index )
+
   let unlock_account_resolver {ctx= t; _} () (password, pk) =
     let password = lazy (return (Bytes.of_string password)) in
     match%map
@@ -1530,21 +1544,26 @@ module Mutations = struct
         (ip_address, Coda_commands.reset_trust_status coda ip_address) )
 
   let send_user_command coda signed_command =
-    let command = User_command.forget_check signed_command in
-    Deferred.return
-    @@
-    match Coda_commands.send_user_command coda command with
+    let user_command = User_command.forget_check signed_command in
+    match Coda_commands.send_user_command coda user_command with
     | `Active f -> (
-      match f with
-      | Ok _receipt ->
-          Ok command
-      | Error e ->
-          Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
+        match%map f with
+        | Ok _receipt ->
+            Ok user_command
+        | Error e ->
+            Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
-        Error "Daemon is bootstrapping"
+        return (Error "Daemon is bootstrapping")
+
+  let find_identity ~public_key coda =
+    Result.of_option
+      (Secrets.Wallets.find_identity (Coda_lib.wallets coda) ~needle:public_key)
+      ~error:
+        "Couldn't find an unlocked key for specified `sender`. Did you unlock \
+         the account you're making a transaction from?"
 
   let create_user_command_payload ~coda ~fee ~nonce ~valid_until ~memo ~sender
-      ~body =
+      ~body : (User_command.Payload.t, string) result =
     let open Result.Let_syntax in
     (* TODO: We should put a more sensible default here. *)
     let valid_until =
@@ -1552,7 +1571,8 @@ module Mutations = struct
         ~f:Coda_numbers.Global_slot.of_uint32 valid_until
     in
     let%bind fee =
-      result_of_exn Currency.Fee.of_uint64 fee ~error:"Invalid `fee` provided."
+      result_of_exn Currency.Fee.of_uint64 fee
+        ~error:(sprintf "Invalid `fee` provided.")
     in
     let%bind () =
       Result.ok_if_true
@@ -1601,15 +1621,15 @@ module Mutations = struct
 
   let send_unsigned_user_command ~coda ~sender ~payload =
     let open Deferred.Result.Let_syntax in
-    let%bind sender_kp =
-      Secrets.Wallets.find_unlocked (Coda_lib.wallets coda) ~needle:sender
-      |> Result.of_option
-           ~error:
-             "Couldn't find an unlocked key for specified `sender`. Did you \
-              unlock the account you're making a transaction from?"
-      |> Deferred.return
+    let%bind command =
+      match%bind Deferred.return @@ find_identity ~public_key:sender coda with
+      | `Keypair sender_kp ->
+          return @@ User_command.sign sender_kp payload
+      | `Hd_index hd_index ->
+          Secrets.Hardware_wallets.sign ~hd_index
+            ~public_key:(Public_key.decompress_exn sender)
+            ~user_command_payload:payload
     in
-    let command = User_command.sign sender_kp payload in
     send_user_command coda command
 
   let send_delegation =
@@ -1628,7 +1648,7 @@ module Mutations = struct
           User_command_payload.Body.Stake_delegation
             (Set_delegate {new_delegate= to_})
         in
-        let%bind payload =
+        let%bind (payload : User_command.Payload.t) =
           Deferred.return
           @@ create_user_command_payload ~coda ~nonce ~sender:from ~memo ~fee
                ~valid_until ~body
