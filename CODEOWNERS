@@ -48,6 +48,7 @@
 /src/lib/gossip_net/ @emberian @bkase @nholland94
 /src/lib/group_map/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/hash_prefixes/ @rbkhmrcr @vanishreerao @imeckler
+/src/lib/integers_stubs_js @mrmr1993 @emberian
 /src/lib/interruptible/ @bkase @nholland94
 /src/lib/key_value_database/ @bkase @nholland94 @psteckler
 /src/lib/keys_lib/ @emberian @mrmr1993 @imeckler
@@ -120,3 +121,5 @@
 /src/lib/unsigned_extended/ @bkase @mrmr1993 @imeckler
 /src/lib/vrf_lib/ @nholland94 @mrmr1993 @bkase @imeckler
 /src/lib/work_selector/ @deepthiskumar @nholland94
+
+/src/nonconsensus @psteckler @deepthiskumar

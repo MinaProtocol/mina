@@ -1,6 +1,18 @@
+(* quickcheck_lib.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
 open Quickcheck.Generator
 open Quickcheck.Let_syntax
+
+[%%ifndef
+consensus_mechanism]
+
+module Currency = Currency_nonconsensus.Currency
+
+[%%endif]
 
 let of_array array = Quickcheck.Generator.of_list @@ Array.to_list array
 

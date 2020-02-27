@@ -109,7 +109,7 @@ module Footer = {
               style([textAlign(`center), color(Theme.Colors.saville)]),
             ])
           )>
-          {React.string({j|© 2019 O(1) Labs|j})}
+          {React.string({j|© 2020 O(1) Labs|j})}
         </p>
       </section>
     </footer>;

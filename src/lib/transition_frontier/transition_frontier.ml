@@ -478,7 +478,12 @@ module For_tests = struct
             ~directory:frontier_dir
         in
         Gc.Expert.add_finalizer_exn persistent_root clean_temp_dirs ;
-        Gc.Expert.add_finalizer_exn persistent_frontier clean_temp_dirs ;
+        Gc.Expert.add_finalizer_exn persistent_frontier (fun x ->
+            Option.iter
+              persistent_frontier.Persistent_frontier.Factory_type.instance
+              ~f:(fun instance ->
+                Persistent_frontier.Database.close instance.db ) ;
+            clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
   let gen ?(logger = Logger.null ()) ?verifier ?trust_system
