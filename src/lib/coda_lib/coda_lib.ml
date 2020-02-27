@@ -600,10 +600,8 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work)
   |> Deferred.don't_wait_for
 
-(*TODO: Synchronize this*)
 let add_transactions t (txns : User_command.t list) =
   Strict_pipe.Writer.write t.pipes.local_txns_writer txns
-  |> Deferred.don't_wait_for
 
 let next_producer_timing t = t.next_producer_timing
 
