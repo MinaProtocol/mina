@@ -65,6 +65,7 @@ medium_curves_and_other_tests = {
     'test_postake_split_medium_curves':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
     'test_postake_full_epoch': ['full-test'],
+    'fake_hash': ['coda-archive-processor-test']
 }
 
 medium_curve_profiles_full = [
