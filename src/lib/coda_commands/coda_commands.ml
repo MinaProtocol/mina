@@ -72,7 +72,9 @@ let schedule_user_command t (txn : User_command.t) account_opt :
         (Coda_lib.top_level_logger t)
         [("coda_command", `String "scheduling a user command")]
     in
-    Coda_lib.add_transactions t [txn] ;
+    let result_ivar = Ivar.create () in
+    Coda_lib.add_transactions t ([txn], result_ivar) ;
+    Ivar.read result_ivar |> ignore ;
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("user_command", User_command.to_yojson txn)]
       "Submitted transaction $user_command to transaction pool" ;
@@ -217,7 +219,7 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
 let schedule_user_commands t (txns : User_command.t list) :
-    unit Participating_state.t =
+    'a Participating_state.t =
   Participating_state.return
   @@
   let logger =
@@ -227,7 +229,9 @@ let schedule_user_commands t (txns : User_command.t list) :
   in
   Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
     "batch-send-payments does not yet report errors" ;
-  Coda_lib.add_transactions t txns
+  let result_ivar = Ivar.create () in
+  Coda_lib.add_transactions t (txns, result_ivar) ;
+  Ivar.read result_ivar |> ignore
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in

@@ -94,6 +94,8 @@ module type Network_pool_base_intf = sig
 
   type resource_pool_diff
 
+  type rejected_diff
+
   type transition_frontier_diff
 
   type config
@@ -104,7 +106,9 @@ module type Network_pool_base_intf = sig
        config:config
     -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
-    -> local_diffs:resource_pool_diff Strict_pipe.Reader.t
+    -> local_diffs:( resource_pool_diff
+                   * (resource_pool_diff * rejected_diff -> unit) )
+                   Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> logger:Logger.t
@@ -115,7 +119,9 @@ module type Network_pool_base_intf = sig
     -> logger:Logger.t
     -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
-    -> local_diffs:resource_pool_diff Strict_pipe.Reader.t
+    -> local_diffs:( resource_pool_diff
+                   * (resource_pool_diff * rejected_diff -> unit) )
+                   Strict_pipe.Reader.t
     -> tf_diffs:transition_frontier_diff Strict_pipe.Reader.t
     -> t
 
@@ -125,7 +131,9 @@ module type Network_pool_base_intf = sig
 
   val apply_and_broadcast :
        t
-    -> resource_pool_diff Envelope.Incoming.t * (bool -> unit)
+    -> resource_pool_diff Envelope.Incoming.t
+       * (bool -> unit)
+       * (resource_pool_diff * rejected_diff -> unit)
     -> unit Deferred.t
 end
 
@@ -202,16 +210,20 @@ module type Snark_pool_diff_intf = sig
 end
 
 module type Transaction_pool_diff_intf = sig
+  type resource_pool
+
   module Stable : sig
     module V1 : sig
-      type t = User_command.Stable.V1.t list
-      [@@deriving sexp, to_yojson, bin_io, version]
+      type t = User_command.Stable.V1.t list [@@deriving sexp, bin_io, version]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+  type t = Stable.Latest.t [@@deriving sexp]
+
+  include
+    Resource_pool_diff_intf with type t := t and type pool := resource_pool
 end
 
 module type Transaction_resource_pool_intf = sig

@@ -57,7 +57,13 @@ val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
 val add_work : t -> Snark_worker.Work.Result.t -> unit
 
-val add_transactions : t -> User_command.t list -> unit
+val add_transactions :
+     t
+  -> User_command.t list
+     * ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+       * Network_pool.Transaction_pool.Resource_pool.Diff.rejected )
+       Ivar.t
+  -> unit
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 

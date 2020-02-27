@@ -43,7 +43,7 @@ module type S = sig
       Transaction_resource_pool_intf
       with type transition_frontier := transition_frontier
 
-    module Diff : Transaction_pool_diff_intf
+    module Diff : Transaction_pool_diff_intf with type resource_pool := t
   end
 
   include
@@ -54,6 +54,7 @@ module type S = sig
      and type config := Resource_pool.Config.t
      and type transition_frontier_diff :=
                 Resource_pool.transition_frontier_diff
+     and type rejected_diff := Resource_pool.Diff.rejected
 end
 
 (* Functor over user command, base ledger and transaction validator for

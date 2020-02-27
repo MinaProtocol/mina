@@ -13,7 +13,8 @@ end)
    and type resource_pool_diff := Resource_pool.Diff.t
    and type transition_frontier := Transition_frontier.t
    and type transition_frontier_diff := Resource_pool.transition_frontier_diff
-   and type config := Resource_pool.Config.t = struct
+   and type config := Resource_pool.Config.t
+   and type rejected_diff := Resource_pool.Diff.rejected = struct
   type t =
     { resource_pool: Resource_pool.t
     ; logger: Logger.t
@@ -24,7 +25,7 @@ end)
 
   let broadcasts {read_broadcasts; _} = read_broadcasts
 
-  let apply_and_broadcast t (pool_diff, valid_cb) =
+  let apply_and_broadcast t (pool_diff, valid_cb, result_cb) =
     let rebroadcast diff' =
       valid_cb true ;
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
@@ -33,7 +34,8 @@ end)
       Linear_pipe.write t.write_broadcasts diff'
     in
     match%bind Resource_pool.Diff.unsafe_apply t.resource_pool pool_diff with
-    | Ok (diff', _rejected) ->
+    | Ok (diff', rejected) ->
+        result_cb (diff', rejected) ;
         rebroadcast diff'
     | Error (`Locally_generated diff') ->
         rebroadcast diff'
@@ -59,11 +61,11 @@ end)
       ]
       ~f:(fun diff_source ->
         match diff_source with
-        | `Incoming diff_and_cb ->
-            apply_and_broadcast network_pool diff_and_cb
-        | `Local diff ->
+        | `Incoming (diff, cb) ->
+            apply_and_broadcast network_pool (diff, cb, Fn.const ())
+        | `Local (diff, result_cb) ->
             apply_and_broadcast network_pool
-              (Envelope.Incoming.local diff, Fn.const ())
+              (Envelope.Incoming.local diff, Fn.const (), result_cb)
         | `Transition_frontier_extension diff ->
             Resource_pool.handle_transition_frontier_diff diff resource_pool )
     |> Deferred.don't_wait_for ;
