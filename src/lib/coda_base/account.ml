@@ -3,20 +3,29 @@
 [%%import
 "/src/config.mlh"]
 
-open Core
-open Import
-open Coda_numbers
-open Currency
-open Snark_bits
-open Fold_lib
+open Core_kernel
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 open Snark_params
 open Tick
+open Snark_bits
+
+[%%else]
+
+open Snark_params_nonconsensus
+open Snark_bits_nonconsensus
+module Currency = Currency_nonconsensus.Currency
+module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
+
+open Currency
+open Coda_numbers
+open Fold_lib
+open Import
 
 module Index = struct
   [%%versioned
@@ -32,14 +41,14 @@ module Index = struct
 
   let to_int = Int.to_int
 
-  let gen = Int.gen_incl 0 ((1 lsl Snark_params.ledger_depth) - 1)
+  let gen = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
 
   module Table = Int.Table
 
   module Vector = struct
     include Int
 
-    let length = Snark_params.ledger_depth
+    let length = ledger_depth
 
     let empty = zero
 
@@ -55,7 +64,12 @@ module Index = struct
 
   let fold t = Fold.group3 ~default:false (fold_bits t)
 
+  [%%ifdef
+  consensus_mechanism]
+
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
+
+  [%%endif]
 end
 
 module Nonce = Account_nonce
@@ -193,8 +207,23 @@ module Timing = struct
           ; vesting_period
           ; vesting_increment }
 
-  [%%if
-  defined consensus_mechanism]
+  let to_bits t =
+    let As_record.
+          { is_timed
+          ; initial_minimum_balance
+          ; cliff_time
+          ; vesting_period
+          ; vesting_increment } =
+      to_record t
+    in
+    is_timed
+    :: ( Balance.to_bits initial_minimum_balance
+       @ Global_slot.to_bits cliff_time
+       @ Global_slot.to_bits vesting_period
+       @ Amount.to_bits vesting_increment )
+
+  [%%ifdef
+  consensus_mechanism]
 
   type var =
     (Boolean.var, Global_slot.Checked.var, Balance.var, Amount.var) As_record.t
@@ -235,21 +264,6 @@ module Timing = struct
       ; vesting_increment= Amount.var_of_t vesting_increment }
 
   let untimed_var = var_of_t Untimed
-
-  let to_bits t =
-    let As_record.
-          { is_timed
-          ; initial_minimum_balance
-          ; cliff_time
-          ; vesting_period
-          ; vesting_increment } =
-      to_record t
-    in
-    is_timed
-    :: ( Balance.to_bits initial_minimum_balance
-       @ Global_slot.to_bits cliff_time
-       @ Global_slot.to_bits vesting_period
-       @ Amount.to_bits vesting_increment )
 
   let typ : (var, t) Typ.t =
     let spec =
@@ -419,7 +433,7 @@ let initialize public_key : t =
 
 let to_input (t : t) =
   let open Random_oracle.Input in
-  let f mk acc field = mk (Core.Field.get field t) :: acc in
+  let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
   let bits conv = f (Fn.compose bitstring conv) in
   Poly.Fields.fold ~init:[]
     ~public_key:(f Public_key.Compressed.to_input)
@@ -435,8 +449,8 @@ let crypto_hash t =
   Random_oracle.hash ~init:crypto_hash_prefix
     (Random_oracle.pack_input (to_input t))
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 type var =
   ( Public_key.Compressed.var
@@ -526,7 +540,7 @@ let var_of_t
 module Checked = struct
   let to_input (t : var) =
     let ( ! ) f x = Run.run_checked (f x) in
-    let f mk acc field = mk (Core.Field.get field t) :: acc in
+    let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
     let open Random_oracle.Input in
     let bits conv =
       f (fun x ->
