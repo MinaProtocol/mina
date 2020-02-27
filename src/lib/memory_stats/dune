@@ -1,0 +1,14 @@
+(library
+ (name memory_stats)
+ (public_name memory_stats)
+ (inline_tests)
+ (library_flags -linkall)
+ (libraries
+    async_kernel
+    core
+    jemalloc
+    logger
+    )
+ (preprocess
+  (pps ppx_snarky ppx_coda ppx_let))
+ (synopsis "Memory statistics for OCaml and jemalloc"))
