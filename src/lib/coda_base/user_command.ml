@@ -213,7 +213,7 @@ module Gen = struct
            Quickcheck.Generator.filter ~f:(fun (_, splits) ->
                Array.for_all splits ~f:(fun split ->
                    List.for_all split ~f:(fun amt ->
-                       Currency.Amount.(amt >= of_int 2) ) ) )
+                       Currency.Amount.(amt >= of_int 2_000_000_000) ) ) )
       in
       let account_nonces = Array.map ~f:Tuple3.get3 account_info in
       let uncons_exn = function
@@ -229,8 +229,9 @@ module Gen = struct
           account_nonces.(sender) <- Account_nonce.succ nonce ;
           let%bind fee =
             Currency.Fee.(
-              gen_incl (of_int 6)
-                (min (of_int 10) @@ Currency.Amount.to_fee this_split))
+              gen_incl (of_int 6_000_000_000)
+                (min (of_int 10_000_000_000)
+                   (Currency.Amount.to_fee this_split)))
           in
           let amount =
             Option.value_exn Currency.Amount.(this_split - of_fee fee)

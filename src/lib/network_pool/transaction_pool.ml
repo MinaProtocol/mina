@@ -253,7 +253,10 @@ struct
                   in
                   acc.balance
             in
-            let cmd' = User_command.check cmd |> Option.value_exn in
+            let cmd' =
+              User_command.check cmd
+              |> Option.value_exn ~message:"user command was invalid"
+            in
             ( match
                 Hashtbl.find_and_remove t.locally_generated_uncommitted cmd'
               with
@@ -874,7 +877,8 @@ let%test_module _ =
           List.map (Array.to_list test_keys) ~f:(fun kp ->
               let compressed = Public_key.compress kp.public_key in
               ( compressed
-              , Account.create compressed @@ Currency.Balance.of_int 1_000 ) )
+              , Account.create compressed
+                @@ Currency.Balance.of_int 1_000_000_000_000 ) )
         in
         let ledger = Public_key.Compressed.Map.of_alist_exn accounts in
         ((pipe_r, ref ledger), pipe_w)
@@ -962,7 +966,7 @@ let%test_module _ =
               ~key_gen:
                 (Quickcheck.Generator.tuple2 (return sender)
                    (Quickcheck_lib.of_array test_keys))
-              ~max_amount:100 ~max_fee:10 ()
+              ~max_amount:100_000_000_000 ~max_fee:10_000_000_000 ()
           in
           go (n + 1) (cmd :: cmds)
         else Quickcheck.Generator.return @@ List.rev cmds
@@ -1050,7 +1054,8 @@ let%test_module _ =
           in
           [%test_eq: pool_apply] apply_res
             (Ok (List.hd_exn independent_cmds :: List.drop independent_cmds 2)) ;
-          best_tip_ref := map_set_multi !best_tip_ref [mk_account 1 1_000 1] ;
+          best_tip_ref :=
+            map_set_multi !best_tip_ref [mk_account 1 1_000_000_000_000 1] ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands= List.take independent_cmds 1
@@ -1067,7 +1072,8 @@ let%test_module _ =
           in
           assert_pool_txs [] ;
           best_tip_ref :=
-            map_set_multi !best_tip_ref [mk_account 0 0 0; mk_account 1 1_000 1] ;
+            map_set_multi !best_tip_ref
+              [mk_account 0 0 0; mk_account 1 1_000_000_000_000 1] ;
           (* need a best tip diff so the ref is actually read *)
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
@@ -1103,7 +1109,8 @@ let%test_module _ =
             setup_test ()
           in
           assert_pool_txs [] ;
-          best_tip_ref := map_set_multi !best_tip_ref [mk_account 0 1_000 1] ;
+          best_tip_ref :=
+            map_set_multi !best_tip_ref [mk_account 0 1_000_000_000_000 1] ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
               { new_user_commands= List.take independent_cmds 2
@@ -1118,7 +1125,8 @@ let%test_module _ =
                  ~key_gen:
                    Quickcheck.Generator.(
                      tuple2 (return sender) (Quickcheck_lib.of_array test_keys))
-                 ~nonce:(Account.Nonce.of_int 1) ~max_amount:100 ~max_fee:10 ())
+                 ~nonce:(Account.Nonce.of_int 1) ~max_amount:100_000_000_000
+                 ~max_fee:10_000_000_000 ())
           in
           let%bind apply_res =
             Test.Resource_pool.Diff.unsafe_apply pool
@@ -1126,7 +1134,7 @@ let%test_module _ =
           in
           [%test_eq: pool_apply] apply_res (Ok [cmd1]) ;
           assert_pool_txs [cmd1] ;
-          let cmd2 = mk_payment 0 1 0 5 999 in
+          let cmd2 = mk_payment 0 1_000_000_000 0 5 999_000_000_000 in
           best_tip_ref := map_set_multi !best_tip_ref [mk_account 0 0 1] ;
           let%bind _ =
             Broadcast_pipe.Writer.write best_tip_diff_w
@@ -1186,7 +1194,9 @@ let%test_module _ =
           in
           ledger_ref2 :=
             map_set_multi !ledger_ref2
-              [mk_account 0 20_000 5; mk_account 1 0 0; mk_account 2 0 1] ;
+              [ mk_account 0 20_000_000_000_000 5
+              ; mk_account 1 0 0
+              ; mk_account 2 0 1 ] ;
           let%bind _ =
             Broadcast_pipe.Writer.write frontier_pipe_w (Some frontier2)
           in
@@ -1205,7 +1215,9 @@ let%test_module _ =
         @@ User_command.sign test_keys.(idx) tx.payload
       in
       let txs0 =
-        [mk_payment 0 1 0 9 20; mk_payment 0 1 1 9 12; mk_payment 0 1 2 9 500]
+        [ mk_payment 0 1_000_000_000 0 9 20_000_000_000
+        ; mk_payment 0 1_000_000_000 1 9 12_000_000_000
+        ; mk_payment 0 1_000_000_000 2 9 500_000_000_000 ]
       in
       let txs1 = List.map ~f:(set_sender 1) txs0 in
       let txs2 = List.map ~f:(set_sender 2) txs0 in
@@ -1219,13 +1231,13 @@ let%test_module _ =
       assert_pool_txs @@ txs_all ;
       let replace_txs =
         [ (* sufficient fee *)
-          mk_payment 0 16 0 1 440
+          mk_payment 0 16_000_000_000 0 1 440_000_000_000
         ; (* insufficient fee *)
-          mk_payment 1 4 0 1 788
+          mk_payment 1 4_000_000_000 0 1 788_000_000_000
         ; (* sufficient *)
-          mk_payment 2 20 1 4 721
+          mk_payment 2 20_000_000_000 1 4 721_000_000_000
         ; (* insufficient *)
-          mk_payment 3 10 1 4 927 ]
+          mk_payment 3 10_000_000_000 1 4 927_000_000_000 ]
       in
       let%bind apply_res_2 =
         Test.Resource_pool.Diff.unsafe_apply pool
@@ -1244,16 +1256,19 @@ let%test_module _ =
         setup_test ()
       in
       let txs =
-        [mk_payment 0 5 0 9 20; mk_payment 0 6 1 5 77; mk_payment 0 1 2 3 891]
+        [ mk_payment 0 5_000_000_000 0 9 20_000_000_000
+        ; mk_payment 0 6_000_000_000 1 5 77_000_000_000
+        ; mk_payment 0 1_000_000_000 2 3 891_000_000_000 ]
       in
-      let committed_tx = mk_payment 0 5 0 2 25 in
+      let committed_tx = mk_payment 0 5_000_000_000 0 2 25_000_000_000 in
       let%bind apply_res =
         Test.Resource_pool.Diff.unsafe_apply pool
         @@ Envelope.Incoming.local txs
       in
       [%test_eq: pool_apply] (Ok txs) apply_res ;
       assert_pool_txs @@ txs ;
-      best_tip_ref := map_set_multi !best_tip_ref [mk_account 0 970 1] ;
+      best_tip_ref :=
+        map_set_multi !best_tip_ref [mk_account 0 970_000_000_000 1] ;
       let%bind () =
         Broadcast_pipe.Writer.write best_tip_diff_w
           { new_user_commands= [committed_tx]
