@@ -1061,7 +1061,9 @@ let set_staking_graphql =
              graphql_endpoint
          in
          print_message "Stopped staking with" (result#setStaking)#lastStaking ;
-         print_message "Failed to start staking with"
+         print_message
+           "❌ Failed to start staking with keys (try `coda accounts unlock` \
+            first)"
            (result#setStaking)#lockedPublicKeys ;
          print_message "Started staking with"
            (result#setStaking)#currentStakingKeys ))
