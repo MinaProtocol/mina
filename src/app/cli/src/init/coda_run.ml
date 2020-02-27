@@ -197,13 +197,13 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   in
   let client_impls =
     [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
-          return
+          Deferred.map
             ( Coda_commands.send_user_command coda tx
-            |> Participating_state.active_error |> Or_error.join ) )
+            |> Participating_state.to_deferred_or_error )
+            ~f:Or_error.join )
     ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-          return
-            ( Coda_commands.schedule_user_commands coda ts
-            |> Participating_state.active_error ) )
+          Coda_commands.schedule_user_commands coda ts
+          |> Participating_state.to_deferred_or_error )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
           return
             ( Coda_commands.get_balance coda pk
