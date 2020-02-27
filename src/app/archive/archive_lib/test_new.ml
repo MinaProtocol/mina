@@ -6,17 +6,18 @@ open Signature_lib
 
 let logger = Logger.create ()
 
-let conn =
-  Thread_safe.block_on_async_exn
-  @@ fun () ->
-  match%map
-    Caqti_async.connect
-      (Uri.of_string "postgres://ghostshell:password@localhost:5432/coda")
-  with
-  | Ok conn ->
-      conn
-  | Error e ->
-      failwith @@ Caqti_error.show e
+let conn_lazy =
+  lazy
+    ( Thread_safe.block_on_async_exn
+    @@ fun () ->
+    match%map
+      Caqti_async.connect
+        (Uri.of_string "postgres://admin:codarules@localhost:5432/archiver")
+    with
+    | Ok conn ->
+        conn
+    | Error e ->
+        failwith @@ Caqti_error.show e )
 
 let keys = Array.init 5 ~f:(fun _ -> Keypair.create ())
 
@@ -32,6 +33,7 @@ let coinbase_gen =
     ~fee_transfer:fee_transfer_gen
 
 let%test_unit "User_command: read and write" =
+  let conn = Lazy.force conn_lazy in
   Thread_safe.block_on_async_exn
   @@ fun () ->
   Async.Quickcheck.async_test ~sexp_of:[%sexp_of: User_command.t]
@@ -53,6 +55,7 @@ let%test_unit "User_command: read and write" =
           failwith @@ Caqti_error.show e )
 
 let%test_unit "Fee_transfer: read and write" =
+  let conn = Lazy.force conn_lazy in
   Thread_safe.block_on_async_exn
   @@ fun () ->
   Async.Quickcheck.async_test ~sexp_of:[%sexp_of: Fee_transfer.Single.t]
@@ -74,6 +77,7 @@ let%test_unit "Fee_transfer: read and write" =
           failwith @@ Caqti_error.show e )
 
 let%test_unit "Coinbase: read and write" =
+  let conn = Lazy.force conn_lazy in
   Thread_safe.block_on_async_exn
   @@ fun () ->
   Async.Quickcheck.async_test ~sexp_of:[%sexp_of: Coinbase.t] coinbase_gen
@@ -95,6 +99,7 @@ let%test_unit "Coinbase: read and write" =
           failwith @@ Caqti_error.show e )
 
 let%test_unit "Block: read and write" =
+  let conn = Lazy.force conn_lazy in
   Quickcheck.test ~trials:20
     ( Quickcheck.Generator.with_size ~size:10
     @@ Quickcheck_lib.gen_imperative_list

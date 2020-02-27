@@ -54,9 +54,28 @@ let main () =
         Deferred.return (i + 1, transition :: acc) )
   in
   let%bind () = after (Time.Span.of_sec 10.) in
-  Deferred.List.iter observed_transitions ~f:(fun With_hash.{hash; data= _} ->
-      match%map Archive_lib.Processor_new.Block.find conn ~state_hash:hash with
-      | Ok _id ->
+  Deferred.List.iter observed_transitions
+    ~f:(fun With_hash.{hash; data= transition} ->
+      match%map
+        let open Deferred.Result.Let_syntax in
+        match%bind
+          Archive_lib.Processor_new.Block.find conn ~state_hash:hash
+        with
+        | Some id ->
+            let%bind Archive_lib.Processor_new.Block.{parent_id; _} =
+              Archive_lib.Processor_new.Block.load conn ~id
+            in
+            Archive_lib.Processor_new.For_test.assert_parent_exist conn
+              ~parent_id
+              ~parent_hash:
+                transition
+                  .Auxiliary_database.Filtered_external_transition
+                   .protocol_state
+                  .previous_state_hash
+        | None ->
+            failwith "Failed to find saved block in database"
+      with
+      | Ok () ->
           ()
       | Error e ->
           failwith @@ Caqti_error.show e )
