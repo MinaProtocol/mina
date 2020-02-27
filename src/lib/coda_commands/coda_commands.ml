@@ -61,11 +61,12 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   Option.is_some remainder
 
 let schedule_user_command t (txn : User_command.t) account_opt :
-    unit Or_error.t =
+    unit Or_error.t Deferred.t =
   (* FIXME #3457: return a status from Transaction_pool.add and use it instead
   *)
   if not (is_valid_user_command t txn account_opt) then
-    Or_error.error_string "Invalid user command: account balance is too low"
+    return
+      (Or_error.error_string "Invalid user command: account balance is too low")
   else
     let logger =
       Logger.extend
@@ -79,7 +80,7 @@ let schedule_user_command t (txn : User_command.t) account_opt :
       ~metadata:[("user_command", User_command.to_yojson txn)]
       "Submitted transaction $user_command to transaction pool" ;
     txn_count := !txn_count + 1 ;
-    Or_error.return ()
+    Deferred.return (Or_error.return ())
 
 let get_account t (addr : Public_key.Compressed.t) =
   let open Participating_state.Let_syntax in
@@ -144,7 +145,7 @@ let send_user_command t (txn : User_command.t) =
   let public_key = Public_key.compress txn.sender in
   let open Participating_state.Let_syntax in
   let%map account_opt = get_account t public_key in
-  let open Or_error.Let_syntax in
+  let open Deferred.Or_error.Let_syntax in
   let%map () = schedule_user_command t txn account_opt in
   record_payment t txn (Option.value_exn account_opt)
 
@@ -219,7 +220,7 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
 let schedule_user_commands t (txns : User_command.t list) :
-    'a Participating_state.t =
+    unit Deferred.t Participating_state.t =
   Participating_state.return
   @@
   let logger =

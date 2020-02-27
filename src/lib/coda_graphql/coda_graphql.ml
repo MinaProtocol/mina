@@ -1535,13 +1535,13 @@ module Mutations = struct
     let user_command = User_command.forget_check signed_command in
     match Coda_commands.send_user_command coda user_command with
     | `Active f -> (
-      match f with
-      | Ok _receipt ->
-          Ok user_command
-      | Error e ->
-          Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
+        match%map f with
+        | Ok _receipt ->
+            Ok user_command
+        | Error e ->
+            Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
-        Error "Daemon is bootstrapping"
+        return (Error "Daemon is bootstrapping")
 
   let find_identity ~public_key coda =
     Result.of_option
@@ -1605,7 +1605,7 @@ module Mutations = struct
       |> Result.of_option ~error:"Invalid signature"
       |> Deferred.return
     in
-    Deferred.return @@ send_user_command coda command
+    send_user_command coda command
 
   let send_unsigned_user_command ~coda ~sender ~payload =
     let open Deferred.Result.Let_syntax in
@@ -1618,7 +1618,7 @@ module Mutations = struct
             ~public_key:(Public_key.decompress_exn sender)
             ~user_command_payload:payload
     in
-    Deferred.return @@ send_user_command coda command
+    send_user_command coda command
 
   let send_delegation =
     io_field "sendDelegation"
