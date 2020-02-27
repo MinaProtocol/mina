@@ -3,4 +3,5 @@
   (public_name quickcheck_lib)
   (libraries core_kernel currency rose_tree)
   (inline_tests)
-  (preprocess (pps ppx_coda ppx_jane)))
+  (preprocessor_deps ../../config.mlh)
+  (preprocess (pps ppx_coda ppx_optcomp ppx_let ppx_inline_test ppx_custom_printf)))

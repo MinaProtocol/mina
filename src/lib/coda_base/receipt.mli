@@ -1,12 +1,18 @@
+(* receipt.mli *)
+
+[%%import "/src/config.mlh"]
+
+[%%ifdef consensus_mechanism]
+
+open Core_kernel
 open Snark_params.Tick
-open Core
+
+[%%endif]
 
 module Chain_hash : sig
   include Data_hash.Full_size
 
   include Codable.S with type t := t
-
-  val gen : t Quickcheck.Generator.t
 
   val to_string : t -> string
 
@@ -15,6 +21,10 @@ module Chain_hash : sig
   val empty : t
 
   val cons : User_command.Payload.t -> t -> t
+
+  [%%ifdef consensus_mechanism]
+
+  val gen : t Quickcheck.Generator.t
 
   module Checked : sig
     val constant : t -> var
@@ -25,4 +35,6 @@ module Chain_hash : sig
 
     val cons : payload:Transaction_union_payload.var -> t -> (t, _) Checked.t
   end
+
+  [%%endif]
 end

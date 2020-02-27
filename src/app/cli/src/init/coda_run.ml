@@ -387,7 +387,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     >>| lift ))
           |> Deferred.map ~f:(fun _ ->
                  Logger.info logger
-                   !"Created GraphQL server and status endpoints at port : %i"
+                   !"Created GraphQL server at: http://localhost:%i/graphql"
                    rest_server_port ~module_:__MODULE__ ~location:__LOC__ ) )
   ) ;
   let where_to_listen =
