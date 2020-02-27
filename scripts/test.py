@@ -68,7 +68,7 @@ medium_curves_and_other_tests = {
 }
 
 archive_processor_test = {
-    'fake_hash': ['coda-archive-processor-test'],
+    'test_archive_processor': ['coda-archive-processor-test'],
 }
 
 medium_curve_profiles_full = [
