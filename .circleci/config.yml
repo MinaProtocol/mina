@@ -60,7 +60,7 @@ jobs:
                 POSTGRES_PASSWORD: codarules
                 POSTGRES_USER: admin
                 POSTGRES_DB: archiver
-            steps:
+        steps:
             - checkout
             - run:
                   name: Update Submodules
