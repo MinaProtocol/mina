@@ -1,8 +1,18 @@
 [%%import
 "/src/config.mlh"]
 
-open Core
+open Core_kernel
 open Import
+
+[%%ifndef
+consensus_mechanism]
+
+module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Currency = Currency_nonconsensus.Currency
+module Quickcheck_lib = Quickcheck_lib_nonconsensus.Quickcheck_lib
+
+[%%endif]
+
 open Coda_numbers
 module Fee = Currency.Fee
 module Payload = User_command_payload
@@ -55,6 +65,9 @@ module Stable = struct
 end]
 
 type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
+
+type _unused = unit
+  constraint (Payload.t, Public_key.t, Signature.t) Poly.t = t
 
 let accounts_accessed = Stable.Latest.accounts_accessed
 
@@ -288,10 +301,22 @@ let check_signature _ = true
 
 [%%else]
 
+[%%ifdef
+consensus_mechanism]
+
 let check_signature ({payload; sender; signature} : t) =
   Schnorr.verify signature
     (Snark_params.Tick.Inner_curve.of_affine sender)
     payload
+
+[%%else]
+
+let check_signature ({payload; sender; signature} : t) =
+  Schnorr.verify signature
+    (Snark_params_nonconsensus.Inner_curve.of_affine sender)
+    payload
+
+[%%endif]
 
 [%%endif]
 

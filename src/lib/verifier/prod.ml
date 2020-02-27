@@ -9,8 +9,8 @@ open Coda_base
 open Coda_state
 open Blockchain_snark
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 open Snark_params
 
