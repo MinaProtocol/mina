@@ -110,14 +110,10 @@ module Inner = {
         switch (status) {
         | Unknown => ("Unknown", greyishAlpha(0.1), grey)
         | Operational => ("Operational", kernelAlpha(0.1), kernel)
-        | DegradedPerformance => ("Degraded", rosebudAlpha(0.1), rosebud)
-        | PartialOutage => ("Partial Outage", rosebudAlpha(0.1), rosebud)
-        | MajorOutage => ("Major Outage", rosebudAlpha(0.1), rosebud)
-        | UnderMaintenance => (
-            "Under Maintenance",
-            rosebudAlpha(0.1),
-            rosebud,
-          )
+        | DegradedPerformance => ("Degraded", amberAlpha(0.1), amber)
+        | PartialOutage => ("Partial Outage", amberAlpha(0.1), amber)
+        | MajorOutage => ("Major Outage", amberAlpha(0.1), amber)
+        | UnderMaintenance => ("Under Maintenance", amberAlpha(0.1), amber)
         }
       );
     };
