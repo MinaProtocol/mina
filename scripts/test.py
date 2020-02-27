@@ -65,7 +65,10 @@ medium_curves_and_other_tests = {
     'test_postake_split_medium_curves':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
     'test_postake_full_epoch': ['full-test'],
-    'fake_hash': ['coda-archive-processor-test']
+}
+
+archive_processor_test = {
+    'fake_hash': ['coda-archive-processor-test'],
 }
 
 medium_curve_profiles_full = [
@@ -192,6 +195,7 @@ def run(args):
 
     all_tests = small_curves_tests
     all_tests.update(medium_curves_and_other_tests)
+    all_tests.update(archive_processor_test)
     all_tests = filter_tests(all_tests, args.includes_patterns,
                              args.excludes_patterns)
     if len(all_tests) == 0:
