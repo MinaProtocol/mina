@@ -2,6 +2,7 @@ pull_request_rules:
     - name: automatically merge approved PRs with the ready-to-merge label
       conditions:
           - "status-success=ci/circleci: build-artifacts--testnet_postake_medium_curves"
+          - "status-success=ci/circleci: build-client-sdk"
           - "status-success=ci/circleci: build-wallet"
           - "status-success=ci/circleci: compare-test-signatures"
           - "status-success=ci/circleci: lint"
@@ -15,6 +16,7 @@ pull_request_rules:
           - "status-success=ci/circleci: test--test_postake_split_snarkless"
           - "status-success=ci/circleci: test--test_postake_txns"
           - "status-success=ci/circleci: test-unit--dev"
+          - "status-success=ci/circleci: test-unit--nonconsensus_medium_curves"
           - "status-success=ci/circleci: test-unit--test_postake_snarkless_unittest"
           - "status-success=ci/circleci: tracetool"
           - "#approved-reviews-by>=1"
