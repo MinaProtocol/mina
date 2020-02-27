@@ -1085,7 +1085,13 @@ let set_staking_graphql =
   Command.async ~summary:"Start producing blocks"
     (Cli_lib.Background_daemon.graphql_init pk_flag
        ~f:(fun graphql_endpoint public_key ->
-         let%map _ =
+         let print_message msg arr =
+           if not (Array.is_empty arr) then
+             printf "%s: %s\n" msg
+               (String.concat_array ~sep:", "
+                  (Array.map ~f:Public_key.Compressed.to_base58_check arr))
+         in
+         let%map result =
            Graphql_client.(
              Graphql_client.query_exn
                (Graphql_queries.Set_staking.make
@@ -1093,8 +1099,11 @@ let set_staking_graphql =
                   ()))
              graphql_endpoint
          in
-         printf "New block producer public key: %s\n"
-           (Public_key.Compressed.to_base58_check public_key) ))
+         print_message "Stopped staking with" (result#setStaking)#lastStaking ;
+         print_message "Failed to start staking with"
+           (result#setStaking)#lockedPublicKeys ;
+         print_message "Started staking with"
+           (result#setStaking)#currentStakingKeys ))
 
 let set_snark_worker =
   let open Command.Param in

@@ -97,7 +97,9 @@ module Set_staking =
 {|
 mutation ($public_key: PublicKey) {
   setStaking(input : {publicKeys: [$public_key]}) {
-    lastStaking
+    lastStaking @bsDecoder(fn: "Decoders.public_key_array")
+    lockedPublicKeys @bsDecoder(fn: "Decoders.public_key_array")
+    currentStakingKeys @bsDecoder(fn: "Decoders.public_key_array")
     }
   }
 |}]

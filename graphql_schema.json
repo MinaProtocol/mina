@@ -310,6 +310,54 @@
               },
               "isDeprecated": false,
               "deprecationReason": null
+            },
+            {
+              "name": "lockedPublicKeys",
+              "description": "List of public keys that could not be used to stake because they were locked",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "PublicKey",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
+            },
+            {
+              "name": "currentStakingKeys",
+              "description": "Returns the public keys that are now staking their funds",
+              "args": [],
+              "type": {
+                "kind": "NON_NULL",
+                "name": null,
+                "ofType": {
+                  "kind": "LIST",
+                  "name": null,
+                  "ofType": {
+                    "kind": "NON_NULL",
+                    "name": null,
+                    "ofType": {
+                      "kind": "SCALAR",
+                      "name": "PublicKey",
+                      "ofType": null
+                    }
+                  }
+                }
+              },
+              "isDeprecated": false,
+              "deprecationReason": null
             }
           ],
           "inputFields": null,
@@ -1685,7 +1733,7 @@
             },
             {
               "name": "setStaking",
-              "description": "Set keys you wish to stake with - silently fails if you pass keys corresponding to accounts that are either locked or in trackedAccounts",
+              "description": "Set keys you wish to stake with",
               "args": [
                 {
                   "name": "input",
@@ -5191,7 +5239,7 @@
             },
             {
               "name": "bestChain",
-              "description": "Retrieve a list of blocks from transition frontier's root to the current best tip.",
+              "description": "Retrieve a list of blocks from transition frontier's root to the current best tip. Returns null if the system is bootstrapping.",
               "args": [],
               "type": {
                 "kind": "LIST",

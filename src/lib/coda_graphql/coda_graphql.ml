@@ -1021,14 +1021,19 @@ module Types = struct
               ~doc:"Returns the public keys that were staking funds previously"
               ~typ:(non_null (list (non_null public_key)))
               ~args:Arg.[]
-              ~resolve:(fun _ (lastStaking, _) -> lastStaking)
+              ~resolve:(fun _ (lastStaking, _, _) -> lastStaking)
           ; field "lockedPublicKeys"
               ~doc:
                 "List of public keys that could not be used to stake because \
                  they were locked"
               ~typ:(non_null (list (non_null public_key)))
               ~args:Arg.[]
-              ~resolve:(fun _ (_, locked) -> locked) ] )
+              ~resolve:(fun _ (_, locked, _) -> locked)
+          ; field "currentStakingKeys"
+              ~doc:"Returns the public keys that are now staking their funds"
+              ~typ:(non_null (list (non_null public_key)))
+              ~args:Arg.[]
+              ~resolve:(fun _ (_, _, currentStaking) -> currentStaking) ] )
 
     let set_snark_work_fee =
       obj "SetSnarkWorkFeePayload" ~fields:(fun _ ->
@@ -1702,8 +1707,9 @@ module Mutations = struct
         ignore
         @@ Coda_lib.replace_block_production_keypairs coda
              (Keypair.And_compressed_pk.Set.of_list unlocked) ;
-        (Public_key.Compressed.Set.to_list old_block_production_keys, locked)
-        )
+        ( Public_key.Compressed.Set.to_list old_block_production_keys
+        , locked
+        , List.map ~f:Tuple.T2.get2 unlocked ) )
 
   let set_snark_worker =
     io_field "setSnarkWorker"
