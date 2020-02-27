@@ -833,6 +833,7 @@ workflows:
                     only: develop
             - tracetool
             - build-wallet
+            - test-archive
             - build-archive
             - build-macos
             - build-client-sdk
