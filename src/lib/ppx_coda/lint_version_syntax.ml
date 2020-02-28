@@ -95,7 +95,7 @@ let is_version_module vn =
 let is_versioned_module_inc_decl inc_decl =
   match inc_decl.pincl_mod.pmod_desc with
   | Pmod_ident {txt= Ldot (Lident "Stable", name); _}
-    when String.equal name "Latest" || is_version_module name ->
+    when is_version_module name ->
       true
   | _ ->
       false

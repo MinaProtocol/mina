@@ -81,7 +81,7 @@ module Actions = struct
     let old_gossip_increment = Peer_trust.max_rate 20. in
     match action with
     | Gossiped_old_transition slot_diff ->
-        (* NOTE: slot_diff here is [received_slot - (proposed_slot + Δ)]
+        (* NOTE: slot_diff here is [received_slot - (produced_slot + Δ)]
          *
          * We want to decrease the score exponentially based on how out of date the transition
          * we received was. We would like the base score decrease to be some constant
@@ -162,7 +162,11 @@ module Peer_trust = Peer_trust.Make (Actions)
 include Peer_trust
 
 let record_envelope_sender :
-    t -> Logger.t -> Envelope.Sender.t -> Actions.t -> unit Deferred.t =
+       t
+    -> Logger.t
+    -> Network_peer.Envelope.Sender.t
+    -> Actions.t
+    -> unit Deferred.t =
  fun t logger sender action ->
   match sender with
   | Local ->
@@ -171,5 +175,5 @@ let record_envelope_sender :
         ~metadata:action_metadata
         "Attempted to record trust action of ourselves: %s" action_fmt ;
       Deferred.unit
-  | Remote inet_addr ->
+  | Remote (inet_addr, _peer_id) ->
       record t logger inet_addr action

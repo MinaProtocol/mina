@@ -1,3 +1,5 @@
+open ReactIntl;
+
 type mode =
   | HyperlinkBlue
   | Gray
@@ -145,3 +147,4 @@ let make =
        <a href=link target="_blank"> {React.string(label)} </a>
      }}
   </button>;
+

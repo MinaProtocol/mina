@@ -40,7 +40,7 @@ module Inputs = struct
   end
 
   type single_spec =
-    ( Transaction.t
+    ( Transaction.t Transaction_protocol_state.t
     , Transaction_witness.t
     , Transaction_snark.t )
     Snark_work_lib.Work.Single.Spec.t

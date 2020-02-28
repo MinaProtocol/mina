@@ -1,11 +1,31 @@
-open Core
-open Import
-open Coda_numbers
+(* account.ml *)
+
+[%%import
+"/src/config.mlh"]
+
+open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params
 open Tick
-open Currency
 open Snark_bits
+
+[%%else]
+
+open Snark_params_nonconsensus
+open Snark_bits_nonconsensus
+module Currency = Currency_nonconsensus.Currency
+module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
+
+open Currency
+open Coda_numbers
 open Fold_lib
+open Import
 
 module Index = struct
   [%%versioned
@@ -21,14 +41,14 @@ module Index = struct
 
   let to_int = Int.to_int
 
-  let gen = Int.gen_incl 0 ((1 lsl Snark_params.ledger_depth) - 1)
+  let gen = Int.gen_incl 0 ((1 lsl ledger_depth) - 1)
 
   module Table = Int.Table
 
   module Vector = struct
     include Int
 
-    let length = Snark_params.ledger_depth
+    let length = ledger_depth
 
     let empty = zero
 
@@ -44,7 +64,12 @@ module Index = struct
 
   let fold t = Fold.group3 ~default:false (fold_bits t)
 
+  [%%ifdef
+  consensus_mechanism]
+
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
+
+  [%%endif]
 end
 
 module Nonce = Account_nonce
@@ -158,28 +183,6 @@ module Timing = struct
       ; vesting_increment: 'amount }
   end
 
-  type var =
-    (Boolean.var, Global_slot.Checked.var, Balance.var, Amount.var) As_record.t
-
-  let var_to_bits
-      As_record.
-        { is_timed
-        ; initial_minimum_balance
-        ; cliff_time
-        ; vesting_period
-        ; vesting_increment } =
-    let open Bitstring_lib.Bitstring.Lsb_first in
-    let initial_minimum_balance =
-      to_list @@ Balance.var_to_bits initial_minimum_balance
-    in
-    let cliff_time = to_list @@ Global_slot.var_to_bits cliff_time in
-    let vesting_period = to_list @@ Global_slot.var_to_bits vesting_period in
-    let vesting_increment = to_list @@ Amount.var_to_bits vesting_increment in
-    of_list
-      ( is_timed
-      :: ( initial_minimum_balance @ cliff_time @ vesting_period
-         @ vesting_increment ) )
-
   (* convert sum type to record format, useful for to_bits and typ *)
   let to_record t =
     match t with
@@ -204,6 +207,46 @@ module Timing = struct
           ; vesting_period
           ; vesting_increment }
 
+  let to_bits t =
+    let As_record.
+          { is_timed
+          ; initial_minimum_balance
+          ; cliff_time
+          ; vesting_period
+          ; vesting_increment } =
+      to_record t
+    in
+    is_timed
+    :: ( Balance.to_bits initial_minimum_balance
+       @ Global_slot.to_bits cliff_time
+       @ Global_slot.to_bits vesting_period
+       @ Amount.to_bits vesting_increment )
+
+  [%%ifdef
+  consensus_mechanism]
+
+  type var =
+    (Boolean.var, Global_slot.Checked.var, Balance.var, Amount.var) As_record.t
+
+  let var_to_bits
+      As_record.
+        { is_timed
+        ; initial_minimum_balance
+        ; cliff_time
+        ; vesting_period
+        ; vesting_increment } =
+    let open Bitstring_lib.Bitstring.Lsb_first in
+    let initial_minimum_balance =
+      to_list @@ Balance.var_to_bits initial_minimum_balance
+    in
+    let cliff_time = to_list @@ Global_slot.var_to_bits cliff_time in
+    let vesting_period = to_list @@ Global_slot.var_to_bits vesting_period in
+    let vesting_increment = to_list @@ Amount.var_to_bits vesting_increment in
+    of_list
+      ( is_timed
+      :: ( initial_minimum_balance @ cliff_time @ vesting_period
+         @ vesting_increment ) )
+
   let var_of_t (t : t) : var =
     let As_record.
           { is_timed
@@ -221,21 +264,6 @@ module Timing = struct
       ; vesting_increment= Amount.var_of_t vesting_increment }
 
   let untimed_var = var_of_t Untimed
-
-  let to_bits t =
-    let As_record.
-          { is_timed
-          ; initial_minimum_balance
-          ; cliff_time
-          ; vesting_period
-          ; vesting_increment } =
-      to_record t
-    in
-    is_timed
-    :: ( Balance.to_bits initial_minimum_balance
-       @ Global_slot.to_bits cliff_time
-       @ Global_slot.to_bits vesting_period
-       @ Amount.to_bits vesting_increment )
 
   let typ : (var, t) Typ.t =
     let spec =
@@ -354,6 +382,8 @@ module Timing = struct
       ; cliff_time
       ; vesting_period
       ; vesting_increment }
+
+  [%%endif]
 end
 
 [%%versioned
@@ -380,15 +410,6 @@ type t = Stable.Latest.t [@@deriving sexp, eq, hash, compare, yojson]
 [%%define_locally
 Stable.Latest.(public_key)]
 
-type var =
-  ( Public_key.Compressed.var
-  , Balance.var
-  , Nonce.Checked.t
-  , Receipt.Chain_hash.var
-  , State_hash.var
-  , Timing.var )
-  Poly.t
-
 type value =
   ( Public_key.Compressed.t
   , Balance.t
@@ -409,6 +430,36 @@ let initialize public_key : t =
   ; delegate= public_key
   ; voting_for= State_hash.dummy
   ; timing= Timing.Untimed }
+
+let to_input (t : t) =
+  let open Random_oracle.Input in
+  let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+  let bits conv = f (Fn.compose bitstring conv) in
+  Poly.Fields.fold ~init:[]
+    ~public_key:(f Public_key.Compressed.to_input)
+    ~balance:(bits Balance.to_bits) ~nonce:(bits Nonce.Bits.to_bits)
+    ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
+    ~delegate:(f Public_key.Compressed.to_input)
+    ~voting_for:(f State_hash.to_input) ~timing:(bits Timing.to_bits)
+  |> List.reduce_exn ~f:append
+
+let crypto_hash_prefix = Hash_prefix.account
+
+let crypto_hash t =
+  Random_oracle.hash ~init:crypto_hash_prefix
+    (Random_oracle.pack_input (to_input t))
+
+[%%ifdef
+consensus_mechanism]
+
+type var =
+  ( Public_key.Compressed.var
+  , Balance.var
+  , Nonce.Checked.t
+  , Receipt.Chain_hash.var
+  , State_hash.var
+  , Timing.var )
+  Poly.t
 
 let typ : (var, value) Typ.t =
   let spec =
@@ -486,23 +537,34 @@ let var_of_t
   ; voting_for= State_hash.var_of_t voting_for
   ; timing= Timing.var_of_t timing }
 
-let to_input (t : t) =
-  let open Random_oracle.Input in
-  let f mk acc field = mk (Core.Field.get field t) :: acc in
-  let bits conv = f (Fn.compose bitstring conv) in
-  Poly.Fields.fold ~init:[]
-    ~public_key:(f Public_key.Compressed.to_input)
-    ~balance:(bits Balance.to_bits) ~nonce:(bits Nonce.Bits.to_bits)
-    ~receipt_chain_hash:(f Receipt.Chain_hash.to_input)
-    ~delegate:(f Public_key.Compressed.to_input)
-    ~voting_for:(f State_hash.to_input) ~timing:(bits Timing.to_bits)
-  |> List.reduce_exn ~f:append
+module Checked = struct
+  let to_input (t : var) =
+    let ( ! ) f x = Run.run_checked (f x) in
+    let f mk acc field = mk (Core_kernel.Field.get field t) :: acc in
+    let open Random_oracle.Input in
+    let bits conv =
+      f (fun x ->
+          bitstring (Bitstring_lib.Bitstring.Lsb_first.to_list (conv x)) )
+    in
+    List.reduce_exn ~f:append
+      (Poly.Fields.fold ~init:[]
+         ~public_key:(f Public_key.Compressed.Checked.to_input)
+         ~balance:(bits Balance.var_to_bits)
+         ~nonce:(bits !Nonce.Checked.to_bits)
+         ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
+         ~delegate:(f Public_key.Compressed.Checked.to_input)
+         ~voting_for:(f State_hash.var_to_input)
+         ~timing:(bits Timing.var_to_bits))
 
-let crypto_hash_prefix = Hash_prefix.account
+  let digest t =
+    make_checked (fun () ->
+        Random_oracle.Checked.(
+          hash ~init:crypto_hash_prefix (pack_input (to_input t))) )
 
-let crypto_hash t =
-  Random_oracle.hash ~init:crypto_hash_prefix
-    (Random_oracle.pack_input (to_input t))
+  let to_input t = make_checked (fun () -> to_input t)
+end
+
+[%%endif]
 
 let empty =
   { Poly.public_key= Public_key.Compressed.empty
@@ -579,30 +641,3 @@ let gen_timed =
   let%map vesting_increment = Amount.gen in
   create_timed public_key balance ~initial_minimum_balance ~cliff_time
     ~vesting_period ~vesting_increment
-
-module Checked = struct
-  let to_input (t : var) =
-    let ( ! ) f x = Run.run_checked (f x) in
-    let f mk acc field = mk (Core.Field.get field t) :: acc in
-    let open Random_oracle.Input in
-    let bits conv =
-      f (fun x ->
-          bitstring (Bitstring_lib.Bitstring.Lsb_first.to_list (conv x)) )
-    in
-    List.reduce_exn ~f:append
-      (Poly.Fields.fold ~init:[]
-         ~public_key:(f Public_key.Compressed.Checked.to_input)
-         ~balance:(bits Balance.var_to_bits)
-         ~nonce:(bits !Nonce.Checked.to_bits)
-         ~receipt_chain_hash:(f Receipt.Chain_hash.var_to_input)
-         ~delegate:(f Public_key.Compressed.Checked.to_input)
-         ~voting_for:(f State_hash.var_to_input)
-         ~timing:(bits Timing.var_to_bits))
-
-  let digest t =
-    make_checked (fun () ->
-        Random_oracle.Checked.(
-          hash ~init:crypto_hash_prefix (pack_input (to_input t))) )
-
-  let to_input t = make_checked (fun () -> to_input t)
-end

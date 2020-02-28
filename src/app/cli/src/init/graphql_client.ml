@@ -36,9 +36,10 @@ let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
       eprintf "❌ Error: %s\n" e ;
       exit 17
 
-let query = Client.query
+let query query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
+  Client.query query_obj uri.value
 
-let query_exn query_obj port = run_exn ~f:query query_obj port
+let query_exn query_obj port = run_exn ~f:Client.query query_obj port
 
 module User_command = struct
   type t =

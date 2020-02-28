@@ -1,6 +1,7 @@
 open Async_kernel
 open Core_kernel
 open Pipe_lib
+open Network_peer
 
 module Make (Transition_frontier : sig
   type t
@@ -11,6 +12,7 @@ end)
   with type resource_pool := Resource_pool.t
    and type resource_pool_diff := Resource_pool.Diff.t
    and type transition_frontier := Transition_frontier.t
+   and type transition_frontier_diff := Resource_pool.transition_frontier_diff
    and type config := Resource_pool.Config.t = struct
   type t =
     { resource_pool: Resource_pool.t
@@ -22,26 +24,49 @@ end)
 
   let broadcasts {read_broadcasts; _} = read_broadcasts
 
-  let apply_and_broadcast t pool_diff =
-    match%bind Resource_pool.Diff.apply t.resource_pool pool_diff with
+  let apply_and_broadcast t (pool_diff, valid_cb) =
+    let rebroadcast diff' =
+      valid_cb true ;
+      Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+        "Broadcasting %s"
+        (Resource_pool.Diff.summary diff') ;
+      Linear_pipe.write t.write_broadcasts diff'
+    in
+    match%bind Resource_pool.Diff.unsafe_apply t.resource_pool pool_diff with
     | Ok diff' ->
-        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Broadcasting %s"
-          (Resource_pool.Diff.summary diff') ;
-        Linear_pipe.write t.write_broadcasts diff'
-    | Error e ->
+        rebroadcast diff'
+    | Error (`Locally_generated diff') ->
+        rebroadcast diff'
+    | Error (`Other e) ->
+        valid_cb false ;
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Pool diff apply feedback: %s" (Error.to_string_hum e) ;
+          "Refusing to rebroadcast: pool diff apply feedback: %s"
+          (Error.to_string_hum e) ;
         Deferred.unit
 
-  let of_resource_pool_and_diffs resource_pool ~logger ~incoming_diffs =
+  let of_resource_pool_and_diffs resource_pool ~logger ~incoming_diffs
+      ~local_diffs ~tf_diffs =
     let read_broadcasts, write_broadcasts = Linear_pipe.create () in
     let network_pool =
       {resource_pool; logger; read_broadcasts; write_broadcasts}
     in
-    Linear_pipe.iter incoming_diffs ~f:(fun diff ->
-        apply_and_broadcast network_pool diff )
-    |> ignore ;
+    (*proiority: Transition frontier diffs > local diffs > incomming diffs*)
+    Strict_pipe.Reader.Merge.iter
+      [ Strict_pipe.Reader.map tf_diffs ~f:(fun diff ->
+            `Transition_frontier_extension diff )
+      ; Strict_pipe.Reader.map local_diffs ~f:(fun diff -> `Local diff)
+      ; Strict_pipe.Reader.map incoming_diffs ~f:(fun diff -> `Incoming diff)
+      ]
+      ~f:(fun diff_source ->
+        match diff_source with
+        | `Incoming diff_and_cb ->
+            apply_and_broadcast network_pool diff_and_cb
+        | `Local diff ->
+            apply_and_broadcast network_pool
+              (Envelope.Incoming.local diff, Fn.const ())
+        | `Transition_frontier_extension diff ->
+            Resource_pool.handle_transition_frontier_diff diff resource_pool )
+    |> Deferred.don't_wait_for ;
     network_pool
 
   (* Rebroadcast locally generated pool items every 10 minutes. Do so for 50
@@ -90,11 +115,18 @@ end)
     in
     go ()
 
-  let create ~config ~incoming_diffs ~frontier_broadcast_pipe ~logger =
+  let create ~config ~incoming_diffs ~local_diffs ~frontier_broadcast_pipe
+      ~logger =
+    (*Diffs from tansition frontier extensions*)
+    let tf_diff_reader, tf_diff_writer =
+      Strict_pipe.(
+        create ~name:"Network pool transition frontier diffs" Synchronous)
+    in
     let t =
       of_resource_pool_and_diffs
-        (Resource_pool.create ~config ~logger ~frontier_broadcast_pipe)
-        ~incoming_diffs ~logger
+        (Resource_pool.create ~config ~logger ~frontier_broadcast_pipe
+           ~tf_diff_writer)
+        ~incoming_diffs ~local_diffs ~logger ~tf_diffs:tf_diff_reader
     in
     don't_wait_for (rebroadcast_loop t logger) ;
     t

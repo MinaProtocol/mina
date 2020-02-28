@@ -1,8 +1,18 @@
 [%%import
 "/src/config.mlh"]
 
-open Core
+open Core_kernel
 open Import
+
+[%%ifndef
+consensus_mechanism]
+
+module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
+module Currency = Currency_nonconsensus.Currency
+module Quickcheck_lib = Quickcheck_lib_nonconsensus.Quickcheck_lib
+
+[%%endif]
+
 open Coda_numbers
 module Fee = Currency.Fee
 module Payload = User_command_payload
@@ -56,6 +66,9 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp, yojson, hash]
 
+type _unused = unit
+  constraint (Payload.t, Public_key.t, Signature.t) Poly.t = t
+
 let accounts_accessed = Stable.Latest.accounts_accessed
 
 include Comparable.Make (Stable.Latest)
@@ -72,6 +85,16 @@ let minimum_fee = Fee.of_int 2
 let is_trivial t = Fee.(fee t < minimum_fee)
 
 let sender t = Public_key.compress Poly.(t.sender)
+
+let receiver = Fn.compose Payload.receiver payload
+
+let amount = Fn.compose Payload.amount payload
+
+let memo = Fn.compose Payload.memo payload
+
+let valid_until = Fn.compose Payload.valid_until payload
+
+let is_payment = Fn.compose Payload.is_payment payload
 
 let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
@@ -219,7 +242,7 @@ module Gen = struct
           account_nonces.(sender) <- Account_nonce.succ nonce ;
           let%bind fee =
             Currency.Fee.(
-              gen_incl (of_int 3)
+              gen_incl (of_int 6)
                 (min (of_int 10) @@ Currency.Amount.to_fee this_split))
           in
           let amount =
@@ -277,12 +300,30 @@ let check_signature _ = true
 
 [%%else]
 
+[%%ifdef
+consensus_mechanism]
+
 let check_signature ({payload; sender; signature} : t) =
   Schnorr.verify signature
     (Snark_params.Tick.Inner_curve.of_affine sender)
     payload
 
+[%%else]
+
+let check_signature ({payload; sender; signature} : t) =
+  Schnorr.verify signature
+    (Snark_params_nonconsensus.Inner_curve.of_affine sender)
+    payload
+
 [%%endif]
+
+[%%endif]
+
+let create_with_signature_checked signature sender payload =
+  let open Option.Let_syntax in
+  let%bind sender = Public_key.decompress sender in
+  let t = Poly.{payload; signature; sender} in
+  Option.some_if (check_signature t) t
 
 let gen_test =
   let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in

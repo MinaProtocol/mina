@@ -20,6 +20,11 @@ genesis_ledger = "release"]
 include Release_ledger
 
 [%%elif
+genesis_ledger = "fuzz"]
+
+include Fuzz_ledger
+
+[%%elif
 genesis_ledger = "test"]
 
 include Test_ledger
@@ -50,9 +55,9 @@ genesis_ledger = "testnet_postake"]
 include Testnet_postake_ledger
 
 [%%elif
-genesis_ledger = "testnet_postake_many_proposers"]
+genesis_ledger = "testnet_postake_many_producers"]
 
-include Testnet_postake_ledger_many_proposers
+include Testnet_postake_ledger_many_producers
 
 [%%else]
 

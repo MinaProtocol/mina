@@ -8,7 +8,7 @@ module Statement = struct
     module V1 = struct
       module T = struct
         type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
-        [@@deriving bin_io, compare, hash, sexp, version, yojson]
+        [@@deriving eq, bin_io, compare, hash, sexp, version, yojson]
       end
 
       include T
@@ -29,7 +29,7 @@ module Statement = struct
   end
 
   (* bin_io omitted *)
-  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson]
+  type t = Stable.Latest.t [@@deriving sexp, hash, compare, yojson, eq]
 
   include Hashable.Make (Stable.Latest)
 
@@ -114,6 +114,8 @@ module T = struct
     ; proofs: Ledger_proof.t One_or_two.t
     ; prover: Public_key.Compressed.t }
   [@@deriving to_yojson, sexp]
+
+  let statement t = One_or_two.map t.proofs ~f:Ledger_proof.statement
 
   let info t =
     let statements = One_or_two.map t.proofs ~f:Ledger_proof.statement in

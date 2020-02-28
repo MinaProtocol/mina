@@ -2,7 +2,7 @@ open Core
 open Async
 
 module Level = struct
-  type t = Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
+  type t = Spam | Trace | Debug | Info | Warn | Error | Faulty_peer | Fatal
   [@@deriving sexp, compare, show {with_path= false}, enumerate]
 
   let of_string str =
@@ -83,9 +83,13 @@ module Message = struct
   type t =
     { timestamp: Time.t
     ; level: Level.t
-    ; source: Source.t
+    ; source: Source.t option
     ; message: string
     ; metadata: Metadata.t }
+  [@@deriving yojson]
+
+  type without_source =
+    {timestamp: Time.t; level: Level.t; message: string; metadata: Metadata.t}
   [@@deriving yojson]
 
   let escape_string str =
@@ -93,7 +97,19 @@ module Message = struct
     |> List.bind ~f:(function '"' -> ['\\'; '"'] | c -> [c])
     |> String.of_char_list
 
-  let to_yojson m = to_yojson {m with message= escape_string m.message}
+  let of_yojson json =
+    match without_source_of_yojson json with
+    | Ok {timestamp; level; message; metadata} ->
+        Ok {timestamp; level; message; metadata; source= None}
+    | Error _ ->
+        of_yojson json
+
+  let to_yojson ({timestamp; level; source; message; metadata} as m) =
+    match source with
+    | Some _ ->
+        to_yojson {m with message= escape_string m.message}
+    | None ->
+        without_source_to_yojson {timestamp; level; message; metadata}
 
   let metadata_interpolation_regex = Re2.create_exn {|\$(\[a-zA-Z_]+)|}
 
@@ -104,7 +120,7 @@ module Message = struct
     | Error _ ->
         []
 
-  let check_invariants t =
+  let check_invariants (t : t) =
     let refs = metadata_references t.message in
     List.for_all refs ~f:(Metadata.mem t.metadata)
 end
@@ -123,7 +139,16 @@ module Processor = struct
 
     let create () = ()
 
-    let process () msg = Some (Yojson.Safe.to_string (Message.to_yojson msg))
+    let process () msg =
+      let msg_json_fields =
+        Message.to_yojson msg |> Yojson.Safe.Util.to_assoc
+      in
+      let json =
+        if Level.compare msg.level Spam = 0 then
+          `Assoc (List.filter msg_json_fields ~f:(fun (k, _) -> k <> "source"))
+        else `Assoc msg_json_fields
+      in
+      Some (Yojson.Safe.to_string json)
   end
 
   module Pretty = struct
@@ -131,7 +156,7 @@ module Processor = struct
 
     let create ~log_level ~config = {log_level; config}
 
-    let process {log_level; config} msg =
+    let process {log_level; config} (msg : Message.t) =
       let open Message in
       if msg.level < log_level then None
       else
@@ -139,7 +164,9 @@ module Processor = struct
           Logproc_lib.Interpolator.interpolate config msg.message msg.metadata
         with
         | Error err ->
-            Core.printf "logproc interpolation error: %s\n" err ;
+            Option.iter msg.source ~f:(fun source ->
+                Core.printf "logproc interpolation error in %s: %s\n"
+                  source.location err ) ;
             None
         | Ok (str, extra) ->
             let formatted_extra =
@@ -307,7 +334,7 @@ let change_id {null; metadata; id= _} ~id = {null; metadata; id}
 let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   { Message.timestamp= Time.now ()
   ; level
-  ; source= Source.create ~module_ ~location
+  ; source= Some (Source.create ~module_ ~location)
   ; message
   ; metadata= Metadata.extend t.metadata metadata }
 
@@ -344,6 +371,8 @@ let error = log ~level:Error
 let fatal = log ~level:Fatal
 
 let faulty_peer_without_punishment = log ~level:Faulty_peer
+
+let spam = log ~level:Spam ~module_:"" ~location:""
 
 (* deprecated, use Trust_system.record instead *)
 let faulty_peer = faulty_peer_without_punishment

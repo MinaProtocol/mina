@@ -26,6 +26,10 @@ module Args = struct
   let zip6 arg1 arg2 arg3 arg4 arg5 arg6 =
     return (fun a b c d e f -> (a, b, c, d, e, f))
     <*> arg1 <*> arg2 <*> arg3 <*> arg4 <*> arg5 <*> arg6
+
+  let zip7 arg1 arg2 arg3 arg4 arg5 arg6 arg7 =
+    return (fun a b c d e f g -> (a, b, c, d, e, f, g))
+    <*> arg1 <*> arg2 <*> arg3 <*> arg4 <*> arg5 <*> arg6 <*> arg7
 end
 
 let or_error_str ~f_ok ~error = function
@@ -63,7 +67,8 @@ let get_balance =
          in
          let balance_str = function
            | Some b ->
-               sprintf "Balance: %s coda\n" (Currency.Balance.to_string b)
+               sprintf "Balance: %s coda\n"
+                 (Currency.Balance.to_formatted_string b)
            | None ->
                "There are no funds in this account\n"
          in
@@ -91,7 +96,7 @@ let get_balance_graphql =
          match response#wallet with
          | Some wallet ->
              printf "Balance: %s coda\n"
-               (Currency.Balance.to_string (wallet#balance)#total)
+               (Currency.Balance.to_formatted_string (wallet#balance)#total)
          | None ->
              printf "There are no funds in this account\n" ))
 
@@ -403,15 +408,6 @@ let get_nonce_exn ~rpc public_key port =
   | Ok nonce ->
       return nonce
 
-let handle_exception_nicely (type a) (f : unit -> a Deferred.t) () :
-    a Deferred.t =
-  match%bind Deferred.Or_error.try_with ~extract_exn:true f with
-  | Ok e ->
-      return e
-  | Error e ->
-      eprintf "Error: %s" (Error.to_string_hum e) ;
-      exit 4
-
 let batch_send_payments =
   let module Payment_info = struct
     type t =
@@ -488,47 +484,10 @@ let batch_send_payments =
 
 let user_command (body_args : User_command_payload.Body.t Command.Param.t)
     ~label ~summary ~error =
-  let open Command.Param in
-  let open Cli_lib.Arg_type in
-  let amount_flag =
-    flag "fee"
-      ~doc:
-        (Printf.sprintf
-           "FEE Amount you are willing to pay to process the transaction \
-            (default: %d) (minimum: %d)"
-           (Currency.Fee.to_int Cli_lib.Default.transaction_fee)
-           (Currency.Fee.to_int User_command.minimum_fee))
-      (optional txn_fee)
-  in
-  let valid_until_flag =
-    flag "valid-until"
-      ~doc:
-        "GLOBAL-SLOT The last global-slot at which this transaction will be \
-         considered valid. This makes it possible to have transactions which \
-         expire if they are not applied before this time. If omitted, the \
-         transaction will never expire."
-      (optional global_slot)
-  in
-  let nonce_flag =
-    flag "nonce"
-      ~doc:
-        "NONCE Nonce that you would like to set for your transaction \
-         (default: nonce of your account on the best ledger or the successor \
-         of highest value nonce of your sent transactions from the \
-         transaction pool )"
-      (optional txn_nonce)
-  in
-  let memo_flag =
-    flag "memo"
-      ~doc:
-        (sprintf
-           "STRING Memo accompanying the transaction (up to %d characters)"
-           User_command_memo.max_input_length)
-      (optional string)
-  in
   let flag =
-    Args.zip6 body_args Cli_lib.Flag.privkey_read_path amount_flag nonce_flag
-      valid_until_flag memo_flag
+    let open Cli_lib.Flag in
+    Args.zip6 body_args Cli_lib.Flag.privkey_read_path User_command.fee
+      User_command.nonce User_command.valid_until User_command.memo
   in
   Command.async ~summary
     (Cli_lib.Background_daemon.rpc_init flag
@@ -582,15 +541,9 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
 let send_payment =
   let body =
     let open Command.Let_syntax in
-    let open Cli_lib.Arg_type in
-    let%map_open receiver =
-      flag "receiver"
-        ~doc:"PUBLICKEY Public key address to which you want to send money"
-        (required public_key_compressed)
-    and amount =
-      flag "amount" ~doc:"VALUE Payment amount you want to send"
-        (required txn_amount)
-    in
+    let open Cli_lib.Flag in
+    let%map_open receiver = User_command.receiver
+    and amount = User_command.amount in
     User_command_payload.Body.Payment {receiver; amount}
   in
   user_command body ~label:"payment" ~summary:"Send payment to an address"
@@ -717,7 +670,7 @@ let cancel_transaction =
                Currency.Fee.of_uint64 (fee + (replace_fee * diff))
              in
              printf "Fee to cancel transaction is %s coda.\n"
-               (Currency.Fee.to_string cancel_fee) ;
+               (Currency.Fee.to_formatted_string cancel_fee) ;
              let body =
                User_command_payload.Body.Payment
                  {receiver; amount= Currency.Amount.zero}
@@ -799,7 +752,7 @@ let cancel_transaction_graphql =
            Currency.Fee.of_uint64 (fee + (replace_fee * diff))
          in
          printf "Fee to cancel transaction is %s coda.\n"
-           (Currency.Fee.to_string cancel_fee) ;
+           (Currency.Fee.to_formatted_string cancel_fee) ;
          let cancel_query =
            let open Graphql_client.Encoders in
            Graphql_queries.Send_payment.make
@@ -859,7 +812,7 @@ let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
     let%bind privkey =
@@ -873,32 +826,14 @@ let dump_keypair =
   Command.async ~summary:"Print out a keypair from a private key file"
     (let open Command.Let_syntax in
     let%map_open privkey_path = Cli_lib.Flag.privkey_read_path in
-    handle_exception_nicely
+    Cli_lib.Exceptions.handle_nicely
     @@ fun () ->
     let open Deferred.Let_syntax in
-    let%map kp =
-      Secrets.Keypair.read_exn ~privkey_path
-        ~password:
-          (lazy (Secrets.Password.read "Password for private key file: "))
-    in
+    let%map kp = Secrets.Keypair.Terminal_stdin.read_exn privkey_path in
     printf "Public key: %s\nPrivate key: %s\n"
       ( kp.public_key |> Public_key.compress
       |> Public_key.Compressed.to_base58_check )
       (kp.private_key |> Private_key.to_base58_check))
-
-let generate_keypair =
-  Command.async ~summary:"Generate a new public-key/private-key pair"
-    (let open Command.Let_syntax in
-    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
-    handle_exception_nicely
-    @@ fun () ->
-    let open Deferred.Let_syntax in
-    let kp = Keypair.create () in
-    let%bind () = Secrets.Keypair.Terminal_stdin.write_exn kp ~privkey_path in
-    printf "Keypair generated\nPublic key: %s\n"
-      ( kp.public_key |> Public_key.compress
-      |> Public_key.Compressed.to_base58_check ) ;
-    exit 0)
 
 let dump_ledger =
   let sl_hash_flag =
@@ -1082,7 +1017,7 @@ let stop_tracing =
 
 let set_staking =
   let privkey_path = Cli_lib.Flag.privkey_read_path in
-  Command.async ~summary:"Set new block proposer keys"
+  Command.async ~summary:"Set new keys for block production"
     (Cli_lib.Background_daemon.rpc_init privkey_path
        ~f:(fun port privkey_path ->
          let%bind ({Keypair.public_key; _} as keypair) =
@@ -1096,7 +1031,7 @@ let set_staking =
              Daemon_rpcs.Client.print_rpc_error e
          | Ok () ->
              printf
-               !"New block proposer public key : %s\n"
+               !"New block producer public key : %s\n"
                (Public_key.Compressed.to_base58_check
                   (Public_key.compress public_key)) ))
 
@@ -1226,7 +1161,9 @@ let import_key =
   let flags = Args.zip2 privkey_path conf_dir in
   Command.async
     ~summary:
-      "Import a password protected private key to be tracked by the daemon."
+      "Import a password protected private key to be tracked by the daemon.\n\
+       Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
+       (key will be imported using the same password)."
     (Cli_lib.Background_daemon.graphql_init flags
        ~f:(fun graphql_endpoint (privkey_path, conf_dir) ->
          let open Deferred.Let_syntax in
@@ -1259,7 +1196,7 @@ let import_key =
                Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
              in
              let%map _response =
-               Graphql_client.query_exn
+               Graphql_client.query
                  (Graphql_queries.Reload_wallets.make ())
                  graphql_endpoint
              in
@@ -1292,7 +1229,7 @@ let list_accounts =
                    \  Locked: %b\n"
                    (i + 1)
                    (Public_key.Compressed.to_base58_check w#public_key)
-                   (Unsigned.UInt64.to_string (w#balance)#total)
+                   (Currency.Balance.to_formatted_string (w#balance)#total)
                    (Option.value ~default:true w#locked) ) ))
 
 let create_account =
@@ -1301,7 +1238,8 @@ let create_account =
     (Cli_lib.Background_daemon.graphql_init (return ())
        ~f:(fun graphql_endpoint () ->
          let%bind password =
-           Secrets.Keypair.prompt_password "Password for new account: "
+           Secrets.Keypair.Terminal_stdin.prompt_password
+             "Password for new account: "
          in
          let%map response =
            Graphql_client.query_exn
@@ -1314,6 +1252,25 @@ let create_account =
              (response#addWallet)#public_key
          in
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ))
+
+let create_hd_account =
+  Command.async ~summary:Secrets.Hardware_wallets.create_hd_account_summary
+    (Cli_lib.Background_daemon.graphql_init Cli_lib.Flag.User_command.hd_index
+       ~f:(fun graphql_endpoint hd_index ->
+         let%map response =
+           Graphql_client.(
+             query_exn
+               (Graphql_queries.Create_hd_account.make
+                  ~hd_index:(Encoders.uint32 hd_index) ()))
+             graphql_endpoint
+         in
+         let pk_string =
+           Public_key.Compressed.to_base58_check
+             (response#createHDAccount)#public_key
+         in
+         printf "\n😄 created HD account with HD-index %s!\nPublic key: %s\n"
+           (Coda_numbers.Hd_index.to_string hd_index)
+           pk_string ))
 
 let unlock_account =
   let open Command.Param in
@@ -1328,7 +1285,8 @@ let unlock_account =
            let open Deferred.Or_error.Let_syntax in
            let%map password =
              Deferred.map ~f:Or_error.return
-               (Secrets.Password.read "Password to unlock account: ")
+               (Secrets.Password.hidden_line_or_env
+                  "Password to unlock account: " ~env:Secrets.Keypair.env)
            in
            password
          in
@@ -1376,30 +1334,31 @@ let lock_account =
 
 let generate_libp2p_keypair =
   Command.async
-    ~summary:
-      "Generate a new libp2p keypair and print it out (this contains the \
-       secret key!)"
-    (Command.Param.return
-       ( handle_exception_nicely
-       @@ fun () ->
-       Deferred.ignore
-         (let open Deferred.Let_syntax in
-         (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
-         let logger = Logger.null () in
-         (* Using the helper only for keypair generation requires no state. *)
-         File_system.with_temp_dir "coda-generate-libp2p-keypair"
-           ~f:(fun tmpd ->
-             match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
-             | Ok net ->
-                 let%bind me = Coda_net2.Keypair.random net in
-                 let%map () = Coda_net2.shutdown net in
-                 printf "libp2p keypair:\n%s\n"
-                   (Coda_net2.Keypair.to_string me)
-             | Error e ->
-                 Logger.fatal logger "failed to generate libp2p keypair: $err"
-                   ~module_:__MODULE__ ~location:__LOC__
-                   ~metadata:[("err", `String (Error.to_string_hum e))] ;
-                 exit 20 )) ))
+    ~summary:"Generate a new libp2p keypair and print out the peer ID"
+    (let open Command.Let_syntax in
+    let%map_open privkey_path = Cli_lib.Flag.privkey_write_path in
+    Cli_lib.Exceptions.handle_nicely
+    @@ fun () ->
+    Deferred.ignore
+      (let open Deferred.Let_syntax in
+      (* FIXME: I'd like to accumulate messages into this logger and only dump them out in failure paths. *)
+      let logger = Logger.null () in
+      (* Using the helper only for keypair generation requires no state. *)
+      File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
+          match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
+          | Ok net ->
+              let%bind me = Coda_net2.Keypair.random net in
+              let%bind () = Coda_net2.shutdown net in
+              let%map () =
+                Secrets.Libp2p_keypair.Terminal_stdin.write_exn ~privkey_path
+                  me
+              in
+              printf "libp2p keypair:\n%s\n" (Coda_net2.Keypair.to_string me)
+          | Error e ->
+              Logger.fatal logger "failed to generate libp2p keypair: $err"
+                ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:[("err", `String (Error.to_string_hum e))] ;
+              exit 20 )))
 
 let trustlist_ip_flag =
   Command.Param.(
@@ -1458,6 +1417,13 @@ let trustlist_list =
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
+let compile_time_constants =
+  Command.basic
+    ~summary:"Print a JSON map of the compile-time consensus parameters"
+    (Command.Param.return (fun () ->
+         Core.printf "%s\n%!"
+           (Yojson.Safe.to_string Consensus.Constants.all_constants) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1512,19 +1478,24 @@ let accounts =
     ; ("lock", lock_account) ]
 
 let client =
-  Command.group ~summary:"Simple client commands" ~preserve_subcommand_order:()
+  Command.group ~summary:"Lightweight client commands"
+    ~preserve_subcommand_order:()
     [ ("get-balance", get_balance_graphql)
     ; ("send-payment", send_payment_graphql)
     ; ("delegate-stake", delegate_stake_graphql)
     ; ("cancel-transaction", cancel_transaction_graphql)
-    ; ("set-staking", set_staking_graphql) ]
+    ; ("set-staking", set_staking_graphql)
+    ; ("set-snark-worker", set_snark_worker)
+    ; ("set-snark-work-fee", set_snark_work_fee)
+    ; ("stop-daemon", stop_daemon)
+    ; ("status", status) ]
 
 let command =
-  Command.group ~summary:"Lightweight client commands"
+  Command.group ~summary:"[Deprecated] Lightweight client commands"
     ~preserve_subcommand_order:()
     [ ("get-balance", get_balance)
     ; ("send-payment", send_payment)
-    ; ("generate-keypair", generate_keypair)
+    ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
     ; ("delegate-stake", delegate_stake)
     ; ("cancel-transaction", cancel_transaction)
     ; ("set-staking", set_staking)
@@ -1565,4 +1536,5 @@ let advanced =
     ; ("unsafe-import", unsafe_import)
     ; ("import", import_key)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
+    ; ("compile-time-constants", compile_time_constants)
     ; ("visualization", Visualization.command_group) ]

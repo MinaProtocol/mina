@@ -75,8 +75,7 @@ module Instance = struct
   let set_root_identifier t new_root_identifier =
     Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
-        [ ( "root_identifier"
-          , Root_identifier.Stable.Latest.to_yojson new_root_identifier ) ]
+        [("root_identifier", Root_identifier.to_yojson new_root_identifier)]
       "Setting persistent root identifier" ;
     let size = Root_identifier.Stable.Latest.bin_size_t new_root_identifier in
     with_file (Locations.root_identifier t.factory.directory) `Write ~size
@@ -98,9 +97,7 @@ module Instance = struct
             in
             Logger.trace t.factory.logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:
-                [ ( "root_identifier"
-                  , Root_identifier.Stable.Latest.to_yojson root_identifier )
-                ]
+                [("root_identifier", Root_identifier.to_yojson root_identifier)]
               "Loaded persistent root identifier" ;
             Some root_identifier )
 

@@ -49,7 +49,8 @@ let generate_base_proof ~ledger =
       ; update= Coda_state.Snark_transition.genesis ~genesis_ledger }
     in
     let main x =
-      Tick.handle (Keys.Step.main x)
+      Tick.handle
+        (Keys.Step.main ~logger:(Logger.create ()) x)
         (Consensus.Data.Prover_state.precomputed_handler ~genesis_ledger)
     in
     let tick =
@@ -66,7 +67,7 @@ let generate_base_proof ~ledger =
   (base_hash, base_proof)
 
 let compiled_accounts_json () : Account_config.t =
-  List.map Test_genesis_ledger.accounts ~f:(fun (sk_opt, acc) ->
+  List.map (Lazy.force Test_genesis_ledger.accounts) ~f:(fun (sk_opt, acc) ->
       { Account_config.pk= acc.public_key
       ; sk= sk_opt
       ; balance= acc.balance
@@ -106,7 +107,7 @@ let get_accounts accounts_json_file n =
         | Ok res ->
             Ok res
         | Error e ->
-            Or_error.errorf "Could not read accounts from file:%s\n%s" file
+            Or_error.errorf "Could not read accounts from file: %s\n%s" file
               (Error.to_string_hum e) )
     | None ->
         Deferred.return (Ok (compiled_accounts_json ()))
