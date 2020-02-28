@@ -11,7 +11,7 @@ module Styles = {
       width(`percent(100.0)),
       maxWidth(`rem(22.0)),
       marginLeft(`rem(5.)),
-      paddingTop(`rem(7.)),
+      paddingTop(`rem(6.)),
     ]);
   };
   let heroRight = {
@@ -29,7 +29,6 @@ module Styles = {
     merge([
       Theme.Text.Body.regularLight,
       style([
-        marginTop(`rem(1.)),
         maxWidth(`rem(23.125)),
         color(white),
         animationFillMode(`forwards),

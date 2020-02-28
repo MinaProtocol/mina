@@ -1,5 +1,3 @@
-let defaultName = "Primary Account";
-
 module AddAccount = [%graphql
   {|
      mutation addWallet($password: String!) {
@@ -14,7 +12,7 @@ module AddAccountMutation = ReasonApollo.CreateMutation(AddAccount);
 
 [@react.component]
 let make = (~nextStep, ~prevStep) => {
-  let (accountName, setName) = React.useState(() => defaultName);
+  let (accountName, setName) = React.useState(() => "");
   let (password, setPassword) = React.useState(() => "");
 
   let (_settings, updateAddressBook) =
@@ -33,13 +31,13 @@ let make = (~nextStep, ~prevStep) => {
       <>
         <FadeIn duration=500 delay=150>
           <Spacer height=0.5 />
-          <TextField
+          <OnboardingTextField
             label="Name"
             onChange={value => setName(_ => value)}
             value=accountName
           />
           <Spacer height=0.5 />
-          <TextField
+          <OnboardingTextField
             label="Password"
             type_="password"
             onChange={value => setPassword(_ => value)}
