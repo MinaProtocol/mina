@@ -1749,7 +1749,7 @@ let%test_module "transaction_snark" =
                   Ledger.create_new_account_exn ledger account.public_key
                     account ) ;
               let t1 =
-                user_command_with_wallet wallets 1 0 8
+                user_command_with_wallet wallets 1 0 8_000_000_000
                   (Fee.of_int (Random.int 20 * 1_000_000_000))
                   Account.Nonce.zero
                   (User_command_memo.create_by_digesting_string_exn
