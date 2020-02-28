@@ -1,14 +1,28 @@
 # Website using NextJS and Contentful
 
+First of all, make sure you have `git lfs` installed. 
+
+On Mac run:
+
+````bash
+brew install git-lfs
+````
+
+After that you have to install `git-lfs` in the website directory and pull it.
+````bash
+git lfs install
+git lfs pull
+````
+
 Install it and run:
 
-```bash
+````bash
 npm install
 npm run dev
 # or
 yarn
 yarn dev
-```
+````
 
 Build and run:
 
