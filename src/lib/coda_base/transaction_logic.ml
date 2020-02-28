@@ -420,6 +420,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     (* We unconditionally deduct the fee if this transaction succeeds *)
     let%bind fee_payer_account, common =
       let%bind account = get' ledger "fee payer" fee_payer_location in
+      let%bind () =
+        if account.token_blocked then
+          Or_error.errorf "The fee-paying account has been blacklisted"
+        else return ()
+      in
+      let%bind () =
+        if account.token_whitelist then
+          Or_error.errorf "Cannot pay fees in a whitelist-restricted token"
+        else return ()
+      in
       let fee = Amount.of_fee (User_command.Payload.fee payload) in
       let%bind balance = sub_amount account.balance fee in
       let%bind () = validate_nonces nonce account.nonce in
@@ -445,6 +455,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       let%bind account =
         if Token_id.equal token fee_token then return fee_payer_account
         else get' ledger "source" source_location
+      in
+      let%bind () =
+        if account.token_blocked then
+          Or_error.errorf "The source account has been blacklisted"
+        else return ()
       in
       let%map timing =
         if User_command.Payload.is_payment payload then
@@ -491,6 +506,25 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                thus the creation fee has been paid.
             *)
             get_or_create ledger receiver
+          in
+          let%bind receiver_account =
+            match action with
+            | `Added ->
+                if
+                  source_account.token_whitelist
+                  && not source_account.token_owner
+                then
+                  Or_error.errorf
+                    "The source account cannot create new accounts for a \
+                     whitelist-restricted token: it is not the token owner."
+                else
+                  return
+                    { receiver_account with
+                      token_owner= false
+                    ; token_whitelist= source_account.token_whitelist
+                    ; token_blocked= false }
+            | `Existed ->
+                return receiver_account
           in
           let previous_empty_accounts =
             previous_empty_accounts action receiver

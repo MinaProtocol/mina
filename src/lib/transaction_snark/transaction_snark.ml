@@ -633,7 +633,7 @@ module Base = struct
                  ~else_:account.token_id
              and token_blocked =
                (* TODO: Block/unblock when the relevant commands are issued. *)
-               return Boolean.false_
+               return account.token_blocked
              in
              { Account.Poly.balance
              ; public_key
@@ -663,6 +663,10 @@ module Base = struct
                - the fee-receiver for a coinbase 
                - the second receiver for a fee transfer
              *)
+             let%bind () =
+               [%with_label "Check that the fee-paying account is unblocked"]
+                 Boolean.(Assert.is_true (not account.token_blocked))
+             in
              let%bind next_nonce =
                Account.Nonce.Checked.succ_if account.nonce is_user_command
              in
@@ -749,6 +753,20 @@ module Base = struct
                - the fee-receiver for a coinbase 
                - the second receiver for a fee transfer
              *)
+             let%bind () =
+               [%with_label "Check that the source account is unblocked"]
+                 Boolean.(Assert.is_true (not account.token_blocked))
+             in
+             let%bind () =
+               [%with_label
+                 "Check that the source is allowed to create the receiver \
+                  account"]
+                 Boolean.(
+                   Assert.any
+                     [ not receiver_was_created
+                     ; account.token_whitelist
+                     ; account.token_owner ])
+             in
              let%bind successful_payment =
                Boolean.(is_payment && not payment_insufficient_funds)
              in

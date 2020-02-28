@@ -182,6 +182,16 @@ let apply_user_command_exn t ({signer; payload; signature= _} : User_command.t)
         let action, receiver_account =
           get_or_initialize_exn receiver t receiver_idx
         in
+        let receiver_account =
+          match action with
+          | `Added ->
+              { receiver_account with
+                token_owner= false
+              ; token_whitelist= source_account.token_whitelist
+              ; token_blocked= false }
+          | `Existed ->
+              receiver_account
+        in
         let source_balance' =
           Currency.Balance.sub_amount source_account.balance amount
         in
