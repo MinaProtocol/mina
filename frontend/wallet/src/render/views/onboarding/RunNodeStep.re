@@ -56,6 +56,7 @@ let make = (~prevStep, ~createAccount) => {
     miscRight={
       <div className=Styles.elapsedTime>
         <LoaderRing />
+        <Spacer height=1.25 />
         <p className=Styles.smallText>
           {React.string("Connecting to the network...")}
         </p>

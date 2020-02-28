@@ -1,12 +1,7 @@
 module Styles = {
   open Css;
   let downloader =
-    style([
-      marginLeft(`rem(2.)),
-      display(`flex),
-      flexDirection(`column),
-      alignItems(`center),
-    ]);
+    style([display(`flex), flexDirection(`column), alignItems(`center)]);
   let downloaderText =
     merge([
       Theme.Text.Header.h3,

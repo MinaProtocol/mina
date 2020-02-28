@@ -9,7 +9,7 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`flexStart),
       width(`percent(100.0)),
-      maxWidth(`rem(32.0)),
+      maxWidth(`rem(22.0)),
       marginLeft(`rem(5.)),
       paddingTop(`rem(7.)),
     ]);
@@ -81,7 +81,11 @@ let make = (~heading, ~description, ~miscLeft, ~miscRight=?) => {
         <div className=Styles.heroBody> miscLeft </div>
       </div>
       {switch (miscRight) {
-       | Some(items) => <div className=Styles.heroRight> items </div>
+       | Some(items) =>
+         <>
+           <Spacer width=10.0 />
+           <div className=Styles.heroRight> items </div>
+         </>
        | None => React.null
        }}
     </div>

@@ -1,13 +1,13 @@
 [@bs.scope "window"] [@bs.val] external openExternal: string => unit = "";
 
 [@react.component]
-let make = (~prevStep, ~nextStep) => {
+let make = (~prevStep, ~closeOnboarding) => {
   <OnboardingTemplate
     heading="Stake Coda to Earn Rewards"
     description={
       <p>
         {React.string(
-           "Enable automatic staking on your account once you receive your first Coda tokens.",
+           "Once you receive funds from the faucet, head into Settings to delegate or stake your new funds.",
          )}
       </p>
     }
@@ -21,18 +21,18 @@ let make = (~prevStep, ~nextStep) => {
             onClick={_ => prevStep()}
           />
           <Spacer width=1.5 />
+          // <Button
+          //   width=17.
+          //   style=Button.HyperlinkBlue2
+          //   label="Continue without Auto-Staking"
+          //   onClick={_ => nextStep()}
+          // />
+          // <Spacer width=1.5 />
           <Button
-            width=17.
-            style=Button.HyperlinkBlue2
-            label="Continue without Auto-Staking"
-            onClick={_ => nextStep()}
-          />
-          <Spacer width=1.5 />
-          <Button
-            width=13.
-            label="Enable Auto-Staking"
+            width=15.
+            label="Take me to Coda Wallet"
             style=Button.HyperlinkBlue3
-            onClick={_ => nextStep()}
+            onClick={_ => closeOnboarding()}
           />
         </div>
       </>

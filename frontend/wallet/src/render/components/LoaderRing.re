@@ -1,5 +1,6 @@
 module Styles = {
   open Css;
+  let ring = style([alignSelf(`center)]);
   let rotate =
     keyframes([
       (0, [transform(rotate(`deg(0)))]),
@@ -18,24 +19,26 @@ module Styles = {
 };
 [@react.component]
 let make = () => {
-  <svg width="120" height="120">
-    <circle
-      stroke="#D8D8D8"
-      strokeWidth="7"
-      fill="transparent"
-      r="52"
-      cx="60"
-      cy="60"
-    />
-    <circle
-      stroke="#3CFF64"
-      strokeWidth="7"
-      fill="transparent"
-      strokeDasharray="200"
-      className=Styles.innerRing
-      r="52"
-      cx="60"
-      cy="60"
-    />
-  </svg>;
+  <div className=Styles.ring>
+    <svg width="120" height="120">
+      <circle
+        stroke="#D8D8D8"
+        strokeWidth="7"
+        fill="transparent"
+        r="52"
+        cx="60"
+        cy="60"
+      />
+      <circle
+        stroke="#3CFF64"
+        strokeWidth="7"
+        fill="transparent"
+        strokeDasharray="200"
+        className=Styles.innerRing
+        r="52"
+        cx="60"
+        cy="60"
+      />
+    </svg>
+  </div>;
 };

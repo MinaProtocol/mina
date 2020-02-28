@@ -24,7 +24,7 @@ let make = () => {
   let step =
     switch (onboardingStep) {
     | Welcome =>
-      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => InstallCoda)} />
     | SetUpNode =>
       <SetupNodeStep
         customSetup={_ => setOnboardingStep(_ => CustomSetupA)}
@@ -48,7 +48,7 @@ let make = () => {
       />
     | InstallCoda =>
       <InstallCodaStep
-        prevStep={_ => setOnboardingStep(_ => SetUpNode)}
+        prevStep={_ => setOnboardingStep(_ => Welcome)}
         nextStep={_ => setOnboardingStep(_ => RunNode)}
       />
     | PortForward =>
@@ -74,7 +74,7 @@ let make = () => {
     | StakeCoda =>
       <StakeCodaStep
         prevStep={_ => setOnboardingStep(_ => AccountCreation)}
-        nextStep={_ => setOnboardingStep(_ => LastStep)}
+        closeOnboarding
       />
     | LastStep =>
       <CompletionStep
