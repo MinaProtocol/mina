@@ -118,7 +118,10 @@ let gen_division_generic (type t) (module M : Int_s with type t = t) (n : t)
     (* Going through floating point land may have caused some rounding error. We
      tack it onto the first result so that the sum of the output is equal to n.
   *)
-    let rounding_error = M.(n - total) in
+    let rounding_error =
+      (* guard against underflow *)
+      if n > total then M.(n - total) else M.zero
+    in
     return
       ( match res with
       | [] ->
