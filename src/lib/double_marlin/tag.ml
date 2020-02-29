@@ -1,4 +1,4 @@
 open Core_kernel
 
-type ('prev_var, 'prev_value) t = 
-  ('prev_var * 'prev_value) Type_equal.Id.t
+type ('var, 'value, 'n1, 'n2) t = 
+  ('var * 'value * 'n1 * 'n2) Type_equal.Id.t 

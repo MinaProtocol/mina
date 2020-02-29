@@ -383,8 +383,8 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     in
     let marlin_checks =
       Marlin_checks.check ~x_hat_beta_1 ~input_domain:Input_domain.self
-        ~domain_h:(Marlin_checks.domain domain_h)
-        ~domain_k:(Marlin_checks.domain domain_k)
+        ~domain_h
+        ~domain_k
         marlin evals
     in
     as_prover
@@ -565,6 +565,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
            {unfinalized_proofs; me_only= me_only_digest}
        ; pass_through } :
         _ Statement.t) =
+    let domain_h, domain_k = Marlin_checks.(domain domain_h, domain domain_k) in
     let prev_states =
       exists
         (vec

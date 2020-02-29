@@ -270,6 +270,17 @@ module Accumulator = struct
               | `Both (x, y) -> Some (f x y)
               | _ -> failwith "map2: Key not present in both maps")
             t1.unshifted_accumulators t2.unshifted_accumulators }
+
+    let accumulate t add ~into =
+      { shifted_accumulator=
+          add into.shifted_accumulator t.shifted_accumulator
+      ; unshifted_accumulators=
+          Int.Map.merge into.unshifted_accumulators t.unshifted_accumulators ~f:(fun ~key:_ ->
+              function
+              | `Both (x, y) -> Some (add x y)
+              | `Left x -> Some x
+              | `Right y -> failwith "shift not present in accumulating map" )
+      }
   end
 
   module Opening_check = struct
@@ -341,6 +352,13 @@ module Accumulator = struct
     ; degree_bound_checks=
         Degree_bound_checks.map2 ~f t1.degree_bound_checks
           t2.degree_bound_checks }
+
+  let accumulate t add ~into =
+    { opening_check= Opening_check.map2 ~f:add t.opening_check into.opening_check
+    ; degree_bound_checks=
+        Degree_bound_checks.accumulate
+          t.degree_bound_checks add ~into:into.degree_bound_checks
+    }
 end
 
 module Opening = struct

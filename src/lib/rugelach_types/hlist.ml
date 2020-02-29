@@ -8,12 +8,15 @@ module type T2 = sig type (_, _) t end
 
 module type T3 = sig type (_, _, _) t end
 
+module type T4 = sig type (_, _, _, _) t end
+
 module E13 (T : T1) = struct type ('a, _, _) t = 'a T.t end
 module E23 (T : T2) = struct type ('a, 'b, _) t = ('a, 'b) T.t end
 
 module E01(T : T0) = struct type _ t = T.t end
 module E02(T : T0) = struct type (_, _) t = T.t end
 module E03(T : T0) = struct type (_, _, _) t = T.t end
+module E04(T : T0) = struct type (_, _, _, _) t = T.t end
 
 module Tuple2(F: T3)(G: T3) = struct
   type ('a, 'b, 'c) t = ('a, 'b, 'c) F.t * ('a, 'b, 'c) G.t
@@ -51,6 +54,32 @@ module Length = Hlist0.Length
 
 module H1 = struct
   module T = Hlist0.H1
+
+  module Iter(F : T1)
+      (C : sig val f: 'a F.t -> unit end) = struct
+
+    let rec f
+      : type a.
+        a T(F).t
+        -> unit
+      =
+      function
+      | [] -> ()
+      | x :: xs -> C.f x ; f xs
+  end
+
+  module Of_vector(X : T0) = struct
+    let rec f : type xs length.
+        (xs, length) Length.t
+      -> (X.t, length) Vector.t
+      -> xs T(E01(X)).t
+      =
+      fun l1 v ->
+        match l1, v with
+        | Z, [] -> []
+        | S n1, x :: xs ->
+          x :: f n1 xs
+  end
 
   module Map(F : T1)(G : T1)
       (C : sig val f: ('a) F.t -> ('a) G.t end) = struct
@@ -200,7 +229,56 @@ module H1 = struct
   end
 end
 
-module Hlist2 = Hlist0.H2
+module H2 = struct
+  module Fst = struct
+    type ('a, _) t = 'a
+  end
+
+  module Tuple2(F: T2)(G: T2) = struct
+    type ('a, 'b) t = ('a, 'b) F.t * ('a, 'b) G.t
+  end
+
+  module T(F : T2) = struct
+    type ( _, _) t =
+      | [] : (unit, unit) t
+      | ( :: ) :
+          ('a1, 'a2) F.t * ('b1, 'b2) t
+          -> ('a1 * 'b1, 'a2 * 'b2) t
+
+    let rec length
+      : type tail1 tail2. (tail1, tail2) t -> tail1 Length.n =
+      function
+      | [] -> T (Z, Z)
+      | _ :: xs ->
+        let T (n, p) = length xs in
+        T (S n, S p)
+  end
+
+  module Zip(F : T2)(G : T2) = struct
+    let rec f
+      : type a b c.
+        (a, b) T(F).t
+        -> (a, b) T(G).t
+        -> (a, b) T(Tuple2(F)(G)).t
+      =
+      fun xs ys ->
+        match xs, ys with
+        | [], [] -> []
+        | x :: xs , y::ys -> (x, y) :: f xs ys
+  end
+
+  module Map(F : T2)(G : T2)
+      (C : sig val f: ('a, 'b) F.t -> ('a, 'b) G.t end) = struct
+
+    let rec f : type a b.
+        (a, b) T(F).t
+        -> (a, b) T(G).t
+      =
+      function
+      | [] -> []
+      | x :: xs -> C.f x :: f xs
+  end
+end
 
 module Hlist_1 (F : sig
   type (_, _) t
@@ -211,6 +289,72 @@ struct
     | ( :: ) :
         ('a1, 's) F.t * ('b1, 's) t
         -> ('a1 * 'b1, 's) t
+end
+
+module H3_2 = struct
+  module T (F : sig
+    type (_, _, _, _, _) t
+  end) =
+  struct
+    type (_, _, _, 's1, 's2) t =
+      | [] : (unit, unit, unit, _, _) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 's1, 's2) F.t * ('b1, 'b2, 'b3, 's1, 's2) t
+          -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3, 's1, 's2) t
+
+    let rec length
+      : type t1 t2 t3 e1 e2. (t1, t2, t3, e1, e2) t -> t1 Length.n
+      =
+      function
+      | [] -> T (Z, Z)
+      | _ :: xs ->
+        let T (n, p) = length xs in
+        T (S n, S p)
+  end
+end
+
+module H3_3 = struct
+  module T (F : sig
+    type (_, _, _, _, _, _) t
+  end) =
+  struct
+    type (_, _, _, 's1, 's2, 's3) t =
+      | [] : (unit, unit, unit, _, _, _) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 's1, 's2, 's3) F.t * ('b1, 'b2, 'b3, 's1, 's2, 's3) t
+          -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3, 's1, 's2, 's3) t
+
+    let rec length
+      : type t1 t2 t3 e1 e2 e3. (t1, t2, t3, e1, e2, e3) t -> t1 Length.n
+      =
+      function
+      | [] -> T (Z, Z)
+      | _ :: xs ->
+        let T (n, p) = length xs in
+        T (S n, S p)
+  end
+end
+
+module H3_4 = struct
+  module T (F : sig
+    type (_, _, _, _, _, _, _) t
+  end) =
+  struct
+    type (_, _, _, 's1, 's2, 's3, 's4) t =
+      | [] : (unit, unit, unit, _, _, _, _) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 's1, 's2, 's3, 's4) F.t * ('b1, 'b2, 'b3, 's1, 's2, 's3, 's4) t
+          -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3, 's1, 's2, 's3, 's4) t
+
+    let rec length
+      : type t1 t2 t3 e1 e2 e3 e4. (t1, t2, t3, e1, e2, e3, e4) t -> t1 Length.n
+      =
+      function
+      | [] -> T (Z, Z)
+      | _ :: xs ->
+        let T (n, p) = length xs in
+        T (S n, S p)
+  end
 end
 
 module H2_1 = struct
@@ -375,6 +519,197 @@ module H2_1 = struct
         | Z, [] -> []
         | S n1, x :: xs ->
           x :: f n1 xs
+  end
+end
+
+module H3 = struct
+  module T (F : sig
+    type (_, _, _) t
+  end) =
+  struct
+    type (_, _, _) t =
+      | [] : (unit, unit, unit) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3) F.t * ('b1, 'b2, 'b3) t
+          -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3) t
+
+    let rec length
+      : type tail1 tail2 tail3 e. (tail1, tail2, tail3) t -> tail1 Length.n =
+      function
+      | [] -> T (Z, Z)
+      | _ :: xs ->
+        let T (n, p) = length xs in
+        T (S n, S p)
+  end
+
+  module To_vector(X : T0) = struct
+    let rec f : type a b c length.
+        (a, length) Length.t
+      -> (a, b, c) T(E03(X)).t
+      -> (X.t, length) Vector.t
+      =
+      fun l1 v ->
+        match l1, v with
+        | Z, [] -> []
+        | S n1, x :: xs ->
+          x :: f n1 xs
+  end
+
+  module Zip(F : T3)(G : T3) = struct
+    let rec f
+      : type a b c.
+        (a, b, c) T(F).t
+        -> (a, b, c) T(G).t
+        -> (a, b, c) T(Tuple2(F)(G)).t
+      =
+      fun xs ys ->
+        match xs, ys with
+        | [], [] -> []
+        | x :: xs , y::ys -> (x, y) :: f xs ys
+  end
+
+  module Fst = struct
+    type ('a, _, _) t = 'a
+  end
+
+  module Map1_to_H1
+      (F : T3)(G : T1)
+      (C : sig val f: ('a, 'b, 'c) F.t -> 'a G.t end) = struct
+
+    let rec f : type a b c.
+        (a, b, c) T(F).t
+        -> a H1.T(G).t
+      =
+      function
+      | [] -> []
+      | x :: xs -> C.f x :: f xs
+  end
+
+  module Map2_to_H1
+      (F : T3)(G : T1)
+      (C : sig val f: ('a, 'b, 'c) F.t -> 'b G.t end) = struct
+
+    let rec f : type a b c.
+        (a, b, c) T(F).t
+        -> b H1.T(G).t
+      =
+      function
+      | [] -> []
+      | x :: xs -> C.f x :: f xs
+  end
+
+  module Map(F : T3)(G : T3)
+      (C : sig val f: ('a, 'b, 'c) F.t -> ('a, 'b, 'c) G.t end) = struct
+
+    let rec f : type a b c.
+        (a, b, c) T(F).t
+        -> (a, b, c) T(G).t
+      =
+      function
+      | [] -> []
+      | x :: xs -> C.f x :: f xs
+  end
+end
+
+module H4 = struct
+  module T (F : sig
+    type (_, _, _, _) t
+  end) =
+  struct
+    type (_, _, _, _) t =
+      | [] : (unit, unit, unit, unit) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 'a4) F.t * ('b1, 'b2, 'b3, 'b4) t
+          -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3, 'a4 * 'b4) t
+
+    let rec length
+      : type tail1 tail2 tail3 tail4. (tail1, tail2, tail3, tail4) t -> tail1 Length.n =
+      function
+      | [] -> T (Z, Z)
+      | _ :: xs ->
+        let T (n, p) = length xs in
+        T (S n, S p)
+  end
+
+  module Fold(F : T4)(X : T0)
+      (C : sig val f: X.t -> _ F.t -> X.t end) = struct
+
+    let rec f
+      : type a b c d.
+        init:X.t
+        -> (a, b, c, d) T(F).t
+        -> X.t
+      =
+      fun ~init xs->
+        match xs with
+      | [] -> init
+      | x :: xs ->
+        f ~init:(C.f init x) xs
+  end
+
+  module Map(F : T4)(G : T4)
+      (C : sig val f: ('a, 'b, 'c, 'd) F.t -> ('a, 'b, 'c, 'd) G.t end) = struct
+
+    let rec f : type a b c d.
+        (a, b, c, d) T(F).t
+        -> (a, b, c, d) T(G).t
+      =
+      function
+      | [] -> []
+      | x :: xs -> C.f x :: f xs
+  end
+
+  module To_vector(X : T0) = struct
+    let rec f : type a b c d length.
+        (a, length) Length.t
+      -> (a, b, c, d) T(E04(X)).t
+      -> (X.t, length) Vector.t
+      =
+      fun l1 v ->
+        match l1, v with
+        | Z, [] -> []
+        | S n1, x :: xs ->
+          x :: f n1 xs
+  end
+
+  module Tuple2(F: T4)(G: T4) = struct
+    type ('a, 'b, 'c, 'd) t = ('a, 'b, 'c, 'd) F.t * ('a, 'b, 'c, 'd) G.t
+  end
+
+  module Zip(F : T4)(G : T4) = struct
+    let rec f
+      : type a b c d.
+        (a, b, c, d) T(F).t
+        -> (a, b, c, d) T(G).t
+        -> (a, b, c, d) T(Tuple2(F)(G)).t
+      =
+      fun xs ys ->
+        match xs, ys with
+        | [], [] -> []
+        | x :: xs , y::ys -> (x, y) :: f xs ys
+  end
+
+end
+
+module H4_2 = struct
+  module T (F : sig
+    type (_, _, _, _, _, _) t
+  end) =
+  struct
+    type (_, _, _, _, 's1, 's2) t =
+      | [] : (unit, unit, unit, unit, _, _) t
+      | ( :: ) :
+          ('a1, 'a2, 'a3, 'a4, 's1, 's2) F.t * ('b1, 'b2, 'b3, 'b4, 's1, 's2) t
+          -> ('a1 * 'b1, 'a2 * 'b2, 'a3 * 'b3, 'a4 * 'b4, 's1, 's2) t
+
+    let rec length
+      : type t1 t2 t3 t4 e1 e2. (t1, t2, t3, t4, e1, e2) t -> t1 Length.n
+      =
+      function
+      | [] -> T (Z, Z)
+      | _ :: xs ->
+        let T (n, p) = length xs in
+        T (S n, S p)
   end
 end
 

@@ -36,8 +36,8 @@ let rec map2 : type a b c n.
       f x y :: map2 xs ys ~f
 
 let rec hhead_off : type xs y n.
-       (xs, n s) Hlist0.H2(T).t
-    -> xs Hlist0.HlistId.t * (xs, n) Hlist0.H2(T).t =
+       (xs, n s) Hlist0.H1_1(T).t
+    -> xs Hlist0.HlistId.t * (xs, n) Hlist0.H1_1(T).t =
  fun xss ->
   match xss with
   | [] ->
@@ -47,7 +47,7 @@ let rec hhead_off : type xs y n.
       (x :: hds, xs :: tls)
 
 let rec mapn : type xs y n.
-    (xs, n) Hlist0.H2(T).t -> f:(xs Hlist0.HlistId.t -> y) -> (y, n) t =
+    (xs, n) Hlist0.H1_1(T).t -> f:(xs Hlist0.HlistId.t -> y) -> (y, n) t =
  fun xss ~f ->
   match xss with
   | [] :: xss ->

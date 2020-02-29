@@ -35,13 +35,21 @@ struct
       T (S n, S p)
 end
 
-module H2 (F : sig
+module H1_1 (F : sig
   type (_, _) t
 end) =
 struct
   type (_, 's) t =
     | [] : (unit, _) t
     | ( :: ) : ('a, 's) F.t * ('b, 's) t -> ('a * 'b, 's) t
+
+  let rec length
+    : type tail1 tail2 . (tail1, tail2 ) t -> tail1 Length.n =
+    function
+    | [] -> T (Z, Z)
+    | _ :: xs ->
+      let T (n, p) = length xs in
+      T (S n, S p)
 end
 
 module Id = struct

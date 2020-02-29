@@ -210,35 +210,7 @@ module Make (Inputs : Inputs) = struct
     let open G1 in
     accumulate_opening_check ~add:( + ) ~negate ~scale ~generator:Generators.g
 
-  module One_hot_vector = struct
-    module Constant = struct
-      type t = int
-    end
-
-    type 'n t = (Boolean.var, 'n) Vector.t
-
-    let typ (n : 'n Nat.t) : ('n t, Constant.t) Typ.t =
-      let typ = Vector.typ Boolean.typ n in
-      let typ =
-        { typ with
-          check = (fun x ->
-              Snarky.Checked.bind (typ.check x) ~f:(fun () ->
-                  make_checked (fun () ->
-                      Boolean.Assert.exactly_one
-                        (Vector.to_list x)))
-            )
-        }
-      in
-      Typ.transport typ
-        ~there:(fun i ->
-            Vector.init n ~f:((=) i))
-        ~back:(fun v -> 
-            let (i, _) =
-              List.findi (Vector.to_list v) ~f:(fun _ b ->
-                  b) |> Option.value_exn
-            in
-            i)
-  end
+  module One_hot_vector = One_hot_vector.Make(Impl)
 
   type 'a index = 'a Abc.t Matrix_evals.t
 

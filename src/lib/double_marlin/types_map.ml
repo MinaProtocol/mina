@@ -2,65 +2,92 @@ open Core_kernel
 open Rugelach_types
 open Snarky_bn382_backend
 
+(* TODO: max_branching is a terrible name. It should be max_width. *)
+
 module Data = struct
   type f = Impls.Dlog_based.field
 
-  type ('a_var, 'a_value) basic =
+  type ('a_var, 'a_value, 'max_branching, 'branches) basic =
     { typ: ('a_var, 'a_value) Impls.Pairing_based.Typ.t
     ; a_var_to_field_elements : 'a_var -> Impls.Pairing_based.Field.t array
+    ; a_value_to_field_elements : 'a_value -> Fp.t array
     ; wrap_domains : Domain.t * Domain.t 
-    ; step_domains : Domain.t * Domain.t
+    ; step_domains : (Domain.t * Domain.t, 'branches) Vector.t
     }
 
-  type ('a_var, 'a_value) t =
-    { verification_keys :  G1.Affine.t Abc.t Matrix_evals.t list
-    ; typ: ('a_var, 'a_value) Impls.Pairing_based.Typ.t
-    ; a_value_to_field_elements : 'a_value -> Fp.t array
-    ; a_var_to_field_elements : 'a_var -> Impls.Pairing_based.Field.t array
-    ; wrap_key : G.Affine.t Abc.t Matrix_evals.t
-    ; wrap_domains : Domain.t * Domain.t
-    ; step_domains : Domain.t * Domain.t
-    ; max_branching : (module Nat.Add.Intf)
-    }
+  type ('a_var, 'a_value, 'max_branching, 'branches) t =
+        { branches: 'branches Nat.t
+        ; max_branching : (module Nat.Add.Intf with type n = 'max_branching )
+        ; verification_keys :  G1.Affine.t Abc.t Matrix_evals.t list
+        ; typ: ('a_var, 'a_value) Impls.Pairing_based.Typ.t
+        ; a_value_to_field_elements : 'a_value -> Fp.t array
+        ; a_var_to_field_elements : 'a_var -> Impls.Pairing_based.Field.t array
+        ; wrap_key : G.Affine.t Abc.t Matrix_evals.t
+        ; wrap_vk : Impls.Dlog_based.Verification_key.t
+        ; wrap_domains : Domain.t * Domain.t
+        ; step_domains : (Domain.t * Domain.t, 'branches) Vector.t
+        ; shifts : Int.Set.t
+        }
+
+  module For_step = struct
+    type ('a_var, 'a_value, 'max_branching, 'branches) t =
+        { branches: 'branches Nat.t
+        ; max_branching : (module Nat.Add.Intf with type n = 'max_branching )
+        ; typ: ('a_var, 'a_value) Impls.Pairing_based.Typ.t
+        ; a_value_to_field_elements : 'a_value -> Fp.t array
+        ; a_var_to_field_elements : 'a_var -> Impls.Pairing_based.Field.t array
+        ; wrap_key : Pairing_main_inputs.G.t Abc.t Matrix_evals.t
+        ; wrap_domains : Domain.t * Domain.t
+        ; step_domains : (Domain.t * Domain.t, 'branches) Vector.t
+        }
+
+    let create
+        { branches                  
+        ; max_branching             
+        ; verification_keys         
+        ; typ                       
+        ; a_value_to_field_elements 
+        ; a_var_to_field_elements   
+        ; wrap_key                  
+        ; wrap_domains              
+        ; step_domains              
+        }
+        =
+        { branches                  
+        ; max_branching             
+        ; typ                       
+        ; a_value_to_field_elements 
+        ; a_var_to_field_elements   
+        ; wrap_key= Matrix_evals.map wrap_key                  
+            ~f:(Abc.map ~f:Pairing_main_inputs.G.constant )
+        ; wrap_domains              
+        ; step_domains              
+        }
+  end
 end
 
 module Packed  =struct
   type t =
-      T : ('var * 'value) Type_equal.Id.t 
-          * ('var, 'value) Data.t
+      T : (*('var * 'value * 'n1 * 'n2) Type_equal.Id.t  *)
+           ('var, 'value, 'n1, 'n2) Tag.t
+          * ('var, 'value, 'n1, 'n2) Data.t
         -> t
 end
 
 type t = Packed.t Type_equal.Id.Uid.Table.t
 
-let lookup : type a b. t -> (a, b) Tag.t -> (a, b) Data.t =
-  fun univ t ->
+let univ : t = Type_equal.Id.Uid.Table.create ()
+
+let lookup : type a b n m. (a, b, n, m) Tag.t -> (a, b, n,m) Data.t =
+  fun t ->
   let T (other_id, d) = Hashtbl.find_exn univ (Type_equal.Id.uid t) in
   let T = Type_equal.Id.same_witness_exn t other_id in
   d
 
-let max_branching : t ->  (_, _) Tag.t -> (module Nat.Add.Intf) =
-  fun t tag -> (lookup t tag).max_branching
+let max_branching : type n1. (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with type n = n1) =
+  fun tag -> 
+  (lookup tag).max_branching
 
-let value_to_field_elements : type a. t -> (_, a) Tag.t -> a -> Fp.t array =
-  fun t tag -> (lookup t tag).a_value_to_field_elements
-
-                      (* TODO
-    ; spec :
-('a_value, 'a_var,
-< bool1 : bool; bool2 : f Snarky.Cvar.t Snarky.Snark_intf.Boolean0.t;
-  bulletproof_challenge1 : ((int64,
-                            Rugelach_types.Nat.N2.n Core_kernel.sexp_opaque)
-                            Rugelach_types.Vector.t, bool)
-                          Bulletproof_challenge.t;
-  bulletproof_challenge2 : (f Snarky.Cvar.t Snarky.Snark_intf.Boolean0.t
-                            list,
-                            f Snarky.Cvar.t Snarky.Snark_intf.Boolean0.t)
-                          Bulletproof_challenge.t;
-  challenge1 : (int64, Rugelach_types.Nat.N2.n Core_kernel.sexp_opaque)
-              Rugelach_types.Vector.t;
-  challenge2 : f Snarky.Cvar.t Snarky.Snark_intf.Boolean0.t list;
-  digest1 : (int64, Rugelach_types.Nat.N4.n Core_kernel.sexp_opaque)
-            Rugelach_types.Vector.t;
-  digest2 : f Snarky.Cvar.t Snarky.Snark_intf.Boolean0.t list; field1 : f;
-  field2 : f Snarky.Cvar.t >) Spec.t *)
+let value_to_field_elements : type a. (_, a, _, _) Tag.t -> a -> Fp.t array =
+  fun tag ->
+  (lookup tag).a_value_to_field_elements
