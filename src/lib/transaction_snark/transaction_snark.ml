@@ -1824,8 +1824,8 @@ let%test_module "transaction_snark" =
           let sender = List.hd_exn wallets in
           let receivers = List.tl_exn wallets in
           let txns_per_receiver = 2 in
-          let amount = 8 in
-          let txn_fee = 2 in
+          let amount = 8_000_000_000 in
+          let txn_fee = 2_000_000_000 in
           let memo =
             User_command_memo.create_by_digesting_string_exn
               (Test_util.arbitrary_string
@@ -1866,7 +1866,7 @@ let%test_module "transaction_snark" =
       Test_util.with_randomness 123456789 (fun () ->
           let receivers = random_wallets ~n:3 () |> Array.to_list in
           let txns_per_receiver = 3 in
-          let fee = 8 in
+          let fee = 8_000_000_000 in
           Ledger.with_ledger ~f:(fun ledger ->
               let fts =
                 let receivers =
@@ -1900,7 +1900,7 @@ let%test_module "transaction_snark" =
           let receiver = wallets.(0) in
           let other = wallets.(1) in
           let dummy_account = wallets.(2) in
-          let reward = 10 in
+          let reward = 10_000_000_000 in
           let fee = Fee.to_int Coda_compile_config.account_creation_fee in
           let coinbase_count = 3 in
           let ft_count = 2 in
@@ -2126,8 +2126,8 @@ let%test_module "account timing check" =
       let pk = Public_key.Compressed.empty in
       let balance = Balance.of_int 100_000_000_000_000 in
       let initial_minimum_balance = Balance.of_int 10_000_000_000_000 in
-      let cliff_time = Global_slot.of_int 1_000_000_000_000 in
-      let vesting_period = Global_slot.of_int 10_000_000_000 in
+      let cliff_time = Global_slot.of_int 1_000 in
+      let vesting_period = Global_slot.of_int 10 in
       let vesting_increment = Amount.of_int 100_000_000_000 in
       let account =
         Or_error.ok_exn
@@ -2135,13 +2135,11 @@ let%test_module "account timing check" =
              ~vesting_period ~vesting_increment
       in
       let txn_amount = Currency.Amount.of_int 100_000_000_000 in
-      let txn_global_slot =
-        Coda_numbers.Global_slot.of_int 2_000_000_000_000
-      in
+      let txn_global_slot = Global_slot.of_int 2_000 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
-      (* we're 1000 slots past the cliff, which is 100 vesting periods
-          subtract 100 * 100 = 10,000 from init min balance of 10,000 to get zero
-          so we should be untimed now
+      (* we're 2_000 - 1_000 = 1_000 slots past the cliff, which is 100 vesting periods
+          subtract 100 * 100_000_000_000 = 10_000_000_000_000 from init min balance 
+          of 10_000_000_000 to get zero, so we should be untimed now
         *)
       match timing with
       | Ok (Untimed as unchecked_timing) ->
@@ -2186,7 +2184,7 @@ let%test_module "account timing check" =
              ~vesting_period ~vesting_increment
       in
       let txn_amount = Currency.Amount.of_int 100_001_000_000_000 in
-      let txn_global_slot = Coda_numbers.Global_slot.of_int 2000_000_000_000 in
+      let txn_global_slot = Global_slot.of_int 2000_000_000_000 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
       | Error _ ->
@@ -2198,8 +2196,8 @@ let%test_module "account timing check" =
       let pk = Public_key.Compressed.empty in
       let balance = Balance.of_int 100_000_000_000_000 in
       let initial_minimum_balance = Balance.of_int 10_000_000_000_000 in
-      let cliff_time = Global_slot.of_int 1000_000_000_000 in
-      let vesting_period = Global_slot.of_int 10_000_000_000 in
+      let cliff_time = Global_slot.of_int 1000 in
+      let vesting_period = Global_slot.of_int 10 in
       let vesting_increment = Amount.of_int 100_000_000_000 in
       let account =
         Or_error.ok_exn
@@ -2208,7 +2206,7 @@ let%test_module "account timing check" =
       in
       (* fully vested, curr min balance = 0, so we can spend the whole balance *)
       let txn_amount = Currency.Amount.of_int 100_000_000_000_000 in
-      let txn_global_slot = Coda_numbers.Global_slot.of_int 3000_000_000_000 in
+      let txn_global_slot = Global_slot.of_int 3000 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       match timing with
       | Ok (Untimed as unchecked_timing) ->
