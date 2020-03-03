@@ -21,30 +21,27 @@ module Styles = {
 };
 [@react.component]
 let make = () => {
-  let initialTime = Js.Math.floor(Js.Date.now());
+  let (initialTime, _) = React.useState(() => Js.Date.now());
+  let (currentTime, setCurrentTime) = React.useState(() => Js.Date.now());
 
-  let (timeSinceInitial, setTimeSinceInitial) =
-    React.useState(() => Js.Math.floor(Js.Date.now()) - initialTime);
-  let (minutesSinceInitial, setMinutes) =
-    React.useState(() => timeSinceInitial / 60);
-  let (secondsPart, setSeconds) =
-    React.useState(() => timeSinceInitial mod 60);
   React.useEffect0(() => {
     let timerId =
       Js.Global.setInterval(
         () => {
-          Js.log(initialTime);
-          setTimeSinceInitial(_ =>
-            Js.Math.floor(Js.Date.now()) - initialTime
-          );
-          setMinutes(_ => timeSinceInitial / 60);
-          setSeconds(_ => timeSinceInitial mod 60);
+          setCurrentTime(_ => {
+            Js.log(Js.Date.now());
+            Js.Date.now();
+          });
           ();
         },
         1000,
       );
     Some(() => Js.Global.clearInterval(timerId));
   });
+
+  let timeElapsed = Js.Math.floor((currentTime -. initialTime) /. 1000.);
+  let minutesSince = timeElapsed / 60;
+  let secondsSince = timeElapsed mod 60;
 
   <div className=Styles.ring>
     <svg width="120" height="120">
@@ -69,11 +66,9 @@ let make = () => {
       <text x="20" y="55" fill="white" className=Theme.Text.Header.h4>
         {React.string("Elapsed Time")}
       </text>
-      <text x="40" y="80" fill="white" className=Styles.timerText>
+      <text x="25" y="80" fill="white" className=Styles.timerText>
         {React.string(
-           Js.Int.toString(minutesSinceInitial)
-           ++ ":"
-           ++ Js.Int.toString(secondsPart),
+           Printf.sprintf("%02d:%02d", minutesSince, secondsSince),
          )}
       </text>
     </svg>
