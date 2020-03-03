@@ -226,7 +226,7 @@ module Gen = struct
            Quickcheck.Generator.filter ~f:(fun (_, splits) ->
                Array.for_all splits ~f:(fun split ->
                    List.for_all split ~f:(fun amt ->
-                       Currency.Amount.(amt >= of_string "2000000000") ) ) )
+                       Currency.Amount.(amt >= of_int 2_000_000_000) ) ) )
       in
       let account_nonces = Array.map ~f:Tuple3.get3 account_info in
       let uncons_exn = function
@@ -241,6 +241,9 @@ module Gen = struct
           let nonce = account_nonces.(sender) in
           account_nonces.(sender) <- Account_nonce.succ nonce ;
           let%bind fee =
+            (* use of_string here because json_of_ocaml won't handle
+               equivalent integer constants
+             *)
             Currency.Fee.(
               gen_incl (of_string "6000000000")
                 (min (of_string "10000000000")
