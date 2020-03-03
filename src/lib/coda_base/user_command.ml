@@ -80,7 +80,7 @@ let fee = Fn.compose Payload.fee payload
 let nonce = Fn.compose Payload.nonce payload
 
 (* for filtering *)
-let minimum_fee = Fee.of_string "2000000000"
+let minimum_fee = Fee.of_int 2_000_000_000
 
 let is_trivial t = Fee.(fee t < minimum_fee)
 
