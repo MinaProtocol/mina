@@ -14,13 +14,13 @@ module Footer = {
         ])
       );
     [@react.component]
-    let make = (~last=false, ~link, ~name, ~children) => {
+    let make = (~last=false, ~link, ~name, ~children, ~notBlank=false) => {
       <li className=Css.(style([display(`inline)]))>
         <a
           href=link
           className=footerStyle
           name={"footer-" ++ name}
-          target="_blank">
+          target={notBlank ? "_self" : "_blank"}>
           children
         </a>
         {last
@@ -31,7 +31,6 @@ module Footer = {
       </li>;
     };
   };
-
   [@react.component]
   let make = (~bgcolor) => {
     <footer className=Css.(style([backgroundColor(bgcolor)]))>

@@ -1,5 +1,5 @@
 // This is the layout for the docs MDX pages
-
+open Page.Footer;
 module Style = {
   open! Css;
 
@@ -39,6 +39,19 @@ module Style = {
       hover([color(Theme.Colors.hyperlinkHover)]),
       ...Theme.Link.basicStyles,
     ]);
+  let footerStyle =
+    Css.(
+      style([
+        Theme.Typeface.ibmplexsans,
+        color(Theme.Colors.slate),
+        textDecoration(`none),
+        display(`inline),
+        hover([color(Theme.Colors.hyperlink)]),
+        fontSize(`rem(1.0)),
+        fontWeight(`light),
+        lineHeight(`rem(1.56)),
+      ])
+    );
 };
 
 module EditLink = {
@@ -101,6 +114,42 @@ let make = (~metadata, ~children) => {
         </Next.MDXProvider>
       </div>
     </div>
+    <footer>
+      <section
+        className=Css.(
+          style([
+            maxWidth(`rem(96.0)),
+            marginLeft(`auto),
+            marginRight(`auto),
+            // Not using Theme.paddingY here because we need the background
+            // color the same (so can't use margin), but we also need some
+            // top spacing.
+            paddingTop(`rem(4.75)),
+          ])
+        )>
+        <div
+          className=Css.(
+            style([
+              display(`flex),
+              justifyContent(`center),
+              textAlign(`center),
+              marginBottom(`rem(2.0)),
+            ])
+          )>
+          <ul
+            className=Css.(
+              style([listStyleType(`none), ...Theme.paddingX(`zero)])
+            )>
+            <Link link="/docs/en" name="English" notBlank=true>
+              {React.string("English")}
+            </Link>
+            <Link link="/docs/de" name="German" notBlank=true last=true>
+              {React.string("German")}
+            </Link>
+          </ul>
+        </div>
+      </section>
+    </footer>
   </Page>;
 };
 
