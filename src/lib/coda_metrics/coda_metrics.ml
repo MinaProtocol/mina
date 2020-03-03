@@ -116,7 +116,7 @@ module Runtime = struct
     Long_job_histogram.v "long_async_job" ~help ~namespace ~subsystem
 
   module Jobs_per_cycle = Histogram (struct
-    let spec = Histogram_spec.of_exponential 150 1.5 10
+    let spec = Histogram_spec.of_exponential 150. 1.5 10
   end)
 
   let jobs_per_cycle : Jobs_per_cycle.t =
