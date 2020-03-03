@@ -66,6 +66,8 @@ module type Gen_intf = sig
       -> unit
       -> t Quickcheck.Generator.t
 
+    [%%ifdef consensus_mechanism]
+
     (** Generate a valid sequence of payments based on the initial state of a
         ledger. Use this together with Ledger.gen_initial_ledger_state.
     *)
@@ -74,6 +76,8 @@ module type Gen_intf = sig
       -> ?sign_type:[`Fake | `Real]
       -> (Signature_lib.Keypair.t * Currency.Amount.t * Account_nonce.t) array
       -> t list Quickcheck.Generator.t
+
+    [%%endif]
   end
 end
 

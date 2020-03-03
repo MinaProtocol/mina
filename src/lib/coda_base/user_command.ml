@@ -171,6 +171,13 @@ module Gen = struct
   let stake_delegation_with_random_participants =
     Stake_delegation.gen_with_random_participants
 
+  [%%ifdef
+  consensus_mechanism]
+
+  (* code in "sequence" used for tests in consensus code, and contains integer
+     constants larger than the 32-bit integers allowed by js_of_ocaml
+   *)
+
   let sequence :
          ?length:int
       -> ?sign_type:[`Fake | `Real]
@@ -264,6 +271,8 @@ module Gen = struct
             match sign_type with `Fake -> For_tests.fake_sign | `Real -> sign
           in
           return @@ sign' (account_info.(sender) |> Tuple3.get1) payload )
+
+  [%%endif]
 end
 
 module With_valid_signature = struct
