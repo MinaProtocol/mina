@@ -39,19 +39,6 @@ module Style = {
       hover([color(Theme.Colors.hyperlinkHover)]),
       ...Theme.Link.basicStyles,
     ]);
-  let footerStyle =
-    Css.(
-      style([
-        Theme.Typeface.ibmplexsans,
-        color(Theme.Colors.slate),
-        textDecoration(`none),
-        display(`inline),
-        hover([color(Theme.Colors.hyperlink)]),
-        fontSize(`rem(1.0)),
-        fontWeight(`light),
-        lineHeight(`rem(1.56)),
-      ])
-    );
 };
 
 module EditLink = {
