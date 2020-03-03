@@ -1,3 +1,5 @@
+open Locales;
+
 module Style = {
   open Css;
   let sideNav =
@@ -149,14 +151,32 @@ module Folder = {
     </li>;
   };
 };
+let getLocales = name => {
+  let pathName = [%bs.raw {| window.location.pathname |}];
+  let regex = [%re "/\//"];
+
+  let results = Js.String.splitByRe(regex, pathName);
+  let locale = results[1];
+
+  Js.log(locale);
+
+  if(locale == "de")
+    DocsLocales.gerTitles
+  else if(locale == "en")
+    DocsLocales.engTitles
+
+};
 
 [@react.component]
 let make = (~currentSlug) => {
   <aside>
     <CurrentSlugProvider value=currentSlug>
       <ul className=Style.sideNav>
-        <Page title="Overview" slug="" />
-        <Page title="Getting Started" slug="getting-started" />
+        <Page title=getLocales()#overview slug="" />
+        <Page
+          title=DocsLocales.engTitles#gettingStarted
+          slug="getting-started"
+        />
         <Page title="My First Transaction" slug="my-first-transaction" />
         <Page title="Become a Node Operator" slug="node-operator" />
         <Page title="Contributing to Coda" slug="contributing" />
