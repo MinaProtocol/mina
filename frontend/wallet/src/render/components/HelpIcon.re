@@ -9,6 +9,7 @@ let make = (~kind) => {
     <svg
       height="24"
       viewBox="0 0 24 24"
+      transform="translate(0 -1)"
       fill="currentColor"
       stroke="currentColor"
       strokeWidth="0"

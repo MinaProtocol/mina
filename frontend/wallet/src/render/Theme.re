@@ -214,6 +214,16 @@ module Text = {
         lineHeight(`rem(1.5)),
         letterSpacing(`rem(-0.03125)),
       ]);
+    let h4 =
+      style([
+        Typeface.plex,
+        fontWeight(`num(500)),
+        fontSize(`rem(0.625)),
+        lineHeight(`rem(1.)),
+        letterSpacing(`px(1)),
+        color(white),
+        textTransform(`uppercase),
+      ]);
     let h5 =
       style([
         Typeface.plex,
