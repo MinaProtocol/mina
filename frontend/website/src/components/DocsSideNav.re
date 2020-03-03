@@ -151,19 +151,24 @@ module Folder = {
     </li>;
   };
 };
+
 let getLocales = name => {
-  let pathName = [%bs.raw {| window.location.pathname |}];
-  let regex = [%re "/\//"];
+    let localeOpt = ref("en");
+    //check if browser ispresent
+    if([%bs.raw {| process.browser |}]){
+      let pathName = [%bs.raw {| window.location.pathname |}];
+      let regex = [%re "/\//"];
+        let results = Js.String.splitByRe(regex, pathName);
+        localeOpt := Option.value(~default="en",results[2]);
+    }
 
-  let results = Js.String.splitByRe(regex, pathName);
-  let locale = results[1];
 
-  Js.log(locale);
 
-  if(locale == "de")
-    DocsLocales.gerTitles
-  else if(locale == "en")
-    DocsLocales.engTitles
+    switch(localeOpt^){
+    | "de" => DocsLocales.gerTitles;
+    | "en" => DocsLocales.engTitles;
+    | _ => DocsLocales.engTitles
+    }
 
 };
 
@@ -174,7 +179,7 @@ let make = (~currentSlug) => {
       <ul className=Style.sideNav>
         <Page title=getLocales()#overview slug="" />
         <Page
-          title=DocsLocales.engTitles#gettingStarted
+          title=getLocales()#gettingStarted
           slug="getting-started"
         />
         <Page title="My First Transaction" slug="my-first-transaction" />
