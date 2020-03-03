@@ -516,6 +516,12 @@ let daemon logger =
              Coda_metrics.(
                Runtime.Long_job_histogram.observe Runtime.long_async_job secs)
              ) ;
+         Stream.iter
+           Async_kernel.Async_kernel_scheduler.(cycle_num_jobs @@ t ())
+           ~f:(fun num_jobs ->
+             Coda_metrics.(
+               Runtime.Jobs_per_cycle.observe Runtime.jobs_per_cycle
+                 (Float.of_int num_jobs)) ) ;
          let trace_database_initialization typ location =
            Logger.trace logger "Creating %s at %s" ~module_:__MODULE__
              ~location typ

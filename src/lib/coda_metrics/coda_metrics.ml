@@ -115,6 +115,14 @@ module Runtime = struct
     let help = "A histogram for long async jobs" in
     Long_job_histogram.v "long_async_job" ~help ~namespace ~subsystem
 
+  module Jobs_per_cycle = Histogram (struct
+    let spec = Histogram_spec.of_exponential 150 1.5 10
+  end)
+
+  let jobs_per_cycle : Jobs_per_cycle.t =
+    let help = "A histogram of the number of jobs per cycle" in
+    Jobs_per_cycle.v "jobs_per_cycle" ~help ~namespace ~subsystem
+
   let start_time = Core.Time.now ()
 
   let current_gc = ref (Gc.stat ())
