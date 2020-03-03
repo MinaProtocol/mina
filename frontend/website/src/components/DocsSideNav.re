@@ -153,18 +153,18 @@ module Folder = {
 };
 
 let getLocales = name => {
-    let localeOpt = ref("en");
-    //check if browser ispresent
-    if([%bs.raw {| process.browser |}]){
+    let localeOpt = if([%bs.raw {| process.browser |}]){
       let pathName = [%bs.raw {| window.location.pathname |}];
       let regex = [%re "/\//"];
         let results = Js.String.splitByRe(regex, pathName);
-        localeOpt := Option.value(~default="en",results[2]);
+        Option.value(~default="en",results[2]);
+    }
+    //if no browser process is found, just return english
+    else {
+    "en"
     }
 
-
-
-    switch(localeOpt^){
+    switch(localeOpt){
     | "de" => DocsLocales.gerTitles;
     | "en" => DocsLocales.engTitles;
     | _ => DocsLocales.engTitles
