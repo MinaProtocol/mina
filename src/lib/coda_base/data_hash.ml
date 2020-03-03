@@ -4,17 +4,19 @@
 "/src/config.mlh"]
 
 open Core_kernel
-open Bitstring_lib
-open Util
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 open Snark_params.Tick
+open Bitstring_lib
+
+[%%else]
+
+open Snark_params_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
-
-module type Small = Data_hash_intf.Small
 
 module type Full_size = Data_hash_intf.Full_size
 
@@ -22,9 +24,18 @@ module Make_basic (M : sig
   val length_in_bits : int
 end) =
 struct
-  type t = Pedersen.Digest.t [@@deriving sexp, compare, yojson]
+  type t = Field.t [@@deriving sexp, compare]
 
-  let to_decimal_string (t : Pedersen.Digest.t) = Field.to_string t
+  let to_yojson t = `String (Field.to_string t)
+
+  let of_yojson = function
+    | `String s -> (
+      try Ok (Field.of_string s)
+      with exn -> Error Error.(to_string_hum (of_exn exn)) )
+    | _ ->
+        Error "of_yojson: expected string"
+
+  let to_decimal_string (t : Field.t) = Field.to_string t
 
   let to_bytes t =
     Fold_lib.(Fold.bool_t_to_string (Fold.of_list (Field.unpack t)))
@@ -33,6 +44,14 @@ struct
 
   let () = assert (Int.(length_in_bits <= Field.size_in_bits))
 
+  let to_input t = Random_oracle.Input.field t
+
+  [%%ifdef
+  consensus_mechanism]
+
+  (* this is in consensus code, because Bigint comes
+     from snarky functors
+  *)
   let gen : t Quickcheck.Generator.t =
     let m =
       if Int.(length_in_bits = Field.size_in_bits) then
@@ -43,12 +62,6 @@ struct
       Bignum_bigint.(gen_incl zero m)
       ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
 
-  let to_input t = Random_oracle.Input.field t
-
-  [%%if
-  defined consensus_mechanism]
-
-  (* SNARK-dependent code *)
   type var =
     { digest: Pedersen.Checked.Digest.var
     ; mutable bits: Boolean.var Bitstring.Lsb_first.t option }
@@ -89,6 +102,9 @@ struct
 
   let var_to_input (t : var) = Random_oracle.Input.field t.digest
 
+  (* TODO : use Random oracle.Digest to satisfy Bits_intf.S, move out of
+     consensus_mechanism guard
+  *)
   include Pedersen.Digest.Bits
 
   let assert_equal x y = Field.Checked.Assert.equal x.digest y.digest
@@ -127,14 +143,15 @@ struct
     in
     {store; read; alloc; check}
 
-  (* end SNARK-dependent *)
   [%%endif]
 end
 
 module Make_full_size () = struct
-  include Make_basic (struct
+  module Basic = Make_basic (struct
     let length_in_bits = Field.size_in_bits
   end)
+
+  include Basic
 
   (* inside functor of no arguments, versioned types are allowed *)
 
@@ -142,13 +159,15 @@ module Make_full_size () = struct
   module Stable = struct
     module V1 = struct
       module T = struct
-        type t = Pedersen.Digest.Stable.V1.t
-        [@@deriving sexp, compare, hash, yojson]
+        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
       end
 
       include T
 
       let to_latest = Fn.id
+
+      [%%define_locally
+      Basic.(to_yojson, of_yojson)]
 
       include Comparable.Make (T)
       include Hashable.Make_binable (T)
@@ -162,10 +181,9 @@ module Make_full_size () = struct
 
   let of_hash = Fn.id
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
-  (* SNARK-dependent *)
   let var_of_hash_packed digest = {digest; bits= None}
 
   let if_ cond ~then_ ~else_ =
@@ -175,28 +193,4 @@ module Make_full_size () = struct
     {digest; bits= None}
 
   [%%endif]
-end
-
-module Make_small (M : sig
-  val length_in_bits : int
-end) =
-struct
-  let () = assert (M.length_in_bits < Field.size_in_bits)
-
-  include Make_basic (M)
-
-  let var_of_hash_packed digest =
-    let%map bits = unpack digest in
-    {digest; bits= Some (Bitstring.Lsb_first.of_list bits)}
-
-  let max_size = Bignum_bigint.(two_to_the M.length_in_bits - one)
-
-  let of_hash x =
-    if Bignum_bigint.( <= ) Bigint.(to_bignum_bigint (of_field x)) max_size
-    then Ok x
-    else
-      Or_error.errorf
-        !"Data_hash.of_hash: %{sexp:Pedersen.Digest.t} > \
-          %{sexp:Bignum_bigint.t}"
-        x max_size
 end

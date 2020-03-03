@@ -1,5 +1,20 @@
+(* stake_delegation.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Signature_lib
+
+[%%else]
+
+open Signature_lib_nonconsensus
+
+[%%endif]
 
 [%%versioned
 module Stable = struct

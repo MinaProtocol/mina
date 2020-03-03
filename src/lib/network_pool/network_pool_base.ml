@@ -77,7 +77,6 @@ end)
               "Processing incoming network pool diff: $diff" ;
             apply_and_broadcast network_pool diff_and_cb
         | `Local diff ->
-            (*Should this be coming from resource pool instead?*)
             apply_and_broadcast network_pool
               (Envelope.Incoming.local diff, Fn.const ())
         | `Transition_frontier_extension diff ->
