@@ -765,7 +765,7 @@ let%test_module _ =
           Quickcheck.Generator.map ~f:Account_nonce.of_int
           @@ Int.gen_incl 0 1000
         in
-        let init_balance = Currency.Amount.of_int 100_000 in
+        let init_balance = Currency.Amount.of_int 100_000_000_000_000 in
         let%bind size = Quickcheck.Generator.size in
         let%bind amounts =
           Quickcheck.Generator.map ~f:Array.of_list
@@ -831,7 +831,9 @@ let%test_module _ =
           { replace_cmd_skeleton.payload with
             common=
               { replace_cmd_skeleton.payload.common with
-                fee= Currency.Fee.of_int (10 + (5 * (size + 1))) } }
+                fee=
+                  Currency.Fee.of_int ((10 + (5 * (size + 1))) * 1_000_000_000)
+              } }
         in
         let replace_cmd =
           User_command.For_tests.fake_sign sender replace_cmd_payload
