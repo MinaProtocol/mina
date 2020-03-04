@@ -32,6 +32,7 @@ module Worker_state = struct
   type t = (module S) Deferred.t
 
   let create {logger; _} : t Deferred.t =
+    Memory_stats.log_memory_stats logger ;
     Deferred.return
       (let%map bc_vk = Snark_keys.blockchain_verification ()
        and tx_vk = Snark_keys.transaction_verification () in
