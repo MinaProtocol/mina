@@ -377,38 +377,76 @@ module Base = struct
       root pending_coinbase_stack_before pending_coinbase_after
       state_body_hash_opt
       ({signer; signature; payload} : Transaction_union.var) =
-    let%bind is_user_command =
-      Transaction_union.Tag.Checked.is_user_command payload.body.tag
+    (* Compute transaction kind. *)
+    let tag = payload.body.tag in
+    let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
+    let is_payment = Transaction_union.Tag.Unpacked.is_payment tag in
+    let is_mint = Transaction_union.Tag.Unpacked.is_mint tag in
+    let is_fee_transfer = Transaction_union.Tag.Unpacked.is_fee_transfer tag in
+    let is_stake_delegation =
+      Transaction_union.Tag.Unpacked.is_stake_delegation tag
     in
+    let is_coinbase = Transaction_union.Tag.Unpacked.is_coinbase tag in
     let%bind () =
       [%with_label "Check transaction signature"]
         (check_signature shifted ~payload ~is_user_command ~signer ~signature)
     in
-    let%bind signer_pk = Public_key.compress_var signer in
-    let fee = payload.common.fee in
-    (* Information for the receiver. *)
-    let receiver = payload.body.account in
-    (* Information for the source. *)
-    let token = Account_id.Checked.token_id receiver in
-    let source = Account_id.Checked.create signer_pk token in
-    (* Information for the fee-payer. *)
-    let nonce = payload.common.nonce in
+    (* Compute and check tokens. *)
+    (* If the transaction requests minting in the invalid token, we should
+       interpret the command as a request to create a new token and mint *that*
+       instead.
+    *)
+    let%bind is_mint_new, token =
+      let token = Account_id.Checked.token_id payload.body.account in
+      let%bind token_invalid =
+        Token_id.(Checked.equal token (var_of_t default))
+      in
+      let%bind is_mint_new = Boolean.(is_mint && token_invalid) in
+      let%map token =
+        let%bind next_token =
+          (* TODO: Get the next token ID from the protocol state. *)
+          return Token_id.(var_of_t default)
+        in
+        Token_id.Checked.if_ is_mint_new ~then_:next_token ~else_:token
+      in
+      (is_mint_new, token)
+    in
     let fee_token = payload.common.fee_token in
-    let fee_payer = Account_id.Checked.create signer_pk fee_token in
-    (* Compute transaction kind. *)
-    let tag = payload.body.tag in
-    let%bind is_payment = Transaction_union.Tag.Checked.is_payment tag in
-    let%bind is_fee_transfer =
-      Transaction_union.Tag.Checked.is_fee_transfer tag
+    let is_mint_old =
+      (* This is safe because [is_mint_new] may only be true (ie. 1) when
+         [is_mint] is also true.
+      *)
+      Boolean.Unsafe.of_cvar
+        (Field.Var.sub (is_mint :> Field.Var.t) (is_mint_new :> Field.Var.t))
     in
-    let%bind is_stake_delegation =
-      Transaction_union.Tag.Checked.is_stake_delegation tag
-    in
-    let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
-    let%bind tokens_equal = Token_id.Checked.equal token fee_token in
     let%bind token_default =
       Token_id.(Checked.equal token (var_of_t default))
     in
+    let%bind () =
+      [%with_label "Don't allow minting of the default token"]
+        Boolean.(Assert.any [not is_mint; not token_default])
+    in
+    let%bind () =
+      [%with_label "Don't allow fees in invalid tokens"]
+        Token_id.(Checked.Assert.not_equal (var_of_t invalid) fee_token)
+    in
+    let%bind () =
+      [%with_label "Don't allow transactions in invalid tokens"]
+        Token_id.(Checked.Assert.not_equal (var_of_t invalid) token)
+    in
+    let fee = payload.common.fee in
+    let%bind signer_pk = Public_key.compress_var signer in
+    (* Information for the receiver. *)
+    let receiver =
+      (* Token may have changed for minting. Re-wrap with the new token. *)
+      Account_id.Checked.(create (public_key payload.body.account) token)
+    in
+    (* Information for the source. *)
+    let source = Account_id.Checked.create signer_pk token in
+    (* Information for the fee-payer. *)
+    let nonce = payload.common.nonce in
+    let fee_payer = Account_id.Checked.create signer_pk fee_token in
+    let%bind tokens_equal = Token_id.Checked.equal token fee_token in
     let%bind () =
       [%with_label "Validate tokens"]
         (let%bind () =
@@ -418,7 +456,7 @@ module Base = struct
                 Token_id.(var_of_t default))
          in
          [%with_label "Validate transfer token"]
-           (Boolean.Assert.any [is_payment; tokens_equal]))
+           (Boolean.Assert.any [is_payment; is_mint; token_default]))
     in
     let%bind () =
       [%with_label "Check slot validity"]
@@ -467,13 +505,16 @@ module Base = struct
             in
             Boolean.Assert.is_true correct_coinbase_stack))
     in
-    let%bind payment_insufficient_funds, token_owner, token_whitelist =
-      (* Here we 'forsee' whether there will be insufficient funds to send,
-         if this is a payment and the fee-payer is distinct from the source
-         account.
+    let%bind payment_insufficient_funds, token_whitelist =
+      (* Here, we extract some information from the source account before we
+         'officially' access it. These values will be later checked against
+         those against the source account, but for now we extract them
+         unchecked so that we can use them when we update the receiver.
 
-         In this case, we still charge the fee-payer, but don't modify the
-         source or receiver balances.
+         In particular, here we check whether there will be sufficient funds in
+         the source account, to decide whether we can execute a transfer. If we
+         cannot, we simply charge the fee-payer and don't move any funds
+         between the source and receiver.
       *)
       let%bind prover_source =
         exists (Typ.Internal.ref ())
@@ -500,7 +541,7 @@ module Base = struct
               in
               Ledger_hash.Get_element account_idx)
       in
-      let%bind payment_insufficient_funds =
+      let%bind insufficient_funds =
         exists Boolean.typ
           ~compute:
             As_prover.(
@@ -508,31 +549,41 @@ module Base = struct
                 read (Typ.Internal.ref ()) prover_source_account
               in
               let%bind fee = read Fee.typ fee in
-              let%bind is_payment = read Boolean.typ is_payment in
               let%bind source = read (Typ.Internal.ref ()) prover_source in
               let%map fee_payer = read Account_id.typ fee_payer in
-              if is_payment && not (Account_id.equal source fee_payer) then
+              if not (Account_id.equal source fee_payer) then
                 Option.is_none
                   (Balance.sub_amount account.balance (Amount.of_fee fee))
               else false)
       in
-      let%bind token_owner =
-        (* TODO: This should be true if we're minting a new token. *)
-        return Boolean.false_
+      let%bind payment_insufficient_funds =
+        Boolean.(is_payment && insufficient_funds)
       in
       let%map token_whitelist =
-        (* TODO: This should be set by the transaction if we're minting a new
-           token.
+        let%bind token_whitelist =
+          exists Boolean.typ
+            ~compute:
+              As_prover.(
+                let%map account, _path =
+                  read (Typ.Internal.ref ()) prover_source_account
+                in
+                account.token_whitelist)
+        in
+        (* If this is a new token, the whitelist parameter in the payload
+           determines the whitelist/blacklist behaviour of the token.
         *)
-        exists Boolean.typ
-          ~compute:
-            As_prover.(
-              let%map account, _path =
-                read (Typ.Internal.ref ()) prover_source_account
-              in
-              account.token_whitelist)
+        Boolean.if_ is_mint_new ~then_:payload.body.whitelist
+          ~else_:token_whitelist
       in
-      (payment_insufficient_funds, token_owner, token_whitelist)
+      (payment_insufficient_funds, token_whitelist)
+    in
+    let%bind token_blocked =
+      (* If this mints an existing token, the whitelist parameter determines
+         whether to block or unblock the account.
+      *)
+      Boolean.if_ is_mint_old
+        ~then_:(Boolean.not payload.body.whitelist)
+        ~else_:Boolean.false_
     in
     let%bind () =
       [%with_label
@@ -542,6 +593,7 @@ module Base = struct
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
          - stake delegation: 0
+         - mint:             payload.body.amount
          - coinbase:         payload.body.amount - payload.common.fee
          - fee transfer:     payload.body.amount
       *)
@@ -587,6 +639,7 @@ module Base = struct
              (* this account is:
                - the receiver for payments
                - the delegated-to account for stake delegation
+               - the receiver for minting
                - the receiver for a coinbase 
                - the first receiver for a fee transfer
              *)
@@ -631,14 +684,11 @@ module Base = struct
              and token_id =
                Token_id.Checked.if_ is_empty_and_writeable ~then_:token
                  ~else_:account.token_id
-             and token_blocked =
-               (* TODO: Block/unblock when the relevant commands are issued. *)
-               return account.token_blocked
              in
              { Account.Poly.balance
              ; public_key
              ; token_id
-             ; token_owner
+             ; token_owner= account.token_owner
              ; token_whitelist
              ; token_blocked
              ; nonce= account.nonce
@@ -660,6 +710,7 @@ module Base = struct
              (* this account is:
                - the fee-payer for payments
                - the fee-payer for stake delegation
+               - the fee-payer for minting
                - the fee-receiver for a coinbase 
                - the second receiver for a fee transfer
              *)
@@ -744,18 +795,75 @@ module Base = struct
     in
     let%bind root_after_source_update =
       [%with_label "Update source"]
-        (Frozen_ledger_hash.modify_account_send ~is_writeable:Boolean.false_
+        (Frozen_ledger_hash.modify_account_send ~is_writeable:is_mint_new
            root_after_fee_payer_update source
-           ~f:(fun ~is_empty_and_writeable:_ account ->
+           ~f:(fun ~is_empty_and_writeable account ->
              (* this account is:
                - the source for payments
                - the delegator for stake delegation
+               - the token-owner for minting
                - the fee-receiver for a coinbase 
                - the second receiver for a fee transfer
              *)
+             let%bind balance, amount =
+               let%bind amount =
+                 (* Only payments should affect the balance at this stage. *)
+                 if_ is_payment ~typ:Amount.typ ~then_:payload.body.amount
+                   ~else_:Amount.(var_of_t zero)
+               in
+               let%bind balance, `Underflow insufficient =
+                 Balance.Checked.sub_amount_flagged account.balance amount
+               in
+               let%bind () =
+                 [%with_label
+                   "Check that the insufficient fund status matches"]
+                   (Field.Checked.Assert.equal
+                      (insufficient :> Field.Var.t)
+                      (payment_insufficient_funds :> Field.Var.t))
+               in
+               let%bind balance =
+                 Balance.Checked.if_ insufficient ~then_:account.balance
+                   ~else_:balance
+               in
+               let%map amount =
+                 Amount.Checked.if_ insufficient
+                   ~then_:Amount.(var_of_t zero)
+                   ~else_:amount
+               in
+               (balance, amount)
+             in
+             let%bind public_key =
+               Public_key.Compressed.Checked.if_ is_empty_and_writeable
+                 ~then_:(Account_id.Checked.public_key source)
+                 ~else_:account.public_key
+             in
+             let%bind token_id =
+               Token_id.Checked.if_ is_empty_and_writeable
+                 ~then_:(Account_id.Checked.token_id source)
+                 ~else_:account.token_id
+             in
+             let%bind token_owner =
+               Boolean.(is_mint_new || account.token_owner)
+             in
+             let receiver_token_whitelist = token_whitelist in
+             let%bind token_whitelist =
+               Boolean.if_ is_empty_and_writeable ~then_:payload.body.whitelist
+                 ~else_:account.token_whitelist
+             in
+             let%bind () =
+               [%with_label
+                 "Check that the 'predicted' token whitelist status matches"]
+                 (Field.Checked.Assert.equal
+                    (receiver_token_whitelist :> Field.Var.t)
+                    (token_whitelist :> Field.Var.t))
+             in
+             let%bind token_blocked =
+               Boolean.if_ is_empty_and_writeable ~then_:Boolean.false_
+                 ~else_:account.token_blocked
+             in
              let%bind () =
                [%with_label "Check that the source account is unblocked"]
-                 Boolean.(Assert.is_true (not account.token_blocked))
+                 Boolean.(Assert.is_true (not token_blocked))
              in
              let%bind () =
                [%with_label
@@ -764,17 +872,8 @@ module Base = struct
                  Boolean.(
                    Assert.any
                      [ not receiver_was_created
-                     ; account.token_whitelist
-                     ; account.token_owner ])
-             in
-             let%bind successful_payment =
-               Boolean.(is_payment && not payment_insufficient_funds)
-             in
-             let%bind amount =
-               (* Only payments should affect the balance at this stage. *)
-               if_ successful_payment ~typ:Amount.typ
-                 ~then_:payload.body.amount
-                 ~else_:Amount.(var_of_t zero)
+                     ; not token_whitelist
+                     ; token_owner ])
              in
              (* TODO: use actual slot. See issue #4036. *)
              let txn_global_slot = Global_slot.Checked.zero in
@@ -782,21 +881,22 @@ module Base = struct
                [%with_label "Check source timing"]
                  (check_timing ~account ~txn_amount:amount ~txn_global_slot)
              in
-             let%bind balance =
-               [%with_label "Check source balance"]
-                 Balance.Checked.(account.balance - amount)
-             in
              let%map delegate =
+               let%bind delegate =
+                 Public_key.Compressed.Checked.if_ is_empty_and_writeable
+                   ~then_:(Account_id.Checked.public_key source)
+                   ~else_:account.delegate
+               in
                Public_key.Compressed.Checked.if_ is_stake_delegation
                  ~then_:(Account_id.Checked.public_key payload.body.account)
-                 ~else_:account.delegate
+                 ~else_:delegate
              in
              { Account.Poly.balance
-             ; public_key= account.public_key
-             ; token_id= account.token_id
-             ; token_owner= account.token_owner
-             ; token_whitelist= account.token_whitelist
-             ; token_blocked= account.token_blocked
+             ; public_key
+             ; token_id
+             ; token_owner
+             ; token_whitelist
+             ; token_blocked
              ; nonce= account.nonce
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
@@ -2044,7 +2144,7 @@ let%test_module "transaction_snark" =
       let mentioned_keys, pending_coinbase_stack_target =
         match txn with
         | Transaction.User_command uc ->
-            ( User_command.accounts_accessed (uc :> User_command.t)
+            ( User_command.accounts_accessed (User_command.forget_check uc)
             , pending_coinbase_stack )
         | Fee_transfer ft ->
             ( One_or_two.map ft ~f:(fun (key, _) ->
@@ -2238,7 +2338,8 @@ let%test_module "transaction_snark" =
                 Sparse_ledger.of_ledger_subset_exn ledger
                   (List.concat_map
                      ~f:(fun t ->
-                       User_command.accounts_accessed (t :> User_command.t) )
+                       User_command.accounts_accessed
+                         (User_command.forget_check t) )
                      [t1; t2])
               in
               let proof12, pending_coinbase_stack_next =

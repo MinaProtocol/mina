@@ -19,6 +19,10 @@ module Body : sig
   type t =
     | Payment of Payment_payload.t
     | Stake_delegation of Stake_delegation.t
+    | Mint of Mint_payload.t
+    | Mint_new of Mint_new_payload.t
+    | Add_to_blacklist of Account_id.t
+    | Add_to_whitelist of Account_id.t
   [@@deriving eq, sexp, hash, yojson]
 
   module Stable : sig
@@ -30,9 +34,9 @@ module Body : sig
     module Latest = V1
   end
 
-  val receiver : t -> Account_id.t
-
   val token : t -> Token_id.t
+
+  val receiver : t -> Account_id.t
 end
 
 module Common : sig

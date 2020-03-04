@@ -142,7 +142,10 @@ let apply_user_command_exn t ({signer; payload; signature= _} : User_command.t)
     =
   let signer_pk = Public_key.compress signer in
   (* Get index for the source. *)
-  let token = User_command.Payload.token payload in
+  let token =
+    (* TODO: Add support for new tokens from the protocol state. *)
+    User_command.Payload.token payload
+  in
   let source = Account_id.create signer_pk token in
   let source_idx = find_index_exn t source in
   (* Get the index for the fee-payer. *)
@@ -173,30 +176,34 @@ let apply_user_command_exn t ({signer; payload; signature= _} : User_command.t)
   | Stake_delegation (Set_delegate {new_delegate}) ->
       let t = set_exn t fee_payer_idx fee_payer_account in
       set_exn t source_idx {source_account with delegate= new_delegate}
-  | Payment {amount; receiver} ->
+  | Payment {amount; receiver} -> (
       if Account_id.equal source receiver then
         let t = set_exn t fee_payer_idx fee_payer_account in
         set_exn t source_idx source_account
       else
-        let receiver_idx = find_index_exn t receiver in
-        let action, receiver_account =
-          get_or_initialize_exn receiver t receiver_idx
-        in
-        let receiver_account =
-          match action with
-          | `Added ->
-              { receiver_account with
-                token_owner= false
-              ; token_whitelist= source_account.token_whitelist
-              ; token_blocked= false }
-          | `Existed ->
-              receiver_account
+        let create_receiver () =
+          let receiver_idx = find_index_exn t receiver in
+          let action, receiver_account =
+            get_or_initialize_exn receiver t receiver_idx
+          in
+          let receiver_account =
+            match action with
+            | `Added ->
+                { receiver_account with
+                  token_owner= false
+                ; token_whitelist= source_account.token_whitelist
+                ; token_blocked= false }
+            | `Existed ->
+                receiver_account
+          in
+          (action, receiver_account, receiver_idx)
         in
         let source_balance' =
           Currency.Balance.sub_amount source_account.balance amount
         in
         if Account_id.equal source fee_payer then
           (* source_idx = fee_payer_idx *)
+          let action, receiver_account, receiver_idx = create_receiver () in
           let receiver_balance' =
             (* Subtract the account creation fee from the amount to be
                transferred.
@@ -212,35 +219,143 @@ let apply_user_command_exn t ({signer; payload; signature= _} : User_command.t)
           set_exn t receiver_idx
             {receiver_account with balance= receiver_balance'}
         else
-          (* Charge fee-payer for creating the account. *)
-          let fee_payer_balance' =
-            sub_account_creation_fee_bal action fee_payer_account.balance
-          in
-          let receiver_balance', source_balance' =
-            match source_balance' with
-            | Some source_balance' ->
-                (* Sending the tokens succeeds, move them into the receiver
-                   account.
-                *)
-                let receiver_balance' =
-                  Option.value_exn
-                    (Currency.Balance.add_amount receiver_account.balance
-                       amount)
-                in
-                (receiver_balance', source_balance')
-            | None ->
-                (* Sending the tokens fails, do not move them. *)
-                (receiver_account.balance, source_account.balance)
-          in
-          let t =
-            set_exn t fee_payer_idx
-              {fee_payer_account with balance= fee_payer_balance'}
-          in
-          let t =
-            set_exn t source_idx {source_account with balance= source_balance'}
-          in
+          match source_balance' with
+          | Some source_balance' ->
+              (* Sending the tokens succeeds, move them into the receiver
+                 account.
+              *)
+              let action, receiver_account, receiver_idx =
+                create_receiver ()
+              in
+              (* Charge fee-payer for creating the account. *)
+              let fee_payer_balance' =
+                sub_account_creation_fee_bal action fee_payer_account.balance
+              in
+              let receiver_balance' =
+                Option.value_exn
+                  (Currency.Balance.add_amount receiver_account.balance amount)
+              in
+              let t =
+                set_exn t fee_payer_idx
+                  {fee_payer_account with balance= fee_payer_balance'}
+              in
+              let t =
+                set_exn t source_idx
+                  {source_account with balance= source_balance'}
+              in
+              let t =
+                set_exn t receiver_idx
+                  {receiver_account with balance= receiver_balance'}
+              in
+              t
+          | None ->
+              (* Sending the tokens fails, do not move them or create the
+                 receiver account.
+              *)
+              let t = set_exn t fee_payer_idx fee_payer_account in
+              let t = set_exn t source_idx source_account in
+              t )
+  | Mint {receiver; amount} ->
+      assert source_account.token_owner ;
+      let receiver_idx = find_index_exn t receiver in
+      let action, receiver_account =
+        if Account_id.equal source receiver then (`Existed, source_account)
+        else get_or_initialize_exn receiver t receiver_idx
+      in
+      let receiver_account =
+        match action with
+        | `Added ->
+            { receiver_account with
+              token_owner= false
+            ; token_whitelist= source_account.token_whitelist
+            ; token_blocked= false }
+        | `Existed ->
+            receiver_account
+      in
+      let receiver_balance' =
+        Option.value_exn
+          (Currency.Balance.add_amount receiver_account.balance amount)
+      in
+      if Token_id.equal fee_token token then
+        (* source_idx = fee_payer_idx *)
+        let source_balance' =
+          sub_account_creation_fee_bal action source_account.balance
+        in
+        let t =
+          set_exn t source_idx {source_account with balance= source_balance'}
+        in
+        let t =
           set_exn t receiver_idx
             {receiver_account with balance= receiver_balance'}
+        in
+        t
+      else
+        (* Charge fee-payer for creating the account. *)
+        let fee_payer_balance' =
+          sub_account_creation_fee_bal action fee_payer_account.balance
+        in
+        let t =
+          set_exn t fee_payer_idx
+            {fee_payer_account with balance= fee_payer_balance'}
+        in
+        let t = set_exn t source_idx source_account in
+        let t =
+          set_exn t receiver_idx
+            {receiver_account with balance= receiver_balance'}
+        in
+        t
+  | Mint_new _ ->
+      (* TODO: Add support for new tokens from the protocol state. *)
+      assert false
+  | (Add_to_blacklist receiver | Add_to_whitelist receiver) as body ->
+      assert source_account.token_owner ;
+      let token_blocked =
+        match body with
+        | Add_to_blacklist _ ->
+            true
+        | Add_to_whitelist _ ->
+            false
+        | _ ->
+            assert false
+      in
+      let receiver_idx = find_index_exn t receiver in
+      let action, receiver_account =
+        if Account_id.equal source receiver then (`Existed, source_account)
+        else get_or_initialize_exn receiver t receiver_idx
+      in
+      assert (not (Account_id.equal source receiver)) ;
+      let receiver_account =
+        match action with
+        | `Added ->
+            { receiver_account with
+              token_owner= false
+            ; token_whitelist= source_account.token_whitelist
+            ; token_blocked }
+        | `Existed ->
+            {receiver_account with token_blocked}
+      in
+      if Token_id.equal fee_token token then
+        (* source_location = fee_payer_location *)
+        let source_balance' =
+          sub_account_creation_fee_bal action source_account.balance
+        in
+        let t =
+          set_exn t source_idx {source_account with balance= source_balance'}
+        in
+        let t = set_exn t receiver_idx receiver_account in
+        t
+      else
+        (* Charge the fee-payer for creating the account. *)
+        let fee_payer_balance' =
+          sub_account_creation_fee_bal action fee_payer_account.balance
+        in
+        let t =
+          set_exn t fee_payer_idx
+            {fee_payer_account with balance= fee_payer_balance'}
+        in
+        let t = set_exn t source_idx source_account in
+        let t = set_exn t receiver_idx receiver_account in
+        t
 
 let apply_fee_transfer_exn =
   let apply_single t ((pk, fee) : Fee_transfer.Single.t) =

@@ -58,6 +58,9 @@ module Undo = struct
             | Payment of {previous_empty_accounts: Account_id.Stable.V1.t list}
             | Stake_delegation of
                 { previous_delegate: Public_key.Compressed.Stable.V1.t }
+            | Add_to_list of
+                { previous_empty_accounts: Account_id.Stable.V1.t list
+                ; blocked: bool }
           [@@deriving sexp]
 
           let to_latest = Fn.id
@@ -67,6 +70,9 @@ module Undo = struct
       type t = Stable.Latest.t =
         | Payment of {previous_empty_accounts: Account_id.t list}
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+        | Add_to_list of
+            { previous_empty_accounts: Account_id.t list
+            ; blocked: bool }
       [@@deriving sexp]
     end
 
@@ -176,6 +182,9 @@ module type S = sig
         type t = Undo.User_command_undo.Body.t =
           | Payment of {previous_empty_accounts: Account_id.t list}
           | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+          | Add_to_list of
+              { previous_empty_accounts: Account_id.t list
+              ; blocked: bool }
         [@@deriving sexp]
       end
 
@@ -393,17 +402,33 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       if
         Token_id.equal
           (User_command.Payload.fee_token payload)
+          Token_id.invalid
+      then Or_error.errorf "The fee token is invalid"
+      else if
+        Token_id.equal
+          (User_command.Payload.fee_token payload)
           Token_id.default
-      then Ok ()
+      then return ()
       else
-        Error
-          (Error.createf
-             "Cannot create transactions with fee_token different from the \
-              default")
+        Or_error.errorf
+          "Cannot create transactions with fee_token different from the default"
     in
     let signer_pk = Public_key.compress signer in
     (* Get account location for the source. *)
-    let token = User_command.Payload.token payload in
+    let%bind token =
+      let token = User_command.Payload.token payload in
+      match User_command.Payload.body payload with
+      | Mint_new _ ->
+          (* TODO: Add support for new tokens from the protocol state. *)
+          Or_error.errorf "Minting new tokens is not yet supported"
+      | _ when Token_id.(equal invalid) token ->
+          Or_error.errorf "The token for this command is invalid"
+      | (Mint _ | Add_to_whitelist _ | Add_to_blacklist _)
+        when Token_id.(equal default) token ->
+          Or_error.errorf "Cannot apply token commands to the default token"
+      | _ ->
+          return token
+    in
     let nonce = User_command.Payload.nonce payload in
     let source = Account_id.create signer_pk token in
     let%bind source_location = location_of_account' ledger "" source in
@@ -453,6 +478,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     *)
     let%bind source_account =
       let%bind account =
+        (* TODO: Create a new account for [Mint_new]. *)
         if Token_id.equal token fee_token then return fee_payer_account
         else get' ledger "source" source_location
       in
@@ -491,7 +517,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         { Undo.User_command_undo.common
         ; body= Stake_delegation {previous_delegate= source_account.delegate}
         }
-    | Payment Payment_payload.Poly.{amount; receiver} ->
+    | Payment {amount; receiver} -> (
         let undo emptys : Undo.User_command_undo.t =
           {common; body= Payment {previous_empty_accounts= emptys}}
         in
@@ -500,36 +526,48 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           set ledger source_location source_account ;
           return (undo []) )
         else
-          let action, receiver_account, receiver_location =
-            (* TODO: Do not use get_or_create here; we should not create a new
-               account before we know that the transaction will go through and
-               thus the creation fee has been paid.
-            *)
-            get_or_create ledger receiver
-          in
-          let%bind receiver_account =
-            match action with
-            | `Added ->
-                if
-                  source_account.token_whitelist
-                  && not source_account.token_owner
-                then
-                  Or_error.errorf
-                    "The source account cannot create new accounts for a \
-                     whitelist-restricted token: it is not the token owner."
-                else
-                  return
-                    { receiver_account with
-                      token_owner= false
-                    ; token_whitelist= source_account.token_whitelist
-                    ; token_blocked= false }
-            | `Existed ->
-                return receiver_account
-          in
-          let previous_empty_accounts =
-            previous_empty_accounts action receiver
+          let create_receiver () =
+            let action, receiver_account, receiver_location =
+              (* TODO: Do not use get_or_create here; we should not create a new
+                 account before we know that the transaction will go through and
+                 thus the creation fee has been paid.
+              *)
+              get_or_create ledger receiver
+            in
+            let%map receiver_account =
+              match action with
+              | `Added ->
+                  if
+                    source_account.token_whitelist
+                    && not source_account.token_owner
+                  then
+                    Or_error.errorf
+                      "The source account cannot create new accounts for a \
+                       whitelist-restricted token: it is not the token owner."
+                  else
+                    return
+                      { receiver_account with
+                        token_owner= false
+                      ; token_whitelist= source_account.token_whitelist
+                      ; token_blocked= false }
+              | `Existed ->
+                  return receiver_account
+            in
+            let previous_empty_accounts =
+              previous_empty_accounts action receiver
+            in
+            ( action
+            , receiver_account
+            , receiver_location
+            , previous_empty_accounts )
           in
           if Token_id.equal fee_token token then (
+            let%bind ( action
+                     , receiver_account
+                     , receiver_location
+                     , previous_empty_accounts ) =
+              create_receiver ()
+            in
             (* source_location = fee_payer_location *)
             let%bind receiver_balance' =
               (* Subtract the account creation fee from the amount to be
@@ -547,35 +585,165 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               {source_account with balance= source_balance'} ;
             undo previous_empty_accounts )
           else
-            (* Charge the fee-payer for creating the account.
-               Note: We don't have a better choice here: there is no other
-               source of tokens in this transaction that is known to have
-               accepted value.
-             *)
-            let%bind fee_payer_balance' =
-              sub_account_creation_fee_bal action fee_payer_account.balance
-            in
-            let%map receiver_balance', source_balance' =
-              match Balance.sub_amount source_account.balance amount with
-              | Some source_balance ->
-                  (* Source account has sufficient balance, increase the
+            match Balance.sub_amount source_account.balance amount with
+            | Some source_balance' ->
+                let%bind ( action
+                         , receiver_account
+                         , receiver_location
+                         , previous_empty_accounts ) =
+                  create_receiver ()
+                in
+                (* Source account has sufficient balance, increase the
                      receiver balance by the same amount.
-                  *)
-                  let%map receiver_balance =
-                    add_amount receiver_account.balance amount
-                  in
-                  (receiver_balance, source_balance)
-              | None ->
-                  (* Source has insufficient balance, do not transfer*)
-                  return (receiver_account.balance, source_account.balance)
-            in
-            set ledger receiver_location
-              {receiver_account with balance= receiver_balance'} ;
-            set ledger fee_payer_location
-              {fee_payer_account with balance= fee_payer_balance'} ;
-            set ledger source_location
-              {source_account with balance= source_balance'} ;
-            undo previous_empty_accounts
+                *)
+                let%bind receiver_balance' =
+                  add_amount receiver_account.balance amount
+                in
+                (* Charge the fee-payer for creating the account.
+                   Note: We don't have a better choice here: there is no other
+                   source of tokens in this transaction that is known to have
+                   accepted value.
+                *)
+                let%map fee_payer_balance' =
+                  sub_account_creation_fee_bal action fee_payer_account.balance
+                in
+                set ledger receiver_location
+                  {receiver_account with balance= receiver_balance'} ;
+                set ledger fee_payer_location
+                  {fee_payer_account with balance= fee_payer_balance'} ;
+                set ledger source_location
+                  {source_account with balance= source_balance'} ;
+                undo previous_empty_accounts
+            | None ->
+                (* Source has insufficient balance, do not transfer or create
+                   the receiver account.
+                *)
+                set ledger fee_payer_location fee_payer_account ;
+                set ledger source_location source_account ;
+                return (undo []) )
+    | Mint {receiver; amount} ->
+        let%bind () =
+          if source_account.token_owner then return ()
+          else Or_error.errorf "Only the token owner can mint new tokens"
+        in
+        let action, receiver_account, receiver_location =
+          if Account_id.equal source receiver then
+            (`Existed, source_account, source_location)
+          else
+            (* TODO: Do not use get_or_create here; we should not
+                       create a new account before we know that the transaction
+                       will go through and thus the creation fee has been paid.
+                    *)
+            get_or_create ledger receiver
+        in
+        let receiver_account =
+          match action with
+          | `Added ->
+              { receiver_account with
+                token_owner= false
+              ; token_whitelist= source_account.token_whitelist
+              ; token_blocked= false }
+          | `Existed ->
+              receiver_account
+        in
+        let previous_empty_accounts =
+          previous_empty_accounts action receiver
+        in
+        let%bind receiver_balance' =
+          add_amount receiver_account.balance amount
+        in
+        let undo =
+          { Undo.User_command_undo.common
+          ; body= Payment {previous_empty_accounts} }
+        in
+        if Token_id.equal fee_token token then (
+          (* source_location = fee_payer_location *)
+          let%map source_balance' =
+            sub_account_creation_fee_bal action source_account.balance
+          in
+          set ledger source_location
+            {source_account with balance= source_balance'} ;
+          set ledger receiver_location
+            {receiver_account with balance= receiver_balance'} ;
+          undo )
+        else
+          (* Charge the fee-payer for creating the account. *)
+          let%map fee_payer_balance' =
+            sub_account_creation_fee_bal action fee_payer_account.balance
+          in
+          set ledger fee_payer_location
+            {fee_payer_account with balance= fee_payer_balance'} ;
+          set ledger source_location source_account ;
+          set ledger receiver_location
+            {receiver_account with balance= receiver_balance'} ;
+          undo
+    | Mint_new _ ->
+        (* TODO: Add support for new tokens from the protocol state. *)
+        Or_error.errorf "Minting new tokens is not yet supported"
+    | (Add_to_blacklist receiver | Add_to_whitelist receiver) as body ->
+        let token_blocked =
+          match body with
+          | Add_to_blacklist _ ->
+              true
+          | Add_to_whitelist _ ->
+              false
+          | _ ->
+              assert false
+        in
+        let%bind () =
+          if source_account.token_owner then return ()
+          else
+            Or_error.errorf
+              "Only the token owner can block or unblock accounts"
+        in
+        let%bind action, receiver_account, receiver_location =
+          if Account_id.equal source receiver then
+            Or_error.errorf
+              "Cannot block or unblock the token owner's own account"
+          else
+            (* TODO: Do not use get_or_create here; we should not create a new
+               account before we know that the transaction will go through and
+               thus the creation fee has been paid.
+            *)
+            return (get_or_create ledger receiver)
+        in
+        let blocked = receiver_account.token_blocked in
+        let receiver_account =
+          match action with
+          | `Added ->
+              { receiver_account with
+                token_owner= false
+              ; token_whitelist= source_account.token_whitelist
+              ; token_blocked }
+          | `Existed ->
+              {receiver_account with token_blocked}
+        in
+        let previous_empty_accounts =
+          previous_empty_accounts action receiver
+        in
+        let undo =
+          { Undo.User_command_undo.common
+          ; body= Add_to_list {previous_empty_accounts; blocked} }
+        in
+        if Token_id.equal fee_token token then (
+          (* source_location = fee_payer_location *)
+          let%map source_balance' =
+            sub_account_creation_fee_bal action source_account.balance
+          in
+          set ledger source_location
+            {source_account with balance= source_balance'} ;
+          set ledger receiver_location receiver_account ;
+          undo )
+        else
+          (* Charge the fee-payer for creating the account. *)
+          let%map fee_payer_balance' =
+            sub_account_creation_fee_bal action fee_payer_account.balance
+          in
+          set ledger fee_payer_location
+            {fee_payer_account with balance= fee_payer_balance'} ;
+          set ledger source_location source_account ;
+          set ledger receiver_location receiver_account ;
+          undo
 
   let apply_user_command ledger
       (user_command : User_command.With_valid_signature.t) =
@@ -775,7 +943,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     let open Or_error.Let_syntax in
     let signer_pk = Public_key.compress signer in
     (* Get account location for the source. *)
-    let token = Account_id.token_id (User_command.Payload.receiver payload) in
+    let token = User_command.Payload.token payload in
     let nonce = User_command.Payload.nonce payload in
     let source = Account_id.create signer_pk token in
     let%bind source_location = location_of_account' ledger "" source in
@@ -847,7 +1015,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
               add_account_creation_fee_bal action fee_payer_account.balance
             in
             let%map receiver_balance' =
-              add_amount receiver_account.balance amount
+              sub_amount receiver_account.balance amount
             in
             set ledger fee_payer_location
               {fee_payer_account with balance= fee_payer_balance'} ;
@@ -856,6 +1024,63 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             set ledger receiver_location
               {receiver_account with balance= receiver_balance'} ;
             remove_accounts_exn ledger previous_empty_accounts
+    | Mint {amount; receiver}, Payment {previous_empty_accounts} ->
+        let action =
+          if List.mem previous_empty_accounts receiver ~equal:Account_id.equal
+          then `Added
+          else `Existed
+        in
+        let%bind fee_payer_balance' =
+          add_account_creation_fee_bal action fee_payer_account.balance
+        in
+        let fee_payer_account =
+          {fee_payer_account with balance= fee_payer_balance'}
+        in
+        let%bind receiver_location =
+          location_of_account' ledger "receiver" receiver
+        in
+        let%bind receiver_account =
+          if Account_id.equal fee_payer receiver then return fee_payer_account
+          else if Account_id.equal source receiver then return source_account
+          else get' ledger "receiver" receiver_location
+        in
+        let%map receiver_balance' =
+          sub_amount receiver_account.balance amount
+        in
+        set ledger source_location source_account ;
+        set ledger fee_payer_location fee_payer_account ;
+        set ledger receiver_location
+          {receiver_account with balance= receiver_balance'} ;
+        remove_accounts_exn ledger previous_empty_accounts
+    | Mint_new _, _ ->
+        (* TODO: Implement undo for Mint_new. *)
+        failwith "Cannot undo Mint_new; not implemented"
+    | ( (Add_to_blacklist receiver | Add_to_whitelist receiver)
+      , Add_to_list {previous_empty_accounts; blocked} ) ->
+        let action =
+          if List.mem previous_empty_accounts receiver ~equal:Account_id.equal
+          then `Added
+          else `Existed
+        in
+        let%bind fee_payer_balance' =
+          add_account_creation_fee_bal action fee_payer_account.balance
+        in
+        let fee_payer_account =
+          {fee_payer_account with balance= fee_payer_balance'}
+        in
+        let%bind receiver_location =
+          location_of_account' ledger "receiver" receiver
+        in
+        let%map receiver_account =
+          if Account_id.equal fee_payer receiver then return fee_payer_account
+          else if Account_id.equal source receiver then return source_account
+          else get' ledger "receiver" receiver_location
+        in
+        set ledger source_location source_account ;
+        set ledger fee_payer_location fee_payer_account ;
+        set ledger receiver_location
+          {receiver_account with token_blocked= blocked} ;
+        remove_accounts_exn ledger previous_empty_accounts
     | _, _ ->
         failwith "Undo/command mismatch"
 

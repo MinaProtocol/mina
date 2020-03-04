@@ -60,6 +60,10 @@ let currency_consumed :
           (* The fee-payer is also the sender account, include the amount. *)
           amount
         else zero
+    | Mint _
+    | Mint_new _
+    | Add_to_blacklist _
+    | Add_to_whitelist _
     | Stake_delegation _ ->
         zero)
 

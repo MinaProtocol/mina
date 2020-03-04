@@ -66,6 +66,12 @@ module User_command = struct
         payment.receiver
     | Stake_delegation (Set_delegate delegation) ->
         Account_id.create delegation.new_delegate Token_id.default
+    | Mint payload ->
+        payload.receiver
+    | Mint_new payload ->
+        Account_id.create payload.receiver_pk Token_id.invalid
+    | Add_to_blacklist account_id | Add_to_whitelist account_id ->
+        account_id
 
   let encode {With_hash.data= user_command; hash} first_seen =
     let payload = User_command.payload user_command in
@@ -83,6 +89,12 @@ module User_command = struct
              | Payment payment ->
                  payment.amount
              | Stake_delegation _ ->
+                 Currency.Amount.zero
+             | Mint payload ->
+                 payload.amount
+             | Mint_new payload ->
+                 payload.amount
+             | Add_to_blacklist _ | Add_to_whitelist _ ->
                  Currency.Amount.zero )
 
       method fee = some @@ Fee.serialize (User_command.fee user_command)
@@ -116,7 +128,15 @@ module User_command = struct
              | Payment _ ->
                  `Payment
              | Stake_delegation _ ->
-                 `Delegation )
+                 `Delegation
+             | Mint _ ->
+                 `Mint
+             | Mint_new _ ->
+                 `Mint_new
+             | Add_to_blacklist _ ->
+                 `Blacklist
+             | Add_to_whitelist _ ->
+                 `Whitelist )
     end
 
   let encode_as_obj_rel_insert_input user_command_with_hash first_seen =
@@ -137,6 +157,23 @@ module User_command = struct
           User_command.Payload.Body.Payment
             { receiver= Account_id.create receiver Token_id.default
             ; amount= obj#amount }
+      | `Mint ->
+          (* TODO: Allow GraphQL to set the token ID. *)
+          User_command.Payload.Body.Mint
+            { receiver= Account_id.create receiver Token_id.invalid
+            ; amount= obj#amount }
+      | `Mint_new ->
+          (* TODO: Allow GraphQL to set the whitelist parameter. *)
+          User_command.Payload.Body.Mint_new
+            {receiver_pk= receiver; amount= obj#amount; whitelist= false}
+      | `Blacklist ->
+          (* TODO: Allow GraphQL to set the token ID. *)
+          User_command.Payload.Body.Add_to_blacklist
+            (Account_id.create receiver Token_id.invalid)
+      | `Whitelist ->
+          (* TODO: Allow GraphQL to set the token ID. *)
+          User_command.Payload.Body.Add_to_whitelist
+            (Account_id.create receiver Token_id.invalid)
     in
     let payload =
       User_command_payload.create ~fee:obj#fee ~nonce:obj#nonce

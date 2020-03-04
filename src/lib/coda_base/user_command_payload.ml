@@ -159,6 +159,10 @@ module Body = struct
       type t =
         | Payment of Payment_payload.Stable.V1.t
         | Stake_delegation of Stake_delegation.Stable.V1.t
+        | Mint of Mint_payload.Stable.V1.t
+        | Mint_new of Mint_new_payload.Stable.V1.t
+        | Add_to_blacklist of Account_id.Stable.V1.t
+        | Add_to_whitelist of Account_id.Stable.V1.t
       [@@deriving compare, eq, sexp, hash, yojson]
 
       let to_latest = Fn.id
@@ -168,6 +172,10 @@ module Body = struct
   type t = Stable.Latest.t =
     | Payment of Payment_payload.t
     | Stake_delegation of Stake_delegation.t
+    | Mint of Mint_payload.t
+    | Mint_new of Mint_new_payload.t
+    | Add_to_blacklist of Account_id.t
+    | Add_to_whitelist of Account_id.t
   [@@deriving eq, sexp, hash, yojson]
 
   module Tag = Transaction_union_tag
@@ -178,14 +186,35 @@ module Body = struct
       (variant2 (Payment_payload.gen ~max_amount) Stake_delegation.gen)
       ~f:(function `A p -> Payment p | `B d -> Stake_delegation d)
 
+  let token (t : t) =
+    match t with
+    | Payment payload ->
+        Account_id.token_id payload.receiver
+    | Stake_delegation _ ->
+        Token_id.default
+    | Mint payload ->
+        Account_id.token_id payload.receiver
+    | Mint_new _ ->
+        Token_id.invalid
+    | Add_to_blacklist account ->
+        Account_id.token_id account
+    | Add_to_whitelist account ->
+        Account_id.token_id account
+
   let receiver (t : t) =
     match t with
     | Payment payload ->
         payload.Payment_payload.Poly.receiver
     | Stake_delegation payload ->
         Account_id.create (Stake_delegation.receiver payload) Token_id.default
-
-  let token t = Account_id.token_id (receiver t)
+    | Mint payload ->
+        payload.receiver
+    | Mint_new payload ->
+        Account_id.create payload.receiver_pk Token_id.invalid
+    | Add_to_blacklist account ->
+        account
+    | Add_to_whitelist account ->
+        account
 end
 
 module Poly = struct
@@ -237,7 +266,7 @@ let body (t : t) = t.body
 
 let receiver (t : t) = Body.receiver t.body
 
-let token t = Account_id.token_id (receiver t)
+let token (t : t) = Body.token t.body
 
 let amount (t : t) =
   match t.body with
@@ -245,9 +274,16 @@ let amount (t : t) =
       Some payload.Payment_payload.Poly.amount
   | Stake_delegation _ ->
       None
+  | Mint payload ->
+      Some payload.amount
+  | Mint_new payload ->
+      Some payload.amount
+  | Add_to_blacklist _ ->
+      None
+  | Add_to_whitelist _ ->
+      None
 
-let is_payment (t : t) =
-  match t.body with Payment _ -> true | Stake_delegation _ -> false
+let is_payment (t : t) = match t.body with Payment _ -> true | _ -> false
 
 let accounts_accessed (t : t) =
   match t.body with
@@ -255,6 +291,14 @@ let accounts_accessed (t : t) =
       [payload.receiver]
   | Stake_delegation _ ->
       []
+  | Mint payload ->
+      [payload.receiver]
+  | Mint_new payload ->
+      [Account_id.create payload.receiver_pk Token_id.invalid]
+  | Add_to_blacklist account ->
+      [account]
+  | Add_to_whitelist account ->
+      [account]
 
 let dummy : t =
   { common=

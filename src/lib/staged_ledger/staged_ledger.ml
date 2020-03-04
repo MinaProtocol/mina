@@ -350,12 +350,12 @@ module T = struct
   let apply_transaction_and_get_witness ledger current_stack s
       state_body_hash_opt =
     let open Deferred.Let_syntax in
-    let public_keys = function
+    let account_ids =
+      match s with
       | Transaction.Fee_transfer t ->
           Fee_transfer.receiver_ids t |> One_or_two.to_list
       | User_command t ->
-          let t = (t :> User_command.t) in
-          User_command.accounts_accessed t
+          User_command.accounts_accessed (User_command.forget_check t)
       | Coinbase c ->
           let ft_receivers =
             Option.value_map c.fee_transfer ~default:[] ~f:(fun ft ->
@@ -363,9 +363,26 @@ module T = struct
           in
           Account_id.create c.receiver Token_id.default :: ft_receivers
     in
+    let next_token_id = ref None in
+    let account_ids =
+      List.map account_ids ~f:(fun aid ->
+          if Token_id.equal (Account_id.token_id aid) Token_id.invalid then
+            let token_id =
+              match !next_token_id with
+              | None ->
+                  (* TODO: Extract next token ID from protocol state. *)
+                  let next_token = Token_id.(next default) in
+                  next_token_id := Some next_token ;
+                  next_token
+              | Some tid ->
+                  tid
+            in
+            Account_id.create (Account_id.public_key aid) token_id
+          else aid )
+    in
     let ledger_witness =
       measure "sparse ledger" (fun () ->
-          Sparse_ledger.of_ledger_subset_exn ledger (public_keys s) )
+          Sparse_ledger.of_ledger_subset_exn ledger account_ids )
     in
     let%bind () = Async.Scheduler.yield () in
     let r =

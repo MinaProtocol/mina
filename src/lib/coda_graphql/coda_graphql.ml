@@ -760,7 +760,11 @@ module Types = struct
               with
               | Stake_delegation _ ->
                   true
-              | Payment _ ->
+              | Payment _
+              | Mint _
+              | Mint_new _
+              | Add_to_blacklist _
+              | Add_to_whitelist _ ->
                   false )
         ; field "nonce" ~typ:(non_null int) ~doc:"Nonce of the transaction"
             ~args:Arg.[]
@@ -789,9 +793,15 @@ module Types = struct
                 User_command_payload.body (User_command.payload payment)
               with
               | Payment {Payment_payload.Poly.receiver; _} ->
-                  Account_id.public_key @@ receiver
+                  Account_id.public_key receiver
               | Stake_delegation (Set_delegate {new_delegate}) ->
-                  new_delegate )
+                  new_delegate
+              | Mint {receiver; _} ->
+                  Account_id.public_key receiver
+              | Mint_new {receiver_pk; _} ->
+                  receiver_pk
+              | Add_to_blacklist account_id | Add_to_whitelist account_id ->
+                  Account_id.public_key account_id )
         ; field "toAccount"
             ~typ:(non_null AccountObj.account)
             ~doc:"Account of the receiver"
@@ -805,6 +815,12 @@ module Types = struct
                     Account_id.public_key @@ receiver
                 | Stake_delegation (Set_delegate {new_delegate}) ->
                     new_delegate
+                | Mint {receiver; _} ->
+                    Account_id.public_key receiver
+                | Mint_new {receiver_pk; _} ->
+                    receiver_pk
+                | Add_to_blacklist account_id | Add_to_whitelist account_id ->
+                    Account_id.public_key account_id
               in
               AccountObj.get_best_ledger_account coda pk )
         ; result_field_no_inputs "amount" ~typ:(non_null uint64)
@@ -820,6 +836,10 @@ module Types = struct
                   Ok (amount |> Currency.Amount.to_uint64)
               | Stake_delegation _ ->
                   (* Stake delegation does not have an amount, so we set it to 0 *)
+                  Ok Unsigned.UInt64.zero
+              | Mint {amount; _} | Mint_new {amount; _} ->
+                  Ok (amount |> Currency.Amount.to_uint64)
+              | Add_to_blacklist _ | Add_to_whitelist _ ->
                   Ok Unsigned.UInt64.zero )
         ; field "fee" ~typ:(non_null uint64)
             ~doc:"Fee that sender is willing to pay for making the transaction"

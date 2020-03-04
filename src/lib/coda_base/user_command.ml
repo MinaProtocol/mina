@@ -98,7 +98,7 @@ let fee_payer {Poly.signer; payload; _} =
 
 let receiver = Fn.compose Payload.receiver payload
 
-let source {Poly.signer; payload; _} =
+let source ({signer; payload; _} : t) =
   Account_id.create (Public_key.compress signer) (Payload.token payload)
 
 let amount = Fn.compose Payload.amount payload

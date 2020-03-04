@@ -35,6 +35,14 @@ val of_string : string -> t
 *)
 val default : t
 
+(** An invalid token ID. This should be used for transactions that will mint
+    new tokens, where the token ID is not known yet. This token should not
+    appear in the ledger.
+*)
+val invalid : t
+
+val next : t -> t
+
 val gen : t Quickcheck.Generator.t
 
 val unpack : t -> bool list
@@ -58,6 +66,8 @@ module Checked : sig
 
   module Assert : sig
     val equal : var -> var -> (unit, _) Checked.t
+
+    val not_equal : var -> var -> (unit, _) Checked.t
   end
 end
 

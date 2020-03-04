@@ -36,7 +36,8 @@ module Message = struct
             ; nonce
             ; valid_until
             ; memo }
-        ; body= {Transaction_union_payload.Body.amount; account; tag} } =
+        ; body= {Transaction_union_payload.Body.amount; account; tag; whitelist}
+        } =
       Transaction_union_payload.of_user_command_payload t
     in
     let open Coda_numbers in
@@ -60,8 +61,8 @@ module Message = struct
       ; User_command_memo.to_bits memo
       ; Amount.to_bits amount
       ; account_id_bits account
-      ; (let x, y = Transaction_union_tag.to_bits tag in
-         [x; y]) ]
+      ; Transaction_union_tag.to_bits tag
+      ; [whitelist] ]
     |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
     |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
     |> Tock.Field.project

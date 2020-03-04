@@ -40,7 +40,11 @@ let to_string = Field.to_string
 
 let of_string = Field.of_string
 
+let invalid = Field.zero
+
 let default = Field.one
+
+let next x = Field.(x + one)
 
 let gen = Field.gen_uniform
 
@@ -68,6 +72,8 @@ module Checked = struct
 
   module Assert = struct
     let equal = Field.Checked.Assert.equal
+
+    let not_equal = Field.Checked.Assert.not_equal
   end
 end
 

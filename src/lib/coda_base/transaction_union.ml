@@ -58,7 +58,8 @@ let of_transaction : Transaction.t -> t = function
           ; body=
               { account= Account_id.create receiver Token_id.default
               ; amount
-              ; tag= Tag.Coinbase } }
+              ; tag= Tag.Coinbase
+              ; whitelist= false } }
       ; signer= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
   | Fee_transfer tr -> (
@@ -73,7 +74,8 @@ let of_transaction : Transaction.t -> t = function
             ; body=
                 { account= Account_id.create pk1 Token_id.default
                 ; amount= Amount.of_fee fee1
-                ; tag= Tag.Fee_transfer } }
+                ; tag= Tag.Fee_transfer
+                ; whitelist= false } }
         ; signer= Public_key.decompress_exn pk2
         ; signature= Signature.dummy }
       in
