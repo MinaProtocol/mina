@@ -366,6 +366,7 @@ let make = () => {
   <NavWrapper keepAnnouncementBar=true>
     [|
       <SimpleButton name="Docs" link="/docs" />,
+      <SimpleButton name="Wiki" link="https://codawiki.com" />,
       <SimpleButton name="Blog" link="/blog" />,
       <SimpleButton name="Careers" link="/jobs" />,
       <SimpleButton name="Testnet" link="/testnet" />,
