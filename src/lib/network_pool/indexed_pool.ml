@@ -59,8 +59,7 @@ let currency_consumed :
         then
           (* The fee-payer is also the sender account, include the amount. *)
           amount
-        else
-          (* The payment won't affect the balance of this account. *)
+        else (* The payment won't affect the balance of this account. *)
           zero
     | Stake_delegation _ ->
         zero)
