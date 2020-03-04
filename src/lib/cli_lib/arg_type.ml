@@ -89,9 +89,8 @@ let consensus_time_unix cli_arg =
     Consensus_time.of_time
       Block_time.(
         Int64.of_int ms_since_epoch
-        |> Span.of_ms |> of_span_since_epoch |> Consensus_time.of_time
-        |> Consensus_time.(
-             normalize (Controller.basic ~logger:(Logger.null ()))))
+        |> Span.of_ms |> of_span_since_epoch
+        |> normalize (Controller.basic ~logger:(Logger.null ())))
     |> unwrap_cli_error cli_arg
   in
   map int ~f:slot_of_unix_time
