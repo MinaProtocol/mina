@@ -291,7 +291,7 @@ let daemon logger =
                ~metadata:[("config_directory", `String conf_dir)] ;
              make_version ~wipe_dir:false
        in
-       Memory_stats.log_memory_stats logger ;
+       Memory_stats.log_memory_stats logger ~process:"daemon" ;
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
