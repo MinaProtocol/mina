@@ -598,19 +598,6 @@ module Balance = struct
 
   [%%endif]
 
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Amount.Stable.V1.t [@@deriving sexp, compare, hash, yojson, eq]
-
-      let to_yojson = to_yojson
-
-      let of_yojson = of_yojson
-
-      let to_latest = Fn.id
-    end
-  end]
-
   let to_amount = Fn.id
 
   let add_amount = Amount.add
