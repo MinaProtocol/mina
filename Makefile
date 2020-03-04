@@ -63,7 +63,6 @@ clean:
 libp2p_helper:
 	$(WRAPAPP) bash -c "if [ -z \"$${USER}\" ]; then export USER=opam ; fi && source ~/.nix-profile/etc/profile.d/nix.sh && (if [ -z \"$${CACHIX_SIGNING_KEY+x}\" ]; then cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix;  else cachix use codaprotocol && cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix | cachix push codaprotocol ; fi)"
 
-
 GENESIS_DIR := $(TMPDIR)/coda_cache_dir
 
 # generate the actual ledger and store in a tar

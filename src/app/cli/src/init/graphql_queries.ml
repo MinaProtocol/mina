@@ -37,6 +37,16 @@ mutation ($password: String) {
 }
 |}]
 
+module Create_hd_account =
+[%graphql
+{|
+mutation ($hd_index: UInt32) {
+  createHDAccount(input: {index: $hd_index}) {
+    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+  }
+}
+|}]
+
 module Unlock_wallet =
 [%graphql
 {|
@@ -89,7 +99,7 @@ query pendingSnarkWork {
       work_id: workId
       }
     }
-    }
+  }
 |}]
 
 module Set_staking =
@@ -97,7 +107,9 @@ module Set_staking =
 {|
 mutation ($public_key: PublicKey) {
   setStaking(input : {publicKeys: [$public_key]}) {
-    lastStaking
+    lastStaking @bsDecoder(fn: "Decoders.public_key_array")
+    lockedPublicKeys @bsDecoder(fn: "Decoders.public_key_array")
+    currentStakingKeys @bsDecoder(fn: "Decoders.public_key_array")
     }
   }
 |}]

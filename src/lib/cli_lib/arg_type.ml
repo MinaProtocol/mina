@@ -77,6 +77,9 @@ let txn_nonce =
   let open Coda_base in
   Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
 
+let hd_index =
+  Command.Arg_type.map Command.Param.string ~f:Coda_numbers.Hd_index.of_string
+
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
 
