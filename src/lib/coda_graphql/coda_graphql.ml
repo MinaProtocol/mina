@@ -763,8 +763,8 @@ module Types = struct
               | Payment _
               | Mint _
               | Mint_new _
-              | Add_to_blacklist _
-              | Add_to_whitelist _ ->
+              | Disable_account _
+              | Enable_account _ ->
                   false )
         ; field "nonce" ~typ:(non_null int) ~doc:"Nonce of the transaction"
             ~args:Arg.[]
@@ -800,7 +800,7 @@ module Types = struct
                   Account_id.public_key receiver
               | Mint_new {receiver_pk; _} ->
                   receiver_pk
-              | Add_to_blacklist account_id | Add_to_whitelist account_id ->
+              | Disable_account account_id | Enable_account account_id ->
                   Account_id.public_key account_id )
         ; field "toAccount"
             ~typ:(non_null AccountObj.account)
@@ -819,7 +819,7 @@ module Types = struct
                     Account_id.public_key receiver
                 | Mint_new {receiver_pk; _} ->
                     receiver_pk
-                | Add_to_blacklist account_id | Add_to_whitelist account_id ->
+                | Disable_account account_id | Enable_account account_id ->
                     Account_id.public_key account_id
               in
               AccountObj.get_best_ledger_account coda pk )
@@ -839,7 +839,7 @@ module Types = struct
                   Ok Unsigned.UInt64.zero
               | Mint {amount; _} | Mint_new {amount; _} ->
                   Ok (amount |> Currency.Amount.to_uint64)
-              | Add_to_blacklist _ | Add_to_whitelist _ ->
+              | Disable_account _ | Enable_account _ ->
                   Ok Unsigned.UInt64.zero )
         ; field "fee" ~typ:(non_null uint64)
             ~doc:"Fee that sender is willing to pay for making the transaction"

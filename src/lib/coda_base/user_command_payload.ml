@@ -161,8 +161,8 @@ module Body = struct
         | Stake_delegation of Stake_delegation.Stable.V1.t
         | Mint of Mint_payload.Stable.V1.t
         | Mint_new of Mint_new_payload.Stable.V1.t
-        | Add_to_blacklist of Account_id.Stable.V1.t
-        | Add_to_whitelist of Account_id.Stable.V1.t
+        | Enable_account of Account_id.Stable.V1.t
+        | Disable_account of Account_id.Stable.V1.t
       [@@deriving compare, eq, sexp, hash, yojson]
 
       let to_latest = Fn.id
@@ -174,8 +174,8 @@ module Body = struct
     | Stake_delegation of Stake_delegation.t
     | Mint of Mint_payload.t
     | Mint_new of Mint_new_payload.t
-    | Add_to_blacklist of Account_id.t
-    | Add_to_whitelist of Account_id.t
+    | Enable_account of Account_id.t
+    | Disable_account of Account_id.t
   [@@deriving eq, sexp, hash, yojson]
 
   module Tag = Transaction_union_tag
@@ -196,9 +196,9 @@ module Body = struct
         Account_id.token_id payload.receiver
     | Mint_new _ ->
         Token_id.invalid
-    | Add_to_blacklist account ->
+    | Disable_account account ->
         Account_id.token_id account
-    | Add_to_whitelist account ->
+    | Enable_account account ->
         Account_id.token_id account
 
   let receiver (t : t) =
@@ -211,9 +211,9 @@ module Body = struct
         payload.receiver
     | Mint_new payload ->
         Account_id.create payload.receiver_pk Token_id.invalid
-    | Add_to_blacklist account ->
+    | Disable_account account ->
         account
-    | Add_to_whitelist account ->
+    | Enable_account account ->
         account
 end
 
@@ -278,9 +278,9 @@ let amount (t : t) =
       Some payload.amount
   | Mint_new payload ->
       Some payload.amount
-  | Add_to_blacklist _ ->
+  | Disable_account _ ->
       None
-  | Add_to_whitelist _ ->
+  | Enable_account _ ->
       None
 
 let is_payment (t : t) = match t.body with Payment _ -> true | _ -> false
@@ -295,9 +295,9 @@ let accounts_accessed (t : t) =
       [payload.receiver]
   | Mint_new payload ->
       [Account_id.create payload.receiver_pk Token_id.invalid]
-  | Add_to_blacklist account ->
+  | Disable_account account ->
       [account]
-  | Add_to_whitelist account ->
+  | Enable_account account ->
       [account]
 
 let dummy : t =

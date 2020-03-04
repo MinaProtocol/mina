@@ -6,14 +6,16 @@ module Poly : sig
   module Stable : sig
     module V1 : sig
       type ('public_key, 'amount, 'bool) t =
-        {receiver_pk: 'public_key; amount: 'amount; whitelist: 'bool}
+        { receiver_pk: 'public_key
+        ; amount: 'amount
+        ; approved_accounts_only: 'bool }
       [@@deriving eq, sexp, hash, yojson, compare]
     end
   end]
 
   type ('public_key, 'amount, 'bool) t =
         ('public_key, 'amount, 'bool) Stable.Latest.t =
-    {receiver_pk: 'public_key; amount: 'amount; whitelist: 'bool}
+    {receiver_pk: 'public_key; amount: 'amount; approved_accounts_only: 'bool}
   [@@deriving eq, sexp, hash, yojson, compare]
 end
 
@@ -32,7 +34,9 @@ end]
 type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
 val gen :
-  max_amount:Currency.Amount.t -> whitelist:bool -> t Quickcheck.Generator.t
+     max_amount:Currency.Amount.t
+  -> approved_accounts_only:bool
+  -> t Quickcheck.Generator.t
 
 type var =
   ( Signature_lib.Public_key.Compressed.var

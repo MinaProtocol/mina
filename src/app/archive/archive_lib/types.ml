@@ -70,7 +70,7 @@ module User_command = struct
         payload.receiver
     | Mint_new payload ->
         Account_id.create payload.receiver_pk Token_id.invalid
-    | Add_to_blacklist account_id | Add_to_whitelist account_id ->
+    | Disable_account account_id | Enable_account account_id ->
         account_id
 
   let encode {With_hash.data= user_command; hash} first_seen =
@@ -94,7 +94,7 @@ module User_command = struct
                  payload.amount
              | Mint_new payload ->
                  payload.amount
-             | Add_to_blacklist _ | Add_to_whitelist _ ->
+             | Disable_account _ | Enable_account _ ->
                  Currency.Amount.zero )
 
       method fee = some @@ Fee.serialize (User_command.fee user_command)
@@ -133,10 +133,10 @@ module User_command = struct
                  `Mint
              | Mint_new _ ->
                  `Mint_new
-             | Add_to_blacklist _ ->
-                 `Blacklist
-             | Add_to_whitelist _ ->
-                 `Whitelist )
+             | Disable_account _ ->
+                 `Disable
+             | Enable_account _ ->
+                 `Enable )
     end
 
   let encode_as_obj_rel_insert_input user_command_with_hash first_seen =
@@ -165,14 +165,16 @@ module User_command = struct
       | `Mint_new ->
           (* TODO: Allow GraphQL to set the whitelist parameter. *)
           User_command.Payload.Body.Mint_new
-            {receiver_pk= receiver; amount= obj#amount; whitelist= false}
-      | `Blacklist ->
+            { receiver_pk= receiver
+            ; amount= obj#amount
+            ; approved_accounts_only= false }
+      | `Disable ->
           (* TODO: Allow GraphQL to set the token ID. *)
-          User_command.Payload.Body.Add_to_blacklist
+          User_command.Payload.Body.Disable_account
             (Account_id.create receiver Token_id.invalid)
-      | `Whitelist ->
+      | `Enable ->
           (* TODO: Allow GraphQL to set the token ID. *)
-          User_command.Payload.Body.Add_to_whitelist
+          User_command.Payload.Body.Enable_account
             (Account_id.create receiver Token_id.invalid)
     in
     let payload =

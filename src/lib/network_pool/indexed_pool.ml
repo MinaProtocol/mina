@@ -62,8 +62,8 @@ let currency_consumed :
         else zero
     | Mint _
     | Mint_new _
-    | Add_to_blacklist _
-    | Add_to_whitelist _
+    | Disable_account _
+    | Enable_account _
     | Stake_delegation _ ->
         zero)
 

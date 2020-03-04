@@ -34,8 +34,7 @@ end = struct
 end
 
 module User_command_type = struct
-  type t =
-    [`Payment | `Delegation | `Mint | `Mint_new | `Blacklist | `Whitelist]
+  type t = [`Payment | `Delegation | `Mint | `Mint_new | `Disable | `Enable]
 
   let encode = function
     | `Payment ->
@@ -46,10 +45,10 @@ module User_command_type = struct
         `String "mint"
     | `Mint_new ->
         `String "mint new"
-    | `Blacklist ->
-        `String "blacklist"
-    | `Whitelist ->
-        `String "whitelist"
+    | `Disable ->
+        `String "disable"
+    | `Enable ->
+        `String "enable"
 
   let decode = function
     | `String "payment" ->
@@ -60,10 +59,10 @@ module User_command_type = struct
         `Mint
     | `String "mint new" ->
         `Mint_new
-    | `String "blacklist" ->
-        `Blacklist
-    | `String "whitelist" ->
-        `Whitelist
+    | `String "disable" ->
+        `Disable
+    | `String "enable" ->
+        `Enable
     | _ ->
         raise (Invalid_argument "Unexpected input to decode user command type")
 end

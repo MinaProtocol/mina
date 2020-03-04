@@ -307,13 +307,13 @@ let apply_user_command_exn t ({signer; payload; signature= _} : User_command.t)
   | Mint_new _ ->
       (* TODO: Add support for new tokens from the protocol state. *)
       assert false
-  | (Add_to_blacklist receiver | Add_to_whitelist receiver) as body ->
+  | (Disable_account receiver | Enable_account receiver) as body ->
       assert source_account.token_owner ;
       let token_blocked =
         match body with
-        | Add_to_blacklist _ ->
+        | Disable_account _ ->
             true
-        | Add_to_whitelist _ ->
+        | Enable_account _ ->
             false
         | _ ->
             assert false

@@ -38,14 +38,14 @@ module Body = struct
         ; whitelist= false }
     | Mint {receiver; amount} ->
         {tag= Tag.Mint; account= receiver; amount; whitelist= false}
-    | Mint_new {receiver_pk; amount; whitelist} ->
+    | Mint_new {receiver_pk; amount; approved_accounts_only} ->
         { tag= Tag.Mint
         ; account= Account_id.create receiver_pk Token_id.default
         ; amount
-        ; whitelist }
-    | Add_to_whitelist account ->
+        ; whitelist= approved_accounts_only }
+    | Enable_account account ->
         {tag= Tag.Mint; account; amount= Currency.Amount.zero; whitelist= true}
-    | Add_to_blacklist account ->
+    | Disable_account account ->
         {tag= Tag.Mint; account; amount= Currency.Amount.zero; whitelist= false}
 
   let gen ~fee =

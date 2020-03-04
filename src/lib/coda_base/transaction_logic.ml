@@ -423,7 +423,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           Or_error.errorf "Minting new tokens is not yet supported"
       | _ when Token_id.(equal invalid) token ->
           Or_error.errorf "The token for this command is invalid"
-      | (Mint _ | Add_to_whitelist _ | Add_to_blacklist _)
+      | (Mint _ | Enable_account _ | Disable_account _)
         when Token_id.(equal default) token ->
           Or_error.errorf "Cannot apply token commands to the default token"
       | _ ->
@@ -680,12 +680,12 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     | Mint_new _ ->
         (* TODO: Add support for new tokens from the protocol state. *)
         Or_error.errorf "Minting new tokens is not yet supported"
-    | (Add_to_blacklist receiver | Add_to_whitelist receiver) as body ->
+    | (Disable_account receiver | Enable_account receiver) as body ->
         let token_blocked =
           match body with
-          | Add_to_blacklist _ ->
+          | Disable_account _ ->
               true
-          | Add_to_whitelist _ ->
+          | Enable_account _ ->
               false
           | _ ->
               assert false
@@ -1055,7 +1055,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     | Mint_new _, _ ->
         (* TODO: Implement undo for Mint_new. *)
         failwith "Cannot undo Mint_new; not implemented"
-    | ( (Add_to_blacklist receiver | Add_to_whitelist receiver)
+    | ( (Disable_account receiver | Enable_account receiver)
       , Add_to_list {previous_empty_accounts; blocked} ) ->
         let action =
           if List.mem previous_empty_accounts receiver ~equal:Account_id.equal

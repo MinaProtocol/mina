@@ -8,14 +8,16 @@ module Poly = struct
   module Stable = struct
     module V1 = struct
       type ('public_key, 'amount, 'bool) t =
-        {receiver_pk: 'public_key; amount: 'amount; whitelist: 'bool}
+        { receiver_pk: 'public_key
+        ; amount: 'amount
+        ; approved_accounts_only: 'bool }
       [@@deriving eq, sexp, hash, yojson, compare]
     end
   end]
 
   type ('public_key, 'amount, 'bool) t =
         ('public_key, 'amount, 'bool) Stable.Latest.t =
-    {receiver_pk: 'public_key; amount: 'amount; whitelist: 'bool}
+    {receiver_pk: 'public_key; amount: 'amount; approved_accounts_only: 'bool}
   [@@deriving eq, sexp, hash, yojson, compare]
 end
 
@@ -46,35 +48,38 @@ let typ : (var, t) Typ.t =
         : 'a 'b 'c.    (unit, 'a -> 'b -> 'c -> unit) H_list.t
           -> ('a, 'b, 'c) Poly.t =
     let open H_list in
-    fun [receiver_pk; amount; whitelist] -> {receiver_pk; amount; whitelist}
+    fun [receiver_pk; amount; approved_accounts_only] ->
+      {receiver_pk; amount; approved_accounts_only}
   in
-  let to_hlist Poly.{receiver_pk; amount; whitelist} =
-    H_list.[receiver_pk; amount; whitelist]
+  let to_hlist Poly.{receiver_pk; amount; approved_accounts_only} =
+    H_list.[receiver_pk; amount; approved_accounts_only]
   in
   Typ.of_hlistable spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let to_input {Poly.receiver_pk; amount; whitelist} =
+let to_input {Poly.receiver_pk; amount; approved_accounts_only} =
   Random_oracle.Input.(
     append (Public_key.Compressed.to_input receiver_pk)
-    @@ append (bitstring (Amount.to_bits amount)) (bitstring [whitelist]))
+    @@ append
+         (bitstring (Amount.to_bits amount))
+         (bitstring [approved_accounts_only]))
 
-let var_to_input {Poly.receiver_pk; amount; whitelist} =
+let var_to_input {Poly.receiver_pk; amount; approved_accounts_only} =
   Random_oracle.Input.(
     append (Public_key.Compressed.Checked.to_input receiver_pk)
     @@ append
          (bitstring
             (Bitstring_lib.Bitstring.Lsb_first.to_list
                (Amount.var_to_bits amount)))
-         (bitstring [whitelist]))
+         (bitstring [approved_accounts_only]))
 
-let var_of_t {Poly.receiver_pk; amount; whitelist} =
+let var_of_t {Poly.receiver_pk; amount; approved_accounts_only} =
   { Poly.receiver_pk= Public_key.Compressed.var_of_t receiver_pk
   ; amount= Amount.var_of_t amount
-  ; whitelist= Boolean.var_of_value whitelist }
+  ; approved_accounts_only= Boolean.var_of_value approved_accounts_only }
 
-let gen ~max_amount ~whitelist =
+let gen ~max_amount ~approved_accounts_only =
   let open Quickcheck.Generator.Let_syntax in
   let%map receiver_pk = Public_key.Compressed.gen
   and amount = Amount.gen_incl Amount.zero max_amount in
-  Poly.{receiver_pk; amount; whitelist}
+  Poly.{receiver_pk; amount; approved_accounts_only}

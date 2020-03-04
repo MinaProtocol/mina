@@ -55,7 +55,7 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
           Some (Currency.Amount.of_fee fee)
       | Payment {amount; _} ->
           Currency.Amount.add_fee amount fee
-      | Mint _ | Mint_new _ | Add_to_blacklist _ | Add_to_whitelist _ ->
+      | Mint _ | Mint_new _ | Disable_account _ | Enable_account _ ->
           Some (Currency.Amount.of_fee fee)
     in
     Currency.Balance.sub_amount account.Account.Poly.balance cost
