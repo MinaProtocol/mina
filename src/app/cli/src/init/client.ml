@@ -575,7 +575,7 @@ let send_payment =
   let body =
     let open Command.Let_syntax in
     let open Cli_lib.Flag in
-    let%map_open receiver_pk = User_command.receiver
+    let%map_open receiver_pk = User_command.receiver_pk
     and token_id =
       flag "token" ~doc:"TOKEN_ID The token ID for the account"
         (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)
