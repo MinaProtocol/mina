@@ -9,7 +9,8 @@ open Rugelach_types
 
 (* Making this dynamic was a bit complicated. *)
 let permitted_domains =
-  [ Domain.Pow_2_roots_of_unity 17
+  [ Domain.Pow_2_roots_of_unity 14
+  ; Domain.Pow_2_roots_of_unity 17
   ; Pow_2_roots_of_unity 18
   ; Pow_2_roots_of_unity 19
   ]
@@ -17,6 +18,7 @@ let permitted_domains =
 let check_step_domains step_domains =
   Vector.iter step_domains ~f:(fun (h, k) ->
       List.iter [h;k] ~f:(fun d ->
+          printf "Domain %d\n%!" (Domain.log2_size d);
         assert
           (List.mem permitted_domains d ~equal:Domain.equal)))
 
@@ -27,77 +29,12 @@ let permitted_shifts =
   |> Int.Set.of_list
 
 
-(* TODO: Expose prev as a type parmeter so we can use it in the compiled version.
-   This compiles to a function prev -> a -> handler -> proof option
-*)
-
-(* For each thing in prev, should be able to look up a Spec in the map, which will enable us to
-   build the pack function for the recursive inputs and thus let us build main. Also will look up
-   the list of possible domain sizes which will make it possible to evaluate the polynomials we need to?
-*)
-
-(* Associated to each type T is a sequence of rules.
-   Let branching_{T,i} be the number of proofs composed in rule i.
-   Let max_branching_T = max_i branching_{T, i}.
-
-   Since we want the public inputs for all the rules in T to be the same
-   and the public inputs exposes the sgs used internally, our public input
-   will have max_branching_T many sgs as well as max_branching_T many "old_bulletproof_challenges".
-
-   Say the composed proofs inside of rule i have types
-   A_{i,1}, ..., A_{i, branching_{T, i}}.
-
-   Let local_max_branching_{i, j} = max_branching_{A_{i, j}}.
-   It is the "max branching" for the type which is the j^th composed proof in
-   rule i.
-
-   Let
-   max_local_max_branching_{T, j}
-   = max_{i, j <= branching_{T, i}} local_max_branching_{i, j}
-
-   It is the largest local_max_branching in the j^th slot of a branch in the type T.
-
-   max_{j <= branching_{T, i}} local
-*)
-
-(* 
-   In a branch i, for each of the branching_{T, i} inner proofs,
-
-   After verifying that proof, I get one sg value and one set of corresponding challenges.
-
-   I thus expose branching_{T, i} of each.
-
-   Also, each PC opening j in 1..branching_{T, i} itself includes 
-   local_max_branching_{i, j} local old sgs, which then requires
-   local_max_branching_{i, j} arrays of old BP challenges.
-
-
-   Also, to compute the combined inner products
-*)
-
 module Full_signature = struct
   type ('max_width, 'branches, 'maxes) t =
     { padded : ((int, 'branches) Vector.t, 'max_width) Vector.t
     ; maxes: (module Maxes.S with type length = 'max_width and type ns = 'maxes)
     }
 end
-
-module Signature = struct
-  module Summary = struct
-    type t =
-      { max_branching: int
-      ; max_local_max_branching: int array
-      }
-  end
-
-  module Branch_signature = struct
-    type t = Summary.t list
-  end
-
-  type t = Branch_signature.t list
-end
-
-type proof
 
 module Verifiable : sig
   type t
@@ -108,23 +45,6 @@ end = struct
   let verify _ = failwith ""
 end
 
-(*
-module type Proof_system_intf = sig
-  type statement
-  type prev_values
-
-  module Proof : sig
-    type t [@@deriving bin_io]
-
-    val to_verifiable : t -> statement -> Verifiable.t
-  end
-
-  (* TODO: Handlers as well *)
-  val provers
-    : (prev_values, < statement: statement; proof: Proof.t >) H2.T(Prover).t
-end
-*)
-
 module Pairing_index = struct
   type t = Snarky_bn382_backend.G1.Affine.t Abc.t Matrix_evals.t
 end
@@ -133,11 +53,9 @@ type dlog_index = Snarky_bn382_backend.G.Affine.t Abc.t Matrix_evals.t
 
 open Snarky_bn382_backend
 
-module P = Pairing_main
-
-type fq = Impls.Dlog_based.Field.Constant.t
-
-type g = Snarky_bn382_backend.G.Affine.t
+type g = 
+  Impls.Pairing_based.Field.Constant.t * Impls.Pairing_based.Field.Constant.t
+[@@deriving sexp, bin_io]
 type g1 =
   Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t
 [@@deriving sexp, bin_io]
@@ -146,7 +64,7 @@ type g1 =
 module Wrap_circuit_bulletproof_rounds = Nat.N17
 type 'a bp_vec = ('a, Wrap_circuit_bulletproof_rounds.n) Vector.t
 
-type dlog_opening = (fq, g) Types.Pairing_based.Openings.Bulletproof.t
+type dlog_opening = (Fq.t, g) Types.Pairing_based.Openings.Bulletproof.t
 
   module Pmain = Pairing_main.Make(struct
       include Pairing_main_inputs
@@ -165,7 +83,7 @@ module Dlog_proof = struct
   type t  =
         dlog_opening
         *
-        (g, fq) Rugelach_types.Pairing_marlin_types.Messages.t
+        (g, Fq.t) Rugelach_types.Pairing_marlin_types.Messages.t
 
   type var = 
       (Impls.Pairing_based.Fq.t, Pairing_main_inputs.G.t) Types.Pairing_based.Openings.Bulletproof.t
@@ -246,16 +164,6 @@ module Per_proof_witness = struct
           Pairing_main_inputs.G.typ
           Fq.typ))
 end
-
-let lookup_map (type a b c d) (univ : Types_map.t) (t : (a, b, c, d) Tag.t)
-    ~self ~default ~(f : (a, b, c, d) Types_map.Data.t -> _)
-  =
-  match Type_equal.Id.same_witness t self with
-  | Some _ -> default
-  | None ->
-    let T (other_id, d) = Hashtbl.find_exn univ (Type_equal.Id.uid t) in
-    let T = Type_equal.Id.same_witness_exn t other_id in
-    f d
 
 module Requests = struct
   open Snarky.Request
@@ -478,64 +386,7 @@ end
 
       end
 
-module H4_Length_1_to_2(F : T4) = struct
-  let rec length1_to_2
-    : type n xs ys a b.
-      (xs, ys, a, b) H4.T(F).t
-      -> (xs, n) Length.t
-      -> (ys, n) Length.t
-    =
-    fun xs n ->
-      match xs, n with
-      | [], Z -> Z
-      | _ :: xs, S n -> S (length1_to_2 xs n)
-end
-
-module Length_1_to_2(F : T3) = struct
-  let rec length1_to_2
-    : type n xs ys e.
-      (xs, ys, e) H2_1.T(F).t
-      -> (xs, n) Length.t
-      -> (ys, n) Length.t
-    =
-    fun xs n ->
-      match xs, n with
-      | [], Z -> Z
-      | _ :: xs, S n -> S (length1_to_2 xs n)
-end
-
 module B = Inductive_rule.B
-
-module H4_typ
-    (Impl: sig type field end) 
-    (F: T4)(Var : T3)(Val : T3)(C : sig
-      val f : ('var, 'value, 'n1, 'n2) F.t ->
-        ( ('var, 'n1, 'n2) Var.t, ('value, 'n1, 'n2) Val.t, Impl.field) Snarky.Typ.t
-  end)
-= struct
-  let transport, transport_var, tuple2,unit = Snarky.Typ.(transport, transport_var, tuple2, unit) 
-
-  let rec f : type vars values ns1 ns2. (vars, values, ns1, ns2) H4.T(F).t
-    ->  ( (vars, ns1, ns2) H3.T(Var).t, (values, ns1 ,ns2) H3.T(Val).t, Impl.field ) Snarky.Typ.t
-    =
-    fun ts ->
-      match ts with
-      | [] ->
-        let there _ = () in
-        transport (unit ())
-          ~there
-          ~back:(fun () : _ H3.T(Val).t -> [])
-        |> transport_var
-          ~there
-          ~back:(fun () : _ H3.T(Var).t -> [])
-      | t :: ts ->
-        transport (tuple2 (C.f t) (f ts))
-              ~there:(fun ((x :: xs) : _ H3.T(Val).t) -> (x, xs))
-              ~back:(fun (x, xs) -> x :: xs)
-            |> transport_var
-              ~there:(fun ((x :: xs) : _ H3.T(Var).t) -> (x, xs))
-              ~back:(fun (x, xs) -> x :: xs)
-end
 
 module Dummy = struct
   let pairing_acc : _ Pairing_marlin_types.Accumulator.t =
@@ -576,6 +427,17 @@ module Dummy = struct
       in
       { opening_check; degree_bound_checks
       }
+
+  let evals =
+    let e =
+      Dlog_marlin_types.Evals.of_vectors
+        (Vector.init Nat.N18.n ~f:(fun _ -> Fq.one),
+         Vector.init Nat.N3.n ~f:(fun _ -> Fq.one)
+        )
+    in
+    let ex = (e, Fq.zero) in
+    (ex, ex, ex)
+
 end
 
 (* TODO: Pad public input to max_branching *)
@@ -657,8 +519,7 @@ let step
               (fun (type var value n m) (d : (var, value, n, m) Tag.t) : (var, value) Typ.t ->
                 match Type_equal.Id.same_witness self d with
                 | Some T -> basic.typ
-                | None ->
-                    (Types_map.lookup d).typ
+                | None ->(Types_map.lookup d).typ
               ) d
             in
             let t =
@@ -676,11 +537,10 @@ let step
         local_signature_length
         local_branches_length
     in
-    let module Prev_typ = H4_typ(Impls.Pairing_based)(Typ_with_max_branching)(Per_proof_witness)(Per_proof_witness.Constant)(struct
+    let module Prev_typ = H4.Typ(Impls.Pairing_based)(Typ_with_max_branching)(Per_proof_witness)(Per_proof_witness.Constant)(struct
         let f = Fn.id
       end)
     in
-    let prevs_typ = Prev_typ.f prev_typs in
     (* stmt unfinalized length should be max_branching probably, with some
        kind of dummy values... or perhaps that can be handled in the wrap.
     *)
@@ -1239,29 +1099,6 @@ let wrap_main
   in
   ((module Req), main)
 
-(*
-module Full_signature = struct
-  type ('prev_varss, 'prev_valss) t = 
-    | T : 
-        ('prev_varss, 'ns, 'env) H2_1.T(E23(Length)).t
-          -> ('prev_varss, 'prev_valss, 'env)t
-end
-
-module Tags = H4.T(Tag)
-
-let rec lengths
-  : type prev_varss prev_valuess widhthss heightss.
-    (prev_varss, prev_valuess, widhtss, heightss) H2_1.T(Inductive_rule).t
-    -> (prev_varss, prev_valuess, env) Lengths.t
-  =
-  function
-  | [] -> T []
-  | T (prevs, _, _) :: rs ->
-    let T lengths = lengths rs in
-    let T (_, length) = Tags.length prevs in
-    T (length :: lengths)
-*)
-
 module Step_branch_data = struct
   (* TODO: Get rid of the vector. Just use an Hlist with an E03 *)
   type ('a_var
@@ -1292,10 +1129,6 @@ module Step_branch_data = struct
                and type local_signature= 'local_widths
                and type local_branches = 'local_heights
             )
-
-  (*
-        ; keypair: Impls.Pairing_based.Keypair.t
-     *)
         } -> 
 (
     'a_var, 'a_value, 'max_branching, 'branches,
@@ -1344,30 +1177,6 @@ module Nvector (N : Nat.Intf) = struct
   include Vector.Sexpable (N)
   let map (t : 'a t) = Vector.map t
 end
-
-module type Pred = sig
-  type succ
-  type n
-
-  val eq : (succ, n Nat.s) Type_equal.t
-end
-
-let pred_exn (type n) (module N : Nat.Intf with type n = n)
-  : (module Pred with type succ = n) =
-  match N.n with
-  | Z -> failwith "pred_exn: Z"
-  | S pred ->
-    let p : type k. k Nat.t -> (module Pred with type succ = k Nat.s) =
-      fun k ->
-        let module P = struct
-          type n = k
-          type succ = k Nat.s
-          let eq = Type_equal.T
-        end
-        in
-        (module P)
-    in
-    p pred
 
 (* TODO: Just use lists but for the bin_io use the vector. *)
 module type BS1 = sig type _ t [@@deriving bin_io, sexp] end
@@ -1423,14 +1232,6 @@ module Proof_ = struct
     type ('s, 'unfinalized_proofs, 'sgs, 'dlog_me_onlys, 'prev_evals) t =
       { statement:
           ( 'unfinalized_proofs
-            (*
-            (( Challenge.Constant.t
-            , Fq.t
-            , (Challenge.Constant.t, bool) Bulletproof_challenge.t Bp_vector.t
-            , Digest.Constant.t )
-            Types.Pairing_based.Proof_state.Per_proof.t
-            * bool)
-            Max_branching_v.t *)
           , ('s, 'sgs ) Me_only.Pairing_based.t
           , 'dlog_me_onlys
           )
@@ -1456,121 +1257,6 @@ module Proof_ = struct
       ; prev_evals: Fp.t Pairing_marlin_types.Evals.t
       ; prev_x_hat_beta_1: Fp.t
       ; proof: Dlog_based.Proof.t }
-  end
-end
-
-module Proof0 = struct
-  module Me_only = Reduced_me_only
-
-  module Statement = struct
-    module Pairing_based = struct
-      type ('challenge, 'digest, 'bp_challenge, 'fq, 'bool, 'g, 's, 'local_signature, 'branching) t_ =
-        ( (
-          (( 'challenge
-          , 'fq
-          , 'bp_challenge Bp_vector.t
-          , 'digest )
-          Types.Pairing_based.Proof_state.Per_proof.t
-          * 'bool), 'branching) Vector.t
-        , ('s, ('g, 'branching ) Vector.t ) Me_only.Pairing_based.t
-        , 'local_signature H1.T(Me_only.Dlog_based).t
-        )
-        Statement.Pairing_based.t
-
-      module Constant = struct
-        type ('s, 'local_signature, 'branching) t =
-          ( Challenge.Constant.t
-          , Digest.Constant.t
-          , (Challenge.Constant.t, bool) Bulletproof_challenge.t
-          , Fq.t
-          , bool
-          , g
-          , 's, 'local_signature, 'branching) t_
-      end
-    end
-
-    module Dlog_based = struct
-      type ('challenge, 'digest, 'fp, 'fq, 'bool, 'g, 's, 'signature_lub, 'branching_lub) t_ =
-        ( Challenge.Constant.t
-        , 'fp
-        , bool
-        , 'fq
-        , 'signature_lub H1.T(Me_only.Dlog_based).t
-        , 'digest
-        , ('s, ('g, 'branching_lub) Vector.t) Me_only.Pairing_based.t 
-        )
-        Statement.Dlog_based.t
-
-      module Constant = struct
-        type
-          ('s, 'signature_lub, 'branching_lub) t =
-          (Challenge.Constant.t
-          ,Digest.Constant.t, Fp.t, Fq.t, bool, g, 's, 'signature_lub, 'branching_lub) t_
-      end
-    end
-  end
-
-  module Pairing_based = struct
-    (* length(local_signature) = branching
-    
-       branching <= max_branching
-
-       local_signature is a type level list of all the max branchings of
-       the proofs in this local_signature.
-    *)
-    type ('s, 'local_signature, 'branching) t =
-      { statement:
-         ('s, 'local_signature, 'branching) Statement.Pairing_based.Constant.t
-      ; index: int
-      ; prev_evals: 
-        ((Fq.t Dlog_marlin_types.Evals.t * Fq.t) Triple.t, 'branching) Vector.t
-      ; proof: Pairing_based.Proof.t }
-
-    type ('s, 'signature_lub, 'branching_lub) lub =
-      { statement:
-          ( 's, 'signature_lub, 'branching_lub)
-          Statement.Pairing_based.Constant.t
-      ; index: int
-      ; prev_evals: 
-        ((Fq.t Dlog_marlin_types.Evals.t * Fq.t) Triple.t, 'branching_lub) Vector.t
-      ; proof: Pairing_based.Proof.t }
-  end
-
-  module Dlog_based = struct
-    type ('s, 'signature_lub, 'branching_lub) t =
-      { statement:
-          ('s, 'signature_lub, 'branching_lub) Statement.Dlog_based.Constant.t
-      ; prev_evals: Fp.t Pairing_marlin_types.Evals.t
-      ; prev_x_hat_beta_1: Fp.t
-      ; proof: Dlog_based.Proof.t }
-  end
-end
-
-module Proof(Max_branching_v :BS1)  = struct
-  module Me_only = Reduced_me_only
-
-  module Pairing_based = struct
-    type ('s, 'max_local_max_branchings) t =
-      ( 's,  (( Challenge.Constant.t
-            , Fq.t
-            , (Challenge.Constant.t, bool) Bulletproof_challenge.t Bp_vector.t
-            , Digest.Constant.t )
-            Types.Pairing_based.Proof_state.Per_proof.t
-            * bool)
-          Max_branching_v.t,
-        g Max_branching_v.t,
-        'max_local_max_branchings H1.T(Me_only.Dlog_based).t,
-        (Fq.t Dlog_marlin_types.Evals.t * Fq.t) Triple.t Max_branching_v.t
-      )
-      Proof_.Pairing_based.t
-  end
-
-  module Dlog_based = struct
-    type ('s, 'max_local_max_branchings) t =
-      ( 's
-      , 'max_local_max_branchings Me_only.Dlog_based.t
-      , g Max_branching_v.t)
-      Proof_.Dlog_based.t
   end
 end
 
@@ -1820,23 +1506,19 @@ module Prev_wrap_domains (A :T0)(A_value: T0) = struct
       ~self
       ~(choices : (xs, ys, ws, hs) H4.T(I).t)
       =
+    let module M_inner = H4.Map(Tag)(E04(Domains))(struct
+        let f : type a b c d. (a, b, c, d) Tag.t -> Domains.t =
+          fun t ->
+            Types_map.lookup_map t ~self ~default:Fix_domains.rough_domains
+              ~f:(fun d -> d.wrap_domains)
+      end)
+    in
     let module M = H4.Map(I)(H4.T(E04(Domains)))(struct
         let f : type vars values env widths heights.
           (vars, values, widths, heights) I.t
           -> (vars, values, widths, heights) H4.T(E04(Domains)).t
           =
-          fun rule ->
-            let module M = H4.Map(Tag)(E04(Domains))(struct
-                let f : type a b c d. (a, b, c, d) Tag.t -> Domains.t =
-                  fun t ->
-                    match Type_equal.Id.same_witness t self with
-                    | Some _ -> Fix_domains.rough_domains
-                    | None ->
-                      let d = Types_map.lookup t in
-                      d.wrap_domains
-              end)
-            in
-            M.f rule.prevs
+          fun rule -> M_inner.f rule.prevs
       end)
     in
     M.f choices
@@ -1881,58 +1563,6 @@ let f
     (Impls.Dlog_based.input ())
     main
 end
-
-(*
-module type Proof_intf = sig
-  type statement
-  type t [@@deriving bin_io]
-
-  val to_generic : t -> statement Generic_proof.Dlog_based.t
-end
-
-module type Prover_intf = sig
-  type statement
-  type prev_values
-
-  val prove
-    :  handler:Snarky.Request.Handler.t
-    -> prev_values H1.T(Generic_proof).t
-    -> statement
-    -> statement Generic_proof.t
-end
-*)
-
-(*
-let (transaction_snark,
-     (module Proof : sig type _ t [@@deriving bin_io] end),
-     [ (module Base : sig
-         val prove
-           : handler:Handler.t
-           -> (unit, unit, _) H2_1.T(E13_on_second(Proof)).t
-           -> TxnSnarkStatement.t 
-           -> TxnSnarkStatement.t Proof.t
-
-         val verify
-           : TxnSnarkStatement.t Proof.t
-           -> Verifiable_component.t list
-       end)
-     ; (module Merge)
-     ]
-    )
-  =
-  let base =
-    T ( [], (fun [] stmt -> (failwith "todo", [])), fun _ -> failwith "todo" )
-  in
-  let merge self  =
-    T ( [ self; self ]
-      , (fun [ l; r ] stmt -> failwith "todo")
-      , (fun [ l; r ] stmt -> failwith "todo") )
-  in
-  compile (fun ~self ->
-    [ T ([
-    ] 
-    )
-*)
 
 let wrap (type max_branching max_local_max_branchings)
     max_branching
@@ -2130,17 +1760,16 @@ let wrap (type max_branching max_local_max_branchings)
     ; prev_x_hat_beta_1= x_hat_beta_1 }
     : _ Proof_.Dlog_based.t )
 
-  module Prev_proof = struct
-    type ('s, 'max_width, 'max_height) t =
-      ( 's
-      , 
-        ( 'max_width
-        ) Proof_.Me_only.Dlog_based.t
+module Prev_proof = struct
+  type ('s, 'max_width, 'max_height) t =
+    ( 's
+    , 
+      ( 'max_width
+      ) Proof_.Me_only.Dlog_based.t
 
-      , (g, 'max_width) Vector.t
-      ) Proof_.Dlog_based.t
-
-  end
+    , (g, 'max_width) Vector.t
+    ) Proof_.Dlog_based.t
+end
 
 module Step 
     (A : T0)
@@ -2149,16 +1778,6 @@ module Step
        val to_field_elements: t -> Fp.t array
            end)
     (Max_branching : Nat.Add.Intf_transparent)
-    (*
-    (Req : Requests.Step.S with type statement = A_value.t)
-    (Inputs : sig
-       type prev_vars
-
-       module Max_branching : Nat.Add.Intf
-
-       val prev_vars_length : (prev_vars, Req.branching) Length.t
-     end)
-       *)
 = struct
 
   let public_input_of_statement prev_statement =
@@ -2174,20 +1793,8 @@ module Step
     type t = Fq.t Dlog_marlin_types.Evals.t Triple.t
   end
 
-  let dummy_evals =
-    let e =
-      Dlog_marlin_types.Evals.of_vectors
-        (Vector.init Nat.N18.n ~f:(fun _ -> Fq.one),
-         Vector.init Nat.N3.n ~f:(fun _ -> Fq.one)
-        )
-    in
-    let ex = (e, Fq.zero) in
-    (ex, ex, ex)
-
-
   let f
-      (type self_branches max_branching prev_vars prev_values local_widths local_heights
-      )
+      (type self_branches prev_vars prev_values local_widths local_heights)
       ((T branch_data) :
          (A.t, A_value.t, Max_branching.n, self_branches,
           prev_vars, prev_values, local_widths, local_heights) Step_branch_data.t)
@@ -2211,8 +1818,8 @@ module Step
       prev_vars_length
   in
   let prev_values_length =
-    let module L12 = H4_Length_1_to_2(Tag) in
-    (L12.length1_to_2
+    let module L12 = H4.Length_1_to_2(Tag) in
+    (L12.f
         branch_data.rule.prevs
         prev_vars_length)
   in
@@ -2444,10 +2051,6 @@ module Step
       let module V = H1.To_vector(Bool) in
           V.f prev_vars_length inners_should_verify
   in
-  let module Padded_dlog_me_only = struct
-    type t
-  end
-  in
   let next_statement : _ Statement.Pairing_based.t =
     let unfinalized_proofs =
         (Vector.zip unfinalized_proofs
@@ -2579,7 +2182,7 @@ module Step
              triple_zip es x_hat ) )
         lte
         Max_branching.n
-        dummy_evals
+        Dummy.evals
   }
 
 end
@@ -2608,6 +2211,7 @@ module Make(A : Statement_var_intf)(A_value: Statement_value_intf)
   module HIR = H4.T(IR)
 
   let max_local_max_branchings
+    ~self
       (type n) (module Max_branching : Nat.Intf with type n = n)
       branches choices
     =
@@ -2619,9 +2223,12 @@ module Make(A : Statement_var_intf)(A_value: Statement_value_intf)
           module V = H4.To_vector(Int)
           module HT = H4.T(Tag)
           module M = H4.Map(Tag)(E04(Int))(struct
-              let f (type a) t =
-                let (module N : Nat.Add.Intf with type n = a) = Types_map.max_branching t in
-                Nat.to_int N.n
+              let f (type a b c d) (t : (a,b,c,d) Tag.t) : int =
+                if Type_equal.Id.same t self 
+                then Nat.to_int Max_branching.n
+                else
+                  let (module M) = Types_map.max_branching t in
+                  Nat.to_int M.n
             end)
 
           let f : type a b c d. (a, b, c, d) IR.t -> Local_max_branchings.t =
@@ -2708,6 +2315,7 @@ module Make(A : Statement_var_intf)(A_value: Statement_value_intf)
         (module Max_branching)
         prev_varss_length
         choices
+        ~self
     in
     let full_signature =
       { Full_signature.padded; maxes= (module Maxes) }
@@ -2770,6 +2378,7 @@ module Make(A : Statement_var_intf)(A_value: Statement_value_intf)
               ~bulletproof_log2:Wrap_circuit_bulletproof_rounds.n 
 
           let f ((T b) : _ Branch_data.t) =
+            Core.printf "HIHI %d\n%!" b.index;
             let T (typ, conv) = etyp in
             let main x () = b.main (conv x) in
             Impls.Pairing_based.generate_keypair
@@ -2804,11 +2413,8 @@ module Make(A : Statement_var_intf)(A_value: Statement_value_intf)
               fun rule ->
                 let module M = H4.Map(Tag)(E04(Domains))(struct
                     let f (type a b c d) (t : (a, b, c, d) Tag.t) : Domains.t =
-                      match Type_equal.Id.same_witness t self with
-                      | Some T -> wrap_domains
-                      | None ->
-                        let d = Types_map.lookup t in
-                        d.wrap_domains
+                      Types_map.lookup_map t ~self ~default:wrap_domains
+                        ~f:(fun d -> d.wrap_domains)
                   end)
                 in
                 M.f rule.Inductive_rule.prevs
@@ -2906,6 +2512,19 @@ module Make(A : Statement_var_intf)(A_value: Statement_value_intf)
       in
       go step_data step_keypairs
     in
+    let data : _ Types_map.Data.t =
+      { branches =Branches.n
+      ; max_branching=(module Max_branching)
+      ; typ
+      ; a_value_to_field_elements =A_value.to_field_elements
+      ; a_var_to_field_elements   =A.to_field_elements
+      ; wrap_key                  =dlog_marlin_index
+      ; wrap_vk                   =wrap_vk
+      ; wrap_domains              =wrap_domains
+      ; step_domains              =step_domains
+      }
+    in
+    Types_map.add_exn self data ;
     (self, provers)
 end
 
@@ -2943,7 +2562,8 @@ let compile
 
 module Provers = H3_3.T(Prover)
 
-module Test = struct
+let%test_module "test" =
+(module (struct
   open Impls.Pairing_based
 
   module Txn_snark = struct
@@ -2967,7 +2587,10 @@ module Test = struct
         ~choices:(fun ~self ->
             [ { prevs= []
               ; main= (fun [] x ->
-                    Boolean.Assert.is_true (Field.is_square x);
+                    let t = (Field.is_square x :> Field.t) in
+                    for i = 0 to 1000 do
+                      assert_r1cs t t t ;
+                    done;
                     [])
               ; main_value = (fun [] _ -> [])
               }
@@ -3026,943 +2649,101 @@ module Test = struct
         Field.Constant.one
     in
     b1
+end))
+
+(* For each thing in prev, should be able to look up a Spec in the map, which will enable us to
+   build the pack function for the recursive inputs and thus let us build main. Also will look up
+   the list of possible domain sizes which will make it possible to evaluate the polynomials we need to?
+*)
+
+(* Associated to each type T is a sequence of rules.
+   Let branching_{T,i} be the number of proofs composed in rule i.
+   Let max_branching_T = max_i branching_{T, i}.
+
+   Since we want the public inputs for all the rules in T to be the same
+   and the public inputs exposes the sgs used internally, our public input
+   will have max_branching_T many sgs as well as max_branching_T many "old_bulletproof_challenges".
+
+   Say the composed proofs inside of rule i have types
+   A_{i,1}, ..., A_{i, branching_{T, i}}.
+
+   Let local_max_branching_{i, j} = max_branching_{A_{i, j}}.
+   It is the "max branching" for the type which is the j^th composed proof in
+   rule i.
+
+   Let
+   max_local_max_branching_{T, j}
+   = max_{i, j <= branching_{T, i}} local_max_branching_{i, j}
+
+   It is the largest local_max_branching in the j^th slot of a branch in the type T.
+
+   max_{j <= branching_{T, i}} local
+*)
+
+(* 
+   In a branch i, for each of the branching_{T, i} inner proofs,
+
+   After verifying that proof, I get one sg value and one set of corresponding challenges.
+
+   I thus expose branching_{T, i} of each.
+
+   Also, each PC opening j in 1..branching_{T, i} itself includes 
+   local_max_branching_{i, j} local old sgs, which then requires
+   local_max_branching_{i, j} arrays of old BP challenges.
+
+
+   Also, to compute the combined inner products
+*)
+
+(*
+module type Proof_intf = sig
+  type statement
+  type t [@@deriving bin_io]
+
+  val to_generic : t -> statement Generic_proof.Dlog_based.t
 end
 
-module Make
-    (Max_branching: Nat.Add.Intf_transparent)
-    (Inputs : sig
-   type prev_varss type prev_valuess type a_var type a_value
-   val name:string
-   val univ:Types_map.t
-   val typ:(a_var, a_value) Impls.Pairing_based.Typ.t
-   val statement_to_field_elements:(a_var -> Impls.Pairing_based.Field.t array)
-   val choices : (self:(a_var, a_value) Tag.t
-     -> (prev_varss, prev_valuess, < statement:a_var> as 'env)
-      H2_1.T(Inductive_rule).t
+module type Prover_intf = sig
+  type statement
+  type prev_values
+
+  val prove
+    :  handler:Snarky.Request.Handler.t
+    -> prev_values H1.T(Generic_proof).t
+    -> statement
+    -> statement Generic_proof.t
+end
+*)
+
+(*
+let (transaction_snark,
+     (module Proof : sig type _ t [@@deriving bin_io] end),
+     [ (module Base : sig
+         val prove
+           : handler:Handler.t
+           -> (unit, unit, _) H2_1.T(E13_on_second(Proof)).t
+           -> TxnSnarkStatement.t 
+           -> TxnSnarkStatement.t Proof.t
+
+         val verify
+           : TxnSnarkStatement.t Proof.t
+           -> Verifiable_component.t list
+       end)
+     ; (module Merge)
+     ]
     )
-  end)
-    ()
-  : sig
-    end
-= struct
-
-  open Inputs
-
-  let self = Type_equal.Id.create ~name sexp_of_opaque
-  let choices = choices ~self
-
-  let branches =
-    let module HI = H2_1.T(Inductive_rule) in
-    HI.length choices
-
-  module Env = struct type t = < statement: a_var; statement_constant: a_value > end
-
-  let Core_kernel.Type_equal.T = Max_branching.eq
-
-  module Bp_vector = Nvector (Wrap_circuit_bulletproof_rounds)
-
-  module Step_data = Step_data(Max_branching)
-
-  module Branching_vector = Nvector (Max_branching)
-
-  module Proof0 = Proof(Branching_vector)
-  module Me_only = Proof0.Me_only
-
-  module Generic_proof = Proof(List)
-
-  let crs_max_degree = 1 lsl Rugelach_types.Nat.to_int Wrap_circuit_bulletproof_rounds.n
-
-  let combined_evaluation (proof : Pairing_based.Proof.t) ~r ~xi ~beta_1
-      ~beta_2 ~beta_3 ~x_hat_beta_1 =
-    let { Pairing_marlin_types.Evals.w_hat
-        ; z_hat_a
-        ; z_hat_b
-        ; h_1
-        ; h_2
-        ; h_3
-        ; g_1
-        ; g_2
-        ; g_3
-        ; row= {a= row_0; b= row_1; c= row_2}
-        ; col= {a= col_0; b= col_1; c= col_2}
-        ; value= {a= val_0; b= val_1; c= val_2} } =
-      proof.openings.evals
-    in
-    let combine t (pt : Fp.t) =
-      let open Fp in
-      Pcs_batch.combine_evaluations
-        ~crs_max_degree ~mul ~add ~one
-        ~evaluation_point:pt ~xi t
-    in
-    let f_1 =
-      combine Common.pairing_beta_1_pcs_batch beta_1
-        [x_hat_beta_1; w_hat; z_hat_a; z_hat_b; g_1; h_1]
-        []
-    in
-    let f_2 = combine Common.pairing_beta_2_pcs_batch beta_2 [g_2; h_2] [] in
-    let f_3 =
-      combine Common.pairing_beta_3_pcs_batch beta_3
-        [ g_3
-        ; h_3
-        ; row_0
-        ; row_1
-        ; row_2
-        ; col_0
-        ; col_1
-        ; col_2
-        ; val_0
-        ; val_1
-        ; val_2 ]
-        []
-    in
-    Fp.(r * (f_1 + (r * (f_2 + (r * f_3)))))
-
-  let combined_polynomials ~xi
-      ~pairing_marlin_index:(index : _ Abc.t Matrix_evals.t) public_input
-      (proof : Pairing_based.Proof.t) =
-    let combine t v =
-      let open G1 in
-      let open Rugelach_types in
-      Pcs_batch.combine_commitments t ~scale ~add ~xi
-        (Vector.map v ~f:G1.of_affine)
-    in
-    let { Pairing_marlin_types.Messages.w_hat
-        ; z_hat_a
-        ; z_hat_b
-        ; gh_1= (g1, _), h1
-        ; sigma_gh_2= _, ((g2, _), h2)
-        ; sigma_gh_3= _, ((g3, _), h3) } =
-      proof.messages
-    in
-    let x_hat =
-      let v = Fp.Vector.create () in
-      List.iter public_input ~f:(Fp.Vector.emplace_back v) ;
-      let domain_size =
-        Int.ceil_pow2 (List.length public_input )
-      in
-      Snarky_bn382.Fp_urs.commit_evaluations
-        (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
-        (Unsigned.Size_t.of_int domain_size)
-        v
-      |> Snarky_bn382_backend.G1.Affine.of_backend
-    in
-    ( combine Common.pairing_beta_1_pcs_batch
-        [x_hat; w_hat; z_hat_a; z_hat_b; g1; h1]
-        []
-    , combine Common.pairing_beta_2_pcs_batch [g2; h2] []
-    , combine Common.pairing_beta_3_pcs_batch
-        [ g3
-        ; h3
-        ; index.row.a
-        ; index.row.b
-        ; index.row.c
-        ; index.col.a
-        ; index.col.b
-        ; index.col.c
-        ; index.value.a
-        ; index.value.b
-        ; index.value.c ]
-        [] )
-
-  let accumulate_pairing_checks (proof : Pairing_based.Proof.t)
-      (prev_acc : _ Pairing_marlin_types.Accumulator.t)
-      ~domain_h ~domain_k
-      ~r ~r_k ~r_xi_sum
-      ~beta_1 ~beta_2 ~beta_3 (f_1, f_2, f_3) =
-    let open G1 in
-    let prev_acc =
-      Pairing_marlin_types.Accumulator.map ~f:of_affine prev_acc
-    in
-    let proof1, proof2, proof3 =
-      Triple.map proof.openings.proofs ~f:of_affine
-    in
-    let conv = Double.map ~f:of_affine in
-    let g1 = conv (fst proof.messages.gh_1) in
-    let g2 = conv (fst (snd proof.messages.sigma_gh_2)) in
-    let g3 = conv (fst (snd proof.messages.sigma_gh_3)) in
-    Pairing_marlin_types.Accumulator.map ~f:to_affine_exn
-      { degree_bound_checks=
-          Dlog_main.accumulate_degree_bound_checks'
-            ~domain_h ~domain_k
-            prev_acc.degree_bound_checks ~add ~scale ~r_h:r ~r_k g1 g2 g3
-      ; opening_check= (
-          Core.printf !"Obetas: %{sexp:Impls.Pairing_based.Field.Constant.t} %{sexp:Impls.Pairing_based.Field.Constant.t} %{sexp:Impls.Pairing_based.Field.Constant.t}\n%!"
-            beta_1
-            beta_2
-            beta_3 ;
-          Core.printf !"Ofs: %{sexp:Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t}  %{sexp:Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t}  %{sexp:Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t}\n%!"
-            (G1.to_affine_exn f_1)
-            (G1.to_affine_exn f_2)
-            (G1.to_affine_exn f_3) ;
-          Dlog_main.accumulate_opening_check ~add ~negate ~scale
-            ~generator:one ~r ~r_xi_sum prev_acc.opening_check
-            (f_1, beta_1, proof1) (f_2, beta_2, proof2) (f_3, beta_3, proof3)
-        )
-      }
-
-let wrap
-    (type max_local_max_branchings)
-    (module Req : Requests.Wrap_intf
-      with type max_branching = Max_branching.n
-       and type max_local_max_branchings = max_local_max_branchings 
-    )
-    (pi_max_local_max_branchings : (max_local_max_branchings, Max_branching.n) Hlist.Length.t)
-    ~dlog_marlin_index
-    wrap_main 
-    to_field_elements
-    (*
-    ~wrap_domains ~step_domains ~dlog_marlin_index
-    which_index *)
-    pairing_vk
-    ~step_domains
-    ~wrap_domains
-    ~pairing_marlin_indices
-    pk
-    ({ statement=prev_statement 
-    ; prev_evals
-    ; proof
-    ; index=which_index
-    } : (_, max_local_max_branchings) Proof0.Pairing_based.t)
   =
-  let pairing_marlin_index =
-    (Vector.to_array pairing_marlin_indices).(which_index)
+  let base =
+    T ( [], (fun [] stmt -> (failwith "todo", [])), fun _ -> failwith "todo" )
   in
-  let prev_me_only =
-    let module M = H1.Map(Me_only.Dlog_based)(Me_only.Dlog_based.Prepared)(struct
-        let f = Me_only.Dlog_based.prepare
-      end)
-    in
-    M.f prev_statement.pass_through
+  let merge self  =
+    T ( [ self; self ]
+      , (fun [ l; r ] stmt -> failwith "todo")
+      , (fun [ l; r ] stmt -> failwith "todo") )
   in
-  let prev_statement_with_hashes
-    : _ Statement.Pairing_based.t =
-    { proof_state=
-        { prev_statement.proof_state with
-          me_only=
-            Common.hash_pairing_me_only
-              ~app_state:to_field_elements
-              (Me_only.Pairing_based.prepare
-                 ~dlog_marlin_index
-                  prev_statement.proof_state.me_only) }
-    ; pass_through=
-        (let module M = H1.Map(Me_only.Dlog_based.Prepared)(E01(Digest.Constant))(struct
-             let f (type n) (m : n Me_only.Dlog_based.Prepared.t) =
-               let T =
-                 Nat.eq_exn Nat.N2.n 
-                   (Vector.length m.old_bulletproof_challenges)
-               in
-               Common.hash_dlog_me_only m
-          end)
-        in
-        let module V = H1.To_vector(Digest.Constant) in
-        V.f pi_max_local_max_branchings (M.f prev_me_only))
-    }
-  in
-  let handler (Snarky.Request.With {request; respond}) =
-    let open Req in
-    let k x = respond (Provide x) in
-    match request with
-    | Evals ->
-        k prev_evals
-    | Index ->
-        k which_index
-    | Pairing_accs ->
-      let module M = H1.Map(Me_only.Dlog_based.Prepared)(E01(Pairing_acc))(struct
-          let f : type a. a Me_only.Dlog_based.Prepared.t -> Pairing_acc.t =
-            fun t -> t.pairing_marlin_acc
-        end)
-      in
-      let module V = H1.To_vector(Pairing_acc) in
-      k (V.f pi_max_local_max_branchings (M.f prev_me_only))
-    | Messages ->
-        k proof.messages
-    | Openings_proof ->
-        k proof.openings.proofs
-    | Proof_state ->
-        k prev_statement_with_hashes.proof_state
-    | _ ->
-        Snarky.Request.unhandled
-  in
-  let module O = Snarky_bn382_backend.Pairing_based.Oracles in
-  let public_input =
-    public_input_of_statement
-      prev_statement_with_hashes
-  in
-  let o = O.create pairing_vk public_input proof in
-  let x_hat_beta_1 = O.x_hat_beta1 o in
-  let next_statement : _ Statement.Dlog_based.t =
-    let sponge_digest_before_evaluations = O.digest_before_evaluations o in
-    let r = O.r o in
-    let r_k = O.r_k o in
-    let xi = O.batch o in
-    let beta_1 = O.beta1 o in
-    let beta_2 = O.beta2 o in
-    let beta_3 = O.beta3 o in
-    let alpha = O.alpha o in
-    let eta_a = O.eta_a o in
-    let eta_b = O.eta_b o in
-    let eta_c = O.eta_c o in
-    let r_xi_sum =
-      combined_evaluation ~x_hat_beta_1 ~r ~xi ~beta_1 ~beta_2 ~beta_3
-        proof
-    in
-    let me_only : _ Types.Dlog_based.Proof_state.Me_only.t =
-      let combined_polys =
-        combined_polynomials ~xi ~pairing_marlin_index public_input proof
-      in
-      let prev_pairing_acc =
-        let open Pairing_marlin_types.Accumulator in
-        let module M = H1.Map_reduce(Proof0.Me_only.Dlog_based)(Pairing_acc.Projective)(struct
-            let reduce = map2 ~f:G1.(+)
-            let map (t : _ Proof0.Me_only.Dlog_based.t) =
-                map ~f:G1.of_affine t.pairing_marlin_acc
-        end)
-        in
-        map ~f:G1.to_affine_exn
-        (M.f prev_statement.pass_through)
-      in
-      (*
-          printf !"Ocombined_acc  %{sexp:(Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t, (Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t) Int.Map.t) Pairing_marlin_types.Accumulator.t}\n%!"
-            prev_pairing_acc ; *)
-      { pairing_marlin_acc=
-          (let (domain_h, domain_k) = step_domains in
-          accumulate_pairing_checks ~domain_h ~domain_k
-            proof prev_pairing_acc ~r ~r_k
-            ~r_xi_sum ~beta_1 ~beta_2 ~beta_3 combined_polys )
-      ; old_bulletproof_challenges=
-          Vector.map prev_statement.proof_state.unfinalized_proofs
-            ~f:(fun (t, _) -> t.deferred_values.bulletproof_challenges) }
-    in
-          printf !"Opost_accumulatieon %{sexp:(Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t, (Impls.Dlog_based.Field.Constant.t * Impls.Dlog_based.Field.Constant.t) Int.Map.t) Pairing_marlin_types.Accumulator.t}\n%!"
-            me_only.pairing_marlin_acc ;
-    let chal = Challenge.Constant.of_fp in
-    { proof_state=
-        { deferred_values=
-            { xi= chal xi
-            ; r= chal r
-            ; r_xi_sum
-            ; marlin=
-                { sigma_2= fst proof.messages.sigma_gh_2
-                ; sigma_3= fst proof.messages.sigma_gh_3
-                ; alpha= chal alpha
-                ; eta_a= chal eta_a
-                ; eta_b= chal eta_b
-                ; eta_c= chal eta_c
-                ; beta_1= chal beta_1
-                ; beta_2= chal beta_2
-                ; beta_3= chal beta_3 } }
-        ; was_base_case=
-            List.for_all ~f:(fun (_, should_verify) -> not should_verify)
-              (Vector.to_list prev_statement.proof_state.unfinalized_proofs)
-        ; sponge_digest_before_evaluations=
-            D.Constant.of_fp sponge_digest_before_evaluations
-        ; me_only }
-    ; pass_through= prev_statement.proof_state.me_only }
-  in
-  let me_only_prepared =
-    Me_only.Dlog_based.prepare
-      next_statement.proof_state.me_only
-  in
-  let next_proof =
-    let (T (input, conv)) = Impls.Dlog_based.input () in
-    Impls.Dlog_based.prove pk
-      ~message:
-        ( Vector.map2 prev_statement.proof_state.me_only.sg
-            me_only_prepared.old_bulletproof_challenges ~f:(fun sg chals ->
-              { Snarky_bn382_backend.Dlog_based_proof.Challenge_polynomial
-                .commitment= sg
-              ; challenges= Vector.to_array chals } )
-        |> Vector.to_list )
-      [input]
-      (fun x () ->
-        ( Impls.Dlog_based.handle
-            (fun ()  : unit ->
-                wrap_main
-                  (conv x))
-            handler
-          : unit ) )
-      ()
-      { pass_through= prev_statement_with_hashes.proof_state.me_only
-      ; proof_state=
-          { next_statement.proof_state with
-            me_only= Common.hash_dlog_me_only me_only_prepared } }
-  in
-  ( { proof= next_proof
-    ; statement= next_statement
-    ; prev_evals= proof.openings.evals
-    ; prev_x_hat_beta_1= x_hat_beta_1 }
-    : _ Proof0.Dlog_based.t )
-
-    let public_input_of_statement prev_statement =
-      let input =
-        let (T (typ, _conv)) = Impls.Dlog_based.input () in
-        Impls.Dlog_based.generate_public_input [typ] prev_statement
-      in
-      Fq.one :: List.init (Fq.Vector.length input) ~f:(Fq.Vector.get input)
-
-    let b_poly = Fq.(Dlog_main.b_poly ~add ~mul ~inv)
-
-    (* TODO: Exclude the dummy unfinalized proofs. *)
-
-  module Dlog_proof = struct
-    type (_, 'value, _) t = 'value Generic_proof.Dlog_based.t
-  end
-
-end
-
-let compile
-  : type prev_varss prev_valuess a_var a_value spec1 spec2 envv.
-    name:string ->
-    univ:Univ.t ->
-    typ:(a_var, a_value) Impls.Pairing_based.Typ.t ->
-    statement_to_field_elements:(a_var -> Impls.Pairing_based.Field.t array) ->
-    spec:(spec1, spec2 , envv) Spec.t ->
-    (self:(a_var, a_value) Tag.t
-     -> (prev_varss, prev_valuess, < statement:a_var> as 'env)
-      H2_1.T(Inductive_rule).t
+  compile (fun ~self ->
+    [ T ([
+    ] 
     )
-    -> 
-    (a_var, a_value) Tag.t 
-    * (module Proof_system_intf with type statement = a_value
-                                 and type prev_values = prev_valuess)
-  =
-  fun ~name ~univ ~typ ~statement_to_field_elements ~spec choices ->
-
-  let self = Type_equal.Id.create ~name sexp_of_opaque in
-  let choices = choices ~self in
-
-  let module Env =(struct type t = < statement: a_var > end) in
-  let prev_wrap_domains self_wrap_domains =
-    let module M = Map2_1_fixed(Inductive_rule)(H2_1.T(E03(Domains)))(Env)(struct
-        let f : type vars values.
-          (vars, values, 'a) Inductive_rule.t
-          -> (vars, values, 'a) H2_1.T(E03(Domains)).t
-          =
-          fun (T (prevs, _)) ->
-            let module M = Map2_1_fixed(E23(Tag))(E03(Domains))(Env)(struct
-                let f : type v x. (v, x) Tag.t -> Domains.t =
-                  fun t ->
-                    match Type_equal.Id.same_witness t self with
-                    | Some T -> self_wrap_domains
-                    | None ->
-                      let T (other_id, d) = Hashtbl.find_exn univ (Type_equal.Id.uid t) in
-                      let T = Type_equal.Id.same_witness_exn t other_id in
-                      d.wrap_domains
-              end)
-            in
-            M.f prevs
-      end)
-    in
-    M.f choices
-  in
-  let T branchings = lengths choices in
-  let (module Max) =
-    Hlist.max_exn
-      (Lengths.extract branchings)
-  in
-  let max_branching = Nat.Add.create Max.n in
-  let module Step_res = Step_data(Max) in
-  let module HI = H2_1.T(Inductive_rule) in
-  let T (_, choices_length) = HI.length choices in
-  let wrap_domains =
-    let num_choices = Hlist.Length.to_nat choices_length in
-    let dummy_step_keys =
-      Vector.init num_choices
-        ~f:(fun _ ->
-            let g = Snarky_bn382_backend.G1.(to_affine_exn one) in
-            let t : _ Abc.t = { a=g; b=g; c=g } in
-            { Matrix_evals.row=t;col=t;value=t;rc=t } )
-    in
-    let dummy_step_domains =
-      Vector.init num_choices ~f:(fun _ ->
-          Fix_domains.rough_domains)
-    in
-    let _, main =
-      wrap_main
-        choices_length
-        dummy_step_keys
-        dummy_step_domains
-        (prev_wrap_domains Fix_domains.rough_domains)
-        max_branching
-    in
-    Fix_domains.domains (module Impls.Dlog_based)
-      (Impls.Dlog_based.input ())
-      main
-  in
-  let steps =
-    let module M = Map2_1_fixed(Inductive_rule)(Step_res)(Env)(struct
-        let f : type prev_vars prev_values.
-          (prev_vars, prev_values, 'a) Inductive_rule.t
-          ->
-          (prev_vars, prev_values, 'a) Step_res.t
-          =
-          fun (T (prevs, _) as rule) ->
-            let T (branching, pi) =
-              let module H = H2_1.T(E23(Tag)) in
-              H.length prevs
-            in
-            let lte = Nat.lte_exn branching Max.n in
-            let step ~step_domains =
-              step
-                ~basic:{
-                      typ;
-                      a_var_to_field_elements=statement_to_field_elements;
-                      wrap_domains;
-                      step_domains;
-                }
-                ~lte
-                ~length:pi
-                ~univ
-                ~self
-                max_branching
-                rule
-            in
-            let etyp =
-                  Impls.Pairing_based.input
-                    ~branching:Max.n
-                    ~bulletproof_log2:Wrap_circuit_bulletproof_rounds.n 
-            in
-            let step_domains =
-              let main, _ =
-                step
-                ~step_domains:Fix_domains.rough_domains
-              in
-              Fix_domains.domains 
-                (module Impls.Pairing_based)
-                etyp
-                main
-            in
-            let step, tags =
-              step ~step_domains
-            in
-            let keypair =
-              let T (typ, conv) = etyp in
-              Impls.Pairing_based.generate_keypair
-                ~exposing:[typ]
-                (fun x () ->
-                   let y = conv x in
-                   step
-                     y)
-            in
-            T { branching= (branching, pi)
-              ; domains= step_domains
-              ; main=step
-              ; request_tags=tags; keypair }
-      end
-      )
-    in
-    M.f choices
-  in
-  let module T = struct
-    type t = Pairing_index.t * Domains.t
-  end
-  in
-  let step_keys, step_domains =
-    let module M = Map2_1_fixed(Step_res)(E03(T)) (Env)
-        (struct
-        let f : type a b. (a, b, Env.t) Step_res.t -> Pairing_index.t * Domains.t =
-          fun (T { keypair; domains; _ }) ->
-            ( Snarky_bn382_backend.Pairing_based.Keypair.vk_commitments
-                (Impls.Pairing_based.Keypair.pk keypair),
-              domains )
-        end)
-    in
-    let module H = Vector_of_hlist(T) in
-    let module L12 = Length_1_to_2(E03(T)) in
-    let vks = M.f steps in
-    H.f
-      choices_length
-      (L12.length1_to_2
-         vks
-         choices_length)
-      vks
-    |> Vector.unzip
-  in
-  let wrap_requests, wrap =
-      wrap_main
-        choices_length
-        step_keys
-        step_domains
-        (prev_wrap_domains wrap_domains)
-        max_branching
-  in
-  wrap_requests
-
-  (*
-  in
-  let datas =
-    let module M = Map2_1(Inductive_rule)(E23(Univ.Data))(struct
-        let f 
-  (* Now, the me_onlys will be parametrized over a merkle tree of
-     keys of all the choices. *)
-  let module T = struct type t = prev_vars end in
-  () *)
-
-(*
-
-  ()
 *)
 
-(*
-    * (prev_values, < statement: a_value; proof: proof >) Hlist.Hlist2(Prover).t
-    (module Proof_intf) *
-   *)
-(*
-module Snark_system = struct
-  module type S = sig
-    type statement
-
-    module Proof : Binable.S
-
-    val step : 'prev 
-  end
-
-    val negative_one : State.Constant.t Dlog_based_proof.t
-
-    val step :
-         State.Constant.t Dlog_based_proof.t Branching_vector.t
-      -> State.Constant.t
-      -> State.Constant.t Pairing_based_proof.t
-
-    val wrap :
-         State.Constant.t Pairing_based_proof.t
-      -> State.Constant.t Dlog_based_proof.t
-end *)
-(*
-      prev
-      let module M = Map2_1_fixed(Inductive_rule)(H2_1.T(E03(Domains)))(Env)(struct
-          let f : type vars values.
-            (vars, values, 'a) Inductive_rule.t
-            -> (vars, values, 'a) H2_1.T(E03(Domains)).t
-            =
-            fun (T (prevs, _)) ->
-              let module M = Map2_1_fixed(E23(Tag))(E03(Domains))(Env)(struct
-                  let f : type v x. (v, x) Tag.t -> Domains.t =
-                    fun t ->
-                      match Type_equal.Id.same_witness t self with
-                      | Some self -> Fix_domains.rough_domains
-                      | None ->
-                        let T (other_id, d) = Hashtbl.find_exn univ (Type_equal.Id.uid t) in
-                        let T = Type_equal.Id.same_witness_exn t other_id in
-                        d.wrap_domains
-                end)
-              in
-              M.f prevs
-        end)
-      in
-      M.f choices
-*)
-      (*
-      let module Proof_result = struct
-        type t = Boolean.var * Types.Pairing_based.Proof_state.Per_proof.t
-      end in
-      let prev_proofs =
-        let inputs =
-          let module Z =
-            H2_1.Zip4
-              (E23(Request_tag.F))
-              (E23(D))
-              (E03(Unfinalized))
-              (E13(Prev_statement))
-          in
-          Z.f
-            request_tags
-            datas
-            unfinalized_proofs
-            prevs_with_state
-        in
-        let module M =
-          H2_1.Map(
-            Tuple4(E23(Request_tag.F))(E23(D))(E03(Unfinalized))(E13(Prev_statement))
-          )(
-            E03(B)
-          )(struct
-            let f : type a b. (a, b, _)
-                Tuple4(E23(Request_tag.F))(E23(D))(E03(Unfinalized))(E13(Prev_statement)).t -> Boolean.var
-              =
-              fun ((module A), data, (unfinalized, should_verify), (proof_state, app_state)) ->
-                let  (typ : (a, b) Impls.Pairing_based.Typ.t),
-                     wrap_key,
-                     wrap_domains,
-                     (to_field_elements : a -> _),
-                     (module Local_max_branching : Nat.Add.Intf)
-                  =
-                  match data with
-                  | Self ->
-                    basic.typ, me_only.dlog_marlin_index, basic.wrap_domains, basic.a_var_to_field_elements, 
-                    (module Max_branching)
-                  | Other d ->
-                    d.typ, (Matrix_evals.map ~f:(Abc.map ~f:Pairing_main_inputs.G.constant)) d.wrap_key, d.wrap_domains, d.a_var_to_field_elements,
-                    d.max_branching
-                in
-                let T = Local_max_branching.eq in
-                let sg_old =
-                  exists ~request:(fun () ->
-                      Sg_old (Local_max_branching.n, A.T) )
-                    (Vector.typ G.typ Local_max_branching.n)
-                in
-                let statement =
-                  let prev_me_only =
-                    (* TODO: Don't rehash when it's not necessary *)
-                    unstage(
-                    hash_me_only
-                      ~index:wrap_key
-                      to_field_elements )
-                      { app_state
-                      ; dlog_marlin_index=wrap_key
-                      ; sg=sg_old
-                      }
-                  in
-                  { Types.Dlog_based.Statement.pass_through= prev_me_only
-                  ; proof_state
-                  }
-                in
-                (* TODO: Need to assert that the top level me_only.sg at this index is
-                   the same as this one. *)
-                let (opening, messages) =
-                  exists ~request:(fun () -> Proof A.T)
-                    (Typ.tuple2
-                      (Types.Pairing_based.Openings.Bulletproof.typ
-                        ~length:(Nat.to_int Wrap_circuit_bulletproof_rounds.n)
-                            Fq.typ
-                            Pairing_main_inputs.G.typ)
-                      (Rugelach_types.Pairing_marlin_types.Messages.typ
-                        Pairing_main_inputs.G.typ
-                        Fq.typ))
-                in
-                Pmain.verify
-                  ~branching:(module Local_max_branching)
-                  ~wrap_domains
-                  ~is_base_case:should_verify
-                  ~sg_old
-                  ~opening
-                  ~messages
-                  ~wrap_verification_key:wrap_key
-                  statement
-                  unfinalized
-          end)
-        in
-        M.f inputs
-      in
- *)
-    (*
-    let wrap_keys =
-      let module M =
-        H.Map (E23(D))
-          (E23(W))
-          (struct
-            let f : type a b. (a, b) D.t -> (a, b)W.t =
-              function
-              | Self -> Self
-              | Other (T d) -> Other d.wrap_key
-        end)
-      in
-      M.f datas
-    in *)
-      (*
-      let prevs_with_state =
-        let tags_and_datas =
-          let pass_throughs = 
-            let module M =
-              H2_1.Of_vector(Packed_digest)
-            in
-            let length_values =
-              let module L = Length_1_to_2(E23(Request_tag.F)) in
-              L.length1_to_2 request_tags length
-            in
-            M.f
-              length
-              length_values
-              (Vector.trim stmt.pass_through
-                lte)
-          in
-          let module Z = H2_1.Zip3(E23(Request_tag.F))(E23(D))(E03(Packed_digest)) in
-          Z.f request_tags datas pass_throughs
-        in
-        let module M =
-          H2_1.Map(
-            Tuple3
-              (E23(Request_tag.F))
-              (E23(D))
-              (E03(Packed_digest))
-          )
-            (E13(Prev_statement))
-            (struct
-              let f : type a b. (a, b, _) Tuple3(E23(Request_tag.F))(E23(D))(E03(Packed_digest)).t
-                -> a Prev_statement.t
-              =
-              fun ((module A), data, me_only) ->
-                let typ : (a, b) Impls.Pairing_based.Typ.t =
-                  match data with
-                  | Self -> basic.typ
-                  | Other d -> d.typ
-                in
-                let state, app_state = 
-                  exists ~request:(fun () -> Statement A.T)
-                  (Typ.tuple2
-                    (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ
-                      Boolean.typ Fq.typ Digest.typ Digest.typ)
-                    typ)
-                in
-                let me_only = Packed_digest.unpack me_only ~length:Digest.length in
-                ({ state with me_only }, app_state)
-          end)
-        in
-        M.f tags_and_datas
-      in
-      *)
-(*
-module Pseudo = struct
-  open Impls.Dlog_based
-
-  type ('a, 'n) t = (Boolean.var, 'n) Vector.t * ('a, 'n) Vector.t
-
-  let choose
-    : type a n. (a, n) t -> f:(a -> Field.t) -> Field.t
-      =
-      fun (bits, xs) ~f ->
-      Vector.map (Vector.zip bits xs) 
-        ~f:(fun (b, x) -> Field.((b :> t) * f x))
-      |> Vector.fold ~init:Field.zero ~f:Field.(+)
-
-  module Degree_bound = struct
-    type nonrec 'n t = (int, 'n) t
-
-    let shifted_pow ~crs_max_degree t x =
-      let pow = Field.(Pcs_batch.pow ~one ~mul ~add) in
-      choose t ~f:(fun deg ->
-        pow x (crs_max_degree - deg) )
-  end
-
-  module Domain = struct
-    type nonrec 'n t = (Domain.t, 'n) t
-
-    let to_domain (type n) ( t : n t) : Field.t Marlin_checks.domain =
-      (* TODO: Special case when all the domains happen to be the same. *)
-      let size =
-        Dmain.seal (
-        choose t ~f:(fun d ->
-          Field.of_int (Domain.size d))) 
-      in
-      let max_log2 =
-        let _, ds = t in
-        List.fold (Vector.to_list ds) ~init:0 ~f:(fun acc d ->
-            Int.max acc (Domain.log2_size d))
-      in
-      object
-        method size = size
-        method vanishing_polynomial x =
-          let pow2_pows =
-            let res = Array.create ~len:max_log2 x in
-            for i = 1 to max_log2 - 1 do
-              res.(i) <- Field.square res.(i - 1)
-            done;
-            res
-          in
-          let open Field in
-          Dmain.seal (
-          choose t ~f:(fun d ->
-              pow2_pows.(Domain.log2_size d))
-          -
-          one )
-      end
-  end
-end
-*)
-(*
-        let module Handler =
-        struct type t = Snarky.Request.request -> Snarky.Request.response
-        end
-        in
-        let module Dp = struct type (_, 'value, _) t = 'value dlog_based_proof end in
-        let handlers =
-          let module Z = Zip(Dp)(E23(Request_tag.F)) in
-          let module M = H2_1.Map_(Tuple2(Dp)(E23(Request_tag.F)))(E03(Handler))(Env)(struct
-              let f : type a b c. (a, b, c) Dp.t * (a, b) Request_tag.F.t -> Handler.t
-                =
-                fun (p, (module A)) ->
-                fun (Snarky.Request.With { request; respond}) ->
-                  let open Requests.Step in
-                  let k x = respond (Provide x ) in
-                  match request with
-                  | Prev_evals A.T -> k (p.prev_evals, p.prev_x_hat_beta_1)
-                  | Statement A.T ->
-                    k (
-                      p.statement.proof_state
-                      , p.statement.pass_through.app_state )
-                  | Sg_old A.T ->
-                    k p.statement.pass_through.sg
-            end)
-          in
-          Z.f
-            (H.f
-              length
-              (L.length1_to_2 request_tags length)
-              (trim prev_proofs lte)
-            )
-            request_tags
-        in
-        let handler (Snarky.Request.With {request; respond}) =
-          let open M.Requests in
-          let k x = respond (Provide x) in
-          match request with
-          | Prev_evals ->
-              k
-                (Vector.map prev_proofs
-                  ~f:(fun {prev_evals; prev_x_hat_beta_1; _} ->
-                    (prev_evals, prev_x_hat_beta_1) ))
-          | Prev_messages ->
-              k (Vector.map prev_proofs ~f:(fun {proof; _} -> proof.messages))
-          | Prev_openings_proof ->
-              k
-                (Vector.map2 prev_proofs next_statement.proof_state.me_only.sg
-                  ~f:(fun {proof; _} sg -> {proof.openings.proof with sg}))
-          | Prev_states State.Tag ->
-              k
-                (Vector.map2 prev_proofs prev_statements_with_hashes
-                  ~f:(fun prev s ->
-                    (s.proof_state, prev.statement.pass_through.app_state) ))
-          | Prev_sg ->
-              k
-                (Vector.map prev_proofs ~f:(fun prev ->
-                    prev.statement.pass_through.sg ))
-          | Me_only State.Tag ->
-              k next_me_only_prepared
-          | _ ->
-              Snarky.Request.unhandled
-        in
-*)
-    (*
-      { statement:
-          ( (( Challenge.Constant.t
-            , Fq.t
-            , (Challenge.Constant.t, bool) Bulletproof_challenge.t Bp_vector.t
-            , Digest.Constant.t )
-            Types.Pairing_based.Proof_state.Per_proof.t
-            * bool)
-            Max_branching_v.t
-          , ('s, g Max_branching_v.t ) Me_only.Pairing_based.t
-          , 'max_local_max_branchings H1.T(Me_only.Dlog_based).t
-          )
-          Statement.Pairing_based.t
-      ; index: int
-      ; prev_evals:
-          (Fq.t Dlog_marlin_types.Evals.t * Fq.t) Triple.t Max_branching_v.t
-      ; proof: Pairing_based.Proof.t }
-       *)
-(*     [@@deriving bin_io] *)
-(*
-      { statement:
-          ( Challenge.Constant.t
-          , Fp.t
-          , bool
-          , Fq.t
-              (* TODO *)
-          , 'max_local_max_branchings Me_only.Dlog_based.t
-          , Digest.Constant.t
-          , ('s, g Max_branching_v.t) Me_only.Pairing_based.t )
-          Statement.Dlog_based.t
-      ; prev_evals: Fp.t Pairing_marlin_types.Evals.t
-      ; prev_x_hat_beta_1: Fp.t
-      ; proof: Dlog_based.Proof.t }
-*)

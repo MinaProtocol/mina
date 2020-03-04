@@ -1,10 +1,12 @@
 open Core_kernel
 open Common
 
+(*
 let () =
   Snarky_bn382_backend.Pairing_based.Keypair.set_urs_info
     "/home/izzy/pickles/urs"
 
+*)
 module type S = Intf.Dlog_main_inputs.S
 
 open Snarky_bn382_backend

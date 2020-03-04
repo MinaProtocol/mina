@@ -689,6 +689,49 @@ module H4 = struct
         | x :: xs , y::ys -> (x, y) :: f xs ys
   end
 
+  module Length_1_to_2(F : T4) = struct
+    let rec f
+      : type n xs ys a b.
+        (xs, ys, a, b) T(F).t
+        -> (xs, n) Length.t
+        -> (ys, n) Length.t
+      =
+      fun xs n ->
+        match xs, n with
+        | [], Z -> Z
+        | _ :: xs, S n -> S (f xs n)
+  end
+
+  module Typ
+      (Impl: sig type field end) 
+      (F: T4)(Var : T3)(Val : T3)(C : sig
+        val f : ('var, 'value, 'n1, 'n2) F.t ->
+          ( ('var, 'n1, 'n2) Var.t, ('value, 'n1, 'n2) Val.t, Impl.field) Snarky.Typ.t
+    end)
+  = struct
+    let transport, transport_var, tuple2,unit = Snarky.Typ.(transport, transport_var, tuple2, unit) 
+
+    let rec f : type vars values ns1 ns2. (vars, values, ns1, ns2) T(F).t
+      ->  ( (vars, ns1, ns2) H3.T(Var).t, (values, ns1 ,ns2) H3.T(Val).t, Impl.field ) Snarky.Typ.t
+      =
+      fun ts ->
+        match ts with
+        | [] ->
+          let there _ = () in
+          transport (unit ())
+            ~there
+            ~back:(fun () : _ H3.T(Val).t -> [])
+          |> transport_var
+            ~there
+            ~back:(fun () : _ H3.T(Var).t -> [])
+        | t :: ts ->
+          transport (tuple2 (C.f t) (f ts))
+                ~there:(fun ((x :: xs) : _ H3.T(Val).t) -> (x, xs))
+                ~back:(fun (x, xs) -> x :: xs)
+              |> transport_var
+                ~there:(fun ((x :: xs) : _ H3.T(Var).t) -> (x, xs))
+                ~back:(fun (x, xs) -> x :: xs)
+  end
 end
 
 module H4_2 = struct

@@ -3,10 +3,12 @@ open Common
 open Snarky_bn382_backend
 module Impl = Impls.Pairing_based
 
+(*
 let () =
   Snarky_bn382_backend.Dlog_based.Keypair.set_urs_info
     "/home/izzy/pickles/dlog-urs"
 
+*)
 let sponge_params_constant =
   Sponge.Params.(map bn382_p ~f:Impl.Field.Constant.of_string)
 

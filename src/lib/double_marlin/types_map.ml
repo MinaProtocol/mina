@@ -18,7 +18,7 @@ module Data = struct
   type ('a_var, 'a_value, 'max_branching, 'branches) t =
         { branches: 'branches Nat.t
         ; max_branching : (module Nat.Add.Intf with type n = 'max_branching )
-        ; verification_keys :  G1.Affine.t Abc.t Matrix_evals.t list
+(*         ; verification_keys :  G1.Affine.t Abc.t Matrix_evals.t list *)
         ; typ: ('a_var, 'a_value) Impls.Pairing_based.Typ.t
         ; a_value_to_field_elements : 'a_value -> Fp.t array
         ; a_var_to_field_elements : 'a_var -> Impls.Pairing_based.Field.t array
@@ -26,8 +26,9 @@ module Data = struct
         ; wrap_vk : Impls.Dlog_based.Verification_key.t
         ; wrap_domains : Domain.t * Domain.t
         ; step_domains : (Domain.t * Domain.t, 'branches) Vector.t
-        ; shifts : Int.Set.t
         }
+
+  type ('a, 'b, 'c, 'd) data =('a, 'b, 'c, 'd) t
 
   module For_step = struct
     type ('a_var, 'a_value, 'max_branching, 'branches) t =
@@ -42,16 +43,16 @@ module Data = struct
         }
 
     let create
-        { branches                  
+        ({ branches                  
         ; max_branching             
-        ; verification_keys         
+(*         ; verification_keys          *)
         ; typ                       
         ; a_value_to_field_elements 
         ; a_var_to_field_elements   
         ; wrap_key                  
         ; wrap_domains              
         ; step_domains              
-        }
+  } :  _ data)
         =
         { branches                  
         ; max_branching             
@@ -91,3 +92,17 @@ let max_branching : type n1. (_, _, n1, _) Tag.t -> (module Nat.Add.Intf with ty
 let value_to_field_elements : type a. (_, a, _, _) Tag.t -> a -> Fp.t array =
   fun tag ->
   (lookup tag).a_value_to_field_elements
+
+let lookup_map (type a b c d) (t : (a, b, c, d) Tag.t)
+    ~self ~default ~(f : (a, b, c, d) Data.t -> _)
+  =
+  match Type_equal.Id.same_witness t self with
+  | Some _ -> default
+  | None ->
+    let T (other_id, d) = Hashtbl.find_exn univ (Type_equal.Id.uid t) in
+    let T = Type_equal.Id.same_witness_exn t other_id in
+    f d
+
+let add_exn (type a b c d) (tag: (a,b,c,d) Tag.t) (data : (a, b, c, d) Data.t) =
+  Hashtbl.add_exn univ ~key:(Type_equal.Id.uid tag)
+    ~data:(Packed.T (tag, data))

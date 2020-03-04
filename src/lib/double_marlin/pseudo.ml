@@ -53,8 +53,8 @@ module Domain = struct
       method size = size
       method vanishing_polynomial x =
         let pow2_pows =
-          let res = Array.create ~len:max_log2 x in
-          for i = 1 to max_log2 - 1 do
+          let res = Array.create ~len:(max_log2 + 1) x in
+          for i = 1 to max_log2 do
             res.(i) <- Field.square res.(i - 1)
           done;
           res

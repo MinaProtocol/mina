@@ -1051,6 +1051,7 @@ let blockchain_snark =
 
 
 let%test_unit "concrete" =
+  assert false ;
   let module Branching_pred = Nat.N0 in
   let module Bp_rounds = Nat.N19 in
   let module State = struct
