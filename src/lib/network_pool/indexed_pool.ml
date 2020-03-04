@@ -55,7 +55,7 @@ let currency_consumed :
     | Payment ({amount; _} as payload) ->
         if
           Token_id.equal cmd'.payload.common.fee_token
-            (Payment_payload.token_id payload)
+            (Payment_payload.token payload)
         then
           (* The fee-payer is also the sender account, include the amount. *)
           amount
