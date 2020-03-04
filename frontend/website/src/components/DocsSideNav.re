@@ -152,7 +152,7 @@ module Folder = {
   };
 };
 
-let getLocales = name => {
+let getLocales = () => {
     let localeOpt = if([%bs.raw {| process.browser |}]){
       let pathName = [%bs.raw {| window.location.pathname |}];
       let regex = [%re "/\//"];
@@ -177,40 +177,40 @@ let make = (~currentSlug) => {
   <aside>
     <CurrentSlugProvider value=currentSlug>
       <ul className=Style.sideNav>
-        <Page title=getLocales()#overview slug="" />
+        <Page title=getLocales().overview slug="" />
         <Page
-          title=getLocales()#gettingStarted
+          title=getLocales().gettingStarted
           slug="getting-started"
         />
-        <Page title=getLocales()#firstTransaction slug="my-first-transaction" />
-        <Page title=getLocales()#becomeANodeOperator slug="node-operator" />
-        <Page title=getLocales()#contributing slug="contributing" />
-        <Folder title=getLocales()#developersFolder slug="developers">
-          <Page title=getLocales()#developersOverview slug="" />
-          <Page title=getLocales()#codebaseOverview slug="codebase-overview" />
-          <Page title=getLocales()#repositoryStructure slug="directory-structure" />
-          <Page title=getLocales()#codeReviews slug="code-reviews" />
-          <Page title=getLocales()#styleGuide slug="style-guide" />
-          <Page title=getLocales()#graphqlApi slug="graphql-api" />
+        <Page title=getLocales().firstTransaction slug="my-first-transaction" />
+        <Page title=getLocales().becomeANodeOperator slug="node-operator" />
+        <Page title=getLocales().contributing slug="contributing" />
+        <Folder title=getLocales().developersFolder slug="developers">
+          <Page title=getLocales().developersOverview slug="" />
+          <Page title=getLocales().codebaseOverview slug="codebase-overview" />
+          <Page title=getLocales().repositoryStructure slug="directory-structure" />
+          <Page title=getLocales().codeReviews slug="code-reviews" />
+          <Page title=getLocales().styleGuide slug="style-guide" />
+          <Page title=getLocales().graphqlApi slug="graphql-api" />
         </Folder>
-        <Folder title=getLocales()#codaProtocolArchitectureFolder slug="architecture">
-          <Page title=getLocales()#codaOverview slug="" />
-          <Page title=getLocales()#lifecycleOfPayment slug="lifecycle-payment" />
-          <Page title=getLocales()#consensus slug="consensus" />
-          <Page title=getLocales()#proofOfStake slug="proof-of-stake" />
+        <Folder title=getLocales().codaProtocolArchitectureFolder slug="architecture">
+          <Page title=getLocales().codaOverview slug="" />
+          <Page title=getLocales().lifecycleOfPayment slug="lifecycle-payment" />
+          <Page title=getLocales().consensus slug="consensus" />
+          <Page title=getLocales().proofOfStake slug="proof-of-stake" />
         </Folder>
-        <Folder title=getLocales()#snarksFolder slug="snarks">
-          <Page title=getLocales()#snarksOverview slug="" />
-          <Page title=getLocales()#snarksGettingStarted slug="snarky" />
-          <Page title=getLocales()#whichSnark slug="constructions" />
-          <Page title=getLocales()#snarkyCryptoLib slug="snarkyjs-crypto" />
-          <Page title=getLocales()#snarkyUniverseLib slug="snarky-universe" />
+        <Folder title=getLocales().snarksFolder slug="snarks">
+          <Page title=getLocales().snarksOverview slug="" />
+          <Page title=getLocales().snarksGettingStarted slug="snarky" />
+          <Page title=getLocales().whichSnark slug="constructions" />
+          <Page title=getLocales().snarkyCryptoLib slug="snarkyjs-crypto" />
+          <Page title=getLocales().snarkyUniverseLib slug="snarky-universe" />
         </Folder>
-        <Page title=getLocales()#guiWallet slug="gui-wallet" />
-        <Page title=getLocales()#cliReference slug="cli-reference" />
-        <Page title=getLocales()#troubleshooting slug="troubleshooting" />
-        <Page title=getLocales()#faq slug="faq" />
-        <Page title=getLocales()#glossary slug="glossary" />
+        <Page title=getLocales().guiWallet slug="gui-wallet" />
+        <Page title=getLocales().cliReference slug="cli-reference" />
+        <Page title=getLocales().troubleshooting slug="troubleshooting" />
+        <Page title=getLocales().faq slug="faq" />
+        <Page title=getLocales().glossary slug="glossary" />
       </ul>
     </CurrentSlugProvider>
   </aside>;

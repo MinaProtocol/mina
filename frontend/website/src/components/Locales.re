@@ -1,5 +1,4 @@
 type docsLocales = {
-  .
   overview: string,
   gettingStarted: string,
   firstTransaction: string,
@@ -32,63 +31,63 @@ type docsLocales = {
 
 module DocsLocales = {
   let engTitles: docsLocales = {
-    pub overview = "Overview";
-    pub gettingStarted = "Getting Started";
-    pub firstTransaction = "My First Transaction";
-    pub becomeANodeOperator = "Become a Node Operator";
-    pub contributing = "Contributing to Coda";
-    pub developersFolder = "Developers";
-    pub developersOverview = "Developers Overview";
-    pub codebaseOverview = "Codebase Overview";
-    pub repositoryStructure = "Repository Structure";
-    pub codeReviews = "Code Reviews";
-    pub styleGuide = "Style Guide";
-    pub graphqlApi = "GraphQL API";
-    pub codaProtocolArchitectureFolder = "Coda Protocol Architecture";
-    pub codaOverview = "Coda Overview";
-    pub lifecycleOfPayment = "Lifecycle of a Payment";
-    pub consensus = "Consensus";
-    pub proofOfStake = "Proof of Stake";
-    pub snarksFolder = "SNARKs";
-    pub snarksOverview = "SNARKs Overview";
-    pub snarksGettingStarted = "Getting started using SNARKs";
-    pub whichSnark = "Which SNARK is right for me?";
-    pub snarkyCryptoLib = "The snarkyjs-crypto library";
-    pub snarkyUniverseLib = "The snarky-universe library";
-    pub guiWallet = "GUI Wallet";
-    pub cliReference = "CLI Reference";
-    pub troubleshooting = "Troubleshooting";
-    pub faq = "FAQ";
-    pub glossary = "Glossary"
+    overview: "Overview",
+    gettingStarted: "Getting Started",
+    firstTransaction: "My First Transaction",
+    becomeANodeOperator: "Become a Node Operator",
+    contributing: "Contributing to Coda",
+    developersFolder: "Developers",
+    developersOverview: "Developers Overview",
+    codebaseOverview: "Codebase Overview",
+    repositoryStructure: "Repository Structure",
+    codeReviews: "Code Reviews",
+    styleGuide: "Style Guide",
+    graphqlApi: "GraphQL API",
+    codaProtocolArchitectureFolder: "Coda Protocol Architecture",
+    codaOverview: "Coda Overview",
+    lifecycleOfPayment: "Lifecycle of a Payment",
+    consensus: "Consensus",
+    proofOfStake: "Proof of Stake",
+    snarksFolder: "SNARKs",
+    snarksOverview: "SNARKs Overview",
+    snarksGettingStarted: "Getting started using SNARKs",
+    whichSnark: "Which SNARK is right for me?",
+    snarkyCryptoLib: "The snarkyjs-crypto library",
+    snarkyUniverseLib: "The snarky-universe library",
+    guiWallet: "GUI Wallet",
+    cliReference: "CLI Reference",
+    troubleshooting: "Troubleshooting",
+    faq: "FAQ",
+    glossary: "Glossary",
   };
   let gerTitles: docsLocales = {
-    pub overview = "Übersicht";
-    pub gettingStarted = "Einführung";
-    pub firstTransaction = "Meine erste Transaktion";
-    pub becomeANodeOperator = "Werde ein Node-Operator";
-    pub contributing = "Beitragen";
-    pub developersFolder = "Entwickler";
-    pub developersOverview = "Entwickler Überblick";
-    pub codebaseOverview = "Codebase Überblick";
-    pub repositoryStructure = "Repository Struktur";
-    pub codeReviews = "Code Reviews";
-    pub styleGuide = "Style Leitfaden";
-    pub graphqlApi = "GraphQL API";
-    pub codaProtocolArchitectureFolder = "Coda Protokoll Architektur";
-    pub codaOverview = "Coda Überblick";
-    pub lifecycleOfPayment = "Lebenszyklus von einer Zahlung";
-    pub consensus = "Konsens";
-    pub proofOfStake = "Proof of Stake";
-    pub snarksFolder = "SNARKs";
-    pub snarksOverview = "SNARKs Überblick";
-    pub snarksGettingStarted = "SNARKs Einführung";
-    pub whichSnark = "Welcher SNARK ist richtig für mich";
-    pub snarkyCryptoLib = "Die Snarky-Crypto Bibliothek";
-    pub snarkyUniverseLib = "Die Snarky-Universe Bibliothek";
-    pub guiWallet = "GUI Geldbörse";
-    pub cliReference = "CLI Referenz";
-    pub troubleshooting = "Problembehebung";
-    pub faq = "FAQ";
-    pub glossary = "Glossar"
+    overview: {j|Übersicht|j},
+    gettingStarted: {j|Einführung|j},
+    firstTransaction: "Meine erste Transaktion",
+    becomeANodeOperator: "Werde ein Node-Operator",
+    contributing: "Beitragen",
+    developersFolder: "Entwickler",
+    developersOverview: "Entwickler Überblick",
+    codebaseOverview: "Codebase Überblick",
+    repositoryStructure: "Repository Struktur",
+    codeReviews: "Code Reviews",
+    styleGuide: "Style Leitfaden",
+    graphqlApi: "GraphQL API",
+    codaProtocolArchitectureFolder: "Coda Protokoll Architektur",
+    codaOverview: {j|Coda Überblick|j},
+    lifecycleOfPayment: "Lebenszyklus von einer Zahlung",
+    consensus: "Konsens",
+    proofOfStake: "Proof of Stake",
+    snarksFolder: "SNARKs",
+    snarksOverview: "SNARKs Überblick",
+    snarksGettingStarted: "SNARKs Einführung",
+    whichSnark: "Welcher SNARK ist richtig für mich",
+    snarkyCryptoLib: "Die Snarky-Crypto Bibliothek",
+    snarkyUniverseLib: "Die Snarky-Universe Bibliothek",
+    guiWallet: "GUI Geldbörse",
+    cliReference: "CLI Referenz",
+    troubleshooting: "Problembehebung",
+    faq: "FAQ",
+    glossary: "Glossar",
   };
 };
