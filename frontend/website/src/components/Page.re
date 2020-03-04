@@ -132,7 +132,7 @@ let make =
 
   <>
     <Next.Head>
-      <title> {React.string(title)} </title>
+      <title> {React.string({js|title|js})} </title>
       <meta property="og:title" content=title />
       <meta charSet="utf-8" />
       <meta property="og:image" content=image />
