@@ -14,14 +14,14 @@ let main () =
     Public_key.compress largest_account_keypair.public_key
   in
   let n = 2 in
-  let proposers i = if i = 0 then Some i else None in
+  let block_production_keys i = if i = 0 then Some i else None in
   let snark_work_public_keys i =
     if i = 0 then Some largest_account_public_key else None
   in
   let is_archive_rocksdb i = i = 1 in
   let%bind testnet =
-    Coda_worker_testnet.test logger n proposers snark_work_public_keys
-      Cli_lib.Arg_type.Work_selection_method.Sequence
+    Coda_worker_testnet.test ~name logger n block_production_keys
+      snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None ~is_archive_rocksdb
   in
   let%bind new_block_pipe =

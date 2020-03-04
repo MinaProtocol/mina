@@ -112,8 +112,15 @@ let%test_unit "of_ledger_subset_exn with keys that don't exist works" =
 let get_or_initialize_exn public_key t idx =
   let account = get_exn t idx in
   if Public_key.Compressed.(equal empty account.public_key) then
-    {account with delegate= public_key; public_key}
-  else account
+    (`Added, {account with delegate= public_key; public_key})
+  else (`Existed, account)
+
+let sub_account_creation_fee action (amount : Currency.Amount.t) =
+  if action = `Added then
+    Option.value_exn
+      Currency.Amount.(
+        sub amount (of_fee Coda_compile_config.account_creation_fee))
+  else amount
 
 let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
     =
@@ -144,48 +151,55 @@ let apply_user_command_exn t ({sender; payload; signature= _} : User_command.t)
               |> Option.value_exn ?here:None ?error:None ?message:None }
       in
       let receiver_idx = find_index_exn t receiver in
-      let receiver_account = get_or_initialize_exn receiver t receiver_idx in
-      set_exn t receiver_idx
-        { receiver_account with
-          balance=
-            Option.value_exn
-              (Balance.add_amount receiver_account.balance amount) }
+      let action, receiver_account =
+        get_or_initialize_exn receiver t receiver_idx
+      in
+      let receiver_balance =
+        (*deduct account-creation fee*)
+        let amount' = sub_account_creation_fee action amount in
+        Option.value_exn (Balance.add_amount receiver_account.balance amount')
+      in
+      set_exn t receiver_idx {receiver_account with balance= receiver_balance}
 
 let apply_fee_transfer_exn =
   let apply_single t ((pk, fee) : Fee_transfer.Single.t) =
     let index = find_index_exn t pk in
-    let account = get_or_initialize_exn pk t index in
+    let action, account = get_or_initialize_exn pk t index in
     let open Currency in
-    set_exn t index
-      { account with
-        balance=
-          Option.value_exn
-            (Balance.add_amount account.balance (Amount.of_fee fee)) }
+    let amount = Amount.of_fee fee in
+    let balance =
+      let amount' = sub_account_creation_fee action amount in
+      Option.value_exn (Balance.add_amount account.balance amount')
+    in
+    set_exn t index {account with balance}
   in
   fun t transfer -> One_or_two.fold transfer ~f:apply_single ~init:t
 
 let apply_coinbase_exn t
-    ({proposer; fee_transfer; amount= coinbase_amount} : Coinbase.t) =
+    ({receiver; fee_transfer; amount= coinbase_amount} : Coinbase.t) =
   let open Currency in
   let add_to_balance t pk amount =
     let idx = find_index_exn t pk in
-    let a = get_or_initialize_exn pk t idx in
-    set_exn t idx
-      {a with balance= Option.value_exn (Balance.add_amount a.balance amount)}
+    let action, a = get_or_initialize_exn pk t idx in
+    let balance =
+      let amount' = sub_account_creation_fee action amount in
+      Option.value_exn (Balance.add_amount a.balance amount')
+    in
+    set_exn t idx {a with balance}
   in
-  let proposer_reward, t =
+  let receiver_reward, t =
     match fee_transfer with
     | None ->
         (coinbase_amount, t)
-    | Some (receiver, fee) ->
+    | Some (transferee, fee) ->
         let fee = Amount.of_fee fee in
         let reward =
           Amount.sub coinbase_amount fee
           |> Option.value_exn ?here:None ?message:None ?error:None
         in
-        (reward, add_to_balance t receiver fee)
+        (reward, add_to_balance t transferee fee)
   in
-  add_to_balance t proposer proposer_reward
+  add_to_balance t receiver receiver_reward
 
 let apply_transaction_exn t (transition : Transaction.t) =
   match transition with

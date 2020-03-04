@@ -83,19 +83,15 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           in
           (*If snarked ledger hash did not change (no new ledger proof) then pop_coinbases should be a no-op*)
           let%bind no_coinbases_popped =
-            let%bind check =
-              Pending_coinbase.Hash.equal_var root_after_delete
-                prev_pending_coinbase_root
-            in
-            Boolean.if_ ledger_hash_didn't_change ~then_:check
-              ~else_:Boolean.true_
+            Pending_coinbase.Hash.equal_var root_after_delete
+              prev_pending_coinbase_root
           in
           (*new stack or update one*)
           let%map new_root =
             with_label __LOC__
               (Pending_coinbase.Checked.add_coinbase root_after_delete
                  ( Snark_transition.pending_coinbase_action transition
-                 , ( Snark_transition.proposer transition
+                 , ( Snark_transition.coinbase_receiver transition
                    , Snark_transition.coinbase_amount transition )
                  , previous_state_body_hash ))
           in
@@ -115,6 +111,9 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
           in
           Pending_coinbase.Hash.equal_var new_pending_coinbase_hash new_root
         in
+        let pending_coinbase_source_stack =
+          Pending_coinbase.Stack.Checked.create_with deleted_stack
+        in
         let%bind correct_transaction_snark =
           with_label __LOC__
             (verify_complete_merge
@@ -123,8 +122,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
                |> Blockchain_state.snarked_ledger_hash )
                ( transition |> Snark_transition.blockchain_state
                |> Blockchain_state.snarked_ledger_hash )
-               Pending_coinbase.Stack.Checked.empty deleted_stack
-               supply_increase
+               pending_coinbase_source_stack deleted_stack supply_increase
                (As_prover.return
                   (Option.value ~default:Tock.Proof.dummy
                      (Snark_transition.ledger_proof transition))))

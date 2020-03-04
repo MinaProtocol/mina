@@ -4,5 +4,4 @@
   (preprocessor_deps ../../config.mlh)
   (preprocess (pps ppx_coda ppx_inline_test ppx_optcomp ppx_deriving.eq))
   (inline_tests)
-  (libraries
-    curve_choice ))
+  (libraries curve_choice))

@@ -36,9 +36,10 @@ let run_exn ~f query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
       eprintf "❌ Error: %s\n" e ;
       exit 17
 
-let query = Client.query
+let query query_obj (uri : Uri.t Cli_lib.Flag.Types.with_name) =
+  Client.query query_obj uri.value
 
-let query_exn query_obj port = run_exn ~f:query query_obj port
+let query_exn query_obj port = run_exn ~f:Client.query query_obj port
 
 module User_command = struct
   type t =
@@ -78,6 +79,8 @@ module Decoders = struct
   let public_key json =
     Yojson.Basic.Util.to_string json
     |> Public_key.Compressed.of_base58_check_exn
+
+  let public_key_array = Array.map ~f:public_key
 
   let optional_public_key = Option.map ~f:public_key
 

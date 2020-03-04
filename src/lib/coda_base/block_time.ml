@@ -82,6 +82,8 @@ module Time = struct
 
     let of_time_span s = UInt64.of_int64 (Int64.of_float (Time.Span.to_ms s))
 
+    let to_time_span s = Time.Span.of_ms (Int64.to_float (UInt64.to_int64 s))
+
     let to_time_ns_span s =
       Time_ns.Span.of_ms (Int64.to_float (UInt64.to_int64 s))
 

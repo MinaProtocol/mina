@@ -9,7 +9,7 @@ module Poly = struct
            , 'consensus_transition
            , 'sok_digest
            , 'amount
-           , 'proposer_pk
+           , 'producer_pk
            , 'pending_coinbase_action )
            t =
         { blockchain_state: 'blockchain_state
@@ -17,7 +17,7 @@ module Poly = struct
         ; sok_digest: 'sok_digest
         ; supply_increase: 'amount
         ; ledger_proof: Proof.Stable.V1.t option
-        ; proposer: 'proposer_pk
+        ; coinbase_receiver: 'producer_pk
         ; coinbase_amount: 'amount
         ; pending_coinbase_action: 'pending_coinbase_action }
       [@@deriving bin_io, to_yojson, sexp, fields, version]
@@ -28,14 +28,14 @@ module Poly = struct
        , 'consensus_transition
        , 'sok_digest
        , 'amount
-       , 'proposer_pk
+       , 'producer_pk
        , 'pending_coinbase_action )
        t =
         ( 'blockchain_state
         , 'consensus_transition
         , 'sok_digest
         , 'amount
-        , 'proposer_pk
+        , 'producer_pk
         , 'pending_coinbase_action )
         Stable.Latest.t =
     { blockchain_state: 'blockchain_state
@@ -43,7 +43,7 @@ module Poly = struct
     ; sok_digest: 'sok_digest
     ; supply_increase: 'amount
     ; ledger_proof: Proof.t option
-    ; proposer: 'proposer_pk
+    ; coinbase_receiver: 'producer_pk
     ; coinbase_amount: 'amount
     ; pending_coinbase_action: 'pending_coinbase_action }
   [@@deriving sexp, to_yojson, fields]
@@ -77,7 +77,7 @@ Poly.
   , ledger_proof
   , sok_digest
   , supply_increase
-  , proposer
+  , coinbase_receiver
   , coinbase_amount
   , pending_coinbase_action )]
 
@@ -93,14 +93,14 @@ type var =
   Poly.t
 
 let create_value ?(sok_digest = Sok_message.Digest.default) ?ledger_proof
-    ~supply_increase ~blockchain_state ~consensus_transition ~proposer
+    ~supply_increase ~blockchain_state ~consensus_transition ~coinbase_receiver
     ~coinbase_amount ~pending_coinbase_action () : Value.t =
   { blockchain_state
   ; consensus_transition
   ; ledger_proof
   ; sok_digest
   ; supply_increase
-  ; proposer
+  ; coinbase_receiver
   ; coinbase_amount
   ; pending_coinbase_action }
 
@@ -117,7 +117,7 @@ let genesis ~genesis_ledger : value =
         ; prover=
             Account.public_key (List.hd_exn (Ledger.to_list genesis_ledger)) }
   ; ledger_proof= None
-  ; proposer= Signature_lib.Public_key.Compressed.empty
+  ; coinbase_receiver= Signature_lib.Public_key.Compressed.empty
   ; coinbase_amount= Currency.Amount.zero
   ; pending_coinbase_action= Pending_coinbase.Update.Action.Update_none }
 
@@ -127,7 +127,7 @@ let to_hlist
     ; sok_digest
     ; supply_increase
     ; ledger_proof
-    ; proposer
+    ; coinbase_receiver
     ; coinbase_amount
     ; pending_coinbase_action } =
   Snarky.H_list.
@@ -136,7 +136,7 @@ let to_hlist
     ; sok_digest
     ; supply_increase
     ; ledger_proof
-    ; proposer
+    ; coinbase_receiver
     ; coinbase_amount
     ; pending_coinbase_action ]
 
@@ -146,7 +146,7 @@ let of_hlist
      ; sok_digest
      ; supply_increase
      ; ledger_proof
-     ; proposer
+     ; coinbase_receiver
      ; coinbase_amount
      ; pending_coinbase_action ] :
       (unit, _) Snarky.H_list.t) =
@@ -155,7 +155,7 @@ let of_hlist
   ; sok_digest
   ; supply_increase
   ; ledger_proof
-  ; proposer
+  ; coinbase_receiver
   ; coinbase_amount
   ; pending_coinbase_action }
 

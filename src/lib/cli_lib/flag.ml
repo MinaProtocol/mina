@@ -106,16 +106,11 @@ module Port = struct
 
   let default_client = 8301
 
-  let default_external = 8302
-
   let default_rest = 0xc0d
 
   let default_archive = default_rest + 1
 
-  (* This is always computed as default_external+1 *)
-  let _default_discovery = 8303
-
-  let default_libp2p = 28675
+  let default_libp2p = 8302
 
   let default_hasura_port = 9000
 
@@ -135,8 +130,8 @@ module Port = struct
 
   module Daemon = struct
     let external_ =
-      create ~name:"external-port" ~default:default_external
-        "Base server port for daemon TCP (discovery UDP on port+1)"
+      create ~name:"external-port" ~default:default_libp2p
+        "Port to use for all libp2p communications (gossip and RPC)"
 
     let client =
       create ~name:"client-port" ~default:default_client
@@ -145,10 +140,6 @@ module Port = struct
     let rest_server =
       create ~name:"rest-port" ~default:default_rest
         "local REST-server for daemon interaction"
-
-    let discovery =
-      create ~name:"discovery-port" ~default:default_libp2p
-        "Daemon to archive process communication"
   end
 
   module Archive = struct
@@ -320,3 +311,62 @@ let user_command_common : user_command_common Command.Param.t =
       (optional string)
   in
   {sender; fee= Option.value fee ~default:Default.transaction_fee; nonce; memo}
+
+module User_command = struct
+  open Arg_type
+
+  let hd_index =
+    let open Command.Param in
+    flag "HD-index" ~doc:"HD-INDEX Index used by hardware wallet"
+      (required hd_index)
+
+  let receiver =
+    let open Command.Param in
+    flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
+      (required public_key_compressed)
+
+  let amount =
+    let open Command.Param in
+    flag "amount" ~doc:"VALUE Payment amount you want to send"
+      (required txn_amount)
+
+  let fee =
+    let open Command.Param in
+    flag "fee"
+      ~doc:
+        (Printf.sprintf
+           "FEE Amount you are willing to pay to process the transaction \
+            (default: %d) (minimum: %d)"
+           (Currency.Fee.to_int Default.transaction_fee)
+           (Currency.Fee.to_int Coda_base.User_command.minimum_fee))
+      (optional txn_fee)
+
+  let valid_until =
+    let open Command.Param in
+    flag "valid-until"
+      ~doc:
+        "GLOBAL-SLOT The last global-slot at which this transaction will be \
+         considered valid. This makes it possible to have transactions which \
+         expire if they are not applied before this time. If omitted, the \
+         transaction will never expire."
+      (optional consensus_time_raw)
+
+  let nonce =
+    let open Command.Param in
+    flag "nonce"
+      ~doc:
+        "NONCE Nonce that you would like to set for your transaction \
+         (default: nonce of your account on the best ledger or the successor \
+         of highest value nonce of your sent transactions from the \
+         transaction pool )"
+      (optional txn_nonce)
+
+  let memo =
+    let open Command.Param in
+    flag "memo"
+      ~doc:
+        (sprintf
+           "STRING Memo accompanying the transaction (up to %d characters)"
+           Coda_base.User_command_memo.max_input_length)
+      (optional string)
+end

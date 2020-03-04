@@ -14,8 +14,8 @@ module type Constants = sig
   (** [k] is the number of blocks required to reach finality *)
   val k : int
 
-  (** The amount of money minted and given to the proposer whenever a block
-   * is created *)
+  (** The amount of money minted and given to the block producer whenever a
+      block is created *)
   val coinbase : Currency.Amount.t
 
   val block_window_duration_ms : int
@@ -40,6 +40,9 @@ module type Constants = sig
 
   (** Number of slots in one epoch *)
   val slots_per_epoch : Unsigned.UInt32.t
+
+  (** The names and values of all constants. *)
+  val all_constants : Yojson.Safe.json
 end
 
 module type Blockchain_state = sig
@@ -222,7 +225,7 @@ module type State_hooks = sig
 
   type consensus_transition
 
-  type proposal_data
+  type block_data
 
   type blockchain_state
 
@@ -234,15 +237,15 @@ module type State_hooks = sig
 
   (**
    * Generate a new protocol state and consensus specific transition data
-   * for a new transition. Called from the proposer in order to generate
-   * a new transition to propose to the network. Returns `None` if a new
+   * for a new transition. Called from the block producer in order to generate
+   * a new transition to broadcast to the network. Returns `None` if a new
    * transition cannot be generated.
   *)
   val generate_transition :
        previous_protocol_state:protocol_state
     -> blockchain_state:blockchain_state
     -> current_time:Unix_timestamp.t
-    -> proposal_data:proposal_data
+    -> block_data:block_data
     -> transactions:Coda_base.User_command.t list
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
@@ -315,7 +318,8 @@ module type S = sig
         -> genesis_ledger:Ledger.t Lazy.t
         -> t
 
-      val current_proposers : t -> Signature_lib.Public_key.Compressed.Set.t
+      val current_block_production_keys :
+        t -> Signature_lib.Public_key.Compressed.Set.t
 
       val current_epoch_delegatee_table :
            local_state:t
@@ -328,9 +332,9 @@ module type S = sig
            Public_key.Compressed.Table.t
            option
 
-      (** Swap in a new set of proposers and invalidate and/or recompute cached
-       * data *)
-      val proposer_swap :
+      (** Swap in a new set of block production keys and invalidate and/or
+          recompute cached data *)
+      val block_production_keys_swap :
            t
         -> Signature_lib.Public_key.Compressed.Set.t
         -> Coda_base.Block_time.t
@@ -390,6 +394,8 @@ module type S = sig
       val of_time : Block_time.t -> t Or_error.t
 
       val of_time_exn : Block_time.t -> t
+
+      val to_time : t -> Block_time.t
 
       (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)
       val get_old : t -> t
@@ -460,7 +466,7 @@ module type S = sig
       val is_genesis_state_var : var -> (Boolean.var, _) Checked.t
     end
 
-    module Proposal_data : sig
+    module Block_data : sig
       type t
 
       val prover_state : t -> Prover_state.t
@@ -482,7 +488,7 @@ module type S = sig
       type query =
         { query:
             'q 'r.    Network_peer.Peer.t -> ('q, 'r) rpc -> 'q
-            -> 'r Deferred.Or_error.t }
+            -> 'r Coda_base.Rpc_intf.rpc_response Deferred.t }
     end
 
     (* Check whether we are in the genesis epoch *)
@@ -507,26 +513,26 @@ module type S = sig
       -> logger:Logger.t
       -> [`Keep | `Take]
 
-    type proposal =
+    type block_producer_timing =
       [ `Check_again of Unix_timestamp.t
-      | `Propose_now of Signature_lib.Keypair.t * Proposal_data.t
-      | `Propose of
-        Unix_timestamp.t * Signature_lib.Keypair.t * Proposal_data.t ]
+      | `Produce_now of Signature_lib.Keypair.t * Block_data.t
+      | `Produce of Unix_timestamp.t * Signature_lib.Keypair.t * Block_data.t
+      ]
 
     (**
-     * Determine if and when to perform the next transition proposal. Either
-     * informs the callee to check again at some time in the future, or to
-     * schedule a proposal with some particular keypair at some time in the
-     * future, or to propose now with some keypair and check again some time in
-     * the future.
+     * Determine if and when to next produce a block. Either informs the callee
+     * to check again at some time in the future, or to schedule block
+     * production with some particular keypair at some time in the future, or to
+     * produce a block now with some keypair and check again some time in the
+     * future.
      *)
-    val next_proposal :
+    val next_producer_timing :
          Unix_timestamp.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> logger:Logger.t
-      -> proposal
+      -> block_producer_timing
 
     (**
      * A hook for managing local state when the locked tip is updated.
@@ -570,7 +576,7 @@ module type S = sig
          logger:Logger.t
       -> trust_system:Trust_system.t
       -> local_state:Local_state.t
-      -> random_peers:(int -> Network_peer.Peer.t list)
+      -> random_peers:(int -> Network_peer.Peer.t list Deferred.t)
       -> query_peer:Rpcs.query
       -> local_state_sync Non_empty_list.t
       -> unit Deferred.Or_error.t
@@ -597,6 +603,6 @@ module type S = sig
        and type consensus_state := Consensus_state.Value.t
        and type consensus_state_var := Consensus_state.var
        and type consensus_transition := Consensus_transition.Value.t
-       and type proposal_data := Proposal_data.t
+       and type block_data := Block_data.t
   end
 end

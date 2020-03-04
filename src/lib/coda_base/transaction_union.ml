@@ -44,9 +44,9 @@ let of_transaction : Transaction.t -> t = function
       { payload= Transaction_union_payload.of_user_command_payload payload
       ; sender
       ; signature }
-  | Coinbase {proposer; fee_transfer; amount} ->
+  | Coinbase {receiver; fee_transfer; amount} ->
       let other_pk, other_amount =
-        Option.value ~default:(proposer, Fee.zero) fee_transfer
+        Option.value ~default:(receiver, Fee.zero) fee_transfer
       in
       { payload=
           { common=
@@ -54,7 +54,7 @@ let of_transaction : Transaction.t -> t = function
               ; nonce= Account.Nonce.zero
               ; valid_until= Coda_numbers.Global_slot.max_value
               ; memo= User_command_memo.empty }
-          ; body= {public_key= proposer; amount; tag= Tag.Coinbase} }
+          ; body= {public_key= receiver; amount; tag= Tag.Coinbase} }
       ; sender= Public_key.decompress_exn other_pk
       ; signature= Signature.dummy }
   | Fee_transfer tr -> (

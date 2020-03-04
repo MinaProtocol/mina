@@ -4,6 +4,7 @@ open Coda_state
 open Pipe_lib
 open Coda_transition
 open O1trace
+open Network_peer
 
 let create_bufferred_pipe ?name () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
@@ -25,7 +26,7 @@ let is_transition_for_bootstrap ~logger frontier new_transition =
            , `String "Transition_router.is_transition_for_bootstrap" ) ])
 
 let start_transition_frontier_controller ~logger ~trust_system ~verifier
-    ~network ~time_controller ~proposer_transition_reader
+    ~network ~time_controller ~producer_transition_reader
     ~verified_transition_writer ~clear_reader ~collected_transitions
     ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -42,7 +43,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
         Transition_frontier_controller.run ~logger ~trust_system ~verifier
           ~network ~time_controller ~collected_transitions ~frontier
           ~network_transition_reader:!transition_reader_ref
-          ~proposer_transition_reader ~clear_reader )
+          ~producer_transition_reader ~clear_reader )
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -51,10 +52,11 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
   |> don't_wait_for
 
 let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
-    ~time_controller ~proposer_transition_reader ~verified_transition_writer
+    ~time_controller ~producer_transition_reader ~verified_transition_writer
     ~clear_reader ~transition_reader_ref ~transition_writer_ref
     ~consensus_local_state ~frontier_w ~initial_root_transition
-    ~persistent_root ~persistent_frontier ~genesis_state_hash ~genesis_ledger =
+    ~persistent_root ~persistent_frontier ~genesis_state_hash ~genesis_ledger
+    ~best_seen_transition =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Starting Bootstrap Controller phase" ;
   let bootstrap_controller_reader, bootstrap_controller_writer =
@@ -62,6 +64,9 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
   in
   transition_reader_ref := bootstrap_controller_reader ;
   transition_writer_ref := bootstrap_controller_writer ;
+  Option.iter best_seen_transition ~f:(fun best_seen_transition ->
+      Strict_pipe.Writer.write bootstrap_controller_writer best_seen_transition
+  ) ;
   don't_wait_for (Broadcast_pipe.Writer.write frontier_w None) ;
   trace_recurring "bootstrap controller" (fun () ->
       upon
@@ -72,7 +77,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
         (fun (new_frontier, collected_transitions) ->
           Strict_pipe.Writer.kill !transition_writer_ref ;
           start_transition_frontier_controller ~logger ~trust_system ~verifier
-            ~network ~time_controller ~proposer_transition_reader
+            ~network ~time_controller ~producer_transition_reader
             ~verified_transition_writer ~clear_reader ~collected_transitions
             ~transition_reader_ref ~transition_writer_ref ~frontier_w
             new_frontier ) )
@@ -80,7 +85,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer =
   let num_peers = 8 in
-  let peers = Coda_networking.random_peers network num_peers in
+  let%bind peers = Coda_networking.random_peers network num_peers in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Requesting peers for their best tip to do initialization" ;
   let open Deferred.Option.Let_syntax in
@@ -115,7 +120,7 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
             | Ok (`Root _, `Best_tip candidate_best_tip) ->
                 let enveloped_candidate_best_tip =
                   Envelope.Incoming.wrap ~data:candidate_best_tip
-                    ~sender:(Envelope.Sender.Remote peer.host)
+                    ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
                 in
                 return
                 @@ Option.merge acc
@@ -136,6 +141,13 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
                            candidate_best_tip existing_best_tip
                          > 0
                        then (
+                         let best_tip_length =
+                           External_transition.Initial_validated
+                           .blockchain_length candidate_best_tip
+                           |> Coda_numbers.Length.to_int
+                         in
+                         Coda_metrics.Transition_frontier
+                         .update_max_blocklength_observed best_tip_length ;
                          don't_wait_for
                          @@ Broadcast_pipe.Writer.write
                               most_recent_valid_block_writer candidate_best_tip ;
@@ -175,18 +187,20 @@ let wait_for_high_connectivity ~logger ~network =
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Already connected to enough peers, start initialization" )
     ; ( after (Time_ns.Span.of_sec connectivity_time_upperbound)
-      >>| fun () ->
+      >>= fun () ->
+      Coda_networking.peers network
+      >>| fun peers ->
       if not @@ Deferred.is_determined high_connectivity then
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
-            [ ("num peers", `Int (List.length @@ Coda_networking.peers network))
+            [ ("num peers", `Int (List.length peers))
             ; ( "max seconds to wait for high connectivity"
               , `Float connectivity_time_upperbound ) ]
           "Will start initialization without connecting with too many peers" )
     ]
 
 let initialize ~logger ~network ~verifier ~trust_system ~time_controller
-    ~frontier_w ~proposer_transition_reader ~clear_reader
+    ~frontier_w ~producer_transition_reader ~clear_reader
     ~verified_transition_writer ~transition_reader_ref ~transition_writer_ref
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
     ~consensus_local_state ~genesis_state_hash ~genesis_ledger ~base_proof =
@@ -198,22 +212,22 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
       (load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
          ~consensus_local_state ~genesis_state_hash ~genesis_ledger ~base_proof)
   with
-  | _, None ->
+  | best_tip, None ->
       let%map initial_root_transition =
         Persistent_frontier.(
           with_instance_exn persistent_frontier ~f:Instance.get_root_transition)
         >>| Result.ok_or_failwith
       in
       start_bootstrap_controller ~logger ~trust_system ~verifier ~network
-        ~time_controller ~proposer_transition_reader
+        ~time_controller ~producer_transition_reader
         ~verified_transition_writer ~clear_reader ~transition_reader_ref
         ~consensus_local_state ~transition_writer_ref ~frontier_w
         ~persistent_root ~persistent_frontier ~initial_root_transition
-        ~genesis_state_hash ~genesis_ledger
+        ~genesis_state_hash ~genesis_ledger ~best_seen_transition:best_tip
   | None, Some frontier ->
       return
       @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
-           ~network ~time_controller ~proposer_transition_reader
+           ~network ~time_controller ~producer_transition_reader
            ~verified_transition_writer ~clear_reader ~collected_transitions:[]
            ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier
   | Some best_tip, Some frontier ->
@@ -226,11 +240,12 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
         in
         let%map () = Transition_frontier.close frontier in
         start_bootstrap_controller ~logger ~trust_system ~verifier ~network
-          ~time_controller ~proposer_transition_reader
+          ~time_controller ~producer_transition_reader
           ~verified_transition_writer ~clear_reader ~transition_reader_ref
           ~consensus_local_state ~transition_writer_ref ~frontier_w
           ~persistent_root ~persistent_frontier ~initial_root_transition
           ~genesis_state_hash ~genesis_ledger
+          ~best_seen_transition:(Some best_tip)
       else
         let root = Transition_frontier.root frontier in
         let%map () =
@@ -251,8 +266,8 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
                     { Consensus.Hooks.Rpcs.query=
                         (fun peer rpc query ->
                           Coda_networking.(
-                            query_peer network peer (Rpcs.Consensus_rpc rpc)
-                              query) ) }
+                            query_peer network peer.peer_id
+                              (Rpcs.Consensus_rpc rpc) query) ) }
                   sync_jobs
               with
               | Error e ->
@@ -261,7 +276,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
                   () )
         in
         start_transition_frontier_controller ~logger ~trust_system ~verifier
-          ~network ~time_controller ~proposer_transition_reader
+          ~network ~time_controller ~producer_transition_reader
           ~verified_transition_writer ~clear_reader
           ~collected_transitions:[best_tip] ~transition_reader_ref
           ~transition_writer_ref ~frontier_w frontier
@@ -304,7 +319,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     ~consensus_local_state ~persistent_root_location
     ~persistent_frontier_location
     ~frontier_broadcast_pipe:(frontier_r, frontier_w)
-    ~network_transition_reader ~proposer_transition_reader
+    ~network_transition_reader ~producer_transition_reader
     ~most_recent_valid_block:( most_recent_valid_block_reader
                              , most_recent_valid_block_writer )
     ~genesis_state_hash ~genesis_ledger ~base_proof =
@@ -338,7 +353,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       upon
         (initialize ~logger ~network ~verifier ~trust_system
            ~persistent_frontier ~persistent_root ~time_controller ~frontier_w
-           ~proposer_transition_reader ~clear_reader
+           ~producer_transition_reader ~clear_reader
            ~verified_transition_writer ~transition_reader_ref
            ~transition_writer_ref ~most_recent_valid_block_writer
            ~consensus_local_state ~genesis_state_hash ~genesis_ledger
@@ -397,12 +412,13 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                        let%map () = Transition_frontier.close frontier in
                        start_bootstrap_controller ~logger ~trust_system
                          ~verifier ~network ~time_controller
-                         ~proposer_transition_reader
+                         ~producer_transition_reader
                          ~verified_transition_writer ~clear_reader
                          ~transition_reader_ref ~transition_writer_ref
                          ~consensus_local_state ~frontier_w ~persistent_root
                          ~persistent_frontier ~initial_root_transition
-                         ~genesis_state_hash ~genesis_ledger )
+                         ~genesis_state_hash ~genesis_ledger
+                         ~best_seen_transition:(Some enveloped_transition) )
                      else Deferred.unit
                  | None ->
                      Deferred.unit ) ) ) ;

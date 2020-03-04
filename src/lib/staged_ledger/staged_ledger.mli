@@ -130,6 +130,7 @@ val current_ledger_proof : t -> Ledger_proof.t option
 val create_diff :
      t
   -> self:Public_key.Compressed.t
+  -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
   -> logger:Logger.t
   -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t

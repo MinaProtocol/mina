@@ -8,7 +8,7 @@ query {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
     locked
     balance {
-      total @bsDecoder(fn: "Decoders.uint64")
+      total @bsDecoder(fn: "Decoders.balance")
     }
   }
 }
@@ -32,6 +32,16 @@ module Add_wallet =
 {|
 mutation ($password: String) {
   addWallet(input: {password: $password}) {
+    public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
+  }
+}
+|}]
+
+module Create_hd_account =
+[%graphql
+{|
+mutation ($hd_index: UInt32) {
+  createHDAccount(input: {index: $hd_index}) {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
   }
 }
@@ -89,7 +99,7 @@ query pendingSnarkWork {
       work_id: workId
       }
     }
-    }
+  }
 |}]
 
 module Set_staking =
@@ -97,7 +107,9 @@ module Set_staking =
 {|
 mutation ($public_key: PublicKey) {
   setStaking(input : {publicKeys: [$public_key]}) {
-    lastStaking
+    lastStaking @bsDecoder(fn: "Decoders.public_key_array")
+    lockedPublicKeys @bsDecoder(fn: "Decoders.public_key_array")
+    currentStakingKeys @bsDecoder(fn: "Decoders.public_key_array")
     }
   }
 |}]

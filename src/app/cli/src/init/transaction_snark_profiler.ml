@@ -65,7 +65,7 @@ let create_ledger_and_transactions num_transitions =
       in
       let coinbase =
         Coinbase.create ~amount:Coda_compile_config.coinbase
-          ~proposer:(Public_key.compress keys.(0).public_key)
+          ~receiver:(Public_key.compress keys.(0).public_key)
           ~fee_transfer:None
         |> Or_error.ok_exn
       in
@@ -239,8 +239,8 @@ let run profiler num_transactions repeats preeval =
            | User_command t ->
                let t = (t :> User_command.t) in
                User_command.accounts_accessed t
-           | Coinbase {proposer; fee_transfer; _} ->
-               proposer :: Option.to_list (Option.map fee_transfer ~f:fst) ))
+           | Coinbase {receiver; fee_transfer; _} ->
+               receiver :: Option.to_list (Option.map fee_transfer ~f:fst) ))
   in
   for i = 1 to repeats do
     let message = profiler sparse_ledger transitions preeval in

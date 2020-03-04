@@ -111,6 +111,8 @@ let txn_nonce =
   let open Coda_base in
   map string ~f:Account.Nonce.of_string
 
+let hd_index = map string ~f:Coda_numbers.Hd_index.of_string
+
 let ip_address = map string ~f:Unix.Inet_addr.of_string
 
 let log_level =
