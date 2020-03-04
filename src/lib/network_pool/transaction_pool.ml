@@ -350,7 +350,7 @@ struct
               match
                 Option.bind
                   (Base_ledger.location_of_account best_tip_ledger
-                     (User_command.source (User_command.forget_check cmd)))
+                     (User_command.fee_payer (User_command.forget_check cmd)))
                   ~f:(Base_ledger.get best_tip_ledger)
               with
               | Some acct -> (

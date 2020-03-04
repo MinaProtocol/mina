@@ -30,6 +30,8 @@ type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
 val dummy : t
 
+val token : t -> Token_id.t
+
 val gen : max_amount:Currency.Amount.t -> t Quickcheck.Generator.t
 
 type var = (Account_id.var, Currency.Amount.var) Poly.t

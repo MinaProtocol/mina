@@ -52,14 +52,16 @@ let currency_consumed :
     fee_amt
     +
     match cmd'.payload.body with
-    | Payment {amount; receiver} ->
+    | Payment ({amount; _} as payload) ->
         if
           Token_id.equal cmd'.payload.common.fee_token
-            (Account_id.token_id receiver)
+            (Payment_payload.token_id payload)
         then
           (* The fee-payer is also the sender account, include the amount. *)
           amount
-        else zero
+        else
+          (* The payment won't affect the balance of this account. *)
+          zero
     | Stake_delegation _ ->
         zero)
 
@@ -426,6 +428,10 @@ let handle_committed_txn :
             | None ->
                 (t3, Sequence.empty)
             | Some (source_cmds, currency_reserved) ->
+                (* The command may have decreased the balance of the source
+                   account, drop any commands that no longer have sufficient
+                   balance to execute.
+                *)
                 let new_queued_cmds, currency_reserved, dropped_cmds =
                   drop_until_sufficient_balance
                     (source_cmds, currency_reserved)

@@ -47,6 +47,8 @@ type t = Stable.Latest.t [@@deriving eq, sexp, hash, yojson]
 
 let dummy = Poly.{receiver= Account_id.empty; amount= Amount.zero}
 
+let token {Poly.receiver; _} = Account_id.token_id receiver
+
 [%%ifdef
 consensus_mechanism]
 
