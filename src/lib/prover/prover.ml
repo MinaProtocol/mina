@@ -182,6 +182,7 @@ module Worker_state = struct
          | _ ->
              failwith "unknown proof_level set in compile config"
        in
+       Memory_stats.log_memory_stats logger ;
        m)
 
   let get = Fn.id
