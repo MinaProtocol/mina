@@ -182,35 +182,35 @@ let make = (~currentSlug) => {
           title=getLocales()#gettingStarted
           slug="getting-started"
         />
-        <Page title="My First Transaction" slug="my-first-transaction" />
-        <Page title="Become a Node Operator" slug="node-operator" />
-        <Page title="Contributing to Coda" slug="contributing" />
-        <Folder title="Developers" slug="developers">
-          <Page title="Developers Overview" slug="" />
-          <Page title="Codebase Overview" slug="codebase-overview" />
-          <Page title="Repository Structure" slug="directory-structure" />
-          <Page title="Code Reviews" slug="code-reviews" />
-          <Page title="Style Guide" slug="style-guide" />
-          <Page title="GraphQL API" slug="graphql-api" />
+        <Page title=getLocales()#firstTransaction slug="my-first-transaction" />
+        <Page title=getLocales()#becomeANodeOperator slug="node-operator" />
+        <Page title=getLocales()#contributing slug="contributing" />
+        <Folder title=getLocales()#developersFolder slug="developers">
+          <Page title=getLocales()#developersOverview slug="" />
+          <Page title=getLocales()#codebaseOverview slug="codebase-overview" />
+          <Page title=getLocales()#repositoryStructure slug="directory-structure" />
+          <Page title=getLocales()#codeReviews slug="code-reviews" />
+          <Page title=getLocales()#styleGuide slug="style-guide" />
+          <Page title=getLocales()#graphqlApi slug="graphql-api" />
         </Folder>
-        <Folder title="Coda Protocol Architecture" slug="architecture">
-          <Page title="Coda Overview" slug="" />
-          <Page title="Lifecycle of a Payment" slug="lifecycle-payment" />
-          <Page title="Consensus" slug="consensus" />
-          <Page title="Proof of Stake" slug="proof-of-stake" />
+        <Folder title=getLocales()#codaProtocolArchitectureFolder slug="architecture">
+          <Page title=getLocales()#codaOverview slug="" />
+          <Page title=getLocales()#lifecycleOfPayment slug="lifecycle-payment" />
+          <Page title=getLocales()#consensus slug="consensus" />
+          <Page title=getLocales()#proofOfStake slug="proof-of-stake" />
         </Folder>
-        <Folder title="SNARKs" slug="snarks">
-          <Page title="SNARKs Overview" slug="" />
-          <Page title="Getting started using SNARKs" slug="snarky" />
-          <Page title="Which SNARK is right for me?" slug="constructions" />
-          <Page title="The snarkyjs-crypto library" slug="snarkyjs-crypto" />
-          <Page title="The snarky-universe library" slug="snarky-universe" />
+        <Folder title=getLocales()#snarksFolder slug="snarks">
+          <Page title=getLocales()#snarksOverview slug="" />
+          <Page title=getLocales()#snarksGettingStarted slug="snarky" />
+          <Page title=getLocales()#whichSnark slug="constructions" />
+          <Page title=getLocales()#snarkyCryptoLib slug="snarkyjs-crypto" />
+          <Page title=getLocales()#snarkyUniverseLib slug="snarky-universe" />
         </Folder>
-        <Page title="GUI Wallet" slug="gui-wallet" />
-        <Page title="CLI Reference" slug="cli-reference" />
-        <Page title="Troubleshooting" slug="troubleshooting" />
-        <Page title="FAQ" slug="faq" />
-        <Page title="Glossary" slug="glossary" />
+        <Page title=getLocales()#guiWallet slug="gui-wallet" />
+        <Page title=getLocales()#cliReference slug="cli-reference" />
+        <Page title=getLocales()#troubleshooting slug="troubleshooting" />
+        <Page title=getLocales()#faq slug="faq" />
+        <Page title=getLocales()#glossary slug="glossary" />
       </ul>
     </CurrentSlugProvider>
   </aside>;

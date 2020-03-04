@@ -19,7 +19,7 @@ type docsLocales = {
   proofOfStake: string,
   snarksFolder: string,
   snarksOverview: string,
-  snarksGettingStartet: string,
+  snarksGettingStarted: string,
   whichSnark: string,
   snarkyCryptoLib: string,
   snarkyUniverseLib: string,
@@ -51,7 +51,7 @@ module DocsLocales = {
     pub proofOfStake = "Proof of Stake";
     pub snarksFolder = "SNARKs";
     pub snarksOverview = "SNARKs Overview";
-    pub snarksGettingStartet = "Getting started using SNARKs";
+    pub snarksGettingStarted = "Getting started using SNARKs";
     pub whichSnark = "Which SNARK is right for me?";
     pub snarkyCryptoLib = "The snarkyjs-crypto library";
     pub snarkyUniverseLib = "The snarky-universe library";
@@ -81,7 +81,7 @@ module DocsLocales = {
     pub proofOfStake = "";
     pub snarksFolder = "";
     pub snarksOverview = "";
-    pub snarksGettingStartet = "";
+    pub snarksGettingStarted = "";
     pub whichSnark = "";
     pub snarkyCryptoLib = "";
     pub snarkyUniverseLib = "";
