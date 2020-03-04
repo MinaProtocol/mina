@@ -52,7 +52,7 @@ jobs:
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-892f3f57408e6abb7d75337cbcdaec271fa34be4
+            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -98,7 +98,7 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-892f3f57408e6abb7d75337cbcdaec271fa34be4
+            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
         steps:
             - checkout
             - run:
@@ -127,7 +127,7 @@ jobs:
                   command: ./scripts/require-ppx-coda.py
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-892f3f57408e6abb7d75337cbcdaec271fa34be4
+            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
         steps:
             - checkout
             - run:
@@ -144,7 +144,7 @@ jobs:
                   command: ./scripts/compare_pr_diff_types.sh
     compare-test-signatures:
         docker:
-            - image: codaprotocol/coda:toolchain-892f3f57408e6abb7d75337cbcdaec271fa34be4
+            - image: codaprotocol/coda:toolchain-cf3d5dc87c195afd8eec14a2c4eaf9980004ee26
         steps:
             - checkout
             - run:
@@ -296,7 +296,7 @@ jobs:
     build-client-sdk:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-892f3f57408e6abb7d75337cbcdaec271fa34be4
+            - image: codaprotocol/coda:toolchain-cf3d5dc87c195afd8eec14a2c4eaf9980004ee26
         steps:
             - checkout
             - run:
@@ -320,7 +320,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-892f3f57408e6abb7d75337cbcdaec271fa34be4
+            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
         steps:
             - checkout
             - run:
@@ -410,7 +410,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-892f3f57408e6abb7d75337cbcdaec271fa34be4
+            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -432,7 +432,7 @@ jobs:
     test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-892f3f57408e6abb7d75337cbcdaec271fa34be4
+            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -453,7 +453,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-892f3f57408e6abb7d75337cbcdaec271fa34be4
+            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -475,7 +475,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-892f3f57408e6abb7d75337cbcdaec271fa34be4
+            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
         steps:
             - checkout
             - run:
@@ -497,7 +497,7 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-892f3f57408e6abb7d75337cbcdaec271fa34be4
+            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
         steps:
             - checkout
             - run:
