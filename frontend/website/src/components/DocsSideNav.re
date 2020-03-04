@@ -68,7 +68,20 @@ module Style = {
   let childPage = style([marginLeft(`rem(1.)), listStyleType(`none)]);
   let flip = style([transform(rotate(`deg(180.)))]);
 };
-
+//method to get the key of location e.g "en"
+let getLocaleKey = () => {
+    let localeOpt = if([%bs.raw {| process.browser |}]){
+      let pathName = [%bs.raw {| window.location.pathname |}];
+      let regex = [%re "/\//"];
+        let results = Js.String.splitByRe(regex, pathName);
+        Option.value(~default="en",results[2]);
+    }
+    //if no browser process is found, just return english
+    else {
+        "en"
+    }
+    localeOpt;
+}
 module CurrentSlugProvider = {
   let (context, make, makeProps) = ReactExt.createContext("");
 };
@@ -92,7 +105,7 @@ module Page = {
       | None => slug
       };
     let isCurrentPage = currentSlug == fullSlug;
-    let href = slugConcat("/docs", fullSlug);
+    let href = slugConcat("/docs/"++getLocaleKey(), fullSlug);
     <li>
       <Next.Link href>
         <a className={isCurrentPage ? Style.currentPage : Style.page}>
@@ -153,16 +166,7 @@ module Folder = {
 };
 
 let getLocales = () => {
-    let localeOpt = if([%bs.raw {| process.browser |}]){
-      let pathName = [%bs.raw {| window.location.pathname |}];
-      let regex = [%re "/\//"];
-        let results = Js.String.splitByRe(regex, pathName);
-        Option.value(~default="en",results[2]);
-    }
-    //if no browser process is found, just return english
-    else {
-    "en"
-    }
+    let localeOpt = getLocaleKey();
 
     switch(localeOpt){
     | "de" => DocsLocales.gerTitles;
