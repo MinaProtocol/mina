@@ -6,32 +6,18 @@ open Snark_params
 open Snark_bits
 open Module_version
 
+[%%versioned_asserted
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t = Tick.Field.t
-      [@@deriving bin_io, sexp, eq, compare, version {asserted}]
-    end
+    type t = Tick.Field.t [@@deriving sexp, eq, compare]
+
+    let to_latest = Fn.id
 
     let gen = Tick.Field.gen
-
-    include T
-    include Registration.Make_latest_version (T)
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "target"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
 
   (* see lib/module_version/README-version-asserted.md *)
-  module For_tests = struct
+  module Tests = struct
     [%%if
     curve_size = 298]
 
@@ -64,7 +50,7 @@ module Stable = struct
 
     [%%endif]
   end
-end
+end]
 
 type t = Stable.Latest.t [@@deriving sexp, eq, compare]
 
