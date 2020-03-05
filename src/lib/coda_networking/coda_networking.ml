@@ -657,7 +657,29 @@ let create (config : Config.t)
     let%bind result, sender =
       run_for_rpc_result conn query ~f:get_ancestry action_msg msg_args
     in
-    record_unknown_item result sender action_msg msg_args
+    match result with
+    | None ->
+        record_unknown_item result sender action_msg msg_args
+    | Some {proof= _, ext_trans; _} ->
+        let current_fork_id = External_transition.current_fork_id ext_trans in
+        let next_fork_id = External_transition.next_fork_id ext_trans in
+        let curr_valid = Fork_id.is_valid current_fork_id in
+        let next_valid = Option.for_all next_fork_id ~f:Fork_id.is_valid in
+        if not curr_valid then
+          Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
+            "Get_ancestry, proof contains external transition with invalid \
+             current fork ID"
+            ~metadata:
+              [("current_fork_id", `String (Fork_id.to_string current_fork_id))] ;
+        if not next_valid then
+          Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
+            "Get_ancestry, proof contains external transition with invalid \
+             next fork ID"
+            ~metadata:
+              [ ( "next_fork_id"
+                , `String (Fork_id.to_string (Option.value_exn next_fork_id))
+                ) ] ;
+        if curr_valid && next_valid then return result else return None
   in
   let get_best_tip_rpc conn ~version:_ query =
     Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -695,7 +717,42 @@ let create (config : Config.t)
     let%bind result, sender =
       run_for_rpc_result conn query ~f:get_transition_chain action_msg msg_args
     in
-    record_unknown_item result sender action_msg msg_args
+    match result with
+    | None ->
+        record_unknown_item result sender action_msg msg_args
+    | Some ext_trans -> (
+        let invalid_fork_ids =
+          List.fold ext_trans ~init:([], [])
+            ~f:(fun (inv_currs, inv_nexts) trans ->
+              let curr_fork_id = External_transition.current_fork_id trans in
+              let inv_currs' =
+                if Fork_id.is_valid curr_fork_id then inv_currs
+                else curr_fork_id :: inv_currs
+              in
+              let inv_nexts' =
+                match External_transition.next_fork_id trans with
+                | None ->
+                    inv_nexts
+                | Some fork_id ->
+                    if Fork_id.is_valid fork_id then inv_nexts
+                    else fork_id :: inv_nexts
+              in
+              (inv_currs', inv_nexts') )
+        in
+        match invalid_fork_ids with
+        | [], [] ->
+            (* all valid fork ids *) return result
+        | invalid_currs, invalid_nexts ->
+            let mk_json_string fork_id = `String (Fork_id.to_string fork_id) in
+            Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
+              "Get_transition_chain, external transition contains invalid \
+               fork IDs"
+              ~metadata:
+                [ ( "invalid_current_fork_ids"
+                  , `List (List.map invalid_currs ~f:mk_json_string) )
+                ; ( "invalid_next_fork_ids"
+                  , `List (List.map invalid_nexts ~f:mk_json_string) ) ] ;
+            return None )
   in
   let ban_notify_rpc conn ~version:_ ban_until =
     (* the port in `conn' is an ephemeral port, not of interest *)

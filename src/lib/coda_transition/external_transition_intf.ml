@@ -35,6 +35,10 @@ module type External_transition_common_intf = sig
 
   val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
 
+  val current_fork_id : t -> Fork_id.t
+
+  val next_fork_id : t -> Fork_id.t option
+
   val broadcast : t -> unit
 
   val don't_broadcast : t -> unit

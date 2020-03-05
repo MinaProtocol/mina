@@ -62,6 +62,10 @@ module Stable = struct
     let delta_transition_chain_proof {delta_transition_chain_proof; _} =
       delta_transition_chain_proof
 
+    let current_fork_id {current_fork_id; _} = current_fork_id
+
+    let next_fork_id {next_fork_id; _} = next_fork_id
+
     let consensus_state {protocol_state; _} =
       Protocol_state.consensus_state protocol_state
 
@@ -148,6 +152,8 @@ Stable.Latest.
   ( protocol_state
   , protocol_state_proof
   , delta_transition_chain_proof
+  , current_fork_id
+  , next_fork_id
   , blockchain_state
   , blockchain_length
   , staged_ledger_diff
@@ -659,6 +665,10 @@ module With_validation = struct
 
   let delta_transition_chain_proof t = lift delta_transition_chain_proof t
 
+  let current_fork_id t = lift current_fork_id t
+
+  let next_fork_id t = lift next_fork_id t
+
   let broadcast t = lift broadcast t
 
   let don't_broadcast t = lift don't_broadcast t
@@ -803,6 +813,8 @@ module Validated = struct
     , create_unsafe
     , protocol_state
     , delta_transition_chain_proof
+    , current_fork_id
+    , next_fork_id
     , broadcast
     , don't_broadcast
     , protocol_state_proof
