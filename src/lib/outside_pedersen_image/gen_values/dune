@@ -2,7 +2,8 @@
   (name gen_values)
   (libraries async core snark_params
              ppxlib ppx_util)
+  (preprocessor_deps ../../../config.mlh)
   (preprocess
-    (pps ppx_jane ppxlib.metaquot))
+    (pps ppx_optcomp ppxlib.metaquot))
   (flags -w -40 -g)
   (modes native))

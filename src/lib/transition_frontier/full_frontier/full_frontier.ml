@@ -515,16 +515,21 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync =
       ~local_state:t.consensus_local_state
     |> Option.is_none
   in
-  let new_root =
-    List.fold diffs ~init:None ~f:(fun prev_root (Diff.Full.E.E diff) ->
+  let new_root, diffs_with_mutants =
+    List.fold diffs ~init:(None, [])
+      ~f:(fun (prev_root, diffs_with_mutants) (Diff.Full.E.E diff) ->
         let mutant, new_root = apply_diff t diff ~enable_epoch_ledger_sync in
         t.hash <- Frontier_hash.merge_diff t.hash (Diff.to_lite diff) mutant ;
         update_metrics_with_diff t diff ;
-        match new_root with
-        | None ->
-            prev_root
-        | Some state_hash ->
-            Some {state_hash; frontier_hash= t.hash} )
+        let new_root =
+          match new_root with
+          | None ->
+              prev_root
+          | Some state_hash ->
+              Some {state_hash; frontier_hash= t.hash}
+        in
+        (new_root, Diff.Full.With_mutant.E (diff, mutant) :: diffs_with_mutants)
+    )
   in
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
     "Reached state %s after applying diffs to full frontier"
@@ -560,7 +565,7 @@ let apply_diffs t diffs ~enable_epoch_ledger_sync =
                 "local state desynced after applying diffs to full frontier" )
         | None ->
             () ) ;
-  `New_root new_root
+  `New_root_and_diffs_with_mutants (new_root, diffs_with_mutants)
 
 module For_tests = struct
   let equal t1 t2 =

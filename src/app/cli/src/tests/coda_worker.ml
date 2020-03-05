@@ -8,7 +8,13 @@ open Init
 
 module Input = struct
   type t =
-    { addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+    { addrs_and_ports: Node_addrs_and_ports.Display.Stable.V1.t
+    ; libp2p_keypair: Coda_net2.Keypair.Stable.V1.t
+    ; net_configs:
+        ( Node_addrs_and_ports.Display.Stable.V1.t
+        * Coda_net2.Keypair.Stable.Latest.t )
+        list
+        * Node_addrs_and_ports.Display.Stable.V1.t list list
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
     ; block_production_key: int option
@@ -17,7 +23,8 @@ module Input = struct
     ; trace_dir: string option
     ; program_dir: string
     ; acceptable_delay: Time.Span.t
-    ; peers: Host_and_port.t list
+    ; chain_id: string
+    ; peers: string list
     ; max_concurrent_connections: int option
     ; is_archive_rocksdb: bool }
   [@@deriving bin_io]
@@ -397,22 +404,22 @@ module T = struct
 
     let init_worker_state
         { addrs_and_ports
+        ; libp2p_keypair
         ; block_production_key
         ; snark_worker_key
         ; work_selection_method
         ; conf_dir
         ; trace_dir
+        ; chain_id
         ; peers
-        ; max_concurrent_connections
+        ; max_concurrent_connections= _ (* FIXME #4095: use this *)
         ; is_archive_rocksdb
         ; _ } =
       let logger =
         Logger.create
           ~metadata:
-            [ ( "host"
-              , `String (Unix.Inet_addr.to_string addrs_and_ports.external_ip)
-              )
-            ; ("port", `Int addrs_and_ports.communication_port) ]
+            [ ("host", `String addrs_and_ports.external_ip)
+            ; ("port", `Int addrs_and_ports.libp2p_port) ]
           ()
       in
       let pids = Child_processes.Termination.create_pid_table () in
@@ -463,7 +470,7 @@ module T = struct
           in
           let block_production_keypair =
             Option.map block_production_key ~f:(fun i ->
-                List.nth_exn Test_genesis_ledger.accounts i
+                List.nth_exn (Lazy.force Test_genesis_ledger.accounts) i
                 |> Test_genesis_ledger.keypair_of_account_record_exn )
           in
           let initial_block_production_keypairs =
@@ -482,36 +489,34 @@ module T = struct
               ~genesis_ledger:Test_genesis_ledger.t ~epoch_ledger_location
           in
           let gossip_net_params =
-            Gossip_net.Real.Config.
+            Gossip_net.Libp2p.Config.
               { timeout= Time.Span.of_sec 3.
-              ; target_peer_count= 8
+              ; initial_peers= List.map ~f:Coda_net2.Multiaddr.of_string peers
+              ; addrs_and_ports=
+                  Node_addrs_and_ports.of_display addrs_and_ports
               ; conf_dir
-              ; initial_peers= peers
-              ; chain_id= "bogus chain id for testing"
-              ; addrs_and_ports
+              ; chain_id
               ; logger
+              ; unsafe_no_trust_ip= true
               ; trust_system
-              ; enable_libp2p= false
-              ; disable_haskell= false
-              ; libp2p_keypair= None
-              ; libp2p_peers= []
-              ; max_concurrent_connections }
+              ; keypair= Some libp2p_keypair }
           in
           let net_config =
             { Coda_networking.Config.logger
             ; trust_system
             ; time_controller
             ; consensus_local_state
+            ; is_seed= List.is_empty peers
             ; genesis_ledger_hash=
                 Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
             ; log_gossip_heard=
-                { snark_pool_diff= false
-                ; transaction_pool_diff= false
-                ; new_state= false }
+                { snark_pool_diff= true
+                ; transaction_pool_diff= true
+                ; new_state= true }
             ; creatable_gossip_net=
                 Coda_networking.Gossip_net.(
-                  Any.Creatable ((module Real), Real.create gossip_net_params))
-            }
+                  Any.Creatable
+                    ((module Libp2p), Libp2p.create gossip_net_params)) }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
@@ -563,7 +568,7 @@ module T = struct
           in
           Logger.info logger "Worker finish setting up coda"
             ~module_:__MODULE__ ~location:__LOC__ ;
-          let coda_peers () = return (Coda_lib.peers coda) in
+          let coda_peers () = Coda_lib.peers coda in
           let coda_start () = Coda_lib.start coda in
           let coda_get_all_transitions pk =
             let external_transition_database =
@@ -604,14 +609,16 @@ module T = struct
               User_command.sign (Keypair.of_private_key_exn sender_sk) payload
             in
             let payment = build_txn amount sk pk fee in
-            Coda_commands.send_user_command coda (payment :> User_command.t)
-            |> Participating_state.to_deferred_or_error
-            |> Deferred.map ~f:Or_error.join
+            Deferred.map
+              ( Coda_commands.send_user_command coda (payment :> User_command.t)
+              |> Participating_state.to_deferred_or_error )
+              ~f:Or_error.join
           in
           let coda_process_user_command cmd =
-            Coda_commands.send_user_command coda (cmd :> User_command.t)
-            |> Participating_state.to_deferred_or_error
-            |> Deferred.map ~f:Or_error.join
+            Deferred.map
+              ( Coda_commands.send_user_command coda (cmd :> User_command.t)
+              |> Participating_state.to_deferred_or_error )
+              ~f:Or_error.join
           in
           let coda_prove_receipt (proving_receipt, resulting_receipt) =
             match%map

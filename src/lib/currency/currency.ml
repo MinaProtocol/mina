@@ -2,15 +2,20 @@
 "/src/config.mlh"]
 
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_bits
 open Bitstring_lib
-
-[%%if
-defined consensus_mechanism]
-
 open Snark_params
 open Tick
 open Let_syntax
+
+[%%else]
+
+open Snark_bits_nonconsensus
+module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
 
 [%%endif]
 
@@ -28,7 +33,7 @@ module Make (Unsigned : sig
 end) (M : sig
   val length : int
 end) : sig
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   include S with type t = Unsigned.t and type var = Boolean.var list
 
@@ -66,6 +71,40 @@ end = struct
   [%%define_locally
   Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
 
+  let precision = 9
+
+  let precision_exp = Unsigned.of_int @@ Int.pow 10 precision
+
+  let to_formatted_string amount =
+    let rec go num_stripped_zeros num =
+      let open Int in
+      if num mod 10 = 0 && num <> 0 then go (num_stripped_zeros + 1) (num / 10)
+      else (num_stripped_zeros, num)
+    in
+    let whole = Unsigned.div amount precision_exp in
+    let remainder = Unsigned.to_int (Unsigned.rem amount precision_exp) in
+    if Int.(remainder = 0) then to_string whole
+    else
+      let num_stripped_zeros, num = go 0 remainder in
+      Printf.sprintf "%s.%0*d" (to_string whole)
+        Int.(precision - num_stripped_zeros)
+        num
+
+  let of_formatted_string input =
+    let parts = String.split ~on:'.' input in
+    match parts with
+    | [whole] ->
+        of_string (whole ^ String.make precision '0')
+    | [whole; decimal] ->
+        let decimal_length = String.length decimal in
+        if Int.(decimal_length > precision) then
+          of_string (whole ^ String.sub decimal ~pos:0 ~len:precision)
+        else
+          of_string
+            (whole ^ decimal ^ String.make Int.(precision - decimal_length) '0')
+    | _ ->
+        failwith "Currency.of_formatted_string: Invalid currency input"
+
   let gen_incl a b : t Quickcheck.Generator.t =
     let a = Bignum_bigint.of_string Unsigned.(to_string a) in
     let b = Bignum_bigint.of_string Unsigned.(to_string b) in
@@ -92,11 +131,11 @@ end = struct
       else Infix.(v land lognot (one lsl i))
   end
 
-  [%%if
-  defined consensus_mechanism]
-
   include (
     Bits.Vector.Make (Vector) : Bits_intf.Convertible_bits with type t := t)
+
+  [%%ifdef
+  consensus_mechanism]
 
   include Bits.Snarkable.Small_bit_vector (Tick) (Vector)
   include Unpacked
@@ -138,7 +177,7 @@ end = struct
 
   type magnitude = t [@@deriving sexp, hash, compare, yojson]
 
-  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+  let to_input t = Random_oracle.Input.bitstring @@ to_bits t
 
   module Signed = struct
     type ('magnitude, 'sgn) typ = ('magnitude, 'sgn) Signed_poly.t =
@@ -191,8 +230,8 @@ end = struct
 
     let ( + ) = add
 
-    [%%if
-    defined consensus_mechanism]
+    [%%ifdef
+    consensus_mechanism]
 
     type nonrec var = (var, Sgn.var) Signed_poly.t
 
@@ -277,8 +316,8 @@ end = struct
     [%%endif]
   end
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   module Checked = struct
     let if_ = if_
@@ -345,6 +384,14 @@ end = struct
           Quickcheck.Generator.map ~f:of_bigint
             (Bignum_bigint.gen_incl (to_bigint x) (to_bigint y))
 
+        let shrinker =
+          Quickcheck.Shrinker.create (fun i ->
+              Sequence.unfold ~init:i ~f:(fun i ->
+                  if Unsigned.equal i Unsigned.zero then None
+                  else
+                    let n = Unsigned.div i (Unsigned.of_int 10) in
+                    Some (n, n) ) )
+
         (* TODO: When we do something to make snarks run fast for tests, increase the trials *)
         let qc_test_fast = Quickcheck.test ~trials:100
 
@@ -397,6 +444,42 @@ end = struct
               expect_failure
                 (sprintf !"overflow: x=%{Unsigned} y=%{Unsigned}" x y)
                 (var_of_t x + var_of_t y) )
+
+        let%test_unit "formatting_roundtrip" =
+          let generator = gen_incl Unsigned.zero Unsigned.max_int in
+          qc_test_fast generator ~shrinker ~f:(fun num ->
+              match of_formatted_string (to_formatted_string num) with
+              | after_format ->
+                  if after_format = num then ()
+                  else
+                    Error.(
+                      raise
+                        (of_string
+                           (sprintf
+                              !"formatting: num=%{Unsigned} middle=%{String} \
+                                after=%{Unsigned}"
+                              num (to_formatted_string num) after_format)))
+              | exception e ->
+                  let err = Error.of_exn e in
+                  Error.(
+                    raise
+                      (tag
+                         ~tag:(sprintf !"formatting: num=%{Unsigned}" num)
+                         err)) )
+
+        let%test_unit "formatting_trailing_zeros" =
+          let generator = gen_incl Unsigned.zero Unsigned.max_int in
+          qc_test_fast generator ~shrinker ~f:(fun num ->
+              let formatted = to_formatted_string num in
+              let has_decimal = String.contains formatted '.' in
+              let trailing_zero = String.is_suffix formatted ~suffix:"0" in
+              if has_decimal && trailing_zero then
+                Error.(
+                  raise
+                    (of_string
+                       (sprintf
+                          !"formatting: num=%{Unsigned} formatted=%{String}"
+                          num (to_formatted_string num)))) )
       end )
   end
 
@@ -448,8 +531,8 @@ module Amount = struct
         let length = currency_length
       end)
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   include (
     T :
@@ -472,8 +555,8 @@ module Amount = struct
 
   let add_fee (t : t) (fee : Fee.t) = add t (of_fee fee)
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   module Checked = struct
     include T.Checked
@@ -499,8 +582,8 @@ module Balance = struct
     end
   end]
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   include (Amount : Basic with type t = Amount.t with type var = Amount.var)
 
@@ -520,8 +603,8 @@ module Balance = struct
 
   let ( - ) = sub_amount
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   module Checked = struct
     let add_signed_amount = Amount.Checked.add_signed
@@ -542,6 +625,9 @@ end
 
 let%test_module "sub_flagged module" =
   ( module struct
+    [%%ifdef
+    consensus_mechanism]
+
     open Tick
 
     module type Sub_flagged_S = sig
@@ -589,4 +675,6 @@ let%test_module "sub_flagged module" =
     let%test_unit "fee sub_flagged" = run_test (module Fee)
 
     let%test_unit "amount sub_flagged" = run_test (module Amount)
+
+    [%%endif]
   end )

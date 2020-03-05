@@ -210,13 +210,13 @@ module Instance = struct
         ~f:Result.return
     in
     let apply_diff diff =
-      let (`New_root _) =
+      let (`New_root_and_diffs_with_mutants (_, diffs_with_mutants)) =
         Full_frontier.apply_diffs frontier [diff]
           ~enable_epoch_ledger_sync:
             ( if ignore_consensus_local_state then `Disabled
             else `Enabled root_ledger )
       in
-      Extensions.notify extensions ~frontier ~diffs:[diff]
+      Extensions.notify extensions ~frontier ~diffs_with_mutants
       |> Deferred.map ~f:Result.return
     in
     (* crawl through persistent frontier and load transitions into in memory frontier *)

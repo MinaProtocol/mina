@@ -1,4 +1,5 @@
 module Peer = Peer
+module Envelope = Envelope
 
 type query_peer =
   { query:

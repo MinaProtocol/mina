@@ -16,7 +16,6 @@
     merkle_address 
     coda_base 
     coda_metrics
-    kademlia
     transition_chain_verifier
     coda_networking
     fake_network))
