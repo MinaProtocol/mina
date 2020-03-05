@@ -3,11 +3,11 @@
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving sexp]
+    type t [@@deriving sexp, eq]
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp]
+type t = Stable.Latest.t [@@deriving sexp, eq]
 
 val create_exn : string -> t
 
