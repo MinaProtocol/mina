@@ -864,3 +864,42 @@ module Get_trustlist = struct
       ~bin_query:Query.Stable.Latest.bin_t
       ~bin_response:Response.Stable.Latest.bin_t
 end
+
+(** daemon-level Get_telemetry_data; implementation invokes
+    Coda_networking's Get_telemetry_data for each provided peer 
+ *)
+module Get_telemetry_data = struct
+  module Query = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Network_peer.Peer.Id.Stable.V1.t list option
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  module Response = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.Stable.V1.t
+          Core_kernel.Or_error.Stable.V1.t
+          list
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t
+  end
+
+  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
+    Rpc.Rpc.create ~name:"Get_telemetry_data" ~version:0
+      ~bin_query:Query.Stable.Latest.bin_t
+      ~bin_response:Response.Stable.Latest.bin_t
+end

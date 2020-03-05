@@ -1046,7 +1046,13 @@ let set_staking_graphql =
   Command.async ~summary:"Start producing blocks"
     (Cli_lib.Background_daemon.graphql_init pk_flag
        ~f:(fun graphql_endpoint public_key ->
-         let%map _ =
+         let print_message msg arr =
+           if not (Array.is_empty arr) then
+             printf "%s: %s\n" msg
+               (String.concat_array ~sep:", "
+                  (Array.map ~f:Public_key.Compressed.to_base58_check arr))
+         in
+         let%map result =
            Graphql_client.(
              Graphql_client.query_exn
                (Graphql_queries.Set_staking.make
@@ -1054,8 +1060,13 @@ let set_staking_graphql =
                   ()))
              graphql_endpoint
          in
-         printf "New block producer public key: %s\n"
-           (Public_key.Compressed.to_base58_check public_key) ))
+         print_message "Stopped staking with" (result#setStaking)#lastStaking ;
+         print_message
+           "❌ Failed to start staking with keys (try `coda accounts unlock` \
+            first)"
+           (result#setStaking)#lockedPublicKeys ;
+         print_message "Started staking with"
+           (result#setStaking)#currentStakingKeys ))
 
 let set_snark_worker =
   let open Command.Param in
@@ -1424,6 +1435,56 @@ let compile_time_constants =
          Core.printf "%s\n%!"
            (Yojson.Safe.to_string Consensus.Constants.all_constants) ))
 
+let telemetry =
+  let open Command.Param in
+  let open Deferred.Let_syntax in
+  let daemon_peers_flag =
+    flag "daemon-peers" no_arg
+      ~doc:"Get telemetry data for peers known to the daemon"
+  in
+  let peer_ids_flag =
+    flag "peer-ids"
+      (optional (Arg_type.comma_separated string))
+      ~doc:"CSV-LIST Peer IDs for obtaining telemetry data"
+  in
+  let show_errors_flag =
+    flag "show-errors" no_arg ~doc:"Include error responses in output"
+  in
+  let flags = Args.zip3 daemon_peers_flag peer_ids_flag show_errors_flag in
+  Command.async ~summary:"Get the trust status associated with an IP address"
+    (Cli_lib.Background_daemon.rpc_init flags
+       ~f:(fun port (daemon_peers, peer_ids, show_errors) ->
+         if
+           (Option.is_none peer_ids && not daemon_peers)
+           || (Option.is_some peer_ids && daemon_peers)
+         then (
+           eprintf
+             "Must provide exactly one of daemon-peers or peer-ids flags\n%!" ;
+           don't_wait_for (exit 33) ) ;
+         let peer_ids_opt =
+           Option.map peer_ids ~f:(fun peer_ids ->
+               List.map peer_ids ~f:Network_peer.Peer.Id.unsafe_of_string )
+         in
+         match%map
+           Daemon_rpcs.Client.dispatch Daemon_rpcs.Get_telemetry_data.rpc
+             peer_ids_opt port
+         with
+         | Ok all_telem_data ->
+             let all_telem_data =
+               if show_errors then all_telem_data
+               else
+                 List.filter all_telem_data ~f:(fun td ->
+                     match td with Ok _ -> true | Error _ -> false )
+             in
+             List.iter all_telem_data ~f:(fun peer_telem_data ->
+                 printf "%s\n%!"
+                   ( Yojson.Safe.to_string
+                   @@ Coda_networking.Rpcs.Get_telemetry_data
+                      .response_to_yojson peer_telem_data ) )
+         | Error err ->
+             printf "Failed to get telemetry data: %s\n%!"
+               (Error.to_string_hum err) ))
+
 module Visualization = struct
   let create_command (type rpc_response) ~name ~f
       (rpc : (string, rpc_response) Rpc.Rpc.t) =
@@ -1537,4 +1598,5 @@ let advanced =
     ; ("import", import_key)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("compile-time-constants", compile_time_constants)
+    ; ("telemetry", telemetry)
     ; ("visualization", Visualization.command_group) ]
