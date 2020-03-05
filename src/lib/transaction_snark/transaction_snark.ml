@@ -1624,10 +1624,14 @@ let%test_module "transaction_snark" =
     end)
 
     let state_body =
-      Coda_state.Genesis_protocol_state.compile_time_genesis.data
-      |> Coda_state.Protocol_state.body
+      let open Lazy.Let_syntax in
+      let%map compile_time_genesis =
+        Lazy.from_fun Coda_state.Genesis_protocol_state.compile_time_genesis
+      in
+      compile_time_genesis.data |> Coda_state.Protocol_state.body
 
-    let state_body_hash = Coda_state.Protocol_state.Body.hash state_body
+    let state_body_hash =
+      Lazy.map ~f:Coda_state.Protocol_state.Body.hash state_body
 
     let pending_coinbase_stack_target (t : Transaction.t) state_body_hash stack
         =
@@ -1728,7 +1732,8 @@ let%test_module "transaction_snark" =
               ; target= pending_coinbase_stack_target } )
 
     let%test_unit "coinbase with state body hash" =
-      Test_util.with_randomness 123456789 (fun () -> coinbase_test state_body)
+      Test_util.with_randomness 123456789 (fun () ->
+          coinbase_test (Lazy.force state_body) )
 
     let%test_unit "new_account" =
       Test_util.with_randomness 123456789 (fun () ->
@@ -1762,7 +1767,8 @@ let%test_module "transaction_snark" =
               in
               let pending_coinbase_stack = Pending_coinbase.Stack.empty in
               let pending_coinbase_stack_target =
-                pending_coinbase_stack_target (User_command t1) state_body_hash
+                pending_coinbase_stack_target (User_command t1)
+                  (Lazy.force state_body_hash)
                   pending_coinbase_stack
               in
               let pending_coinbase_stack_state =
@@ -1772,7 +1778,7 @@ let%test_module "transaction_snark" =
               check_user_command ~sok_message
                 ~source:(Ledger.merkle_root ledger)
                 ~target pending_coinbase_stack_state
-                {transaction= t1; block_data= state_body}
+                {transaction= t1; block_data= Lazy.force state_body}
                 (unstage @@ Sparse_ledger.handler sparse_ledger) ) )
 
     let account_fee = Fee.to_int Coda_compile_config.account_creation_fee
@@ -1782,7 +1788,8 @@ let%test_module "transaction_snark" =
       let pending_coinbase_stack = Pending_coinbase.Stack.empty in
       let mentioned_keys, pending_coinbase_stack_target =
         let pending_coinbase_stack =
-          Pending_coinbase.Stack.push_state state_body_hash
+          Pending_coinbase.Stack.push_state
+            (Lazy.force state_body_hash)
             pending_coinbase_stack
         in
         match txn with
@@ -1812,7 +1819,7 @@ let%test_module "transaction_snark" =
         ~pending_coinbase_stack_state:
           { Pending_coinbase_stack_state.source= pending_coinbase_stack
           ; target= pending_coinbase_stack_target }
-        {transaction= txn; block_data= state_body}
+        {transaction= txn; block_data= Lazy.force state_body}
         (unstage @@ Sparse_ledger.handler sparse_ledger)
 
     let%test_unit "account creation fee - user commands" =
@@ -1970,7 +1977,9 @@ let%test_module "transaction_snark" =
               in
               let proof12, _ =
                 of_user_command' sok_digest ledger t1
-                  Pending_coinbase.Stack.empty state_body_hash state_body
+                  Pending_coinbase.Stack.empty
+                  (Lazy.force state_body_hash)
+                  (Lazy.force state_body)
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
@@ -1983,7 +1992,9 @@ let%test_module "transaction_snark" =
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23, pending_coinbase_stack_target =
                 of_user_command' sok_digest ledger t2
-                  Pending_coinbase.Stack.empty state_body_hash state_body
+                  Pending_coinbase.Stack.empty
+                  (Lazy.force state_body_hash)
+                  (Lazy.force state_body)
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
@@ -2080,7 +2091,9 @@ let%test_module "transaction_snark" =
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23, pending_coinbase_stack_target =
                 of_user_command' sok_digest ledger t2
-                  pending_coinbase_stack_next state_body_hash state_body
+                  pending_coinbase_stack_next
+                  (Lazy.force state_body_hash)
+                  (Lazy.force state_body)
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =

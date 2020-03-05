@@ -17,6 +17,10 @@ struct
     @@ Snark_work_lib.Work.Single.Spec.gen Int.quickcheck_generator
          Int.quickcheck_generator Fee.gen
 
+  let compile_time_genesis =
+    Core_kernel.Lazy.from_fun
+      Coda_state.Genesis_protocol_state.compile_time_genesis
+
   let%test_unit "Workspec chunk doesn't send same things again" =
     Backtrace.elide := false ;
     let p = 50 in
@@ -33,9 +37,7 @@ struct
               let stuff, seen =
                 Selection_method.work ~snark_pool ~fee sl seen ~logger
                   ~get_protocol_state:(fun _ ->
-                    Ok
-                      Coda_state.Genesis_protocol_state.compile_time_genesis
-                        .data )
+                    Ok (Lazy.force compile_time_genesis).data )
                 |> Or_error.ok_exn
               in
               match stuff with None -> return () | _ -> go (i + 1) seen
@@ -52,7 +54,7 @@ struct
         let stuff, seen =
           Selection_method.work ~snark_pool ~fee sl seen ~logger
             ~get_protocol_state:(fun _ ->
-              Ok Coda_state.Genesis_protocol_state.compile_time_genesis.data )
+              Ok (Lazy.force compile_time_genesis).data )
           |> Or_error.ok_exn
         in
         match stuff with
@@ -108,8 +110,7 @@ struct
       let%map pool =
         gen_snark_pool
           ( T.Staged_ledger.all_work_pairs sl ~get_state:(fun _ ->
-                Ok Coda_state.Genesis_protocol_state.compile_time_genesis.data
-            )
+                Ok (Lazy.force compile_time_genesis).data )
           |> Or_error.ok_exn )
           (Currency.Fee.of_int 2)
       in
@@ -130,9 +131,7 @@ struct
               let work, seen =
                 Selection_method.work ~snark_pool ~fee:my_fee sl seen ~logger
                   ~get_protocol_state:(fun _ ->
-                    Ok
-                      Coda_state.Genesis_protocol_state.compile_time_genesis
-                        .data )
+                    Ok (Lazy.force compile_time_genesis).data )
                 |> Or_error.ok_exn
               in
               match work with
