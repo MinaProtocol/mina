@@ -254,13 +254,15 @@ module For_tests = struct
           ~coinbase_receiver:`Producer ~self:largest_account_public_key
           ~transactions_by_fee:transactions ~get_completed_work
       in
-      let state_body_hash =
+      let state_and_body_hash =
         let prev_state =
           validated_transition parent_breadcrumb
           |> External_transition.Validated.protocol_state
         in
-        ( Protocol_state.hash prev_state
-        , Protocol_state.body prev_state |> Protocol_state.Body.hash )
+        let body_hash =
+          Protocol_state.body prev_state |> Protocol_state.Body.hash
+        in
+        (Protocol_state.hash_with_body ~body_hash prev_state, body_hash)
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
@@ -268,7 +270,7 @@ module For_tests = struct
                , `Pending_coinbase_data _ ) =
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
-            staged_ledger_diff ~state_body_hash
+            staged_ledger_diff ~state_and_body_hash
         with
         | Ok r ->
             return r

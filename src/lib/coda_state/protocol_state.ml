@@ -21,7 +21,8 @@ module Poly = struct
     end
   end]
 
-  type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t
+  type ('state_hash, 'body) t = ('state_hash, 'body) Stable.Latest.t =
+    {previous_state_hash: 'state_hash; body: 'body}
   [@@deriving sexp]
 end
 
@@ -230,6 +231,10 @@ let genesis_state_hash_checked ~state_hash state =
 [%%endif]
 
 let hash = hash_abstract ~hash_body:Body.hash
+
+let hash_with_body t ~body_hash =
+  hash_abstract ~hash_body:Fn.id
+    {Poly.previous_state_hash= t.Poly.previous_state_hash; body= body_hash}
 
 let genesis_state_hash ?(state_hash = None) state =
   (*If this is gthe genesis state then simply return its hash

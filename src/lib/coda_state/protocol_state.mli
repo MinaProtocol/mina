@@ -123,3 +123,8 @@ val negative_one : genesis_ledger:Coda_base.Ledger.t Lazy.t -> Value.t
 val hash_checked : var -> (State_hash.var * State_body_hash.var, _) Checked.t
 
 val hash : Value.t -> State_hash.t
+
+(** Same as [hash], but accept the [body_hash] directly to avoid re-computing
+    it.
+*)
+val hash_with_body : Value.t -> body_hash:State_body_hash.t -> State_hash.t

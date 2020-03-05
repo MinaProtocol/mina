@@ -102,7 +102,7 @@ val apply :
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
-  -> state_body_hash:State_hash.t * State_body_hash.t
+  -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
        * [`Staged_ledger of t]
@@ -114,7 +114,7 @@ val apply :
 val apply_diff_unchecked :
      t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
-  -> state_body_hash:State_hash.t * State_body_hash.t
+  -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
        * [`Staged_ledger of t]

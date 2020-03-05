@@ -741,7 +741,7 @@ module T = struct
              (List.length (Scan_state.all_work_statements_exn t.scan_state)))
     )
 
-  let apply t witness ~logger ~verifier ~state_body_hash =
+  let apply t witness ~logger ~verifier ~state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () = check_completed_works ~logger ~verifier t.scan_state work in
@@ -751,7 +751,7 @@ module T = struct
       |> Deferred.return
     in
     let%map ((_, _, `Staged_ledger new_staged_ledger, __) as res) =
-      apply_diff t prediff ~logger ~state_and_body_hash:state_body_hash
+      apply_diff t prediff ~logger ~state_and_body_hash
     in
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
@@ -765,15 +765,14 @@ module T = struct
 
   let apply_diff_unchecked t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t)
-      ~state_body_hash =
+      ~state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
       @@ Pre_diff_info.get_unchecked sl_diff
       |> Deferred.return
     in
-    apply_diff t prediff ~logger:(Logger.null ())
-      ~state_and_body_hash:state_body_hash
+    apply_diff t prediff ~logger:(Logger.null ()) ~state_and_body_hash
 
   module Resources = struct
     module Discarded = struct
@@ -1464,8 +1463,8 @@ let%test_module "test" =
         Public_key.Compressed.gen
 
     (* Functor for testing with different instantiated staged ledger modules. *)
-    let create_and_apply_with_state_body_hash state_body_hash sl logger pids
-        txns stmt_to_work =
+    let create_and_apply_with_state_body_hash state_and_body_hash sl logger
+        pids txns stmt_to_work =
       let open Deferred.Let_syntax in
       let diff =
         Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
@@ -1479,7 +1478,9 @@ let%test_module "test" =
               , `Staged_ledger sl'
               , `Pending_coinbase_data
                   (is_new_stack, coinbase_amount, pc_action) ) =
-        match%map Sl.apply !sl diff' ~logger ~verifier ~state_body_hash with
+        match%map
+          Sl.apply !sl diff' ~logger ~verifier ~state_and_body_hash
+        with
         | Ok x ->
             x
         | Error e ->
@@ -2001,7 +2002,7 @@ let%test_module "test" =
                     in
                     let%bind apply_res =
                       Sl.apply !sl diff ~logger ~verifier
-                        ~state_body_hash:
+                        ~state_and_body_hash:
                           (State_hash.dummy, State_body_hash.dummy)
                     in
                     let checked', diff' =

@@ -122,7 +122,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
       in
       match%map
         Staged_ledger.apply_diff_unchecked staged_ledger diff
-          ~state_body_hash:
+          ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
       with
       | Ok
