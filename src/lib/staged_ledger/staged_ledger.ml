@@ -336,7 +336,9 @@ module T = struct
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
     let pending_coinbase_with_coinbase = push_coinbase current_stack s in
-    (*Each transaction will have the state updated so as to contstraint the protocol state in transaction snark*)
+    (* Each transaction will have the state updated so as to contstrain the
+       protocol state in the transaction snark.
+    *)
     let pending_coinbase_after =
       push_state pending_coinbase_with_coinbase state_body_hash
     in
