@@ -61,8 +61,7 @@ let make = (~posts) => {
                    passHref=true>
                    <a className=Style.title> {React.string(post.title)} </a>
                  </Next.Link>
-                 {ReactUtils.fromOpt(
-                    Js.Undefined.toOption(post.subtitle), ~f=s =>
+                 {ReactExt.fromOpt(Js.Undefined.toOption(post.subtitle), ~f=s =>
                     <div className=Style.subtitle> {React.string(s)} </div>
                   )}
                  <Spacer height=1. />
@@ -103,9 +102,9 @@ Next.injectGetInitialProps(make, _ => {
       "order": "-fields.date",
     },
   )
-  |> Js.Promise.then_((entries: ContentType.Post.entries) => {
+  |> Promise.map((entries: ContentType.Post.entries) => {
        let posts =
          Array.map((e: ContentType.Post.entry) => e.fields, entries.items);
-       Js.Promise.resolve({"posts": posts});
+       {"posts": posts};
      })
 });

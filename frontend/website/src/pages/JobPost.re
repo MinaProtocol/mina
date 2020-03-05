@@ -147,15 +147,15 @@ Next.injectGetInitialProps(make, ({Next.query}) => {
         "fields.slug": slug,
       },
     )
-    |> Js.Promise.then_((entries: ContentType.JobPost.entries) => {
+    |> Promise.map((entries: ContentType.JobPost.entries) => {
          let post =
            switch (entries.items) {
            | [|item|] => Some(item.fields)
            | _ => None
            };
-         Js.Promise.resolve({"post": post});
+         {"post": post};
        });
 
-  | None => Js.Promise.resolve({"post": None})
+  | None => Promise.return({"post": None})
   }
 });

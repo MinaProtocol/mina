@@ -96,6 +96,16 @@ module Style = {
       selector("ul", [paddingLeft(`rem(1.))]),
       selector("ul > li", [paddingLeft(`rem(0.5))]),
       selector("ul > li > ul", [marginLeft(`rem(1.))]),
+      selector(
+        "img + em",
+        [
+          fontSize(`px(13)),
+          color(`hex("757575")),
+          width(`percent(100.)),
+          display(`inlineBlock),
+          textAlign(`center),
+        ],
+      ),
       mediaMedium([
         selector(".not-large, .not-mobile", [display(`block)]),
         selector(".mobile-only, .large-only", [display(`none)]),
@@ -130,7 +140,7 @@ let make = (~post: option(ContentType.Post.t)) => {
       <Next.Head> Markdown.katexStylesheet </Next.Head>
       <div className=Style.wrapper>
         <div className=Style.title id="title"> {React.string(title)} </div>
-        {ReactUtils.fromOpt(Js.Undefined.toOption(subtitle), ~f=s =>
+        {ReactExt.fromOpt(Js.Undefined.toOption(subtitle), ~f=s =>
            <div className=Style.subtitle id="subtitle">
              {React.string(s)}
            </div>
@@ -166,14 +176,14 @@ Next.injectGetInitialProps(make, ({Next.query}) => {
           "fields.slug": slug,
         },
       )
-      |> Js.Promise.then_((entries: ContentType.Post.entries) => {
+      |> Promise.map((entries: ContentType.Post.entries) => {
            let post =
              switch (entries.items) {
              | [|item|] => Some(item.fields)
              | _ => None
              };
            Js.Dict.set(cache, slug, post);
-           Js.Promise.resolve({"post": post});
+           {"post": post};
          })
     };
   | None => Js.Promise.resolve({"post": None})

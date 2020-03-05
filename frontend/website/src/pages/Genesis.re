@@ -211,19 +211,22 @@ let make = () => {
         <div className=Styles.stepRowFlex>
           <div className=Styles.stepRow>
             <StepButton
-              label="Step 1: Apply Now"
+              labelStep="Step 1: "
+              label="Apply Now"
               image="/static/img/ApplyCircle.svg"
               buttonLabel="Apply"
               buttonLink=" https://forms.gle/Eer4yM1gb5SvLCk79"
             />
             <StepButton
-              label="Step 2: Join Discord"
+              labelStep="Step 2: "
+              label="Join Discord"
               image="/static/img/DiscordCircle.svg"
               buttonLabel="Join"
               buttonLink="http://bit.ly/GenesisDiscord"
             />
             <StepButton
-              label="Step 3: Participate in Testnet"
+              labelStep="Step 3: "
+              label="Participate in Testnet"
               image="/static/img/TestnetCircle.svg"
               buttonLabel="Get Started"
               buttonLink="http://bit.ly/GenesisTestnet"
@@ -242,7 +245,7 @@ let make = () => {
           <ul className={Css.merge([Styles.heroCopy, Styles.legalListList])}>
             <li className=Styles.legalListItem>
               {React.string(
-                 "At mainnet launch, 6.67% of the protocol will be distributed in this manner.",
+                 "At mainnet launch, 6.6% of the protocol will be distributed in this manner.",
                )}
             </li>
             <li className=Styles.legalListItem>
@@ -282,7 +285,6 @@ let make = () => {
             href="https://cdn.codaprotocol.com/v2/static/coda-whitepaper-05-10-2018-0.pdf"
           />
           <Spacer width=2.5 />
-          // comment
           <WhitepaperButton
             label="Economics whitepaper"
             sigil=Icons.economic

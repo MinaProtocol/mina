@@ -9,7 +9,8 @@ let main () =
   Async.Scheduler.set_record_backtraces true ;
   let logger = Logger.create () in
   let keypairs =
-    List.map Test_genesis_ledger.accounts
+    List.map
+      (Lazy.force Test_genesis_ledger.accounts)
       ~f:Test_genesis_ledger.keypair_of_account_record_exn
   in
   let largest_account_keypair =
@@ -22,7 +23,7 @@ let main () =
   in
   let num_nodes = 3 in
   let%bind testnet =
-    Coda_worker_testnet.test logger num_nodes block_production_keys
+    Coda_worker_testnet.test ~name logger num_nodes block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in

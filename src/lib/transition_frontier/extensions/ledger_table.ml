@@ -42,18 +42,18 @@ module T = struct
 
   let lookup t ledger_hash = Ledger_hash.Table.find t.ledgers ledger_hash
 
-  let handle_diffs t _frontier diffs =
-    let open Diff.Full.E in
-    List.iter diffs ~f:(function
-      | E (New_node (Full breadcrumb)) ->
+  let handle_diffs t _frontier diffs_with_mutants =
+    let open Diff.Full.With_mutant in
+    List.iter diffs_with_mutants ~f:(function
+      | E (New_node (Full breadcrumb), _) ->
           let ledger =
             Staged_ledger.ledger @@ Breadcrumb.staged_ledger breadcrumb
           in
           let ledger_hash = Ledger.merkle_root ledger in
           add_entry t ~ledger_hash ~ledger
-      | E (New_node (Lite _)) ->
+      | E (New_node (Lite _), _) ->
           failwith "ledger_table extension: unexpected new lite node"
-      | E (Root_transitioned transition) -> (
+      | E (Root_transitioned transition, _) -> (
         match transition.garbage with
         | Full nodes ->
             let open Coda_state in
@@ -76,7 +76,7 @@ module T = struct
         | Lite _ ->
             failwith
               "ledger_table extension: unexpected garbage with lite nodes" )
-      | E (Best_tip_changed _) ->
+      | E (Best_tip_changed _, _) ->
           () ) ;
     None
 end

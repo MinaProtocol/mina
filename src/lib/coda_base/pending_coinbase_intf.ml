@@ -152,6 +152,8 @@ module type S = sig
         -> (Boolean.var, _) Tick.Checked.t
 
       val empty : t
+
+      val create_with : t -> t
     end
   end
 

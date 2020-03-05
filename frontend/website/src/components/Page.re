@@ -94,7 +94,10 @@ module Footer = {
             <Link link="/jobs" name="hiring">
               {React.string("We're Hiring")}
             </Link>
-            <Link link="/static/presskit.zip" name="presskit" last=true>
+            <Link
+              link="https://s3.us-east-2.amazonaws.com/static.o1test.net/presskit.zip"
+              name="presskit"
+              last=true>
               {React.string("Press Kit")}
             </Link>
           </ul>
@@ -106,7 +109,7 @@ module Footer = {
               style([textAlign(`center), color(Theme.Colors.saville)]),
             ])
           )>
-          {React.string({j|© 2019 O(1) Labs|j})}
+          {React.string({j|© 2020 O(1) Labs|j})}
         </p>
       </section>
     </footer>;

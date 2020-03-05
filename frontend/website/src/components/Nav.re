@@ -150,7 +150,6 @@ module NavWrapper = {
       |> Array.mapi((idx, elem) =>
            if (idx == Array.length(children) - 1) {
              <li
-               key={string_of_int(idx)}
                className={Css.style([
                  Css.paddingLeft(`rem(0.75)), // we need to skip padding right here as it's on the edge
                  Css.listStyle(`none, `inside, `none),
@@ -162,7 +161,7 @@ module NavWrapper = {
                elem
              </li>;
            } else {
-             <React.Fragment key={string_of_int(idx)}>
+             <>
                <li
                  className={Css.style(
                    Theme.paddingX(`rem(0.75))
@@ -196,10 +195,10 @@ module NavWrapper = {
                    ])
                  )
                />
-             </React.Fragment>;
+             </>;
            }
          )
-      |> React.array;
+      |> ReactExt.staticArray;
 
     <nav
       className=Css.(
@@ -366,7 +365,7 @@ module SimpleButton = {
 let make = () => {
   <NavWrapper keepAnnouncementBar=true>
     [|
-      <SimpleButton name="Developers" link="/developers" />,
+      <SimpleButton name="Docs" link="/docs" />,
       <SimpleButton name="Blog" link="/blog" />,
       <SimpleButton name="Careers" link="/jobs" />,
       <SimpleButton name="Testnet" link="/testnet" />,

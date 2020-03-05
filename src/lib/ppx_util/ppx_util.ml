@@ -2,7 +2,7 @@ open Ppxlib
 open Asttypes
 open Parsetree
 open Longident
-open Core
+open Core_kernel
 
 let expr_of_sexp ~loc s =
   let module E = Ppxlib.Ast_builder.Make (struct

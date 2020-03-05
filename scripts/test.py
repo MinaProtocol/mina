@@ -13,7 +13,7 @@ build_artifact_profiles = [
     'testnet_postake_medium_curves'
 ]
 
-unit_test_profiles = ['test_postake_snarkless_unittest', 'dev']
+unit_test_profiles = ['dev']
 
 unit_test_profiles_medium_curves = ['dev_medium_curves']
 
@@ -28,7 +28,6 @@ integration_tests = [
     'coda-block-production-test',
     'coda-shared-prefix-test -who-produces 0',
     'coda-shared-prefix-test -who-produces 1',
-    'coda-restart-node-test',
     'coda-change-snark-worker-test',
     'coda-archive-node-test'
 ]
@@ -52,19 +51,18 @@ small_curves_tests = {
     'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
-    'test_postake_five_even_snarkless':
-    ['coda-shared-prefix-multiproducer-test -num-block-producers 5'],
     'test_postake_five_even_txns':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments'],
 }
 
-medium_curves_tests = {
+medium_curves_and_other_tests = {
     'test_postake_medium_curves':
     simple_tests,
     'test_postake_snarkless_medium_curves':
     simple_tests,
     'test_postake_split_medium_curves':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 2'],
+    'test_postake_full_epoch': ['full-test'],
 }
 
 medium_curve_profiles_full = [
@@ -78,7 +76,6 @@ ci_excludes = [
 
 # of all the generated CI jobs, allow these specific ones to fail (extra excludes on top of ci_excludes)
 required_excludes = [
-    'test_postake_five_even_snarkless:*',
     'test_postake_catchup:*',
     'test_postake_three_producers:*'
 ]
@@ -87,8 +84,10 @@ required_excludes = [
 extra_required_status_checks = [
     "ci/circleci: lint",
     "ci/circleci: tracetool",
-    "ci/circleci: build-auxiliary",
     "ci/circleci: build-wallet",
+    "ci/circleci: compare-test-signatures",
+    "ci/circleci: build-client-sdk",
+    "ci/circleci: test-unit--nonconsensus_medium_curves",
 ]
 
 # these are full status check names. they will not be required to succeed.
@@ -190,7 +189,7 @@ def run(args):
             build_targets = '%s %s' % (coda_exe, logproc_exe)
 
     all_tests = small_curves_tests
-    all_tests.update(medium_curves_tests)
+    all_tests.update(medium_curves_and_other_tests)
     all_tests = filter_tests(all_tests, args.includes_patterns,
                              args.excludes_patterns)
     if len(all_tests) == 0:
@@ -285,7 +284,7 @@ def render(args):
         unit_test_profiles=unit_test_profiles,
         unit_test_profiles_medium_curves=unit_test_profiles_medium_curves,
         small_curves_tests=tests,
-        medium_curves_tests=medium_curves_tests,
+        medium_curves_and_other_tests=medium_curves_and_other_tests,
         medium_curve_profiles=medium_curve_profiles_full)
 
     if args.check:
@@ -319,7 +318,7 @@ def render(args):
 
 def list_tests(_args):
     all_tests = small_curves_tests
-    all_tests.update(medium_curves_tests)
+    all_tests.update(medium_curves_and_other_tests)
     for profile in all_tests.keys():
         print('- ' + profile)
         for test in small_curves_tests[profile]:

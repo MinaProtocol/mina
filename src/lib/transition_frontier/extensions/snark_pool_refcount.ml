@@ -46,19 +46,19 @@ module T = struct
 
   type diff_update = {num_removed: int; is_added: bool}
 
-  let handle_diffs t _frontier diffs =
-    let open Diff in
+  let handle_diffs t _frontier diffs_with_mutants =
+    let open Diff.Full.With_mutant in
     let {num_removed; is_added} =
-      List.fold diffs ~init:{num_removed= 0; is_added= false}
+      List.fold diffs_with_mutants ~init:{num_removed= 0; is_added= false}
         ~f:(fun ({num_removed; is_added} as init) -> function
-        | Full.E.E (New_node (Full breadcrumb)) ->
+        | E (New_node (Full breadcrumb), _) ->
             let scan_state =
               Breadcrumb.staged_ledger breadcrumb |> Staged_ledger.scan_state
             in
             { num_removed
             ; is_added= is_added || add_scan_state_to_ref_table t scan_state }
-        | Full.E.E
-            (Root_transitioned {new_root= _; garbage= Full garbage_nodes}) ->
+        | E (Root_transitioned {new_root= _; garbage= Full garbage_nodes}, _)
+          ->
             let open Diff.Node_list in
             let extra_num_removed =
               List.fold garbage_nodes ~init:0 ~f:(fun acc node ->
@@ -70,11 +70,11 @@ module T = struct
                   acc + delta )
             in
             {num_removed= num_removed + extra_num_removed; is_added}
-        | Full.E.E (Best_tip_changed _) ->
+        | E (Best_tip_changed _, _) ->
             init
-        | Full.E.E (Root_transitioned {garbage= Lite _; _}) ->
+        | E (Root_transitioned {garbage= Lite _; _}, _) ->
             failwith "impossible"
-        | Full.E.E (New_node (Lite _)) ->
+        | E (New_node (Lite _), _) ->
             failwith "impossible" )
     in
     if num_removed > 0 || is_added then Some (num_removed, t) else None

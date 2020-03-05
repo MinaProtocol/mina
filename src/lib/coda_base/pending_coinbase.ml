@@ -592,6 +592,9 @@ struct
 
       let empty = var_of_t empty
 
+      let create_with (t : var) =
+        {empty with state= State_stack.create ~init:t.state.init}
+
       let if_ = if_
     end
   end
@@ -769,13 +772,13 @@ struct
         in
         let%bind amount1_equal_to_zero = equal_to_zero amount in
         let%bind amount2_equal_to_zero = equal_to_zero rem_amount in
+        (*if no update then coinbase amount has to be zero*)
         let%bind () =
           with_label __LOC__
             (let%bind check = Boolean.equal no_update amount1_equal_to_zero in
              Boolean.Assert.is_true check)
         in
         let%bind no_coinbase =
-          let%bind no_update = Boolean.(no_update && amount1_equal_to_zero) in
           Boolean.(no_update || no_coinbase_in_this_stack)
         in
         (* TODO: Optimize here since we are pushing twice to the same stack *)
@@ -977,7 +980,7 @@ struct
 
   let curr_stack_id (t : t) = List.hd t.pos_list
 
-  let previous_stack t =
+  let current_stack t =
     let prev_stack_id =
       Option.value ~default:Stack_id.zero (curr_stack_id t)
     in
@@ -994,7 +997,7 @@ struct
           Merkle_tree.get_exn t.tree index )
     in
     if is_new_stack then
-      let%map prev_stack = previous_stack t in
+      let%map prev_stack = current_stack t in
       {res with state= State_stack.create ~init:prev_stack.state.curr}
     else Ok res
 
@@ -1107,7 +1110,7 @@ struct
             let prev_state =
               if is_new_stack then
                 let stack =
-                  previous_stack !pending_coinbase |> Or_error.ok_exn
+                  current_stack !pending_coinbase |> Or_error.ok_exn
                 in
                 { State_stack.Poly.init= stack.state.curr
                 ; curr= stack.state.curr }

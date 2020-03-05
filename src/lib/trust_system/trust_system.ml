@@ -162,7 +162,11 @@ module Peer_trust = Peer_trust.Make (Actions)
 include Peer_trust
 
 let record_envelope_sender :
-    t -> Logger.t -> Envelope.Sender.t -> Actions.t -> unit Deferred.t =
+       t
+    -> Logger.t
+    -> Network_peer.Envelope.Sender.t
+    -> Actions.t
+    -> unit Deferred.t =
  fun t logger sender action ->
   match sender with
   | Local ->
@@ -171,5 +175,5 @@ let record_envelope_sender :
         ~metadata:action_metadata
         "Attempted to record trust action of ourselves: %s" action_fmt ;
       Deferred.unit
-  | Remote inet_addr ->
+  | Remote (inet_addr, _peer_id) ->
       record t logger inet_addr action

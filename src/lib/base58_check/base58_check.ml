@@ -31,6 +31,13 @@ struct
 
   let version_string = String.make 1 version_byte
 
+  (* the Base58 library's "convert" routine, used for both
+     encoding and decoding, runs in time O(n^2); limit
+     length of input when encoding to avoid bottlenecks
+   *)
+
+  let max_encodable_length = 8192
+
   let compute_checksum payload =
     (* double-hash using SHA256 *)
     let open Digestif.SHA256 in
@@ -43,6 +50,9 @@ struct
     second_hash |> String.sub ~pos:0 ~len:checksum_len
 
   let encode payload =
+    let len = String.length payload in
+    if len > max_encodable_length then
+      failwith (sprintf "Base58_check.encode: input too long (%d bytes)" len) ;
     let checksum = compute_checksum payload in
     let bytes = version_string ^ payload ^ checksum |> Bytes.of_string in
     B58.encode coda_alphabet bytes |> Bytes.to_string
