@@ -103,7 +103,7 @@ end
 
 let generate_next_state ~previous_protocol_state ~time_controller
     ~staged_ledger ~transactions ~get_completed_work ~logger ~coinbase_receiver
-    ~(keypair : Keypair.t) ~block_data ~scheduled_time =
+    ~(keypair : Keypair.t) ~block_data ~scheduled_time ~log_block_creation =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
   let previous_protocol_state_body_hash =
@@ -125,7 +125,8 @@ let generate_next_state ~previous_protocol_state ~time_controller
         measure "create_diff" (fun () ->
             Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
               ~logger ~current_global_slot:previous_global_slot
-              ~transactions_by_fee:transactions ~get_completed_work )
+              ~transactions_by_fee:transactions ~get_completed_work
+              ~log_block_creation )
       in
       match%map
         Staged_ledger.apply_diff_unchecked staged_ledger diff
@@ -262,7 +263,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
-    ~set_next_producer_timing =
+    ~set_next_producer_timing ~log_block_creation =
   trace "block_producer" (fun () ->
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -306,6 +307,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 ~block_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
+                ~log_block_creation
             in
             trace_event "next state generated" ;
             match next_state_opt with
