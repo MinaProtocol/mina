@@ -589,11 +589,4 @@ module For_tests = struct
     List.equal equal_breadcrumb
       (all_breadcrumbs t1 |> sort_breadcrumbs)
       (all_breadcrumbs t2 |> sort_breadcrumbs)
-
-  let close_databases ~frontier =
-    let consensus_local_state = consensus_local_state frontier in
-    Ledger.Db.close
-      (Consensus.Data.Local_state.staking_epoch_ledger consensus_local_state) ;
-    Ledger.Db.close
-      (Consensus.Data.Local_state.next_epoch_ledger consensus_local_state)
 end

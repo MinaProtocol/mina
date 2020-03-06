@@ -110,6 +110,4 @@ module For_tests : sig
     -> branch_size:int
     -> unit
     -> (t * Breadcrumb.t list) Quickcheck.Generator.t
-
-  val close_databases : frontier:t -> unit
 end

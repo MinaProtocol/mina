@@ -42,6 +42,4 @@ val apply_diffs :
 
 module For_tests : sig
   val equal : t -> t -> bool
-
-  val close_databases : frontier:t -> unit
 end

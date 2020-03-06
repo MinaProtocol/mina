@@ -483,6 +483,8 @@ module For_tests = struct
               persistent_frontier.Persistent_frontier.Factory_type.instance
               ~f:(fun instance ->
                 Persistent_frontier.Database.close instance.db ) ;
+            Option.iter persistent_root.Persistent_root.Factory_type.instance
+              ~f:(fun instance -> Ledger.Db.close instance.snarked_ledger) ;
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
@@ -573,6 +575,14 @@ module For_tests = struct
     Async.Thread_safe.block_on_async_exn (fun () ->
         Deferred.List.iter ~how:`Sequential branches
           ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) ) ;
+    Core.Gc.Expert.add_finalizer_exn consensus_local_state
+      (fun consensus_local_state ->
+        Ledger.Db.close
+        @@ Consensus.Data.Local_state.staking_epoch_ledger
+             consensus_local_state ;
+        Ledger.Db.close
+        @@ Consensus.Data.Local_state.next_epoch_ledger consensus_local_state
+    ) ;
     frontier
 
   let gen_with_branch ?logger ?verifier ?trust_system ?consensus_local_state
@@ -596,11 +606,4 @@ module For_tests = struct
           make_branch (get_branch_root frontier) )
     in
     (frontier, branch)
-
-  let close_databases ~frontier =
-    Full_frontier.For_tests.close_databases ~frontier:frontier.full_frontier ;
-    Ledger.Db.close (root_snarked_ledger frontier) ;
-    Core.Option.iter
-      (persistent_frontier frontier).Persistent_frontier.Factory_type.instance
-      ~f:(fun instance -> Persistent_frontier.Database.close instance.db)
 end

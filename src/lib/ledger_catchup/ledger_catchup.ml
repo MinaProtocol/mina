@@ -538,11 +538,7 @@ let%test_module "Ledger_catchup tests" =
                 (best_tip peer_net.state.frontier))
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path ) ;
-          Transition_frontier.For_tests.close_databases
-            ~frontier:my_net.state.frontier ;
-          Transition_frontier.For_tests.close_databases
-            ~frontier:peer_net.state.frontier )
+              test_successful_catchup ~my_net ~target_best_tip_path ) )
 
     let%test_unit "catchup succeeds even if the parent transition is already \
                    in the frontier" =
@@ -557,11 +553,7 @@ let%test_module "Ledger_catchup tests" =
             [Transition_frontier.best_tip peer_net.state.frontier]
           in
           Thread_safe.block_on_async_exn (fun () ->
-              test_successful_catchup ~my_net ~target_best_tip_path ) ;
-          Transition_frontier.For_tests.close_databases
-            ~frontier:my_net.state.frontier ;
-          Transition_frontier.For_tests.close_databases
-            ~frontier:peer_net.state.frontier )
+              test_successful_catchup ~my_net ~target_best_tip_path ) )
 
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
@@ -607,11 +599,8 @@ let%test_module "Ledger_catchup tests" =
                   (Ivar.read (Cache_lib.Cached.final_state cached_transition))
               in
               if result <> `Failed then
-                failwith "expected ledger catchup to fail, but it succeeded" ;
-              Transition_frontier.For_tests.close_databases
-                ~frontier:my_net.state.frontier ;
-              Transition_frontier.For_tests.close_databases
-                ~frontier:peer_net.state.frontier ) )
+                failwith "expected ledger catchup to fail, but it succeeded" )
+          )
 
     (* TODO: fix and re-enable *)
     (*
