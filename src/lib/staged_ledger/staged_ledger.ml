@@ -228,7 +228,8 @@ module T = struct
     return t
 
   let of_scan_state_pending_coinbases_and_snarked_ledger ~logger ~verifier
-      ~scan_state ~snarked_ledger ~expected_merkle_root ~pending_coinbases =
+      ~scan_state ~snarked_ledger ~expected_merkle_root ~pending_coinbases
+      ~current_global_slot =
     let open Deferred.Or_error.Let_syntax in
     let snarked_ledger_hash = Ledger.merkle_root snarked_ledger in
     let snarked_frozen_ledger_hash =
@@ -241,8 +242,9 @@ module T = struct
       Deferred.List.fold txs ~init:(Ok ()) ~f:(fun acc tx ->
           Deferred.map (Async.Scheduler.yield ()) ~f:(fun () ->
               Or_error.bind acc ~f:(fun () ->
-                  Ledger.apply_transaction snarked_ledger tx |> Or_error.ignore
-              ) ) )
+                  Ledger.apply_transaction ~txn_global_slot:current_global_slot
+                    snarked_ledger tx
+                  |> Or_error.ignore ) ) )
     in
     let%bind () =
       let staged_ledger_hash = Ledger.merkle_root snarked_ledger in
@@ -326,7 +328,7 @@ module T = struct
     Pending_coinbase.Stack.push_state state_body_hash current_stack
 
   let apply_transaction_and_get_statement ledger current_stack s
-      state_body_hash =
+      txn_global_slot state_body_hash =
     let open Result.Let_syntax in
     let%bind fee_excess = Transaction.fee_excess s |> to_staged_ledger_or_error
     and supply_increase =
@@ -336,14 +338,15 @@ module T = struct
       Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
     in
     let pending_coinbase_with_coinbase = push_coinbase current_stack s in
-    (* Each transaction will have the state updated so as to contstrain the
+    (* Each transaction will have the state updated so as to constrain the
        protocol state in the transaction snark.
     *)
     let pending_coinbase_after =
       push_state pending_coinbase_with_coinbase state_body_hash
     in
     let%map undo =
-      Ledger.apply_transaction ledger s |> to_staged_ledger_or_error
+      Ledger.apply_transaction ~txn_global_slot ledger s
+      |> to_staged_ledger_or_error
     in
     ( undo
     , { Transaction_snark.Statement.source
@@ -355,7 +358,7 @@ module T = struct
       ; proof_type= `Base }
     , pending_coinbase_with_coinbase )
 
-  let apply_transaction_and_get_witness ledger current_stack s
+  let apply_transaction_and_get_witness ledger current_stack s txn_global_slot
       state_and_body_hash =
     let open Deferred.Let_syntax in
     let public_keys = function
@@ -379,7 +382,7 @@ module T = struct
     let r =
       measure "apply+stmt" (fun () ->
           apply_transaction_and_get_statement ledger current_stack s
-            (snd state_and_body_hash) )
+            txn_global_slot (snd state_and_body_hash) )
     in
     let%map () = Async.Scheduler.yield () in
     let open Result.Let_syntax in
@@ -391,7 +394,7 @@ module T = struct
     , updated_coinbase_stack )
 
   let update_ledger_and_get_statements ledger current_stack ts
-      state_and_body_hash =
+      current_global_slot state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let rec go coinbase_stack acc = function
       | [] ->
@@ -400,7 +403,7 @@ module T = struct
           let open Deferred.Let_syntax in
           match%bind
             apply_transaction_and_get_witness ledger coinbase_stack t
-              state_and_body_hash
+              current_global_slot state_and_body_hash
           with
           | Ok (res, updated_coinbase_stack) ->
               (*Push the state body hash to the pending coinbase stack once per diff*)
@@ -475,7 +478,8 @@ module T = struct
       partitions.second
 
   let update_coinbase_stack_and_get_data scan_state ledger
-      pending_coinbase_collection transactions state_and_body_hash =
+      pending_coinbase_collection transactions current_global_slot
+      state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let coinbase_exists txns =
       List.fold_until ~init:false txns
@@ -503,7 +507,7 @@ module T = struct
           in
           let%map data, updated_stack =
             update_ledger_and_get_statements ledger working_stack transactions
-              state_and_body_hash
+              current_global_slot state_and_body_hash
           in
           ( is_new_stack
           , data
@@ -527,7 +531,7 @@ module T = struct
           in
           let%bind data1, updated_stack1 =
             update_ledger_and_get_statements ledger working_stack1
-              txns_for_partition1 state_and_body_hash
+              txns_for_partition1 current_global_slot state_and_body_hash
           in
           let txns_for_partition2 = List.drop transactions slots in
           (*Push the new state to the state_stack from the previous block even in the second stack*)
@@ -536,7 +540,7 @@ module T = struct
           in
           let%map data2, updated_stack2 =
             update_ledger_and_get_statements ledger working_stack2
-              txns_for_partition2 state_and_body_hash
+              txns_for_partition2 current_global_slot state_and_body_hash
           in
           let second_has_data = List.length txns_for_partition2 > 0 in
           let pending_coinbase_action, stack_update =
@@ -624,7 +628,8 @@ module T = struct
           (Staged_ledger_error.Pre_diff
              (Pre_diff_info.Error.Coinbase_error "More than two coinbase parts"))
 
-  let apply_diff ~logger t pre_diff_info ~state_and_body_hash =
+  let apply_diff ~logger t pre_diff_info ~current_global_slot
+      ~state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let max_throughput =
       Int.pow 2
@@ -640,7 +645,8 @@ module T = struct
     let transactions, works, user_commands_count, coinbases = pre_diff_info in
     let%bind is_new_stack, data, stack_update_in_snark, stack_update =
       update_coinbase_stack_and_get_data t.scan_state new_ledger
-        t.pending_coinbase_collection transactions state_and_body_hash
+        t.pending_coinbase_collection transactions current_global_slot
+        state_and_body_hash
     in
     let slots = List.length data in
     let work_count = List.length works in
@@ -743,7 +749,8 @@ module T = struct
              (List.length (Scan_state.all_work_statements_exn t.scan_state)))
     )
 
-  let apply t witness ~logger ~verifier ~state_and_body_hash =
+  let apply t witness ~logger ~verifier ~current_global_slot
+      ~state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let work = Staged_ledger_diff.completed_works witness in
     let%bind () = check_completed_works ~logger ~verifier t.scan_state work in
@@ -753,7 +760,7 @@ module T = struct
       |> Deferred.return
     in
     let%map ((_, _, `Staged_ledger new_staged_ledger, __) as res) =
-      apply_diff t prediff ~logger ~state_and_body_hash
+      apply_diff t prediff ~logger ~current_global_slot ~state_and_body_hash
     in
     let () =
       Or_error.iter_error (update_metrics new_staged_ledger witness)
@@ -767,14 +774,15 @@ module T = struct
 
   let apply_diff_unchecked t
       (sl_diff : Staged_ledger_diff.With_valid_signatures_and_proofs.t)
-      ~state_and_body_hash =
+      ~current_global_slot ~state_and_body_hash =
     let open Deferred.Result.Let_syntax in
     let%bind prediff =
       Result.map_error ~f:(fun error -> Staged_ledger_error.Pre_diff error)
       @@ Pre_diff_info.get_unchecked sl_diff
       |> Deferred.return
     in
-    apply_diff t prediff ~logger:(Logger.null ()) ~state_and_body_hash
+    apply_diff t prediff ~logger:(Logger.null ()) ~current_global_slot
+      ~state_and_body_hash
 
   module Resources = struct
     module Discarded = struct
@@ -1368,7 +1376,7 @@ module T = struct
           let res = try_with_coinbase () in
           make_diff res None
 
-  let create_diff t ~self ~coinbase_receiver ~logger
+  let create_diff t ~self ~coinbase_receiver ~logger ~current_global_slot
       ~(transactions_by_fee : User_command.With_valid_signature.t Sequence.t)
       ~(get_completed_work :
             Transaction_snark_work.Statement.t
@@ -1415,7 +1423,7 @@ module T = struct
           match
             O1trace.measure "validate txn" (fun () ->
                 Transaction_validator.apply_transaction validating_ledger
-                  (User_command t) )
+                  ~txn_global_slot:current_global_slot (User_command t) )
           with
           | Error e ->
               let error_message =
@@ -1465,12 +1473,12 @@ let%test_module "test" =
         Public_key.Compressed.gen
 
     (* Functor for testing with different instantiated staged ledger modules. *)
-    let create_and_apply_with_state_body_hash state_and_body_hash sl logger
-        pids txns stmt_to_work =
+    let create_and_apply_with_state_body_hash current_global_slot
+        state_and_body_hash sl logger pids txns stmt_to_work =
       let open Deferred.Let_syntax in
       let diff =
-        Sl.create_diff !sl ~self:self_pk ~logger ~transactions_by_fee:txns
-          ~get_completed_work:stmt_to_work
+        Sl.create_diff !sl ~self:self_pk ~logger ~current_global_slot
+          ~transactions_by_fee:txns ~get_completed_work:stmt_to_work
           ~coinbase_receiver:(`Other coinbase_receiver)
       in
       let diff' = Staged_ledger_diff.forget diff in
@@ -1481,7 +1489,8 @@ let%test_module "test" =
               , `Pending_coinbase_data
                   (is_new_stack, coinbase_amount, pc_action) ) =
         match%map
-          Sl.apply !sl diff' ~logger ~verifier ~state_and_body_hash
+          Sl.apply !sl diff' ~logger ~verifier ~current_global_slot
+            ~state_and_body_hash
         with
         | Ok x ->
             x
@@ -1495,7 +1504,7 @@ let%test_module "test" =
     let create_and_apply sl logger pids txns stmt_to_work =
       let open Deferred.Let_syntax in
       let%map ledger_proof, diff, _, _, _ =
-        create_and_apply_with_state_body_hash
+        create_and_apply_with_state_body_hash Coda_numbers.Global_slot.zero
           (State_hash.dummy, State_body_hash.dummy)
           sl logger pids txns stmt_to_work
       in
@@ -1548,7 +1557,10 @@ let%test_module "test" =
         | [] ->
             return ()
         | cmd :: cmds ->
-            let%bind _ = Ledger.apply_user_command test_ledger cmd in
+            let%bind _ =
+              Ledger.apply_user_command test_ledger
+                ~txn_global_slot:Coda_numbers.Global_slot.zero cmd
+            in
             apply_cmds cmds
       in
       Or_error.ok_exn @@ apply_cmds @@ List.take cmds_all cmds_used ;
@@ -2004,6 +2016,7 @@ let%test_module "test" =
                     in
                     let%bind apply_res =
                       Sl.apply !sl diff ~logger ~verifier
+                        ~current_global_slot:Coda_numbers.Global_slot.zero
                         ~state_and_body_hash:
                           (State_hash.dummy, State_body_hash.dummy)
                     in
@@ -2063,6 +2076,7 @@ let%test_module "test" =
                 (fun _cmds_left _count_opt cmds_this_iter () ->
                   let diff =
                     Sl.create_diff !sl ~self:self_pk ~logger
+                      ~current_global_slot:Coda_numbers.Global_slot.zero
                       ~transactions_by_fee:cmds_this_iter
                       ~get_completed_work:stmt_to_work
                       ~coinbase_receiver:(`Other coinbase_receiver)
@@ -2459,12 +2473,13 @@ let%test_module "test" =
         -> int option list
         -> int list
         -> (State_hash.t * State_body_hash.t) list
+        -> Coda_numbers.Global_slot.t
         -> Sl.t ref
         -> Ledger.Mask.Attached.t
         -> [`One_prover | `Many_provers]
         -> unit Deferred.t =
-     fun init_state cmds cmd_iters proofs_available state_body_hashes sl
-         test_mask provers ->
+     fun init_state cmds cmd_iters proofs_available state_body_hashes
+         current_global_slot sl test_mask provers ->
       let logger = Logger.null () in
       let pids = Child_processes.Termination.create_pid_table () in
       let%map proofs_available_left, _state_body_hashes_left =
@@ -2483,8 +2498,8 @@ let%test_module "test" =
             let sl_before = !sl in
             let state_body_hash = List.hd_exn state_body_hashes in
             let%map proof, diff, coinbase_amount, is_new_stack, pc_action =
-              create_and_apply_with_state_body_hash state_body_hash sl logger
-                pids cmds_this_iter
+              create_and_apply_with_state_body_hash current_global_slot
+                state_body_hash sl logger pids cmds_this_iter
                 (stmt_to_work_restricted
                    (List.take work_list proofs_available_this_iter)
                    provers)
@@ -2528,6 +2543,7 @@ let%test_module "test" =
         return
           (ledger_init_state, cmds, iters, proofs_available, state_body_hashes)
       in
+      let current_global_slot = Coda_numbers.Global_slot.zero in
       Quickcheck.test g ~trials:5
         ~f:(fun ( ledger_init_state
                 , cmds
@@ -2537,7 +2553,8 @@ let%test_module "test" =
            ->
           async_with_ledgers ledger_init_state (fun sl test_mask ->
               test_pending_coinbase ledger_init_state cmds iters
-                proofs_available state_body_hashes sl test_mask prover ) )
+                proofs_available state_body_hashes current_global_slot sl
+                test_mask prover ) )
 
     let%test_unit "Validate pending coinbase for random number of \
                    user_commands-random number of proofs-one prover)" =

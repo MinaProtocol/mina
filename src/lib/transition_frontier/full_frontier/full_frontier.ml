@@ -348,13 +348,20 @@ let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
       let s = t.root_ledger in
       (* STEP 4 *)
       let mt = Ledger.Maskable.register_mask s (Ledger.Mask.create ()) in
+      let current_global_slot =
+        Breadcrumb.consensus_state new_root_node.breadcrumb
+        |> Consensus.Data.Consensus_state.curr_slot
+      in
       (* STEP 5 *)
       Non_empty_list.iter
         (Option.value_exn
            (Staged_ledger.proof_txns
               (Breadcrumb.staged_ledger new_root_node.breadcrumb)))
         ~f:(fun txn ->
-          ignore (Or_error.ok_exn (Ledger.apply_transaction mt txn)) ) ;
+          ignore
+            (Or_error.ok_exn
+               (Ledger.apply_transaction ~txn_global_slot:current_global_slot
+                  mt txn)) ) ;
       (* STEP 6 *)
       Ledger.commit mt ;
       (* STEP 7 *)

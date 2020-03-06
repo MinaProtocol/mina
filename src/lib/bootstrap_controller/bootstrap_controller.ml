@@ -155,6 +155,12 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       |> External_transition.Validation.reset_frontier_dependencies_validation
       |> External_transition.Validation.reset_staged_ledger_diff_validation
     in
+    let initial_global_slot =
+      initial_root_transition
+      |> External_transition.Validation.forget_validation
+      |> External_transition.consensus_state
+      |> Consensus.Data.Consensus_state.curr_slot
+    in
     let t =
       { network
       ; logger
@@ -221,7 +227,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         let temp_mask = Ledger.of_database temp_snarked_ledger in
         let%map result =
           Staged_ledger.of_scan_state_pending_coinbases_and_snarked_ledger
-            ~logger ~verifier ~scan_state ~snarked_ledger:temp_mask
+            ~logger ~verifier ~scan_state
+            ~current_global_slot:initial_global_slot ~snarked_ledger:temp_mask
             ~expected_merkle_root ~pending_coinbases
         in
         ignore (Ledger.Maskable.unregister_mask_exn temp_mask) ;

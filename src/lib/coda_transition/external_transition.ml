@@ -934,6 +934,10 @@ module Staged_ledger_validation = struct
              , `Pending_coinbase_data _ ) =
       Staged_ledger.apply ~logger ~verifier parent_staged_ledger
         staged_ledger_diff
+        ~current_global_slot:
+          ( Coda_state.Protocol_state.(
+              Body.consensus_state @@ body parent_protocol_state)
+          |> Consensus.Data.Consensus_state.curr_slot )
         ~state_and_body_hash:
           (let body_hash =
              Protocol_state.(Body.hash @@ body parent_protocol_state)

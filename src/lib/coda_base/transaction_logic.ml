@@ -217,13 +217,21 @@ module type S = sig
 
   val apply_user_command :
        ledger
+    -> txn_global_slot:Global_slot.t
     -> User_command.With_valid_signature.t
     -> Undo.User_command_undo.t Or_error.t
 
-  val apply_transaction : ledger -> Transaction.t -> Undo.t Or_error.t
+  val apply_transaction :
+       ledger
+    -> txn_global_slot:Global_slot.t
+    -> Transaction.t
+    -> Undo.t Or_error.t
 
   val merkle_root_after_user_command_exn :
-    ledger -> User_command.With_valid_signature.t -> Ledger_hash.t
+       ledger
+    -> txn_global_slot:Global_slot.t
+    -> User_command.With_valid_signature.t
+    -> Ledger_hash.t
 
   val undo : ledger -> Undo.t -> unit Or_error.t
 
@@ -373,7 +381,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   (* someday: It would probably be better if we didn't modify the receipt chain hash
   in the case that the sender is equal to the receiver, but it complicates the SNARK, so
   we don't for now. *)
-  let apply_user_command_unchecked ledger
+  let apply_user_command_unchecked ledger ~txn_global_slot
       ({payload; sender; signature= _} as user_command : User_command.t) =
     let sender = Public_key.compress sender in
     let nonce = User_command.Payload.nonce payload in
@@ -390,11 +398,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         {user_command; previous_receipt_chain_hash= account.receipt_chain_hash}
       in
       let%bind () = validate_nonces nonce account.nonce in
-      (* TODO: Put actual value here. See issue #4036. *)
-      let current_global_slot = Global_slot.zero in
       let%bind () =
         validate_time ~valid_until:payload.common.valid_until
-          ~current_global_slot
+          ~current_global_slot:txn_global_slot
       in
       let%map timing =
         if User_command.Payload.is_payment payload then
@@ -405,8 +411,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | _ ->
                 failwith "Expected payment when validating transaction timing"
           in
-          validate_timing ~txn_amount ~txn_global_slot:current_global_slot
-            ~account
+          validate_timing ~txn_amount ~txn_global_slot ~account
         else return account.timing
       in
       let account =
@@ -454,9 +459,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             {receiver_account with balance= receiver_balance'} ;
           undo previous_empty_accounts
 
-  let apply_user_command ledger
+  let apply_user_command ledger ~txn_global_slot
       (user_command : User_command.With_valid_signature.t) =
-    apply_user_command_unchecked ledger (user_command :> User_command.t)
+    apply_user_command_unchecked ledger ~txn_global_slot
+      (user_command :> User_command.t)
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
@@ -684,14 +690,14 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         [%test_eq: Ledger_hash.t] undo.previous_hash (merkle_root ledger) ) ;
     res
 
-  let apply_transaction ledger (t : Transaction.t) =
+  let apply_transaction ledger ~txn_global_slot (t : Transaction.t) =
     O1trace.measure "apply_transaction" (fun () ->
         let previous_hash = merkle_root ledger in
         Or_error.map
           ( match t with
           | User_command txn ->
-              Or_error.map (apply_user_command ledger txn) ~f:(fun u ->
-                  Undo.Varying.User_command u )
+              Or_error.map (apply_user_command ledger ~txn_global_slot txn)
+                ~f:(fun u -> Undo.Varying.User_command u)
           | Fee_transfer t ->
               Or_error.map (apply_fee_transfer ledger t) ~f:(fun u ->
                   Undo.Varying.Fee_transfer u )
@@ -700,8 +706,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
                   Undo.Varying.Coinbase u ) )
           ~f:(fun varying -> {Undo.previous_hash; varying}) )
 
-  let merkle_root_after_user_command_exn ledger payment =
-    let undo = Or_error.ok_exn (apply_user_command ledger payment) in
+  let merkle_root_after_user_command_exn ledger ~txn_global_slot payment =
+    let undo =
+      Or_error.ok_exn (apply_user_command ~txn_global_slot ledger payment)
+    in
     let root = merkle_root ledger in
     Or_error.ok_exn (undo_user_command ledger undo) ;
     root

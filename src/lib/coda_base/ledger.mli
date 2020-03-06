@@ -139,15 +139,23 @@ val create_new_account_exn : t -> Public_key.Compressed.t -> Account.t -> unit
 
 val apply_user_command :
      t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
   -> User_command.With_valid_signature.t
   -> Undo.User_command_undo.t Or_error.t
 
-val apply_transaction : t -> Transaction.t -> Undo.t Or_error.t
+val apply_transaction :
+     t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> Transaction.t
+  -> Undo.t Or_error.t
 
 val undo : t -> Undo.t -> unit Or_error.t
 
 val merkle_root_after_user_command_exn :
-  t -> User_command.With_valid_signature.t -> Ledger_hash.t
+     t
+  -> txn_global_slot:Coda_numbers.Global_slot.t
+  -> User_command.With_valid_signature.t
+  -> Ledger_hash.t
 
 val create_empty : t -> Public_key.Compressed.t -> Path.t * Account.t
 

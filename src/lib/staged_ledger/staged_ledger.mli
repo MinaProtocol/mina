@@ -102,6 +102,7 @@ val apply :
   -> Staged_ledger_diff.t
   -> logger:Logger.t
   -> verifier:Verifier.t
+  -> current_global_slot:Coda_numbers.Global_slot.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
@@ -114,6 +115,7 @@ val apply :
 val apply_diff_unchecked :
      t
   -> Staged_ledger_diff.With_valid_signatures_and_proofs.t
+  -> current_global_slot:Coda_numbers.Global_slot.t
   -> state_and_body_hash:State_hash.t * State_body_hash.t
   -> ( [`Hash_after_applying of Staged_ledger_hash.t]
        * [`Ledger_proof of (Ledger_proof.t * Transaction.t list) option]
@@ -132,6 +134,7 @@ val create_diff :
   -> self:Public_key.Compressed.t
   -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
   -> logger:Logger.t
+  -> current_global_slot:Coda_numbers.Global_slot.t
   -> transactions_by_fee:User_command.With_valid_signature.t Sequence.t
   -> get_completed_work:(   Transaction_snark_work.Statement.t
                          -> Transaction_snark_work.Checked.t option)
@@ -147,6 +150,7 @@ val of_scan_state_pending_coinbases_and_snarked_ledger :
   -> snarked_ledger:Ledger.t
   -> expected_merkle_root:Ledger_hash.t
   -> pending_coinbases:Pending_coinbase.t
+  -> current_global_slot:Coda_numbers.Global_slot.t
   -> t Or_error.t Deferred.t
 
 val all_work_pairs :

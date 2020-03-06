@@ -427,6 +427,7 @@ module For_tests = struct
                  .of_scan_state_pending_coinbases_and_snarked_ledger ~logger
                    ~verifier
                    ~scan_state:(Staged_ledger.Scan_state.empty ())
+                   ~current_global_slot:Coda_numbers.Global_slot.zero
                    ~pending_coinbases:
                      (Or_error.ok_exn @@ Pending_coinbase.create ())
                    ~snarked_ledger:genesis_ledger

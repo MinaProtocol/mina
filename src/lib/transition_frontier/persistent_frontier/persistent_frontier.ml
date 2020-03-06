@@ -20,12 +20,20 @@ let construct_staged_ledger_at_root ~root_ledger ~root_transition ~root =
       (Staged_ledger.Scan_state.staged_transactions root.scan_state)
   in
   let mask = Ledger.of_database root_ledger in
+  let current_global_slot =
+    External_transition.Validated.protocol_state root_transition
+    |> Protocol_state.consensus_state
+    |> Consensus.Data.Consensus_state.curr_slot
+  in
   let%bind () =
     Deferred.return
       (List.fold transactions ~init:(Or_error.return ()) ~f:(fun acc txn ->
            let open Or_error.Let_syntax in
            let%bind () = acc in
-           let%map _ = Ledger.apply_transaction mask txn in
+           let%map _ =
+             Ledger.apply_transaction mask ~txn_global_slot:current_global_slot
+               txn
+           in
            () ))
   in
   Staged_ledger.of_scan_state_and_ledger_unchecked ~snarked_ledger_hash

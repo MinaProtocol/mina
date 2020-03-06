@@ -1571,9 +1571,9 @@ let%test_module "transaction_snark" =
 
       let merkle_root t = Frozen_ledger_hash.of_ledger_hash @@ merkle_root t
 
-      let merkle_root_after_user_command_exn t txn =
+      let merkle_root_after_user_command_exn t ~txn_global_slot txn =
         Frozen_ledger_hash.of_ledger_hash
-        @@ merkle_root_after_user_command_exn t txn
+        @@ merkle_root_after_user_command_exn t ~txn_global_slot txn
     end
 
     module Sparse_ledger = struct
@@ -1652,8 +1652,13 @@ let%test_module "transaction_snark" =
     let of_user_command' sok_digest ledger user_command pending_coinbase_stack
         state_body_hash state_body handler =
       let source = Ledger.merkle_root ledger in
+      let current_global_slot =
+        Coda_state.Protocol_state.Body.consensus_state state_body
+        |> Consensus.Data.Consensus_state.curr_slot
+      in
       let target =
-        Ledger.merkle_root_after_user_command_exn ledger user_command
+        Ledger.merkle_root_after_user_command_exn ledger
+          ~txn_global_slot:current_global_slot user_command
       in
       let pending_coinbase_stack_target =
         pending_coinbase_stack_target (User_command user_command)
@@ -1752,8 +1757,14 @@ let%test_module "transaction_snark" =
                      (Test_util.arbitrary_string
                         ~len:User_command_memo.max_digestible_string_length))
               in
+              let current_global_slot =
+                Lazy.force state_body
+                |> Coda_state.Protocol_state.Body.consensus_state
+                |> Consensus.Data.Consensus_state.curr_slot
+              in
               let target =
-                Ledger.merkle_root_after_user_command_exn ledger t1
+                Ledger.merkle_root_after_user_command_exn ledger
+                  ~txn_global_slot:current_global_slot t1
               in
               let mentioned_keys =
                 User_command.accounts_accessed (t1 :> User_command.t)
@@ -1812,7 +1823,13 @@ let%test_module "transaction_snark" =
       let sparse_ledger =
         Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
       in
-      let _undo = Ledger.apply_transaction ledger txn in
+      let txn_global_slot =
+        Lazy.force state_body |> Coda_state.Protocol_state.Body.consensus_state
+        |> Consensus.Data.Consensus_state.curr_slot
+      in
+      let _undo =
+        Or_error.ok_exn @@ Ledger.apply_transaction ledger ~txn_global_slot txn
+      in
       let target = Ledger.merkle_root ledger in
       let sok_message = Sok_message.create ~fee:Fee.zero ~prover:sender in
       check_transaction ~sok_message ~source ~target
@@ -1943,6 +1960,8 @@ let%test_module "transaction_snark" =
     let%test "base_and_merge" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
+          let state_body = Lazy.force state_body in
+          let state_body_hash = Lazy.force state_body_hash in
           Ledger.with_ledger ~f:(fun ledger ->
               Array.iter wallets ~f:(fun {account; private_key= _} ->
                   Ledger.create_new_account_exn ledger account.public_key
@@ -1977,24 +1996,26 @@ let%test_module "transaction_snark" =
               in
               let proof12, _ =
                 of_user_command' sok_digest ledger t1
-                  Pending_coinbase.Stack.empty
-                  (Lazy.force state_body_hash)
-                  (Lazy.force state_body)
+                  Pending_coinbase.Stack.empty state_body_hash state_body
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn sparse_ledger
                   (t1 :> User_command.t)
               in
-              Ledger.apply_user_command ledger t1 |> Or_error.ok_exn |> ignore ;
+              let current_global_slot =
+                Coda_state.Protocol_state.Body.consensus_state state_body
+                |> Consensus.Data.Consensus_state.curr_slot
+              in
+              Ledger.apply_user_command ledger
+                ~txn_global_slot:current_global_slot t1
+              |> Or_error.ok_exn |> ignore ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23, pending_coinbase_stack_target =
                 of_user_command' sok_digest ledger t2
-                  Pending_coinbase.Stack.empty
-                  (Lazy.force state_body_hash)
-                  (Lazy.force state_body)
+                  Pending_coinbase.Stack.empty state_body_hash state_body
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
@@ -2006,7 +2027,9 @@ let%test_module "transaction_snark" =
                   { source= Pending_coinbase.Stack.empty
                   ; target= pending_coinbase_stack_target }
               in
-              Ledger.apply_user_command ledger t2 |> Or_error.ok_exn |> ignore ;
+              Ledger.apply_user_command ledger
+                ~txn_global_slot:current_global_slot t2
+              |> Or_error.ok_exn |> ignore ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
@@ -2035,6 +2058,8 @@ let%test_module "transaction_snark" =
     let%test "base_and_merge- transactions in different blocks" =
       Test_util.with_randomness 123456789 (fun () ->
           let wallets = random_wallets () in
+          let state_body = Lazy.force state_body in
+          let state_body_hash = Lazy.force state_body_hash in
           Ledger.with_ledger ~f:(fun ledger ->
               Array.iter wallets ~f:(fun {account; private_key= _} ->
                   Ledger.create_new_account_exn ledger account.public_key
@@ -2085,15 +2110,19 @@ let%test_module "transaction_snark" =
                 Sparse_ledger.apply_user_command_exn sparse_ledger
                   (t1 :> User_command.t)
               in
-              Ledger.apply_user_command ledger t1 |> Or_error.ok_exn |> ignore ;
+              let current_global_slot =
+                Coda_state.Protocol_state.Body.consensus_state state_body
+                |> Consensus.Data.Consensus_state.curr_slot
+              in
+              Ledger.apply_user_command ledger
+                ~txn_global_slot:current_global_slot t1
+              |> Or_error.ok_exn |> ignore ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;
               let proof23, pending_coinbase_stack_target =
                 of_user_command' sok_digest ledger t2
-                  pending_coinbase_stack_next
-                  (Lazy.force state_body_hash)
-                  (Lazy.force state_body)
+                  pending_coinbase_stack_next state_body_hash state_body
                   (unstage @@ Sparse_ledger.handler sparse_ledger)
               in
               let sparse_ledger =
@@ -2105,7 +2134,9 @@ let%test_module "transaction_snark" =
                   { source= Pending_coinbase.Stack.empty
                   ; target= pending_coinbase_stack_target }
               in
-              Ledger.apply_user_command ledger t2 |> Or_error.ok_exn |> ignore ;
+              Ledger.apply_user_command ledger
+                ~txn_global_slot:current_global_slot t2
+              |> Or_error.ok_exn |> ignore ;
               [%test_eq: Frozen_ledger_hash.t]
                 (Ledger.merkle_root ledger)
                 (Sparse_ledger.merkle_root sparse_ledger) ;

@@ -75,8 +75,8 @@ include Transaction_logic.Make (Hashless_ledger)
 
 let create = Hashless_ledger.create
 
-let apply_user_command l uc =
-  Result.map ~f:(Fn.const ()) (apply_user_command l uc)
+let apply_user_command l ~txn_global_slot uc =
+  Result.map ~f:(Fn.const ()) (apply_user_command l ~txn_global_slot uc)
 
-let apply_transaction l txn =
-  Result.map ~f:(Fn.const ()) (apply_transaction l txn)
+let apply_transaction l ~txn_global_slot txn =
+  Result.map ~f:(Fn.const ()) (apply_transaction l ~txn_global_slot txn)

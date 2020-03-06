@@ -110,7 +110,13 @@ let generate_next_state ~previous_protocol_state ~time_controller
     Protocol_state.body previous_protocol_state |> Protocol_state.Body.hash
   in
   let previous_protocol_state_hash =
-    Protocol_state.hash previous_protocol_state
+    Protocol_state.hash_with_body ~body_hash:previous_protocol_state_body_hash
+      previous_protocol_state
+  in
+  let previous_global_slot =
+    Protocol_state.body previous_protocol_state
+    |> Coda_state.Protocol_state.Body.consensus_state
+    |> Consensus.Data.Consensus_state.curr_slot
   in
   let%bind res =
     Interruptible.uninterruptible
@@ -118,10 +124,12 @@ let generate_next_state ~previous_protocol_state ~time_controller
       let diff =
         measure "create_diff" (fun () ->
             Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
-              ~logger ~transactions_by_fee:transactions ~get_completed_work )
+              ~logger ~current_global_slot:previous_global_slot
+              ~transactions_by_fee:transactions ~get_completed_work )
       in
       match%map
         Staged_ledger.apply_diff_unchecked staged_ledger diff
+          ~current_global_slot:previous_global_slot
           ~state_and_body_hash:
             (previous_protocol_state_hash, previous_protocol_state_body_hash)
       with
