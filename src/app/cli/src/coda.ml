@@ -51,6 +51,23 @@ let daemon logger =
             provide both `block-producer-key` and `block-producer-pubkey`. \
             (default: don't produce blocks)"
          (optional string)
+     and block_production_pubkey =
+       flag "block-producer-pubkey"
+         ~doc:
+           "PUBLICKEY Public key for the associated private key that is being \
+            tracked by this daemon. You cannot provide both \
+            `block-producer-key` and `block-producer-pubkey`. (default: don't \
+            produce blocks)"
+         (optional string)
+     and block_production_password =
+       flag "block-producer-password"
+         ~doc:
+           "PASSWORD Password associated with the block-producer key. Setting \
+            this is equivalent to setting the CODA_PRIVKEY_PASS environment \
+            variable. Be careful when setting it in the commandline as it \
+            will likely get tracked in your history. Mainly to be used from \
+            the daemon.json config file"
+         (optional string)
      and demo_mode =
        flag "demo-mode" no_arg
          ~doc:
@@ -420,13 +437,51 @@ let daemon logger =
          let addrs_and_ports : Node_addrs_and_ports.t =
            {external_ip; bind_ip; peer= None; client_port; libp2p_port}
          in
+         let block_production_key =
+           maybe_from_config YJ.Util.to_string_option "block-producer-key"
+             block_production_key
+         in
+         let block_production_pubkey =
+           maybe_from_config YJ.Util.to_string_option "block-producer-pubkey"
+             block_production_pubkey
+         in
+         let block_production_password =
+           maybe_from_config YJ.Util.to_string_option "block-producer-password"
+             block_production_password
+         in
+         Option.iter
+           ~f:(fun password ->
+             Unix.putenv ~key:Secrets.Keypair.env ~data:password )
+           block_production_password ;
          let%bind block_production_keypair =
-           match block_production_key with
-           | Some sk_file ->
+           match (block_production_key, block_production_pubkey) with
+           | Some _, Some _ ->
+               eprintf
+                 "Error: You cannot provide both `block-producer-key` and \
+                  `block_production_pubkey`\n" ;
+               exit 11
+           | None, None ->
+               Deferred.return None
+           | Some sk_file, _ ->
                let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
                Some kp
-           | None ->
-               return None
+           | _, Some tracked_pubkey -> (
+             match Public_key.Compressed.of_base58_check tracked_pubkey with
+             | Ok pk ->
+                 let%bind wallets =
+                   Secrets.Wallets.load ~logger
+                     ~disk_location:(conf_dir ^/ "wallets")
+                 in
+                 let sk_file = Secrets.Wallets.get_path wallets pk in
+                 let%map kp =
+                   Secrets.Keypair.Terminal_stdin.read_exn sk_file
+                 in
+                 Some kp
+             | Error e ->
+                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                   "Error decoding block-producer-pubkey key: $error"
+                   ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                 Deferred.return None )
          in
          let%bind client_trustlist =
            Reader.load_sexp
