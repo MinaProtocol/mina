@@ -13,7 +13,7 @@ type exn += No_initial_peers
 
 (* INSTRUCTIONS FOR ADDING A NEW RPC:
  *   - define a new module under the Rpcs module
- *   - add an entry to the Rpcs.rpc GADT definition for the new module
+ *   - add an entry to the Rpcs.rpc GADT definition for the new module (type ('query, 'response) rpc, below)
  *   - add the new constructor for Rpcs.rpc to Rpcs.all_of_type_erased_rpc
  *   - add a pattern matching case to Rpcs.implementation_of_rpc mapping the
  *     new constructor to the new module for your RPC
@@ -419,6 +419,126 @@ module Rpcs = struct
     end
   end
 
+  module Get_telemetry_data = struct
+    module Telemetry_data = struct
+      let yojson_of_ban_status (inet_addr, peer_status) =
+        `Assoc
+          [ ("IP_address", `String (Unix.Inet_addr.to_string inet_addr))
+          ; ("peer_status", Trust_system.Peer_status.to_yojson peer_status) ]
+
+      let yojson_of_ban_statuses ban_statuses =
+        `List (List.map ban_statuses ~f:yojson_of_ban_status)
+
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t =
+            { node: Core.Unix.Inet_addr.Stable.V1.t
+            ; peers: Network_peer.Peer.Stable.V1.t list
+            ; block_producers:
+                Signature_lib.Public_key.Compressed.Stable.V1.t list
+            ; protocol_state_hash: State_hash.Stable.V1.t
+            ; ban_statuses:
+                ( Core.Unix.Inet_addr.Stable.V1.t
+                * Trust_system.Peer_status.Stable.V1.t )
+                list
+            ; k_block_hashes: State_hash.Stable.V1.t list }
+
+          (* N.B.: the [@@to_yojson ...] per-field spec didn't seem to work, so we write
+             the full function in gory detail
+           *)
+          let to_yojson t =
+            `Assoc
+              [ ("node", `String (Unix.Inet_addr.to_string t.node))
+              ; ( "peers"
+                , `List
+                    (List.map t.peers ~f:Network_peer.Peer.Stable.V1.to_yojson)
+                )
+              ; ( "block_producers"
+                , `List
+                    (List.map t.block_producers
+                       ~f:
+                         Signature_lib.Public_key.Compressed.Stable.V1
+                         .to_yojson) )
+              ; ( "protocol_state_hash"
+                , State_hash.Stable.V1.to_yojson t.protocol_state_hash )
+              ; ("ban_statuses", yojson_of_ban_statuses t.ban_statuses)
+              ; ( "k_block_hashes"
+                , `List
+                    (List.map t.k_block_hashes
+                       ~f:State_hash.Stable.V1.to_yojson) ) ]
+
+          let to_latest = Fn.id
+        end
+      end]
+
+      type t = Stable.Latest.t =
+        { node: Unix.Inet_addr.t
+        ; peers: Network_peer.Peer.t list
+        ; block_producers: Signature_lib.Public_key.Compressed.t list
+        ; protocol_state_hash: State_hash.t
+        ; ban_statuses: (Unix.Inet_addr.t * Trust_system.Peer_status.t) list
+        ; k_block_hashes: State_hash.t list }
+    end
+
+    module Master = struct
+      let name = "get_telemetry_data"
+
+      module T = struct
+        type query = unit [@@deriving sexp, to_yojson]
+
+        type response = Telemetry_data.t Or_error.t
+      end
+
+      module Caller = T
+      module Callee = T
+    end
+
+    include Master.T
+    module M = Versioned_rpc.Both_convert.Plain.Make (Master)
+    include M
+
+    let response_to_yojson response =
+      match response with
+      | Ok telem ->
+          Telemetry_data.Stable.V1.to_yojson telem
+      | Error err ->
+          `Assoc [("error", `String (Error.to_string_hum err))]
+
+    include Perf_histograms.Rpc.Plain.Extend (struct
+      include M
+      include Master
+    end)
+
+    module V1 = struct
+      module T = struct
+        type query = unit [@@deriving bin_io, sexp, version {rpc}]
+
+        type response =
+          Telemetry_data.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
+        [@@deriving bin_io, version {rpc}]
+
+        let query_of_caller_model = Fn.id
+
+        let callee_model_of_query = Fn.id
+
+        let response_of_callee_model = Fn.id
+
+        let caller_model_of_response = Fn.id
+      end
+
+      module T' =
+        Perf_histograms.Rpc.Plain.Decorate_bin_io (struct
+            include M
+            include Master
+          end)
+          (T)
+
+      include T'
+      include Register (T')
+    end
+  end
+
   type ('query, 'response) rpc =
     | Get_staged_ledger_aux_and_pending_coinbases_at_hash
         : ( Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
@@ -437,6 +557,8 @@ module Rpcs = struct
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
+    | Get_telemetry_data
+        : (Get_telemetry_data.query, Get_telemetry_data.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   type rpc_handler =
@@ -458,6 +580,8 @@ module Rpcs = struct
         (module Ban_notify)
     | Get_best_tip ->
         (module Get_best_tip)
+    | Get_telemetry_data ->
+        (module Get_telemetry_data)
     | Consensus_rpc rpc ->
         Consensus.Hooks.Rpcs.implementation_of_rpc rpc
 
@@ -557,32 +681,28 @@ let wrap_rpc_data_in_envelope conn data =
 
 let create (config : Config.t)
     ~(get_staged_ledger_aux_and_pending_coinbases_at_hash :
-          State_hash.t Envelope.Incoming.t
-       -> (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t)
-          option
+          Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.query
+          Envelope.Incoming.t
+       -> Rpcs.Get_staged_ledger_aux_and_pending_coinbases_at_hash.response
           Deferred.t)
     ~(answer_sync_ledger_query :
-          (Ledger_hash.t * Ledger.Location.Addr.t Syncable_ledger.Query.t)
-          Envelope.Incoming.t
-       -> Sync_ledger.Answer.t Deferred.Or_error.t)
+          Rpcs.Answer_sync_ledger_query.query Envelope.Incoming.t
+       -> Rpcs.Answer_sync_ledger_query.response Deferred.t)
     ~(get_ancestry :
-          Consensus.Data.Consensus_state.Value.t Envelope.Incoming.t
-       -> ( External_transition.t
-          , State_body_hash.t list * External_transition.t )
-          Proof_carrying_data.t
-          Deferred.Option.t)
+          Rpcs.Get_ancestry.query Envelope.Incoming.t
+       -> Rpcs.Get_ancestry.response Deferred.t)
     ~(get_best_tip :
-          unit Envelope.Incoming.t
-       -> ( External_transition.t
-          , State_body_hash.t list * External_transition.t )
-          Proof_carrying_data.t
-          Deferred.Option.t)
+          Rpcs.Get_best_tip.query Envelope.Incoming.t
+       -> Rpcs.Get_best_tip.response Deferred.t)
+    ~(get_telemetry_data :
+          Rpcs.Get_telemetry_data.query Envelope.Incoming.t
+       -> Rpcs.Get_telemetry_data.response Deferred.t)
     ~(get_transition_chain_proof :
-          State_hash.t Envelope.Incoming.t
-       -> (State_hash.t * State_body_hash.t list) Deferred.Option.t)
+          Rpcs.Get_transition_chain_proof.query Envelope.Incoming.t
+       -> Rpcs.Get_transition_chain_proof.response Deferred.t)
     ~(get_transition_chain :
-          State_hash.t list Envelope.Incoming.t
-       -> External_transition.t list Deferred.Option.t) =
+          Rpcs.Get_transition_chain.query Envelope.Incoming.t
+       -> Rpcs.Get_transition_chain.response Deferred.t) =
   let run_for_rpc_result conn data ~f action_msg msg_args =
     let data_in_envelope = wrap_rpc_data_in_envelope conn data in
     let sender = Envelope.Incoming.sender data_in_envelope in
@@ -595,14 +715,14 @@ let create (config : Config.t)
     return (result, sender)
   in
   let record_unknown_item result sender action_msg msg_args =
-    let%bind () =
+    let%map () =
       if Option.is_none result then
         Trust_system.(
           record_envelope_sender config.trust_system config.logger sender
             Actions.(Requested_unknown_item, Some (action_msg, msg_args)))
       else return ()
     in
-    return result
+    result
   in
   let validate_fork_ids ~rpc_name external_transition =
     let External_transition.{valid_current; valid_next; matches_daemon} =
@@ -727,6 +847,18 @@ let create (config : Config.t)
         if valid_data_fork_ids && valid_proof_fork_ids then return result
         else return None
   in
+  let get_telemetry_data_rpc conn ~version:_ query =
+    Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
+      "Sending telemetry data to peer with IP %s"
+      (Unix.Inet_addr.to_string conn.Peer.host) ;
+    let action_msg = "Telemetry_data" in
+    let msg_args = [] in
+    (* if peer doesn't return telemetry data, don't change trust score *)
+    let%map result, _sender =
+      run_for_rpc_result conn query ~f:get_telemetry_data action_msg msg_args
+    in
+    result
+  in
   let get_transition_chain_proof_rpc conn ~version:_ query =
     Logger.info config.logger ~module_:__MODULE__ ~location:__LOC__
       "Sending transition_chain_proof to peer with IP %s"
@@ -781,6 +913,7 @@ let create (config : Config.t)
         , get_staged_ledger_aux_and_pending_coinbases_at_hash_rpc )
     ; Rpc_handler (Answer_sync_ledger_query, answer_sync_ledger_query_rpc)
     ; Rpc_handler (Get_best_tip, get_best_tip_rpc)
+    ; Rpc_handler (Get_telemetry_data, get_telemetry_data_rpc)
     ; Rpc_handler (Get_ancestry, get_ancestry_rpc)
     ; Rpc_handler (Get_transition_chain, get_transition_chain_rpc)
     ; Rpc_handler (Get_transition_chain_proof, get_transition_chain_proof_rpc)

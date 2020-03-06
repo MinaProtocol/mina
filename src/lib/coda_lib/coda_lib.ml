@@ -600,10 +600,8 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work)
   |> Deferred.don't_wait_for
 
-(*TODO: Synchronize this*)
 let add_transactions t (txns : User_command.t list) =
   Strict_pipe.Writer.write t.pipes.local_txns_writer txns
-  |> Deferred.don't_wait_for
 
 let next_producer_timing t = t.next_producer_timing
 
@@ -736,6 +734,65 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 in
                 f ~frontier input )
           in
+          (* knot-tying hack so we can pass a get_telemetry function before net created *)
+          let net_ref = ref None in
+          let block_producers =
+            config.initial_block_production_keypairs |> Keypair.Set.to_list
+            |> List.map ~f:(fun {Keypair.public_key; _} ->
+                   Public_key.compress public_key )
+          in
+          let get_telemetry_data _env =
+            let node = config.gossip_net_params.addrs_and_ports.external_ip in
+            match !net_ref with
+            | None ->
+                (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
+                Logger.info config.logger
+                  "Network not instantiated when telemetry data requested"
+                  ~module_:__MODULE__ ~location:__LOC__ ;
+                Deferred.return
+                @@ Error
+                     (Error.of_string
+                        (sprintf
+                           !"Node: %{sexp: Unix.Inet_addr.t}, network not \
+                             instantiated when telemetry data requested"
+                           node))
+            | Some net -> (
+              match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
+              | None ->
+                  Deferred.return
+                  @@ Error
+                       (Error.of_string
+                          (sprintf
+                             !"Node: %{sexp: Unix.Inet_addr.t}, could not get \
+                               transition frontier for telemetry data"
+                             node))
+              | Some frontier ->
+                  let%map peers = Coda_networking.peers net in
+                  let protocol_state_hash =
+                    let tip = Transition_frontier.best_tip frontier in
+                    let state =
+                      Transition_frontier.Breadcrumb.protocol_state tip
+                    in
+                    Coda_state.Protocol_state.hash state
+                  in
+                  let ban_statuses =
+                    Trust_system.Peer_trust.peer_statuses config.trust_system
+                  in
+                  let k_block_hashes =
+                    List.map
+                      ( Transition_frontier.root frontier
+                      :: Transition_frontier.best_tip_path frontier )
+                      ~f:Transition_frontier.Breadcrumb.state_hash
+                  in
+                  Ok
+                    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
+                      { node
+                      ; peers
+                      ; block_producers
+                      ; protocol_state_hash
+                      ; ban_statuses
+                      ; k_block_hashes } )
+          in
           let%bind net =
             Coda_networking.create config.net_config
               ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
@@ -795,6 +852,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               ~get_best_tip:
                 (handle_request "get_best_tip" ~f:(fun ~frontier () ->
                      Best_tip_prover.prove ~logger:config.logger frontier ))
+              ~get_telemetry_data
               ~get_transition_chain_proof:
                 (handle_request "get_transition_chain_proof"
                    ~f:(fun ~frontier hash ->
@@ -803,6 +861,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
           in
+          (* tie the knot *)
+          net_ref := Some net ;
           let local_txns_reader, local_txns_writer =
             Strict_pipe.(create ~name:"local transactions" Synchronous)
           in

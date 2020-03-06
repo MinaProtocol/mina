@@ -1021,7 +1021,19 @@ module Types = struct
               ~doc:"Returns the public keys that were staking funds previously"
               ~typ:(non_null (list (non_null public_key)))
               ~args:Arg.[]
-              ~resolve:(fun _ -> Fn.id) ] )
+              ~resolve:(fun _ (lastStaking, _, _) -> lastStaking)
+          ; field "lockedPublicKeys"
+              ~doc:
+                "List of public keys that could not be used to stake because \
+                 they were locked"
+              ~typ:(non_null (list (non_null public_key)))
+              ~args:Arg.[]
+              ~resolve:(fun _ (_, locked, _) -> locked)
+          ; field "currentStakingKeys"
+              ~doc:"Returns the public keys that are now staking their funds"
+              ~typ:(non_null (list (non_null public_key)))
+              ~args:Arg.[]
+              ~resolve:(fun _ (_, _, currentStaking) -> currentStaking) ] )
 
     let set_snark_work_fee =
       obj "SetSnarkWorkFeePayload" ~fields:(fun _ ->
@@ -1535,13 +1547,13 @@ module Mutations = struct
     let user_command = User_command.forget_check signed_command in
     match Coda_commands.send_user_command coda user_command with
     | `Active f -> (
-      match f with
-      | Ok _receipt ->
-          Ok user_command
-      | Error e ->
-          Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
+        match%map f with
+        | Ok _receipt ->
+            Ok user_command
+        | Error e ->
+            Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
     | `Bootstrapping ->
-        Error "Daemon is bootstrapping"
+        return (Error "Daemon is bootstrapping")
 
   let find_identity ~public_key coda =
     Result.of_option
@@ -1605,7 +1617,7 @@ module Mutations = struct
       |> Result.of_option ~error:"Invalid signature"
       |> Deferred.return
     in
-    Deferred.return @@ send_user_command coda command
+    send_user_command coda command
 
   let send_unsigned_user_command ~coda ~sender ~payload =
     let open Deferred.Result.Let_syntax in
@@ -1618,7 +1630,7 @@ module Mutations = struct
             ~public_key:(Public_key.decompress_exn sender)
             ~user_command_payload:payload
     in
-    Deferred.return @@ send_user_command coda command
+    send_user_command coda command
 
   let send_delegation =
     io_field "sendDelegation"
@@ -1696,20 +1708,28 @@ module Mutations = struct
         Some payment )
 
   let set_staking =
-    field "setStaking"
-      ~doc:
-        "Set keys you wish to stake with - silently fails if you pass keys \
-         corresponding to accounts that are either locked or in \
-         trackedAccounts"
+    field "setStaking" ~doc:"Set keys you wish to stake with"
       ~args:Arg.[arg "input" ~typ:(non_null Types.Input.set_staking)]
       ~typ:(non_null Types.Payload.set_staking)
       ~resolve:(fun {ctx= coda; _} () pks ->
-        (* TODO: Handle errors like: duplicates, etc *)
         let old_block_production_keys =
           Coda_lib.block_production_pubkeys coda
         in
-        ignore @@ Coda_commands.replace_block_production_keys coda pks ;
-        Public_key.Compressed.Set.to_list old_block_production_keys )
+        let wallet = Coda_lib.wallets coda in
+        let unlocked, locked =
+          List.partition_map pks ~f:(fun pk ->
+              match Secrets.Wallets.find_unlocked ~needle:pk wallet with
+              | Some kp ->
+                  `Fst (kp, pk)
+              | None ->
+                  `Snd pk )
+        in
+        ignore
+        @@ Coda_lib.replace_block_production_keypairs coda
+             (Keypair.And_compressed_pk.Set.of_list unlocked) ;
+        ( Public_key.Compressed.Set.to_list old_block_production_keys
+        , locked
+        , List.map ~f:Tuple.T2.get2 unlocked ) )
 
   let set_snark_worker =
     io_field "setSnarkWorker"

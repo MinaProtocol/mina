@@ -285,6 +285,11 @@ let run_test () : unit Deferred.t =
             User_command.sign (Keypair.of_private_key_exn sender_sk) payload )
       in
       let assert_ok x = assert (Or_error.is_ok x) in
+      let send_payment (payment : User_command.With_valid_signature.t) =
+        Coda_commands.send_user_command coda (payment :> User_command.t)
+        |> Participating_state.to_deferred_or_error
+        |> Deferred.map ~f:Or_error.join
+      in
       let test_sending_payment sender_sk receiver_pk =
         let payment =
           build_payment send_amount sender_sk receiver_pk transaction_fee
@@ -299,21 +304,15 @@ let run_test () : unit Deferred.t =
           |> Participating_state.active_exn
           |> Option.value ~default:Currency.Balance.zero
         in
-        let p1_res =
-          Coda_commands.send_user_command coda (payment :> User_command.t)
-          |> Participating_state.active_error
-        in
-        assert_ok (Or_error.join p1_res) ;
+        let%bind p1_res = send_payment payment in
+        assert_ok p1_res ;
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =
           build_payment send_amount sender_sk receiver_pk transaction_fee
         in
-        let p2_res =
-          Coda_commands.send_user_command coda (payment' :> User_command.t)
-          |> Participating_state.active_error
-        in
-        assert_ok @@ Or_error.join p2_res ;
+        let%bind p2_res = send_payment payment' in
+        assert_ok p2_res ;
         (* The payment fails, but the rpc command doesn't indicate that because that
            failure comes from the network. *)
         (* Let the system settle, mine some blocks *)
@@ -344,12 +343,8 @@ let run_test () : unit Deferred.t =
               Option.value_exn
                 (Currency.Balance.add_amount (Option.value_exn v) amount) )
         in
-        let p_res =
-          Coda_commands.send_user_command coda (payment :> User_command.t)
-          |> Participating_state.active_error
-        in
-        p_res |> Or_error.join |> assert_ok ;
-        new_balance_sheet'
+        let%map p_res = send_payment payment in
+        assert_ok p_res ; new_balance_sheet'
       in
       let pks accounts =
         List.map accounts ~f:(fun ((keypair : Signature_lib.Keypair.t), _) ->
@@ -357,7 +352,7 @@ let run_test () : unit Deferred.t =
       in
       let send_payments accounts ~txn_count balance_sheet f_amount =
         let pks = pks accounts in
-        List.foldi (List.take accounts txn_count) ~init:balance_sheet
+        Deferred.List.foldi (List.take accounts txn_count) ~init:balance_sheet
           ~f:(fun i acc ((keypair : Signature_lib.Keypair.t), _) ->
             let sender_pk = Public_key.compress keypair.public_key in
             let receiver =
@@ -384,7 +379,7 @@ let run_test () : unit Deferred.t =
                  ( Public_key.compress keypair.public_key
                  , account.Account.Poly.balance ) ))
         in
-        let updated_balance_sheet =
+        let%bind updated_balance_sheet =
           send_payments accounts ~txn_count balance_sheet (fun i ->
               Currency.Amount.of_int ((i + 1) * 10) )
         in

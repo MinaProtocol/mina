@@ -608,14 +608,16 @@ module T = struct
               User_command.sign (Keypair.of_private_key_exn sender_sk) payload
             in
             let payment = build_txn amount sk pk fee in
-            Coda_commands.send_user_command coda (payment :> User_command.t)
-            |> Participating_state.active_error |> Or_error.join
-            |> Deferred.return
+            Deferred.map
+              ( Coda_commands.send_user_command coda (payment :> User_command.t)
+              |> Participating_state.to_deferred_or_error )
+              ~f:Or_error.join
           in
           let coda_process_user_command cmd =
-            Coda_commands.send_user_command coda (cmd :> User_command.t)
-            |> Participating_state.active_error |> Or_error.join
-            |> Deferred.return
+            Deferred.map
+              ( Coda_commands.send_user_command coda (cmd :> User_command.t)
+              |> Participating_state.to_deferred_or_error )
+              ~f:Or_error.join
           in
           let coda_prove_receipt (proving_receipt, resulting_receipt) =
             match%map
