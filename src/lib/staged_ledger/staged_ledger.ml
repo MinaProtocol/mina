@@ -1429,8 +1429,28 @@ module T = struct
                 Continue
                   ( Sequence.append seq (Sequence.singleton cw_checked)
                   , One_or_two.length cw_checked.proofs + count )
-              else Stop (seq, count)
+              else (
+                Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                  ~metadata:
+                    [ ( "work"
+                      , Transaction_snark_work.Checked.to_yojson cw_checked )
+                    ; ( "work_ids"
+                      , Transaction_snark_work.Statement.compact_json w )
+                    ; ("snark_fee", Currency.Fee.to_yojson cw_checked.fee)
+                    ; ( "account_creation_fee"
+                      , Currency.Fee.to_yojson
+                          Coda_compile_config.account_creation_fee ) ]
+                  !"Staged_ledger_diff creation: Snark fee $snark_fee \
+                    insufficient to create the snark worker account" ;
+                Stop (seq, count) )
           | None ->
+              Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                ~metadata:
+                  [ ("statement", Transaction_snark_work.Statement.to_yojson w)
+                  ; ( "work_ids"
+                    , Transaction_snark_work.Statement.compact_json w ) ]
+                !"Staged_ledger_diff creation: No snark work found for \
+                  $statement" ;
               Stop (seq, count) )
         ~finish:Fn.id
     in
@@ -1447,8 +1467,8 @@ module T = struct
           | Error e ->
               let error_message =
                 sprintf
-                  !"Invalid user command! Error was: %s, command was: \
-                    $user_command"
+                  !"Staged_ledger_diff creation: Invalid user command! Error \
+                    was: %s, command was: $user_command"
                   (Error.to_string_hum e)
               in
               Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
