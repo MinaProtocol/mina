@@ -1,5 +1,3 @@
-open ReactIntl;
-
 type mode =
   | HyperlinkBlue
   | Gray
