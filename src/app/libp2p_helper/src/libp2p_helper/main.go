@@ -57,7 +57,6 @@ type app struct {
 	OutLock         sync.Mutex
 	Out             *bufio.Writer
 	UnsafeNoTrustIP bool
-	Extra           *os.File
 }
 
 var seqs = make(chan int)
@@ -106,7 +105,6 @@ func (app *app) writeMsg(msg interface{}) {
 	app.OutLock.Lock()
 	defer app.OutLock.Unlock()
 	bytes, err := json.Marshal(msg)
-	app.Extra.Write(bytes)
 	if err == nil {
 		n, err := app.Out.Write(bytes)
 		if err != nil {
@@ -989,12 +987,7 @@ type successResult struct {
 
 func main() {
 	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
-	os.Mkdir("/tmp/artifacts", os.ModePerm)
-	logfile, err := os.Create("/tmp/artifacts/helper.log")
-	if err != nil {
-		panic(err)
-	}
-	log.SetOutput(logfile)
+	log.SetOutput(os.Stderr)
 	logging.SetAllLoggers(logging2.INFO)
 	helperLog := logging.Logger("helper top-level JSON handling")
 
@@ -1019,7 +1012,6 @@ func main() {
 		ValidatorMutex: &sync.Mutex{},
 		Validators:     make(map[int]*validationStatus),
 		Streams:        make(map[int]net.Stream),
-		Extra:          logfile,
 		// OutLock doesn't need to be initialized
 		Out: out,
 	}
