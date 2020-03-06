@@ -99,7 +99,7 @@ let make = () => {
            | Data(data) =>
              <>
                <Button
-                 label="request"
+                 label="Request"
                  style=Button.Gray
                  onClick={_ => setModalState(_ => true)}
                />
