@@ -9,7 +9,7 @@ module Styles = {
       flexDirection(`column),
       justifyContent(`flexStart),
       width(`percent(100.0)),
-      maxWidth(`rem(22.0)),
+      maxWidth(`rem(22.5)),
       marginLeft(`rem(5.)),
       paddingTop(`rem(6.)),
     ]);

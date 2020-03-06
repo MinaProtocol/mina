@@ -2,12 +2,15 @@
 
 module Styles = {
   open Css;
+  let loader = style([display(`flex), justifyContent(`center)]);
+
   let elapsedTime =
     style([
       display(`flex),
       flexDirection(`column),
+      alignItems(`center),
       justifyContent(`center),
-      alignContent(`center),
+      width(`rem(12.)),
     ]);
   let downloaderText =
     merge([
@@ -54,12 +57,14 @@ let make = (~prevStep, ~createAccount) => {
         </div>
       </>
     miscRight={
-      <div className=Styles.elapsedTime>
-        <LoaderRing />
-        <Spacer height=1.25 />
-        <p className=Styles.smallText>
-          {React.string("Connecting to the network...")}
-        </p>
+      <div className=Styles.loader>
+        <div className=Styles.elapsedTime>
+          <LoaderRing />
+          <Spacer height=1.25 />
+          <p className=Styles.smallText>
+            {React.string("Connecting to the network...")}
+          </p>
+        </div>
       </div>
     }
   />;

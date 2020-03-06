@@ -7,7 +7,7 @@ let make = (~prevStep, ~closeOnboarding) => {
     description={
       <p>
         {React.string(
-           "Once you receive funds from the faucet, head into Settings to delegate or stake your new funds.",
+           "Enable staking in your account settings once your account has tokens.",
          )}
       </p>
     }
