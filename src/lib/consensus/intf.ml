@@ -412,6 +412,10 @@ module type S = sig
 
         type t = Stable.Latest.t
         [@@deriving hash, eq, compare, sexp, to_yojson]
+
+        module For_tests : sig
+          val with_curr_global_slot : t -> Global_slot.t -> t
+        end
       end
 
       type display [@@deriving yojson]

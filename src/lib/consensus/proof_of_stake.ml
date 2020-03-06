@@ -1746,6 +1746,11 @@ module Data = struct
       type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
 
       let to_yojson = Stable.Latest.to_yojson
+
+      module For_tests = struct
+        let with_curr_global_slot (state : t) curr_global_slot =
+          {state with curr_global_slot}
+      end
     end
 
     open Snark_params.Tick

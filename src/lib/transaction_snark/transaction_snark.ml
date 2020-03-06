@@ -1794,13 +1794,48 @@ let%test_module "transaction_snark" =
 
     let account_fee = Fee.to_int Coda_compile_config.account_creation_fee
 
-    let test_transaction ledger txn =
+    let test_transaction ?txn_global_slot ledger txn =
       let source = Ledger.merkle_root ledger in
       let pending_coinbase_stack = Pending_coinbase.Stack.empty in
+      let state_body, state_body_hash, txn_global_slot =
+        match txn_global_slot with
+        | None ->
+            let state_body = Lazy.force state_body in
+            let txn_global_slot =
+              state_body |> Coda_state.Protocol_state.Body.consensus_state
+              |> Consensus.Data.Consensus_state.curr_slot
+            in
+            (state_body, Lazy.force state_body_hash, txn_global_slot)
+        | Some txn_global_slot ->
+            let state_body =
+              let state_body = Lazy.force state_body in
+              let state =
+                (* NB: The [previous_state_hash] is a dummy, do not use. *)
+                Coda_state.Protocol_state.create
+                  ~previous_state_hash:Tick0.Field.zero ~body:state_body
+              in
+              let consensus_state_at_slot =
+                Consensus.Data.Consensus_state.Value.For_tests
+                .with_curr_global_slot
+                  (Coda_state.Protocol_state.consensus_state state)
+                  txn_global_slot
+              in
+              Coda_state.Protocol_state.(
+                create_value
+                  ~previous_state_hash:(previous_state_hash state)
+                  ~genesis_state_hash:(genesis_state_hash state)
+                  ~blockchain_state:(blockchain_state state)
+                  ~consensus_state:consensus_state_at_slot)
+                .body
+            in
+            let state_body_hash =
+              Coda_state.Protocol_state.Body.hash state_body
+            in
+            (state_body, state_body_hash, txn_global_slot)
+      in
       let mentioned_keys, pending_coinbase_stack_target =
         let pending_coinbase_stack =
-          Pending_coinbase.Stack.push_state
-            (Lazy.force state_body_hash)
+          Pending_coinbase.Stack.push_state state_body_hash
             pending_coinbase_stack
         in
         match txn with
@@ -1823,10 +1858,6 @@ let%test_module "transaction_snark" =
       let sparse_ledger =
         Sparse_ledger.of_ledger_subset_exn ledger mentioned_keys
       in
-      let txn_global_slot =
-        Lazy.force state_body |> Coda_state.Protocol_state.Body.consensus_state
-        |> Consensus.Data.Consensus_state.curr_slot
-      in
       let _undo =
         Or_error.ok_exn @@ Ledger.apply_transaction ledger ~txn_global_slot txn
       in
@@ -1836,7 +1867,7 @@ let%test_module "transaction_snark" =
         ~pending_coinbase_stack_state:
           { Pending_coinbase_stack_state.source= pending_coinbase_stack
           ; target= pending_coinbase_stack_target }
-        {transaction= txn; block_data= Lazy.force state_body}
+        {transaction= txn; block_data= state_body}
         (unstage @@ Sparse_ledger.handler sparse_ledger)
 
     let%test_unit "account creation fee - user commands" =
@@ -2160,6 +2191,65 @@ let%test_module "transaction_snark" =
                    (merge_top_hash ~sok_digest ~state1 ~state2:state3
                       ~supply_increase:Amount.zero ~fee_excess:total_fees
                       ~pending_coinbase_stack_state wrap_vk_state)) ) )
+
+    let%test_unit "timed account - transactions" =
+      Test_util.with_randomness 123456789 (fun () ->
+          let wallets = random_wallets ~n:3 () |> Array.to_list in
+          let sender = List.hd_exn wallets in
+          let receivers = List.tl_exn wallets in
+          let txns_per_receiver = 2 in
+          let amount = 8 in
+          let txn_fee = 2 in
+          let memo =
+            User_command_memo.create_by_digesting_string_exn
+              (Test_util.arbitrary_string
+                 ~len:User_command_memo.max_digestible_string_length)
+          in
+          let pk = sender.account.public_key in
+          let balance = Balance.of_int 100_000 in
+          let initial_minimum_balance = Balance.of_int 80_000 in
+          let cliff_time = Global_slot.of_int 1000 in
+          let vesting_period = Global_slot.of_int 10 in
+          let vesting_increment = Amount.of_int 1 in
+          let txn_global_slot = Global_slot.of_int 1002 in
+          let sender =
+            { sender with
+              account=
+                Or_error.ok_exn
+                @@ Account.create_timed pk balance ~initial_minimum_balance
+                     ~cliff_time ~vesting_period ~vesting_increment }
+          in
+          Ledger.with_ledger ~f:(fun ledger ->
+              let _, ucs =
+                let receivers =
+                  List.fold ~init:receivers
+                    (List.init (txns_per_receiver - 1) ~f:Fn.id)
+                    ~f:(fun acc _ -> receivers @ acc)
+                in
+                List.fold receivers ~init:(Account.Nonce.zero, [])
+                  ~f:(fun (nonce, txns) receiver ->
+                    let uc =
+                      user_command sender receiver amount (Fee.of_int txn_fee)
+                        nonce memo
+                    in
+                    (Account.Nonce.succ nonce, txns @ [uc]) )
+              in
+              Ledger.create_new_account_exn ledger sender.account.public_key
+                sender.account ;
+              let () =
+                List.iter ucs ~f:(fun uc ->
+                    test_transaction ~txn_global_slot ledger
+                      (Transaction.User_command uc) )
+              in
+              List.iter receivers ~f:(fun receiver ->
+                  check_balance receiver.account.public_key
+                    ((amount * txns_per_receiver) - account_fee)
+                    ledger ) ;
+              check_balance sender.account.public_key
+                ( Balance.to_int sender.account.balance
+                - (amount + txn_fee) * txns_per_receiver
+                  * List.length receivers )
+                ledger ) )
   end )
 
 let%test_module "account timing check" =
