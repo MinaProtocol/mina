@@ -15,43 +15,39 @@ module Rpcs : sig
     type query = State_hash.Stable.V1.t
 
     type response =
-      ( Staged_ledger.Scan_state.Stable.V1.t
-      * Ledger_hash.Stable.V1.t
-      * Pending_coinbase.Stable.V1.t )
-      option
+      (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t) option
   end
 
   module Answer_sync_ledger_query : sig
-    type query = Ledger_hash.Stable.V1.t * Sync_ledger.Query.Stable.V1.t
+    type query = Ledger_hash.t * Sync_ledger.Query.t
 
-    type response = Sync_ledger.Answer.Stable.V1.t Core.Or_error.Stable.V1.t
+    type response = Sync_ledger.Answer.t Core.Or_error.t
   end
 
   module Get_transition_chain : sig
     type query = State_hash.Stable.V1.t list
 
-    type response = External_transition.Stable.V1.t list option
+    type response = External_transition.t list option
   end
 
   module Get_transition_chain_proof : sig
-    type query = State_hash.Stable.V1.t
+    type query = State_hash.t
 
-    type response =
-      (State_hash.Stable.V1.t * State_body_hash.Stable.V1.t list) option
+    type response = (State_hash.t * State_body_hash.t list) option
   end
 
   module Get_ancestry : sig
     type query = Consensus.Data.Consensus_state.Value.t
 
     type response =
-      ( External_transition.Stable.V1.t
+      ( External_transition.t
       , State_body_hash.t list * External_transition.t )
-      Proof_carrying_data.Stable.V1.t
+      Proof_carrying_data.t
       option
   end
 
   module Ban_notify : sig
-    type query = Core.Time.Stable.V1.t
+    type query = Core.Time.t
 
     type response = unit
   end
@@ -60,10 +56,44 @@ module Rpcs : sig
     type query = unit [@@deriving sexp, to_yojson]
 
     type response =
-      ( External_transition.Stable.V1.t
-      , State_body_hash.Stable.V1.t list * External_transition.Stable.V1.t )
-      Proof_carrying_data.Stable.V1.t
+      ( External_transition.t
+      , State_body_hash.t list * External_transition.t )
+      Proof_carrying_data.t
       option
+  end
+
+  module Get_telemetry_data : sig
+    module Telemetry_data : sig
+      [%%versioned:
+      module Stable : sig
+        module V1 : sig
+          type t =
+            { node: Core.Unix.Inet_addr.Stable.V1.t
+            ; peers: Network_peer.Peer.Stable.V1.t list
+            ; block_producers:
+                Signature_lib.Public_key.Compressed.Stable.V1.t list
+            ; protocol_state_hash: State_hash.Stable.V1.t
+            ; ban_statuses:
+                ( Core.Unix.Inet_addr.Stable.V1.t
+                * Trust_system.Peer_status.Stable.V1.t )
+                list
+            ; k_block_hashes: State_hash.Stable.V1.t list }
+        end
+      end]
+
+      type t = Stable.Latest.t =
+        { node: Unix.Inet_addr.t
+        ; peers: Network_peer.Peer.t list
+        ; block_producers: Signature_lib.Public_key.Compressed.t list
+        ; protocol_state_hash: State_hash.t
+        ; ban_statuses:
+            (Core.Unix.Inet_addr.t * Trust_system.Peer_status.t) list
+        ; k_block_hashes: State_hash.t list }
+    end
+
+    type query = unit [@@deriving sexp, to_yojson]
+
+    type response = Telemetry_data.t Or_error.t [@@deriving to_yojson]
   end
 
   type ('query, 'response) rpc =
@@ -84,6 +114,8 @@ module Rpcs : sig
     | Get_ancestry : (Get_ancestry.query, Get_ancestry.response) rpc
     | Ban_notify : (Ban_notify.query, Ban_notify.response) rpc
     | Get_best_tip : (Get_best_tip.query, Get_best_tip.response) rpc
+    | Get_telemetry_data
+        : (Get_telemetry_data.query, Get_telemetry_data.response) rpc
     | Consensus_rpc : ('q, 'r) Consensus.Hooks.Rpcs.rpc -> ('q, 'r) rpc
 
   include Rpc_intf.Rpc_interface_intf with type ('q, 'r) rpc := ('q, 'r) rpc
@@ -214,32 +246,30 @@ val ban_notification_reader :
 
 val create :
      Config.t
-  -> get_staged_ledger_aux_and_pending_coinbases_at_hash:(   State_hash.t
+  -> get_staged_ledger_aux_and_pending_coinbases_at_hash:(   Rpcs
+                                                             .Get_staged_ledger_aux_and_pending_coinbases_at_hash
+                                                             .query
                                                              Envelope.Incoming
                                                              .t
-                                                          -> ( Staged_ledger
-                                                               .Scan_state
-                                                               .t
-                                                             * Ledger_hash.t
-                                                             * Pending_coinbase
-                                                               .t )
-                                                             Deferred.Option.t)
-  -> answer_sync_ledger_query:(   (Ledger_hash.t * Sync_ledger.Query.t)
+                                                          -> Rpcs
+                                                             .Get_staged_ledger_aux_and_pending_coinbases_at_hash
+                                                             .response
+                                                             Deferred.t)
+  -> answer_sync_ledger_query:(   Rpcs.Answer_sync_ledger_query.query
                                   Envelope.Incoming.t
-                               -> Sync_ledger.Answer.t Deferred.Or_error.t)
-  -> get_ancestry:(   Consensus.Data.Consensus_state.Value.t Envelope.Incoming.t
-                   -> ( External_transition.t
-                      , State_body_hash.t list * External_transition.t )
-                      Proof_carrying_data.t
-                      Deferred.Option.t)
-  -> get_best_tip:(   unit Envelope.Incoming.t
-                   -> ( External_transition.t
-                      , State_body_hash.t list * External_transition.t )
-                      Proof_carrying_data.t
-                      Deferred.Option.t)
-  -> get_transition_chain_proof:(   State_hash.t Envelope.Incoming.t
-                                 -> (State_hash.t * State_body_hash.t list)
-                                    Deferred.Option.t)
-  -> get_transition_chain:(   State_hash.t list Envelope.Incoming.t
-                           -> External_transition.t list Deferred.Option.t)
+                               -> Rpcs.Answer_sync_ledger_query.response
+                                  Deferred.t)
+  -> get_ancestry:(   Rpcs.Get_ancestry.query Envelope.Incoming.t
+                   -> Rpcs.Get_ancestry.response Deferred.t)
+  -> get_best_tip:(   Rpcs.Get_best_tip.query Envelope.Incoming.t
+                   -> Rpcs.Get_best_tip.response Deferred.t)
+  -> get_telemetry_data:(   Rpcs.Get_telemetry_data.query Envelope.Incoming.t
+                         -> Rpcs.Get_telemetry_data.response Deferred.t)
+  -> get_transition_chain_proof:(   Rpcs.Get_transition_chain_proof.query
+                                    Envelope.Incoming.t
+                                 -> Rpcs.Get_transition_chain_proof.response
+                                    Deferred.t)
+  -> get_transition_chain:(   Rpcs.Get_transition_chain.query
+                              Envelope.Incoming.t
+                           -> Rpcs.Get_transition_chain.response Deferred.t)
   -> t Deferred.t

@@ -77,6 +77,8 @@ module Decoders = struct
     Yojson.Basic.Util.to_string json
     |> Public_key.Compressed.of_base58_check_exn
 
+  let public_key_array = Array.map ~f:public_key
+
   let optional_public_key = Option.map ~f:public_key
 
   let uint64 json =
