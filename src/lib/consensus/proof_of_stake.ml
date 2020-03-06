@@ -3058,9 +3058,7 @@ module Hooks = struct
       !local_state.last_epoch_delegatee_table
       <- Some !local_state.staking_epoch_snapshot.delegatee_table ;
       Coda_base.Ledger.Db.close !local_state.staking_epoch_snapshot.ledger ;
-      File_system.rmrf
-        ( !local_state.epoch_ledger_location
-        ^ Uuid.to_string !local_state.epoch_ledger_uuids.staking ) ;
+      File_system.rmrf @@ Local_state.staking_epoch_ledger_location local_state ;
       !local_state.staking_epoch_snapshot <- !local_state.next_epoch_snapshot ;
       let epoch_ledger_uuids =
         Local_state.Data.
@@ -3068,6 +3066,9 @@ module Hooks = struct
           ; next= Uuid_unix.create () }
       in
       !local_state.epoch_ledger_uuids <- epoch_ledger_uuids ;
+      Yojson.Basic.to_file
+        (!local_state.epoch_ledger_location ^ ".json")
+        (Local_state.epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
       !local_state.next_epoch_snapshot
       <- { ledger=
              Coda_base.Ledger.Db.create_checkpoint snarked_ledger
