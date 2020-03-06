@@ -60,27 +60,27 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   in
   Option.is_some remainder
 
-let schedule_user_command t (txn : User_command.t) account_opt :
-    'a Or_error.t Deferred.t =
+let schedule_user_command t (txn : User_command.t) : 'a Or_error.t Deferred.t =
   (* FIXME #3457: return a status from Transaction_pool.add and use it instead
   *)
-  if not (is_valid_user_command t txn account_opt) then
+  (*if not (is_valid_user_command t txn account_opt) then
     return
       (Or_error.error_string "Invalid user command: account balance is too low")
   else
-    let logger =
-      Logger.extend
-        (Coda_lib.top_level_logger t)
-        [("coda_command", `String "scheduling a user command")]
-    in
-    let result_ivar = Ivar.create () in
-    Coda_lib.add_transactions t ([txn], result_ivar) ;
-    let%map res = Ivar.read result_ivar in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("user_command", User_command.to_yojson txn)]
-      "Submitted transaction $user_command to transaction pool" ;
-    txn_count := !txn_count + 1 ;
-    Or_error.return res
+    *)
+  let logger =
+    Logger.extend
+      (Coda_lib.top_level_logger t)
+      [("coda_command", `String "scheduling a user command")]
+  in
+  let result_ivar = Ivar.create () in
+  Coda_lib.add_transactions t ([txn], result_ivar) ;
+  let%map res = Ivar.read result_ivar in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    ~metadata:[("user_command", User_command.to_yojson txn)]
+    "Submitted transaction $user_command to transaction pool" ;
+  txn_count := !txn_count + 1 ;
+  res
 
 let get_account t (addr : Public_key.Compressed.t) =
   let open Participating_state.Let_syntax in
@@ -146,7 +146,7 @@ let send_user_command t (txn : User_command.t) =
   let open Participating_state.Let_syntax in
   let%map account_opt = get_account t public_key in
   let open Deferred.Let_syntax in
-  match%map schedule_user_command t txn account_opt with
+  match%map schedule_user_command t txn with
   | Ok ([], [failed_txn]) ->
       Error
         (Error.of_string
@@ -232,7 +232,7 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
 let schedule_user_commands t (txns : User_command.t list) :
-    'a Deferred.t Participating_state.t =
+    'a Deferred.Or_error.t Participating_state.t =
   Participating_state.return
   @@
   let logger =

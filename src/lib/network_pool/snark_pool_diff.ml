@@ -74,6 +74,8 @@ module Make
           (Yojson.Safe.to_string @@ Work.compact_json work)
           (Yojson.Safe.to_string @@ Coda_base.Fee_with_prover.to_yojson fee)
 
+  let is_empty _ = false
+
   let of_result
       (res :
         ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
@@ -102,7 +104,7 @@ module Make
               ~location:__LOC__
               "Rejecting locally generated snark work $work, %s" reason
               ~metadata:[("work", Work.compact_json work)] ;
-            Deferred.return (Error (`Locally_generated diff)) )
+            Deferred.return (Error (`Locally_generated (diff, ()))) )
           else Deferred.return (Error (`Other (Error.of_string reason)))
         in
         let check_and_add () =

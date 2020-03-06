@@ -46,7 +46,8 @@ module type S = sig
                       * (bool -> unit) )
                       Strict_pipe.Reader.t
     -> local_diffs:( Resource_pool.Diff.t
-                   * (   Resource_pool.Diff.t * Resource_pool.Diff.rejected
+                   * (   (Resource_pool.Diff.t * Resource_pool.Diff.rejected)
+                         Or_error.t
                       -> unit) )
                    Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier option

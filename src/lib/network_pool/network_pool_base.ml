@@ -26,23 +26,29 @@ end)
   let broadcasts {read_broadcasts; _} = read_broadcasts
 
   let apply_and_broadcast t (pool_diff, valid_cb, result_cb) =
-    let rebroadcast diff' =
+    let rebroadcast (diff', rejected) =
       valid_cb true ;
-      Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-        "Broadcasting %s"
-        (Resource_pool.Diff.summary diff') ;
-      Linear_pipe.write t.write_broadcasts diff'
+      result_cb (Ok (diff', rejected)) ;
+      if Resource_pool.Diff.is_empty diff' then (
+        Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Refusing to rebroadcast. Pool diff apply feedback: empty diff" ;
+        Deferred.unit )
+      else (
+        Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
+          "Broadcasting %s"
+          (Resource_pool.Diff.summary diff') ;
+        Linear_pipe.write t.write_broadcasts diff' )
     in
     match%bind Resource_pool.Diff.unsafe_apply t.resource_pool pool_diff with
-    | Ok (diff', rejected) ->
-        result_cb (diff', rejected) ;
-        rebroadcast diff'
-    | Error (`Locally_generated diff') ->
-        rebroadcast diff'
+    | Ok res ->
+        rebroadcast res
+    | Error (`Locally_generated res) ->
+        rebroadcast res
     | Error (`Other e) ->
         valid_cb false ;
+        result_cb (Error e) ;
         Logger.debug t.logger ~module_:__MODULE__ ~location:__LOC__
-          "Refusing to rebroadcast: pool diff apply feedback: %s"
+          "Refusing to rebroadcast. Pool diff apply feedback: %s"
           (Error.to_string_hum e) ;
         Deferred.unit
 

@@ -56,8 +56,12 @@ module type Resource_pool_diff_intf = sig
   val unsafe_apply :
        pool
     -> t Envelope.Incoming.t
-    -> (t * rejected, [`Locally_generated of t | `Other of Error.t]) Result.t
+    -> ( t * rejected
+       , [`Locally_generated of t * rejected | `Other of Error.t] )
+       Result.t
        Deferred.t
+
+  val is_empty : t -> bool
 end
 
 (** A [Resource_pool_intf] ties together an associated pair of
@@ -107,7 +111,8 @@ module type Network_pool_base_intf = sig
     -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
-                   * (resource_pool_diff * rejected_diff -> unit) )
+                   * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+                   )
                    Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
@@ -120,7 +125,8 @@ module type Network_pool_base_intf = sig
     -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
     -> local_diffs:( resource_pool_diff
-                   * (resource_pool_diff * rejected_diff -> unit) )
+                   * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+                   )
                    Strict_pipe.Reader.t
     -> tf_diffs:transition_frontier_diff Strict_pipe.Reader.t
     -> t
@@ -133,7 +139,7 @@ module type Network_pool_base_intf = sig
        t
     -> resource_pool_diff Envelope.Incoming.t
        * (bool -> unit)
-       * (resource_pool_diff * rejected_diff -> unit)
+       * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
     -> unit Deferred.t
 end
 

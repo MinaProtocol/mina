@@ -62,6 +62,7 @@ val add_transactions :
   -> User_command.t list
      * ( Network_pool.Transaction_pool.Resource_pool.Diff.t
        * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+       Or_error.t
        Ivar.t
   -> unit
 

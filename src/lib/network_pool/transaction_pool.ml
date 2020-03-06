@@ -554,6 +554,8 @@ struct
       let summary t =
         Printf.sprintf "Transaction diff of length %d" (List.length t)
 
+      let is_empty = List.is_empty
+
       let apply t env =
         let txs = Envelope.Incoming.data env in
         let sender = Envelope.Incoming.sender env in
@@ -572,10 +574,8 @@ struct
               match txs' with
               | [] ->
                   t.pool <- pool ;
-                  if not (List.is_empty accepted) then
-                    Deferred.Or_error.return
-                    @@ (List.rev accepted, List.rev rejected)
-                  else Deferred.Or_error.error_string "no useful transactions"
+                  Deferred.Or_error.return
+                  @@ (List.rev accepted, List.rev rejected)
               | tx :: txs'' -> (
                 match User_command.check tx with
                 | None ->

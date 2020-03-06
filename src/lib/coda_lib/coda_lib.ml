@@ -56,16 +56,18 @@ type pipes =
       Pipe.Writer.t
   ; local_txns_writer:
       ( Network_pool.Transaction_pool.Resource_pool.Diff.t
-        * (   Network_pool.Transaction_pool.Resource_pool.Diff.t
-              * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t
+        * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+              * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+              Or_error.t
            -> unit)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
   ; local_snark_work_writer:
       ( Network_pool.Snark_pool.Resource_pool.Diff.t
-        * (   Network_pool.Snark_pool.Resource_pool.Diff.t
-              * Network_pool.Snark_pool.Resource_pool.Diff.rejected
+        * (   ( Network_pool.Snark_pool.Resource_pool.Diff.t
+              * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
+              Or_error.t
            -> unit)
       , Strict_pipe.synchronous
       , unit Deferred.t )
