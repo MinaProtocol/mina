@@ -56,7 +56,7 @@ module HelpSection = {
         width=4.
         height=1.5
         padding=0.4625
-        style=HelpButton.OffWhite
+        style=Button.OffWhite
         onClick={_ => openExternal("https://codaprotocol.com/docs/")}
       />
       <Spacer width=0.37 />
@@ -66,7 +66,7 @@ module HelpSection = {
         width=5.5
         height=1.5
         padding=0.4625
-        style=HelpButton.OffWhite
+        style=Button.OffWhite
         onClick={_ => openExternal("https://discordapp.com/invite/Vexf4ED")}
       />
     </div>;
