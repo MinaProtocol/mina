@@ -1,8 +1,20 @@
 module Styles = {
   open Css;
+  let installer = style([display(`flex), justifyContent(`center)]);
   let downloader =
-    style([display(`flex), flexDirection(`column), alignItems(`center)]);
+    style([
+      display(`flex),
+      flexDirection(`column),
+      alignItems(`center),
+      justifyContent(`center),
+      width(`rem(12.)),
+    ]);
   let downloaderText =
+    merge([
+      Theme.Text.Header.h3,
+      style([color(white), whiteSpace(`nowrap)]),
+    ]);
+  let installingText =
     merge([
       Theme.Text.Header.h3,
       style([color(white), whiteSpace(`nowrap)]),
@@ -23,29 +35,33 @@ module Styles = {
 module InstallProgress = {
   [@react.component]
   let make = (~setFinished, ~finished) =>
-    <div className=Styles.downloader>
-      <Downloader
-        keyName="keys-temporary_hack-testnet_postake.tar.bz2"
-        onFinish={_ => setFinished(_ => true)}
-        finished
-      />
-      {finished
-         ? <p className=Styles.downloaderText>
-             {React.string("Installation Complete!")}
-           </p>
-         : <>
-             <p className=Styles.downloaderText>
-               {React.string("Installing Coda")}
+    <div className=Styles.installer>
+      <div className=Styles.downloader>
+        <Downloader
+          keyName="keys-temporary_hack-testnet_postake.tar.bz2"
+          onFinish={_ => setFinished(_ => true)}
+          finished
+        />
+        {finished
+           ? <p className=Styles.downloaderText>
+               {React.string("Installation Complete!")}
              </p>
-             <a
-               onClick={_ =>
-                 openExternal("https://codaprotocol.com/docs/troubleshooting")
-               }
-               target="_blank"
-               className=Styles.downloaderSubtext>
-               {React.string({j|Having problems installing Coda?|j})}
-             </a>
-           </>}
+           : <>
+               <p className=Styles.installingText>
+                 {React.string("Installing Coda")}
+               </p>
+               <a
+                 onClick={_ =>
+                   openExternal(
+                     "https://codaprotocol.com/docs/troubleshooting",
+                   )
+                 }
+                 target="_blank"
+                 className=Styles.downloaderSubtext>
+                 {React.string({j|Having problems installing Coda?|j})}
+               </a>
+             </>}
+      </div>
     </div>;
 };
 

@@ -40,7 +40,7 @@ let make = (~keyName, ~onFinish, ~finished) => {
     ? <svg width="120" height="120">
         <circle
           stroke="#3CFF64"
-          strokeWidth="4"
+          strokeWidth="7"
           fill="transparent"
           r={Js.Float.toString(radius)}
           cx="60"
@@ -80,7 +80,7 @@ let make = (~keyName, ~onFinish, ~finished) => {
         />
         <text
           x="50%"
-          y="55%"
+          y="60%"
           textAnchor="middle"
           className=Styles.progressText
           fill="white">
