@@ -61,7 +61,7 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   Option.is_some remainder
 
 let schedule_user_command t (txn : User_command.t) account_opt :
-    unit Or_error.t Deferred.t =
+    'a Or_error.t Deferred.t =
   (* FIXME #3457: return a status from Transaction_pool.add and use it instead
   *)
   if not (is_valid_user_command t txn account_opt) then
@@ -75,12 +75,12 @@ let schedule_user_command t (txn : User_command.t) account_opt :
     in
     let result_ivar = Ivar.create () in
     Coda_lib.add_transactions t ([txn], result_ivar) ;
-    Ivar.read result_ivar |> ignore ;
+    let%map res = Ivar.read result_ivar in
     Logger.info logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("user_command", User_command.to_yojson txn)]
       "Submitted transaction $user_command to transaction pool" ;
     txn_count := !txn_count + 1 ;
-    Deferred.return (Or_error.return ())
+    Or_error.return res
 
 let get_account t (addr : Public_key.Compressed.t) =
   let open Participating_state.Let_syntax in
@@ -145,9 +145,21 @@ let send_user_command t (txn : User_command.t) =
   let public_key = Public_key.compress txn.sender in
   let open Participating_state.Let_syntax in
   let%map account_opt = get_account t public_key in
-  let open Deferred.Or_error.Let_syntax in
-  let%map () = schedule_user_command t txn account_opt in
-  record_payment t txn (Option.value_exn account_opt)
+  let open Deferred.Let_syntax in
+  match%map schedule_user_command t txn account_opt with
+  | Ok ([], [failed_txn]) ->
+      Error
+        (Error.of_string
+           (sprintf !"%s"
+              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                .to_yojson (snd failed_txn)
+              |> Yojson.Safe.to_string )))
+  | Ok ([_t], []) ->
+      Ok (record_payment t txn (Option.value_exn account_opt))
+  | Ok _ ->
+      Error (Error.of_string "Invalid result from scheduling a payment")
+  | Error e ->
+      Error e
 
 let get_balance t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
@@ -220,7 +232,7 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
 let schedule_user_commands t (txns : User_command.t list) :
-    unit Deferred.t Participating_state.t =
+    'a Deferred.t Participating_state.t =
   Participating_state.return
   @@
   let logger =
@@ -232,7 +244,7 @@ let schedule_user_commands t (txns : User_command.t list) :
     "batch-send-payments does not yet report errors" ;
   let result_ivar = Ivar.create () in
   Coda_lib.add_transactions t (txns, result_ivar) ;
-  Ivar.read result_ivar |> ignore
+  Ivar.read result_ivar
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in

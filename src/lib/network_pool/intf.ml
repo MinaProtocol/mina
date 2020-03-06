@@ -222,8 +222,58 @@ module type Transaction_pool_diff_intf = sig
 
   type t = Stable.Latest.t [@@deriving sexp]
 
+  module Diff_error : sig
+    module Stable : sig
+      module V1 : sig
+        type t =
+          | Insufficient_replace_fee
+          | Invalid_signature
+          | Duplicate
+          | Sender_account_does_not_exist
+          | Insufficient_amount_for_account_creation
+          | Delegate_not_found
+          | Invalid_nonce
+          | Insufficient_funds
+          | Insufficient_fee
+          | Overflow
+        [@@deriving sexp, yojson, bin_io]
+      end
+
+      module Latest = V1
+    end
+
+    type t = Stable.Latest.t =
+      | Insufficient_replace_fee
+      | Invalid_signature
+      | Duplicate
+      | Sender_account_does_not_exist
+      | Insufficient_amount_for_account_creation
+      | Delegate_not_found
+      | Invalid_nonce
+      | Insufficient_funds
+      | Insufficient_fee
+      | Overflow
+    [@@deriving sexp, yojson]
+  end
+
+  module Rejected : sig
+    module Stable : sig
+      module V1 : sig
+        type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
+        [@@deriving sexp, bin_io, yojson, version]
+      end
+
+      module Latest = V1
+    end
+
+    type t = Stable.Latest.t [@@deriving sexp, yojson]
+  end
+
   include
-    Resource_pool_diff_intf with type t := t and type pool := resource_pool
+    Resource_pool_diff_intf
+    with type t := t
+     and type pool := resource_pool
+     and type rejected = Rejected.t
 end
 
 module type Transaction_resource_pool_intf = sig

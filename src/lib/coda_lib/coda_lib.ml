@@ -57,7 +57,7 @@ type pipes =
   ; local_txns_writer:
       ( Network_pool.Transaction_pool.Resource_pool.Diff.t
         * (   Network_pool.Transaction_pool.Resource_pool.Diff.t
-              * Network_pool.Transaction_pool.Resource_pool.Diff.rejected
+              * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t
            -> unit)
       , Strict_pipe.synchronous
       , unit Deferred.t )

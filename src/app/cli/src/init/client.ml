@@ -50,7 +50,7 @@ let stop_daemon =
               ~f_ok:(fun _ -> "Daemon stopping\n")
               ~error:"Daemon likely stopped") ))
 
-let get_balance =
+(*let get_balance =
   let open Command.Param in
   let open Deferred.Let_syntax in
   let address_flag =
@@ -74,7 +74,7 @@ let get_balance =
          in
          printf "%s"
            (or_error_str res ~f_ok:balance_str ~error:"Failed to get balance")
-     ))
+     ))*)
 
 let get_balance_graphql =
   let open Command.Param in
@@ -482,7 +482,7 @@ let batch_send_payments =
        (Args.zip2 Cli_lib.Flag.privkey_read_path payment_path_flag)
        ~f:main)
 
-let user_command (body_args : User_command_payload.Body.t Command.Param.t)
+(*let user_command (body_args : User_command_payload.Body.t Command.Param.t)
     ~label ~summary ~error =
   let flag =
     let open Cli_lib.Flag in
@@ -547,7 +547,7 @@ let send_payment =
     User_command_payload.Body.Payment {receiver; amount}
   in
   user_command body ~label:"payment" ~summary:"Send payment to an address"
-    ~error:"Failed to send payment"
+    ~error:"Failed to send payment"*)
 
 let send_payment_graphql =
   let open Command.Param in
@@ -610,7 +610,7 @@ let delegate_stake_graphql =
          printf "Dispatched stake delegation with ID %s\n"
            ((response#sendDelegation)#delegation)#id ))
 
-let cancel_transaction =
+(*let cancel_transaction =
   let txn_id_flag =
     Command.Param.(
       flag "id" ~doc:"ID Transaction ID to be cancelled" (required string))
@@ -695,7 +695,7 @@ let cancel_transaction =
                ~join_error:Or_error.join
          | Error _e ->
              eprintf "Could not deserialize user command\n" ;
-             exit 16 ))
+             exit 16 ))*)
 
 let cancel_transaction_graphql =
   let txn_id_flag =
@@ -791,7 +791,7 @@ let get_transaction_status =
              eprintf "Could not deserialize user command" ;
              exit 16 ))
 
-let delegate_stake =
+(*let delegate_stake =
   let body =
     let open Command.Let_syntax in
     let open Cli_lib.Arg_type in
@@ -806,7 +806,7 @@ let delegate_stake =
   in
   user_command body ~label:"delegate"
     ~summary:"Change the address to which you're delegating your coda"
-    ~error:"Failed to change delegate"
+    ~error:"Failed to change delegate"*)
 
 let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
@@ -1015,7 +1015,7 @@ let stop_tracing =
          | Error e ->
              Daemon_rpcs.Client.print_rpc_error e ))
 
-let set_staking =
+(*let set_staking =
   let privkey_path = Cli_lib.Flag.privkey_read_path in
   Command.async ~summary:"Set new keys for block production"
     (Cli_lib.Background_daemon.rpc_init privkey_path
@@ -1033,7 +1033,7 @@ let set_staking =
              printf
                !"New block producer public key : %s\n"
                (Public_key.Compressed.to_base58_check
-                  (Public_key.compress public_key)) ))
+                  (Public_key.compress public_key)) ))*)
 
 let set_staking_graphql =
   let open Command.Param in
@@ -1490,22 +1490,6 @@ let client =
     ; ("stop-daemon", stop_daemon)
     ; ("status", status) ]
 
-let command =
-  Command.group ~summary:"[Deprecated] Lightweight client commands"
-    ~preserve_subcommand_order:()
-    [ ("get-balance", get_balance)
-    ; ("send-payment", send_payment)
-    ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
-    ; ("delegate-stake", delegate_stake)
-    ; ("cancel-transaction", cancel_transaction)
-    ; ("set-staking", set_staking)
-    ; ("set-snark-worker", set_snark_worker)
-    ; ("set-snark-work-fee", set_snark_work_fee)
-    ; ("generate-receipt", generate_receipt)
-    ; ("verify-receipt", verify_receipt)
-    ; ("stop-daemon", stop_daemon)
-    ; ("status", status) ]
-
 let client_trustlist_group =
   Command.group ~summary:"Client trustlist management"
     ~preserve_subcommand_order:()
@@ -1537,4 +1521,7 @@ let advanced =
     ; ("import", import_key)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("compile-time-constants", compile_time_constants)
-    ; ("visualization", Visualization.command_group) ]
+    ; ("visualization", Visualization.command_group)
+    ; ("generate-receipt", generate_receipt)
+    ; ("verify-receipt", verify_receipt)
+    ; ("generate-keypair", Cli_lib.Commands.generate_keypair) ]
