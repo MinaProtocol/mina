@@ -605,39 +605,44 @@ let create (config : Config.t)
     return result
   in
   let validate_fork_ids ~rpc_name external_transition =
-    let current_fork_id =
-      External_transition.current_fork_id external_transition
+    let External_transition.{valid_current; valid_next; matches_daemon} =
+      External_transition.fork_id_status external_transition
     in
-    let next_fork_id = External_transition.next_fork_id external_transition in
-    let curr_valid = Fork_id.is_valid current_fork_id in
-    let next_valid = Option.for_all next_fork_id ~f:Fork_id.is_valid in
-    if not curr_valid then
+    if not valid_current then
       Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
         "$rpc_name: external transition with invalid current fork ID"
         ~metadata:
           [ ("rpc_name", `String rpc_name)
-          ; ("current_fork_id", `String (Fork_id.to_string current_fork_id)) ] ;
-    if not next_valid then
+          ; ( "current_fork_id"
+            , `String
+                (Fork_id.to_string
+                   (External_transition.current_fork_id external_transition))
+            ) ] ;
+    if not valid_next then
       Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
         "$rpc_name: external transition with invalid next fork ID"
         ~metadata:
           [ ("rpc_name", `String rpc_name)
           ; ( "next_fork_id"
-            , `String (Fork_id.to_string (Option.value_exn next_fork_id)) ) ] ;
-    let daemon_current_fork_id = Fork_id.get_current () in
-    let matching_fork_ids =
-      Fork_id.equal current_fork_id daemon_current_fork_id
-    in
-    if not matching_fork_ids then
+            , `String
+                (Fork_id.to_string
+                   (Option.value_exn
+                      (External_transition.next_fork_id_opt external_transition)))
+            ) ] ;
+    if not matches_daemon then
       Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
         "$rpc_name: current fork ID in external transition does not match \
          daemon current fork ID"
         ~metadata:
           [ ("rpc_name", `String rpc_name)
-          ; ("current_fork_id", `String (Fork_id.to_string current_fork_id))
+          ; ( "current_fork_id"
+            , `String
+                (Fork_id.to_string
+                   (External_transition.current_fork_id external_transition))
+            )
           ; ( "daemon_current_fork_id"
-            , `String (Fork_id.to_string daemon_current_fork_id) ) ] ;
-    curr_valid && next_valid && matching_fork_ids
+            , `String Fork_id.(to_string @@ get_current ()) ) ] ;
+    valid_current && valid_next && matches_daemon
   in
   (* each of the passed-in procedures expects an enveloped input, so
      we wrap the data received via RPC *)
