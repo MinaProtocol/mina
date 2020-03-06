@@ -56,7 +56,7 @@ let make = (~nextStep, ~prevStep) => {
             {(mutation, {result}) =>
                <>
                  <Button
-                   label="Create"
+                   label="Continue"
                    style=Button.HyperlinkBlue3
                    disabled={
                      switch (result) {
