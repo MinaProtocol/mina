@@ -61,13 +61,6 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   Option.is_some remainder
 
 let schedule_user_command t (txn : User_command.t) : 'a Or_error.t Deferred.t =
-  (* FIXME #3457: return a status from Transaction_pool.add and use it instead
-  *)
-  (*if not (is_valid_user_command t txn account_opt) then
-    return
-      (Or_error.error_string "Invalid user command: account balance is too low")
-  else
-    *)
   let logger =
     Logger.extend
       (Coda_lib.top_level_logger t)
