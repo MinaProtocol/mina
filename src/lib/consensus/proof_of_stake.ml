@@ -165,7 +165,6 @@ module Data = struct
       type t =
         { ledger: Coda_base.Ledger.Db.t
         ; merkle_root: Coda_base.Ledger_hash.t
-        ; location: string
         ; delegatee_table:
             Coda_base.Account.t Coda_base.Account.Index.Table.t
             Public_key.Compressed.Table.t }
@@ -174,7 +173,7 @@ module Data = struct
       let delegators t key =
         Public_key.Compressed.Table.find t.delegatee_table key
 
-      let to_yojson {ledger; delegatee_table; merkle_root; location} =
+      let to_yojson {ledger= _; delegatee_table; merkle_root} =
         `Assoc
           [ ("ledger_hash", Coda_base.Ledger_hash.to_yojson merkle_root)
           ; ( "delegators"
@@ -193,6 +192,8 @@ module Data = struct
     end
 
     module Data = struct
+      type epoch_ledger_uuids = {staking: Uuid.t; next: Uuid.t}
+
       (* Invariant: Snapshot's delegators are taken from accounts in block_production_pubkeys *)
       type t =
         { mutable staking_epoch_snapshot: Snapshot.t
@@ -202,8 +203,9 @@ module Data = struct
         ; mutable last_epoch_delegatee_table:
             Coda_base.Account.t Coda_base.Account.Index.Table.t
             Public_key.Compressed.Table.t
-            Option.t }
-      [@@deriving sexp]
+            Option.t
+        ; mutable epoch_ledger_uuids: epoch_ledger_uuids
+        ; epoch_ledger_location: string }
 
       let to_yojson t =
         `Assoc
@@ -222,7 +224,13 @@ module Data = struct
     end
 
     (* The outer ref changes whenever we swap in new staker set; all the snapshots are recomputed *)
-    type t = Data.t ref [@@deriving sexp, to_yojson]
+    type t = Data.t ref [@@deriving to_yojson]
+
+    let staking_epoch_ledger_location (t : t) =
+      !t.epoch_ledger_location ^ Uuid.to_string !t.epoch_ledger_uuids.staking
+
+    let next_epoch_ledger_location (t : t) =
+      !t.epoch_ledger_location ^ Uuid.to_string !t.epoch_ledger_uuids.next
 
     let current_epoch_delegatee_table ~(local_state : t) =
       !local_state.staking_epoch_snapshot.delegatee_table
@@ -243,6 +251,18 @@ module Data = struct
           Table.add_exn last_checked_slot_and_epoch ~key:pk ~data ) ;
       last_checked_slot_and_epoch
 
+    let epoch_ledger_uuids_to_yojson Data.{staking; next} =
+      `Assoc
+        [ ("staking", `String (Uuid.to_string staking))
+        ; ("next", `String (Uuid.to_string next)) ]
+
+    let epoch_ledger_uuids_from_file location =
+      let open Yojson.Basic.Util in
+      let json = Yojson.Basic.from_file location in
+      Data.
+        { staking= json |> member "staking" |> to_string |> Uuid.of_string
+        ; next= json |> member "next" |> to_string |> Uuid.of_string }
+
     let create_epoch_ledger ~location ~genesis_ledger =
       let open Coda_base in
       let module Ledger_transfer = Ledger_transfer.Make (Ledger) (Ledger.Db) in
@@ -260,12 +280,28 @@ module Data = struct
       (* TODO: remove this duplicate of the genesis ledger *)
       let open Coda_base in
       let genesis_ledger = Lazy.force genesis_ledger in
-      let staking_epoch_ledger_location = epoch_ledger_location ^ "_staking" in
+      let epoch_ledger_uuids_location = epoch_ledger_location ^ ".json" in
+      let epoch_ledger_uuids =
+        if Sys.file_exists epoch_ledger_uuids_location then
+          epoch_ledger_uuids_from_file epoch_ledger_uuids_location
+        else
+          let epoch_ledger_uuids =
+            Data.{staking= Uuid_unix.create (); next= Uuid_unix.create ()}
+          in
+          Yojson.Basic.to_file epoch_ledger_uuids_location
+            (epoch_ledger_uuids_to_yojson epoch_ledger_uuids) ;
+          epoch_ledger_uuids
+      in
+      let staking_epoch_ledger_location =
+        epoch_ledger_location ^ Uuid.to_string epoch_ledger_uuids.staking
+      in
       let staking_epoch_ledger =
         create_epoch_ledger ~location:staking_epoch_ledger_location
           ~genesis_ledger
       in
-      let next_epoch_ledger_location = epoch_ledger_location ^ "_next" in
+      let next_epoch_ledger_location =
+        epoch_ledger_location ^ Uuid.to_string epoch_ledger_uuids.next
+      in
       let next_epoch_ledger =
         create_epoch_ledger ~location:next_epoch_ledger_location
           ~genesis_ledger
@@ -276,29 +312,29 @@ module Data = struct
             ; merkle_root= Ledger.Db.merkle_root staking_epoch_ledger
             ; delegatee_table=
                 compute_delegatee_table_ledger_db block_producer_pubkeys
-                  staking_epoch_ledger
-            ; location= staking_epoch_ledger_location }
+                  staking_epoch_ledger }
         ; next_epoch_snapshot=
             { Snapshot.ledger= next_epoch_ledger
             ; merkle_root= Ledger.Db.merkle_root next_epoch_ledger
             ; delegatee_table=
                 compute_delegatee_table_ledger_db block_producer_pubkeys
-                  next_epoch_ledger
-            ; location= next_epoch_ledger_location }
+                  next_epoch_ledger }
         ; last_checked_slot_and_epoch=
             make_last_checked_slot_and_epoch_table
               (Public_key.Compressed.Table.create ())
               block_producer_pubkeys ~default:(Epoch.zero, Slot.zero)
-        ; last_epoch_delegatee_table= None }
+        ; last_epoch_delegatee_table= None
+        ; epoch_ledger_uuids
+        ; epoch_ledger_location }
 
     let block_production_keys_swap t block_production_pubkeys now =
       let old : Data.t = !t in
-      let s {Snapshot.ledger; delegatee_table= _; location; merkle_root} =
+      let s {Snapshot.ledger; delegatee_table= _; merkle_root} =
         { Snapshot.ledger
         ; merkle_root
         ; delegatee_table=
             compute_delegatee_table_ledger_db block_production_pubkeys ledger
-        ; location }
+        }
       in
       t :=
         { Data.staking_epoch_snapshot= s old.staking_epoch_snapshot
@@ -313,7 +349,9 @@ module Data = struct
                 ((* TODO: Be smarter so that we don't have to look at the slot before again *)
                  let epoch, slot = Epoch_and_slot.of_time_exn now in
                  (epoch, UInt32.(if slot > zero then sub slot one else slot)))
-        ; last_epoch_delegatee_table= None }
+        ; last_epoch_delegatee_table= None
+        ; epoch_ledger_uuids= old.epoch_ledger_uuids
+        ; epoch_ledger_location= old.epoch_ledger_location }
 
     type snapshot_identifier = Staking_epoch_snapshot | Next_epoch_snapshot
     [@@deriving to_yojson]
@@ -346,23 +384,21 @@ module Data = struct
       | Staking_epoch_snapshot ->
           let old_ledger = !t.staking_epoch_snapshot.ledger in
           Ledger.Db.close old_ledger ;
-          let location = !t.staking_epoch_snapshot.location in
+          let location = staking_epoch_ledger_location t in
           File_system.rmrf location ;
           let ledger = Ledger.Db.create ~directory_name:location () in
           ignore
           @@ Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger ;
-          !t.staking_epoch_snapshot
-          <- {delegatee_table; ledger; location; merkle_root}
+          !t.staking_epoch_snapshot <- {delegatee_table; ledger; merkle_root}
       | Next_epoch_snapshot ->
           let old_ledger = !t.next_epoch_snapshot.ledger in
           Ledger.Db.close old_ledger ;
-          let location = !t.next_epoch_snapshot.location in
+          let location = next_epoch_ledger_location t in
           File_system.rmrf location ;
           let ledger = Ledger.Db.create ~directory_name:location () in
           ignore
           @@ Ledger_transfer.transfer_accounts ~src:sparse_ledger ~dest:ledger ;
-          !t.next_epoch_snapshot
-          <- {delegatee_table; ledger; location; merkle_root}
+          !t.next_epoch_snapshot <- {delegatee_table; ledger; merkle_root}
 
     let next_epoch_ledger (t : t) =
       Snapshot.ledger @@ get_snapshot t Next_epoch_snapshot
@@ -2684,17 +2720,18 @@ module Hooks = struct
                (Frozen_ledger_hash.to_ledger_hash target_ledger_hash)
                !local_state.next_epoch_snapshot.merkle_root)
       then (
-        File_system.rmrf !local_state.staking_epoch_snapshot.location ;
+        File_system.rmrf @@ staking_epoch_ledger_location local_state ;
         let ledger =
           Coda_base.Ledger.Db.create_checkpoint
             !local_state.next_epoch_snapshot.ledger
-            ~directory_name:!local_state.staking_epoch_snapshot.location ()
+            ~directory_name:(staking_epoch_ledger_location local_state)
+            ()
         in
         set_snapshot local_state Staking_epoch_snapshot
           { ledger
           ; merkle_root= !local_state.next_epoch_snapshot.merkle_root
           ; delegatee_table= !local_state.next_epoch_snapshot.delegatee_table
-          ; location= !local_state.staking_epoch_snapshot.location } ;
+          } ;
         return true )
       else
         let%bind peers = random_peers 3 in
@@ -3021,27 +3058,28 @@ module Hooks = struct
       !local_state.last_epoch_delegatee_table
       <- Some !local_state.staking_epoch_snapshot.delegatee_table ;
       Coda_base.Ledger.Db.close !local_state.staking_epoch_snapshot.ledger ;
-      File_system.rmrf !local_state.staking_epoch_snapshot.location ;
-      !local_state.staking_epoch_snapshot
-      <- { ledger=
-             Coda_base.Ledger.Db.create_checkpoint
-               !local_state.next_epoch_snapshot.ledger
-               ~directory_name:!local_state.staking_epoch_snapshot.location ()
-         ; merkle_root= !local_state.next_epoch_snapshot.merkle_root
-         ; delegatee_table= !local_state.next_epoch_snapshot.delegatee_table
-         ; location= !local_state.staking_epoch_snapshot.location } ;
-      Coda_base.Ledger.Db.close !local_state.next_epoch_snapshot.ledger ;
-      File_system.rmrf !local_state.next_epoch_snapshot.location ;
+      File_system.rmrf
+        ( !local_state.epoch_ledger_location
+        ^ Uuid.to_string !local_state.epoch_ledger_uuids.staking ) ;
+      !local_state.staking_epoch_snapshot <- !local_state.next_epoch_snapshot ;
+      let epoch_ledger_uuids =
+        Local_state.Data.
+          { staking= !local_state.epoch_ledger_uuids.next
+          ; next= Uuid_unix.create () }
+      in
+      !local_state.epoch_ledger_uuids <- epoch_ledger_uuids ;
       !local_state.next_epoch_snapshot
       <- { ledger=
              Coda_base.Ledger.Db.create_checkpoint snarked_ledger
-               ~directory_name:!local_state.next_epoch_snapshot.location ()
+               ~directory_name:
+                 ( !local_state.epoch_ledger_location
+                 ^ Uuid.to_string epoch_ledger_uuids.next )
+               ()
          ; merkle_root= Coda_base.Ledger.Db.merkle_root snarked_ledger
          ; delegatee_table=
              compute_delegatee_table_ledger_db
                (Local_state.current_block_production_keys local_state)
-               snarked_ledger
-         ; location= !local_state.next_epoch_snapshot.location } )
+               snarked_ledger } )
 
   let should_bootstrap_len ~existing ~candidate =
     let length = Length.to_int in

@@ -311,7 +311,7 @@ module type S = sig
 
   module Data : sig
     module Local_state : sig
-      type t [@@deriving sexp, to_yojson]
+      type t [@@deriving to_yojson]
 
       val create :
            Signature_lib.Public_key.Compressed.Set.t
