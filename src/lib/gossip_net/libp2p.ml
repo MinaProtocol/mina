@@ -21,6 +21,7 @@ end
 module Config = struct
   type t =
     { timeout: Time.Span.t
+    ; is_seed: bool
     ; initial_peers: Coda_net2.Multiaddr.t list
     ; addrs_and_ports: Node_addrs_and_ports.t
     ; conf_dir: string
@@ -94,7 +95,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       match%bind
         Monitor.try_with (fun () ->
             trace "coda_net2" (fun () ->
-                Coda_net2.create ~logger:config.logger ~conf_dir ) )
+                Coda_net2.create ~logger:config.logger ~conf_dir
+                  ~is_seed:config.is_seed ) )
       with
       | Ok (Ok net2) -> (
           let open Coda_net2 in
