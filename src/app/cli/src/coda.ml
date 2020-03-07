@@ -171,6 +171,7 @@ let daemon logger =
            "KEYFILE Keypair (generated from `coda advanced \
             generate-libp2p-keypair`) to use with libp2p discovery (default: \
             generate per-run temporary keypair)"
+     and is_seed = flag "seed" ~doc:"Start the node as a seed node" no_arg
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
@@ -504,7 +505,11 @@ let daemon logger =
                     "peers" None ~default:[] ]
          in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-         let is_seed = List.is_empty initial_peers in
+         if is_seed then
+           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+             "Starting node as a seed node"
+         else if List.is_empty initial_peers then
+           failwith "no seed or initial peer flags passed" ;
          let gossip_net_params =
            Gossip_net.Libp2p.Config.
              { timeout= Time.Span.of_sec 3.
@@ -515,7 +520,8 @@ let daemon logger =
              ; initial_peers
              ; addrs_and_ports
              ; trust_system
-             ; keypair= libp2p_keypair }
+             ; keypair= libp2p_keypair
+             ; is_seed }
          in
          let net_config =
            { Coda_networking.Config.logger

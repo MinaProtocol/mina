@@ -153,7 +153,8 @@ let run_test () : unit Deferred.t =
               ; libp2p_port
               ; client_port }
           ; trust_system
-          ; keypair= None }
+          ; keypair= None
+          ; is_seed= false }
       in
       let net_config =
         Coda_networking.Config.

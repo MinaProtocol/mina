@@ -26,7 +26,8 @@ module Input = struct
     ; chain_id: string
     ; peers: string list
     ; max_concurrent_connections: int option
-    ; is_archive_rocksdb: bool }
+    ; is_archive_rocksdb: bool
+    ; is_seed: bool }
   [@@deriving bin_io]
 end
 
@@ -414,6 +415,7 @@ module T = struct
         ; peers
         ; max_concurrent_connections= _ (* FIXME #4095: use this *)
         ; is_archive_rocksdb
+        ; is_seed
         ; _ } =
       let logger =
         Logger.create
@@ -498,7 +500,8 @@ module T = struct
               ; logger
               ; unsafe_no_trust_ip= true
               ; trust_system
-              ; keypair= Some libp2p_keypair }
+              ; keypair= Some libp2p_keypair
+              ; is_seed }
           in
           let net_config =
             { Coda_networking.Config.logger

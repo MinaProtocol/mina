@@ -12,6 +12,7 @@ let net_configs n =
   File_system.with_temp_dir "coda-processes-generate-keys" ~f:(fun tmpd ->
       let%bind net =
         Coda_net2.create ~logger:(Logger.create ()) ~conf_dir:tmpd
+          ~is_seed:false
       in
       let net = Or_error.ok_exn net in
       let ips =
@@ -68,9 +69,9 @@ let local_configs ?block_production_interval
           Node_addrs_and_ports.to_display addrs_and_ports
         in
         let peers = List.map ~f:Node_addrs_and_ports.to_multiaddr_exn peers in
-        Coda_process.local_config ?block_production_interval ~addrs_and_ports
-          ~libp2p_keypair ~net_configs ~peers ~snark_worker_key:public_key
-          ~program_dir ~acceptable_delay ~chain_id
+        Coda_process.local_config ?block_production_interval ~is_seed:false
+          ~addrs_and_ports ~libp2p_keypair ~net_configs ~peers
+          ~snark_worker_key:public_key ~program_dir ~acceptable_delay ~chain_id
           ~block_production_key:(block_production_keys i)
           ~work_selection_method ~trace_dir
           ~is_archive_rocksdb:(is_archive_rocksdb i)

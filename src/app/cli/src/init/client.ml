@@ -1356,7 +1356,9 @@ let generate_libp2p_keypair =
       let logger = Logger.null () in
       (* Using the helper only for keypair generation requires no state. *)
       File_system.with_temp_dir "coda-generate-libp2p-keypair" ~f:(fun tmpd ->
-          match%bind Coda_net2.create ~logger ~conf_dir:tmpd with
+          match%bind
+            Coda_net2.create ~logger ~conf_dir:tmpd ~is_seed:false
+          with
           | Ok net ->
               let%bind me = Coda_net2.Keypair.random net in
               let%bind () = Coda_net2.shutdown net in
