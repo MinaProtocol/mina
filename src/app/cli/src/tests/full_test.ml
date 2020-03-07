@@ -154,7 +154,7 @@ let run_test () : unit Deferred.t =
               ; client_port }
           ; trust_system
           ; keypair= None
-          ; is_seed= false }
+          ; is_seed= true }
       in
       let net_config =
         Coda_networking.Config.
