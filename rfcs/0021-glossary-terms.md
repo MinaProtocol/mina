@@ -105,7 +105,7 @@ Additionally, the usage of "work" in snark worker can be misconstrued as a conne
 - User command - this term is confusing, especially in  docs, as it can be conflated with a CLI command that a user issues.
 
 ### Protocol Transaction
-**Concept:** A transaction issued by the protocol that does not have a "from" field - currently a fee transfer or coinbase (both are structurally identical).
+**Concept:** A transaction issued by the protocol - currently a fee transfer or coinbase (both are structurally identical).
 
 **Rationale:** In discussions with parties that were not familiar with the protocol, fee transfers were misunderstood as representations of fees associated with a user transaction. As soon as it was explained that these were transactions programatically issued by the protocol rather than a user, it became clear. As such, it is recommend to partition transactions into *user transactions* and *protcol transactions*.
 
