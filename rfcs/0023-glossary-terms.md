@@ -64,7 +64,7 @@ The terms proposed are below:
 ### Snark worker
 **Concept:** A Coda node that produces SNARKs to compress data in the network.
 
-**Rationale:** The community likes SNARKs and it is a point of differentiation for Coda, so snarker is an engaging term.
+**Rationale:** The community likes SNARKs and it is a point of differentiation for Coda, so Snark worker is an engaging term.
 
 **Downsides:** Gets invalidated if Coda switches to another type of zero-knowledge proof. NOTE - There is some concern about using the progressive tense of "snark" as a verb, eg. "snarking" - as this can be confused with staking. However, if the community enjoys "snarking", it  would make sense to  continue using it as a verb.
 
