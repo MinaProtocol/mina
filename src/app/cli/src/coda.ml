@@ -58,7 +58,7 @@ let daemon logger =
             tracked by this daemon. You cannot provide both \
             `block-producer-key` and `block-producer-pubkey`. (default: don't \
             produce blocks)"
-         (optional string)
+         (optional public_key_compressed)
      and block_production_password =
        flag "block-producer-password"
          ~doc:
@@ -423,6 +423,28 @@ let daemon logger =
            ; transaction_pool_diff= log_transaction_pool_diff
            ; new_state= log_received_blocks }
          in
+         let json_to_publickey_compressed_option json =
+           YJ.Util.to_string_option json
+           |> Option.bind ~f:(fun pk_str ->
+                  match Public_key.Compressed.of_base58_check pk_str with
+                  | Ok key ->
+                      Some key
+                  | Error e ->
+                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                        "Error decoding public key ($key): $error"
+                        ~metadata:
+                          [ ("key", `String pk_str)
+                          ; ("error", `String (Error.to_string_hum e)) ] ;
+                      None )
+         in
+         let run_snark_worker_flag =
+           maybe_from_config json_to_publickey_compressed_option
+             "run-snark-worker" run_snark_worker_flag
+         in
+         let coinbase_receiver_flag =
+           maybe_from_config json_to_publickey_compressed_option
+             "coinbase-receiver" coinbase_receiver_flag
+         in
          let%bind external_ip =
            match external_ip_opt with
            | None ->
@@ -442,8 +464,8 @@ let daemon logger =
              block_production_key
          in
          let block_production_pubkey =
-           maybe_from_config YJ.Util.to_string_option "block-producer-pubkey"
-             block_production_pubkey
+           maybe_from_config json_to_publickey_compressed_option
+             "block-producer-pubkey" block_production_pubkey
          in
          let block_production_password =
            maybe_from_config YJ.Util.to_string_option "block-producer-password"
@@ -465,23 +487,14 @@ let daemon logger =
            | Some sk_file, _ ->
                let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
                Some kp
-           | _, Some tracked_pubkey -> (
-             match Public_key.Compressed.of_base58_check tracked_pubkey with
-             | Ok pk ->
-                 let%bind wallets =
-                   Secrets.Wallets.load ~logger
-                     ~disk_location:(conf_dir ^/ "wallets")
-                 in
-                 let sk_file = Secrets.Wallets.get_path wallets pk in
-                 let%map kp =
-                   Secrets.Keypair.Terminal_stdin.read_exn sk_file
-                 in
-                 Some kp
-             | Error e ->
-                 Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                   "Error decoding block-producer-pubkey key: $error"
-                   ~metadata:[("error", `String (Error.to_string_hum e))] ;
-                 Deferred.return None )
+           | _, Some tracked_pubkey ->
+               let%bind wallets =
+                 Secrets.Wallets.load ~logger
+                   ~disk_location:(conf_dir ^/ "wallets")
+               in
+               let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
+               let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
+               Some kp
          in
          let%bind client_trustlist =
            Reader.load_sexp
