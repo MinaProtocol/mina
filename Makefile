@@ -1,7 +1,7 @@
 - run:
 	    name: Build portable binary
 	    command: |
-	        make macos-portable#######################################
+	        make macos-portable
 ## Docker Wrapper
 ## Hint: export USEDOCKER=TRUE
 
