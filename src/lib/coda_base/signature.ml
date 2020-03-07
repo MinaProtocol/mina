@@ -1,9 +1,19 @@
 [%%import
 "/src/config.mlh"]
 
-open Core
+open Core_kernel
 open Module_version
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params.Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+
+[%%endif]
 
 module Arg = struct
   [%%versioned_asserted
@@ -75,7 +85,16 @@ module Stable = struct
   end
 end]
 
+type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash]
+
+let dummy = (Field.one, Inner_curve.Scalar.one)
+
+[%%ifdef
+consensus_mechanism]
+
+type var = Field.Var.t * Inner_curve.Scalar.var
+
+[%%endif]
+
 [%%define_locally
 Stable.Latest.(of_base58_check_exn, of_base58_check, of_yojson, to_yojson)]
-
-include Signature_functor.Make (Snark_params.Tick)

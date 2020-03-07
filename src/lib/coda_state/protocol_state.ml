@@ -3,7 +3,13 @@
 
 open Core_kernel
 open Coda_base
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params.Tick
+
+[%%endif]
 
 module Poly = struct
   [%%versioned
@@ -70,6 +76,9 @@ module Body = struct
 
   type value = Value.t [@@deriving sexp, to_yojson]
 
+  [%%ifdef
+  consensus_mechanism]
+
   type var =
     ( State_hash.var
     , Blockchain_state.var
@@ -111,17 +120,19 @@ module Body = struct
       append blockchain_state consensus_state
       |> append (field (State_hash.var_to_hash_packed genesis_state_hash)))
 
-  let hash s =
-    Random_oracle.hash ~init:Hash_prefix.protocol_state_body
-      (Random_oracle.pack_input (to_input s))
-    |> State_body_hash.of_hash
-
   let hash_checked (t : var) =
     let%bind input = var_to_input t in
     make_checked (fun () ->
         Random_oracle.Checked.(
           hash ~init:Hash_prefix.protocol_state_body (pack_input input)
           |> State_body_hash.var_of_hash_packed) )
+
+  [%%endif]
+
+  let hash s =
+    Random_oracle.hash ~init:Hash_prefix.protocol_state_body
+      (Random_oracle.pack_input (to_input s))
+    |> State_body_hash.of_hash
 end
 
 module Value = struct
@@ -143,7 +154,12 @@ end
 
 type value = Value.t [@@deriving sexp, to_yojson]
 
+[%%ifdef
+consensus_mechanism]
+
 type var = (State_hash.var, Body.var) Poly.t
+
+[%%endif]
 
 module Proof = Proof
 module Hash = State_hash
@@ -158,8 +174,6 @@ let create' ~previous_state_hash ~genesis_state_hash ~blockchain_state
 
 let create_value = create'
 
-let create_var = create'
-
 let body {Poly.Stable.Latest.body; _} = body
 
 let previous_state_hash {Poly.Stable.Latest.previous_state_hash; _} =
@@ -173,6 +187,11 @@ let consensus_state {Poly.Stable.Latest.body= {Body.Poly.consensus_state; _}; _}
     =
   consensus_state
 
+[%%ifdef
+consensus_mechanism]
+
+let create_var = create'
+
 let to_hlist {Poly.Stable.Latest.previous_state_hash; body} =
   H_list.[previous_state_hash; body]
 
@@ -185,8 +204,6 @@ let typ =
   Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 
-let hash = hash_abstract ~hash_body:Body.hash
-
 let hash_checked ({previous_state_hash; body} : var) =
   let%bind body = Body.hash_checked body in
   let%map hash =
@@ -198,13 +215,6 @@ let hash_checked ({previous_state_hash; body} : var) =
   in
   (hash, body)
 
-let genesis_state_hash ?(state_hash = None) state =
-  (*If this is gthe genesis state then simply return its hash
-    otherwise return its the genesis_state_hash*)
-  if Consensus.Data.Consensus_state.is_genesis_state (consensus_state state)
-  then match state_hash with None -> hash state | Some hash -> hash
-  else state.body.genesis_state_hash
-
 let genesis_state_hash_checked ~state_hash state =
   let%bind is_genesis =
     (*if state is in global_slot = 0 then this is the genesis state*)
@@ -214,6 +224,17 @@ let genesis_state_hash_checked ~state_hash state =
     genesis state*)
   State_hash.if_ is_genesis ~then_:state_hash
     ~else_:state.body.genesis_state_hash
+
+[%%endif]
+
+let hash = hash_abstract ~hash_body:Body.hash
+
+let genesis_state_hash ?(state_hash = None) state =
+  (*If this is gthe genesis state then simply return its hash
+    otherwise return its the genesis_state_hash*)
+  if Consensus.Data.Consensus_state.is_genesis_state (consensus_state state)
+  then match state_hash with None -> hash state | Some hash -> hash
+  else state.body.genesis_state_hash
 
 [%%if
 call_logger]

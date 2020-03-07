@@ -146,10 +146,11 @@ module DeleteButton = {
            title="Delete Account" onRequestClose={_ => updateModal(_ => None)}>
            <div className=Styles.modalContainer>
              <div className=Styles.deleteAlert>
-               <Alert kind=`Warning message=warningMessage />
+               <Alert kind=`Warning defaultMessage=warningMessage />
              </div>
              {switch (error) {
-              | Some(errorText) => <Alert kind=`Danger message=errorText />
+              | Some(errorText) =>
+                <Alert kind=`Danger defaultMessage=errorText />
               | None => React.null
               }}
              <div className=Styles.deleteModalLabel>
@@ -295,11 +296,17 @@ module BlockRewards = {
              switch (account.delegateAccount, data##syncStatus) {
              | (None, `SYNCED) =>
                <Well>
-                 <Alert kind=`Warning message="Your node is synced, but the account has not entered the ledger yet because there are no funds in this account. Have you requested from the faucet yet?" />
+                 <Alert
+                   kind=`Warning
+                   defaultMessage="Your node is synced, but the account has not entered the ledger yet because there are no funds in this account. Have you requested from the faucet yet?"
+                 />
                </Well>
-             | (None, _) => 
-                <Well>
-                 <Alert kind=`Warning message="Wait until fully synced..." />
+             | (None, _) =>
+               <Well>
+                 <Alert
+                   kind=`Warning
+                   defaultMessage="Wait until fully synced..."
+                 />
                </Well>
              | (Some(delegate), _) =>
                let isDelegation =
@@ -337,7 +344,18 @@ module BlockRewards = {
                                     onMouseLeave={_ =>
                                       setStakingHovered(_ => false)
                                     }
-                                    onClick={_ => Task.liftPromise(mutate) |> Task.perform(~f=_ => {Bindings.setTimeout(100) |> ignore response.refetch(Some(accountInfoVariables))} |> ignore) }
+                                    onClick={_ =>
+                                      Task.liftPromise(mutate)
+                                      |> Task.perform(~f=_ =>
+                                           {
+                                             Bindings.setTimeout(100) |> ignore;
+                                             response.refetch(
+                                               Some(accountInfoVariables),
+                                             );
+                                           }
+                                           |> ignore
+                                         )
+                                    }
                                   />
                               )
                             </DisableStakingMutation>

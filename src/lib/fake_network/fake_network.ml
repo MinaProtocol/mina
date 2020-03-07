@@ -3,6 +3,7 @@ open Core
 open Coda_base
 open Gadt_lib
 open Signature_lib
+open Network_peer
 module Gossip_net = Coda_networking.Gossip_net
 
 (* There must be at least 2 peers to create a network *)
@@ -34,14 +35,17 @@ let setup (type n) ?(logger = Logger.null ())
   let _, peers =
     Vect.fold_map states
       ~init:(Constants.init_ip, Constants.init_discovery_port)
-      ~f:(fun (ip, discovery_port) _ ->
+      ~f:(fun (ip, libp2p_port) _ ->
         (* each peer has a distinct IP address, so we lookup frontiers by IP *)
         let peer =
           Network_peer.Peer.create
             (Unix.Inet_addr.inet4_addr_of_int32 ip)
-            ~discovery_port ~communication_port:(discovery_port + 1)
+            ~libp2p_port
+            ~peer_id:
+              (Peer.Id.unsafe_of_string
+                 (sprintf "fake peer at port %d" libp2p_port))
         in
-        ((Int32.( + ) Int32.one ip, discovery_port + 2), peer) )
+        ((Int32.( + ) Int32.one ip, libp2p_port + 1), peer) )
   in
   let fake_gossip_network =
     Gossip_net.Fake.create_network (Vect.to_list peers)
@@ -52,6 +56,7 @@ let setup (type n) ?(logger = Logger.null ())
     ; trust_system
     ; time_controller
     ; consensus_local_state
+    ; is_seed= Vect.is_empty peers
     ; genesis_ledger_hash=
         Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
     ; creatable_gossip_net=
@@ -100,6 +105,8 @@ let setup (type n) ?(logger = Logger.null ())
                     (Sync_handler.Root.prove ~logger ~frontier
                        (Envelope.Incoming.data query_env)) )
                 ~get_best_tip:(fun _ -> failwith "Get_best_tip unimplemented")
+                ~get_telemetry_data:(fun _ ->
+                  failwith "Get_telemetry data unimplemented" )
                 ~get_transition_chain_proof:(fun query_env ->
                   Deferred.return
                     (Transition_chain_prover.prove ~frontier

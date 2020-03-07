@@ -8,6 +8,10 @@ module Test_inputs = struct
   module Transaction = Int
   module Ledger_proof_statement = Fee
 
+  module Transaction_protocol_state = struct
+    type 'a t = 'a
+  end
+
   module Ledger_proof = struct
     module T = struct
       type t = Fee.t [@@deriving hash, compare, sexp]
@@ -52,7 +56,10 @@ module Test_inputs = struct
 
   module Staged_ledger = struct
     type t =
-      (int, int, Transaction_snark_work.t) Snark_work_lib.Work.Single.Spec.t
+      ( int Transaction_protocol_state.t
+      , int
+      , Transaction_snark_work.t )
+      Snark_work_lib.Work.Single.Spec.t
       List.t
 
     let work = Fn.id
@@ -71,4 +78,5 @@ module Implementation_inputs = struct
   module Transaction_snark_work = Transaction_snark_work
   module Snark_pool = Network_pool.Snark_pool
   module Staged_ledger = Staged_ledger
+  module Transaction_protocol_state = Transaction_protocol_state
 end

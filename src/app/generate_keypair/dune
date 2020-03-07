@@ -1,0 +1,8 @@
+(executable
+  (package generate_keypair)
+  (name generate_keypair)
+  (public_name generate_keypair)
+  (modes native)
+  (libraries cli_lib core_kernel)
+  (preprocess (pps ppx_coda ppx_let ppx_sexp_conv ppx_optcomp))
+  (flags -short-paths -g -w @a-4-29-40-41-42-44-45-48-58-59-60) )

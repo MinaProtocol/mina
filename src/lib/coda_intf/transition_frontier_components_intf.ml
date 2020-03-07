@@ -4,6 +4,7 @@ open Pipe_lib
 open Cache_lib
 open Coda_base
 open Coda_transition
+open Network_peer
 
 module type Transition_handler_validator_intf = sig
   type unprocessed_transition_cache
@@ -79,7 +80,7 @@ module type Transition_handler_processor_intf = sig
                                  , State_hash.t )
                                  Cached.t
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:transition_frontier_breadcrumb
+    -> producer_transition_reader:transition_frontier_breadcrumb
                                   Strict_pipe.Reader.t
     -> clean_up_catchup_scheduler:unit Ivar.t
     -> catchup_job_writer:( State_hash.t
@@ -110,7 +111,10 @@ module type Transition_handler_processor_intf = sig
                                   , Strict_pipe.crash Strict_pipe.buffered
                                   , unit )
                                   Strict_pipe.Writer.t
-    -> processed_transition_writer:( External_transition.Validated.t
+    -> processed_transition_writer:( [ `Transition of
+                                       External_transition.Validated.t ]
+                                     * [ `Source of
+                                         [`Gossip | `Catchup | `Internal] ]
                                    , Strict_pipe.crash Strict_pipe.buffered
                                    , unit )
                                    Strict_pipe.Writer.t
@@ -290,7 +294,7 @@ module type Transition_frontier_controller_intf = sig
     -> network_transition_reader:External_transition.Initial_validated.t
                                  Envelope.Incoming.t
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
+    -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> clear_reader:[`Clear] Strict_pipe.Reader.t
     -> External_transition.Validated.t Strict_pipe.Reader.t
 end
@@ -305,7 +309,8 @@ module type Initial_validator_intf = sig
     -> trust_system:Trust_system.t
     -> transition_reader:( [ `Transition of
                              external_transition Envelope.Incoming.t ]
-                         * [`Time_received of Block_time.t] )
+                         * [`Time_received of Block_time.t]
+                         * [`Valid_cb of bool -> unit] )
                          Strict_pipe.Reader.t
     -> valid_transition_writer:( [ `Transition of
                                    external_transition_with_initial_validation
@@ -345,9 +350,10 @@ module type Transition_router_intf = sig
     -> network_transition_reader:( [ `Transition of
                                      External_transition.t Envelope.Incoming.t
                                    ]
-                                 * [`Time_received of Block_time.t] )
+                                 * [`Time_received of Block_time.t]
+                                 * [`Valid_cb of bool -> unit] )
                                  Strict_pipe.Reader.t
-    -> proposer_transition_reader:breadcrumb Strict_pipe.Reader.t
+    -> producer_transition_reader:breadcrumb Strict_pipe.Reader.t
     -> most_recent_valid_block:External_transition.Initial_validated.t
                                Broadcast_pipe.Reader.t
                                * External_transition.Initial_validated.t
@@ -355,5 +361,8 @@ module type Transition_router_intf = sig
     -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
     -> base_proof:Coda_base.Proof.t
-    -> External_transition.Validated.t Strict_pipe.Reader.t * unit Ivar.t
+    -> ( [`Transition of External_transition.Validated.t]
+       * [`Source of [`Gossip | `Catchup | `Internal]] )
+       Strict_pipe.Reader.t
+       * unit Ivar.t
 end
