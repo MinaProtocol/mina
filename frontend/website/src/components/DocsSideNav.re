@@ -160,6 +160,12 @@ let make = (~currentSlug) => {
         <Page title="My First Transaction" slug="my-first-transaction" />
         <Page title="Become a Node Operator" slug="node-operator" />
         <Page title="Contributing to Coda" slug="contributing" />
+        <Folder title="Node Operators" slug="node-operators">
+          <Page
+            title="Snark Workers for Node Operators"
+            slug="snark-workers"
+          />
+        </Folder>
         <Folder title="Developers" slug="developers">
           <Page title="Developers Overview" slug="" />
           <Page title="Codebase Overview" slug="codebase-overview" />

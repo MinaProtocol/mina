@@ -1,0 +1,117 @@
+import Page from '@reason/pages/Docs';
+export default Page({title: "Snark Workers for Node Operators"});
+
+## Intro
+
+While most protocols have just one primary node operator class (often called miners, validators, or block producers), Coda has a second class — the **snark worker**.
+
+Snark workers are integral to the Coda network's health because these nodes are responsible for snarking, or producing SNARK proofs, of transactions in the network. By producing these proofs, snark workers help maintain the succinctness of the Coda blockchain.
+
+In this document, we'll briefly cover why snark workers are needed, how the economic incentives align, and provide operational details of performing snark work. Feel free to click through to any of the sections above that are most relevant to your needs.
+
+Note: This document primarily targets node operators, and will not cover the theory of zk-SNARKs. Deep knowledge of SNARKs is not required to read this section, but it will be helpful to know roughly how SNARKs work and what they are useful for. If this is not the case, please check out [this primer on SNARKs](https://codaprotocol.com/blog/zkp-guide.html) first.
+
+## Why Snark Workers?
+
+Coda's unique property is the succinct blockchain. Each block producer, when they propose a new block to the network, must also include a zk-SNARK along with that block. This allows nodes to discard all historical data that's been finalized, and retain just the SNARK. If you are unfamiliar with the Coda protocol, [this video is a good start](https://www.youtube.com/watch?v=eWVGATxEB6M).  
+
+However, it is not only sufficient for the block producers in Coda to generate SNARK proofs of blocks. Transactions also need to be snarked. The reason is because the blockchain SNARK does not make any statements of the validity of the transactions included in the block. 
+
+For example — let's say the current head of the blockchain has a state hash `a6f8792226...` , and we receive a new block with a state hash `0ffdcf284f...` . This block will contain all the transactions that the block producer has chosen to include in this block, and associated metadata. We will also receive an accompanying SNARK that verifies the statement:
+
+    There exists a block with a state hash 0ffdcf284f which extends the blockchain
+    with a previous best tip with state hash a6f8792226.
+
+Notice that this statement says nothing about the validity of the transactions included in the new block. If we were to believe this SNARK, and do nothing else, we may be tricked by a malicious block producer sending this block. Luckily, we have the raw block and we can check each transaction to ensure it is valid. But what about nodes in the network that may just want to receive the proof and not verify each block?
+
+## Snarking Transactions
+
+In order to ensure that nodes can operate without trust on the Coda, it is important that each node can verify the state of the chain without needing to replay the transactions. In order for this to work, the above blockchain SNARK is not enough. We need to know that the transactions are also valid. Well, since SNARKs are good for exactly that, the naive suggestion might be to generate a SNARK of each transaction as they come in, and then combine them.
+
+However, generating SNARK proofs is computationally expensive — if we had to compute SNARKs serially for each transaction, throughput would be very low and block times would skyrocket. Furthermore, transactions in a real world environment arrive asynchronously, so it would be very tough to predict when to perform the next item of work.
+
+Lucky for us, we can leverage two properties about SNARKs:
+
+1. proofs can be merged - two proofs can be combined to form a *merge proof*
+2. merges are associative - merge proofs are identical, regardless of the order merged
+
+![](/static/img/snark-diagram.png)
+
+*Each σ ⇒ σ' represents a state transition (aka a transaction) — you can see from this image that the two trees are identical, regardless of the order in which transactions were proved.*
+
+What these two properties essentially allow us to do is take advantage of parallelism. If proofs can be merged, and it doesn't matter how they're combined, then SNARK proofs can be generated in parallel. Whichever proof is finished first can be combined later with the proofs in progress. This can be envisioned as a binary tree, where the bottom row (the leaves) consists of the individual transaction proofs, and each parent row, the set of respective merge proofs. We can combine these all the way to the root, which represents a state update performed by applying all the transactions.
+
+In addition, because the SNARK proofs don't depend on each other and we can exploit parallelism, this means anyone can do the work! The end result is that the distributed work pool is permission-less. Anyone with spare compute can join the network as snark workers, observe transactions that need to be snarked, and contribute their compute. And of course, they will be compensated for their work in what we affectionately call **the snarketplace**.
+
+Note: To learn more about the details of how this snark work scheme evolved, it is highly recommended to watch this video: [High Throughput with Slow Snarks](https://www.youtube.com/watch?v=NZmq1V-Te0E). If you're interested in functional programming and the details of the scan state (the tree structure described above), [we have a blog post](https://www.notion.so/codaprotocol/Snark-Workers-for-Node-Operators-8a15155ee37a482fb995460a6b1e61af#29d88321a71c497492e144bde4b0c157) covering the technical details, or [a video](https://www.youtube.com/watch?v=ztH_Z5TCe9I) if you prefer that format.
+
+## The Snarketplace
+
+The key dynamic to understand about snark work is:
+
+*Block producers use their block rewards to purchase snark work from snark workers.* 
+
+There is no protocol involvement in pricing snarks, nor are there any protocol level rewards for snark workers to produce snarks. The incentives are purely peer-to-peer, and dynamically established in a public marketplace, aka the snarketplace.
+
+You may ask, why does a block producer need to buy SNARKs? Fair question — the reason is because of what we mentioned earlier. In order to know for sure the state at the head of the Coda blockchain is valid, the transactions need to be snarked. But if we keep adding more transactions without snarking them at an equal rate, then over time we accumulate work that never gets finished. In order to reach a steady state equilibrium, we need work to be processed at roughly the same rate that work is added.
+
+Since block producers profit from including transactions in a block (through transaction fees and the coinbase transaction), they are responsible for offsetting the transactions by purchasing an equal number of completed snark work, thereby creating demand for snark work. However, their imperative is to purchase snark work for the lowest price from the snarketplace. Conversely, the snark workers want to maximize their profit while also being able to sell their snark work. These two roles act as the two sides of the marketplace, and over time establish an equilibrium at a market price for snark work.
+
+### How to price snark work
+
+We anticipate the snarketplace to dynamically rebalance — eg. follow the simple laws of [supply and demand](https://en.wikipedia.org/wiki/Supply_and_demand). While each snark work applies to a different transaction, seen from a larger perspective, snark work is largely a commodity (meaning it doesn't matter which snark worker produces the good — it will be the same). However, there are some nuances, so it may help to have some heuristics for pricing strategy:
+
+- if market price is X, it is likely effective to sell snark work for any price below X (eg. X - 1), provided it is profitable after operating expenses.
+- block producers are incentivized to purchase more units of snark work from the same snark worker because there will only be one *fee transfer* transaction they have to include in the block.
+    - Basically, the way a block producer pays a snark worker is through a special type of transaction called a fee transfer. The BP's incentive is to minimize the number of fee transfers, as each is a discrete transaction that needs to be added to a block (and consequently offset by more snark work). Thus, the best case scenario is to buy a bundle of snark work from the same snark worker.
+- some snark work will be more important to complete ahead of other work, as it would free up an entire tree worth of memory (see the video above for more details). This is made possible by different work selection methods. Currently, the two methods supported natively are sequential and random. Neither of these however takes advantage of dynamic markets, which is an area of improvement that the Coda community can develop solutions for.
+
+Since all the data around snarks and prices are public, there are several ways to inspect the snarketplace. One example is [using the GraphQL API](https://www.youtube.com/watch?v=pIeo5GO8w8w), and other options include using the CLI, or rolling a custom solution that tracks snarks in the snark mempool.
+
+Stay tuned for more detailed analysis on snarketplace dynamics. We will also be releasing an economic whitepaper shortly that will provide more context.
+
+## Operating Snark Worker Nodes
+
+TODO
+
+## FAQ
+
+**Is generating SNARKs similar to Proof-of-Work (PoW) mining?**
+
+No, they are different in several ways:
+
+- SNARK work is deterministic, while PoW mining requires randomly calculating hashes to try and solve a puzzle. There is no luck element in SNARK work — if a snark worker wants to generate a SNARK of a transaction, they only need to generate the proof once. This means SNARK work is much less expensive and environmentally wasteful, as the compute is all spent towards a productive goal.
+- There is no difficulty increase for SNARK work, as there is with PoW mining. In fact, as SNARK constructions, and proof generation times improve, the difficulty may actually decrease.
+- SNARK work is not directly involved in consensus. Snark workers play no role in determining the next state of the blockchain. Their role is to simply generate SNARKs of transactions observed in the network
+- As a snark worker, there is no requirement for uptime. PoW miners need to run their rigs non-stop to ensure they don't miss out on a potential block. Snark workers can come online and offline as they please — it is more like Uber, where there will always be work to be done, and it is nobody needs to say head of of time when they want to work.
+
+**Do I need a GPU?**
+
+No.
+
+**What is the difference between a SNARK, a SNARK proof, and snark work?**
+
+SNARKs are a very overloaded term currently — when you read **SNARK**, it could be referring to the concept of succinct non-interactive proof systems (eg. SNARKs vs Bulletproofs), the specific technical implementation of the proof system (eg. the construction, the circuit, or the prover), or the individual instance of the proof itself (eg. the blockchain SNARK). 
+
+When we speak about it, we will try to adhere to using:
+
+- SNARK: as the general concept of succinct, non-interactive zero-knowledge proofs
+- SNARK circuit: the specific circuit and prover, as pertaining to an app
+- SNARK proof: an individual proof that is generated by a SNARK prover
+- snark work: a Coda protocol data structure that is a wrapper around one or two SNARK proofs and a price to be paid to the snark worker that generated the proof(s). This is made unforgeable by a Signature of Knowledge scheme that will be detailed in another section.
+
+**Is there any concern about a single large snark worker [dumping](https://en.wikipedia.org/wiki/Dumping_(pricing_policy)) work in the snarketplace, and then raising prices after monopolizing the market?**
+
+In economics, there is a pricing strategy called predatory pricing (or dumping) where one supplier of a product seeks to exhaust competing suppliers in the market by undercutting the market price. The supplier prices their goods much cheaper than the market rate, in order to drive out competitors, even if it means incurring short-term losses. Once the market has been cleared, the dominant supplier then increases prices [above competitive market rates](https://en.wikipedia.org/wiki/Supracompetitive_pricing), as competition has been extinguished.
+
+However, this strategy is only effective in markets where there are high barriers to entry. Meaning, competitors who were crowded out in the predation stage are unable to rejoin the market. 
+
+This is not the case for snark work, as the barriers to entry are low. Anyone who has spare compute can join the snarketplace and produce as little as one snark work, and profit on that unit of work. The only barrier to entry is the initial capital expense on hardware, but we anticipate hardware requirements to be low, such that users with spare equipment can come online and participate. If any snark worker succeeds in driving out the market and increases prices, it is anticipated that newcomers would reappear and drive prices back down.
+
+**Does speed of producing snarks matter? If my computer is slower, will I be at a disadvantage?**
+
+No, provided that the snark work produced is still required by block producers, it doesn't matter who produced it first — only the price matters in the block producers' eyes. The caveat here is that earlier inclusion into the snark mempool is obviously beneficial, as block producers are likely to "see" the work earlier.
+
+One could however envision a scenario where a set of snark workers are favored because they produced the most number of snark works that are profitable, and buying proofs from as few entities as possible would allow for more transactions to be included in any block.
+
+There is also a threshold at which time becomes a factor, but this would only apply to very underpowered devices. We will follow up with detailed benchmarks, when we have run more tests.
