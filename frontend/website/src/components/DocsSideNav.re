@@ -162,7 +162,7 @@ let make = (~currentSlug) => {
         <Page title="Contributing to Coda" slug="contributing" />
         <Folder title="Node Operators" slug="node-operators">
           <Page
-            title="Snark Workers for Node Operators"
+            title="Snark Workers"
             slug="snark-workers"
           />
         </Folder>
