@@ -51,7 +51,7 @@ let make =
     </Next.Head>
     <Nav />
     <div> children </div>
-    <Footer bgcolor=footerColor />
+    <Footer />
     <CookieWarning />
   </>;
 };

@@ -89,7 +89,8 @@ external urlSearchParams: Js.t('a) => Fetch.urlSearchParams =
   "URLSearchParams";
 
 [@react.component]
-let make = (~center as centerText=false) => {
+//textcolor is for the "Subscibe to our newsletter" part, default should be white
+let make = (~center as centerText=false, ~whiteText) => {
   let (successState, showSuccess) = React.useState(() => false);
   let (email, setEmail) = React.useState(() => "");
 
@@ -116,6 +117,7 @@ let make = (~center as centerText=false) => {
         style([
           marginBottom(px(8)),
           textAlign(centerText ? `center : `left),
+          color(whiteText ? Css.white : Theme.Colors.saville),
         ])
       )>
       {React.string("Subscribe to our newsletter for updates")}
