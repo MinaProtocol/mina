@@ -197,13 +197,13 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   in
   let client_impls =
     [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
-          return
+          Deferred.map
             ( Coda_commands.send_user_command coda tx
-            |> Participating_state.active_error |> Or_error.join ) )
+            |> Participating_state.to_deferred_or_error )
+            ~f:Or_error.join )
     ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-          return
-            ( Coda_commands.schedule_user_commands coda ts
-            |> Participating_state.active_error ) )
+          Coda_commands.schedule_user_commands coda ts
+          |> Participating_state.to_deferred_or_error )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
           return
             ( Coda_commands.get_balance coda pk
@@ -304,7 +304,10 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                  Unix.Inet_addr.Set.remove !client_trustlist ip ;
                Ok () )) )
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
-          return (Set.to_list !client_trustlist) ) ]
+          return (Set.to_list !client_trustlist) )
+    ; implement Daemon_rpcs.Get_telemetry_data.rpc (fun () peers ->
+          Telemetry.get_telemetry_data_from_peers (Coda_lib.net coda) peers )
+    ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
@@ -387,7 +390,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                     >>| lift ))
           |> Deferred.map ~f:(fun _ ->
                  Logger.info logger
-                   !"Created GraphQL server and status endpoints at port : %i"
+                   !"Created GraphQL server at: http://localhost:%i/graphql"
                    rest_server_port ~module_:__MODULE__ ~location:__LOC__ ) )
   ) ;
   let where_to_listen =

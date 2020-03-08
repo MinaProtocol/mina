@@ -3,7 +3,7 @@
  (public_name ppx_util)
  (library_flags -linkall)
  (inline_tests)
- (libraries core ppxlib)
+ (libraries core_kernel ppxlib)
  (preprocess
   (pps ppx_coda bisect_ppx ppx_jane ppxlib.metaquot ppxlib.runner -- -conditional))
  (synopsis "PPX utilities"))

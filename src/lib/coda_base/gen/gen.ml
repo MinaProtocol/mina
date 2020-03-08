@@ -2,40 +2,26 @@ open Ppxlib
 open Asttypes
 open Parsetree
 open Longident
-open Core
-open Crypto_params
+open Core_kernel
 open Signature_lib
-
-let seed = "Coda_sample_keypairs"
-
-let random_bool = Crs.create ~seed
-
-module Group = Curve_choice.Tick_backend.Inner_curve
-
-let bigint_of_bits bits =
-  List.foldi bits ~init:Bigint.zero ~f:(fun i acc b ->
-      if b then Bigint.(acc + (of_int 2 lsl i)) else acc )
-
-let rec random_scalar () =
-  let n =
-    bigint_of_bits
-      (List.init Tock0.Field.size_in_bits ~f:(fun _ -> random_bool ()))
-  in
-  if Bigint.(n < Tock0.Field.size) then
-    Tock0.Bigint.(to_field (of_bignum_bigint n))
-  else random_scalar ()
 
 let keypairs =
   let n = 120 in
+  let generated_keypairs =
+    let sks =
+      Quickcheck.(
+        random_value ~seed:(`Deterministic "Coda_sample_keypairs")
+          (Generator.list_with_length n Private_key.gen))
+    in
+    List.map sks ~f:Keypair.of_private_key_exn
+  in
   List.cons
     (* FIXME #2936: remove this "precomputed VRF keypair" *)
     (* This key is also at the start of all the release ledgers. It's needed to generate a valid genesis transition *)
     (Keypair.of_private_key_exn
        (Private_key.of_base58_check_exn
           "6BnSKU5GQjgvEPbM45Qzazsf6M8eCrQdpL7x4jAvA4sr8Ga3FAx8AxdgWcqN7uNGu1SthMgDeMSUvEbkY9a56UxwmJpTzhzVUjfgfFsjJSVp9H1yWHt6H5couPNpF7L7e5u7NBGYnDMhx"))
-    (List.init n ~f:(fun _ ->
-         let sk = random_scalar () in
-         Keypair.of_private_key_exn sk ))
+    generated_keypairs
 
 let expr ~loc =
   let module E = Ppxlib.Ast_builder.Make (struct

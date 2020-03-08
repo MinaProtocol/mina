@@ -40,5 +40,7 @@ type t =
   ; archive_process_location:
       Core.Host_and_port.t Cli_lib.Flag.Types.with_name option
         [@default None]
-  ; genesis_state_hash: State_hash.t }
+  ; demo_mode: bool [@default false]
+  ; genesis_state_hash: State_hash.t
+  ; log_block_creation: bool [@default false] }
 [@@deriving make]

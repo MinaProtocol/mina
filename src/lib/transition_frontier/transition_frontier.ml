@@ -275,7 +275,8 @@ let add_breadcrumb_exn t breadcrumb =
             (List.map diffs ~f:(fun (Diff.Full.E.E diff) -> Diff.to_yojson diff))
         ) ]
     "Applying diffs: $diffs" ;
-  let (`New_root new_root_identifier) =
+  let (`New_root_and_diffs_with_mutants
+        (new_root_identifier, diffs_with_mutants)) =
     Full_frontier.apply_diffs t.full_frontier diffs
       ~ignore_consensus_local_state:false
   in
@@ -308,7 +309,7 @@ let add_breadcrumb_exn t breadcrumb =
             running, which indicates that transition frontier initialization \
             has not been performed correctly" )
   |> Result.ok_exn ;
-  Extensions.notify t.extensions ~frontier:t.full_frontier ~diffs
+  Extensions.notify t.extensions ~frontier:t.full_frontier ~diffs_with_mutants
 
 (* proxy full frontier functions *)
 include struct
@@ -477,7 +478,12 @@ module For_tests = struct
             ~directory:frontier_dir
         in
         Gc.Expert.add_finalizer_exn persistent_root clean_temp_dirs ;
-        Gc.Expert.add_finalizer_exn persistent_frontier clean_temp_dirs ;
+        Gc.Expert.add_finalizer_exn persistent_frontier (fun x ->
+            Option.iter
+              persistent_frontier.Persistent_frontier.Factory_type.instance
+              ~f:(fun instance ->
+                Persistent_frontier.Database.close instance.db ) ;
+            clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
   let gen ?(logger = Logger.null ()) ?verifier ?trust_system
