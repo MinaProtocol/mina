@@ -304,7 +304,10 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
                  Unix.Inet_addr.Set.remove !client_trustlist ip ;
                Ok () )) )
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
-          return (Set.to_list !client_trustlist) ) ]
+          return (Set.to_list !client_trustlist) )
+    ; implement Daemon_rpcs.Get_telemetry_data.rpc (fun () peers ->
+          Telemetry.get_telemetry_data_from_peers (Coda_lib.net coda) peers )
+    ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
