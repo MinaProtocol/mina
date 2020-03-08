@@ -483,7 +483,7 @@ let batch_send_payments =
        ~f:main)
 
 (*Deepthi: Deprecated*)
-let user_command (body_args : User_command_payload.Body.t Command.Param.t)
+(*let user_command (body_args : User_command_payload.Body.t Command.Param.t)
     ~label ~summary ~error =
   let flag =
     let open Cli_lib.Flag in
@@ -525,7 +525,7 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
                ~default:Coda_numbers.Global_slot.max_value
            in
            let command =
-             Coda_commands.setup_user_command ~fee ~nonce ~memo ~valid_until
+             Coda_commands.send_user_command ~fee ~nonce ~memo ~valid_until
                ~sender_kp body
            in
            Daemon_rpcs.Client.dispatch_with_message
@@ -549,7 +549,7 @@ let send_payment =
     User_command_payload.Body.Payment {receiver; amount}
   in
   user_command body ~label:"payment" ~summary:"Send payment to an address"
-    ~error:"Failed to send payment"
+    ~error:"Failed to send payment"*)
 
 let send_payment_graphql =
   let open Command.Param in
@@ -613,7 +613,7 @@ let delegate_stake_graphql =
            ((response#sendDelegation)#delegation)#id ))
 
 (*Deepthi: Deprecated*)
-let cancel_transaction =
+(*let cancel_transaction =
   let txn_id_flag =
     Command.Param.(
       flag "id" ~doc:"ID Transaction ID to be cancelled" (required string))
@@ -698,7 +698,7 @@ let cancel_transaction =
                ~join_error:Or_error.join
          | Error _e ->
              eprintf "Could not deserialize user command\n" ;
-             exit 16 ))
+             exit 16 ))*)
 
 let cancel_transaction_graphql =
   let txn_id_flag =
@@ -795,7 +795,7 @@ let get_transaction_status =
              exit 16 ))
 
 (*Deepthi: Deprecated*)
-let delegate_stake =
+(*let delegate_stake =
   let body =
     let open Command.Let_syntax in
     let open Cli_lib.Arg_type in
@@ -810,7 +810,7 @@ let delegate_stake =
   in
   user_command body ~label:"delegate"
     ~summary:"Change the address to which you're delegating your coda"
-    ~error:"Failed to change delegate"
+    ~error:"Failed to change delegate"*)
 
 let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
@@ -1558,11 +1558,10 @@ let client =
 let command =
   Command.group ~summary:"[Deprecated] Lightweight client commands"
     ~preserve_subcommand_order:()
-    [ ("get-balance", get_balance)
-    ; ("send-payment", send_payment)
+    [ ("get-balance", get_balance) (*; ("send-payment", send_payment)*)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
-    ; ("delegate-stake", delegate_stake)
-    ; ("cancel-transaction", cancel_transaction)
+      (*; ("delegate-stake", delegate_stake)
+    ; ("cancel-transaction", cancel_transaction)*)
     ; ("set-staking", set_staking)
     ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)

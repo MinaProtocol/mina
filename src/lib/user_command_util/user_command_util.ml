@@ -2,7 +2,6 @@ open Coda_base
 open Signature_lib
 open Coda_numbers
 open Core_kernel
-open Async_kernel
 
 module Client_input = struct
   [%%versioned
@@ -15,6 +14,7 @@ module Client_input = struct
         ; valid_until: Account_nonce.Stable.V1.t
         ; memo: User_command_memo.Stable.V1.t
         ; body: User_command_payload.Body.Stable.V1.t }
+      [@@deriving to_yojson]
 
       let to_latest = Fn.id
     end
@@ -27,7 +27,7 @@ module Client_input = struct
     ; valid_until: Account_nonce.t
     ; memo: User_command_memo.t
     ; body: User_command_payload.Body.t }
-  [@@deriving make]
+  [@@deriving make, to_yojson]
 
   (*let create ~fee ~nonce_opt ~valid_until ~memo ~sender_kp
   user_command_body =
@@ -35,10 +35,12 @@ module Client_input = struct
 end
 
 type user_command_input =
-  { client_input: (Client_input.t, Client_input.t list) Either.t
-  ; inferred_nonce: Public_key.Compressed.t -> Account_nonce.t Option.t
-  ; record_payment: User_command.t -> Account.t -> Receipt.Chain_hash.t
-  ; result: (User_command.t * Receipt.Chain_hash.t) list Or_error.t Ivar.t }
+  { client_input: Client_input.t list
+  ; inferred_nonce: Public_key.Compressed.t -> Account_nonce.t Option.t }
+
+(*; record_payment: User_command.t -> Account.t -> Receipt.Chain_hash.t
+  ; result: unit Or_error.t Ivar.t }*)
+(*list of accepted and rejected user commands*)
 
 (*let setup_user_command (input: Input.t) =
   let payload =

@@ -279,6 +279,12 @@ let best_tip = compose_of_option best_tip_opt
 
 let root_length = compose_of_option root_length_opt
 
+let active_or_bootstrapping =
+  compose_of_option (fun t ->
+      Option.bind
+        (Broadcast_pipe.Reader.peek t.components.transition_frontier)
+        ~f:(Fn.const (Some ())) )
+
 [%%if
 mock_frontend_data]
 
@@ -914,29 +920,24 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   client_input.valid_until client_input.memo client_input.body
                   client_input.sender_kp
               in
-              let res =
-                match uc_input.client_input with
-                | Either.First input -> (
-                  match setup_user_command input with
-                  | Some user_command ->
-                      (*let receipt = uc_input.record_payment user_command account*)
-                      Ok
-                        ( [user_command]
-                        , [(user_command, Receipt.Chain_hash.empty)] )
-                  | None ->
-                      Error (Error.of_string "Account not found") )
-                | Either.Second _inputs ->
-                    Ok ([], [])
-                (*List.map inputs and generate user comamnds and receipt hashes*)
+              let user_commands =
+                List.filter_map uc_input.client_input ~f:(fun uc ->
+                    match setup_user_command uc with
+                    | None ->
+                        Logger.warn config.logger
+                          "Cannot submit $cmd to the pool: Sender account not \
+                           found"
+                          ~module_:__MODULE__ ~location:__LOC__
+                          ~metadata:
+                            [ ( "cmd"
+                              , User_command_util.Client_input.to_yojson uc )
+                            ] ;
+                        None
+                    | res ->
+                        res )
               in
-              match res with
-              | Ok (user_commands, receipts) ->
-                  let%map () =
-                    Strict_pipe.Writer.write local_txns_writer user_commands
-                  in
-                  Ivar.fill uc_input.result (Ok receipts)
-              | Error e ->
-                  return (Ivar.fill uc_input.result (Error e)) )
+              if List.is_empty user_commands then return ()
+              else Strict_pipe.Writer.write local_txns_writer user_commands )
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =

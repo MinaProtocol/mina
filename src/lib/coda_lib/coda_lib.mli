@@ -59,6 +59,8 @@ val add_work : t -> Snark_worker.Work.Result.t -> unit
 
 val add_transactions : t -> User_command_util.user_command_input -> unit
 
+val active_or_bootstrapping : t -> unit Participating_state.t
+
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
 val best_ledger : t -> Ledger.t Participating_state.t

@@ -194,24 +194,33 @@ let get_inferred_nonce_from_transaction_pool_and_ledger_exn t
   User_command.forget_check signed_user_command*)
 
 let add_transactions t user_commands =
-  let res_ivar = Ivar.create () in
+  (*let res_ivar = Ivar.create () in*)
   Coda_lib.add_transactions t
     { User_command_util.client_input= user_commands
-    ; inferred_nonce= get_inferred_nonce_from_transaction_pool_and_ledger_exn t
-    ; record_payment= record_payment t
-    ; result= res_ivar } ;
-  Ivar.read res_ivar
+    ; inferred_nonce=
+        get_inferred_nonce_from_transaction_pool_and_ledger_exn t
+        (*; result= res_ivar*) } ;
+  Deferred.return ()
+
+(*Ivar.read res_ivar*)
 
 (*TODO: add logs*)
 let setup_and_submit_user_command t user_command_input =
   (*let user_command_input = User_command_util.Input.make ~fee ~nonce_opt ~valid_until ~memo ~sender_kp ~body
     in*)
-  add_transactions t (Either.First user_command_input)
+  let open Participating_state.Let_syntax in
+  let%map _is_active = Coda_lib.active_or_bootstrapping t in
+  let open Deferred.Let_syntax in
+  let%map () = add_transactions t [user_command_input] in
+  txn_count := !txn_count + 1 ;
+  Or_error.return ()
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
 let setup_and_submit_user_commands t user_command_list =
   (*let user_command_input = User_command_util.Input.make ~fee ~nonce_opt ~valid_until ~memo ~sender_kp ~body
       in*)
+  let open Participating_state.Let_syntax in
+  let%map _is_active = Coda_lib.active_or_bootstrapping t in
   let logger =
     Logger.extend
       (Coda_lib.top_level_logger t)
@@ -219,7 +228,7 @@ let setup_and_submit_user_commands t user_command_list =
   in
   Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
     "batch-send-payments does not yet report errors" ;
-  add_transactions t (Either.Second user_command_list)
+  add_transactions t user_command_list
 
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
