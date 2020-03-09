@@ -128,7 +128,8 @@ val current_ledger_proof : t -> Ledger_proof.t option
 (* This should memoize the snark verifications *)
 
 val create_diff :
-     t
+     ?log_block_creation:bool
+  -> t
   -> self:Public_key.Compressed.t
   -> coinbase_receiver:[`Producer | `Other of Public_key.Compressed.t]
   -> logger:Logger.t
