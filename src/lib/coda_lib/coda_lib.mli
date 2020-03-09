@@ -60,11 +60,9 @@ val add_work : t -> Snark_worker.Work.Result.t -> unit
 val add_transactions :
      t
   -> User_command.t list
-     * ( Network_pool.Transaction_pool.Resource_pool.Diff.t
-       * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
-       Or_error.t
-       Ivar.t
-  -> unit
+  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+     * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+     Deferred.Or_error.t
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 

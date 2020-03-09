@@ -608,11 +608,12 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
   |> Deferred.don't_wait_for
 
-let add_transactions t ((txns : User_command.t list), (result_ivar : 'a Ivar.t))
-    =
+let add_transactions t (txns : User_command.t list) =
+  let result_ivar = Ivar.create () in
   Strict_pipe.Writer.write t.pipes.local_txns_writer
     (txns, Ivar.fill result_ivar)
-  |> Deferred.don't_wait_for
+  |> Deferred.don't_wait_for ;
+  Ivar.read result_ivar
 
 let next_producer_timing t = t.next_producer_timing
 

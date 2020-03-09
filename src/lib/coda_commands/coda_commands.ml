@@ -66,9 +66,7 @@ let schedule_user_command t (txn : User_command.t) : 'a Or_error.t Deferred.t =
       (Coda_lib.top_level_logger t)
       [("coda_command", `String "scheduling a user command")]
   in
-  let result_ivar = Ivar.create () in
-  Coda_lib.add_transactions t ([txn], result_ivar) ;
-  let%map res = Ivar.read result_ivar in
+  let%map res = Coda_lib.add_transactions t [txn] in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     ~metadata:[("user_command", User_command.to_yojson txn)]
     "Submitted transaction $user_command to transaction pool" ;
@@ -222,9 +220,7 @@ let schedule_user_commands t (txns : User_command.t list) :
   in
   Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
     "batch-send-payments does not yet report errors" ;
-  let result_ivar = Ivar.create () in
-  Coda_lib.add_transactions t (txns, result_ivar) ;
-  Ivar.read result_ivar
+  Coda_lib.add_transactions t txns
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in
