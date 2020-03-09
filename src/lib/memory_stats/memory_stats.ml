@@ -3,7 +3,7 @@
 open Core_kernel
 open Async
 
-let log_memory_stats logger =
+let log_memory_stats logger ~process =
   don't_wait_for
     (let bytes_per_word = Sys.word_size / 8 in
      (* Curve points are allocated in C++ and deallocated with finalizers.
@@ -43,7 +43,8 @@ let log_memory_stats logger =
        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
          "OCaml memory statistics, %s" suffix
          ~metadata:
-           [ ("heap_size", `Int (stat.heap_words * bytes_per_word))
+           [ ("process", `String process)
+           ; ("heap_size", `Int (stat.heap_words * bytes_per_word))
            ; ("heap_chunks", `Int stat.heap_chunks)
            ; ("max_heap_size", `Int (stat.top_heap_words * bytes_per_word))
            ; ("live_size", `Int (stat.live_words * bytes_per_word))
@@ -54,7 +55,8 @@ let log_memory_stats logger =
        Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
          "Jemalloc memory statistics (in bytes)"
          ~metadata:
-           [ ("active", `Int active)
+           [ ("process", `String process)
+           ; ("active", `Int active)
            ; ("resident", `Int resident)
            ; ("allocated", `Int allocated)
            ; ("mapped", `Int mapped) ]
