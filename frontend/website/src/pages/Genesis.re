@@ -151,6 +151,60 @@ module Styles = {
     ]);
 };
 
+module MemberProfile = {
+  module Styles = {
+    open Css;
+    let outerBox =
+      style([
+        display(`flex),
+        justifyContent(`center),
+        alignContent(`center),
+        width(`percent(100.)),
+      ]);
+    let container =
+      style([
+        position(`relative),
+        display(`flex),
+        justifyContent(`center),
+        alignContent(`center),
+        width(`rem(30.)),
+        height(`rem(24.5)),
+        borderRadius(`px(6)),
+        background(`hex("F5F5F5")),
+        border(`px(1), `solid, Theme.Colors.teal),
+      ]);
+    let profilePic =
+      style([
+        position(`absolute),
+        borderRadius(`percent(50.)),
+        background(white),
+        marginTop(`rem(-3.)),
+        border(`px(1), `solid, Theme.Colors.saville),
+        padding(`px(5)),
+      ]);
+    let memberName = style([margin(`auto), display(`flex)]);
+    let icon =
+      style([
+        height(`percent(100.)),
+        width(`percent(100.)),
+        alignSelf(`center),
+      ]);
+  };
+  [@react.component]
+  let make = () => {
+    <div className=Styles.outerBox>
+      <div className=Styles.container>
+        <img src="/static/img/gareth.png" className=Styles.profilePic />
+        <div className=Styles.memberName>
+          <img src="/static/img/DiscordLogo.png" className=Styles.icon />
+          <Spacer width=0.31 />
+          <h4 className=Theme.H4.header> {React.string("GarethDavies")} </h4>
+        </div>
+      </div>
+    </div>;
+  };
+};
+
 [@react.component]
 let make = () => {
   <Page
@@ -233,6 +287,21 @@ let make = () => {
             />
           </div>
         </div>
+        <Spacer height=4. />
+        <h1 className=Styles.textBlockHeading>
+          {React.string("Meet the Genesis Founding Members")}
+        </h1>
+        <div className=Styles.textBlock>
+          <p className=Styles.heroCopy>
+            {React.string(
+               "Meet some of the 48 Genesis Founding Members.
+               These community members are learning how to operate the protocol, and strengthening the Coda network and community.
+               They are the backbone of the global Coda community.",
+             )}
+          </p>
+        </div>
+        <Spacer height=4. />
+        <MemberProfile />
         <Spacer height=4. />
         <h1 className=Styles.textBlockHeading> {React.string("Details")} </h1>
         <Spacer height=1. />
