@@ -71,7 +71,7 @@ module Copy = {
           <br />
         </p>
       </div>
-      <NewsletterWidget />
+      <NewsletterWidget whiteText=false />
     </div>;
   };
 };

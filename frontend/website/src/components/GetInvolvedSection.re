@@ -333,7 +333,7 @@ let make = (~links) => {
           ),
         ])
       )>
-      <NewsletterWidget center=true />
+      <NewsletterWidget center=true whiteText=false />
     </div>
     <div
       className=Css.(

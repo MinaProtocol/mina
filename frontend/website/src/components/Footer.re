@@ -121,9 +121,12 @@ module Footer = {
       style([
         width(`percent(100.0)),
         backgroundColor(`hex("424242")),
-        paddingTop(`rem(3.0)),
-        paddingBottom(`rem(2.0)),
+        paddingTop(`rem(3.5)),
+        paddingBottom(`rem(3.5)),
         display(`flex),
+        justifyContent(`center),
+        flexWrap(`wrap),
+        alignItems(`flexStart),
       ])
     );
   let footerSectionStyle =
