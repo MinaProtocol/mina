@@ -186,15 +186,14 @@ module MemberProfile = {
     let memberName =
       style([
         height(`px(32)),
-        paddingTop(`rem(0.65)),
         marginTop(`px(62)),
         display(`flex),
-        margin3(~top=`rem(3.875), ~h=`auto, ~bottom=`zero),
+        margin3(~top=`rem(4.43), ~h=`auto, ~bottom=`zero),
       ]);
     let icon = style([height(`auto), alignSelf(`center)]);
     let genesisLabel =
       style([
-        margin2(~v=`rem(1.), ~h=`auto),
+        margin2(~v=`rem(0.6875), ~h=`auto),
         borderRadius(`px(4)),
         background(`hex("757575")),
         Theme.Typeface.ibmplexsans,
@@ -210,7 +209,40 @@ module MemberProfile = {
     let quote =
       merge([
         Theme.Body.basic,
-        style([margin2(~v=`zero, ~h=`auto), width(`rem(22.))]),
+        style([
+          margin2(~v=`zero, ~h=`rem(1.5)),
+          width(`rem(23.)),
+          fontWeight(`light),
+        ]),
+      ]);
+    let socials =
+      style([
+        display(`flex),
+        justifyContent(`spaceBetween),
+        width(`rem(24.7)),
+        margin2(~v=`rem(1.93), ~h=`auto),
+      ]);
+    let socialTag =
+      style([
+        display(`flex),
+        selector("p", [marginTop(`zero), marginBottom(`zero)]),
+      ]);
+
+    let ctaButton =
+      merge([
+        Theme.Body.basic_semibold,
+        style([
+          width(`rem(14.)),
+          height(`rem(3.)),
+          backgroundColor(Theme.Colors.hyperlink),
+          borderRadius(`px(6)),
+          textDecoration(`none),
+          color(white),
+          padding2(~v=`px(12), ~h=`px(24)),
+          textAlign(`center),
+          alignSelf(`center),
+          hover([backgroundColor(Theme.Colors.hyperlinkHover)]),
+        ]),
       ]);
   };
   [@react.component]
@@ -234,6 +266,32 @@ module MemberProfile = {
                "\"My favorite thing about Coda is how it utilizes and builds on zk-SNARKs, which are a fundamental technology that could have a massive impact on the blockchain space and technology in general.\"",
              )}
           </p>
+          <div className=Styles.socials>
+            <div className=Styles.socialTag>
+              <img src="/static/img/Location.svg" />
+              <Spacer width=0.34 />
+              <p className=Theme.Body.basic_small>
+                {React.string("Victoria, Canada")}
+              </p>
+            </div>
+            <div className=Styles.socialTag>
+              <img src="/static/img/Icon.Twitter.svg" />
+              <Spacer width=0.34 />
+              <p className=Theme.Body.basic_small>
+                {React.string("@_garethtdavies")}
+              </p>
+            </div>
+            <div className=Styles.socialTag>
+              <img src="/static/img/Icon.Git.svg" />
+              <Spacer width=0.34 />
+              <p className=Theme.Body.basic_small>
+                {React.string("garethtdavies")}
+              </p>
+            </div>
+          </div>
+          <a href="/blog" className=Styles.ctaButton>
+            {React.string({js|Learn More|js})}
+          </a>
         </div>
       </div>
     </div>;
