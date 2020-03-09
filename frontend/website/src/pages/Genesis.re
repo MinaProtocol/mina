@@ -173,6 +173,7 @@ module MemberProfile = {
         background(`hex("F5F5F5")),
         border(`px(1), `solid, Theme.Colors.teal),
       ]);
+    let innerFlex = style([display(`flex), flexDirection(`column)]);
     let profilePic =
       style([
         position(`absolute),
@@ -182,12 +183,34 @@ module MemberProfile = {
         border(`px(1), `solid, Theme.Colors.saville),
         padding(`px(5)),
       ]);
-    let memberName = style([margin(`auto), display(`flex)]);
-    let icon =
+    let memberName =
       style([
-        height(`percent(100.)),
-        width(`percent(100.)),
-        alignSelf(`center),
+        height(`px(32)),
+        paddingTop(`rem(0.65)),
+        marginTop(`px(62)),
+        display(`flex),
+        margin3(~top=`rem(3.875), ~h=`auto, ~bottom=`zero),
+      ]);
+    let icon = style([height(`auto), alignSelf(`center)]);
+    let genesisLabel =
+      style([
+        margin2(~v=`rem(1.), ~h=`auto),
+        borderRadius(`px(4)),
+        background(`hex("757575")),
+        Theme.Typeface.ibmplexsans,
+        fontSize(`rem(0.68)),
+        textTransform(`uppercase),
+        letterSpacing(`px(1)),
+        lineHeight(`rem(1.)),
+        color(white),
+        height(`rem(1.)),
+        width(`rem(11.9)),
+        padding2(~h=`rem(0.5), ~v=`zero),
+      ]);
+    let quote =
+      merge([
+        Theme.Body.basic,
+        style([margin2(~v=`zero, ~h=`auto), width(`rem(22.))]),
       ]);
   };
   [@react.component]
@@ -195,10 +218,22 @@ module MemberProfile = {
     <div className=Styles.outerBox>
       <div className=Styles.container>
         <img src="/static/img/gareth.png" className=Styles.profilePic />
-        <div className=Styles.memberName>
-          <img src="/static/img/DiscordLogo.png" className=Styles.icon />
-          <Spacer width=0.31 />
-          <h4 className=Theme.H4.header> {React.string("GarethDavies")} </h4>
+        <div className=Styles.innerFlex>
+          <span className=Styles.memberName>
+            <img src="/static/img/DiscordLogo.png" className=Styles.icon />
+            <Spacer width=0.31 />
+            <h4 className=Theme.H4.header>
+              {React.string("Garethtdavies")}
+            </h4>
+          </span>
+          <p className=Styles.genesisLabel>
+            {React.string("Genesis Founding Member")}
+          </p>
+          <p className=Styles.quote>
+            {React.string(
+               "\"My favorite thing about Coda is how it utilizes and builds on zk-SNARKs, which are a fundamental technology that could have a massive impact on the blockchain space and technology in general.\"",
+             )}
+          </p>
         </div>
       </div>
     </div>;
