@@ -54,7 +54,7 @@ type pipes =
       * Block_time.t
       * (bool -> unit) )
       Pipe.Writer.t
-  ; local_txns_writer:
+  ; user_command_input_writer:
       ( User_command_util.user_command_input
       , Strict_pipe.synchronous
       , unit Deferred.t )
@@ -608,7 +608,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
 
 (*TODO: Synchronize this*)
 let add_transactions t (uc_inputs : User_command_util.user_command_input) =
-  Strict_pipe.Writer.write t.pipes.local_txns_writer uc_inputs
+  Strict_pipe.Writer.write t.pipes.user_command_input_writer uc_inputs
   |> Deferred.don't_wait_for
 
 let next_producer_timing t = t.next_producer_timing
@@ -894,50 +894,100 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           Strict_pipe.Reader.iter user_command_input_reader
             ~f:(fun (uc_input : User_command_util.user_command_input) ->
               let setup_user_command
-                  (client_input : User_command_util.Client_input.t) =
-                let create_user_command fee nonce valid_until memo body
-                    sender_kp =
+                  (client_input : User_command_util.Client_input.t) :
+                  User_command.t Deferred.Or_error.t =
+                let open Deferred.Or_error.Let_syntax in
+                let opt_error ~error_string opt =
+                  Option.value_map
+                    ~default:
+                      (Or_error.error_string
+                         (sprintf "Error creating user command: %s Error: %s"
+                            (Yojson.Safe.to_string
+                               (User_command_util.Client_input.to_yojson
+                                  client_input))
+                            error_string))
+                    ~f:(fun value -> Ok value)
+                    opt
+                  |> Deferred.return
+                in
+                let create_user_command nonce =
                   let payload =
-                    User_command.Payload.create ~fee ~nonce ~valid_until ~memo
-                      ~body
+                    User_command.Payload.create ~fee:client_input.fee ~nonce
+                      ~valid_until:client_input.valid_until
+                      ~memo:client_input.memo ~body:client_input.body
                   in
-                  let signed_user_command =
-                    User_command.sign sender_kp payload
+                  (*Capture the errors*)
+                  let%map signed_user_command =
+                    match client_input.sign_choice with
+                    | `Signature signature ->
+                        User_command.create_with_signature_checked signature
+                          client_input.sender payload
+                        |> opt_error ~error_string:"Invalid signature"
+                    | `Keypair sender_kp ->
+                        Deferred.Or_error.return
+                          (User_command.sign sender_kp payload)
+                    | `Hd_index hd_index ->
+                        Deferred.map
+                          (Secrets.Hardware_wallets.sign ~hd_index
+                             ~public_key:
+                               (Public_key.decompress_exn client_input.sender)
+                             ~user_command_payload:payload)
+                          ~f:(Result.map_error ~f:Error.of_string)
                   in
                   User_command.forget_check signed_user_command
                 in
-                let open Option.Let_syntax in
-                let%map nonce =
+                let%bind nonce =
                   match client_input.nonce_opt with
                   | Some nonce ->
-                      Some nonce
+                      Deferred.Or_error.return nonce
                   | None ->
                       (*get inferred nonce*)
-                      uc_input.inferred_nonce
-                        (Public_key.compress client_input.sender_kp.public_key)
+                      uc_input.inferred_nonce client_input.sender
+                      |> opt_error
+                           ~error_string:
+                             "Couldn't infer nonce for transaction from \
+                              specified `sender` since `sender` is not in the \
+                              ledger or sent a transaction in transaction \
+                              pool."
                 in
-                create_user_command client_input.fee nonce
-                  client_input.valid_until client_input.memo client_input.body
-                  client_input.sender_kp
+                create_user_command nonce
               in
-              let user_commands =
-                List.filter_map uc_input.client_input ~f:(fun uc ->
-                    match setup_user_command uc with
-                    | None ->
-                        Logger.warn config.logger
-                          "Cannot submit $cmd to the pool: Sender account not \
-                           found"
-                          ~module_:__MODULE__ ~location:__LOC__
-                          ~metadata:
-                            [ ( "cmd"
-                              , User_command_util.Client_input.to_yojson uc )
-                            ] ;
-                        None
-                    | res ->
-                        res )
+              let%bind user_commands =
+                let rec go acc ucs =
+                  match ucs with
+                  | [] ->
+                      return acc
+                  | uc :: ucs -> (
+                      match%bind setup_user_command uc with
+                      | Ok res ->
+                          let acc' =
+                            let open Or_error.Let_syntax in
+                            let%map acc = acc in
+                            res :: acc
+                          in
+                          go acc' ucs
+                      | Error e ->
+                          Logger.warn config.logger
+                            "Cannot submit $cmd to the pool: $error"
+                            ~module_:__MODULE__ ~location:__LOC__
+                            ~metadata:
+                              [ ( "cmd"
+                                , User_command_util.Client_input.to_yojson uc
+                                )
+                              ; ("error", `String (Error.to_string_hum e)) ] ;
+                          return (Error e) )
+                in
+                go (Ok []) uc_input.client_input
               in
-              if List.is_empty user_commands then return ()
-              else Strict_pipe.Writer.write local_txns_writer user_commands )
+              match user_commands with
+              | Ok ucs ->
+                  let user_commands' = List.rev ucs in
+                  Ivar.fill uc_input.result (Ok user_commands') ;
+                  if List.is_empty user_commands' then return ()
+                  else
+                    Strict_pipe.Writer.write local_txns_writer user_commands'
+              | Error e ->
+                  Deferred.return (Ivar.fill uc_input.result (Error e)) )
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
@@ -1194,7 +1244,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 ; external_transitions_writer=
                     Strict_pipe.Writer.to_linear_pipe
                       external_transitions_writer
-                ; local_txns_writer= user_command_input_writer
+                ; user_command_input_writer
                 ; local_snark_work_writer }
             ; wallets
             ; block_production_keypairs

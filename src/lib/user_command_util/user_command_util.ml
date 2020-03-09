@@ -2,18 +2,23 @@ open Coda_base
 open Signature_lib
 open Coda_numbers
 open Core_kernel
+open Async_kernel
 
 module Client_input = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
-        { sender_kp: Keypair.Stable.V1.t
+        { sender: Public_key.Compressed.Stable.V1.t
         ; fee: Currency.Fee.Stable.V1.t
         ; nonce_opt: Account_nonce.Stable.V1.t option
         ; valid_until: Account_nonce.Stable.V1.t
         ; memo: User_command_memo.Stable.V1.t
-        ; body: User_command_payload.Body.Stable.V1.t }
+        ; body: User_command_payload.Body.Stable.V1.t
+        ; sign_choice:
+            [ `Signature of Signature.Stable.V1.t
+            | `Hd_index of Unsigned_extended.UInt32.Stable.V1.t
+            | `Keypair of Keypair.Stable.V1.t ] }
       [@@deriving to_yojson]
 
       let to_latest = Fn.id
@@ -21,12 +26,16 @@ module Client_input = struct
   end]
 
   type t = Stable.Latest.t =
-    { sender_kp: Keypair.t
+    { sender: Public_key.Compressed.t
     ; fee: Currency.Fee.t
     ; nonce_opt: Account_nonce.t option
     ; valid_until: Account_nonce.t
     ; memo: User_command_memo.t
-    ; body: User_command_payload.Body.t }
+    ; body: User_command_payload.Body.t
+    ; sign_choice:
+        [ `Signature of Signature.t
+        | `Hd_index of Unsigned_extended.UInt32.t
+        | `Keypair of Keypair.t ] }
   [@@deriving make, to_yojson]
 
   (*let create ~fee ~nonce_opt ~valid_until ~memo ~sender_kp
@@ -36,7 +45,8 @@ end
 
 type user_command_input =
   { client_input: Client_input.t list
-  ; inferred_nonce: Public_key.Compressed.t -> Account_nonce.t Option.t }
+  ; inferred_nonce: Public_key.Compressed.t -> Account_nonce.t Option.t
+  ; result: User_command.t list Or_error.t Ivar.t }
 
 (*; record_payment: User_command.t -> Account.t -> Receipt.Chain_hash.t
   ; result: unit Or_error.t Ivar.t }*)

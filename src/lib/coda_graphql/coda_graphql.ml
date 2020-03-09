@@ -1543,12 +1543,23 @@ module Mutations = struct
         in
         (ip_address, Coda_commands.reset_trust_status coda ip_address) )
 
-  let send_user_command coda signed_command =
-    let user_command = User_command.forget_check signed_command in
+  let send_user_command coda user_command_input =
+    (*let user_command = User_command.forget_check signed_command in
     match Coda_commands.send_user_command coda user_command with
     | `Active f -> (
         match%map f with
         | Ok _receipt ->
+            Ok user_command
+        | Error e ->
+            Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
+    | `Bootstrapping ->
+        return (Error "Daemon is bootstrapping")*)
+    match
+      Coda_commands.setup_and_submit_user_command coda user_command_input
+    with
+    | `Active f -> (
+        match%map f with
+        | Ok user_command ->
             Ok user_command
         | Error e ->
             Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
@@ -1561,6 +1572,41 @@ module Mutations = struct
       ~error:
         "Couldn't find an unlocked key for specified `sender`. Did you unlock \
          the account you're making a transaction from?"
+
+  let create_user_command_input ~fee ~nonce_opt ~valid_until ~memo ~sender
+      ~body ~sign_choice : (User_command_util.Client_input.t, string) result =
+    let open Result.Let_syntax in
+    (* TODO: We should put a more sensible default here. *)
+    let valid_until =
+      Option.value_map ~default:Coda_numbers.Global_slot.max_value
+        ~f:Coda_numbers.Global_slot.of_uint32 valid_until
+    in
+    let%bind fee =
+      result_of_exn Currency.Fee.of_uint64 fee
+        ~error:(sprintf "Invalid `fee` provided.")
+    in
+    let%bind () =
+      Result.ok_if_true
+        Currency.Fee.(fee >= User_command.minimum_fee)
+        ~error:
+          (sprintf
+             !"Invalid user command. Fee %s is less than the minimum fee, %s."
+             (Currency.Fee.to_string fee)
+             (Currency.Fee.to_string User_command.minimum_fee))
+    in
+    let%map memo =
+      Option.value_map memo ~default:(Ok User_command_memo.empty)
+        ~f:(fun memo ->
+          result_of_exn User_command_memo.create_from_string_exn memo
+            ~error:"Invalid `memo` provided." )
+    in
+    { User_command_util.Client_input.sender
+    ; fee
+    ; nonce_opt
+    ; valid_until
+    ; memo
+    ; body
+    ; sign_choice }
 
   let create_user_command_payload ~coda ~fee ~nonce ~valid_until ~memo ~sender
       ~body : (User_command.Payload.t, string) result =
@@ -1610,27 +1656,38 @@ module Mutations = struct
     in
     User_command.Payload.create ~fee ~nonce ~valid_until ~memo ~body
 
-  let send_signed_user_command ~coda ~sender ~payload ~signature =
+  let send_signed_user_command ~(*~coda ~sender ~payload*) signature ~coda
+      ~nonce_opt ~sender ~memo ~fee ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
-    let%bind command =
-      User_command.create_with_signature_checked signature sender payload
-      |> Result.of_option ~error:"Invalid signature"
+    let%bind user_command_input =
+      create_user_command_input ~nonce_opt ~sender ~memo ~fee ~valid_until
+        ~body ~sign_choice:(`Signature signature)
       |> Deferred.return
     in
-    send_user_command coda command
+    send_user_command coda user_command_input
 
-  let send_unsigned_user_command ~coda ~sender ~payload =
+  let send_unsigned_user_command ~(*~coda ~sender ~payload*) coda ~nonce_opt
+      ~sender ~memo ~fee ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
-    let%bind command =
-      match%bind Deferred.return @@ find_identity ~public_key:sender coda with
+    let%bind sign_choice =
+      (*Deferred.return @@  find_identity ~public_key:sender coda*)
+      match%map Deferred.return @@ find_identity ~public_key:sender coda with
       | `Keypair sender_kp ->
-          return @@ User_command.sign sender_kp payload
+          `Keypair sender_kp
       | `Hd_index hd_index ->
-          Secrets.Hardware_wallets.sign ~hd_index
+          `Hd_index hd_index
+      (*Secrets.Hardware_wallets.sign ~hd_index
             ~public_key:(Public_key.decompress_exn sender)
-            ~user_command_payload:payload
+            ~user_command_payload:payload*)
+      (*in
+    send_user_command coda command*)
     in
-    send_user_command coda command
+    let%bind user_command_input =
+      create_user_command_input ~nonce_opt ~sender ~memo ~fee ~valid_until
+        ~body ~sign_choice
+      |> Deferred.return
+    in
+    send_user_command coda user_command_input
 
   let send_delegation =
     io_field "sendDelegation"
@@ -1641,23 +1698,25 @@ module Mutations = struct
           [ arg "input" ~typ:(non_null Types.Input.send_delegation)
           ; Types.Input.Fields.signature ]
       ~resolve:
-        (fun {ctx= coda; _} () (from, to_, fee, valid_until, memo, nonce)
+        (fun {ctx= coda; _} () (from, to_, fee, valid_until, memo, nonce_opt)
              signature ->
-        let open Deferred.Result.Let_syntax in
+        (*let open Deferred.Result.Let_syntax in*)
         let body =
           User_command_payload.Body.Stake_delegation
             (Set_delegate {new_delegate= to_})
         in
-        let%bind (payload : User_command.Payload.t) =
+        (*let%bind (payload : User_command.Payload.t) =
           Deferred.return
           @@ create_user_command_payload ~coda ~nonce ~sender:from ~memo ~fee
                ~valid_until ~body
-        in
+        in*)
         match signature with
         | None ->
-            send_unsigned_user_command ~coda ~sender:from ~payload
+            send_unsigned_user_command ~coda ~nonce_opt ~sender:from ~memo ~fee
+              ~valid_until ~body
         | Some signature ->
-            send_signed_user_command ~coda ~sender:from ~payload ~signature )
+            send_signed_user_command ~coda ~nonce_opt ~sender:from ~memo ~fee
+              ~valid_until ~body ~signature )
 
   let send_payment =
     io_field "sendPayment" ~doc:"Send a payment"
@@ -1668,22 +1727,24 @@ module Mutations = struct
           ; Types.Input.Fields.signature ]
       ~resolve:
         (fun {ctx= coda; _} ()
-             (from, to_, amount, fee, valid_until, memo, nonce) signature ->
-        let open Deferred.Result.Let_syntax in
+             (from, to_, amount, fee, valid_until, memo, nonce_opt) signature ->
+        (*let open Deferred.Result.Let_syntax in*)
         let body =
           User_command_payload.Body.Payment
             {receiver= to_; amount= Amount.of_uint64 amount}
         in
-        let%bind payload =
+        (*let%bind payload =
           Deferred.return
           @@ create_user_command_payload ~coda ~nonce ~sender:from ~memo ~fee
                ~valid_until ~body
-        in
+        in*)
         match signature with
         | None ->
-            send_unsigned_user_command ~coda ~sender:from ~payload
+            send_unsigned_user_command ~coda ~nonce_opt ~sender:from ~memo ~fee
+              ~valid_until ~body
         | Some signature ->
-            send_signed_user_command ~coda ~sender:from ~payload ~signature )
+            send_signed_user_command ~coda ~nonce_opt ~sender:from ~memo ~fee
+              ~valid_until ~body ~signature )
 
   let add_payment_receipt =
     result_field "addPaymentReceipt"
