@@ -166,7 +166,77 @@ module H1 = {
       ),
     ]);
 };
+module Grid = {
+  open Css;
 
+  module MobileFullWidth = {
+    let (basic, basicStyles) =
+      generateStyles([
+        media("(min-width: 10rem)", [width(`percent(100.0))]),
+      ]);
+  };
+
+  module X1 = {
+    let (basic, basicStyles) =
+      generateStyles([
+        media(MediaQuery.somewhatLarge, [width(`percent(10.0))]),
+      ]);
+  };
+  module X2 = {
+    let (basic, basicStyles) =
+      generateStyles([
+        media(MediaQuery.somewhatLarge, [width(`percent(20.0))]),
+      ]);
+  };
+  module X3 = {
+    let (basic, basicStyles) =
+      generateStyles([
+        media(MediaQuery.somewhatLarge, [width(`percent(30.0))]),
+      ]);
+  };
+  module X4 = {
+    let (basic, basicStyles) =
+      generateStyles([
+        media(MediaQuery.somewhatLarge, [width(`percent(40.0))]),
+      ]);
+  };
+  module X5 = {
+    let (basic, basicStyles) =
+      generateStyles([
+        media(MediaQuery.somewhatLarge, [width(`percent(50.0))]),
+      ]);
+  };
+  module X6 = {
+    let (basic, basicStyles) =
+      generateStyles([
+        media(MediaQuery.somewhatLarge, [width(`percent(60.0))]),
+      ]);
+  };
+  module X7 = {
+    let (basic, basicStyles) =
+      generateStyles([
+        media(MediaQuery.somewhatLarge, [width(`percent(70.0))]),
+      ]);
+  };
+  module X8 = {
+    let (basic, basicStyles) =
+      generateStyles([
+        media(MediaQuery.somewhatLarge, [width(`percent(80.0))]),
+      ]);
+  };
+  module X9 = {
+    let (basic, basicStyles) =
+      generateStyles([
+        media(MediaQuery.somewhatLarge, [width(`percent(90.0))]),
+      ]);
+  };
+  module X10 = {
+    let (basic, basicStyles) =
+      generateStyles([
+        media(MediaQuery.somewhatLarge, [width(`percent(100.0))]),
+      ]);
+  };
+};
 module H2 = {
   open Css;
 

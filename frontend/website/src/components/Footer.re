@@ -132,14 +132,23 @@ module Footer = {
   let footerSectionStyle =
     Css.(
       style([
-        Theme.Typeface.ibmplexsans,
-        color(Theme.Colors.slate),
-        textDecoration(`none),
-        display(`inline),
-        hover([color(Theme.Colors.hyperlink)]),
-        fontSize(`rem(1.0)),
-        fontWeight(`light),
-        lineHeight(`rem(1.56)),
+        width(`percent(100.0)),
+        backgroundColor(`hex("212121")),
+        display(`flex),
+        paddingTop(`rem(3.5)),
+        paddingBottom(`rem(4.0)),
+        media(
+          Theme.MediaQuery.notMobile,
+          [paddingLeft(`rem(1.0)), paddingRight(`rem(1.0))],
+        ),
+        media(
+          Theme.MediaQuery.full,
+          [paddingLeft(`rem(5.0)), paddingRight(`rem(5.0))],
+        ),
+        media(
+          Theme.MediaQuery.veryLarge,
+          [paddingLeft(`rem(8.0)), paddingRight(`rem(8.0))],
+        ),
       ])
     );
   [@react.component]
@@ -149,6 +158,10 @@ module Footer = {
         <NewsletterWidget center=true whiteText=true />
       </section>
       <section className=footerSectionStyle>
+        <div>
+          <div> {React.string("One")} </div>
+          <div> {React.string("Two")} </div>
+        </div>
         {React.string("This is normal footer section")}
       </section>
     </footer>;
