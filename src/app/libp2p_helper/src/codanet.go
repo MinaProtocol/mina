@@ -116,8 +116,7 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 		p2p.DisableRelay(),
 		p2p.ListenAddrs(listenOn...),
 		p2p.AddrsFactory(func(as []ma.Multiaddr) []ma.Multiaddr {
-			as = append(as, externalAddr)
-			return as
+			return []ma.Multiaddr{externalAddr}
 		}),
 		p2p.Filters(filters),
 		p2p.NATPortMap(),
