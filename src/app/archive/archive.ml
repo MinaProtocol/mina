@@ -20,7 +20,7 @@ let setup_server ~logger ~postgres_address ~server_port =
         ~metadata:[("error", `String (Caqti_error.show e))] ;
       Deferred.unit
   | Ok conn ->
-      Processor_new.run conn reader ~logger |> don't_wait_for ;
+      Processor.run conn reader ~logger |> don't_wait_for ;
       Deferred.ignore
       @@ Tcp.Server.create
            ~on_handler_error:

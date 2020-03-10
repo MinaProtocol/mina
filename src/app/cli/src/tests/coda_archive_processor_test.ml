@@ -17,7 +17,7 @@ let main () =
         failwith @@ Caqti_error.show e
   in
   let logger = Logger.create () in
-  Archive_lib.Processor_new.setup_server ~logger ~postgres_address
+  Archive_lib.Processor.setup_server ~logger ~postgres_address
     ~server_port:(Host_and_port.port archive_address)
   |> don't_wait_for ;
   let largest_account_keypair =
@@ -58,15 +58,12 @@ let main () =
     ~f:(fun With_hash.{hash; data= transition} ->
       match%map
         let open Deferred.Result.Let_syntax in
-        match%bind
-          Archive_lib.Processor_new.Block.find conn ~state_hash:hash
-        with
+        match%bind Archive_lib.Processor.Block.find conn ~state_hash:hash with
         | Some id ->
-            let%bind Archive_lib.Processor_new.Block.{parent_id; _} =
-              Archive_lib.Processor_new.Block.load conn ~id
+            let%bind Archive_lib.Processor.Block.{parent_id; _} =
+              Archive_lib.Processor.Block.load conn ~id
             in
-            Archive_lib.Processor_new.For_test.assert_parent_exist conn
-              ~parent_id
+            Archive_lib.Processor.For_test.assert_parent_exist conn ~parent_id
               ~parent_hash:
                 transition
                   .Auxiliary_database.Filtered_external_transition
