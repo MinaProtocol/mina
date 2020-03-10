@@ -555,6 +555,8 @@ let daemon logger =
            Auxiliary_database.External_transition_database.create ~logger
              external_transition_database_dir
          in
+         trace_database_initialization "external_transition_database" __LOC__
+           external_transition_database_dir ;
          (* log terminated child processes *)
          (* FIXME adapt to new system, move into child_processes lib *)
          let pids = Child_processes.Termination.create_pid_table () in

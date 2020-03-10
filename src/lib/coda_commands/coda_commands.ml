@@ -201,7 +201,6 @@ let add_transactions t user_commands =
     ; result= res_ivar } ;
   Ivar.read res_ivar
 
-(*TODO: add logs*)
 let setup_and_submit_user_command t user_command_input =
   let open Participating_state.Let_syntax in
   let%map _is_active = Coda_lib.active_or_bootstrapping t in
