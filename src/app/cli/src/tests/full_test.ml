@@ -264,17 +264,23 @@ let run_test () : unit Deferred.t =
       *)
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
-      let build_payment amount sender_sk receiver_pk fee =
+      let build_payment ?(nonce_opt = None) amount sender_sk receiver_pk fee =
         trace_recurring "build_payment" (fun () ->
             let memo =
               User_command_memo.create_from_string_exn
                 "A memo created in full-test"
             in
-            User_command_util.Client_input.make ~sender:(pk_of_sk sender_sk)
-              ~fee ~memo ~valid_until:Coda_numbers.Global_slot.max_value
-              ~body:(Payment {receiver= receiver_pk; amount})
-              ~sign_choice:(`Keypair (Keypair.of_private_key_exn sender_sk))
-              () )
+            let uc_input =
+              User_command_util.Client_input.make ~sender:(pk_of_sk sender_sk)
+                ~fee ~memo ~valid_until:Coda_numbers.Global_slot.max_value
+                ~body:(Payment {receiver= receiver_pk; amount})
+                ~sign_choice:(`Keypair (Keypair.of_private_key_exn sender_sk))
+            in
+            match nonce_opt with
+            | None ->
+                uc_input ()
+            | Some nonce ->
+                uc_input ~nonce_opt:nonce () )
       in
       let assert_ok x = assert (Or_error.is_ok x) in
       let send_payment (payment : User_command_util.Client_input.t) =
@@ -298,10 +304,12 @@ let run_test () : unit Deferred.t =
         in
         let%bind p1_res = send_payment payment in
         assert_ok p1_res ;
+        let user_cmd, _receipt = p1_res |> Or_error.ok_exn in
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =
           build_payment send_amount sender_sk receiver_pk transaction_fee
+            ~nonce_opt:(Some (User_command.nonce user_cmd))
         in
         let%bind p2_res = send_payment payment' in
         assert_ok p2_res ;
