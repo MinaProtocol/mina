@@ -159,6 +159,12 @@ let daemon logger =
            "true|false Log transaction-pool diff received from peers \
             (default: false)"
          (optional bool)
+     and log_block_creation =
+       flag "log-block-creation"
+         ~doc:
+           "true|false Log the steps involved in including transactions and \
+            snark work in a block (default: true)"
+         (optional bool)
      and libp2p_keypair =
        flag "discovery-keypair" (optional string)
          ~doc:
@@ -291,70 +297,7 @@ let daemon logger =
                ~metadata:[("config_directory", `String conf_dir)] ;
              make_version ~wipe_dir:false
        in
-       don't_wait_for
-         (let bytes_per_word = Sys.word_size / 8 in
-          (* Curve points are allocated in C++ and deallocated with finalizers.
-             The points on the C++ heap are much bigger than the OCaml heap
-             objects that point to them, which makes the GC underestimate how
-             much memory has been allocated since the last collection and not
-             run major GCs often enough, which means the finalizers don't run
-             and we use way too much memory. As a band-aid solution, we run a
-             major GC cycle every ten minutes.
-          *)
-          let gc_method =
-            Option.value ~default:"full" @@ Unix.getenv "CODA_GC_HACK_MODE"
-          in
-          (* Doing Gc.major is known to work, but takes quite a bit of time.
-             Running a single slice might be sufficient, but I haven't tested it
-             and the documentation isn't super clear. *)
-          let gc_fun =
-            match gc_method with
-            | "full" ->
-                Gc.major
-            | "slice" ->
-                fun () -> ignore (Gc.major_slice 0)
-            | other ->
-                failwithf
-                  "CODA_GC_HACK_MODE was %s, it should be full or slice. \
-                   Default is full."
-                  other
-          in
-          let interval =
-            Time.Span.of_sec
-            @@ Option.(
-                 value ~default:600.
-                   ( map ~f:Float.of_string
-                   @@ Unix.getenv "CODA_GC_HACK_INTERVAL" ))
-          in
-          let log_stats suffix =
-            let stat = Gc.stat () in
-            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "OCaml memory statistics, %s" suffix
-              ~metadata:
-                [ ("heap_size", `Int (stat.heap_words * bytes_per_word))
-                ; ("heap_chunks", `Int stat.heap_chunks)
-                ; ("max_heap_size", `Int (stat.top_heap_words * bytes_per_word))
-                ; ("live_size", `Int (stat.live_words * bytes_per_word))
-                ; ("live_blocks", `Int stat.live_blocks) ] ;
-            let {Jemalloc.active; resident; allocated; mapped} =
-              Jemalloc.get_memory_stats ()
-            in
-            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-              "Jemalloc memory statistics (in bytes)"
-              ~metadata:
-                [ ("active", `Int active)
-                ; ("resident", `Int resident)
-                ; ("allocated", `Int allocated)
-                ; ("mapped", `Int mapped) ]
-          in
-          let rec loop () =
-            log_stats "before major gc" ;
-            gc_fun () ;
-            log_stats "after major gc" ;
-            let%bind () = after interval in
-            loop ()
-          in
-          loop ()) ;
+       Memory_stats.log_memory_stats logger ~process:"daemon" ;
        Parallel.init_master () ;
        let monitor = Async.Monitor.create ~name:"coda" () in
        let module Coda_initialization = struct
@@ -452,6 +395,10 @@ let daemon logger =
          let log_transaction_pool_diff =
            or_from_config YJ.Util.to_bool_option "log-txn-pool-gossip"
              ~default:false log_transaction_pool_diff
+         in
+         let log_block_creation =
+           or_from_config YJ.Util.to_bool_option "log-block-creation"
+             ~default:true log_block_creation
          in
          let log_gossip_heard =
            { Coda_networking.Config.snark_pool_diff=
@@ -682,7 +629,7 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~genesis_state_hash ())
+                ~genesis_state_hash ~log_block_creation ())
              ~genesis_ledger ~base_proof
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}

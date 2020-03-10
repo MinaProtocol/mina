@@ -1,192 +1,95 @@
 module Styles = {
   open Css;
-
-  let map =
-    style([
-      position(`fixed),
-      left(`px(0)),
-      top(`px(0)),
-      zIndex(-1),
-      maxWidth(`percent(100.)),
-    ]);
-
   let hero = {
-    style([display(`flex), flexDirection(`row)]);
+    style([display(`flex), flexDirection(`row), paddingTop(`rem(5.))]);
   };
-
   let heroLeft = {
     style([
       display(`flex),
       flexDirection(`column),
-      justifyContent(`center),
+      justifyContent(`flexStart),
+      maxWidth(`rem(28.0)),
       width(`percent(100.0)),
-      maxWidth(`rem(32.0)),
-      marginLeft(`px(80)),
-      marginTop(`px(80)),
-      marginRight(`px(80)),
+      marginLeft(`rem(5.)),
+      paddingTop(`rem(7.)),
+    ]);
+  };
+  let heroRight = {
+    style([
+      display(`flex),
+      flexDirection(`column),
+      justifyContent(`flexStart),
+      paddingTop(`rem(7.)),
     ]);
   };
   let header = {
-    merge([Theme.Text.Header.h1, style([fontSize(`rem(2.70))])]);
+    merge([Theme.Text.title, style([color(white)])]);
   };
   let heroBody = {
     merge([
       Theme.Text.Body.regularLight,
       style([
         marginTop(`rem(1.)),
-        marginBottom(`rem(3.)),
-        maxWidth(`rem(28.)),
-        color(Theme.Colors.midnightBlue),
+        color(white),
         animationFillMode(`forwards),
       ]),
     ]);
   };
 
-  let image = {
+  let main =
     style([
-      width(`percent(100.0)),
-      maxWidth(`rem(15.0)),
-      marginRight(`rem(2.0)),
+      position(`absolute),
+      top(`zero),
+      left(`zero),
       display(`flex),
-      justifyContent(`spaceAround),
+      flexDirection(`row),
+      paddingTop(`rem(7.5)),
+      height(`vh(100.)),
+      width(`vw(100.)),
+      zIndex(100),
     ]);
-  };
-
-  let codaImage = {
-    style([width(`rem(0.625))]);
-  };
-
-  let towerImage = {
-    style([marginRight(`rem(-1.5))]);
-  };
-};
-
-module Info = {
-  [@react.component]
-  let make =
-      (
-        ~className="",
-        ~sizeEmphasis,
-        ~name,
-        ~size,
-        ~label,
-        ~textColor,
-        ~children,
-      ) => {
-    <div
-      className=Css.(
-        merge([
-          className,
-          style([
-            display(`flex),
-            flexDirection(`column),
-            justifyContent(`flexEnd),
-            alignItems(`center),
-            textAlign(`center),
-          ]),
-        ])
-      )>
-      children
-      <div>
-        <h3
-          className=Css.(
-            merge([
-              Theme.Text.Header.h3,
-              style([
-                color(textColor),
-                fontWeight(`medium),
-                marginTop(`rem(1.25)),
-                marginBottom(`zero),
-              ]),
-            ])
-          )>
-          {React.string(name)}
-        </h3>
-        <h3
-          className=Css.(
-            merge([
-              Theme.Text.Header.h3,
-              style([
-                color(textColor),
-                marginTop(`zero),
-                marginBottom(`zero),
-                fontWeight(sizeEmphasis ? `bold : `normal),
-              ]),
-            ])
-          )>
-          {React.string(size)}
-        </h3>
-      </div>
-      <h5
-        className=Css.(
-          merge([
-            Theme.Text.Header.h5,
-            style([marginTop(`rem(1.125)), marginBottom(`rem(0.375))]),
-          ])
-        )>
-        {React.string(label)}
-      </h5>
-    </div>;
+  let map =
+    style([
+      position(`fixed),
+      left(`px(0)),
+      top(`px(0)),
+      zIndex(1),
+      maxWidth(`percent(100.)),
+    ]);
+  let buttonRow = {
+    style([display(`flex), flexDirection(`row)]);
   };
 };
 
 [@react.component]
 let make = (~nextStep) => {
   let mapImage = Hooks.useAsset("map@2x.png");
-  let codaImage = Hooks.useAsset("coda-icon.png");
-  let towerImage = Hooks.useAsset("hero-illustration.png");
-  <div className=Theme.Onboarding.main>
+  <div className=Styles.main>
     <div className=Styles.map>
       <img src=mapImage alt="Map" className=Styles.map />
     </div>
-    <div className=Styles.hero>
+    <OnboardingHeader />
+    <div className=Theme.Onboarding.main>
       <div className=Styles.heroLeft>
         <FadeIn duration=500 delay=0>
-          <h1 className=Styles.header>
-            {React.string("Welcome to Coda Wallet!")}
-          </h1>
+          <h1 className=Styles.header> {React.string("Welcome")} </h1>
         </FadeIn>
         <FadeIn duration=500 delay=150>
-          <p className=Styles.heroBody>
-            {React.string(
-               {|Coda swaps the traditional blockchain for a tiny cryptographic proof, enabling a cryptocurrency that stays the same size forever. With the Coda Wallet you can send, recieve and view transactions on the Coda network.|},
-             )}
-          </p>
+          <div className=Styles.heroBody>
+            <p>
+              {React.string(
+                 {|You're about to install everything you need to participate in Coda Protocol's revolutionary blockchain, which will make cryptocurrency accessible to everyone.|},
+               )}
+            </p>
+          </div>
         </FadeIn>
-        <div>
+        <div className=Styles.heroBody>
           <Button
-            label="Continue"
-            style=Button.HyperlinkBlue
+            label="Get Started"
+            style=Button.HyperlinkBlue3
             onClick={_ => nextStep()}
           />
         </div>
-      </div>
-      <div />
-      <div className=Styles.image>
-        <Info
-          sizeEmphasis=false
-          name="Coda"
-          size="22kB"
-          label="Fixed"
-          textColor=Theme.Colors.jungle>
-          <img
-            className=Styles.codaImage
-            src=codaImage
-            alt="Small Coda logo representing its small, fixed blockchain size."
-          />
-        </Info>
-        <Info
-          className=Styles.towerImage
-          sizeEmphasis=true
-          name="Other blockchains"
-          size="2TB+"
-          label="Increasing"
-          textColor=Theme.Colors.roseBud>
-          <img
-            src=towerImage
-            alt="Huge tower of blocks representing the data required by other blockchains."
-          />
-        </Info>
       </div>
     </div>
   </div>;
