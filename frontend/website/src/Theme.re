@@ -169,73 +169,20 @@ module H1 = {
 module Grid = {
   open Css;
 
-  module MobileFullWidth = {
-    let (basic, basicStyles) =
-      generateStyles([
-        media("(min-width: 10rem)", [width(`percent(100.0))]),
-      ]);
-  };
-
-  module X1 = {
-    let (basic, basicStyles) =
-      generateStyles([
-        media(MediaQuery.somewhatLarge, [width(`percent(10.0))]),
-      ]);
-  };
-  module X2 = {
-    let (basic, basicStyles) =
-      generateStyles([
-        media(MediaQuery.somewhatLarge, [width(`percent(20.0))]),
-      ]);
-  };
-  module X3 = {
-    let (basic, basicStyles) =
-      generateStyles([
-        media(MediaQuery.somewhatLarge, [width(`percent(30.0))]),
-      ]);
-  };
-  module X4 = {
-    let (basic, basicStyles) =
-      generateStyles([
-        media(MediaQuery.somewhatLarge, [width(`percent(40.0))]),
-      ]);
-  };
-  module X5 = {
-    let (basic, basicStyles) =
-      generateStyles([
-        media(MediaQuery.somewhatLarge, [width(`percent(50.0))]),
-      ]);
-  };
-  module X6 = {
-    let (basic, basicStyles) =
-      generateStyles([
-        media(MediaQuery.somewhatLarge, [width(`percent(60.0))]),
-      ]);
-  };
-  module X7 = {
-    let (basic, basicStyles) =
-      generateStyles([
-        media(MediaQuery.somewhatLarge, [width(`percent(70.0))]),
-      ]);
-  };
-  module X8 = {
-    let (basic, basicStyles) =
-      generateStyles([
-        media(MediaQuery.somewhatLarge, [width(`percent(80.0))]),
-      ]);
-  };
-  module X9 = {
-    let (basic, basicStyles) =
-      generateStyles([
-        media(MediaQuery.somewhatLarge, [width(`percent(90.0))]),
-      ]);
-  };
-  module X10 = {
-    let (basic, basicStyles) =
-      generateStyles([
-        media(MediaQuery.somewhatLarge, [width(`percent(100.0))]),
-      ]);
-  };
+  let mobileFullWidth =
+    style([media("(min-width: 10rem)", [width(`percent(100.0))])]);
+  let gridParent = style([width(`percent(100.0)), display(`flex)]);
+  let x1 = style([media("(min-width: 40rem)", [width(`percent(10.0))])]);
+  let x2 = style([media("(min-width: 40rem)", [width(`percent(20.0))])]);
+  let x3 = style([media("(min-width: 40rem)", [width(`percent(30.0))])]);
+  let x4 = style([media("(min-width: 40rem)", [width(`percent(40.0))])]);
+  let x5 = style([media("(min-width: 40rem)", [width(`percent(50.0))])]);
+  let x6 = style([media("(min-width: 40rem)", [width(`percent(60.0))])]);
+  let x7 = style([media("(min-width: 40rem)", [width(`percent(70.0))])]);
+  let x8 = style([media("(min-width: 40rem)", [width(`percent(80.0))])]);
+  let x9 = style([media("(min-width: 40rem)", [width(`percent(90.0))])]);
+  let x10 =
+    style([media("(min-width: 40rem)", [width(`percent(100.0))])]);
 };
 module H2 = {
   open Css;

@@ -158,11 +158,16 @@ module Footer = {
         <NewsletterWidget center=true whiteText=true />
       </section>
       <section className=footerSectionStyle>
-        <div>
-          <div> {React.string("One")} </div>
-          <div> {React.string("Two")} </div>
+        <div className=Theme.Grid.gridParent>
+          <div
+            className={Css.merge([Theme.Grid.mobileFullWidth, Theme.Grid.x8])}>
+            {React.string("One")}
+          </div>
+          <div
+            className={Css.merge([Theme.Grid.mobileFullWidth, Theme.Grid.x2])}>
+            {React.string("Two")}
+          </div>
         </div>
-        {React.string("This is normal footer section")}
       </section>
     </footer>;
   };
