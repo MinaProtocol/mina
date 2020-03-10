@@ -327,22 +327,33 @@ let daemon logger =
              ~logger ~conf_dir
          in
          let%bind config =
+           let configpath = conf_dir ^/ "daemon.json" in
            match%map
              Monitor.try_with_or_error ~extract_exn:true (fun () ->
-                 let%bind r = Reader.open_file (conf_dir ^/ "daemon.json") in
-                 let%map contents =
-                   Pipe.to_list (Reader.lines r)
-                   >>| fun ss -> String.concat ~sep:"\n" ss
-                 in
-                 YJ.from_string ~fname:"daemon.json" contents )
+                 let%bind r = Reader.open_file configpath in
+                 Pipe.to_list (Reader.lines r)
+                 >>| fun ss -> String.concat ~sep:"\n" ss )
            with
-           | Ok c ->
-               Some c
            | Error e ->
                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "Error reading daemon.json: $error"
-                 ~metadata:[("error", `String (Error.to_string_mach e))] ;
+                 "No daemon.json found at $configpath: $error"
+                 ~metadata:
+                   [ ("error", `String (Error.to_string_mach e))
+                   ; ("configpath", `String configpath) ] ;
                None
+           | Ok contents -> (
+             try
+               let json = YJ.from_string ~fname:"daemon.json" contents in
+               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                 "Using daemon.json config found at $configpath"
+                 ~metadata:[("configpath", `String configpath)] ;
+               Some json
+             with Yojson.Json_error e ->
+               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                 "Error parsing daemon.json at $configpath: $error"
+                 ~metadata:
+                   [("error", `String e); ("configpath", `String configpath)] ;
+               None )
          in
          let maybe_from_config (type a) (f : YJ.json -> a option)
              (keyname : string) (actual_value : a option) : a option =
@@ -354,6 +365,9 @@ let daemon logger =
            | None ->
                let%bind config = config in
                let%bind json_val = to_option Fn.id (member keyname config) in
+               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                 "Key $key being used from config file"
+                 ~metadata:[("key", `String keyname)] ;
                f json_val
          in
          let or_from_config map keyname actual_value ~default =
@@ -473,7 +487,14 @@ let daemon logger =
          in
          Option.iter
            ~f:(fun password ->
-             Unix.putenv ~key:Secrets.Keypair.env ~data:password )
+             match Sys.getenv Secrets.Keypair.env with
+             | Some env_pass when env_pass <> password ->
+                 Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                   "$envkey environment variable doesn't match value provided \
+                    on command-line or daemon.json. Using value from $envkey"
+                   ~metadata:[("envkey", `String Secrets.Keypair.env)]
+             | _ ->
+                 Unix.putenv ~key:Secrets.Keypair.env ~data:password )
            block_production_password ;
          let%bind block_production_keypair =
            match (block_production_key, block_production_pubkey) with
