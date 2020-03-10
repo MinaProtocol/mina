@@ -45,13 +45,12 @@ module type External_transition_base_intf = sig
 
   include Comparable.S with type t := t
 
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type nonrec t = t [@@deriving sexp, eq, bin_io, to_yojson, version]
+      type nonrec t = t [@@deriving sexp, to_yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   include External_transition_common_intf with type t := t
 end
@@ -64,40 +63,6 @@ module type S = sig
   type external_transition = t
 
   module Validation : sig
-    module Stable : sig
-      module V1 : sig
-        type ( 'time_received
-             , 'genesis_state
-             , 'proof
-             , 'delta_transition_chain
-             , 'frontier_dependencies
-             , 'staged_ledger_diff )
-             t =
-          'time_received
-          * 'genesis_state
-          * 'proof
-          * 'delta_transition_chain
-          * 'frontier_dependencies
-          * 'staged_ledger_diff
-          constraint 'time_received = [`Time_received] * (unit, _) Truth.t
-          constraint 'genesis_state = [`Genesis_state] * (unit, _) Truth.t
-          constraint 'proof = [`Proof] * (unit, _) Truth.t
-          constraint
-            'delta_transition_chain =
-            [`Delta_transition_chain]
-            * (State_hash.t Non_empty_list.t, _) Truth.t
-          constraint
-            'frontier_dependencies =
-            [`Frontier_dependencies] * (unit, _) Truth.t
-          constraint
-            'staged_ledger_diff =
-            [`Staged_ledger_diff] * (unit, _) Truth.t
-        [@@deriving version]
-      end
-
-      module Latest = V1
-    end
-
     type ( 'time_received
          , 'genesis_state
          , 'proof
@@ -105,13 +70,24 @@ module type S = sig
          , 'frontier_dependencies
          , 'staged_ledger_diff )
          t =
-      ( 'time_received
-      , 'genesis_state
-      , 'proof
-      , 'delta_transition_chain
-      , 'frontier_dependencies
-      , 'staged_ledger_diff )
-      Stable.Latest.t
+      'time_received
+      * 'genesis_state
+      * 'proof
+      * 'delta_transition_chain
+      * 'frontier_dependencies
+      * 'staged_ledger_diff
+      constraint 'time_received = [`Time_received] * (unit, _) Truth.t
+      constraint 'genesis_state = [`Genesis_state] * (unit, _) Truth.t
+      constraint 'proof = [`Proof] * (unit, _) Truth.t
+      constraint
+        'delta_transition_chain =
+        [`Delta_transition_chain] * (State_hash.t Non_empty_list.t, _) Truth.t
+      constraint
+        'frontier_dependencies =
+        [`Frontier_dependencies] * (unit, _) Truth.t
+      constraint
+        'staged_ledger_diff =
+        [`Staged_ledger_diff] * (unit, _) Truth.t
 
     type fully_invalid =
       ( [`Time_received] * unit Truth.false_t

@@ -76,9 +76,12 @@ module UInt64 = struct
         let length = 64
       end)
 
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      type t = Unsigned.UInt64.t [@@deriving version {of_binable}]
+      type t = Unsigned.UInt64.t
+
+      let to_latest = Fn.id
 
       (* these are defined in the Extend functor, rather than derived, so import them *)
       [%%define_locally
@@ -102,9 +105,7 @@ module UInt64 = struct
         let of_binable = Unsigned.UInt64.of_int64
       end)
     end
-
-    module Latest = V1
-  end
+  end]
 
   include M
 
@@ -123,7 +124,7 @@ module UInt32 = struct
 
   module Stable = struct
     module V1 = struct
-      type t = Unsigned.UInt32.t [@@deriving version {of_binable}]
+      type t = Unsigned.UInt32.t [@@deriving version {binable}]
 
       (* these are defined in the Extend functor, rather than derived, so import them *)
       [%%define_locally
