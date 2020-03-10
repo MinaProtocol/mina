@@ -418,6 +418,11 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		for {
 			msg, err := sub.Next(ctx)
 			if err == nil {
+				if msg.ReceivedFrom == app.P2p.Me {
+					app.P2p.Logger.Info("ignoring message on subscription because we sent it")
+					continue
+				}
+
 				sender, err := findPeerInfo(app, msg.ReceivedFrom)
 				if err != nil && !app.UnsafeNoTrustIP {
 					app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us an already-validated pubsub message, dropping it", peer.IDB58Encode(msg.ReceivedFrom))
