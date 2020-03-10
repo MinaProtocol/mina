@@ -14,7 +14,7 @@ end
 (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
 type t =
   { conf_dir: string
-  ; logger: Logger.t
+  ; mutable logger: Logger.t
   ; pids: Child_processes.Termination.t
   ; trust_system: Trust_system.t
   ; monitor: Monitor.t option
