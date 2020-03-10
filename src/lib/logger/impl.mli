@@ -145,4 +145,4 @@ val faulty_peer_without_punishment : _ log_function
 
 val fatal : _ log_function
 
-val global_metadata : ref Metadata.t
+val global_metadata : Metadata.t ref
