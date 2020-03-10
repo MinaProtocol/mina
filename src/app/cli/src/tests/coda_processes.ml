@@ -12,7 +12,6 @@ let net_configs n =
   File_system.with_temp_dir "coda-processes-generate-keys" ~f:(fun tmpd ->
       let%bind net =
         Coda_net2.create ~logger:(Logger.create ()) ~conf_dir:tmpd
-          ~is_seed:true
       in
       let net = Or_error.ok_exn net in
       let ips =
