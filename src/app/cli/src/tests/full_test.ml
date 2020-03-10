@@ -153,8 +153,7 @@ let run_test () : unit Deferred.t =
               ; libp2p_port
               ; client_port }
           ; trust_system
-          ; keypair= None
-          ; is_seed= true }
+          ; keypair= None }
       in
       let net_config =
         Coda_networking.Config.
@@ -187,7 +186,7 @@ let run_test () : unit Deferred.t =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
-             ~gossip_net_params
+             ~gossip_net_params ~is_seed:true
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)

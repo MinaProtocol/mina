@@ -500,8 +500,7 @@ module T = struct
               ; logger
               ; unsafe_no_trust_ip= true
               ; trust_system
-              ; keypair= Some libp2p_keypair
-              ; is_seed }
+              ; keypair= Some libp2p_keypair }
           in
           let net_config =
             { Coda_networking.Config.logger
@@ -532,7 +531,8 @@ module T = struct
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
+                 ~is_seed ~coinbase_receiver:`Producer ~net_config
+                 ~gossip_net_params
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)

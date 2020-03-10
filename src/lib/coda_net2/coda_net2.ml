@@ -1262,7 +1262,7 @@ let unban_ip net ip =
 
 let banned_ips net = Deferred.return net.Helper.banned_ips
 
-let create ~logger ~conf_dir ~is_seed =
+let create ~logger ~conf_dir =
   let outstanding_requests = Hashtbl.create (module Int) in
   let termination_hack_ref : Helper.t option ref = ref None in
   match%bind
@@ -1271,7 +1271,7 @@ let create ~logger ~conf_dir ~is_seed =
       ~conf_dir ~args:[]
       ~stdout:(`Log Logger.Level.Spam, `Pipe, `Filter_empty)
       ~stderr:
-        (`Log Logger.Level.Spam, `Pipe, `Filter_empty)
+        (`Log Logger.Level.Spam, `No_pipe, `Filter_empty)
         (* TODO the stderr log messages are JSON but not in our format. The
              helper should either emit our format or we should convert in
              OCaml *)
@@ -1328,30 +1328,6 @@ let create ~logger ~conf_dir ~is_seed =
         ; finished= false }
       in
       termination_hack_ref := Some t ;
-      don't_wait_for
-        (Strict_pipe.Reader.iter (Child_processes.stderr_lines subprocess)
-           ~f:(fun line ->
-             try
-               let open Yojson.Safe.Util in
-               let json = Yojson.Safe.from_string line in
-               match member "message" json with
-               | `String
-                   "failed to query self during routing table refresh: failed \
-                    to find any peer in table" ->
-                   if not is_seed then (
-                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
-                       "Failed to find any peers" ;
-                     exit 1 )
-                   else return ()
-               | _ ->
-                   return ()
-             with exn ->
-               Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-                 ~metadata:
-                   [ ("message", `String line)
-                   ; ("exn", `String (Exn.to_string exn)) ]
-                 "Invalid libp2p_helper stderr message: $message" ;
-               return () )) ;
       Strict_pipe.Reader.iter (Child_processes.stdout_lines subprocess)
         ~f:(fun line ->
           let open Yojson.Safe.Util in
@@ -1386,13 +1362,13 @@ let%test_module "coda network tests" =
       let%bind a =
         create
           ~logger:(Logger.extend logger [("name", `String "a")])
-          ~conf_dir:a_tmp ~is_seed:false
+          ~conf_dir:a_tmp
         >>| Or_error.ok_exn
       in
       let%bind b =
         create
           ~logger:(Logger.extend logger [("name", `String "b")])
-          ~conf_dir:b_tmp ~is_seed:false
+          ~conf_dir:b_tmp
         >>| Or_error.ok_exn
       in
       let%bind kp_a = Keypair.random a in

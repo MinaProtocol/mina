@@ -827,6 +827,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
             trace "transition router" (fun () ->
                 Transition_router.run ~logger:config.logger
                   ~trust_system:config.trust_system ~verifier ~network:net
+                  ~is_seed:config.is_seed
                   ~time_controller:config.time_controller
                   ~consensus_local_state:config.consensus_local_state
                   ~persistent_root_location:config.persistent_root_location
