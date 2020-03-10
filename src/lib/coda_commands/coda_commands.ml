@@ -60,7 +60,8 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   in
   Option.is_some remainder
 
-let schedule_user_command t (txn : User_command.t) account_opt :
+(* remove this after merging #4515
+  let schedule_user_command t (txn : User_command.t) account_opt :
     unit Or_error.t Deferred.t =
   (* FIXME #3457: return a status from Transaction_pool.add and use it instead
   *)
@@ -78,7 +79,7 @@ let schedule_user_command t (txn : User_command.t) account_opt :
       ~metadata:[("user_command", User_command.to_yojson txn)]
       "Submitted transaction $user_command to transaction pool" ;
     txn_count := !txn_count + 1 ;
-    Deferred.Or_error.return ()
+    Deferred.Or_error.return ()*)
 
 let get_account t (addr : Public_key.Compressed.t) =
   let open Participating_state.Let_syntax in
@@ -113,13 +114,14 @@ let get_nonce t (addr : Public_key.Compressed.t) =
   let%map account = get_account t addr in
   account.Account.Poly.nonce
 
-let send_user_command t (txn : User_command.t) =
+(* TODO: remove this after merging #4515
+  let send_user_command t (txn : User_command.t) =
   let public_key = Public_key.compress txn.sender in
   let open Participating_state.Let_syntax in
   let%map account_opt = get_account t public_key in
   let open Deferred.Or_error.Let_syntax in
   let%map () = schedule_user_command t txn account_opt in
-  record_payment t txn (Option.value_exn account_opt)
+  record_payment t txn (Option.value_exn account_opt)*)
 
 let get_balance t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
@@ -185,14 +187,6 @@ let get_inferred_nonce_from_transaction_pool_and_ledger_exn t
   get_inferred_nonce_from_transaction_pool_and_ledger t addr
   |> Participating_state.active_exn
 
-(*let setup_user_command (input: Input.t) =
-  let payload =
-    User_command.Payload.create ~fee:input.fee ~nonce ~valid_until ~memo
-      ~body:user_command_body
-  in
-  let signed_user_command = User_command.sign sender_kp payload in
-  User_command.forget_check signed_user_command*)
-
 let add_transactions t user_commands =
   let res_ivar = Ivar.create () in
   Coda_lib.add_transactions t
@@ -201,15 +195,16 @@ let add_transactions t user_commands =
     ; result= res_ivar } ;
   Ivar.read res_ivar
 
-let setup_and_submit_user_command t user_command_input =
+let setup_and_submit_user_command t
+    (user_command_input : User_command_util.Client_input.t) =
   let open Participating_state.Let_syntax in
-  let%map _is_active = Coda_lib.active_or_bootstrapping t in
+  let%map account_opt = get_account t user_command_input.sender in
   let open Deferred.Let_syntax in
   let%map result = add_transactions t [user_command_input] in
   txn_count := !txn_count + 1 ;
   match result with
   | Ok [uc] ->
-      Ok uc
+      Ok (uc, record_payment t uc (Option.value_exn account_opt))
   | Ok _ ->
       Or_error.error_string
         "Error adding transaction. Invalid result from add_transaction"
@@ -218,8 +213,6 @@ let setup_and_submit_user_command t user_command_input =
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
 let setup_and_submit_user_commands t user_command_list =
-  (*let user_command_input = User_command_util.Input.make ~fee ~nonce_opt ~valid_until ~memo ~sender_kp ~body
-      in*)
   let open Participating_state.Let_syntax in
   let%map _is_active = Coda_lib.active_or_bootstrapping t in
   let logger =
@@ -229,6 +222,7 @@ let setup_and_submit_user_commands t user_command_list =
   in
   Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
     "batch-send-payments does not yet report errors" ;
+  (*TODO: return the user commands and errors after merging #4515*)
   Deferred.map (add_transactions t user_command_list) ~f:(Fn.const ())
 
 module Receipt_chain_hash = struct
@@ -258,8 +252,9 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
       !"Merkle list proof does not contain payment %{sexp:User_command.t}"
       verifying_txn
 
-(* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
-let schedule_user_commands t (_txns : User_command.t list) :
+(* remove this after merging #4515*)
+(*TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
+(*let schedule_user_commands t (_txns : User_command.t list) :
     'a Deferred.Or_error.t Participating_state.t =
   Participating_state.return
   @@
@@ -272,7 +267,7 @@ let schedule_user_commands t (_txns : User_command.t list) :
     "batch-send-payments does not yet report errors" ;
   Deferred.Or_error.return ()
 
-(*Coda_lib.add_transactions t txns*)
+(*Coda_lib.add_transactions t txns*) *)
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in

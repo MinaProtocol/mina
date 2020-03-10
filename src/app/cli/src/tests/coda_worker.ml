@@ -70,12 +70,12 @@ module T = struct
     ; send_user_command:
         ( 'worker
         , Send_payment_input.t
-        , Receipt.Chain_hash.t Or_error.t )
+        , (User_command.t * Receipt.Chain_hash.t) Or_error.t )
         Rpc_parallel.Function.t
     ; process_user_command:
         ( 'worker
-        , User_command.t
-        , Receipt.Chain_hash.t Or_error.t )
+        , User_command_util.Client_input.t
+        , (User_command.t * Receipt.Chain_hash.t) Or_error.t )
         Rpc_parallel.Function.t
     ; verified_transitions:
         ('worker, unit, state_hashes Pipe.Reader.t) Rpc_parallel.Function.t
@@ -145,9 +145,11 @@ module T = struct
         -> Coda_numbers.Account_nonce.t option Deferred.t
     ; coda_root_length: unit -> int Deferred.t
     ; coda_send_payment:
-        Send_payment_input.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
+           Send_payment_input.t
+        -> (User_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
     ; coda_process_user_command:
-        User_command.t -> Receipt.Chain_hash.t Or_error.t Deferred.t
+           User_command_util.Client_input.t
+        -> (User_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
     ; coda_verified_transitions: unit -> state_hashes Pipe.Reader.t Deferred.t
     ; coda_sync_status:
         unit -> Sync_status.Stable.V1.t Pipe.Reader.t Deferred.t
@@ -318,13 +320,17 @@ module T = struct
       C.create_rpc ~name:"send_user_command" ~f:send_payment_impl
         ~bin_input:Send_payment_input.Stable.Latest.bin_t
         ~bin_output:
-          [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
+          [%bin_type_class:
+            (User_command.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t)
+            Or_error.t] ()
 
     let process_user_command =
       C.create_rpc ~name:"process_user_command" ~f:process_user_command_impl
-        ~bin_input:User_command.Stable.Latest.bin_t
+        ~bin_input:User_command_util.Client_input.Stable.Latest.bin_t
         ~bin_output:
-          [%bin_type_class: Receipt.Chain_hash.Stable.V1.t Or_error.t] ()
+          [%bin_type_class:
+            (User_command.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t)
+            Or_error.t] ()
 
     let verified_transitions =
       C.create_pipe ~name:"verified_transitions" ~f:verified_transitions_impl
@@ -593,28 +599,22 @@ module T = struct
             let pk_of_sk sk =
               Public_key.of_private_key_exn sk |> Public_key.compress
             in
-            let build_txn amount sender_sk receiver_pk fee =
-              let nonce =
-                Coda_commands.get_nonce coda (pk_of_sk sender_sk)
-                |> Participating_state.active_exn
-                |> Option.value_exn ?here:None ?message:None ?error:None
-              in
-              let payload : User_command.Payload.t =
-                User_command.Payload.create ~fee ~nonce ~memo
-                  ~valid_until:Coda_numbers.Global_slot.max_value
-                  ~body:(Payment {receiver= receiver_pk; amount})
-              in
-              User_command.sign (Keypair.of_private_key_exn sender_sk) payload
+            let build_user_command_input amount sender_sk receiver_pk fee =
+              User_command_util.Client_input.make ~sender:(pk_of_sk sender_sk)
+                ~fee ~memo ~valid_until:Coda_numbers.Global_slot.max_value
+                ~body:(Payment {receiver= receiver_pk; amount})
+                ~sign_choice:(`Keypair (Keypair.of_private_key_exn sender_sk))
+                ()
             in
-            let payment = build_txn amount sk pk fee in
+            let payment_input = build_user_command_input amount sk pk fee in
             Deferred.map
-              ( Coda_commands.send_user_command coda (payment :> User_command.t)
+              ( Coda_commands.setup_and_submit_user_command coda payment_input
               |> Participating_state.to_deferred_or_error )
               ~f:Or_error.join
           in
-          let coda_process_user_command cmd =
+          let coda_process_user_command cmd_input =
             Deferred.map
-              ( Coda_commands.send_user_command coda (cmd :> User_command.t)
+              ( Coda_commands.setup_and_submit_user_command coda cmd_input
               |> Participating_state.to_deferred_or_error )
               ~f:Or_error.join
           in

@@ -10,7 +10,7 @@ module Send_user_command = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = User_command.Stable.V1.t
+        type t = User_command_util.Client_input.Stable.V1.t
 
         let to_latest = Fn.id
       end
@@ -24,7 +24,8 @@ module Send_user_command = struct
     module Stable = struct
       module V1 = struct
         type t =
-          Receipt.Chain_hash.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
+          (User_command.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t)
+          Core_kernel.Or_error.Stable.V1.t
 
         let to_latest = Fn.id
       end

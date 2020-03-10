@@ -1544,22 +1544,12 @@ module Mutations = struct
         (ip_address, Coda_commands.reset_trust_status coda ip_address) )
 
   let send_user_command coda user_command_input =
-    (*let user_command = User_command.forget_check signed_command in
-    match Coda_commands.send_user_command coda user_command with
-    | `Active f -> (
-        match%map f with
-        | Ok _receipt ->
-            Ok user_command
-        | Error e ->
-            Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
-    | `Bootstrapping ->
-        return (Error "Daemon is bootstrapping")*)
     match
       Coda_commands.setup_and_submit_user_command coda user_command_input
     with
     | `Active f -> (
         match%map f with
-        | Ok user_command ->
+        | Ok (user_command, _receipt) ->
             Ok user_command
         | Error e ->
             Error ("Couldn't send user_command: " ^ Error.to_string_hum e) )
@@ -1608,7 +1598,7 @@ module Mutations = struct
     ; body
     ; sign_choice }
 
-  let create_user_command_payload ~coda ~fee ~nonce ~valid_until ~memo ~sender
+  (*let create_user_command_payload ~coda ~fee ~nonce ~valid_until ~memo ~sender
       ~body : (User_command.Payload.t, string) result =
     let open Result.Let_syntax in
     (* TODO: We should put a more sensible default here. *)
@@ -1654,7 +1644,7 @@ module Mutations = struct
         | `Bootstrapping ->
             Error "Node is still bootstrapping" )
     in
-    User_command.Payload.create ~fee ~nonce ~valid_until ~memo ~body
+    User_command.Payload.create ~fee ~nonce ~valid_until ~memo ~body*)
 
   let send_signed_user_command ~(*~coda ~sender ~payload*) signature ~coda
       ~nonce_opt ~sender ~memo ~fee ~valid_until ~body =
@@ -1670,17 +1660,11 @@ module Mutations = struct
       ~sender ~memo ~fee ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind sign_choice =
-      (*Deferred.return @@  find_identity ~public_key:sender coda*)
       match%map Deferred.return @@ find_identity ~public_key:sender coda with
       | `Keypair sender_kp ->
           `Keypair sender_kp
       | `Hd_index hd_index ->
           `Hd_index hd_index
-      (*Secrets.Hardware_wallets.sign ~hd_index
-            ~public_key:(Public_key.decompress_exn sender)
-            ~user_command_payload:payload*)
-      (*in
-    send_user_command coda command*)
     in
     let%bind user_command_input =
       create_user_command_input ~nonce_opt ~sender ~memo ~fee ~valid_until
@@ -1700,16 +1684,10 @@ module Mutations = struct
       ~resolve:
         (fun {ctx= coda; _} () (from, to_, fee, valid_until, memo, nonce_opt)
              signature ->
-        (*let open Deferred.Result.Let_syntax in*)
         let body =
           User_command_payload.Body.Stake_delegation
             (Set_delegate {new_delegate= to_})
         in
-        (*let%bind (payload : User_command.Payload.t) =
-          Deferred.return
-          @@ create_user_command_payload ~coda ~nonce ~sender:from ~memo ~fee
-               ~valid_until ~body
-        in*)
         match signature with
         | None ->
             send_unsigned_user_command ~coda ~nonce_opt ~sender:from ~memo ~fee
@@ -1733,11 +1711,6 @@ module Mutations = struct
           User_command_payload.Body.Payment
             {receiver= to_; amount= Amount.of_uint64 amount}
         in
-        (*let%bind payload =
-          Deferred.return
-          @@ create_user_command_payload ~coda ~nonce ~sender:from ~memo ~fee
-               ~valid_until ~body
-        in*)
         match signature with
         | None ->
             send_unsigned_user_command ~coda ~nonce_opt ~sender:from ~memo ~fee

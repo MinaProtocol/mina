@@ -450,9 +450,6 @@ let batch_send_payments =
     let open Deferred.Let_syntax in
     let%bind keypair = Secrets.Keypair.Terminal_stdin.read_exn privkey_path
     and infos = get_infos payments_path in
-    (*let%bind nonce0 =
-      get_nonce_exn ~rpc:Daemon_rpcs.Get_nonce.rpc keypair.public_key port
-    in*)
     let ts : User_command_util.Client_input.t list =
       List.map infos ~f:(fun {receiver; valid_until; amount; fee} ->
           User_command_util.Client_input.make
@@ -478,75 +475,6 @@ let batch_send_payments =
     (Cli_lib.Background_daemon.rpc_init
        (Args.zip2 Cli_lib.Flag.privkey_read_path payment_path_flag)
        ~f:main)
-
-(*Deepthi: Deprecated*)
-(*let user_command (body_args : User_command_payload.Body.t Command.Param.t)
-    ~label ~summary ~error =
-  let flag =
-    let open Cli_lib.Flag in
-    Args.zip6 body_args Cli_lib.Flag.privkey_read_path User_command.fee
-      User_command.nonce User_command.valid_until User_command.memo
-  in
-  Command.async ~summary
-    (Cli_lib.Background_daemon.rpc_init flag
-       ~f:(fun port
-          (body, from_account, fee_opt, nonce_opt, valid_until_opt, memo_opt)
-          ->
-         let open Deferred.Let_syntax in
-         let%bind sender_kp =
-           Secrets.Keypair.Terminal_stdin.read_exn from_account
-         in
-         let%bind nonce =
-           match nonce_opt with
-           | Some nonce ->
-               return nonce
-           | None ->
-               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
-                 sender_kp.public_key port
-         in
-         let fee =
-           Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
-         in
-         if Currency.Fee.( < ) fee User_command.minimum_fee then (
-           printf "Fee %d is less than the minimum, %d\n%!"
-             (Currency.Fee.to_int fee)
-             (Currency.Fee.to_int User_command.minimum_fee) ;
-           exit 29 )
-         else
-           let memo =
-             Option.value_map memo_opt ~default:User_command_memo.empty
-               ~f:User_command_memo.create_from_string_exn
-           in
-           let valid_until =
-             Option.value valid_until_opt
-               ~default:Coda_numbers.Global_slot.max_value
-           in
-           let command =
-             Coda_commands.send_user_command ~fee ~nonce ~memo ~valid_until
-               ~sender_kp body
-           in
-           Daemon_rpcs.Client.dispatch_with_message
-             Daemon_rpcs.Send_user_command.rpc command port
-             ~success:(fun receipt_chain_hash ->
-               sprintf
-                 "Dispatched %s with ID %s\nReceipt chain hash is now %s\n"
-                 label
-                 (User_command.to_base58_check command)
-                 (Receipt.Chain_hash.to_string receipt_chain_hash) )
-             ~error:(fun e -> sprintf "%s: %s" error (Error.to_string_hum e))
-             ~join_error:Or_error.join ))
-
-(*Deepthi: Deprecated*)
-let send_payment =
-  let body =
-    let open Command.Let_syntax in
-    let open Cli_lib.Flag in
-    let%map_open receiver = User_command.receiver
-    and amount = User_command.amount in
-    User_command_payload.Body.Payment {receiver; amount}
-  in
-  user_command body ~label:"payment" ~summary:"Send payment to an address"
-    ~error:"Failed to send payment"*)
 
 let send_payment_graphql =
   let open Command.Param in
@@ -608,94 +536,6 @@ let delegate_stake_graphql =
          in
          printf "Dispatched stake delegation with ID %s\n"
            ((response#sendDelegation)#delegation)#id ))
-
-(*Deepthi: Deprecated*)
-(*let cancel_transaction =
-  let txn_id_flag =
-    Command.Param.(
-      flag "id" ~doc:"ID Transaction ID to be cancelled" (required string))
-  in
-  let args = Args.zip2 Cli_lib.Flag.privkey_read_path txn_id_flag in
-  Command.async
-    ~summary:
-      "Cancel a transaction -- this submits a replacement transaction with a \
-       fee larger than the cancelled transaction."
-    (Cli_lib.Background_daemon.rpc_init args
-       ~f:(fun port (privkey_read_path, serialized_transaction) ->
-         match User_command.of_base58_check serialized_transaction with
-         | Ok user_command ->
-             let receiver =
-               match
-                 User_command.Payload.body (User_command.payload user_command)
-               with
-               | Payment payment ->
-                   payment.receiver
-               | Stake_delegation (Set_delegate {new_delegate}) ->
-                   new_delegate
-             in
-             let%bind sender_kp =
-               Secrets.Keypair.Terminal_stdin.read_exn privkey_read_path
-             in
-             let cancel_sender = User_command.sender user_command in
-             if
-               not
-                 (Public_key.Compressed.equal
-                    (Public_key.compress sender_kp.public_key)
-                    cancel_sender)
-             then (
-               eprintf
-                 "Provided key doesn't match transaction to be cancelled.\n\
-                  Wanted key for %s\n"
-                 (Public_key.Compressed.to_base58_check cancel_sender) ;
-               Deferred.don't_wait_for (exit 17) ) ;
-             let%bind inferred_nonce =
-               get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
-                 sender_kp.public_key port
-             in
-             let cancelled_nonce = User_command.nonce user_command in
-             let cancel_fee =
-               let diff =
-                 Unsigned.UInt64.of_int
-                   Coda_numbers.Account_nonce.(
-                     to_int inferred_nonce - to_int cancelled_nonce)
-               in
-               let fee =
-                 Currency.Fee.to_uint64 (User_command.fee user_command)
-               in
-               let replace_fee =
-                 Currency.Fee.to_uint64 Network_pool.Indexed_pool.replace_fee
-               in
-               let open Unsigned.UInt64.Infix in
-               (* fee amount "inspired by" network_pool/indexed_pool.ml *)
-               Currency.Fee.of_uint64 (fee + (replace_fee * diff))
-             in
-             printf "Fee to cancel transaction is %s coda.\n"
-               (Currency.Fee.to_formatted_string cancel_fee) ;
-             let body =
-               User_command_payload.Body.Payment
-                 {receiver; amount= Currency.Amount.zero}
-             in
-             let command =
-               Coda_commands.setup_user_command ~fee:cancel_fee
-                 ~nonce:cancelled_nonce ~memo:User_command_memo.empty
-                 ~valid_until:user_command.payload.common.valid_until
-                 ~sender_kp body
-             in
-             Daemon_rpcs.Client.dispatch_with_message
-               Daemon_rpcs.Send_user_command.rpc command port
-               ~success:(fun receipt_chain_hash ->
-                 sprintf
-                   "Dispatched cancel transaction with ID %s\n\
-                    Receipt chain hash is now %s\n"
-                   (User_command.to_base58_check command)
-                   (Receipt.Chain_hash.to_string receipt_chain_hash) )
-               ~error:(fun e ->
-                 sprintf "Failed to cancel transaction: %s"
-                   (Error.to_string_hum e) )
-               ~join_error:Or_error.join
-         | Error _e ->
-             eprintf "Could not deserialize user command\n" ;
-             exit 16 ))*)
 
 let cancel_transaction_graphql =
   let txn_id_flag =
@@ -790,24 +630,6 @@ let get_transaction_status =
          | Error _e ->
              eprintf "Could not deserialize user command" ;
              exit 16 ))
-
-(*Deepthi: Deprecated*)
-(*let delegate_stake =
-  let body =
-    let open Command.Let_syntax in
-    let open Cli_lib.Arg_type in
-    let%map_open new_delegate =
-      flag "delegate"
-        ~doc:
-          "PUBLICKEY Public key address to which you want to which you want \
-           to delegate your stake"
-        (required public_key_compressed)
-    in
-    User_command_payload.Body.Stake_delegation (Set_delegate {new_delegate})
-  in
-  user_command body ~label:"delegate"
-    ~summary:"Change the address to which you're delegating your coda"
-    ~error:"Failed to change delegate"*)
 
 let wrap_key =
   Command.async ~summary:"Wrap a private key into a private key file"
@@ -1555,10 +1377,8 @@ let client =
 let command =
   Command.group ~summary:"[Deprecated] Lightweight client commands"
     ~preserve_subcommand_order:()
-    [ ("get-balance", get_balance) (*; ("send-payment", send_payment)*)
+    [ ("get-balance", get_balance)
     ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
-      (*; ("delegate-stake", delegate_stake)
-    ; ("cancel-transaction", cancel_transaction)*)
     ; ("set-staking", set_staking)
     ; ("set-snark-worker", set_snark_worker)
     ; ("set-snark-work-fee", set_snark_work_fee)

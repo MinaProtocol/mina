@@ -137,17 +137,14 @@ module Api = struct
     let open Deferred.Option.Let_syntax in
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
-    let%bind nonce = Coda_process.get_nonce_exn worker pk_of_sk in
-    let payload =
-      User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
-        ~valid_until ~body
+    let user_command_input =
+      User_command_util.Client_input.make ~sender:pk_of_sk ~fee
+        ~memo:User_command_memo.dummy ~valid_until ~body
+        ~sign_choice:(`Keypair (Keypair.of_private_key_exn sk))
+        ()
     in
-    let user_cmd =
-      ( User_command.sign (Keypair.of_private_key_exn sk) payload
-        :> User_command.t )
-    in
-    let%map _receipt =
-      Coda_process.process_user_command_exn worker user_cmd
+    let%map user_cmd, _receipt =
+      Coda_process.process_user_command_exn worker user_command_input
       |> Deferred.map ~f:Or_error.ok
     in
     user_cmd

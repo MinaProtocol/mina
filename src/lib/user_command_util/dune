@@ -5,5 +5,5 @@
     ; opam deps
     core
     ; libs
-    coda_base signature_lib coda_version)
+    coda_base signature_lib coda_version secrets)
   (preprocess (pps ppx_coda ppx_deriving_yojson ppx_jane ppx_deriving.make)))
