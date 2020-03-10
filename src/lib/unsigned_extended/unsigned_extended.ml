@@ -162,23 +162,19 @@ end
 (* check that serializations don't change *)
 let%test_module "Unsigned serializations" =
   ( module struct
-    let run_test (type t) (module M : Bin_prot.Binable.S with type t = t)
-        known_good_serialization (value : t) =
-      let buff = Bin_prot.Common.create_buf 256 in
-      let len = M.bin_write_t buff ~pos:0 value in
-      let bytes = Bytes.create len in
-      Bin_prot.Common.blit_buf_bytes buff bytes ~len ;
-      Bytes.equal bytes known_good_serialization
+    open Module_version.Serialization
 
     let%test "UInt32 V1 serialization" =
       let uint32 = UInt32.of_int 9775 in
-      let known_good_serialization = Bytes.of_string "\xFE\x2F\x26" in
-      run_test (module UInt32.Stable.V1) known_good_serialization uint32
+      let known_good_hash =
+        "\xDD\x22\xFB\x81\x59\xD2\x98\x81\x60\x82\x7D\x26\x48\xB8\x2D\x61\xB0\x65\xB5\xDC\x02\x54\x02\x03\x16\x66\xD4\xDE\xD1\xA2\xD8\x66"
+      in
+      check_serialization (module UInt32.Stable.V1) uint32 known_good_hash
 
     let%test "UInt64 V1 serialization" =
       let uint64 = UInt64.of_int64 191797697848L in
-      let known_good_serialization =
-        Bytes.of_string "\xFC\x38\x9D\x08\xA8\x2C\x00\x00\x00"
+      let known_good_hash =
+        "\x26\xA8\x3E\xB9\xCA\x2A\xDE\x52\xD3\xB7\x95\x36\x61\xAD\xCB\xA8\x1C\x71\x50\xE9\xAC\x07\xE8\xD9\x50\x5B\x8F\x36\x8D\x6E\xAE\x27"
       in
-      run_test (module UInt64.Stable.V1) known_good_serialization uint64
+      check_serialization (module UInt64.Stable.V1) uint64 known_good_hash
   end )
