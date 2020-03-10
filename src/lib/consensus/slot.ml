@@ -7,10 +7,11 @@ module T = Coda_numbers.Nat.Make32 ()
 
 include (T : module type of T with module Checked := T.Checked)
 
+(* TODO: This must be 1/3 of the epoch length *)
 let in_seed_update_range (slot : t) =
   let ck = Constants.(c * k |> UInt32.of_int) in
   let open UInt32.Infix in
-  ck <= slot && slot < ck * UInt32.of_int 2
+  slot < ck * UInt32.of_int 2
 
 module Checked = struct
   include T.Checked
@@ -28,14 +29,11 @@ module Checked = struct
     let open Tick.Let_syntax in
     let ( < ) = Bitstring_checked.lt_value in
     let ck = Constants.(c * k) |> UInt32.of_int in
-    let ck_bitstring = uint32_msb ck
-    and ck_times_2 = uint32_msb UInt32.(Infix.(of_int 2 * ck)) in
+    let ck_times_2 = uint32_msb UInt32.(Infix.(of_int 2 * ck)) in
     let%bind slot_msb =
       to_bits slot >>| Bitstring_lib.Bitstring.Msb_first.of_lsb_first
     in
-    let%bind slot_gte_ck = slot_msb < ck_bitstring >>| Boolean.not
-    and slot_lt_ck_times_2 = slot_msb < ck_times_2 in
-    Boolean.(slot_gte_ck && slot_lt_ck_times_2)
+    slot_msb < ck_times_2
 end
 
 let gen =

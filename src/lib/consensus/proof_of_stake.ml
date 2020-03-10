@@ -2690,6 +2690,15 @@ module Hooks = struct
       (Consensus_state.curr_epoch_and_slot consensus_state)
       ~time_received
 
+  let is_short_range =
+    let most_recent_lock c =
+      if Slot.in_seed_update_range (Consensus_state.curr_slot c) then
+        c.staking_epoch_data.lock_checkpoint
+      else c.next_epoch_data.lock_checkpoint
+    in
+    fun c1 c2 ->
+      Coda_base.State_hash.equal (most_recent_lock c1) (most_recent_lock c2)
+
   let select ~existing ~candidate ~logger =
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
     let log_result choice msg =
@@ -2725,89 +2734,36 @@ module Hooks = struct
     in
     let ( << ) a b =
       let c = Length.compare a b in
+      (* TODO: I'm not sure we should throw away our current chain if they compare equal *)
       c < 0 || (c = 0 && candidate_vrf_is_bigger)
     in
-    let ( = ) = Coda_base.State_hash.equal in
-    let branches =
-      [ ( ( lazy
-              ( existing.staking_epoch_data.lock_checkpoint
-              = candidate.staking_epoch_data.lock_checkpoint )
-          , "last epoch lock checkpoints are equal" )
-        , ( lazy (existing.blockchain_length << candidate.blockchain_length)
-          , "candidate is longer than existing" ) )
-      ; ( ( lazy
-              ( existing.staking_epoch_data.start_checkpoint
-              = candidate.staking_epoch_data.start_checkpoint )
-          , "last epoch start checkpoints are equal" )
-        , ( lazy
-              ( existing.staking_epoch_data.epoch_length
-              << candidate.staking_epoch_data.epoch_length )
-          , "candidate last epoch is longer than existing last epoch" ) )
-        (* these two could be condensed into one entry *)
-      ; ( ( lazy
-              ( existing.next_epoch_data.lock_checkpoint
-              = candidate.staking_epoch_data.lock_checkpoint )
-          , "candidate last epoch lock checkpoint is equal to existing \
-             current epoch lock checkpoint" )
-        , ( lazy (existing.blockchain_length << candidate.blockchain_length)
-          , "candidate is longer than existing" ) )
-      ; ( ( lazy
-              ( candidate.next_epoch_data.lock_checkpoint
-              = existing.staking_epoch_data.lock_checkpoint )
-          , "candidate current epoch lock checkpoint is equal to existing \
-             last epoch lock checkpoint" )
-        , ( lazy (existing.blockchain_length << candidate.blockchain_length)
-          , "candidate is longer than existing" ) )
-      ; ( ( lazy
-              ( existing.next_epoch_data.start_checkpoint
-              = candidate.staking_epoch_data.start_checkpoint )
-          , "candidate last epoch start checkpoint is equal to existing \
-             current epoch start checkpoint" )
-        , ( lazy
-              ( existing.next_epoch_data.epoch_length
-              << candidate.staking_epoch_data.epoch_length )
-          , "candidate last epoch is longer than existing current epoch" ) )
-      ; ( ( lazy
-              ( existing.staking_epoch_data.start_checkpoint
-              = candidate.next_epoch_data.start_checkpoint )
-          , "candidate current epoch start checkpoint is equal to existing \
-             last epoch start checkpoint" )
-        , ( lazy
-              ( existing.staking_epoch_data.epoch_length
-              << candidate.next_epoch_data.epoch_length )
-          , "candidate current epoch is longer than existing last epoch" ) ) ]
-    in
     let precondition_msg, choice_msg, should_take =
-      List.find_map branches
-        ~f:(fun ((precondition, precondition_msg), (choice, choice_msg)) ->
-          Option.some_if (Lazy.force precondition)
-            (precondition_msg, choice_msg, choice) )
-      |> Option.value
-           ~default:
-             ( "default case"
-             , "candidate virtual min-length is longer than existing virtual \
-                min-length"
-             , lazy
-                 (let newest_epoch =
-                    Epoch.max
-                      (Consensus_state.curr_epoch existing)
-                      (Consensus_state.curr_epoch candidate)
-                  in
-                  let virtual_min_length (s : Consensus_state.Value.t) =
-                    let curr_epoch = Consensus_state.curr_epoch s in
-                    if Epoch.(succ curr_epoch < newest_epoch) then Length.zero
-                      (* There is a gap of an entire epoch *)
-                    else if Epoch.(succ curr_epoch = newest_epoch) then
-                      Length.(
-                        min s.min_window_density s.next_epoch_data.epoch_length)
-                      (* Imagine the latest epoch was padded out with zeros to reach the newest_epoch *)
-                    else s.min_window_density
-                  in
-                  Length.(
-                    virtual_min_length existing < virtual_min_length candidate))
-             )
+      if is_short_range existing candidate then
+        ( "most recent finalized checkpoints are equal"
+        , "candidate length is longer than existing length "
+        , existing.blockchain_length << candidate.blockchain_length )
+      else
+        ( "most recent finalized checkpoints are not equal"
+        , "candidate virtual min-length is longer than existing virtual \
+           min-length"
+        , let newest_epoch =
+            Epoch.max
+              (Consensus_state.curr_epoch existing)
+              (Consensus_state.curr_epoch candidate)
+          in
+          let virtual_min_length (s : Consensus_state.Value.t) =
+            let curr_epoch = Consensus_state.curr_epoch s in
+            if Epoch.(succ curr_epoch < newest_epoch) then Length.zero
+              (* There is a gap of an entire epoch *)
+            else if Epoch.(succ curr_epoch = newest_epoch) then
+              Length.(min s.min_window_density s.next_epoch_data.epoch_length)
+              (* Imagine the latest epoch was padded out with zeros to reach the newest_epoch *)
+            else s.min_window_density
+          in
+          Length.(virtual_min_length existing < virtual_min_length candidate)
+        )
     in
-    let choice = if Lazy.force should_take then `Take else `Keep in
+    let choice = if should_take then `Take else `Keep in
     log_choice ~precondition_msg ~choice_msg choice ;
     choice
 
