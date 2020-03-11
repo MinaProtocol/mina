@@ -273,7 +273,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
             let crumb = Transition_frontier.best_tip frontier in
             Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
               ~metadata:[("breadcrumb", Breadcrumb.to_yojson crumb)]
-              !"Producing new block with parent $breadcrumb%!" ;
+              "Producing new block with parent $breadcrumb%!" ;
             let previous_protocol_state, previous_protocol_state_proof =
               let transition : External_transition.Validated.t =
                 Breadcrumb.validated_transition crumb
@@ -486,25 +486,25 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 Logger.error logger ~module_:__MODULE__
                                   ~location:__LOC__
                                   ~metadata:
-                                    [ ( "diff"
+                                    [ ("error", `String (Error.to_string_hum e))
+                                    ; ( "diff"
                                       , Staged_ledger_diff.to_yojson
                                           staged_ledger_diff ) ]
-                                  !"Error building breadcrumb from produced \
-                                    transition. Invalid staged ledger diff -- \
-                                    %s"
-                                  (Error.to_string_hum e) ;
+                                  !"Unable to build breadcrumb from produced \
+                                    transition due to invlaid staged ledger \
+                                    diff: $error" ;
                                 return ()
                             | Ok breadcrumb -> (
+                                Logger.trace logger ~module_:__MODULE__
+                                  ~location:__LOC__
+                                  ~metadata:
+                                    [("breadcrumb", Breadcrumb.to_yojson crumb)]
+                                  "Successfully produced a new block: \
+                                   $breadcrumb" ;
                                 let metadata =
                                   [ ( "state_hash"
                                     , State_hash.to_yojson transition_hash ) ]
                                 in
-                                Logger.info logger ~module_:__MODULE__
-                                  ~location:__LOC__
-                                  !"Submitting newly produced block \
-                                    $state_hash to the transition frontier \
-                                    controller"
-                                  ~metadata ;
                                 Coda_metrics.(
                                   Counter.inc_one
                                     Block_producer.blocks_produced) ;
@@ -514,7 +514,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 in
                                 Logger.debug logger ~module_:__MODULE__
                                   ~location:__LOC__ ~metadata
-                                  "Waiting for transition $state_hash to be \
+                                  "Waiting for block $state_hash to be \
                                    inserted into frontier" ;
                                 Deferred.choose
                                   [ Deferred.choice
@@ -537,19 +537,16 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                       "Generated transition $state_hash was \
                                        accepted into transition frontier"
                                 | `Timed_out ->
-                                    let str =
+                                    (* FIXME #3167: this should be fatal, and more importantly, shouldn't happen. *)
+                                    Logger.fatal logger ~module_:__MODULE__
+                                      ~location:__LOC__ ~metadata
                                       "Timed out waiting for generated \
                                        transition $state_hash to enter \
                                        transition frontier. Continuing to \
                                        produce new blocks anyway. This may \
                                        mean your CPU is overloaded. Consider \
                                        disabling `-run-snark-worker` if it's \
-                                       configured."
-                                    in
-                                    (* FIXME #3167: this should be fatal, and more importantly, shouldn't happen. *)
-                                    Logger.error logger ~module_:__MODULE__
-                                      ~location:__LOC__ ~metadata "%s" str ) )
-                        ) )) )
+                                       configured." ) ) ) )) )
       in
       let production_supervisor = Singleton_supervisor.create ~task:produce in
       let scheduler = Singleton_scheduler.create time_controller in

@@ -172,8 +172,8 @@ let record_envelope_sender :
   | Local ->
       let action_fmt, action_metadata = Actions.to_log action in
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:action_metadata
-        "Attempted to record trust action of ourselves: %s" action_fmt ;
+        ~metadata:(("action", `String action_fmt) :: action_metadata)
+        "Attempted to record trust action of ourselves: $action" ;
       Deferred.unit
   | Remote (inet_addr, _peer_id) ->
       record t logger inet_addr action
