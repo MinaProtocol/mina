@@ -167,11 +167,15 @@ module MemberProfile = {
         display(`flex),
         justifyContent(`center),
         alignContent(`center),
-        width(`rem(30.)),
-        height(`rem(24.5)),
+        width(`rem(21.25)),
+        height(`rem(35.875)),
         borderRadius(`px(6)),
         background(`hex("F5F5F5")),
         border(`px(1), `solid, Theme.Colors.teal),
+        media(
+          Theme.MediaQuery.tablet,
+          [width(`rem(30.)), height(`rem(25.5))],
+        ),
       ]);
     let innerFlex = style([display(`flex), flexDirection(`column)]);
     let profilePic =
@@ -188,7 +192,7 @@ module MemberProfile = {
         height(`px(32)),
         marginTop(`px(62)),
         display(`flex),
-        margin3(~top=`rem(4.43), ~h=`auto, ~bottom=`zero),
+        margin3(~top=`rem(4.6), ~h=`auto, ~bottom=`zero),
       ]);
     let icon = style([height(`auto), alignSelf(`center)]);
     let genesisLabel =
@@ -211,16 +215,21 @@ module MemberProfile = {
         Theme.Body.basic,
         style([
           margin2(~v=`zero, ~h=`rem(1.5)),
-          width(`rem(23.)),
-          fontWeight(`light),
+          width(`rem(16.625)),
+          alignSelf(`center),
+          media(Theme.MediaQuery.tablet, [width(`rem(24.))]),
         ]),
       ]);
     let socials =
       style([
         display(`flex),
         justifyContent(`spaceBetween),
-        width(`rem(24.7)),
-        margin2(~v=`rem(1.93), ~h=`auto),
+        flexDirection(`column),
+        margin2(~v=`rem(2.), ~h=`auto),
+        media(
+          Theme.MediaQuery.tablet,
+          [flexDirection(`row), width(`rem(24.7))],
+        ),
       ]);
     let socialTag =
       style([
@@ -252,7 +261,7 @@ module MemberProfile = {
         <img src="/static/img/gareth.png" className=Styles.profilePic />
         <div className=Styles.innerFlex>
           <span className=Styles.memberName>
-            <img src="/static/img/DiscordLogo.png" className=Styles.icon />
+            <img src="/static/img/Icon.Discord.svg" className=Styles.icon />
             <Spacer width=0.31 />
             <h4 className=Theme.H4.header>
               {React.string("Garethtdavies")}
@@ -274,6 +283,7 @@ module MemberProfile = {
                 {React.string("Victoria, Canada")}
               </p>
             </div>
+            <Spacer height=1. />
             <div className=Styles.socialTag>
               <img src="/static/img/Icon.Twitter.svg" />
               <Spacer width=0.34 />
@@ -281,6 +291,7 @@ module MemberProfile = {
                 {React.string("@_garethtdavies")}
               </p>
             </div>
+            <Spacer height=1. />
             <div className=Styles.socialTag>
               <img src="/static/img/Icon.Git.svg" />
               <Spacer width=0.34 />
@@ -292,6 +303,7 @@ module MemberProfile = {
           <a href="/blog" className=Styles.ctaButton>
             {React.string({js|Learn More|js})}
           </a>
+          <Spacer height=3. />
         </div>
       </div>
     </div>;
