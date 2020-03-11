@@ -8,10 +8,10 @@ module Styles = {
       display(`flex),
       flexDirection(`column),
       justifyContent(`flexStart),
-      maxWidth(`rem(28.0)),
       width(`percent(100.0)),
+      maxWidth(`rem(22.5)),
       marginLeft(`rem(5.)),
-      paddingTop(`rem(7.)),
+      paddingTop(`rem(6.)),
     ]);
   };
   let heroRight = {
@@ -29,7 +29,7 @@ module Styles = {
     merge([
       Theme.Text.Body.regularLight,
       style([
-        marginTop(`rem(1.)),
+        maxWidth(`rem(23.125)),
         color(white),
         animationFillMode(`forwards),
       ]),
@@ -62,7 +62,7 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~nextStep) => {
+let make = (~heading, ~description, ~miscLeft, ~miscRight=?) => {
   let mapImage = Hooks.useAsset("map@2x.png");
   <div className=Styles.main>
     <div className=Styles.map>
@@ -72,25 +72,21 @@ let make = (~nextStep) => {
     <div className=Theme.Onboarding.main>
       <div className=Styles.heroLeft>
         <FadeIn duration=500 delay=0>
-          <h1 className=Styles.header> {React.string("Welcome")} </h1>
+          <h1 className=Styles.header> {React.string(heading)} </h1>
         </FadeIn>
         <FadeIn duration=500 delay=150>
-          <div className=Styles.heroBody>
-            <p>
-              {React.string(
-                 {|You're about to install everything you need to participate in Coda Protocol's revolutionary blockchain, which will make cryptocurrency accessible to everyone.|},
-               )}
-            </p>
-          </div>
+          <div className=Styles.heroBody> description </div>
         </FadeIn>
-        <div className=Styles.heroBody>
-          <Button
-            label="Get Started"
-            style=Button.HyperlinkBlue3
-            onClick={_ => nextStep()}
-          />
-        </div>
+        <div className=Styles.heroBody> miscLeft </div>
       </div>
+      {switch (miscRight) {
+       | Some(items) =>
+         <>
+           <Spacer width=10.0 />
+           <div className=Styles.heroRight> items </div>
+         </>
+       | None => React.null
+       }}
     </div>
   </div>;
 };
