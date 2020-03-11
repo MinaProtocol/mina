@@ -1137,7 +1137,7 @@ module Data = struct
       let staking_data', next_data', epoch_count' =
         if next_epoch > prev_epoch then
           ( next_to_staking next_data
-          , { Poly.seed= Epoch_seed.initial
+          , { Poly.seed= next_data.seed
             ; ledger=
                 {Epoch_ledger.Poly.hash= snarked_ledger_hash; total_currency}
             ; start_checkpoint=
@@ -2117,11 +2117,7 @@ module Data = struct
       in
       let%bind next_epoch_data =
         let%map seed =
-          let%bind base =
-            Epoch_seed.if_ epoch_increased
-              ~then_:Epoch_seed.(var_of_t initial)
-              ~else_:previous_state.next_epoch_data.seed
-          in
+          let base = previous_state.next_epoch_data.seed in
           let%bind updated = Epoch_seed.update_var base vrf_result in
           Epoch_seed.if_ in_seed_update_range ~then_:updated ~else_:base
         and epoch_length =
@@ -2691,13 +2687,20 @@ module Hooks = struct
       ~time_received
 
   let is_short_range =
-    let most_recent_lock c =
-      if Slot.in_seed_update_range (Consensus_state.curr_slot c) then
-        c.staking_epoch_data.lock_checkpoint
-      else c.next_epoch_data.lock_checkpoint
+    let open Consensus_state in
+    let is_pred x1 x2 = Epoch.equal (Epoch.succ x1) x2 in
+    let pred_case c1 c2 =
+      let e1, e2 = (curr_epoch c1, curr_epoch c2) in
+      is_pred e1 e2
+      && (not (Slot.in_seed_update_range (curr_slot c1)))
+      && Coda_base.State_hash.equal c1.next_epoch_data.lock_checkpoint
+           c2.staking_epoch_data.lock_checkpoint
     in
     fun c1 c2 ->
-      Coda_base.State_hash.equal (most_recent_lock c1) (most_recent_lock c2)
+      if Epoch.equal (curr_epoch c1) (curr_epoch c2) then
+        Coda_base.State_hash.equal c1.staking_epoch_data.lock_checkpoint
+          c2.staking_epoch_data.lock_checkpoint
+      else pred_case c1 c2 || pred_case c2 c1
 
   let select ~existing ~candidate ~logger =
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
