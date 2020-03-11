@@ -43,6 +43,8 @@ module Metadata : sig
   end
 
   type t = Stable.V1.t
+
+  val extend : t -> (string * Yojson.Safe.json) list -> t
 end
 
 (** Used only when dealing with the raw logging function *)

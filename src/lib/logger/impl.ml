@@ -74,6 +74,14 @@ module Metadata = struct
 
   let mem = String.Map.mem
 
+  let merge a b =
+    String.Map.merge a b ~f:(fun ~key src ->
+        match src with
+        | `Left x | `Right x ->
+            Some x
+        | `Both _ ->
+            failwithf "cannot merge metadata key: %s" key () )
+
   let extend (t : t) alist =
     List.fold_left alist ~init:t ~f:(fun acc (key, data) ->
         String.Map.add_exn acc ~key ~data )
@@ -338,7 +346,8 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   ; level
   ; source= Some (Source.create ~module_ ~location)
   ; message
-  ; metadata= Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata }
+  ; metadata=
+      Metadata.merge (Metadata.extend t.metadata metadata) !global_metadata }
 
 let raw ({id; _} as t) msg =
   if t.null then ()
