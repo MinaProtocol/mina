@@ -893,6 +893,10 @@ func (lp *listPeersMsg) run(app *app) (interface{}, error) {
 			app.P2p.Logger.Warning("skipping maddr ", conn.RemoteMultiaddr().String(), " because it failed to parse: ", err.Error())
 			continue
 		}
+		if maybePeer.Libp2pPort == 0 {
+			// not sure what this is, but it's definitely not important to be in the peer list
+			continue
+		}
 		peerInfos = append(peerInfos, *maybePeer)
 	}
 
