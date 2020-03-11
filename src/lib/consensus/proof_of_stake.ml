@@ -1131,7 +1131,7 @@ module Data = struct
 
     let update_pair
         ((staking_data, next_data) : Staking.Value.t * Next.Value.t)
-        epoch_count ~prev_epoch ~next_epoch ~prev_slot
+        epoch_count ~prev_epoch ~next_epoch ~next_slot
         ~prev_protocol_state_hash ~producer_vrf_result ~snarked_ledger_hash
         ~total_currency =
       let staking_data', next_data', epoch_count' =
@@ -1154,7 +1154,7 @@ module Data = struct
           , epoch_count ) )
       in
       let curr_seed, curr_lock_checkpoint =
-        if Slot.in_seed_update_range prev_slot then
+        if Slot.in_seed_update_range next_slot then
           ( Epoch_seed.update next_data'.seed producer_vrf_result
           , prev_protocol_state_hash )
         else (next_data'.seed, next_data'.lock_checkpoint)
@@ -1965,7 +1965,7 @@ module Data = struct
           ( previous_consensus_state.staking_epoch_data
           , previous_consensus_state.next_epoch_data )
           previous_consensus_state.epoch_count ~prev_epoch ~next_epoch
-          ~prev_slot ~prev_protocol_state_hash:previous_protocol_state_hash
+          ~next_slot ~prev_protocol_state_hash:previous_protocol_state_hash
           ~producer_vrf_result ~snarked_ledger_hash ~total_currency
       in
       let min_window_density, sub_window_densities =
@@ -2088,7 +2088,7 @@ module Data = struct
         let%bind is_genesis = is_genesis next_global_slot in
         Boolean.Assert.any [global_slot_increased; is_genesis]
       in
-      let%bind next_epoch, _next_slot =
+      let%bind next_epoch, next_slot =
         Global_slot.Checked.to_epoch_and_slot next_global_slot
       and prev_epoch, prev_slot =
         Global_slot.Checked.to_epoch_and_slot prev_global_slot
@@ -2113,7 +2113,7 @@ module Data = struct
         same_checkpoint_window ~prev:prev_global_slot ~next:next_global_slot
       in
       let%bind in_seed_update_range =
-        Slot.Checked.in_seed_update_range prev_slot
+        Slot.Checked.in_seed_update_range next_slot
       in
       let%bind next_epoch_data =
         let%map seed =
@@ -2691,16 +2691,47 @@ module Hooks = struct
     let is_pred x1 x2 = Epoch.equal (Epoch.succ x1) x2 in
     let pred_case c1 c2 =
       let e1, e2 = (curr_epoch c1, curr_epoch c2) in
-      is_pred e1 e2
-      && (not (Slot.in_seed_update_range (curr_slot c1)))
+      Core.printf "pred_case\n%!" ;
+      Core.printf "e1, e2: %d, %d\n%!"
+        (Epoch.to_int (curr_epoch c1))
+        (Epoch.to_int (curr_epoch c2)) ;
+      Core.printf "slot_1: %d\n%!" (Slot.to_int (curr_slot c1)) ;
+      let c1_next_is_finalized =
+        not (Slot.in_seed_update_range (Slot.succ (curr_slot c1)))
+      in
+      Core.printf "slot_1 next_is_finalized: %b\n%!" c1_next_is_finalized ;
+      Core.printf
+        !"c1 next, c2 staking: %{sexp:Coda_base.State_hash.t} \
+          %{sexp:Coda_base.State_hash.t}\n\
+          %!"
+        c1.next_epoch_data.lock_checkpoint
+        c2.staking_epoch_data.lock_checkpoint ;
+      is_pred e1 e2 && c1_next_is_finalized
       && Coda_base.State_hash.equal c1.next_epoch_data.lock_checkpoint
            c2.staking_epoch_data.lock_checkpoint
     in
     fun c1 c2 ->
-      if Epoch.equal (curr_epoch c1) (curr_epoch c2) then
-        Coda_base.State_hash.equal c1.staking_epoch_data.lock_checkpoint
-          c2.staking_epoch_data.lock_checkpoint
-      else pred_case c1 c2 || pred_case c2 c1
+      let t =
+        if Epoch.equal (curr_epoch c1) (curr_epoch c2) then
+          Coda_base.State_hash.equal c1.staking_epoch_data.lock_checkpoint
+            c2.staking_epoch_data.lock_checkpoint
+        else pred_case c1 c2 || pred_case c2 c1
+      in
+      Core.printf "slots per epoch: %d\n%!" Configuration.t.slots_per_epoch ;
+      Core.printf
+        !"c%d staking, next: %{sexp:Coda_base.State_hash.t} \
+          %{sexp:Coda_base.State_hash.t}\n\
+          %!"
+        1 c1.staking_epoch_data.lock_checkpoint
+        c1.next_epoch_data.lock_checkpoint ;
+      Core.printf
+        !"c%d staking, next: %{sexp:Coda_base.State_hash.t} \
+          %{sexp:Coda_base.State_hash.t}\n\
+          %!"
+        2 c2.staking_epoch_data.lock_checkpoint
+        c2.next_epoch_data.lock_checkpoint ;
+      Core.printf "is_short_range: %b\n%!" t ;
+      t
 
   let select ~existing ~candidate ~logger =
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
@@ -3101,7 +3132,8 @@ module Hooks = struct
           let staking_epoch_data, next_epoch_data, epoch_count =
             Epoch_data.update_pair
               (prev.staking_epoch_data, prev.next_epoch_data)
-              prev.epoch_count ~prev_epoch ~next_epoch:curr_epoch ~prev_slot
+              prev.epoch_count ~prev_epoch ~next_epoch:curr_epoch
+              ~next_slot:curr_slot
               ~prev_protocol_state_hash:
                 (With_hash.hash previous_protocol_state)
               ~producer_vrf_result ~snarked_ledger_hash ~total_currency
