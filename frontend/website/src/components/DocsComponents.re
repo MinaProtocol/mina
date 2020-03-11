@@ -206,3 +206,24 @@ module Ol =
   Wrap({
     let element = <ol className=Style.list />;
   });
+
+module Img =
+  Wrap({
+    let element = <img width="100%" />;
+  });
+
+let allComponents = () => {
+  "Alert": Alert.make,
+  "h1": H1.make,
+  "h2": H2.make,
+  "h3": H3.make,
+  "h4": H4.make,
+  "p": P.make,
+  "a": A.make,
+  "strong": Strong.make,
+  "pre": Pre.make,
+  "code": Code.make,
+  "ul": Ul.make,
+  "ol": Ol.make,
+  "img": Img.make,
+};

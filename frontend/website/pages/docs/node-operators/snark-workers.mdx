@@ -35,8 +35,7 @@ Lucky for us, we can leverage two properties about SNARKs:
 1. proofs can be merged - two proofs can be combined to form a *merge proof*
 2. merges are associative - merge proofs are identical, regardless of the order merged
 
-![](/static/img/snark-diagram.png)
-
+![Diagram of snark merge proofs](/static/img/snark-diagram.png)
 *Each σ ⇒ σ' represents a state transition (aka a transaction) — you can see from this image that the two trees are identical, regardless of the order in which transactions were proved.*
 
 What these two properties essentially allow us to do is take advantage of parallelism. If proofs can be merged, and it doesn't matter how they're combined, then SNARK proofs can be generated in parallel. Whichever proof is finished first can be combined later with the proofs in progress. This can be envisioned as a binary tree, where the bottom row (the leaves) consists of the individual transaction proofs, and each parent row, the set of respective merge proofs. We can combine these all the way to the root, which represents a state update performed by applying all the transactions.
