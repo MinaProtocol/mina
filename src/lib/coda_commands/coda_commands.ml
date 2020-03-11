@@ -167,12 +167,13 @@ let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let trust_system = config.trust_system in
   Trust_system.reset trust_system ip_address
 
-let setup_user_command ~fee ~nonce ~valid_until ~memo ~sender_kp
+let setup_user_command ~fee ~nonce ~valid_until ~memo ~(sender_kp : Keypair.t)
     user_command_body =
   (* TODO: Fees in tokens support. *)
   let payload =
-    User_command.Payload.create ~fee ~fee_token:Token_id.default ~nonce
-      ~valid_until ~memo ~body:user_command_body
+    User_command.Payload.create ~fee ~fee_token:Token_id.default
+      ~fee_payer_pk:(Signature_lib.Public_key.compress sender_kp.public_key)
+      ~nonce ~valid_until ~memo ~body:user_command_body
   in
   let signed_user_command = User_command.sign sender_kp payload in
   User_command.forget_check signed_user_command

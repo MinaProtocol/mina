@@ -267,13 +267,11 @@ let run_test () : unit Deferred.t =
       (* Send money to someone *)
       let build_payment amount sender_sk receiver_pk fee =
         trace_recurring "build_payment" (fun () ->
-            let sender_id =
-              Account_id.create (pk_of_sk sender_sk) Token_id.default
-            in
-            let receiver_id = Account_id.create receiver_pk Token_id.default in
+            let sender_pk = pk_of_sk sender_sk in
+            let sender = Account_id.create sender_pk Token_id.default in
             let nonce =
               Option.value_exn
-                ( Coda_commands.get_nonce coda sender_id
+                ( Coda_commands.get_nonce coda sender
                 |> Participating_state.active_exn )
             in
             let memo =
@@ -282,8 +280,14 @@ let run_test () : unit Deferred.t =
             in
             let payload : User_command.Payload.t =
               User_command.Payload.create ~fee_token:Token_id.default ~fee
-                ~nonce ~memo ~valid_until:Coda_numbers.Global_slot.max_value
-                ~body:(Payment {receiver= receiver_id; amount})
+                ~fee_payer_pk:sender_pk ~nonce ~memo
+                ~valid_until:Coda_numbers.Global_slot.max_value
+                ~body:
+                  (Payment
+                     { source_pk= sender_pk
+                     ; receiver_pk
+                     ; token_id= Token_id.default
+                     ; amount })
             in
             (* verify memo is in the payload *)
             assert (User_command_memo.equal memo payload.common.memo) ;

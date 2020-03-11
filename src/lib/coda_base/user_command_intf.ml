@@ -98,9 +98,19 @@ module type S = sig
 
   val signer : t -> Public_key.t
 
+  val fee_token : t -> Token_id.t
+
+  val fee_payer_pk : t -> Public_key.Compressed.t
+
   val fee_payer : t -> Account_id.t
 
+  val token : t -> Token_id.t
+
+  val source_pk : t -> Public_key.Compressed.t
+
   val source : t -> Account_id.t
+
+  val receiver_pk : t -> Public_key.Compressed.t
 
   val receiver : t -> Account_id.t
 

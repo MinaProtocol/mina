@@ -60,13 +60,6 @@ module Public_key = struct
 end
 
 module User_command = struct
-  let receiver user_command =
-    match (User_command.payload user_command).body with
-    | Payment payment ->
-        payment.receiver
-    | Stake_delegation (Set_delegate delegation) ->
-        Account_id.create delegation.new_delegate Token_id.default
-
   let encode {With_hash.data= user_command; hash} first_seen =
     let payload = User_command.payload user_command in
     let body = payload.body in
@@ -102,12 +95,11 @@ module User_command = struct
 
       method sender =
         some @@ Public_key.encode_as_obj_rel_insert_input
-        @@ Account_id.public_key
-        @@ User_command.fee_payer user_command
+        @@ User_command.fee_payer_pk user_command
 
       method receiver =
         some @@ Public_key.encode_as_obj_rel_insert_input
-        @@ Account_id.public_key @@ receiver user_command
+        @@ User_command.receiver_pk user_command
 
       method typ =
         some
@@ -131,11 +123,13 @@ module User_command = struct
       match obj#typ with
       | `Delegation ->
           User_command.Payload.Body.Stake_delegation
-            (Set_delegate {new_delegate= receiver})
+            (Set_delegate {delegator= signer; new_delegate= receiver})
       | `Payment ->
           (* TODO: Allow GraphQL to send tokens other than the default. *)
           User_command.Payload.Body.Payment
-            { receiver= Account_id.create receiver Token_id.default
+            { source_pk= signer
+            ; receiver_pk= receiver
+            ; token_id= Token_id.default
             ; amount= obj#amount }
     in
     let payload =
@@ -143,7 +137,7 @@ module User_command = struct
         ~memo:
           obj#memo
           (* TODO: Allow GraphQL to send tokens other than the default. *)
-        ~fee_token:Token_id.default
+        ~fee_token:Token_id.default ~fee_payer_pk:signer
         ~body (* TODO: We should actually be passing obj#valid_until *)
         ~valid_until:Coda_numbers.Global_slot.max_value
     in

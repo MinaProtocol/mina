@@ -1,6 +1,7 @@
 [%%import "/src/config.mlh"]
 
 open Core_kernel
+open Import
 
 [%%ifdef consensus_mechanism]
 
@@ -37,9 +38,10 @@ end
 
 module Common : sig
   module Poly : sig
-    type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t =
+    type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
       { fee: 'fee
       ; fee_token: 'token_id
+      ; fee_payer_pk: 'public_key
       ; nonce: 'nonce
       ; valid_until: 'global_slot
       ; memo: 'memo }
@@ -48,20 +50,27 @@ module Common : sig
     module Stable :
       sig
         module V1 : sig
-          type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t
+          type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t
           [@@deriving bin_io, eq, sexp, hash, yojson, version]
         end
 
         module Latest = V1
       end
-      with type ('fee, 'token_id, 'nonce, 'global_slot, 'memo) V1.t =
-                  ('fee, 'token_id, 'nonce, 'global_slot, 'memo) t
+      with type ( 'fee
+                , 'public_key
+                , 'token_id
+                , 'nonce
+                , 'global_slot
+                , 'memo )
+                V1.t =
+                  ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t
   end
 
   module Stable : sig
     module V1 : sig
       type t =
         ( Currency.Fee.Stable.V1.t
+        , Public_key.Compressed.Stable.V1.t
         , Token_id.Stable.V1.t
         , Coda_numbers.Account_nonce.Stable.V1.t
         , Coda_numbers.Global_slot.Stable.V1.t
@@ -77,12 +86,13 @@ module Common : sig
 
   val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 
-  val gen : t Quickcheck.Generator.t
+  val gen : ?fee_token_id:Token_id.t -> unit -> t Quickcheck.Generator.t
 
   [%%ifdef consensus_mechanism]
 
   type var =
     ( Currency.Fee.var
+    , Public_key.Compressed.var
     , Token_id.var
     , Coda_numbers.Account_nonce.Checked.t
     , Coda_numbers.Global_slot.Checked.t
@@ -140,6 +150,7 @@ type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 val create :
      fee:Currency.Fee.t
   -> fee_token:Token_id.t
+  -> fee_payer_pk:Public_key.Compressed.t
   -> nonce:Coda_numbers.Account_nonce.t
   -> valid_until:Coda_numbers.Global_slot.t
   -> memo:User_command_memo.t
@@ -152,6 +163,10 @@ val fee : t -> Currency.Fee.t
 
 val fee_token : t -> Token_id.t
 
+val fee_payer_pk : t -> Public_key.Compressed.t
+
+val fee_payer : t -> Account_id.t
+
 val nonce : t -> Coda_numbers.Account_nonce.t
 
 val valid_until : t -> Coda_numbers.Global_slot.t
@@ -160,7 +175,13 @@ val memo : t -> User_command_memo.t
 
 val body : t -> Body.t
 
+val receiver_pk : t -> Public_key.Compressed.t
+
 val receiver : t -> Account_id.t
+
+val source_pk : t -> Public_key.Compressed.t
+
+val source : t -> Account_id.t
 
 val token : t -> Token_id.t
 

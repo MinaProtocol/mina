@@ -22,15 +22,20 @@ let create_ledger_and_transactions num_transitions =
       let account_id = Account_id.create public_key Token_id.default in
       Ledger.create_new_account_exn ledger account_id
         (Account.create account_id (Currency.Balance.of_int 10_000)) ) ;
-  let txn from_kp (to_kp : Signature_lib.Keypair.t) amount fee nonce =
-    let receiver =
-      Account_id.create (Public_key.compress to_kp.public_key) Token_id.default
-    in
+  let txn (from_kp : Signature_lib.Keypair.t) (to_kp : Signature_lib.Keypair.t)
+      amount fee nonce =
+    let to_pk = Public_key.compress to_kp.public_key in
+    let from_pk = Public_key.compress from_kp.public_key in
     let payload : User_command.Payload.t =
-      User_command.Payload.create ~fee ~fee_token:Token_id.default ~nonce
-        ~memo:User_command_memo.dummy
+      User_command.Payload.create ~fee ~fee_token:Token_id.default
+        ~fee_payer_pk:to_pk ~nonce ~memo:User_command_memo.dummy
         ~valid_until:Coda_numbers.Global_slot.max_value
-        ~body:(Payment {receiver; amount})
+        ~body:
+          (Payment
+             { source_pk= from_pk
+             ; receiver_pk= to_pk
+             ; token_id= Token_id.default
+             ; amount })
     in
     User_command.sign from_kp payload
   in

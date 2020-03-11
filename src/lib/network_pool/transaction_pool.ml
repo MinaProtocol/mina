@@ -1084,20 +1084,19 @@ let%test_module _ =
           Deferred.unit )
 
     let mk_payment sender_idx fee nonce receiver_idx amount =
+      let get_pk idx = Public_key.compress test_keys.(idx).public_key in
       User_command.forget_check
       @@ User_command.sign test_keys.(sender_idx)
            (User_command_payload.create ~fee:(Currency.Fee.of_int fee)
-              ~fee_token:Token_id.default
+              ~fee_token:Token_id.default ~fee_payer_pk:(get_pk sender_idx)
               ~valid_until:Coda_numbers.Global_slot.max_value
               ~nonce:(Account.Nonce.of_int nonce)
               ~memo:(User_command_memo.create_by_digesting_string_exn "foo")
               ~body:
                 (User_command_payload.Body.Payment
-                   { receiver=
-                       Account_id.create
-                         (Public_key.compress
-                            test_keys.(receiver_idx).public_key)
-                         Token_id.default
+                   { source_pk= get_pk sender_idx
+                   ; receiver_pk= get_pk receiver_idx
+                   ; token_id= Token_id.default
                    ; amount= Currency.Amount.of_int amount }))
 
     let%test_unit "Now-invalid transactions are removed from the pool on fork \

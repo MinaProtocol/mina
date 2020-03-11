@@ -588,21 +588,23 @@ module T = struct
               Public_key.of_private_key_exn sk |> Public_key.compress
             in
             let build_txn amount sender_sk receiver_pk fee =
-              let sender_id =
-                Account_id.create (pk_of_sk sender_sk) Token_id.default
-              in
-              let receiver_id =
-                Account_id.create receiver_pk Token_id.default
-              in
+              let sender_pk = pk_of_sk sender_sk in
+              let sender = Account_id.create sender_pk Token_id.default in
               let nonce =
-                Coda_commands.get_nonce coda sender_id
+                Coda_commands.get_nonce coda sender
                 |> Participating_state.active_exn
                 |> Option.value_exn ?here:None ?message:None ?error:None
               in
               let payload : User_command.Payload.t =
                 User_command.Payload.create ~fee ~fee_token:Token_id.default
-                  ~nonce ~memo ~valid_until:Coda_numbers.Global_slot.max_value
-                  ~body:(Payment {receiver= receiver_id; amount})
+                  ~fee_payer_pk:sender_pk ~nonce ~memo
+                  ~valid_until:Coda_numbers.Global_slot.max_value
+                  ~body:
+                    (Payment
+                       { source_pk= sender_pk
+                       ; receiver_pk
+                       ; token_id= Token_id.default
+                       ; amount })
               in
               User_command.sign (Keypair.of_private_key_exn sender_sk) payload
             in

@@ -30,38 +30,19 @@ module Message = struct
   let challenge_length = 128
 
   let derive t ~private_key ~public_key:pk =
-    let { User_command_payload.Poly.common=
-            { User_command_payload.Common.Poly.fee
-            ; fee_token
-            ; nonce
-            ; valid_until
-            ; memo }
-        ; body= {Transaction_union_payload.Body.amount; account; tag} } =
+    let input =
       Transaction_union_payload.of_user_command_payload t
+      |> Transaction_union_payload.to_input
+      |> Random_oracle.Input.to_bits ~unpack:Field.unpack
     in
-    let open Coda_numbers in
-    let open Currency in
     let pk_bits {Signature_lib.Public_key.Compressed.Poly.x; is_odd} =
       is_odd :: Field.unpack x
-    in
-    let account_id_bits aid =
-      List.append
-        (pk_bits (Account_id.public_key aid))
-        (Token_id.unpack (Account_id.token_id aid))
     in
     List.concat
       [ Tock.Field.unpack private_key
       ; pk_bits
           (Signature_lib.Public_key.compress (Inner_curve.to_affine_exn pk))
-      ; Fee.to_bits fee
-      ; Token_id.unpack fee_token
-      ; Account_nonce.Bits.to_bits nonce
-      ; Global_slot.to_bits valid_until
-      ; User_command_memo.to_bits memo
-      ; Amount.to_bits amount
-      ; account_id_bits account
-      ; (let x, y = Transaction_union_tag.to_bits tag in
-         [x; y]) ]
+      ; input ]
     |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
     |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
     |> Tock.Field.project

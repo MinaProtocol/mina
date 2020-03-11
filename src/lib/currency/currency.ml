@@ -624,6 +624,10 @@ module Balance = struct
 
     let sub_amount = Amount.Checked.sub
 
+    let add_amount_flagged = Amount.Checked.add_flagged
+
+    let sub_amount_flagged = Amount.Checked.sub_flagged
+
     let ( + ) = add_amount
 
     let ( - ) = sub_amount

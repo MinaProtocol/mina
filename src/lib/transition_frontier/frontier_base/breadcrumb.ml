@@ -184,7 +184,14 @@ module For_tests = struct
         let open Option.Let_syntax in
         let%bind sender_sk = sender_sk in
         let sender_keypair = Keypair.of_private_key_exn sender_sk in
-        let%bind receiver_aid = List.random_element account_ids in
+        let token = sender_account.token_id in
+        let%bind receiver =
+          account_ids
+          |> List.filter
+               ~f:(Fn.compose (Token_id.equal token) Account_id.token_id)
+          |> List.random_element
+        in
+        let receiver_pk = Account_id.public_key receiver in
         let nonce =
           let ledger = Staged_ledger.ledger staged_ledger in
           let status, account_location =
@@ -200,11 +207,18 @@ module For_tests = struct
           sender_account.Account.Poly.balance |> Currency.Balance.to_amount
         in
         let%map _ = Currency.Amount.sub sender_account_amount send_amount in
+        let sender_pk = Account.public_key sender_account in
         let payload : User_command.Payload.t =
           User_command.Payload.create ~fee:Fee.zero ~fee_token:Token_id.default
-            ~nonce ~valid_until:Coda_numbers.Global_slot.max_value
+            ~fee_payer_pk:sender_pk ~nonce
+            ~valid_until:Coda_numbers.Global_slot.max_value
             ~memo:User_command_memo.dummy
-            ~body:(Payment {receiver= receiver_aid; amount= send_amount})
+            ~body:
+              (Payment
+                 { source_pk= sender_pk
+                 ; receiver_pk
+                 ; token_id= token
+                 ; amount= send_amount })
         in
         User_command.sign sender_keypair payload )
 

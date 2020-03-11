@@ -59,17 +59,8 @@ module Stable = struct
     include Comparable.Make (T)
     include Hashable.Make (T)
 
-    let accounts_accessed ({payload; signer; _} : t) =
-      let signer_pk = Public_key.compress signer in
-      let fee_token_id = Payload.fee_token payload in
-      let token_id = Payload.token payload in
-      let fee_payer = Account_id.create signer_pk fee_token_id in
-      let source =
-        if Token_id.equal fee_token_id token_id then []
-        else [Account_id.create signer_pk token_id]
-      in
-      let payload_accounts = Payload.accounts_accessed payload in
-      fee_payer :: List.append source payload_accounts
+    let accounts_accessed ({payload; _} : t) =
+      Payload.accounts_accessed payload
   end
 end]
 
@@ -93,13 +84,21 @@ let is_trivial t = Fee.(fee t < minimum_fee)
 
 let signer {Poly.signer; _} = signer
 
-let fee_payer {Poly.signer; payload; _} =
-  Account_id.create (Public_key.compress signer) (Payload.fee_token payload)
+let fee_token ({payload; _} : t) = Payload.fee_token payload
 
-let receiver = Fn.compose Payload.receiver payload
+let fee_payer_pk ({payload; _} : t) = Payload.fee_payer_pk payload
 
-let source {Poly.signer; payload; _} =
-  Account_id.create (Public_key.compress signer) (Payload.token payload)
+let fee_payer ({payload; _} : t) = Payload.fee_payer payload
+
+let token ({payload; _} : t) = Payload.token payload
+
+let source_pk ({payload; _} : t) = Payload.source_pk payload
+
+let source ({payload; _} : t) = Payload.source payload
+
+let receiver_pk ({payload; _} : t) = Payload.receiver_pk payload
+
+let receiver ({payload; _} : t) = Payload.receiver payload
 
 let amount = Fn.compose Payload.amount payload
 
@@ -125,16 +124,19 @@ module Gen = struct
       ?(nonce = Account_nonce.zero) ?(fee_token = Token_id.default) ~max_fee
       create_body =
     let open Quickcheck.Generator.Let_syntax in
-    let%bind sender, (receiver : Signature_keypair.t) = key_gen
+    let%bind (signer : Signature_keypair.t), (receiver : Signature_keypair.t) =
+      key_gen
     and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int
     and memo = String.quickcheck_generator in
-    let%map body = create_body receiver in
+    let%map body = create_body signer receiver in
     let payload : Payload.t =
-      Payload.create ~fee ~fee_token ~nonce ~valid_until:Global_slot.max_value
+      Payload.create ~fee ~fee_token
+        ~fee_payer_pk:(Public_key.compress signer.public_key)
+        ~nonce ~valid_until:Global_slot.max_value
         ~memo:(User_command_memo.create_by_digesting_string_exn memo)
         ~body
     in
-    sign' sender payload
+    sign' signer payload
 
   let with_random_participants ~keys ~gen =
     let key_gen = Quickcheck_lib.gen_pair @@ Quickcheck_lib.of_array keys in
@@ -145,12 +147,13 @@ module Gen = struct
         ?nonce ~max_amount ?fee_token ?(payment_token = Token_id.default)
         ~max_fee () =
       gen_inner sign' ~key_gen ?nonce ?fee_token ~max_fee
-      @@ fun {public_key= receiver; _} ->
+      @@ fun {public_key= signer; _} {public_key= receiver; _} ->
       let open Quickcheck.Generator.Let_syntax in
       let%map amount = Int.gen_incl 1 max_amount >>| Currency.Amount.of_int in
       User_command_payload.Body.Payment
-        { receiver=
-            Account_id.create (Public_key.compress receiver) payment_token
+        { receiver_pk= Public_key.compress receiver
+        ; source_pk= Public_key.compress signer
+        ; token_id= payment_token
         ; amount }
 
     let gen ?(sign_type = `Fake) =
@@ -170,11 +173,12 @@ module Gen = struct
   module Stake_delegation = struct
     let gen ~key_gen ?nonce ?fee_token ~max_fee () =
       gen_inner For_tests.fake_sign ~key_gen ?nonce ?fee_token ~max_fee
-        (fun {public_key= new_delegate; _} ->
+        (fun {public_key= signer; _} {public_key= new_delegate; _} ->
           Quickcheck.Generator.return
           @@ User_command_payload.Body.Stake_delegation
-               (Set_delegate {new_delegate= Public_key.compress new_delegate})
-      )
+               (Set_delegate
+                  { delegator= Public_key.compress signer
+                  ; new_delegate= Public_key.compress new_delegate }) )
 
     let gen_with_random_participants ~keys ?nonce ?fee_token ~max_fee =
       with_random_participants ~keys ~gen:(gen ?nonce ?fee_token ~max_fee)
@@ -255,6 +259,7 @@ module Gen = struct
       in
       Quickcheck_lib.map_gens command_senders ~f:(fun sender ->
           let this_split, rest_splits = uncons_exn currency_splits.(sender) in
+          let sender_pk = account_info.(sender) |> Tuple3.get1 in
           currency_splits.(sender) <- rest_splits ;
           let nonce = account_nonces.(sender) in
           account_nonces.(sender) <- Account_nonce.succ nonce ;
@@ -274,17 +279,21 @@ module Gen = struct
           in
           let memo = User_command_memo.dummy in
           let payload =
+            let sender_pk = Public_key.compress sender_pk.public_key in
             Payload.create ~fee ~fee_token:Token_id.default
-              ~valid_until:Global_slot.max_value ~nonce ~memo
+              ~fee_payer_pk:sender_pk ~valid_until:Global_slot.max_value ~nonce
+              ~memo
               ~body:
                 (Payment
-                   { receiver= Account_id.create receiver Token_id.default
+                   { source_pk= sender_pk
+                   ; receiver_pk= receiver
+                   ; token_id= Token_id.default
                    ; amount })
           in
           let sign' =
             match sign_type with `Fake -> For_tests.fake_sign | `Real -> sign
           in
-          return @@ sign' (account_info.(sender) |> Tuple3.get1) payload )
+          return @@ sign' sender_pk payload )
 end
 
 module With_valid_signature = struct

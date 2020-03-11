@@ -42,7 +42,15 @@ let of_string = Field.of_string
 
 let default = Field.one
 
-let gen = Field.gen_uniform
+let invalid = Field.zero
+
+let field_max = Field.(zero - one)
+
+let next x = Field.(one + x)
+
+let gen = Field.gen_uniform_incl default field_max
+
+let gen_non_default = Field.gen_uniform_incl (next default) field_max
 
 let unpack = Field.unpack
 

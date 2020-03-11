@@ -836,11 +836,12 @@ let%test_module _ =
             in
             let modified_payload : User_command.Payload.t =
               match cmd.payload.body with
-              | Payment {receiver; amount= _amount_unused} ->
+              | Payment payment_payload ->
                   { common=
                       {cmd.payload.common with fee= Currency.Amount.to_fee fee}
-                  ; body= User_command.Payload.Body.Payment {receiver; amount}
-                  }
+                  ; body=
+                      User_command.Payload.Body.Payment
+                        {payment_payload with amount} }
               | _ ->
                   failwith "generated user command that wasn't a payment"
             in

@@ -759,28 +759,13 @@ module Types = struct
             ~doc:"Public key of the receiver"
             ~deprecated:(Deprecated (Some "use toAccount field instead"))
             ~args:Arg.[]
-            ~resolve:(fun _ payment ->
-              match
-                User_command_payload.body (User_command.payload payment)
-              with
-              | Payment {Payment_payload.Poly.receiver; _} ->
-                  Account_id.public_key @@ receiver
-              | Stake_delegation (Set_delegate {new_delegate}) ->
-                  new_delegate )
+            ~resolve:(fun _ payment -> User_command.receiver_pk payment)
         ; field "toAccount"
             ~typ:(non_null AccountObj.account)
             ~doc:"Account of the receiver"
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} payment ->
-              let pk =
-                match
-                  User_command_payload.body (User_command.payload payment)
-                with
-                | Payment {Payment_payload.Poly.receiver; _} ->
-                    Account_id.public_key @@ receiver
-                | Stake_delegation (Set_delegate {new_delegate}) ->
-                    new_delegate
-              in
+              let pk = User_command.receiver_pk payment in
               AccountObj.get_best_ledger_account coda pk )
         ; result_field_no_inputs "amount" ~typ:(non_null uint64)
             ~doc:
@@ -1624,7 +1609,8 @@ module Mutations = struct
         | `Bootstrapping ->
             Error "Node is still bootstrapping" )
     in
-    User_command.Payload.create ~fee ~fee_token ~nonce ~valid_until ~memo ~body
+    User_command.Payload.create ~fee ~fee_token ~fee_payer_pk:sender ~nonce
+      ~valid_until ~memo ~body
 
   let send_signed_user_command ~coda ~sender ~payload ~signature =
     let open Deferred.Result.Let_syntax in
@@ -1662,7 +1648,7 @@ module Mutations = struct
         let open Deferred.Result.Let_syntax in
         let body =
           User_command_payload.Body.Stake_delegation
-            (Set_delegate {new_delegate= to_})
+            (Set_delegate {delegator= from; new_delegate= to_})
         in
         let%bind (payload : User_command.Payload.t) =
           Deferred.return
@@ -1687,10 +1673,12 @@ module Mutations = struct
         (fun {ctx= coda; _} ()
              (from, to_, amount, fee, valid_until, memo, nonce) signature ->
         let open Deferred.Result.Let_syntax in
-        let receiver_id = Account_id.create to_ Token_id.default in
         let body =
           User_command_payload.Body.Payment
-            {receiver= receiver_id; amount= Amount.of_uint64 amount}
+            { source_pk= from
+            ; receiver_pk= to_
+            ; token_id= Token_id.default
+            ; amount= Amount.of_uint64 amount }
         in
         let%bind payload =
           Deferred.return

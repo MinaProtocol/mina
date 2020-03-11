@@ -31,11 +31,25 @@ val of_string : string -> t
 
 (** The default token ID, associated with the native coda token.
 
-    This key should be used for fee and coinbase transactions.
+    This ID should be used for fee and coinbase transactions.
 *)
 val default : t
 
+(** An invalid token ID.
+
+    This ID should only be used as a dummy value.
+*)
+val invalid : t
+
+val next : t -> t
+
+(** Generates a random token ID. This is guaranteed not to equal [invalid]. *)
 val gen : t Quickcheck.Generator.t
+
+(** Generates a random token ID. This is guaranteed not to equal [invalid] or
+    [default].
+*)
+val gen_non_default : t Quickcheck.Generator.t
 
 val unpack : t -> bool list
 

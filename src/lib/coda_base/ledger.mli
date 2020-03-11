@@ -100,6 +100,7 @@ module Undo : sig
       type t = Undo.User_command_undo.Body.t =
         | Payment of {previous_empty_accounts: Account_id.t list}
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+        | Failed
       [@@deriving sexp]
     end
 

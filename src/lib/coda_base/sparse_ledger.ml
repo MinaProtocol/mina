@@ -130,107 +130,151 @@ let sub_account_creation_fee action (amount : Currency.Amount.t) =
         sub amount (of_fee Coda_compile_config.account_creation_fee))
   else amount
 
-let sub_account_creation_fee_bal action balance =
+let apply_user_command_exn t
+    ({signer; payload; signature= _} as user_command : User_command.t) =
   let open Currency in
-  if action = `Added then
-    Option.value_exn
-      (Balance.sub_amount balance
-         (Amount.of_fee Coda_compile_config.account_creation_fee))
-  else balance
-
-let apply_user_command_exn t ({signer; payload; signature= _} : User_command.t)
-    =
   let signer_pk = Public_key.compress signer in
-  (* Get index for the source. *)
-  let token = User_command.Payload.token payload in
-  let source = Account_id.create signer_pk token in
-  let source_idx = find_index_exn t source in
-  (* Get the index for the fee-payer. *)
-  let nonce = User_command.Payload.nonce payload in
-  let fee_token = User_command.Payload.fee_token payload in
-  let fee_payer = Account_id.create signer_pk fee_token in
-  let fee_payer_idx = find_index_exn t fee_payer in
-  (* TODO: Disable this check and update the transaction snark. *)
-  assert (Token_id.equal fee_token Token_id.default) ;
-  let fee_payer_account =
-    let account = get_exn t fee_payer_idx in
+  (* TODO: Put actual value here. See issue #4036. *)
+  let current_global_slot = Coda_numbers.Global_slot.zero in
+  (* Fee-payer information *)
+  let fee_token = User_command.fee_token user_command in
+  let fee_payer = User_command.fee_payer user_command in
+  let nonce = User_command.nonce user_command in
+  let () =
+    (* TODO: Enable multi-sig. *)
+    assert (
+      Public_key.Compressed.equal (Account_id.public_key fee_payer) signer_pk
+    )
+  in
+  let () = assert (Token_id.equal fee_token Token_id.default) in
+  let fee_payer_idx, fee_payer_account =
+    let idx = find_index_exn t fee_payer in
+    let account = get_exn t idx in
     assert (Account.Nonce.equal account.nonce nonce) ;
-    let fee = User_command.Payload.fee payload in
-    let open Currency in
-    { account with
-      nonce= Account.Nonce.succ account.nonce
-    ; balance=
-        Balance.sub_amount account.balance (Amount.of_fee fee)
-        |> Option.value_exn ?here:None ?error:None ?message:None
-    ; receipt_chain_hash=
-        Receipt.Chain_hash.cons payload account.receipt_chain_hash }
+    let fee = User_command.fee user_command in
+    let timing =
+      Or_error.ok_exn
+      @@ Transaction_logic.validate_timing ~txn_amount:(Amount.of_fee fee)
+           ~txn_global_slot:current_global_slot ~account
+    in
+    ( idx
+    , { account with
+        nonce= Account.Nonce.succ account.nonce
+      ; balance=
+          Balance.sub_amount account.balance (Amount.of_fee fee)
+          |> Option.value_exn ?here:None ?error:None ?message:None
+      ; receipt_chain_hash=
+          Receipt.Chain_hash.cons payload account.receipt_chain_hash
+      ; timing } )
   in
-  let source_account =
-    if Account_id.equal fee_payer source then fee_payer_account
-    else get_exn t source_idx
-  in
-  match User_command.Payload.body payload with
-  | Stake_delegation (Set_delegate {new_delegate}) ->
-      let t = set_exn t fee_payer_idx fee_payer_account in
-      set_exn t source_idx {source_account with delegate= new_delegate}
-  | Payment {amount; receiver} ->
-      if Account_id.equal source receiver then
-        let t = set_exn t fee_payer_idx fee_payer_account in
-        set_exn t source_idx source_account
-      else
+  (* Charge the fee. *)
+  let t = set_exn t fee_payer_idx fee_payer_account in
+  let source = User_command.source user_command in
+  let receiver = User_command.receiver user_command in
+  let exception Reject of exn in
+  (* Raise an exception if any of the invariants for the user command are not
+     satisfied, so that the command will not go through.
+
+     This must re-check the conditions in Transaction_logic, to ensure that the
+     failure cases are consistent.
+  *)
+  match
+    let () =
+      (* TODO: Predicates. *)
+      assert (
+        Public_key.Compressed.equal
+          (User_command.fee_payer_pk user_command)
+          (User_command.source_pk user_command) )
+    in
+    match User_command.Payload.body payload with
+    | Stake_delegation _ ->
+        let receiver_account = get_exn t @@ find_index_exn t receiver in
+        (* Check that receiver account exists. *)
+        assert (
+          not Public_key.Compressed.(equal empty receiver_account.public_key)
+        ) ;
+        let source_idx = find_index_exn t source in
+        let source_account = get_exn t source_idx in
+        (* Check that source account exists. *)
+        assert (
+          not Public_key.Compressed.(equal empty source_account.public_key) ) ;
+        let source_account =
+          {source_account with delegate= Account_id.public_key receiver}
+        in
+        [(source_idx, source_account)]
+    | Payment {amount; token_id= token; _} ->
         let receiver_idx = find_index_exn t receiver in
         let action, receiver_account =
           get_or_initialize_exn receiver t receiver_idx
         in
-        let source_balance' =
-          Currency.Balance.sub_amount source_account.balance amount
+        let receiver_amount, creation_fee =
+          if Token_id.equal fee_token token then
+            (sub_account_creation_fee action amount, Amount.zero)
+          else if action = `Added then
+            let account_creation_fee =
+              Amount.of_fee Coda_compile_config.account_creation_fee
+            in
+            (amount, account_creation_fee)
+          else (amount, Amount.zero)
         in
-        if Account_id.equal source fee_payer then
-          (* source_idx = fee_payer_idx *)
-          let receiver_balance' =
-            (* Subtract the account creation fee from the amount to be
-               transferred.
+        let fee_payer_account =
+          { fee_payer_account with
+            balance=
+              Balance.sub_amount fee_payer_account.balance creation_fee
+              |> Option.value_exn ?here:None ?error:None ?message:None
+          ; timing=
+              Or_error.ok_exn
+              @@ Transaction_logic.validate_timing ~txn_amount:creation_fee
+                   ~txn_global_slot:current_global_slot
+                   ~account:fee_payer_account }
+        in
+        let receiver_account =
+          { receiver_account with
+            balance=
+              Balance.add_amount receiver_account.balance receiver_amount
+              |> Option.value_exn ?here:None ?error:None ?message:None }
+        in
+        let source_idx = find_index_exn t source in
+        let source_account =
+          let account =
+            if Account_id.equal source receiver then (
+              assert (action = `Existed) ;
+              receiver_account )
+            else get_exn t source_idx
+          in
+          (* Check that source account exists. *)
+          assert (not Public_key.Compressed.(equal empty account.public_key)) ;
+          try
+            { account with
+              balance=
+                Balance.sub_amount account.balance creation_fee
+                |> Option.value_exn ?here:None ?error:None ?message:None
+            ; timing=
+                Or_error.ok_exn
+                @@ Transaction_logic.validate_timing ~txn_amount:amount
+                     ~txn_global_slot:current_global_slot ~account }
+          with exn when Account_id.equal fee_payer source ->
+            (* Don't process transactions with insufficient balance from the
+               fee-payer.
             *)
-            let amount' = sub_account_creation_fee action amount in
-            Option.value_exn
-              (Currency.Balance.add_amount receiver_account.balance amount')
-          in
-          let source_balance' = Option.value_exn source_balance' in
-          let t =
-            set_exn t source_idx {source_account with balance= source_balance'}
-          in
-          set_exn t receiver_idx
-            {receiver_account with balance= receiver_balance'}
-        else
-          (* Charge fee-payer for creating the account. *)
-          let fee_payer_balance' =
-            sub_account_creation_fee_bal action fee_payer_account.balance
-          in
-          let receiver_balance', source_balance' =
-            match source_balance' with
-            | Some source_balance' ->
-                (* Sending the tokens succeeds, move them into the receiver
-                   account.
-                *)
-                let receiver_balance' =
-                  Option.value_exn
-                    (Currency.Balance.add_amount receiver_account.balance
-                       amount)
-                in
-                (receiver_balance', source_balance')
-            | None ->
-                (* Sending the tokens fails, do not move them. *)
-                (receiver_account.balance, source_account.balance)
-          in
-          let t =
-            set_exn t fee_payer_idx
-              {fee_payer_account with balance= fee_payer_balance'}
-          in
-          let t =
-            set_exn t source_idx {source_account with balance= source_balance'}
-          in
-          set_exn t receiver_idx
-            {receiver_account with balance= receiver_balance'}
+            raise (Reject exn)
+        in
+        [ (fee_payer_idx, fee_payer_account)
+        ; (receiver_idx, receiver_account)
+        ; (source_idx, source_account) ]
+  with
+  | indexed_accounts ->
+      (* User command succeeded, update accounts in the ledger. *)
+      List.fold ~init:t indexed_accounts ~f:(fun t (idx, account) ->
+          set_exn t idx account )
+  | exception Reject exn ->
+      (* TODO: These transactions should never reach this stage, this error
+         should be fatal.
+      *)
+      raise exn
+  | exception _ ->
+      (* Not able to apply the user command successfully, charge fee only. *)
+      t
 
 let apply_fee_transfer_exn =
   let apply_single t ((pk, fee) : Fee_transfer.Single.t) =

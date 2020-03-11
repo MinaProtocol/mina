@@ -9,10 +9,12 @@ open Core_kernel
 consensus_mechanism]
 
 open Snark_params.Tick
+open Signature_lib
 open Currency
 
 [%%else]
 
+open Signature_lib_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 open Currency_nonconsensus.Currency
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
@@ -22,18 +24,26 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 module Tag = Transaction_union_tag
 
 module Body = struct
-  type ('tag, 'account_id, 'amount) t_ =
-    {tag: 'tag; account: 'account_id; amount: 'amount}
+  type ('tag, 'public_key, 'token_id, 'amount) t_ =
+    { tag: 'tag
+    ; source_pk: 'public_key
+    ; receiver_pk: 'public_key
+    ; token_id: 'token_id
+    ; amount: 'amount }
   [@@deriving sexp]
 
-  type t = (Tag.t, Account_id.t, Currency.Amount.t) t_ [@@deriving sexp]
+  type t = (Tag.t, Public_key.Compressed.t, Token_id.t, Currency.Amount.t) t_
+  [@@deriving sexp]
 
   let of_user_command_payload_body = function
-    | User_command_payload.Body.Payment {receiver; amount} ->
-        {tag= Tag.Payment; account= receiver; amount}
-    | Stake_delegation (Set_delegate {new_delegate}) ->
+    | User_command_payload.Body.Payment
+        {source_pk; receiver_pk; token_id; amount} ->
+        {tag= Tag.Payment; source_pk; receiver_pk; token_id; amount}
+    | Stake_delegation (Set_delegate {delegator; new_delegate}) ->
         { tag= Tag.Stake_delegation
-        ; account= Account_id.create new_delegate Token_id.default
+        ; source_pk= delegator
+        ; receiver_pk= new_delegate
+        ; token_id= Token_id.default
         ; amount= Currency.Amount.zero }
 
   let gen ~fee =
@@ -59,47 +69,71 @@ module Body = struct
             (Amount.of_fee fee, Amount.max_int)
       in
       Amount.gen_incl min max
-    and account = Account_id.gen in
-    {tag; account; amount}
+    and source_pk = Public_key.Compressed.gen
+    and receiver_pk = Public_key.Compressed.gen
+    and token_id =
+      match tag with Payment -> Token_id.gen | _ -> return Token_id.default
+    in
+    {tag; source_pk; receiver_pk; token_id; amount}
 
   [%%ifdef
   consensus_mechanism]
 
-  type var = (Tag.var, Account_id.var, Currency.Amount.var) t_
+  type var =
+    (Tag.var, Public_key.Compressed.var, Token_id.var, Currency.Amount.var) t_
 
-  let to_hlist {tag; account; amount} = H_list.[tag; account; amount]
+  let to_hlist {tag; source_pk; receiver_pk; token_id; amount} =
+    H_list.[tag; source_pk; receiver_pk; token_id; amount]
 
-  let spec = Data_spec.[Tag.typ; Account_id.typ; Currency.Amount.typ]
+  let spec =
+    Data_spec.
+      [ Tag.typ
+      ; Public_key.Compressed.typ
+      ; Public_key.Compressed.typ
+      ; Token_id.typ
+      ; Currency.Amount.typ ]
 
   let typ =
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
-      ~var_of_hlist:(fun H_list.[tag; account; amount] ->
-        {tag; account; amount} )
-      ~value_of_hlist:(fun H_list.[tag; account; amount] ->
-        {tag; account; amount} )
+      ~var_of_hlist:
+        (fun H_list.[tag; source_pk; receiver_pk; token_id; amount] ->
+        {tag; source_pk; receiver_pk; token_id; amount} )
+      ~value_of_hlist:
+        (fun H_list.[tag; source_pk; receiver_pk; token_id; amount] ->
+        {tag; source_pk; receiver_pk; token_id; amount} )
 
   module Checked = struct
-    let constant ({tag; account; amount} : t) : var =
+    let constant ({tag; source_pk; receiver_pk; token_id; amount} : t) : var =
       { tag= Tag.Checked.constant tag
-      ; account= Account_id.var_of_t account
+      ; source_pk= Public_key.Compressed.var_of_t source_pk
+      ; receiver_pk= Public_key.Compressed.var_of_t receiver_pk
+      ; token_id= Token_id.var_of_t token_id
       ; amount= Currency.Amount.var_of_t amount }
 
-    let to_input {tag; account; amount} =
-      let open Random_oracle.Input in
-      let tag1, tag2 = tag in
-      append (bitstring [tag1; tag2])
-      @@ append (Account_id.Checked.to_input account)
-      @@ bitstring (Currency.Amount.var_to_bits amount :> Boolean.var list)
+    let to_input {tag; source_pk; receiver_pk; token_id; amount} =
+      let bitstring = Random_oracle.Input.bitstring in
+      Array.reduce_exn ~f:Random_oracle.Input.append
+        [| bitstring
+             (let tag1, tag2 = tag in
+              [tag1; tag2])
+         ; Public_key.Compressed.Checked.to_input source_pk
+         ; Public_key.Compressed.Checked.to_input receiver_pk
+         ; Token_id.Checked.to_input token_id
+         ; Currency.Amount.var_to_input amount |]
   end
 
   [%%endif]
 
-  let to_input {tag; account; amount} =
-    let open Random_oracle.Input in
-    let tag1, tag2 = Tag.to_bits tag in
-    append (bitstring [tag1; tag2])
-    @@ append (Account_id.to_input account)
-    @@ bitstring (Currency.Amount.to_bits amount)
+  let to_input {tag; source_pk; receiver_pk; token_id; amount} =
+    let bitstring = Random_oracle.Input.bitstring in
+    Array.reduce_exn ~f:Random_oracle.Input.append
+      [| bitstring
+           (let tag1, tag2 = Tag.to_bits tag in
+            [tag1; tag2])
+       ; Public_key.Compressed.to_input source_pk
+       ; Public_key.Compressed.to_input receiver_pk
+       ; Token_id.to_input token_id
+       ; Currency.Amount.to_input amount |]
 end
 
 type t = (User_command_payload.Common.t, Body.t) User_command_payload.Poly.t
@@ -112,7 +146,9 @@ let of_user_command_payload ({common; body} : User_command_payload.t) : t =
 
 let gen =
   let open Quickcheck.Generator.Let_syntax in
-  let%bind common = User_command_payload.Common.gen in
+  let%bind common =
+    User_command_payload.Common.gen ~fee_token_id:Token_id.default ()
+  in
   let%map body = Body.gen ~fee:common.fee in
   User_command_payload.Poly.{common; body}
 
