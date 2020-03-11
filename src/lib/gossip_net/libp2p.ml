@@ -110,7 +110,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           (Logger.global_metadata :=
              Logger.(
                Metadata.extend !global_metadata
-                 [("peer_id", `String my_peer_id)])) ;
+                 [("node_peer_id_", `String my_peer_id)])) ;
           ( match config.addrs_and_ports.peer with
           | Some _ ->
               ()
