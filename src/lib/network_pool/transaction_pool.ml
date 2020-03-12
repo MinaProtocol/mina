@@ -1204,8 +1204,20 @@ let%test_module _ =
         setup_test ()
       in
       let set_sender idx (tx : User_command.t) =
-        User_command.forget_check
-        @@ User_command.sign test_keys.(idx) tx.payload
+        let sender_kp = test_keys.(idx) in
+        let sender_pk = Public_key.compress sender_kp.public_key in
+        let payload : User_command.Payload.t =
+          match tx.payload with
+          | {common; body= Payment payload} ->
+              { common= {common with fee_payer_pk= sender_pk}
+              ; body= Payment {payload with source_pk= sender_pk} }
+          | {common; body= Stake_delegation (Set_delegate payload)} ->
+              { common= {common with fee_payer_pk= sender_pk}
+              ; body=
+                  Stake_delegation
+                    (Set_delegate {payload with delegator= sender_pk}) }
+        in
+        User_command.forget_check @@ User_command.sign sender_kp payload
       in
       let txs0 =
         [mk_payment 0 1 0 9 20; mk_payment 0 1 1 9 12; mk_payment 0 1 2 9 500]

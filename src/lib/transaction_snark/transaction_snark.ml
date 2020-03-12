@@ -349,145 +349,154 @@ module Base = struct
     let compute_unchecked ~txn_global_slot ~(fee_payer_account : Account.t)
         ~(receiver_account : Account.t) ~(source_account : Account.t)
         ({payload; signature= _; signer= _} : Transaction_union.t) =
-      let fail s =
-        failwithf
-          "Transaction_snark.Base.User_command_failure.compute_unchecked: %s" s
-          ()
-      in
-      let fee_token = payload.common.fee_token in
-      let token = payload.body.token_id in
-      let fee_payer =
-        Account_id.create payload.common.fee_payer_pk fee_token
-      in
-      let source = Account_id.create payload.body.source_pk token in
-      let receiver = Account_id.create payload.body.receiver_pk token in
-      (* This should shadow the logic in [Sparse_ledger]. *)
-      let fee_payer_account =
-        { fee_payer_account with
-          balance=
-            Option.value_exn ?here:None ?error:None ?message:None
-            @@ Balance.sub_amount fee_payer_account.balance
-                 (Amount.of_fee payload.common.fee) }
-      in
-      let predicate_failed =
-        (* TODO: Predicates. *)
-        not
-          (Public_key.Compressed.equal payload.common.fee_payer_pk
-             payload.body.source_pk)
-      in
       match payload.body.tag with
       | Fee_transfer | Coinbase ->
           (* Not user commands, return no failure. *)
           ( `Should_pay_to_create false
           , of_list (List.init num_fields ~f:(fun _ -> false)) )
-      | Stake_delegation ->
-          let receiver_account =
-            if Account_id.equal receiver fee_payer then fee_payer_account
-            else receiver_account
+      | _ -> (
+          let fail s =
+            failwithf
+              "Transaction_snark.Base.User_command_failure.compute_unchecked: \
+               %s"
+              s ()
           in
-          let receiver_not_present =
-            let id = Account.identifier receiver_account in
-            if Account_id.equal Account_id.empty id then true
-            else if Account_id.equal receiver id then false
-            else fail "bad receiver account ID"
+          let fee_token = payload.common.fee_token in
+          let token = payload.body.token_id in
+          let fee_payer =
+            Account_id.create payload.common.fee_payer_pk fee_token
           in
-          let source_account =
-            if Account_id.equal source fee_payer then fee_payer_account
-            else source_account
+          let source = Account_id.create payload.body.source_pk token in
+          let receiver = Account_id.create payload.body.receiver_pk token in
+          (* This should shadow the logic in [Sparse_ledger]. *)
+          let fee_payer_account =
+            { fee_payer_account with
+              balance=
+                Option.value_exn ?here:None ?error:None ?message:None
+                @@ Balance.sub_amount fee_payer_account.balance
+                     (Amount.of_fee payload.common.fee) }
           in
-          let source_not_present =
-            let id = Account.identifier source_account in
-            if Account_id.equal Account_id.empty id then true
-            else if Account_id.equal source id then false
-            else fail "bad source account ID"
+          let predicate_failed =
+            (* TODO: Predicates. *)
+            not
+              (Public_key.Compressed.equal payload.common.fee_payer_pk
+                 payload.body.source_pk)
           in
-          ( `Should_pay_to_create false
-          , { predicate_failed
-            ; source_not_present
-            ; receiver_not_present
-            ; amount_insufficient_to_create= false
-            ; fee_payer_balance_insufficient_to_create= false
-            ; fee_payer_bad_timing_for_create= false
-            ; source_insufficient_balance= false
-            ; source_bad_timing= false } )
-      | Payment ->
-          let receiver_account =
-            if Account_id.equal receiver fee_payer then fee_payer_account
-            else receiver_account
-          in
-          let receiver_needs_creating =
-            let id = Account.identifier receiver_account in
-            if Account_id.equal Account_id.empty id then true
-            else if Account_id.equal receiver id then false
-            else fail "bad receiver account ID"
-          in
-          let fee_token_is_token = Token_id.equal fee_token token in
-          let amount_insufficient_to_create, creation_fee =
-            let creation_amount =
-              Amount.of_fee Coda_compile_config.account_creation_fee
-            in
-            if receiver_needs_creating then
-              if fee_token_is_token then
-                ( Option.is_none
-                    (Amount.sub payload.body.amount creation_amount)
-                , Amount.zero )
-              else (false, creation_amount)
-            else (false, Amount.zero)
-          in
-          let fee_payer_balance_insufficient_to_create =
-            Amount.(Balance.to_amount fee_payer_account.balance < creation_fee)
-          in
-          let fee_payer_bad_timing_for_create =
-            fee_payer_balance_insufficient_to_create
-            || Or_error.is_error
-                 (Transaction_logic.validate_timing ~txn_amount:creation_fee
-                    ~txn_global_slot ~account:fee_payer_account)
-          in
-          let source_account =
-            if Account_id.equal source fee_payer then fee_payer_account
-            else source_account
-          in
-          let source_not_present =
-            let id = Account.identifier source_account in
-            if Account_id.equal Account_id.empty id then true
-            else if Account_id.equal source id then false
-            else fail "bad source account ID"
-          in
-          let fee_payer_is_source = Account_id.equal fee_payer source in
-          let source_insufficient_balance =
-            (not fee_payer_is_source)
-            &&
-            if Account_id.equal source receiver then
-              (* The final balance will be [0 - account_creation_fee]. *)
-              receiver_needs_creating && fee_token_is_token
-            else
-              Amount.(
-                Balance.to_amount source_account.balance < payload.body.amount)
-          in
-          let source_bad_timing =
-            (not fee_payer_is_source)
-            &&
-            if Account_id.equal source receiver then
-              (* The final balance will be [0 - account_creation_fee]. *)
-              receiver_needs_creating && fee_token_is_token
-            else
-              Or_error.is_error
-                (Transaction_logic.validate_timing
-                   ~txn_amount:payload.body.amount ~txn_global_slot
-                   ~account:source_account)
-          in
-          ( `Should_pay_to_create
-              (receiver_needs_creating && not fee_token_is_token)
-          , { predicate_failed
-            ; source_not_present
-            ; receiver_not_present= false
-            ; amount_insufficient_to_create
-            ; fee_payer_balance_insufficient_to_create
-            ; fee_payer_bad_timing_for_create
-            ; source_insufficient_balance
-            ; source_bad_timing } )
+          match payload.body.tag with
+          | Fee_transfer | Coinbase ->
+              assert false
+          | Stake_delegation ->
+              let receiver_account =
+                if Account_id.equal receiver fee_payer then fee_payer_account
+                else receiver_account
+              in
+              let receiver_not_present =
+                let id = Account.identifier receiver_account in
+                if Account_id.equal Account_id.empty id then true
+                else if Account_id.equal receiver id then false
+                else fail "bad receiver account ID"
+              in
+              let source_account =
+                if Account_id.equal source fee_payer then fee_payer_account
+                else source_account
+              in
+              let source_not_present =
+                let id = Account.identifier source_account in
+                if Account_id.equal Account_id.empty id then true
+                else if Account_id.equal source id then false
+                else fail "bad source account ID"
+              in
+              ( `Should_pay_to_create false
+              , { predicate_failed
+                ; source_not_present
+                ; receiver_not_present
+                ; amount_insufficient_to_create= false
+                ; fee_payer_balance_insufficient_to_create= false
+                ; fee_payer_bad_timing_for_create= false
+                ; source_insufficient_balance= false
+                ; source_bad_timing= false } )
+          | Payment ->
+              let receiver_account =
+                if Account_id.equal receiver fee_payer then fee_payer_account
+                else receiver_account
+              in
+              let receiver_needs_creating =
+                let id = Account.identifier receiver_account in
+                if Account_id.equal Account_id.empty id then true
+                else if Account_id.equal receiver id then false
+                else fail "bad receiver account ID"
+              in
+              let fee_token_is_token = Token_id.equal fee_token token in
+              let amount_insufficient_to_create, creation_fee =
+                let creation_amount =
+                  Amount.of_fee Coda_compile_config.account_creation_fee
+                in
+                if receiver_needs_creating then
+                  if fee_token_is_token then
+                    ( Option.is_none
+                        (Amount.sub payload.body.amount creation_amount)
+                    , Amount.zero )
+                  else (false, creation_amount)
+                else (false, Amount.zero)
+              in
+              let fee_payer_balance_insufficient_to_create =
+                Amount.(
+                  Balance.to_amount fee_payer_account.balance < creation_fee)
+              in
+              let fee_payer_bad_timing_for_create =
+                fee_payer_balance_insufficient_to_create
+                || Or_error.is_error
+                     (Transaction_logic.validate_timing
+                        ~txn_amount:creation_fee ~txn_global_slot
+                        ~account:fee_payer_account)
+              in
+              let source_account =
+                if Account_id.equal source fee_payer then fee_payer_account
+                else source_account
+              in
+              let source_not_present =
+                let id = Account.identifier source_account in
+                if Account_id.equal Account_id.empty id then true
+                else if Account_id.equal source id then false
+                else fail "bad source account ID"
+              in
+              let fee_payer_is_source = Account_id.equal fee_payer source in
+              let source_insufficient_balance =
+                (not fee_payer_is_source)
+                &&
+                if Account_id.equal source receiver then
+                  (* The final balance will be [0 - account_creation_fee]. *)
+                  receiver_needs_creating && fee_token_is_token
+                else
+                  Amount.(
+                    Balance.to_amount source_account.balance
+                    < payload.body.amount)
+              in
+              let source_bad_timing =
+                (not fee_payer_is_source)
+                &&
+                if Account_id.equal source receiver then
+                  (* The final balance will be [0 - account_creation_fee]. *)
+                  receiver_needs_creating && fee_token_is_token
+                else
+                  Or_error.is_error
+                    (Transaction_logic.validate_timing
+                       ~txn_amount:payload.body.amount ~txn_global_slot
+                       ~account:source_account)
+              in
+              ( `Should_pay_to_create
+                  (receiver_needs_creating && not fee_token_is_token)
+              , { predicate_failed
+                ; source_not_present
+                ; receiver_not_present= false
+                ; amount_insufficient_to_create
+                ; fee_payer_balance_insufficient_to_create
+                ; fee_payer_bad_timing_for_create
+                ; source_insufficient_balance
+                ; source_bad_timing } ) )
 
-    let compute_as_prover ~txn_global_slot (txn : Transaction_union.var) =
+    let%snarkydef compute_as_prover ~txn_global_slot
+        (txn : Transaction_union.var) =
       let%bind data =
         exists (Typ.Internal.ref ())
           ~compute:
@@ -850,6 +859,16 @@ module Base = struct
              let%bind should_pay_for_receiver =
                Boolean.(should_pay_to_create && not user_command_fails)
              in
+             let%bind is_empty_and_writeable =
+               (* If this is a coinbase with zero fee, do not create the
+                  account, since the fee amount won't be enough to pay for it.
+               *)
+               let%bind is_zero_fee =
+                 fee |> Fee.var_to_number |> Number.to_var
+                 |> Field.(Checked.equal (Var.constant zero))
+               in
+               Boolean.(is_empty_and_writeable && not is_zero_fee)
+             in
              let%bind amount =
                [%with_label "Compute fee payer amount"]
                  (let fee_payer_amount =
@@ -948,14 +967,22 @@ module Base = struct
                     (Boolean.Assert.( = ) bad_timing_for_create
                        user_command_failure.fee_payer_bad_timing_for_create))
              in
-             let%map delegate =
+             let%map public_key =
                Public_key.Compressed.Checked.if_ is_empty_and_writeable
-                 ~then_:(Account_id.Checked.public_key source)
+                 ~then_:(Account_id.Checked.public_key fee_payer)
+                 ~else_:account.public_key
+             and token_id =
+               Token_id.Checked.if_ is_empty_and_writeable
+                 ~then_:(Account_id.Checked.token_id fee_payer)
+                 ~else_:account.token_id
+             and delegate =
+               Public_key.Compressed.Checked.if_ is_empty_and_writeable
+                 ~then_:(Account_id.Checked.public_key fee_payer)
                  ~else_:account.delegate
              in
              { Account.Poly.balance
-             ; public_key= Account_id.Checked.public_key fee_payer
-             ; token_id= Account_id.Checked.token_id fee_payer
+             ; public_key
+             ; token_id
              ; nonce= next_nonce
              ; receipt_chain_hash
              ; delegate
@@ -1029,12 +1056,12 @@ module Base = struct
                         user_command_failure.amount_insufficient_to_create)
                  in
                  Currency.Amount.Checked.if_ user_command_fails
-                   ~then_:amount_for_new_account
-                   ~else_:Amount.(var_of_t zero)
+                   ~then_:Amount.(var_of_t zero)
+                   ~else_:amount_for_new_account
                in
                (* TODO: Is this a sanity check, or can overflow here actually
                   happen? If it is possible, we should add a case for it to
-                  [user_command_failure] and check it here.
+                  [User_command_failure.t] and check it here.
                 *)
                Balance.Checked.(account.balance + receiver_amount)
              in
@@ -1255,9 +1282,9 @@ module Base = struct
         state_body_hash_opt t
     in
     let%map () =
-      with_label __LOC__
+      [%with_label "Check that the computed hash matches the input hash"]
         (let%bind sok_digest =
-           with_label __LOC__
+           [%with_label "Fetch the sok_digest"]
              (exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest)
          in
          let input =
@@ -1271,7 +1298,7 @@ module Base = struct
              ; Amount.var_to_input supply_increase
              ; Amount.Signed.Checked.to_input fee_excess ]
          in
-         with_label __LOC__
+         [%with_label "Compare the hashes"]
            ( make_checked (fun () ->
                  Random_oracle.Checked.(
                    hash ~init:Hash_prefix.base_snark (pack_input input)) )
@@ -2628,7 +2655,7 @@ let%test_module "transaction_snark" =
               in
               let sparse_ledger =
                 Sparse_ledger.apply_user_command_exn sparse_ledger
-                  (t1 :> User_command.t)
+                  (User_command.forget_check t1)
               in
               Ledger.apply_user_command ledger t1 |> Or_error.ok_exn |> ignore ;
               [%test_eq: Frozen_ledger_hash.t]

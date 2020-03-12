@@ -11,6 +11,7 @@ type ('payload, 'pk, 'signature) t_ =
 
 (* OK to use Latest, rather than Vn, because t is not bin_io'ed *)
 type t = (Payload.t, Public_key.Stable.Latest.t, Signature.Stable.Latest.t) t_
+[@@deriving sexp]
 
 type var = (Payload.var, Public_key.var, Signature.var) t_
 

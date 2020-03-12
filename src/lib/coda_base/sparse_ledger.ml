@@ -247,7 +247,7 @@ let apply_user_command_exn t
           try
             { account with
               balance=
-                Balance.sub_amount account.balance creation_fee
+                Balance.sub_amount account.balance amount
                 |> Option.value_exn ?here:None ?error:None ?message:None
             ; timing=
                 Or_error.ok_exn
