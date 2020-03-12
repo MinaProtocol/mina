@@ -13,6 +13,18 @@ let check_modname ~loc name =
     Location.raise_errorf ~loc
       "Expected a module named Stable, but got a module named %s." name
 
+(* replace newlines in standard formatter with a space, so string is all on one line *)
+let formatter =
+  let std_formatter = Format.std_formatter in
+  let funs = Format.pp_get_formatter_out_functions std_formatter () in
+  let funs' =
+    { funs with
+      out_newline= (fun () -> funs.out_spaces 1)
+    ; out_indent= (fun _ -> ()) }
+  in
+  Format.pp_set_formatter_out_functions std_formatter funs' ;
+  std_formatter
+
 let validate_module_version module_version loc =
   let len = String.length module_version in
   if not (Char.equal module_version.[0] 'V' && len > 1) then
