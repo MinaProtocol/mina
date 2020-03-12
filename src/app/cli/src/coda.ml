@@ -305,7 +305,7 @@ let daemon logger =
            {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
        end in
        let coda_initialization_deferred () =
-         let%bind genesis_ledger, base_proof =
+         let%bind genesis_ledger, base_proof, genesis_constants =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
              ~logger ~conf_dir
          in
@@ -630,7 +630,7 @@ let daemon logger =
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
                 ~genesis_state_hash ~log_block_creation ())
-             ~genesis_ledger ~base_proof
+             ~genesis_ledger ~base_proof ~genesis_constants
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in

@@ -209,6 +209,7 @@ let run_test () : unit Deferred.t =
              ())
           ~genesis_ledger:Test_genesis_ledger.t
           ~base_proof:Precomputed_values.base_proof
+          ~genesis_constants:Coda_constants.genesis_constants_compiled
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback

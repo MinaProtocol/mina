@@ -7,17 +7,17 @@ let s3_install_path = "/tmp/s3_cache_dir"
 
 let manual_install_path = "/var/lib/coda"
 
-let genesis_dir_name =
+let genesis_dir_name (genesis_constants : Genesis_constants.t) =
   let digest =
-    (*include all the compile time constants that would affect the genesis
+    (*include all the time constants that would affect the genesis
     ledger and the proof*)
     let str =
       ( List.map
-          [ Coda_compile_config.curve_size
-          ; Snark_params.ledger_depth
+          [ genesis_constants.curve_size
+          ; genesis_constants.ledger_depth
           ; Coda_compile_config.fake_accounts_target
-          ; Consensus.Constants.c
-          ; Consensus.Constants.k ]
+          ; genesis_constants.consensus.c
+          ; genesis_constants.consensus.k ]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
       ^ Coda_compile_config.proof_level ^ Coda_compile_config.genesis_ledger

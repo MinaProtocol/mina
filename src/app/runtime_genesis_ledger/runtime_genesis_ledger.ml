@@ -5,9 +5,6 @@ open Core
 open Async
 open Coda_base
 
-[%%inject
-"ledger_depth", ledger_depth]
-
 [%%if
 proof_level = "full"]
 
@@ -137,10 +134,13 @@ let get_accounts accounts_json_file n =
         (Account_config.to_yojson all_accounts) ) ;
   all_accounts
 
+let genesis_dirname =
+  Cache_dir.genesis_dir_name Coda_constants.genesis_constants_compiled
+
 let create_tar top_dir =
-  let tar_file = top_dir ^/ Cache_dir.genesis_dir_name ^ ".tar.gz" in
+  let tar_file = top_dir ^/ genesis_dirname ^ ".tar.gz" in
   let tar_command =
-    sprintf "tar -C %s -czf %s %s" top_dir tar_file Cache_dir.genesis_dir_name
+    sprintf "tar -C %s -czf %s %s" top_dir tar_file genesis_dirname
   in
   let exit = Core.Sys.command tar_command in
   if exit = 2 then
@@ -152,7 +152,7 @@ let main accounts_json_file dir n =
   let open Deferred.Let_syntax in
   let top_dir = Option.value ~default:Cache_dir.autogen_path dir in
   let%bind genesis_dir =
-    let dir = top_dir ^/ Cache_dir.genesis_dir_name in
+    let dir = top_dir ^/ genesis_dirname in
     let%map () = File_system.create_dir dir ~clear_if_exists:true in
     dir
   in
@@ -220,11 +220,12 @@ let () =
                    If the number of accounts in the account file, say x, is \
                    less than n then the tool will generate (n-x) fake \
                    accounts (default: x)."
-                  (Int.pow 2 ledger_depth))
+                  (Int.pow 2 Coda_compile_config.ledger_depth))
              (optional int)
          in
          fun () ->
-           let max = Int.pow 2 ledger_depth in
+           (*Deepthi: fix this. ledger depth from config first*)
+           let max = Int.pow 2 Coda_compile_config.ledger_depth in
            if Option.value ~default:0 n >= max then
              failwith (sprintf "Invalid value for n (0 <= n <= %d)" max)
            else main accounts_json genesis_dir (Option.value ~default:0 n)))

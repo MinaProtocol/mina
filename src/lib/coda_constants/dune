@@ -1,0 +1,13 @@
+(library
+ (name coda_constants)
+ (public_name coda_constants)
+ (library_flags -linkall)
+ (inline_tests)
+ (preprocessor_deps ../../config.mlh)
+ (libraries core coda_base genesis_constants)
+ (preprocess (pps
+  ppx_coda ppx_optcomp ppx_bin_prot ppx_compare ppx_hash
+  ppx_fields_conv ppx_deriving.eq ppx_deriving.make
+  ppx_sexp_conv ppx_let ppx_custom_printf
+  ppx_inline_test bisect_ppx -- -conditional))
+ (synopsis "Coda constants"))

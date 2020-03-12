@@ -122,6 +122,7 @@ val create :
      Config.t
   -> genesis_ledger:Ledger.t Lazy.t
   -> base_proof:Proof.t
+  -> genesis_constants:Genesis_constants.t
   -> t Deferred.t
 
 val staged_ledger_ledger_proof : t -> Ledger_proof.t option

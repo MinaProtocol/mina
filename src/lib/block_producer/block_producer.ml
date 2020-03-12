@@ -253,6 +253,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~consensus_local_state ~frontier_reader ~transition_writer
     ~set_next_producer_timing ~log_block_creation =
   trace "block_producer" (fun () ->
+      let coda_constants = Lazy.force !Coda_constants.t in
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Pausing block production while bootstrapping"
@@ -381,7 +382,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       in
                       let delta_transition_chain_proof =
                         Transition_chain_prover.prove
-                          ~length:(Consensus.Constants.delta - 1)
+                          ~length:(coda_constants.consensus.delta - 1)
                           ~frontier previous_state_hash
                         |> Option.value_exn
                       in
@@ -636,11 +637,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
       in
       (* if the producer starts before genesis, sleep until genesis *)
       let now = Time.now time_controller in
-      if Time.( >= ) now Consensus.Constants.genesis_state_timestamp then
-        start ()
+      if Time.( >= ) now coda_constants.genesis_state_timestamp then start ()
       else
         let time_till_genesis =
-          Time.diff Consensus.Constants.genesis_state_timestamp now
+          Time.diff coda_constants.genesis_state_timestamp now
         in
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:

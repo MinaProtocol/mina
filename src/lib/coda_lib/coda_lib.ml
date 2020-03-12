@@ -662,7 +662,8 @@ let start t =
     ~log_block_creation:t.config.log_block_creation ;
   Snark_worker.start t
 
-let create (config : Config.t) ~genesis_ledger ~base_proof =
+let create (config : Config.t) ~genesis_ledger ~base_proof ~genesis_constants =
+  Coda_constants.t := Coda_constants.create_t genesis_constants ;
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->

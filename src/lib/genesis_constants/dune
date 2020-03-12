@@ -1,0 +1,12 @@
+(library
+ (name genesis_constants)
+ (public_name genesis_constants)
+ (library_flags -linkall)
+ (inline_tests)
+ (libraries core coda_base)
+ (preprocess (pps
+  ppx_coda ppx_optcomp ppx_bin_prot ppx_compare ppx_hash
+  ppx_fields_conv ppx_deriving.eq ppx_deriving.make
+  ppx_sexp_conv ppx_let ppx_custom_printf
+  ppx_inline_test bisect_ppx -- -conditional))
+ (synopsis "Coda genesis constants"))
