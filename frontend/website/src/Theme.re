@@ -171,7 +171,8 @@ module Grid = {
 
   let mobileFullWidth =
     style([media("(min-width: 10rem)", [width(`percent(100.0))])]);
-  let gridParent = style([width(`percent(100.0)), display(`flex)]);
+  let gridParent =
+    style([width(`percent(100.0)), display(`flex), flexWrap(`wrap)]);
   let x1 = style([media("(min-width: 40rem)", [width(`percent(10.0))])]);
   let x2 = style([media("(min-width: 40rem)", [width(`percent(20.0))])]);
   let x3 = style([media("(min-width: 40rem)", [width(`percent(30.0))])]);
