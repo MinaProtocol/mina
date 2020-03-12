@@ -989,7 +989,7 @@ type successResult struct {
 func main() {
 	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
 	log.SetOutput(os.Stderr)
-	logging.SetAllLoggers(logging2.INFO)
+	logging.SetAllLoggers(logging2.DEBUG)
 	helperLog := logging.Logger("helper top-level JSON handling")
 
 	go func() {
