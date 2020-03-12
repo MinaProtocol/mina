@@ -21,6 +21,7 @@
 [%%define mock_frontend_data false]
 
 [%%define print_versioned_types false]
+[%%define print_binable_functors false]
 
 [%%define daemon_expiry "never"]
 [%%define test_full_epoch true]

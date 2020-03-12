@@ -1,3 +1,6 @@
+[%%import
+"/src/config.mlh"]
+
 (* print_binable_functors.ml *)
 
 (* print out applications of functors Binable.Of... or Bin_prot.Utils.Make_binable
@@ -6,6 +9,9 @@
    and they should always appear within a versioned type
 
 *)
+
+[%%if
+print_binable_functors]
 
 open Core_kernel
 open Ppxlib
@@ -85,3 +91,5 @@ let impl str =
   str
 
 let () = Ppxlib.Driver.register_transformation name ~impl
+
+[%%endif]
