@@ -26,11 +26,11 @@ module Footer = {
         ),
         media(
           Theme.MediaQuery.full,
-          [paddingLeft(`rem(5.0)), paddingRight(`rem(5.0))],
+          [paddingLeft(`rem(8.0)), paddingRight(`rem(8.0))],
         ),
         media(
           Theme.MediaQuery.veryLarge,
-          [paddingLeft(`rem(8.0)), paddingRight(`rem(8.0))],
+          [paddingLeft(`rem(12.0)), paddingRight(`rem(12.0))],
         ),
       ])
     );
@@ -43,7 +43,7 @@ module Footer = {
       <section className=footerSectionStyle>
         <div className=Theme.Grid.gridParent>
           <div
-            className={Css.merge([Theme.Grid.mobileFullWidth, Theme.Grid.x8])}>
+            className={Css.merge([Theme.Grid.mobileFullWidth, Theme.Grid.x7])}>
             <div>
               <div> <img src="/static/img/coda-logo.png" /> </div>
               <div
@@ -65,7 +65,7 @@ module Footer = {
             <div> {React.string("Row two")} </div>
           </div>
           <div
-            className={Css.merge([Theme.Grid.mobileFullWidth, Theme.Grid.x2])}>
+            className={Css.merge([Theme.Grid.mobileFullWidth, Theme.Grid.x3])}>
             {React.string("Two")}
           </div>
         </div>
