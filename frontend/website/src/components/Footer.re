@@ -46,7 +46,10 @@ module Footer = {
             className={Css.merge([Theme.Grid.mobileFullWidth, Theme.Grid.x8])}>
             <div>
               <div> <img src="/static/img/coda-logo.png" /> </div>
-              <div className=Css.(style([display(`flex)]))>
+              <div
+                className=Css.(
+                  style([display(`flex), justifyContent(`spaceBetween)])
+                )>
                 <div>
                   <p> {React.string("Contact Us")} </p>
                   <a> {React.string("contact@o1labs.org")} </a>
@@ -55,6 +58,8 @@ module Footer = {
                   <p> {React.string("Powered by")} </p>
                   <a> {React.string("o1labs.org")} </a>
                 </div>
+                <img src="/static/img/whitepaperEcon.png" />
+                <img src="/static/img/whitepaperTec.png" />
               </div>
             </div>
             <div> {React.string("Row two")} </div>
