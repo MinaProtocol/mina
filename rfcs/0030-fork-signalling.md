@@ -18,10 +18,11 @@ A fork is denoted by a fork identifier (`fork ID`). Blocks have two fork ID fiel
 indicate the current fork, another to indicate a proposed fork. Because there will usually
 not be a proposed fork, that field has an option type.
 
-When a node is started, the current fork ID is retrieved from the node's configuration.
-If the node is being run for the first time, the fork ID must be provided as a command-line
-flag. Alternatively, a current fork ID can be provided via a compile-time constant,
-which can be overridden via the configuration or command-line flag.
+The compile-time configuration includes a current fork ID. That fork ID can be overridden
+via a command-line flag, which is saved to the node's dynamic configuration. If the
+dynamic configuration includes the fork ID, the next time the node is started, that
+fork ID will be used. It's an error to start the node with a fork ID from the command line
+that's different from one stored in the dynamic configuration.
 
 For RPCs between nodes, if the response contains a block with a different current fork ID,
 that response is ignored, and the sender punished. The next fork ID is ignored for these RPCs.
@@ -29,21 +30,17 @@ that response is ignored, and the sender punished. The next fork ID is ignored f
 For gossiped blocks, if the block's current fork ID differs from the node's current fork ID,
 that block is ignored, and the sender is punished.
 
-To signal a proposed fork change, there needs to be a mechanism for the node to set its
-next fork ID, to be included in the blocks it gossips. That can be accomplished by a
-client command that stores the next fork ID in the configuration, to be used the
-next time the node is run. Additionally, we may wish to change a node's next fork ID
-dynamically via a GraphQL query, which would also store the next fork ID in the configuration.
+To signal a proposed fork change, we need mechanisms for a node to set its
+next fork ID, to be included in the blocks it gossips subsequently. An optional command-line
+flag indicates the next fork ID to be used, which also stores the next fork ID in the dynamic
+configuration, to be used the next time the node is run. Additionally, we'll provide a GraphQL
+endpoint to set the next fork ID, which would also store the next fork ID in the dynamic
+configuration.
 
-A node can track the number of gossiped blocks with a proposed next fork ID and elect to
-restart with a new current fork ID. Nodes should log statistics of proposed next fork IDs that
-appear in received gossip, so that node operators can make informed choices whether
-to switch. Such statistics should also be available via GraphQL. We defer discussion
-of the details of such statistics.
-
-Some of this design appears in PR #4347, which has not been merged as of this writing.
-The punishment implemented there for mismatched current fork IDs is an Instaban, which
-may be too severe. In that PR, there is no code to set next fork IDs.
+Much of this design appears in PR #4347, which has not been merged as of this writing.
+The punishment implemented there for mismatched current fork IDs is a trust decrease of
+0.25, allowing a small number of mismatches in blocks before banning a peer. That PR
+does not implement any mechanism for setting the next fork ID.
 
 ## Drawbacks
 [drawbacks]: #drawbacks
@@ -76,7 +73,8 @@ increment a version number in blocks. Nodes would be required to accept blocks w
 the new version number once they'd seen a certain frequency of them within a
 number-of-blocks window, and reject lower-versioned blocks upon a higher frequency threshold.
 The new version number signalled an `activation`, a change in consensus rules. The Bitcoin
-mechanism does not handle hard forks. The design here is inspired by that mechanism.
+mechanism does not handle hard forks. The design here is inspired by that mechanism, although
+our design is intended for hard forks in the first instance.
 
 There are other soft fork mechanisms in Bitcoin. See [this article] (https://medium.com/@elombrozo/forks-signaling-and-activation-d60b6abda49a)
 for a discussion of them.
@@ -84,11 +82,12 @@ for a discussion of them.
 ## Unresolved questions
 [unresolved-questions]: #unresolved-questions
 
-Do we want the flexibility of setting the current fork ID, given its possible drawbacks?
+Do we want the flexibility of setting the current fork ID to a value other than the compile-time
+default, given the possibility of network fragmentation?
 
-If a node receives a block with a current fork ID that doesn't match its own, either by RPC or gossip, what
-should the punishment be for the sender?
+Is the trust decrease of 0.25 the right level of punishment for a peer that sends a
+mismatched current fork ID?
 
-Do we wish to accomodate both soft forks and hard forks? The next fork ID could be tagged with `Hard` or `Soft`.
-For `Hard`, restarting a node would require upgrading software. In the `Soft` case, the current
-fork ID would change, while the software would be unchanged.
+Do we wish this design to accomodate both soft forks and hard forks? The next fork ID could be tagged
+with `Hard` or `Soft`. For `Hard`, restarting a node would require upgrading software. In the `Soft` case,
+the current fork ID would change, while the existing software would continue to work.
