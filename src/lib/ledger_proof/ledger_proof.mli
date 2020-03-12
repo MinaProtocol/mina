@@ -7,8 +7,7 @@ module type S = Ledger_proof_intf.S
 module Prod : S with type t = Transaction_snark.t
 
 module Debug :
-  S
-  with type t = Transaction_snark.Statement.t * Sok_message.Digest.Stable.V1.t
+  S with type t = Transaction_snark.Statement.t * Sok_message.Digest.t
 
 [%%if proof_level = "full"]
 
