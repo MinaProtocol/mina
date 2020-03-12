@@ -44,7 +44,20 @@ module Footer = {
         <div className=Theme.Grid.gridParent>
           <div
             className={Css.merge([Theme.Grid.mobileFullWidth, Theme.Grid.x8])}>
-            {React.string("One")}
+            <div>
+              <div> <img src="/static/img/coda-logo.png" /> </div>
+              <div className=Css.(style([display(`flex)]))>
+                <div>
+                  <p> {React.string("Contact Us")} </p>
+                  <a> {React.string("contact@o1labs.org")} </a>
+                </div>
+                <div>
+                  <p> {React.string("Powered by")} </p>
+                  <a> {React.string("o1labs.org")} </a>
+                </div>
+              </div>
+            </div>
+            <div> {React.string("Row two")} </div>
           </div>
           <div
             className={Css.merge([Theme.Grid.mobileFullWidth, Theme.Grid.x2])}>
