@@ -724,44 +724,66 @@ let create (config : Config.t)
     in
     result
   in
-  let validate_fork_ids ~rpc_name external_transition =
+  let validate_fork_ids ~rpc_name sender external_transition =
+    let open Trust_system.Actions in
     let External_transition.{valid_current; valid_next; matches_daemon} =
       External_transition.fork_id_status external_transition
     in
-    if not valid_current then
-      Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
-        "$rpc_name: external transition with invalid current fork ID"
-        ~metadata:
-          [ ("rpc_name", `String rpc_name)
-          ; ( "current_fork_id"
-            , `String
-                (Fork_id.to_string
-                   (External_transition.current_fork_id external_transition))
-            ) ] ;
-    if not valid_next then
-      Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
-        "$rpc_name: external transition with invalid next fork ID"
-        ~metadata:
-          [ ("rpc_name", `String rpc_name)
-          ; ( "next_fork_id"
-            , `String
-                (Fork_id.to_string
-                   (Option.value_exn
-                      (External_transition.next_fork_id_opt external_transition)))
-            ) ] ;
-    if not matches_daemon then
-      Logger.warn config.logger ~module_:__MODULE__ ~location:__LOC__
-        "$rpc_name: current fork ID in external transition does not match \
-         daemon current fork ID"
-        ~metadata:
-          [ ("rpc_name", `String rpc_name)
-          ; ( "current_fork_id"
-            , `String
-                (Fork_id.to_string
-                   (External_transition.current_fork_id external_transition))
-            )
-          ; ( "daemon_current_fork_id"
-            , `String Fork_id.(to_string @@ get_current ()) ) ] ;
+    let%bind () =
+      if valid_current then return ()
+      else
+        let actions =
+          ( Sent_invalid_fork_id
+          , Some
+              ( "$rpc_name: external transition with invalid current fork ID"
+              , [ ("rpc_name", `String rpc_name)
+                ; ( "current_fork_id"
+                  , `String
+                      (Fork_id.to_string
+                         (External_transition.current_fork_id
+                            external_transition)) ) ] ) )
+        in
+        Trust_system.record_envelope_sender config.trust_system config.logger
+          sender actions
+    in
+    let%bind () =
+      if valid_next then return ()
+      else
+        let actions =
+          ( Sent_invalid_fork_id
+          , Some
+              ( "$rpc_name: external transition with invalid next fork ID"
+              , [ ("rpc_name", `String rpc_name)
+                ; ( "next_fork_id"
+                  , `String
+                      (Fork_id.to_string
+                         (Option.value_exn
+                            (External_transition.next_fork_id_opt
+                               external_transition))) ) ] ) )
+        in
+        Trust_system.record_envelope_sender config.trust_system config.logger
+          sender actions
+    in
+    let%map () =
+      if matches_daemon then return ()
+      else
+        let actions =
+          ( Sent_mismatched_fork_id
+          , Some
+              ( "$rpc_name: current fork ID in external transition does not \
+                 match daemon current fork ID"
+              , [ ("rpc_name", `String rpc_name)
+                ; ( "current_fork_id"
+                  , `String
+                      (Fork_id.to_string
+                         (External_transition.current_fork_id
+                            external_transition)) )
+                ; ( "daemon_current_fork_id"
+                  , `String Fork_id.(to_string @@ get_current ()) ) ] ) )
+        in
+        Trust_system.record_envelope_sender config.trust_system config.logger
+          sender actions
+    in
     valid_current && valid_next && matches_daemon
   in
   (* each of the passed-in procedures expects an enveloped input, so
@@ -821,9 +843,10 @@ let create (config : Config.t)
     | None ->
         record_unknown_item result sender action_msg msg_args
     | Some {proof= _, ext_trans; _} ->
-        if validate_fork_ids ~rpc_name:"Get_ancestry" ext_trans then
-          return result
-        else return None
+        let%map valid_fork_ids =
+          validate_fork_ids ~rpc_name:"Get_ancestry" sender ext_trans
+        in
+        if valid_fork_ids then result else None
   in
   let get_best_tip_rpc conn ~version:_ query =
     Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -838,14 +861,15 @@ let create (config : Config.t)
     | None ->
         record_unknown_item result sender action_msg msg_args
     | Some {data= data_ext_trans; proof= _, proof_ext_trans} ->
-        let valid_data_fork_ids =
-          validate_fork_ids ~rpc_name:"Get_best_tip (data)" data_ext_trans
+        let%bind valid_data_fork_ids =
+          validate_fork_ids ~rpc_name:"Get_best_tip (data)" sender
+            data_ext_trans
         in
-        let valid_proof_fork_ids =
-          validate_fork_ids ~rpc_name:"Get_best_tip (proof)" proof_ext_trans
+        let%map valid_proof_fork_ids =
+          validate_fork_ids ~rpc_name:"Get_best_tip (proof)" sender
+            proof_ext_trans
         in
-        if valid_data_fork_ids && valid_proof_fork_ids then return result
-        else return None
+        if valid_data_fork_ids && valid_proof_fork_ids then result else None
   in
   let get_telemetry_data_rpc conn ~version:_ query =
     Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
@@ -888,12 +912,12 @@ let create (config : Config.t)
     | None ->
         record_unknown_item result sender action_msg msg_args
     | Some ext_trans ->
-        let valid_fork_ids =
-          List.map ext_trans
-            ~f:(validate_fork_ids ~rpc_name:"Get_transition_chain")
+        let%map valid_fork_ids =
+          Deferred.List.map ext_trans
+            ~f:(validate_fork_ids ~rpc_name:"Get_transition_chain" sender)
         in
-        if List.for_all valid_fork_ids ~f:(Bool.equal true) then return result
-        else return None
+        if List.for_all valid_fork_ids ~f:(Bool.equal true) then result
+        else None
   in
   let ban_notify_rpc conn ~version:_ ban_until =
     (* the port in `conn' is an ephemeral port, not of interest *)
