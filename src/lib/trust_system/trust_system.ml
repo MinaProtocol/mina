@@ -115,8 +115,9 @@ module Actions = struct
         Insta_ban
     | Sent_invalid_fork_id ->
         Insta_ban
+    (* allow nodes to send wrong current fork ID a small number of times *)
     | Sent_mismatched_fork_id ->
-        Insta_ban
+        Trust_decrease 0.25
     (*Genesis ledger (and the genesis protocol state) is now a runtime config, so we should ban nodes that are running using a different genesis ledger*)
     | Has_invalid_genesis_protocol_state ->
         Insta_ban
