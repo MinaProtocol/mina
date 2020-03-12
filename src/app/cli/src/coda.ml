@@ -39,6 +39,9 @@ let chain_id ~genesis_state_hash =
 [%%inject
 "daemon_expiry", daemon_expiry]
 
+[%%inject
+"compile_time_current_fork_id", current_fork_id]
+
 let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -617,7 +620,8 @@ let daemon logger =
              ~f:(fun pk -> `Other pk)
          in
          let current_fork_id =
-           Coda_run.get_current_fork_id ~conf_dir ~logger curr_fork_id
+           Coda_run.get_current_fork_id ~compile_time_current_fork_id ~conf_dir
+             ~logger curr_fork_id
            |> Fork_id.create_exn
          in
          let%map coda =
