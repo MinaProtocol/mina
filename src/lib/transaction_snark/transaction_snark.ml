@@ -738,7 +738,9 @@ module Base = struct
     let%bind () =
       [%with_label "Validate tokens"]
         (let%bind () =
-           (* TODO: Enable using different tokens for fees. *)
+           (* TODO: Remove this check and update the transaction snark once we
+              have an exchange rate mechanism. See issue #4447.
+           *)
            [%with_label "Validate fee token"]
              (Token_id.Checked.Assert.equal fee_token
                 Token_id.(var_of_t default))

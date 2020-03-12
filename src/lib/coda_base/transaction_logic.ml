@@ -425,7 +425,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           "Cannot pay fees from a public key that did not sign the transaction"
     in
     let%bind () =
-      (* TODO: Remove this check and update the transaction snark. *)
+      (* TODO: Remove this check and update the transaction snark once we have
+         an exchange rate mechanism. See issue #4447.
+      *)
       if Token_id.equal fee_token Token_id.default then return ()
       else
         Or_error.errorf
