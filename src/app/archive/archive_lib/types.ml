@@ -296,12 +296,12 @@ module Blocks = struct
         (External_transition.t, State_hash.t) With_hash.t)
       (user_commands :
         ( (Coda_base.User_command.t, Transaction_hash.t) With_hash.t
-        * Coda_base.Block_time.t option
+        * Block_time.t option
         * Receipt_chain_hash.t option )
         list)
       (fee_transfers :
         ( (Coda_base.Fee_transfer.Single.t, Transaction_hash.t) With_hash.t
-        * Coda_base.Block_time.t option )
+        * Block_time.t option )
         list) =
     let blockchain_state =
       External_transition.blockchain_state external_transition

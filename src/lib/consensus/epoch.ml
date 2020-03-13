@@ -39,8 +39,8 @@ let end_time (epoch : t) =
 
 let slot_start_time (epoch : t) (slot : Slot.t) =
   let coda_constants = Lazy.force !Coda_constants.t in
-  Coda_base.Block_time.add (start_time epoch)
-    (Coda_base.Block_time.Span.of_ms
+  Block_time.add (start_time epoch)
+    (Block_time.Span.of_ms
        Int64.Infix.(
          int64_of_uint32 slot * coda_constants.consensus.slot_duration_ms))
 
@@ -54,7 +54,7 @@ let slot_end_time (epoch : t) (slot : Slot.t) =
 let epoch_and_slot_of_time_exn tm : t * Slot.t =
   let coda_constants = Lazy.force !Coda_constants.t in
   let epoch = of_time_exn tm in
-  let time_since_epoch = Coda_base.Block_time.diff tm (start_time epoch) in
+  let time_since_epoch = Block_time.diff tm (start_time epoch) in
   let slot =
     uint32_of_int64
     @@ Int64.Infix.(

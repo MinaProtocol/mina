@@ -1849,27 +1849,17 @@ let%test_module "test" =
       if Option.is_some expected_proof_count then
         assert (total_ledger_proofs = Option.value_exn expected_proof_count)
 
-    (* We use first class modules to compute some derived constants that depend
-       on the scan state constants. *)
-    module type Constants_intf = sig
-      val transaction_capacity_log_2 : int
-
-      val work_delay : int
-    end
-
     (* How many blocks do we need to fully exercise the ledger
        behavior and produce one ledger proof *)
-    let min_blocks_for_first_snarked_ledger_generic (module C : Constants_intf)
-        =
-      let open C in
-      ((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1
+    let min_blocks_for_first_snarked_ledger_generic =
+      let constants = Coda_constants.compiled_constants_for_test.scan_state in
+      ((constants.transaction_capacity_log_2 + 1) * (constants.work_delay + 1))
+      + 1
 
     (* n-1 extra blocks for n ledger proofs since we are already producing one
     proof *)
     let max_blocks_for_coverage n =
-      min_blocks_for_first_snarked_ledger_generic
-        (module Transaction_snark_scan_state.Constants)
-      + n - 1
+      min_blocks_for_first_snarked_ledger_generic + n - 1
 
     (** Generator for when we always have enough commands to fill all slots. *)
 

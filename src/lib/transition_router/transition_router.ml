@@ -282,7 +282,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
           ~transition_writer_ref ~frontier_w frontier
 
 let wait_till_genesis ~logger ~time_controller =
-  let module Time = Coda_base.Block_time in
+  let module Time = Block_time in
   let now = Time.now time_controller in
   let constants = Lazy.force !Coda_constants.t in
   try Consensus.Hooks.is_genesis now |> Fn.const Deferred.unit

@@ -32,7 +32,7 @@ module Merkle_tree =
       let hash = Checked.digest
     end)
 
-let depth = Snark_params.ledger_depth
+let depth () = (Lazy.force !Coda_constants.t).ledger_depth
 
 include Data_hash.Make_full_size ()
 
@@ -88,7 +88,7 @@ let reraise_merkle_requests (With {request; respond}) =
 
 let get t addr =
   handle
-    (Merkle_tree.get_req ~depth (var_to_hash_packed t) addr)
+    (Merkle_tree.get_req ~depth:(depth ()) (var_to_hash_packed t) addr)
     reraise_merkle_requests
 
 (*
@@ -108,7 +108,7 @@ let%snarkydef modify_account t pk ~(filter : Account.var -> ('a, _) Checked.t)
         map (read Public_key.Compressed.typ pk) ~f:(fun s -> Find_index s))
   in
   handle
-    (Merkle_tree.modify_req ~depth (var_to_hash_packed t) addr
+    (Merkle_tree.modify_req ~depth:(depth ()) (var_to_hash_packed t) addr
        ~f:(fun account ->
          let%bind x = filter account in
          f x account ))

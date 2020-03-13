@@ -7,7 +7,7 @@ open Coda_transition
 open Signature_lib
 open O1trace
 open Otp_lib
-module Time = Coda_base.Block_time
+module Time = Block_time
 
 module Singleton_supervisor : sig
   type ('data, 'a) t

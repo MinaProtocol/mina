@@ -37,6 +37,9 @@ module Index = struct
     end
   end]
 
+  (*Deepthi TODO: make this use runtime constants*)
+  let ledger_depth = Coda_compile_config.ledger_depth
+
   type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 
   let to_int = Int.to_int

@@ -1,4 +1,4 @@
-[%%import
+(*[%%import
 "/src/config.mlh"]
 
 (* in the config files, we either have:
@@ -47,3 +47,4 @@ let transaction_capacity_log_2 =
 (*Log of maximum number of trees in the parallel scan state*)
 let pending_coinbase_depth =
   Int.ceil_log2 (((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1)
+*)

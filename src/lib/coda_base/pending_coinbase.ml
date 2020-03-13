@@ -415,13 +415,13 @@ end
  *)
 
 module Make (Depth : sig
-  val depth : int
+  val depth : unit -> int
 end) =
 struct
   include Depth
 
   (* Total number of stacks *)
-  let max_coinbase_stack_count = Int.pow 2 depth
+  let max_coinbase_stack_count = Int.pow 2 (depth ())
 
   module Stack = struct
     module Poly = struct
@@ -690,7 +690,7 @@ struct
     module Address = struct
       include Merkle_tree.Address
 
-      let typ = typ ~depth
+      let typ = typ ~depth:(depth ())
     end
 
     type _ Request.t +=
@@ -717,7 +717,7 @@ struct
 
     let get t addr =
       handle
-        (Merkle_tree.get_req ~depth (Hash.var_to_hash_packed t) addr)
+        (Merkle_tree.get_req ~depth:(depth ()) (Hash.var_to_hash_packed t) addr)
         reraise_merkle_requests
 
     let%snarkydef add_coinbase t
@@ -729,6 +729,7 @@ struct
             map (read Update.Action.typ action) ~f:(fun act ->
                 Find_index_of_newest_stacks act ))
       in
+      let depth = depth () in
       let equal_to_zero x = Amount.(equal_var x (var_of_t zero)) in
       let chain if_ b ~then_ ~else_ =
         let%bind then_ = then_ and else_ = else_ in
@@ -827,6 +828,7 @@ struct
       Hash.var_of_hash_packed root
 
     let%snarkydef pop_coinbases t ~proof_emitted =
+      let depth = depth () in
       let%bind addr =
         request_witness Address.typ
           As_prover.(map (return ()) ~f:(fun _ -> Find_index_of_oldest_stack))
@@ -892,7 +894,7 @@ struct
   (* this calculation doesn't depend on any inputs *)
   let hash_on_level, root_hash =
     List.fold
-      (List.init depth ~f:(fun i -> i + 1))
+      (List.init (depth ()) ~f:(fun i -> i + 1))
       ~init:([(0, init_hash)], init_hash)
       ~f:(fun (hashes, (cur_hash : Data_hash_binable.t)) height ->
         let (merged : Hash.t) =
@@ -901,6 +903,7 @@ struct
         ((height, merged) :: hashes, merged) )
 
   let create_exn' () =
+    let depth = depth () in
     let rec create_path height path key =
       if height < 0 then path
       else
@@ -1116,7 +1119,9 @@ struct
 end
 
 module T = Make (struct
-  let depth = Snark_params.pending_coinbase_depth
+  let depth () =
+    let constants = (Lazy.force !Coda_constants.t).scan_state in
+    constants.pending_coinbase_depth
 end)
 
 include T
@@ -1305,7 +1310,7 @@ let%test_unit "Checked_tree = Unchecked_tree after pop" =
 let%test_unit "push and pop multiple stacks" =
   let open Quickcheck in
   let module Pending_coinbase = Make (struct
-    let depth = 3
+    let depth () = 3
   end) in
   let t_of_coinbases t = function
     | [] ->

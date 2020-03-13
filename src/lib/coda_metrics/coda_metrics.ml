@@ -425,39 +425,6 @@ end
 module Scan_state_metrics = struct
   let subsystem = "Scan_state"
 
-  (*duplicating Snark_params.Scan_state_constants because of a dependency cycle*)
-  module Scan_state_constants = struct
-    [%%inject
-    "work_delay", scan_state_work_delay]
-
-    [%%if
-    scan_state_with_tps_goal]
-
-    open Core_kernel
-
-    [%%inject
-    "tps_goal_x10", scan_state_tps_goal_x10]
-
-    let max_coinbases = 2
-
-    (* block_window_duration is in milliseconds, so divide by 1000
-       divide by 10 again because we have tps * 10
-     *)
-    let max_user_commands_per_block =
-      tps_goal_x10 * block_window_duration / (1000 * 10)
-
-    let transaction_capacity_log_2 =
-      1
-      + Core_kernel.Int.ceil_log2 (max_user_commands_per_block + max_coinbases)
-
-    [%%else]
-
-    [%%inject
-    "transaction_capacity_log_2", scan_state_transaction_capacity_log_2]
-
-    [%%endif]
-  end
-
   module Metric = struct
     type t = Gauge.t
 
@@ -473,10 +440,6 @@ module Scan_state_metrics = struct
   let slots_available_map = Gauge_metric_map.of_alist_exn []
 
   let merge_snark_required_map = Gauge_metric_map.of_alist_exn []
-
-  let max_trees =
-    let open Scan_state_constants in
-    ((transaction_capacity_log_2 + 1) * (work_delay + 1)) + 1
 
   let scan_state_available_space ~name : Gauge.t =
     let help = "# of slots available" in

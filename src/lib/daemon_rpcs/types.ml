@@ -1,6 +1,5 @@
 open Core_kernel
 open Async
-open Coda_base
 
 module Git_sha = struct
   [%%versioned

@@ -12,7 +12,7 @@ open Module_version
 open Snark_params
 open Bitstring_lib
 open Num_util
-module Time = Coda_base.Block_time
+module Time = Block_time
 module Run = Snark_params.Tick.Run
 module Graphql_base_types = Graphql_lib.Base_types
 
@@ -2847,8 +2847,7 @@ module Hooks = struct
       "Determining next slot to produce block" ;
     let curr_epoch, curr_slot =
       Epoch.epoch_and_slot_of_time_exn
-        (Coda_base.Block_time.of_span_since_epoch
-           (Coda_base.Block_time.Span.of_ms now))
+        (Block_time.of_span_since_epoch (Block_time.Span.of_ms now))
     in
     let epoch, slot =
       if
@@ -3196,7 +3195,7 @@ module Hooks = struct
   end
 end
 
-let time_hum (now : Coda_base.Block_time.t) =
+let time_hum (now : Block_time.t) =
   let epoch, slot = Epoch.epoch_and_slot_of_time_exn now in
   Printf.sprintf "epoch=%d, slot=%d" (Epoch.to_int epoch) (Slot.to_int slot)
 

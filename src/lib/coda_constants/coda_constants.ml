@@ -2,7 +2,6 @@
 "/src/config.mlh"]
 
 open Core_kernel
-open Coda_base
 open Signed
 open Unsigned
 module Time = Block_time
@@ -45,6 +44,8 @@ module type S = sig
   val t : t Lazy.t
 end
 
+(** Consensus constants are defined with a single letter (latin or greek) based on
+ * their usage in the Ouroboros suite of papers *)
 module Consensus_constants = struct
   type t =
     { k: int
@@ -63,6 +64,17 @@ module Consensus_constants = struct
     ; delta_duration: Time.Span.t }
 end
 
+(*transaction_capacity_log_2: Log of the capacity of transactions per
+transition. 1 will only work if we don't have prover fees. 2 will work with
+prover fees, but not if we want a transaction included in every block. At least 
+3 ensures a transaction per block and the staged-ledger unit tests pass.
+work_delay: All the proofs before the last <work_delay> blocks are required to
+be completed to add transactions. <work_delay> is the minimum number of blocks
+and will increase if the throughput is less. If delay = 0, then all the work
+that was added to the scan state in the previous block is expected to be
+completed and included in the current block if any transactions/coinbase are to
+be included. Having a delay >= 1 means there's at least two block times for
+completing the proofs *)
 module Scan_state_constants = struct
   type t =
     { work_delay: int
@@ -211,6 +223,9 @@ let genesis_constants_compiled : Genesis_constants.t =
 
 (*Deepthi: remove lazy*)
 let t : t Lazy.t ref = ref (create_t genesis_constants_compiled)
+
+let compiled_constants_for_test =
+  Lazy.force (create_t genesis_constants_compiled)
 
 let all_constants () =
   let t = Lazy.force !t in

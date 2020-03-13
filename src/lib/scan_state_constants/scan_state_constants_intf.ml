@@ -1,4 +1,4 @@
-[%%import
+(*[%%import
 "/src/config.mlh"]
 
 module type S = sig
@@ -7,4 +7,4 @@ module type S = sig
 
   (** All the proofs before the last <work_delay> blocks are required to be completed to add transactions. <work_delay> is the minimum number of blocks and will increase if the throughput is less. If delay = 0, then all the work that was added to the scan state in the previous block is expected to be completed and included in the current block if any transactions/coinbase are to be included. Having a delay >= 1 means there's at least two block times for completing the proofs *)
   val work_delay : int
-end
+end*)

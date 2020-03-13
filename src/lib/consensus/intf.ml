@@ -5,47 +5,6 @@ open Currency
 open Signature_lib
 open Coda_base
 
-(** Constants are defined with a single letter (latin or greek) based on
- * their usage in the Ouroboros suite of papers *)
-
-(*module type Constants = sig
-  (** The timestamp for the genesis block *)
-  val genesis_state_timestamp : Block_time.t
-
-  (** [k] is the number of blocks required to reach finality *)
-  val k : int
-
-  (** The amount of money minted and given to the block producer whenever a
-      block is created *)
-  val coinbase : Currency.Amount.t
-
-  val block_window_duration_ms : int
-
-  (** The window duration in which blocks are created *)
-  val block_window_duration : Block_time.Span.t
-
-  (** [delta] is the number of slots in the valid window for receiving blocks over the network *)
-  val delta : int
-
-  (** [c] is the number of slots in which we can probalistically expect at least 1
-   * block. In sig, it's exactly 1 as blocks should be produced every slot. *)
-  val c : int
-
-  val inactivity_ms : int
-
-  val sub_windows_per_window : Unsigned.UInt32.t
-
-  val slots_per_sub_window : Unsigned.UInt32.t
-
-  val slots_per_window : Unsigned.UInt32.t
-
-  (** Number of slots in one epoch *)
-  val slots_per_epoch : Unsigned.UInt32.t
-
-  (** The names and values of all constants. *)
-  val all_constants : Yojson.Safe.json
-end*)
-
 module type Blockchain_state = sig
   module Poly : sig
     [%%versioned:
@@ -288,7 +247,7 @@ module type S = sig
     * This is mostly useful for PoStake and other consensus mechanisms that have their own
     * notions of time.
   *)
-  val time_hum : Coda_base.Block_time.t -> string
+  val time_hum : Block_time.t -> string
 
   (** from postake *)
   val epoch_size : unit -> int
@@ -334,10 +293,7 @@ module type S = sig
       (** Swap in a new set of block production keys and invalidate and/or
           recompute cached data *)
       val block_production_keys_swap :
-           t
-        -> Signature_lib.Public_key.Compressed.Set.t
-        -> Coda_base.Block_time.t
-        -> unit
+        t -> Signature_lib.Public_key.Compressed.Set.t -> Block_time.t -> unit
     end
 
     module Prover_state : sig
@@ -483,7 +439,7 @@ module type S = sig
     end
 
     (* Check whether we are in the genesis epoch *)
-    val is_genesis : Coda_base.Block_time.t -> bool
+    val is_genesis : Block_time.t -> bool
 
     (**
      * Check that a consensus state was received at a valid time.

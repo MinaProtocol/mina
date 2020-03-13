@@ -1,5 +1,3 @@
-open Coda_base
-
 module Consensus = struct
   type t = {k: int; c: int; delta: int}
 end

@@ -4,7 +4,7 @@
  (library_flags -linkall)
  (inline_tests)
  (preprocessor_deps ../../config.mlh)
- (libraries core coda_base genesis_constants)
+ (libraries core block_time genesis_constants coda_compile_config)
  (preprocess (pps
   ppx_coda ppx_optcomp ppx_bin_prot ppx_compare ppx_hash
   ppx_fields_conv ppx_deriving.eq ppx_deriving.make
