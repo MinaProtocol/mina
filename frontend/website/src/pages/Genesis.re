@@ -149,169 +149,12 @@ module Styles = {
       fontWeight(`medium),
       fontSize(`rem(2.)),
     ]);
-};
 
-module MemberProfile = {
-  module Styles = {
-    open Css;
-    let outerBox =
-      style([
-        display(`flex),
-        justifyContent(`center),
-        alignContent(`center),
-        width(`percent(100.)),
-      ]);
-    let container =
-      style([
-        position(`relative),
-        display(`flex),
-        justifyContent(`center),
-        alignContent(`center),
-        width(`rem(21.25)),
-        height(`rem(35.875)),
-        borderRadius(`px(6)),
-        background(`hex("F5F5F5")),
-        border(`px(1), `solid, Theme.Colors.teal),
-        media(
-          Theme.MediaQuery.tablet,
-          [width(`rem(30.)), height(`rem(25.5))],
-        ),
-      ]);
-    let innerFlex = style([display(`flex), flexDirection(`column)]);
-    let profilePic =
-      style([
-        position(`absolute),
-        borderRadius(`percent(50.)),
-        background(white),
-        marginTop(`rem(-3.)),
-        border(`px(1), `solid, Theme.Colors.saville),
-        padding(`px(5)),
-      ]);
-    let memberName =
-      style([
-        height(`px(32)),
-        marginTop(`px(62)),
-        display(`flex),
-        margin3(~top=`rem(4.6), ~h=`auto, ~bottom=`zero),
-      ]);
-    let icon = style([height(`auto), alignSelf(`center)]);
-    let genesisLabel =
-      style([
-        margin2(~v=`rem(0.6875), ~h=`auto),
-        borderRadius(`px(4)),
-        background(`hex("757575")),
-        Theme.Typeface.ibmplexsans,
-        fontSize(`rem(0.68)),
-        textTransform(`uppercase),
-        letterSpacing(`px(1)),
-        lineHeight(`rem(1.)),
-        color(white),
-        height(`rem(1.)),
-        width(`rem(11.9)),
-        padding2(~h=`rem(0.5), ~v=`zero),
-      ]);
-    let quote =
-      merge([
-        Theme.Body.basic,
-        style([
-          margin2(~v=`zero, ~h=`rem(1.5)),
-          width(`rem(16.625)),
-          alignSelf(`center),
-          media(Theme.MediaQuery.tablet, [width(`rem(24.))]),
-        ]),
-      ]);
-    let socials =
-      style([
-        display(`flex),
-        justifyContent(`spaceBetween),
-        flexDirection(`column),
-        margin2(~v=`rem(2.), ~h=`auto),
-        media(
-          Theme.MediaQuery.tablet,
-          [flexDirection(`row), width(`rem(24.7))],
-        ),
-      ]);
-    let socialTag =
-      style([
-        display(`flex),
-        selector("p", [marginTop(`zero), marginBottom(`zero)]),
-      ]);
-
-    let ctaButton =
-      merge([
-        Theme.Body.basic_semibold,
-        style([
-          width(`rem(14.)),
-          height(`rem(3.)),
-          backgroundColor(Theme.Colors.hyperlink),
-          borderRadius(`px(6)),
-          textDecoration(`none),
-          color(white),
-          padding2(~v=`px(12), ~h=`px(24)),
-          textAlign(`center),
-          alignSelf(`center),
-          hover([backgroundColor(Theme.Colors.hyperlinkHover)]),
-        ]),
-      ]);
-  };
-  [@react.component]
-  let make = () => {
-    <div className=Styles.outerBox>
-      <div className=Styles.container>
-        <img src="/static/img/gareth.png" className=Styles.profilePic />
-        <div className=Styles.innerFlex>
-          <span className=Styles.memberName>
-            <img src="/static/img/Icon.Discord.svg" className=Styles.icon />
-            <Spacer width=0.31 />
-            <h4 className=Theme.H4.header>
-              {React.string("Garethtdavies")}
-            </h4>
-          </span>
-          <p className=Styles.genesisLabel>
-            {React.string("Genesis Founding Member")}
-          </p>
-          <p className=Styles.quote>
-            {React.string(
-               "\"My favorite thing about Coda is how it utilizes and builds on zk-SNARKs, which are a fundamental technology that could have a massive impact on the blockchain space and technology in general.\"",
-             )}
-          </p>
-          <div className=Styles.socials>
-            <div className=Styles.socialTag>
-              <img src="/static/img/Location.svg" />
-              <Spacer width=0.34 />
-              <p className=Theme.Body.basic_small>
-                {React.string("Victoria, Canada")}
-              </p>
-            </div>
-            <Spacer height=1. />
-            <div className=Styles.socialTag>
-              <img src="/static/img/Icon.Twitter.svg" />
-              <Spacer width=0.34 />
-              <p className=Theme.Body.basic_small>
-                {React.string("@_garethtdavies")}
-              </p>
-            </div>
-            <Spacer height=1. />
-            <div className=Styles.socialTag>
-              <img src="/static/img/Icon.Git.svg" />
-              <Spacer width=0.34 />
-              <p className=Theme.Body.basic_small>
-                {React.string("garethtdavies")}
-              </p>
-            </div>
-          </div>
-          <a href="/blog" className=Styles.ctaButton>
-            {React.string({js|Learn More|js})}
-          </a>
-          <Spacer height=3. />
-        </div>
-      </div>
-    </div>;
-  };
+  let profileRow = style([display(`flex), justifyContent(`spaceAround)]);
 };
 
 [@react.component]
-let make = () => {
+let make = (~profiles) => {
   <Page
     title="Genesis"
     description="Join Genesis. Become one of 1000 community members to receive a grant of 66,000 coda tokens. You'll participate in activities that will strengthen the Coda network and community.">
@@ -406,7 +249,24 @@ let make = () => {
           </p>
         </div>
         <Spacer height=4. />
-        <MemberProfile />
+        <div className=Styles.profileRow>
+          {React.array(
+             Array.map(
+               (p: ContentType.GenesisProfile.t) => {
+                 <MemberProfile
+                   key={p.name}
+                   name={p.name}
+                   photo={p.profilePhoto.fields.file.url}
+                   quote={"\"" ++ p.quote ++ "\""}
+                   location={p.memberLocation}
+                   twitter={p.twitter}
+                   github={p.github}
+                 />
+               },
+               profiles,
+             ),
+           )}
+        </div>
         <Spacer height=4. />
         <h1 className=Styles.textBlockHeading> {React.string("Details")} </h1>
         <Spacer height=1. />
@@ -508,3 +368,23 @@ let make = () => {
     </Wrapped>
   </Page>;
 };
+
+Next.injectGetInitialProps(make, _ => {
+  Contentful.getEntries(
+    Lazy.force(Contentful.client),
+    {
+      "include": 1,
+      "content_type": ContentType.GenesisProfile.id,
+      "order": "-fields.publishDate",
+      "limit": 3,
+    },
+  )
+  |> Promise.map((entries: ContentType.GenesisProfile.entries) => {
+       let profiles =
+         Array.map(
+           (e: ContentType.GenesisProfile.entry) => e.fields,
+           entries.items,
+         );
+       {"profiles": profiles};
+     })
+});
