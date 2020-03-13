@@ -73,8 +73,10 @@ let traverse_ast =
     method! structure_item stri acc =
       match stri.pstr_desc with
       | Pstr_module {pmb_name; pmb_expr; _} ->
-          self#module_expr pmb_expr
-            {module_path= pmb_name.txt :: acc.module_path}
+          ignore
+            (self#module_expr pmb_expr
+               {module_path= pmb_name.txt :: acc.module_path}) ;
+          acc
       | Pstr_extension ((name, _payload), _attrs)
         when String.equal name.txt "test_module" ->
           (* don't print functors in test code *)
