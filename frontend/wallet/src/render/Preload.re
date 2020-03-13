@@ -10,8 +10,8 @@ let downloadKey = (keyName, chunkCb, doneCb) =>
     doneCb,
   );
 
-let downloadCoda = (chunkCb, doneCb) =>
-  DownloadLogic.downloadCoda(chunkCb, doneCb);
+let downloadCoda = (version, chunkCb, doneCb) =>
+  DownloadLogic.downloadCoda(version, chunkCb, doneCb);
 
 [@bs.module "electron"] [@bs.scope "shell"] [@bs.val]
 external showItemInFolder: string => unit = "showItemInFolder";
