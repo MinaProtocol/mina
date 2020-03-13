@@ -92,7 +92,7 @@ let make = (~account, ~onClose, ~onSuccess) => {
           <Spacer height=1.5 />
           <div className=Css.(style([display(`flex)]))>
             <Button
-              label="cancel"
+              label="Cancel"
               style=Button.Gray
               onClick={evt => {
                 ReactEvent.Synthetic.stopPropagation(evt);
@@ -100,7 +100,7 @@ let make = (~account, ~onClose, ~onSuccess) => {
               }}
             />
             <Spacer width=1. />
-            <Button label="unlock" style=Button.Green type_="submit" />
+            <Button label="Unlock" style=Button.Green type_="submit" />
           </div>
         </form>
       }
