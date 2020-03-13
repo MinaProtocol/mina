@@ -76,7 +76,7 @@ let handleResponse = (response, filename, dataEncoding, chunkCb, doneCb) => {
     |> Https.Response.getHeaders
     |> Https.Response.Headers.contentLengthGet
     |> int_of_string;
-  let filestream = Filestream.create(filename, {"encoding": dataEncoding});
+  let filestream = Filestream.createWriteStream(filename, {"encoding": dataEncoding});
 
   Filestream.onFinish(filestream, () => doneCb(Belt.Result.Ok()));
   Filestream.onError(filestream, e => doneCb(Error(e)));
@@ -137,5 +137,5 @@ let downloadCoda = (version, chunkCb, doneCb) => {
     doneCb,
   );
   Filestream.createReadStream(tempFilename)
-  ->(Filestream.pipe(Unzipper.extract(installPath)));
+  ->(Filestream.pipe(Unzipper.extract({ path: installPath })));
 };
