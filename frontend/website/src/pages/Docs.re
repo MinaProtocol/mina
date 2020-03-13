@@ -82,21 +82,7 @@ let make = (~metadata, ~children) => {
       <DocsSideNav currentSlug />
       <div className=Style.content>
         <EditLink route={router.route} />
-        <Next.MDXProvider
-          components={
-            "Alert": Alert.make,
-            "h1": DocsComponents.H1.make,
-            "h2": DocsComponents.H2.make,
-            "h3": DocsComponents.H3.make,
-            "h4": DocsComponents.H4.make,
-            "p": DocsComponents.P.make,
-            "a": DocsComponents.A.make,
-            "strong": DocsComponents.Strong.make,
-            "pre": DocsComponents.Pre.make,
-            "code": DocsComponents.Code.make,
-            "ul": DocsComponents.Ul.make,
-            "ol": DocsComponents.Ol.make,
-          }>
+        <Next.MDXProvider components={DocsComponents.allComponents()}>
           children
         </Next.MDXProvider>
       </div>
