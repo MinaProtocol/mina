@@ -1433,7 +1433,7 @@ let compile_time_constants =
     ~summary:"Print a JSON map of the compile-time consensus parameters"
     (Command.Param.return (fun () ->
          Core.printf "%s\n%!"
-           (Yojson.Safe.to_string Consensus.Constants.all_constants) ))
+           (Yojson.Safe.to_string (Coda_constants.all_constants ())) ))
 
 let telemetry =
   let open Command.Param in

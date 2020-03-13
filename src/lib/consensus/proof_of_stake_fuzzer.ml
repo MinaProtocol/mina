@@ -45,10 +45,11 @@ module Vrf_distribution = struct
    *  [ep + 2R/3 - 1].
    *)
   let create ~stakers ~epoch ~initial_consensus_state =
+    let constants = (Lazy.force !Coda_constants.t).consensus in
     Core_kernel.Printf.printf
       !"[%d] Evaluating %d VRFs for %d stakers\n%!"
       (UInt32.to_int epoch)
-      (List.length stakers * UInt32.to_int Constants.slots_per_epoch)
+      (List.length stakers * UInt32.to_int constants.slots_per_epoch)
       (List.length stakers) ;
     let open UInt32 in
     let open UInt32.Infix in
@@ -60,11 +61,11 @@ module Vrf_distribution = struct
       if epoch = zero then zero
       else
         Global_slot.of_epoch_and_slot
-          (epoch - of_int 1, of_int 2 * Constants.slots_per_epoch)
+          (epoch - of_int 1, of_int 2 * constants.slots_per_epoch)
     in
     let term_slot =
       Global_slot.of_epoch_and_slot
-        (epoch, (of_int 2 * Constants.slots_per_epoch) - of_int 1)
+        (epoch, (of_int 2 * constants.slots_per_epoch) - of_int 1)
     in
     let start_time = Global_slot.start_time start_slot in
     let term_time = Global_slot.start_time term_slot in
@@ -100,7 +101,7 @@ module Vrf_distribution = struct
                  | `Produce_now (_, proposal_data) ->
                      let slot_span =
                        Block_time.Span.of_ms
-                       @@ Int64.of_int Constants.block_window_duration_ms
+                       @@ Int64.of_int constants.block_window_duration_ms
                      in
                      let proposal_time = Block_time.add curr_time slot_span in
                      Some (proposal_time, proposal_data)
@@ -127,6 +128,7 @@ module Vrf_distribution = struct
   (** Picks a single chain of proposals from a distribution. Does not attempt
    *  to simulate any regular properties of how a real chain would be built. *)
   let pick_chain_unrealistically dist =
+    let constants = (Lazy.force !Coda_constants.t).consensus in
     let default_window_size = Constants.delta in
     let rec find_potential_proposals acc_proposals window_depth slot =
       let slot_in_dist_range = slot < dist.term_slot in

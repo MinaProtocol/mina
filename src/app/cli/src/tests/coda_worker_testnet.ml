@@ -207,6 +207,8 @@ module Api = struct
     signal
 end
 
+let coda_constants = Lazy.force !Coda_constants.t
+
 (** the prefix check keeps track of the "best path" for each worker. the
     best path being the list of state hashes from the root to the best tip.
     the check is satisfied as long as the paths are not disjoint, ie, overlap
@@ -289,8 +291,8 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               < Time.Span.to_sec acceptable_delay
                 +. epsilon
                 +. Int.to_float
-                     ( (Consensus.Constants.c - 1)
-                     * Consensus.Constants.block_window_duration_ms )
+                     ( (coda_constants.consensus.c - 1)
+                     * coda_constants.consensus.block_window_duration_ms )
                    /. 1000. )
        then (
          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
@@ -333,8 +335,8 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                | Some (`Bootstrap, signal) ->
                    if
                      testnet.root_lengths.(i)
-                     + (2 * Consensus.Constants.k)
-                     + Consensus.Constants.delta
+                     + (2 * coda_constants.consensus.k)
+                     + coda_constants.consensus.delta
                      < root_length - 2
                    then (
                      Ivar.fill signal () ;
@@ -342,7 +344,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    else ()
                | Some (`Catchup, signal) ->
                    if
-                     testnet.root_lengths.(i) + (Consensus.Constants.k / 2)
+                     testnet.root_lengths.(i) + (coda_constants.consensus.k / 2)
                      < root_length - 1
                    then (
                      Logger.info logger !"Filled catchup ivar"
@@ -409,7 +411,9 @@ let events workers start_reader =
                  >>= Linear_pipe.read >>| ignore
                in
                let ms_to_sync =
-                 Consensus.Constants.(delta * block_window_duration_ms) + 6_000
+                 coda_constants.consensus.delta
+                 * coda_constants.consensus.block_window_duration_ms
+                 + 6_000
                  |> Float.of_int
                in
                let%map () = after (Time.Span.of_ms ms_to_sync) in
@@ -449,11 +453,12 @@ let test ?is_archive_rocksdb ~name logger n block_production_keys
     snark_work_public_keys work_selection_method ~max_concurrent_connections =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
   let block_production_interval =
-    Consensus.Constants.block_window_duration_ms
+    coda_constants.consensus.block_window_duration_ms
   in
   let acceptable_delay =
     Time.Span.of_ms
-      (block_production_interval * Consensus.Constants.delta |> Float.of_int)
+      ( block_production_interval * coda_constants.consensus.delta
+      |> Float.of_int )
   in
   let%bind program_dir = Unix.getcwd () in
   Coda_processes.init () ;
@@ -502,7 +507,7 @@ end = struct
               Hashtbl.add_exn user_cmds_under_inspection ~key:user_cmd
                 ~data:
                   { expected_deadline=
-                      root_length + Consensus.Constants.k + delay
+                      root_length + coda_constants.consensus.k + delay
                   ; passed_root } ;
               Option.return passed_root
           | _ ->
@@ -569,7 +574,8 @@ end = struct
                           ~key:user_cmd
                           ~data:
                             { expected_deadline=
-                                root_length + Consensus.Constants.k + delay
+                                root_length + coda_constants.consensus.k
+                                + delay
                             ; passed_root } ;
                         Option.return passed_root
                     | _ ->

@@ -9,54 +9,70 @@ include Coda_numbers.Nat.Make32 ()
 module Time = Block_time
 
 let of_time_exn t : t =
-  if Time.(t < Constants.genesis_state_timestamp) then
+  let coda_constants = Lazy.force !Coda_constants.t in
+  if Time.(t < coda_constants.genesis_state_timestamp) then
     raise
       (Invalid_argument
          "Epoch.of_time: time is earlier than genesis block timestamp") ;
-  let time_since_genesis = Time.diff t Constants.genesis_state_timestamp in
+  let time_since_genesis =
+    Time.diff t coda_constants.genesis_state_timestamp
+  in
   uint32_of_int64
     Int64.Infix.(
       Time.Span.to_ms time_since_genesis
-      / Time.Span.to_ms Constants.Epoch.duration)
+      / Time.Span.to_ms coda_constants.consensus.epoch_duration)
 
 let start_time (epoch : t) =
+  let coda_constants = Lazy.force !Coda_constants.t in
   let ms =
     let open Int64.Infix in
     Block_time.Span.to_ms
-      (Block_time.to_span_since_epoch Constants.genesis_state_timestamp)
-    + (int64_of_uint32 epoch * Block_time.Span.to_ms Constants.Epoch.duration)
+      (Block_time.to_span_since_epoch coda_constants.genesis_state_timestamp)
+    + int64_of_uint32 epoch
+      * Block_time.Span.to_ms coda_constants.consensus.epoch_duration
   in
   Block_time.of_span_since_epoch (Block_time.Span.of_ms ms)
 
-let end_time (epoch : t) = Time.add (start_time epoch) Constants.Epoch.duration
+let end_time (epoch : t) =
+  let coda_constants = Lazy.force !Coda_constants.t in
+  Time.add (start_time epoch) coda_constants.consensus.epoch_duration
 
 let slot_start_time (epoch : t) (slot : Slot.t) =
+  let coda_constants = Lazy.force !Coda_constants.t in
   Coda_base.Block_time.add (start_time epoch)
     (Coda_base.Block_time.Span.of_ms
-       Int64.Infix.(int64_of_uint32 slot * Constants.Slot.duration_ms))
+       Int64.Infix.(
+         int64_of_uint32 slot * coda_constants.consensus.slot_duration_ms))
 
 let slot_end_time (epoch : t) (slot : Slot.t) =
-  Time.add (slot_start_time epoch slot) Constants.block_window_duration
+  let coda_constants = Lazy.force !Coda_constants.t in
+  Time.add
+    (slot_start_time epoch slot)
+    ( Int64.of_int coda_constants.consensus.block_window_duration_ms
+    |> Time.Span.of_ms )
 
 let epoch_and_slot_of_time_exn tm : t * Slot.t =
+  let coda_constants = Lazy.force !Coda_constants.t in
   let epoch = of_time_exn tm in
   let time_since_epoch = Coda_base.Block_time.diff tm (start_time epoch) in
   let slot =
     uint32_of_int64
     @@ Int64.Infix.(
-         Time.Span.to_ms time_since_epoch / Constants.Slot.duration_ms)
+         Time.Span.to_ms time_since_epoch
+         / coda_constants.consensus.slot_duration_ms)
   in
   (epoch, slot)
 
 let diff_in_slots ((epoch, slot) : t * Slot.t) ((epoch', slot') : t * Slot.t) :
     int64 =
+  let coda_constants = Lazy.force !Coda_constants.t in
   let ( < ) x y = Pervasives.(Int64.compare x y < 0) in
   let ( > ) x y = Pervasives.(Int64.compare x y > 0) in
   let open Int64.Infix in
   let of_uint32 = UInt32.to_int64 in
   let epoch, slot = (of_uint32 epoch, of_uint32 slot) in
   let epoch', slot' = (of_uint32 epoch', of_uint32 slot') in
-  let epoch_size = of_uint32 Constants.Epoch.size in
+  let epoch_size = of_uint32 coda_constants.consensus.epoch_size in
   let epoch_diff = epoch - epoch' in
   if epoch_diff > 0L then
     ((epoch_diff - 1L) * epoch_size) + slot + (epoch_size - slot')
@@ -65,10 +81,11 @@ let diff_in_slots ((epoch, slot) : t * Slot.t) ((epoch', slot') : t * Slot.t) :
   else slot - slot'
 
 let%test_unit "test diff_in_slots" =
+  let coda_constants = Lazy.force !Coda_constants.t in
   let open Int64.Infix in
   let ( !^ ) = UInt32.of_int in
   let ( !@ ) = Fn.compose ( !^ ) Int64.to_int in
-  let epoch_size = UInt32.to_int64 Constants.Epoch.size in
+  let epoch_size = UInt32.to_int64 coda_constants.consensus.epoch_size in
   [%test_eq: int64] (diff_in_slots (!^0, !^5) (!^0, !^0)) 5L ;
   [%test_eq: int64] (diff_in_slots (!^3, !^23) (!^3, !^20)) 3L ;
   [%test_eq: int64] (diff_in_slots (!^4, !^4) (!^3, !^0)) (epoch_size + 4L) ;
@@ -85,5 +102,7 @@ let%test_unit "test diff_in_slots" =
 
 let incr ((epoch, slot) : t * Slot.t) =
   let open UInt32 in
-  if Slot.equal slot (sub Constants.Epoch.size one) then (add epoch one, zero)
+  let coda_constants = Lazy.force !Coda_constants.t in
+  if Slot.equal slot (sub coda_constants.consensus.epoch_size one) then
+    (add epoch one, zero)
   else (epoch, add slot one)

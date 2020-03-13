@@ -438,14 +438,15 @@ let run_test () : unit Deferred.t =
         else if with_snark then 15.
         else 7.
       in
+      let consensus_constants = (Lazy.force !Coda_constants.t).consensus in
       let wait_till_length =
         if medium_curves then Coda_numbers.Length.of_int 1
         else if test_full_epoch then
           (*Note: wait to produce (2*slots_per_epoch) blocks. This could take a while depending on what k and c are*)
           Coda_numbers.Length.of_int
             (Unsigned.UInt32.to_int
-               Consensus.Constants.(
-                 Unsigned.UInt32.(mul slots_per_epoch (of_int 2))))
+               Unsigned.UInt32.(
+                 mul consensus_constants.slots_per_epoch (of_int 2)))
         else Coda_numbers.Length.of_int 5
       in
       let%map () =
@@ -462,10 +463,9 @@ let run_test () : unit Deferred.t =
                 > Coda_numbers.Length.add blockchain_length' wait_till_length
                 )
               ~timeout_min:
-                ( Consensus.Constants.(
-                    (delta + c)
-                    * ( block_window_duration_ms
-                      * (Coda_numbers.Length.to_int wait_till_length + 1) ))
+                ( (consensus_constants.delta + consensus_constants.c)
+                  * ( consensus_constants.block_window_duration_ms
+                    * (Coda_numbers.Length.to_int wait_till_length + 1) )
                   / 1000 / 60
                 |> Float.of_int )
           in

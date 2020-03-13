@@ -73,7 +73,9 @@ module Segment_id = Nat.Make32 ()
 module Typ = Crypto_params.Tick0.Typ
 module Constants = Constants
 
-let epoch_size = UInt32.to_int Constants.Epoch.size
+let epoch_size =
+  let constants = (Lazy.force !Coda_constants.t).consensus in
+  UInt32.to_int constants.epoch_size
 
 module Configuration = struct
   type t =
@@ -137,10 +139,11 @@ module Data = struct
     let of_time_exn tm : t =
       let epoch = Epoch.of_time_exn tm in
       let time_since_epoch = Time.diff tm (Epoch.start_time epoch) in
+      let constants = (Lazy.force !Coda_constants.t).consensus in
       let slot =
         uint32_of_int64
         @@ Int64.Infix.(
-             Time.Span.to_ms time_since_epoch / Constants.Slot.duration_ms)
+             Time.Span.to_ms time_since_epoch / constants.slot_duration_ms)
       in
       (epoch, slot)
   end
@@ -1220,9 +1223,13 @@ module Data = struct
     let gc_width : UInt32.t = delay * of_int 2
 
     (* epoch, slot components of gc_width *)
-    let gc_width_epoch : UInt32.t = gc_width / of_int Constants.epoch_size
+    let gc_width_epoch : UInt32.t =
+      let constants = (Lazy.force !Coda_constants.t).consensus in
+      gc_width / constants.epoch_size
 
-    let gc_width_slot : UInt32.t = gc_width mod of_int Constants.epoch_size
+    let gc_width_slot : UInt32.t =
+      let constants = (Lazy.force !Coda_constants.t).consensus in
+      gc_width mod constants.epoch_size
 
     let gc_interval : UInt32.t = gc_width
 
@@ -1269,10 +1276,11 @@ module Data = struct
       let same_sub_window =
         Global_sub_window.equal prev_global_sub_window next_global_sub_window
       in
+      let constants = (Lazy.force !Coda_constants.t).consensus in
       let same_window =
         Global_sub_window.(
           add prev_global_sub_window
-            (constant Constants.sub_windows_per_window)
+            (constant constants.sub_windows_per_window)
           >= next_global_sub_window)
       in
       let new_sub_window_densities =
@@ -1336,10 +1344,11 @@ module Data = struct
           Global_sub_window.Checked.equal prev_global_sub_window
             next_global_sub_window
         in
+        let constants = (Lazy.force !Coda_constants.t).consensus in
         let%bind same_window =
           Global_sub_window.Checked.(
             add prev_global_sub_window
-              (constant Constants.sub_windows_per_window)
+              (constant constants.sub_windows_per_window)
             >= next_global_sub_window)
         in
         let if_ cond ~then_ ~else_ =
@@ -1421,10 +1430,11 @@ module Data = struct
           let next_global_sub_window =
             Global_sub_window.of_global_slot next_global_slot
           in
+          let constants = (Lazy.force !Coda_constants.t).consensus in
           let sub_window_diff =
             UInt32.(
               to_int
-              @@ min (succ Constants.sub_windows_per_window)
+              @@ min (succ constants.sub_windows_per_window)
               @@ Global_sub_window.sub next_global_sub_window
                    prev_global_sub_window)
           in
@@ -1461,10 +1471,13 @@ module Data = struct
           @ List.take prev_sub_window_densities prev_relative_sub_window
           @ [List.nth_exn prev_sub_window_densities prev_relative_sub_window]
 
-        let slots_per_sub_window = UInt32.to_int Constants.slots_per_sub_window
+        let slots_per_sub_window =
+          let constants = (Lazy.force !Coda_constants.t).consensus in
+          UInt32.to_int constants.slots_per_sub_window
 
         let sub_windows_per_window =
-          UInt32.to_int Constants.sub_windows_per_window
+          let constants = (Lazy.force !Coda_constants.t).consensus in
+          UInt32.to_int constants.sub_windows_per_window
 
         (* slot_diff are generated in such a way so that we can test different cases
            in the update function, I use a weighted union to generate it.
@@ -1828,12 +1841,13 @@ module Data = struct
       ; has_ancestor_in_same_checkpoint_window }
 
     let data_spec =
+      let constants = (Lazy.force !Coda_constants.t).consensus in
       let open Snark_params.Tick.Data_spec in
       [ Length.typ
       ; Length.typ
       ; Length.typ
       ; Typ.list
-          ~length:(UInt32.to_int Constants.sub_windows_per_window)
+          ~length:(UInt32.to_int constants.sub_windows_per_window)
           Length.typ
       ; Vrf.Output.Truncated.typ
       ; Amount.typ
@@ -1921,7 +1935,8 @@ module Data = struct
     let global_slot {Poly.curr_global_slot; _} = curr_global_slot
 
     let checkpoint_window slot =
-      Global_slot.to_int slot / Constants.Checkpoint_window.size_in_slots
+      let constants = (Lazy.force !Coda_constants.t).consensus in
+      Global_slot.to_int slot / constants.checkpoint_window_size_in_slots
 
     let same_checkpoint_window_unchecked slot1 slot2 =
       Core.Int.(checkpoint_window slot1 = checkpoint_window slot2)
@@ -1996,15 +2011,16 @@ module Data = struct
       let open Snarky_integer in
       let open Run in
       let slot1 = Global_slot.Checked.to_integer slot1 in
+      let constants = (Lazy.force !Coda_constants.t).consensus in
       let _q1, r1 =
         Integer.div_mod ~m slot1
           (Integer.constant ~m
-             (Bignum_bigint.of_int Constants.Checkpoint_window.size_in_slots))
+             (Bignum_bigint.of_int constants.checkpoint_window_size_in_slots))
       in
       let next_window_start =
         Field.(
           Integer.to_field slot1 - Integer.to_field r1
-          + of_int Constants.Checkpoint_window.size_in_slots)
+          + of_int constants.checkpoint_window_size_in_slots)
       in
       (Field.compare ~bit_length:Global_slot.length_in_bits
          (slot2 |> Global_slot.Checked.to_integer |> Integer.to_field)
@@ -2015,11 +2031,12 @@ module Data = struct
       make_checked (fun () -> same_checkpoint_window ~prev ~next)
 
     let negative_one ~genesis_ledger =
+      let constants = (Lazy.force !Coda_constants.t).consensus in
       let max_sub_window_density =
-        Length.of_int (UInt32.to_int Constants.slots_per_sub_window)
+        Length.of_int (UInt32.to_int constants.slots_per_sub_window)
       in
       let max_window_density =
-        Length.of_int (UInt32.to_int Constants.slots_per_window)
+        Length.of_int (UInt32.to_int constants.slots_per_window)
       in
       { Poly.blockchain_length= Length.zero
       ; epoch_count= Length.zero
@@ -2027,7 +2044,7 @@ module Data = struct
       ; sub_window_densities=
           Length.zero
           :: List.init
-               (UInt32.to_int Constants.sub_windows_per_window - 1)
+               (UInt32.to_int constants.sub_windows_per_window - 1)
                ~f:(Fn.const max_sub_window_density)
       ; last_vrf_output= Vrf.Output.Truncated.dummy
       ; total_currency= genesis_ledger_total_currency ~ledger:genesis_ledger
@@ -2528,9 +2545,10 @@ module Hooks = struct
       Epoch.equal epoch
         (Epoch.succ (Consensus_state.curr_epoch consensus_state))
     in
+    let constants = (Lazy.force !Coda_constants.t).consensus in
     (* has the first transition in the epoch reached finalization? *)
     let epoch_is_finalized =
-      consensus_state.next_epoch_data.epoch_length > Length.of_int Constants.k
+      consensus_state.next_epoch_data.epoch_length > Length.of_int constants.k
     in
     if in_next_epoch || not epoch_is_finalized then
       (`Curr, !local_state.Data.next_epoch_snapshot)
@@ -2679,9 +2697,10 @@ module Hooks = struct
         (Epoch_and_slot.of_time_exn time_received)
         (epoch, slot)
     in
+    let constants = (Lazy.force !Coda_constants.t).consensus in
     if slot_diff < 0L then Error `Too_early
-    else if slot_diff >= of_int Constants.delta then
-      Error (`Too_late (sub slot_diff (of_int Constants.delta)))
+    else if slot_diff >= of_int constants.delta then
+      Error (`Too_late (sub slot_diff (of_int constants.delta)))
     else Ok ()
 
   let received_at_valid_time (consensus_state : Consensus_state.Value.t)
@@ -2900,7 +2919,8 @@ module Hooks = struct
           ~finish:(fun () -> None)
       in
       let rec find_winning_slot (slot : Slot.t) =
-        if UInt32.of_int (Slot.to_int slot) >= Constants.Epoch.size then None
+        let constants = (Lazy.force !Coda_constants.t).consensus in
+        if UInt32.of_int (Slot.to_int slot) >= constants.epoch_size then None
         else
           match Local_state.seen_slot local_state epoch slot with
           | `All_seen ->
@@ -2958,7 +2978,8 @@ module Hooks = struct
 
   let should_bootstrap_len ~existing ~candidate =
     let length = Length.to_int in
-    length candidate - length existing > (2 * Constants.k) + Constants.delta
+    let constants = (Lazy.force !Coda_constants.t).consensus in
+    length candidate - length existing > (2 * constants.k) + constants.delta
 
   let should_bootstrap ~existing ~candidate ~logger =
     match select ~existing ~candidate ~logger with
@@ -2983,7 +3004,8 @@ module Hooks = struct
       Consensus_state.curr_epoch_and_slot
         (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t)
     in
-    let delay = Constants.delta / 2 |> UInt32.of_int in
+    let constants = (Lazy.force !Coda_constants.t).consensus in
+    let delay = constants.delta / 2 |> UInt32.of_int in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time curr_epoch new_slot in
     received_at_valid_time
@@ -3007,8 +3029,9 @@ module Hooks = struct
         (Consensus_state.curr_slot
            (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t))
     in
+    let constants = (Lazy.force !Coda_constants.t).consensus in
     let too_late =
-      let delay = Constants.delta * 2 |> UInt32.of_int in
+      let delay = constants.delta * 2 |> UInt32.of_int in
       let delayed_slot = UInt32.Infix.(curr_slot + delay) in
       Epoch.slot_start_time curr_epoch delayed_slot
     in
@@ -3134,7 +3157,7 @@ module Hooks = struct
           in
           let total_currency =
             Option.value_exn
-              (Amount.add prev.total_currency Constants.coinbase)
+              (Amount.add prev.total_currency Coda_compile_config.coinbase)
           in
           let prev_epoch, prev_slot =
             Consensus_state.curr_epoch_and_slot prev

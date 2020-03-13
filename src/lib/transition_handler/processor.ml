@@ -20,8 +20,9 @@ module Transition_frontier_validation =
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
 let catchup_timeout_duration =
+  let constants = (Lazy.force !Coda_constants.t).consensus in
   Block_time.Span.of_ms
-    (Consensus.Constants.(delta * block_window_duration_ms) |> Int64.of_int)
+    (constants.delta * constants.block_window_duration_ms |> Int64.of_int)
 
 let cached_transform_deferred_result ~transform_cached ~transform_result cached
     =

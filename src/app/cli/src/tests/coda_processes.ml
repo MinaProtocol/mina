@@ -43,11 +43,11 @@ let net_configs n =
       (addrs_and_ports_list, List.map ~f:(List.map ~f:fst) peers) )
 
 let offset =
-  lazy
-    Core.Time.(
-      diff (now ())
-        ( Consensus.Constants.genesis_state_timestamp
-        |> Coda_base.Block_time.to_time ))
+  let open Lazy.Let_syntax in
+  let%map coda_constants = !Coda_constants.t in
+  Core.Time.(
+    diff (now ())
+      (coda_constants.genesis_state_timestamp |> Coda_base.Block_time.to_time))
 
 let local_configs ?block_production_interval
     ?(block_production_keys = Fn.const None)

@@ -14,7 +14,7 @@ module Runtime_configurable = struct
   type t =
     { txpool_max_size: int
     ; genesis_state_timestamp: Block_time.t
-    ; block_window_duration_ms: Block_time.Span.t }
+    ; block_window_duration_ms: int }
 end
 
 type t =

@@ -4,15 +4,17 @@ open Async
 let name = "coda-peers-test"
 
 let main () =
+  let coda_constants = Lazy.force !Coda_constants.t in
   let%bind program_dir = Unix.getcwd () in
   let n = 3 in
   let logger = Logger.create () in
   let block_production_interval =
-    Consensus.Constants.block_window_duration_ms
+    coda_constants.consensus.block_window_duration_ms
   in
   let acceptable_delay =
     Time.Span.of_ms
-      (block_production_interval * Consensus.Constants.delta |> Float.of_int)
+      ( block_production_interval * coda_constants.consensus.delta
+      |> Float.of_int )
   in
   let work_selection_method =
     Cli_lib.Arg_type.Work_selection_method.Sequence

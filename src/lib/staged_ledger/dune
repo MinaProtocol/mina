@@ -3,7 +3,7 @@
  (public_name staged_ledger)
  (library_flags -linkall)
  (inline_tests)
- (libraries core lens transaction_snark_scan_state sgn transaction_snark coda_base  merkle_mask pipe_lib logger
+ (libraries core lens transaction_snark_scan_state sgn transaction_snark coda_base coda_constants  merkle_mask pipe_lib logger
   async async_extra module_version ledger_proof verifier transaction_snark_work staged_ledger_diff)
  (preprocessor_deps ../../config.mlh)
  (preprocess (pps

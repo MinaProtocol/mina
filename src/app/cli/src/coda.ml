@@ -218,7 +218,7 @@ let daemon logger =
            "Daemon will expire at $exp"
            ~metadata:[("exp", `String daemon_expiry)] ;
          let tm =
-           (* same approach as in Consensus.Constants.genesis_state_timestamp *)
+           (* same approach as in Coda_constants.genesis_state_timestamp *)
            let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
            Core.Time.of_string_gen
              ~if_no_timezone:(`Use_this_one default_timezone) daemon_expiry

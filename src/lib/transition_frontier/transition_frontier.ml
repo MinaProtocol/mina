@@ -14,7 +14,9 @@ module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 
-let global_max_length = Consensus.Constants.k
+let global_max_length =
+  let constants = (Lazy.force !Coda_constants.t).consensus in
+  constants.k
 
 type t =
   { logger: Logger.t
