@@ -112,8 +112,7 @@ module Key = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (* TEMP *)
-      type t = Public_key.Compressed.Stable.V2.t
+      type t = Public_key.Compressed.Stable.V1.t
       [@@deriving sexp, eq, hash, compare, yojson]
 
       let to_latest = Fn.id
