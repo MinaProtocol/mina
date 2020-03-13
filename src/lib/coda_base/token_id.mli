@@ -66,6 +66,8 @@ val var_of_t : t -> var
 module Checked : sig
   val to_input : var -> (Field.Var.t, Boolean.var) Random_oracle.Input.t
 
+  val next : var -> var
+
   val equal : var -> var -> (Boolean.var, _) Checked.t
 
   val if_ : Boolean.var -> then_:var -> else_:var -> (var, _) Checked.t

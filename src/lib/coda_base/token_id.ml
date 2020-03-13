@@ -68,6 +68,8 @@ let var_of_t = Field.Var.constant
 module Checked = struct
   open Snark_params.Tick
 
+  let next x = Field.Var.(add x (constant Field.one))
+
   let to_input (x : var) = Random_oracle.Input.field x
 
   let equal = Field.Checked.equal
