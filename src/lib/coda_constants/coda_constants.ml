@@ -209,6 +209,7 @@ let t : t Lazy.t ref = ref (create_t genesis_constants_compiled)
 let compiled_constants_for_test =
   Lazy.force (create_t genesis_constants_compiled)
 
+(*Deepthi: This should go elsewhere to remove the currency dependency*)
 let all_constants () =
   let t = Lazy.force !t in
   `Assoc

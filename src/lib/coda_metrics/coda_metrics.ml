@@ -6,9 +6,6 @@ open Prometheus
 open Namespace
 open Metric_generators
 
-[%%inject
-"block_window_duration", block_window_duration]
-
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
   let re_unquoted_escapes = Re.compile @@ Re.set "\\\n"
@@ -656,6 +653,11 @@ end
 (* these block latency metrics are recomputed every half a slot, and the averages span 20 slots *)
 module Block_latency = struct
   let subsystem = "Block_latency"
+
+  (*let block_window_duration () =
+    (Lazy.force !Coda_constants.t).consensus.block_window_duration_ms*)
+  [%%inject
+  "block_window_duration", block_window_duration]
 
   module Latency_time_spec = struct
     let tick_interval =

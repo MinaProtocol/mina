@@ -69,7 +69,7 @@ module Make0 (Base_ledger : sig
 
   val get : t -> Location.t -> Account.t option
 end) (Max_size : sig
-  val pool_max_size : int
+  val pool_max_size : unit -> int
 end) (Staged_ledger : sig
   type t
 
@@ -152,7 +152,7 @@ struct
         -> Indexed_pool.t * User_command.With_valid_signature.t Sequence.t =
      fun pool ->
       let rec go pool' dropped =
-        if Indexed_pool.size pool' > pool_max_size then (
+        if Indexed_pool.size pool' > pool_max_size () then (
           let dropped', pool'' = Indexed_pool.remove_lowest_fee pool' in
           assert (not (Sequence.is_empty dropped')) ;
           go pool'' @@ Sequence.append dropped dropped' )
@@ -165,7 +165,7 @@ struct
       | None ->
           true
       | Some min_fee ->
-          if Indexed_pool.size pool >= pool_max_size then
+          if Indexed_pool.size pool >= pool_max_size () then
             Currency.Fee.(User_command.fee cmd > min_fee)
           else true
 
@@ -802,11 +802,7 @@ end)
        low fee transactions the smaller-pooled nodes consider useless and get
        themselves banned.
     *)
-      [%%import
-      "../../config.mlh"]
-
-      [%%inject
-      "pool_max_size", pool_max_size]
+      let pool_max_size () = (Lazy.force !Coda_constants.t).txpool_max_size
     end)
     (Staged_ledger)
     (Transition_frontier)
@@ -888,7 +884,7 @@ let%test_module _ =
       Make0
         (Mock_base_ledger)
         (struct
-          let pool_max_size = 25
+          let pool_max_size () = 25
         end)
         (Mock_staged_ledger)
         (Mock_transition_frontier)
@@ -1264,13 +1260,11 @@ let%test_module _ =
       Deferred.unit
 
     let%test_unit "max size is maintained" =
+      let pool_max_size = Test.Resource_pool.pool_max_size () in
       Quickcheck.test ~trials:500
         (let open Quickcheck.Generator.Let_syntax in
         let%bind init_ledger_state = Ledger.gen_initial_ledger_state in
-        let%bind cmds_count =
-          Int.gen_incl Test.Resource_pool.pool_max_size
-            (Test.Resource_pool.pool_max_size * 2)
-        in
+        let%bind cmds_count = Int.gen_incl pool_max_size (pool_max_size * 2) in
         let%bind cmds =
           User_command.Gen.sequence ~sign_type:`Real ~length:cmds_count
             init_ledger_state
@@ -1304,16 +1298,13 @@ let%test_module _ =
                   ; removed_user_commands= []
                   ; reorg_best_tip= true }
               in
-              let cmds1, cmds2 =
-                List.split_n cmds Test.Resource_pool.pool_max_size
-              in
+              let cmds1, cmds2 = List.split_n cmds pool_max_size in
               let%bind apply_res1 =
                 Test.Resource_pool.Diff.unsafe_apply pool
                   (Envelope.Incoming.local cmds1)
               in
               assert (Result.is_ok apply_res1) ;
-              [%test_eq: int] Test.Resource_pool.pool_max_size
-                (Indexed_pool.size pool.pool) ;
+              [%test_eq: int] pool_max_size (Indexed_pool.size pool.pool) ;
               let%map _apply_res2 =
                 Test.Resource_pool.Diff.unsafe_apply pool
                   (Envelope.Incoming.local cmds2)
@@ -1324,9 +1315,7 @@ let%test_module _ =
                  commands have higher fee than the lowest one already in the
                  pool.
               *)
-              assert (
-                Indexed_pool.size pool.pool <= Test.Resource_pool.pool_max_size
-              ) ) )
+              assert (Indexed_pool.size pool.pool <= pool_max_size) ) )
 
     let assert_rebroadcastable pool cmds =
       let normalize = List.sort ~compare:User_command.compare in

@@ -9,16 +9,17 @@ open Async
 [%%if
 consensus_mechanism = "proof_of_stake"]
 
-[%%inject
-"delta_int", delta]
-
-let delta = float_of_int delta_int
+let is_postake = true
 
 [%%else]
 
-let delta = 1.0
+let is_postake = false
 
 [%%endif]
+
+let delta () =
+  Float.of_int
+    (if is_postake then (Lazy.force !Coda_constants.t).consensus.delta else 1)
 
 module Actions = struct
   type action =
@@ -95,7 +96,7 @@ module Actions = struct
          * giving us [f(x) = (1/(Δ^2/2))x^2 + c].
          *)
         let c = 0.1 in
-        let y = (delta ** 2.0) /. 2.0 in
+        let y = (delta () ** 2.0) /. 2.0 in
         let f x = (1.0 /. y *. (x ** 2.0)) +. c in
         Trust_decrease (f (Int64.to_float slot_diff))
     | Gossiped_future_transition ->
