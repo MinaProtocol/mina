@@ -1,5 +1,5 @@
 [@bs.val] [@bs.scope "window"]
-external downloadKey:
+external downloadCoda:
   (string, (int, int) => unit, Belt.Result.t(unit, string) => unit) => unit =
   "";
 
@@ -16,12 +16,12 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~keyName, ~onFinish, ~finished) => {
+let make = (~onFinish, ~finished) => {
   let ((downloaded, total), updateState) = React.useState(() => (0, 0));
 
   React.useEffect0(() => {
-    downloadKey(
-      keyName,
+    downloadCoda(
+      "latest",
       (chunkSize, totalSize) =>
         updateState(((downloaded, _)) =>
           (downloaded + chunkSize, totalSize)

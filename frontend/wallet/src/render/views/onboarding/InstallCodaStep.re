@@ -38,7 +38,6 @@ module InstallProgress = {
     <div className=Styles.installer>
       <div className=Styles.downloader>
         <Downloader
-          keyName="keys-temporary_hack-testnet_postake.tar.bz2"
           onFinish={_ => setFinished(_ => true)}
           finished
         />

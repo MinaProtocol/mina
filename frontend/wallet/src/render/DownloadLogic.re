@@ -1,22 +1,27 @@
 module Filestream = {
-  type t;
+  type writable;
+  type readable;
 
   module Chunk = {
     type t = {. "length": int};
   };
 
   [@bs.module "fs"]
-  external create: (string, {. "encoding": string}) => t =
-    "createWriteStream";
+  external createWriteStream: (string, {. "encoding": string}) => writable =
+    "";
+
+  external createReadStream: string => readable = "";
 
   [@bs.send]
-  external onError: (t, [@bs.as "error"] _, string => unit) => unit = "on";
+  external onError: (writable, [@bs.as "error"] _, string => unit) => unit = "on";
   [@bs.send]
-  external onFinish: (t, [@bs.as "finish"] _, unit => unit) => unit = "on";
+  external onFinish: (writable, [@bs.as "finish"] _, unit => unit) => unit = "on";
 
-  [@bs.send] external write: (t, Chunk.t) => unit = "";
+  [@bs.send] external write: (writable, Chunk.t) => unit = "";
 
-  [@bs.send] external endStream: t => unit = "end";
+  [@bs.send] external endStream: writable => unit = "end";
+
+  [@bs.send] external pipe: (readable, writable) => unit = "";
 };
 
 module Https = {
@@ -56,6 +61,12 @@ module Https = {
 
   [@bs.module "https"]
   external get: (string, Response.t => unit) => Request.t = "";
+};
+
+module Unzipper = {
+  type extractOpts = {path: string};
+  [@bs.module "unzipper"]
+  external extract: extractOpts => Filestream.writable = "Extract";
 };
 
 let handleResponse = (response, filename, dataEncoding, chunkCb, doneCb) => {
@@ -108,4 +119,23 @@ let rec download = (filename, url, encoding, maxRedirects, chunkCb, doneCb) => {
       }
     );
   Https.Request.onError(request, e => doneCb(Error(e)));
+};
+
+let codaRepo = "...";
+[@bs.module "electron"] [@bs.scope "app"]
+external getAppPath: string => string = "getPath";
+
+let downloadCoda = (version, chunkCb, doneCb) => {
+  let tempFilename = "coda-portable-" ++ version ++ ".zip";
+  let installPath = getAppPath("userData") ++ "/daemon";
+  download(
+    tempFilename,
+    codaRepo ++ version ++ ".zip",
+    "binary",
+    1,
+    chunkCb,
+    doneCb,
+  );
+  Filestream.createReadStream(tempFilename)
+  ->(Filestream.pipe(Unzipper.extract(installPath)));
 };
