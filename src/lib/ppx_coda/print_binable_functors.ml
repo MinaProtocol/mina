@@ -88,10 +88,10 @@ let traverse_ast =
           super#structure_item stri acc
   end
 
-let impl str =
+let preprocess_impl str =
   ignore (traverse_ast#structure str {module_path= []}) ;
   str
 
-let () = Ppxlib.Driver.register_transformation name ~impl
+let () = Ppxlib.Driver.register_transformation name ~preprocess_impl
 
 [%%endif]
