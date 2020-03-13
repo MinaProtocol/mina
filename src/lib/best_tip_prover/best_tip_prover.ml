@@ -49,7 +49,7 @@ module Make (Inputs : Inputs_intf) :
     let%map () =
       Option.some_if
         ( Transition_frontier.best_tip_path_length_exn frontier
-        = Transition_frontier.global_max_length )
+        = Transition_frontier.global_max_length () )
         ()
     in
     let best_tip_breadcrumb = Transition_frontier.best_tip frontier in
@@ -104,8 +104,11 @@ module Make (Inputs : Inputs_intf) :
              ( Error.of_string
              @@ sprintf
                   !"Peer should have given a proof of length %d but got %d"
-                  Transition_frontier.global_max_length merkle_list_length )
-           (Int.equal Transition_frontier.global_max_length merkle_list_length))
+                  (Transition_frontier.global_max_length ())
+                  merkle_list_length )
+           (Int.equal
+              (Transition_frontier.global_max_length ())
+              merkle_list_length))
     in
     let best_tip_with_hash =
       With_hash.of_data best_tip ~hash_data:External_transition.state_hash

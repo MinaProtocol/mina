@@ -263,7 +263,7 @@ let get_status ~flag t =
   let consensus_time_now =
     Consensus.Data.Consensus_time.of_time_exn @@ Block_time.now time_controller
   in
-  let consensus_configuration = Consensus.Configuration.t in
+  let consensus_configuration = Consensus.Configuration.t () in
   let r = Perf_histograms.report in
   let histograms =
     match flag with

@@ -4,7 +4,7 @@ open Core_kernel
 open Coda_base
 open Frontier_base
 
-let max_latency =
+let max_latency () =
   let constants = (Lazy.force !Coda_constants.t).consensus in
   Block_time.Span.(
     ( constants.block_window_duration_ms |> Int64.of_int
@@ -91,7 +91,7 @@ let create ~time_controller ~base_hash ~worker =
   let timer =
     Timer.create ~time_controller
       ~f:(fun () -> if t.flush_job = None then flush t)
-      max_latency
+      (max_latency ())
   in
   t.timer <- Some timer ;
   t

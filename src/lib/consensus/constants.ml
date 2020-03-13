@@ -1,4 +1,4 @@
-[%%import
+(*[%%import
 "/src/config.mlh"]
 
 open Coda_base
@@ -99,3 +99,4 @@ let all_constants =
       , `Int (Unsigned.UInt32.to_int slots_per_sub_window) )
     ; ("slots_per_window", `Int (Unsigned.UInt32.to_int slots_per_window))
     ; ("slots_per_epoch", `Int (Unsigned.UInt32.to_int slots_per_epoch)) ]
+*)

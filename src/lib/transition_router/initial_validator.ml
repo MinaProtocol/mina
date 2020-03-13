@@ -70,16 +70,16 @@ module Duplicate_block_detector = struct
 
   type t = {mutable table: State_hash.t Blocks.Map.t; mutable latest_epoch: int}
 
-  let delay =
+  let delay () =
     let open Consensus in
-    Data.Consensus_state.network_delay Configuration.t
+    Data.Consensus_state.network_delay (Configuration.t ())
 
-  let gc_width = delay * 2
+  let gc_width () = delay () * 2
 
   (* epoch, slot components of gc_width *)
-  let gc_width_epoch = gc_width / Consensus.epoch_size
+  let gc_width_epoch () = gc_width () / Consensus.epoch_size ()
 
-  let gc_width_slot = gc_width mod Consensus.epoch_size
+  let gc_width_slot () = gc_width () mod Consensus.epoch_size ()
 
   let gc_interval = gc_width
 
@@ -94,7 +94,7 @@ module Duplicate_block_detector = struct
 
   (* every gc_interval blocks seen, discard blocks more than gc_width ago *)
   let table_gc t block =
-    gc_count := (!gc_count + 1) mod gc_interval ;
+    gc_count := (!gc_count + 1) mod gc_interval () ;
     if Int.equal !gc_count 0 then
       let splitting_block = make_splitting_block block in
       let _, _, gt_map = Map.split t.table splitting_block in

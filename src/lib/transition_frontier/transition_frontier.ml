@@ -14,7 +14,7 @@ module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 
-let global_max_length =
+let global_max_length () =
   let constants = (Lazy.force !Coda_constants.t).consensus in
   constants.k
 
@@ -221,7 +221,7 @@ let rec load_with_max_length :
   | Ok () ->
       continue persistent_frontier_instance ~ignore_consensus_local_state:true
 
-let load = load_with_max_length ~max_length:global_max_length
+let load = load_with_max_length ~max_length:(global_max_length ())
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)

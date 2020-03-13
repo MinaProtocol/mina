@@ -7,7 +7,8 @@ open Coda_base
 
 (** Constants are defined with a single letter (latin or greek) based on
  * their usage in the Ouroboros suite of papers *)
-module type Constants = sig
+
+(*module type Constants = sig
   (** The timestamp for the genesis block *)
   val genesis_state_timestamp : Block_time.t
 
@@ -43,7 +44,7 @@ module type Constants = sig
 
   (** The names and values of all constants. *)
   val all_constants : Yojson.Safe.json
-end
+end*)
 
 module type Blockchain_state = sig
   module Poly : sig
@@ -289,10 +290,8 @@ module type S = sig
   *)
   val time_hum : Coda_base.Block_time.t -> string
 
-  module Constants : Constants
-
   (** from postake *)
-  val epoch_size : int
+  val epoch_size : unit -> int
 
   module Configuration : sig
     type t =
@@ -306,7 +305,7 @@ module type S = sig
       ; acceptable_network_delay: int }
     [@@deriving yojson, bin_io, fields]
 
-    val t : t
+    val t : unit -> t
   end
 
   module Data : sig

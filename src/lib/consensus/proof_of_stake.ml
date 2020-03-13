@@ -73,7 +73,7 @@ module Segment_id = Nat.Make32 ()
 module Typ = Crypto_params.Tick0.Typ
 module Constants = Constants
 
-let epoch_size =
+let epoch_size () =
   let constants = (Lazy.force !Coda_constants.t).consensus in
   UInt32.to_int constants.epoch_size
 
@@ -89,17 +89,17 @@ module Configuration = struct
     ; acceptable_network_delay: int }
   [@@deriving yojson, bin_io, fields]
 
-  let t =
-    let open Constants in
-    { delta
-    ; k
-    ; c
-    ; c_times_k= c * k
-    ; slots_per_epoch= UInt32.to_int Epoch.size
-    ; slot_duration= Int64.to_int Slot.duration_ms
-    ; epoch_duration= Int64.to_int (Time.Span.to_ms Epoch.duration)
-    ; acceptable_network_delay= Int64.to_int (Time.Span.to_ms delta_duration)
-    }
+  let t () =
+    let constants = (Lazy.force !Coda_constants.t).consensus in
+    { delta= constants.delta
+    ; k= constants.k
+    ; c= constants.c
+    ; c_times_k= constants.c * constants.k
+    ; slots_per_epoch= UInt32.to_int constants.epoch_size
+    ; slot_duration= Int64.to_int constants.slot_duration_ms
+    ; epoch_duration= Int64.to_int (Time.Span.to_ms constants.epoch_duration)
+    ; acceptable_network_delay=
+        Int64.to_int (Time.Span.to_ms constants.delta_duration) }
 end
 
 module Data = struct
@@ -1211,8 +1211,9 @@ module Data = struct
 
     let to_string_hum = time_hum
 
-    let delay =
-      UInt32.of_int @@ Configuration.acceptable_network_delay Configuration.t
+    let delay () =
+      UInt32.of_int
+      @@ Configuration.acceptable_network_delay (Configuration.t ())
 
     (* externally, we are only interested in when the slot starts *)
     let to_time = start_time
@@ -1220,30 +1221,31 @@ module Data = struct
     open UInt32
     open Infix
 
-    let gc_width : UInt32.t = delay * of_int 2
+    let gc_width () : UInt32.t = delay () * of_int 2
 
     (* epoch, slot components of gc_width *)
-    let gc_width_epoch : UInt32.t =
+    let gc_width_epoch () : UInt32.t =
       let constants = (Lazy.force !Coda_constants.t).consensus in
-      gc_width / constants.epoch_size
+      gc_width () / constants.epoch_size
 
-    let gc_width_slot : UInt32.t =
+    let gc_width_slot () : UInt32.t =
       let constants = (Lazy.force !Coda_constants.t).consensus in
-      gc_width mod constants.epoch_size
+      gc_width () mod constants.epoch_size
 
-    let gc_interval : UInt32.t = gc_width
+    let gc_interval () : UInt32.t = gc_width ()
 
     (* create dummy block to split map on *)
     let get_old (t : Global_slot.t) : Global_slot.t =
       if
         Global_slot.(
-          t < Global_slot.of_epoch_and_slot (gc_width_epoch, gc_width_slot))
+          t
+          < Global_slot.of_epoch_and_slot (gc_width_epoch (), gc_width_slot ()))
       then (* block not beyond gc_width *)
         Global_slot.zero
       else
         let open Int in
         (* subtract epoch, slot components of gc_width *)
-        Global_slot.diff t (gc_width_epoch, gc_width_slot)
+        Global_slot.diff t (gc_width_epoch (), gc_width_slot ())
 
     let to_uint32 = Global_slot.to_uint32
   end
