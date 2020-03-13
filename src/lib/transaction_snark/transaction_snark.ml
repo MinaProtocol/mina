@@ -473,16 +473,17 @@ module Base = struct
                     < payload.body.amount)
               in
               let source_bad_timing =
-                (not fee_payer_is_source)
-                &&
-                if Account_id.equal source receiver then
-                  (* The final balance will be [0 - account_creation_fee]. *)
-                  receiver_needs_creating && fee_token_is_token
-                else
-                  Or_error.is_error
-                    (Transaction_logic.validate_timing
-                       ~txn_amount:payload.body.amount ~txn_global_slot
-                       ~account:source_account)
+                source_insufficient_balance
+                || (not fee_payer_is_source)
+                   &&
+                   if Account_id.equal source receiver then
+                     (* The final balance will be [0 - account_creation_fee]. *)
+                     receiver_needs_creating && fee_token_is_token
+                   else
+                     Or_error.is_error
+                       (Transaction_logic.validate_timing
+                          ~txn_amount:payload.body.amount ~txn_global_slot
+                          ~account:source_account)
               in
               ( `Should_pay_to_create
                   (receiver_needs_creating && not fee_token_is_token)
@@ -1021,13 +1022,19 @@ module Base = struct
                - the receiver for a coinbase 
                - the first receiver for a fee transfer
              *)
+             let%bind is_empty_delegatee =
+               Boolean.(is_empty_and_writeable && is_stake_delegation)
+             in
              let%bind () =
                [%with_label "Receiver existence failure matches predicted"]
-                 (let%bind is_empty_delegatee =
-                    Boolean.(is_empty_and_writeable && is_stake_delegation)
-                  in
-                  Boolean.Assert.( = ) is_empty_delegatee
+                 (Boolean.Assert.( = ) is_empty_delegatee
                     user_command_failure.receiver_not_present)
+             in
+             let is_empty_and_writeable =
+               (* is_empty_and_writable && not is_stake_delegation *)
+               Boolean.Unsafe.of_cvar
+               @@ Field.Var.(
+                    sub (is_empty_and_writeable :> t) (is_empty_delegatee :> t))
              in
              let%bind () =
                [%with_label "Validate should_pay_for_receiver"]
@@ -2865,8 +2872,8 @@ let%test_module "transaction_snark" =
 
     let%test_unit "insufficient account creation fee for non-default token \
                    transfer" =
-      Ledger.with_ledger ~f:(fun ledger ->
-          Test_util.with_randomness 123456789 (fun () ->
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
               let signer =
                 Keypair.of_private_key_exn wallets.(0).private_key
@@ -2923,8 +2930,8 @@ let%test_module "transaction_snark" =
 
     let%test_unit "insufficient source balance for non-default token transfer"
         =
-      Ledger.with_ledger ~f:(fun ledger ->
-          Test_util.with_randomness 123456789 (fun () ->
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~f:(fun ledger ->
               let wallets = random_wallets ~n:2 () in
               let signer =
                 Keypair.of_private_key_exn wallets.(0).private_key
@@ -3165,9 +3172,7 @@ let%test_module "transaction_snark" =
               let create_account aid balance =
                 Account.create aid (Balance.of_int balance)
               in
-              let accounts =
-                [|create_account fee_payer 20; create_account source 30|]
-              in
+              let accounts = [|create_account fee_payer 20|] in
               let fee = Fee.of_int (random_int_incl 2 15) in
               let valid_until = Global_slot.max_value in
               let nonce = accounts.(0).nonce in
@@ -3206,13 +3211,13 @@ let%test_module "transaction_snark" =
     let%test_unit "delegation delegator does not exist" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~f:(fun ledger ->
-              let wallets = random_wallets ~n:2 () in
+              let wallets = random_wallets ~n:3 () in
               let signer =
                 Keypair.of_private_key_exn wallets.(0).private_key
               in
               let fee_payer_pk = Public_key.compress signer.public_key in
-              let source_pk = fee_payer_pk in
-              let receiver_pk = wallets.(1).account.public_key in
+              let source_pk = wallets.(1).account.public_key in
+              let receiver_pk = wallets.(2).account.public_key in
               let fee_token = Token_id.default in
               let token_id = Token_id.default in
               let fee_payer = Account_id.create fee_payer_pk fee_token in
