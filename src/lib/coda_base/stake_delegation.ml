@@ -13,6 +13,7 @@ open Signature_lib
 [%%else]
 
 open Signature_lib_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 

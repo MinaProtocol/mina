@@ -15,6 +15,7 @@ open Snark_bits
 
 open Snark_bits_nonconsensus
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 

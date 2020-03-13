@@ -13,6 +13,7 @@ type string_js = Js.js_string Js.t
 
 type payload_common_js =
   < fee: string_js Js.prop
+  ; feePayer: string_js Js.prop
   ; nonce: string_js Js.prop
   ; validUntil: string_js Js.prop
   ; memo: string_js Js.prop >
@@ -21,6 +22,10 @@ type payload_common_js =
 let payload_common_of_js (payload_common_js : payload_common_js) =
   let fee_js = payload_common_js##.fee in
   let fee = Js.to_string fee_js |> Currency.Fee.of_string in
+  let fee_payer_pk =
+    payload_common_js##.feePayer
+    |> Js.to_string |> Signature_lib.Public_key.Compressed.of_base58_check_exn
+  in
   let fee_token = Token_id.default in
   let nonce_js = payload_common_js##.nonce in
   let nonce = Js.to_string nonce_js |> Coda_numbers.Account_nonce.of_string in
@@ -28,10 +33,14 @@ let payload_common_of_js (payload_common_js : payload_common_js) =
   let valid_until = Js.to_string valid_until_js |> Global_slot.of_string in
   let memo_js = payload_common_js##.memo in
   let memo = Js.to_string memo_js |> Memo.create_from_string_exn in
-  User_command_payload.Common.Poly.{fee; fee_token; nonce; valid_until; memo}
+  User_command_payload.Common.Poly.
+    {fee; fee_token; fee_payer_pk; nonce; valid_until; memo}
 
 type payment_payload_js =
-  < receiver: string_js Js.prop ; amount: string_js Js.prop > Js.t
+  < source: string_js Js.prop
+  ; receiver: string_js Js.prop
+  ; amount: string_js Js.prop >
+  Js.t
 
 type payment_js =
   < common: payload_common_js Js.prop
@@ -39,34 +48,49 @@ type payment_js =
   Js.t
 
 let payment_body_of_js payment_payload =
-  let receiver =
+  let source_pk =
+    payment_payload##.source |> Js.to_string
+    |> Signature_lib.Public_key.Compressed.of_base58_check_exn
+  in
+  let receiver_pk =
     payment_payload##.receiver |> Js.to_string
     |> Signature_lib.Public_key.Compressed.of_base58_check_exn
   in
-  let receiver = Account_id.create receiver Token_id.default in
+  let token_id = Token_id.default in
   let amount =
     payment_payload##.amount |> Js.to_string |> Currency.Amount.of_string
   in
-  User_command_payload.Body.Payment Payment_payload.Poly.{receiver; amount}
+  User_command_payload.Body.Payment
+    Payment_payload.Poly.{source_pk; receiver_pk; token_id; amount}
 
 let payload_of_payment_js payment_js : User_command_payload.t =
   let common = payload_common_of_js payment_js##.common in
   let body = payment_body_of_js payment_js##.paymentPayload in
   User_command_payload.Poly.{common; body}
 
-type stake_delegation_js =
-  < common: payload_common_js Js.prop ; newDelegate: string_js Js.prop > Js.t
+type stake_delegation_payload_js =
+  < delegator: string_js Js.prop ; newDelegate: string_js Js.prop > Js.t
 
-let stake_delegation_body_of_js new_delegate =
-  let new_delegate =
-    Js.to_string new_delegate
+type stake_delegation_js =
+  < common: payload_common_js Js.prop
+  ; delegationPayload: stake_delegation_payload_js Js.prop >
+  Js.t
+
+let stake_delegation_body_of_js delegation_payload =
+  let delegator =
+    Js.to_string delegation_payload##.delegator
     |> Signature_lib.Public_key.Compressed.of_base58_check_exn
   in
-  User_command_payload.Body.Stake_delegation (Set_delegate {new_delegate})
+  let new_delegate =
+    Js.to_string delegation_payload##.newDelegate
+    |> Signature_lib.Public_key.Compressed.of_base58_check_exn
+  in
+  User_command_payload.Body.Stake_delegation
+    (Set_delegate {delegator; new_delegate})
 
 let payload_of_stake_delegation_js payment_js : User_command_payload.t =
   let common = payload_common_of_js payment_js##.common in
-  let body = stake_delegation_body_of_js payment_js##.newDelegate in
+  let body = stake_delegation_body_of_js payment_js##.delegationPayload in
   User_command_payload.Poly.{common; body}
 
 type signature_js =

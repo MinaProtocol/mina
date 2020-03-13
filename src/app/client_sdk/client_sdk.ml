@@ -73,27 +73,7 @@ let _ =
            (payment_js : payment_js) : signed_payment =
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
-         let User_command_payload.Common.Poly.
-               {fee; fee_token; nonce; valid_until; memo} =
-           payload_common_of_js payment_js##.common
-         in
-         let payment_payload = payment_js##.paymentPayload in
-         let receiver =
-           Js.to_string payment_payload##.receiver
-           |> Public_key.Compressed.of_base58_check_exn
-         in
-         let receiver = Account_id.create receiver Token_id.default in
-         let amount =
-           Js.to_string payment_payload##.amount |> Currency.Amount.of_string
-         in
-         let body =
-           User_command_payload.Body.Payment
-             Payment_payload.Poly.{receiver; amount}
-         in
-         let payload =
-           User_command_payload.create ~fee ~fee_token ~nonce ~valid_until
-             ~memo ~body
-         in
+         let payload = payload_of_payment_js payment_js in
          let signature = Schnorr.sign sk payload |> signature_to_js_object in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
@@ -124,22 +104,7 @@ let _ =
            : signed_stake_delegation =
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
-         let User_command_payload.Common.Poly.
-               {fee; fee_token; nonce; valid_until; memo} =
-           payload_common_of_js stake_delegation_js##.common
-         in
-         let new_delegate =
-           Js.to_string stake_delegation_js##.newDelegate
-           |> Public_key.Compressed.of_base58_check_exn
-         in
-         let body =
-           User_command_payload.Body.Stake_delegation
-             Stake_delegation.(Set_delegate {new_delegate})
-         in
-         let payload =
-           User_command_payload.create ~fee ~fee_token ~nonce ~valid_until
-             ~memo ~body
-         in
+         let payload = payload_of_stake_delegation_js stake_delegation_js in
          let signature = Schnorr.sign sk payload |> signature_to_js_object in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js

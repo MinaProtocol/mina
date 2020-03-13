@@ -222,6 +222,9 @@ let%test_module "user_command_memo" =
         false
       with Too_long_user_memo_input -> true
 
+    [%%ifdef
+    consensus_mechanism]
+
     let%test_unit "typ is identity" =
       let s = "this is a string" in
       let memo = create_by_digesting_string_exn s in
@@ -239,4 +242,6 @@ let%test_module "user_command_memo" =
         Snarky.Typ_monads.Read.run (typ.read memo_var) read_constant
       in
       [%test_eq: string] memo memo_read
+
+    [%%endif]
   end )
