@@ -2,8 +2,8 @@ module Style = {
   open Css;
   let header =
     style([
-      display(`flex),
       marginTop(rem(2.)),
+      textAlign(`left),
       marginBottom(`rem(0.5)),
       color(Theme.Colors.denimTwo),
       hover([selector(".headerlink", [display(`inlineBlock)])]),
@@ -70,8 +70,8 @@ module H1 =
     let element =
       <h1
         className={merge([
-          Style.header,
           Theme.H1.hero,
+          Style.header,
           style([alignItems(`baseline), fontWeight(`light)]),
         ])}
       />;
@@ -82,8 +82,8 @@ module H2 =
     let element =
       <h2
         className={merge([
-          Style.header,
           Theme.H2.basic,
+          Style.header,
           style([alignItems(`baseline), fontWeight(`light)]),
         ])}
       />;
@@ -92,10 +92,10 @@ module H2 =
 module H3 =
   WrapHeader({
     let element =
-      <h2
+      <h3
         className={merge([
-          Style.header,
           Theme.H3.basic,
+          Style.header,
           style([alignItems(`center), fontWeight(`medium)]),
         ])}
       />;
@@ -103,7 +103,7 @@ module H3 =
 
 module H4 =
   WrapHeader({
-    let element = <h2 className={merge([Style.header, Theme.H4.basic])} />;
+    let element = <h4 className={merge([Theme.H4.basic, Style.header])} />;
   });
 
 module P =
