@@ -6,6 +6,8 @@
 #
 # the first file is the original, the second is the modified file
 
+import sys
+
 from compare_versioned_items import run_comparison
 
 if __name__ == "__main__":
