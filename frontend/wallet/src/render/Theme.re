@@ -19,6 +19,7 @@ module Colors = {
       Printf.sprintf("hsla(%d,%d%%,%d%%,%f)", h, s, l, a);
 
   let bgColor = white;
+  let offWhite = a => `rgba((255, 255, 255, a));
 
   // Linux doesn't support transparency
   let bgColorElectronWindow = "#FFE9E9E9";
@@ -79,6 +80,8 @@ module Colors = {
 
   let tealAlpha = a => `rgba((71, 130, 160, a));
   let teal = tealAlpha(1.0);
+
+  let blue3 = `hex("0AA9FF");
 };
 
 module Typeface = {
@@ -137,6 +140,13 @@ module Text = {
         Typeface.plex,
         fontWeight(`medium),
         fontSize(`rem(1.)),
+        lineHeight(`rem(1.5)),
+      ]);
+    let regularSmall =
+      style([
+        Typeface.plex,
+        fontWeight(`medium),
+        fontSize(`px(13)),
         lineHeight(`rem(1.5)),
       ]);
     let regularLight =
@@ -204,6 +214,16 @@ module Text = {
         lineHeight(`rem(1.5)),
         letterSpacing(`rem(-0.03125)),
       ]);
+    let h4 =
+      style([
+        Typeface.plex,
+        fontWeight(`num(500)),
+        fontSize(`rem(0.625)),
+        lineHeight(`rem(1.)),
+        letterSpacing(`px(1)),
+        color(white),
+        textTransform(`uppercase),
+      ]);
     let h5 =
       style([
         Typeface.plex,
@@ -259,20 +279,16 @@ let codaLogoCurrent =
 
 module Onboarding = {
   let main =
-    merge([
-      style([
-        position(`absolute),
-        top(`zero),
-        left(`zero),
-        background(white),
-        zIndex(100),
-        display(`flex),
-        flexDirection(`row),
-        paddingTop(Spacing.headerHeight),
-        paddingBottom(Spacing.footerHeight),
-        height(`vh(100.)),
-        width(`vw(100.)),
-      ]),
-      Window.Styles.bg,
+    style([
+      position(`absolute),
+      top(`zero),
+      left(`zero),
+      display(`flex),
+      flexDirection(`row),
+      paddingTop(Spacing.headerHeight),
+      paddingBottom(Spacing.footerHeight),
+      height(`vh(100.)),
+      width(`vw(100.)),
+      zIndex(2),
     ]);
 };
