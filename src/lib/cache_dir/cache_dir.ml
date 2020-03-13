@@ -14,7 +14,7 @@ let genesis_dir_name (genesis_constants : Genesis_constants.t) =
     let str =
       ( List.map
           [ genesis_constants.curve_size
-          ; genesis_constants.ledger_depth
+          ; Coda_compile_config.ledger_depth
           ; Coda_compile_config.fake_accounts_target
           ; genesis_constants.consensus.c
           ; genesis_constants.consensus.k ]

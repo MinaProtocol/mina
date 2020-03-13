@@ -45,8 +45,7 @@ let net_configs n =
 let offset =
   let open Lazy.Let_syntax in
   let%map coda_constants = !Coda_constants.t in
-  Core.Time.(
-    diff (now ()) (coda_constants.genesis_state_timestamp |> Block_time.to_time))
+  Core.Time.(diff (now ()) coda_constants.genesis_state_timestamp)
 
 let local_configs ?block_production_interval
     ?(block_production_keys = Fn.const None)

@@ -10,39 +10,44 @@ module Time = Block_time
 
 let of_time_exn t : t =
   let coda_constants = Lazy.force !Coda_constants.t in
-  if Time.(t < coda_constants.genesis_state_timestamp) then
+  if Time.(t < of_time coda_constants.genesis_state_timestamp) then
     raise
       (Invalid_argument
          "Epoch.of_time: time is earlier than genesis block timestamp") ;
   let time_since_genesis =
-    Time.diff t coda_constants.genesis_state_timestamp
+    Time.diff t (Time.of_time coda_constants.genesis_state_timestamp)
   in
   uint32_of_int64
     Int64.Infix.(
       Time.Span.to_ms time_since_genesis
-      / Time.Span.to_ms coda_constants.consensus.epoch_duration)
+      / Time.Span.(
+          to_ms @@ of_time_span coda_constants.consensus.epoch_duration))
 
 let start_time (epoch : t) =
   let coda_constants = Lazy.force !Coda_constants.t in
   let ms =
     let open Int64.Infix in
     Block_time.Span.to_ms
-      (Block_time.to_span_since_epoch coda_constants.genesis_state_timestamp)
+      Block_time.(
+        to_span_since_epoch @@ of_time coda_constants.genesis_state_timestamp)
     + int64_of_uint32 epoch
-      * Block_time.Span.to_ms coda_constants.consensus.epoch_duration
+      * Block_time.Span.(
+          to_ms @@ of_time_span coda_constants.consensus.epoch_duration)
   in
   Block_time.of_span_since_epoch (Block_time.Span.of_ms ms)
 
 let end_time (epoch : t) =
   let coda_constants = Lazy.force !Coda_constants.t in
-  Time.add (start_time epoch) coda_constants.consensus.epoch_duration
+  Time.add (start_time epoch)
+    (Time.Span.of_time_span coda_constants.consensus.epoch_duration)
 
 let slot_start_time (epoch : t) (slot : Slot.t) =
   let coda_constants = Lazy.force !Coda_constants.t in
   Block_time.add (start_time epoch)
     (Block_time.Span.of_ms
        Int64.Infix.(
-         int64_of_uint32 slot * coda_constants.consensus.slot_duration_ms))
+         int64_of_uint32 slot
+         * Int64.of_int coda_constants.consensus.slot_duration_ms))
 
 let slot_end_time (epoch : t) (slot : Slot.t) =
   let coda_constants = Lazy.force !Coda_constants.t in
@@ -59,7 +64,7 @@ let epoch_and_slot_of_time_exn tm : t * Slot.t =
     uint32_of_int64
     @@ Int64.Infix.(
          Time.Span.to_ms time_since_epoch
-         / coda_constants.consensus.slot_duration_ms)
+         / Int64.of_int coda_constants.consensus.slot_duration_ms)
   in
   (epoch, slot)
 

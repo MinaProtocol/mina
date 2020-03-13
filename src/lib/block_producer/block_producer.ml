@@ -635,13 +635,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               ~f:check_next_block_timing ) ;
         check_next_block_timing ()
       in
+      let genesis_state_timestamp =
+        Time.of_time coda_constants.genesis_state_timestamp
+      in
       (* if the producer starts before genesis, sleep until genesis *)
       let now = Time.now time_controller in
-      if Time.( >= ) now coda_constants.genesis_state_timestamp then start ()
+      if Time.( >= ) now genesis_state_timestamp then start ()
       else
-        let time_till_genesis =
-          Time.diff coda_constants.genesis_state_timestamp now
-        in
+        let time_till_genesis = Time.diff genesis_state_timestamp now in
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
             [ ( "time_till_genesis"

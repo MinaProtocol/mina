@@ -224,7 +224,6 @@ let () =
              (optional int)
          in
          fun () ->
-           (*Deepthi: fix this. ledger depth from config first*)
            let max = Int.pow 2 Coda_compile_config.ledger_depth in
            if Option.value ~default:0 n >= max then
              failwith (sprintf "Invalid value for n (0 <= n <= %d)" max)

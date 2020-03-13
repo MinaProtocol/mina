@@ -285,9 +285,12 @@ let wait_till_genesis ~logger ~time_controller =
   let module Time = Block_time in
   let now = Time.now time_controller in
   let constants = Lazy.force !Coda_constants.t in
+  let genesis_state_timestamp =
+    Time.of_time constants.genesis_state_timestamp
+  in
   try Consensus.Hooks.is_genesis now |> Fn.const Deferred.unit
   with Invalid_argument _ ->
-    let time_till_genesis = Time.diff constants.genesis_state_timestamp now in
+    let time_till_genesis = Time.diff genesis_state_timestamp now in
     Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:
         [ ( "time_till_genesis"
@@ -299,7 +302,7 @@ let wait_till_genesis ~logger ~time_controller =
       let now = Time.now time_controller in
       try Consensus.Hooks.is_genesis now |> Fn.const Deferred.unit
       with Invalid_argument _ ->
-        let tm_remaining = Time.diff constants.genesis_state_timestamp now in
+        let tm_remaining = Time.diff genesis_state_timestamp now in
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
           "Still waiting $tm_remaining milliseconds before running transition \
            router"

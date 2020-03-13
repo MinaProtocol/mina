@@ -5,7 +5,7 @@ open Merkle_ledger
 
 module Ledger_inner = struct
   module Depth = struct
-    let depth = Coda_constants.compiled_constants_for_test.ledger_depth
+    let depth = Coda_compile_config.ledger_depth
   end
 
   module Location0 : Merkle_ledger.Location_intf.S =

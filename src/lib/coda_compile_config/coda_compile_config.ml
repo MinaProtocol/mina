@@ -58,3 +58,9 @@ let scan_state_capacity =
   `Transaction_capacity_log_2 transaction_capacity_log_2
 
 [%%endif]
+
+[%%inject
+"block_window_duration_ms", block_window_duration]
+
+[%%inject
+"genesis_state_timestamp_string", genesis_state_timestamp]

@@ -1,10 +1,4 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
-open Signed
-open Unsigned
-module Time = Block_time
 
 module type S = sig
   module Consensus : sig
@@ -17,7 +11,7 @@ module type S = sig
       ; slots_per_sub_window: Unsigned.UInt32.t
       ; slots_per_window: Unsigned.UInt32.t
       ; slots_per_epoch: Unsigned.UInt32.t
-      ; slot_duration_ms: Int64.t
+      ; slot_duration_ms: int
       ; epoch_size: Unsigned.UInt32.t
       ; epoch_duration: Time.Span.t
       ; checkpoint_window_slots_per_year: int
@@ -36,7 +30,6 @@ module type S = sig
     { consensus: Consensus.t
     ; scan_state: Scan_state.t
     ; inactivity_ms: int
-    ; ledger_depth: int
     ; curve_size: int
     ; txpool_max_size: int
     ; genesis_state_timestamp: Time.t }
@@ -56,7 +49,7 @@ module Consensus_constants = struct
     ; slots_per_sub_window: Unsigned.UInt32.t
     ; slots_per_window: Unsigned.UInt32.t
     ; slots_per_epoch: Unsigned.UInt32.t
-    ; slot_duration_ms: Int64.t
+    ; slot_duration_ms: int
     ; epoch_size: Unsigned.UInt32.t
     ; epoch_duration: Time.Span.t
     ; checkpoint_window_slots_per_year: int
@@ -86,19 +79,13 @@ type t =
   { consensus: Consensus_constants.t
   ; scan_state: Scan_state_constants.t
   ; inactivity_ms: int
-  ; ledger_depth: int
   ; curve_size: int
   ; txpool_max_size: int
   ; genesis_state_timestamp: Time.t }
 
 let create_t (genesis_constants : Genesis_constants.t) : t Lazy.t =
   lazy
-    (let int64_of_uint32 x = x |> UInt32.to_int64 |> Int64.of_int64 in
-     (* This is a bit of a hack, see #3232. *)
-     let inactivity_ms =
-       genesis_constants.runtime.block_window_duration_ms * 8
-     in
-     let sub_windows_per_window =
+    (let sub_windows_per_window =
        Unsigned.UInt32.of_int genesis_constants.consensus.c
      in
      let slots_per_sub_window =
@@ -113,25 +100,29 @@ let create_t (genesis_constants : Genesis_constants.t) : t Lazy.t =
          of_int
            (3 * genesis_constants.consensus.c * genesis_constants.consensus.k))
      in
+     (* This is a bit of a hack, see #3232. *)
+     let inactivity_ms =
+       genesis_constants.runtime.block_window_duration_ms * 8
+     in
      let module Slot = struct
-       let duration_ms =
-         Int64.of_int genesis_constants.runtime.block_window_duration_ms
+       let duration_ms = genesis_constants.runtime.block_window_duration_ms
      end in
      let module Epoch = struct
        let size = slots_per_epoch
 
        (* Amount of time in total for an epoch *)
        let duration =
-         Time.Span.of_ms Int64.Infix.(Slot.duration_ms * int64_of_uint32 size)
+         Time.Span.of_ms
+           (Float.of_int (Slot.duration_ms * Unsigned.UInt32.to_int size))
      end in
      let module Checkpoint_window = struct
        let per_year = 12
 
        let slots_per_year =
          let one_year_ms =
-           Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int |> Int.to_int64
+           Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int
          in
-         Int64.Infix.(one_year_ms / Slot.duration_ms) |> Int64.to_int
+         one_year_ms / Slot.duration_ms
 
        let size_in_slots =
          assert (slots_per_year mod per_year = 0) ;
@@ -139,8 +130,7 @@ let create_t (genesis_constants : Genesis_constants.t) : t Lazy.t =
      end in
      let delta_duration =
        Time.Span.of_ms
-         (Int64.of_int
-            (Int64.to_int Slot.duration_ms * genesis_constants.consensus.delta))
+         (Float.of_int (Slot.duration_ms * genesis_constants.consensus.delta))
      in
      let consensus =
        { Consensus_constants.k= genesis_constants.consensus.k
@@ -191,35 +181,27 @@ let create_t (genesis_constants : Genesis_constants.t) : t Lazy.t =
      { consensus
      ; scan_state
      ; inactivity_ms
-     ; ledger_depth= genesis_constants.ledger_depth
      ; curve_size= genesis_constants.curve_size
      ; txpool_max_size= genesis_constants.runtime.txpool_max_size
      ; genesis_state_timestamp=
          genesis_constants.runtime.genesis_state_timestamp })
 
-[%%inject
-"block_window_duration_ms_compiled", block_window_duration]
-
-[%%inject
-"genesis_state_timestamp_string", genesis_state_timestamp]
-
 let genesis_state_timestamp_compiled =
   let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
   Core.Time.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone)
-    genesis_state_timestamp_string
-  |> Time.of_time
+    Coda_compile_config.genesis_state_timestamp_string
 
 let genesis_constants_compiled : Genesis_constants.t =
   let open Coda_compile_config in
-  { ledger_depth
-  ; curve_size
+  { curve_size
   ; consensus= {k; c; delta}
   ; scan_state= {work_delay; capacity= scan_state_capacity}
   ; runtime=
       { txpool_max_size=
           pool_max_size (*The following two needs to be generated here*)
       ; genesis_state_timestamp= genesis_state_timestamp_compiled
-      ; block_window_duration_ms= block_window_duration_ms_compiled } }
+      ; block_window_duration_ms= Coda_compile_config.block_window_duration_ms
+      } }
 
 (*Deepthi: remove lazy*)
 let t : t Lazy.t ref = ref (create_t genesis_constants_compiled)
@@ -232,8 +214,8 @@ let all_constants () =
   `Assoc
     [ ( "genesis_state_timestamp"
       , `String
-          ( Time.to_time t.genesis_state_timestamp
-          |> Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc ) )
+          (Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
+             t.genesis_state_timestamp) )
     ; ("k", `Int t.consensus.k)
     ; ("coinbase", `Int (Currency.Amount.to_int Coda_compile_config.coinbase))
     ; ("block_window_duration_ms", `Int t.consensus.block_window_duration_ms)

@@ -96,10 +96,11 @@ module Configuration = struct
     ; c= constants.c
     ; c_times_k= constants.c * constants.k
     ; slots_per_epoch= UInt32.to_int constants.epoch_size
-    ; slot_duration= Int64.to_int constants.slot_duration_ms
-    ; epoch_duration= Int64.to_int (Time.Span.to_ms constants.epoch_duration)
+    ; slot_duration= constants.slot_duration_ms
+    ; epoch_duration=
+        Float.to_int (Core.Time.Span.to_ms constants.epoch_duration)
     ; acceptable_network_delay=
-        Int64.to_int (Time.Span.to_ms constants.delta_duration) }
+        Float.to_int (Core.Time.Span.to_ms constants.delta_duration) }
 end
 
 module Data = struct
@@ -143,7 +144,8 @@ module Data = struct
       let slot =
         uint32_of_int64
         @@ Int64.Infix.(
-             Time.Span.to_ms time_since_epoch / constants.slot_duration_ms)
+             Time.Span.to_ms time_since_epoch
+             / Int64.of_int constants.slot_duration_ms)
       in
       (epoch, slot)
   end
