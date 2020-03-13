@@ -4,6 +4,8 @@
 
 # in CI, this script is run from git root of the PR branch
 
+import sys
+
 from compare_pr_diff_items import run_comparison
 
 if __name__ == "__main__":
@@ -11,4 +13,4 @@ if __name__ == "__main__":
         print("Usage: %s Github-PR-URL" % sys.argv[0], file=sys.stderr)
         sys.exit(1)
 
-    run_comparison(sys.argv[1],'compare_binables.py'
+    run_comparison(sys.argv[1],'compare_binables.py')
