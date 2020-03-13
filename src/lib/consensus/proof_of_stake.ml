@@ -2691,47 +2691,18 @@ module Hooks = struct
     let is_pred x1 x2 = Epoch.equal (Epoch.succ x1) x2 in
     let pred_case c1 c2 =
       let e1, e2 = (curr_epoch c1, curr_epoch c2) in
-      Core.printf "pred_case\n%!" ;
-      Core.printf "e1, e2: %d, %d\n%!"
-        (Epoch.to_int (curr_epoch c1))
-        (Epoch.to_int (curr_epoch c2)) ;
-      Core.printf "slot_1: %d\n%!" (Slot.to_int (curr_slot c1)) ;
       let c1_next_is_finalized =
         not (Slot.in_seed_update_range (Slot.succ (curr_slot c1)))
       in
-      Core.printf "slot_1 next_is_finalized: %b\n%!" c1_next_is_finalized ;
-      Core.printf
-        !"c1 next, c2 staking: %{sexp:Coda_base.State_hash.t} \
-          %{sexp:Coda_base.State_hash.t}\n\
-          %!"
-        c1.next_epoch_data.lock_checkpoint
-        c2.staking_epoch_data.lock_checkpoint ;
       is_pred e1 e2 && c1_next_is_finalized
       && Coda_base.State_hash.equal c1.next_epoch_data.lock_checkpoint
            c2.staking_epoch_data.lock_checkpoint
     in
     fun c1 c2 ->
-      let t =
-        if Epoch.equal (curr_epoch c1) (curr_epoch c2) then
-          Coda_base.State_hash.equal c1.staking_epoch_data.lock_checkpoint
-            c2.staking_epoch_data.lock_checkpoint
-        else pred_case c1 c2 || pred_case c2 c1
-      in
-      Core.printf "slots per epoch: %d\n%!" Configuration.t.slots_per_epoch ;
-      Core.printf
-        !"c%d staking, next: %{sexp:Coda_base.State_hash.t} \
-          %{sexp:Coda_base.State_hash.t}\n\
-          %!"
-        1 c1.staking_epoch_data.lock_checkpoint
-        c1.next_epoch_data.lock_checkpoint ;
-      Core.printf
-        !"c%d staking, next: %{sexp:Coda_base.State_hash.t} \
-          %{sexp:Coda_base.State_hash.t}\n\
-          %!"
-        2 c2.staking_epoch_data.lock_checkpoint
-        c2.next_epoch_data.lock_checkpoint ;
-      Core.printf "is_short_range: %b\n%!" t ;
-      t
+      if Epoch.equal (curr_epoch c1) (curr_epoch c2) then
+        Coda_base.State_hash.equal c1.staking_epoch_data.lock_checkpoint
+          c2.staking_epoch_data.lock_checkpoint
+      else pred_case c1 c2 || pred_case c2 c1
 
   let select ~existing ~candidate ~logger =
     let string_of_choice = function `Take -> "Take" | `Keep -> "Keep" in
