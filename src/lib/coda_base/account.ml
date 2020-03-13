@@ -450,15 +450,17 @@ let key_gen = Public_key.Compressed.gen
 let initialize account_id : t =
   let public_key = Account_id.public_key account_id in
   let token_id = Account_id.token_id account_id in
+  let delegate =
+    (* Only allow delegation if this account is for the default token. *)
+    if Token_id.(equal default) token_id then public_key
+    else Public_key.Compressed.empty
+  in
   { public_key
   ; token_id
   ; balance= Balance.zero
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty
-  ; delegate=
-      (* Only allow delegation if this account is for the default token. *)
-      ( if Token_id.equal token_id Token_id.default then public_key
-      else Public_key.Compressed.empty )
+  ; delegate
   ; voting_for= State_hash.dummy
   ; timing= Timing.Untimed }
 
@@ -626,12 +628,18 @@ let digest = crypto_hash
 
 let create account_id balance =
   let public_key = Account_id.public_key account_id in
+  let token_id = Account_id.token_id account_id in
+  let delegate =
+    (* Only allow delegation if this account is for the default token. *)
+    if Token_id.(equal default) token_id then public_key
+    else Public_key.Compressed.empty
+  in
   { Poly.public_key
-  ; token_id= Account_id.token_id account_id
+  ; token_id
   ; balance
   ; nonce= Nonce.zero
   ; receipt_chain_hash= Receipt.Chain_hash.empty
-  ; delegate= public_key
+  ; delegate
   ; voting_for= State_hash.dummy
   ; timing= Timing.Untimed }
 
@@ -646,13 +654,19 @@ let create_timed account_id balance ~initial_minimum_balance ~cliff_time
     Or_error.errorf "create_timed: vesting period must be greater than zero"
   else
     let public_key = Account_id.public_key account_id in
+    let token_id = Account_id.token_id account_id in
+    let delegate =
+      (* Only allow delegation if this account is for the default token. *)
+      if Token_id.(equal default) token_id then public_key
+      else Public_key.Compressed.empty
+    in
     Or_error.return
       { Poly.public_key
-      ; token_id= Account_id.token_id account_id
+      ; token_id
       ; balance
       ; nonce= Nonce.zero
       ; receipt_chain_hash= Receipt.Chain_hash.empty
-      ; delegate= public_key
+      ; delegate
       ; voting_for= State_hash.dummy
       ; timing=
           Timing.Timed
