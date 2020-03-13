@@ -384,8 +384,7 @@ let%test_module "vrf-test" =
 
       include (Other_impl.Field : Sexpable.S with type t := t)
 
-      (* TEMP *)
-      include Binable.Of_sexpable (Other_impl.Field2)
+      include Binable.Of_sexpable (Other_impl.Field)
 
       let length_in_bits = size_in_bits
 

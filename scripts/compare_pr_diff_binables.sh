@@ -1,5 +1,10 @@
 #!/bin/bash
 
+# cleanup if needed
+
+git clean -dfx
+rm -rf base
+
 # build run_ppx_coda, then run Python script to compare binable functors in a pull request
 
 source ~/.profile && \
