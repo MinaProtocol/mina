@@ -173,6 +173,7 @@ let make = (~currentSlug) => {
           <Page title="Lifecycle of a Payment" slug="lifecycle-payment" />
           <Page title="Consensus" slug="consensus" />
           <Page title="Proof of Stake" slug="proof-of-stake" />
+          <Page title="Snark Workers" slug="snark-workers" />
         </Folder>
         <Folder title="SNARKs" slug="snarks">
           <Page title="SNARKs Overview" slug="" />
