@@ -209,7 +209,7 @@ let run_test () : unit Deferred.t =
              ())
           ~genesis_ledger:Test_genesis_ledger.t
           ~base_proof:Precomputed_values.base_proof
-          ~genesis_constants:Coda_constants.genesis_constants_compiled
+          ~genesis_constants:Genesis_constants.compiled
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
@@ -443,10 +443,7 @@ let run_test () : unit Deferred.t =
         if medium_curves then Coda_numbers.Length.of_int 1
         else if test_full_epoch then
           (*Note: wait to produce (2*slots_per_epoch) blocks. This could take a while depending on what k and c are*)
-          Coda_numbers.Length.of_int
-            (Unsigned.UInt32.to_int
-               Unsigned.UInt32.(
-                 mul consensus_constants.slots_per_epoch (of_int 2)))
+          Coda_numbers.Length.of_int (consensus_constants.slots_per_epoch * 2)
         else Coda_numbers.Length.of_int 5
       in
       let%map () =

@@ -549,7 +549,7 @@ module T = struct
                  ~work_reassignment_wait:420000 ~genesis_state_hash ())
               ~genesis_ledger:Test_genesis_ledger.t
               ~base_proof:Precomputed_values.base_proof
-              ~genesis_constants:Coda_constants.genesis_constants_compiled
+              ~genesis_constants:Genesis_constants.compiled
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger

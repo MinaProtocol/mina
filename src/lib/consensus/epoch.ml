@@ -77,7 +77,7 @@ let diff_in_slots ((epoch, slot) : t * Slot.t) ((epoch', slot') : t * Slot.t) :
   let of_uint32 = UInt32.to_int64 in
   let epoch, slot = (of_uint32 epoch, of_uint32 slot) in
   let epoch', slot' = (of_uint32 epoch', of_uint32 slot') in
-  let epoch_size = of_uint32 coda_constants.consensus.epoch_size in
+  let epoch_size = Int64.of_int coda_constants.consensus.epoch_size in
   let epoch_diff = epoch - epoch' in
   if epoch_diff > 0L then
     ((epoch_diff - 1L) * epoch_size) + slot + (epoch_size - slot')
@@ -90,7 +90,7 @@ let%test_unit "test diff_in_slots" =
   let open Int64.Infix in
   let ( !^ ) = UInt32.of_int in
   let ( !@ ) = Fn.compose ( !^ ) Int64.to_int in
-  let epoch_size = UInt32.to_int64 coda_constants.consensus.epoch_size in
+  let epoch_size = Int64.of_int coda_constants.consensus.epoch_size in
   [%test_eq: int64] (diff_in_slots (!^0, !^5) (!^0, !^0)) 5L ;
   [%test_eq: int64] (diff_in_slots (!^3, !^23) (!^3, !^20)) 3L ;
   [%test_eq: int64] (diff_in_slots (!^4, !^4) (!^3, !^0)) (epoch_size + 4L) ;
@@ -108,6 +108,8 @@ let%test_unit "test diff_in_slots" =
 let incr ((epoch, slot) : t * Slot.t) =
   let open UInt32 in
   let coda_constants = Lazy.force !Coda_constants.t in
-  if Slot.equal slot (sub coda_constants.consensus.epoch_size one) then
-    (add epoch one, zero)
+  if
+    Slot.equal slot
+      (sub (UInt32.of_int coda_constants.consensus.epoch_size) one)
+  then (add epoch one, zero)
   else (epoch, add slot one)

@@ -1429,11 +1429,28 @@ let trustlist_list =
                (Error.to_string_hum e) ))
 
 let compile_time_constants =
+  let constants () =
+    let t = Lazy.force !Coda_constants.t in
+    `Assoc
+      [ ( "genesis_state_timestamp"
+        , `String
+            (Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
+               t.genesis_state_timestamp) )
+      ; ("k", `Int t.consensus.k)
+      ; ("coinbase", `Int (Currency.Amount.to_int Coda_compile_config.coinbase))
+      ; ("block_window_duration_ms", `Int t.consensus.block_window_duration_ms)
+      ; ("delta", `Int t.consensus.delta)
+      ; ("c", `Int t.consensus.c)
+      ; ("inactivity_ms", `Int t.inactivity_ms)
+      ; ("sub_windows_per_window", `Int t.consensus.sub_windows_per_window)
+      ; ("slots_per_sub_window", `Int t.consensus.slots_per_sub_window)
+      ; ("slots_per_window", `Int t.consensus.slots_per_window)
+      ; ("slots_per_epoch", `Int t.consensus.slots_per_epoch) ]
+  in
   Command.basic
     ~summary:"Print a JSON map of the compile-time consensus parameters"
     (Command.Param.return (fun () ->
-         Core.printf "%s\n%!"
-           (Yojson.Safe.to_string (Coda_constants.all_constants ())) ))
+         Core.printf "%s\n%!" (Yojson.Safe.to_string (constants ())) ))
 
 let telemetry =
   let open Command.Param in

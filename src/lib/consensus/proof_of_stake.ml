@@ -75,7 +75,7 @@ module Constants = Constants
 
 let epoch_size () =
   let constants = (Lazy.force !Coda_constants.t).consensus in
-  UInt32.to_int constants.epoch_size
+  constants.epoch_size
 
 module Configuration = struct
   type t =
@@ -95,7 +95,7 @@ module Configuration = struct
     ; k= constants.k
     ; c= constants.c
     ; c_times_k= constants.c * constants.k
-    ; slots_per_epoch= UInt32.to_int constants.epoch_size
+    ; slots_per_epoch= constants.epoch_size
     ; slot_duration= constants.slot_duration_ms
     ; epoch_duration=
         Float.to_int (Core.Time.Span.to_ms constants.epoch_duration)
@@ -1228,11 +1228,11 @@ module Data = struct
     (* epoch, slot components of gc_width *)
     let gc_width_epoch () : UInt32.t =
       let constants = (Lazy.force !Coda_constants.t).consensus in
-      gc_width () / constants.epoch_size
+      gc_width () / UInt32.of_int constants.epoch_size
 
     let gc_width_slot () : UInt32.t =
       let constants = (Lazy.force !Coda_constants.t).consensus in
-      gc_width () mod constants.epoch_size
+      gc_width () mod UInt32.of_int constants.epoch_size
 
     let gc_interval () : UInt32.t = gc_width ()
 
@@ -1850,9 +1850,7 @@ module Data = struct
       [ Length.typ
       ; Length.typ
       ; Length.typ
-      ; Typ.list
-          ~length:(UInt32.to_int constants.sub_windows_per_window)
-          Length.typ
+      ; Typ.list ~length:constants.sub_windows_per_window Length.typ
       ; Vrf.Output.Truncated.typ
       ; Amount.typ
       ; Global_slot.Checked.typ
@@ -2037,18 +2035,16 @@ module Data = struct
     let negative_one ~genesis_ledger =
       let constants = (Lazy.force !Coda_constants.t).consensus in
       let max_sub_window_density =
-        Length.of_int (UInt32.to_int constants.slots_per_sub_window)
+        Length.of_int constants.slots_per_sub_window
       in
-      let max_window_density =
-        Length.of_int (UInt32.to_int constants.slots_per_window)
-      in
+      let max_window_density = Length.of_int constants.slots_per_window in
       { Poly.blockchain_length= Length.zero
       ; epoch_count= Length.zero
       ; min_window_density= max_window_density
       ; sub_window_densities=
           Length.zero
           :: List.init
-               (UInt32.to_int constants.sub_windows_per_window - 1)
+               (constants.sub_windows_per_window - 1)
                ~f:(Fn.const max_sub_window_density)
       ; last_vrf_output= Vrf.Output.Truncated.dummy
       ; total_currency= genesis_ledger_total_currency ~ledger:genesis_ledger
@@ -2923,7 +2919,7 @@ module Hooks = struct
       in
       let rec find_winning_slot (slot : Slot.t) =
         let constants = (Lazy.force !Coda_constants.t).consensus in
-        if UInt32.of_int (Slot.to_int slot) >= constants.epoch_size then None
+        if Slot.to_int slot >= constants.epoch_size then None
         else
           match Local_state.seen_slot local_state epoch slot with
           | `All_seen ->

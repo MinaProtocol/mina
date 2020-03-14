@@ -5,4 +5,4 @@ let main genesis_constants =
     ~data:(Cache_dir.genesis_dir_name genesis_constants) ;
   exit 0
 
-let () = main Coda_constants.genesis_constants_compiled
+let () = main Genesis_constants.compiled

@@ -9,11 +9,12 @@ let equal a b = UInt32.compare a b = 0
 
 let of_global_slot (s : Global_slot.t) : t =
   let constants = (Lazy.force !Coda_constants.t).consensus in
-  UInt32.Infix.(Global_slot.to_uint32 s / constants.slots_per_sub_window)
+  UInt32.Infix.(
+    Global_slot.to_uint32 s / UInt32.of_int constants.slots_per_sub_window)
 
 let sub_window t =
   let constants = (Lazy.force !Coda_constants.t).consensus in
-  UInt32.rem t constants.sub_windows_per_window
+  UInt32.rem t (UInt32.of_int constants.sub_windows_per_window)
 
 let ( >= ) a b = UInt32.compare a b >= 0
 
@@ -35,8 +36,7 @@ module Checked = struct
           Integer.div_mod ~m
             (Global_slot.Checked.to_integer s)
             (Integer.constant ~m
-               (Bignum_bigint.of_int
-                  (UInt32.to_int constants.slots_per_sub_window)))
+               (Bignum_bigint.of_int constants.slots_per_sub_window))
         in
         q )
 
@@ -46,8 +46,7 @@ module Checked = struct
         let _, shift =
           Integer.div_mod ~m t
             (Integer.constant ~m
-               (Bignum_bigint.of_int
-                  (UInt32.to_int constants.sub_windows_per_window)))
+               (Bignum_bigint.of_int constants.sub_windows_per_window))
         in
         Sub_window.Checked.Unsafe.of_integer shift )
 

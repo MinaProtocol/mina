@@ -12,7 +12,7 @@
     ; libs
     snarky_log
     cli_lib
-    coda_base coda_graphql coda_lib coda_state
+    coda_base coda_graphql coda_lib coda_state coda_constants coda_compile_config
     consensus coda_transition coda_version lite_compat
     lite_lib o1trace telemetry transition_frontier web_client_pipe
     web_request graphql_lib genesis_ledger_helper)

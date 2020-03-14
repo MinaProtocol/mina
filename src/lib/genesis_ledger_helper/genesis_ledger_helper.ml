@@ -7,7 +7,7 @@ type exn += Genesis_state_initialization_error
 let retrieve_genesis_state dir_opt ~logger ~conf_dir :
     (Ledger.t lazy_t * Proof.t * Genesis_constants.t) Deferred.t =
   let open Cache_dir in
-  let genesis_constants = Coda_constants.genesis_constants_compiled in
+  let genesis_constants = Genesis_constants.compiled in
   let genesis_dir_name = Cache_dir.genesis_dir_name genesis_constants in
   let tar_filename = genesis_dir_name ^ ".tar.gz" in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -89,8 +89,7 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir :
       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
         "Successfully retrieved genesis ledger and genesis proof from $path"
         ~metadata:[("path", `String tar_dir)] ;
-      Some
-        (genesis_ledger, base_proof, Coda_constants.genesis_constants_compiled) )
+      Some (genesis_ledger, base_proof, Genesis_constants.compiled) )
     else (
       Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
         "Error retrieving genesis ledger and genesis proof from $path"

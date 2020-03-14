@@ -14,9 +14,9 @@ end
 module type Bucketed_average_spec_intf = sig
   include Metric_spec_intf
 
-  val bucket_interval : Core.Time.Span.t
+  val bucket_interval : unit -> Core.Time.Span.t
 
-  val num_buckets : int
+  val num_buckets : unit -> int
 
   val render_average : (float * int) list -> float
 end
@@ -24,9 +24,9 @@ end
 module type Time_average_spec_intf = sig
   include Metric_spec_intf
 
-  val tick_interval : Core.Time.Span.t
+  val tick_interval : unit -> Core.Time.Span.t
 
-  val rolling_interval : Core.Time.Span.t
+  val rolling_interval : unit -> Core.Time.Span.t
 end
 
 module type Moving_average_metric_intf = sig
@@ -47,26 +47,32 @@ module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) () :
 
   let empty_bucket_entry = (0.0, 0)
 
-  let empty_buckets = List.init num_buckets ~f:(Fn.const empty_bucket_entry)
+  let empty_buckets () =
+    List.init (num_buckets ()) ~f:(Fn.const empty_bucket_entry)
 
-  let buckets = ref empty_buckets
+  let buckets = ref None
 
-  let clear () = buckets := empty_buckets
+  let clear () = buckets := Some (empty_buckets ())
 
   let update datum =
-    match !buckets with
+    if Option.is_none !buckets then buckets := Some (empty_buckets ()) ;
+    match Option.value_exn !buckets with
     | [] ->
         failwith "Moving_bucketed_average buckets are malformed"
     | (value, num_entries) :: t ->
-        buckets := (value +. datum, num_entries + 1) :: t
+        buckets := Some ((value +. datum, num_entries + 1) :: t)
 
   let () =
     let rec tick () =
       upon
-        (after (Time_ns.Span.of_ns @@ Time.Span.to_ns bucket_interval))
+        (after (Time_ns.Span.of_ns @@ Time.Span.to_ns (bucket_interval ())))
         (fun () ->
-          Gauge.set v (render_average !buckets) ;
-          buckets := empty_bucket_entry :: List.take !buckets (num_buckets - 1) ;
+          if Option.is_none !buckets then buckets := Some (empty_buckets ()) ;
+          let buckets_val = Option.value_exn !buckets in
+          Gauge.set v (render_average buckets_val) ;
+          buckets :=
+            Some
+              (empty_bucket_entry :: List.take buckets_val (num_buckets () - 1)) ;
           tick () )
     in
     tick ()
@@ -84,7 +90,8 @@ end)
   let () =
     let ( = ) = Float.equal in
     let ( mod ) = Float.mod_float in
-    if not (to_ns rolling_interval mod to_ns tick_interval = 0.0) then
+    if not (to_ns (rolling_interval ()) mod to_ns (tick_interval ()) = 0.0)
+    then
       failwith
         "invalid intervals provided to Moving_time_average -- the \
          tick_interval does not evenly divide the rolling_interval"
@@ -94,8 +101,9 @@ end)
 
               let bucket_interval = tick_interval
 
-              let num_buckets =
-                Float.to_int (to_ns rolling_interval /. to_ns tick_interval)
+              let num_buckets () =
+                Float.to_int
+                  (to_ns (rolling_interval ()) /. to_ns (tick_interval ()))
 
               let render_average buckets =
                 let sum =
@@ -115,6 +123,6 @@ module Moving_time_sec_average (Spec : Time_average_spec_intf) () :
       include Spec
 
       let render_time_average span =
-        Core.Time.Span.(to_sec span /. to_sec rolling_interval)
+        Core.Time.Span.(to_sec span /. to_sec (rolling_interval ()))
     end)
     ()

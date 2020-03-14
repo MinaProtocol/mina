@@ -8,19 +8,17 @@ include (T : module type of T with module Checked := T.Checked)
 
 let create ~(epoch : Epoch.t) ~(slot : Slot.t) =
   let constants = (Lazy.force !Coda_constants.t).consensus in
-  of_int
-    ( Slot.to_int slot
-    + (UInt32.to_int constants.slots_per_epoch * Epoch.to_int epoch) )
+  of_int (Slot.to_int slot + (constants.slots_per_epoch * Epoch.to_int epoch))
 
 let of_epoch_and_slot (epoch, slot) = create ~epoch ~slot
 
 let epoch t =
   let constants = (Lazy.force !Coda_constants.t).consensus in
-  UInt32.Infix.(t / constants.slots_per_epoch)
+  UInt32.Infix.(t / UInt32.of_int constants.slots_per_epoch)
 
 let slot t =
   let constants = (Lazy.force !Coda_constants.t).consensus in
-  UInt32.Infix.(t mod constants.slots_per_epoch)
+  UInt32.Infix.(t mod UInt32.of_int constants.slots_per_epoch)
 
 let to_epoch_and_slot t = (epoch t, slot t)
 
@@ -48,7 +46,7 @@ let diff t (other_epoch, other_slot) =
     epoch - other_epoch - (UInt32.of_int @@ if other_slot > slot then 1 else 0)
   in
   let constants = (Lazy.force !Coda_constants.t).consensus in
-  let old_slot = (slot - other_slot) mod constants.epoch_size in
+  let old_slot = (slot - other_slot) mod UInt32.of_int constants.epoch_size in
   of_epoch_and_slot (old_epoch, old_slot)
 
 module Checked = struct
@@ -62,7 +60,7 @@ module Checked = struct
         let epoch, slot =
           Integer.div_mod ~m (to_integer t)
             (Integer.constant ~m
-               (Bignum_bigint.of_int (UInt32.to_int constants.slots_per_epoch)))
+               (Bignum_bigint.of_int constants.slots_per_epoch))
         in
         ( Epoch.Checked.Unsafe.of_integer epoch
         , Slot.Checked.Unsafe.of_integer slot ) )

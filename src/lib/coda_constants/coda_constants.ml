@@ -7,12 +7,12 @@ module type S = sig
       ; c: int
       ; delta: int
       ; block_window_duration_ms: Time.Span.t
-      ; sub_windows_per_window: Unsigned.UInt32.t
-      ; slots_per_sub_window: Unsigned.UInt32.t
-      ; slots_per_window: Unsigned.UInt32.t
-      ; slots_per_epoch: Unsigned.UInt32.t
+      ; sub_windows_per_window: int
+      ; slots_per_sub_window: int
+      ; slots_per_window: int
+      ; slots_per_epoch: int
       ; slot_duration_ms: int
-      ; epoch_size: Unsigned.UInt32.t
+      ; epoch_size: int
       ; epoch_duration: Time.Span.t
       ; checkpoint_window_slots_per_year: int
       ; checkpoint_window_size_in_slots: int
@@ -30,7 +30,6 @@ module type S = sig
     { consensus: Consensus.t
     ; scan_state: Scan_state.t
     ; inactivity_ms: int
-    ; curve_size: int
     ; txpool_max_size: int
     ; genesis_state_timestamp: Time.t }
 
@@ -45,12 +44,12 @@ module Consensus_constants = struct
     ; c: int
     ; delta: int
     ; block_window_duration_ms: int
-    ; sub_windows_per_window: Unsigned.UInt32.t
-    ; slots_per_sub_window: Unsigned.UInt32.t
-    ; slots_per_window: Unsigned.UInt32.t
-    ; slots_per_epoch: Unsigned.UInt32.t
+    ; sub_windows_per_window: int
+    ; slots_per_sub_window: int
+    ; slots_per_window: int
+    ; slots_per_epoch: int
     ; slot_duration_ms: int
-    ; epoch_size: Unsigned.UInt32.t
+    ; epoch_size: int
     ; epoch_duration: Time.Span.t
     ; checkpoint_window_slots_per_year: int
     ; checkpoint_window_size_in_slots: int
@@ -79,26 +78,17 @@ type t =
   { consensus: Consensus_constants.t
   ; scan_state: Scan_state_constants.t
   ; inactivity_ms: int
-  ; curve_size: int
   ; txpool_max_size: int
   ; genesis_state_timestamp: Time.t }
 
 let create_t (genesis_constants : Genesis_constants.t) : t Lazy.t =
   lazy
-    (let sub_windows_per_window =
-       Unsigned.UInt32.of_int genesis_constants.consensus.c
-     in
-     let slots_per_sub_window =
-       Unsigned.UInt32.of_int genesis_constants.consensus.k
-     in
-     let slots_per_window =
-       Unsigned.UInt32.(mul sub_windows_per_window slots_per_sub_window)
-     in
+    (let sub_windows_per_window = genesis_constants.consensus.c in
+     let slots_per_sub_window = genesis_constants.consensus.k in
+     let slots_per_window = sub_windows_per_window * slots_per_sub_window in
      (* Number of slots =24k in ouroboros praos *)
      let slots_per_epoch =
-       Unsigned.UInt32.(
-         of_int
-           (3 * genesis_constants.consensus.c * genesis_constants.consensus.k))
+       3 * genesis_constants.consensus.c * genesis_constants.consensus.k
      in
      (* This is a bit of a hack, see #3232. *)
      let inactivity_ms =
@@ -111,9 +101,7 @@ let create_t (genesis_constants : Genesis_constants.t) : t Lazy.t =
        let size = slots_per_epoch
 
        (* Amount of time in total for an epoch *)
-       let duration =
-         Time.Span.of_ms
-           (Float.of_int (Slot.duration_ms * Unsigned.UInt32.to_int size))
+       let duration = Time.Span.of_ms (Float.of_int (Slot.duration_ms * size))
      end in
      let module Checkpoint_window = struct
        let per_year = 12
@@ -181,53 +169,12 @@ let create_t (genesis_constants : Genesis_constants.t) : t Lazy.t =
      { consensus
      ; scan_state
      ; inactivity_ms
-     ; curve_size= genesis_constants.curve_size
      ; txpool_max_size= genesis_constants.runtime.txpool_max_size
      ; genesis_state_timestamp=
          genesis_constants.runtime.genesis_state_timestamp })
 
-let genesis_state_timestamp_compiled =
-  let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
-  Core.Time.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone)
-    Coda_compile_config.genesis_state_timestamp_string
-
-let genesis_constants_compiled : Genesis_constants.t =
-  let open Coda_compile_config in
-  { curve_size
-  ; consensus= {k; c; delta}
-  ; scan_state= {work_delay; capacity= scan_state_capacity}
-  ; runtime=
-      { txpool_max_size=
-          pool_max_size (*The following two needs to be generated here*)
-      ; genesis_state_timestamp= genesis_state_timestamp_compiled
-      ; block_window_duration_ms= Coda_compile_config.block_window_duration_ms
-      } }
-
 (*Deepthi: remove lazy*)
-let t : t Lazy.t ref = ref (create_t genesis_constants_compiled)
+let t : t Lazy.t ref = ref (create_t Genesis_constants.compiled)
 
 let compiled_constants_for_test =
-  Lazy.force (create_t genesis_constants_compiled)
-
-(*Deepthi: This should go elsewhere to remove the currency dependency*)
-let all_constants () =
-  let t = Lazy.force !t in
-  `Assoc
-    [ ( "genesis_state_timestamp"
-      , `String
-          (Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
-             t.genesis_state_timestamp) )
-    ; ("k", `Int t.consensus.k)
-    ; ("coinbase", `Int (Currency.Amount.to_int Coda_compile_config.coinbase))
-    ; ("block_window_duration_ms", `Int t.consensus.block_window_duration_ms)
-    ; ("delta", `Int t.consensus.delta)
-    ; ("c", `Int t.consensus.c)
-    ; ("inactivity_ms", `Int t.inactivity_ms)
-    ; ( "sub_windows_per_window"
-      , `Int (Unsigned.UInt32.to_int t.consensus.sub_windows_per_window) )
-    ; ( "slots_per_sub_window"
-      , `Int (Unsigned.UInt32.to_int t.consensus.slots_per_sub_window) )
-    ; ( "slots_per_window"
-      , `Int (Unsigned.UInt32.to_int t.consensus.slots_per_window) )
-    ; ( "slots_per_epoch"
-      , `Int (Unsigned.UInt32.to_int t.consensus.slots_per_epoch) ) ]
+  Lazy.force (create_t Genesis_constants.compiled)

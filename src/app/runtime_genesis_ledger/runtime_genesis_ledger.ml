@@ -134,8 +134,7 @@ let get_accounts accounts_json_file n =
         (Account_config.to_yojson all_accounts) ) ;
   all_accounts
 
-let genesis_dirname =
-  Cache_dir.genesis_dir_name Coda_constants.genesis_constants_compiled
+let genesis_dirname = Cache_dir.genesis_dir_name Genesis_constants.compiled
 
 let create_tar top_dir =
   let tar_file = top_dir ^/ genesis_dirname ^ ".tar.gz" in

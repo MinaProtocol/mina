@@ -1,6 +1,3 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Prometheus
 open Namespace
@@ -563,9 +560,9 @@ module Transition_frontier = struct
 
   module TPS_30min =
     Moving_bucketed_average (struct
-        let bucket_interval = Core.Time.Span.of_min 3.0
+        let bucket_interval () = Core.Time.Span.of_min 3.0
 
-        let num_buckets = 10
+        let num_buckets () = 10
 
         let render_average buckets =
           let total =
@@ -654,25 +651,23 @@ end
 module Block_latency = struct
   let subsystem = "Block_latency"
 
-  (*let block_window_duration () =
-    (Lazy.force !Coda_constants.t).consensus.block_window_duration_ms*)
-  [%%inject
-  "block_window_duration", block_window_duration]
+  let block_window_duration () =
+    (Lazy.force !Coda_constants.t).consensus.block_window_duration_ms
 
   module Latency_time_spec = struct
-    let tick_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
+    let tick_interval () =
+      Core.Time.Span.of_ms (Int.to_float (block_window_duration () / 2))
 
-    let rolling_interval =
-      Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
+    let rolling_interval () =
+      Core.Time.Span.of_ms (Int.to_float (block_window_duration () * 20))
   end
 
   module Gossip_slots =
     Moving_bucketed_average (struct
-        let bucket_interval =
-          Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
+        let bucket_interval () =
+          Core.Time.Span.of_ms (Int.to_float (block_window_duration () / 2))
 
-        let num_buckets = 40
+        let num_buckets () = 40
 
         let subsystem = subsystem
 
