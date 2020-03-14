@@ -1,5 +1,10 @@
 #!/bin/bash
 
+if [ ! "$CI" = "true" ] || [ ! -f /.dockerenv ]; then
+    echo `basename $0` "can run only in Circle CI"
+    exit 1
+fi
+
 # cleanup if needed
 
 git clean -dfx
