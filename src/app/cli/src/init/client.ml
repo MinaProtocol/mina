@@ -62,15 +62,15 @@ let get_balance_graphql =
        ~f:(fun graphql_endpoint public_key ->
          let%map response =
            Graphql_client.query_exn
-             (Graphql_queries.Get_wallet.make
+             (Graphql_queries.Get_tracked_account.make
                 ~public_key:(Graphql_client.Encoders.public_key public_key)
                 ())
              graphql_endpoint
          in
-         match response#wallet with
-         | Some wallet ->
+         match response#account with
+         | Some account ->
              printf "Balance: %s coda\n"
-               (Currency.Balance.to_formatted_string (wallet#balance)#total)
+               (Currency.Balance.to_formatted_string (account#balance)#total)
          | None ->
              printf "There are no funds in this account\n" ))
 
@@ -549,8 +549,8 @@ let cancel_transaction_graphql =
          in
          let maybe_inferred_nonce =
            let open Option.Let_syntax in
-           let%bind wallet = nonce_response#wallet in
-           let%map nonce = wallet#inferredNonce in
+           let%bind account = nonce_response#account in
+           let%map nonce = account#inferredNonce in
            int_of_string nonce
          in
          let cancelled_nonce =
@@ -866,7 +866,7 @@ let set_snark_worker =
        ~f:(fun graphql_endpoint optional_public_key ->
          let graphql =
            Graphql_queries.Set_snark_worker.make
-             ~wallet:
+             ~public_key:
                Graphql_client.Encoders.(
                  optional optional_public_key ~f:public_key)
              ()
@@ -902,54 +902,7 @@ let set_snark_work_fee =
                (Currency.Fee.to_int fee)
                (Unsigned.UInt64.to_int (response#setSnarkWorkFee)#lastFee) ) )
 
-(* A step towards `account import`, for now `unsafe-import` will suffice *)
-(* TODO: remove this when systems are transitioned to using "safe" import *)
-let unsafe_import =
-  Command.async
-    ~summary:
-      "Unsafely import a password protected private key to one with the \
-       password stripped, but tracked by this daemon and accessible via the \
-       GraphQL API"
-    (let open Command.Let_syntax in
-    (* We'll do this entirely without talking to the daemon for now, though in the future this may change *)
-    let%map_open privkey_path = Cli_lib.Flag.privkey_read_path
-    and conf_dir = Cli_lib.Flag.conf_dir in
-    fun () ->
-      let open Deferred.Let_syntax in
-      let%bind home = Sys.home_directory () in
-      let conf_dir =
-        Option.value ~default:(home ^/ Cli_lib.Default.conf_dir_name) conf_dir
-      in
-      let wallets_disk_location = conf_dir ^/ "wallets" in
-      let%bind ({Keypair.public_key; _} as keypair) =
-        Secrets.Keypair.Terminal_stdin.read_exn privkey_path
-      in
-      let pk = Public_key.compress public_key in
-      let%bind wallets =
-        Secrets.Wallets.load ~logger:(Logger.create ())
-          ~disk_location:wallets_disk_location
-      in
-      let password = lazy (Deferred.return (Bytes.create 0)) in
-      (* Either we already are tracking it *)
-      match Secrets.Wallets.check_locked wallets ~needle:pk with
-      | Some _ ->
-          printf
-            !"Key already present, no need to import : %s\n"
-            (Public_key.Compressed.to_base58_check
-               (Public_key.compress public_key)) ;
-          Deferred.unit
-      | None ->
-          (* Or we import it *)
-          let%map _ =
-            Secrets.Wallets.import_keypair wallets keypair ~password
-          in
-          printf
-            !"Key imported successfully : %s\n"
-            (Public_key.Compressed.to_base58_check
-               (Public_key.compress public_key)))
-
 let import_key =
-  (* We'll do this entirely without talking to the daemon for now, though in the future this may change *)
   let privkey_path = Cli_lib.Flag.privkey_read_path in
   let conf_dir = Cli_lib.Flag.conf_dir in
   let flags = Args.zip2 privkey_path conf_dir in
@@ -989,9 +942,10 @@ let import_key =
              let%bind _ =
                Secrets.Wallets.import_keypair_terminal_stdin wallets keypair
              in
+             (* Attempt to reload, but if you can't connect to daemon, it's ok *)
              let%map _response =
                Graphql_client.query
-                 (Graphql_queries.Reload_wallets.make ())
+                 (Graphql_queries.Reload_accounts.make ())
                  graphql_endpoint
              in
              printf
@@ -1006,18 +960,18 @@ let list_accounts =
        ~f:(fun graphql_endpoint () ->
          let%map response =
            Graphql_client.query_exn
-             (Graphql_queries.Get_wallets.make ())
+             (Graphql_queries.Get_tracked_accounts.make ())
              graphql_endpoint
          in
-         match response#ownedWallets with
+         match response#trackedAccounts with
          | [||] ->
              printf
-               "😢 You have no wallets!\n\
+               "😢 You have no tracked accounts!\n\
                 You can make a new one using `coda accounts create`\n"
-         | wallets ->
-             Array.iteri wallets ~f:(fun i w ->
+         | accounts ->
+             Array.iteri accounts ~f:(fun i w ->
                  printf
-                   "Wallet #%d:\n\
+                   "Account #%d:\n\
                    \  Public key: %s\n\
                    \  Balance: %s\n\
                    \  Locked: %b\n"
@@ -1037,13 +991,13 @@ let create_account =
          in
          let%map response =
            Graphql_client.query_exn
-             (Graphql_queries.Add_wallet.make
+             (Graphql_queries.Create_account.make
                 ~password:(Bytes.to_string password) ())
              graphql_endpoint
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             (response#addWallet)#public_key
+             (response#createAccount)#public_key
          in
          printf "\n😄 Added new account!\nPublic key: %s\n" pk_string ))
 
@@ -1088,7 +1042,7 @@ let unlock_account =
          | Ok password_bytes ->
              let%map response =
                Graphql_client.query_exn
-                 (Graphql_queries.Unlock_wallet.make
+                 (Graphql_queries.Unlock_account.make
                     ~public_key:(Graphql_client.Encoders.public_key pk_str)
                     ~password:(Bytes.to_string password_bytes)
                     ())
@@ -1096,7 +1050,7 @@ let unlock_account =
              in
              let pk_string =
                Public_key.Compressed.to_base58_check
-                 (response#unlockWallet)#public_key
+                 (response#unlockAccount)#public_key
              in
              printf "\n🔓 Unlocked account!\nPublic key: %s\n" pk_string
          | Error e ->
@@ -1115,14 +1069,14 @@ let lock_account =
        ~f:(fun graphql_endpoint pk ->
          let%map response =
            Graphql_client.query_exn
-             (Graphql_queries.Lock_wallet.make
+             (Graphql_queries.Lock_account.make
                 ~public_key:(Graphql_client.Encoders.public_key pk)
                 ())
              graphql_endpoint
          in
          let pk_string =
            Public_key.Compressed.to_base58_check
-             (response#lockWallet)#public_key
+             (response#lockAccount)#public_key
          in
          printf "🔒 Locked account!\nPublic key: %s\n" pk_string ))
 
@@ -1361,8 +1315,6 @@ let advanced =
     ; ("pooled-user-commands", pooled_user_commands)
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
-    ; ("unsafe-import", unsafe_import)
-    ; ("import", import_key)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("compile-time-constants", compile_time_constants)
     ; ("telemetry", telemetry)
