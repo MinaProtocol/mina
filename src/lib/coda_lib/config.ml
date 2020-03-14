@@ -8,7 +8,8 @@ open Signature_lib
 module Snark_worker_config = struct
   type t =
     { initial_snark_worker_key: Public_key.Compressed.t option
-    ; shutdown_on_disconnect: bool }
+    ; shutdown_on_disconnect: bool
+    ; num_threads: int option }
 end
 
 (** If ledger_db_location is None, will auto-generate a db based on a UUID *)

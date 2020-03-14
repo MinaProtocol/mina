@@ -105,10 +105,15 @@ let replace_block_production_keypairs t kps =
   Agent.update t.block_production_keypairs kps
 
 module Snark_worker = struct
-  let run_process ~logger client_port kill_ivar =
+  let run_process ~logger client_port kill_ivar num_threads =
+    let env =
+      Option.map
+        ~f:(fun num -> `Extend [("OMP_NUM_THREADS", string_of_int num)])
+        num_threads
+    in
     let%map snark_worker_process =
       let our_binary = Sys.executable_name in
-      Process.create_exn () ~prog:our_binary
+      Process.create_exn () ~prog:our_binary ?env
         ~args:
           ( "internal" :: Snark_worker.Intf.command_name
           :: Snark_worker.arguments
@@ -168,6 +173,7 @@ module Snark_worker = struct
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
             t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
+            t.config.snark_worker_config.num_threads
         in
         Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
