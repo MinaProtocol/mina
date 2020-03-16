@@ -10,9 +10,6 @@
 
 *)
 
-[%%if
-print_binable_functors]
-
 open Core_kernel
 open Ppxlib
 
@@ -92,6 +89,9 @@ let preprocess_impl str =
   ignore (traverse_ast#structure str {module_path= []}) ;
   str
 
-let () = Ppxlib.Driver.register_transformation name ~preprocess_impl
-
-[%%endif]
+let () =
+  match Sys.getenv_opt "CODA_PRINT_BINABLE_FUNCTORS" with
+  | Some "true" ->
+      Ppxlib.Driver.register_transformation name ~preprocess_impl
+  | _ ->
+      ()
