@@ -71,7 +71,6 @@ let compute_delegatee_table_sparse_ledger keys ledger =
 module Segment_id = Nat.Make32 ()
 
 module Typ = Crypto_params.Tick0.Typ
-module Constants = Constants
 
 let epoch_size () =
   let constants = (Lazy.force !Coda_constants.t).consensus in

@@ -194,6 +194,16 @@ let daemon logger =
            "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             discovery"
          (listed string)
+     and genesis_runtime_constants =
+       flag "genesis-constants"
+         ~doc:
+           (sprintf
+              "PATH path to the runtime-configurable constants. For example: \
+               %s  (default: compiled constants)"
+              ( Genesis_constants.(
+                  to_daemon_config compiled.runtime |> Daemon_config.to_yojson)
+              |> Yojson.Safe.to_string ))
+         (optional string)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -324,7 +334,7 @@ let daemon logger =
        let coda_initialization_deferred () =
          let%bind genesis_ledger, base_proof, genesis_constants =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
-             ~logger ~conf_dir
+             ~logger ~conf_dir ~daemon_conf:genesis_runtime_constants
          in
          let%bind config =
            let configpath = conf_dir ^/ "daemon.json" in

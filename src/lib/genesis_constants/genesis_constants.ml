@@ -125,22 +125,6 @@ module Daemon_config = struct
     Result.(
       of_yojson s
       >>= fun t -> validate_time t.genesis_state_timestamp >>= fun _ -> Ok t)
-
-  let () =
-    let time = Time.now () in
-    let t =
-      { txpool_max_size= Some 1
-      ; genesis_state_timestamp= Some "2019-01-30 12:00:00-0800"
-      ; block_window_duration_ms= None }
-    in
-    let y = to_yojson t in
-    let t' = of_yojson y |> Result.ok_or_failwith in
-    assert (equal t t') ;
-    Core.printf
-      !"constants: %s\nTime: %s\n%!"
-      ( of_yojson y |> Result.ok_or_failwith |> to_yojson
-      |> Yojson.Safe.to_string )
-      (Time.to_string time)
 end
 
 let of_config_file ~(default : t) (t : Config_file.t) : t =
@@ -191,3 +175,11 @@ let of_daemon_config ~(default : Runtime_configurable.t)
   ; block_window_duration_ms=
       Option.value ~default:default.block_window_duration_ms
         block_window_duration_ms }
+
+let to_daemon_config (t : Runtime_configurable.t) : Daemon_config.t =
+  { txpool_max_size= Some t.txpool_max_size
+  ; genesis_state_timestamp=
+      Some
+        (Core.Time.format t.genesis_state_timestamp "%Y-%m-%d %H:%M:%S%z"
+           ~zone:Core.Time.Zone.utc)
+  ; block_window_duration_ms= Some t.block_window_duration_ms }

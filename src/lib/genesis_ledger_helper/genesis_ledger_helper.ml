@@ -4,7 +4,7 @@ open Coda_base
 
 type exn += Genesis_state_initialization_error
 
-let retrieve_genesis_state dir_opt ~logger ~conf_dir :
+let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
     (Ledger.t lazy_t * Proof.t * Genesis_constants.t) Deferred.t =
   let open Cache_dir in
   let genesis_dir_name =
@@ -115,8 +115,31 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir :
       Deferred.return None )
   in
   let res_or_fail dir_str = function
-    | Some res ->
-        res
+    | Some ((ledger, proof, (constants : Genesis_constants.t)) as res) ->
+        (*Replace runtime-configurable constants from the dameon, if any*)
+        Option.value_map daemon_conf ~default:res ~f:(fun daemon_config_file ->
+            let new_runtime_constants =
+              match
+                Result.bind
+                  ( Result.try_with (fun () ->
+                        Yojson.Safe.from_file daemon_config_file )
+                  |> Result.map_error ~f:Exn.to_string )
+                  ~f:(fun json ->
+                    Genesis_constants.Daemon_config.of_yojson json )
+              with
+              | Ok t ->
+                  Genesis_constants.(
+                    of_daemon_config ~default:compiled.runtime t)
+              | Error s ->
+                  Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
+                    "Error loading runtime-configurable constants from $file: \
+                     $error"
+                    ~metadata:
+                      [ ("dir", `String daemon_config_file)
+                      ; ("error", `String s) ] ;
+                  raise Genesis_state_initialization_error
+            in
+            (ledger, proof, {constants with runtime= new_runtime_constants}) )
     | None ->
         Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
           "Could not retrieve genesis ledger and genesis proof from paths \
