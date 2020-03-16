@@ -7,8 +7,9 @@ type exn += Genesis_state_initialization_error
 let retrieve_genesis_state dir_opt ~logger ~conf_dir :
     (Ledger.t lazy_t * Proof.t * Genesis_constants.t) Deferred.t =
   let open Cache_dir in
-  let genesis_constants = Genesis_constants.compiled in
-  let genesis_dir_name = Cache_dir.genesis_dir_name genesis_constants in
+  let genesis_dir_name =
+    Cache_dir.genesis_dir_name Genesis_constants.compiled
+  in
   let tar_filename = genesis_dir_name ^ ".tar.gz" in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Looking for the genesis tar file $filename"
@@ -50,9 +51,11 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir :
     let extract_target = conf_dir ^/ genesis_dir_name in
     let ledger_dir = extract_target ^/ "ledger" in
     let proof_file = extract_target ^/ "genesis_proof" in
+    let constants_file = extract_target ^/ "genesis_constants.json" in
     if
       Core.Sys.file_exists ledger_dir = `Yes
       && Core.Sys.file_exists proof_file = `Yes
+      && Core.Sys.file_exists constants_file = `Yes
     then (
       let genesis_ledger =
         let ledger = lazy (Ledger.create ~directory_name:ledger_dir ()) in
@@ -65,6 +68,21 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir :
               ~metadata:
                 [ ("dir", `String ledger_dir)
                 ; ("error", `String (Error.to_string_hum e)) ] ;
+            raise Genesis_state_initialization_error
+      in
+      let genesis_constants =
+        match
+          Result.bind
+            ( Result.try_with (fun () -> Yojson.Safe.from_file constants_file)
+            |> Result.map_error ~f:Exn.to_string )
+            ~f:(fun json -> Genesis_constants.Config_file.of_yojson json)
+        with
+        | Ok t ->
+            Genesis_constants.(of_config_file ~default:compiled t)
+        | Error s ->
+            Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
+              "Error loading genesis constants from $file: $error"
+              ~metadata:[("dir", `String constants_file); ("error", `String s)] ;
             raise Genesis_state_initialization_error
       in
       let%map base_proof =
@@ -89,7 +107,7 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir :
       Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
         "Successfully retrieved genesis ledger and genesis proof from $path"
         ~metadata:[("path", `String tar_dir)] ;
-      Some (genesis_ledger, base_proof, Genesis_constants.compiled) )
+      Some (genesis_ledger, base_proof, genesis_constants) )
     else (
       Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
         "Error retrieving genesis ledger and genesis proof from $path"

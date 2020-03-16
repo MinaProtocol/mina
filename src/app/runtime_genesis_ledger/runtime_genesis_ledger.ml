@@ -147,7 +147,22 @@ let create_tar top_dir =
       (sprintf "Error generating the tar for genesis ledger. Exit code: %d"
          exit)
 
-let main accounts_json_file dir n =
+let read_write_constants read_from_opt write_to =
+  let open Result.Let_syntax in
+  let%map constants =
+    match read_from_opt with
+    | Some file ->
+        let%map t =
+          Yojson.Safe.from_file file |> Genesis_constants.Config_file.of_yojson
+        in
+        Genesis_constants.of_config_file ~default:Genesis_constants.compiled t
+    | None ->
+        Ok Genesis_constants.compiled
+  in
+  Yojson.Safe.to_file write_to
+    Genesis_constants.(to_config_file constants |> Config_file.to_yojson)
+
+let main accounts_json_file dir n constants_file =
   let open Deferred.Let_syntax in
   let top_dir = Option.value ~default:Cache_dir.autogen_path dir in
   let%bind genesis_dir =
@@ -157,6 +172,7 @@ let main accounts_json_file dir n =
   in
   let ledger_path = genesis_dir ^/ "ledger" in
   let proof_path = genesis_dir ^/ "genesis_proof" in
+  let constants_path = genesis_dir ^/ "genesis_constants.json" in
   let%bind accounts = get_accounts accounts_json_file n in
   let%bind () =
     match
@@ -177,7 +193,9 @@ let main accounts_json_file dir n =
         in
         let%bind wr = Writer.open_file proof_path in
         Writer.write wr (Proof.Stable.V1.sexp_of_t base_proof |> Sexp.to_string) ;
-        Writer.close wr
+        let%map () = Writer.close wr in
+        read_write_constants constants_file constants_path
+        |> Result.ok_or_failwith
     | Error e ->
         failwithf "Failed to create genesis ledger\n%s" (Error.to_string_hum e)
           ()
@@ -221,9 +239,22 @@ let () =
                    accounts (default: x)."
                   (Int.pow 2 Coda_compile_config.ledger_depth))
              (optional int)
+         and constants =
+           flag "constants"
+             ~doc:
+               (sprintf
+                  "Filepath of the json file that has Coda constants. \
+                   (default: %s)"
+                  ( Genesis_constants.(
+                      compiled |> to_config_file |> Config_file.to_yojson)
+                  |> Yojson.Safe.to_string ))
+             (optional string)
          in
          fun () ->
            let max = Int.pow 2 Coda_compile_config.ledger_depth in
            if Option.value ~default:0 n >= max then
              failwith (sprintf "Invalid value for n (0 <= n <= %d)" max)
-           else main accounts_json genesis_dir (Option.value ~default:0 n)))
+           else
+             main accounts_json genesis_dir
+               (Option.value ~default:0 n)
+               constants))
