@@ -24,7 +24,7 @@ module System = {
   type entries('a) = {items: array(entry('a))};
 };
 
-module Post = {
+module BlogPost = {
   let id = "test";
   type t = {
     title: string,
@@ -84,6 +84,7 @@ module GenesisProfile = {
     twitter: string,
     github: string,
     publishDate: string,
+    blogPost: BlogPost.entry,
   };
   type entry = System.entry(t);
   type entries = System.entries(t);

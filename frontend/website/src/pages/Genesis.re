@@ -235,7 +235,7 @@ let make = (~profiles) => {
             />
           </div>
         </div>
-        <Spacer height=4. />
+        <Spacer height=7. />
         <h1 className=Styles.textBlockHeading>
           {React.string("Meet the Genesis Founding Members")}
         </h1>
@@ -261,6 +261,7 @@ let make = (~profiles) => {
                    location={p.memberLocation}
                    twitter={p.twitter}
                    github={p.github}
+                   blogPost={p.blogPost.fields.slug}
                  />
                },
                profiles,

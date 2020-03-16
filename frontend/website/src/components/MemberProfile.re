@@ -99,9 +99,18 @@ module Styles = {
         hover([backgroundColor(Theme.Colors.hyperlinkHover)]),
       ]),
     ]);
+
+  let link =
+    merge([
+      Theme.Body.basic_small,
+      style([
+        textDecoration(`none),
+        hover([color(Theme.Colors.hyperlinkHover)]),
+      ]),
+    ]);
 };
 [@react.component]
-let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github) => {
+let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
   <div className=Styles.outerBox>
     <div className=Styles.container>
       <img src=photo alt=name className=Styles.profilePic />
@@ -125,18 +134,24 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github) => {
           <div className=Styles.socialTag>
             <img src="/static/img/Icon.Twitter.svg" />
             <Spacer width=0.34 />
-            <p className=Theme.Body.basic_small> {React.string(twitter)} </p>
+            <a href={"https://twitter.com/" ++ twitter} className=Styles.link>
+              {React.string(twitter)}
+            </a>
           </div>
           <Spacer height=1. />
           <div className=Styles.socialTag>
             <img src="/static/img/Icon.Git.svg" />
             <Spacer width=0.34 />
-            <p className=Theme.Body.basic_small> {React.string(github)} </p>
+            <a href={"https://github.com/" ++ github} className=Styles.link>
+              {React.string(github)}
+            </a>
           </div>
         </div>
-        <a href="/blog" className=Styles.ctaButton>
-          {React.string({js|Learn More|js})}
-        </a>
+        <Next.Link href="/blog/[slug]" _as={"/blog/" ++ blogPost}>
+          <a className=Styles.ctaButton>
+            {React.string({js|Learn More|js})}
+          </a>
+        </Next.Link>
         <Spacer height=3. />
       </div>
     </div>
