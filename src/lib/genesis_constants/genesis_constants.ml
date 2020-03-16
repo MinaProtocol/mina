@@ -16,6 +16,16 @@ module T = struct
   end
 
   type t = {consensus: Consensus.t; runtime: Runtime_configurable.t}
+
+  let hash (t : t) =
+    let str =
+      ( List.map
+          [t.consensus.k; t.consensus.delta; t.runtime.txpool_max_size]
+          ~f:Int.to_string
+      |> String.concat ~sep:"" )
+      ^ Core.Time.to_string t.runtime.genesis_state_timestamp
+    in
+    Blake2.digest_string str |> Blake2.to_hex
 end
 
 include T

@@ -40,7 +40,7 @@ let protocol_state_body = salt protocol_state_body
 let merkle_tree =
   Array.init Coda_compile_config.ledger_depth ~f:(fun i -> salt (merkle_tree i))
 
-let coinbase_merkle_tree () =
+let coinbase_merkle_tree =
   Array.init Coda_compile_config.pending_coinbase_depth ~f:(fun i ->
       salt (coinbase_merkle_tree i) )
 
