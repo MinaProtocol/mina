@@ -55,13 +55,17 @@ module Navigator = {
 };
 
 module Stream = {
-  module Readable = {
+  module Writable = {
     type t;
     [@bs.send] external on: (t, string, Node.Buffer.t => unit) => unit = "on";
   };
 
-  module Writable = {
+  module Readable = {
     type t;
+    [@bs.send] external on: (t, string, Node.Buffer.t => unit) => unit = "";
+    [@bs.send] external pipe: (t, Writable.t) => unit = "";
+
+    [@bs.module "fs"] external create: string => t = "createReadStream";
   };
 };
 

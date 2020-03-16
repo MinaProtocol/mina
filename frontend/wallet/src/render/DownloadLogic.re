@@ -1,27 +1,22 @@
 module Filestream = {
-  type writable;
-  type readable;
+  type t;
 
   module Chunk = {
     type t = {. "length": int};
   };
 
   [@bs.module "fs"]
-  external createWriteStream: (string, {. "encoding": string}) => writable =
+  external createWriteStream: (string, {. "encoding": string}) => t =
     "";
 
-  external createReadStream: string => readable = "";
-
   [@bs.send]
-  external onError: (writable, [@bs.as "error"] _, string => unit) => unit = "on";
+  external onError: (t, [@bs.as "error"] _, string => unit) => unit = "on";
   [@bs.send]
-  external onFinish: (writable, [@bs.as "finish"] _, unit => unit) => unit = "on";
+  external onFinish: (t, [@bs.as "finish"] _, unit => unit) => unit = "on";
 
-  [@bs.send] external write: (writable, Chunk.t) => unit = "";
+  [@bs.send] external write: (t, Chunk.t) => unit = "";
 
-  [@bs.send] external endStream: writable => unit = "end";
-
-  [@bs.send] external pipe: (readable, writable) => unit = "";
+  [@bs.send] external endStream: t => unit = "end";
 };
 
 module Https = {
@@ -66,7 +61,7 @@ module Https = {
 module Unzipper = {
   type extractOpts = {path: string};
   [@bs.module "unzipper"]
-  external extract: extractOpts => Filestream.writable = "Extract";
+  external extract: extractOpts => Bindings.Stream.Writable.t = "Extract";
 };
 
 let handleResponse = (response, filename, dataEncoding, chunkCb, doneCb) => {
@@ -134,6 +129,6 @@ let downloadCoda = (version, chunkCb, doneCb) => {
     chunkCb,
     doneCb,
   );
-  Filestream.createReadStream(tempFilename)
-  ->(Filestream.pipe(Unzipper.extract({ path: installPath })));
+  Bindings.Stream.Readable.create(tempFilename)
+  ->(Bindings.Stream.Readable.pipe(Unzipper.extract({ path: installPath })));
 };
