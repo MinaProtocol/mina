@@ -8,7 +8,7 @@ module T = Coda_numbers.Nat.Make32 ()
 include (T : module type of T with module Checked := T.Checked)
 
 let in_seed_update_range (slot : t) =
-  let constants = (Lazy.force !Coda_constants.t).consensus in
+  let constants = (Coda_constants.t ()).consensus in
   let ck = constants.c * constants.k |> UInt32.of_int in
   let open UInt32.Infix in
   ck <= slot && slot < ck * UInt32.of_int 2
@@ -28,7 +28,7 @@ module Checked = struct
     let open Tick in
     let open Tick.Let_syntax in
     let ( < ) = Bitstring_checked.lt_value in
-    let constants = (Lazy.force !Coda_constants.t).consensus in
+    let constants = (Coda_constants.t ()).consensus in
     let ck = constants.c * constants.k |> UInt32.of_int in
     let ck_bitstring = uint32_msb ck
     and ck_times_2 = uint32_msb UInt32.(Infix.(of_int 2 * ck)) in
@@ -42,7 +42,7 @@ end
 
 let gen =
   let open Quickcheck.Let_syntax in
-  let constants = (Lazy.force !Coda_constants.t).consensus in
+  let constants = (Coda_constants.t ()).consensus in
   Core.Int.gen_incl 0 (constants.c * constants.k * 3) >>| UInt32.of_int
 
 let%test_unit "in_seed_update_range unchecked vs. checked equality" =
@@ -50,7 +50,7 @@ let%test_unit "in_seed_update_range unchecked vs. checked equality" =
     Test_util.test_equal typ Tick.Boolean.typ Checked.in_seed_update_range
       in_seed_update_range
   in
-  let constants = (Lazy.force !Coda_constants.t).consensus in
+  let constants = (Coda_constants.t ()).consensus in
   let x = constants.c * constants.k in
   let examples =
     List.map ~f:UInt32.of_int [x; x - 1; x + 1; x * 2; (x * 2) - 1; (x * 2) + 1]

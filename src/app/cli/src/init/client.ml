@@ -1430,7 +1430,7 @@ let trustlist_list =
 
 let compile_time_constants =
   let constants () =
-    let t = Lazy.force !Coda_constants.t in
+    let t = Coda_constants.t () in
     `Assoc
       [ ( "genesis_state_timestamp"
         , `String

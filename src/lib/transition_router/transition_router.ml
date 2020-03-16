@@ -284,7 +284,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
 let wait_till_genesis ~logger ~time_controller =
   let module Time = Block_time in
   let now = Time.now time_controller in
-  let constants = Lazy.force !Coda_constants.t in
+  let constants = Coda_constants.t () in
   let genesis_state_timestamp =
     Time.of_time constants.genesis_state_timestamp
   in

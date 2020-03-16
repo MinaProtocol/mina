@@ -802,7 +802,7 @@ end)
        low fee transactions the smaller-pooled nodes consider useless and get
        themselves banned.
     *)
-      let pool_max_size () = (Lazy.force !Coda_constants.t).txpool_max_size
+      let pool_max_size () = (Coda_constants.t ()).txpool_max_size
     end)
     (Staged_ledger)
     (Transition_frontier)

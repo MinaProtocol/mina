@@ -617,7 +617,7 @@ module T = struct
 
   let apply_diff ~logger t pre_diff_info ~state_body_hash =
     let open Deferred.Result.Let_syntax in
-    let constants = (Lazy.force !Coda_constants.t).scan_state in
+    let constants = (Coda_constants.t ()).scan_state in
     let max_throughput = Int.pow 2 constants.transaction_capacity_log_2 in
     let spots_available, proofs_waiting =
       let jobs = Scan_state.all_work_statements t.scan_state in
@@ -1748,7 +1748,7 @@ let%test_module "test" =
       assert (Fee.Signed.(equal fee_excess zero))
 
     let transaction_capacity =
-      let constants = (Lazy.force !Coda_constants.t).scan_state in
+      let constants = (Coda_constants.t ()).scan_state in
       Int.pow 2 constants.transaction_capacity_log_2
 
     (* Abstraction for the pattern of taking a list of commands and applying it

@@ -438,7 +438,7 @@ let run_test () : unit Deferred.t =
         else if with_snark then 15.
         else 7.
       in
-      let consensus_constants = (Lazy.force !Coda_constants.t).consensus in
+      let consensus_constants = (Coda_constants.t ()).consensus in
       let wait_till_length =
         if medium_curves then Coda_numbers.Length.of_int 1
         else if test_full_epoch then

@@ -253,7 +253,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~consensus_local_state ~frontier_reader ~transition_writer
     ~set_next_producer_timing ~log_block_creation =
   trace "block_producer" (fun () ->
-      let coda_constants = Lazy.force !Coda_constants.t in
+      let coda_constants = Coda_constants.t () in
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Pausing block production while bootstrapping"

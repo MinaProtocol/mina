@@ -4,7 +4,7 @@ open Async
 let name = "coda-long-fork"
 
 let main n waiting_time () =
-  let coda_constants = Lazy.force !Coda_constants.t in
+  let coda_constants = Coda_constants.t () in
   let logger = Logger.create () in
   let keypairs =
     List.map

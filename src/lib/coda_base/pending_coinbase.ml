@@ -309,7 +309,7 @@ module Hash_builder = struct
 
   let merge ~height (h1 : t) (h2 : t) =
     Random_oracle.hash
-      ~init:Hash_prefix.coinbase_merkle_tree.(height)
+      ~init:(Hash_prefix.coinbase_merkle_tree ()).(height)
       [|(h1 :> field); (h2 :> field)|]
     |> of_hash
 
@@ -421,7 +421,7 @@ struct
   include Depth
 
   (* Total number of stacks *)
-  let max_coinbase_stack_count = Int.pow 2 (depth ())
+  let max_coinbase_stack_count () = Int.pow 2 (depth ())
 
   module Stack = struct
     module Poly = struct
@@ -668,7 +668,7 @@ struct
           let merge ~height h1 h2 =
             Tick.make_checked (fun () ->
                 Random_oracle.Checked.hash
-                  ~init:Hash_prefix.coinbase_merkle_tree.(height)
+                  ~init:(Hash_prefix.coinbase_merkle_tree ()).(height)
                   [|h1; h2|] )
 
           let assert_equal h1 h2 = Field.Checked.Assert.equal h1 h2
@@ -945,7 +945,8 @@ struct
 
   let next_index (t : t) =
     if
-      Stack_id.equal t.new_pos (Stack_id.of_int (max_coinbase_stack_count - 1))
+      Stack_id.equal t.new_pos
+        (Stack_id.of_int (max_coinbase_stack_count () - 1))
     then Ok Stack_id.zero
     else Stack_id.incr_by_one t.new_pos
 
@@ -1120,7 +1121,7 @@ end
 
 module T = Make (struct
   let depth () =
-    let constants = (Lazy.force !Coda_constants.t).scan_state in
+    let constants = (Coda_constants.t ()).scan_state in
     constants.pending_coinbase_depth
 end)
 
@@ -1361,7 +1362,8 @@ let%test_unit "push and pop multiple stacks" =
       if List.is_empty coinbase_lists then ()
       else
         let coinbase_lists' =
-          List.take coinbase_lists Pending_coinbase.max_coinbase_stack_count
+          List.take coinbase_lists
+            (Pending_coinbase.max_coinbase_stack_count ())
         in
         let added_stacks, pending_coinbases_updated = add coinbase_lists' pc in
         let pending_coinbases' =
@@ -1369,7 +1371,8 @@ let%test_unit "push and pop multiple stacks" =
             ~f:(fun pc expected_stack -> remove_check pc expected_stack)
         in
         let remaining_lists =
-          List.drop coinbase_lists Pending_coinbase.max_coinbase_stack_count
+          List.drop coinbase_lists
+            (Pending_coinbase.max_coinbase_stack_count ())
         in
         go remaining_lists pending_coinbases'
     in

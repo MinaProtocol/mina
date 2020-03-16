@@ -471,7 +471,7 @@ let create ~work_delay ~transaction_capacity_log_2 =
   Parallel_scan.empty ~delay:work_delay ~max_base_jobs:k
 
 let empty () =
-  let constants = (Lazy.force !Coda_constants.t).scan_state in
+  let constants = (Coda_constants.t ()).scan_state in
   create ~work_delay:constants.work_delay
     ~transaction_capacity_log_2:constants.transaction_capacity_log_2
 

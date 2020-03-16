@@ -652,7 +652,11 @@ module Block_latency = struct
   let subsystem = "Block_latency"
 
   let block_window_duration () =
-    (Lazy.force !Coda_constants.t).consensus.block_window_duration_ms
+    (*Starting with compile-time constants* because coda_constants would not have been initiliazed before this is used*)
+    if Option.is_none !Coda_constants.t_ref then
+      Coda_constants.compiled_constants_for_test.consensus
+        .block_window_duration_ms
+    else (Coda_constants.t ()).consensus.block_window_duration_ms
 
   module Latency_time_spec = struct
     let tick_interval () =

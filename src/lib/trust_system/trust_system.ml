@@ -18,8 +18,7 @@ let is_postake = false
 [%%endif]
 
 let delta () =
-  Float.of_int
-    (if is_postake then (Lazy.force !Coda_constants.t).consensus.delta else 1)
+  Float.of_int (if is_postake then (Coda_constants.t ()).consensus.delta else 1)
 
 module Actions = struct
   type action =

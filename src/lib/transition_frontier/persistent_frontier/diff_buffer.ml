@@ -4,7 +4,7 @@ open Core_kernel
 open Frontier_base
 
 let max_latency () =
-  let constants = (Lazy.force !Coda_constants.t).consensus in
+  let constants = (Coda_constants.t ()).consensus in
   Block_time.Span.(
     ( constants.block_window_duration_ms |> Int64.of_int
     |> Block_time.Span.of_ms )
