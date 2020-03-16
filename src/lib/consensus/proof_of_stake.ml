@@ -1279,11 +1279,10 @@ module Data = struct
       let same_sub_window =
         Global_sub_window.equal prev_global_sub_window next_global_sub_window
       in
-      let constants = (Coda_constants.t ()).consensus in
       let same_window =
         Global_sub_window.(
           add prev_global_sub_window
-            (constant constants.sub_windows_per_window)
+            (constant Coda_compile_config.sub_windows_per_window)
           >= next_global_sub_window)
       in
       let new_sub_window_densities =
@@ -1347,11 +1346,10 @@ module Data = struct
           Global_sub_window.Checked.equal prev_global_sub_window
             next_global_sub_window
         in
-        let constants = (Coda_constants.t ()).consensus in
         let%bind same_window =
           Global_sub_window.Checked.(
             add prev_global_sub_window
-              (constant constants.sub_windows_per_window)
+              (constant Coda_compile_config.sub_windows_per_window)
             >= next_global_sub_window)
         in
         let if_ cond ~then_ ~else_ =
@@ -1479,8 +1477,7 @@ module Data = struct
           UInt32.to_int constants.slots_per_sub_window
 
         let sub_windows_per_window =
-          let constants = (Coda_constants.t ()).consensus in
-          UInt32.to_int constants.sub_windows_per_window
+          UInt32.to_int Coda_compile_config.sub_windows_per_window
 
         (* slot_diff are generated in such a way so that we can test different cases
            in the update function, I use a weighted union to generate it.
@@ -1844,12 +1841,11 @@ module Data = struct
       ; has_ancestor_in_same_checkpoint_window }
 
     let data_spec =
-      let constants = (Coda_constants.t ()).consensus in
       let open Snark_params.Tick.Data_spec in
       [ Length.typ
       ; Length.typ
       ; Length.typ
-      ; Typ.list ~length:constants.sub_windows_per_window Length.typ
+      ; Typ.list ~length:Coda_compile_config.sub_windows_per_window Length.typ
       ; Vrf.Output.Truncated.typ
       ; Amount.typ
       ; Global_slot.Checked.typ
@@ -2043,7 +2039,7 @@ module Data = struct
       ; sub_window_densities=
           Length.zero
           :: List.init
-               (constants.sub_windows_per_window - 1)
+               (Coda_compile_config.sub_windows_per_window - 1)
                ~f:(Fn.const max_sub_window_density)
       ; last_vrf_output= Vrf.Output.Truncated.dummy
       ; total_currency= genesis_ledger_total_currency ~ledger:genesis_ledger

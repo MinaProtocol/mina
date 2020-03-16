@@ -15,8 +15,6 @@ open Hash_prefixes
 
 let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
 
-let constants () = Coda_constants.t ()
-
 let receipt_chain = salt receipt_chain
 
 let coinbase = salt coinbase
@@ -43,7 +41,7 @@ let merkle_tree =
   Array.init Coda_compile_config.ledger_depth ~f:(fun i -> salt (merkle_tree i))
 
 let coinbase_merkle_tree () =
-  Array.init (constants ()).scan_state.pending_coinbase_depth ~f:(fun i ->
+  Array.init Coda_compile_config.pending_coinbase_depth ~f:(fun i ->
       salt (coinbase_merkle_tree i) )
 
 let vrf_message = salt vrf_message

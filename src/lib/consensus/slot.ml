@@ -42,7 +42,7 @@ end
 
 let gen =
   let open Quickcheck.Let_syntax in
-  let constants = (Coda_constants.t ()).consensus in
+  let constants = Coda_constants.compiled_constants_for_test.consensus in
   Core.Int.gen_incl 0 (constants.c * constants.k * 3) >>| UInt32.of_int
 
 let%test_unit "in_seed_update_range unchecked vs. checked equality" =
@@ -50,7 +50,7 @@ let%test_unit "in_seed_update_range unchecked vs. checked equality" =
     Test_util.test_equal typ Tick.Boolean.typ Checked.in_seed_update_range
       in_seed_update_range
   in
-  let constants = (Coda_constants.t ()).consensus in
+  let constants = Coda_constants.compiled_constants_for_test.consensus in
   let x = constants.c * constants.k in
   let examples =
     List.map ~f:UInt32.of_int [x; x - 1; x + 1; x * 2; (x * 2) - 1; (x * 2) + 1]

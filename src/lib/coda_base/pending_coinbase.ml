@@ -1120,9 +1120,7 @@ struct
 end
 
 module T = Make (struct
-  let depth () =
-    let constants = (Coda_constants.t ()).scan_state in
-    constants.pending_coinbase_depth
+  let depth () = Coda_compile_config.pending_coinbase_depth
 end)
 
 include T

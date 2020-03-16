@@ -13,8 +13,7 @@ let of_global_slot (s : Global_slot.t) : t =
     Global_slot.to_uint32 s / UInt32.of_int constants.slots_per_sub_window)
 
 let sub_window t =
-  let constants = (Coda_constants.t ()).consensus in
-  UInt32.rem t (UInt32.of_int constants.sub_windows_per_window)
+  UInt32.rem t (UInt32.of_int Coda_compile_config.sub_windows_per_window)
 
 let ( >= ) a b = UInt32.compare a b >= 0
 
@@ -42,11 +41,10 @@ module Checked = struct
 
   let sub_window (t : t) : (Sub_window.Checked.t, _) Checked.t =
     make_checked (fun () ->
-        let constants = (Coda_constants.t ()).consensus in
         let _, shift =
           Integer.div_mod ~m t
             (Integer.constant ~m
-               (Bignum_bigint.of_int constants.sub_windows_per_window))
+               (Bignum_bigint.of_int Coda_compile_config.sub_windows_per_window))
         in
         Sub_window.Checked.Unsafe.of_integer shift )
 

@@ -159,6 +159,8 @@ let read_write_constants read_from_opt write_to =
     | None ->
         Ok Genesis_constants.compiled
   in
+  (*Set this before generating the base proof to use the constants from config file if any*)
+  Coda_constants.t_ref := Some (Coda_constants.create_t constants) ;
   Yojson.Safe.to_file write_to
     Genesis_constants.(to_config_file constants |> Config_file.to_yojson)
 
@@ -184,6 +186,8 @@ let main accounts_json_file dir n constants_file =
           ledger )
     with
     | Ok ledger ->
+        read_write_constants constants_file constants_path
+        |> Result.ok_or_failwith ;
         let%bind _base_hash, base_proof =
           if use_dummy_values then
             return
@@ -193,9 +197,7 @@ let main accounts_json_file dir n constants_file =
         in
         let%bind wr = Writer.open_file proof_path in
         Writer.write wr (Proof.Stable.V1.sexp_of_t base_proof |> Sexp.to_string) ;
-        let%map () = Writer.close wr in
-        read_write_constants constants_file constants_path
-        |> Result.ok_or_failwith
+        Writer.close wr
     | Error e ->
         failwithf "Failed to create genesis ledger\n%s" (Error.to_string_hum e)
           ()

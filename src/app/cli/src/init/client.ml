@@ -1442,7 +1442,8 @@ let compile_time_constants =
       ; ("delta", `Int t.consensus.delta)
       ; ("c", `Int t.consensus.c)
       ; ("inactivity_ms", `Int t.inactivity_ms)
-      ; ("sub_windows_per_window", `Int t.consensus.sub_windows_per_window)
+      ; ( "sub_windows_per_window"
+        , `Int Coda_compile_config.sub_windows_per_window )
       ; ("slots_per_sub_window", `Int t.consensus.slots_per_sub_window)
       ; ("slots_per_window", `Int t.consensus.slots_per_window)
       ; ("slots_per_epoch", `Int t.consensus.slots_per_epoch) ]

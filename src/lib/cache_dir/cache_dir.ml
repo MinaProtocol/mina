@@ -16,7 +16,7 @@ let genesis_dir_name (genesis_constants : Genesis_constants.t) =
           [ Coda_compile_config.curve_size
           ; Coda_compile_config.ledger_depth
           ; Coda_compile_config.fake_accounts_target
-          ; genesis_constants.consensus.c
+          ; Coda_compile_config.c
           ; genesis_constants.consensus.k ]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
