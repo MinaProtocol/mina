@@ -22,7 +22,7 @@ module Test_inputs = struct
     end
 
     (* TEMP *)
-    include Binable.Of_binable (Int) (T)
+    include Binable.Of_binable (Int) (T2)
     include T
   end
 
