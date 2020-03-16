@@ -122,12 +122,10 @@ let rec download = (filename, url, encoding, maxRedirects, chunkCb, doneCb) => {
 };
 
 let codaRepo = "...";
-[@bs.module "electron"] [@bs.scope "app"]
-external getAppPath: string => string = "getPath";
 
 let downloadCoda = (version, chunkCb, doneCb) => {
   let tempFilename = "coda-portable-" ++ version ++ ".zip";
-  let installPath = getAppPath("userData") ++ "/daemon";
+  let installPath = ProjectRoot.getPath(`UserData) ++ "/daemon";
   download(
     tempFilename,
     codaRepo ++ version ++ ".zip",
