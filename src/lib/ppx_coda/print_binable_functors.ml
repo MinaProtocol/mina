@@ -60,7 +60,7 @@ let print_included_binable_functor_app ~path inc =
       if i < path_len - 1 then printf "." ) ;
   printf ":%!" ;
   Pprintast.structure_item Versioned_util.diff_formatter inc ;
-  Format.print_flush () ;
+  Format.pp_print_flush Versioned_util.diff_formatter () ;
   printf "\n%!"
 
 let traverse_ast =
