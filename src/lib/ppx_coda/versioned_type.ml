@@ -136,7 +136,7 @@ let print_type ~options:_ ~path type_decls =
   in
   let stri = type_decls_to_stri type_decls_filtered_attrs in
   Pprintast.structure_item Versioned_util.diff_formatter stri ;
-  Format.print_flush () ;
+  Format.pp_print_flush Versioned_util.diff_formatter () ;
   printf "\n%!" ;
   []
 
