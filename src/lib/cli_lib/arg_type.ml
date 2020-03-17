@@ -10,40 +10,19 @@ let int16 =
   Command.Arg_type.map Command.Param.int
     ~f:(Fn.compose Or_error.ok_exn validate_int16)
 
-module Key_arg_type (Key : sig
-  type t
-
-  val of_base58_check_exn : string -> t
-
-  val to_base58_check : t -> string
-
-  val name : string
-
-  val random : unit -> t
-end) =
-struct
-  let arg_type =
-    Command.Arg_type.create (fun s ->
-        try Key.of_base58_check_exn s
-        with e ->
-          failwithf
-            "Couldn't read %s (Invalid key format) %s -- here's a sample one: \
-             %s"
-            Key.name
-            (Error.to_string_hum (Error.of_exn e))
-            (Key.to_base58_check (Key.random ()))
-            () )
-end
-
 let public_key_compressed =
-  let module Pk = Key_arg_type (struct
-    include Public_key.Compressed
-
-    let name = "public key"
-
-    let random () = Public_key.compress (Keypair.create ()).public_key
-  end) in
-  Pk.arg_type
+  Command.Arg_type.create (fun s ->
+      try Public_key.Compressed.of_base58_check_exn s
+      with e ->
+        let random = Public_key.compress (Keypair.create ()).public_key in
+        eprintf
+          "Error parsing command line.  Run with -help for usage information.\n\
+           Couldn't read public key (Invalid key format)\n\
+           %s\n\
+           - here's a sample one: %s\n"
+          (Error.to_string_hum (Error.of_exn e))
+          (Public_key.Compressed.to_base58_check random) ;
+        exit 1 )
 
 let public_key =
   Command.Arg_type.map public_key_compressed ~f:(fun pk ->

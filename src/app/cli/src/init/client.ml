@@ -953,6 +953,85 @@ let import_key =
                (Public_key.Compressed.to_base58_check
                   (Public_key.compress public_key)) ))
 
+let export_key =
+  let privkey_path = Cli_lib.Flag.privkey_write_path in
+  let pk_flag =
+    let open Command.Param in
+    flag "public-key" ~doc:"KEY Public key of account to be exported"
+      (required Cli_lib.Arg_type.public_key_compressed)
+  in
+  let conf_dir = Cli_lib.Flag.conf_dir in
+  let flags = Args.zip3 privkey_path pk_flag conf_dir in
+  Command.async
+    ~summary:
+      "Export a tracked account so that it can be saved or transferred \
+       between machines.\n\
+      \ Set CODA_PRIVKEY_PASS environment variable to use non-interactively \
+       (key will be exported using the same password)."
+    (Cli_lib.Background_daemon.graphql_init flags
+       ~f:(fun _ (export_path, pk, conf_dir) ->
+         let open Deferred.Let_syntax in
+         let%bind home = Sys.home_directory () in
+         let conf_dir =
+           Option.value
+             ~default:(home ^/ Cli_lib.Default.conf_dir_name)
+             conf_dir
+         in
+         let wallets_disk_location = conf_dir ^/ "wallets" in
+         let%bind wallets =
+           Secrets.Wallets.load ~logger:(Logger.create ())
+             ~disk_location:wallets_disk_location
+         in
+         let password =
+           lazy
+             (Secrets.Password.hidden_line_or_env
+                "Password for exported account: " ~env:Secrets.Keypair.env)
+         in
+         let%bind account =
+           let open Deferred.Result.Let_syntax in
+           let%bind _ = Secrets.Wallets.unlock wallets ~needle:pk ~password in
+           Secrets.Wallets.find_identity wallets ~needle:pk
+           |> Result.of_option ~error:`Not_found
+           |> Deferred.return
+         in
+         let kp =
+           match account with
+           | Ok (`Keypair kp) ->
+               Ok kp
+           | Ok (`Hd_index i) ->
+               Error
+                 (sprintf
+                    !"account is an HD account (hardware wallet), the \
+                      associated index is %{Unsigned.UInt32}"
+                    i)
+           | Error `Bad_password ->
+               Error
+                 (sprintf
+                    !"wrong password provided for account \
+                      %{Public_key.Compressed.to_base58_check}"
+                    pk)
+           | Error `Not_found ->
+               Error
+                 (sprintf
+                    !"account not found corresponding to account \
+                      %{Public_key.Compressed.to_base58_check}"
+                    pk)
+         in
+         match kp with
+         | Ok kp ->
+             let%bind () =
+               Secrets.Keypair.Terminal_stdin.write_exn kp
+                 ~privkey_path:export_path
+             in
+             printf
+               !"😄 Account exported to %s: %s\n"
+               export_path
+               (Public_key.Compressed.to_base58_check pk) ;
+             Deferred.unit
+         | Error e ->
+             printf "❌ Export failed -- %s\n" e ;
+             Deferred.unit ))
+
 let list_accounts =
   let open Command.Param in
   Command.async ~summary:"List all owned accounts"
