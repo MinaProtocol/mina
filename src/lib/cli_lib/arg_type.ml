@@ -16,10 +16,10 @@ let public_key_compressed =
       with e ->
         let random = Public_key.compress (Keypair.create ()).public_key in
         eprintf
-          "Error parsing command line.  Run with -help for usage information.\n\
+          "Error parsing command line.  Run with -help for usage information.\n\n\
            Couldn't read public key (Invalid key format)\n\
-           %s\n\
-           - here's a sample one: %s\n"
+          \ %s\n\
+          \ - here's a sample one: %s\n"
           (Error.to_string_hum (Error.of_exn e))
           (Public_key.Compressed.to_base58_check random) ;
         exit 1 )
