@@ -107,6 +107,7 @@ let versioned_in_functor_error loc =
 
 type accumulator =
   { in_functor: bool
+  ; in_include: bool
   ; module_path: string list
   ; errors: (Location.t * string) list }
 
@@ -307,6 +308,13 @@ let lint_ast =
               ; pmod_loc
               ; _ }
             , {pmod_desc= Pmod_ident {txt= Lident _; _}; _} ) ->
+            let include_errors =
+              if acc.in_include then []
+              else
+                [ ( pmod_loc
+                  , "Binable.Of_binable application must be an argument to an \
+                     include" ) ]
+            in
             let path_errors =
               if in_stable_versioned_module acc.module_path then []
               else
@@ -321,7 +329,8 @@ let lint_ast =
                   , "First argument to Binable.Of_binable must be a \
                      stable-versioned module" ) ]
             in
-            acc_with_accum_errors acc (path_errors @ arg_errors)
+            acc_with_accum_errors acc
+              (include_errors @ path_errors @ arg_errors)
         | Pmod_apply
             ( { pmod_desc= Pmod_ident {txt= Ldot (Lident "Binable", ftor); _}
               ; pmod_loc
@@ -330,6 +339,14 @@ let lint_ast =
           when List.mem
                  ["Of_sexpable"; "Of_stringable"]
                  ftor ~equal:String.equal ->
+            let include_errors =
+              if acc.in_include then []
+              else
+                [ ( pmod_loc
+                  , sprintf
+                      "Binable.%s application must be an argument to an include"
+                      ftor ) ]
+            in
             let path_errors =
               if in_stable_versioned_module acc.module_path then []
               else
@@ -338,7 +355,7 @@ let lint_ast =
                       "Binable.%s applied outside of stable-versioned module"
                       ftor ) ]
             in
-            acc_with_accum_errors acc path_errors
+            acc_with_accum_errors acc (include_errors @ path_errors)
         | Pmod_apply
             ( { pmod_desc=
                   Pmod_ident
@@ -348,6 +365,13 @@ let lint_ast =
               ; pmod_loc
               ; _ }
             , _ ) ->
+            let include_errors =
+              if acc.in_include then []
+              else
+                [ ( pmod_loc
+                  , "Bin_prot.Utils.Make_binable application must be an \
+                     argument to an include" ) ]
+            in
             let path_errors =
               if in_stable_versioned_module acc.module_path then []
               else
@@ -355,7 +379,7 @@ let lint_ast =
                   , "Bin_prot.Utils.Make_binable applied outside of \
                      stable-versioned module" ) ]
             in
-            acc_with_accum_errors acc path_errors
+            acc_with_accum_errors acc (include_errors @ path_errors)
         | _ ->
             super#module_expr expr acc
       in
@@ -400,6 +424,11 @@ let lint_ast =
           acc
       | Pstr_include inc_decl when is_versioned_module_inc_decl inc_decl ->
           acc_with_errors acc [include_versioned_module_error str.pstr_loc]
+      | Pstr_include inc_decl ->
+          let acc' =
+            self#module_expr inc_decl.pincl_mod {acc with in_include= true}
+          in
+          {acc' with in_include= false}
       | _ ->
           let acc' = super#structure_item str acc in
           acc_with_errors acc acc'.errors
@@ -407,7 +436,8 @@ let lint_ast =
 
 let lint_impl str =
   let acc =
-    lint_ast#structure str {in_functor= false; module_path= []; errors= []}
+    lint_ast#structure str
+      {in_functor= false; in_include= false; module_path= []; errors= []}
   in
   if !errors_as_warnings_ref then (
     (* we can't print Lint_error.t's, so collect the same information

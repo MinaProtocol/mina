@@ -1,22 +1,6 @@
 open Core_kernel
 open Currency
 
-module T = struct
-  type t = Fee.t [@@deriving hash, compare, sexp]
-
-  let of_binable = Fee.of_int
-
-  let to_binable = Fee.to_int
-end
-
-module Stable = struct
-  module V1 = struct
-    type t = int
-
-    include Binable.Of_binable (Core_kernel.Int) (T)
-  end
-end
-
 module Test_inputs = struct
   module Transaction_witness = Int
   module Ledger_hash = Int
