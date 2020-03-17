@@ -156,11 +156,9 @@ let in_versioned_type_module module_path =
   | _ ->
       false
 
-let is_versioned_module_or_jane_street_ident id =
+let is_versioned_module_ident id =
   match id with
   | Ldot (prefix, vn) when is_version_module vn && is_stable_prefix prefix ->
-      true
-  | Ldot (prefix, _) when is_jane_street_prefix prefix ->
       true
   | _ ->
       false
@@ -323,7 +321,7 @@ let lint_ast =
                      module" ) ]
             in
             let arg_errors =
-              if is_versioned_module_or_jane_street_ident arg then []
+              if is_versioned_module_ident arg then []
               else
                 [ ( pmod_loc
                   , "First argument to Binable.Of_binable must be a \
