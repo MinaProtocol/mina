@@ -336,6 +336,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		return nil, needsDHT()
 	}
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
+		return true
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
 			app.P2p.Logger.Info("would have validated but it's from us!")
@@ -988,7 +989,7 @@ type successResult struct {
 func main() {
 	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
 	log.SetOutput(os.Stderr)
-	logging.SetAllLoggers(logging2.INFO)
+	logging.SetAllLoggers(logging2.DEBUG)
 	helperLog := logging.Logger("helper top-level JSON handling")
 
 	go func() {
