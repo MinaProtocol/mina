@@ -77,7 +77,8 @@ ci_excludes = [
 # of all the generated CI jobs, allow these specific ones to fail (extra excludes on top of ci_excludes)
 required_excludes = [
     'test_postake_catchup:*',
-    'test_postake_three_producers:*'
+    'test_postake_three_producers:*',
+    'test_postake_five_even_txns:*',
 ]
 
 # these extra jobs are not filters, they are full status check names
