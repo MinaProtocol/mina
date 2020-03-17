@@ -302,9 +302,11 @@ let make = (~profiles) => {
               {React.string(
                  "To learn more about the selection criteria and requirements, see the ",
                )}
-              <a className=Theme.Link.basic href="/tcGenesis">
-                {React.string("Terms and Conditions.")}
-              </a>
+              <Next.Link href="/tcGenesis">
+                <a className=Theme.Link.basic>
+                  {React.string("Terms and Conditions.")}
+                </a>
+              </Next.Link>
             </li>
           </ul>
         </div>
@@ -327,9 +329,17 @@ let make = (~profiles) => {
           />
         </div>
         <Spacer height=1.5 />
-        <a className=Theme.Link.basic href="/tcGenesis">
-          {React.string("Terms and Conditions ")}
+        <a
+          className=Theme.Link.basic
+          href="https://forums.codaprotocol.com/t/genesis-token-program-faq/270">
+          {React.string("FAQ")}
         </a>
+        <Spacer height=1. />
+        <Next.Link href="/tcGenesis">
+          <a className=Theme.Link.basic>
+            {React.string("Terms and Conditions ")}
+          </a>
+        </Next.Link>
         <Spacer height=5.65 />
         <h1 className=Styles.textBlockHeading>
           {React.string("About Coda Protocol")}
