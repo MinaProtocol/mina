@@ -1029,16 +1029,12 @@ let unlock_account =
   Command.async ~summary:"Unlock a tracked account"
     (Cli_lib.Background_daemon.graphql_init pk_flag
        ~f:(fun graphql_endpoint pk_str ->
-         let args =
-           let open Deferred.Or_error.Let_syntax in
-           let%map password =
-             Deferred.map ~f:Or_error.return
-               (Secrets.Password.hidden_line_or_env
-                  "Password to unlock account: " ~env:Secrets.Keypair.env)
-           in
-           password
+         let password =
+           Deferred.map ~f:Or_error.return
+             (Secrets.Password.hidden_line_or_env
+                "Password to unlock account: " ~env:Secrets.Keypair.env)
          in
-         match%bind args with
+         match%bind password with
          | Ok password_bytes ->
              let%map response =
                Graphql_client.query_exn
@@ -1272,6 +1268,7 @@ let accounts =
     [ ("list", list_accounts)
     ; ("create", create_account)
     ; ("import", import_key)
+    ; ("export", export_key)
     ; ("unlock", unlock_account)
     ; ("lock", lock_account) ]
 
