@@ -56,19 +56,27 @@ let get_balance =
   let address_flag =
     flag "address"
       ~doc:"PUBLICKEY Public-key for which you want to check the balance"
-      (required Cli_lib.Arg_type.public_key)
+      (required Cli_lib.Arg_type.public_key_compressed)
   in
+  let token_flag =
+    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
+    Command.Param.return Token_id.default
+  in
+  let flags = Args.zip2 address_flag token_flag in
   Command.async ~summary:"Get balance associated with a public key"
-    (Cli_lib.Background_daemon.rpc_init address_flag ~f:(fun port address ->
+    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (pk, token_id) ->
+         let account_id = Account_id.create pk token_id in
          let%map res =
            Daemon_rpcs.Client.dispatch_join_errors Daemon_rpcs.Get_balance.rpc
-             (Public_key.compress address)
-             port
+             account_id port
          in
          let balance_str = function
-           | Some b ->
+           | Some b when Token_id.(equal default) token_id ->
                sprintf "Balance: %s coda\n"
                  (Currency.Balance.to_formatted_string b)
+           | Some b ->
+               sprintf "Balance: %s\n" (Currency.Balance.to_formatted_string b)
            | None ->
                "There are no funds in this account\n"
          in
@@ -259,13 +267,19 @@ let generate_receipt =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
+  let token_flag =
+    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
+    Command.Param.return Token_id.default
+  in
   Command.async ~summary:"Generate a receipt for a sent payment"
     (Cli_lib.Background_daemon.rpc_init
-       (Args.zip2 receipt_hash_flag address_flag)
-       ~f:(fun port (receipt_chain_hash, pk) ->
+       (Args.zip3 receipt_hash_flag address_flag token_flag)
+       ~f:(fun port (receipt_chain_hash, pk, token_id) ->
+         let account_id = Account_id.create pk token_id in
          Daemon_rpcs.Client.dispatch_with_message Prove_receipt.rpc
-           (receipt_chain_hash, pk) port
-           ~success:Cli_lib.Render.Prove_receipt.to_text
+           (receipt_chain_hash, account_id)
+           port ~success:Cli_lib.Render.Prove_receipt.to_text
            ~error:Error.to_string_hum ~join_error:Or_error.join ))
 
 let read_json filepath ~flag =
@@ -300,10 +314,16 @@ let verify_receipt =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
+  let token_flag =
+    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
+    Command.Param.return Token_id.default
+  in
   Command.async ~summary:"Verify a receipt of a sent payment"
     (Cli_lib.Background_daemon.rpc_init
-       (Args.zip3 payment_path_flag proof_path_flag address_flag)
-       ~f:(fun port (payment_path, proof_path, pk) ->
+       (Args.zip4 payment_path_flag proof_path_flag address_flag token_flag)
+       ~f:(fun port (payment_path, proof_path, pk, token_id) ->
+         let account_id = Account_id.create pk token_id in
          let dispatch_result =
            let open Deferred.Or_error.Let_syntax in
            let%bind payment_json =
@@ -328,7 +348,8 @@ let verify_receipt =
                   ~error:
                     (sprintf "Proof file %s has invalid json format" proof_path)
            in
-           Daemon_rpcs.Client.dispatch Verify_proof.rpc (pk, payment, proof)
+           Daemon_rpcs.Client.dispatch Verify_proof.rpc
+             (account_id, payment, proof)
              port
          in
          match%map dispatch_result with
@@ -339,17 +360,13 @@ let verify_receipt =
                (Error.to_string_hum e) ))
 
 let get_nonce :
-       rpc:( Public_key.Compressed.t
-           , Account.Nonce.t option Or_error.t )
-           Rpc.Rpc.t
-    -> Public_key.t
+       rpc:(Account_id.t, Account.Nonce.t option Or_error.t) Rpc.Rpc.t
+    -> Account_id.t
     -> Host_and_port.t
     -> (Account.Nonce.t, string) Deferred.Result.t =
- fun ~rpc addr port ->
+ fun ~rpc account_id port ->
   let open Deferred.Let_syntax in
-  let%map res =
-    Daemon_rpcs.Client.dispatch rpc (Public_key.compress addr) port
-  in
+  let%map res = Daemon_rpcs.Client.dispatch rpc account_id port in
   match Or_error.join res with
   | Ok (Some n) ->
       Ok n
@@ -362,11 +379,20 @@ let get_nonce_cmd =
   let open Command.Param in
   let address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address you want the nonce for"
-      (required Cli_lib.Arg_type.public_key)
+      (required Cli_lib.Arg_type.public_key_compressed)
   in
+  let token_flag =
+    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
+    Command.Param.return Token_id.default
+  in
+  let flags = Args.zip2 address_flag token_flag in
   Command.async ~summary:"Get the current nonce for an account"
-    (Cli_lib.Background_daemon.rpc_init address_flag ~f:(fun port address ->
-         match%bind get_nonce ~rpc:Daemon_rpcs.Get_nonce.rpc address port with
+    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (pk, token_flag) ->
+         let account_id = Account_id.create pk token_flag in
+         match%bind
+           get_nonce ~rpc:Daemon_rpcs.Get_nonce.rpc account_id port
+         with
          | Error e ->
              eprintf "Failed to get nonce\n%s\n" e ;
              exit 2
@@ -451,22 +477,29 @@ let batch_send_payments =
     let%bind keypair = Secrets.Keypair.Terminal_stdin.read_exn privkey_path
     and infos = get_infos payments_path in
     let%bind nonce0 =
-      get_nonce_exn ~rpc:Daemon_rpcs.Get_nonce.rpc keypair.public_key port
+      get_nonce_exn ~rpc:Daemon_rpcs.Get_nonce.rpc
+        (Account_id.create
+           (Public_key.compress keypair.public_key)
+           Token_id.default)
+        port
     in
     let _, ts =
       List.fold_map ~init:nonce0 infos
         ~f:(fun nonce {receiver; valid_until; amount; fee} ->
+          let sender_pk = Public_key.compress keypair.public_key in
           ( Account.Nonce.succ nonce
           , User_command.sign keypair
-              (User_command_payload.create ~fee ~nonce
-                 ~memo:User_command_memo.empty
+              (User_command_payload.create ~fee ~fee_token:Token_id.default
+                 ~fee_payer_pk:sender_pk ~nonce ~memo:User_command_memo.empty
                  ~valid_until:
                    (Option.value valid_until
                       ~default:Coda_numbers.Global_slot.max_value)
                  ~body:
                    (Payment
-                      { receiver=
+                      { source_pk= sender_pk
+                      ; receiver_pk=
                           Public_key.Compressed.of_base58_check_exn receiver
+                      ; token_id= Token_id.default
                       ; amount })) ) )
     in
     Daemon_rpcs.Client.dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
@@ -482,7 +515,9 @@ let batch_send_payments =
        (Args.zip2 Cli_lib.Flag.privkey_read_path payment_path_flag)
        ~f:main)
 
-let user_command (body_args : User_command_payload.Body.t Command.Param.t)
+let user_command
+    (body_args :
+      (Public_key.Compressed.t -> User_command_payload.Body.t) Command.Param.t)
     ~label ~summary ~error =
   let flag =
     let open Cli_lib.Flag in
@@ -498,13 +533,19 @@ let user_command (body_args : User_command_payload.Body.t Command.Param.t)
          let%bind sender_kp =
            Secrets.Keypair.Terminal_stdin.read_exn from_account
          in
+         let body = body (Public_key.compress sender_kp.public_key) in
          let%bind nonce =
            match nonce_opt with
            | Some nonce ->
                return nonce
            | None ->
+               let sender_account_id =
+                 Account_id.create
+                   (Public_key.compress sender_kp.public_key)
+                   (User_command.Payload.Body.token body)
+               in
                get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
-                 sender_kp.public_key port
+                 sender_account_id port
          in
          let fee =
            Option.value ~default:Cli_lib.Default.transaction_fee fee_opt
@@ -542,9 +583,15 @@ let send_payment =
   let body =
     let open Command.Let_syntax in
     let open Cli_lib.Flag in
-    let%map_open receiver = User_command.receiver
+    let%map_open receiver_pk = User_command.receiver_pk
+    and token_id =
+      (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
+        (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
+      Command.Param.return Token_id.default
     and amount = User_command.amount in
-    User_command_payload.Body.Payment {receiver; amount}
+    fun source_pk ->
+      User_command_payload.Body.Payment
+        {source_pk; receiver_pk; token_id; amount}
   in
   user_command body ~label:"payment" ~summary:"Send payment to an address"
     ~error:"Failed to send payment"
@@ -624,35 +671,29 @@ let cancel_transaction =
        ~f:(fun port (privkey_read_path, serialized_transaction) ->
          match User_command.of_base58_check serialized_transaction with
          | Ok user_command ->
-             let receiver =
-               match
-                 User_command.Payload.body (User_command.payload user_command)
-               with
-               | Payment payment ->
-                   payment.receiver
-               | Stake_delegation (Set_delegate {new_delegate}) ->
-                   new_delegate
-             in
              let%bind sender_kp =
                Secrets.Keypair.Terminal_stdin.read_exn privkey_read_path
              in
-             let cancel_sender = User_command.sender user_command in
+             let cancel_sender = User_command.fee_payer user_command in
+             let cancel_sender_pk = User_command.fee_payer_pk user_command in
              if
                not
-                 (Public_key.Compressed.equal
-                    (Public_key.compress sender_kp.public_key)
-                    cancel_sender)
+                 (Public_key.Compressed.equal cancel_sender_pk
+                    (Public_key.compress sender_kp.public_key))
              then (
                eprintf
                  "Provided key doesn't match transaction to be cancelled.\n\
                   Wanted key for %s\n"
-                 (Public_key.Compressed.to_base58_check cancel_sender) ;
+                 (Public_key.Compressed.to_base58_check cancel_sender_pk) ;
                Deferred.don't_wait_for (exit 17) ) ;
              let%bind inferred_nonce =
                get_nonce_exn ~rpc:Daemon_rpcs.Get_inferred_nonce.rpc
-                 sender_kp.public_key port
+                 cancel_sender port
              in
              let cancelled_nonce = User_command.nonce user_command in
+             (* TODO: This fee is insufficient if this wasn't the last command
+                issued for this account.
+             *)
              let cancel_fee =
                let diff =
                  Unsigned.UInt64.of_int
@@ -673,7 +714,13 @@ let cancel_transaction =
                (Currency.Fee.to_formatted_string cancel_fee) ;
              let body =
                User_command_payload.Body.Payment
-                 {receiver; amount= Currency.Amount.zero}
+                 { source_pk= cancel_sender_pk
+                 ; receiver_pk=
+                     cancel_sender_pk
+                     (* NOTE: Use [fee_token] because we know the account exists.
+                   *)
+                 ; token_id= User_command.fee_token user_command
+                 ; amount= Currency.Amount.zero }
              in
              let command =
                Coda_commands.setup_user_command ~fee:cancel_fee
@@ -710,20 +757,18 @@ let cancel_transaction_graphql =
     (Cli_lib.Background_daemon.graphql_init txn_id_flag
        ~f:(fun graphql_endpoint user_command ->
          let receiver =
-           match
-             User_command.Payload.body (User_command.payload user_command)
-           with
-           | Payment payment ->
-               payment.receiver
-           | Stake_delegation (Set_delegate {new_delegate}) ->
-               new_delegate
+           user_command |> User_command.payload |> User_command.Payload.body
+           |> User_command.Payload.Body.receiver
          in
+         let receiver_pk = Account_id.public_key receiver in
+         let cancel_sender = User_command.fee_payer user_command in
+         let cancel_sender_pk = Account_id.public_key cancel_sender in
          let open Deferred.Let_syntax in
          let%bind nonce_response =
            let open Graphql_client.Encoders in
            Graphql_client.query_exn
              (Graphql_queries.Get_inferred_nonce.make
-                ~public_key:(public_key (User_command.sender user_command))
+                ~public_key:(public_key cancel_sender_pk)
                 ())
              graphql_endpoint
          in
@@ -756,8 +801,8 @@ let cancel_transaction_graphql =
          let cancel_query =
            let open Graphql_client.Encoders in
            Graphql_queries.Send_payment.make
-             ~sender:(public_key (User_command.sender user_command))
-             ~receiver:(public_key receiver) ~fee:(fee cancel_fee)
+             ~sender:(public_key cancel_sender_pk)
+             ~receiver:(public_key receiver_pk) ~fee:(fee cancel_fee)
              ~amount:(amount Currency.Amount.zero)
              ~nonce:
                (uint32
@@ -802,7 +847,9 @@ let delegate_stake =
            to delegate your stake"
         (required public_key_compressed)
     in
-    User_command_payload.Body.Stake_delegation (Set_delegate {new_delegate})
+    fun delegator ->
+      User_command_payload.Body.Stake_delegation
+        (Set_delegate {delegator; new_delegate})
   in
   user_command body ~label:"delegate"
     ~summary:"Change the address to which you're delegating your coda"

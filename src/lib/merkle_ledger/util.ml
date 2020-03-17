@@ -5,10 +5,17 @@ module type Inputs_intf = sig
 
   module Key : Intf.Key
 
+  module Token_id : Intf.Token_id
+
+  module Account_id :
+    Intf.Account_id with type key := Key.t and type token_id := Token_id.t
+
   module Balance : Intf.Balance
 
   module Account :
-    Intf.Account with type balance := Balance.t and type key := Key.t
+    Intf.Account
+    with type balance := Balance.t
+     and type account_id := Account_id.t
 
   module Hash : Intf.Hash with type account := Account.t
 
@@ -35,7 +42,7 @@ module type Inputs_intf = sig
   val set_location_batch :
        last_location:Location.t
     -> Base.t
-    -> (Key.t * Location.t) Non_empty_list.t
+    -> (Account_id.t * Location.t) Non_empty_list.t
     -> unit
 end
 
@@ -125,7 +132,7 @@ end = struct
         let key_locations =
           Non_empty_list.map nonempty_addresses_and_accounts
             ~f:(fun (address, account) ->
-              (Inputs.Account.public_key account, address) )
+              (Inputs.Account.identifier account, address) )
         in
         let new_last_location =
           let current_last_index =

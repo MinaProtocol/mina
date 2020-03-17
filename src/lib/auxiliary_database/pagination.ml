@@ -35,11 +35,11 @@ struct
     ; mutable time_index: Cursor_with_date.Set.t }
 
   type t =
-    { user_cursors: Cursor_with_date.Set.t Public_key.Compressed.Table.t
+    { user_cursors: Cursor_with_date.Set.t Account_id.Table.t
     ; all_values: all_values }
 
   let create () =
-    { user_cursors= Public_key.Compressed.Table.create ()
+    { user_cursors= Account_id.Table.create ()
     ; all_values=
         {table= Cursor.Table.create (); time_index= Cursor_with_date.Set.empty}
     }
@@ -224,12 +224,13 @@ let%test_module "Pagination" =
       User_command.Set.(
         [%test_eq: t] (of_list expected_values) (of_list actual_values))
 
-    module Pagination =
-      Make (User_command.Stable.V1) (User_command.Stable.V1) (Int)
+    module Pagination = Make (User_command) (User_command) (Int)
 
     let ({Keypair.public_key= pk1; _} as keypair1) = Keypair.create ()
 
     let pk1 = Public_key.compress pk1
+
+    let account_id1 = Account_id.create pk1 Token_id.default
 
     let keypair2 = Keypair.create ()
 
@@ -260,10 +261,10 @@ let%test_module "Pagination" =
                 let participants =
                   User_command.accounts_accessed user_command
                 in
-                List.mem participants pk1 ~equal:Public_key.Compressed.equal )
+                List.mem participants account_id1 ~equal:Account_id.equal )
           in
           let pk1_queried_transactions =
-            Pagination.get_all_values t (Some pk1)
+            Pagination.get_all_values t (Some account_id1)
           in
           assert_same_set pk1_expected_transactions pk1_queried_transactions )
 
@@ -394,7 +395,8 @@ let%test_module "Pagination" =
               , `Has_earlier_page has_earlier
               , `Has_later_page has_later ) =
             query_next_page t ~cursor:(Some query_transaction)
-              ~value_filter_specification:(`User_only pk1) ~num_items:None
+              ~value_filter_specification:(`User_only account_id1)
+              ~num_items:None
           in
           assert_same_set expected_next_page_transactions
             next_page_transactions ;
@@ -423,7 +425,7 @@ let%test_module "Pagination" =
               , `Has_earlier_page has_earlier
               , `Has_later_page has_later ) =
             query_next_page t ~cursor:None
-              ~value_filter_specification:(`User_only pk1) ~num_items
+              ~value_filter_specification:(`User_only account_id1) ~num_items
           in
           assert_same_set expected_next_page_transactions
             next_page_transactions ;
@@ -452,7 +454,7 @@ let%test_module "Pagination" =
               , `Has_earlier_page has_earlier
               , `Has_later_page has_later ) =
             query_next_page t ~cursor:(Some querying_transaction)
-              ~value_filter_specification:(`User_only pk1)
+              ~value_filter_specification:(`User_only account_id1)
               ~num_items:(Some amount_to_query)
           in
           assert_same_set expected_next_page_transactions
@@ -475,7 +477,7 @@ let%test_module "Pagination" =
            ~payment_gen:Gen.Payment.same_sender_same_receiver)
         ~query_next_page:
           (Pagination.query ~navigation:`Earlier
-             ~value_filter_specification:(`User_only pk1))
+             ~value_filter_specification:(`User_only account_id1))
 
     let%test_unit "Trying to query n transactions that occurred before \
                    another transaction can give you less than n transactions" =
@@ -529,7 +531,7 @@ let%test_module "Pagination" =
       test ~trials:5 later_pagination_transaction_gen
         ~query_next_page:
           (Pagination.query ~navigation:`Later
-             ~value_filter_specification:(`User_only pk1))
+             ~value_filter_specification:(`User_only account_id1))
 
     let%test_unit "Trying to query n values that occurred after another value \
                    can give you less than n values" =

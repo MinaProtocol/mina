@@ -2,7 +2,6 @@ open Async_kernel
 open Core_kernel
 open Coda_base
 open Pipe_lib
-open Signature_lib
 open Network_peer
 
 (** A [Resource_pool_base_intf] is a mutable pool of resources that supports
@@ -198,16 +197,14 @@ module type Snark_pool_diff_intf = sig
 end
 
 module type Transaction_pool_diff_intf = sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = User_command.Stable.V1.t list
-      [@@deriving sexp, to_yojson, bin_io, version]
+      type t = User_command.Stable.V1.t list [@@deriving sexp, to_yojson]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+  type t = User_command.t list [@@deriving sexp, to_yojson]
 end
 
 module type Transaction_resource_pool_intf = sig
@@ -222,6 +219,6 @@ module type Transaction_resource_pool_intf = sig
   val transactions :
     logger:Logger.t -> t -> User_command.With_valid_signature.t Sequence.t
 
-  val all_from_user :
-    t -> Public_key.Compressed.t -> User_command.With_valid_signature.t list
+  val all_from_account :
+    t -> Account_id.t -> User_command.With_valid_signature.t list
 end

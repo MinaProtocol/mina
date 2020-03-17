@@ -256,6 +256,8 @@ end = struct
 
       let of_unsigned magnitude = {magnitude; sgn= Sgn.Checked.pos}
 
+      let negate {magnitude; sgn} = {magnitude; sgn= Sgn.Checked.negate sgn}
+
       let if_ cond ~then_ ~else_ =
         let%map sgn = Sgn.Checked.if_ cond ~then_:then_.sgn ~else_:else_.sgn
         and magnitude =
@@ -311,6 +313,11 @@ end = struct
           (l, r)
         in
         ({sgn= l_sgn; magnitude= l_mag}, {sgn= r_sgn; magnitude= r_mag})
+
+      let scale (f : Field.Var.t) (t : var) =
+        let%bind x = Field.Checked.mul (pack_var t.magnitude) f in
+        let%map x = unpack_var x in
+        {sgn= t.sgn; magnitude= x}
     end
 
     [%%endif]
@@ -363,6 +370,10 @@ end = struct
     let add_signed (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
       Field.Var.add (pack_var t) d |> unpack_var
+
+    let scale (f : Field.Var.t) (t : var) =
+      let%bind x = Field.Checked.mul (pack_var t) f in
+      unpack_var x
 
     let%test_module "currency_test" =
       ( module struct
@@ -612,6 +623,10 @@ module Balance = struct
     let add_amount = Amount.Checked.add
 
     let sub_amount = Amount.Checked.sub
+
+    let add_amount_flagged = Amount.Checked.add_flagged
+
+    let sub_amount_flagged = Amount.Checked.sub_flagged
 
     let ( + ) = add_amount
 

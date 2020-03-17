@@ -54,8 +54,8 @@ let%test_module "Processor" =
         ~expect:user_command.payload decoded_user_command.payload ;
       [%test_result: Public_key.Compressed.t]
         ~equal:Public_key.Compressed.equal
-        ~expect:(Public_key.compress user_command.sender)
-        decoded_user_command.sender ;
+        ~expect:(Public_key.compress user_command.signer)
+        decoded_user_command.signer ;
       [%test_result: Block_time.t option]
         ~equal:[%equal: Block_time.t Option.t] ~expect:block_time
         decoded_block_time
@@ -159,18 +159,19 @@ let%test_module "Processor" =
               in
               [%test_result: Int.t] ~equal:Int.equal ~expect:n_keys
                 (Array.length queried_public_keys) ;
-              let queried_public_keys =
-                Public_key.Compressed.Set.of_array queried_public_keys
+              let queried_accounts =
+                Account_id.Set.of_array
+                @@ Array.map queried_public_keys ~f:(fun pk ->
+                       Account_id.create pk Token_id.default )
               in
               let accessed_accounts =
-                Public_key.Compressed.Set.of_list
+                Account_id.Set.of_list
                 @@ List.concat
                      [ User_command.accounts_accessed user_command1
                      ; User_command.accounts_accessed user_command2 ]
               in
-              [%test_result: Public_key.Compressed.Set.t]
-                ~equal:Public_key.Compressed.Set.equal
-                ~expect:accessed_accounts queried_public_keys ;
+              [%test_result: Account_id.Set.t] ~equal:Account_id.Set.equal
+                ~expect:accessed_accounts queried_accounts ;
               let query_user_command hash =
                 let%map query_result =
                   Processor.Client.query_exn

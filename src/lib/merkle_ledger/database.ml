@@ -17,8 +17,8 @@ module Make (Inputs : Inputs_intf) :
    and type account := Inputs.Account.t
    and type root_hash := Inputs.Hash.t
    and type hash := Inputs.Hash.t
-   and type key := Inputs.Key.t
-   and type key_set := Inputs.Key.Set.t = struct
+   and type account_id := Inputs.Account_id.t
+   and type account_id_set := Inputs.Account_id.Set.t = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   open Inputs
   include Depth
@@ -111,8 +111,8 @@ module Make (Inputs : Inputs_intf) :
 
   let to_list mdb = account_list_bin mdb Account.bin_read_t
 
-  let keys mdb =
-    to_list mdb |> List.map ~f:Account.public_key |> Key.Set.of_list
+  let accounts mdb =
+    to_list mdb |> List.map ~f:Account.identifier |> Account_id.Set.of_list
 
   let set_raw {kvdb; _} location bin =
     Kvdb.set kvdb ~key:(Location.serialize location) ~data:bin
@@ -151,11 +151,17 @@ module Make (Inputs : Inputs_intf) :
       assert (Location.is_generic location) ;
       get_raw mdb location
 
-    (* encodes a key as a location used as a database key, so we can find the
-       account location associated with that key *)
-    let build_location key =
+    (** encodes a key, token_id pair as a location used as a database key, so
+        we can find the account location associated with that key.
+    *)
+    let build_location account_id =
       Location.build_generic
-        (Bigstring.of_string ("$" ^ Format.sprintf !"%{sexp: Key.t}" key))
+        (Bigstring.of_string
+           ( "$"
+           ^ Format.sprintf
+               !"%{sexp: Key.t}!%{sexp: Token_id.t}"
+               (Account_id.public_key account_id)
+               (Account_id.token_id account_id) ))
 
     let get mdb key =
       match get_generic mdb (build_location key) with
@@ -232,7 +238,7 @@ module Make (Inputs : Inputs_intf) :
           Some parsed_location
   end
 
-  let location_of_key t key =
+  let location_of_account t key =
     match Account_location.get t key with
     | Error _ ->
         None
@@ -243,6 +249,8 @@ module Make (Inputs : Inputs_intf) :
 
   include Util.Make (struct
     module Key = Key
+    module Token_id = Token_id
+    module Account_id = Account_id
     module Balance = Balance
     module Location = Location
     module Account = Account
@@ -303,8 +311,8 @@ module Make (Inputs : Inputs_intf) :
       (Location.Hash (Location.to_path_exn location))
       (Hash.hash_account account)
 
-  let index_of_key_exn mdb key =
-    let location = location_of_key mdb key |> Option.value_exn in
+  let index_of_account_exn mdb account_id =
+    let location = location_of_account mdb account_id |> Option.value_exn in
     let addr = Location.to_path_exn location in
     Addr.to_int addr
 
@@ -316,10 +324,10 @@ module Make (Inputs : Inputs_intf) :
     let addr = Addr.of_int_exn index in
     set mdb (Location.Account addr) account
 
-  let get_or_create_account mdb key account =
-    match Account_location.get mdb key with
+  let get_or_create_account mdb account_id account =
+    match Account_location.get mdb account_id with
     | Error Account_location_not_found -> (
-      match Account_location.allocate mdb key with
+      match Account_location.allocate mdb account_id with
       | Ok location ->
           set mdb location account ;
           Ok (`Added, location)
@@ -330,8 +338,8 @@ module Make (Inputs : Inputs_intf) :
     | Ok location ->
         Ok (`Existed, location)
 
-  let get_or_create_account_exn mdb key account =
-    get_or_create_account mdb key account
+  let get_or_create_account_exn mdb account_id account =
+    get_or_create_account mdb account_id account
     |> Result.map_error ~f:(fun err -> raise (Error.to_exn err))
     |> Result.ok_exn
 
@@ -353,25 +361,26 @@ module Make (Inputs : Inputs_intf) :
   (* TODO : if key-value store supports iteration mechanism, like RocksDB,
      maybe use that here, instead of loading all accounts into memory See Issue
      #1191 *)
-  let foldi_with_ignored_keys t ignored_keys ~init ~f =
+  let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
     let f' index accum account = f (Addr.of_int_exn index) accum account in
     match Account_location.last_location_address t with
     | None ->
         init
     | Some last_addr ->
         let ignored_indices =
-          Int.Set.map ignored_keys ~f:(fun key ->
-              try index_of_key_exn t key with _ -> -1
-              (* dummy index for keys not in database *) )
+          Int.Set.map ignored_accounts ~f:(fun account_id ->
+              try index_of_account_exn t account_id with _ -> -1
+              (* dummy index for accounts not in database *) )
         in
         let last = Addr.to_int last_addr in
         Sequence.range ~stop:`inclusive 0 last
-        (* filter out indices corresponding to ignored keys *)
+        (* filter out indices corresponding to ignored accounts *)
         |> Sequence.filter ~f:(fun loc -> not (Int.Set.mem ignored_indices loc))
         |> Sequence.map ~f:(get_at_index_exn t)
         |> Sequence.foldi ~init ~f:f'
 
-  let foldi t ~init ~f = foldi_with_ignored_keys t Key.Set.empty ~init ~f
+  let foldi t ~init ~f =
+    foldi_with_ignored_accounts t Account_id.Set.empty ~init ~f
 
   module C : Container.S0 with type t := t and type elt := Account.t =
   Container.Make0 (struct

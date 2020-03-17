@@ -13,9 +13,9 @@ module type S = sig
 
   type hash
 
-  type key
+  type account_id
 
-  type key_set
+  type account_id_set
 
   module Location : Merkle_ledger.Location_intf.S
 
@@ -34,8 +34,8 @@ module type S = sig
       with type account := account
        and type root_hash := hash
        and type hash := hash
-       and type key := key
-       and type key_set := key_set
+       and type account_id := account_id
+       and type account_id_set := account_id_set
 
     exception Dangling_parent_reference of Uuid.t
 

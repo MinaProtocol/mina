@@ -35,3 +35,5 @@ include Comparable.S with type t := t
 val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
 
 val receivers : t -> Public_key.Compressed.t One_or_two.t
+
+val receiver_ids : t -> Account_id.t One_or_two.t

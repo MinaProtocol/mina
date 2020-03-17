@@ -12,7 +12,7 @@ val refused_answer_query_string : string
 
 module Rpcs : sig
   module Get_staged_ledger_aux_and_pending_coinbases_at_hash : sig
-    type query = State_hash.Stable.V1.t
+    type query = State_hash.t
 
     type response =
       (Staged_ledger.Scan_state.t * Ledger_hash.t * Pending_coinbase.t) option
@@ -25,7 +25,7 @@ module Rpcs : sig
   end
 
   module Get_transition_chain : sig
-    type query = State_hash.Stable.V1.t list
+    type query = State_hash.t list
 
     type response = External_transition.t list option
   end

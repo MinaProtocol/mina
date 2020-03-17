@@ -8,6 +8,22 @@ module Stable = struct
       [@@deriving bin_io, equal, compare, hash, sexp, version, yojson]
     end
 
+    let to_latest a_latest = function
+      | `One x ->
+          `One (a_latest x)
+      | `Two (x, y) ->
+          `Two (a_latest x, a_latest y)
+
+    let of_latest a_latest = function
+      | `One x ->
+          let open Result.Let_syntax in
+          let%map x = a_latest x in
+          `One x
+      | `Two (x, y) ->
+          let open Result.Let_syntax in
+          let%map x = a_latest x and y = a_latest y in
+          `Two (x, y)
+
     include T
   end
 

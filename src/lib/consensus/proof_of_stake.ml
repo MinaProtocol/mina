@@ -42,7 +42,11 @@ let compute_delegatee_table keys ~iter_accounts =
   let open Coda_base in
   let outer_table = Public_key.Compressed.Table.create () in
   iter_accounts (fun i (acct : Account.t) ->
-      if Public_key.Compressed.Set.mem keys acct.delegate then
+      if
+        Public_key.Compressed.Set.mem keys acct.delegate
+        (* Only default tokens may delegate. *)
+        && Token_id.equal acct.token_id Token_id.default
+      then
         Public_key.Compressed.Table.update outer_table acct.delegate
           ~f:(function
           | None ->
@@ -730,6 +734,10 @@ module Data = struct
       let%bind account =
         with_label __LOC__ (Frozen_ledger_hash.get ledger staker_addr)
       in
+      let%bind () =
+        [%with_label "Account is for the default token"]
+          Token_id.(Checked.Assert.equal account.token_id (var_of_t default))
+      in
       let%bind delegate =
         with_label __LOC__ (Public_key.decompress_var account.delegate)
       in
@@ -778,7 +786,7 @@ module Data = struct
         let dummy_sparse_ledger =
           Coda_base.Sparse_ledger.of_ledger_subset_exn
             (Lazy.force genesis_ledger)
-            [pk]
+            [Coda_base.(Account_id.create pk Token_id.default)]
         in
         let empty_pending_coinbase =
           Coda_base.Pending_coinbase.create () |> Or_error.ok_exn
@@ -3170,8 +3178,11 @@ let%test_module "Proof of stake tests" =
       let maybe_sk, account = Test_genesis_ledger.largest_account_exn () in
       let private_key = Option.value_exn maybe_sk in
       let public_key_compressed = Account.public_key account in
+      let account_id =
+        Account_id.create public_key_compressed Token_id.default
+      in
       let location =
-        Ledger.Any_ledger.M.location_of_key ledger public_key_compressed
+        Ledger.Any_ledger.M.location_of_account ledger account_id
       in
       let delegator =
         Option.value_exn location |> Ledger.Any_ledger.M.Location.to_path_exn

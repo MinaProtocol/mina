@@ -83,14 +83,12 @@ val validated_transitions :
   t -> External_transition.Validated.t Strict_pipe.Reader.t
 
 module Root_diff : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t = {user_commands: User_command.Stable.V1.t list; root_length: int}
-      [@@deriving bin_io]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t
 end
