@@ -115,10 +115,6 @@ let gen_division_generic (type t) (module M : Int_s with type t = t) (n : t)
     in
     let res = List.map dirichlet ~f:(fun x -> float_to_mt @@ (x *. n_float)) in
     let total = List.fold res ~f:M.( + ) ~init:M.zero in
-    (* Going through floating point land may have caused some rounding error. We
-     tack it onto the first result so that the sum of the output is equal to n.
-  *)
-    let rounding_error = M.(n - total) in
     return
       ( match res with
       | [] ->
@@ -126,7 +122,11 @@ let gen_division_generic (type t) (module M : Int_s with type t = t) (n : t)
             "empty result list in gen_symm_dirichlet, this should be \
              impossible. "
       | head :: rest ->
-          M.(head + rounding_error) :: rest )
+          (* Going through floating point land may have caused some rounding error. We
+           tack it onto the first result so that the sum of the output is equal to n. 
+         *)
+          if n > total then M.(head + (n - total)) :: rest
+          else M.(head - (total - n)) :: rest )
 
 let gen_division = gen_division_generic (module Int)
 
