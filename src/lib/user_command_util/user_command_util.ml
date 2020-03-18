@@ -41,10 +41,9 @@ end
 
 type user_command_input =
   { client_input: Client_input.t list
-  ; inferred_nonce: Public_key.Compressed.t -> Account_nonce.t Option.t
-  ; result: User_command.t list Or_error.t Ivar.t }
+  ; inferred_nonce: Public_key.Compressed.t -> Account_nonce.t Option.t }
 
-let process_user_command_input (uc_input : user_command_input) logger =
+let process_user_command_input (uc_inputs, result_cb, inferred_nonce) logger =
   let setup_user_command (client_input : Client_input.t) :
       User_command.t Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
@@ -89,7 +88,7 @@ let process_user_command_input (uc_input : user_command_input) logger =
           Deferred.Or_error.return nonce
       | None ->
           (*get inferred nonce*)
-          uc_input.inferred_nonce client_input.sender
+          inferred_nonce client_input.sender
           |> opt_error
                ~error_string:
                  "Couldn't infer nonce for transaction from specified \
@@ -120,13 +119,13 @@ let process_user_command_input (uc_input : user_command_input) logger =
                   ; ("error", `String (Error.to_string_hum e)) ] ;
               return (Error e) )
     in
-    go (Ok []) uc_input.client_input
+    go (Ok []) uc_inputs
   in
   match user_commands with
   | Ok ucs ->
       let user_commands' = List.rev ucs in
-      Ivar.fill uc_input.result (Ok user_commands') ;
+      Ivar.fill result_cb (Ok user_commands') ;
       user_commands'
   | Error e ->
-      Ivar.fill uc_input.result (Error e) ;
+      Ivar.fill result_cb (Error e) ;
       []

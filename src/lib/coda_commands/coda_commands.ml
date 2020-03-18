@@ -156,58 +156,25 @@ let replace_block_production_keys keys pks =
     (Keypair.And_compressed_pk.Set.of_list kps) ;
   kps |> List.map ~f:snd
 
-let get_inferred_nonce_from_transaction_pool_and_ledger t
-    (addr : Public_key.Compressed.t) =
-  let transaction_pool = Coda_lib.transaction_pool t in
-  let resource_pool =
-    Network_pool.Transaction_pool.resource_pool transaction_pool
-  in
-  let pooled_transactions =
-    Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
-      addr
-  in
-  let txn_pool_nonce =
-    let nonces =
-      List.map pooled_transactions
-        ~f:(Fn.compose User_command.nonce User_command.forget_check)
-    in
-    (* The last nonce gives us the maximum nonce in the transaction pool *)
-    List.last nonces
-  in
-  match txn_pool_nonce with
-  | Some nonce ->
-      Participating_state.Option.return (Account.Nonce.succ nonce)
-  | None ->
-      let open Participating_state.Option.Let_syntax in
-      let%map account = get_account t addr in
-      account.Account.Poly.nonce
-
-let get_inferred_nonce_from_transaction_pool_and_ledger_exn t
-    (addr : Public_key.Compressed.t) =
-  get_inferred_nonce_from_transaction_pool_and_ledger t addr
-  |> Participating_state.active_exn
-
-let add_transactions t user_commands =
-  let res_ivar = Ivar.create () in
-  Coda_lib.add_transactions t
-    { User_command_util.client_input= user_commands
-    ; inferred_nonce= get_inferred_nonce_from_transaction_pool_and_ledger_exn t
-    ; result= res_ivar } ;
-  Ivar.read res_ivar
-
 let setup_and_submit_user_command t
     (user_command_input : User_command_util.Client_input.t) =
   let open Participating_state.Let_syntax in
   let%map account_opt = get_account t user_command_input.sender in
   let open Deferred.Let_syntax in
-  let%map result = add_transactions t [user_command_input] in
+  let%map result = Coda_lib.add_transactions t [user_command_input] in
   txn_count := !txn_count + 1 ;
   match result with
-  | Ok [uc] ->
-      Ok (uc, record_payment t uc (Option.value_exn account_opt))
+  | Ok ([], [failed_txn]) ->
+      Error
+        (Error.of_string
+           (sprintf !"%s"
+              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                .to_yojson (snd failed_txn)
+              |> Yojson.Safe.to_string )))
+  | Ok ([txn], []) ->
+      Ok (txn, record_payment t txn (Option.value_exn account_opt))
   | Ok _ ->
-      Or_error.error_string
-        "Error adding transaction. Invalid result from add_transaction"
+      Error (Error.of_string "Invalid result from scheduling a payment")
   | Error e ->
       Error e
 
@@ -222,8 +189,7 @@ let setup_and_submit_user_commands t user_command_list =
   in
   Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
     "batch-send-payments does not yet report errors" ;
-  (*TODO: return the user commands and errors after merging #4515*)
-  Deferred.map (add_transactions t user_command_list) ~f:(Fn.const ())
+  Coda_lib.add_transactions t user_command_list
 
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)

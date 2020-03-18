@@ -96,8 +96,8 @@ module Helper = struct
     ; decode: string -> 'a Or_error.t
     ; write_pipe:
         ( 'a Envelope.Incoming.t
-        , Strict_pipe.crash Strict_pipe.buffered
-        , unit )
+        , Strict_pipe.synchronous
+        , unit Deferred.t )
         Strict_pipe.Writer.t
     ; read_pipe: 'a Envelope.Incoming.t Strict_pipe.Reader.t }
 
@@ -941,8 +941,8 @@ module Pubsub = struct
       ; decode: string -> 'a Or_error.t
       ; write_pipe:
           ( 'a Envelope.Incoming.t
-          , Strict_pipe.crash Strict_pipe.buffered
-          , unit )
+          , Strict_pipe.synchronous
+          , unit Deferred.t )
           Strict_pipe.Writer.t
       ; read_pipe: 'a Envelope.Incoming.t Strict_pipe.Reader.t }
 
@@ -973,9 +973,8 @@ module Pubsub = struct
       ~encode ~decode ~on_decode_failure =
     let subscription_idx = Helper.genseq net in
     let read_pipe, write_pipe =
-      Strict_pipe.create
-        ~name:(sprintf "subscription to topic «%s»" topic)
-        Strict_pipe.(Buffered (`Capacity 64, `Overflow Crash))
+      Strict_pipe.(
+        create ~name:(sprintf "subscription to topic «%s»" topic) Synchronous)
     in
     let sub =
       { Subscription.net

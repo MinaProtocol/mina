@@ -50,32 +50,6 @@ let stop_daemon =
               ~f_ok:(fun _ -> "Daemon stopping\n")
               ~error:"Daemon likely stopped") ))
 
-let get_balance =
-  let open Command.Param in
-  let open Deferred.Let_syntax in
-  let address_flag =
-    flag "address"
-      ~doc:"PUBLICKEY Public-key for which you want to check the balance"
-      (required Cli_lib.Arg_type.public_key)
-  in
-  Command.async ~summary:"Get balance associated with a public key"
-    (Cli_lib.Background_daemon.rpc_init address_flag ~f:(fun port address ->
-         let%map res =
-           Daemon_rpcs.Client.dispatch_join_errors Daemon_rpcs.Get_balance.rpc
-             (Public_key.compress address)
-             port
-         in
-         let balance_str = function
-           | Some b ->
-               sprintf "Balance: %s coda\n"
-                 (Currency.Balance.to_formatted_string b)
-           | None ->
-               "There are no funds in this account\n"
-         in
-         printf "%s"
-           (or_error_str res ~f_ok:balance_str ~error:"Failed to get balance")
-     ))
-
 let get_balance_graphql =
   let open Command.Param in
   let pk_flag =
@@ -838,26 +812,6 @@ let stop_tracing =
          | Error e ->
              Daemon_rpcs.Client.print_rpc_error e ))
 
-let set_staking =
-  let privkey_path = Cli_lib.Flag.privkey_read_path in
-  Command.async ~summary:"Set new keys for block production"
-    (Cli_lib.Background_daemon.rpc_init privkey_path
-       ~f:(fun port privkey_path ->
-         let%bind ({Keypair.public_key; _} as keypair) =
-           Secrets.Keypair.Terminal_stdin.read_exn privkey_path
-         in
-         match%map
-           Daemon_rpcs.Client.dispatch Daemon_rpcs.Set_staking.rpc [keypair]
-             port
-         with
-         | Error e ->
-             Daemon_rpcs.Client.print_rpc_error e
-         | Ok () ->
-             printf
-               !"New block producer public key : %s\n"
-               (Public_key.Compressed.to_base58_check
-                  (Public_key.compress public_key)) ))
-
 let set_staking_graphql =
   let open Command.Param in
   let open Cli_lib.Arg_type in
@@ -1374,19 +1328,6 @@ let client =
     ; ("stop-daemon", stop_daemon)
     ; ("status", status) ]
 
-let command =
-  Command.group ~summary:"[Deprecated] Lightweight client commands"
-    ~preserve_subcommand_order:()
-    [ ("get-balance", get_balance)
-    ; ("generate-keypair", Cli_lib.Commands.generate_keypair)
-    ; ("set-staking", set_staking)
-    ; ("set-snark-worker", set_snark_worker)
-    ; ("set-snark-work-fee", set_snark_work_fee)
-    ; ("generate-receipt", generate_receipt)
-    ; ("verify-receipt", verify_receipt)
-    ; ("stop-daemon", stop_daemon)
-    ; ("status", status) ]
-
 let client_trustlist_group =
   Command.group ~summary:"Client trustlist management"
     ~preserve_subcommand_order:()
@@ -1419,4 +1360,7 @@ let advanced =
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
     ; ("compile-time-constants", compile_time_constants)
     ; ("telemetry", telemetry)
-    ; ("visualization", Visualization.command_group) ]
+    ; ("visualization", Visualization.command_group)
+    ; ("generate-receipt", generate_receipt)
+    ; ("verify-receipt", verify_receipt)
+    ; ("generate-keypair", Cli_lib.Commands.generate_keypair) ]

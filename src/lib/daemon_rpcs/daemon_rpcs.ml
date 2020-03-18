@@ -92,7 +92,11 @@ module Send_user_commands = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = unit Core_kernel.Or_error.Stable.V1.t
+        type t =
+          ( Network_pool.Transaction_pool.Resource_pool.Diff.Stable.V1.t
+          * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.Stable.V1
+            .t )
+          Core_kernel.Or_error.Stable.V1.t
 
         let to_latest = Fn.id
       end

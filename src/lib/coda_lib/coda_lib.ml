@@ -55,12 +55,28 @@ type pipes =
       * (bool -> unit) )
       Pipe.Writer.t
   ; user_command_input_writer:
-      ( User_command_util.user_command_input
+      ( User_command_util.Client_input.t list
+        * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+              * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+              Or_error.t
+           -> unit)
+        * (   Signature_lib.Public_key.Compressed.t
+           -> Coda_base.Account.Nonce.t option Participating_state.t)
+      (*  ; local_txns_writer:
+   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+     * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+           * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+           Or_error.t
+        -> unit)*)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
   ; local_snark_work_writer:
       ( Network_pool.Snark_pool.Resource_pool.Diff.t
+        * (   ( Network_pool.Snark_pool.Resource_pool.Diff.t
+              * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
+              Or_error.t
+           -> unit)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t }
@@ -408,6 +424,39 @@ let get_ledger t staged_ledger_hash_opt =
       Deferred.Or_error.error_string
         "get_ledger: staged ledger hash not found in transition frontier"
 
+let get_inferred_nonce_from_transaction_pool_and_ledger t
+    (addr : Public_key.Compressed.t) =
+  let get_account addr =
+    let open Participating_state.Let_syntax in
+    let%map ledger = best_ledger t in
+    let open Option.Let_syntax in
+    let%bind loc = Ledger.location_of_key ledger addr in
+    Ledger.get ledger loc
+  in
+  let transaction_pool = t.components.transaction_pool in
+  let resource_pool =
+    Network_pool.Transaction_pool.resource_pool transaction_pool
+  in
+  let pooled_transactions =
+    Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
+      addr
+  in
+  let txn_pool_nonce =
+    let nonces =
+      List.map pooled_transactions
+        ~f:(Fn.compose User_command.nonce User_command.forget_check)
+    in
+    (* The last nonce gives us the maximum nonce in the transaction pool *)
+    List.last nonces
+  in
+  match txn_pool_nonce with
+  | Some nonce ->
+      Participating_state.Option.return (Account.Nonce.succ nonce)
+  | None ->
+      let open Participating_state.Option.Let_syntax in
+      let%map account = get_account addr in
+      account.Account.Poly.nonce
+
 let seen_jobs t = t.seen_jobs
 
 let add_block_subscriber t public_key =
@@ -603,13 +652,16 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
-    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work)
+    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
   |> Deferred.don't_wait_for
 
-(*TODO: Synchronize this*)
-let add_transactions t (uc_inputs : User_command_util.user_command_input) =
-  Strict_pipe.Writer.write t.pipes.user_command_input_writer uc_inputs
-  |> Deferred.don't_wait_for
+let add_transactions t (uc_inputs : User_command_util.Client_input.t list) =
+  let result_ivar = Ivar.create () in
+  let inferred_nonce = get_inferred_nonce_from_transaction_pool_and_ledger t in
+  Strict_pipe.Writer.write t.pipes.user_command_input_writer
+    (uc_inputs, Ivar.fill result_ivar, inferred_nonce)
+  |> Deferred.don't_wait_for ;
+  Ivar.read result_ivar
 
 let next_producer_timing t = t.next_producer_timing
 
@@ -715,6 +767,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     ; kill_ivar= Ivar.create () }
                   , config.snark_work_fee ) )
           in
+          Fork_id.set_current config.initial_fork_id ;
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
           in
@@ -892,7 +945,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           Strict_pipe.Reader.iter user_command_input_reader
-            ~f:(fun (uc_input : User_command_util.user_command_input) ->
+            ~f:(fun (uc_inputs, result_cb, inferred_nonce) ->
               let setup_user_command
                   (client_input : User_command_util.Client_input.t) :
                   User_command.t Deferred.Or_error.t =
@@ -942,7 +995,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                       Deferred.Or_error.return nonce
                   | None ->
                       (*get inferred nonce*)
-                      uc_input.inferred_nonce client_input.sender
+                      Participating_state.active
+                        (inferred_nonce client_input.sender)
+                      |> Option.bind ~f:Fn.id
                       |> opt_error
                            ~error_string:
                              "Couldn't infer nonce for transaction from \
@@ -961,9 +1016,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                       match%bind setup_user_command uc with
                       | Ok res ->
                           let acc' =
-                            let open Or_error.Let_syntax in
-                            let%map acc = acc in
-                            res :: acc
+                            Or_error.map acc ~f:(fun acc -> res :: acc)
                           in
                           go acc' ucs
                       | Error e ->
@@ -977,17 +1030,20 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                               ; ("error", `String (Error.to_string_hum e)) ] ;
                           return (Error e) )
                 in
-                go (Ok []) uc_input.client_input
+                go (Ok []) uc_inputs
               in
               match user_commands with
               | Ok ucs ->
                   let user_commands' = List.rev ucs in
-                  Ivar.fill uc_input.result (Ok user_commands') ;
-                  if List.is_empty user_commands' then return ()
+                  if List.is_empty user_commands' then (
+                    result_cb
+                      (Error (Error.of_string "No user commands to send")) ;
+                    return () )
                   else
-                    Strict_pipe.Writer.write local_txns_writer user_commands'
+                    Strict_pipe.Writer.write local_txns_writer
+                      (user_commands', result_cb)
               | Error e ->
-                  Deferred.return (Ivar.fill uc_input.result (Error e)) )
+                  Deferred.return (result_cb (Error e)) )
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =

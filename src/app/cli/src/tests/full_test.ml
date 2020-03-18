@@ -186,7 +186,7 @@ let run_test () : unit Deferred.t =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
-             ~gossip_net_params
+             ~gossip_net_params ~initial_fork_id:Fork_id.empty
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
@@ -312,9 +312,7 @@ let run_test () : unit Deferred.t =
             ~nonce_opt:(Some (User_command.nonce user_cmd))
         in
         let%bind p2_res = send_payment payment' in
-        assert_ok p2_res ;
-        (* The payment fails, but the rpc command doesn't indicate that because that
-           failure comes from the network. *)
+        assert (Or_error.is_error p2_res) ;
         (* Let the system settle, mine some blocks *)
         let%map () =
           balance_change_or_timeout
@@ -472,12 +470,12 @@ let run_test () : unit Deferred.t =
             blockchain_length coda
             > Coda_numbers.Length.add blockchain_length' wait_till_length )
         else if with_check then
-          let%map _ =
+          let%bind _ =
             test_multiple_payments other_accounts
               ~txn_count:(List.length other_accounts / 2)
               timeout_mins
           in
-          ()
+          test_duplicate_payments sender_keypair receiver_keypair
         else
           let%bind _ =
             test_multiple_payments other_accounts

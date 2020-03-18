@@ -562,12 +562,15 @@ end = struct
                           Coda_process.root_length_exn worker
                         in
                         let passed_root = Ivar.create () in
-                        Hashtbl.add_exn user_cmds_under_inspection
-                          ~key:user_cmd
-                          ~data:
-                            { expected_deadline=
-                                root_length + Consensus.Constants.k + delay
-                            ; passed_root } ;
+                        (* since amount, fee, valid_until fixed for all commands,
+                           might have duplicate commands if there are key duplicates
+                        *)
+                        ignore
+                          (Hashtbl.add user_cmds_under_inspection ~key:user_cmd
+                             ~data:
+                               { expected_deadline=
+                                   root_length + Consensus.Constants.k + delay
+                               ; passed_root }) ;
                         Option.return passed_root
                     | _ ->
                         return None )
