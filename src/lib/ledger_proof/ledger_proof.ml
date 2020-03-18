@@ -23,7 +23,7 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+  type t = Stable.Latest.t [@@deriving compare, sexp, to_yojson]
 
   let statement (t : t) = Transaction_snark.statement t
 
@@ -62,7 +62,7 @@ struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving sexp, yojson]
+  type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
 
   let statement ((t, _) : t) : Transaction_snark.Statement.t = t
 
