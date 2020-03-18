@@ -480,7 +480,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             (User_command.source_pk user_command)
         then return ()
         else
-          (* TODO: Predicates. *)
+          (* TODO(#4554): Predicates. *)
           Or_error.errorf
             "The fee-payer is not authorised to issue commands for the source \
              account"
@@ -621,7 +621,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
-    (* TODO: Allow token_id to vary from default. *)
+    (* TODO(#4555): Allow token_id to vary from default. *)
     match transfer with
     | `One (pk, fee) ->
         let account_id = Account_id.create pk Token_id.default in

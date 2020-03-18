@@ -46,6 +46,8 @@ module Node_list = struct
 
         (* Migrate this to a new latest version and expose the underlying
            serialised type directly when this type changes.
+
+           TODO(#4556): replace this mechanism with %%versioned_binable.
         *)
         module T_nonbinable = struct
           type nonrec t = t
