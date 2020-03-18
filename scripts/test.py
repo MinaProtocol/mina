@@ -266,7 +266,7 @@ class Executive:
                         with open(log, 'r') as file:
                             lines = file.readlines()
                             for line in lines[-200:]:
-                                print(line, end='')
+                                sys.stdout.write(line)
                     self.fail('command failed: %s' % cmd)
         self.do('$ %s' % cmd, action)
 
@@ -277,7 +277,8 @@ class Executive:
             return default
         else:
             while True:
-                print('%s [y/n]' % msg, end=' ', flush=True)
+                sys.stdout.write('%s [y/n] ' % msg)
+                sys.stdout.flush()
                 c = readchar()
                 print()
                 if c == 'y' or c == 'Y':
