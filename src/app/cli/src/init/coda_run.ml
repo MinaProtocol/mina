@@ -151,38 +151,40 @@ let get_next_fork_id_opt ~conf_dir ~logger =
       (* not on command-line, not in config dir, there's no next fork ID *)
       None )
   | Some fork_id -> (
-    try
-      (* it's an error if the command line value disagrees with the value in the config *)
-      let config_fork_id = read_fork_id () in
-      if String.equal config_fork_id fork_id then (
+      let validate_cli_fork_id fork_id =
+        if Option.is_none (Fork_id.create_opt fork_id) then (
+          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+            "Next fork ID provided on command line is invalid"
+            ~metadata:[("next_fork_id", `String fork_id)] ;
+          failwith "Next fork ID from command line is invalid" )
+      in
+      try
+        (* overwrite if the command line value disagrees with the value in the config *)
+        let config_fork_id = read_fork_id () in
+        if String.equal config_fork_id fork_id then (
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            "Using next fork ID $fork_id from command line, which matches the \
+             one in the config"
+            ~metadata:[("fork_id", `String fork_id)] ;
+          Some config_fork_id )
+        else (
+          validate_cli_fork_id fork_id ;
+          write_fork_id fork_id ;
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            "Overwriting Coda config next fork ID $config_next_fork_id with \
+             next fork ID $next_fork_id from the command line"
+            ~metadata:
+              [ ("config_next_fork_id", `String config_fork_id)
+              ; ("next_fork_id", `String fork_id) ] ;
+          Some fork_id )
+      with Sys_error _ ->
+        (* use value provided on command line, write to config dir *)
+        validate_cli_fork_id fork_id ;
+        write_fork_id fork_id ;
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          "Using next fork ID $fork_id from command line, which matches the \
-           one in the config"
+          "Using next fork ID $fork_id from command line, writing to config"
           ~metadata:[("fork_id", `String fork_id)] ;
-        Some config_fork_id )
-      else (
-        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-          "Next fork ID $fork_id from the command line disagrees with \
-           $config_fork_id from the Coda config"
-          ~metadata:
-            [ ("fork_id", `String fork_id)
-            ; ("config_fork_id", `String config_fork_id) ] ;
-        failwith
-          "Next fork ID from command line disagrees with fork ID in Coda \
-           config; please delete your Coda config if you wish to use a new \
-           fork ID" )
-    with Sys_error _ ->
-      (* use value provided on command line, write to config dir *)
-      if Option.is_none (Fork_id.create_opt fork_id) then (
-        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-          "Next fork ID provided on command line is invalid"
-          ~metadata:[("next_fork_id", `String fork_id)] ;
-        failwith "Next fork ID from command line is invalid" ) ;
-      write_fork_id fork_id ;
-      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-        "Using next fork ID $fork_id from command line, writing to config"
-        ~metadata:[("fork_id", `String fork_id)] ;
-      Some fork_id )
+        Some fork_id )
 
 (*TODO check deferred now and copy theose files to the temp directory*)
 let log_shutdown ~conf_dir ~top_logger coda_ref =
