@@ -468,11 +468,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
     set_with_location ledger fee_payer_location fee_payer_account ;
     let source = User_command.source user_command in
     let receiver = User_command.receiver user_command in
-    (* Compute the necessary changes to apply the command, failing if any of
-       the conditions are not met.
-    *)
     let exception Reject of Error.t in
-    match
+    let compute_updates () =
+      (* Compute the necessary changes to apply the command, failing if any of
+         the conditions are not met.
+      *)
       let%bind () =
         if
           Public_key.Compressed.equal
@@ -597,7 +597,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ; (receiver_location, receiver_account)
             ; (source_location, source_account) ]
           , Undo.User_command_undo.Body.Payment {previous_empty_accounts} )
-    with
+    in
+    match compute_updates () with
     | Ok (located_accounts, undo_body) ->
         (* Update the ledger. *)
         List.iter located_accounts ~f:(fun (location, account) ->

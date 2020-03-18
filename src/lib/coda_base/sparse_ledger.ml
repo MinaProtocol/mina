@@ -146,7 +146,7 @@ let apply_user_command_exn t
       Public_key.Compressed.equal (Account_id.public_key fee_payer) signer_pk
     )
   in
-  let () = assert (Token_id.equal fee_token Token_id.default) in
+  assert (Token_id.equal fee_token Token_id.default) ;
   let fee_payer_idx, fee_payer_account =
     let idx = find_index_exn t fee_payer in
     let account = get_exn t idx in
@@ -172,13 +172,13 @@ let apply_user_command_exn t
   let source = User_command.source user_command in
   let receiver = User_command.receiver user_command in
   let exception Reject of exn in
-  (* Raise an exception if any of the invariants for the user command are not
-     satisfied, so that the command will not go through.
+  let compute_updates () =
+    (* Raise an exception if any of the invariants for the user command are not
+       satisfied, so that the command will not go through.
 
-     This must re-check the conditions in Transaction_logic, to ensure that the
-     failure cases are consistent.
-  *)
-  match
+       This must re-check the conditions in Transaction_logic, to ensure that
+       the failure cases are consistent.
+    *)
     let () =
       (* TODO: Predicates. *)
       assert (
@@ -262,11 +262,13 @@ let apply_user_command_exn t
         [ (fee_payer_idx, fee_payer_account)
         ; (receiver_idx, receiver_account)
         ; (source_idx, source_account) ]
+  in
+  try
+    let indexed_accounts = compute_updates () in
+    (* User command succeeded, update accounts in the ledger. *)
+    List.fold ~init:t indexed_accounts ~f:(fun t (idx, account) ->
+        set_exn t idx account )
   with
-  | indexed_accounts ->
-      (* User command succeeded, update accounts in the ledger. *)
-      List.fold ~init:t indexed_accounts ~f:(fun t (idx, account) ->
-          set_exn t idx account )
   | exception Reject exn ->
       (* TODO: These transactions should never reach this stage, this error
          should be fatal.
