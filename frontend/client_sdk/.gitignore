@@ -13,6 +13,7 @@ yarn-error.log
 *.ts
 *.js
 !/src/SDKWrapper.ts
+!/src/TSTypes.ts
 !/test/Test.ts
 
 # These are generated but helpful for documentation
