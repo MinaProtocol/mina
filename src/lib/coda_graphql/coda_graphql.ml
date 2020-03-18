@@ -1598,56 +1598,8 @@ module Mutations = struct
     ; body
     ; sign_choice }
 
-  (*let create_user_command_payload ~coda ~fee ~nonce ~valid_until ~memo ~sender
-      ~body : (User_command.Payload.t, string) result =
-    let open Result.Let_syntax in
-    (* TODO: We should put a more sensible default here. *)
-    let valid_until =
-      Option.value_map ~default:Coda_numbers.Global_slot.max_value
-        ~f:Coda_numbers.Global_slot.of_uint32 valid_until
-    in
-    let%bind fee =
-      result_of_exn Currency.Fee.of_uint64 fee
-        ~error:(sprintf "Invalid `fee` provided.")
-    in
-    let%bind () =
-      Result.ok_if_true
-        Currency.Fee.(fee >= User_command.minimum_fee)
-        ~error:
-          (sprintf
-             !"Invalid user command. Fee %s is less than the minimum fee, %s."
-             (Currency.Fee.to_string fee)
-             (Currency.Fee.to_string User_command.minimum_fee))
-    in
-    let%bind memo =
-      Option.value_map memo ~default:(Ok User_command_memo.empty)
-        ~f:(fun memo ->
-          result_of_exn User_command_memo.create_from_string_exn memo
-            ~error:"Invalid `memo` provided." )
-    in
-    let%map nonce =
-      match nonce with
-      | Some nonce ->
-          Ok (Account.Nonce.of_uint32 nonce)
-      | None -> (
-        match
-          Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger
-            coda sender
-        with
-        | `Active (Some nonce) ->
-            Ok nonce
-        | `Active None ->
-            Error
-              "Couldn't infer nonce for transaction from specified `sender` \
-               since `sender` is not in the ledger or sent a transaction in \
-               transaction pool."
-        | `Bootstrapping ->
-            Error "Node is still bootstrapping" )
-    in
-    User_command.Payload.create ~fee ~nonce ~valid_until ~memo ~body*)
-
-  let send_signed_user_command ~(*~coda ~sender ~payload*) signature ~coda
-      ~nonce_opt ~sender ~memo ~fee ~valid_until ~body =
+  let send_signed_user_command ~signature ~coda ~nonce_opt ~sender ~memo ~fee
+      ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind user_command_input =
       create_user_command_input ~nonce_opt ~sender ~memo ~fee ~valid_until
@@ -1656,8 +1608,8 @@ module Mutations = struct
     in
     send_user_command coda user_command_input
 
-  let send_unsigned_user_command ~(*~coda ~sender ~payload*) coda ~nonce_opt
-      ~sender ~memo ~fee ~valid_until ~body =
+  let send_unsigned_user_command ~coda ~nonce_opt ~sender ~memo ~fee
+      ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind sign_choice =
       match%map Deferred.return @@ find_identity ~public_key:sender coda with
@@ -1706,7 +1658,6 @@ module Mutations = struct
       ~resolve:
         (fun {ctx= coda; _} ()
              (from, to_, amount, fee, valid_until, memo, nonce_opt) signature ->
-        (*let open Deferred.Result.Let_syntax in*)
         let body =
           User_command_payload.Body.Payment
             {receiver= to_; amount= Amount.of_uint64 amount}
