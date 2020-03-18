@@ -123,6 +123,11 @@ let get_current_fork_id ~compile_time_current_fork_id ~conf_dir ~logger =
            fork ID" )
     with Sys_error _ ->
       (* use value provided on command line, write to config dir *)
+      if Option.is_none (Fork_id.create_opt fork_id) then (
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          "Fork ID provided on command line is invalid"
+          ~metadata:[("fork_id", `String fork_id)] ;
+        failwith "Fork ID from command line is invalid" ) ;
       write_fork_id fork_id ;
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Using current fork ID $fork_id from command line, writing to config"
@@ -168,6 +173,11 @@ let get_next_fork_id_opt ~conf_dir ~logger =
            fork ID" )
     with Sys_error _ ->
       (* use value provided on command line, write to config dir *)
+      if Option.is_none (Fork_id.create_opt fork_id) then (
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          "Next fork ID provided on command line is invalid"
+          ~metadata:[("next_fork_id", `String fork_id)] ;
+        failwith "Next fork ID from command line is invalid" ) ;
       write_fork_id fork_id ;
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Using next fork ID $fork_id from command line, writing to config"

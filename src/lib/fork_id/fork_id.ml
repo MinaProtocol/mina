@@ -55,12 +55,7 @@ let create_exn s =
       "Fork_id.create: input string must contain only hexadecimal digits" ;
   s_lowercase
 
-let create_opt s =
-  let len = String.length s in
-  if not (Int.equal len required_length) then None
-  else
-    let s_lowercase = String.lowercase s in
-    if not @@ is_hex_string s_lowercase then None else Some s_lowercase
+let create_opt s = try Some (create_exn s) with _ -> None
 
 let to_string = Fn.id
 
