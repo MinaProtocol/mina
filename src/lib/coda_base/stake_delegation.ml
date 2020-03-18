@@ -57,6 +57,6 @@ let gen =
 
 let to_input = function
   | Set_delegate {delegator; new_delegate} ->
-      Array.reduce_exn ~f:Random_oracle.Input.append
-        [| Public_key.Compressed.to_input delegator
-         ; Public_key.Compressed.to_input new_delegate |]
+      Random_oracle.Input.append
+        (Public_key.Compressed.to_input delegator)
+        (Public_key.Compressed.to_input new_delegate)
