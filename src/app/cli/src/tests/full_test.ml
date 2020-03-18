@@ -312,9 +312,7 @@ let run_test () : unit Deferred.t =
           build_payment send_amount sender_sk receiver_pk transaction_fee
         in
         let%bind p2_res = send_payment payment' in
-        assert_ok p2_res ;
-        (* The payment fails, but the rpc command doesn't indicate that because that
-           failure comes from the network. *)
+        assert (Or_error.is_error p2_res) ;
         (* Let the system settle, mine some blocks *)
         let%map () =
           balance_change_or_timeout
@@ -472,12 +470,12 @@ let run_test () : unit Deferred.t =
             blockchain_length coda
             > Coda_numbers.Length.add blockchain_length' wait_till_length )
         else if with_check then
-          let%map _ =
+          let%bind _ =
             test_multiple_payments other_accounts
               ~txn_count:(List.length other_accounts / 2)
               timeout_mins
           in
-          ()
+          test_duplicate_payments sender_keypair receiver_keypair
         else
           let%bind _ =
             test_multiple_payments other_accounts
