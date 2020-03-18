@@ -233,6 +233,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                    Instead of refactoring it to have validation up-front and decoupled,
                    we pass along a validation callback with the message. This ends up
                    ignoring the actual subscription message pipe, so drain it separately. *)
+                (* HACK: validation is currently bypassed, this function will never be called *)
                 ~should_forward_message:(fun envelope ->
                   (* Messages from ourselves are valid. Don't try and reingest them. *)
                   match Envelope.Incoming.sender envelope with
@@ -268,10 +269,14 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       () ))
             in
             (* #4097 fix: drain the published message pipe, which we don't care about. *)
+            (* HACK: we're bypassing validation, use these messages *)
             don't_wait_for
               (Strict_pipe.Reader.iter
                  (Coda_net2.Pubsub.Subscription.message_pipe subscription)
-                 ~f:(Fn.const Deferred.unit)) ;
+                 ~f:(fun envelope ->
+                   let valid_ivar = Ivar.create () in
+                   Strict_pipe.Writer.write message_writer
+                     (envelope, Ivar.fill valid_ivar) )) ;
             let%map _ =
               (* XXX: this ALWAYS needs to be AFTER handle_protocol/subscribe
                 or it is possible to miss connections! *)

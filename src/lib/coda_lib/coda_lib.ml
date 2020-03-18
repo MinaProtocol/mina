@@ -56,11 +56,19 @@ type pipes =
       Pipe.Writer.t
   ; local_txns_writer:
       ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+        * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+              * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+              Or_error.t
+           -> unit)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
   ; local_snark_work_writer:
       ( Network_pool.Snark_pool.Resource_pool.Diff.t
+        * (   ( Network_pool.Snark_pool.Resource_pool.Diff.t
+              * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
+              Or_error.t
+           -> unit)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t }
@@ -105,10 +113,15 @@ let replace_block_production_keypairs t kps =
   Agent.update t.block_production_keypairs kps
 
 module Snark_worker = struct
-  let run_process ~logger client_port kill_ivar =
+  let run_process ~logger client_port kill_ivar num_threads =
+    let env =
+      Option.map
+        ~f:(fun num -> `Extend [("OMP_NUM_THREADS", string_of_int num)])
+        num_threads
+    in
     let%map snark_worker_process =
       let our_binary = Sys.executable_name in
-      Process.create_exn () ~prog:our_binary
+      Process.create_exn () ~prog:our_binary ?env
         ~args:
           ( "internal" :: Snark_worker.Intf.command_name
           :: Snark_worker.arguments
@@ -168,6 +181,7 @@ module Snark_worker = struct
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
             t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
+            t.config.snark_worker_config.num_threads
         in
         Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
@@ -597,11 +611,15 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
-    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work)
+    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
   |> Deferred.don't_wait_for
 
 let add_transactions t (txns : User_command.t list) =
-  Strict_pipe.Writer.write t.pipes.local_txns_writer txns
+  let result_ivar = Ivar.create () in
+  Strict_pipe.Writer.write t.pipes.local_txns_writer
+    (txns, Ivar.fill result_ivar)
+  |> Deferred.don't_wait_for ;
+  Ivar.read result_ivar
 
 let next_producer_timing t = t.next_producer_timing
 
@@ -658,7 +676,8 @@ let start t =
     ~coinbase_receiver:t.coinbase_receiver
     ~consensus_local_state:t.config.consensus_local_state
     ~frontier_reader:t.components.transition_frontier
-    ~transition_writer:t.pipes.producer_transition_writer ;
+    ~transition_writer:t.pipes.producer_transition_writer
+    ~log_block_creation:t.config.log_block_creation ;
   Snark_worker.start t
 
 let create (config : Config.t) ~genesis_ledger ~base_proof =
@@ -706,6 +725,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     ; kill_ivar= Ivar.create () }
                   , config.snark_work_fee ) )
           in
+          Fork_id.set_current config.initial_fork_id ;
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
           in
@@ -732,6 +752,65 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                 in
                 f ~frontier input )
+          in
+          (* knot-tying hack so we can pass a get_telemetry function before net created *)
+          let net_ref = ref None in
+          let block_producers =
+            config.initial_block_production_keypairs |> Keypair.Set.to_list
+            |> List.map ~f:(fun {Keypair.public_key; _} ->
+                   Public_key.compress public_key )
+          in
+          let get_telemetry_data _env =
+            let node = config.gossip_net_params.addrs_and_ports.external_ip in
+            match !net_ref with
+            | None ->
+                (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
+                Logger.info config.logger
+                  "Network not instantiated when telemetry data requested"
+                  ~module_:__MODULE__ ~location:__LOC__ ;
+                Deferred.return
+                @@ Error
+                     (Error.of_string
+                        (sprintf
+                           !"Node: %{sexp: Unix.Inet_addr.t}, network not \
+                             instantiated when telemetry data requested"
+                           node))
+            | Some net -> (
+              match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
+              | None ->
+                  Deferred.return
+                  @@ Error
+                       (Error.of_string
+                          (sprintf
+                             !"Node: %{sexp: Unix.Inet_addr.t}, could not get \
+                               transition frontier for telemetry data"
+                             node))
+              | Some frontier ->
+                  let%map peers = Coda_networking.peers net in
+                  let protocol_state_hash =
+                    let tip = Transition_frontier.best_tip frontier in
+                    let state =
+                      Transition_frontier.Breadcrumb.protocol_state tip
+                    in
+                    Coda_state.Protocol_state.hash state
+                  in
+                  let ban_statuses =
+                    Trust_system.Peer_trust.peer_statuses config.trust_system
+                  in
+                  let k_block_hashes =
+                    List.map
+                      ( Transition_frontier.root frontier
+                      :: Transition_frontier.best_tip_path frontier )
+                      ~f:Transition_frontier.Breadcrumb.state_hash
+                  in
+                  Ok
+                    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
+                      { node
+                      ; peers
+                      ; block_producers
+                      ; protocol_state_hash
+                      ; ban_statuses
+                      ; k_block_hashes } )
           in
           let%bind net =
             Coda_networking.create config.net_config
@@ -792,6 +871,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               ~get_best_tip:
                 (handle_request "get_best_tip" ~f:(fun ~frontier () ->
                      Best_tip_prover.prove ~logger:config.logger frontier ))
+              ~get_telemetry_data
               ~get_transition_chain_proof:
                 (handle_request "get_transition_chain_proof"
                    ~f:(fun ~frontier hash ->
@@ -800,6 +880,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 (handle_request "get_transition_chain"
                    ~f:Sync_handler.get_transition_chain)
           in
+          (* tie the knot *)
+          net_ref := Some net ;
           let local_txns_reader, local_txns_writer =
             Strict_pipe.(create ~name:"local transactions" Synchronous)
           in
