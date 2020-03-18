@@ -54,6 +54,23 @@ let daemon logger =
             provide both `block-producer-key` and `block-producer-pubkey`. \
             (default: don't produce blocks)"
          (optional string)
+     and block_production_pubkey =
+       flag "block-producer-pubkey"
+         ~doc:
+           "PUBLICKEY Public key for the associated private key that is being \
+            tracked by this daemon. You cannot provide both \
+            `block-producer-key` and `block-producer-pubkey`. (default: don't \
+            produce blocks)"
+         (optional public_key_compressed)
+     and block_production_password =
+       flag "block-producer-password"
+         ~doc:
+           "PASSWORD Password associated with the block-producer key. Setting \
+            this is equivalent to setting the CODA_PRIVKEY_PASS environment \
+            variable. Be careful when setting it in the commandline as it \
+            will likely get tracked in your history. Mainly to be used from \
+            the daemon.json config file"
+         (optional string)
      and demo_mode =
        flag "demo-mode" no_arg
          ~doc:
@@ -320,22 +337,33 @@ let daemon logger =
              ~logger ~conf_dir
          in
          let%bind config =
+           let configpath = conf_dir ^/ "daemon.json" in
            match%map
              Monitor.try_with_or_error ~extract_exn:true (fun () ->
-                 let%bind r = Reader.open_file (conf_dir ^/ "daemon.json") in
-                 let%map contents =
-                   Pipe.to_list (Reader.lines r)
-                   >>| fun ss -> String.concat ~sep:"\n" ss
-                 in
-                 YJ.from_string ~fname:"daemon.json" contents )
+                 let%bind r = Reader.open_file configpath in
+                 Pipe.to_list (Reader.lines r)
+                 >>| fun ss -> String.concat ~sep:"\n" ss )
            with
-           | Ok c ->
-               Some c
            | Error e ->
                Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-                 "Error reading daemon.json: $error"
-                 ~metadata:[("error", `String (Error.to_string_mach e))] ;
+                 "No daemon.json found at $configpath: $error"
+                 ~metadata:
+                   [ ("error", `String (Error.to_string_mach e))
+                   ; ("configpath", `String configpath) ] ;
                None
+           | Ok contents -> (
+             try
+               let json = YJ.from_string ~fname:"daemon.json" contents in
+               Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                 "Using daemon.json config found at $configpath"
+                 ~metadata:[("configpath", `String configpath)] ;
+               Some json
+             with Yojson.Json_error e ->
+               Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                 "Error parsing daemon.json at $configpath: $error"
+                 ~metadata:
+                   [("error", `String e); ("configpath", `String configpath)] ;
+               None )
          in
          let maybe_from_config (type a) (f : YJ.json -> a option)
              (keyname : string) (actual_value : a option) : a option =
@@ -347,6 +375,9 @@ let daemon logger =
            | None ->
                let%bind config = config in
                let%bind json_val = to_option Fn.id (member keyname config) in
+               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
+                 "Key $key being used from config file"
+                 ~metadata:[("key", `String keyname)] ;
                f json_val
          in
          let or_from_config map keyname actual_value ~default =
@@ -416,6 +447,28 @@ let daemon logger =
            ; transaction_pool_diff= log_transaction_pool_diff
            ; new_state= log_received_blocks }
          in
+         let json_to_publickey_compressed_option json =
+           YJ.Util.to_string_option json
+           |> Option.bind ~f:(fun pk_str ->
+                  match Public_key.Compressed.of_base58_check pk_str with
+                  | Ok key ->
+                      Some key
+                  | Error e ->
+                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                        "Error decoding public key ($key): $error"
+                        ~metadata:
+                          [ ("key", `String pk_str)
+                          ; ("error", `String (Error.to_string_hum e)) ] ;
+                      None )
+         in
+         let run_snark_worker_flag =
+           maybe_from_config json_to_publickey_compressed_option
+             "run-snark-worker" run_snark_worker_flag
+         in
+         let coinbase_receiver_flag =
+           maybe_from_config json_to_publickey_compressed_option
+             "coinbase-receiver" coinbase_receiver_flag
+         in
          let%bind external_ip =
            match external_ip_opt with
            | None ->
@@ -430,13 +483,49 @@ let daemon logger =
          let addrs_and_ports : Node_addrs_and_ports.t =
            {external_ip; bind_ip; peer= None; client_port; libp2p_port}
          in
+         let block_production_key =
+           maybe_from_config YJ.Util.to_string_option "block-producer-key"
+             block_production_key
+         in
+         let block_production_pubkey =
+           maybe_from_config json_to_publickey_compressed_option
+             "block-producer-pubkey" block_production_pubkey
+         in
+         let block_production_password =
+           maybe_from_config YJ.Util.to_string_option "block-producer-password"
+             block_production_password
+         in
+         Option.iter
+           ~f:(fun password ->
+             match Sys.getenv Secrets.Keypair.env with
+             | Some env_pass when env_pass <> password ->
+                 Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
+                   "$envkey environment variable doesn't match value provided \
+                    on command-line or daemon.json. Using value from $envkey"
+                   ~metadata:[("envkey", `String Secrets.Keypair.env)]
+             | _ ->
+                 Unix.putenv ~key:Secrets.Keypair.env ~data:password )
+           block_production_password ;
          let%bind block_production_keypair =
-           match block_production_key with
-           | Some sk_file ->
+           match (block_production_key, block_production_pubkey) with
+           | Some _, Some _ ->
+               eprintf
+                 "Error: You cannot provide both `block-producer-key` and \
+                  `block_production_pubkey`\n" ;
+               exit 11
+           | None, None ->
+               Deferred.return None
+           | Some sk_file, _ ->
                let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
                Some kp
-           | None ->
-               return None
+           | _, Some tracked_pubkey ->
+               let%bind wallets =
+                 Secrets.Wallets.load ~logger
+                   ~disk_location:(conf_dir ^/ "wallets")
+               in
+               let sk_file = Secrets.Wallets.get_path wallets tracked_pubkey in
+               let%map kp = Secrets.Keypair.Terminal_stdin.read_exn sk_file in
+               Some kp
          in
          let%bind client_trustlist =
            Reader.load_sexp
@@ -785,7 +874,6 @@ let internal_commands =
 let coda_commands logger =
   [ ("accounts", Client.accounts)
   ; ("daemon", daemon logger)
-  ; ("client-old", Client.command)
   ; ("client", Client.client)
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
