@@ -42,7 +42,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     zlib1g-dev \
     libbz2-dev
 
-RUN sudo pip install sexpdata awscli
+RUN sudo pip install sexpdata awscli readchar
 
 RUN sudo gem install deb-s3
 
