@@ -86,13 +86,19 @@ let daemon logger =
      and genesis_ledger_dir_flag =
        flag "genesis-ledger-dir"
          ~doc:
-           "Dir Directory that contains the genesis ledger and the genesis \
+           "DIR Directory that contains the genesis ledger and the genesis \
             blockchain proof (default: <config-dir>/genesis-ledger)"
          (optional string)
      and run_snark_worker_flag =
        flag "run-snark-worker"
          ~doc:"PUBLICKEY Run the SNARK worker with this public key"
          (optional public_key_compressed)
+     and snark_worker_parallelism_flag =
+       flag "snark-worker-parallelism"
+         ~doc:
+           "NUM Run the SNARK worker using this many threads. Equivalent to \
+            setting OMP_NUM_THREADS, but doesn't affect block production."
+         (optional int)
      and work_selection_method_flag =
        flag "work-selection"
          ~doc:
@@ -465,6 +471,10 @@ let daemon logger =
            maybe_from_config json_to_publickey_compressed_option
              "run-snark-worker" run_snark_worker_flag
          in
+         let snark_worker_parallelism_flag =
+           maybe_from_config YJ.Util.to_int_option "snark-worker-parallelism"
+             snark_worker_parallelism_flag
+         in
          let coinbase_receiver_flag =
            maybe_from_config json_to_publickey_compressed_option
              "coinbase-receiver" coinbase_receiver_flag
@@ -726,7 +736,8 @@ let daemon logger =
                 ~snark_worker_config:
                   { Coda_lib.Config.Snark_worker_config.initial_snark_worker_key=
                       run_snark_worker_flag
-                  ; shutdown_on_disconnect= true }
+                  ; shutdown_on_disconnect= true
+                  ; num_threads= snark_worker_parallelism_flag }
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~wallets_disk_location:(conf_dir ^/ "wallets")
                 ~persistent_root_location:(conf_dir ^/ "root")
