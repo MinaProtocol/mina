@@ -140,12 +140,8 @@ let apply_user_command_exn t
   let fee_token = User_command.fee_token user_command in
   let fee_payer = User_command.fee_payer user_command in
   let nonce = User_command.nonce user_command in
-  let () =
-    (* TODO: Enable multi-sig. *)
-    assert (
-      Public_key.Compressed.equal (Account_id.public_key fee_payer) signer_pk
-    )
-  in
+  assert (
+    Public_key.Compressed.equal (Account_id.public_key fee_payer) signer_pk ) ;
   assert (Token_id.equal fee_token Token_id.default) ;
   let fee_payer_idx, fee_payer_account =
     let idx = find_index_exn t fee_payer in
