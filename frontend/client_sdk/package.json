@@ -7,7 +7,7 @@
     "start": "bsb -make-world -w",
     "clean": "bsb -clean-world",
     "make-jsoo": "make -C ../.. client_sdk && cp ../../_build/default/src/app/client_sdk/client_sdk.bc.js src",
-    "prepublishOnly": "yarn make-jsoo && yarn build",
+    "prepublishOnly": "yarn make-jsoo && yarn build && yarn test",
     "test": "tsc test/Test.ts && node test/Test.js"
   },
   "keywords": [
