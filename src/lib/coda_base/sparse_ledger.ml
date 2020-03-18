@@ -265,12 +265,12 @@ let apply_user_command_exn t
     List.fold ~init:t indexed_accounts ~f:(fun t (idx, account) ->
         set_exn t idx account )
   with
-  | exception Reject exn ->
+  | Reject exn ->
       (* TODO: These transactions should never reach this stage, this error
          should be fatal.
       *)
       raise exn
-  | exception _ ->
+  | _ ->
       (* Not able to apply the user command successfully, charge fee only. *)
       t
 
