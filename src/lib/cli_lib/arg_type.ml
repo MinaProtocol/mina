@@ -24,13 +24,23 @@ let public_key_compressed =
           (Public_key.Compressed.to_base58_check random) ;
         exit 1 )
 
-let public_key =
-  Command.Arg_type.map public_key_compressed ~f:(fun pk ->
-      match Public_key.decompress pk with
-      | None ->
-          failwith "Invalid key"
-      | Some pk' ->
-          pk' )
+(* Hack to allow us to deprecate a value without needing to add an mli
+ * just for this. We only want to have one "kind" of public key in the
+ * public-facing interface if possible *)
+include (
+  struct
+      let public_key =
+        Command.Arg_type.map public_key_compressed ~f:(fun pk ->
+            match Public_key.decompress pk with
+            | None ->
+                failwith "Invalid key"
+            | Some pk' ->
+                pk' )
+    end :
+    sig
+      val public_key : Public_key.t Command.Arg_type.t
+        [@@deprecated "Use public_key_compressed in commandline args"]
+    end )
 
 let receipt_chain_hash =
   Command.Arg_type.map Command.Param.string

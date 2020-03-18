@@ -334,7 +334,8 @@ let get_nonce :
 
 let get_nonce_cmd =
   let open Command.Param in
-  let address_flag =
+  (* Ignores deprecation of public_key type for backwards compatibility *)
+  let[@warning "-3"] address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address you want the nonce for"
       (required Cli_lib.Arg_type.public_key)
   in
