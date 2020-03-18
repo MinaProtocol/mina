@@ -17,6 +17,10 @@ val get_current : unit -> t
 
 val set_current : t -> unit
 
+val get_next_opt : unit -> t option
+
+val set_next_opt : t option -> unit
+
 val empty : t
 
 val to_string : t -> string

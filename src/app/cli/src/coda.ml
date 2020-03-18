@@ -204,6 +204,13 @@ let daemon logger =
               "HEX-STRING (%d characters) Current fork ID for this node, only \
                blocks with the same ID accepted"
               Fork_id.required_length)
+     and next_fork_id =
+       flag "next-fork-id" (optional string)
+         ~doc:
+           (sprintf
+              "HEX-STRING (%d characters) Proposed next fork ID to signal \
+               other nodes"
+              Fork_id.required_length)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -713,11 +720,16 @@ let daemon logger =
              ~logger curr_fork_id
            |> Fork_id.create_exn
          in
+         let next_fork_id_opt =
+           Option.map
+             (Coda_run.get_next_fork_id_opt ~conf_dir ~logger next_fork_id)
+             ~f:Fork_id.create_exn
+         in
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                 ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
-                ~initial_fork_id:current_fork_id
+                ~initial_fork_id:current_fork_id ~next_fork_id_opt
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)

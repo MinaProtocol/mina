@@ -64,19 +64,26 @@ let get_lite_chain :
       let proof = Lite_compat.proof proof in
       {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
-let get_current_fork_id ~compile_time_current_fork_id ~conf_dir ~logger =
-  let current_fork_id_file = conf_dir ^/ "current_fork_id" in
-  let read_fork_id () =
+(* create reader, writer for fork IDs, but really for any one-line item in conf_dir *)
+let make_conf_dir_item_io ~conf_dir ~filename =
+  let item_file = conf_dir ^/ filename in
+  let read_item () =
     let open Stdlib in
-    let inp = open_in current_fork_id_file in
+    let inp = open_in item_file in
     let res = input_line inp in
     close_in inp ; res
   in
-  let write_fork_id fork_id =
+  let write_item item =
     let open Stdlib in
-    let outp = open_out current_fork_id_file in
-    output_string outp (fork_id ^ "\n") ;
+    let outp = open_out item_file in
+    output_string outp (item ^ "\n") ;
     close_out outp
+  in
+  (read_item, write_item)
+
+let get_current_fork_id ~compile_time_current_fork_id ~conf_dir ~logger =
+  let read_fork_id, write_fork_id =
+    make_conf_dir_item_io ~conf_dir ~filename:"current_fork_id"
   in
   function
   | None -> (
@@ -115,12 +122,57 @@ let get_current_fork_id ~compile_time_current_fork_id ~conf_dir ~logger =
            config; please delete your Coda config if you wish to use a new \
            fork ID" )
     with Sys_error _ ->
-      (* use value provided on command line, write to config dir, possibly overwriting existing entry *)
+      (* use value provided on command line, write to config dir *)
       write_fork_id fork_id ;
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Using current fork ID $fork_id from command line, writing to config"
         ~metadata:[("fork_id", `String fork_id)] ;
       fork_id )
+
+let get_next_fork_id_opt ~conf_dir ~logger =
+  let read_fork_id, write_fork_id =
+    make_conf_dir_item_io ~conf_dir ~filename:"next_fork_id"
+  in
+  function
+  | None -> (
+    try
+      (* not provided on command line, try to read from config dir *)
+      let fork_id = read_fork_id () in
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Setting next fork ID to $fork_id from config"
+        ~metadata:[("fork_id", `String fork_id)] ;
+      Some fork_id
+    with Sys_error _ ->
+      (* not on command-line, not in config dir, there's no next fork ID *)
+      None )
+  | Some fork_id -> (
+    try
+      (* it's an error if the command line value disagrees with the value in the config *)
+      let config_fork_id = read_fork_id () in
+      if String.equal config_fork_id fork_id then (
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Using next fork ID $fork_id from command line, which matches the \
+           one in the config"
+          ~metadata:[("fork_id", `String fork_id)] ;
+        Some config_fork_id )
+      else (
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          "Next fork ID $fork_id from the command line disagrees with \
+           $config_fork_id from the Coda config"
+          ~metadata:
+            [ ("fork_id", `String fork_id)
+            ; ("config_fork_id", `String config_fork_id) ] ;
+        failwith
+          "Next fork ID from command line disagrees with fork ID in Coda \
+           config; please delete your Coda config if you wish to use a new \
+           fork ID" )
+    with Sys_error _ ->
+      (* use value provided on command line, write to config dir *)
+      write_fork_id fork_id ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Using next fork ID $fork_id from command line, writing to config"
+        ~metadata:[("fork_id", `String fork_id)] ;
+      Some fork_id )
 
 (*TODO check deferred now and copy theose files to the temp directory*)
 let log_shutdown ~conf_dir ~top_logger coda_ref =

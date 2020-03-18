@@ -29,7 +29,11 @@ let required_length = 5
 
 let (current_fork_id : t option ref) = ref None
 
+let (next_fork_id_opt : t option ref) = ref None
+
 let set_current fork_id = current_fork_id := Some fork_id
+
+let set_next_opt fork_id_opt = next_fork_id_opt := fork_id_opt
 
 let empty = String.make required_length '0'
 
@@ -37,6 +41,8 @@ let empty = String.make required_length '0'
    due to current_fork_id = None in get_current_fork_id and create
  *)
 let get_current () = Option.value_exn !current_fork_id
+
+let get_next_opt () = !next_fork_id_opt
 
 let create_exn s =
   let len = String.length s in
