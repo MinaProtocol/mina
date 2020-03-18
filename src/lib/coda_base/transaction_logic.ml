@@ -480,7 +480,7 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             (User_command.source_pk user_command)
         then return ()
         else
-          (* TODO(#4554): Predicates. *)
+          (* TODO(#4554): Hook predicate evaluation in here once implemented. *)
           Or_error.errorf
             "The fee-payer is not authorised to issue commands for the source \
              account"
