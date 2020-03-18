@@ -56,11 +56,19 @@ type pipes =
       Pipe.Writer.t
   ; local_txns_writer:
       ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+        * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+              * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+              Or_error.t
+           -> unit)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
   ; local_snark_work_writer:
       ( Network_pool.Snark_pool.Resource_pool.Diff.t
+        * (   ( Network_pool.Snark_pool.Resource_pool.Diff.t
+              * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
+              Or_error.t
+           -> unit)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t }
@@ -597,11 +605,15 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
-    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work)
+    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
   |> Deferred.don't_wait_for
 
 let add_transactions t (txns : User_command.t list) =
-  Strict_pipe.Writer.write t.pipes.local_txns_writer txns
+  let result_ivar = Ivar.create () in
+  Strict_pipe.Writer.write t.pipes.local_txns_writer
+    (txns, Ivar.fill result_ivar)
+  |> Deferred.don't_wait_for ;
+  Ivar.read result_ivar
 
 let next_producer_timing t = t.next_producer_timing
 

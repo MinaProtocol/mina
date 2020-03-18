@@ -43,7 +43,7 @@ module type S = sig
       Transaction_resource_pool_intf
       with type transition_frontier := transition_frontier
 
-    module Diff : Transaction_pool_diff_intf
+    module Diff : Transaction_pool_diff_intf with type resource_pool := t
   end
 
   include
@@ -54,6 +54,7 @@ module type S = sig
      and type config := Resource_pool.Config.t
      and type transition_frontier_diff :=
                 Resource_pool.transition_frontier_diff
+     and type rejected_diff := Resource_pool.Diff.rejected
 end
 
 (* Functor over user command, base ledger and transaction validator for
@@ -502,8 +503,61 @@ struct
       (* bin_io omitted *)
       type t = Stable.Latest.t [@@deriving sexp, yojson]
 
+      module Diff_error = struct
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type t =
+              | Insufficient_replace_fee
+              | Invalid_signature
+              | Duplicate
+              | Sender_account_does_not_exist
+              | Insufficient_amount_for_account_creation
+              | Delegate_not_found
+              | Invalid_nonce
+              | Insufficient_funds
+              | Insufficient_fee
+              | Overflow
+            [@@deriving sexp, yojson]
+
+            let to_latest = Fn.id
+          end
+        end]
+
+        type t = Stable.Latest.t =
+          | Insufficient_replace_fee
+          | Invalid_signature
+          | Duplicate
+          | Sender_account_does_not_exist
+          | Insufficient_amount_for_account_creation
+          | Delegate_not_found
+          | Invalid_nonce
+          | Insufficient_funds
+          | Insufficient_fee
+          | Overflow
+        [@@deriving sexp, yojson]
+      end
+
+      module Rejected = struct
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
+            [@@deriving sexp, yojson]
+
+            let to_latest = Fn.id
+          end
+        end]
+
+        type t = Stable.Latest.t [@@deriving sexp, yojson]
+      end
+
+      type rejected = Rejected.t [@@deriving sexp, yojson]
+
       let summary t =
         Printf.sprintf "Transaction diff of length %d" (List.length t)
+
+      let is_empty = List.is_empty
 
       let apply t env =
         let txs = Envelope.Incoming.data env in
@@ -519,13 +573,12 @@ struct
               Trust_system.record_envelope_sender t.config.trust_system
                 t.logger sender
             in
-            let rec go txs' pool accepted =
+            let rec go txs' pool (accepted, rejected) =
               match txs' with
               | [] ->
                   t.pool <- pool ;
-                  if not (List.is_empty accepted) then
-                    Deferred.Or_error.return @@ List.rev accepted
-                  else Deferred.Or_error.error_string "no useful transactions"
+                  Deferred.Or_error.return
+                  @@ (List.rev accepted, List.rev rejected)
               | tx :: txs'' -> (
                 match User_command.check tx with
                 | None ->
@@ -538,14 +591,17 @@ struct
                     in
                     (* that's an insta-ban, so ignore the rest of the diff. *)
                     t.pool <- pool ;
-                    Deferred.Or_error.error_string "invalid signature"
+                    Deferred.Or_error.error_string
+                      (sprintf !"invalid signature %s"
+                         (Yojson.Safe.to_string (User_command.to_yojson tx)))
                 | Some tx' -> (
                     if Indexed_pool.member pool tx' then
                       let%bind _ =
                         trust_record
                           (Trust_system.Actions.Sent_old_gossip, None)
                       in
-                      go txs'' pool accepted
+                      go txs'' pool
+                        (accepted, (tx, Diff_error.Duplicate) :: rejected)
                     else
                       let account ledger key =
                         Option.bind
@@ -561,7 +617,10 @@ struct
                                   ( "account does not exist for command: $cmd"
                                   , [("cmd", User_command.to_yojson tx)] ) )
                           in
-                          go txs'' pool accepted
+                          go txs'' pool
+                            ( accepted
+                            , (tx, Diff_error.Sender_account_does_not_exist)
+                              :: rejected )
                       | Some sender_account ->
                           if has_sufficient_fee pool tx then (
                             let validate_receiver =
@@ -601,6 +660,20 @@ struct
                                 ~f:(fun res ->
                                   Result.map validate_receiver ~f:(fun _ -> res)
                                   )
+                            in
+                            let of_indexed_pool_error = function
+                              | `Invalid_nonce ->
+                                  Diff_error.Invalid_nonce
+                              | `Insufficient_funds ->
+                                  Insufficient_funds
+                              | `Insufficient_replace_fee ->
+                                  Insufficient_replace_fee
+                              | `Overflow ->
+                                  Overflow
+                              | `Delegate_not_found ->
+                                  Delegate_not_found
+                              | `Insufficient_amount_for_account_creation ->
+                                  Insufficient_amount_for_account_creation
                             in
                             let yojson_fail_reason =
                               Fn.compose
@@ -691,7 +764,7 @@ struct
                                                  .With_valid_signature
                                                  .to_yojson
                                                locally_generated_dropped) ) ] ;
-                                go txs'' pool'' (tx :: accepted)
+                                go txs'' pool'' (tx :: accepted, rejected)
                             | Error `Insufficient_replace_fee ->
                                 (* We can't punish peers for this, since an
                                    attacker can simultaneously send different
@@ -707,15 +780,20 @@ struct
                                   "rejecting $cmd because of insufficient \
                                    replace fee"
                                   ~metadata:[("cmd", User_command.to_yojson tx)] ;
-                                go txs'' pool accepted
+                                go txs'' pool
+                                  ( accepted
+                                  , (tx, Diff_error.Insufficient_replace_fee)
+                                    :: rejected )
                             | Error err ->
+                                let diff_err = of_indexed_pool_error err in
                                 if is_sender_local then
                                   Logger.error t.logger ~module_:__MODULE__
                                     ~location:__LOC__
                                     "rejecting $cmd because of $reason"
                                     ~metadata:
                                       [ ("cmd", User_command.to_yojson tx)
-                                      ; ("reason", yojson_fail_reason err) ] ;
+                                      ; ( "reason"
+                                        , Diff_error.to_yojson diff_err ) ] ;
                                 let%bind _ =
                                   trust_record
                                     ( Trust_system.Actions.Sent_useless_gossip
@@ -725,7 +803,8 @@ struct
                                           ; ("reason", yojson_fail_reason err)
                                           ] ) )
                                 in
-                                go txs'' pool accepted )
+                                go txs'' pool
+                                  (accepted, (tx, diff_err) :: rejected) )
                           else
                             let%bind _ =
                               trust_record
@@ -736,9 +815,12 @@ struct
                                          insufficient fee."
                                     , [("cmd", User_command.to_yojson tx)] ) )
                             in
-                            go txs'' pool accepted ) )
+                            go txs'' pool
+                              ( accepted
+                              , (tx, Diff_error.Insufficient_fee) :: rejected
+                              ) ) )
             in
-            go txs t.pool []
+            go txs t.pool ([], [])
 
       let unsafe_apply t env =
         match%map apply t env with Ok e -> Ok e | Error e -> Error (`Other e)
@@ -986,6 +1068,8 @@ let%test_module _ =
     type pool_apply = (User_command.t list, [`Other of Error.t]) Result.t
     [@@deriving sexp, compare]
 
+    let accepted_user_commands = Result.map ~f:fst
+
     let%test_unit "transactions are removed in linear case" =
       Thread_safe.block_on_async_exn (fun () ->
           let%bind assert_pool_txs, pool, best_tip_diff_w, _frontier =
@@ -996,7 +1080,9 @@ let%test_module _ =
             Test.Resource_pool.Diff.unsafe_apply pool
               (Envelope.Incoming.local independent_cmds)
           in
-          [%test_eq: pool_apply] apply_res (Ok independent_cmds) ;
+          [%test_eq: pool_apply]
+            (accepted_user_commands apply_res)
+            (Ok independent_cmds) ;
           assert_pool_txs independent_cmds ;
           let%bind () =
             Broadcast_pipe.Writer.write best_tip_diff_w
@@ -1052,7 +1138,8 @@ let%test_module _ =
               @@ (List.hd_exn independent_cmds :: List.drop independent_cmds 2)
               )
           in
-          [%test_eq: pool_apply] apply_res
+          [%test_eq: pool_apply]
+            (accepted_user_commands apply_res)
             (Ok (List.hd_exn independent_cmds :: List.drop independent_cmds 2)) ;
           best_tip_ref :=
             map_set_multi !best_tip_ref [mk_account 1 1_000_000_000_000 1] ;
@@ -1085,7 +1172,9 @@ let%test_module _ =
             Test.Resource_pool.Diff.unsafe_apply pool
             @@ Envelope.Incoming.local independent_cmds
           in
-          [%test_eq: pool_apply] (Ok (List.drop independent_cmds 2)) apply_res ;
+          [%test_eq: pool_apply]
+            (Ok (List.drop independent_cmds 2))
+            (accepted_user_commands apply_res) ;
           assert_pool_txs (List.drop independent_cmds 2) ;
           Deferred.unit )
 
@@ -1132,7 +1221,7 @@ let%test_module _ =
             Test.Resource_pool.Diff.unsafe_apply pool
             @@ Envelope.Incoming.local [cmd1]
           in
-          [%test_eq: pool_apply] apply_res (Ok [cmd1]) ;
+          [%test_eq: pool_apply] (accepted_user_commands apply_res) (Ok [cmd1]) ;
           assert_pool_txs [cmd1] ;
           let cmd2 = mk_payment 0 1_000_000_000 0 5 999_000_000_000 in
           best_tip_ref := map_set_multi !best_tip_ref [mk_account 0 0 1] ;
@@ -1227,7 +1316,7 @@ let%test_module _ =
         Test.Resource_pool.Diff.unsafe_apply pool
           (Envelope.Incoming.local txs_all)
       in
-      [%test_eq: pool_apply] (Ok txs_all) apply_res ;
+      [%test_eq: pool_apply] (Ok txs_all) (accepted_user_commands apply_res) ;
       assert_pool_txs @@ txs_all ;
       let replace_txs =
         [ (* sufficient fee *)
@@ -1245,7 +1334,7 @@ let%test_module _ =
       in
       [%test_eq: pool_apply]
         (Ok [List.nth_exn replace_txs 0; List.nth_exn replace_txs 2])
-        apply_res_2 ;
+        (accepted_user_commands apply_res_2) ;
       Deferred.unit
 
     let%test_unit "it drops queued transactions if a committed one makes \
@@ -1265,7 +1354,7 @@ let%test_module _ =
         Test.Resource_pool.Diff.unsafe_apply pool
         @@ Envelope.Incoming.local txs
       in
-      [%test_eq: pool_apply] (Ok txs) apply_res ;
+      [%test_eq: pool_apply] (Ok txs) (accepted_user_commands apply_res) ;
       assert_pool_txs @@ txs ;
       best_tip_ref :=
         map_set_multi !best_tip_ref [mk_account 0 970_000_000_000 1] ;
@@ -1372,7 +1461,9 @@ let%test_module _ =
             Test.Resource_pool.Diff.unsafe_apply pool
               (Envelope.Incoming.local local_cmds)
           in
-          [%test_eq: pool_apply] apply_res_1 (Ok local_cmds) ;
+          [%test_eq: pool_apply]
+            (accepted_user_commands apply_res_1)
+            (Ok local_cmds) ;
           assert_pool_txs local_cmds ;
           assert_rebroadcastable pool local_cmds ;
           (* Adding non-locally-generated transactions doesn't affect
@@ -1381,7 +1472,9 @@ let%test_module _ =
             Test.Resource_pool.Diff.unsafe_apply pool
               (Envelope.Incoming.wrap ~data:remote_cmds ~sender:mock_sender)
           in
-          [%test_eq: pool_apply] apply_res_2 (Ok remote_cmds) ;
+          [%test_eq: pool_apply]
+            (accepted_user_commands apply_res_2)
+            (Ok remote_cmds) ;
           assert_pool_txs (local_cmds @ remote_cmds) ;
           assert_rebroadcastable pool local_cmds ;
           (* When locally generated transactions are committed they are no
