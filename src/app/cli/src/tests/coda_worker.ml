@@ -74,7 +74,7 @@ module T = struct
         Rpc_parallel.Function.t
     ; process_user_command:
         ( 'worker
-        , User_command_util.Client_input.t
+        , User_command_input.t
         , (User_command.t * Receipt.Chain_hash.t) Or_error.t )
         Rpc_parallel.Function.t
     ; verified_transitions:
@@ -148,7 +148,7 @@ module T = struct
            Send_payment_input.t
         -> (User_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
     ; coda_process_user_command:
-           User_command_util.Client_input.t
+           User_command_input.t
         -> (User_command.t * Receipt.Chain_hash.t) Or_error.t Deferred.t
     ; coda_verified_transitions: unit -> state_hashes Pipe.Reader.t Deferred.t
     ; coda_sync_status:
@@ -326,7 +326,7 @@ module T = struct
 
     let process_user_command =
       C.create_rpc ~name:"process_user_command" ~f:process_user_command_impl
-        ~bin_input:User_command_util.Client_input.Stable.Latest.bin_t
+        ~bin_input:User_command_input.Stable.Latest.bin_t
         ~bin_output:
           [%bin_type_class:
             (User_command.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t)
@@ -601,8 +601,8 @@ module T = struct
               Public_key.of_private_key_exn sk |> Public_key.compress
             in
             let build_user_command_input amount sender_sk receiver_pk fee =
-              User_command_util.Client_input.make ~sender:(pk_of_sk sender_sk)
-                ~fee ~memo ~valid_until:Coda_numbers.Global_slot.max_value
+              User_command_input.make ~sender:(pk_of_sk sender_sk) ~fee ~memo
+                ~valid_until:Coda_numbers.Global_slot.max_value
                 ~body:(Payment {receiver= receiver_pk; amount})
                 ~sign_choice:(`Keypair (Keypair.of_private_key_exn sender_sk))
                 ()

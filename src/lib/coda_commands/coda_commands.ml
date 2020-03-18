@@ -60,27 +60,6 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   in
   Option.is_some remainder
 
-(* remove this after merging #4515
-  let schedule_user_command t (txn : User_command.t) account_opt :
-    unit Or_error.t Deferred.t =
-  (* FIXME #3457: return a status from Transaction_pool.add and use it instead
-  *)
-  if not (is_valid_user_command t txn account_opt) then
-    return
-      (Or_error.error_string "Invalid user command: account balance is too low")
-  else
-    let logger =
-      Logger.extend
-        (Coda_lib.top_level_logger t)
-        [("coda_command", `String "scheduling a user command")]
-    in
-    (*Coda_lib.add_transactions t [txn] ;*)
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("user_command", User_command.to_yojson txn)]
-      "Submitted transaction $user_command to transaction pool" ;
-    txn_count := !txn_count + 1 ;
-    Deferred.Or_error.return ()*)
-
 let get_account t (addr : Public_key.Compressed.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Coda_lib.best_ledger t in
@@ -113,15 +92,6 @@ let get_nonce t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
   account.Account.Poly.nonce
-
-(* TODO: remove this after merging #4515
-  let send_user_command t (txn : User_command.t) =
-  let public_key = Public_key.compress txn.sender in
-  let open Participating_state.Let_syntax in
-  let%map account_opt = get_account t public_key in
-  let open Deferred.Or_error.Let_syntax in
-  let%map () = schedule_user_command t txn account_opt in
-  record_payment t txn (Option.value_exn account_opt)*)
 
 let get_balance t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
@@ -156,8 +126,8 @@ let replace_block_production_keys keys pks =
     (Keypair.And_compressed_pk.Set.of_list kps) ;
   kps |> List.map ~f:snd
 
-let setup_and_submit_user_command t
-    (user_command_input : User_command_util.Client_input.t) =
+let setup_and_submit_user_command t (user_command_input : User_command_input.t)
+    =
   let open Participating_state.Let_syntax in
   let%map account_opt = get_account t user_command_input.sender in
   let open Deferred.Let_syntax in
@@ -178,7 +148,6 @@ let setup_and_submit_user_command t
   | Error e ->
       Error e
 
-(* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
 let setup_and_submit_user_commands t user_command_list =
   let open Participating_state.Let_syntax in
   let%map _is_active = Coda_lib.active_or_bootstrapping t in
@@ -217,23 +186,6 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
     Or_error.errorf
       !"Merkle list proof does not contain payment %{sexp:User_command.t}"
       verifying_txn
-
-(* remove this after merging #4515*)
-(*TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
-(*let schedule_user_commands t (_txns : User_command.t list) :
-    'a Deferred.Or_error.t Participating_state.t =
-  Participating_state.return
-  @@
-  let logger =
-    Logger.extend
-      (Coda_lib.top_level_logger t)
-      [("coda_command", `String "scheduling a batch of user transactions")]
-  in
-  Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-    "batch-send-payments does not yet report errors" ;
-  Deferred.Or_error.return ()
-
-(*Coda_lib.add_transactions t txns*) *)
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in

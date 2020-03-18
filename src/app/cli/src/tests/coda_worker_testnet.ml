@@ -138,7 +138,7 @@ module Api = struct
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
     let user_command_input =
-      User_command_util.Client_input.make ~sender:pk_of_sk ~fee
+      User_command_input.make ~sender:pk_of_sk ~fee
         ~memo:User_command_memo.dummy ~valid_until ~body
         ~sign_choice:(`Keypair (Keypair.of_private_key_exn sk))
         ()

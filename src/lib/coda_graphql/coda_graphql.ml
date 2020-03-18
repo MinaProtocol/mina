@@ -1564,7 +1564,7 @@ module Mutations = struct
          the account you're making a transaction from?"
 
   let create_user_command_input ~fee ~nonce_opt ~valid_until ~memo ~sender
-      ~body ~sign_choice : (User_command_util.Client_input.t, string) result =
+      ~body ~sign_choice : (User_command_input.t, string) result =
     let open Result.Let_syntax in
     (* TODO: We should put a more sensible default here. *)
     let valid_until =
@@ -1590,7 +1590,7 @@ module Mutations = struct
           result_of_exn User_command_memo.create_from_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
-    { User_command_util.Client_input.sender
+    { User_command_input.sender
     ; fee
     ; nonce_opt
     ; valid_until

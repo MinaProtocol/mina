@@ -271,8 +271,8 @@ let run_test () : unit Deferred.t =
                 "A memo created in full-test"
             in
             let uc_input =
-              User_command_util.Client_input.make ~sender:(pk_of_sk sender_sk)
-                ~fee ~memo ~valid_until:Coda_numbers.Global_slot.max_value
+              User_command_input.make ~sender:(pk_of_sk sender_sk) ~fee ~memo
+                ~valid_until:Coda_numbers.Global_slot.max_value
                 ~body:(Payment {receiver= receiver_pk; amount})
                 ~sign_choice:(`Keypair (Keypair.of_private_key_exn sender_sk))
             in
@@ -283,7 +283,7 @@ let run_test () : unit Deferred.t =
                 uc_input ~nonce_opt:nonce () )
       in
       let assert_ok x = assert (Or_error.is_ok x) in
-      let send_payment (payment : User_command_util.Client_input.t) =
+      let send_payment (payment : User_command_input.t) =
         Coda_commands.setup_and_submit_user_command coda payment
         |> Participating_state.to_deferred_or_error
         |> Deferred.map ~f:Or_error.join

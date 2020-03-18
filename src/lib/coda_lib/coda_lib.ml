@@ -55,19 +55,13 @@ type pipes =
       * (bool -> unit) )
       Pipe.Writer.t
   ; user_command_input_writer:
-      ( User_command_util.Client_input.t list
+      ( User_command_input.t list
         * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
               * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
               Or_error.t
            -> unit)
         * (   Signature_lib.Public_key.Compressed.t
            -> Coda_base.Account.Nonce.t option Participating_state.t)
-      (*  ; local_txns_writer:
-   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
-     * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
-           * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
-           Or_error.t
-        -> unit)*)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -655,7 +649,7 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
   |> Deferred.don't_wait_for
 
-let add_transactions t (uc_inputs : User_command_util.Client_input.t list) =
+let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
   let inferred_nonce = get_inferred_nonce_from_transaction_pool_and_ledger t in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
@@ -944,106 +938,15 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               ~local_diffs:local_txns_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
-          Strict_pipe.Reader.iter user_command_input_reader
-            ~f:(fun (uc_inputs, result_cb, inferred_nonce) ->
-              let setup_user_command
-                  (client_input : User_command_util.Client_input.t) :
-                  User_command.t Deferred.Or_error.t =
-                let open Deferred.Or_error.Let_syntax in
-                let opt_error ~error_string opt =
-                  Option.value_map
-                    ~default:
-                      (Or_error.error_string
-                         (sprintf "Error creating user command: %s Error: %s"
-                            (Yojson.Safe.to_string
-                               (User_command_util.Client_input.to_yojson
-                                  client_input))
-                            error_string))
-                    ~f:(fun value -> Ok value)
-                    opt
-                  |> Deferred.return
-                in
-                let create_user_command nonce =
-                  let payload =
-                    User_command.Payload.create ~fee:client_input.fee ~nonce
-                      ~valid_until:client_input.valid_until
-                      ~memo:client_input.memo ~body:client_input.body
-                  in
-                  (*Capture the errors*)
-                  let%map signed_user_command =
-                    match client_input.sign_choice with
-                    | `Signature signature ->
-                        User_command.create_with_signature_checked signature
-                          client_input.sender payload
-                        |> opt_error ~error_string:"Invalid signature"
-                    | `Keypair sender_kp ->
-                        Deferred.Or_error.return
-                          (User_command.sign sender_kp payload)
-                    | `Hd_index hd_index ->
-                        Deferred.map
-                          (Secrets.Hardware_wallets.sign ~hd_index
-                             ~public_key:
-                               (Public_key.decompress_exn client_input.sender)
-                             ~user_command_payload:payload)
-                          ~f:(Result.map_error ~f:Error.of_string)
-                  in
-                  User_command.forget_check signed_user_command
-                in
-                let%bind nonce =
-                  match client_input.nonce_opt with
-                  | Some nonce ->
-                      Deferred.Or_error.return nonce
-                  | None ->
-                      (*get inferred nonce*)
-                      Participating_state.active
-                        (inferred_nonce client_input.sender)
-                      |> Option.bind ~f:Fn.id
-                      |> opt_error
-                           ~error_string:
-                             "Couldn't infer nonce for transaction from \
-                              specified `sender` since `sender` is not in the \
-                              ledger or sent a transaction in transaction \
-                              pool."
-                in
-                create_user_command nonce
-              in
-              let%bind user_commands =
-                let rec go acc ucs =
-                  match ucs with
-                  | [] ->
-                      return acc
-                  | uc :: ucs -> (
-                      match%bind setup_user_command uc with
-                      | Ok res ->
-                          let acc' =
-                            Or_error.map acc ~f:(fun acc -> res :: acc)
-                          in
-                          go acc' ucs
-                      | Error e ->
-                          Logger.warn config.logger
-                            "Cannot submit $cmd to the pool: $error"
-                            ~module_:__MODULE__ ~location:__LOC__
-                            ~metadata:
-                              [ ( "cmd"
-                                , User_command_util.Client_input.to_yojson uc
-                                )
-                              ; ("error", `String (Error.to_string_hum e)) ] ;
-                          return (Error e) )
-                in
-                go (Ok []) uc_inputs
-              in
-              match user_commands with
-              | Ok ucs ->
-                  let user_commands' = List.rev ucs in
-                  if List.is_empty user_commands' then (
-                    result_cb
-                      (Error (Error.of_string "No user commands to send")) ;
-                    return () )
-                  else
-                    Strict_pipe.Writer.write local_txns_writer
-                      (user_commands', result_cb)
-              | Error e ->
-                  Deferred.return (result_cb (Error e)) )
+          (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
+          Strict_pipe.Reader.iter user_command_input_reader ~f:(fun input ->
+              match%bind
+                User_command_input.to_user_command input config.logger
+              with
+              | Some res ->
+                  Strict_pipe.Writer.write local_txns_writer res
+              | None ->
+                  Deferred.unit )
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =

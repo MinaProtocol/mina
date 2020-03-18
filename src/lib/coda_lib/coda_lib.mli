@@ -59,7 +59,7 @@ val add_work : t -> Snark_worker.Work.Result.t -> unit
 
 val add_transactions :
      t
-  -> User_command_util.Client_input.t list
+  -> User_command_input.t list
   -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t

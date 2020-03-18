@@ -10,7 +10,7 @@ module Send_user_command = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = User_command_util.Client_input.Stable.V1.t
+        type t = User_command_input.Stable.V1.t
 
         let to_latest = Fn.id
       end
@@ -79,7 +79,7 @@ module Send_user_commands = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = User_command_util.Client_input.Stable.V1.t list
+        type t = User_command_input.Stable.V1.t list
 
         let to_latest = Fn.id
       end

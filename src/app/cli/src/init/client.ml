@@ -424,9 +424,9 @@ let batch_send_payments =
     let open Deferred.Let_syntax in
     let%bind keypair = Secrets.Keypair.Terminal_stdin.read_exn privkey_path
     and infos = get_infos payments_path in
-    let ts : User_command_util.Client_input.t list =
+    let ts : User_command_input.t list =
       List.map infos ~f:(fun {receiver; valid_until; amount; fee} ->
-          User_command_util.Client_input.make
+          User_command_input.make
             ~sender:(Public_key.compress keypair.public_key)
             ~fee ~memo:User_command_memo.empty
             ~valid_until:

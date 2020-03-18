@@ -4,47 +4,41 @@ open Coda_numbers
 open Core_kernel
 open Async_kernel
 
-module Client_input = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        { sender: Public_key.Compressed.Stable.V1.t
-        ; fee: Currency.Fee.Stable.V1.t
-        ; nonce_opt: Account_nonce.Stable.V1.t option
-        ; valid_until: Account_nonce.Stable.V1.t
-        ; memo: User_command_memo.Stable.V1.t
-        ; body: User_command_payload.Body.Stable.V1.t
-        ; sign_choice:
-            [ `Signature of Signature.Stable.V1.t
-            | `Hd_index of Unsigned_extended.UInt32.Stable.V1.t
-            | `Keypair of Keypair.Stable.V1.t ] }
-      [@@deriving to_yojson]
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type t =
+      { sender: Public_key.Compressed.Stable.V1.t
+      ; fee: Currency.Fee.Stable.V1.t
+      ; nonce_opt: Account_nonce.Stable.V1.t option
+      ; valid_until: Account_nonce.Stable.V1.t
+      ; memo: User_command_memo.Stable.V1.t
+      ; body: User_command_payload.Body.Stable.V1.t
+      ; sign_choice:
+          [ `Signature of Signature.Stable.V1.t
+          | `Hd_index of Unsigned_extended.UInt32.Stable.V1.t
+          | `Keypair of Keypair.Stable.V1.t ] }
+    [@@deriving to_yojson]
 
-      let to_latest = Fn.id
-    end
-  end]
+    let to_latest = Fn.id
+  end
+end]
 
-  type t = Stable.Latest.t =
-    { sender: Public_key.Compressed.t
-    ; fee: Currency.Fee.t
-    ; nonce_opt: Account_nonce.t option
-    ; valid_until: Account_nonce.t
-    ; memo: User_command_memo.t
-    ; body: User_command_payload.Body.t
-    ; sign_choice:
-        [ `Signature of Signature.t
-        | `Hd_index of Unsigned_extended.UInt32.t
-        | `Keypair of Keypair.t ] }
-  [@@deriving make, to_yojson]
-end
+type t = Stable.Latest.t =
+  { sender: Public_key.Compressed.t
+  ; fee: Currency.Fee.t
+  ; nonce_opt: Account_nonce.t option
+  ; valid_until: Account_nonce.t
+  ; memo: User_command_memo.t
+  ; body: User_command_payload.Body.t
+  ; sign_choice:
+      [ `Signature of Signature.t
+      | `Hd_index of Unsigned_extended.UInt32.t
+      | `Keypair of Keypair.t ] }
+[@@deriving make, to_yojson]
 
-type user_command_input =
-  { client_input: Client_input.t list
-  ; inferred_nonce: Public_key.Compressed.t -> Account_nonce.t Option.t }
-
-let process_user_command_input (uc_inputs, result_cb, inferred_nonce) logger =
-  let setup_user_command (client_input : Client_input.t) :
+let to_user_command (uc_inputs, result_cb, inferred_nonce) logger =
+  let setup_user_command (client_input : t) :
       User_command.t Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
     let opt_error ~error_string opt =
@@ -52,7 +46,7 @@ let process_user_command_input (uc_inputs, result_cb, inferred_nonce) logger =
         ~default:
           (Or_error.error_string
              (sprintf "Error creating user command: %s Error: %s"
-                (Yojson.Safe.to_string (Client_input.to_yojson client_input))
+                (Yojson.Safe.to_string (to_yojson client_input))
                 error_string))
         ~f:(fun value -> Ok value)
         opt
@@ -88,7 +82,8 @@ let process_user_command_input (uc_inputs, result_cb, inferred_nonce) logger =
           Deferred.Or_error.return nonce
       | None ->
           (*get inferred nonce*)
-          inferred_nonce client_input.sender
+          Participating_state.active (inferred_nonce client_input.sender)
+          |> Option.bind ~f:Fn.id
           |> opt_error
                ~error_string:
                  "Couldn't infer nonce for transaction from specified \
@@ -105,17 +100,13 @@ let process_user_command_input (uc_inputs, result_cb, inferred_nonce) logger =
       | uc :: ucs -> (
           match%bind setup_user_command uc with
           | Ok res ->
-              let acc' =
-                let open Or_error.Let_syntax in
-                let%map acc = acc in
-                res :: acc
-              in
+              let acc' = Or_error.map acc ~f:(fun acc -> res :: acc) in
               go acc' ucs
           | Error e ->
               Logger.warn logger "Cannot submit $cmd to the pool: $error"
                 ~module_:__MODULE__ ~location:__LOC__
                 ~metadata:
-                  [ ("cmd", Client_input.to_yojson uc)
+                  [ ("cmd", to_yojson uc)
                   ; ("error", `String (Error.to_string_hum e)) ] ;
               return (Error e) )
     in
@@ -124,8 +115,9 @@ let process_user_command_input (uc_inputs, result_cb, inferred_nonce) logger =
   match user_commands with
   | Ok ucs ->
       let user_commands' = List.rev ucs in
-      Ivar.fill result_cb (Ok user_commands') ;
-      user_commands'
+      if List.is_empty user_commands' then (
+        result_cb (Error (Error.of_string "No user commands to send")) ;
+        None )
+      else Some (user_commands', result_cb)
   | Error e ->
-      Ivar.fill result_cb (Error e) ;
-      []
+      result_cb (Error e) ; None
