@@ -142,6 +142,11 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
                 .to_yojson (snd failed_txn)
               |> Yojson.Safe.to_string )))
   | Ok ([txn], []) ->
+      Logger.info
+        (Coda_lib.top_level_logger t)
+        ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("user_command", User_command.to_yojson txn)]
+        "Scheduled payment $user_command" ;
       Ok (txn, record_payment t txn (Option.value_exn account_opt))
   | Ok _ ->
       Error (Error.of_string "Invalid result from scheduling a payment")
@@ -151,13 +156,12 @@ let setup_and_submit_user_command t (user_command_input : User_command_input.t)
 let setup_and_submit_user_commands t user_command_list =
   let open Participating_state.Let_syntax in
   let%map _is_active = Coda_lib.active_or_bootstrapping t in
-  let logger =
-    Logger.extend
-      (Coda_lib.top_level_logger t)
-      [("coda_command", `String "scheduling a batch of user transactions")]
-  in
-  Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-    "batch-send-payments does not yet report errors" ;
+  Logger.warn
+    (Coda_lib.top_level_logger t)
+    ~module_:__MODULE__ ~location:__LOC__
+    "batch-send-payments does not yet report errors"
+    ~metadata:
+      [("coda_command", `String "scheduling a batch of user transactions")] ;
   Coda_lib.add_transactions t user_command_list
 
 module Receipt_chain_hash = struct
