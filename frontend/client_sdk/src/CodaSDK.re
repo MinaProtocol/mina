@@ -1,7 +1,11 @@
 type publicKey = string;
 type privateKey = string;
-type globalSlot = string;
+
+[@genType.import "./TSTypes"]
 type uint64 = string;
+
+[@genType.import "./TSTypes"]
+type uint32 = string;
 
 // Max uint32
 let defaultValidUntil = "4294967295";
@@ -30,9 +34,9 @@ type stakeDelegation = {
   to_: publicKey,
   from: publicKey,
   fee: uint64,
-  nonce: int,
+  nonce: uint32,
   memo: option(string),
-  validUntil: option(globalSlot),
+  validUntil: option(uint32),
 };
 
 type payment = {
@@ -41,9 +45,9 @@ type payment = {
   from: publicKey,
   fee: uint64,
   amount: uint64,
-  nonce: int,
+  nonce: uint32,
   memo: option(string),
-  validUntil: option(globalSlot),
+  validUntil: option(uint32),
 };
 
 type codaSDK;
@@ -135,7 +139,7 @@ type payment_js = {
 type stake_delegation_js = {
   .
   "common": common_payload_js,
-  "new_delegate": publicKey,
+  "newDelegate": publicKey,
 };
 
 type signed_js = {
@@ -163,11 +167,20 @@ external signPayment: (codaSDK, privateKey, payment_js) => signed_js =
 let signPayment =
   (. payment: payment, key: keypair) => {
     let memo = value(~default="", payment.memo);
-    let validUntil = value(~default=defaultValidUntil, payment.validUntil);
+    // Stringify all numeric inputs since they may be passed as
+    // number/bigint in TS/JS
+    let fee = Js.String.make(payment.fee);
+    let nonce = Js.String.make(payment.nonce);
+    let amount = Js.String.make(payment.amount);
+    let validUntil =
+      Js.String.make(value(~default=defaultValidUntil, payment.validUntil));
     {
       publicKey: key.publicKey,
       payload: {
         ...payment,
+        fee,
+        nonce,
+        amount,
         // Set missing values so that the signature can be checked without guessing defaults.
         memo: Some(memo),
         validUntil: Some(validUntil),
@@ -178,14 +191,14 @@ let signPayment =
           key.privateKey,
           {
             "common": {
-              "fee": payment.fee,
-              "nonce": string_of_int(payment.nonce),
+              "fee": fee,
+              "nonce": nonce,
               "validUntil": validUntil,
               "memo": memo,
             },
             "paymentPayload": {
               "receiver": payment.to_,
-              "amount": payment.amount,
+              "amount": amount,
             },
           },
         )##signature,
@@ -213,11 +226,20 @@ external signStakeDelegation:
 let signStakeDelegation =
   (. stakeDelegation: stakeDelegation, key: keypair) => {
     let memo = value(~default="", stakeDelegation.memo);
-    let validUntil = value(~default=defaultValidUntil, stakeDelegation.validUntil);
+    // Stringify all numeric inputs since they may be passed as
+    // number/bigint in TS/JS
+    let fee = Js.String.make(stakeDelegation.fee);
+    let nonce = Js.String.make(stakeDelegation.nonce);
+    let validUntil =
+      Js.String.make(
+        value(~default=defaultValidUntil, stakeDelegation.validUntil),
+      );
     {
       publicKey: key.publicKey,
       payload: {
         ...stakeDelegation,
+        fee,
+        nonce,
         // Set missing values so that the signature can be checked without guessing defaults.
         memo: Some(memo),
         validUntil: Some(validUntil),
@@ -228,12 +250,12 @@ let signStakeDelegation =
           key.privateKey,
           {
             "common": {
-              "fee": stakeDelegation.fee,
-              "nonce": string_of_int(stakeDelegation.nonce),
+              "fee": fee,
+              "nonce": nonce,
               "validUntil": validUntil,
               "memo": memo,
             },
-            "new_delegate": stakeDelegation.to_,
+            "newDelegate": stakeDelegation.to_,
           },
         )##signature,
     };

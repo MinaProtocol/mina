@@ -20,6 +20,14 @@ let signed = CodaSDK.signMessage("hello", keys);
 if (CodaSDK.verifyMessage(signed)) {
     console.log("Message was verified successfully")
 };
+
+let signedPayment = CodaSDK.signPayment({
+    to: keys.publicKey,
+    from: keys.publicKey,
+    amount: 1,
+    fee: 1,
+    nonce: 0
+  }, key);
 ```
 
 NodeJS:
@@ -31,6 +39,14 @@ let signed = CodaSDK.signMessage("hello", keys);
 if (CodaSDK.verifyMessage(signed)) {
     console.log("Message was verified successfully")
 };
+
+let signedPayment = CodaSDK.signPayment({
+    to: keys.publicKey,
+    from: keys.publicKey,
+    amount: 1,
+    fee: 1,
+    nonce: 0
+  }, key);
 ```
 
 ReasonML:
@@ -46,6 +62,14 @@ let signed = CodaSDK.signMessage(. "hello", keys);
 if (CodaSDK.verifyMessage(. signed)) {
   Js.log("Message was verified successfully");
 };
+
+let signedPayment = CodaSDK.signPayment({
+    to_: keys.publicKey,
+    from: keys.publicKey,
+    amount: "1",
+    fee: "1",
+    nonce: "0"
+  }, key);
 
 ```
 

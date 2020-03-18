@@ -67,6 +67,8 @@ let verify_transition ~logger ~trust_system ~verifier ~frontier
       External_transition.Validation.wrap transition
       |> External_transition.skip_time_received_validation
            `This_transition_was_not_received_via_gossip
+      |> External_transition.skip_fork_ids_validation
+           `This_transition_has_valid_fork_ids
       |> Fn.compose Deferred.return
            (External_transition.validate_genesis_protocol_state
               ~genesis_state_hash)
