@@ -487,10 +487,10 @@ jobs:
             {%- for test in small_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts "{{profile}}:{{test}}"'
             {%- endfor %}
             - store_artifacts:
-                  path: test_logs
+                  path: test_output/artifacts
     {%- endfor %}
 
     {%- for profile in medium_curves_and_other_tests.keys() | sort %}
@@ -509,13 +509,13 @@ jobs:
             {%- for test in medium_curves_and_other_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts "{{profile}}:{{test}}"'
                   {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
             {%- endfor %}
             - store_artifacts:
-                  path: test_logs
+                  path: test_output/artifacts
     {%- endfor %}
 
 workflows:
