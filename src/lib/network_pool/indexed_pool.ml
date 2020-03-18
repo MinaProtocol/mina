@@ -11,7 +11,7 @@ open Signature_lib
    of currency, but a made up number will do for the testnets at least. See
    issue #2385.
 *)
-let replace_fee : Currency.Fee.t = Currency.Fee.of_int 5
+let replace_fee : Currency.Fee.t = Currency.Fee.of_int 5_000_000_000
 
 (* Invariants, maintained whenever a t is exposed from this module:
    * Iff a command is in all_by_fee it is also in all_by_sender.
@@ -765,7 +765,7 @@ let%test_module _ =
           Quickcheck.Generator.map ~f:Account_nonce.of_int
           @@ Int.gen_incl 0 1000
         in
-        let init_balance = Currency.Amount.of_int 100_000 in
+        let init_balance = Currency.Amount.of_int 100_000_000_000_000 in
         let%bind size = Quickcheck.Generator.size in
         let%bind amounts =
           Quickcheck.Generator.map ~f:Array.of_list
@@ -831,7 +831,9 @@ let%test_module _ =
           { replace_cmd_skeleton.payload with
             common=
               { replace_cmd_skeleton.payload.common with
-                fee= Currency.Fee.of_int (10 + (5 * (size + 1))) } }
+                fee=
+                  Currency.Fee.of_int ((10 + (5 * (size + 1))) * 1_000_000_000)
+              } }
         in
         let replace_cmd =
           User_command.For_tests.fake_sign sender replace_cmd_payload

@@ -39,6 +39,9 @@ let chain_id ~genesis_state_hash =
 [%%inject
 "daemon_expiry", daemon_expiry]
 
+[%%inject
+"compile_time_current_fork_id", current_fork_id]
+
 let daemon logger =
   let open Command.Let_syntax in
   let open Cli_lib.Arg_type in
@@ -194,6 +197,13 @@ let daemon logger =
            "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             discovery"
          (listed string)
+     and curr_fork_id =
+       flag "current-fork-id" (optional string)
+         ~doc:
+           (sprintf
+              "HEX-STRING (%d characters) Current fork ID for this node, only \
+               blocks with the same ID accepted"
+              Fork_id.required_length)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -698,10 +708,16 @@ let daemon logger =
            Option.value_map coinbase_receiver_flag ~default:`Producer
              ~f:(fun pk -> `Other pk)
          in
+         let current_fork_id =
+           Coda_run.get_current_fork_id ~compile_time_current_fork_id ~conf_dir
+             ~logger curr_fork_id
+           |> Fork_id.create_exn
+         in
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                 ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
+                ~initial_fork_id:current_fork_id
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)

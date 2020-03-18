@@ -1,7 +1,9 @@
+import { uint32 as $$uint32 } from './TSTypes';
+import { uint64 as $$uint64 } from './TSTypes';
 export declare type publicKey = string;
 export declare type privateKey = string;
-export declare type globalSlot = string;
-export declare type uint64 = string;
+export declare type uint64 = $$uint64;
+export declare type uint32 = $$uint32;
 export declare type keypair = {
     readonly privateKey: privateKey;
     readonly publicKey: publicKey;
@@ -19,18 +21,18 @@ export declare type stakeDelegation = {
     readonly to: publicKey;
     readonly from: publicKey;
     readonly fee: uint64;
-    readonly nonce: number;
+    readonly nonce: uint32;
     readonly memo?: string;
-    readonly validUntil?: globalSlot;
+    readonly validUntil?: uint32;
 };
 export declare type payment = {
     readonly to: publicKey;
     readonly from: publicKey;
     readonly fee: uint64;
     readonly amount: uint64;
-    readonly nonce: number;
+    readonly nonce: uint32;
     readonly memo?: string;
-    readonly validUntil?: globalSlot;
+    readonly validUntil?: uint32;
 };
 /**
   * Generates a public/private keypair
