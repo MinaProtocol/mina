@@ -61,24 +61,14 @@ The terms proposed are below:
 **Alternatives:**
 - External transition - maybe this is more precise, but has the heavy lifting of having to explain a new term for a mostly similar concept. Additionally, the word transition is very similar to transaction, causing confusion at times.
 
-### User Transaction
-**Concept:** A transaction issued by a user - currently a payment or a delegation change
-
-**Rationale:** This term clearly describes the concept, and leaves room for further types of user issued transactions.
-
-**Downsides:** This is a subset of "Transactions", so it is a bit redundant.
-
-**Usage:** There are three types of transactions in the Coda network currently - user transactions, fee transfers, and coinbases. User transactions allow users to manage accounts and send money.
-
-**Alternatives:**
-- User command - this term is confusing, especially in  docs, as it can be conflated with a CLI command that a user issues.
-
-### Snark worker / Snarker
+### Snark worker
 **Concept:** A Coda node that produces SNARKs to compress data in the network.
 
-**Rationale:** The community likes SNARKs and it is a point of differentiation for Coda, so snarker is an engaging term.
+**Rationale:** The community likes SNARKs and it is a point of differentiation for Coda, so Snark worker is an engaging term.
 
 **Downsides:** Gets invalidated if Coda switches to another type of zero-knowledge proof. NOTE - There is some concern about using the progressive tense of "snark" as a verb, eg. "snarking" - as this can be confused with staking. However, if the community enjoys "snarking", it  would make sense to  continue using it as a verb.
+
+Additionally, the usage of "work" in snark worker can be misconstrued as a connection to Proof-of-Work, but this will addressed in documentation under the FAQ section.
 
 **Usage:** 
 - Anyone can join the coda network and become a snark worker.
@@ -86,6 +76,7 @@ The terms proposed are below:
 
 **Alternatives:**
 - Compressor - this term was considered initially, but given the community excitement about SNARKs, it makes sense to include the more specific term in the lexicon.
+- Snarker - this term is used interchangeably with "snark worker", but it is suggested to converge on snark worker.
 
 ### Full node
 **Concept:** A Coda node that is able to verify the state of the network - however it may need to request paths for its accounts from other nodes that have all the accounts state.
@@ -101,6 +92,41 @@ The terms proposed are below:
 - Trustless nodes - again, some lifting required.
 - Light node / light client - has a negative connotation of not being able to validate chain state.
 
+### User Transaction
+**Concept:** A transaction issued by a user - currently a payment or a delegation change.
+
+**Rationale:** This term clearly describes the concept, and leaves room for further types of user issued transactions.
+
+**Downsides:** This is a subset of "Transactions", so it is a bit redundant.
+
+**Usage:** There are three types of transactions in the Coda network currently - user transactions, fee transfers, and coinbases. User transactions allow users to manage accounts and send money.
+
+**Alternatives:**
+- User command - this term is confusing, especially in  docs, as it can be conflated with a CLI command that a user issues.
+
+### Protocol Transaction
+**Concept:** A transaction issued by the protocol - currently a fee transfer or coinbase (both are structurally identical).
+
+**Rationale:** In discussions with parties that were not familiar with the protocol, fee transfers were misunderstood as representations of fees associated with a user transaction. As soon as it was explained that these were transactions programatically issued by the protocol rather than a user, it became clear. As such, it is recommend to partition transactions into *user transactions* and *protocol transactions*.
+
+**Downsides:** If there will ever be fee transfers issued by users, this will break the proposed structure. However, there currently doesn't seem to be any plans currently to do that.
+
+**Usage:** Snark workers are compensated for their snark work by protocol transactions.
+
+**Alternatives:**
+- Fee transfers - current usage, confusing to unfamiliar users.
+
+### Block Hash
+**Concept:** A hash that serves as an identifier for a specific block in the blockchain.
+
+**Rationale:** Most major cryptocurrency protocols use the term block hash, and it is helpful to align with existing terms when possible.
+
+**Downsides:** This didn't make sense when blocks were referred to as external transitions. Now that blocks is the accepted terminology, it should follow that the updated name for the reference is block hash.
+
+**Usage:** Each block contains a unique block hash that is used as an indentifier.
+
+**Alternatives:**
+- State hash - the previous term -- perhaps more accurate, but doesn't conform to broader industry terms.
 
 ## Drawbacks
 [drawbacks]: #drawbacks

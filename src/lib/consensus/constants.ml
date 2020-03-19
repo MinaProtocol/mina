@@ -21,11 +21,6 @@ let genesis_state_timestamp =
 "k", k]
 
 [%%inject
-"coinbase_int", coinbase]
-
-let coinbase = Currency.Amount.of_int coinbase_int
-
-[%%inject
 "block_window_duration_ms", block_window_duration]
 
 let block_window_duration =
@@ -88,7 +83,9 @@ let all_constants =
           ( Block_time.to_time genesis_state_timestamp
           |> Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc ) )
     ; ("k", `Int k)
-    ; ("coinbase", `Int (Currency.Amount.to_int coinbase))
+    ; ( "coinbase"
+      , `String
+          (Currency.Amount.to_formatted_string Coda_compile_config.coinbase) )
     ; ("block_window_duration_ms", `Int block_window_duration_ms)
     ; ("delta", `Int delta)
     ; ("c", `Int c)
