@@ -213,7 +213,7 @@ class ArtifactCollector:
 
 class SingleArtifactCollector(ArtifactCollector):
     def __init__(self, root_dir, context, src_name, dst_name=None):
-        super(SimpleArtifactCollector, self).__init__(root_dir, context)
+        super(SingleArtifactCollector, self).__init__(root_dir, context)
         self.src_name = src_name
         self.dst_name = dst_name
 
