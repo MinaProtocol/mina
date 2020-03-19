@@ -35,7 +35,7 @@ module Https = {
       type t =
         pri {
           location: string,
-          [@bs.as "content-length"]
+          [@bs.as "Content-Length"]
           contentLength: string,
         };
     };
@@ -59,7 +59,9 @@ module Https = {
 };
 
 module Unzipper = {
-  type extractOpts = {path: string};
+  type extractOpts = Js.t({.
+    path: string
+  });
   [@bs.module "unzipper"]
   external extract: extractOpts => Bindings.Stream.Writable.t = "Extract";
 };
@@ -116,19 +118,22 @@ let rec download = (filename, url, encoding, maxRedirects, chunkCb, doneCb) => {
   Https.Request.onError(request, e => doneCb(Error(e)));
 };
 
-let codaRepo = "...";
+let codaRepo = "https://s3-us-west-2.amazonaws.com/wallet.o1test.net/daemon/";
 
 let downloadCoda = (version, chunkCb, doneCb) => {
-  let tempFilename = "coda-portable-" ++ version ++ ".zip";
-  let installPath = ProjectRoot.getPath(`UserData) ++ "/daemon";
+  let tempFilename = "coda-daemon-" ++ version ++ ".zip";
+  //let installPath = ProjectRoot.getPath(`UserData) ++ "/daemon";
+  let extractArgs = [%bs.obj {
+    path: "/tmp/daemon"
+  }];
   download(
     tempFilename,
-    codaRepo ++ version ++ ".zip",
+    codaRepo ++ tempFilename,
     "binary",
     1,
     chunkCb,
     doneCb,
   );
   Bindings.Stream.Readable.create(tempFilename)
-  ->(Bindings.Stream.Readable.pipe(Unzipper.extract({ path: installPath })));
+  ->(Bindings.Stream.Readable.pipe(Unzipper.extract(extractArgs)));
 };

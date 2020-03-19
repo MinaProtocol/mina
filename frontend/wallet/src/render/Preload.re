@@ -35,6 +35,7 @@ let getTranslation = name =>
 
 [%bs.raw "window.isFaker = isFaker"];
 [%bs.raw "window.downloadKey = downloadKey"];
+[%bs.raw "window.downloadCoda = downloadCoda"];
 [%bs.raw "window.showItemInFolder = showItemInFolder"];
 [%bs.raw "window.openExternal = openExternal"];
 [%bs.raw

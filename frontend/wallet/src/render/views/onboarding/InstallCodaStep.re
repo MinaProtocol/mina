@@ -38,7 +38,12 @@ module InstallProgress = {
     <div className=Styles.installer>
       <div className=Styles.downloader>
         <Downloader
-          onFinish={_ => setFinished(_ => true)}
+          onFinish={result =>
+            switch (result) {
+            | Belt.Result.Ok(_) => setFinished(_ => true)
+            | Belt.Result.Error(_) => setFinished(_ => false)
+            }
+          }
           finished
         />
         {finished

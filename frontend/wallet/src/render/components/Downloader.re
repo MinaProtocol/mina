@@ -21,7 +21,7 @@ let make = (~onFinish, ~finished) => {
 
   React.useEffect0(() => {
     downloadCoda(
-      "latest",
+      "macos",
       (chunkSize, totalSize) =>
         updateState(((downloaded, _)) =>
           (downloaded + chunkSize, totalSize)
