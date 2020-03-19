@@ -112,8 +112,6 @@ module Port = struct
 
   let default_libp2p = 8302
 
-  let default_hasura_port = 9000
-
   let of_raw raw =
     let open Or_error.Let_syntax in
     let%bind () =
@@ -198,7 +196,7 @@ module Host_and_port = struct
 
   module Daemon = struct
     let archive =
-      create ~name:"archive-port" ~arg_type
+      create ~name:"archive-address" ~arg_type
         (make_doc_builder "Daemon to archive process communication"
            Port.default_archive)
         Optional
@@ -243,22 +241,18 @@ module Uri = struct
   end
 
   module Archive = struct
-    let hasura =
+    let postgres =
       let doc_builder =
         Doc_builder.create ~display:to_string
           ~examples:
-            [ Port.to_uri ~path:"graphql" Port.default_client
-            ; Uri.of_string
-                ( example_host ^ ":"
-                ^ Int.to_string Port.default_client
-                ^/ "v1/graphql" ) ]
-          "URI/LOCALHOST-PORT" "Srchive process to communicate with Hasura"
+            [Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"]
+          "URI" "URI for postgresql database"
       in
-      create ~name:"hasura-port"
-        ~arg_type:(arg_type ~path:"v1/graphql")
+      create ~name:"postgres-uri"
+        ~arg_type:(Command.Arg_type.map Command.Param.string ~f:Uri.of_string)
         doc_builder
         (Resolve_with_default
-           (Port.to_uri ~path:"graphql" Port.default_hasura_port))
+           (Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"))
   end
 end
 
