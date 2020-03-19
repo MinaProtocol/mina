@@ -319,6 +319,10 @@ jobs:
                     cp homebrew-* ../package/.
                     popd
             - run:
+                name: Decode Apple Certificates
+                context: org-global
+                command: base64 -O -o Certificates.p12 <<< $AppleCertificates
+            - run:
                 name: Build portable binary
                 command: |
                     make macos-portable
