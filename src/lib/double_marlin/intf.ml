@@ -281,13 +281,15 @@ module Pairing_main_inputs = struct
     module Impl : Snarky.Snark_intf.Run with type prover_state = unit
 
     module Fq : sig
-      type t
+      type t [@@deriving sexp]
 
       val to_bits : t -> bool list
 
       val of_bits : bool list -> t
 
       val is_square : t -> bool
+
+      val print : t -> unit
     end
 
     module G : sig

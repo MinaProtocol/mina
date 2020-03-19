@@ -209,14 +209,13 @@ module Accumulator = struct
     *)
 
     module Shift = Int
+
     module Unshifted_accumulators = struct
       type 'a t = 'a Shift.Map.t [@@deriving sexp, bin_io]
     end
 
     type ('g, 'unshifted) t =
-      { shifted_accumulator: 'g
-      ; unshifted_accumulators: 'unshifted
-      }
+      {shifted_accumulator: 'g; unshifted_accumulators: 'unshifted}
     [@@deriving fields, bin_io, sexp]
 
     let to_hlist {shifted_accumulator; unshifted_accumulators} =
@@ -228,29 +227,23 @@ module Accumulator = struct
 
     let typ (shifts : Shift.Set.t) g =
       let key_order = `Increasing in
-      let there (xs: _ Unshifted_accumulators.t) =
-        Map.to_alist ~key_order xs
-        |> List.map ~f:snd
+      let there (xs : _ Unshifted_accumulators.t) =
+        Map.to_alist ~key_order xs |> List.map ~f:snd
       in
-      let back xs = 
+      let back xs =
         Set.to_sequence ~order:key_order shifts
         |> Fn.flip Sequence.zip (Sequence.of_list xs)
-        |> Shift.Map.of_increasing_sequence
-        |> Or_error.ok_exn
+        |> Shift.Map.of_increasing_sequence |> Or_error.ok_exn
       in
       Snarky.Typ.of_hlistable
-        [g; 
-         Typ.transport
-           (Typ.list ~length:(Set.length shifts)
-              g)
-           ~there ~back
-       |> Typ.transport_var ~there ~back
-
-    (*
+        [ g
+        ; Typ.transport (Typ.list ~length:(Set.length shifts) g) ~there ~back
+          |> Typ.transport_var ~there ~back
+          (*
          Vector.typ
            (Vector.typ g Unshifted_accumulators_per_branch.n)
            branches *)
-        ]
+         ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
@@ -265,22 +258,22 @@ module Accumulator = struct
     let map2 t1 t2 ~f =
       { shifted_accumulator= f t1.shifted_accumulator t2.shifted_accumulator
       ; unshifted_accumulators=
-          Int.Map.merge ~f:(fun ~key:_ ->
-              function
-              | `Both (x, y) -> Some (f x y)
-              | _ -> failwith "map2: Key not present in both maps")
+          Int.Map.merge
+            ~f:(fun ~key:_ -> function `Both (x, y) -> Some (f x y) | _ ->
+                  failwith "map2: Key not present in both maps" )
             t1.unshifted_accumulators t2.unshifted_accumulators }
 
     let accumulate t add ~into =
-      { shifted_accumulator=
-          add into.shifted_accumulator t.shifted_accumulator
+      { shifted_accumulator= add into.shifted_accumulator t.shifted_accumulator
       ; unshifted_accumulators=
-          Int.Map.merge into.unshifted_accumulators t.unshifted_accumulators ~f:(fun ~key:_ ->
-              function
-              | `Both (x, y) -> Some (add x y)
-              | `Left x -> Some x
-              | `Right y -> failwith "shift not present in accumulating map" )
-      }
+          Int.Map.merge into.unshifted_accumulators t.unshifted_accumulators
+            ~f:(fun ~key:_ -> function
+            | `Both (x, y) ->
+                Some (add x y)
+            | `Left x ->
+                Some x
+            | `Right y ->
+                failwith "shift not present in accumulating map" ) }
   end
 
   module Opening_check = struct
@@ -354,11 +347,11 @@ module Accumulator = struct
           t2.degree_bound_checks }
 
   let accumulate t add ~into =
-    { opening_check= Opening_check.map2 ~f:add t.opening_check into.opening_check
+    { opening_check=
+        Opening_check.map2 ~f:add t.opening_check into.opening_check
     ; degree_bound_checks=
-        Degree_bound_checks.accumulate
-          t.degree_bound_checks add ~into:into.degree_bound_checks
-    }
+        Degree_bound_checks.accumulate t.degree_bound_checks add
+          ~into:into.degree_bound_checks }
 end
 
 module Opening = struct

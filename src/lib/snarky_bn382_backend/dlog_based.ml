@@ -112,7 +112,7 @@ module Keypair = struct
   let set_urs_info, load_urs =
     let urs_info = Set_once.create () in
     let urs = ref None in
-    let set_urs_info ?(degree = 1 lsl 19) path =
+    let set_urs_info ?(degree = 1 lsl 20) path =
       Set_once.set_exn urs_info Lexing.dummy_pos (degree, path)
     in
     let load () =

@@ -1,6 +1,6 @@
 type z = Z of z
 
-type 'a s = Z | S of 'a 
+type 'a s = Z | S of 'a
 
 type _ t = Z : z t | S : 'n t -> 'n s t
 
@@ -19,12 +19,11 @@ let to_int : type n. n t -> int =
   fun x -> go 0 x
 
 let rec of_int : int -> e =
-  fun n ->
+ fun n ->
   if n < 0 then failwith "of_int: negative"
-  else if n = 0
-  then T Z
+  else if n = 0 then T Z
   else
-    let T n = of_int (n - 1) in
+    let (T n) = of_int (n - 1) in
     T (S n)
 
 module type Intf = sig
@@ -36,8 +35,7 @@ end
 type 'n m = (module Intf with type n = 'n)
 
 module Is_succ = struct
-  type 'n t =
-    | Has_pred : 'm t -> 'm s t
+  type 'n t = Has_pred : 'm t -> 'm s t
 end
 
 module Adds = struct
@@ -54,20 +52,16 @@ module Adds = struct
 end
 
 module Lte = struct
-  type (_, _) t =
-    | Z : (z, _) t
-    | S : ('n, 'm) t -> ('n s, 'm s) t
+  type (_, _) t = Z : (z, _) t | S : ('n, 'm) t -> ('n s, 'm s) t
 
-  let rec refl : type n. n nat -> (n, n) t =
-    function
-    | Z -> Z
-    | S n -> S (refl n)
+  let rec refl : type n. n nat -> (n, n) t = function
+    | Z ->
+        Z
+    | S n ->
+        S (refl n)
 
   let rec trans : type a b c. (a, b) t -> (b, c) t -> (a, c) t =
-    fun t1 t2 ->
-    match t1, t2 with
-    | Z, _ -> Z
-    | S t1, S t2 -> S (trans t1 t2)
+   fun t1 t2 -> match (t1, t2) with Z, _ -> Z | S t1, S t2 -> S (trans t1 t2)
 end
 
 module N0 = struct
@@ -95,23 +89,26 @@ module Add = struct
     val add : 'm nat -> 'm plus_n nat * (z plus_n, 'm, 'm plus_n) Adds.t
   end
 
-  let rec create : type n. n nat -> (module Intf with type n = n) =
-    function
-    | Z -> (module N0)
+  let rec create : type n. n nat -> (module Intf with type n = n) = function
+    | Z ->
+        (module N0)
     | S n ->
-      let (module N) = create n in
-      let T = N.eq in
-      let module Sn = struct
-        type 'a plus_n = 'a N.plus_n s
-        type n = N.n s
-        let n = S N.n 
-        let eq = Core_kernel.Type_equal.T
-        let add t =
-          let (t_plus_n, pi) = N.add t in
-          (S t_plus_n, Adds.S pi)
-      end
-      in
-      (module Sn)
+        let (module N) = create n in
+        let T = N.eq in
+        let module Sn = struct
+          type 'a plus_n = 'a N.plus_n s
+
+          type n = N.n s
+
+          let n = S N.n
+
+          let eq = Core_kernel.Type_equal.T
+
+          let add t =
+            let t_plus_n, pi = N.add t in
+            (S t_plus_n, Adds.S pi)
+        end in
+        (module Sn)
 
   module type Intf_transparent = sig
     type _ plus_n
@@ -183,32 +180,34 @@ end
 
 open Core_kernel
 
-let rec compare
-  : type n m. n t -> m t -> [ `Lte of (n, m) Lte.t | `Gt of ( (n, m) Lte.t Not.t) ]
-  =
-  fun n m ->
-  match n, m with
-  | Z, _ -> `Lte Lte.Z
-  | S _, Z -> `Gt (function _ -> .)
-  | S n, S m ->
+let rec compare : type n m.
+    n t -> m t -> [`Lte of (n, m) Lte.t | `Gt of (n, m) Lte.t Not.t] =
+ fun n m ->
+  match (n, m) with
+  | Z, _ ->
+      `Lte Lte.Z
+  | S _, Z ->
+      `Gt (function _ -> .)
+  | S n, S m -> (
     match compare n m with
-    | `Lte pi -> `Lte (S pi)
-    | `Gt gt -> `Gt (function S pi -> gt pi)
+    | `Lte pi ->
+        `Lte (S pi)
+    | `Gt gt ->
+        `Gt (function S pi -> gt pi) )
 
 let lte_exn n m =
-  match compare n m with
-  | `Lte pi -> pi
-  | `Gt gt -> failwith "lte_exn"
+  match compare n m with `Lte pi -> pi | `Gt gt -> failwith "lte_exn"
 
-let rec gt_implies_gte
-  : type n m. n nat -> m nat -> (n, m) Lte.t Not.t -> (m, n) Lte.t
-  =
-  fun n m not_lte ->
-  match n, m with
-  | Z, _ -> Empty.elim (not_lte Z)
-  | S _, Z -> Z
+let rec gt_implies_gte : type n m.
+    n nat -> m nat -> (n, m) Lte.t Not.t -> (m, n) Lte.t =
+ fun n m not_lte ->
+  match (n, m) with
+  | Z, _ ->
+      Empty.elim (not_lte Z)
+  | S _, Z ->
+      Z
   | S n, S m ->
-    S (gt_implies_gte n m (fun pi -> not_lte (S pi)))
+      S (gt_implies_gte n m (fun pi -> not_lte (S pi)))
 
 let rec eq : type n m.
        n nat
@@ -230,8 +229,10 @@ let rec eq : type n m.
     | `Not_equal f ->
         `Not_equal (function T -> f T) )
 
-let eq_exn: type n m. n nat -> m nat -> (n, m) Type_equal.t
-  = fun n m ->
-    match eq n m with
-    | `Equal t -> t
-    | `Not_equal _ -> failwith "eq_exn"
+let eq_exn : type n m. n nat -> m nat -> (n, m) Type_equal.t =
+ fun n m ->
+  match eq n m with
+  | `Equal t ->
+      t
+  | `Not_equal _ ->
+      failwithf "eq_exn: %d vs %d" (to_int n) (to_int m) ()

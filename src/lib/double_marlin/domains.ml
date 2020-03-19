@@ -1,2 +1,1 @@
-  type t = Domain.t * Domain.t
-
+type t = Domain.t * Domain.t

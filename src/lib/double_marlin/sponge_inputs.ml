@@ -20,10 +20,11 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
   module Operations = struct
     let seal x =
       match Field.to_constant x with
-      | Some x -> Field.constant x
+      | Some x ->
+          Field.constant x
       | None ->
-        let x' = exists typ ~compute:As_prover.(fun () -> read_var x) in
-        Assert.equal x x' ; x'
+          let x' = exists typ ~compute:As_prover.(fun () -> read_var x) in
+          Assert.equal x x' ; x'
 
     (* TODO: experiment with sealing version of this *)
     let add_assign ~state i x = state.(i) <- state.(i) + x

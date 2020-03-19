@@ -94,10 +94,7 @@ let rec map : type a b n. (a, n) t -> f:(a -> b) -> (b, n) t =
 
 let mapi (type a b m) (t : (a, m) t) ~(f : int -> a -> b) =
   let rec go : type n. int -> (a, n) t -> (b, n) t =
-    fun i t ->
-      match t with
-      | [] -> []
-      | x :: xs -> f i x :: go (i + 1) xs
+   fun i t -> match t with [] -> [] | x :: xs -> f i x :: go (i + 1) xs
   in
   go 0 t
 
@@ -156,10 +153,12 @@ let rec fold : type acc a n. (a, n) t -> f:(acc -> a -> acc) -> init:acc -> acc
 
 let reduce (init :: xs) ~f = fold xs ~f ~init
 
-let reduce_exn (type n) (t : (_, n) t)  ~f =
+let reduce_exn (type n) (t : (_, n) t) ~f =
   match t with
-  | [] ->  failwith "reduce_exn: empty list"
-  | (init :: xs) -> fold xs ~f ~init
+  | [] ->
+      failwith "reduce_exn: empty list"
+  | init :: xs ->
+      fold xs ~f ~init
 
 open Core_kernel
 
@@ -313,46 +312,39 @@ let rec append : type n m n_m a.
       x :: append t1 t2 adds
 
 let rec transpose : type a n m. ((a, n) t, m) t -> ((a, m) t, n) t =
-  fun xss ->
+ fun xss ->
   match xss with
-  | [] -> failwith "transpose: empty list"
-  | [] :: _ -> []
-  | (_::_) :: _ ->
-    let heads, tails = unzip (map xss ~f:(fun (x :: xs) -> (x, xs))) in
-    heads :: transpose tails
+  | [] ->
+      failwith "transpose: empty list"
+  | [] :: _ ->
+      []
+  | (_ :: _) :: _ ->
+      let heads, tails = unzip (map xss ~f:(fun (x :: xs) -> (x, xs))) in
+      heads :: transpose tails
 
-let rec trim
-  : type a n m.
-    (a, m) t
-    -> (n, m) Nat.Lte.t
-    -> (a, n) t
-  =
-  fun v p ->
-  match v, p with
-  | _, Z -> []
-  | x :: xs , S p -> x :: trim xs p
+let rec trim : type a n m. (a, m) t -> (n, m) Nat.Lte.t -> (a, n) t =
+ fun v p -> match (v, p) with _, Z -> [] | x :: xs, S p -> x :: trim xs p
 
 let rec extend_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
-  fun v m default ->
-  match v, m with
-  | [], Z -> []
-  | [], S n -> default :: extend_exn [] n default
-  | x :: xs, Z -> failwith "extend_exn: list too long"
+ fun v m default ->
+  match (v, m) with
+  | [], Z ->
+      []
+  | [], S n ->
+      default :: extend_exn [] n default
+  | x :: xs, Z ->
+      failwith "extend_exn: list too long"
   | x :: xs, S m ->
-    let extended = extend_exn xs m default in
-    x :: extended
+      let extended = extend_exn xs m default in
+      x :: extended
 
-let rec extend
-  : type a n m.
-    (a, n) t
-    -> (n, m) Nat.Lte.t
-    -> m Nat.t
-    -> a
-    -> (a, m) t
-  =
-  fun v p m default ->
-  match v, p, m with
-  | _, Z, Z -> []
-  | _, Z, S m -> default :: extend [] Z m default
-  | x :: xs , S p, S m -> x :: extend xs p m default
-
+let rec extend : type a n m.
+    (a, n) t -> (n, m) Nat.Lte.t -> m Nat.t -> a -> (a, m) t =
+ fun v p m default ->
+  match (v, p, m) with
+  | _, Z, Z ->
+      []
+  | _, Z, S m ->
+      default :: extend [] Z m default
+  | x :: xs, S p, S m ->
+      x :: extend xs p m default

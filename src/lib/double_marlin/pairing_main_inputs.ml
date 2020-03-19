@@ -23,7 +23,18 @@ let unrelated_g (x, y) =
 let crs_max_degree = 1 lsl 22
 
 open Impl
-module Fq = Snarky_bn382_backend.Fq
+module Fq = struct
+  type t = 
+    Impls.Dlog_based.Field.Constant.t [@@deriving sexp]
+
+  open Snarky_bn382_backend.Fq
+  let of_bits = of_bits
+  let to_bits = to_bits
+  let is_square = is_square
+  let inv = inv
+  let print = print
+  let of_int = of_int
+end
 
 let sponge_params =
   Sponge.Params.(map sponge_params_constant ~f:Impl.Field.constant)
@@ -218,7 +229,6 @@ end
 
 module Generators = struct
   let h =
-    Snarky_bn382.Fq_urs.h
-      (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
+    Snarky_bn382.Fq_urs.h (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
     |> Snarky_bn382_backend.G.Affine.of_backend
 end

@@ -19,12 +19,10 @@ open Core_kernel
 
 let dlog_pcs_batch (type n_branching total)
     ((without_degree_bound, pi) :
-       total Nat.t * (n_branching, Nat.N19.n, total) Nat.Adds.t)
-    ~h_minus_1
-    ~k_minus_1
-  =
+      total Nat.t * (n_branching, Nat.N19.n, total) Nat.Adds.t) ~h_minus_1
+    ~k_minus_1 =
   Pcs_batch.create ~without_degree_bound
-    ~with_degree_bound:[h_minus_1; h_minus_1; k_minus_1 ]
+    ~with_degree_bound:[h_minus_1; h_minus_1; k_minus_1]
 
 let pairing_beta_1_pcs_batch : (int, _, _) Pcs_batch.t =
   Pcs_batch.create ~without_degree_bound:Nat.N6.n ~with_degree_bound:[]

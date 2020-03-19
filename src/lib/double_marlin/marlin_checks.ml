@@ -1,7 +1,7 @@
 open Core_kernel
 open Rugelach_types
 
-type 'field domain = < size : 'field; vanishing_polynomial : 'field -> 'field >
+type 'field domain = < size: 'field ; vanishing_polynomial: 'field -> 'field >
 
 module Make (Impl : Snarky.Snark_intf.Run) = struct
   open Impl
@@ -20,9 +20,9 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
     let size = Field.of_int (Domain.size domain) in
     object
       method size = size
+
       method vanishing_polynomial x = vanishing_polynomial domain x
     end
-
 
   let sum' xs f = List.reduce_exn (List.map xs ~f) ~f:F.( + )
 

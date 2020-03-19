@@ -40,7 +40,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
 
   type 'a vec = ('a, Branching.n) Vector.t
 
-  let debug = false
+  let debug = true
 
   let print_g lab g =
     if debug then
@@ -107,8 +107,8 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
           ~compute:
             As_prover.(
               fun () ->
-                Fq.Constant.(is_square(of_bits
-                  (List.map pre ~f:(read Boolean.typ)))))
+                Fq.Constant.(
+                  is_square (of_bits (List.map pre ~f:(read Boolean.typ)))))
       in
       let left_term =
         let base =
@@ -144,20 +144,15 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
   let h_precomp = G.Scaling_precomputation.create Generators.h
 
   let check_bulletproof
-(*       ~branching:((module Branching) : (module Nat.Add.Intf_transparent)) *)
-
-    ~pcs_batch
-      ~domain_h ~domain_k ~sponge ~xi ~combined_inner_product
+      ~(*       ~branching:((module Branching) : (module Nat.Add.Intf_transparent)) *)
+      pcs_batch ~domain_h ~domain_k ~sponge ~xi ~combined_inner_product
       ~
       (* Corresponds to y in figure 7 of WTS *)
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       (advice : _ Openings.Bulletproof.Advice.t)
-      ~polynomials:(
-      without_degree_bound,
-      with_degree_bound)
+      ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:({lr; delta; z_1; z_2; sg} :
-                         (Fq.t, G.t) Openings.Bulletproof.t)
-    =
+                        (Fq.t, G.t) Openings.Bulletproof.t) =
     (*
     let dlog_pcs_batch =
       Common.dlog_pcs_batch ~domain_h ~domain_k (Branching.add Nat.N19.n)
@@ -172,11 +167,8 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     in
     let open G in
     let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
-      Pcs_batch.combine_commitments 
-        pcs_batch
-        ~scale ~add:( + ) ~xi
-        without_degree_bound
-        with_degree_bound
+      Pcs_batch.combine_commitments pcs_batch ~scale ~add:( + ) ~xi
+        without_degree_bound with_degree_bound
     in
     let lr_prod, challenges = bullet_reduce sponge lr in
     let p_prime =
@@ -211,13 +203,11 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     Array.map Input_domain.lagrange_commitments
       ~f:G.Scaling_precomputation.create
 
-  let incrementally_verify_proof
-    (type b)
-    (module Branching : Nat.Add.Intf with type n = b)
-      ~domain_h ~domain_k
+  let incrementally_verify_proof (type b)
+      (module Branching : Nat.Add.Intf with type n = b) ~domain_h ~domain_k
       ~verification_key:(m : _ Abc.t Matrix_evals.t) ~xi ~sponge ~public_input
-      ~(sg_old : (_, Branching.n) Vector.t) ~combined_inner_product ~advice ~messages
-      ~openings_proof =
+      ~(sg_old : (_, Branching.n) Vector.t) ~combined_inner_product ~advice
+      ~messages ~openings_proof =
     let receive ty f =
       let x = f messages in
       absorb sponge ty x ; x
@@ -226,15 +216,27 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     let open Pairing_marlin_types.Messages in
     let x_hat =
       Core.printf "pairing public input bits: %d\n%!"
-        (List.length (List.concat (Array.to_list public_input) )) ;
+        (List.length (List.concat (Array.to_list public_input))) ;
       assert (
         Int.ceil_pow2 (Array.length public_input)
         = Domain.size Input_domain.domain ) ;
       G.multiscale_known
         (Array.mapi public_input ~f:(fun i x ->
+            as_prover As_prover.(fun () ->
+                let t =
+                  Fq.Constant.of_bits
+                    (List.map ~f:(read Boolean.typ) x)
+                in
+                print_g (sprintf "g_%d" i)
+                  (G.constant Input_domain.lagrange_commitments.(i) );
+                Fq.Constant.print t;
+               );
              (x, lagrange_precomputations.(i)) ))
     in
     absorb sponge PC x_hat ;
+    Core.printf "pmain x domain size %d\n%!"
+      (Domain.size Input_domain.domain);
+    print_g "pmain x_hat" x_hat ;
     let w_hat = receive PC w_hat in
     let z_hat_a = receive PC z_hat_a in
     let z_hat_b = receive PC z_hat_b in
@@ -302,13 +304,13 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
           (snd (Branching.add Nat.N19.n))
       in
       check_bulletproof
-        ~pcs_batch:(Common.dlog_pcs_batch
-                      ~h_minus_1:(Domain.size domain_h - 1)
-                      ~k_minus_1:(Domain.size domain_k - 1)
-                      (Branching.add Nat.N19.n)
-                   )
-        ~domain_h ~domain_k ~sponge:sponge_before_evaluations
-        ~xi ~combined_inner_product ~advice ~openings_proof
+        ~pcs_batch:
+          (Common.dlog_pcs_batch
+             ~h_minus_1:(Domain.size domain_h - 1)
+             ~k_minus_1:(Domain.size domain_k - 1)
+             (Branching.add Nat.N19.n))
+        ~domain_h ~domain_k ~sponge:sponge_before_evaluations ~xi
+        ~combined_inner_product ~advice ~openings_proof
         ~polynomials:(without_degree_bound, [g_1; g_2; g_3])
     in
     ( sponge_digest_before_evaluations
@@ -383,9 +385,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     in
     let marlin_checks =
       Marlin_checks.check ~x_hat_beta_1 ~input_domain:Input_domain.self
-        ~domain_h
-        ~domain_k
-        marlin evals
+        ~domain_h ~domain_k marlin evals
     in
     as_prover
       As_prover.(
@@ -414,10 +414,8 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
 
   type 's app_state = (module App_state_intf with type t = 's)
 
-  let hash_me_only (type s) 
-      ~index
-      (state_to_field_elements : s -> Field.t array)
-    =
+  let hash_me_only (type s) ~index
+      (state_to_field_elements : s -> Field.t array) =
     let open Types.Pairing_based.Proof_state.Me_only in
     let after_index =
       let sponge = Sponge.create sponge_params in
@@ -453,14 +451,14 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
       Boolean.Assert.(b1 = b2)
     in
     let chal c1 c2 = Field.Assert.equal c1 (Field.project c2) in
-    fq m1.sigma_2 m2.sigma_2 ;
-    fq m1.sigma_3 m2.sigma_3 ;
     chal m1.alpha m2.alpha ;
     chal m1.eta_a m2.eta_a ;
     chal m1.eta_b m2.eta_b ;
     chal m1.eta_c m2.eta_c ;
     chal m1.beta_1 m2.beta_1 ;
+    fq m1.sigma_2 m2.sigma_2 ;
     chal m1.beta_2 m2.beta_2 ;
+    fq m1.sigma_3 m2.sigma_3 ;
     chal m1.beta_3 m2.beta_3
 
   module Requests = struct
@@ -497,75 +495,60 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
              t
   end
 
-  let verify
-      ~branching
-      ~is_base_case
-      ~sg_old
-      ~(opening : _ Openings.Bulletproof.t)
-      ~messages
-      ~wrap_domains:(domain_h, domain_k)
-      ~wrap_verification_key
-      statement
-      (unfinalized : _ Types.Pairing_based.Proof_state.Per_proof.t)
-    =
-      let public_input =
-        let fp x =
-          [|Bitstring_lib.Bitstring.Lsb_first.to_list (Fp.unpack_full x)|]
+  let verify ~branching ~is_base_case ~sg_old
+      ~(opening : _ Openings.Bulletproof.t) ~messages
+      ~wrap_domains:(domain_h, domain_k) ~wrap_verification_key statement
+      (unfinalized : _ Types.Pairing_based.Proof_state.Per_proof.t) =
+    let public_input =
+      let fp x =
+        [|Bitstring_lib.Bitstring.Lsb_first.to_list (Fp.unpack_full x)|]
+      in
+      Array.append
+        [|[Boolean.true_]|]
+        (Spec.pack
+           (module Impl)
+           fp Types.Dlog_based.Statement.spec
+           (Types.Dlog_based.Statement.to_data statement))
+    in
+    let sponge = Sponge.create sponge_params in
+    let { Types.Pairing_based.Proof_state.Deferred_values.xi
+        ; combined_inner_product
+        ; b } =
+      unfinalized.deferred_values
+    in
+    let ( sponge_digest_before_evaluations_actual
+        , (`Success bulletproof_success, bulletproof_challenges_actual)
+        , marlin_actual ) =
+      let xi = Field.unpack ~length:Challenge.length xi in
+      incrementally_verify_proof branching ~domain_h ~domain_k ~xi
+        ~verification_key:wrap_verification_key ~sponge ~public_input ~sg_old
+        ~combined_inner_product ~advice:{b} ~messages ~openings_proof:opening
+    in
+    assert_eq_marlin unfinalized.deferred_values.marlin marlin_actual ;
+    Field.Assert.equal unfinalized.sponge_digest_before_evaluations
+      (Fp.pack sponge_digest_before_evaluations_actual) ;
+    Array.iteri
+      (Vector.to_array unfinalized.deferred_values.bulletproof_challenges)
+      ~f:(fun i c1 ->
+        let c2 = bulletproof_challenges_actual.(i) in
+        Boolean.Assert.( = ) c1.Bulletproof_challenge.is_square
+          (Boolean.if_ is_base_case ~then_:c1.is_square ~else_:c2.is_square) ;
+        let c1 = Field.pack c1.prechallenge in
+        let c2 =
+          Field.if_ is_base_case ~then_:c1 ~else_:(Field.pack c2.prechallenge)
         in
-        Array.append
-          [|[Boolean.true_]|]
-          (Spec.pack
-              (module Impl)
-              fp 
-              Types.Dlog_based.Statement.spec
-              (Types.Dlog_based.Statement.to_data statement))
-      in
-      let sponge = Sponge.create sponge_params in
-      let { Types.Pairing_based.Proof_state.Deferred_values.xi
-          ; combined_inner_product
-          ; b } =
-        unfinalized.deferred_values
-      in
-      let ( sponge_digest_before_evaluations_actual
-          , (`Success bulletproof_success, bulletproof_challenges_actual)
-          , marlin_actual ) =
-        let xi = Field.unpack ~length:Challenge.length xi in
-        incrementally_verify_proof 
-          branching
-          ~domain_h ~domain_k ~xi
-          ~verification_key:wrap_verification_key
-          ~sponge ~public_input 
-          ~sg_old
-          ~combined_inner_product ~advice:{b}
-          ~messages
-          ~openings_proof:opening
-      in
-      Field.Assert.equal unfinalized.sponge_digest_before_evaluations
-        (Fp.pack sponge_digest_before_evaluations_actual) ;
-      assert_eq_marlin unfinalized.deferred_values.marlin marlin_actual ;
-      Array.iteri
-        (Vector.to_array unfinalized.deferred_values.bulletproof_challenges)
-        ~f:(fun i c1 ->
-          let c2 = bulletproof_challenges_actual.(i) in
-          Boolean.Assert.( = ) c1.Bulletproof_challenge.is_square
-            (Boolean.if_ is_base_case ~then_:c1.is_square
-                ~else_:c2.is_square) ;
-          let c1 = Field.pack c1.prechallenge in
-          let c2 =
-            Field.if_ is_base_case ~then_:c1
-              ~else_:(Field.pack c2.prechallenge)
-          in
-          Field.Assert.equal c1 c2 ) ;
-      bulletproof_success 
+        Field.Assert.equal c1 c2 ) ;
+    bulletproof_success
 
   (* TODO: Assert equality with the pass through ! *)
   let main ~bulletproof_log2 ~domain_h ~domain_k ~wrap_domains (type s)
       ((module A) : s app_state)
-      ({ proof_state=
-           {unfinalized_proofs; me_only= me_only_digest}
+      ({ proof_state= {unfinalized_proofs; me_only= me_only_digest}
        ; pass_through } :
         _ Statement.t) =
-    let domain_h, domain_k = Marlin_checks.(domain domain_h, domain domain_k) in
+    let domain_h, domain_k =
+      Marlin_checks.(domain domain_h, domain domain_k)
+    in
     let prev_states =
       exists
         (vec
@@ -585,7 +568,9 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
         ; sg } =
       me_only
     in
-    let hash_me_only = unstage (hash_me_only A.to_field_elements ~index:dlog_marlin_index) in
+    let hash_me_only =
+      unstage (hash_me_only A.to_field_elements ~index:dlog_marlin_index)
+    in
     Field.Assert.equal me_only_digest (Field.pack (hash_me_only me_only)) ;
     (* TODO: Just group this with prev_states *)
     let sg_old =
@@ -653,22 +638,16 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
                 ; sg_old
                 ; messages
                 ; opening
-                ; ((unfinalized : _ Types.Pairing_based.Proof_state.Per_proof.t), should_verify)
-                ]
+                ; ( (unfinalized :
+                      _ Types.Pairing_based.Proof_state.Per_proof.t)
+                  , should_verify ) ]
            ->
           assert_equal_g opening.sg sg ;
           Boolean.Assert.(should_verify = Boolean.not is_base_case) ;
           verify
             ~branching:(module Branching)
-            ~is_base_case
-            ~sg_old
-            ~opening
-            ~messages
-            ~wrap_domains
-            ~wrap_verification_key:dlog_marlin_index
-            statement
-            unfinalized
-          )
+            ~is_base_case ~sg_old ~opening ~messages ~wrap_domains
+            ~wrap_verification_key:dlog_marlin_index statement unfinalized )
       |> Vector.to_list |> Boolean.all
     in
     let prev_proof_correct =
