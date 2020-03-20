@@ -7,10 +7,10 @@ open Signature_lib
 module type External_transition_common_intf = sig
   type t
 
-  type fork_id_status =
+  type protocol_version_status =
     {valid_current: bool; valid_next: bool; matches_daemon: bool}
 
-  val fork_id_status : t -> fork_id_status
+  val protocol_version_status : t -> protocol_version_status
 
   val protocol_state : t -> Protocol_state.Value.t
 
@@ -40,9 +40,9 @@ module type External_transition_common_intf = sig
 
   val delta_transition_chain_proof : t -> State_hash.t * State_body_hash.t list
 
-  val current_fork_id : t -> Fork_id.t
+  val current_protocol_version : t -> Protocol_version.t
 
-  val next_fork_id_opt : t -> Fork_id.t option
+  val proposed_protocol_version_opt : t -> Protocol_version.t option
 
   val broadcast : t -> unit
 
@@ -81,7 +81,7 @@ module type S = sig
              , 'delta_transition_chain
              , 'frontier_dependencies
              , 'staged_ledger_diff
-             , 'fork_ids )
+             , 'protocol_versions )
              t =
           'time_received
           * 'genesis_state
@@ -89,7 +89,7 @@ module type S = sig
           * 'delta_transition_chain
           * 'frontier_dependencies
           * 'staged_ledger_diff
-          * 'fork_ids
+          * 'protocol_versions
           constraint 'time_received = [`Time_received] * (unit, _) Truth.t
           constraint 'genesis_state = [`Genesis_state] * (unit, _) Truth.t
           constraint 'proof = [`Proof] * (unit, _) Truth.t
@@ -103,7 +103,9 @@ module type S = sig
           constraint
             'staged_ledger_diff =
             [`Staged_ledger_diff] * (unit, _) Truth.t
-          constraint 'fork_ids = [`Fork_ids] * (unit, _) Truth.t
+          constraint
+            'protocol_versions =
+            [`Protocol_versions] * (unit, _) Truth.t
         [@@deriving version]
       end
 
@@ -116,7 +118,7 @@ module type S = sig
          , 'delta_transition_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff
-         , 'fork_ids )
+         , 'protocol_versions )
          t =
       ( 'time_received
       , 'genesis_state
@@ -124,7 +126,7 @@ module type S = sig
       , 'delta_transition_chain
       , 'frontier_dependencies
       , 'staged_ledger_diff
-      , 'fork_ids )
+      , 'protocol_versions )
       Stable.Latest.t
 
     type fully_invalid =
@@ -134,7 +136,7 @@ module type S = sig
       , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.false_t
       , [`Frontier_dependencies] * unit Truth.false_t
       , [`Staged_ledger_diff] * unit Truth.false_t
-      , [`Fork_ids] * unit Truth.false_t )
+      , [`Protocol_versions] * unit Truth.false_t )
       t
 
     type fully_valid =
@@ -144,7 +146,7 @@ module type S = sig
       , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
       , [`Frontier_dependencies] * unit Truth.true_t
       , [`Staged_ledger_diff] * unit Truth.true_t
-      , [`Fork_ids] * unit Truth.true_t )
+      , [`Protocol_versions] * unit Truth.true_t )
       t
 
     type initial_valid =
@@ -154,7 +156,7 @@ module type S = sig
       , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
       , [`Frontier_dependencies] * unit Truth.false_t
       , [`Staged_ledger_diff] * unit Truth.false_t
-      , [`Fork_ids] * unit Truth.true_t )
+      , [`Protocol_versions] * unit Truth.true_t )
       t
 
     type almost_valid =
@@ -164,7 +166,7 @@ module type S = sig
       , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
       , [`Frontier_dependencies] * unit Truth.true_t
       , [`Staged_ledger_diff] * unit Truth.false_t
-      , [`Fork_ids] * unit Truth.true_t )
+      , [`Protocol_versions] * unit Truth.true_t )
       t
 
     type ( 'time_received
@@ -173,7 +175,7 @@ module type S = sig
          , 'delta_transition_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff
-         , 'fork_ids )
+         , 'protocol_versions )
          with_transition =
       (external_transition, State_hash.t) With_hash.t
       * ( 'time_received
@@ -182,7 +184,7 @@ module type S = sig
         , 'delta_transition_chain
         , 'frontier_dependencies
         , 'staged_ledger_diff
-        , 'fork_ids )
+        , 'protocol_versions )
         t
 
     val fully_invalid : fully_invalid
@@ -199,7 +201,7 @@ module type S = sig
            * State_hash.t Non_empty_list.t Truth.true_t
          , 'frontier_dependencies
          , 'staged_ledger_diff
-         , 'fork_ids )
+         , 'protocol_versions )
          t
       -> State_hash.t Non_empty_list.t
 
@@ -210,7 +212,7 @@ module type S = sig
          , 'delta_transition_chain
          , [`Frontier_dependencies] * unit Truth.true_t
          , 'staged_ledger_diff
-         , 'fork_ids )
+         , 'protocol_versions )
          with_transition
       -> ( 'time_received
          , 'genesis_state
@@ -218,7 +220,7 @@ module type S = sig
          , 'delta_transition_chain
          , [`Frontier_dependencies] * unit Truth.false_t
          , 'staged_ledger_diff
-         , 'fork_ids )
+         , 'protocol_versions )
          with_transition
 
     val reset_staged_ledger_diff_validation :
@@ -228,7 +230,7 @@ module type S = sig
          , 'delta_transition_chain
          , 'frontier_dependencies
          , [`Staged_ledger_diff] * unit Truth.true_t
-         , 'fork_ids )
+         , 'protocol_versions )
          with_transition
       -> ( 'time_received
          , 'genesis_state
@@ -236,7 +238,7 @@ module type S = sig
          , 'delta_transition_chain
          , 'frontier_dependencies
          , [`Staged_ledger_diff] * unit Truth.false_t
-         , 'fork_ids )
+         , 'protocol_versions )
          with_transition
 
     val forget_validation :
@@ -246,7 +248,7 @@ module type S = sig
          , 'delta_transition_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff
-         , 'fork_ids )
+         , 'protocol_versions )
          with_transition
       -> external_transition
   end
@@ -294,7 +296,7 @@ module type S = sig
     -> staged_ledger_diff:Staged_ledger_diff.t
     -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
     -> validation_callback:(bool -> unit)
-    -> ?next_fork_id_opt:Fork_id.t
+    -> ?proposed_protocol_version_opt:Protocol_version.t
     -> unit
     -> t
 
@@ -308,7 +310,7 @@ module type S = sig
       -> staged_ledger_diff:Staged_ledger_diff.t
       -> delta_transition_chain_proof:State_hash.t * State_body_hash.t list
       -> validation_callback:(bool -> unit)
-      -> ?next_fork_id_opt:Fork_id.t
+      -> ?proposed_protocol_version_opt:Protocol_version.t
       -> unit
       -> t
 
@@ -326,7 +328,7 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
     -> ( [`Time_received] * unit Truth.true_t
        , 'genesis_state
@@ -334,7 +336,7 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
 
   val validate_time_received :
@@ -344,7 +346,7 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
     -> time_received:Block_time.t
     -> ( ( [`Time_received] * unit Truth.true_t
@@ -353,7 +355,7 @@ module type S = sig
          , 'delta_transition_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff
-         , 'fork_ids )
+         , 'protocol_versions )
          Validation.with_transition
        , [> `Invalid_time_received of [`Too_early | `Too_late of int64]] )
        Result.t
@@ -366,7 +368,7 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
     -> ( 'time_received
        , 'genesis_state
@@ -374,7 +376,7 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
 
   val skip_delta_transition_chain_validation :
@@ -386,7 +388,7 @@ module type S = sig
          * State_hash.t Non_empty_list.t Truth.false_t
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
     -> ( 'time_received
        , 'genesis_state
@@ -394,7 +396,7 @@ module type S = sig
        , [`Delta_transition_chain] * State_hash.t Non_empty_list.t Truth.true_t
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
 
   val skip_genesis_protocol_state_validation :
@@ -405,7 +407,7 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
     -> ( 'time_received
        , [`Genesis_state] * unit Truth.true_t
@@ -413,7 +415,7 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
 
   val validate_genesis_protocol_state :
@@ -424,7 +426,7 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
     -> ( ( 'time_received
          , [`Genesis_state] * unit Truth.true_t
@@ -432,7 +434,7 @@ module type S = sig
          , 'delta_transition_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff
-         , 'fork_ids )
+         , 'protocol_versions )
          Validation.with_transition
        , [> `Invalid_genesis_protocol_state] )
        Result.t
@@ -444,7 +446,7 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
     -> verifier:Verifier.t
     -> ( ( 'time_received
@@ -453,7 +455,7 @@ module type S = sig
          , 'delta_transition_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff
-         , 'fork_ids )
+         , 'protocol_versions )
          Validation.with_transition
        , [> `Invalid_proof | `Verifier_error of Error.t] )
        Deferred.Result.t
@@ -466,7 +468,7 @@ module type S = sig
          * State_hash.t Non_empty_list.t Truth.false_t
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
     -> ( ( 'time_received
          , 'genesis_state
@@ -475,19 +477,19 @@ module type S = sig
            * State_hash.t Non_empty_list.t Truth.true_t
          , 'frontier_dependencies
          , 'staged_ledger_diff
-         , 'fork_ids )
+         , 'protocol_versions )
          Validation.with_transition
        , [> `Invalid_delta_transition_chain_proof] )
        Result.t
 
-  val validate_fork_ids :
+  val validate_protocol_versions :
        ( 'time_received
        , 'genesis_state
        , 'proof
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , [`Fork_ids] * unit Truth.false_t )
+       , [`Protocol_versions] * unit Truth.false_t )
        Validation.with_transition
     -> ( ( 'time_received
          , 'genesis_state
@@ -495,9 +497,9 @@ module type S = sig
          , 'delta_transition_chain
          , 'frontier_dependencies
          , 'staged_ledger_diff
-         , [`Fork_ids] * unit Truth.true_t )
+         , [`Protocol_versions] * unit Truth.true_t )
          Validation.with_transition
-       , [> `Invalid_fork_id | `Mismatched_fork_id] )
+       , [> `Invalid_protocol_version | `Mismatched_protocol_version] )
        Result.t
 
   (* This functor is necessary to break the dependency cycle between the Transition_fronter and the External_transition *)
@@ -521,7 +523,7 @@ module type S = sig
          , 'delta_transition_chain
          , [`Frontier_dependencies] * unit Truth.false_t
          , 'staged_ledger_diff
-         , 'fork_ids )
+         , 'protocol_versions )
          Validation.with_transition
       -> logger:Logger.t
       -> frontier:Transition_frontier.t
@@ -531,7 +533,7 @@ module type S = sig
            , 'delta_transition_chain
            , [`Frontier_dependencies] * unit Truth.true_t
            , 'staged_ledger_diff
-           , 'fork_ids )
+           , 'protocol_versions )
            Validation.with_transition
          , [ `Already_in_frontier
            | `Parent_missing_from_frontier
@@ -548,7 +550,7 @@ module type S = sig
        , 'delta_transition_chain
        , [`Frontier_dependencies] * unit Truth.false_t
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
     -> ( 'time_received
        , 'genesis_state
@@ -556,7 +558,7 @@ module type S = sig
        , 'delta_transition_chain
        , [`Frontier_dependencies] * unit Truth.true_t
        , 'staged_ledger_diff
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
 
   val validate_staged_ledger_hash :
@@ -567,7 +569,7 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , [`Staged_ledger_diff] * unit Truth.false_t
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
     -> ( ( 'time_received
          , 'genesis_state
@@ -575,7 +577,7 @@ module type S = sig
          , 'delta_transition_chain
          , 'frontier_dependencies
          , [`Staged_ledger_diff] * unit Truth.true_t
-         , 'fork_ids )
+         , 'protocol_versions )
          Validation.with_transition
        , [> `Staged_ledger_hash_mismatch] )
        Result.t
@@ -588,7 +590,7 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , [`Staged_ledger_diff] * unit Truth.false_t
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
     -> ( 'time_received
        , 'genesis_state
@@ -596,18 +598,18 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , [`Staged_ledger_diff] * unit Truth.true_t
-       , 'fork_ids )
+       , 'protocol_versions )
        Validation.with_transition
 
-  val skip_fork_ids_validation :
-       [`This_transition_has_valid_fork_ids]
+  val skip_protocol_versions_validation :
+       [`This_transition_has_valid_protocol_versions]
     -> ( 'time_received
        , 'genesis_state
        , 'proof
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , [`Fork_ids] * unit Truth.false_t )
+       , [`Protocol_versions] * unit Truth.false_t )
        Validation.with_transition
     -> ( 'time_received
        , 'genesis_state
@@ -615,7 +617,7 @@ module type S = sig
        , 'delta_transition_chain
        , 'frontier_dependencies
        , 'staged_ledger_diff
-       , [`Fork_ids] * unit Truth.true_t )
+       , [`Protocol_versions] * unit Truth.true_t )
        Validation.with_transition
 
   module Staged_ledger_validation : sig
@@ -626,7 +628,7 @@ module type S = sig
          , 'delta_transition_chain
          , 'frontier_dependencies
          , [`Staged_ledger_diff] * unit Truth.false_t
-         , 'fork_ids )
+         , 'protocol_versions )
          Validation.with_transition
       -> logger:Logger.t
       -> verifier:Verifier.t
@@ -640,7 +642,7 @@ module type S = sig
                , 'delta_transition_chain
                , 'frontier_dependencies
                , [`Staged_ledger_diff] * unit Truth.true_t
-               , 'fork_ids )
+               , 'protocol_versions )
                Validation.with_transition ]
            * [`Staged_ledger of Staged_ledger.t]
          , [ `Invalid_staged_ledger_diff of

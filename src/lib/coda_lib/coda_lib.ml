@@ -725,8 +725,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     ; kill_ivar= Ivar.create () }
                   , config.snark_work_fee ) )
           in
-          Fork_id.set_current config.initial_fork_id ;
-          Fork_id.set_next_opt config.next_fork_id_opt ;
+          Protocol_version.set_current config.initial_protocol_version ;
+          Protocol_version.set_proposed_opt
+            config.proposed_protocol_version_opt ;
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
           in

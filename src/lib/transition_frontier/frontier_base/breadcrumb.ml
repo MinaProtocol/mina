@@ -307,7 +307,7 @@ module For_tests = struct
         Protocol_state.create_value ~genesis_state_hash ~previous_state_hash
           ~blockchain_state:next_blockchain_state ~consensus_state
       in
-      Fork_id.(set_current empty) ;
+      Protocol_version.(set_current zero) ;
       let next_external_transition =
         External_transition.For_tests.create ~protocol_state
           ~protocol_state_proof:Proof.dummy

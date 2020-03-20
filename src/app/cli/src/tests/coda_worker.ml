@@ -532,7 +532,8 @@ module T = struct
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
-                 ~initial_fork_id:Fork_id.empty ~next_fork_id_opt:None
+                 ~initial_protocol_version:Protocol_version.zero
+                 ~proposed_protocol_version_opt:None
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)

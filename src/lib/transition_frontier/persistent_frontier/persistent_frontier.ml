@@ -167,8 +167,8 @@ module Instance = struct
            `This_transition_was_not_received_via_gossip
       |> External_transition.skip_frontier_dependencies_validation
            `This_transition_was_loaded_from_persistence
-      |> External_transition.skip_fork_ids_validation
-           `This_transition_has_valid_fork_ids
+      |> External_transition.skip_protocol_versions_validation
+           `This_transition_has_valid_protocol_versions
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)

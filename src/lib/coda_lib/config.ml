@@ -27,9 +27,9 @@ type t =
   ; work_reassignment_wait: int
   ; gossip_net_params: Gossip_net.Libp2p.Config.t
   ; net_config: Coda_networking.Config.t
-  ; initial_fork_id: Fork_id.t
-        (* Option.t instead of option, so that the derived `make' requires a next_fork_id_opt argument *)
-  ; next_fork_id_opt: Fork_id.t Option.t
+  ; initial_protocol_version: Protocol_version.t
+        (* Option.t instead of option, so that the derived `make' requires an argument *)
+  ; proposed_protocol_version_opt: Protocol_version.t Option.t
   ; snark_pool_disk_location: string
   ; wallets_disk_location: string
   ; persistent_root_location: string

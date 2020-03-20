@@ -7,7 +7,7 @@
 [%%import "/src/config/proof_level/full.mlh"]
 [%%import "/src/config/txpool_size.mlh"]
 [%%import "/src/config/account_creation_fee/standard.mlh"]
-[%%import "/src/config/fork_id/current.mlh"]
+[%%import "/src/config/protocol_version/current.mlh"]
 
 [%%define time_offsets true]
 [%%define fake_hash false]
