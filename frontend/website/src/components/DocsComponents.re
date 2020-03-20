@@ -149,14 +149,7 @@ module Pre = {
           },
         ),
       );
-    <pre
-      className={style([
-        backgroundColor(Theme.Colors.slateAlpha(0.05)),
-        borderRadius(`px(9)),
-        padding2(~v=`rem(0.5), ~h=`rem(1.)),
-        overflow(`scroll),
-        position(`relative),
-      ])}>
+    <div className={style([position(`relative)])}>
       <div
         className={style([
           position(`absolute),
@@ -181,8 +174,17 @@ module Pre = {
           |> Promise.iter(() => {Js.log("copied")})
         }}
       />
-      {props##children}
-    </pre>;
+      <pre
+        className={style([
+          backgroundColor(Theme.Colors.slateAlpha(0.05)),
+          borderRadius(`px(9)),
+          padding2(~v=`rem(0.5), ~h=`rem(1.)),
+          overflow(`scroll),
+          selector("code", [Theme.Typeface.pragmataPro]),
+        ])}>
+        {props##children}
+      </pre>
+    </div>;
   };
 };
 

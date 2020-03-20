@@ -51,7 +51,8 @@ let offset =
 
 let local_configs ?block_production_interval
     ?(block_production_keys = Fn.const None)
-    ?(is_archive_rocksdb = Fn.const false) n ~acceptable_delay ~chain_id
+    ?(is_archive_rocksdb = Fn.const false)
+    ?(archive_process_location = Fn.const None) n ~acceptable_delay ~chain_id
     ~program_dir ~snark_worker_public_keys ~work_selection_method ~trace_dir
     ~max_concurrent_connections =
   let%map net_configs = net_configs n in
@@ -74,6 +75,7 @@ let local_configs ?block_production_interval
           ~block_production_key:(block_production_keys i)
           ~work_selection_method ~trace_dir
           ~is_archive_rocksdb:(is_archive_rocksdb i)
+          ~archive_process_location:(archive_process_location i)
           ~offset:(Lazy.force offset) ~max_concurrent_connections () )
   in
   configs
