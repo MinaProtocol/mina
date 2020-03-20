@@ -262,7 +262,7 @@ void camlsnark_bn382_fp_verifier_index_delete(void*);
 void *camlsnark_bn382_fp_verifier_index_urs(void*);
 
 void *camlsnark_bn382_fp_verifier_index_make(
-    size_t, size_t, size_t, size_t,
+    size_t, size_t, size_t, size_t, size_t,
     void*,
     void*, void*, void*, void*,
     void*, void*, void*, void*,
@@ -274,7 +274,7 @@ void camlsnark_bn382_fq_verifier_index_delete(void*);
 void *camlsnark_bn382_fq_verifier_index_urs(void*);
 
 void *camlsnark_bn382_fq_verifier_index_make(
-    size_t, size_t, size_t, size_t,
+    size_t, size_t, size_t, size_t, size_t,
     void*,
     void*, void*, void*, void*,
     void*, void*, void*, void*,
@@ -287,7 +287,7 @@ void* camlsnark_bn382_fp_urs_read(char*);
 void* camlsnark_bn382_fp_urs_lagrange_commitment(void*, size_t, size_t);
 void* camlsnark_bn382_fp_urs_commit_evaluations(void*, size_t, void*);
 void* camlsnark_bn382_fp_urs_dummy_opening_check(void*);
-void* camlsnark_bn382_fp_urs_dummy_degree_bound_checks(void*, size_t, size_t);
+void* camlsnark_bn382_fp_urs_dummy_degree_bound_checks(void*, void*);
 
 // Fq URS
 void *camlsnark_bn382_fq_urs_create(size_t);

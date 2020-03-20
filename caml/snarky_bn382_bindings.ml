@@ -109,10 +109,11 @@ struct
 
   let make =
     foreign (prefix "make")
-      ( size_t @-> size_t @-> size_t @-> size_t @-> Urs.typ @-> G1Affine.typ
+      ( size_t @-> size_t @-> size_t @-> size_t @-> size_t @-> Urs.typ
       @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ
       @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ
-      @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ @-> returning typ )
+      @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ
+      @-> returning typ )
 end
 
 module URS
@@ -928,7 +929,7 @@ module Full (F : Ctypes.FOREIGN) = struct
     let dummy_degree_bound_checks =
       foreign
         (prefix "dummy_degree_bound_checks")
-        (typ @-> size_t @-> size_t @-> returning G1.Affine.Vector.typ)
+        (typ @-> Usize_vector.typ @-> returning G1.Affine.Vector.typ)
   end
 
   module Fp_index =

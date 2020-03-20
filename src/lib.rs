@@ -86,16 +86,12 @@ fn index_to_witness_position(public_inputs: usize, h_to_x_ratio: usize, i: usize
 
 fn rows_to_csmat<F: Clone + Copy + std::fmt::Debug>(
     public_inputs: usize,
+    h_group_size : usize,
     h_to_x_ratio: usize,
     v: &Vec<(Vec<usize>, Vec<F>)>,
 ) -> CsMat<F> {
-    let constraints = ceil_pow2(v.len());
-
-    // By using "constraints" as the number of columns, we are
-    // implicitly padding this matrix to be square.
-
-    let mut m = CsMat::empty(CSR, /* number of columns */ constraints);
-    m.reserve_outer_dim(constraints);
+    let mut m = CsMat::empty(CSR, /* number of columns */ h_group_size);
+    m.reserve_outer_dim(h_group_size);
 
     for (indices, coefficients) in v.iter() {
         let mut shifted: Vec<(usize, F)> = indices
@@ -110,14 +106,14 @@ fn rows_to_csmat<F: Clone + Copy + std::fmt::Debug>(
         let shifted_indices : Vec<usize> = shifted.iter().map(|(i, _)| *i).collect();
         let shifted_coefficients : Vec<F> = shifted.iter().map(|(_, x)| *x).collect();
 
-        match CsVecView::<F>::new_view(constraints, &shifted_indices, &shifted_coefficients) {
-            Ok(v) => m = m.append_outer_csvec(v),
+        match CsVecView::<F>::new_view(h_group_size, &shifted_indices, &shifted_coefficients) {
+            Ok(r) => m = m.append_outer_csvec(r),
             Err(e) => panic!("new_view failed {} ({:?}, {:?})", e, shifted_indices, shifted_coefficients)
         };
     }
 
-    for _ in 0..(constraints - v.len()) {
-        match CsVecView::<F>::new_view(constraints, & vec![], & vec![]) {
+    for _ in 0..(h_group_size - v.len()) {
+        match CsVecView::<F>::new_view(h_group_size, & vec![], & vec![]) {
             Ok(v) => m = m.append_outer_csvec(v),
             Err(e) => panic!("new_view failed {}", e)
         };
@@ -1062,6 +1058,7 @@ pub extern "C" fn camlsnark_bn382_fp_verifier_index_urs(
 pub extern "C" fn camlsnark_bn382_fp_verifier_index_make(
     public_inputs: usize,
     variables: usize,
+    constraints: usize,
     nonzero_entries: usize,
     max_degree: usize,
     urs: *const URS<Bn_382>,
@@ -1082,7 +1079,7 @@ pub extern "C" fn camlsnark_bn382_fp_verifier_index_make(
 ) -> *const VerifierIndex<Bn_382> {
     let urs : URS<Bn_382> = (unsafe { &*urs }).clone();
     let index = VerifierIndex {
-        domains: EvaluationDomains::create(variables, public_inputs, nonzero_entries).unwrap(),
+        domains: EvaluationDomains::create(variables, constraints, public_inputs, nonzero_entries).unwrap(),
         matrix_commitments: [
             MatrixValues { row: (unsafe {*row_a}).clone(), col: (unsafe {*col_a}).clone(), val: (unsafe {*val_a}).clone(), rc: (unsafe {*rc_a}).clone() },
             MatrixValues { row: (unsafe {*row_b}).clone(), col: (unsafe {*col_b}).clone(), val: (unsafe {*val_b}).clone(), rc: (unsafe {*rc_b}).clone() },
@@ -1161,21 +1158,33 @@ pub extern "C" fn camlsnark_bn382_fp_urs_commit_evaluations(
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_urs_dummy_degree_bound_checks(
     urs : *const URS<Bn_382>,
-    bound1 : usize,
-    bound2 : usize
+    bounds : *const Vec<usize>,
     )
 -> *const Vec<G1Affine> {
     let urs = unsafe { &*urs };
-    let p1 = DensePolynomial::<Fp>::from_coefficients_vec((0..bound1).map(|x| (x as u64).into()).collect());
-    let p2 = DensePolynomial::<Fp>::from_coefficients_vec((0..bound2).map(|x| (x as u64).into()).collect());
-    let (c1, s1) = urs.commit_with_degree_bound(&p1, bound1).unwrap();
-    let (c2, s2) = urs.commit_with_degree_bound(&p2, bound2).unwrap();
+    let bounds = unsafe { &*bounds };
+    let comms : Vec<_> = bounds.iter().map(|b| {
+        let p = DensePolynomial::<Fp>::from_coefficients_vec((0..*b).map(|i| {
+            if i == 0 {
+                Fp::one()
+            } else {
+                Fp::zero()
+            }
+        }).collect());
+        urs.commit_with_degree_bound(&p, *b).unwrap()
+    }).collect();
 
-    let r1 = (2u64).into();
-    let r2 = (3u64).into();
+    let cs = comms.iter().map(|(c, _)| *c);
+    let ss = comms.iter().map(|(_, s)| *s);
 
-    let shifted = (s1.into_projective() * &r1 + &(s2.into_projective() * &r2)).into_affine();
-    let res = vec![ shifted, (c1.into_projective() * &r1).into_affine(), (c2.into_projective() * &r2).into_affine() ];
+    let rs : Vec<Fp> = bounds.iter().enumerate().map(|(_, i)| ((i + 2) as u64).into()).collect();
+
+    let shifted = ss.zip(rs.iter()).map(|(s, r)| s.into_projective() * r)
+        .fold(G1Projective::zero(), |acc, x| acc + &x).into_affine();
+
+    let mut res = vec![ shifted ];
+    res.extend(
+        cs.zip(rs).map(|(c, r)| (c.into_projective() * &r).into_affine()));
 
     Box::into_raw(Box::new(res))
 }
@@ -1315,20 +1324,20 @@ pub extern "C" fn camlsnark_bn382_fp_index_create<'a>(
     let c = unsafe { &*c };
 
     let num_constraints = a.len();
-    println!("num constraints, num_vars: {}, {}", num_constraints, vars);
-    assert!(num_constraints >= vars);
 
+    let m = if num_constraints > vars { num_constraints } else { vars };
+
+    let h_group_size = EvaluationDomain::<Fp>::compute_size_of_domain(m).unwrap();
     let h_to_x_ratio = {
         let x_group_size = EvaluationDomain::<Fp>::compute_size_of_domain(public_inputs).unwrap();
-        let h_group_size = EvaluationDomain::<Fp>::compute_size_of_domain(num_constraints).unwrap();
         h_group_size / x_group_size
     };
 
     return Box::into_raw(Box::new(
         Index::<Bn_382>::create(
-            rows_to_csmat(public_inputs, h_to_x_ratio, a),
-            rows_to_csmat(public_inputs, h_to_x_ratio, b),
-            rows_to_csmat(public_inputs, h_to_x_ratio, c),
+            rows_to_csmat(public_inputs, h_group_size, h_to_x_ratio, a),
+            rows_to_csmat(public_inputs, h_group_size, h_to_x_ratio, b),
+            rows_to_csmat(public_inputs, h_group_size, h_to_x_ratio, c),
             public_inputs,
             oracle::bn_382::fp::params(),
             oracle::bn_382::fq::params(),
@@ -1487,20 +1496,20 @@ pub extern "C" fn camlsnark_bn382_fq_index_create<'a>(
     let c = unsafe { &*c };
 
     let num_constraints = a.len();
-    println!("dlog num constraints, vars {}, {}", num_constraints, vars);
-    assert!(num_constraints >= vars);
 
+    let m = if num_constraints > vars { num_constraints } else { vars };
+
+    let h_group_size = EvaluationDomain::<Fq>::compute_size_of_domain(m).unwrap();
     let h_to_x_ratio = {
         let x_group_size = EvaluationDomain::<Fq>::compute_size_of_domain(public_inputs).unwrap();
-        let h_group_size = EvaluationDomain::<Fq>::compute_size_of_domain(num_constraints).unwrap();
         h_group_size / x_group_size
     };
 
     return Box::into_raw(Box::new(
         DlogIndex::<GAffine>::create(
-            rows_to_csmat(public_inputs, h_to_x_ratio, a),
-            rows_to_csmat(public_inputs, h_to_x_ratio, b),
-            rows_to_csmat(public_inputs, h_to_x_ratio, c),
+            rows_to_csmat(public_inputs, h_group_size, h_to_x_ratio, a),
+            rows_to_csmat(public_inputs, h_group_size, h_to_x_ratio, b),
+            rows_to_csmat(public_inputs, h_group_size, h_to_x_ratio, c),
             public_inputs,
             oracle::bn_382::fq::params(),
             oracle::bn_382::fp::params(),
@@ -1652,6 +1661,7 @@ pub extern "C" fn camlsnark_bn382_fq_verifier_index_urs<'a>(
 pub extern "C" fn camlsnark_bn382_fq_verifier_index_make<'a>(
     public_inputs: usize,
     variables: usize,
+    constraints: usize,
     nonzero_entries: usize,
     max_degree: usize,
     urs: *const SRS<GAffine>,
@@ -1672,7 +1682,7 @@ pub extern "C" fn camlsnark_bn382_fq_verifier_index_make<'a>(
 ) -> *const DlogVerifierIndex<'a, GAffine> {
     let srs : SRS<GAffine> = (unsafe { &*urs }).clone();
     let index = DlogVerifierIndex::<GAffine> {
-        domains: EvaluationDomains::create(variables, public_inputs, nonzero_entries).unwrap(),
+        domains: EvaluationDomains::create(variables, constraints, public_inputs, nonzero_entries).unwrap(),
         matrix_commitments: [
             circuits_dlog::index::MatrixValues { row: (unsafe {*row_a}).clone(), col: (unsafe {*col_a}).clone(), val: (unsafe {*val_a}).clone(), rc: (unsafe {*rc_a}).clone() },
             circuits_dlog::index::MatrixValues { row: (unsafe {*row_b}).clone(), col: (unsafe {*col_b}).clone(), val: (unsafe {*val_b}).clone(), rc: (unsafe {*rc_b}).clone() },
