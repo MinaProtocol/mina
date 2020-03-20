@@ -643,6 +643,8 @@ module With_validation = struct
   let broadcast t = lift broadcast t
 
   let don't_broadcast t = lift don't_broadcast t
+
+  let poke_validation_callback t = lift poke_validation_callback t
 end
 
 module Initial_validated = struct
@@ -786,6 +788,7 @@ module Validated = struct
     , delta_transition_chain_proof
     , broadcast
     , don't_broadcast
+    , poke_validation_callback
     , protocol_state_proof
     , blockchain_state
     , blockchain_length

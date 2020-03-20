@@ -38,6 +38,8 @@ module type External_transition_common_intf = sig
   val broadcast : t -> unit
 
   val don't_broadcast : t -> unit
+
+  val poke_validation_callback : t -> (bool -> unit) -> unit
 end
 
 module type External_transition_base_intf = sig
@@ -58,8 +60,6 @@ end
 
 module type S = sig
   include External_transition_base_intf
-
-  val poke_validation_callback : t -> (bool -> unit) -> unit
 
   type external_transition = t
 
