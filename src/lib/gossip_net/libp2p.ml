@@ -1,8 +1,6 @@
 [%%import
 "../../config.mlh"]
 
-(* A dumb comment just to debug the validation failure *)
-
 open Core
 open Async
 open Network_peer
