@@ -95,8 +95,7 @@ module Dmain = Dlog_main.Make (struct
 end)
 
 module Dlog_proof = struct
-  type t =
-    dlog_opening * (g, fq) Pickles_types.Pairing_marlin_types.Messages.t
+  type t = dlog_opening * (g, fq) Pickles_types.Pairing_marlin_types.Messages.t
 
   type var =
     (Impls.Pairing_based.Fq.t, G.t) Types.Pairing_based.Openings.Bulletproof.t
@@ -618,16 +617,19 @@ let step
       M.f prevs
     in
     (* TODO: Use this *)
-    let prev_proofs_finalized =
+    let proofs_should_verify = rule.main prev_statements me_only.app_state in
+    (*
+    let _prev_proofs_finalized =
       let rec go : type vars vals ns1 ns2.
              (vars, ns1, ns2) H3.T(Per_proof_witness).t
           -> (vars, vals, ns1, ns2) H4.T(Types_map.Data.For_step).t
+          -> vars H1.T(E01(B)).t
           -> Boolean.var list =
-       fun proofs datas ->
-        match (proofs, datas) with
-        | [], [] ->
+       fun proofs datas should_verifys ->
+        match (proofs, datas, should_verifys) with
+          | [], [], [] ->
             []
-        | p :: proofs, d :: datas ->
+        | p :: proofs, d :: datas, should_verify:: should_verifys ->
             let _, which_index, state, prev_evals, _sgs, _opening = p in
             let sponge_digest =
               Fp.pack state.sponge_digest_before_evaluations
@@ -647,16 +649,20 @@ let step
               Pseudo.Domain.
                 (to_domain (which_index, hs), to_domain (which_index, ks))
             in
-            Pmain.finalize_other_proof ~domain_k ~domain_h ~sponge
-              deferred_values prev_evals
-            :: go proofs datas
+            let ok =
+              Boolean.(
+                Pmain.finalize_other_proof ~domain_k ~domain_h ~sponge
+                  deferred_values prev_evals
+                || not should_verify )
+            in
+            ok :: go proofs datas should_verifys
       in
-      go prevs datas
+      Boolean.Assert.all (go prevs datas proofs_should_verify)
     in
+       *)
     let module Proof = struct
       type t = Dlog_proof.var
     end in
-    let proofs_should_verify = rule.main prev_statements me_only.app_state in
     let open Pairing_main_inputs in
     let open Pmain in
     let prevs_verified =
@@ -665,7 +671,7 @@ let step
           -> (vars, vals, ns1, ns2) H4.T(Types_map.Data.For_step).t
           -> vars H1.T(E01(Unfinalized)).t
           -> vars H1.T(E01(B)).t
-          -> vars H1.T(E01(B)).t =
+          -> B.t list =
        fun proofs datas unfinalizeds should_verifys ->
         match (proofs, datas, unfinalizeds, should_verifys) with
         | [], [], [], [] ->
@@ -678,10 +684,32 @@ let step
             let ( app_state
                 , which_index
                 , state
-                , _prev_evals
+                , prev_evals
                 , sg_old
                 , (opening, messages) ) =
               p
+            in
+            let finalized =
+              let sponge_digest =
+                Fp.pack state.sponge_digest_before_evaluations
+              in
+              let deferred_values =
+                Types.Dlog_based.Proof_state.Deferred_values.map_challenges
+                  ~f:Fp.pack state.deferred_values
+              in
+              let sponge =
+                let open Pairing_main_inputs in
+                let sponge = Sponge.create sponge_params in
+                Sponge.absorb sponge (`Field sponge_digest) ;
+                sponge
+              in
+              let domain_h, domain_k =
+                let hs, ks = Vector.unzip d.step_domains in
+                Pseudo.Domain.
+                  (to_domain (which_index, hs), to_domain (which_index, ks))
+              in
+              Pmain.finalize_other_proof ~domain_k ~domain_h ~sponge
+                deferred_values prev_evals
             in
             (* TODO Use a pseudo sg old which masks out the extraneous sgs
                  for the index of this internal proof... *)
@@ -695,14 +723,20 @@ let step
               { Types.Dlog_based.Statement.pass_through= prev_me_only
               ; proof_state= state }
             in
-            Pmain.verify ~branching:d.max_branching
-              ~wrap_domains:d.wrap_domains ~is_base_case:should_verify ~sg_old
-              ~opening ~messages ~wrap_verification_key:d.wrap_key statement
-              unfinalized
+            let verified =
+              Boolean.(
+                Pmain.verify ~branching:d.max_branching
+                  ~wrap_domains:d.wrap_domains ~is_base_case:should_verify
+                  ~sg_old ~opening ~messages ~wrap_verification_key:d.wrap_key
+                  statement unfinalized
+                && finalized)
+            in
+            Boolean.(verified || not should_verify)
             :: go proofs datas unfinalizeds should_verifys
       in
-      go prevs datas unfinalized_proofs proofs_should_verify
+      Boolean.all (go prevs datas unfinalized_proofs proofs_should_verify)
     in
+    (*
     let () =
       let bs =
         let module Z = H1.Zip (E01 (B)) (E01 (B)) in
@@ -721,6 +755,7 @@ let step
       in
       M.f bs
     in
+*)
     let () =
       let hash_me_only =
         unstage
@@ -1956,7 +1991,8 @@ struct
                 next_me_only_prepared.sg
                 (*                  Vector.trim next_me_only_prepared.sg lte *)
             }
-      | _ -> Snarky.Request.unhandled
+      | _ ->
+          Snarky.Request.unhandled
     in
     let (next_proof : Pairing_based.Proof.t) =
       let (T (input, conv)) =
