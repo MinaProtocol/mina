@@ -1,5 +1,5 @@
 open Core_kernel
-open Rugelach_types.Hlist
+open Pickles_types.Hlist
 
 module B = struct
   type t = Impls.Pairing_based.Boolean.var

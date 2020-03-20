@@ -4,7 +4,7 @@ open Core_kernel
 open Import
 open Util
 open Types.Pairing_based
-open Rugelach_types
+open Pickles_types
 open Common
 
 module Make (Inputs : Intf.Pairing_main_inputs.S) = struct

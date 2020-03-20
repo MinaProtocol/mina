@@ -1,5 +1,5 @@
 open Core_kernel
-open Rugelach_types
+open Pickles_types
 
 module Challenge_polynomial = struct
   type t = {challenges: Fq.t array; commitment: G.Affine.t} [@@deriving bin_io]

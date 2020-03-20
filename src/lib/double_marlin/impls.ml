@@ -1,4 +1,4 @@
-open Rugelach_types
+open Pickles_types
 module D = Digest
 open Core_kernel
 module Digest = D

@@ -1,5 +1,5 @@
 open Core_kernel
-open Rugelach_types
+open Pickles_types
 
 type 'field domain = < size: 'field ; vanishing_polynomial: 'field -> 'field >
 

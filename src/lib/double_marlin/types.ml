@@ -1,4 +1,4 @@
-open Rugelach_types
+open Pickles_types
 open Core_kernel
 
 let index_to_field_elements ({row; col; value} : _ Abc.t Matrix_evals.t)

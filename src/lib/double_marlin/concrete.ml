@@ -1,6 +1,6 @@
 module I = Intf
 open Types
-open Rugelach_types
+open Pickles_types
 module D = Digest
 open Core_kernel
 module Digest = D
@@ -60,7 +60,7 @@ struct
     module Branching_pred = Branching_pred
     module Bulletproof_rounds = Bp_rounds
 
-    let crs_max_degree = 1 lsl Rugelach_types.Nat.to_int Bulletproof_rounds.n
+    let crs_max_degree = 1 lsl Pickles_types.Nat.to_int Bulletproof_rounds.n
 
     include Dlog_main_inputs
   end
@@ -431,7 +431,7 @@ struct
         (proof : Pairing_based.Proof.t) =
       let combine t v =
         let open G1 in
-        let open Rugelach_types in
+        let open Pickles_types in
         Pcs_batch.combine_commitments t ~scale ~add ~xi
           (Vector.map v ~f:G1.of_affine)
       in
@@ -1069,7 +1069,7 @@ let%test_unit "concrete" =
       let to_field_elements x = [|x|]
 
       let update prevs =
-        Rugelach_types.Vector.fold ~init:Field.Constant.one
+        Pickles_types.Vector.fold ~init:Field.Constant.one
           ~f:Field.Constant.( + ) prevs
 
       let dummy = Field.Constant.zero

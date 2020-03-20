@@ -5,7 +5,7 @@ module type Inputs = Intf.Dlog_main_inputs.S
 open Core_kernel
 open Import
 open Util
-open Rugelach_types
+open Pickles_types
 open Dlog_marlin_types
 module Accumulator = Pairing_marlin_types.Accumulator
 open Tuple_lib
@@ -248,7 +248,7 @@ module Make (Inputs : Inputs) = struct
   let input_domain = Set_once.create ()
 
   let print_pairing_acc domain_sizes lab t =
-    let open Rugelach_types.Pairing_marlin_types in
+    let open Pickles_types.Pairing_marlin_types in
     if debug then
       as_prover
         As_prover.(
@@ -644,7 +644,7 @@ module Make (Inputs : Inputs) = struct
   let print_me_only lab t =
     let module T = struct
       module Nvector (N : Nat.Intf) = struct
-        open Rugelach_types
+        open Pickles_types
 
         type 'a t = ('a, N.n) Vector.t
 
@@ -670,7 +670,7 @@ module Make (Inputs : Inputs) = struct
                 (Types.Dlog_based.Proof_state.Me_only.typ
                    (Typ.transport G1.typ ~there:G1.Constant.of_affine
                       ~back:G1.Constant.to_affine_exn)
-                   (Rugelach_types.Vector.typ Fq.typ Bulletproof_rounds.n)
+                   (Pickles_types.Vector.typ Fq.typ Bulletproof_rounds.n)
                    ~length:Branching.n)
                 t
             in

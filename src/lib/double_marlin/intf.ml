@@ -1,5 +1,5 @@
 open Core_kernel
-open Rugelach_types
+open Pickles_types
 module Sponge_lib = Sponge
 
 module type App_state_intf = sig

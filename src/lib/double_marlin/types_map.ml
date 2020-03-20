@@ -1,5 +1,5 @@
 open Core_kernel
-open Rugelach_types
+open Pickles_types
 open Snarky_bn382_backend
 
 (* TODO: max_branching is a terrible name. It should be max_width. *)

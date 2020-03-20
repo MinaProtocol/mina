@@ -1,5 +1,5 @@
 open Core_kernel
-open Rugelach_types
+open Pickles_types
 open Hlist
 
 module type Statement_intf = sig

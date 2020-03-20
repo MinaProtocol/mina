@@ -1,6 +1,6 @@
 module D = Digest
 open Core_kernel
-open Rugelach_types
+open Pickles_types
 open Hlist
 
 module Basic = struct

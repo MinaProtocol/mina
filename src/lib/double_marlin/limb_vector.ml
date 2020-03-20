@@ -1,5 +1,5 @@
 open Core_kernel
-open Rugelach_types
+open Pickles_types
 
 module Constant = struct
   type 'n t = (Int64.t, 'n) Vector.t [@@deriving sexp_of]

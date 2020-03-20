@@ -1,5 +1,5 @@
 open Core_kernel
-open Rugelach_types
+open Pickles_types
 
 module Make (Impl : Snarky.Snark_intf.Run) = struct
   open Impl

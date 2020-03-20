@@ -1,4 +1,4 @@
-open Rugelach_types
+open Pickles_types
 
 let hash_pairing_me_only ~app_state t =
   Fp_sponge.digest Fp_sponge.params

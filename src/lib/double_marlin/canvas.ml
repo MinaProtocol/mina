@@ -2,9 +2,9 @@ open Tuple_lib
 module D = Digest
 open Core_kernel
 module Digest = D
-open Rugelach_types
+open Pickles_types
 open Hlist
-open Rugelach_types
+open Pickles_types
 
 module Ro = struct
   open Snarky_bn382_backend
@@ -83,7 +83,7 @@ module Pmain = Pairing_main.Make (struct
 end)
 
 let crs_max_degree =
-  1 lsl Rugelach_types.Nat.to_int Wrap_circuit_bulletproof_rounds.n
+  1 lsl Pickles_types.Nat.to_int Wrap_circuit_bulletproof_rounds.n
 
 module Dmain = Dlog_main.Make (struct
   include Dlog_main_inputs
@@ -96,13 +96,13 @@ end)
 
 module Dlog_proof = struct
   type t =
-    dlog_opening * (g, fq) Rugelach_types.Pairing_marlin_types.Messages.t
+    dlog_opening * (g, fq) Pickles_types.Pairing_marlin_types.Messages.t
 
   type var =
     (Impls.Pairing_based.Fq.t, G.t) Types.Pairing_based.Openings.Bulletproof.t
     * ( G.t
       , Impls.Pairing_based.Fq.t )
-      Rugelach_types.Pairing_marlin_types.Messages.t
+      Pickles_types.Pairing_marlin_types.Messages.t
 end
 
 module Challenges_vector = struct
@@ -173,7 +173,7 @@ module Per_proof_witness = struct
          (Types.Pairing_based.Openings.Bulletproof.typ
             ~length:(Nat.to_int Wrap_circuit_bulletproof_rounds.n)
             Fq.typ G.typ)
-         (Rugelach_types.Pairing_marlin_types.Messages.typ G.typ Fq.typ))
+         (Pickles_types.Pairing_marlin_types.Messages.typ G.typ Fq.typ))
 end
 
 module Requests = struct
@@ -342,7 +342,7 @@ module Unfinalized = struct
     , Fq.t
     , ( (Boolean.var list, Boolean.var) Bulletproof_challenge.t
       , Wrap_circuit_bulletproof_rounds.n )
-      Rugelach_types.Vector.t
+      Pickles_types.Vector.t
     , Fpv.t )
     Types.Pairing_based.Proof_state.Per_proof.t
     * Boolean.var
@@ -1205,7 +1205,7 @@ let fp_public_input_of_statement ~max_branching
   Fp.one :: List.init (Fp.Vector.length input) ~f:(Fp.Vector.get input)
 
 let crs_max_degree =
-  1 lsl Rugelach_types.Nat.to_int Wrap_circuit_bulletproof_rounds.n
+  1 lsl Pickles_types.Nat.to_int Wrap_circuit_bulletproof_rounds.n
 
 let combined_evaluation (proof : Pairing_based.Proof.t) ~r ~xi ~beta_1 ~beta_2
     ~beta_3 ~x_hat_beta_1 =
@@ -1246,7 +1246,7 @@ let combined_polynomials ~xi
     (proof : Pairing_based.Proof.t) =
   let combine t v =
     let open G1 in
-    let open Rugelach_types in
+    let open Pickles_types in
     Pcs_batch.combine_commitments t ~scale ~add ~xi
       (Vector.map v ~f:G1.of_affine)
   in
@@ -1936,7 +1936,7 @@ struct
           ( A_value.t
           , ( Snarky_bn382_backend.G.Affine.t
             , Max_branching.n )
-            Rugelach_types.Vector.t )
+            Pickles_types.Vector.t )
           Reduced_me_only.Pairing_based.t =
         next_statement.proof_state.me_only
       in
@@ -1956,6 +1956,7 @@ struct
                 next_me_only_prepared.sg
                 (*                  Vector.trim next_me_only_prepared.sg lte *)
             }
+      | _ -> Snarky.Request.unhandled
     in
     let (next_proof : Pairing_based.Proof.t) =
       let (T (input, conv)) =
@@ -2293,7 +2294,6 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let provers =
       let module Z = H4.Zip (Branch_data) (E04 (Impls.Pairing_based.Keypair))
       in
-      let t = Z.f step_data step_keypairs in
       let f : type prev_vars prev_values local_widths local_heights.
              (prev_vars, prev_values, local_widths, local_heights) Branch_data.t
           -> Impls.Pairing_based.Keypair.t
@@ -2514,8 +2514,8 @@ let%test_module "test" =
       let t12 = Txn_snark.merge [t1; t2] base12 in
       let b_neg_one :
           ( Blockchain_snark.Statement.Constant.t
-          , Rugelach_types.Nat.N2.n
-          , Rugelach_types.Nat.N1.n )
+          , Pickles_types.Nat.N2.n
+          , Pickles_types.Nat.N1.n )
           Prev_proof.t =
         let open Ro in
         let g = G.(to_affine_exn one) in
