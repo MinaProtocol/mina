@@ -14,18 +14,25 @@ proposes a new fork, other nodes need to be informed of the proposal.
 ## Detailed design
 [detailed-design]: #detailed-design
 
-A fork is denoted by a fork identifier (`fork ID`). Blocks have two fork ID fields, one to
-indicate the current fork, another to indicate a proposed fork. Because there will usually
-not be a proposed fork, that field has an option type.
+A fork is denoted by a protocol version, which is a semantic version. That is, the protocol
+version has the form `m.n.p`, where `m` is an integer denoting a major version, `n` is a minor
+version number, and `p` is a patch number.  Blocks have two protocol version fields, one to
+indicate the current fork, another to indicate a proposed fork. Because there will usually not
+be a proposed fork, that field has an option type.
 
-The compile-time configuration includes a current fork ID. That fork ID can be overridden
-via a command-line flag, which is saved to the node's dynamic configuration. If the
-dynamic configuration includes the fork ID, the next time the node is started, that
-fork ID will be used. It's an error to start the node with a fork ID from the command line
-that's different from one stored in the dynamic configuration.
+A change to the patch number represents a software upgrade, and does not require signalling.
+A change to the minor version is signalled, but nodes can continue to run existing software
+(a soft fork). A change to the major version number requires that nodes upgrade their software
+(a hard fork).
 
-For RPCs between nodes, if the response contains a block with a different current fork ID,
-that response is ignored, and the sender punished. The next fork ID is ignored for these RPCs.
+The compile-time configuration includes a current protocol version. That protocol version
+can be overridden via a command-line flag, which is saved to the node's dynamic configuration. If the
+dynamic configuration includes the protocol version, the next time the node is started, that
+protocol version will be used. It's an error to start the node with a protocol version from the
+command line that's different from one stored in the dynamic configuration.
+
+For RPCs between nodes, if the response contains a block with a different current protocol version,
+that response is ignored, and the sender punished. The next protocol version is ignored for these RPCs.
 
 For gossiped blocks, if the block's current fork ID differs from the node's current fork ID,
 that block is ignored, and the sender is punished.
