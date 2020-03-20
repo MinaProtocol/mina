@@ -222,20 +222,19 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
         = Domain.size Input_domain.domain ) ;
       G.multiscale_known
         (Array.mapi public_input ~f:(fun i x ->
-            as_prover As_prover.(fun () ->
-                let t =
-                  Fq.Constant.of_bits
-                    (List.map ~f:(read Boolean.typ) x)
-                in
-                print_g (sprintf "g_%d" i)
-                  (G.constant Input_domain.lagrange_commitments.(i) );
-                Fq.Constant.print t;
-               );
+             as_prover
+               As_prover.(
+                 fun () ->
+                   let t =
+                     Fq.Constant.of_bits (List.map ~f:(read Boolean.typ) x)
+                   in
+                   print_g (sprintf "g_%d" i)
+                     (G.constant Input_domain.lagrange_commitments.(i)) ;
+                   Fq.Constant.print t) ;
              (x, lagrange_precomputations.(i)) ))
     in
     absorb sponge PC x_hat ;
-    Core.printf "pmain x domain size %d\n%!"
-      (Domain.size Input_domain.domain);
+    Core.printf "pmain x domain size %d\n%!" (Domain.size Input_domain.domain) ;
     print_g "pmain x_hat" x_hat ;
     let w_hat = receive PC w_hat in
     let z_hat_a = receive PC z_hat_a in
