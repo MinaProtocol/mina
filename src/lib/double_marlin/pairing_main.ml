@@ -40,7 +40,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
 
   type 'a vec = ('a, Branching.n) Vector.t
 
-  let debug = true
+  let debug = false
 
   let print_g lab g =
     if debug then
@@ -215,8 +215,6 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     let sample () = Sponge.squeeze sponge ~length:Challenge.length in
     let open Pairing_marlin_types.Messages in
     let x_hat =
-      Core.printf "pairing public input bits: %d\n%!"
-        (List.length (List.concat (Array.to_list public_input))) ;
       assert (
         Int.ceil_pow2 (Array.length public_input)
         = Domain.size Input_domain.domain ) ;
@@ -234,7 +232,6 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
              (x, lagrange_precomputations.(i)) ))
     in
     absorb sponge PC x_hat ;
-    Core.printf "pmain x domain size %d\n%!" (Domain.size Input_domain.domain) ;
     print_g "pmain x_hat" x_hat ;
     let w_hat = receive PC w_hat in
     let z_hat_a = receive PC z_hat_a in

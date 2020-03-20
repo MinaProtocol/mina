@@ -150,7 +150,7 @@ module Make (Inputs : Inputs) = struct
     let pack : Unpacked.t -> Packed.t = Field.project
   end
 
-  let debug = true
+  let debug = false
 
   let print_g1 lab (x, y) =
     if debug then
@@ -304,8 +304,6 @@ module Make (Inputs : Inputs) = struct
       (Domain.Pow_2_roots_of_unity (Int.ceil_log2 (Array.length public_input))) ;
     let x_hat =
       let input_size = Array.length public_input in
-      Core.printf "dlog public input bits: %d\n%!"
-        (List.length (List.concat (Array.to_list public_input))) ;
       G1.multiscale_known
         (Array.mapi public_input ~f:(fun i x ->
              (x, lagrange_precomputations ~input_size i) ))
@@ -387,18 +385,7 @@ module Make (Inputs : Inputs) = struct
                 let flags =
                   let domain_size = domain#size in
                   List.map keys ~f:(fun shift ->
-                      let b =
-                        Field.(equal (domain_size - one) (of_int shift))
-                      in
-                      as_prover
-                        As_prover.(
-                          fun () ->
-                            Core.printf "%s\n%!" __LOC__ ;
-                            Core.printf
-                              !"%{sexp:Field.Constant.t} = %d ? %b\n%!"
-                              (read_var Field.(domain_size - one))
-                              shift (read Boolean.typ b)) ;
-                      b )
+                      Field.(equal (domain_size - one) (of_int shift)) )
                 in
                 let elt_plus_delta = G1.( + ) (mask_gs flags elts) delta in
                 List.map2_exn flags elts ~f:(fun b g ->
@@ -621,61 +608,12 @@ module Make (Inputs : Inputs) = struct
           ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
             is_square :: prechallenge ) ]
 
-  let hash_me_only
-      (*
-    (* TODO: Since the index is a choice of constants, we can avoid computing
-       after_index by hashing and instead compute it as a choice of the statically
-       computed states of absorbing the static choice of indices. *)
-    let after_index =
-      let sponge = Sponge.create sponge_params in
-      Array.iter
-        (Types.index_to_field_elements ~g:G1.to_field_elements index)
-        ~f:(Sponge.absorb sponge) ;
-      sponge
-    in *)
-      t =
+  let hash_me_only t =
     let sponge = Sponge.create sponge_params in
     Array.iter ~f:(Sponge.absorb sponge)
       (Types.Dlog_based.Proof_state.Me_only.to_field_elements
          ~g1:G1.to_field_elements t) ;
     Sponge.squeeze sponge ~length:Digest.length
-
-  (*
-  let print_me_only lab t =
-    let module T = struct
-      module Nvector (N : Nat.Intf) = struct
-        open Pickles_types
-
-        type 'a t = ('a, N.n) Vector.t
-
-        include Vector.Binable (N)
-        include Vector.Sexpable (N)
-      end
-
-      module Bp_vector = Nvector (Bulletproof_rounds)
-      module Branching_vector = Nvector (Branching)
-
-      type t =
-        ( Field.Constant.t * Field.Constant.t
-        , Fq.Constant.t Bp_vector.t Branching_vector.t )
-        Types.Dlog_based.Proof_state.Me_only.t
-      [@@deriving sexp_of]
-    end in
-    if debug then
-      as_prover
-        As_prover.(
-          fun () ->
-            let t =
-              read
-                (Types.Dlog_based.Proof_state.Me_only.typ
-                   (Typ.transport G1.typ ~there:G1.Constant.of_affine
-                      ~back:G1.Constant.to_affine_exn)
-                   (Pickles_types.Vector.typ Fq.typ Bulletproof_rounds.n)
-                   ~length:Branching.n)
-                t
-            in
-            printf !"%s: %{sexp:T.t}\n%!" lab t)
-     *)
 
   let combine_pairing_accs : type n. (_, n) Vector.t -> _ = function
     | [] ->
@@ -685,12 +623,9 @@ module Make (Inputs : Inputs) = struct
     | a :: accs ->
         let open Pairing_marlin_types.Accumulator in
         let (module Shifted) = G1.shifted () in
-        (*         print_pairing_acc "a" a ; *)
         Vector.fold accs
           ~init:(map a ~f:(fun x -> Shifted.(add zero x)))
-          ~f:(fun acc t ->
-            (*               print_pairing_acc "anotha" t ; *)
-            map2 acc t ~f:Shifted.add )
+          ~f:(fun acc t -> map2 acc t ~f:Shifted.add)
         |> map ~f:Shifted.unshift_nonzero
 
   module Branching = Nat.S (Branching_pred)
@@ -821,11 +756,6 @@ module Make (Inputs : Inputs) = struct
                 (map_challenges deferred_values ~f:Fq.pack)
                 ~old_bulletproof_challenges evals
             in
-            as_prover
-              As_prover.(
-                fun () ->
-                  Core.printf "should verify %b\n%!"
-                    (read Boolean.typ should_verify)) ;
             Boolean.(Assert.any [not should_verify; verified]) ;
             chals )
       in
