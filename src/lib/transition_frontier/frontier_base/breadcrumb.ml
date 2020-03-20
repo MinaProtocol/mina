@@ -3,6 +3,7 @@ open Core_kernel
 open Coda_base
 open Coda_state
 open Coda_transition
+open Network_peer
 
 type t =
   { validated_transition: External_transition.Validated.t
@@ -21,7 +22,8 @@ let create validated_transition staged_ledger =
   {validated_transition; staged_ledger; just_emitted_a_proof= false}
 
 let build ~logger ~verifier ~trust_system ~parent
-    ~transition:transition_with_validation ~sender =
+    ~transition:(transition_with_validation :
+                  External_transition.Almost_validated.t) ~sender =
   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
@@ -50,16 +52,14 @@ let build ~logger ~verifier ~trust_system ~parent
                 | `Incorrect_target_staged_ledger_hash ->
                     "staged ledger hash"
                 | `Incorrect_target_snarked_ledger_hash ->
-                    "snarked ledger hash"
-                | `Incorrect_staged_ledger_diff_state_body_hash ->
-                    "state body hash" ))
+                    "snarked ledger hash" ))
           in
           let message = "invalid staged ledger diff: incorrect " ^ reasons in
           let%map () =
             match sender with
             | None | Some Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote inet_addr) ->
+            | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
                 Trust_system.(
                   record trust_system logger inet_addr
                     Actions.(Gossiped_invalid_transition, Some (message, [])))
@@ -74,7 +74,7 @@ let build ~logger ~verifier ~trust_system ~parent
             match sender with
             | None | Some Envelope.Sender.Local ->
                 return ()
-            | Some (Envelope.Sender.Remote inet_addr) ->
+            | Some (Envelope.Sender.Remote (inet_addr, _peer_id)) ->
                 let error_string =
                   Staged_ledger.Staged_ledger_error.to_string
                     staged_ledger_error
@@ -122,7 +122,7 @@ let blockchain_state = lift External_transition.Validated.blockchain_state
 
 let blockchain_length = lift External_transition.Validated.blockchain_length
 
-let proposer = lift External_transition.Validated.proposer
+let block_producer = lift External_transition.Validated.block_producer
 
 let user_commands = lift External_transition.Validated.user_commands
 
@@ -252,12 +252,8 @@ module For_tests = struct
       in
       let staged_ledger_diff =
         Staged_ledger.create_diff parent_staged_ledger ~logger
-          ~self:largest_account_public_key ~transactions_by_fee:transactions
-          ~get_completed_work
-          ~state_body_hash:
-            ( validated_transition parent_breadcrumb
-            |> External_transition.Validated.protocol_state
-            |> Protocol_state.body |> Protocol_state.Body.hash )
+          ~coinbase_receiver:`Producer ~self:largest_account_public_key
+          ~transactions_by_fee:transactions ~get_completed_work
       in
       let%bind ( `Hash_after_applying next_staged_ledger_hash
                , `Ledger_proof ledger_proof_opt
@@ -266,6 +262,10 @@ module For_tests = struct
         match%bind
           Staged_ledger.apply_diff_unchecked parent_staged_ledger
             staged_ledger_diff
+            ~state_body_hash:
+              ( validated_transition parent_breadcrumb
+              |> External_transition.Validated.protocol_state
+              |> Protocol_state.body |> Protocol_state.Body.hash )
         with
         | Ok r ->
             return r
@@ -299,15 +299,21 @@ module For_tests = struct
             With_hash.
               {data= previous_protocol_state; hash= previous_state_hash}
       in
+      let genesis_state_hash =
+        Protocol_state.genesis_state_hash
+          ~state_hash:(Some previous_state_hash) previous_protocol_state
+      in
       let protocol_state =
-        Protocol_state.create_value ~previous_state_hash
+        Protocol_state.create_value ~genesis_state_hash ~previous_state_hash
           ~blockchain_state:next_blockchain_state ~consensus_state
       in
+      Fork_id.(set_current empty) ;
       let next_external_transition =
-        External_transition.create ~protocol_state
+        External_transition.For_tests.create ~protocol_state
           ~protocol_state_proof:Proof.dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
-          ~delta_transition_chain_proof:(previous_state_hash, [])
+          ~validation_callback:Fn.ignore
+          ~delta_transition_chain_proof:(previous_state_hash, []) ()
       in
       (* We manually created a verified an external_transition *)
       let (`I_swear_this_is_safe_see_my_comment

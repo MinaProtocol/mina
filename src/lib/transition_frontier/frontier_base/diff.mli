@@ -83,7 +83,7 @@ end
 (** A transition frontier diff represents a single item
  *  of mutation that can be or has been performed on
  *  a transition frontier. Each diff is associated with
- *  a type parameter that reprsents a "diff mutant".
+ *  a type parameter that represents a "diff mutant".
  *  A "diff mutant" is any information related to the
  *  correct application of a diff which is not encapsulated
  *  directly within the itself. This is used for computing
@@ -143,5 +143,9 @@ module Full : sig
     type t = E : (full, 'mutant) diff -> t
 
     val to_lite : t -> Lite.E.t
+  end
+
+  module With_mutant : sig
+    type t = E : (full, 'mutant) diff * 'mutant -> t
   end
 end

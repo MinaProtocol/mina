@@ -26,14 +26,14 @@ module T = struct
           | None ->
               [ivar] ) )
 
-  let handle_diffs transition_registry _ diffs =
-    List.iter diffs ~f:(function
-      | Diff.Full.E.E (New_node (Full breadcrumb)) ->
+  let handle_diffs transition_registry _ diffs_with_mutants =
+    List.iter diffs_with_mutants ~f:(function
+      | Diff.Full.With_mutant.E (New_node (Full breadcrumb), _) ->
           notify transition_registry (Breadcrumb.state_hash breadcrumb)
       | _ ->
           () ) ;
     None
 end
 
-include T
 module Broadcasted = Functor.Make_broadcasted (T)
+include T

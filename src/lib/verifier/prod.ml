@@ -1,9 +1,20 @@
-open Core
+(* prod.ml *)
+
+[%%import
+"/src/config.mlh"]
+
+open Core_kernel
 open Async
 open Coda_base
 open Coda_state
 open Blockchain_snark
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params
+
+[%%endif]
 
 type ledger_proof = Ledger_proof.Prod.t
 
@@ -21,6 +32,7 @@ module Worker_state = struct
   type t = (module S) Deferred.t
 
   let create {logger; _} : t Deferred.t =
+    Memory_stats.log_memory_stats logger ~process:"verifier" ;
     Deferred.return
       (let%map bc_vk = Snark_keys.blockchain_verification ()
        and tx_vk = Snark_keys.transaction_verification () in

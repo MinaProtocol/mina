@@ -1,33 +1,109 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
 open Async_kernel
-open Snark_params
+open Module_version
 
+[%%ifdef
+consensus_mechanism]
+
+open Snark_params.Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+
+[%%endif]
+
+[%%versioned_asserted
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t = Tick.Inner_curve.Scalar.t
-      [@@deriving bin_io, sexp, version {asserted}]
+    type t = Inner_curve.Scalar.t [@@deriving sexp]
 
-      let to_yojson t = `String (Tick.Inner_curve.Scalar.to_string t)
-    end
+    let to_latest = Fn.id
 
-    include T
+    let to_yojson t = `String (Inner_curve.Scalar.to_string t)
+
+    let of_yojson = function
+      | `String s ->
+          Ok (Inner_curve.Scalar.of_string s)
+      | _ ->
+          Error "Private_key.of_yojson expected `String"
+
+    [%%ifdef
+    consensus_mechanism]
+
+    let gen =
+      let open Snark_params.Tick.Inner_curve.Scalar in
+      let size' = Bignum_bigint.to_string size |> of_string in
+      gen_uniform_incl one (size' - one)
+
+    [%%else]
+
+    let gen = Inner_curve.Scalar.(gen_uniform_incl one (size - one))
+
+    [%%endif]
   end
 
-  module Latest = V1
-end
+  (* see lib/module_version/README-version-asserted.md *)
+  module Tests = struct
+    (* these tests check not only whether the serialization of the version-asserted type has changed,
+       but also whether the serializations for the consensus and nonconsensus code are identical
+     *)
 
-type t = Stable.Latest.t [@@deriving to_yojson, sexp]
+    [%%if
+    curve_size = 298]
+
+    let%test "private key serialization v1" =
+      let pk =
+        Quickcheck.random_value ~seed:(`Deterministic "private key seed v1")
+          V1.gen
+      in
+      let known_good_hash =
+        "\xB5\xFE\x88\xB3\x7E\xDD\x30\x25\xA2\xB5\x00\x69\xCA\x0E\xE3\xC4\xAC\x17\x57\x40\xAD\x85\x40\xBB\x55\xDE\x3C\xB6\x30\xAD\x52\x5B"
+      in
+      Serialization.check_serialization (module V1) pk known_good_hash
+
+    [%%elif
+    curve_size = 753]
+
+    let%test "private key serialization v1" =
+      let pk =
+        Quickcheck.random_value ~seed:(`Deterministic "private key seed v1")
+          V1.gen
+      in
+      let known_good_hash =
+        "\x61\xB5\xC7\xDD\x3F\x67\x72\xD4\x8F\x58\x59\xD9\xE2\x2B\x2C\x94\xDD\x09\x83\x50\x1E\x8E\x2E\x9E\xBD\x48\x94\x9D\xC9\x8B\x51\x0A"
+      in
+      Serialization.check_serialization (module V1) pk known_good_hash
+
+    [%%else]
+
+    let%test "private key serialization v1" =
+      failwith "No test for this curve size"
+
+    [%%endif]
+  end
+end]
+
+type t = Stable.Latest.t [@@deriving yojson, sexp]
+
+[%%define_locally
+Stable.Latest.(gen)]
+
+[%%ifdef
+consensus_mechanism]
 
 let create () =
   (* This calls into libsnark which uses /dev/urandom *)
-  Tick.Inner_curve.Scalar.random ()
+  Inner_curve.Scalar.random ()
 
-let gen =
-  let open Bignum_bigint in
-  Quickcheck.Generator.map
-    (gen_uniform_incl one (Snark_params.Tick.Inner_curve.Scalar.size - one))
-    ~f:Snark_params.Tock.Bigint.(Fn.compose to_field of_bignum_bigint)
+[%%else]
+
+let create () = Quickcheck.random_value ~seed:`Nondeterministic gen
+
+[%%endif]
 
 let of_bigstring_exn = Binable.of_bigstring (module Stable.Latest)
 

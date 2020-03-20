@@ -1,6 +1,22 @@
+(* unsigned_extended.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
-open Snark_params
 include Intf
+
+[%%ifdef
+consensus_mechanism]
+
+open Snark_params
+open Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+
+[%%endif]
 
 module type Unsigned_intf = Unsigned.S
 
@@ -9,7 +25,7 @@ module Extend
         val length : int
     end) : S with type t = Unsigned.t = struct
   ;;
-  assert (M.length < Tick.Field.size_in_bits - 3)
+  assert (M.length < Field.size_in_bits - 3)
 
   let length_in_bits = M.length
 

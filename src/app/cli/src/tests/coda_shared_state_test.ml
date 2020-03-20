@@ -8,14 +8,15 @@ let main () =
   let logger = Logger.create () in
   let n = 2 in
   let keypairs =
-    List.map Genesis_ledger.accounts
-      ~f:Genesis_ledger.keypair_of_account_record_exn
+    List.map
+      (Lazy.force Test_genesis_ledger.accounts)
+      ~f:Test_genesis_ledger.keypair_of_account_record_exn
   in
   let snark_work_public_keys i =
     Some ((List.nth_exn keypairs i).public_key |> Public_key.compress)
   in
   let%bind testnet =
-    Coda_worker_testnet.test logger n Option.some snark_work_public_keys
+    Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in

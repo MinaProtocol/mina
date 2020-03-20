@@ -1,7 +1,16 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
+
+[%%ifdef
+consensus_mechanism]
 
 open Curve_choice.Tick0
+
+[%%else]
+
+open Snark_params_nonconsensus
+
+[%%endif]
 
 [%%if
 curve_size = 298]

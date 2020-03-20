@@ -26,23 +26,3 @@ let faucetFailNotification = (~error) => {j|
 I failed to send you some coda just now :sob:
 Please try again later!
 Error: $error|j};
-
-let status =
-    (
-      ~blockchainLength: string,
-      ~uptimeSecs: int,
-      ~numPeers: int,
-      ~consensusTimeBestTip: string,
-      ~consensusTimeNow: string,
-      ~balance: string,
-      ~nonce: string,
-    ) => {j|
-**Daemon Status**
-Blockchain Length: `$blockchainLength`
-Uptime: `$uptimeSecs seconds`
-# Peers: `$numPeers`
-Best Consensus Time: `$consensusTimeBestTip`
-Consensus Time Now: `$consensusTimeNow`
-**Faucet**
-Balance: `$balance` Coda
-Nonce: `$nonce`|j};

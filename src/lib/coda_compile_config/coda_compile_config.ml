@@ -1,10 +1,25 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 [%%inject
 "proof_level", proof_level]
 
 [%%inject
-"coinbase_int", coinbase]
+"coinbase_string", coinbase]
 
-let coinbase = Currency.Amount.of_int coinbase_int
+[%%inject
+"curve_size", curve_size]
+
+[%%inject
+"fake_accounts_target", fake_accounts_target]
+
+[%%inject
+"genesis_ledger", genesis_ledger]
+
+[%%inject
+"account_creation_fee_string", account_creation_fee_int]
+
+let coinbase = Currency.Amount.of_formatted_string coinbase_string
+
+let account_creation_fee =
+  Currency.Fee.of_formatted_string account_creation_fee_string

@@ -6,15 +6,17 @@ module Poly : sig
        , 'consensus_transition
        , 'sok_digest
        , 'amount
-       , 'proposer_pk )
+       , 'producer_pk
+       , 'pending_coinbase_action )
        t =
     { blockchain_state: 'blockchain_state
     ; consensus_transition: 'consensus_transition
     ; sok_digest: 'sok_digest
     ; supply_increase: 'amount
     ; ledger_proof: Proof.Stable.V1.t option
-    ; proposer: 'proposer_pk
-    ; coinbase_amount: 'amount }
+    ; coinbase_receiver: 'producer_pk
+    ; coinbase_amount: 'amount
+    ; pending_coinbase_action: 'pending_coinbase_action }
   [@@deriving sexp, fields]
 
   module Stable :
@@ -24,7 +26,8 @@ module Poly : sig
              , 'consensus_transition
              , 'sok_digest
              , 'amount
-             , 'proposer_pk )
+             , 'producer_pk
+             , 'pending_coinbase_action )
              t
         [@@deriving bin_io, sexp, version]
       end
@@ -35,13 +38,15 @@ module Poly : sig
               , 'consensus_transition
               , 'sok_digest
               , 'amount
-              , 'proposer_pk )
+              , 'producer_pk
+              , 'pending_coinbase_action )
               V1.t =
                 ( 'blockchain_state
                 , 'consensus_transition
                 , 'sok_digest
                 , 'amount
-                , 'proposer_pk )
+                , 'producer_pk
+                , 'pending_coinbase_action )
                 t
 end
 
@@ -53,7 +58,8 @@ module Value : sig
         , Consensus.Data.Consensus_transition.Value.Stable.V1.t
         , Sok_message.Digest.Stable.V1.t
         , Currency.Amount.Stable.V1.t
-        , Signature_lib.Public_key.Compressed.Stable.V1.t )
+        , Signature_lib.Public_key.Compressed.Stable.V1.t
+        , Pending_coinbase.Update.Action.Stable.V1.t )
         Poly.Stable.V1.t
       [@@deriving bin_io, sexp, to_yojson, version]
     end
@@ -71,7 +77,8 @@ type var =
   , Consensus.Data.Consensus_transition.var
   , Sok_message.Digest.Checked.t
   , Currency.Amount.var
-  , Signature_lib.Public_key.Compressed.var )
+  , Signature_lib.Public_key.Compressed.var
+  , Pending_coinbase.Update.Action.var )
   Poly.t
 
 include
@@ -83,25 +90,29 @@ val create_value :
   -> supply_increase:Currency.Amount.t
   -> blockchain_state:Blockchain_state.Value.t
   -> consensus_transition:Consensus.Data.Consensus_transition.Value.Stable.V1.t
-  -> proposer:Signature_lib.Public_key.Compressed.t
+  -> coinbase_receiver:Signature_lib.Public_key.Compressed.t
   -> coinbase_amount:Currency.Amount.t
+  -> pending_coinbase_action:Pending_coinbase.Update.Action.t
   -> unit
   -> Value.t
 
-val genesis : Value.t Lazy.t
+val genesis : genesis_ledger:Ledger.t Lazy.t -> Value.t
 
 val blockchain_state :
-  ('blockchain_state, _, _, _, _) Poly.t -> 'blockchain_state
+  ('blockchain_state, _, _, _, _, _) Poly.t -> 'blockchain_state
 
 val consensus_transition :
-  (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
+  (_, 'consensus_transition, _, _, _, _) Poly.t -> 'consensus_transition
 
-val sok_digest : (_, _, 'sok_digest, _, _) Poly.t -> 'sok_digest
+val sok_digest : (_, _, 'sok_digest, _, _, _) Poly.t -> 'sok_digest
 
-val supply_increase : (_, _, _, 'amount, _) Poly.t -> 'amount
+val supply_increase : (_, _, _, 'amount, _, _) Poly.t -> 'amount
 
-val coinbase_amount : (_, _, _, 'amount, _) Poly.t -> 'amount
+val coinbase_amount : (_, _, _, 'amount, _, _) Poly.t -> 'amount
 
 val ledger_proof : _ Poly.t -> Proof.t option
 
-val proposer : (_, _, _, _, 'proposer_pk) Poly.t -> 'proposer_pk
+val coinbase_receiver : (_, _, _, _, 'producer_pk, _) Poly.t -> 'producer_pk
+
+val pending_coinbase_action :
+  (_, _, _, _, _, 'pending_coinbase_action) Poly.t -> 'pending_coinbase_action

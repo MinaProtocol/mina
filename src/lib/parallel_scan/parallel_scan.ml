@@ -106,9 +106,7 @@ module Base = struct
       end
     end]
 
-    type 'base t = 'base Stable.Latest.t =
-      | Empty
-      | Full of 'base Record.Stable.V1.t
+    type 'base t = 'base Stable.Latest.t = Empty | Full of 'base Record.t
     [@@deriving sexp]
 
     let job_str = function Empty -> "Base.Empty" | Full _ -> "Base.Full"
@@ -158,7 +156,7 @@ module Merge = struct
     type 'merge t = 'merge Stable.Latest.t =
       | Empty
       | Part of 'merge
-      | Full of 'merge Record.Stable.V1.t
+      | Full of 'merge Record.t
     [@@deriving sexp]
 
     let job_str = function
@@ -258,8 +256,7 @@ module Job_view = struct
       end
     end]
 
-    type t = Stable.Latest.t =
-      {seq_no: Sequence_number.Stable.V1.t; status: Job_status.Stable.V1.t}
+    type t = Stable.Latest.t = {seq_no: Sequence_number.t; status: Job_status.t}
     [@@deriving sexp]
   end
 
@@ -279,10 +276,10 @@ module Job_view = struct
 
     type 'a t = 'a Stable.Latest.t =
       | BEmpty
-      | BFull of ('a * Extra.Stable.V1.t)
+      | BFull of ('a * Extra.t)
       | MEmpty
       | MPart of 'a
-      | MFull of ('a * 'a * Extra.Stable.V1.t)
+      | MFull of ('a * 'a * Extra.t)
     [@@deriving sexp]
   end
 
@@ -293,7 +290,7 @@ module Job_view = struct
     end
   end]
 
-  type 'a t = 'a Stable.Latest.t = {position: int; value: 'a Node.Stable.V1.t}
+  type 'a t = 'a Stable.Latest.t = {position: int; value: 'a Node.t}
   [@@deriving sexp]
 end
 
@@ -943,9 +940,7 @@ module T = struct
   end
 
   type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
-    { trees:
-        ('merge Merge.Stable.V1.t, 'base Base.Stable.V1.t) Tree.Stable.V1.t
-        Non_empty_list.Stable.V1.t
+    { trees: ('merge Merge.t, 'base Base.t) Tree.t Non_empty_list.t
     ; acc: ('merge * 'base list) option
           (*last emitted proof and the corresponding transactions*)
     ; curr_job_seq_no: int

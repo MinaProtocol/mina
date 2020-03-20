@@ -44,7 +44,10 @@ val handle_committed_txn :
      t
   -> User_command.With_valid_signature.t
   -> Currency.Amount.t (** Current balance of sender account. *)
-  -> t * User_command.With_valid_signature.t Sequence.t
+  -> ( t * User_command.With_valid_signature.t Sequence.t
+     , [ `Queued_txns_by_sender of
+         string * User_command.With_valid_signature.t Sequence.t ] )
+     Result.t
 
 (** Add a command to the pool. Pass the current nonce for the account and
     its current balance. Throws if the contents of the pool before adding the
@@ -58,9 +61,9 @@ val add_from_gossip_exn :
   -> Account_nonce.t
   -> Currency.Amount.t
   -> ( t * User_command.With_valid_signature.t Sequence.t
-     , [ `Invalid_nonce
+     , [> `Invalid_nonce
        | `Insufficient_funds
-       | (* NOTE: don't punish for this, attackers can induce nodes to blacklist
+       | (* NOTE: don't punish for this, attackers can induce nodes to banlist
           each other that way! *)
          `Insufficient_replace_fee
        | `Overflow ] )

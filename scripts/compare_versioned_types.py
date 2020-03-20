@@ -20,7 +20,7 @@ import tempfile
 
 exit_code = 0
 
-run_ppx_coda='src/_build/default/lib/ppx_coda/run_ppx_coda.exe'
+run_ppx_coda='_build/default/src/lib/ppx_coda/run_ppx_coda.exe'
 
 def create_dict (types_file) :
     with open (types_file, 'r') as fp :

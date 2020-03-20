@@ -1,6 +1,22 @@
+(* user_command_intf.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Import
-open Core
+open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Coda_numbers
+
+[%%else]
+
+open Coda_numbers_nonconsensus.Coda_numbers
+module Currency = Currency_nonconsensus.Currency
+
+[%%endif]
 
 module type Gen_intf = sig
   type t
@@ -56,10 +72,7 @@ module type Gen_intf = sig
     val sequence :
          ?length:int
       -> ?sign_type:[`Fake | `Real]
-      -> ( Signature_lib.Keypair.t
-         * Currency.Amount.t
-         * Coda_numbers.Account_nonce.t )
-         array
+      -> (Signature_lib.Keypair.t * Currency.Amount.t * Account_nonce.t) array
       -> t list Quickcheck.Generator.t
   end
 end
@@ -76,6 +89,16 @@ module type S = sig
   val nonce : t -> Account_nonce.t
 
   val sender : t -> Public_key.Compressed.t
+
+  val receiver : t -> Public_key.Compressed.t
+
+  val amount : t -> Currency.Amount.t option
+
+  val is_payment : t -> bool
+
+  val memo : t -> User_command_memo.t
+
+  val valid_until : t -> Global_slot.t
 
   (* for filtering *)
   val minimum_fee : Currency.Fee.t
@@ -105,6 +128,14 @@ module type S = sig
 
   val sign :
     Signature_keypair.t -> User_command_payload.t -> With_valid_signature.t
+
+  val check_signature : t -> bool
+
+  val create_with_signature_checked :
+       Signature.t
+    -> Public_key.Compressed.t
+    -> User_command_payload.t
+    -> With_valid_signature.t option
 
   module For_tests : sig
     val fake_sign :

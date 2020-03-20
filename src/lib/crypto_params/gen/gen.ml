@@ -1,5 +1,5 @@
 [%%import
-"../../../config.mlh"]
+"/src/config.mlh"]
 
 open Ppxlib
 open Asttypes

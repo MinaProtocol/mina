@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 (* versioned_types.ml -- static enforcement of versioned types via ppx *)
 
@@ -287,7 +287,6 @@ let jane_street_type_constructors = ["sexp_opaque"]
 (* true iff module_path is of form M. ... .Stable.Vn, where M is Core or Core_kernel, and n is integer *)
 let is_jane_street_stable_module module_path =
   let hd_elt = List.hd_exn module_path in
-  let jane_street_libs = ["Core_kernel"; "Core"] in
   let is_version_module vn =
     let len = String.length vn in
     len > 1
@@ -297,7 +296,7 @@ let is_jane_street_stable_module module_path =
     String.for_all numeric_part ~f:Char.is_digit
     && not (Int.equal (Char.get_digit_exn numeric_part.[0]) 0)
   in
-  List.mem jane_street_libs hd_elt ~equal:String.equal
+  List.mem jane_street_modules hd_elt ~equal:String.equal
   &&
   match List.rev module_path with
   | vn :: "Stable" :: _ ->
@@ -308,7 +307,7 @@ let is_jane_street_stable_module module_path =
   | _ ->
       false
 
-let whitelisted_prefix prefix ~loc =
+let trustlisted_prefix prefix ~loc =
   match prefix with
   | Lident id ->
       String.equal id "Bitstring"
@@ -370,7 +369,7 @@ let rec generate_core_type_version_decls type_name core_type =
             id
     | Ldot (prefix, "t") ->
         (* type t = A.B.t
-           if prefix not whitelisted, generate: let _ = A.B.__versioned__
+           if prefix not trustlisted, generate: let _ = A.B.__versioned__
            disallow Stable.Latest.t
         *)
         if is_stable_latest prefix then
@@ -380,7 +379,7 @@ let rec generate_core_type_version_decls type_name core_type =
         let core_type_decls =
           generate_version_lets_for_core_types type_name core_types
         in
-        if whitelisted_prefix prefix ~loc:core_type.ptyp_loc then
+        if trustlisted_prefix prefix ~loc:core_type.ptyp_loc then
           core_type_decls
         else
           let loc = core_type.ptyp_loc in

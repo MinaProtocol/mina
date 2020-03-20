@@ -4,6 +4,7 @@ open Cache_lib
 open Pipe_lib
 open Coda_base
 open Coda_transition
+open Network_peer
 
 (** [Ledger_catchup] is a procedure that connects a foreign external transition
     into a transition frontier by requesting a path of external_transitions
@@ -58,6 +59,7 @@ end
 let verify_transition ~logger ~trust_system ~verifier ~frontier
     ~unprocessed_transition_cache enveloped_transition =
   let sender = Envelope.Incoming.sender enveloped_transition in
+  let genesis_state_hash = Transition_frontier.genesis_state_hash frontier in
   let cached_initially_validated_transition_result =
     let open Deferred.Result.Let_syntax in
     let transition = Envelope.Incoming.data enveloped_transition in
@@ -65,7 +67,12 @@ let verify_transition ~logger ~trust_system ~verifier ~frontier
       External_transition.Validation.wrap transition
       |> External_transition.skip_time_received_validation
            `This_transition_was_not_received_via_gossip
-      |> External_transition.validate_proof ~verifier
+      |> External_transition.skip_fork_ids_validation
+           `This_transition_has_valid_fork_ids
+      |> Fn.compose Deferred.return
+           (External_transition.validate_genesis_protocol_state
+              ~genesis_state_hash)
+      >>= External_transition.validate_proof ~verifier
       >>= Fn.compose Deferred.return
             External_transition.validate_delta_transition_chain
     in
@@ -113,6 +120,13 @@ let verify_transition ~logger ~trust_system ~verifier ~frontier
           , Some ("invalid proof", []) )
       in
       Error (Error.of_string "invalid proof")
+  | Error `Invalid_genesis_protocol_state ->
+      let%map () =
+        Trust_system.record_envelope_sender trust_system logger sender
+          ( Trust_system.Actions.Gossiped_invalid_transition
+          , Some ("invalid genesis protocol state", []) )
+      in
+      Error (Error.of_string "invalid genesis protocol state")
   | Error `Invalid_delta_transition_chain_proof ->
       let%map () =
         Trust_system.record_envelope_sender trust_system logger sender
@@ -141,7 +155,7 @@ let rec fold_until ~(init : 'accum)
 (* returns a list of state-hashes with the older ones at the front *)
 let download_state_hashes ~logger ~trust_system ~network ~frontier ~num_peers
     ~target_hash =
-  let peers = Coda_networking.random_peers network num_peers in
+  let%bind peers = Coda_networking.random_peers network num_peers in
   Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
     ~metadata:[("target_hash", State_hash.to_yojson target_hash)]
     "Doing a catchup job with target $target_hash" ;
@@ -199,7 +213,7 @@ let rec partition size = function
 (* returns a list of transitions with old ones comes first *)
 let download_transitions ~logger ~trust_system ~network ~num_peers
     ~preferred_peer ~maximum_download_size ~hashes_of_missing_transitions =
-  let random_peers = Coda_networking.random_peers network num_peers in
+  let%bind random_peers = Coda_networking.random_peers network num_peers in
   Deferred.Or_error.List.concat_map
     (partition maximum_download_size hashes_of_missing_transitions)
     ~how:`Parallel ~f:(fun hashes ->
@@ -233,7 +247,8 @@ let download_transitions ~logger ~trust_system ~network ~num_peers
                      With_hash.of_data transition ~hash_data:(Fn.const hash)
                    in
                    Envelope.Incoming.wrap ~data:transition_with_hash
-                     ~sender:(Envelope.Sender.Remote peer.host) ) ) )
+                     ~sender:(Envelope.Sender.Remote (peer.host, peer.peer_id))
+               ) ) )
 
 let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
     ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
@@ -473,7 +488,7 @@ let%test_module "Ledger_catchup tests" =
       (* TODO: expose Strict_pipe.read *)
       let%map cached_catchup_breadcrumbs =
         Block_time.Timeout.await_exn time_controller
-          ~timeout_duration:(Block_time.Span.of_ms 15000L)
+          ~timeout_duration:(Block_time.Span.of_ms 30000L)
           ( match%map Strict_pipe.Reader.read breadcrumbs_reader with
           | `Eof ->
               failwith "unexpected EOF"
