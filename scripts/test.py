@@ -213,7 +213,7 @@ class ArtifactCollector:
 
 class SingleArtifactCollector(ArtifactCollector):
     def __init__(self, root_dir, context, src_name, dst_name=None):
-        super(SingleArtifactCollector, self).__init__(root_dir, context)
+        ArtifactCollector.__init__(self, root_dir, context)
         self.src_name = src_name
         self.dst_name = dst_name
 
@@ -225,7 +225,7 @@ class SingleArtifactCollector(ArtifactCollector):
 
 class BatchArtifactCollector(ArtifactCollector):
     def __init__(self, root_dir, context, pattern):
-        super(BatchArtifactCollector, self).__init__(root_dir, context)
+        ArtifactCollector.__init__(self, root_dir, context)
         self.pattern = pattern
 
     def collect(self, destination):
