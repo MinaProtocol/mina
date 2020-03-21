@@ -30,7 +30,13 @@ module Checked : sig
 
   val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
 
-  val of_global_slot : Global_slot.Checked.t -> (t, _) Checked.t
+  val of_global_slot :
+       Global_slot.Checked.t
+    -> slots_per_sub_window:Coda_base.Coda_constants_checked.T.Checked.var
+    -> (t, _) Checked.t
 
-  val sub_window : t -> (Sub_window.Checked.t, _) Checked.t
+  val sub_window :
+       t
+    -> sub_windows_per_window:Coda_base.Coda_constants_checked.T.Checked.var
+    -> (Sub_window.Checked.t, _) Checked.t
 end

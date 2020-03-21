@@ -808,9 +808,9 @@ module Validated = struct
     |> Validation.reset_staged_ledger_diff_validation
 end
 
-let genesis ~genesis_ledger ~base_proof =
+let genesis ~genesis_ledger ~base_proof ~genesis_constants =
   let genesis_protocol_state =
-    Coda_state.Genesis_protocol_state.t ~genesis_ledger
+    Coda_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_constants
   in
   let creator = fst Consensus_state_hooks.genesis_winner in
   let empty_diff =

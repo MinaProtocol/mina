@@ -5,6 +5,8 @@ open Core_kernel
 
 (*Scan state and the following constants cannot be in Genesis_constants.t until 
 key generation is moved to runtime_genesis_ledger.exe.
+c, ledger_depth, pending_coinbase_depth(calculated from scan state and block 
+window duration if tps is given) is used to define typs.
 Defining block_window_duration_ms, c here instead of using from Coda_compile_config.t to avoid a dependency cycle*)
 [%%inject
 "block_window_duration_ms", block_window_duration]
@@ -21,6 +23,7 @@ module type S = sig
       ; block_window_duration_ms: Time.Span.t
       ; slots_per_sub_window: int
       ; slots_per_window: int
+      ; sub_windows_per_window: int
       ; slots_per_epoch: int
       ; slot_duration_ms: int
       ; epoch_size: int
@@ -49,6 +52,7 @@ module Consensus_constants = struct
     ; block_window_duration_ms: int
     ; slots_per_sub_window: int
     ; slots_per_window: int
+    ; sub_windows_per_window: int
     ; slots_per_epoch: int
     ; slot_duration_ms: int
     ; epoch_size: int
@@ -103,6 +107,7 @@ let create_t (genesis_constants : Genesis_constants.t) : t =
     ; block_window_duration_ms
     ; slots_per_sub_window
     ; slots_per_window
+    ; sub_windows_per_window
     ; slots_per_epoch
     ; slot_duration_ms= Slot.duration_ms
     ; epoch_size= Epoch.size

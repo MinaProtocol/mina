@@ -207,7 +207,7 @@ module Api = struct
     signal
 end
 
-let coda_constants = Coda_constants.t ()
+let coda_constants = Coda_constants.compiled_constants_for_test
 
 (** the prefix check keeps track of the "best path" for each worker. the
     best path being the list of state hashes from the root to the best tip.

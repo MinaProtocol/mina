@@ -265,6 +265,7 @@ proof_level = "check"]
 
 let genesis_protocol_state =
   Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+    ~genesis_constants:Genesis_constants.compiled
 
 let prove_blockchain ~logger (module Keys : Keys_lib.Keys.S)
     (chain : Blockchain.t) (next_state : Protocol_state.Value.t)
@@ -439,7 +440,8 @@ let create_genesis_data () =
   in
   let genesis_protocol_state =
     With_hash.data
-      (Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t)
+      (Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+         ~genesis_constants:Genesis_constants.compiled)
   in
   let genesis_transition =
     External_transition.create ~protocol_state:genesis_protocol_state

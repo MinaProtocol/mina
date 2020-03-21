@@ -524,6 +524,7 @@ module T = struct
           let genesis_state_hash =
             Coda_state.Genesis_protocol_state.t
               ~genesis_ledger:Test_genesis_ledger.t
+              ~genesis_constants:Genesis_constants.compiled
             |> With_hash.hash
           in
           let coda_deferred () =

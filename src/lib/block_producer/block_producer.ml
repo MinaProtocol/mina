@@ -103,7 +103,8 @@ end
 
 let generate_next_state ~previous_protocol_state ~time_controller
     ~staged_ledger ~transactions ~get_completed_work ~logger ~coinbase_receiver
-    ~(keypair : Keypair.t) ~block_data ~scheduled_time ~log_block_creation =
+    ~(keypair : Keypair.t) ~block_data ~scheduled_time ~log_block_creation
+    ~coda_constants =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
   let previous_protocol_state_body_hash =
@@ -207,7 +208,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
                       .user_commands diff
                       :> User_command.t list )
                   ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
-                  ~logger ) )
+                  ~logger ~coda_constants ) )
       in
       lift_sync (fun () ->
           measure "making Snark and Internal transitions" (fun () ->
@@ -296,7 +297,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 ~block_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
-                ~log_block_creation
+                ~log_block_creation ~coda_constants
             in
             trace_event "next state generated" ;
             match next_state_opt with

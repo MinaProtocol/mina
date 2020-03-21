@@ -80,13 +80,25 @@ module type Protocol_state = sig
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type ('state_hash, 'blockchain_state, 'consensus_state) t
+          type ( 'state_hash
+               , 'blockchain_state
+               , 'consensus_state
+               , 'coda_constants )
+               t
           [@@deriving sexp]
         end
       end]
 
-      type ('state_hash, 'blockchain_state, 'consensus_state) t =
-        ('state_hash, 'blockchain_state, 'consensus_state) Stable.Latest.t
+      type ( 'state_hash
+           , 'blockchain_state
+           , 'consensus_state
+           , 'coda_constants )
+           t =
+        ( 'state_hash
+        , 'blockchain_state
+        , 'consensus_state
+        , 'coda_constants )
+        Stable.Latest.t
       [@@deriving sexp]
     end
 
@@ -95,7 +107,11 @@ module type Protocol_state = sig
       module Stable : sig
         module V1 : sig
           type t =
-            (State_hash.t, blockchain_state, consensus_state) Poly.Stable.V1.t
+            ( State_hash.t
+            , blockchain_state
+            , consensus_state
+            , Coda_constants_checked.Value.t )
+            Poly.Stable.V1.t
           [@@deriving sexp, to_yojson]
         end
       end]
@@ -104,7 +120,8 @@ module type Protocol_state = sig
     type var =
       ( State_hash.var
       , blockchain_state_var
-      , consensus_state_var )
+      , consensus_state_var
+      , Coda_constants_checked.var )
       Poly.Stable.Latest.t
   end
 
@@ -127,6 +144,7 @@ module type Protocol_state = sig
     -> genesis_state_hash:State_hash.t
     -> blockchain_state:blockchain_state
     -> consensus_state:consensus_state
+    -> coda_constants:Coda_constants_checked.Value.t
     -> Value.t
 
   val previous_state_hash : ('state_hash, _) Poly.t -> 'state_hash
@@ -134,13 +152,16 @@ module type Protocol_state = sig
   val body : (_, 'body) Poly.t -> 'body
 
   val blockchain_state :
-    (_, (_, 'blockchain_state, _) Body.Poly.t) Poly.t -> 'blockchain_state
+    (_, (_, 'blockchain_state, _, _) Body.Poly.t) Poly.t -> 'blockchain_state
 
   val genesis_state_hash :
     ?state_hash:State_hash.t option -> Value.t -> State_hash.t
 
   val consensus_state :
-    (_, (_, _, 'consensus_state) Body.Poly.t) Poly.t -> 'consensus_state
+    (_, (_, _, 'consensus_state, _) Body.Poly.t) Poly.t -> 'consensus_state
+
+  val coda_constants :
+    (_, (_, _, _, 'coda_constants) Body.Poly.t) Poly.t -> 'coda_constants
 
   val hash : Value.t -> State_hash.t
 end
@@ -210,6 +231,7 @@ module type State_hooks = sig
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
+    -> coda_constants:Coda_constants.t
     -> protocol_state * consensus_transition
 
   (**
@@ -373,17 +395,22 @@ module type S = sig
 
       include Snark_params.Tick.Snarkable.S with type value := Value.t
 
-      val negative_one : genesis_ledger:Ledger.t Lazy.t -> Value.t
+      val negative_one :
+           genesis_ledger:Ledger.t Lazy.t
+        -> genesis_constants:Genesis_constants.t
+        -> Value.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_constants:Genesis_constants.t
         -> Value.t
 
       val create_genesis :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> genesis_ledger:Ledger.t Lazy.t
+        -> genesis_constants:Genesis_constants.t
         -> Value.t
 
       open Snark_params.Tick

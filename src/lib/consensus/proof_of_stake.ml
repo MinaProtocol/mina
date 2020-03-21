@@ -73,6 +73,7 @@ module Segment_id = Nat.Make32 ()
 module Typ = Crypto_params.Tick0.Typ
 
 let epoch_size () =
+  Core.printf "14\n%!" ;
   let constants = (Coda_constants.t ()).consensus in
   constants.epoch_size
 
@@ -89,6 +90,7 @@ module Configuration = struct
   [@@deriving yojson, bin_io, fields]
 
   let t () =
+    Core.printf "15\n%!" ;
     let constants = (Coda_constants.t ()).consensus in
     { delta= constants.delta
     ; k= constants.k
@@ -139,6 +141,7 @@ module Data = struct
     let of_time_exn tm : t =
       let epoch = Epoch.of_time_exn tm in
       let time_since_epoch = Time.diff tm (Epoch.start_time epoch) in
+      Core.printf "16\n%!" ;
       let constants = (Coda_constants.t ()).consensus in
       let slot =
         uint32_of_int64
@@ -152,7 +155,7 @@ module Data = struct
   module Block_data = struct
     type t =
       { stake_proof: Stake_proof.t
-      ; global_slot: Global_slot.t
+      ; global_slot: Coda_numbers.Global_slot.t
       ; vrf_result: Random_oracle.Digest.t }
 
     let prover_state {stake_proof; _} = stake_proof
@@ -453,6 +456,8 @@ module Data = struct
     end
 
     module Message = struct
+      module Global_slot = Coda_numbers.Global_slot
+
       type ('global_slot, 'epoch_seed, 'delegator) t =
         {global_slot: 'global_slot; seed: 'epoch_seed; delegator: 'delegator}
 
@@ -465,10 +470,14 @@ module Data = struct
         t
 
       let to_input ({global_slot; seed; delegator} : value) =
+        (*let global_slot_input = Global_slot.to_input global_slot in
+        Random_oracle.Input.append*)
         { Random_oracle.Input.field_elements= [|(seed :> Tick.field)|]
         ; bitstrings=
-            [| Global_slot.Bits.to_bits global_slot
-             ; Coda_base.Account.Index.to_bits delegator |] }
+            [| Coda_base.Account.Index.to_bits delegator
+             ; Global_slot.to_bits global_slot |] }
+
+      (* global_slot_input*)
 
       let to_hlist {global_slot; seed; delegator} =
         Coda_base.H_list.[global_slot; seed; delegator]
@@ -483,9 +492,7 @@ module Data = struct
 
       let data_spec =
         let open Tick.Data_spec in
-        [ Global_slot.Checked.typ
-        ; Epoch_seed.typ
-        ; Coda_base.Account.Index.Unpacked.typ ]
+        [Global_slot.typ; Epoch_seed.typ; Coda_base.Account.Index.Unpacked.typ]
 
       let typ : (var, value) Typ.t =
         Tick.Typ.of_hlistable data_spec ~var_to_hlist:to_hlist
@@ -503,11 +510,17 @@ module Data = struct
 
         let to_input ({global_slot; seed; delegator} : var) =
           let open Tick.Checked.Let_syntax in
+          (*let%map global_slot_input =
+            Global_slot.Checked.to_bits global_slot
+          in
+          Random_oracle.Input.append*)
           let%map global_slot = Global_slot.Checked.to_bits global_slot in
           let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
           { Random_oracle.Input.field_elements=
               [|Epoch_seed.var_to_hash_packed seed|]
           ; bitstrings= [|s global_slot; delegator|] }
+
+        (*global_slot_input*)
 
         let hash_to_group msg =
           let%bind input = to_input msg in
@@ -822,12 +835,6 @@ module Data = struct
       let open Message in
       let open Local_state in
       let open Snapshot in
-      (let epoch, slot = Global_slot.to_epoch_and_slot global_slot in
-       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-         "Checking VRF evaluations at epoch: $epoch, slot: $slot"
-         ~metadata:
-           [ ("epoch", `Int (Epoch.to_int epoch))
-           ; ("slot", `Int (Slot.to_int slot)) ]) ;
       with_return (fun {return} ->
           Hashtbl.iteri
             ( Snapshot.delegators epoch_snapshot public_key_compressed
@@ -1137,7 +1144,7 @@ module Data = struct
         ((staking_data, next_data) : Staking.Value.t * Next.Value.t)
         epoch_count ~prev_epoch ~next_epoch ~prev_slot
         ~prev_protocol_state_hash ~producer_vrf_result ~snarked_ledger_hash
-        ~total_currency =
+        ~total_currency ~(coda_constants : Coda_constants.t) =
       let staking_data', next_data', epoch_count' =
         if next_epoch > prev_epoch then
           ( next_to_staking next_data
@@ -1158,7 +1165,10 @@ module Data = struct
           , epoch_count ) )
       in
       let curr_seed, curr_lock_checkpoint =
-        if Slot.in_seed_update_range prev_slot then
+        if
+          Slot.in_seed_update_range prev_slot ~c:coda_constants.consensus.c
+            ~k:coda_constants.consensus.k
+        then
           ( Epoch_seed.update next_data'.seed producer_vrf_result
           , prev_protocol_state_hash )
         else (next_data'.seed, next_data'.lock_checkpoint)
@@ -1200,7 +1210,9 @@ module Data = struct
           ; field "globalSlot"
               ~typ:(non_null @@ uint32 ())
               ~args:Arg.[]
-              ~resolve:(fun _ global_slot -> Global_slot.to_uint32 global_slot)
+              ~resolve:(fun _ (global_slot : t) ->
+                Coda_numbers.Global_slot.to_uint32
+                  (Global_slot.slot_number global_slot) )
           ; field "startTime" ~typ:(non_null string)
               ~args:Arg.[]
               ~resolve:(fun _ global_slot ->
@@ -1226,10 +1238,12 @@ module Data = struct
 
     (* epoch, slot components of gc_width *)
     let gc_width_epoch () : UInt32.t =
+      Core.printf "17\n%!" ;
       let constants = (Coda_constants.t ()).consensus in
       gc_width () / UInt32.of_int constants.epoch_size
 
     let gc_width_slot () : UInt32.t =
+      Core.printf "18\n%!" ;
       let constants = (Coda_constants.t ()).consensus in
       gc_width () mod UInt32.of_int constants.epoch_size
 
@@ -1237,18 +1251,25 @@ module Data = struct
 
     (* create dummy block to split map on *)
     let get_old (t : Global_slot.t) : Global_slot.t =
-      if
-        Global_slot.(
-          t
-          < Global_slot.of_epoch_and_slot (gc_width_epoch (), gc_width_slot ()))
-      then (* block not beyond gc_width *)
-        Global_slot.zero
+      Core.printf "18\n%!" ;
+      let epoch_size =
+        (Coda_constants.t ()).consensus.epoch_size |> UInt32.of_int
+      in
+      let slots_per_epoch : uint32 = Global_slot.slots_per_epoch t in
+      let gs =
+        of_epoch_and_slot
+          (gc_width_epoch (), gc_width_slot ())
+          ~slots_per_epoch
+      in
+      if Global_slot.(t < gs) then
+        (* block not beyond gc_width *)
+        Global_slot.zero ~slots_per_epoch
       else
         let open Int in
         (* subtract epoch, slot components of gc_width *)
-        Global_slot.diff t (gc_width_epoch (), gc_width_slot ())
+        Global_slot.diff t (gc_width_epoch (), gc_width_slot ()) ~epoch_size
 
-    let to_uint32 = Global_slot.to_uint32
+    let to_uint32 t = Global_slot.slot_number t
   end
 
   [%%if
@@ -1327,20 +1348,24 @@ module Data = struct
 
       let%snarkydef update_min_window_density ~prev_global_slot
           ~next_global_slot ~prev_sub_window_densities ~prev_min_window_density
-          =
+          ~slots_per_sub_window ~sub_windows_per_window =
         let open Tick in
         let open Tick.Checked.Let_syntax in
         let%bind prev_global_sub_window =
           Global_sub_window.Checked.of_global_slot prev_global_slot
+            ~slots_per_sub_window
         in
         let%bind next_global_sub_window =
           Global_sub_window.Checked.of_global_slot next_global_slot
+            ~slots_per_sub_window
         in
         let%bind prev_relative_sub_window =
           Global_sub_window.Checked.sub_window prev_global_sub_window
+            ~slots_per_sub_window
         in
         let%bind next_relative_sub_window =
           Global_sub_window.Checked.sub_window next_global_sub_window
+            ~sub_windows_per_window
         in
         let%bind same_sub_window =
           Global_sub_window.Checked.equal prev_global_sub_window
@@ -1431,6 +1456,7 @@ module Data = struct
           let next_global_sub_window =
             Global_sub_window.of_global_slot next_global_slot
           in
+          Core.printf "19\n%!" ;
           let constants = (Coda_constants.t ()).consensus in
           let sub_window_diff =
             UInt32.(
@@ -1473,6 +1499,7 @@ module Data = struct
           @ [List.nth_exn prev_sub_window_densities prev_relative_sub_window]
 
         let slots_per_sub_window =
+          Core.printf "20\n%!" ;
           let constants = (Coda_constants.t ()).consensus in
           UInt32.to_int constants.slots_per_sub_window
 
@@ -1641,7 +1668,8 @@ module Data = struct
 
     module Checked = struct
       let update_min_window_density ~prev_global_slot ~next_global_slot
-          ~prev_sub_window_densities ~prev_min_window_density =
+          ~prev_sub_window_densities ~prev_min_window_density
+          ~slots_per_sub_window ~sub_windows_per_window =
         Tick.Checked.return (prev_min_window_density, prev_sub_window_densities)
     end
   end
@@ -1727,7 +1755,7 @@ module Data = struct
             ( Length.Stable.V1.t
             , Vrf.Output.Truncated.Stable.V1.t
             , Amount.Stable.V1.t
-            , Coda_numbers.Global_slot.Stable.V1.t
+            , Global_slot.Stable.V1.t
             , Epoch_data.Staking.Value.Stable.V1.t
             , Epoch_data.Next.Value.Stable.V1.t
             , bool )
@@ -1848,7 +1876,7 @@ module Data = struct
       ; Typ.list ~length:Coda_compile_config.sub_windows_per_window Length.typ
       ; Vrf.Output.Truncated.typ
       ; Amount.typ
-      ; Global_slot.Checked.typ
+      ; Global_slot.typ
       ; Epoch_data.Staking.typ
       ; Epoch_data.Next.typ
       ; Boolean.typ ]
@@ -1878,7 +1906,7 @@ module Data = struct
              ; List.concat_map ~f:Length.Bits.to_bits sub_window_densities
              ; Vrf.Output.Truncated.to_bits last_vrf_output
              ; Amount.to_bits total_currency
-             ; Global_slot.Bits.to_bits curr_global_slot
+             ; Global_slot.to_bits curr_global_slot
              ; [has_ancestor_in_same_checkpoint_window] |]
         ; field_elements= [||] }
       in
@@ -1931,12 +1959,16 @@ module Data = struct
 
     let global_slot {Poly.curr_global_slot; _} = curr_global_slot
 
-    let checkpoint_window slot =
-      let constants = (Coda_constants.t ()).consensus in
-      Global_slot.to_int slot / constants.checkpoint_window_size_in_slots
+    let checkpoint_window (slot : Global_slot.t)
+        ~checkpoint_window_size_in_slots =
+      UInt32.to_int (Global_slot.slot_number slot)
+      / checkpoint_window_size_in_slots
 
-    let same_checkpoint_window_unchecked slot1 slot2 =
-      Core.Int.(checkpoint_window slot1 = checkpoint_window slot2)
+    let same_checkpoint_window_unchecked slot1 slot2
+        ~checkpoint_window_size_in_slots =
+      Core.Int.(
+        checkpoint_window slot1 ~checkpoint_window_size_in_slots
+        = checkpoint_window slot2 ~checkpoint_window_size_in_slots)
 
     let time_hum (t : Value.t) =
       let epoch, slot = Global_slot.to_epoch_and_slot t.curr_global_slot in
@@ -1947,13 +1979,20 @@ module Data = struct
         ~(previous_protocol_state_hash : Coda_base.State_hash.t)
         ~(supply_increase : Currency.Amount.t)
         ~(snarked_ledger_hash : Coda_base.Frozen_ledger_hash.t)
-        ~(producer_vrf_result : Random_oracle.Digest.t) : Value.t Or_error.t =
+        ~(producer_vrf_result : Random_oracle.Digest.t)
+        ~(coda_constants : Coda_constants.t) : Value.t Or_error.t =
       let open Or_error.Let_syntax in
       let prev_epoch, prev_slot =
         Global_slot.to_epoch_and_slot previous_consensus_state.curr_global_slot
       in
+      let next_global_slot =
+        Global_slot.of_slot_number consensus_transition
+          ~slots_per_epoch:
+            (Global_slot.slots_per_epoch
+               previous_consensus_state.curr_global_slot)
+      in
       let next_epoch, next_slot =
-        Global_slot.to_epoch_and_slot consensus_transition
+        Global_slot.to_epoch_and_slot next_global_slot
       in
       let%map total_currency =
         Amount.add previous_consensus_state.total_currency supply_increase
@@ -1962,9 +2001,10 @@ module Data = struct
              ~default:(Or_error.error_string "failed to add total_currency")
       and () =
         if
-          Global_slot.(equal consensus_transition Consensus_transition.genesis)
+          Consensus_transition.(
+            equal consensus_transition Consensus_transition.genesis)
           || Global_slot.(
-               previous_consensus_state.curr_global_slot < consensus_transition)
+               previous_consensus_state.curr_global_slot < next_global_slot)
         then Ok ()
         else
           Or_error.errorf
@@ -1979,11 +2019,12 @@ module Data = struct
           previous_consensus_state.epoch_count ~prev_epoch ~next_epoch
           ~prev_slot ~prev_protocol_state_hash:previous_protocol_state_hash
           ~producer_vrf_result ~snarked_ledger_hash ~total_currency
+          ~coda_constants
       in
       let min_window_density, sub_window_densities =
         Min_window_density.update_min_window_density
           ~prev_global_slot:previous_consensus_state.curr_global_slot
-          ~next_global_slot:consensus_transition
+          ~next_global_slot
           ~prev_sub_window_densities:
             previous_consensus_state.sub_window_densities
           ~prev_min_window_density:previous_consensus_state.min_window_density
@@ -1995,40 +2036,50 @@ module Data = struct
       ; sub_window_densities
       ; last_vrf_output= Vrf.Output.truncate producer_vrf_result
       ; total_currency
-      ; curr_global_slot= consensus_transition
+      ; curr_global_slot= next_global_slot
       ; staking_epoch_data
       ; next_epoch_data
       ; has_ancestor_in_same_checkpoint_window=
           same_checkpoint_window_unchecked
-            (Global_slot.create ~epoch:prev_epoch ~slot:prev_slot)
-            (Global_slot.create ~epoch:next_epoch ~slot:next_slot) }
+            (Global_slot.create ~epoch:prev_epoch ~slot:prev_slot
+               ~slots_per_epoch:
+                 (UInt32.of_int coda_constants.consensus.slots_per_epoch))
+            (Global_slot.create ~epoch:next_epoch ~slot:next_slot
+               ~slots_per_epoch:
+                 (UInt32.of_int coda_constants.consensus.slots_per_epoch))
+            ~checkpoint_window_size_in_slots:
+              coda_constants.consensus.checkpoint_window_size_in_slots }
 
     let same_checkpoint_window ~prev:(slot1 : Global_slot.Checked.t)
-        ~next:(slot2 : Global_slot.Checked.t) =
+        ~next:(slot2 : Global_slot.Checked.t)
+        ~(checkpoint_window_size_in_slots : Coda_numbers.Global_slot.Checked.t)
+        =
       let open Snarky_integer in
       let open Run in
-      let slot1 = Global_slot.Checked.to_integer slot1 in
-      let constants = (Coda_constants.t ()).consensus in
-      let _q1, r1 =
-        Integer.div_mod ~m slot1
-          (Integer.constant ~m
-             (Bignum_bigint.of_int constants.checkpoint_window_size_in_slots))
+      let module Slot = Coda_numbers.Global_slot in
+      let slot1 = Slot.Checked.to_integer (Global_slot.slot_number slot1) in
+      let checkpoint_window_size_in_slots =
+        Slot.Checked.to_integer checkpoint_window_size_in_slots
       in
+      let _q1, r1 = Integer.div_mod ~m slot1 checkpoint_window_size_in_slots in
       let next_window_start =
         Field.(
           Integer.to_field slot1 - Integer.to_field r1
-          + of_int constants.checkpoint_window_size_in_slots)
+          + Integer.to_field checkpoint_window_size_in_slots)
       in
-      (Field.compare ~bit_length:Global_slot.length_in_bits
-         (slot2 |> Global_slot.Checked.to_integer |> Integer.to_field)
+      (Field.compare ~bit_length:Slot.length_in_bits
+         ( Global_slot.slot_number slot2
+         |> Slot.Checked.to_integer |> Integer.to_field )
          next_window_start)
         .less
 
-    let same_checkpoint_window ~prev ~next =
-      make_checked (fun () -> same_checkpoint_window ~prev ~next)
+    let same_checkpoint_window ~prev ~next ~checkpoint_window_size_in_slots =
+      make_checked (fun () ->
+          same_checkpoint_window ~prev ~next ~checkpoint_window_size_in_slots
+      )
 
-    let negative_one ~genesis_ledger =
-      let constants = (Coda_constants.t ()).consensus in
+    let negative_one ~genesis_ledger ~genesis_constants =
+      let constants = (Coda_constants.create_t genesis_constants).consensus in
       let max_sub_window_density =
         Length.of_int constants.slots_per_sub_window
       in
@@ -2043,13 +2094,15 @@ module Data = struct
                ~f:(Fn.const max_sub_window_density)
       ; last_vrf_output= Vrf.Output.Truncated.dummy
       ; total_currency= genesis_ledger_total_currency ~ledger:genesis_ledger
-      ; curr_global_slot= Global_slot.zero
+      ; curr_global_slot=
+          Global_slot.zero
+            ~slots_per_epoch:(constants.slots_per_epoch |> UInt32.of_int)
       ; staking_epoch_data= Epoch_data.Staking.genesis ~genesis_ledger
       ; next_epoch_data= Epoch_data.Next.genesis ~genesis_ledger
       ; has_ancestor_in_same_checkpoint_window= false }
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
-        ~consensus_transition ~genesis_ledger : Value.t =
+        ~consensus_transition ~genesis_ledger ~genesis_constants : Value.t =
       let producer_vrf_result =
         let _, sk = Vrf.Precomputed.genesis_winner in
         Vrf.eval ~private_key:sk
@@ -2063,24 +2116,29 @@ module Data = struct
       in
       Or_error.ok_exn
         (update ~producer_vrf_result
-           ~previous_consensus_state:(negative_one ~genesis_ledger)
+           ~previous_consensus_state:
+             (negative_one ~genesis_ledger ~genesis_constants)
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
            ~consensus_transition ~supply_increase:Currency.Amount.zero
-           ~snarked_ledger_hash)
+           ~snarked_ledger_hash
+           ~coda_constants:(Coda_constants.create_t genesis_constants))
 
-    let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger :
-        Value.t =
+    let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger
+        ~genesis_constants : Value.t =
       create_genesis_from_transition ~negative_one_protocol_state_hash
         ~consensus_transition:Consensus_transition.genesis ~genesis_ledger
+        ~genesis_constants
 
     (* Check that both epoch and slot are zero.
     *)
     let is_genesis_state (t : Value.t) =
-      Global_slot.(equal zero t.curr_global_slot)
+      Coda_numbers.Global_slot.(
+        equal zero (Global_slot.slot_number t.curr_global_slot))
 
     let is_genesis (global_slot : Global_slot.Checked.t) =
-      let open Global_slot in
-      Checked.equal (Checked.constant zero) global_slot
+      let open Coda_numbers.Global_slot in
+      Checked.equal (Checked.constant zero)
+        (Global_slot.slot_number global_slot)
 
     let is_genesis_state_var (t : var) = is_genesis t.curr_global_slot
 
@@ -2089,10 +2147,20 @@ module Data = struct
         (previous_protocol_state_hash : Coda_base.State_hash.var)
         ~(supply_increase : Currency.Amount.var)
         ~(previous_blockchain_state_ledger_hash :
-           Coda_base.Frozen_ledger_hash.var) =
+           Coda_base.Frozen_ledger_hash.var)
+        ~(coda_constants : Coda_base.Coda_constants_checked.var) =
       let open Snark_params.Tick in
       let {Poly.curr_global_slot= prev_global_slot; _} = previous_state in
-      let next_global_slot = transition_data in
+      let%bind slots_per_epoch =
+        Coda_base.Coda_constants_checked.to_slot_var
+          coda_constants.slots_per_epoch
+      and checkpoint_window_size_in_slots =
+        Coda_base.Coda_constants_checked.to_slot_var
+          coda_constants.checkpoint_window_size_in_slots
+      in
+      let next_global_slot =
+        Global_slot.of_slot_number transition_data ~slots_per_epoch
+      in
       let%bind () =
         let%bind global_slot_increased =
           Global_slot.Checked.(prev_global_slot < next_global_slot)
@@ -2114,7 +2182,8 @@ module Data = struct
         let%bind (module M) = Inner_curve.Checked.Shifted.create () in
         Vrf.Checked.check
           (module M)
-          ~epoch_ledger:staking_epoch_data.ledger ~global_slot:next_global_slot
+          ~epoch_ledger:staking_epoch_data.ledger
+          ~global_slot:(Global_slot.slot_number next_global_slot)
           ~seed:staking_epoch_data.seed
       in
       let%bind new_total_currency =
@@ -2123,9 +2192,11 @@ module Data = struct
       in
       let%bind has_ancestor_in_same_checkpoint_window =
         same_checkpoint_window ~prev:prev_global_slot ~next:next_global_slot
+          ~checkpoint_window_size_in_slots
       in
       let%bind in_seed_update_range =
-        Slot.Checked.in_seed_update_range prev_slot
+        Slot.Checked.in_seed_update_range prev_slot ~c:coda_constants.c
+          ~k:coda_constants.k
       in
       let%bind next_epoch_data =
         let%map seed =
@@ -2184,6 +2255,8 @@ module Data = struct
           ~next_global_slot
           ~prev_sub_window_densities:previous_state.sub_window_densities
           ~prev_min_window_density:previous_state.min_window_density
+          ~slots_per_sub_window:coda_constants.slots_per_sub_window
+          ~sub_windows_per_window:coda_constants.sub_windows_per_window
       in
       Checked.return
         ( `Success threshold_satisfied
@@ -2247,7 +2320,7 @@ module Data = struct
       let dummy_advance (t : Value.t) ?(increase_epoch_count = false)
           ~new_global_slot : Value.t =
         let new_epoch_count =
-          if increase_epoch_count then Global_slot.(t.epoch_count + 1)
+          if increase_epoch_count then Length.succ t.epoch_count
           else t.epoch_count
         in
         {t with epoch_count= new_epoch_count; curr_global_slot= new_global_slot}
@@ -2540,6 +2613,7 @@ module Hooks = struct
       Epoch.equal epoch
         (Epoch.succ (Consensus_state.curr_epoch consensus_state))
     in
+    Core.printf "23\n%!" ;
     let constants = (Coda_constants.t ()).consensus in
     (* has the first transition in the epoch reached finalization? *)
     let epoch_is_finalized =
@@ -2692,6 +2766,7 @@ module Hooks = struct
         (Epoch_and_slot.of_time_exn time_received)
         (epoch, slot)
     in
+    Core.printf "24\n%!" ;
     let constants = (Coda_constants.t ()).consensus in
     if slot_diff < 0L then Error `Too_early
     else if slot_diff >= of_int constants.delta then
@@ -2832,6 +2907,7 @@ module Hooks = struct
 
   let next_producer_timing now (state : Consensus_state.Value.t) ~local_state
       ~keypairs ~logger =
+    let coda_constants = (Coda_constants.t ()).consensus in
     let info_if_producing =
       if Keypair.And_compressed_pk.Set.is_empty keypairs then Logger.debug
       else Logger.info
@@ -2899,9 +2975,20 @@ module Hooks = struct
               @@ Public_key.Compressed.Set.mem unseen_pks public_key_compressed
             then Continue_or_stop.Continue ()
             else
-              let global_slot = Global_slot.of_epoch_and_slot (epoch, slot) in
+              let global_slot =
+                Global_slot.of_epoch_and_slot (epoch, slot)
+                  ~slots_per_epoch:
+                    (UInt32.of_int coda_constants.slots_per_epoch)
+              in
+              Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+                "Checking VRF evaluations at epoch: $epoch, slot: $slot"
+                ~metadata:
+                  [ ("epoch", `Int (Epoch.to_int epoch))
+                  ; ("slot", `Int (Slot.to_int slot)) ] ;
               match
-                Vrf.check ~global_slot ~seed:epoch_data.seed ~epoch_snapshot
+                Vrf.check
+                  ~global_slot:(Global_slot.slot_number global_slot)
+                  ~seed:epoch_data.seed ~epoch_snapshot
                   ~private_key:keypair.private_key
                   ~public_key:keypair.public_key ~public_key_compressed
                   ~total_stake ~logger
@@ -2913,6 +3000,7 @@ module Hooks = struct
           ~finish:(fun () -> None)
       in
       let rec find_winning_slot (slot : Slot.t) =
+        Core.printf "25\n%!" ;
         let constants = (Coda_constants.t ()).consensus in
         if Slot.to_int slot >= constants.epoch_size then None
         else
@@ -2972,6 +3060,7 @@ module Hooks = struct
 
   let should_bootstrap_len ~existing ~candidate =
     let length = Length.to_int in
+    Core.printf "26\n%!" ;
     let constants = (Coda_constants.t ()).consensus in
     length candidate - length existing > (2 * constants.k) + constants.delta
 
@@ -2996,14 +3085,16 @@ module Hooks = struct
   let%test "Receive a valid consensus_state with a bit of delay" =
     let curr_epoch, curr_slot =
       Consensus_state.curr_epoch_and_slot
-        (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t)
+        (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
+           ~genesis_constants:Genesis_constants.compiled)
     in
     let constants = (Coda_constants.t ()).consensus in
     let delay = constants.delta / 2 |> UInt32.of_int in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time curr_epoch new_slot in
     received_at_valid_time
-      (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t)
+      (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
+         ~genesis_constants:Genesis_constants.compiled)
       ~time_received:(to_unix_timestamp time_received)
     |> Result.is_ok
 
@@ -3013,15 +3104,23 @@ module Hooks = struct
     let ((curr_epoch, curr_slot) as curr) =
       Epoch_and_slot.of_time_exn start_time
     in
+    let slots_per_epoch =
+      Coda_constants.compiled_constants_for_test.consensus.slots_per_epoch
+      |> UInt32.of_int
+    in
     let consensus_state =
-      { (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t) with
-        curr_global_slot= Global_slot.of_epoch_and_slot curr }
+      { (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
+           ~genesis_constants:Genesis_constants.compiled)
+        with
+        curr_global_slot= Global_slot.of_epoch_and_slot curr ~slots_per_epoch
+      }
     in
     let too_early =
       (* TODO: Does this make sense? *)
       Epoch.start_time
         (Consensus_state.curr_slot
-           (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t))
+           (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
+              ~genesis_constants:Genesis_constants.compiled))
     in
     let constants = (Coda_constants.t ()).consensus in
     let too_late =
@@ -3065,24 +3164,35 @@ module Hooks = struct
     let genesis_winner = Vrf.Precomputed.genesis_winner
 
     let check_block_data ~logger (block_data : Block_data.t) global_slot =
-      if not (Global_slot.equal global_slot block_data.global_slot) then
+      if
+        not
+          (Coda_numbers.Global_slot.equal
+             (Global_slot.slot_number global_slot)
+             block_data.global_slot)
+      then
         Logger.error ~module_:__MODULE__ ~location:__LOC__ logger
           !"VRF was evaluated at (epoch, slot) %{sexp:Epoch_and_slot.t} but \
             the corresponding block was produced at a time corresponding to \
             %{sexp:Epoch_and_slot.t}. This means that generating the block \
             took more time than expected."
-          (Global_slot.to_epoch_and_slot block_data.global_slot)
+          (Global_slot.to_epoch_and_slot
+             (Global_slot.of_slot_number block_data.global_slot
+                ~slots_per_epoch:(Global_slot.slots_per_epoch global_slot)))
           (Global_slot.to_epoch_and_slot global_slot)
 
     let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
         ~blockchain_state ~current_time ~(block_data : Block_data.t)
-        ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger =
+        ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger
+        ~(coda_constants : Coda_constants.t) =
       let previous_consensus_state =
         Protocol_state.consensus_state previous_protocol_state
       in
       (let actual_global_slot =
          let time = Time.of_span_since_epoch (Time.Span.of_ms current_time) in
-         Global_slot.of_epoch_and_slot (Epoch_and_slot.of_time_exn time)
+         Global_slot.of_epoch_and_slot
+           (Epoch_and_slot.of_time_exn time)
+           ~slots_per_epoch:
+             (coda_constants.consensus.slots_per_epoch |> UInt32.of_int)
        in
        check_block_data ~logger block_data actual_global_slot) ;
       let consensus_transition = block_data.global_slot in
@@ -3095,7 +3205,7 @@ module Hooks = struct
              ~consensus_transition
              ~producer_vrf_result:block_data.Block_data.vrf_result
              ~previous_protocol_state_hash ~supply_increase
-             ~snarked_ledger_hash)
+             ~snarked_ledger_hash ~coda_constants)
       in
       let genesis_state_hash =
         Protocol_state.genesis_state_hash
@@ -3106,6 +3216,8 @@ module Hooks = struct
         Protocol_state.create_value ~genesis_state_hash
           ~previous_state_hash:(Protocol_state.hash previous_protocol_state)
           ~blockchain_state ~consensus_state
+          ~coda_constants:
+            (Protocol_state.coda_constants previous_protocol_state)
       in
       (protocol_state, consensus_transition)
 
@@ -3120,6 +3232,7 @@ module Hooks = struct
           ~previous_blockchain_state_ledger_hash:
             ( Protocol_state.blockchain_state prev_state
             |> Blockchain_state.snarked_ledger_hash )
+          ~coda_constants:(Protocol_state.coda_constants prev_state)
     end
 
     module For_tests = struct
@@ -3146,6 +3259,9 @@ module Hooks = struct
           let curr_global_slot =
             Global_slot.(prev.curr_global_slot + slot_advancement)
           in
+          let coda_constants =
+            Coda_constants.create_t Genesis_constants.compiled
+          in
           let curr_epoch, curr_slot =
             Global_slot.to_epoch_and_slot curr_global_slot
           in
@@ -3163,6 +3279,7 @@ module Hooks = struct
               ~prev_protocol_state_hash:
                 (With_hash.hash previous_protocol_state)
               ~producer_vrf_result ~snarked_ledger_hash ~total_currency
+              ~coda_constants
           in
           let min_window_density, sub_window_densities =
             Min_window_density.update_min_window_density
@@ -3170,6 +3287,9 @@ module Hooks = struct
               ~next_global_slot:curr_global_slot
               ~prev_sub_window_densities:prev.sub_window_densities
               ~prev_min_window_density:prev.min_window_density
+          in
+          let slots_per_epoch =
+            coda_constants.consensus.slots_per_epoch |> UInt32.of_int
           in
           { Poly.blockchain_length
           ; epoch_count
@@ -3182,8 +3302,12 @@ module Hooks = struct
           ; next_epoch_data
           ; has_ancestor_in_same_checkpoint_window=
               same_checkpoint_window_unchecked
-                (Global_slot.create ~epoch:prev_epoch ~slot:prev_slot)
-                (Global_slot.create ~epoch:curr_epoch ~slot:curr_slot) }
+                (Global_slot.create ~epoch:prev_epoch ~slot:prev_slot
+                   ~slots_per_epoch)
+                (Global_slot.create ~epoch:curr_epoch ~slot:curr_slot
+                   ~slots_per_epoch)
+                ~checkpoint_window_size_in_slots:
+                  coda_constants.consensus.checkpoint_window_size_in_slots }
     end
   end
 end
@@ -3209,12 +3333,21 @@ let%test_module "Proof of stake tests" =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
           ~genesis_ledger:Test_genesis_ledger.t
+          ~genesis_constants:Genesis_constants.compiled
+      in
+      let coda_constants =
+        Coda_constants.create_t Genesis_constants.compiled
+      in
+      let slots_per_epoch =
+        coda_constants.consensus.slots_per_epoch |> UInt32.of_int
       in
       let global_slot =
         Core_kernel.Time.now () |> Time.of_time |> Epoch_and_slot.of_time_exn
-        |> Global_slot.of_epoch_and_slot
+        |> Global_slot.of_epoch_and_slot ~slots_per_epoch
       in
-      let consensus_transition : Consensus_transition.t = global_slot in
+      let consensus_transition : Consensus_transition.t =
+        Global_slot.slot_number global_slot
+      in
       let supply_increase = Currency.Amount.of_int 42 in
       (* setup ledger, needed to compute producer_vrf_result here and handler below *)
       let open Coda_base in
@@ -3243,12 +3376,13 @@ let%test_module "Proof of stake tests" =
             previous_consensus_state.next_epoch_data.seed
           else previous_consensus_state.staking_epoch_data.seed
         in
-        Vrf.eval ~private_key {global_slot; seed; delegator}
+        Vrf.eval ~private_key
+          {global_slot= Global_slot.slot_number global_slot; seed; delegator}
       in
       let next_consensus_state =
         update ~previous_consensus_state ~consensus_transition
           ~previous_protocol_state_hash ~supply_increase ~snarked_ledger_hash
-          ~producer_vrf_result
+          ~producer_vrf_result ~coda_constants
         |> Or_error.ok_exn
       in
       (* build pieces needed to apply "update_var" *)
@@ -3273,10 +3407,18 @@ let%test_module "Proof of stake tests" =
           exists Coda_base.Frozen_ledger_hash.typ
             ~compute:(As_prover.return snarked_ledger_hash)
         in
+        let%bind coda_constants_checked =
+          exists Coda_base.Coda_constants_checked.typ
+            ~compute:
+              (As_prover.return
+                 (Coda_base.Coda_constants_checked.of_coda_constants
+                    coda_constants))
+        in
         let result =
           update_var previous_state transition_data
             previous_protocol_state_hash ~supply_increase
             ~previous_blockchain_state_ledger_hash
+            ~coda_constants:coda_constants_checked
         in
         (* setup handler *)
         let indices =

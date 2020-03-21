@@ -885,6 +885,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof ~genesis_constants =
               =
             Broadcast_pipe.create
               ( External_transition.genesis ~genesis_ledger ~base_proof
+                  ~genesis_constants
               |> External_transition.Validated.to_initial_validated )
           in
           let valid_transitions, initialization_finish_signal =
@@ -941,7 +942,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof ~genesis_constants =
                          breadcrumb ))
                   ~most_recent_valid_block
                   ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
-                  ~base_proof )
+                  ~base_proof ~genesis_constants )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

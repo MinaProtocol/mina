@@ -269,6 +269,7 @@ module type Bootstrap_controller_intf = sig
     -> initial_root_transition:External_transition.Validated.t
     -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
+    -> genesis_constants:Genesis_constants.t
     -> ( transition_frontier
        * External_transition.Initial_validated.t Envelope.Incoming.t list )
        Deferred.t
@@ -361,6 +362,7 @@ module type Transition_router_intf = sig
     -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
     -> base_proof:Coda_base.Proof.t
+    -> genesis_constants:Genesis_constants.t
     -> ( [`Transition of External_transition.Validated.t]
        * [`Source of [`Gossip | `Catchup | `Internal]] )
        Strict_pipe.Reader.t

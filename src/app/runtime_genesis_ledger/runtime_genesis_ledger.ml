@@ -18,10 +18,12 @@ let use_dummy_values = true
 
 type t = Ledger.t
 
-let generate_base_proof ~ledger =
+let generate_base_proof ~ledger ~genesis_constants =
   let%map (module Keys) = Keys_lib.Keys.create () in
   let genesis_ledger = lazy ledger in
-  let genesis_state = Coda_state.Genesis_protocol_state.t ~genesis_ledger in
+  let genesis_state =
+    Coda_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_constants
+  in
   let base_hash = Keys.Step.instance_hash genesis_state.data in
   let wrap hash proof =
     let open Snark_params in
@@ -40,7 +42,9 @@ let generate_base_proof ~ledger =
     let prover_state =
       { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state= Coda_state.Protocol_state.negative_one ~genesis_ledger
+      ; prev_state=
+          Coda_state.Protocol_state.negative_one ~genesis_ledger
+            ~genesis_constants
       ; genesis_state_hash= genesis_state.hash
       ; expected_next_state= None
       ; update= Coda_state.Snark_transition.genesis ~genesis_ledger }
@@ -162,7 +166,8 @@ let read_write_constants read_from_opt write_to =
   (*Set this before generating the base proof to use the constants from config file if any*)
   Coda_constants.t_ref := Some (Coda_constants.create_t constants) ;
   Yojson.Safe.to_file write_to
-    Genesis_constants.(to_config_file constants |> Config_file.to_yojson)
+    Genesis_constants.(to_config_file constants |> Config_file.to_yojson) ;
+  constants
 
 let main accounts_json_file dir n constants_file =
   let open Deferred.Let_syntax in
@@ -186,14 +191,16 @@ let main accounts_json_file dir n constants_file =
           ledger )
     with
     | Ok ledger ->
-        read_write_constants constants_file constants_path
-        |> Result.ok_or_failwith ;
+        let genesis_constants =
+          read_write_constants constants_file constants_path
+          |> Result.ok_or_failwith
+        in
         let%bind _base_hash, base_proof =
           if use_dummy_values then
             return
               ( Snark_params.Tick.Field.zero
               , Dummy_values.Tock.Bowe_gabizon18.proof )
-          else generate_base_proof ~ledger
+          else generate_base_proof ~ledger ~genesis_constants
         in
         let%bind wr = Writer.open_file proof_path in
         Writer.write wr (Proof.Stable.V1.sexp_of_t base_proof |> Sexp.to_string) ;

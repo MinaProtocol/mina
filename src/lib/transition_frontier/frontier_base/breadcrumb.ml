@@ -305,6 +305,8 @@ module For_tests = struct
       let protocol_state =
         Protocol_state.create_value ~genesis_state_hash ~previous_state_hash
           ~blockchain_state:next_blockchain_state ~consensus_state
+          ~coda_constants:
+            (Protocol_state.coda_constants previous_protocol_state)
       in
       let next_external_transition =
         External_transition.create ~protocol_state
