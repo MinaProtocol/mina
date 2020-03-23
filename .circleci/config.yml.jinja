@@ -387,7 +387,7 @@ jobs:
             - run:
                   name: Generate runtime ledger with 10k accounts
                   command: |
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -n 10000 -account-file genesis_ledgers/phase_three/genesis_ledger.json'
+                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && ./_build/default/src/app/runtime_genesis_ledger/runtime_genesis_ledger.exe -account-file genesis_ledgers/phase_three/genesis_ledger.json'
                   no_output_timeout: 20m
             - run:
                   name: Build deb package with PV keys and PV key tar
@@ -432,6 +432,7 @@ jobs:
                               --extra-args "--build-arg coda_version=$CODA_DEB_VERSION --build-arg deb_repo=$CODA_DEB_REPO"
                         fi
                     fi
+                  no_output_timeout: 20m
             - store_artifacts:
                   path: /tmp/artifacts
             {%- endif %}
