@@ -1,5 +1,16 @@
+(* transaction_union_tag.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params.Tick
+
+[%%endif]
 
 type t = Payment | Stake_delegation | Fee_transfer | Coinbase
 [@@deriving enum, eq, sexp]
@@ -7,8 +18,6 @@ type t = Payment | Stake_delegation | Fee_transfer | Coinbase
 let gen =
   Quickcheck.Generator.map (Int.gen_incl min max) ~f:(fun i ->
       Option.value_exn (of_enum i) )
-
-type var = Boolean.var * Boolean.var
 
 let to_bits = function
   | Payment ->
@@ -35,8 +44,13 @@ let%test_unit "to_bool of_bool inv" =
   test (Generator.tuple2 Bool.quickcheck_generator Bool.quickcheck_generator)
     ~f:(fun b -> assert (b = to_bits (of_bits b)))
 
+[%%ifdef
+consensus_mechanism]
+
 let typ =
   Typ.transport Typ.(Boolean.typ * Boolean.typ) ~there:to_bits ~back:of_bits
+
+type var = Boolean.var * Boolean.var
 
 module Checked = struct
   open Let_syntax
@@ -78,3 +92,5 @@ module Checked = struct
         test_predicate is_user_command (one_of [Payment; Stake_delegation])
     end )
 end
+
+[%%endif]

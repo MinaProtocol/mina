@@ -55,7 +55,14 @@ val request_work : t -> Snark_worker.Work.Spec.t option
 
 val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
-val add_work : t -> Snark_worker.Work.Result.t -> unit Deferred.t
+val add_work : t -> Snark_worker.Work.Result.t -> unit
+
+val add_transactions :
+     t
+  -> User_command.t list
+  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+     * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+     Deferred.Or_error.t
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
@@ -100,6 +107,8 @@ val initialization_finish_signal : t -> unit Ivar.t
 val dump_tf : t -> string Or_error.t
 
 val best_path : t -> State_hash.t list option
+
+val best_chain : t -> Transition_frontier.Breadcrumb.t list option
 
 val transaction_pool : t -> Network_pool.Transaction_pool.t
 

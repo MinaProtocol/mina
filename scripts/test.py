@@ -13,7 +13,7 @@ build_artifact_profiles = [
     'testnet_postake_medium_curves'
 ]
 
-unit_test_profiles = ['test_postake_snarkless_unittest', 'dev']
+unit_test_profiles = ['dev']
 
 unit_test_profiles_medium_curves = ['dev_medium_curves']
 
@@ -51,8 +51,6 @@ small_curves_tests = {
     'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
-    'test_postake_five_even_snarkless':
-    ['coda-shared-prefix-multiproducer-test -num-block-producers 5'],
     'test_postake_five_even_txns':
     ['coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments'],
 }
@@ -67,6 +65,10 @@ medium_curves_and_other_tests = {
     'test_postake_full_epoch': ['full-test'],
 }
 
+archive_processor_test = {
+    'test_archive_processor': ['coda-archive-processor-test'],
+}
+
 medium_curve_profiles_full = [
     'test_postake_medium_curves', 'testnet_postake_medium_curves',
     'testnet_postake_many_producers_medium_curves'
@@ -78,7 +80,6 @@ ci_excludes = [
 
 # of all the generated CI jobs, allow these specific ones to fail (extra excludes on top of ci_excludes)
 required_excludes = [
-    'test_postake_five_even_snarkless:*',
     'test_postake_catchup:*',
     'test_postake_three_producers:*'
 ]
@@ -88,6 +89,9 @@ extra_required_status_checks = [
     "ci/circleci: lint",
     "ci/circleci: tracetool",
     "ci/circleci: build-wallet",
+    "ci/circleci: compare-test-signatures",
+    "ci/circleci: build-client-sdk",
+    "ci/circleci: test-unit--nonconsensus_medium_curves",
 ]
 
 # these are full status check names. they will not be required to succeed.
@@ -190,6 +194,7 @@ def run(args):
 
     all_tests = small_curves_tests
     all_tests.update(medium_curves_and_other_tests)
+    all_tests.update(archive_processor_test)
     all_tests = filter_tests(all_tests, args.includes_patterns,
                              args.excludes_patterns)
     if len(all_tests) == 0:

@@ -1,18 +1,14 @@
 open Coda_base
 
 module type S = sig
-  (* bin_io omitted intentionally *)
   type t [@@deriving sexp, to_yojson]
 
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving bin_io, compare, sexp, version, to_yojson]
-      end
-
-      module Latest = V1
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type nonrec t = t [@@deriving compare, sexp, to_yojson]
     end
-    with type V1.t = t
+  end]
 
   val create :
        statement:Transaction_snark.Statement.t

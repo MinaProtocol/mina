@@ -1,8 +1,18 @@
 [%%import "/src/config.mlh"]
 
-open Core
+open Core_kernel
+
+[%%ifdef consensus_mechanism]
+
 open Snark_params
 open Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
 
 type t = Field.t * Field.t [@@deriving sexp, hash]
 
@@ -19,7 +29,7 @@ end
 
 include Comparable.S_binable with type t := t
 
-[%%if defined consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 type var = Field.Var.t * Field.Var.t
 
@@ -80,7 +90,7 @@ module Compressed : sig
 
   val of_base58_check : string -> t Or_error.t
 
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   type var = (Field.Var.t, Boolean.var) Poly.t
 
@@ -115,7 +125,7 @@ val decompress : Compressed.t -> t option
 
 val decompress_exn : Compressed.t -> t
 
-[%%if defined consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 val compress_var : var -> (Compressed.var, _) Checked.t
 

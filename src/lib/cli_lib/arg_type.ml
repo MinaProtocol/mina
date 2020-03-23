@@ -64,14 +64,18 @@ let global_slot =
   Command.Arg_type.map Command.Param.int ~f:Coda_numbers.Global_slot.of_int
 
 let txn_fee =
-  Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_string
+  Command.Arg_type.map Command.Param.string ~f:Currency.Fee.of_formatted_string
 
 let txn_amount =
-  Command.Arg_type.map Command.Param.string ~f:Currency.Amount.of_string
+  Command.Arg_type.map Command.Param.string
+    ~f:Currency.Amount.of_formatted_string
 
 let txn_nonce =
   let open Coda_base in
   Command.Arg_type.map Command.Param.string ~f:Account.Nonce.of_string
+
+let hd_index =
+  Command.Arg_type.map Command.Param.string ~f:Coda_numbers.Hd_index.of_string
 
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string

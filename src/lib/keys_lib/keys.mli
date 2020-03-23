@@ -33,7 +33,10 @@ module type S = sig
 
     val instance_hash : Protocol_state.value -> Tick.Field.t
 
-    val main : Tick.Field.Var.t -> (unit, Prover_state.t) Tick.Checked.t
+    val main :
+         logger:Logger.t
+      -> Tick.Field.Var.t
+      -> (unit, Prover_state.t) Tick.Checked.t
   end
 
   module Wrap : sig

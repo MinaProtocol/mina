@@ -4,8 +4,8 @@
 open Core_kernel
 open Coda_base
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 open Snark_params.Tick
 
@@ -76,8 +76,8 @@ module Body = struct
 
   type value = Value.t [@@deriving sexp, to_yojson]
 
-  [%%if
-  defined consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
   type var =
     ( State_hash.var
@@ -154,8 +154,8 @@ end
 
 type value = Value.t [@@deriving sexp, to_yojson]
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 type var = (State_hash.var, Body.var) Poly.t
 
@@ -187,8 +187,8 @@ let consensus_state {Poly.Stable.Latest.body= {Body.Poly.consensus_state; _}; _}
     =
   consensus_state
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 let create_var = create'
 

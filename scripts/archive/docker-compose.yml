@@ -22,4 +22,3 @@ services:
     depends_on:
     - "postgres"
     restart: always
-

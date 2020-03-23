@@ -167,6 +167,8 @@ module Instance = struct
            `This_transition_was_not_received_via_gossip
       |> External_transition.skip_frontier_dependencies_validation
            `This_transition_was_loaded_from_persistence
+      |> External_transition.skip_fork_ids_validation
+           `This_transition_has_valid_fork_ids
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)
@@ -210,10 +212,10 @@ module Instance = struct
         ~f:Result.return
     in
     let apply_diff diff =
-      let (`New_root _) =
+      let (`New_root_and_diffs_with_mutants (_, diffs_with_mutants)) =
         Full_frontier.apply_diffs frontier [diff] ~ignore_consensus_local_state
       in
-      Extensions.notify extensions ~frontier ~diffs:[diff]
+      Extensions.notify extensions ~frontier ~diffs_with_mutants
       |> Deferred.map ~f:Result.return
     in
     (* crawl through persistent frontier and load transitions into in memory frontier *)

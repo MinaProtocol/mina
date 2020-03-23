@@ -186,7 +186,7 @@ let run_test () : unit Deferred.t =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
-             ~gossip_net_params
+             ~gossip_net_params ~initial_fork_id:Fork_id.empty
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
@@ -195,7 +195,8 @@ let run_test () : unit Deferred.t =
                  { initial_snark_worker_key=
                      Some
                        (Public_key.compress largest_account_keypair.public_key)
-                 ; shutdown_on_disconnect= true }
+                 ; shutdown_on_disconnect= true
+                 ; num_threads= None }
              ~snark_pool_disk_location:(temp_conf_dir ^/ "snark_pool")
              ~wallets_disk_location:(temp_conf_dir ^/ "wallets")
              ~persistent_root_location:(temp_conf_dir ^/ "root")
@@ -285,6 +286,11 @@ let run_test () : unit Deferred.t =
             User_command.sign (Keypair.of_private_key_exn sender_sk) payload )
       in
       let assert_ok x = assert (Or_error.is_ok x) in
+      let send_payment (payment : User_command.With_valid_signature.t) =
+        Coda_commands.send_user_command coda (payment :> User_command.t)
+        |> Participating_state.to_deferred_or_error
+        |> Deferred.map ~f:Or_error.join
+      in
       let test_sending_payment sender_sk receiver_pk =
         let payment =
           build_payment send_amount sender_sk receiver_pk transaction_fee
@@ -299,23 +305,15 @@ let run_test () : unit Deferred.t =
           |> Participating_state.active_exn
           |> Option.value ~default:Currency.Balance.zero
         in
-        let%bind p1_res =
-          Coda_commands.send_user_command coda (payment :> User_command.t)
-          |> Participating_state.to_deferred_or_error
-        in
-        assert_ok (Or_error.join p1_res) ;
+        let%bind p1_res = send_payment payment in
+        assert_ok p1_res ;
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =
           build_payment send_amount sender_sk receiver_pk transaction_fee
         in
-        let%bind p2_res =
-          Coda_commands.send_user_command coda (payment' :> User_command.t)
-          |> Participating_state.to_deferred_or_error
-        in
-        assert_ok @@ Or_error.join p2_res ;
-        (* The payment fails, but the rpc command doesn't indicate that because that
-           failure comes from the network. *)
+        let%bind p2_res = send_payment payment' in
+        assert (Or_error.is_error p2_res) ;
         (* Let the system settle, mine some blocks *)
         let%map () =
           balance_change_or_timeout
@@ -344,12 +342,8 @@ let run_test () : unit Deferred.t =
               Option.value_exn
                 (Currency.Balance.add_amount (Option.value_exn v) amount) )
         in
-        let%map p_res =
-          Coda_commands.send_user_command coda (payment :> User_command.t)
-          |> Participating_state.to_deferred_or_error
-        in
-        p_res |> Or_error.join |> assert_ok ;
-        new_balance_sheet'
+        let%map p_res = send_payment payment in
+        assert_ok p_res ; new_balance_sheet'
       in
       let pks accounts =
         List.map accounts ~f:(fun ((keypair : Signature_lib.Keypair.t), _) ->
@@ -477,12 +471,12 @@ let run_test () : unit Deferred.t =
             blockchain_length coda
             > Coda_numbers.Length.add blockchain_length' wait_till_length )
         else if with_check then
-          let%map _ =
+          let%bind _ =
             test_multiple_payments other_accounts
               ~txn_count:(List.length other_accounts / 2)
               timeout_mins
           in
-          ()
+          test_duplicate_payments sender_keypair receiver_keypair
         else
           let%bind _ =
             test_multiple_payments other_accounts

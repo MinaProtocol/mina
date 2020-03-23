@@ -21,11 +21,6 @@ let genesis_state_timestamp =
 "k", k]
 
 [%%inject
-"coinbase_int", coinbase]
-
-let coinbase = Currency.Amount.of_int coinbase_int
-
-[%%inject
 "block_window_duration_ms", block_window_duration]
 
 let block_window_duration =
@@ -80,3 +75,24 @@ let epoch_size = UInt32.to_int Epoch.size
 
 let delta_duration =
   Time.Span.of_ms (Int64.of_int (Int64.to_int Slot.duration_ms * delta))
+
+let all_constants =
+  `Assoc
+    [ ( "genesis_state_timestamp"
+      , `String
+          ( Block_time.to_time genesis_state_timestamp
+          |> Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc ) )
+    ; ("k", `Int k)
+    ; ( "coinbase"
+      , `String
+          (Currency.Amount.to_formatted_string Coda_compile_config.coinbase) )
+    ; ("block_window_duration_ms", `Int block_window_duration_ms)
+    ; ("delta", `Int delta)
+    ; ("c", `Int c)
+    ; ("inactivity_ms", `Int inactivity_ms)
+    ; ( "sub_windows_per_window"
+      , `Int (Unsigned.UInt32.to_int sub_windows_per_window) )
+    ; ( "slots_per_sub_window"
+      , `Int (Unsigned.UInt32.to_int slots_per_sub_window) )
+    ; ("slots_per_window", `Int (Unsigned.UInt32.to_int slots_per_window))
+    ; ("slots_per_epoch", `Int (Unsigned.UInt32.to_int slots_per_epoch)) ]
