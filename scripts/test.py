@@ -65,6 +65,10 @@ medium_curves_and_other_tests = {
     'test_postake_full_epoch': ['full-test'],
 }
 
+archive_processor_test = {
+    'test_archive_processor': ['coda-archive-processor-test'],
+}
+
 medium_curve_profiles_full = [
     'test_postake_medium_curves', 'testnet_postake_medium_curves',
     'testnet_postake_many_producers_medium_curves'
@@ -190,6 +194,7 @@ def run(args):
 
     all_tests = small_curves_tests
     all_tests.update(medium_curves_and_other_tests)
+    all_tests.update(archive_processor_test)
     all_tests = filter_tests(all_tests, args.includes_patterns,
                              args.excludes_patterns)
     if len(all_tests) == 0:
