@@ -176,6 +176,7 @@ let make = () => {
             <Spacer height=2. />
             <a
               href=" https://forms.gle/Eer4yM1gb5SvLCk79"
+              target="_blank"
               className=Styles.ctaButton>
               {React.string({js| Apply Now |js})}
             </a>
@@ -216,6 +217,7 @@ let make = () => {
               image="/static/img/ApplyCircle.svg"
               buttonLabel="Apply"
               buttonLink=" https://forms.gle/Eer4yM1gb5SvLCk79"
+              target="_blank"
             />
             <StepButton
               labelStep="Step 2: "
@@ -223,6 +225,7 @@ let make = () => {
               image="/static/img/DiscordCircle.svg"
               buttonLabel="Join"
               buttonLink="http://bit.ly/GenesisDiscord"
+              target="_blank"
             />
             <StepButton
               labelStep="Step 3: "
