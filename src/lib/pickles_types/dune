@@ -6,4 +6,5 @@
   (preprocess (pps ppx_coda ppx_jane ppx_deriving.std))
   (libraries
     snarky
-    core_kernel))
+    core_kernel
+    module_version))

@@ -1,3 +1,5 @@
+open Core_kernel
+
 [%%versioned
 module Stable = struct
   module V1 = struct

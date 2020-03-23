@@ -234,7 +234,8 @@ module Accumulator = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
-          type 'a t = 'a Core_kernel.Shift.Map.t [@@deriving sexp]
+          type 'a t = 'a Core_kernel.Int.Stable.V1.Map.t
+          [@@deriving version {asserted}, sexp, compare]
         end
       end]
 
@@ -362,8 +363,9 @@ module Accumulator = struct
   module Stable = struct
     module V1 = struct
       type ('g, 'unshifted) t =
-        { opening_check: 'g Opening_check.t
-        ; degree_bound_checks: ('g, 'unshifted) Degree_bound_checks.t }
+        { opening_check: 'g Opening_check.Stable.V1.t
+        ; degree_bound_checks: ('g, 'unshifted) Degree_bound_checks.Stable.V1.t
+        }
       [@@deriving fields, sexp]
     end
   end]
@@ -437,7 +439,7 @@ module Openings = struct
   module Stable = struct
     module V1 = struct
       type ('proof, 'fp) t =
-        {proofs: 'proof * 'proof * 'proof; evals: 'fp Evals.t}
+        {proofs: 'proof * 'proof * 'proof; evals: 'fp Evals.Stable.V1.t}
     end
   end]
 
@@ -512,7 +514,7 @@ module Proof = struct
   module Stable = struct
     module V1 = struct
       type ('pc, 'fp, 'openings) t =
-        {messages: ('pc, 'fp) Messages.t; openings: 'openings}
+        {messages: ('pc, 'fp) Messages.Stable.V1.t; openings: 'openings}
       [@@deriving fields]
     end
   end]

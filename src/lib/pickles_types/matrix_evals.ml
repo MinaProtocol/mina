@@ -1,3 +1,4 @@
+open Core_kernel
 module H_list = Snarky.H_list
 
 [%%versioned
