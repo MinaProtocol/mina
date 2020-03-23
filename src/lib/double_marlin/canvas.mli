@@ -40,6 +40,9 @@ module Prover : sig
     -> 'proof
 end
 
+(** This compiles a series of inductive rules defining a set into a proof
+    system for proving membership in that set, with a prover corresponding
+    to each inductive rule. *)
 val compile :
      (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)

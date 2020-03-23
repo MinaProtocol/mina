@@ -44,10 +44,6 @@ module Full_signature = struct
         (module Maxes.S with type length = 'max_width and type ns = 'maxes) }
 end
 
-module Pairing_index = struct
-  type t = Snarky_bn382_backend.G1.Affine.t Abc.t Matrix_evals.t
-end
-
 open Snarky_bn382_backend
 module G = Pairing_main_inputs.G
 module G1 = Dlog_main_inputs.G1
@@ -62,6 +58,7 @@ type g = fp * fp [@@deriving sexp, bin_io]
 
 type g1 = fq * fq [@@deriving sexp, bin_io]
 
+(* We hardcode the number of rounds in the discrete log based proof. *)
 module Wrap_circuit_bulletproof_rounds = Nat.N20
 
 module Nvector (N : Nat.Intf) = struct
@@ -447,7 +444,8 @@ module Dummy = struct
     (ex, ex, ex)
 end
 
-let step
+(* The SNARK function corresponding to the input inductive rule. *)
+let step_main
     : type branching self_branches prev_vars prev_values a_var a_value max_branching local_branches local_signature.
        (module Requests.Step.S
           with type local_signature = local_signature
@@ -477,11 +475,11 @@ let step
        , a_var
        , a_value )
        Inductive_rule.t
-    -> ( (Unfinalized.t, max_branching) Vector.t
+    -> (( (Unfinalized.t, max_branching) Vector.t
        , Fpv.t
        , (Fpv.t, max_branching) Vector.t )
        Types.Pairing_based.Statement.t
-    -> unit =
+    -> unit) Staged.t =
  fun (module Req) (module Max_branching) ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length ~branching
      ~lte ~basic ~self rule ->
@@ -616,50 +614,7 @@ let step
       in
       M.f prevs
     in
-    (* TODO: Use this *)
     let proofs_should_verify = rule.main prev_statements me_only.app_state in
-    (*
-    let _prev_proofs_finalized =
-      let rec go : type vars vals ns1 ns2.
-             (vars, ns1, ns2) H3.T(Per_proof_witness).t
-          -> (vars, vals, ns1, ns2) H4.T(Types_map.Data.For_step).t
-          -> vars H1.T(E01(B)).t
-          -> Boolean.var list =
-       fun proofs datas should_verifys ->
-        match (proofs, datas, should_verifys) with
-          | [], [], [] ->
-            []
-        | p :: proofs, d :: datas, should_verify:: should_verifys ->
-            let _, which_index, state, prev_evals, _sgs, _opening = p in
-            let sponge_digest =
-              Fp.pack state.sponge_digest_before_evaluations
-            in
-            let deferred_values =
-              Types.Dlog_based.Proof_state.Deferred_values.map_challenges
-                ~f:Fp.pack state.deferred_values
-            in
-            let sponge =
-              let open Pairing_main_inputs in
-              let sponge = Sponge.create sponge_params in
-              Sponge.absorb sponge (`Field sponge_digest) ;
-              sponge
-            in
-            let domain_h, domain_k =
-              let hs, ks = Vector.unzip d.step_domains in
-              Pseudo.Domain.
-                (to_domain (which_index, hs), to_domain (which_index, ks))
-            in
-            let ok =
-              Boolean.(
-                Pmain.finalize_other_proof ~domain_k ~domain_h ~sponge
-                  deferred_values prev_evals
-                || not should_verify )
-            in
-            ok :: go proofs datas should_verifys
-      in
-      Boolean.Assert.all (go prevs datas proofs_should_verify)
-    in
-       *)
     let module Proof = struct
       type t = Dlog_proof.var
     end in
@@ -736,26 +691,6 @@ let step
       in
       Boolean.all (go prevs datas unfinalized_proofs proofs_should_verify)
     in
-    (*
-    let () =
-      let bs =
-        let module Z = H1.Zip (E01 (B)) (E01 (B)) in
-        Z.f proofs_should_verify prevs_verified
-      in
-      let module M =
-        H1.Iter
-          (H1.Tuple2
-             (E01
-                (B))
-                (E01 (B)))
-                (struct
-                  let f (should_verify, verified) =
-                    Boolean.(Assert.(any [not should_verify; verified]))
-                end)
-      in
-      M.f bs
-    in
-*)
     let () =
       let hash_me_only =
         unstage
@@ -763,13 +698,12 @@ let step
              basic.a_var_to_field_elements)
       in
       Field.Assert.equal
-        stmt.proof_state.me_only (* Has the max branching !! *)
+        stmt.proof_state.me_only
         (Field.pack (hash_me_only me_only))
-      (* Has the local branching *)
     in
     ()
   in
-  main
+  stage main
 
 let pad_local_max_branchings
     (type prev_varss prev_valuess env max_branching branches)
@@ -801,6 +735,7 @@ let pad_local_max_branchings
   let module V = H2_1.To_vector (Vec) in
   V.f length (M.f local_max_branchings)
 
+(* The SNARK function for wrapping any proof coming from the given set of keys *)
 let wrap_main
     (type max_branching branches prev_varss prev_valuess env
     max_local_max_branchings)
@@ -833,10 +768,6 @@ let wrap_main
        ; pass_through } :
         _ Types.Dlog_based.Statement.t) =
     let open Dlog_main_inputs in
-    (* Pick tag in 0..(num_disjuncts - 1).
-       Ehh. Honestly better just to make it uniform in the step circuit,
-       less complicated I think.
-    *)
     let open Dmain in
     let prev_proof_state =
       let open Types.Pairing_based.Proof_state in
@@ -1374,7 +1305,7 @@ let make_step_data
   let lte = Nat.lte_exn self_width max_branching in
   let requests = Requests.Step.create () in
   let step ~step_domains =
-    step requests
+    step_main requests
       (Nat.Add.create max_branching)
       rule
       ~basic:
@@ -1386,6 +1317,7 @@ let make_step_data
       ~self_branches:branches ~branching ~local_signature:widths
       ~local_signature_length ~local_branches:heights ~local_branches_length
       ~lte ~self
+    |> unstage
   in
   let own_domains =
     let main =
@@ -1464,6 +1396,7 @@ module Wrap_domains (A : T0) (A_value : T0) = struct
       main
 end
 
+(* The prover for wrapping a proof *)
 let wrap (type max_branching max_local_max_branchings) max_branching
     (module Max_local_max_branchings : Hlist.Maxes.S
       with type ns = max_local_max_branchings
@@ -1690,6 +1623,7 @@ struct
     type t = Fq.t Dlog_marlin_types.Evals.t Triple.t
   end
 
+  (* The prover corresponding to the given inductive rule. *)
   let f (type self_branches prev_vars prev_values local_widths local_heights)
       (T branch_data :
         ( A.t
