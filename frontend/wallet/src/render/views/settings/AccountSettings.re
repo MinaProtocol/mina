@@ -439,7 +439,8 @@ module BlockRewards = {
   };
 };
 
-[@bs.scope "window"] [@bs.val] external showItemInFolder: string => unit;
+[@bs.scope "window"] [@bs.val]
+external showItemInFolder: string => unit = "showItemInFolder";
 
 module KeypathQueryString = [%graphql
   {|
