@@ -1,5 +1,13 @@
-type 'a t = {a: 'a; b: 'a; c: 'a} [@@deriving fields, bin_io, sexp]
+module Stable = struct
+  module V1 = struct
+    type 'a t = {a: 'a; b: 'a; c: 'a}
+    [@@deriving version, fields, bin_io, sexp]
+  end
 
+  module Latest = V1
+end
+
+include Stable.Latest
 module H_list = Snarky.H_list
 
 let to_hlist {a; b; c} = H_list.[a; b; c]

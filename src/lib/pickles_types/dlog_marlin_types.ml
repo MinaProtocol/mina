@@ -1,22 +1,42 @@
 open Tuple_lib
 open Core_kernel
 
+module Triple = struct
+  module Stable = struct
+    module V1 = struct
+      type 'a t = 'a * 'a * 'a [@@deriving version, bin_io]
+    end
+
+    module Latest = V1
+  end
+
+  include Stable.Latest
+end
+
 module Evals = struct
-  type 'a t =
-    { w_hat: 'a
-    ; z_hat_a: 'a
-    ; z_hat_b: 'a
-    ; h_1: 'a
-    ; h_2: 'a
-    ; h_3: 'a
-    ; row: 'a Abc.t
-    ; col: 'a Abc.t
-    ; value: 'a Abc.t
-    ; rc: 'a Abc.t
-    ; g_1: 'a
-    ; g_2: 'a
-    ; g_3: 'a }
-  [@@deriving fields, bin_io]
+  module Stable = struct
+    module V1 = struct
+      type 'a t =
+        { w_hat: 'a
+        ; z_hat_a: 'a
+        ; z_hat_b: 'a
+        ; h_1: 'a
+        ; h_2: 'a
+        ; h_3: 'a
+        ; row: 'a Abc.t
+        ; col: 'a Abc.t
+        ; value: 'a Abc.t
+        ; rc: 'a Abc.t
+        ; g_1: 'a
+        ; g_2: 'a
+        ; g_3: 'a }
+      [@@deriving version, fields, bin_io]
+    end
+
+    module Latest = V1
+  end
+
+  include Stable.Latest
 
   let to_vectors
       { w_hat
@@ -98,10 +118,17 @@ end
 
 module Openings = struct
   module Bulletproof = struct
-    type ('fq, 'g) t =
-      {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-    [@@deriving bin_io]
+    module Stable = struct
+      module V1 = struct
+        type ('fq, 'g) t =
+          {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
+        [@@deriving version, bin_io]
+      end
 
+      module Latest = V1
+    end
+
+    include Stable.Latest
     open Snarky.H_list
 
     let to_hlist {lr; z_1; z_2; delta; sg} = [lr; z_1; z_2; delta; sg]
@@ -119,9 +146,17 @@ module Openings = struct
 
   open Evals
 
-  type ('fq, 'g) t =
-    {proof: ('fq, 'g) Bulletproof.t; evals: 'fq Evals.t Triple.t}
-  [@@deriving bin_io]
+  module Stable = struct
+    module V1 = struct
+      type ('fq, 'g) t =
+        {proof: ('fq, 'g) Bulletproof.t; evals: 'fq Evals.Stable.V1.t Triple.t}
+      [@@deriving version, bin_io]
+    end
+
+    module Latest = V1
+  end
+
+  include Stable.Latest
 
   let to_hlist {proof; evals} = Snarky.H_list.[proof; evals]
 
