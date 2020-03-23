@@ -1,6 +1,14 @@
-open Core
-open Snark_params
-open Tick
+(* user_command_memo.ml *)
+
+[%%import "/src/config.mlh"]
+
+open Core_kernel
+
+[%%ifdef consensus_mechanism]
+
+open Snark_params.Tick
+
+[%%endif]
 
 exception Too_long_user_memo_input
 
@@ -17,6 +25,8 @@ module Stable : sig
   module Latest = V1
 end
 
+[%%ifdef consensus_mechanism]
+
 module Checked : sig
   type unchecked = t
 
@@ -24,6 +34,11 @@ module Checked : sig
 
   val constant : unchecked -> t
 end
+
+(** typ representation *)
+val typ : (Checked.t, t) Curve_choice.Tick0.Typ.t
+
+[%%endif]
 
 val dummy : t
 
@@ -78,6 +93,3 @@ val create_from_string : string -> t Or_error.t
 (** convert a memo to a list of bools
  *)
 val to_bits : t -> bool list
-
-(** typ representation *)
-val typ : (Checked.t, t) Curve_choice.Tick0.Typ.t

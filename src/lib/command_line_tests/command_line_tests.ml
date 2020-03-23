@@ -48,18 +48,24 @@ let%test_module "Command line tests" =
       Ok ()
 
     let start_daemon config_dir genesis_ledger_dir port =
+      let%bind working_dir = Sys.getcwd () in
+      Core.printf "Starting daemon inside %s\n" working_dir ;
       let%map _ =
         match%map
           Process.run ~prog:coda_exe
             ~args:
               [ "daemon"
+              ; "-working-dir"
+              ; working_dir
               ; "-background"
               ; "-client-port"
               ; sprintf "%d" port
               ; "-config-directory"
               ; config_dir
               ; "-genesis-ledger-dir"
-              ; genesis_ledger_dir ]
+              ; genesis_ledger_dir
+              ; "-current-fork-id"
+              ; "00000" ]
             ()
         with
         | Ok s ->

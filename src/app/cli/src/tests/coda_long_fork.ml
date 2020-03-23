@@ -6,7 +6,8 @@ let name = "coda-long-fork"
 let main n waiting_time () =
   let logger = Logger.create () in
   let keypairs =
-    List.map Test_genesis_ledger.accounts
+    List.map
+      (Lazy.force Test_genesis_ledger.accounts)
       ~f:Test_genesis_ledger.keypair_of_account_record_exn
   in
   let snark_work_public_keys i =
@@ -15,7 +16,7 @@ let main n waiting_time () =
       |> Signature_lib.Public_key.compress )
   in
   let%bind testnet =
-    Coda_worker_testnet.test logger n Option.some snark_work_public_keys
+    Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
       ~max_concurrent_connections:None
   in

@@ -14,7 +14,7 @@ let%test_module "Full_frontier tests" =
 
     let logger = Logger.null ()
 
-    let accounts_with_secret_keys = Test_genesis_ledger.accounts
+    let accounts_with_secret_keys = Lazy.force Test_genesis_ledger.accounts
 
     let max_length = 5
 
@@ -51,7 +51,8 @@ let%test_module "Full_frontier tests" =
       let root_data =
         let open Root_data in
         { transition=
-            External_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
+            External_transition.For_tests.genesis
+              ~genesis_ledger:Test_genesis_ledger.t
               ~base_proof:Precomputed_values.base_proof
         ; staged_ledger= Staged_ledger.create_exn ~ledger:root_ledger }
       in

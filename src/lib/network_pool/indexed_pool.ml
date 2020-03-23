@@ -11,7 +11,7 @@ open Signature_lib
    of currency, but a made up number will do for the testnets at least. See
    issue #2385.
 *)
-let replace_fee : Currency.Fee.t = Currency.Fee.of_int 5
+let replace_fee : Currency.Fee.t = Currency.Fee.of_int 5_000_000_000
 
 (* Invariants, maintained whenever a t is exposed from this module:
    * Iff a command is in all_by_fee it is also in all_by_sender.
@@ -345,23 +345,28 @@ let handle_committed_txn :
        t
     -> User_command.With_valid_signature.t
     -> Currency.Amount.t
-    -> t * User_command.With_valid_signature.t Sequence.t =
+    -> ( t * User_command.With_valid_signature.t Sequence.t
+       , [ `Queued_txns_by_sender of
+           string * User_command.With_valid_signature.t Sequence.t ] )
+       Result.t =
  fun t committed current_balance ->
   let committed' = (committed :> User_command.t) in
   let sender = User_command.sender committed' in
   let nonce_to_remove = User_command.nonce committed' in
   match Map.find t.all_by_sender sender with
   | None ->
-      (t, Sequence.empty)
+      Ok (t, Sequence.empty)
   | Some (cmds, currency_reserved) ->
       let first_cmd, rest_cmds = Option.value_exn (F_sequence.uncons cmds) in
       let first_nonce =
         first_cmd |> User_command.forget_check |> User_command.nonce
       in
       if Account_nonce.(nonce_to_remove <> first_nonce) then
-        failwith
-          "Tried to handle a committed transaction in the pool but its nonce \
-           doesn't match the head of the queue for that sender."
+        Error
+          (`Queued_txns_by_sender
+            ( "Tried to handle a committed transaction in the pool but its \
+               nonce doesn't match the head of the queue for that sender"
+            , F_sequence.to_seq cmds ))
       else
         let first_cmd_consumed =
           (* safe since we checked this when we added it to the pool originally *)
@@ -386,28 +391,30 @@ let handle_committed_txn :
         let t'' =
           Sequence.fold dropped_cmds ~init:t' ~f:remove_all_by_fee_exn
         in
-        ( { t'' with
-            all_by_sender=
-              ( if F_sequence.is_empty new_queued_cmds then
-                Map.remove t.all_by_sender sender
-              else
-                Map.set t.all_by_sender ~key:sender
-                  ~data:(new_queued_cmds, currency_reserved'') )
-          ; applicable_by_fee=
-              ( match F_sequence.uncons new_queued_cmds with
-              | None ->
-                  t''.applicable_by_fee
-              | Some (head_cmd, _) ->
-                  Map_set.insert
-                    (module User_command.With_valid_signature)
+        Ok
+          ( { t'' with
+              all_by_sender=
+                ( if F_sequence.is_empty new_queued_cmds then
+                  Map.remove t.all_by_sender sender
+                else
+                  Map.set t.all_by_sender ~key:sender
+                    ~data:(new_queued_cmds, currency_reserved'') )
+            ; applicable_by_fee=
+                ( match F_sequence.uncons new_queued_cmds with
+                | None ->
                     t''.applicable_by_fee
-                    (head_cmd |> User_command.forget_check |> User_command.fee)
-                    head_cmd ) }
-        , Sequence.append
-            ( if User_command.With_valid_signature.equal committed first_cmd
-            then Sequence.empty
-            else Sequence.singleton first_cmd )
-            dropped_cmds )
+                | Some (head_cmd, _) ->
+                    Map_set.insert
+                      (module User_command.With_valid_signature)
+                      t''.applicable_by_fee
+                      ( head_cmd |> User_command.forget_check
+                      |> User_command.fee )
+                      head_cmd ) }
+          , Sequence.append
+              ( if User_command.With_valid_signature.equal committed first_cmd
+              then Sequence.empty
+              else Sequence.singleton first_cmd )
+              dropped_cmds )
 
 let remove_lowest_fee : t -> User_command.With_valid_signature.t Sequence.t * t
     =
@@ -445,7 +452,7 @@ let rec add_from_gossip_exn :
     -> Account_nonce.t
     -> Currency.Amount.t
     -> ( t * User_command.With_valid_signature.t Sequence.t
-       , [ `Invalid_nonce
+       , [> `Invalid_nonce
          | `Insufficient_funds
          | `Insufficient_replace_fee
          | `Overflow ] )
@@ -758,7 +765,7 @@ let%test_module _ =
           Quickcheck.Generator.map ~f:Account_nonce.of_int
           @@ Int.gen_incl 0 1000
         in
-        let init_balance = Currency.Amount.of_int 100_000 in
+        let init_balance = Currency.Amount.of_int 100_000_000_000_000 in
         let%bind size = Quickcheck.Generator.size in
         let%bind amounts =
           Quickcheck.Generator.map ~f:Array.of_list
@@ -824,7 +831,9 @@ let%test_module _ =
           { replace_cmd_skeleton.payload with
             common=
               { replace_cmd_skeleton.payload.common with
-                fee= Currency.Fee.of_int (10 + (5 * (size + 1))) } }
+                fee=
+                  Currency.Fee.of_int ((10 + (5 * (size + 1))) * 1_000_000_000)
+              } }
         in
         let replace_cmd =
           User_command.For_tests.fake_sign sender replace_cmd_payload

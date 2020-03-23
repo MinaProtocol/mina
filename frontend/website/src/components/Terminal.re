@@ -85,12 +85,9 @@ let useIncrement = (~initial, ~total, ~increment, ~delay) => {
 };
 
 module Wrapper = {
-  [@bs.val] [@bs.module "react"] [@bs.scope "Children"]
-  external toArrayChildren: React.element => array(React.element) = "toArray";
-
   [@react.component]
   let make = (~lineDelay, ~children) => {
-    let arr = toArrayChildren(children);
+    let arr = ReactExt.Children.toArray(children);
     let total = Array.length(arr);
     let numDisplayed =
       useIncrement(
@@ -127,7 +124,7 @@ module Line = {
       );
     let displayed = String.sub(value, 0, numDisplayed);
     <div className=Style.item>
-      {ReactUtils.fromOpt(
+      {ReactExt.fromOpt(
          ~f=
            prompt =>
              <span className=Style.prompt> {React.string(prompt)} </span>,

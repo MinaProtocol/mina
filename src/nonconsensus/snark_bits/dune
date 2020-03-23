@@ -1,0 +1,9 @@
+(library
+ (name snark_bits_nonconsensus)
+ (public_name snark_bits_nonconsensus)
+ (library_flags -linkall)
+ (libraries fold_lib bitstring_lib core_kernel integers)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess
+  (pps ppx_coda ppx_optcomp ppx_let ppx_deriving.eq ppx_inline_test bisect_ppx -- -conditional))
+ (synopsis "Snark parameters"))

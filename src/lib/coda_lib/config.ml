@@ -8,7 +8,8 @@ open Signature_lib
 module Snark_worker_config = struct
   type t =
     { initial_snark_worker_key: Public_key.Compressed.t option
-    ; shutdown_on_disconnect: bool }
+    ; shutdown_on_disconnect: bool
+    ; num_threads: int option }
 end
 
 (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
@@ -23,8 +24,9 @@ type t =
   ; work_selection_method: (module Work_selector.Selection_method_intf)
   ; snark_worker_config: Snark_worker_config.t
   ; work_reassignment_wait: int
-  ; gossip_net_params: Gossip_net.Real.Config.t
+  ; gossip_net_params: Gossip_net.Libp2p.Config.t
   ; net_config: Coda_networking.Config.t
+  ; initial_fork_id: Fork_id.t
   ; snark_pool_disk_location: string
   ; wallets_disk_location: string
   ; persistent_root_location: string
@@ -40,5 +42,7 @@ type t =
   ; archive_process_location:
       Core.Host_and_port.t Cli_lib.Flag.Types.with_name option
         [@default None]
-  ; genesis_state_hash: State_hash.t }
+  ; demo_mode: bool [@default false]
+  ; genesis_state_hash: State_hash.t
+  ; log_block_creation: bool [@default false] }
 [@@deriving make]

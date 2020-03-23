@@ -2,9 +2,13 @@
 
 open Core_kernel
 
-[%%if defined consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 open Snark_params.Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
 
 [%%endif]
 
@@ -21,11 +25,13 @@ type t = Stable.Latest.t = Pos | Neg
 
 val to_field : t -> Field.t
 
+val of_field_exn : Field.t -> t
+
 val gen : t Quickcheck.Generator.t
 
 val negate : t -> t
 
-[%%if defined consensus_mechanism]
+[%%ifdef consensus_mechanism]
 
 type var = private Field.Var.t
 

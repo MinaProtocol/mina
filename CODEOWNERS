@@ -1,16 +1,16 @@
 /CODEOWNERS @imeckler @bkase
-/frontend/ @schmavery @bkase @figitaki @o1pranay
+/frontend/ @schmavery @bkase @figitaki
 /dockerfiles/ @nholland94 @yourbuddyconner @bkase @psteckler
 /rfcs/ @imeckler @es92 @bkase
 /scripts/ @nholland94 @yourbuddyconner @emberian @bkase @psteckler
 /Makefile @nholland94 @bkase @yourbuddyconner
 /src/config/dev.mlh @nholland94 @emberian @bkase
 /src/config/testnet_postake_medium_curves.mlh @nholland94 @bkase @emberian
-/CODE_OF_CONDUCT.md @imeckler @emberian @o1pranay
-/CONTRIBUTING.md @imeckler @emberian @o1pranay
+/CODE_OF_CONDUCT.md @imeckler @emberian
+/CONTRIBUTING.md @imeckler @emberian
 /LICENSE @imeckler
-/README.md @emberian @imeckler @o1pranay
-/README-dev.md @emberian @imeckler @o1pranay
+/README.md @emberian @imeckler
+/README-dev.md @emberian @imeckler
 
 /src/external/ @emberian @bkase @psteckler @imeckler
 
@@ -18,7 +18,6 @@
 /src/app/cli/src/tests @emberian @bkase @ghost-not-in-the-shell @deepthiskumar
 /src/app/cli/src/coda.ml @nholland94 @bkase @emberian @imeckler
 /src/app/cli/src/init @nholland94 @bkase @emberian @imeckler
-/src/app/kademlia-haskell/ @bkase @emberian @psteckler
 /src/app/libp2p_helper @emberian @bkase @nholland94
 /src/app/reformat/ @bkase
 /src/app/trace-tool/ @emberian @mrmr1993
@@ -33,7 +32,7 @@
 /src/lib/cli_lib/ @bkase @schmavery @figitaki
 /src/lib/coda_base/ @emberian @nholland94 @bkase @imeckler
 /src/lib/coda_commands @bkase @schmavery @figitaki
-/src/lib/coda_graphql @bkase @schmavery @o1pranay
+/src/lib/coda_graphql @bkase @schmavery
 /src/lib/coda_networking/ @emberian @nholland94
 /src/lib/coda_numbers/ @bkase @nholland94 @imeckler @mrmr1993
 /src/lib/coda_state/ @nholland94 @ghost-not-in-the-shell @deepthiskumar
@@ -49,8 +48,8 @@
 /src/lib/gossip_net/ @emberian @bkase @nholland94
 /src/lib/group_map/ @rbkhmrcr @vanishreerao @imeckler
 /src/lib/hash_prefixes/ @rbkhmrcr @vanishreerao @imeckler
+/src/lib/integers_stubs_js @mrmr1993 @emberian
 /src/lib/interruptible/ @bkase @nholland94
-/src/lib/kademlia @bkase @emberian @psteckler
 /src/lib/key_value_database/ @bkase @nholland94 @psteckler
 /src/lib/keys_lib/ @emberian @mrmr1993 @imeckler
 /src/lib/ledger_catchup/ @nholland94 @ghost-not-in-the-shell
@@ -122,3 +121,5 @@
 /src/lib/unsigned_extended/ @bkase @mrmr1993 @imeckler
 /src/lib/vrf_lib/ @nholland94 @mrmr1993 @bkase @imeckler
 /src/lib/work_selector/ @deepthiskumar @nholland94
+
+/src/nonconsensus @psteckler @deepthiskumar

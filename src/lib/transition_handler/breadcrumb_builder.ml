@@ -3,6 +3,7 @@ open Core
 open Async
 open Cache_lib
 open Coda_transition
+open Network_peer
 
 let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier
     ~initial_hash subtrees_of_enveloped_transitions =
@@ -126,7 +127,7 @@ let build_subtrees_of_breadcrumbs ~logger ~verifier ~trust_system ~frontier
                               failwith
                                 "build_subtrees_of_breadcrumbs: sender of \
                                  external transition should not be Local"
-                          | Remote inet_addr ->
+                          | Remote (inet_addr, _peer_id) ->
                               Set.add inet_addrs inet_addr )
                     in
                     let ip_addresses = Set.to_list ip_address_set in

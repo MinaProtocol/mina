@@ -1,0 +1,6 @@
+(library
+ (name node_addrs_and_ports)
+ (public_name node_addrs_and_ports)
+ (libraries core async network_peer yojson)
+ (inline_tests)
+ (preprocess (pps ppx_coda ppx_jane ppx_let ppx_deriving_yojson)))

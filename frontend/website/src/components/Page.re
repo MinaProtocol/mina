@@ -76,6 +76,9 @@ module Footer = {
             <Link link="https://github.com/CodaProtocol/coda" name="github">
               {React.string("GitHub")}
             </Link>
+            <Link link="https://codawiki.com" name="wiki">
+              {React.string("Community Wiki")}
+            </Link>
             <Link link="https://forums.codaprotocol.com" name="discourse">
               {React.string("Discourse")}
             </Link>
@@ -109,7 +112,7 @@ module Footer = {
               style([textAlign(`center), color(Theme.Colors.saville)]),
             ])
           )>
-          {React.string({j|© 2019 O(1) Labs|j})}
+          {React.string({j|© 2020 O(1) Labs|j})}
         </p>
       </section>
     </footer>;

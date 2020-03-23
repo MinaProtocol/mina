@@ -4,11 +4,12 @@ open Frontier_base
 module T = struct
   type t = unit
 
-  type view = Diff.Full.E.t list
+  type view = Diff.Full.With_mutant.t list
 
   let create ~logger:_ _ = ((), [])
 
-  let handle_diffs () _ diffs : view option = Some diffs
+  let handle_diffs () _ diffs_with_mutants : view option =
+    Some diffs_with_mutants
 end
 
 include T

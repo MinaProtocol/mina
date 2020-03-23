@@ -103,7 +103,7 @@ end
 
 let generate_next_state ~previous_protocol_state ~time_controller
     ~staged_ledger ~transactions ~get_completed_work ~logger ~coinbase_receiver
-    ~(keypair : Keypair.t) ~block_data ~scheduled_time =
+    ~(keypair : Keypair.t) ~block_data ~scheduled_time ~log_block_creation =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
   let previous_protocol_state_body_hash =
@@ -115,7 +115,8 @@ let generate_next_state ~previous_protocol_state ~time_controller
       let diff =
         measure "create_diff" (fun () ->
             Staged_ledger.create_diff staged_ledger ~self ~coinbase_receiver
-              ~logger ~transactions_by_fee:transactions ~get_completed_work )
+              ~logger ~transactions_by_fee:transactions ~get_completed_work
+              ~log_block_creation )
       in
       match%map
         Staged_ledger.apply_diff_unchecked staged_ledger diff
@@ -250,7 +251,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
-    ~set_next_producer_timing =
+    ~set_next_producer_timing ~log_block_creation =
   trace "block_producer" (fun () ->
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -282,7 +283,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
               )
             in
             let transactions =
-              Network_pool.Transaction_pool.Resource_pool.transactions
+              Network_pool.Transaction_pool.Resource_pool.transactions ~logger
                 transaction_resource_pool
             in
             trace_event "waiting for ivar..." ;
@@ -294,6 +295,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 ~block_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
+                ~log_block_creation
             in
             trace_event "next state generated" ;
             match next_state_opt with
@@ -397,9 +399,12 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                             ; data=
                                 External_transition.create ~protocol_state
                                   ~protocol_state_proof ~staged_ledger_diff
-                                  ~delta_transition_chain_proof }
+                                  ~validation_callback:Fn.ignore
+                                  ~delta_transition_chain_proof () }
                           |> External_transition.skip_time_received_validation
                                `This_transition_was_not_received_via_gossip
+                          |> External_transition.skip_fork_ids_validation
+                               `This_transition_has_valid_fork_ids
                           |> External_transition
                              .validate_genesis_protocol_state
                                ~genesis_state_hash:
@@ -588,7 +593,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   = None ) ;
                 let now = Time.now time_controller in
                 let next_producer_timing =
-                  measure "asking conensus what to do" (fun () ->
+                  measure "asking consensus what to do" (fun () ->
                       Consensus.Hooks.next_producer_timing (time_to_ms now)
                         consensus_state ~local_state:consensus_local_state
                         ~keypairs ~logger )

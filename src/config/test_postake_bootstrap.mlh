@@ -7,13 +7,14 @@
 [%%import "/src/config/proof_level/none.mlh"]
 [%%import "/src/config/txpool_size.mlh"]
 [%%import "/src/config/account_creation_fee/standard.mlh"]
+[%%import "/src/config/fork_id/current.mlh"]
 
 [%%define time_offsets true]
 [%%define fake_hash true]
 
 [%%define genesis_ledger "test"]
 [%%define genesis_state_timestamp "2019-01-30 12:00:00-08:00"]
-[%%define block_window_duration 1000]
+[%%define block_window_duration 1500]
 
 [%%define integration_tests true]
 [%%define force_updates false]

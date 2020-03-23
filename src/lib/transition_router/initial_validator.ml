@@ -5,15 +5,16 @@ open Coda_base
 open Coda_state
 open Signature_lib
 open Coda_transition
-
-let max_blocklength_observed = ref 0
+open Network_peer
 
 type validation_error =
   [ `Invalid_time_received of [`Too_early | `Too_late of int64]
   | `Invalid_genesis_protocol_state
   | `Invalid_proof
   | `Invalid_delta_transition_chain_proof
-  | `Verifier_error of Error.t ]
+  | `Verifier_error of Error.t
+  | `Mismatched_fork_id
+  | `Invalid_fork_id ]
 
 let handle_validation_error ~logger ~trust_system ~sender ~state_hash
     (error : validation_error) =
@@ -52,6 +53,10 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash
         (Some
            ( "off by $slot_diff slots"
            , [("slot_diff", `String (Int64.to_string slot_diff))] ))
+  | `Invalid_fork_id ->
+      punish Sent_invalid_fork_id None
+  | `Mismatched_fork_id ->
+      punish Sent_mismatched_fork_id None
 
 module Duplicate_block_detector = struct
   (* maintain a map from block producer key, epoch, slot to state hashes *)
@@ -144,7 +149,9 @@ let run ~logger ~trust_system ~verifier ~transition_reader
   don't_wait_for
     (Reader.iter transition_reader ~f:(fun network_transition ->
          if Ivar.is_full initialization_finish_signal then (
-           let `Transition transition_env, `Time_received time_received =
+           let ( `Transition transition_env
+               , `Time_received time_received
+               , `Valid_cb is_valid_cb ) =
              network_transition
            in
            let transition_with_hash =
@@ -165,13 +172,26 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                |> defer (validate_time_received ~time_received)
                >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
                >>= validate_proof ~verifier
-               >>= defer validate_delta_transition_chain)
+               >>= defer validate_delta_transition_chain
+               >>= defer validate_fork_ids)
            with
            | Ok verified_transition ->
+               External_transition.poke_validation_callback
+                 (Envelope.Incoming.data transition_env)
+                 is_valid_cb ;
                Envelope.Incoming.wrap ~data:verified_transition ~sender
                |> Writer.write valid_transition_writer ;
+               let blockchain_length =
+                 External_transition.Initial_validated.consensus_state
+                   verified_transition
+                 |> Consensus.Data.Consensus_state.blockchain_length
+                 |> Coda_numbers.Length.to_int
+               in
+               Coda_metrics.Transition_frontier.update_max_blocklength_observed
+                 blockchain_length ;
                return ()
            | Error error ->
+               is_valid_cb false ;
                handle_validation_error ~logger ~trust_system ~sender
                  ~state_hash:(With_hash.hash transition_with_hash)
                  error )

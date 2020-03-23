@@ -46,6 +46,8 @@ module Time : sig
 
     val of_time_span : Time.Span.t -> t
 
+    val to_time_span : t -> Time.Span.t
+
     include
       Tick.Snarkable.Bits.Faithful
       with type Unpacked.value = t

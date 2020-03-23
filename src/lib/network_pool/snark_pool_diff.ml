@@ -1,43 +1,24 @@
 open Core_kernel
 open Async_kernel
 open Module_version
+module Work = Transaction_snark_work.Statement
+module Ledger_proof = Ledger_proof
+module Work_info = Transaction_snark_work.Info
+open Network_peer
 
-module Make (Ledger_proof : sig
-  type t [@@deriving bin_io, compare, sexp, to_yojson, version]
-end) (Work : sig
-  type t [@@deriving sexp]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type t [@@deriving bin_io, compare, hash, sexp, to_yojson, version]
-      end
-    end
-    with type V1.t = t
-
-  include Hashable.S with type t := t
-
-  val compact_json : t -> Yojson.Safe.json
-end) (Work_info : sig
-  type t [@@deriving sexp]
-end)
-(Transition_frontier : T)
-(Pool : Intf.Snark_resource_pool_intf
-        with type work := Work.t
-         and type transition_frontier := Transition_frontier.t
-         and type ledger_proof := Ledger_proof.t
-         and type work_info := Work_info.t) :
-  Intf.Snark_pool_diff_intf
-  with type ledger_proof := Ledger_proof.t
-   and type work := Work.t
-   and type resource_pool := Pool.t = struct
+module Make
+    (Transition_frontier : T)
+    (Pool : Intf.Snark_resource_pool_intf
+            with type transition_frontier := Transition_frontier.t) :
+  Intf.Snark_pool_diff_intf with type resource_pool := Pool.t = struct
   module Stable = struct
     module V1 = struct
       module T = struct
         type t =
           | Add_solved_work of
-              Work.Stable.V1.t
-              * Ledger_proof.t One_or_two.Stable.V1.t Priced_proof.Stable.V1.t
+              Transaction_snark_work.Statement.Stable.V1.t
+              * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+                Priced_proof.Stable.V1.t
         [@@deriving bin_io, compare, sexp, to_yojson, version]
       end
 
@@ -60,8 +41,24 @@ end)
   (* bin_io omitted *)
   type t = Stable.Latest.t =
     | Add_solved_work of
-        Work.Stable.V1.t * Ledger_proof.t One_or_two.t Priced_proof.Stable.V1.t
+        Work.Stable.V1.t
+        * Ledger_proof.Stable.V1.t One_or_two.t Priced_proof.Stable.V1.t
   [@@deriving compare, sexp, to_yojson]
+
+  module Rejected = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t [@@deriving sexp, yojson]
+  end
+
+  type rejected = Rejected.t [@@deriving sexp, yojson]
 
   let compact_json = function
     | Add_solved_work (work, {proof= _; fee= {fee; prover}}) ->
@@ -77,34 +74,48 @@ end)
           (Yojson.Safe.to_string @@ Work.compact_json work)
           (Yojson.Safe.to_string @@ Coda_base.Fee_with_prover.to_yojson fee)
 
-  let apply (pool : Pool.t) (t : t Envelope.Incoming.t) :
-      t Or_error.t Deferred.t =
-    let open Deferred.Or_error.Let_syntax in
+  let is_empty _ = false
+
+  let of_result
+      (res :
+        ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t
+          Snark_work_lib.Work.Spec.t
+        , Ledger_proof.t )
+        Snark_work_lib.Work.Result.t) =
+    Add_solved_work
+      ( One_or_two.map res.spec.instances
+          ~f:Snark_work_lib.Work.Single.Spec.statement
+      , {proof= res.proofs; fee= {fee= res.spec.fee; prover= res.prover}} )
+
+  let unsafe_apply (pool : Pool.t) (t : t Envelope.Incoming.t) =
     let {Envelope.Incoming.data= diff; sender} = t in
     let is_local = match sender with Local -> true | _ -> false in
     let to_or_error = function
       | `Statement_not_referenced ->
-          Or_error.error_string "statement not referenced"
+          Error (`Other (Error.of_string "statement not referenced"))
       | `Added ->
-          Ok diff
+          Ok (diff, ())
     in
     match diff with
     | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) -> (
         let reject_and_log_if_local reason =
-          if is_local then
-            Logger.warn (Pool.get_logger pool) ~module_:__MODULE__
+          if is_local then (
+            Logger.trace (Pool.get_logger pool) ~module_:__MODULE__
               ~location:__LOC__
               "Rejecting locally generated snark work $work, %s" reason
               ~metadata:[("work", Work.compact_json work)] ;
-          Deferred.return (Or_error.error_string reason)
+            Deferred.return (Error (`Locally_generated (diff, ()))) )
+          else Deferred.return (Error (`Other (Error.of_string reason)))
         in
         let check_and_add () =
-          let%bind () =
+          match%map
             Pool.verify_and_act pool ~work:(work, p)
               ~sender:(Envelope.Incoming.sender t)
-          in
-          Pool.add_snark ~is_local pool ~work ~proof ~fee
-          |> to_or_error |> Deferred.return
+          with
+          | Ok () ->
+              Pool.add_snark ~is_local pool ~work ~proof ~fee |> to_or_error
+          | Error e ->
+              Error (`Other e)
         in
         match Pool.request_proof pool work with
         | None ->

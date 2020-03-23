@@ -1,11 +1,24 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
-open Snark_bits
 open Fold_lib
 include Intf
 module Intf = Intf
 
+[%%ifdef
+consensus_mechanism]
+
+open Snark_bits
+
 let zero_checked =
   Snarky_integer.Integer.constant ~m:Snark_params.Tick.m Bigint.zero
+
+[%%else]
+
+open Snark_bits_nonconsensus
+
+[%%endif]
 
 module Make (N : sig
   type t [@@deriving sexp, compare, hash]
@@ -23,6 +36,9 @@ struct
   include Comparable.Make (N)
 
   include (N : module type of N with type t := t)
+
+  [%%ifdef
+  consensus_mechanism]
 
   module Checked = struct
     open Bitstring_lib
@@ -118,15 +134,17 @@ struct
   (* warning: this typ does not work correctly with the generic if_ *)
   let typ = Checked.typ
 
+  let var_to_bits var =
+    Snarky_integer.Integer.to_bits ~length:N.length_in_bits
+      ~m:Snark_params.Tick.m var
+
+  [%%endif]
+
   module Bits = Bits
 
   let to_bits = Bits.to_bits
 
   let of_bits = Bits.of_bits
-
-  let var_to_bits var =
-    Snarky_integer.Integer.to_bits ~length:N.length_in_bits
-      ~m:Snark_params.Tick.m var
 
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 
