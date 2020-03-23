@@ -15,7 +15,7 @@
     "react-intl": "^3.6.2",
     "react-modal": "^3.8.1",
     "react-waypoint": "^9.0.2",
-    "reason-apollo": "github:yawaramin/reason-apollo#bugfix/226-option-annotation",
+    "reason-apollo": "^0.19.0",
     "reason-react": "^0.7.0",
     "tablecloth-bucklescript": "file:./tablecloth/bs"
   },
