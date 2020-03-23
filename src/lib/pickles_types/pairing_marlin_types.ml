@@ -329,8 +329,6 @@ module Accumulator = struct
         type 'g t = {r_f_minus_r_v_plus_rz_pi: 'g; r_pi: 'g}
         [@@deriving fields, sexp]
       end
-
-      module Latest = V1
     end]
 
     type 'g t = 'g Stable.Latest.t = {r_f_minus_r_v_plus_rz_pi: 'g; r_pi: 'g}
