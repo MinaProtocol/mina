@@ -109,9 +109,37 @@ module Keypair = struct
 
   type t = Fq_index.t
 
-  let urs =
-    let path = "/home/izzy/pickles/dlog-urs" in
-    lazy (Snarky_bn382.Fq_urs.read path)
+  let set_urs_info, load_urs =
+    let urs_info = Set_once.create () in
+    let urs = ref None in
+    let set_urs_info ?(degree = 1 lsl 20) path =
+      Set_once.set_exn urs_info Lexing.dummy_pos (degree, path)
+    in
+    let load () =
+      match !urs with
+      | Some urs ->
+          urs
+      | None ->
+          let degree, path =
+            match Set_once.get urs_info with
+            | None ->
+                failwith "Dlog_based.urs: Info not set"
+            | Some t ->
+                t
+          in
+          let u =
+            if Sys.file_exists path then Snarky_bn382.Fq_urs.read path
+            else
+              let urs =
+                Snarky_bn382.Fq_urs.create (Unsigned.Size_t.of_int degree)
+              in
+              Snarky_bn382.Fq_urs.write urs path ;
+              urs
+          in
+          urs := Some u ;
+          u
+    in
+    (set_urs_info, load)
 
   let create
       { R1cs_constraint_system.public_input_size
@@ -122,13 +150,13 @@ module Keypair = struct
     Fq_index.create a b c
       (Unsigned.Size_t.of_int vars)
       (Unsigned.Size_t.of_int (public_input_size + 1))
-      (Lazy.force urs)
+      (load_urs ())
 
   let vk t = Fq_verifier_index.create t
 
   let pk = Fn.id
 
-  open Rugelach_types
+  open Pickles_types
 
   let vk_commitments t : G.Affine.t Abc.t Matrix_evals.t =
     { row=
