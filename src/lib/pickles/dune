@@ -1,7 +1,7 @@
 (library
   (inline_tests)
-  (name double_marlin)
-  (public_name double_marlin)
+  (name pickles)
+  (public_name pickles)
   (flags -warn-error -27)
   (preprocess (pps ppx_coda ppx_jane ppx_deriving.std))
   (libraries
