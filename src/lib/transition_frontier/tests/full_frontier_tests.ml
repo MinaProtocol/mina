@@ -51,7 +51,8 @@ let%test_module "Full_frontier tests" =
       let root_data =
         let open Root_data in
         { transition=
-            External_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
+            External_transition.For_tests.genesis
+              ~genesis_ledger:Test_genesis_ledger.t
               ~base_proof:Precomputed_values.base_proof
         ; staged_ledger= Staged_ledger.create_exn ~ledger:root_ledger }
       in

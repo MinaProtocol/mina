@@ -35,7 +35,7 @@ module Uri : sig
   end
 
   module Archive : sig
-    val hasura : Uri.t Types.with_name Command.Spec.param
+    val postgres : Uri.t Types.with_name Command.Spec.param
   end
 end
 
