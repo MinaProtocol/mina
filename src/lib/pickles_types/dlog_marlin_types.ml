@@ -2,18 +2,18 @@ open Tuple_lib
 open Core_kernel
 
 module Triple = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = 'a * 'a * 'a [@@deriving version, bin_io]
+      type 'a t = 'a * 'a * 'a
     end
+  end]
 
-    module Latest = V1
-  end
-
-  include Stable.Latest
+  type 'a t = 'a Stable.Latest.t
 end
 
 module Evals = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
       type 'a t =
@@ -23,20 +23,32 @@ module Evals = struct
         ; h_1: 'a
         ; h_2: 'a
         ; h_3: 'a
-        ; row: 'a Abc.t
-        ; col: 'a Abc.t
-        ; value: 'a Abc.t
-        ; rc: 'a Abc.t
+        ; row: 'a Abc.Stable.V1.t
+        ; col: 'a Abc.Stable.V1.t
+        ; value: 'a Abc.Stable.V1.t
+        ; rc: 'a Abc.Stable.V1.t
         ; g_1: 'a
         ; g_2: 'a
         ; g_3: 'a }
-      [@@deriving version, fields, bin_io]
+      [@@deriving fields]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  include Stable.Latest
+  type 'a t = 'a Stable.Latest.t =
+    { w_hat: 'a
+    ; z_hat_a: 'a
+    ; z_hat_b: 'a
+    ; h_1: 'a
+    ; h_2: 'a
+    ; h_3: 'a
+    ; row: 'a Abc.t
+    ; col: 'a Abc.t
+    ; value: 'a Abc.t
+    ; rc: 'a Abc.t
+    ; g_1: 'a
+    ; g_2: 'a
+    ; g_3: 'a }
+  [@@deriving fields]
 
   let to_vectors
       { w_hat
@@ -118,17 +130,17 @@ end
 
 module Openings = struct
   module Bulletproof = struct
+    [%%versioned
     module Stable = struct
       module V1 = struct
         type ('fq, 'g) t =
           {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-        [@@deriving version, bin_io]
       end
+    end]
 
-      module Latest = V1
-    end
+    type ('fq, 'g) t = ('fq, 'g) Stable.Latest.t =
+      {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
 
-    include Stable.Latest
     open Snarky.H_list
 
     let to_hlist {lr; z_1; z_2; delta; sg} = [lr; z_1; z_2; delta; sg]
@@ -146,17 +158,17 @@ module Openings = struct
 
   open Evals
 
+  [%%versioned
   module Stable = struct
     module V1 = struct
       type ('fq, 'g) t =
-        {proof: ('fq, 'g) Bulletproof.t; evals: 'fq Evals.Stable.V1.t Triple.t}
-      [@@deriving version, bin_io]
+        { proof: ('fq, 'g) Bulletproof.Stable.V1.t
+        ; evals: 'fq Evals.Stable.V1.t Triple.Stable.V1.t }
     end
+  end]
 
-    module Latest = V1
-  end
-
-  include Stable.Latest
+  type ('fq, 'g) t = ('fq, 'g) Stable.Latest.t =
+    {proof: ('fq, 'g) Bulletproof.t; evals: 'fq Evals.t Triple.t}
 
   let to_hlist {proof; evals} = Snarky.H_list.[proof; evals]
 

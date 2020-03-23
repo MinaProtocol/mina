@@ -59,14 +59,14 @@ module Style = {
 };
 
 [@react.component]
-let make = (~labelStep, ~label, ~image, ~buttonLabel, ~buttonLink) => {
+let make = (~target=?, ~labelStep, ~label, ~image, ~buttonLabel, ~buttonLink) => {
   <div className=Style.container ariaLabel=label>
     <label className=Style.label>
       <span className=Style.labelSemiBold> {React.string(labelStep)} </span>
       {React.string(label)}
     </label>
     <img src=image className=Style.image />
-    <a className=Style.ctaButton href=buttonLink>
+    <a ?target className=Style.ctaButton href=buttonLink>
       {React.string(buttonLabel)}
     </a>
   </div>;
