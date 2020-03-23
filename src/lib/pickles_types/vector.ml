@@ -35,25 +35,25 @@ let rec map2 : type a b c n.
   | x :: xs, y :: ys ->
       f x y :: map2 xs ys ~f
 
-let rec head_off : type xs y n.
-       (xs, n s) Hlist.Hlist2(T).t
-    -> xs Hlist.HlistId.t * (xs, n) Hlist.Hlist2(T).t =
+let rec hhead_off : type xs y n.
+       (xs, n s) Hlist0.H1_1(T).t
+    -> xs Hlist0.HlistId.t * (xs, n) Hlist0.H1_1(T).t =
  fun xss ->
   match xss with
   | [] ->
       ([], [])
   | (x :: xs) :: xss ->
-      let hds, tls = head_off xss in
+      let hds, tls = hhead_off xss in
       (x :: hds, xs :: tls)
 
 let rec mapn : type xs y n.
-    (xs, n) Hlist.Hlist2(T).t -> f:(xs Hlist.HlistId.t -> y) -> (y, n) t =
+    (xs, n) Hlist0.H1_1(T).t -> f:(xs Hlist0.HlistId.t -> y) -> (y, n) t =
  fun xss ~f ->
   match xss with
   | [] :: xss ->
       []
   | (_ :: _) :: _ ->
-      let hds, tls = head_off xss in
+      let hds, tls = hhead_off xss in
       f hds :: mapn tls ~f
   | [] ->
       failwith "mapn: Empty args"
@@ -91,6 +91,12 @@ let rec fold_map : type acc a b n.
 
 let rec map : type a b n. (a, n) t -> f:(a -> b) -> (b, n) t =
  fun t ~f -> match t with [] -> [] | x :: xs -> f x :: map xs ~f
+
+let mapi (type a b m) (t : (a, m) t) ~(f : int -> a -> b) =
+  let rec go : type n. int -> (a, n) t -> (b, n) t =
+   fun i t -> match t with [] -> [] | x :: xs -> f i x :: go (i + 1) xs
+  in
+  go 0 t
 
 let unzip ts = (map ts ~f:fst, map ts ~f:snd)
 
@@ -148,6 +154,13 @@ let rec fold : type acc a n. (a, n) t -> f:(acc -> a -> acc) -> init:acc -> acc
       fold xs ~f ~init:acc
 
 let reduce (init :: xs) ~f = fold xs ~f ~init
+
+let reduce_exn (type n) (t : (_, n) t) ~f =
+  match t with
+  | [] ->
+      failwith "reduce_exn: empty list"
+  | init :: xs ->
+      fold xs ~f ~init
 
 open Core_kernel
 
@@ -299,3 +312,41 @@ let rec append : type n m n_m a.
       t2
   | x :: t1, S adds ->
       x :: append t1 t2 adds
+
+let rec transpose : type a n m. ((a, n) t, m) t -> ((a, m) t, n) t =
+ fun xss ->
+  match xss with
+  | [] ->
+      failwith "transpose: empty list"
+  | [] :: _ ->
+      []
+  | (_ :: _) :: _ ->
+      let heads, tails = unzip (map xss ~f:(fun (x :: xs) -> (x, xs))) in
+      heads :: transpose tails
+
+let rec trim : type a n m. (a, m) t -> (n, m) Nat.Lte.t -> (a, n) t =
+ fun v p -> match (v, p) with _, Z -> [] | x :: xs, S p -> x :: trim xs p
+
+let rec extend_exn : type n m a. (a, n) t -> m Nat.t -> a -> (a, m) t =
+ fun v m default ->
+  match (v, m) with
+  | [], Z ->
+      []
+  | [], S n ->
+      default :: extend_exn [] n default
+  | x :: xs, Z ->
+      failwith "extend_exn: list too long"
+  | x :: xs, S m ->
+      let extended = extend_exn xs m default in
+      x :: extended
+
+let rec extend : type a n m.
+    (a, n) t -> (n, m) Nat.Lte.t -> m Nat.t -> a -> (a, m) t =
+ fun v p m default ->
+  match (v, p, m) with
+  | _, Z, Z ->
+      []
+  | _, Z, S m ->
+      default :: extend [] Z m default
+  | x :: xs, S p, S m ->
+      x :: extend xs p m default

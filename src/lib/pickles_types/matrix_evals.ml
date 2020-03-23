@@ -13,3 +13,9 @@ let typ g =
 
 let map {row; col; value; rc} ~f =
   {row= f row; col= f col; value= f value; rc= f rc}
+
+let map2 t1 t2 ~f =
+  { row= f t1.row t2.row
+  ; col= f t1.col t2.col
+  ; value= f t1.value t2.value
+  ; rc= f t1.rc t2.rc }
