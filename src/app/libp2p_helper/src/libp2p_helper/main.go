@@ -1010,8 +1010,9 @@ func main() {
 	}()
 
 	lines := bufio.NewScanner(os.Stdin)
-	// 11MiB buffer size, larger than the 10.66MB minimum for 8MiB to be b64'd
-	bufsize := (1024 * 1024) * 11
+	// 22MiB buffer size, larger than the 21.33MB minimum for 16MiB to be b64'd
+	// 4 * (2^24/3) / 2^20 = 21.33
+	bufsize := (1024 * 1024) * 22
 	lines.Buffer(make([]byte, bufsize), bufsize)
 	out := bufio.NewWriter(os.Stdout)
 
