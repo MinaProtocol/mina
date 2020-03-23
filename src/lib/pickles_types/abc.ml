@@ -1,13 +1,12 @@
+[%%versioned
 module Stable = struct
   module V1 = struct
-    type 'a t = {a: 'a; b: 'a; c: 'a}
-    [@@deriving version, fields, bin_io, sexp]
+    type 'a t = {a: 'a; b: 'a; c: 'a} [@@deriving fields, sexp]
   end
+end]
 
-  module Latest = V1
-end
+type 'a t = 'a Stable.Latest.t = {a: 'a; b: 'a; c: 'a}
 
-include Stable.Latest
 module H_list = Snarky.H_list
 
 let to_hlist {a; b; c} = H_list.[a; b; c]

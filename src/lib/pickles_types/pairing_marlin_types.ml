@@ -5,6 +5,7 @@ module Typ = Snarky.Typ
 module Evals = struct
   open Vector
 
+  [%%versioned
   module Stable = struct
     module V1 = struct
       type 'a t =
@@ -21,13 +22,24 @@ module Evals = struct
         ; col: 'a Abc.Stable.V1.t
         ; value: 'a Abc.Stable.V1.t
         ; rc: 'a Abc.Stable.V1.t }
-      [@@deriving version, fields, bin_io]
+      [@@deriving fields]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  include Stable.Latest
+  type 'a t = 'a Stable.Latest.t =
+    { w_hat: 'a
+    ; z_hat_a: 'a
+    ; z_hat_b: 'a
+    ; g_1: 'a
+    ; h_1: 'a
+    ; g_2: 'a
+    ; h_2: 'a
+    ; g_3: 'a
+    ; h_3: 'a
+    ; row: 'a Abc.t
+    ; col: 'a Abc.t
+    ; value: 'a Abc.t
+    ; rc: 'a Abc.t }
 
   (* This is just the order used for iterating when absorbing the evaluations
      into the sponge. *)
@@ -219,29 +231,28 @@ module Accumulator = struct
     module Shift = Int
 
     module Unshifted_accumulators = struct
+      [%%versioned
       module Stable = struct
         module V1 = struct
-          type 'a t = 'a Shift.Map.t
-          [@@deriving version {asserted}, sexp, bin_io]
+          type 'a t = 'a Core_kernel.Shift.Map.t [@@deriving sexp]
         end
+      end]
 
-        module Latest = V1
-      end
-
-      include Stable.Latest
+      type 'a t = 'a Stable.Latest.t
     end
 
+    [%%versioned
     module Stable = struct
       module V1 = struct
         type ('g, 'unshifted) t =
           {shifted_accumulator: 'g; unshifted_accumulators: 'unshifted}
-        [@@deriving version, fields, bin_io, sexp]
+        [@@deriving fields, sexp]
       end
+    end]
 
-      module Latest = V1
-    end
-
-    include Stable.Latest
+    type ('g, 'unshifted) t = ('g, 'unshifted) Stable.Latest.t =
+      {shifted_accumulator: 'g; unshifted_accumulators: 'unshifted}
+    [@@deriving fields, sexp]
 
     let to_hlist {shifted_accumulator; unshifted_accumulators} =
       H_list.[shifted_accumulator; unshifted_accumulators]
@@ -312,16 +323,18 @@ module Accumulator = struct
 
        e(f - [v] + z pi, H) = e(pi, beta*H)
     *)
+    [%%versioned
     module Stable = struct
       module V1 = struct
         type 'g t = {r_f_minus_r_v_plus_rz_pi: 'g; r_pi: 'g}
-        [@@deriving version, fields, bin_io, sexp]
+        [@@deriving fields, sexp]
       end
 
       module Latest = V1
-    end
+    end]
 
-    include Stable.Latest
+    type 'g t = 'g Stable.Latest.t = {r_f_minus_r_v_plus_rz_pi: 'g; r_pi: 'g}
+    [@@deriving fields, sexp]
 
     let to_hlist {r_f_minus_r_v_plus_rz_pi; r_pi} =
       H_list.[r_f_minus_r_v_plus_rz_pi; r_pi]
@@ -347,18 +360,20 @@ module Accumulator = struct
       ; r_pi= f t1.r_pi t2.r_pi }
   end
 
+  [%%versioned
   module Stable = struct
     module V1 = struct
       type ('g, 'unshifted) t =
         { opening_check: 'g Opening_check.t
         ; degree_bound_checks: ('g, 'unshifted) Degree_bound_checks.t }
-      [@@deriving version, fields, bin_io, sexp]
+      [@@deriving fields, sexp]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  include Stable.Latest
+  type ('g, 'unshifted) t = ('g, 'unshifted) Stable.Latest.t =
+    { opening_check: 'g Opening_check.t
+    ; degree_bound_checks: ('g, 'unshifted) Degree_bound_checks.t }
+  [@@deriving fields, sexp]
 
   let to_hlist {opening_check; degree_bound_checks} =
     H_list.[opening_check; degree_bound_checks]
@@ -396,16 +411,17 @@ module Accumulator = struct
 end
 
 module Opening = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
       type ('proof, 'values) t = {proof: 'proof; values: 'values}
-      [@@deriving version, fields, bin_io]
+      [@@deriving fields]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  include Stable.Latest
+  type ('proof, 'values) t = ('proof, 'values) Stable.Latest.t =
+    {proof: 'proof; values: 'values}
+  [@@deriving fields]
 
   let to_hlist {proof; values} = H_list.[proof; values]
 
@@ -419,17 +435,16 @@ end
 module Openings = struct
   open Evals
 
+  [%%versioned
   module Stable = struct
     module V1 = struct
       type ('proof, 'fp) t =
         {proofs: 'proof * 'proof * 'proof; evals: 'fp Evals.t}
-      [@@deriving version, bin_io]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  include Stable.Latest
+  type ('proof, 'fp) t = ('proof, 'fp) Stable.Latest.t =
+    {proofs: 'proof * 'proof * 'proof; evals: 'fp Evals.t}
 
   let to_hlist {proofs; evals} = H_list.[proofs; evals]
 
@@ -444,18 +459,18 @@ module Openings = struct
 end
 
 module Degree_bounded = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'pc t = 'pc * 'pc [@@deriving version, bin_io]
+      type 'pc t = 'pc * 'pc
     end
+  end]
 
-    module Latest = V1
-  end
-
-  include Stable.Latest
+  type 'pc t = 'pc Stable.Latest.t
 end
 
 module Messages = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
       type ('pc, 'fp) t =
@@ -465,13 +480,17 @@ module Messages = struct
         ; gh_1: 'pc Degree_bounded.Stable.V1.t * 'pc
         ; sigma_gh_2: 'fp * ('pc Degree_bounded.Stable.V1.t * 'pc)
         ; sigma_gh_3: 'fp * ('pc Degree_bounded.Stable.V1.t * 'pc) }
-      [@@deriving version, fields, bin_io]
+      [@@deriving fields]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  include Stable.Latest
+  type ('pc, 'fp) t = ('pc, 'fp) Stable.Latest.t =
+    { w_hat: 'pc
+    ; z_hat_a: 'pc
+    ; z_hat_b: 'pc
+    ; gh_1: 'pc Degree_bounded.t * 'pc
+    ; sigma_gh_2: 'fp * ('pc Degree_bounded.t * 'pc)
+    ; sigma_gh_3: 'fp * ('pc Degree_bounded.t * 'pc) }
 
   let to_hlist {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3} =
     H_list.[w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3]
@@ -491,17 +510,18 @@ module Messages = struct
 end
 
 module Proof = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
       type ('pc, 'fp, 'openings) t =
         {messages: ('pc, 'fp) Messages.t; openings: 'openings}
-      [@@deriving version, fields, bin_io]
+      [@@deriving fields]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  include Stable.Latest
+  type ('pc, 'fp, 'openings) t = ('pc, 'fp, 'openings) Stable.Latest.t =
+    {messages: ('pc, 'fp) Messages.t; openings: 'openings}
+  [@@deriving fields]
 
   let to_hlist {messages; openings} = H_list.[messages; openings]
 
