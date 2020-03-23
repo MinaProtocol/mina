@@ -42,7 +42,7 @@ let genesis_root_data ~genesis_ledger ~base_proof ~genesis_constants =
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
     ~persistent_frontier_instance ~genesis_state_hash
-    ignore_consensus_local_state =
+    ignore_consensus_local_state ~genesis_constants =
   let open Deferred.Result.Let_syntax in
   let root_identifier =
     match
@@ -89,7 +89,8 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
          persistent_frontier_instance ~max_length
          ~root_ledger:
            (Persistent_root.Instance.snarked_ledger persistent_root_instance)
-         ~consensus_local_state ~ignore_consensus_local_state)
+         ~consensus_local_state ~ignore_consensus_local_state
+         ~genesis_constants)
       ~f:
         (Result.map_error ~f:(function
           | `Sync_cannot_be_running ->
@@ -151,7 +152,7 @@ let rec load_with_max_length :
       load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
         ~max_length ~persistent_root ~persistent_root_instance
         ~persistent_frontier ~persistent_frontier_instance ~genesis_state_hash
-        ignore_consensus_local_state
+        ~genesis_constants ignore_consensus_local_state
     with
     | Ok _ as result ->
         return result

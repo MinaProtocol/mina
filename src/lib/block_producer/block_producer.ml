@@ -567,7 +567,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     consensus_local_state
                     ( Keypair.And_compressed_pk.Set.to_list keypairs
                     |> List.map ~f:snd |> Public_key.Compressed.Set.of_list )
-                    (Time.now time_controller) ;
+                    (Time.now time_controller) ~coda_constants ;
                   keypairs
               | keypairs, `Same ->
                   keypairs
@@ -589,14 +589,14 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 in
                 assert (
                   Consensus.Hooks.required_local_state_sync ~consensus_state
-                    ~local_state:consensus_local_state
+                    ~local_state:consensus_local_state ~coda_constants
                   = None ) ;
                 let now = Time.now time_controller in
                 let next_producer_timing =
                   measure "asking conensus what to do" (fun () ->
                       Consensus.Hooks.next_producer_timing (time_to_ms now)
                         consensus_state ~local_state:consensus_local_state
-                        ~keypairs ~logger )
+                        ~keypairs ~logger ~coda_constants )
                 in
                 set_next_producer_timing next_producer_timing ;
                 match next_producer_timing with

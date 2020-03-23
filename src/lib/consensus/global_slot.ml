@@ -92,24 +92,38 @@ let ( < ) (t : t) (t' : t) = t.slot_number < t'.slot_number
 let of_slot_number slot_number ~slots_per_epoch =
   {Poly.slot_number; slots_per_epoch}
 
-let start_time t =
+let start_time t ~genesis_state_timestamp ~epoch_duration ~slot_duration_ms =
   let epoch, slot = to_epoch_and_slot t in
-  Epoch.slot_start_time epoch slot
+  Epoch.slot_start_time epoch slot ~genesis_state_timestamp ~epoch_duration
+    ~slot_duration_ms
 
-let end_time t =
+let end_time t ~genesis_state_timestamp ~epoch_duration ~slot_duration_ms =
   let epoch, slot = to_epoch_and_slot t in
-  Epoch.slot_end_time epoch slot
+  Epoch.slot_end_time epoch slot ~genesis_state_timestamp ~epoch_duration
+    ~slot_duration_ms
 
 let time_hum t =
   let epoch, slot = to_epoch_and_slot t in
   sprintf "epoch=%d, slot=%d" (Epoch.to_int epoch) (Slot.to_int slot)
 
-let of_time_exn time =
-  Core.printf "6\n%!" ;
-  let slots_per_epoch =
-    (Coda_constants.t ()).consensus.slots_per_epoch |> T.of_int
+let of_time_exn time ~(coda_constants : Coda_constants.t) =
+  let genesis_state_timestamp =
+    coda_constants.genesis_state_timestamp |> Block_time.of_time
   in
-  of_epoch_and_slot (Epoch.epoch_and_slot_of_time_exn time) ~slots_per_epoch
+  let epoch_duration =
+    coda_constants.consensus.epoch_duration |> Block_time.Span.of_time_span
+  in
+  let slot_duration_ms =
+    coda_constants.consensus.slot_duration_ms |> Int64.of_int
+    |> Block_time.Span.of_ms
+  in
+  let slots_per_epoch =
+    coda_constants.consensus.slot_duration_ms |> UInt32.of_int
+  in
+  of_epoch_and_slot
+    (Epoch.epoch_and_slot_of_time_exn time ~genesis_state_timestamp
+       ~epoch_duration ~slot_duration_ms)
+    ~slots_per_epoch
 
 let diff (t : t) (other_epoch, other_slot) ~epoch_size =
   let open UInt32.Infix in

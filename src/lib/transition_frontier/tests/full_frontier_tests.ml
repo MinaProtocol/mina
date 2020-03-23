@@ -58,6 +58,7 @@ let%test_module "Full_frontier tests" =
       Full_frontier.create ~logger ~root_data
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger) root_ledger)
         ~base_hash ~consensus_local_state ~max_length
+        ~genesis_constants:Genesis_constants.compiled
 
     let%test_unit "Should be able to find a breadcrumbs after adding them" =
       Quickcheck.test gen_breadcrumb ~trials:4 ~f:(fun make_breadcrumb ->

@@ -57,15 +57,25 @@ val epoch : t -> Epoch.t
 
 val slot : t -> Slot.t
 
-val start_time : t -> Block_time.t
+val start_time :
+     t
+  -> genesis_state_timestamp:Block_time.t
+  -> epoch_duration:Block_time.Span.t
+  -> slot_duration_ms:Block_time.Span.t
+  -> Block_time.t
 
-val end_time : t -> Block_time.t
+val end_time :
+     t
+  -> genesis_state_timestamp:Block_time.t
+  -> epoch_duration:Block_time.Span.t
+  -> slot_duration_ms:Block_time.Span.t
+  -> Block_time.t
 
 val time_hum : t -> string
 
 val to_epoch_and_slot : t -> Epoch.t * Slot.t
 
-val of_time_exn : Block_time.t -> t
+val of_time_exn : Block_time.t -> coda_constants:Coda_constants.t -> t
 
 val diff : t -> Epoch.t * Slot.t -> epoch_size:UInt32.t -> t
 

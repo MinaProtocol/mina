@@ -67,8 +67,23 @@ module Vrf_distribution = struct
       Global_slot.of_epoch_and_slot
         (epoch, (of_int 2 * constants.slots_per_epoch) - of_int 1)
     in
-    let start_time = Global_slot.start_time start_slot in
-    let term_time = Global_slot.start_time term_slot in
+    let slot_duration_ms =
+      constants.slot_duration_ms |> Int64.of_int |> Block_time.Span.of_ms
+    in
+    let genesis_state_timestamp =
+      Block_time.of_time coda_constants.genesis_state_timestamp
+    in
+    let epoch_duration =
+      Block_time.Span.of_time_span coda_constants.consensus.epoch_duration
+    in
+    let start_time =
+      Global_slot.start_time start_slot ~genesis_state_timestamp
+        ~epoch_duration ~slot_duration_ms
+    in
+    let term_time =
+      Global_slot.start_time term_slot ~genesis_state_timestamp ~epoch_duration
+        ~slot_duration_ms
+    in
     let proposal_table = Int.Table.create () in
     let record_proposal ~staker ~proposal_data =
       let _, pk = staker.keypair in
@@ -316,9 +331,22 @@ proof_level]
 (* TODO: update stakers' relative local_states *)
 let propose_block_onto_chain ~logger ~keys
     (previous_transition, previous_staged_ledger) (proposer_pk, block_data) =
+  let coda_constants = Coda_constants.t () in
   let open Deferred.Let_syntax in
   let proposal_slot = Block_data.global_slot block_data in
-  let proposal_time = Global_slot.start_time proposal_slot in
+  let genesis_state_timestamp =
+    Block_time.of_time coda_constants.genesis_state_timestamp
+  in
+  let epoch_duration =
+    Block_time.Span.of_time_span coda_constants.consensus.epoch_duration
+  in
+  let proposal_time =
+    Global_slot.start_time proposal_slot ~genesis_state_timestamp
+      ~epoch_duration
+      ~slot_duration_ms:
+        ( coda_constants.consensus.slot_duration_ms |> Int64.of_int
+        |> Block_time.Span.of_ms )
+  in
   let previous_protocol_state =
     External_transition.protocol_state previous_transition
   in

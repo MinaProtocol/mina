@@ -269,7 +269,7 @@ module type S = sig
     * This is mostly useful for PoStake and other consensus mechanisms that have their own
     * notions of time.
   *)
-  val time_hum : Block_time.t -> string
+  val time_hum : Block_time.t -> coda_constants:Coda_constants.t -> string
 
   (** from postake *)
   val epoch_size : unit -> int
@@ -315,7 +315,11 @@ module type S = sig
       (** Swap in a new set of block production keys and invalidate and/or
           recompute cached data *)
       val block_production_keys_swap :
-        t -> Signature_lib.Public_key.Compressed.Set.t -> Block_time.t -> unit
+           t
+        -> Signature_lib.Public_key.Compressed.Set.t
+        -> Block_time.t
+        -> coda_constants:Coda_constants.t
+        -> unit
     end
 
     module Prover_state : sig
@@ -364,13 +368,15 @@ module type S = sig
 
       type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
 
-      val graphql_type : unit -> ('ctx, t option) Graphql_async.Schema.typ
+      val graphql_type :
+           coda_constants:Coda_constants.t
+        -> ('ctx, t option) Graphql_async.Schema.typ
 
       val to_string_hum : t -> string
 
-      val to_time : t -> Block_time.t
+      val to_time : t -> coda_constants:Coda_constants.t -> Block_time.t
 
-      val of_time_exn : Block_time.t -> t
+      val of_time_exn : Block_time.t -> coda_constants:Coda_constants.t -> t
 
       (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)
       val get_old : t -> t
@@ -466,7 +472,8 @@ module type S = sig
     end
 
     (* Check whether we are in the genesis epoch *)
-    val is_genesis : Block_time.t -> bool
+    val is_genesis_epoch :
+      Block_time.t -> coda_constants:Coda_constants.t -> bool
 
     (**
      * Check that a consensus state was received at a valid time.
@@ -474,6 +481,7 @@ module type S = sig
     val received_at_valid_time :
          Consensus_state.Value.t
       -> time_received:Unix_timestamp.t
+      -> coda_constants:Coda_constants.t
       -> (unit, [`Too_early | `Too_late of int64]) result
 
     (**
@@ -506,6 +514,7 @@ module type S = sig
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> logger:Logger.t
+      -> coda_constants:Coda_constants.t
       -> block_producer_timing
 
     (**
@@ -525,11 +534,13 @@ module type S = sig
          existing:Consensus_state.Value.t
       -> candidate:Consensus_state.Value.t
       -> logger:Logger.t
+      -> coda_constants:Coda_constants.t
       -> bool
 
     val get_epoch_ledger :
          consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
+      -> coda_constants:Coda_constants.t
       -> Coda_base.Sparse_ledger.t
 
     (** Data needed to synchronize the local state. *)
@@ -541,6 +552,7 @@ module type S = sig
     val required_local_state_sync :
          consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
+      -> coda_constants:Coda_constants.t
       -> local_state_sync Non_empty_list.t option
 
     (**

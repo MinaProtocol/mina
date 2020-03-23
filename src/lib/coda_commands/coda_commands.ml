@@ -238,6 +238,7 @@ type active_state_fields =
 
 let get_status ~flag t =
   let open Coda_lib.Config in
+  let coda_constants = Coda_constants.t () in
   let uptime_secs =
     Time_ns.diff (Time_ns.now ()) start_time
     |> Time_ns.Span.to_sec |> Int.of_float
@@ -261,7 +262,9 @@ let get_status ~flag t =
   let consensus_mechanism = Consensus.name in
   let time_controller = (Coda_lib.config t).time_controller in
   let consensus_time_now =
-    Consensus.Data.Consensus_time.of_time_exn @@ Block_time.now time_controller
+    Consensus.Data.Consensus_time.of_time_exn
+      (Block_time.now time_controller)
+      ~coda_constants
   in
   let consensus_configuration = Consensus.Configuration.t () in
   let r = Perf_histograms.report in

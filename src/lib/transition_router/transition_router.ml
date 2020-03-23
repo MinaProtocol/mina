@@ -9,7 +9,8 @@ open Network_peer
 let create_bufferred_pipe ?name () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
-let is_transition_for_bootstrap ~logger frontier new_transition =
+let is_transition_for_bootstrap ~logger frontier new_transition
+    ~genesis_constants =
   let root_state =
     Transition_frontier.root frontier
     |> Transition_frontier.Breadcrumb.protocol_state
@@ -18,6 +19,7 @@ let is_transition_for_bootstrap ~logger frontier new_transition =
     External_transition.Initial_validated.protocol_state new_transition
   in
   Consensus.Hooks.should_bootstrap
+    ~coda_constants:(Coda_constants.create_t genesis_constants)
     ~existing:(Protocol_state.consensus_state root_state)
     ~candidate:(Protocol_state.consensus_state new_state)
     ~logger:
@@ -28,7 +30,8 @@ let is_transition_for_bootstrap ~logger frontier new_transition =
 let start_transition_frontier_controller ~logger ~trust_system ~verifier
     ~network ~time_controller ~producer_transition_reader
     ~verified_transition_writer ~clear_reader ~collected_transitions
-    ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier =
+    ~transition_reader_ref ~transition_writer_ref ~frontier_w
+    ~genesis_constants frontier =
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Starting Transition Frontier Controller phase" ;
   let ( transition_frontier_controller_reader
@@ -43,7 +46,7 @@ let start_transition_frontier_controller ~logger ~trust_system ~verifier
         Transition_frontier_controller.run ~logger ~trust_system ~verifier
           ~network ~time_controller ~collected_transitions ~frontier
           ~network_transition_reader:!transition_reader_ref
-          ~producer_transition_reader ~clear_reader )
+          ~producer_transition_reader ~clear_reader ~genesis_constants )
   in
   Strict_pipe.Reader.iter new_verified_transition_reader
     ~f:
@@ -80,7 +83,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
             ~network ~time_controller ~producer_transition_reader
             ~verified_transition_writer ~clear_reader ~collected_transitions
             ~transition_reader_ref ~transition_writer_ref ~frontier_w
-            new_frontier ) )
+            ~genesis_constants new_frontier ) )
 
 let download_best_tip ~logger ~network ~verifier ~trust_system
     ~most_recent_valid_block_writer =
@@ -233,11 +236,13 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
       @@ start_transition_frontier_controller ~logger ~trust_system ~verifier
            ~network ~time_controller ~producer_transition_reader
            ~verified_transition_writer ~clear_reader ~collected_transitions:[]
-           ~transition_reader_ref ~transition_writer_ref ~frontier_w frontier
+           ~transition_reader_ref ~transition_writer_ref ~frontier_w
+           ~genesis_constants frontier
   | Some best_tip, Some frontier ->
       if
         is_transition_for_bootstrap ~logger frontier
           (best_tip |> Envelope.Incoming.data)
+          ~genesis_constants
       then
         let initial_root_transition =
           Transition_frontier.(Breadcrumb.validated_transition (root frontier))
@@ -258,6 +263,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
               ~consensus_state:
                 (Transition_frontier.Breadcrumb.consensus_state root)
               ~local_state:consensus_local_state
+              ~coda_constants:(Coda_constants.create_t genesis_constants)
           with
           | None ->
               Deferred.unit
@@ -283,16 +289,18 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
           ~network ~time_controller ~producer_transition_reader
           ~verified_transition_writer ~clear_reader
           ~collected_transitions:[best_tip] ~transition_reader_ref
-          ~transition_writer_ref ~frontier_w frontier
+          ~transition_writer_ref ~frontier_w ~genesis_constants frontier
 
-let wait_till_genesis ~logger ~time_controller =
+let wait_till_genesis ~logger ~time_controller ~genesis_constants =
   let module Time = Block_time in
   let now = Time.now time_controller in
-  let constants = Coda_constants.t () in
+  let coda_constants = Coda_constants.create_t genesis_constants in
   let genesis_state_timestamp =
-    Time.of_time constants.genesis_state_timestamp
+    Time.of_time coda_constants.genesis_state_timestamp
   in
-  try Consensus.Hooks.is_genesis now |> Fn.const Deferred.unit
+  try
+    Consensus.Hooks.is_genesis_epoch now ~coda_constants
+    |> Fn.const Deferred.unit
   with Invalid_argument _ ->
     let time_till_genesis = Time.diff genesis_state_timestamp now in
     Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
@@ -304,12 +312,14 @@ let wait_till_genesis ~logger ~time_controller =
     let rec logger_loop () =
       let%bind () = after (Time_ns.Span.of_sec 30.) in
       let now = Time.now time_controller in
-      try Consensus.Hooks.is_genesis now |> Fn.const Deferred.unit
+      try
+        Consensus.Hooks.is_genesis_epoch now ~coda_constants
+        |> Fn.const Deferred.unit
       with Invalid_argument _ ->
         let tm_remaining = Time.diff genesis_state_timestamp now in
         Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-          "Still waiting $tm_remaining milliseconds before running transition \
-           router"
+          "Time before genesis. Waiting $tm_remaining milliseconds before \
+           running transition router"
           ~metadata:
             [ ( "tm_remaining"
               , `Int (Int64.to_int_exn @@ Time.Span.to_ms tm_remaining) ) ] ;
@@ -339,7 +349,8 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
   in
   let transition_reader_ref = ref transition_reader in
   let transition_writer_ref = ref transition_writer in
-  upon (wait_till_genesis ~logger ~time_controller) (fun () ->
+  upon (wait_till_genesis ~logger ~time_controller ~genesis_constants)
+    (fun () ->
       let valid_transition_reader, valid_transition_writer =
         create_bufferred_pipe ~name:"valid transitions" ()
       in
@@ -403,7 +414,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
                  | Some frontier ->
                      if
                        is_transition_for_bootstrap ~logger frontier
-                         incoming_transition
+                         incoming_transition ~genesis_constants
                      then (
                        Strict_pipe.Writer.kill !transition_writer_ref ;
                        let initial_root_transition =

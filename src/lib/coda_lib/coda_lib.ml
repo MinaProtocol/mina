@@ -607,6 +607,10 @@ let next_producer_timing t = t.next_producer_timing
 
 let staking_ledger t =
   let open Option.Let_syntax in
+  let coda_constants =
+    Coda_constants.t ()
+    (*TODO: add genesis constants to coda lib *)
+  in
   let%map transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
@@ -616,6 +620,7 @@ let staking_ledger t =
   in
   let local_state = t.config.consensus_local_state in
   Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
+    ~coda_constants
 
 let find_delegators table pk =
   Option.value_map
@@ -663,7 +668,8 @@ let start t =
   Snark_worker.start t
 
 let create (config : Config.t) ~genesis_ledger ~base_proof ~genesis_constants =
-  Coda_constants.t_ref := Some (Coda_constants.create_t genesis_constants) ;
+  let coda_constants = Coda_constants.create_t genesis_constants in
+  Coda_constants.t_ref := Some coda_constants ;
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->
@@ -915,11 +921,12 @@ let create (config : Config.t) ~genesis_ledger ~base_proof ~genesis_constants =
                          in
                          let tn_production_time =
                            Consensus.Data.Consensus_time.to_time
-                             tn_production_consensus_time
+                             tn_production_consensus_time ~coda_constants
                          in
                          let tm_slot =
                            lift_consensus_time
-                             (Consensus.Data.Consensus_time.of_time_exn tm)
+                             (Consensus.Data.Consensus_time.of_time_exn tm
+                                ~coda_constants)
                          in
                          Coda_metrics.Block_latency.Gossip_slots.update
                            (Float.of_int (tm_slot - tn_production_slot)) ;
@@ -979,7 +986,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof ~genesis_constants =
                   in
                   match
                     Consensus.Hooks.received_at_valid_time ~time_received:now
-                      consensus_state
+                      consensus_state ~coda_constants
                   with
                   | Ok () ->
                       Logger.trace config.logger ~module_:__MODULE__

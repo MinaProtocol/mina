@@ -136,11 +136,14 @@ module Types = struct
         option )
       typ =
     obj "BlockProducerTimings" ~fields:(fun _ ->
-        let of_time = Consensus.Data.Consensus_time.of_time_exn in
+        let coda_constants = Coda_constants.t () in
+        let of_time =
+          Consensus.Data.Consensus_time.of_time_exn ~coda_constants
+        in
         [ field "times"
             ~typ:
               ( non_null @@ list @@ non_null
-              @@ Consensus.Data.Consensus_time.graphql_type () )
+              @@ Consensus.Data.Consensus_time.graphql_type ~coda_constants )
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} -> function `Check_again _time -> []
               | `Produce time -> [of_time time] | `Produce_now ->
@@ -230,6 +233,10 @@ module Types = struct
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
           let open Reflection.Shorthand in
+          let coda_constants = Coda_constants.t () in
+          let consensus_time =
+            Consensus.Data.Consensus_time.graphql_type ~coda_constants
+          in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
                ~next_block_production:(id ~typ:block_producer_timing)
@@ -243,14 +250,8 @@ module Types = struct
                ~block_production_keys:
                  (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms)
-               ~consensus_time_best_tip:
-                 (id ~typ:(Consensus.Data.Consensus_time.graphql_type ()))
-               ~consensus_time_now:
-                 (id
-                    ~typ:
-                      Schema.(
-                        non_null
-                          (Consensus.Data.Consensus_time.graphql_type ())))
+               ~consensus_time_best_tip:(id ~typ:consensus_time)
+               ~consensus_time_now:(id ~typ:Schema.(non_null consensus_time))
                ~consensus_mechanism:nn_string
                ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
                ~consensus_configuration:

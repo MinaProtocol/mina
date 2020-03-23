@@ -272,6 +272,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
           match
             Consensus.Hooks.required_local_state_sync ~consensus_state
               ~local_state:consensus_local_state
+              ~coda_constants:(Coda_constants.create_t genesis_constants)
           with
           | None ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__

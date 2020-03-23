@@ -7,14 +7,10 @@ let succ = UInt32.succ
 
 let equal a b = UInt32.compare a b = 0
 
-let of_global_slot (s : Global_slot.t) : t =
-  Core.printf "13\n%!" ;
-  let constants = (Coda_constants.t ()).consensus in
-  UInt32.Infix.(
-    Global_slot.slot_number s / UInt32.of_int constants.slots_per_sub_window)
+let of_global_slot (s : Global_slot.t) ~slots_per_sub_window : t =
+  UInt32.Infix.(Global_slot.slot_number s / slots_per_sub_window)
 
-let sub_window t =
-  UInt32.rem t (UInt32.of_int Coda_compile_config.sub_windows_per_window)
+let sub_window t ~sub_windows_per_window = UInt32.rem t sub_windows_per_window
 
 let ( >= ) a b = UInt32.compare a b >= 0
 

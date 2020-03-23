@@ -2,9 +2,10 @@ type t [@@deriving eq]
 
 val succ : t -> t
 
-val of_global_slot : Global_slot.t -> t
+val of_global_slot :
+  Global_slot.t -> slots_per_sub_window:Unsigned.UInt32.t -> t
 
-val sub_window : t -> Sub_window.t
+val sub_window : t -> sub_windows_per_window:Unsigned.UInt32.t -> Sub_window.t
 
 val constant : Unsigned.UInt32.t -> t
 
