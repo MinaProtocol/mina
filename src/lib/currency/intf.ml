@@ -2,12 +2,18 @@
 "/src/config.mlh"]
 
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_bits
-
-[%%if
-defined consensus_mechanism]
-
 open Snark_params.Tick
+
+[%%else]
+
+open Snark_bits_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+module Sgn = Sgn_nonconsensus.Sgn
 
 [%%endif]
 
@@ -19,6 +25,8 @@ module type Basic = sig
   type magnitude = t [@@deriving sexp, compare]
 
   val max_int : t
+
+  val length_in_bits : int
 
   include Comparable.S with type t := t
 
@@ -38,6 +46,10 @@ module type Basic = sig
 
   val to_string : t -> string
 
+  val of_formatted_string : string -> t
+
+  val to_formatted_string : t -> string
+
   val of_int : int -> t
 
   val to_int : t -> int
@@ -46,7 +58,7 @@ module type Basic = sig
 
   val of_uint64 : uint64 -> t
 
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   type var
 
@@ -80,7 +92,11 @@ end
 module type Signed_intf = sig
   type magnitude
 
+  [%%ifdef consensus_mechanism]
+
   type magnitude_var
+
+  [%%endif]
 
   type t = (magnitude, Sgn.t) Signed_poly.t
   [@@deriving sexp, hash, compare, eq, yojson]
@@ -106,7 +122,7 @@ module type Signed_intf = sig
 
   val of_unsigned : magnitude -> t
 
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   type var = (magnitude_var, Sgn.var) Signed_poly.t
 
@@ -137,8 +153,8 @@ module type Signed_intf = sig
   [%%endif]
 end
 
-[%%if
-defined consensus_mechanism]
+[%%ifdef
+consensus_mechanism]
 
 module type Checked_arithmetic_intf = sig
   type t
@@ -175,7 +191,7 @@ module type S = sig
 
   include Arithmetic_intf with type t := t
 
-  [%%if defined consensus_mechanism]
+  [%%ifdef consensus_mechanism]
 
   module Signed :
     Signed_intf with type magnitude := t and type magnitude_var := var

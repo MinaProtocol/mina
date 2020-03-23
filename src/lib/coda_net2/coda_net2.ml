@@ -15,7 +15,7 @@ let peer_of_peer_info peer_info =
     ~libp2p_port:peer_info.libp2p_port
     ~peer_id:(Peer.Id.unsafe_of_string peer_info.peer_id)
 
-let of_b58_data = function
+let of_b64_data = function
   | `String s -> (
     match Base64.decode s with
     | Ok result ->
@@ -25,7 +25,7 @@ let of_b58_data = function
   | _ ->
       Or_error.error_string "expected a string"
 
-let to_b58_data (s : string) = Base64.encode_string ~pad:true s
+let to_b64_data (s : string) = Base64.encode_string ~pad:true s
 
 let to_int_res x =
   match Yojson.Safe.Util.to_int_option x with
@@ -96,8 +96,8 @@ module Helper = struct
     ; decode: string -> 'a Or_error.t
     ; write_pipe:
         ( 'a Envelope.Incoming.t
-        , Strict_pipe.crash Strict_pipe.buffered
-        , unit )
+        , Strict_pipe.synchronous
+        , unit Deferred.t )
         Strict_pipe.Writer.t
     ; read_pipe: 'a Envelope.Incoming.t Strict_pipe.Reader.t }
 
@@ -522,7 +522,7 @@ module Helper = struct
             match%map
               do_rpc net
                 (module Rpcs.Send_stream_msg)
-                {stream_idx= idx; data= to_b58_data msg}
+                {stream_idx= idx; data= to_b64_data msg}
             with
             | Ok "sendStreamMsg success" ->
                 ()
@@ -868,27 +868,27 @@ module Keypair = struct
     match%map Helper.do_rpc net (module Helper.Rpcs.Generate_keypair) () with
     | Ok {sk; pk; peer_id} ->
         (let open Or_error.Let_syntax in
-        let%bind secret = of_b58_data (`String sk) in
-        let%map public = of_b58_data (`String pk) in
+        let%bind secret = of_b64_data (`String sk) in
+        let%map public = of_b64_data (`String pk) in
         ({secret; public; peer_id= Peer.Id.unsafe_of_string peer_id} : t))
         |> Or_error.ok_exn
     | Error e ->
         failwithf "other RPC error generateKeypair: %s" (Error.to_string_hum e)
           ()
 
-  let secret_key_base58 ({secret; _} : t) = to_b58_data secret
+  let secret_key_base64 ({secret; _} : t) = to_b64_data secret
 
   let to_string ({secret; public; peer_id} : t) =
     String.concat ~sep:","
-      [to_b58_data secret; to_b58_data public; Peer.Id.to_string peer_id]
+      [to_b64_data secret; to_b64_data public; Peer.Id.to_string peer_id]
 
   let of_string s =
     let parse_with_sep sep =
       match String.split s ~on:sep with
-      | [secret_b58; public_b58; peer_id] ->
+      | [secret_b64; public_b64; peer_id] ->
           let open Or_error.Let_syntax in
-          let%map secret = of_b58_data (`String secret_b58)
-          and public = of_b58_data (`String public_b58) in
+          let%map secret = of_b64_data (`String secret_b64)
+          and public = of_b64_data (`String public_b64) in
           ({secret; public; peer_id= Peer.Id.unsafe_of_string peer_id} : t)
       | _ ->
           Or_error.errorf "%s is not a valid Keypair.to_string output" s
@@ -941,8 +941,8 @@ module Pubsub = struct
       ; decode: string -> 'a Or_error.t
       ; write_pipe:
           ( 'a Envelope.Incoming.t
-          , Strict_pipe.crash Strict_pipe.buffered
-          , unit )
+          , Strict_pipe.synchronous
+          , unit Deferred.t )
           Strict_pipe.Writer.t
       ; read_pipe: 'a Envelope.Incoming.t Strict_pipe.Reader.t }
 
@@ -973,9 +973,8 @@ module Pubsub = struct
       ~encode ~decode ~on_decode_failure =
     let subscription_idx = Helper.genseq net in
     let read_pipe, write_pipe =
-      Strict_pipe.create
-        ~name:(sprintf "subscription to topic «%s»" topic)
-        Strict_pipe.(Buffered (`Capacity 64, `Overflow Crash))
+      Strict_pipe.(
+        create ~name:(sprintf "subscription to topic «%s»" topic) Synchronous)
     in
     let sub =
       { Subscription.net
@@ -1067,7 +1066,7 @@ let configure net ~me ~external_maddr ~maddrs ~network_id ~on_new_peer
   match%map
     Helper.do_rpc net
       (module Helper.Rpcs.Configure)
-      { privk= Keypair.secret_key_base58 me
+      { privk= Keypair.secret_key_base64 me
       ; statedir= net.conf_dir
       ; ifaces= List.map ~f:Multiaddr.to_string maddrs
       ; external_maddr= Multiaddr.to_string external_maddr
