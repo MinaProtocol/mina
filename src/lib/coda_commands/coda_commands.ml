@@ -267,10 +267,8 @@ let coda_constants t =
 let get_status ~flag t =
   let open Coda_lib.Config in
   let config = Coda_lib.config t in
-  let consensus_constants =
-    Consensus.Constants.create
-      ~protocol_constants:config.genesis_constants.protocol
-  in
+  let protocol_constants = config.genesis_constants.protocol in
+  let consensus_constants = Consensus.Constants.create ~protocol_constants in
   let uptime_secs =
     Time_ns.diff (Time_ns.now ()) start_time
     |> Time_ns.Span.to_sec |> Int.of_float
@@ -298,8 +296,9 @@ let get_status ~flag t =
       (Block_time.now time_controller)
       ~constants:consensus_constants
   in
-  (*TODO: from coda constants*)
-  let consensus_configuration = Consensus.Configuration.t () in
+  let consensus_configuration =
+    Consensus.Configuration.t ~protocol_constants
+  in
   let r = Perf_histograms.report in
   let histograms =
     match flag with

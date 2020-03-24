@@ -363,7 +363,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       in
       Initial_validator.run ~logger ~trust_system ~verifier
         ~transition_reader:network_transition_reader ~valid_transition_writer
-        ~initialization_finish_signal ~genesis_state_hash ;
+        ~initialization_finish_signal ~genesis_state_hash ~genesis_constants ;
       let persistent_frontier =
         Transition_frontier.Persistent_frontier.create ~logger ~verifier
           ~time_controller ~directory:persistent_frontier_location

@@ -323,6 +323,7 @@ module type Initial_validator_intf = sig
                                , unit )
                                Strict_pipe.Writer.t
     -> genesis_state_hash:State_hash.t
+    -> genesis_constants:Genesis_constants.t
     -> unit
 end
 

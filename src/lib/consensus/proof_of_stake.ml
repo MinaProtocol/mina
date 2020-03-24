@@ -2,10 +2,6 @@ open Async_kernel
 open Core_kernel
 open Signed
 open Unsigned
-
-(*module GS = Global_slot
-open Coda_numbers
-module Global_slot = GS*)
 open Currency
 open Fold_lib
 open Signature_lib
@@ -74,11 +70,6 @@ module Segment_id = Coda_numbers.Nat.Make32 ()
 
 module Typ = Crypto_params.Tick0.Typ
 
-let epoch_size () =
-  Core.printf "14\n%!" ;
-  let constants = (Coda_constants.t ()).consensus in
-  constants.epoch_size
-
 module Configuration = struct
   type t =
     { delta: int
@@ -91,19 +82,18 @@ module Configuration = struct
     ; acceptable_network_delay: int }
   [@@deriving yojson, bin_io, fields]
 
-  let t () =
-    Core.printf "15\n%!" ;
-    let constants = (Coda_constants.t ()).consensus in
-    { delta= constants.delta
-    ; k= constants.k
-    ; c= constants.c
-    ; c_times_k= constants.c * constants.k
-    ; slots_per_epoch= constants.epoch_size
-    ; slot_duration= constants.slot_duration_ms
-    ; epoch_duration=
-        Float.to_int (Core.Time.Span.to_ms constants.epoch_duration)
-    ; acceptable_network_delay=
-        Float.to_int (Core.Time.Span.to_ms constants.delta_duration) }
+  let t ~protocol_constants =
+    let constants = Constants.create ~protocol_constants in
+    let of_int32 = UInt32.to_int in
+    let of_span = Fn.compose Int64.to_int Block_time.Span.to_ms in
+    { delta= of_int32 constants.delta
+    ; k= of_int32 constants.k
+    ; c= of_int32 constants.c
+    ; c_times_k= of_int32 constants.c * of_int32 constants.k
+    ; slots_per_epoch= of_int32 constants.epoch_size
+    ; slot_duration= of_span constants.slot_duration_ms
+    ; epoch_duration= of_span constants.epoch_duration
+    ; acceptable_network_delay= of_span constants.delta_duration }
 end
 
 module Constants = Constants
@@ -485,14 +475,10 @@ module Data = struct
         t
 
       let to_input ({global_slot; seed; delegator} : value) =
-        (*let global_slot_input = Global_slot.to_input global_slot in
-        Random_oracle.Input.append*)
         { Random_oracle.Input.field_elements= [|(seed :> Tick.field)|]
         ; bitstrings=
             [| Global_slot.Bits.to_bits global_slot
              ; Coda_base.Account.Index.to_bits delegator |] }
-
-      (* global_slot_input*)
 
       let to_hlist {global_slot; seed; delegator} =
         Coda_base.H_list.[global_slot; seed; delegator]
@@ -525,17 +511,11 @@ module Data = struct
 
         let to_input ({global_slot; seed; delegator} : var) =
           let open Tick.Checked.Let_syntax in
-          (*let%map global_slot_input =
-            Global_slot.Checked.to_bits global_slot
-          in
-          Random_oracle.Input.append*)
           let%map global_slot = Global_slot.Checked.to_bits global_slot in
           let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
           { Random_oracle.Input.field_elements=
               [|Epoch_seed.var_to_hash_packed seed|]
           ; bitstrings= [|s global_slot; delegator|] }
-
-        (*global_slot_input*)
 
         let hash_to_group msg =
           let%bind input = to_input msg in
@@ -1209,10 +1189,6 @@ module Data = struct
 
     let to_string_hum = time_hum
 
-    let delay () =
-      UInt32.of_int
-      @@ Configuration.acceptable_network_delay (Configuration.t ())
-
     (* externally, we are only interested in when the slot starts *)
     let to_time t ~(constants : Constants.t) =
       let slot_duration_ms = constants.slot_duration_ms in
@@ -1223,32 +1199,18 @@ module Data = struct
     open UInt32
     open Infix
 
-    let gc_width () : UInt32.t = delay () * of_int 2
-
-    (* epoch, slot components of gc_width *)
-    let gc_width_epoch () : UInt32.t =
-      Core.printf "17\n%!" ;
-      let constants = (Coda_constants.t ()).consensus in
-      gc_width () / UInt32.of_int constants.epoch_size
-
-    let gc_width_slot () : UInt32.t =
-      Core.printf "18\n%!" ;
-      let constants = (Coda_constants.t ()).consensus in
-      gc_width () mod UInt32.of_int constants.epoch_size
-
-    let gc_interval () : UInt32.t = gc_width ()
-
     (* create dummy block to split map on *)
-    let get_old (t : Global_slot.t) : Global_slot.t =
-      Core.printf "18\n%!" ;
-      let epoch_size =
-        (Coda_constants.t ()).consensus.epoch_size |> UInt32.of_int
+    let get_old (t : Global_slot.t) ~constants : Global_slot.t =
+      let ( `Acceptable_network_delay _
+          , `Gc_width _
+          , `Gc_width_epoch gc_width_epoch
+          , `Gc_width_slot gc_width_slot
+          , `Gc_interval _ ) =
+        Constants.gc_parameters constants
       in
       let slots_per_epoch : uint32 = Global_slot.slots_per_epoch t in
       let gs =
-        of_epoch_and_slot
-          (gc_width_epoch (), gc_width_slot ())
-          ~slots_per_epoch
+        of_epoch_and_slot (gc_width_epoch, gc_width_slot) ~slots_per_epoch
       in
       if Global_slot.(t < gs) then
         (* block not beyond gc_width *)
@@ -1256,7 +1218,9 @@ module Data = struct
       else
         let open Int in
         (* subtract epoch, slot components of gc_width *)
-        Global_slot.diff t (gc_width_epoch (), gc_width_slot ()) ~epoch_size
+        Global_slot.diff t
+          (gc_width_epoch, gc_width_slot)
+          ~epoch_size:constants.epoch_size
 
     let to_uint32 t = Global_slot.slot_number t
   end
@@ -1437,6 +1401,7 @@ module Data = struct
            array-indexing is not supported in Snarky. We could use list-indexing, but it
            takes O(n) instead of O(1).
          *)
+
         let update_min_window_density_reference_implementation
             ~prev_global_slot ~next_global_slot ~prev_sub_window_densities
             ~prev_min_window_density ~slots_per_sub_window
@@ -1474,12 +1439,18 @@ module Data = struct
           <- Length.succ new_sub_window_densities.(n - 1) ;
           (min_window_density, new_sub_window_densities)
 
+        let slots_per_sub_window, sub_windows_per_window, slots_per_epoch =
+          let constants = Constants.compiled in
+          ( constants.slots_per_sub_window
+          , constants.sub_windows_per_window
+          , constants.slots_per_epoch )
+
         (* converting the input for actual implementation to the input required by the
            reference implementation *)
-        let actual_to_reference ~prev_global_slot ~prev_sub_window_densities
-            ~sub_windows_per_window =
+        let actual_to_reference ~prev_global_slot ~prev_sub_window_densities =
           let prev_global_sub_window =
             Global_sub_window.of_global_slot prev_global_slot
+              ~slots_per_sub_window
           in
           let prev_relative_sub_window =
             Sub_window.to_int
@@ -1490,12 +1461,6 @@ module Data = struct
           @@ List.drop prev_sub_window_densities prev_relative_sub_window
           @ List.take prev_sub_window_densities prev_relative_sub_window
           @ [List.nth_exn prev_sub_window_densities prev_relative_sub_window]
-
-        let slots_per_sub_window, sub_windows_per_window =
-          let constants = Constants.compiled in
-          UInt32.
-            ( to_int constants.slots_per_sub_window
-            , to_int constants.sub_windows_per_window )
 
         (* slot_diff are generated in such a way so that we can test different cases
            in the update function, I use a weighted union to generate it.
@@ -1508,11 +1473,15 @@ module Data = struct
          *)
         let gen_slot_diff =
           let open Quickcheck.Generator in
+          let to_int = Length.to_int in
           Quickcheck.Generator.weighted_union
-          @@ List.init (2 * sub_windows_per_window) ~f:(fun i ->
+          @@ List.init
+               (2 * to_int sub_windows_per_window)
+               ~f:(fun i ->
                  ( 1.0 /. (Float.of_int (i + 1) ** 2.)
-                 , Core.Int.gen_incl (i * slots_per_sub_window)
-                     ((i + 1) * slots_per_sub_window) ) )
+                 , Core.Int.gen_incl
+                     (i * to_int slots_per_sub_window)
+                     ((i + 1) * to_int slots_per_sub_window) ) )
 
         let num_global_slots_to_test = 1
 
@@ -1520,9 +1489,11 @@ module Data = struct
            the initial slot. The length of the list is fixed because this same list would
            also passed into a snarky computation, and the *Typ* of the list requires a
            fixed length. *)
-        let gen_global_slots =
+        let gen_global_slots :
+            (Global_slot.t * Global_slot.t list) Quickcheck.Generator.t =
           let open Quickcheck.Generator in
           let open Quickcheck.Generator.Let_syntax in
+          let module GS = Coda_numbers.Global_slot in
           let%bind prev_global_slot = small_positive_int in
           let%bind slot_diffs =
             Core.List.gen_with_length num_global_slots_to_test gen_slot_diff
@@ -1534,19 +1505,23 @@ module Data = struct
                 (next_global_slot, next_global_slot :: acc) )
           in
           return
-            ( Global_slot.of_int prev_global_slot
-            , List.map global_slots ~f:Global_slot.of_int |> List.rev )
+            ( Global_slot.of_slot_number
+                (GS.of_int prev_global_slot)
+                ~slots_per_epoch
+            , List.map global_slots ~f:(fun s ->
+                  Global_slot.of_slot_number (GS.of_int s) ~slots_per_epoch )
+              |> List.rev )
 
         let gen_length =
           Quickcheck.Generator.union
-          @@ List.init slots_per_sub_window ~f:(fun n ->
+          @@ List.init (Length.to_int slots_per_sub_window) ~f:(fun n ->
                  Quickcheck.Generator.return @@ Length.of_int n )
 
         let gen_min_window_density =
           let open Quickcheck.Generator in
           let open Quickcheck.Generator.Let_syntax in
           let%bind prev_sub_window_densities =
-            list_with_length sub_windows_per_window gen_length
+            list_with_length (Length.to_int sub_windows_per_window) gen_length
           in
           let min_window_density =
             let initial xs = List.(rev (tl_exn (rev xs))) in
@@ -1574,6 +1549,7 @@ module Data = struct
               let min_window_density, sub_window_densities =
                 f ~prev_global_slot ~next_global_slot
                   ~prev_sub_window_densities ~prev_min_window_density
+                  ~slots_per_sub_window ~sub_windows_per_window
               in
               (next_global_slot, sub_window_densities, min_window_density) )
 
@@ -1592,9 +1568,17 @@ module Data = struct
                     , prev_min_window_density )
                next_global_slot
                ->
+              let%bind slots_per_sub_window, sub_windows_per_window =
+                Tick.exists
+                  (Typ.tuple2 Length.typ Length.typ)
+                  ~compute:
+                    (Tick.As_prover.return
+                       (slots_per_sub_window, sub_windows_per_window))
+              in
               let%bind min_window_density, sub_window_densities =
                 f ~prev_global_slot ~next_global_slot
                   ~prev_sub_window_densities ~prev_min_window_density
+                  ~slots_per_sub_window ~sub_windows_per_window
               in
               return
                 (next_global_slot, sub_window_densities, min_window_density) )
@@ -1602,14 +1586,13 @@ module Data = struct
         let%test_unit "the actual implementation is equivalent to the \
                        reference implementation" =
           Quickcheck.test ~trials:100 gen
-            ~f:(fun ( (prev_global_slot, next_global_slots)
+            ~f:(fun ( ((prev_global_slot : Global_slot.t), next_global_slots)
                     , (prev_min_window_density, prev_sub_window_densities) )
                ->
               let _, _, min_window_density1 =
                 update_several_times ~f:update_min_window_density
                   ~prev_global_slot ~next_global_slots
                   ~prev_sub_window_densities ~prev_min_window_density
-                  ~slots_per_sub_window ~sub_windows_per_window
               in
               let _, _, min_window_density2 =
                 update_several_times
@@ -1617,9 +1600,8 @@ module Data = struct
                   ~prev_global_slot ~next_global_slots
                   ~prev_sub_window_densities:
                     (actual_to_reference ~prev_global_slot
-                       ~prev_sub_window_densities ~sub_windows_per_window)
-                  ~prev_min_window_density ~slots_per_sub_window
-                  ~sub_windows_per_window
+                       ~prev_sub_window_densities)
+                  ~prev_min_window_density
               in
               assert (Length.(equal min_window_density1 min_window_density2))
           )
@@ -1634,23 +1616,25 @@ module Data = struct
                       (Typ.list ~length:num_global_slots_to_test
                          Global_slot.typ))
                    (Typ.tuple2 Length.typ
-                      (Typ.list ~length:sub_windows_per_window Length.typ)))
+                      (Typ.list
+                         ~length:(Length.to_int sub_windows_per_window)
+                         Length.typ)))
                 (Typ.tuple3 Global_slot.typ
-                   (Typ.list ~length:sub_windows_per_window Length.typ)
+                   (Typ.list
+                      ~length:(Length.to_int sub_windows_per_window)
+                      Length.typ)
                    Length.typ)
                 (fun ( (prev_global_slot, next_global_slots)
                      , (prev_min_window_density, prev_sub_window_densities) ) ->
                   update_several_times_checked
                     ~f:Checked.update_min_window_density ~prev_global_slot
                     ~next_global_slots ~prev_sub_window_densities
-                    ~prev_min_window_density ~slots_per_sub_window
-                    ~sub_windows_per_window )
+                    ~prev_min_window_density )
                 (fun ( (prev_global_slot, next_global_slots)
                      , (prev_min_window_density, prev_sub_window_densities) ) ->
                   update_several_times ~f:update_min_window_density
                     ~prev_global_slot ~next_global_slots
-                    ~prev_sub_window_densities ~prev_min_window_density
-                    ~slots_per_sub_window ~sub_windows_per_window )
+                    ~prev_sub_window_densities ~prev_min_window_density )
                 slots_and_min_window_densities )
       end )
   end
@@ -2280,9 +2264,6 @@ module Data = struct
       ; curr_epoch= Segment_id.to_int epoch
       ; curr_slot= Segment_id.to_int slot
       ; total_currency= Amount.to_int t.total_currency }
-
-    let network_delay (config : Configuration.t) =
-      config.acceptable_network_delay
 
     let curr_global_slot (t : Value.t) = t.curr_global_slot
 

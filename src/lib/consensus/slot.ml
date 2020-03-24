@@ -16,34 +16,16 @@ module Checked = struct
   include T.Checked
 
   let in_seed_update_range (slot : var) ~c ~k =
-    (*let uint32_msb (x : UInt32.t) =
-      List.init 32 ~f:(fun i ->
-          let open UInt32 in
-          let open Infix in
-          let ( = ) x y = Core.Int.equal (compare x y) 0 in
-          (x lsr Int.sub 31 i) land UInt32.one = UInt32.one )
-      |> Bitstring_lib.Bitstring.Msb_first.of_list
-    in*)
     let open Tick in
     let open Tick.Let_syntax in
     let open Snarky_integer in
-    (*let ( < ) = Bitstring_checked.lt_value in
-    let constants = (Coda_constants.t ()).consensus in*)
     let length_to_int = Coda_numbers.Length.Checked.to_integer in
     let ck = Integer.mul ~m (length_to_int c) (length_to_int k) in
-    (*let ck_bitstring = uint32_msb ck in*)
     let two = Integer.constant ~m (Bignum_bigint.of_int 2) in
     let ck_times_2 = Integer.mul ~m ck two in
     let slot = to_integer slot in
-    (*let%bind slot_msb =
-      to_bits slot >>| Bitstring_lib.Bitstring.Msb_first.of_lsb_first
-    in*)
     let slot_gte_ck = Integer.gte ~m slot ck
-    (*slot_msb < ck_bitstring >>| Boolean.not*)
-    and slot_lt_ck_times_2 =
-      Integer.lt ~m slot ck_times_2
-      (*slot_msb < ck_times_2*)
-    in
+    and slot_lt_ck_times_2 = Integer.lt ~m slot ck_times_2 in
     Boolean.(slot_gte_ck && slot_lt_ck_times_2)
 end
 

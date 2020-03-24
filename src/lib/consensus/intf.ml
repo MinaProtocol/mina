@@ -9,6 +9,14 @@ module type Constants = sig
   type t
 
   val create : protocol_constants:Genesis_constants.Protocol.t -> t
+
+  val gc_parameters :
+       t
+    -> [`Acceptable_network_delay of Length.t]
+       * [`Gc_width of Length.t]
+       * [`Gc_width_epoch of Length.t]
+       * [`Gc_width_slot of Length.t]
+       * [`Gc_interval of Length.t]
 end
 
 module type Blockchain_state = sig
@@ -267,9 +275,6 @@ module type S = sig
   *)
   val time_hum : Block_time.t -> constants:Constants.t -> string
 
-  (** from postake *)
-  val epoch_size : unit -> int
-
   module Constants = Constants
 
   module Configuration : sig
@@ -284,7 +289,7 @@ module type S = sig
       ; acceptable_network_delay: int }
     [@@deriving yojson, bin_io, fields]
 
-    val t : unit -> t
+    val t : protocol_constants:Genesis_constants.Protocol.t -> t
   end
 
   module Data : sig
@@ -373,7 +378,7 @@ module type S = sig
       val of_time_exn : Block_time.t -> constants:Constants.t -> t
 
       (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)
-      val get_old : t -> t
+      val get_old : t -> constants:Constants.t -> t
 
       val to_uint32 : t -> Unsigned.UInt32.t
 
@@ -441,8 +446,6 @@ module type S = sig
       val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
       val display : Value.t -> display
-
-      val network_delay : Configuration.t -> int
 
       val consensus_time : Value.t -> Consensus_time.t
 

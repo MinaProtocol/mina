@@ -4,6 +4,5 @@
   (library_flags (-linkall))
   (libraries core async coda_constants network_peer key_value_database logger pipe_lib rocksdb coda_metrics module_version)
   (inline_tests)
-  (preprocessor_deps ../../config.mlh)
   (preprocess (pps ppx_base ppx_coda ppx_let ppx_assert ppx_deriving.std ppx_deriving_yojson ppx_sexp_conv ppx_bin_prot ppx_custom_printf ppx_inline_test ppx_optcomp ppx_snarky ppx_deriving_yojson ppx_fields_conv bisect_ppx -conditional))
   (synopsis "Track how much we trust peers"))

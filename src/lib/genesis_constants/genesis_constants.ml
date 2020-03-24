@@ -3,10 +3,12 @@
 
 open Core_kernel
 
-(*Constants that can be specified for generating base proof (that are not required for key-generation) in runtime_genesis_ledger.exe and that can be configured at runtime.
+(*Constants that can be specified for generating the base proof (that are not required for key-generation) in runtime_genesis_ledger.exe and that can be configured at runtime.
+The types are defined such that this module doesn't depend on any of the coda libraries (except blake2) to avoid dependency cycles.
 TODO: move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
 
 module T = struct
+  (*Protocol constants required for consensus and snarks. Consensus constants is generated using these*)
   module Protocol = struct
     type ('k, 'delta, 'genesis_state_timestamp) _t =
       {k: 'k; delta: 'delta; genesis_state_timestamp: 'genesis_state_timestamp}
