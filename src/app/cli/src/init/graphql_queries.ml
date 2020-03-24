@@ -102,6 +102,14 @@ query pendingSnarkWork {
   }
 |}]
 
+module Coda_constants =
+[%graphql
+{|
+  query codaConstants {
+    codaConstants
+    }
+|}]
+
 module Set_staking =
 [%graphql
 {|

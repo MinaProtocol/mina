@@ -78,3 +78,5 @@ let pending_coinbase_depth =
 
 [%%inject
 "block_window_duration_ms", block_window_duration]
+
+let inactivity_ms = block_window_duration_ms * 8

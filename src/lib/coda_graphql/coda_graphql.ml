@@ -1862,6 +1862,13 @@ module Queries = struct
       ~typ:(non_null Types.DaemonStatus.t) ~resolve:(fun {ctx= coda; _} () ->
         Coda_commands.get_status ~flag:`Performance coda >>| Result.return )
 
+  let coda_constants =
+    field "codaConstants" ~doc:"Coda constants"
+      ~args:Arg.[]
+      ~typ:(non_null string)
+      ~resolve:(fun {ctx= coda; _} () ->
+        Yojson.Safe.to_string @@ Coda_commands.coda_constants coda )
+
   let trust_status =
     field "trustStatus" ~typ:Types.Payload.trust_status
       ~args:Arg.[arg "ipAddress" ~typ:(non_null string)]
@@ -2082,7 +2089,8 @@ module Queries = struct
     ; trust_status_all
     ; snark_pool
     ; blockchain_verification_key
-    ; pending_snark_work ]
+    ; pending_snark_work
+    ; coda_constants ]
 end
 
 let schema =

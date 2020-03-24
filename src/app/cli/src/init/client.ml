@@ -989,6 +989,17 @@ let pending_snark_work =
              in
              print_string (Yojson.Safe.to_string lst) ) ))
 
+let coda_constants =
+  let open Command.Param in
+  Command.async ~summary:"Coda constants"
+    (Cli_lib.Background_daemon.graphql_init (return ())
+       ~f:(fun graphql_endpoint () ->
+         Deferred.map
+           (Graphql_client.query_exn
+              (Graphql_queries.Coda_constants.make ())
+              graphql_endpoint)
+           ~f:(fun response -> print_string response#codaConstants) ))
+
 let start_tracing =
   let open Deferred.Let_syntax in
   let open Command.Param in
@@ -1428,30 +1439,6 @@ let trustlist_list =
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
-let compile_time_constants =
-  let constants () =
-    let t = Coda_constants.t () in
-    `Assoc
-      [ ( "genesis_state_timestamp"
-        , `String
-            (Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
-               t.genesis_state_timestamp) )
-      ; ("k", `Int t.consensus.k)
-      ; ("coinbase", `Int (Currency.Amount.to_int Coda_compile_config.coinbase))
-      ; ("block_window_duration_ms", `Int t.consensus.block_window_duration_ms)
-      ; ("delta", `Int t.consensus.delta)
-      ; ("c", `Int t.consensus.c)
-      ; ("inactivity_ms", `Int t.inactivity_ms)
-      ; ("sub_windows_per_window", `Int t.consensus.sub_windows_per_window)
-      ; ("slots_per_sub_window", `Int t.consensus.slots_per_sub_window)
-      ; ("slots_per_window", `Int t.consensus.slots_per_window)
-      ; ("slots_per_epoch", `Int t.consensus.slots_per_epoch) ]
-  in
-  Command.basic
-    ~summary:"Print a JSON map of the compile-time consensus parameters"
-    (Command.Param.return (fun () ->
-         Core.printf "%s\n%!" (Yojson.Safe.to_string (constants ())) ))
-
 let telemetry =
   let open Command.Param in
   let open Deferred.Let_syntax in
@@ -1614,6 +1601,6 @@ let advanced =
     ; ("unsafe-import", unsafe_import)
     ; ("import", import_key)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
-    ; ("compile-time-constants", compile_time_constants)
+    ; ("coda-constants", coda_constants)
     ; ("telemetry", telemetry)
     ; ("visualization", Visualization.command_group) ]
