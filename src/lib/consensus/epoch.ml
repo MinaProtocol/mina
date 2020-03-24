@@ -79,12 +79,6 @@ let diff_in_slots ((epoch, slot) : t * Slot.t) ((epoch', slot') : t * Slot.t)
 let%test_unit "test diff_in_slots" =
   let coda_constants = Coda_constants.t () in
   let open Int64.Infix in
-  let genesis_state_timestamp =
-    Block_time.of_time coda_constants.genesis_state_timestamp
-  in
-  let epoch_duration =
-    Block_time.Span.of_time_span coda_constants.consensus.epoch_duration
-  in
   let ( !^ ) = UInt32.of_int in
   let ( !@ ) = Fn.compose ( !^ ) Int64.to_int in
   let epoch_size = coda_constants.consensus.epoch_size in

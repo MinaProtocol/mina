@@ -15,6 +15,7 @@ module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 
 let global_max_length () =
+  (*TODO: get from full frontier*)
   let constants = (Coda_constants.t ()).consensus in
   constants.k
 

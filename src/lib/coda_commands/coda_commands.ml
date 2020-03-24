@@ -238,13 +238,14 @@ type active_state_fields =
 
 let get_status ~flag t =
   let open Coda_lib.Config in
-  let coda_constants = Coda_constants.t () in
+  let config = Coda_lib.config t in
+  let coda_constants = Coda_constants.create_t config.genesis_constants in
   let uptime_secs =
     Time_ns.diff (Time_ns.now ()) start_time
     |> Time_ns.Span.to_sec |> Int.of_float
   in
   let commit_id = Coda_version.commit_id in
-  let conf_dir = (Coda_lib.config t).conf_dir in
+  let conf_dir = config.conf_dir in
   let%map peers = Coda_lib.peers t in
   let peers =
     List.map peers ~f:(fun peer ->
@@ -260,12 +261,13 @@ let get_status ~flag t =
   let snark_work_fee = Currency.Fee.to_int @@ Coda_lib.snark_work_fee t in
   let block_production_keys = Coda_lib.block_production_pubkeys t in
   let consensus_mechanism = Consensus.name in
-  let time_controller = (Coda_lib.config t).time_controller in
+  let time_controller = config.time_controller in
   let consensus_time_now =
     Consensus.Data.Consensus_time.of_time_exn
       (Block_time.now time_controller)
       ~coda_constants
   in
+  (*TODO: from coda constants*)
   let consensus_configuration = Consensus.Configuration.t () in
   let r = Perf_histograms.report in
   let histograms =
@@ -380,8 +382,7 @@ let get_status ~flag t =
           `Check_again (time |> Span.of_ms |> of_span_since_epoch) )
   in
   let addrs_and_ports =
-    Node_addrs_and_ports.to_display
-      (Coda_lib.config t).gossip_net_params.addrs_and_ports
+    Node_addrs_and_ports.to_display config.gossip_net_params.addrs_and_ports
   in
   { Daemon_rpcs.Types.Status.num_accounts
   ; sync_status

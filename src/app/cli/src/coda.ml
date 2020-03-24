@@ -205,7 +205,7 @@ let daemon logger =
               "PATH path to the runtime-configurable constants. For example: \
                %s  (default: compiled constants)"
               ( Genesis_constants.(
-                  to_daemon_config compiled.runtime |> Daemon_config.to_yojson)
+                  to_daemon_config compiled |> Daemon_config.to_yojson)
               |> Yojson.Safe.to_string ))
          (optional string)
      in
@@ -735,8 +735,8 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~genesis_state_hash ~log_block_creation ())
-             ~genesis_ledger ~base_proof ~genesis_constants
+                ~genesis_state_hash ~log_block_creation ~genesis_constants ())
+             ~genesis_ledger ~base_proof
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in

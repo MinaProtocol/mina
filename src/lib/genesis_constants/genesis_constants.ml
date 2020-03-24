@@ -7,23 +7,22 @@ open Core_kernel
 TODO: move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
 
 module T = struct
-  module Consensus = struct
-    type t = {k: int; delta: int}
+  module Protocol = struct
+    type ('k, 'delta, 'genesis_state_timestamp) _t =
+      {k: 'k; delta: 'delta; genesis_state_timestamp: 'genesis_state_timestamp}
+
+    type t = (int, int, Time.t) _t
   end
 
-  module Runtime_configurable = struct
-    type t = {txpool_max_size: int; genesis_state_timestamp: Time.t}
-  end
-
-  type t = {consensus: Consensus.t; runtime: Runtime_configurable.t}
+  type t = {protocol: Protocol.t; txpool_max_size: int}
 
   let hash (t : t) =
     let str =
       ( List.map
-          [t.consensus.k; t.consensus.delta; t.runtime.txpool_max_size]
+          [t.protocol.k; t.protocol.delta; t.txpool_max_size]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
-      ^ Core.Time.to_string t.runtime.genesis_state_timestamp
+      ^ Core.Time.to_string t.protocol.genesis_state_timestamp
     in
     Blake2.digest_string str |> Blake2.to_hex
 end
@@ -47,11 +46,12 @@ let genesis_timestamp_of_string str =
   Core.Time.of_string_gen ~if_no_timezone:(`Use_this_one default_timezone) str
 
 let compiled : t =
-  { consensus= {k; delta}
-  ; runtime=
-      { txpool_max_size= pool_max_size
+  { protocol=
+      { k
+      ; delta
       ; genesis_state_timestamp=
-          genesis_timestamp_of_string genesis_state_timestamp_string } }
+          genesis_timestamp_of_string genesis_state_timestamp_string }
+  ; txpool_max_size= pool_max_size }
 
 let validate_time time_str =
   match
@@ -93,41 +93,38 @@ end
 
 let of_config_file ~(default : t) (t : Config_file.t) : t =
   let opt default x = Option.value ~default x in
-  let consensus =
-    { Consensus.k= opt default.consensus.k t.k
-    ; delta= opt default.consensus.delta t.delta }
-  in
-  let runtime =
-    { Runtime_configurable.txpool_max_size=
-        opt default.runtime.txpool_max_size t.txpool_max_size
+  let protocol =
+    { Protocol.k= opt default.protocol.k t.k
+    ; delta= opt default.protocol.delta t.delta
     ; genesis_state_timestamp=
-        Option.value_map ~default:default.runtime.genesis_state_timestamp
+        Option.value_map ~default:default.protocol.genesis_state_timestamp
           t.genesis_state_timestamp ~f:genesis_timestamp_of_string }
   in
-  {T.consensus; runtime}
+  {T.protocol; txpool_max_size= opt default.txpool_max_size t.txpool_max_size}
 
 let to_config_file t : Config_file.t =
-  { Config_file.k= Some t.consensus.k
-  ; delta= Some t.consensus.delta
-  ; txpool_max_size= Some t.runtime.txpool_max_size
+  { Config_file.k= Some t.protocol.k
+  ; delta= Some t.protocol.delta
+  ; txpool_max_size= Some t.txpool_max_size
   ; genesis_state_timestamp=
       Some
-        (Core.Time.format t.runtime.genesis_state_timestamp
+        (Core.Time.format t.protocol.genesis_state_timestamp
            "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }
 
-let of_daemon_config ~(default : Runtime_configurable.t)
-    ({txpool_max_size; genesis_state_timestamp} : Daemon_config.t) :
-    Runtime_configurable.t =
-  { Runtime_configurable.txpool_max_size=
+let of_daemon_config ~(default : t)
+    ({txpool_max_size; genesis_state_timestamp} : Daemon_config.t) : t =
+  { txpool_max_size=
       Option.value ~default:default.txpool_max_size txpool_max_size
-  ; genesis_state_timestamp=
-      Option.value_map genesis_state_timestamp
-        ~default:default.genesis_state_timestamp ~f:genesis_timestamp_of_string
-  }
+  ; protocol=
+      { default.protocol with
+        genesis_state_timestamp=
+          Option.value_map genesis_state_timestamp
+            ~default:default.protocol.genesis_state_timestamp
+            ~f:genesis_timestamp_of_string } }
 
-let to_daemon_config (t : Runtime_configurable.t) : Daemon_config.t =
+let to_daemon_config (t : t) : Daemon_config.t =
   { txpool_max_size= Some t.txpool_max_size
   ; genesis_state_timestamp=
       Some
-        (Core.Time.format t.genesis_state_timestamp "%Y-%m-%d %H:%M:%S%z"
-           ~zone:Core.Time.Zone.utc) }
+        (Core.Time.format t.protocol.genesis_state_timestamp
+           "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }

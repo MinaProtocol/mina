@@ -68,8 +68,6 @@ module Make0 (Base_ledger : sig
   val location_of_key : t -> Public_key.Compressed.t -> Location.t option
 
   val get : t -> Location.t -> Account.t option
-end) (Max_size : sig
-  val pool_max_size : unit -> int
 end) (Staged_ledger : sig
   type t
 
@@ -81,13 +79,19 @@ struct
   module Breadcrumb = Transition_frontier.Breadcrumb
 
   module Resource_pool = struct
-    include Max_size
-
     type transition_frontier_diff =
       Transition_frontier.best_tip_diff * Base_ledger.t
 
     module Config = struct
-      type t = {trust_system: Trust_system.t sexp_opaque}
+      type t =
+        { trust_system: Trust_system.t sexp_opaque
+        ; pool_max_size: int
+              (* note this value needs to be mostly the same across gossipping nodes, so
+      nodes with larger pools don't send nodes with smaller pools lots of
+      low fee transactions the smaller-pooled nodes consider useless and get
+      themselves banned.
+   *)
+        }
       [@@deriving sexp_of, make]
     end
 
@@ -148,11 +152,12 @@ struct
       |> Breadcrumb.staged_ledger |> Staged_ledger.ledger
 
     let drop_until_below_max_size :
-           Indexed_pool.t
+           pool_max_size:int
+        -> Indexed_pool.t
         -> Indexed_pool.t * User_command.With_valid_signature.t Sequence.t =
-     fun pool ->
+     fun ~pool_max_size pool ->
       let rec go pool' dropped =
-        if Indexed_pool.size pool' > pool_max_size () then (
+        if Indexed_pool.size pool' > pool_max_size then (
           let dropped', pool'' = Indexed_pool.remove_lowest_fee pool' in
           assert (not (Sequence.is_empty dropped')) ;
           go pool'' @@ Sequence.append dropped dropped' )
@@ -160,12 +165,12 @@ struct
       in
       go pool @@ Sequence.empty
 
-    let has_sufficient_fee pool cmd : bool =
+    let has_sufficient_fee ~pool_max_size pool cmd : bool =
       match Indexed_pool.min_fee pool with
       | None ->
           true
       | Some min_fee ->
-          if Indexed_pool.size pool >= pool_max_size () then
+          if Indexed_pool.size pool >= pool_max_size then
             Currency.Fee.(User_command.fee cmd > min_fee)
           else true
 
@@ -188,6 +193,7 @@ struct
          versa so those hashtables remain in sync with reality.
       *)
       t.best_tip_ledger <- Some best_tip_ledger ;
+      let pool_max_size = t.config.pool_max_size in
       Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
         ~metadata:
           [ ( "removed"
@@ -217,7 +223,8 @@ struct
                   ~data:time_added ) ;
             let pool', dropped_seq =
               drop_until_below_max_size
-              @@ Indexed_pool.add_from_backtrack pool cmd
+                (Indexed_pool.add_from_backtrack pool cmd)
+                ~pool_max_size
             in
             (pool', Sequence.append dropped_so_far dropped_seq) )
       in
@@ -327,7 +334,12 @@ struct
             remove_cmd ()
           in
           if not (Hashtbl.mem t.locally_generated_committed cmd) then
-            if not (has_sufficient_fee t.pool (cmd :> User_command.t)) then (
+            if
+              not
+                (has_sufficient_fee t.pool
+                   (cmd :> User_command.t)
+                   ~pool_max_size)
+            then (
               Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                 "Not re-adding locally generated command $cmd to pool, \
                  insufficient fee"
@@ -506,6 +518,7 @@ struct
         let txs = Envelope.Incoming.data env in
         let sender = Envelope.Incoming.sender env in
         let is_sender_local = Envelope.Sender.(equal sender Local) in
+        let pool_max_size = t.config.pool_max_size in
         match t.best_tip_ledger with
         | None ->
             Deferred.Or_error.error_string
@@ -560,7 +573,7 @@ struct
                           in
                           go txs'' pool accepted
                       | Some sender_account ->
-                          if has_sufficient_fee pool tx then (
+                          if has_sufficient_fee pool tx ~pool_max_size then (
                             let validate_receiver =
                               match
                                 account ledger (User_command.receiver tx)
@@ -634,6 +647,7 @@ struct
                                     ~data:(Time.now ()) ;
                                 let pool'', dropped_for_size =
                                   drop_until_below_max_size pool'
+                                    ~pool_max_size
                                 in
                                 let seq_cmd_to_yojson seq =
                                   `List
@@ -794,18 +808,7 @@ end)
 (Transition_frontier : Transition_frontier_intf
                        with type staged_ledger := Staged_ledger.t) :
   S with type transition_frontier := Transition_frontier.t =
-  Make0
-    (Coda_base.Ledger)
-    (struct
-      (* note this value needs to be mostly the same across gossipping nodes, so
-       nodes with larger pools don't send nodes with smaller pools lots of
-       low fee transactions the smaller-pooled nodes consider useless and get
-       themselves banned.
-    *)
-      let pool_max_size () = (Coda_constants.t ()).txpool_max_size
-    end)
-    (Staged_ledger)
-    (Transition_frontier)
+  Make0 (Coda_base.Ledger) (Staged_ledger) (Transition_frontier)
 
 (* TODO: defunctor or remove monkey patching (#3731) *)
 include Make
@@ -881,13 +884,9 @@ let%test_module _ =
     end
 
     module Test =
-      Make0
-        (Mock_base_ledger)
-        (struct
-          let pool_max_size () = 25
-        end)
-        (Mock_staged_ledger)
-        (Mock_transition_frontier)
+      Make0 (Mock_base_ledger) (Mock_staged_ledger) (Mock_transition_frontier)
+
+    let pool_max_size = 25
 
     let _ =
       Core.Backtrace.elide := false ;
@@ -928,7 +927,9 @@ let%test_module _ =
       in
       let trust_system = Trust_system.null () in
       let logger = Logger.null () in
-      let config = Test.Resource_pool.make_config ~trust_system in
+      let config =
+        Test.Resource_pool.make_config ~trust_system ~pool_max_size
+      in
       let pool =
         Test.create ~config ~logger ~incoming_diffs:incoming_diff_r
           ~local_diffs:local_diff_r ~frontier_broadcast_pipe:tf_pipe_r
@@ -1146,7 +1147,9 @@ let%test_module _ =
           in
           let logger = Logger.null () in
           let trust_system = Trust_system.null () in
-          let config = Test.Resource_pool.make_config ~trust_system in
+          let config =
+            Test.Resource_pool.make_config ~trust_system ~pool_max_size
+          in
           let pool =
             Test.create ~config ~logger ~incoming_diffs:incoming_diff_r
               ~local_diffs:local_diff_r
@@ -1260,7 +1263,6 @@ let%test_module _ =
       Deferred.unit
 
     let%test_unit "max size is maintained" =
-      let pool_max_size = Test.Resource_pool.pool_max_size () in
       Quickcheck.test ~trials:500
         (let open Quickcheck.Generator.Let_syntax in
         let%bind init_ledger_state = Ledger.gen_initial_ledger_state in

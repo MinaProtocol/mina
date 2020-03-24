@@ -2,9 +2,10 @@ open Async_kernel
 open Core_kernel
 open Signed
 open Unsigned
-module GS = Global_slot
+
+(*module GS = Global_slot
 open Coda_numbers
-module Global_slot = GS
+module Global_slot = GS*)
 open Currency
 open Fold_lib
 open Signature_lib
@@ -15,6 +16,7 @@ open Num_util
 module Time = Block_time
 module Run = Snark_params.Tick.Run
 module Graphql_base_types = Graphql_lib.Base_types
+module Length = Coda_numbers.Length
 
 let m = Snark_params.Tick.m
 
@@ -68,7 +70,7 @@ let compute_delegatee_table_sparse_ledger keys ledger =
   compute_delegatee_table keys ~iter_accounts:(fun f ->
       Coda_base.Sparse_ledger.iteri ledger ~f:(fun i acct -> f i acct) )
 
-module Segment_id = Nat.Make32 ()
+module Segment_id = Coda_numbers.Nat.Make32 ()
 
 module Typ = Crypto_params.Tick0.Typ
 
@@ -1923,10 +1925,11 @@ module Data = struct
 
     let data_spec =
       let open Snark_params.Tick.Data_spec in
+      let sub_windows_per_window = Coda_compile_config.c in
       [ Length.typ
       ; Length.typ
       ; Length.typ
-      ; Typ.list ~length:Coda_compile_config.sub_windows_per_window Length.typ
+      ; Typ.list ~length:sub_windows_per_window Length.typ
       ; Vrf.Output.Truncated.typ
       ; Amount.typ
       ; Global_slot.typ
@@ -2147,7 +2150,7 @@ module Data = struct
       ; sub_window_densities=
           Length.zero
           :: List.init
-               (Coda_compile_config.sub_windows_per_window - 1)
+               (constants.sub_windows_per_window - 1)
                ~f:(Fn.const max_sub_window_density)
       ; last_vrf_output= Vrf.Output.Truncated.dummy
       ; total_currency= genesis_ledger_total_currency ~ledger:genesis_ledger

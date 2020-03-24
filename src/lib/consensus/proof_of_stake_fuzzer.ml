@@ -45,7 +45,7 @@ module Vrf_distribution = struct
    *  [ep + 2R/3 - 1].
    *)
   let create ~stakers ~epoch ~initial_consensus_state =
-    let constants = (Coda_constants.t ()).consensus in
+    let constants = Coda_constants.compiled_constants_for_test in
     Core_kernel.Printf.printf
       !"[%d] Evaluating %d VRFs for %d stakers\n%!"
       (UInt32.to_int epoch)
@@ -143,7 +143,7 @@ module Vrf_distribution = struct
   (** Picks a single chain of proposals from a distribution. Does not attempt
    *  to simulate any regular properties of how a real chain would be built. *)
   let pick_chain_unrealistically dist =
-    let constants = (Coda_constants.t ()).consensus in
+    let constants = Coda_constants.compiled_constants_for_test.consensus in
     let default_window_size = constants.delta in
     let rec find_potential_proposals acc_proposals window_depth slot =
       let slot_in_dist_range = slot < dist.term_slot in
@@ -331,7 +331,7 @@ proof_level]
 (* TODO: update stakers' relative local_states *)
 let propose_block_onto_chain ~logger ~keys
     (previous_transition, previous_staged_ledger) (proposer_pk, block_data) =
-  let coda_constants = Coda_constants.t () in
+  let coda_constants = Coda_constants.compiled_constants_for_test in
   let open Deferred.Let_syntax in
   let proposal_slot = Block_data.global_slot block_data in
   let genesis_state_timestamp =

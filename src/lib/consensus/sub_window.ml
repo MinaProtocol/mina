@@ -1,1 +1,1 @@
-include Coda_numbers.Nat.Make32 ()
+include Coda_numbers.Sub_window

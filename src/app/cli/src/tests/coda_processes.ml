@@ -44,7 +44,7 @@ let net_configs n =
 
 let offset =
   lazy
-    (let coda_constants = Coda_constants.t () in
+    (let coda_constants = Coda_constants.compiled_constants_for_test in
      Core.Time.(diff (now ()) coda_constants.genesis_state_timestamp))
 
 let local_configs ?block_production_interval

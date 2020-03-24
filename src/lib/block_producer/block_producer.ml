@@ -252,9 +252,9 @@ let generate_next_state ~previous_protocol_state ~time_controller
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
-    ~set_next_producer_timing ~log_block_creation =
+    ~set_next_producer_timing ~log_block_creation ~genesis_constants =
   trace "block_producer" (fun () ->
-      let coda_constants = Coda_constants.t () in
+      let coda_constants = Coda_constants.create_t genesis_constants in
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Pausing block production while bootstrapping"

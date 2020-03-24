@@ -215,7 +215,8 @@ module type Transaction_resource_pool_intf = sig
 
   include Resource_pool_base_intf with type t := t
 
-  val make_config : trust_system:Trust_system.t -> Config.t
+  val make_config :
+    trust_system:Trust_system.t -> pool_max_size:int -> Config.t
 
   val member : t -> User_command.With_valid_signature.t -> bool
 

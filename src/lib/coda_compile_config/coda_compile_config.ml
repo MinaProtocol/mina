@@ -76,4 +76,5 @@ let pending_coinbase_depth =
 [%%inject
 "c", c]
 
-let sub_windows_per_window = c
+[%%inject
+"block_window_duration_ms", block_window_duration]

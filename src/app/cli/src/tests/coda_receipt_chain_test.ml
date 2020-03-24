@@ -13,7 +13,7 @@ let restart_node worker ~config ~logger =
   Coda_process.spawn_exn config
 
 let main () =
-  let coda_constants = Coda_constants.t () in
+  let coda_constants = Coda_constants.compiled_constants_for_test in
   let open Keypair in
   let logger = Logger.create () in
   let largest_account_keypair =

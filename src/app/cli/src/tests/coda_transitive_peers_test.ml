@@ -4,7 +4,7 @@ open Async
 let name = "coda-transitive-peers-test"
 
 let main () =
-  let coda_constants = Coda_constants.t () in
+  let coda_constants = Coda_constants.compiled_constants_for_test in
   let%bind program_dir = Unix.getcwd () in
   let n = 3 in
   let logger = Logger.create () in

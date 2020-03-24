@@ -118,7 +118,7 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
     | Some ((ledger, proof, (constants : Genesis_constants.t)) as res) ->
         (*Replace runtime-configurable constants from the dameon, if any*)
         Option.value_map daemon_conf ~default:res ~f:(fun daemon_config_file ->
-            let new_runtime_constants =
+            let new_constants =
               match
                 Result.bind
                   ( Result.try_with (fun () ->
@@ -128,8 +128,7 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
                     Genesis_constants.Daemon_config.of_yojson json )
               with
               | Ok t ->
-                  Genesis_constants.(
-                    of_daemon_config ~default:compiled.runtime t)
+                  Genesis_constants.(of_daemon_config ~default:constants t)
               | Error s ->
                   Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
                     "Error loading runtime-configurable constants from $file: \
@@ -139,7 +138,7 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
                       ; ("error", `String s) ] ;
                   raise Genesis_state_initialization_error
             in
-            (ledger, proof, {constants with runtime= new_runtime_constants}) )
+            (ledger, proof, new_constants) )
     | None ->
         Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
           "Could not retrieve genesis ledger and genesis proof from paths \

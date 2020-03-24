@@ -172,6 +172,49 @@ let to_slot_var :
   let%map bits = T.Checked.to_bits t in
   Coda_numbers.Global_slot.Checked.of_bits bits
 
+module Protocol = struct
+  open Genesis_constants.Protocol
+
+  type value = (T.t, T.t, Block_time.t) _t
+
+  let value_of_t (v : t) : value =
+    { k= T.of_int v.k
+    ; delta= T.of_int v.delta
+    ; genesis_state_timestamp= Block_time.of_time v.genesis_state_timestamp }
+
+  type var = (T.Checked.t, T.Checked.t, Block_time.Unpacked.var) _t
+
+  let to_hlist ({k; delta; genesis_state_timestamp} : (_, _, _) _t) =
+    H_list.[k; delta; genesis_state_timestamp]
+
+  let of_hlist : (unit, 'a -> 'b -> 'c -> unit) H_list.t -> ('a, 'b, 'c) _t =
+   fun H_list.[k; delta; genesis_state_timestamp] ->
+    {k; delta; genesis_state_timestamp}
+
+  let data_spec =
+    Data_spec.[T.Checked.typ; T.Checked.typ; Block_time.Unpacked.typ]
+
+  let typ =
+    Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
+      ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+
+  let to_input (t : value) =
+    Random_oracle.Input.bitstrings
+      [| T.to_bits t.k
+       ; T.to_bits t.delta
+       ; Block_time.Bits.to_bits t.genesis_state_timestamp |]
+
+  let var_to_input (var : var) =
+    let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
+    let%map k = T.Checked.to_bits var.k
+    and delta = T.Checked.to_bits var.delta in
+    let genesis_state_timestamp =
+      Block_time.Unpacked.var_to_bits var.genesis_state_timestamp
+    in
+    Random_oracle.Input.bitstrings
+      (Array.map ~f:s [|k; delta; genesis_state_timestamp|])
+end
+
 (*type 'a tree = Empty | Node of 'a * 'a forest
 
 and 'a forest = Nil | Cons of 'a tree * 'a forest [@@deriving sexp]

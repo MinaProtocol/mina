@@ -70,10 +70,10 @@ type t =
 
 let create_t (genesis_constants : Genesis_constants.t) : t =
   let sub_windows_per_window = c in
-  let slots_per_sub_window = genesis_constants.consensus.k in
+  let slots_per_sub_window = genesis_constants.protocol.k in
   let slots_per_window = sub_windows_per_window * slots_per_sub_window in
   (* Number of slots =24k in ouroboros praos *)
-  let slots_per_epoch = 3 * c * genesis_constants.consensus.k in
+  let slots_per_epoch = 3 * c * genesis_constants.protocol.k in
   (* This is a bit of a hack, see #3232. *)
   let inactivity_ms = block_window_duration_ms * 8 in
   let module Slot = struct
@@ -98,12 +98,12 @@ let create_t (genesis_constants : Genesis_constants.t) : t =
   end in
   let delta_duration =
     Time.Span.of_ms
-      (Float.of_int (Slot.duration_ms * genesis_constants.consensus.delta))
+      (Float.of_int (Slot.duration_ms * genesis_constants.protocol.delta))
   in
   let consensus =
-    { Consensus_constants.k= genesis_constants.consensus.k
+    { Consensus_constants.k= genesis_constants.protocol.k
     ; c
-    ; delta= genesis_constants.consensus.delta
+    ; delta= genesis_constants.protocol.delta
     ; block_window_duration_ms
     ; slots_per_sub_window
     ; slots_per_window
@@ -118,8 +118,8 @@ let create_t (genesis_constants : Genesis_constants.t) : t =
   in
   { consensus
   ; inactivity_ms
-  ; txpool_max_size= genesis_constants.runtime.txpool_max_size
-  ; genesis_state_timestamp= genesis_constants.runtime.genesis_state_timestamp
+  ; txpool_max_size= genesis_constants.txpool_max_size
+  ; genesis_state_timestamp= genesis_constants.protocol.genesis_state_timestamp
   }
 
 let t_ref = ref None

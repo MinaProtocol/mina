@@ -19,8 +19,8 @@ module Transition_frontier_validation =
   External_transition.Transition_frontier_validation (Transition_frontier)
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
-let catchup_timeout_duration () =
-  let constants = (Coda_constants.t ()).consensus in
+let catchup_timeout_duration genesis_constants =
+  let constants = (Coda_constants.create_t genesis_constants).consensus in
   Block_time.Span.of_ms
     (constants.delta * constants.block_window_duration_ms |> Int64.of_int)
 
@@ -146,7 +146,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
                   (Transition_frontier.find frontier
                      (Non_empty_list.head delta_state_hashes))
                   ~init:(Block_time.Span.of_ms 0L)
-                  ~f:(fun _ _ -> catchup_timeout_duration ())
+                  ~f:(fun _ _ -> catchup_timeout_duration genesis_constants)
               in
               Catchup_scheduler.watch catchup_scheduler ~timeout_duration
                 ~cached_transition:cached_initially_validated_transition ;

@@ -607,10 +607,7 @@ let next_producer_timing t = t.next_producer_timing
 
 let staking_ledger t =
   let open Option.Let_syntax in
-  let coda_constants =
-    Coda_constants.t ()
-    (*TODO: add genesis constants to coda lib *)
-  in
+  let coda_constants = Coda_constants.create_t t.config.genesis_constants in
   let%map transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
@@ -664,11 +661,12 @@ let start t =
     ~consensus_local_state:t.config.consensus_local_state
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
-    ~log_block_creation:t.config.log_block_creation ;
+    ~log_block_creation:t.config.log_block_creation
+    ~genesis_constants:t.config.genesis_constants ;
   Snark_worker.start t
 
-let create (config : Config.t) ~genesis_ledger ~base_proof ~genesis_constants =
-  let coda_constants = Coda_constants.create_t genesis_constants in
+let create (config : Config.t) ~genesis_ledger ~base_proof =
+  let coda_constants = Coda_constants.create_t config.genesis_constants in
   Coda_constants.t_ref := Some coda_constants ;
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
@@ -879,6 +877,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof ~genesis_constants =
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config
               ~trust_system:config.trust_system
+              ~pool_max_size:config.genesis_constants.txpool_max_size
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
@@ -891,7 +890,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof ~genesis_constants =
               =
             Broadcast_pipe.create
               ( External_transition.genesis ~genesis_ledger ~base_proof
-                  ~genesis_constants
+                  ~genesis_constants:config.genesis_constants
               |> External_transition.Validated.to_initial_validated )
           in
           let valid_transitions, initialization_finish_signal =
@@ -949,7 +948,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof ~genesis_constants =
                          breadcrumb ))
                   ~most_recent_valid_block
                   ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
-                  ~base_proof ~genesis_constants )
+                  ~base_proof ~genesis_constants:config.genesis_constants )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

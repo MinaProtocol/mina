@@ -206,10 +206,9 @@ let run_test () : unit Deferred.t =
              ~genesis_state_hash:
                (Coda_state.Genesis_protocol_state.For_tests.genesis_state_hash
                   ())
-             ())
+             ~genesis_constants:Genesis_constants.compiled ())
           ~genesis_ledger:Test_genesis_ledger.t
           ~base_proof:Precomputed_values.base_proof
-          ~genesis_constants:Genesis_constants.compiled
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
@@ -438,7 +437,9 @@ let run_test () : unit Deferred.t =
         else if with_snark then 15.
         else 7.
       in
-      let consensus_constants = (Coda_constants.t ()).consensus in
+      let consensus_constants =
+        Coda_constants.compiled_constants_for_test.consensus
+      in
       let wait_till_length =
         if medium_curves then Coda_numbers.Length.of_int 1
         else if test_full_epoch then
