@@ -245,9 +245,7 @@ let make = (~profiles) => {
         <div className=Styles.textBlock>
           <p className=Styles.heroCopy>
             {React.string(
-               "Meet some of the 48 Genesis Founding Members.
-               These community members are learning how to operate the protocol, and strengthening the Coda network and community.
-               They are the backbone of the global Coda community.",
+               "Meet a few of the 40 members who are part of Genesis Cohort 1. These community members are crucial to strengthening the Coda network. They are the backbone of the global Coda community.",
              )}
           </p>
         </div>
