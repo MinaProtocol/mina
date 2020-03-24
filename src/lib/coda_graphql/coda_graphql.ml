@@ -130,6 +130,46 @@ module Types = struct
                 "The transaction has either been snarked, reached finality \
                  through consensus or has been dropped" ]
 
+  let consensus_time =
+    let module C = Consensus.Data.Consensus_time in
+    obj "ConsensusTime" ~fields:(fun _ ->
+        [ field "epoch" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ global_slot -> C.epoch global_slot)
+        ; field "slot" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ global_slot -> C.slot global_slot)
+        ; field "globalSlot" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ (global_slot : Consensus.Data.Consensus_time.t) ->
+              C.to_uint32 global_slot )
+        ; field "startTime" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} global_slot ->
+              let constants =
+                Consensus.Constants.create
+                  ~protocol_constants:
+                    (Coda_lib.config coda).genesis_constants.protocol
+              in
+              Block_time.to_string
+              @@ C.start_time global_slot
+                   ~genesis_state_timestamp:constants.genesis_state_timestamp
+                   ~epoch_duration:constants.epoch_duration
+                   ~slot_duration_ms:constants.slot_duration_ms )
+        ; field "endTime" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} global_slot ->
+              let constants =
+                Consensus.Constants.create
+                  ~protocol_constants:
+                    (Coda_lib.config coda).genesis_constants.protocol
+              in
+              Block_time.to_string
+              @@ C.end_time global_slot
+                   ~genesis_state_timestamp:constants.genesis_state_timestamp
+                   ~epoch_duration:constants.epoch_duration
+                   ~slot_duration_ms:constants.slot_duration_ms ) ] )
+
   let block_producer_timing :
       ( _
       , [`Check_again of Block_time.t | `Produce of Block_time.t | `Produce_now]
@@ -141,9 +181,7 @@ module Types = struct
             ~constants:consensus_constants
         in
         [ field "times"
-            ~typ:
-              ( non_null @@ list @@ non_null
-              @@ Consensus.Data.Consensus_time.graphql_type () )
+            ~typ:(non_null @@ list @@ non_null consensus_time)
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} ->
               let consensus_constants =
@@ -243,7 +281,6 @@ module Types = struct
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
           let open Reflection.Shorthand in
-          let consensus_time = Consensus.Data.Consensus_time.graphql_type () in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
                ~next_block_production:(id ~typ:block_producer_timing)

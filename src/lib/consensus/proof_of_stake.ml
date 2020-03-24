@@ -1205,44 +1205,7 @@ module Data = struct
   end
 
   module Consensus_time = struct
-    open Graphql_async
-    open Schema
     include Global_slot
-
-    let graphql_type () =
-      let open Graphql_lib.Base_types in
-      (*Deepthi TODO*)
-      let constants = Constants.compiled in
-      let slot_duration_ms = constants.slot_duration_ms in
-      let genesis_state_timestamp = constants.genesis_state_timestamp in
-      let epoch_duration = constants.epoch_duration in
-      obj "ConsensusTime" ~fields:(fun _ ->
-          [ field "epoch"
-              ~typ:(non_null @@ uint32 ())
-              ~args:Arg.[]
-              ~resolve:(fun {ctx= _coda; _} global_slot -> epoch global_slot)
-          ; field "slot"
-              ~typ:(non_null @@ uint32 ())
-              ~args:Arg.[]
-              ~resolve:(fun _ global_slot -> slot global_slot)
-          ; field "globalSlot"
-              ~typ:(non_null @@ uint32 ())
-              ~args:Arg.[]
-              ~resolve:(fun _ (global_slot : t) ->
-                Coda_numbers.Global_slot.to_uint32
-                  (Global_slot.slot_number global_slot) )
-          ; field "startTime" ~typ:(non_null string)
-              ~args:Arg.[]
-              ~resolve:(fun _ global_slot ->
-                Time.to_string
-                @@ start_time global_slot ~genesis_state_timestamp
-                     ~epoch_duration ~slot_duration_ms )
-          ; field "endTime" ~typ:(non_null string)
-              ~args:Arg.[]
-              ~resolve:(fun _ global_slot ->
-                Time.to_string
-                @@ end_time global_slot ~genesis_state_timestamp
-                     ~epoch_duration ~slot_duration_ms ) ] )
 
     let to_string_hum = time_hum
 

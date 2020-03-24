@@ -366,8 +366,6 @@ module type S = sig
 
       type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
 
-      val graphql_type : unit -> ('ctx, t option) Graphql_async.Schema.typ
-
       val to_string_hum : t -> string
 
       val to_time : t -> constants:Constants.t -> Block_time.t
@@ -378,6 +376,24 @@ module type S = sig
       val get_old : t -> t
 
       val to_uint32 : t -> Unsigned.UInt32.t
+
+      val epoch : t -> Unsigned.UInt32.t
+
+      val slot : t -> Unsigned.UInt32.t
+
+      val start_time :
+           t
+        -> genesis_state_timestamp:Block_time.t
+        -> epoch_duration:Block_time.Span.t
+        -> slot_duration_ms:Block_time.Span.t
+        -> Block_time.t
+
+      val end_time :
+           t
+        -> genesis_state_timestamp:Block_time.t
+        -> epoch_duration:Block_time.Span.t
+        -> slot_duration_ms:Block_time.Span.t
+        -> Block_time.t
     end
 
     module Consensus_state : sig
