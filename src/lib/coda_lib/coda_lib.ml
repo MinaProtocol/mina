@@ -11,7 +11,6 @@ open Strict_pipe
 open Signature_lib
 open O1trace
 open Otp_lib
-open Module_version
 open Network_peer
 module Config = Config
 module Subscriptions = Coda_subscriptions
@@ -463,29 +462,14 @@ let staged_ledger_ledger_proof t =
 let validated_transitions t = t.pipes.validated_transitions_reader
 
 module Root_diff = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          {user_commands: User_command.Stable.V1.t list; root_length: int}
-        [@@deriving bin_io, version]
-      end
+      type t = {user_commands: User_command.Stable.V1.t list; root_length: int}
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transition_frontier_diff_node_list"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t =
     {user_commands: User_command.t list; root_length: int}

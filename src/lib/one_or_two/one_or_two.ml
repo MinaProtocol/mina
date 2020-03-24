@@ -1,18 +1,13 @@
 open Core
 open Async
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type 'a t = [`One of 'a | `Two of 'a * 'a]
-      [@@deriving bin_io, equal, compare, hash, sexp, version, yojson]
-    end
-
-    include T
+    type 'a t = [`One of 'a | `Two of 'a * 'a]
+    [@@deriving equal, compare, hash, sexp, yojson]
   end
-
-  module Latest = V1
-end
+end]
 
 type 'a t = 'a Stable.Latest.t [@@deriving compare, equal, hash, sexp, yojson]
 
