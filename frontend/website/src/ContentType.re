@@ -24,7 +24,7 @@ module System = {
   type entries('a) = {items: array(entry('a))};
 };
 
-module Post = {
+module BlogPost = {
   let id = "test";
   type t = {
     title: string,
@@ -66,39 +66,26 @@ module KnowledgeBase = {
   type entries = System.entries(t);
 };
 
-module DocsPage = {
-  let id = "docsPage2";
-  type t = {
-    title: string,
-    slug: string,
-    content: string,
-  };
+module Image = {
+  type file = {url: string};
+  type t = {file};
+
   type entry = System.entry(t);
   type entries = System.entries(t);
 };
 
-module DocsFolder = {
-  let id = "docsPage";
-  type docsChild;
-  type docsChildEntry = System.entry(docsChild);
+module GenesisProfile = {
+  let id = "genesisProfile";
   type t = {
-    title: string,
-    slug: string,
-    children: array(docsChildEntry),
+    name: string,
+    profilePhoto: Image.entry,
+    quote: string,
+    memberLocation: string,
+    twitter: string,
+    github: string,
+    publishDate: string,
+    blogPost: BlogPost.entry,
   };
   type entry = System.entry(t);
   type entries = System.entries(t);
-  external childToPageUnsafe: docsChildEntry => DocsPage.entry = "%identity";
-  external childToFolderUnsafe: docsChildEntry => entry = "%identity";
-};
-
-module Docs = {
-  type t = [ | `Page(DocsPage.t) | `Folder(DocsFolder.t)];
-
-  let fromDocsChild = (entry: System.entry(DocsFolder.docsChild)) =>
-    if (entry.sys.contentType.sys.id == DocsPage.id) {
-      `Page(DocsFolder.childToPageUnsafe(entry).fields);
-    } else {
-      `Folder(DocsFolder.childToFolderUnsafe(entry).fields);
-    };
 };

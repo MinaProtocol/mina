@@ -61,13 +61,15 @@ let make = (~account, ~onClose, ~onSuccess) => {
            | Data(_) =>
              onSuccess();
              React.null;
-           | Error(err) =>
+           | Error((err: ReasonApolloTypes.apolloError)) =>
              let message =
-               err##graphQLErrors
+               err.graphQLErrors
                |> Js.Nullable.toOption
-               |> Option.withDefault(~default=Array.empty)
+               |> Option.withDefault(~default=[||])
                |> Array.get(~index=0)
-               |> Option.map(~f=e => e##message)
+               |> Option.map(~f=(e: ReasonApolloTypes.graphqlError) =>
+                    e.message
+                  )
                |> Option.withDefault(~default="Server error");
              setError(_ => Some(message));
              React.null;
