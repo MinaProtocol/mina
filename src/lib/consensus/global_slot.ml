@@ -3,6 +3,7 @@ open Core
 open Coda_base
 open Snark_params.Tick
 module T = Coda_numbers.Global_slot
+module Length = Coda_numbers.Length
 
 (*include (T : module type of T with module Checked := T.Checked)*)
 
@@ -10,19 +11,22 @@ module Poly = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type 'a t = {slot_number: 'a; slots_per_epoch: 'a}
+      type ('slot_number, 'slots_per_epoch) t =
+        {slot_number: 'slot_number; slots_per_epoch: 'slots_per_epoch}
       [@@deriving sexp, eq, compare, hash, yojson]
     end
   end]
 
-  type 'a t = 'a Stable.Latest.t = {slot_number: 'a; slots_per_epoch: 'a}
+  type ('slot_number, 'slots_per_epoch) t =
+        ('slot_number, 'slots_per_epoch) Stable.Latest.t =
+    {slot_number: 'slot_number; slots_per_epoch: 'slots_per_epoch}
   [@@deriving sexp, eq, compare, hash, yojson]
 end
 
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = T.Stable.V1.t Poly.Stable.V1.t
+    type t = (T.Stable.V1.t, Length.Stable.V1.t) Poly.Stable.V1.t
     [@@deriving sexp, eq, compare, hash, yojson]
 
     let to_latest = Fn.id
@@ -36,15 +40,15 @@ type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
 type value = t [@@deriving sexp, eq, compare, hash, yojson]
 
-type var = T.Checked.var Poly.t
+type var = (T.Checked.t, Length.Checked.t) Poly.t
 
-let to_hlist ({slot_number; slots_per_epoch} : 'a Poly.t) =
+let to_hlist ({slot_number; slots_per_epoch} : _ Poly.t) =
   H_list.[slot_number; slots_per_epoch]
 
-let of_hlist : (unit, 'a -> 'a -> unit) H_list.t -> 'a Poly.t =
+let of_hlist : (unit, _) H_list.t -> _ Poly.t =
  fun H_list.[slot_number; slots_per_epoch] -> {slot_number; slots_per_epoch}
 
-let data_spec = Data_spec.[T.Checked.typ; T.Checked.typ]
+let data_spec = Data_spec.[T.Checked.typ; Length.Checked.typ]
 
 let typ =
   Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -52,18 +56,19 @@ let typ =
 
 let to_input (t : value) =
   Random_oracle.Input.bitstrings
-    (Array.map ~f:T.to_bits [|t.slot_number; t.slots_per_epoch|])
+    [|T.to_bits t.slot_number; Length.to_bits t.slots_per_epoch|]
 
 let gen =
   let open Quickcheck.Let_syntax in
   let slots_per_epoch =
     Coda_constants.compiled_constants_for_test.consensus.slots_per_epoch
-    |> T.of_int
+    |> Length.of_int
   in
   let%map slot_number = T.gen in
   {Poly.slot_number; slots_per_epoch}
 
-let create ~(epoch : Epoch.t) ~(slot : Slot.t) ~slots_per_epoch : t =
+let create ~(epoch : Epoch.t) ~(slot : Slot.t) ~(slots_per_epoch : Length.t) :
+    t =
   { slot_number= UInt32.Infix.(slot + (slots_per_epoch * epoch))
   ; slots_per_epoch }
 
@@ -106,20 +111,11 @@ let time_hum t =
   let epoch, slot = to_epoch_and_slot t in
   sprintf "epoch=%d, slot=%d" (Epoch.to_int epoch) (Slot.to_int slot)
 
-let of_time_exn time ~(coda_constants : Coda_constants.t) =
-  let genesis_state_timestamp =
-    coda_constants.genesis_state_timestamp |> Block_time.of_time
-  in
-  let epoch_duration =
-    coda_constants.consensus.epoch_duration |> Block_time.Span.of_time_span
-  in
-  let slot_duration_ms =
-    coda_constants.consensus.slot_duration_ms |> Int64.of_int
-    |> Block_time.Span.of_ms
-  in
-  let slots_per_epoch =
-    coda_constants.consensus.slot_duration_ms |> UInt32.of_int
-  in
+let of_time_exn time ~(constants : Constants.t) =
+  let genesis_state_timestamp = constants.genesis_state_timestamp in
+  let epoch_duration = constants.epoch_duration in
+  let slot_duration_ms = constants.slot_duration_ms in
+  let slots_per_epoch = constants.slots_per_epoch in
   of_epoch_and_slot
     (Epoch.epoch_and_slot_of_time_exn time ~genesis_state_timestamp
        ~epoch_duration ~slot_duration_ms)
@@ -131,7 +127,7 @@ let diff (t : t) (other_epoch, other_slot) ~epoch_size =
   let old_epoch =
     epoch - other_epoch - (UInt32.of_int @@ if other_slot > slot then 1 else 0)
   in
-  let old_slot = (slot - other_slot) mod epoch_size in
+  let old_slot = (slot - other_slot) mod Length.to_uint32 epoch_size in
   of_epoch_and_slot (old_epoch, old_slot) ~slots_per_epoch:t.slots_per_epoch
 
 module Checked = struct
@@ -142,13 +138,13 @@ module Checked = struct
   let to_bits (t : t) =
     let open Bitstring_lib.Bitstring.Lsb_first in
     let%map slot_number = T.Checked.to_bits t.slot_number
-    and slots_per_epoch = T.Checked.to_bits t.slots_per_epoch in
+    and slots_per_epoch = Length.Checked.to_bits t.slots_per_epoch in
     List.concat_map ~f:to_list [slot_number; slots_per_epoch] |> of_list
 
   let to_input (var : t) =
     let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
     let%map slot_number = T.Checked.to_bits var.slot_number
-    and slots_per_epoch = T.Checked.to_bits var.slots_per_epoch in
+    and slots_per_epoch = Length.Checked.to_bits var.slots_per_epoch in
     Random_oracle.Input.bitstrings
       (Array.map ~f:s [|slot_number; slots_per_epoch|])
 
@@ -159,7 +155,7 @@ module Checked = struct
         let epoch, slot =
           Integer.div_mod ~m
             (T.Checked.to_integer t.slot_number)
-            (T.Checked.to_integer t.slots_per_epoch)
+            (Length.Checked.to_integer t.slots_per_epoch)
         in
         ( Epoch.Checked.Unsafe.of_integer epoch
         , Slot.Checked.Unsafe.of_integer slot ) )

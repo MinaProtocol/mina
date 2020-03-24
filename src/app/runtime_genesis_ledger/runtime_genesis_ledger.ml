@@ -18,7 +18,7 @@ let use_dummy_values = true
 
 type t = Ledger.t
 
-let generate_base_proof ~ledger ~genesis_constants =
+let generate_base_proof ~ledger ~(genesis_constants : Genesis_constants.t) =
   let%map (module Keys) = Keys_lib.Keys.create () in
   let genesis_ledger = lazy ledger in
   let genesis_state =
@@ -44,7 +44,7 @@ let generate_base_proof ~ledger ~genesis_constants =
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
       ; prev_state=
           Coda_state.Protocol_state.negative_one ~genesis_ledger
-            ~genesis_constants
+            ~protocol_constants:genesis_constants.protocol
       ; genesis_state_hash= genesis_state.hash
       ; expected_next_state= None
       ; update= Coda_state.Snark_transition.genesis ~genesis_ledger }

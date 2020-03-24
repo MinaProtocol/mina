@@ -33,12 +33,14 @@ let cached_transform_deferred_result ~transform_cached ~transform_result cached
 (* add a breadcrumb and perform post processing *)
 let add_and_finalize ~logger ~frontier ~catchup_scheduler
     ~processed_transition_writer ~only_if_present ~time_controller ~source
-    cached_breadcrumb ~genesis_constants =
+    cached_breadcrumb ~(genesis_constants : Genesis_constants.t) =
   let breadcrumb =
     if Cached.is_pure cached_breadcrumb then Cached.peek cached_breadcrumb
     else Cached.invalidate_with_success cached_breadcrumb
   in
-  let coda_constants = Coda_constants.create_t genesis_constants in
+  let consensus_constants =
+    Consensus.Constants.create ~protocol_constants:genesis_constants.protocol
+  in
   let transition =
     Transition_frontier.Breadcrumb.validated_transition breadcrumb
   in
@@ -69,7 +71,7 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
         Block_time.diff
           (Block_time.now time_controller)
           (Consensus.Data.Consensus_time.to_time transition_time
-             ~coda_constants)
+             ~constants:consensus_constants)
       in
       Coda_metrics.Block_latency.Inclusion_time.update
         (Block_time.Span.to_time_span time_elapsed) ) ;

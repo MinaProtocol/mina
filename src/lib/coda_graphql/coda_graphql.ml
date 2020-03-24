@@ -136,18 +136,28 @@ module Types = struct
         option )
       typ =
     obj "BlockProducerTimings" ~fields:(fun _ ->
-        let coda_constants = Coda_constants.t () in
-        let of_time =
-          Consensus.Data.Consensus_time.of_time_exn ~coda_constants
+        let of_time ~consensus_constants =
+          Consensus.Data.Consensus_time.of_time_exn
+            ~constants:consensus_constants
         in
         [ field "times"
             ~typ:
               ( non_null @@ list @@ non_null
-              @@ Consensus.Data.Consensus_time.graphql_type ~coda_constants )
+              @@ Consensus.Data.Consensus_time.graphql_type () )
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} -> function `Check_again _time -> []
-              | `Produce time -> [of_time time] | `Produce_now ->
-                  [ of_time
+            ~resolve:(fun {ctx= coda; _} ->
+              let consensus_constants =
+                Consensus.Constants.create
+                  ~protocol_constants:
+                    (Coda_lib.config coda).genesis_constants.protocol
+              in
+              function
+              | `Check_again _time ->
+                  []
+              | `Produce time ->
+                  [of_time time ~consensus_constants]
+              | `Produce_now ->
+                  [ of_time ~consensus_constants
                     @@ Block_time.now (Coda_lib.config coda).time_controller ]
               ) ] )
 
@@ -233,10 +243,7 @@ module Types = struct
     let t : (_, Daemon_rpcs.Types.Status.t option) typ =
       obj "DaemonStatus" ~fields:(fun _ ->
           let open Reflection.Shorthand in
-          let coda_constants = Coda_constants.t () in
-          let consensus_time =
-            Consensus.Data.Consensus_time.graphql_type ~coda_constants
-          in
+          let consensus_time = Consensus.Data.Consensus_time.graphql_type () in
           List.rev
           @@ Daemon_rpcs.Types.Status.Fields.fold ~init:[] ~num_accounts:int
                ~next_block_production:(id ~typ:block_producer_timing)

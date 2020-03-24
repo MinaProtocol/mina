@@ -67,7 +67,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
       ; prev_state=
           Protocol_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-            ~genesis_constants:Genesis_constants.compiled
+            ~protocol_constants:Genesis_constants.compiled.protocol
       ; genesis_state_hash= protocol_state_with_hash.hash
       ; expected_next_state= None
       ; update= Snark_transition.genesis ~genesis_ledger:Test_genesis_ledger.t

@@ -10,7 +10,7 @@ let create_bufferred_pipe ?name () =
   Strict_pipe.create ?name (Buffered (`Capacity 50, `Overflow Crash))
 
 let is_transition_for_bootstrap ~logger frontier new_transition
-    ~genesis_constants =
+    ~(genesis_constants : Genesis_constants.t) =
   let root_state =
     Transition_frontier.root frontier
     |> Transition_frontier.Breadcrumb.protocol_state
@@ -19,7 +19,9 @@ let is_transition_for_bootstrap ~logger frontier new_transition
     External_transition.Initial_validated.protocol_state new_transition
   in
   Consensus.Hooks.should_bootstrap
-    ~coda_constants:(Coda_constants.create_t genesis_constants)
+    ~constants:
+      (Consensus.Constants.create
+         ~protocol_constants:genesis_constants.protocol)
     ~existing:(Protocol_state.consensus_state root_state)
     ~candidate:(Protocol_state.consensus_state new_state)
     ~logger:
@@ -263,7 +265,9 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
               ~consensus_state:
                 (Transition_frontier.Breadcrumb.consensus_state root)
               ~local_state:consensus_local_state
-              ~coda_constants:(Coda_constants.create_t genesis_constants)
+              ~constants:
+                (Consensus.Constants.create
+                   ~protocol_constants:genesis_constants.protocol)
           with
           | None ->
               Deferred.unit
@@ -291,15 +295,16 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
           ~collected_transitions:[best_tip] ~transition_reader_ref
           ~transition_writer_ref ~frontier_w ~genesis_constants frontier
 
-let wait_till_genesis ~logger ~time_controller ~genesis_constants =
+let wait_till_genesis ~logger ~time_controller
+    ~(genesis_constants : Genesis_constants.t) =
   let module Time = Block_time in
   let now = Time.now time_controller in
-  let coda_constants = Coda_constants.create_t genesis_constants in
-  let genesis_state_timestamp =
-    Time.of_time coda_constants.genesis_state_timestamp
+  let consensus_constants =
+    Consensus.Constants.create ~protocol_constants:genesis_constants.protocol
   in
+  let genesis_state_timestamp = consensus_constants.genesis_state_timestamp in
   try
-    Consensus.Hooks.is_genesis_epoch now ~coda_constants
+    Consensus.Hooks.is_genesis_epoch now ~constants:consensus_constants
     |> Fn.const Deferred.unit
   with Invalid_argument _ ->
     let time_till_genesis = Time.diff genesis_state_timestamp now in
@@ -313,7 +318,7 @@ let wait_till_genesis ~logger ~time_controller ~genesis_constants =
       let%bind () = after (Time_ns.Span.of_sec 30.) in
       let now = Time.now time_controller in
       try
-        Consensus.Hooks.is_genesis_epoch now ~coda_constants
+        Consensus.Hooks.is_genesis_epoch now ~constants:consensus_constants
         |> Fn.const Deferred.unit
       with Invalid_argument _ ->
         let tm_remaining = Time.diff genesis_state_timestamp now in

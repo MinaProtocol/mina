@@ -527,9 +527,11 @@ let skip_genesis_protocol_state_validation
 
 let validate_time_received (t, validation) ~time_received =
   let protocol_state = With_hash.data t |> protocol_state in
-  let coda_constants =
-    Coda_constants.t ()
-    (*TODO let coda_constants = Coda_constants.create_t Protocol_state.coda_constants *)
+  let constants =
+    Consensus.Constants.create
+      ~protocol_constants:
+        ( Protocol_state.constants protocol_state
+        |> Protocol_constants_checked.t_of_value )
   in
   let consensus_state = Protocol_state.consensus_state protocol_state in
   let received_unix_timestamp =
@@ -537,7 +539,7 @@ let validate_time_received (t, validation) ~time_received =
   in
   match
     Consensus.Hooks.received_at_valid_time consensus_state
-      ~time_received:received_unix_timestamp ~coda_constants
+      ~time_received:received_unix_timestamp ~constants
   with
   | Ok () ->
       Ok (t, Validation.Unsafe.set_valid_time_received validation)

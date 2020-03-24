@@ -32,7 +32,7 @@ module Checked = struct
           Integer.div_mod ~m
             (Coda_numbers.Global_slot.Checked.to_integer
                (Global_slot.slot_number s))
-            (Coda_base.Coda_constants_checked.T.Checked.to_integer
+            (Coda_base.Protocol_constants_checked.T.Checked.to_integer
                slots_per_sub_window)
         in
         q )
@@ -42,7 +42,7 @@ module Checked = struct
     make_checked (fun () ->
         let _, shift =
           Integer.div_mod ~m t
-            (Coda_base.Coda_constants_checked.T.Checked.to_integer
+            (Coda_base.Protocol_constants_checked.T.Checked.to_integer
                sub_windows_per_window)
         in
         Sub_window.Checked.Unsafe.of_integer shift )

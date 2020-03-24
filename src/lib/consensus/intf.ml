@@ -5,6 +5,12 @@ open Currency
 open Signature_lib
 open Coda_base
 
+module type Constants = sig
+  type t
+
+  val create : protocol_constants:Genesis_constants.Protocol.t -> t
+end
+
 module type Blockchain_state = sig
   module Poly : sig
     [%%versioned:
@@ -80,24 +86,16 @@ module type Protocol_state = sig
       [%%versioned:
       module Stable : sig
         module V1 : sig
-          type ( 'state_hash
-               , 'blockchain_state
-               , 'consensus_state
-               , 'coda_constants )
-               t
+          type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t
           [@@deriving sexp]
         end
       end]
 
-      type ( 'state_hash
-           , 'blockchain_state
-           , 'consensus_state
-           , 'coda_constants )
-           t =
+      type ('state_hash, 'blockchain_state, 'consensus_state, 'constants) t =
         ( 'state_hash
         , 'blockchain_state
         , 'consensus_state
-        , 'coda_constants )
+        , 'constants )
         Stable.Latest.t
       [@@deriving sexp]
     end
@@ -110,7 +108,7 @@ module type Protocol_state = sig
             ( State_hash.t
             , blockchain_state
             , consensus_state
-            , Coda_constants_checked.Value.t )
+            , Protocol_constants_checked.Value.Stable.V1.t )
             Poly.Stable.V1.t
           [@@deriving sexp, to_yojson]
         end
@@ -121,7 +119,7 @@ module type Protocol_state = sig
       ( State_hash.var
       , blockchain_state_var
       , consensus_state_var
-      , Coda_constants_checked.var )
+      , Protocol_constants_checked.var )
       Poly.Stable.Latest.t
   end
 
@@ -144,7 +142,7 @@ module type Protocol_state = sig
     -> genesis_state_hash:State_hash.t
     -> blockchain_state:blockchain_state
     -> consensus_state:consensus_state
-    -> coda_constants:Coda_constants_checked.Value.t
+    -> constants:Protocol_constants_checked.Value.t
     -> Value.t
 
   val previous_state_hash : ('state_hash, _) Poly.t -> 'state_hash
@@ -160,8 +158,7 @@ module type Protocol_state = sig
   val consensus_state :
     (_, (_, _, 'consensus_state, _) Body.Poly.t) Poly.t -> 'consensus_state
 
-  val coda_constants :
-    (_, (_, _, _, 'coda_constants) Body.Poly.t) Poly.t -> 'coda_constants
+  val constants : (_, (_, _, _, 'constants) Body.Poly.t) Poly.t -> 'constants
 
   val hash : Value.t -> State_hash.t
 end
@@ -231,7 +228,6 @@ module type State_hooks = sig
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
-    -> coda_constants:Coda_constants.t
     -> protocol_state * consensus_transition
 
   (**
@@ -269,10 +265,12 @@ module type S = sig
     * This is mostly useful for PoStake and other consensus mechanisms that have their own
     * notions of time.
   *)
-  val time_hum : Block_time.t -> coda_constants:Coda_constants.t -> string
+  val time_hum : Block_time.t -> constants:Constants.t -> string
 
   (** from postake *)
   val epoch_size : unit -> int
+
+  module Constants = Constants
 
   module Configuration : sig
     type t =
@@ -318,7 +316,7 @@ module type S = sig
            t
         -> Signature_lib.Public_key.Compressed.Set.t
         -> Block_time.t
-        -> coda_constants:Coda_constants.t
+        -> constants:Constants.t
         -> unit
     end
 
@@ -368,15 +366,13 @@ module type S = sig
 
       type t = Stable.Latest.t [@@deriving compare, sexp, yojson]
 
-      val graphql_type :
-           coda_constants:Coda_constants.t
-        -> ('ctx, t option) Graphql_async.Schema.typ
+      val graphql_type : unit -> ('ctx, t option) Graphql_async.Schema.typ
 
       val to_string_hum : t -> string
 
-      val to_time : t -> coda_constants:Coda_constants.t -> Block_time.t
+      val to_time : t -> constants:Constants.t -> Block_time.t
 
-      val of_time_exn : Block_time.t -> coda_constants:Coda_constants.t -> t
+      val of_time_exn : Block_time.t -> constants:Constants.t -> t
 
       (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)
       val get_old : t -> t
@@ -403,20 +399,20 @@ module type S = sig
 
       val negative_one :
            genesis_ledger:Ledger.t Lazy.t
-        -> genesis_constants:Genesis_constants.t
+        -> protocol_constants:Genesis_constants.Protocol.t
         -> Value.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
         -> genesis_ledger:Ledger.t Lazy.t
-        -> genesis_constants:Genesis_constants.t
+        -> protocol_constants:Genesis_constants.Protocol.t
         -> Value.t
 
       val create_genesis :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> genesis_ledger:Ledger.t Lazy.t
-        -> genesis_constants:Genesis_constants.t
+        -> protocol_constants:Genesis_constants.Protocol.t
         -> Value.t
 
       open Snark_params.Tick
@@ -472,8 +468,7 @@ module type S = sig
     end
 
     (* Check whether we are in the genesis epoch *)
-    val is_genesis_epoch :
-      Block_time.t -> coda_constants:Coda_constants.t -> bool
+    val is_genesis_epoch : Block_time.t -> constants:Constants.t -> bool
 
     (**
      * Check that a consensus state was received at a valid time.
@@ -481,7 +476,7 @@ module type S = sig
     val received_at_valid_time :
          Consensus_state.Value.t
       -> time_received:Unix_timestamp.t
-      -> coda_constants:Coda_constants.t
+      -> constants:Constants.t
       -> (unit, [`Too_early | `Too_late of int64]) result
 
     (**
@@ -514,7 +509,7 @@ module type S = sig
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> logger:Logger.t
-      -> coda_constants:Coda_constants.t
+      -> constants:Constants.t
       -> block_producer_timing
 
     (**
@@ -534,13 +529,13 @@ module type S = sig
          existing:Consensus_state.Value.t
       -> candidate:Consensus_state.Value.t
       -> logger:Logger.t
-      -> coda_constants:Coda_constants.t
+      -> constants:Constants.t
       -> bool
 
     val get_epoch_ledger :
          consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> coda_constants:Coda_constants.t
+      -> constants:Constants.t
       -> Coda_base.Sparse_ledger.t
 
     (** Data needed to synchronize the local state. *)
@@ -552,7 +547,7 @@ module type S = sig
     val required_local_state_sync :
          consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> coda_constants:Coda_constants.t
+      -> constants:Constants.t
       -> local_state_sync Non_empty_list.t option
 
     (**

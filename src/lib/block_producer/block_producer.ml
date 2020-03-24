@@ -103,8 +103,7 @@ end
 
 let generate_next_state ~previous_protocol_state ~time_controller
     ~staged_ledger ~transactions ~get_completed_work ~logger ~coinbase_receiver
-    ~(keypair : Keypair.t) ~block_data ~scheduled_time ~log_block_creation
-    ~coda_constants =
+    ~(keypair : Keypair.t) ~block_data ~scheduled_time ~log_block_creation =
   let open Interruptible.Let_syntax in
   let self = Public_key.compress keypair.public_key in
   let previous_protocol_state_body_hash =
@@ -208,7 +207,7 @@ let generate_next_state ~previous_protocol_state ~time_controller
                       .user_commands diff
                       :> User_command.t list )
                   ~snarked_ledger_hash:previous_ledger_hash ~supply_increase
-                  ~logger ~coda_constants ) )
+                  ~logger ) )
       in
       lift_sync (fun () ->
           measure "making Snark and Internal transitions" (fun () ->
@@ -252,9 +251,13 @@ let generate_next_state ~previous_protocol_state ~time_controller
 let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
     ~transaction_resource_pool ~time_controller ~keypairs ~coinbase_receiver
     ~consensus_local_state ~frontier_reader ~transition_writer
-    ~set_next_producer_timing ~log_block_creation ~genesis_constants =
+    ~set_next_producer_timing ~log_block_creation
+    ~(genesis_constants : Genesis_constants.t) =
   trace "block_producer" (fun () ->
-      let coda_constants = Coda_constants.create_t genesis_constants in
+      let consensus_constants =
+        Consensus.Constants.create
+          ~protocol_constants:genesis_constants.protocol
+      in
       let log_bootstrap_mode () =
         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
           "Pausing block production while bootstrapping"
@@ -297,7 +300,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 ~block_data ~previous_protocol_state ~time_controller
                 ~staged_ledger:(Breadcrumb.staged_ledger crumb)
                 ~transactions ~get_completed_work ~logger ~keypair
-                ~log_block_creation ~coda_constants
+                ~log_block_creation
             in
             trace_event "next state generated" ;
             match next_state_opt with
@@ -383,7 +386,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                       in
                       let delta_transition_chain_proof =
                         Transition_chain_prover.prove
-                          ~length:(coda_constants.consensus.delta - 1)
+                          ~length:
+                            ( Coda_numbers.Length.to_int
+                                consensus_constants.delta
+                            - 1 )
                           ~frontier previous_state_hash
                         |> Option.value_exn
                       in
@@ -567,7 +573,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                     consensus_local_state
                     ( Keypair.And_compressed_pk.Set.to_list keypairs
                     |> List.map ~f:snd |> Public_key.Compressed.Set.of_list )
-                    (Time.now time_controller) ~coda_constants ;
+                    (Time.now time_controller) ~constants:consensus_constants ;
                   keypairs
               | keypairs, `Same ->
                   keypairs
@@ -589,14 +595,15 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                 in
                 assert (
                   Consensus.Hooks.required_local_state_sync ~consensus_state
-                    ~local_state:consensus_local_state ~coda_constants
+                    ~local_state:consensus_local_state
+                    ~constants:consensus_constants
                   = None ) ;
                 let now = Time.now time_controller in
                 let next_producer_timing =
                   measure "asking conensus what to do" (fun () ->
                       Consensus.Hooks.next_producer_timing (time_to_ms now)
                         consensus_state ~local_state:consensus_local_state
-                        ~keypairs ~logger ~coda_constants )
+                        ~keypairs ~logger ~constants:consensus_constants )
                 in
                 set_next_producer_timing next_producer_timing ;
                 match next_producer_timing with
@@ -637,7 +644,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
         check_next_block_timing ()
       in
       let genesis_state_timestamp =
-        Time.of_time coda_constants.genesis_state_timestamp
+        consensus_constants.genesis_state_timestamp
       in
       (* if the producer starts before genesis, sleep until genesis *)
       let now = Time.now time_controller in

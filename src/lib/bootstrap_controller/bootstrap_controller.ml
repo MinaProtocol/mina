@@ -142,7 +142,7 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader =
 let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     ~transition_reader ~persistent_root ~persistent_frontier
     ~initial_root_transition ~genesis_state_hash ~genesis_ledger
-    ~genesis_constants =
+    ~(genesis_constants : Genesis_constants.t) =
   let rec loop () =
     let sync_ledger_reader, sync_ledger_writer =
       create ~name:"sync ledger pipe"
@@ -272,7 +272,9 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
           match
             Consensus.Hooks.required_local_state_sync ~consensus_state
               ~local_state:consensus_local_state
-              ~coda_constants:(Coda_constants.create_t genesis_constants)
+              ~constants:
+                (Consensus.Constants.create
+                   ~protocol_constants:genesis_constants.protocol)
           with
           | None ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__

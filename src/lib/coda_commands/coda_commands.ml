@@ -239,7 +239,10 @@ type active_state_fields =
 let get_status ~flag t =
   let open Coda_lib.Config in
   let config = Coda_lib.config t in
-  let coda_constants = Coda_constants.create_t config.genesis_constants in
+  let consensus_constants =
+    Consensus.Constants.create
+      ~protocol_constants:config.genesis_constants.protocol
+  in
   let uptime_secs =
     Time_ns.diff (Time_ns.now ()) start_time
     |> Time_ns.Span.to_sec |> Int.of_float
@@ -265,7 +268,7 @@ let get_status ~flag t =
   let consensus_time_now =
     Consensus.Data.Consensus_time.of_time_exn
       (Block_time.now time_controller)
-      ~coda_constants
+      ~constants:consensus_constants
   in
   (*TODO: from coda constants*)
   let consensus_configuration = Consensus.Configuration.t () in

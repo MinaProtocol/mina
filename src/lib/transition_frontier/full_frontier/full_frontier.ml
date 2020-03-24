@@ -506,11 +506,13 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
     "Applying %d diffs to full frontier (%s --> ?)" (List.length diffs)
     (Frontier_hash.to_string t.hash) ;
-  let coda_constants = Coda_constants.create_t t.genesis_constants in
+  let consensus_constants =
+    Consensus.Constants.create ~protocol_constants:t.genesis_constants.protocol
+  in
   let local_state_was_synced_at_start =
     Consensus.Hooks.required_local_state_sync
       ~consensus_state:(Breadcrumb.consensus_state (best_tip t))
-      ~local_state:t.consensus_local_state ~coda_constants
+      ~local_state:t.consensus_local_state ~constants:consensus_constants
     |> Option.is_none
   in
   let new_root, diffs_with_mutants =
@@ -541,7 +543,7 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
             ~consensus_state:
               (Breadcrumb.consensus_state
                  (Hashtbl.find_exn t.table t.best_tip).breadcrumb)
-            ~local_state:t.consensus_local_state ~coda_constants
+            ~local_state:t.consensus_local_state ~constants:consensus_constants
         with
         | Some jobs ->
             (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)

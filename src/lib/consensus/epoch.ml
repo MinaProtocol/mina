@@ -68,7 +68,7 @@ let diff_in_slots ((epoch, slot) : t * Slot.t) ((epoch', slot') : t * Slot.t)
   let of_uint32 = UInt32.to_int64 in
   let epoch, slot = (of_uint32 epoch, of_uint32 slot) in
   let epoch', slot' = (of_uint32 epoch', of_uint32 slot') in
-  let epoch_size = Int64.of_int epoch_size in
+  let epoch_size = UInt32.to_int64 epoch_size in
   let epoch_diff = epoch - epoch' in
   if epoch_diff > 0L then
     ((epoch_diff - 1L) * epoch_size) + slot + (epoch_size - slot')
@@ -77,12 +77,14 @@ let diff_in_slots ((epoch, slot) : t * Slot.t) ((epoch', slot') : t * Slot.t)
   else slot - slot'
 
 let%test_unit "test diff_in_slots" =
-  let coda_constants = Coda_constants.t () in
+  let constants =
+    Constants.create ~protocol_constants:Genesis_constants.compiled.protocol
+  in
   let open Int64.Infix in
   let ( !^ ) = UInt32.of_int in
   let ( !@ ) = Fn.compose ( !^ ) Int64.to_int in
-  let epoch_size = coda_constants.consensus.epoch_size in
-  let epoch_size_int64 = Int64.of_int epoch_size in
+  let epoch_size = constants.epoch_size in
+  let epoch_size_int64 = UInt32.to_int64 epoch_size in
   [%test_eq: int64] (diff_in_slots (!^0, !^5) (!^0, !^0) ~epoch_size) 5L ;
   [%test_eq: int64] (diff_in_slots (!^3, !^23) (!^3, !^20) ~epoch_size) 3L ;
   [%test_eq: int64]
@@ -103,6 +105,6 @@ let%test_unit "test diff_in_slots" =
 
 let incr ((epoch, slot) : t * Slot.t) ~epoch_size =
   let open UInt32 in
-  if Slot.equal slot (sub (UInt32.of_int epoch_size) one) then
+  if Slot.equal slot (sub (Coda_numbers.Length.to_uint32 epoch_size) one) then
     (add epoch one, zero)
   else (epoch, add slot one)
