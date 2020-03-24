@@ -115,10 +115,6 @@ let gen_division_generic (type t) (module M : Int_s with type t = t) (n : t)
     in
     let res = List.map dirichlet ~f:(fun x -> float_to_mt @@ (x *. n_float)) in
     let total = List.fold res ~f:M.( + ) ~init:M.zero in
-    (* Going through floating point land may have caused some rounding error. We
-     tack it onto the first result so that the sum of the output is equal to n.
-  *)
-    let rounding_error = M.(n - total) in
     return
       ( match res with
       | [] ->
@@ -126,7 +122,11 @@ let gen_division_generic (type t) (module M : Int_s with type t = t) (n : t)
             "empty result list in gen_symm_dirichlet, this should be \
              impossible. "
       | head :: rest ->
-          M.(head + rounding_error) :: rest )
+          (* Going through floating point land may have caused some rounding error. We
+           tack it onto the first result so that the sum of the output is equal to n. 
+         *)
+          if n > total then M.(head + (n - total)) :: rest
+          else M.(head - (total - n)) :: rest )
 
 let gen_division = gen_division_generic (module Int)
 
@@ -196,15 +196,14 @@ let gen_imperative_list (root_gen : 'a t) (node_gen : ('a -> 'a) t) =
       | n ->
           let%bind this = node_gen in
           let%map f = with_size ~size:(n - 1) self in
-          fun parent ->
-            let x = this parent in
-            x :: f x )
+          fun parent -> parent :: f (this parent) )
 
 let%test_module "Quickcheck lib tests" =
   ( module struct
     let%test_unit "gen_imperative_list" =
       let increment = ( + ) 2 in
-      let root_gen = Int.gen_incl 0 100 in
+      let root = 1 in
+      let root_gen = return root in
       let gen =
         Int.gen_incl 2 100
         >>= fun size ->
@@ -216,6 +215,7 @@ let%test_module "Quickcheck lib tests" =
           | [] ->
               failwith "We assume that our list has at least one element"
           | x :: xs ->
+              assert (x = root) ;
               let result =
                 List.fold_result xs ~init:x ~f:(fun elem next_elem ->
                     if next_elem = increment elem then Result.return next_elem

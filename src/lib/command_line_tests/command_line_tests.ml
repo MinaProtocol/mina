@@ -63,7 +63,9 @@ let%test_module "Command line tests" =
               ; "-config-directory"
               ; config_dir
               ; "-genesis-ledger-dir"
-              ; genesis_ledger_dir ]
+              ; genesis_ledger_dir
+              ; "-current-fork-id"
+              ; "00000" ]
             ()
         with
         | Ok s ->

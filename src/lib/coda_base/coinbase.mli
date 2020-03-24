@@ -20,6 +20,14 @@ type t = Stable.Latest.t = private
   ; fee_transfer: Fee_transfer.Single.Stable.V1.t option }
 [@@deriving sexp, compare, eq, hash, yojson]
 
+include Codable.Base58_check_intf with type t := t
+
+val receiver : t -> Public_key.Compressed.t
+
+val amount : t -> Currency.Amount.t
+
+val fee_transfer : t -> Fee_transfer.Single.t option
+
 val create :
      amount:Currency.Amount.t
   -> receiver:Public_key.Compressed.t
@@ -30,4 +38,13 @@ val supply_increase : t -> Currency.Amount.t Or_error.t
 
 val fee_excess : t -> Currency.Fee.Signed.t Or_error.t
 
-val gen : t Quickcheck.Generator.t
+module Gen : sig
+  val gen : t Quickcheck.Generator.t
+
+  val with_random_receivers :
+       keys:Signature_keypair.t array
+    -> min_amount:int
+    -> max_amount:int
+    -> fee_transfer:Fee_transfer.Single.t Quickcheck.Generator.t
+    -> t Quickcheck.Generator.t
+end

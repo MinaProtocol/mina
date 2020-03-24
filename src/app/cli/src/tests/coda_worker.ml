@@ -26,7 +26,8 @@ module Input = struct
     ; chain_id: string
     ; peers: string list
     ; max_concurrent_connections: int option
-    ; is_archive_rocksdb: bool }
+    ; is_archive_rocksdb: bool
+    ; archive_process_location: Core.Host_and_port.t option }
   [@@deriving bin_io]
 end
 
@@ -414,6 +415,7 @@ module T = struct
         ; peers
         ; max_concurrent_connections= _ (* FIXME #4095: use this *)
         ; is_archive_rocksdb
+        ; archive_process_location
         ; _ } =
       let logger =
         Logger.create
@@ -530,13 +532,15 @@ module T = struct
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
+                 ~initial_fork_id:Fork_id.empty
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
                  ~snark_worker_config:
                    Coda_lib.Config.Snark_worker_config.
                      { initial_snark_worker_key= snark_worker_key
-                     ; shutdown_on_disconnect= true }
+                     ; shutdown_on_disconnect= true
+                     ; num_threads= None }
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~persistent_root_location:(conf_dir ^/ "root")
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
@@ -546,7 +550,12 @@ module T = struct
                  ~initial_block_production_keypairs ~monitor
                  ~consensus_local_state ~transaction_database
                  ~external_transition_database ~is_archive_rocksdb
-                 ~work_reassignment_wait:420000 ~genesis_state_hash ())
+                 ~work_reassignment_wait:420000 ~genesis_state_hash ()
+                 ~archive_process_location:
+                   (Option.map archive_process_location
+                      ~f:(fun host_and_port ->
+                        Cli_lib.Flag.Types.
+                          {name= "dummy"; value= host_and_port} )))
               ~genesis_ledger:Test_genesis_ledger.t
               ~base_proof:Precomputed_values.base_proof
           in
