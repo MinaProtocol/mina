@@ -21,7 +21,6 @@ let check_terminated_child t child_pid logger =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       "Child process of kind $process_kind with pid $child_pid has terminated"
       ~metadata:
-        [ ("parent_pid", `Int (Pid.to_int (Unix.getpid ())))
-        ; ("child_pid", `Int (Pid.to_int child_pid))
+        [ ("child_pid", `Int (Pid.to_int child_pid))
         ; ("process_kind", `String (show_process_kind kind)) ] ;
     Core_kernel.exit 99 )

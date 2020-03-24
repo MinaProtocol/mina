@@ -760,7 +760,7 @@ let server ~port ~logger =
   let handle_error _ exn =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       ~metadata:[("error", `String (Exn.to_string exn))]
-      !"ecountered error while handling request to prometheus server: $error"
+      "ecountered error while handling request to prometheus server: $error"
   in
   let callback ~body:_ _ req =
     let uri = Request.uri req in
