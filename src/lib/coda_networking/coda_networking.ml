@@ -654,12 +654,11 @@ type t =
   ; first_received_message_signal: unit Ivar.t }
 [@@deriving fields]
 
-let offline_time () =
-  let coda_constants = Coda_constants.t () in
-  Block_time.Span.of_ms @@ Int64.of_int coda_constants.inactivity_ms
+let offline_time =
+  Block_time.Span.of_ms @@ Int64.of_int Coda_compile_config.inactivity_ms
 
 let setup_timer time_controller sync_state_broadcaster =
-  Block_time.Timeout.create time_controller (offline_time ()) ~f:(fun _ ->
+  Block_time.Timeout.create time_controller offline_time ~f:(fun _ ->
       Broadcast_pipe.Writer.write sync_state_broadcaster `Offline
       |> don't_wait_for )
 

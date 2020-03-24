@@ -154,6 +154,8 @@ let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
 
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
+let genesis_constants t = t.genesis_constants
+
 let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
 let best_tip_path_length_exn {table; root; best_tip; _} =

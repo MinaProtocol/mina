@@ -88,7 +88,7 @@ let start_bootstrap_controller ~logger ~trust_system ~verifier ~network
             ~genesis_constants new_frontier ) )
 
 let download_best_tip ~logger ~network ~verifier ~trust_system
-    ~most_recent_valid_block_writer =
+    ~most_recent_valid_block_writer ~genesis_constants =
   let num_peers = 8 in
   let%bind peers = Coda_networking.random_peers network num_peers in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -106,7 +106,9 @@ let download_best_tip ~logger ~network ~verifier ~trust_system
               "Couldn't get best tip from peer: $error" ;
             return acc
         | Ok peer_best_tip -> (
-            match%bind Best_tip_prover.verify ~verifier peer_best_tip with
+            match%bind
+              Best_tip_prover.verify ~verifier peer_best_tip ~genesis_constants
+            with
             | Error e ->
                 Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
                   ~metadata:
@@ -215,7 +217,7 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
   match%bind
     Deferred.both
       (download_best_tip ~logger ~network ~verifier ~trust_system
-         ~most_recent_valid_block_writer)
+         ~most_recent_valid_block_writer ~genesis_constants)
       (load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
          ~consensus_local_state ~genesis_state_hash ~genesis_ledger ~base_proof
          ~genesis_constants)

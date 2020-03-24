@@ -172,6 +172,7 @@ module type Best_tip_prover_intf = sig
 
   val verify :
        verifier:Verifier.t
+    -> genesis_constants:Genesis_constants.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
@@ -198,6 +199,7 @@ module type Consensus_best_tip_prover_intf = sig
   val verify :
        logger:Logger.t
     -> verifier:Verifier.t
+    -> genesis_constants:Genesis_constants.t
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )

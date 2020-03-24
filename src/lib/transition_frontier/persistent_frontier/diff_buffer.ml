@@ -3,10 +3,9 @@ open Async_kernel
 open Core_kernel
 open Frontier_base
 
-let max_latency () =
-  let constants = (Coda_constants.t ()).consensus in
+let max_latency =
   Block_time.Span.(
-    ( constants.block_window_duration_ms |> Int64.of_int
+    ( Coda_compile_config.block_window_duration_ms |> Int64.of_int
     |> Block_time.Span.of_ms )
     * of_ms 5L)
 
@@ -90,7 +89,7 @@ let create ~time_controller ~base_hash ~worker =
   let timer =
     Timer.create ~time_controller
       ~f:(fun () -> if t.flush_job = None then flush t)
-      (max_latency ())
+      max_latency
   in
   t.timer <- Some timer ;
   t

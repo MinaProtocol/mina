@@ -14,10 +14,8 @@ module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 
-let global_max_length () =
-  (*TODO: get from full frontier*)
-  let constants = (Coda_constants.t ()).consensus in
-  constants.k
+let global_max_length (genesis_constants : Genesis_constants.t) =
+  genesis_constants.protocol.k
 
 type t =
   { logger: Logger.t
@@ -230,7 +228,7 @@ let rec load_with_max_length :
 let load ?(retry_with_fresh_db = true) ~logger ~verifier ~consensus_local_state
     ~persistent_root ~persistent_frontier ~genesis_state_hash ~genesis_ledger
     ?(base_proof = Precomputed_values.base_proof) ~genesis_constants () =
-  let max_length = global_max_length () in
+  let max_length = global_max_length genesis_constants in
   load_with_max_length ~max_length ~retry_with_fresh_db ~logger ~verifier
     ~consensus_local_state ~persistent_root ~persistent_frontier
     ~genesis_state_hash ~genesis_ledger ~base_proof ~genesis_constants ()
@@ -361,6 +359,8 @@ include struct
   let root = proxy1 root
 
   let find = proxy1 find
+
+  let genesis_constants = proxy1 genesis_constants
 
   (* TODO: find -> option externally, find_exn internally *)
   let find_exn = proxy1 find_exn
