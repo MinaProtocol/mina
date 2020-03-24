@@ -78,6 +78,9 @@ let make = (~metadata, ~children) => {
   let currentSlug =
     Js.String.replaceByRe(Js.Re.fromString("^/docs/?"), "", router.route);
   <Page title={metadata.title}>
+    <Next.Head>
+      <link rel="stylesheet" href="/static/css/a11y-light.css" />
+    </Next.Head>
     <div className=Style.page>
       <DocsSideNav currentSlug />
       <div className=Style.content>

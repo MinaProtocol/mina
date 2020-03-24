@@ -1,10 +1,10 @@
 module Decoders = Graphql_client.Decoders
 
-module Get_wallets =
+module Get_tracked_accounts =
 [%graphql
 {|
 query {
-  ownedWallets {
+  trackedAccounts {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
     locked
     balance {
@@ -14,11 +14,11 @@ query {
 }
 |}]
 
-module Get_wallet =
+module Get_tracked_account =
 [%graphql
 {|
 query ($public_key: PublicKey) {
-  wallet(publicKey: $public_key) {
+  account(publicKey: $public_key) {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
     balance {
       total @bsDecoder(fn: "Decoders.balance")
@@ -27,11 +27,11 @@ query ($public_key: PublicKey) {
 }
 |}]
 
-module Add_wallet =
+module Create_account =
 [%graphql
 {|
 mutation ($password: String) {
-  addWallet(input: {password: $password}) {
+  createAccount(input: {password: $password}) {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
   }
 }
@@ -47,28 +47,30 @@ mutation ($hd_index: UInt32) {
 }
 |}]
 
-module Unlock_wallet =
+module Unlock_account =
 [%graphql
 {|
 mutation ($password: String, $public_key: PublicKey) {
-  unlockWallet(input: {password: $password, publicKey: $public_key }) {
+  unlockAccount(input: {password: $password, publicKey: $public_key }) {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
   }
 }
 |}]
 
-module Lock_wallet =
+module Lock_account =
 [%graphql
 {|
 mutation ($public_key: PublicKey) {
-  lockWallet(input: {publicKey: $public_key }) {
+  lockAccount(input: {publicKey: $public_key }) {
     public_key: publicKey @bsDecoder(fn: "Decoders.public_key")
   }
 }
 |}]
 
-module Reload_wallets = [%graphql {|
-mutation { reloadWallets { success } }
+module Reload_accounts =
+[%graphql
+{|
+mutation { reloadAccounts { success } }
 |}]
 
 module Snark_pool =
@@ -117,8 +119,8 @@ mutation ($public_key: PublicKey) {
 module Set_snark_worker =
 [%graphql
 {|
-mutation ($wallet: PublicKey) {
-  setSnarkWorker (input : {publicKey: $wallet}) {
+mutation ($public_key: PublicKey) {
+  setSnarkWorker (input : {publicKey: $public_key}) {
       lastSnarkWorker @bsDecoder(fn: "Decoders.optional_public_key")
     }
   }
@@ -173,7 +175,7 @@ module Get_inferred_nonce =
 [%graphql
 {|
 query nonce($public_key: PublicKey) {
-  wallet(publicKey: $public_key) {
+  account(publicKey: $public_key) {
     inferredNonce
   }
 }

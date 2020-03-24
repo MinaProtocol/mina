@@ -202,7 +202,10 @@ module DeleteButton = {
                                  let message =
                                    err
                                    |> Array.get(~index=0)
-                                   |> Option.map(~f=e => e##message)
+                                   |> Option.map(
+                                        ~f=(e: ReasonApolloTypes.graphqlError) =>
+                                        e.message
+                                      )
                                    |> Option.withDefault(
                                         ~default="Server error",
                                       );
@@ -285,7 +288,8 @@ module BlockRewards = {
         {response =>
            switch (response.result) {
            | Loading => <Loader />
-           | Error(err) => <span> {React.string(err##message)} </span>
+           | Error((err: ReasonApolloTypes.apolloError)) =>
+             <span> {React.string(err.message)} </span>
            | Data(data) =>
              let account = Option.getExn(data##account);
              let isDelegationInProgress =
@@ -435,7 +439,8 @@ module BlockRewards = {
   };
 };
 
-[@bs.scope "window"] [@bs.val] external showItemInFolder: string => unit = "";
+[@bs.scope "window"] [@bs.val]
+external showItemInFolder: string => unit = "showItemInFolder";
 
 module KeypathQueryString = [%graphql
   {|

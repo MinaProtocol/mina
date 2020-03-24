@@ -288,6 +288,15 @@ module H4 = {
     ]);
 
   let semiBold = merge([basic, style([fontWeight(`semiBold)])]);
+  let header =
+    style([
+      Typeface.ibmplexsans,
+      textAlign(`center),
+      fontSize(`rem(1.5)),
+      lineHeight(`rem(2.0)),
+      fontWeight(`semiBold),
+      color(Colors.saville),
+    ]);
 
   let (wide, wideStyles) =
     generateStyles([
@@ -370,6 +379,13 @@ module Body = {
       fontSize(`rem(0.8125)),
       opacity(0.5),
       lineHeight(`rem(1.25)),
+    ]);
+
+  let basic_small =
+    style([
+      Typeface.ibmplexsans,
+      fontSize(`rem(0.8125)),
+      color(Colors.saville),
     ]);
 };
 

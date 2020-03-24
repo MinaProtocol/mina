@@ -49,6 +49,37 @@ jobs:
                   name: Build bot
                   command: cd frontend/bot && yarn run build-ci
 
+    test-archive:
+        resource_class: xlarge
+        docker:
+            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
+              environment:
+                CODA_DOCKER: true
+            - image: postgres:12
+              environment:
+                POSTGRES_PASSWORD: codarules
+                POSTGRES_USER: admin
+                POSTGRES_DB: archiver
+        steps:
+            - checkout
+            - run:
+                  name: Update Submodules
+                  command: git submodule sync && git submodule update --init --recursive
+            - run:
+                  name: Update OPAM
+                  command: ./scripts/update-opam-in-docker.sh
+            - run:
+                name: Build libp2p_helper
+                command: make libp2p_helper
+            - run:
+                  name: Set Up Database
+                  command: |
+                    sudo apt-get install -y postgresql
+                    PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
+            - run:
+                  name: Running test -- test_archive_processor:coda-archive-processor-test
+                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_archive_processor:coda-archive-processor-test"'
+
     build-archive:
         resource_class: xlarge
         docker:
@@ -86,8 +117,8 @@ jobs:
             # Ideally this DB setup step would be handled by the archive process itself.
             - run:
                   name: Set Up Database
-                  command: |
-                    sudo apt-get install -y postgresql
+                  command: | 
+                    sudo apt-get install -y postgresql 
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
                   name: Configure Hasura
@@ -766,6 +797,7 @@ workflows:
                     only: develop
             - tracetool
             - build-wallet
+            - test-archive
             - build-archive
             - build-macos
             - build-client-sdk
