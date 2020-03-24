@@ -1,3 +1,4 @@
+/** Bindings **/
 module Filestream = {
   type t;
 
@@ -6,8 +7,7 @@ module Filestream = {
   };
 
   [@bs.module "fs"]
-  external createWriteStream: (string, {. "encoding": string}) => t =
-    "";
+  external createWriteStream: (string, {. "encoding": string}) => t = "";
 
   [@bs.send]
   external onError: (t, [@bs.as "error"] _, string => unit) => unit = "on";
@@ -59,9 +59,7 @@ module Https = {
 };
 
 module Unzipper = {
-  type extractOpts = Js.t({.
-    path: string
-  });
+  type extractOpts = {. "path": string};
   [@bs.module "unzipper"]
   external extract: extractOpts => Bindings.Stream.Writable.t = "Extract";
 };
@@ -73,7 +71,8 @@ let handleResponse = (response, filename, dataEncoding, chunkCb, doneCb) => {
     |> Https.Response.getHeaders
     |> Https.Response.Headers.contentLengthGet
     |> int_of_string;
-  let filestream = Filestream.createWriteStream(filename, {"encoding": dataEncoding});
+  let filestream =
+    Filestream.createWriteStream(filename, {"encoding": dataEncoding});
 
   Filestream.onFinish(filestream, () => doneCb(Belt.Result.Ok()));
   Filestream.onError(filestream, e => doneCb(Error(e)));
@@ -89,6 +88,10 @@ let handleResponse = (response, filename, dataEncoding, chunkCb, doneCb) => {
   Https.Response.onEnd(response, () => Filestream.endStream(filestream));
 };
 
+/**
+  Recusively follows redirects until non-redirect resource is hit, or
+  we reach `maxRedirects`, then passes onto handleResonse.
+ */
 let rec download = (filename, url, encoding, maxRedirects, chunkCb, doneCb) => {
   let request =
     Https.get(url, response =>
@@ -118,22 +121,36 @@ let rec download = (filename, url, encoding, maxRedirects, chunkCb, doneCb) => {
   Https.Request.onError(request, e => doneCb(Error(e)));
 };
 
+// TODO: Make this an env var
 let codaRepo = "https://s3-us-west-2.amazonaws.com/wallet.o1test.net/daemon/";
 
+let extractZip = (src, dest) => {
+  let extractArgs = {"path": dest};
+
+  Bindings.Stream.Readable.create(src)
+  ->(Bindings.Stream.Readable.pipe(Unzipper.extract(extractArgs)));
+};
+
+/**
+  Unique helper to download and unzip a coda daemon executable.
+ */
 let downloadCoda = (version, chunkCb, doneCb) => {
   let tempFilename = "coda-daemon-" ++ version ++ ".zip";
-  //let installPath = ProjectRoot.getPath(`UserData) ++ "/daemon";
-  let extractArgs = [%bs.obj {
-    path: "/tmp/daemon"
-  }];
+  let installPath = "/tmp/coda/"; // ProjectRoot.getPath(`UserData) ++ "/daemon";
   download(
     tempFilename,
     codaRepo ++ tempFilename,
     "binary",
     1,
     chunkCb,
-    doneCb,
+    res => {
+      switch (res) {
+      | Belt.Result.Error(e) => Js.log(e)
+      | _ => Js.log("it worked")
+      };
+      Js.log("Results!");
+      extractZip(tempFilename, installPath);
+      doneCb(res);
+    },
   );
-  Bindings.Stream.Readable.create(tempFilename)
-  ->(Bindings.Stream.Readable.pipe(Unzipper.extract(extractArgs)));
 };
