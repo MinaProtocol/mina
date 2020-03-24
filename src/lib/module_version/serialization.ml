@@ -9,7 +9,7 @@ let print_hash hash =
 (** use this function to test Bin_prot serialization of types with asserted versioning *)
 
 let check_serialization (type t) (module M : Binable.S with type t = t) (t : t)
-    known_good_hash =
+    ?(show_hash = false) known_good_hash =
   let open Digestif.SHA256 in
   (* serialize value *)
   let sz = M.bin_size_t t in
@@ -22,5 +22,5 @@ let check_serialization (type t) (module M : Binable.S with type t = t) (t : t)
   let ctx0 = init () in
   let ctx1 = feed_string ctx0 s in
   let hash = get ctx1 |> to_raw_string in
-  (* print_hash hash ; *)
+  if show_hash then print_hash hash ;
   String.equal hash known_good_hash
