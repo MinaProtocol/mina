@@ -230,7 +230,9 @@ let make = (~onClose) => {
                      let message =
                        err
                        |> Array.get(~index=0)
-                       |> Option.map(~f=e => e##message)
+                       |> Option.map(~f=(e: ReasonApolloTypes.graphqlError) =>
+                            e.message
+                          )
                        |> Option.withDefault(~default="Server error");
                      afterSubmit(Error(message));
                    },
