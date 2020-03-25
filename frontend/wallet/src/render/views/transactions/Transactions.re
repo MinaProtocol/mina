@@ -179,7 +179,8 @@ let make = () => {
            response =>
              switch (response.result) {
              | Loading => <Loader.Page> <Loader /> </Loader.Page>
-             | Error(err) => React.string(err##message) /* TODO format this error message */
+             | Error((err: ReasonApolloTypes.apolloError)) =>
+               React.string(err.message) /* TODO format this error message */
              | Data(data) =>
                let {blocks, pending} = extractTransactions(data);
                let transactions = Array.concatenate(blocks);
@@ -239,7 +240,7 @@ let make = () => {
                           );
 
                         response.fetchMore(
-                          ~variables=moreTransactions##variables,
+                          ~variables=Some(moreTransactions##variables),
                           ~updateQuery,
                           (),
                         );

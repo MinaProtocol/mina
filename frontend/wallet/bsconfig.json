@@ -22,11 +22,17 @@
     "@glennsl/bs-json",
     "bs-react-intl"
   ],
-  "bs-dev-dependencies": ["@glennsl/bs-jest"],
-  "ppx-flags": ["graphql_ppx/ppx"],
-  "bsc-flags": ["-bs-g"],
+  "bs-dev-dependencies": [
+    "@glennsl/bs-jest"
+  ],
+  "ppx-flags": [
+    "@baransu/graphql_ppx_re/ppx6"
+  ],
+  "bsc-flags": [
+    "-bs-g"
+  ],
   "warnings": {
-    "error": "+a+101-4-9-30-40-41-42-102"
+    "error": "+a+101-4-9-30-40-41-42-102-3-105-48"
   },
   "refmt": 3
 }
