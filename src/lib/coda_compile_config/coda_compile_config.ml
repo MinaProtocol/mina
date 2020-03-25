@@ -1,6 +1,13 @@
 [%%import
 "/src/config.mlh"]
 
+[%%ifndef
+consensus_mechanism]
+
+module Currency = Currency_nonconsensus.Currency
+
+[%%endif]
+
 (*This file consists of compile time constants that are not in Genesis_constants.t or  i.e., all the constants that are defined at compile-time for both tests and production*)
 [%%inject
 "proof_level", proof_level]
@@ -30,7 +37,7 @@ let coinbase = Currency.Amount.of_formatted_string coinbase_string
 
 (*transaction_capacity_log_2: Log of the capacity of transactions per
 transition. 1 will only work if we don't have prover fees. 2 will work with
-prover fees, but not if we want a transaction included in every block. At least 
+prover fees, but not if we want a transaction included in every block. At least
 3 ensures a transaction per block and the staged-ledger unit tests pass.
 work_delay: All the proofs before the last <work_delay> blocks are required to
 be completed to add transactions. <work_delay> is the minimum number of blocks
