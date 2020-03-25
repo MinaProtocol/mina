@@ -22,5 +22,10 @@ let check_serialization (type t) (module M : Binable.S with type t = t) (t : t)
   let ctx0 = init () in
   let ctx1 = feed_string ctx0 s in
   let hash = get ctx1 |> to_raw_string in
-  (* print_hash hash ; *)
-  String.equal hash known_good_hash
+  let result = String.equal hash known_good_hash in
+  if not result then (
+    printf "Expected hash: " ;
+    print_hash known_good_hash ;
+    printf "Got hash:      " ;
+    print_hash hash ) ;
+  result
