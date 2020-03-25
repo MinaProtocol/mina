@@ -32,21 +32,27 @@ module Styles = {
 };
 [@bs.scope "window"] [@bs.val] external openExternal: string => unit = "";
 
+type state =
+  | Init
+  | Downloading
+  | Installing
+  | Finished;
+
 module InstallProgress = {
   [@react.component]
-  let make = (~setFinished, ~finished) =>
+  let make = (~setState, ~installerState) =>
     <div className=Styles.installer>
       <div className=Styles.downloader>
         <Downloader
           onFinish={result =>
             switch (result) {
-            | Belt.Result.Ok(_) => setFinished(_ => true)
-            | Belt.Result.Error(_) => setFinished(_ => false)
+            | Belt.Result.Ok(_) => setState(_ => Finished)
+            | Belt.Result.Error(_) => setState(_ => Finished)
             }
           }
-          finished
+          finished={installerState === Finished}
         />
-        {finished
+        {installerState === Finished
            ? <p className=Styles.downloaderText>
                {React.string("Installation Complete!")}
              </p>
@@ -71,7 +77,8 @@ module InstallProgress = {
 
 [@react.component]
 let make = (~prevStep, ~nextStep) => {
-  let (finished, setFinished) = React.useState(() => false);
+  let (installerState, setInstallerState) = React.useState(() => Init);
+
   <OnboardingTemplate
     heading="Installing Coda"
     description={
@@ -91,13 +98,19 @@ let make = (~prevStep, ~nextStep) => {
             onClick={_ => prevStep()}
           />
           <Spacer width=1.5 />
-          <Button
-            label="Continue"
-            style=Button.HyperlinkBlue3
-            onClick={_ => nextStep()}
-          />
+          {switch (installerState) {
+           | Finished =>
+             <Button
+               label="Continue"
+               style=Button.HyperlinkBlue3
+               onClick={_ => nextStep()}
+             />
+           | _ => React.null
+           }}
         </div>
       </>
-    miscRight={<InstallProgress setFinished finished />}
+    miscRight={
+      <InstallProgress setState=setInstallerState installerState />
+    }
   />;
 };
