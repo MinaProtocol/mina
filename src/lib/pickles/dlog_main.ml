@@ -380,7 +380,6 @@ module Make (Inputs : Inputs) = struct
                 Map.to_sequence ~order:`Increasing_key m |> Sequence.to_list
               in
               let keys = List.map m ~f:fst in
-              (* TODO: Potential off by one. *)
               let add domain delta elts =
                 let flags =
                   let domain_size = domain#size in
@@ -560,20 +559,6 @@ module Make (Inputs : Inputs) = struct
         ; marlin_checks_passed ]
     , bulletproof_challenges )
 
-  (* TODO: No need to hash the entire bulletproof challenges. Could
-   just hash the segment of the public input LDE corresponding to them
-   that we compute when verifying the previous proof. That is a commitment
-   to them.
-*)
-  let hash_me_only t =
-    let elts =
-      Types.Dlog_based.Proof_state.Me_only.to_field_elements
-        ~g1:G1.to_field_elements t
-    in
-    let sponge = Sponge.create sponge_params in
-    Array.iter elts ~f:(fun x -> Sponge.absorb sponge x) ;
-    Sponge.squeeze sponge ~length:Digest.length
-
   let map_challenges
       { Types.Pairing_based.Proof_state.Deferred_values.marlin
       ; combined_inner_product
@@ -593,20 +578,11 @@ module Make (Inputs : Inputs) = struct
     ; r= f r
     ; b }
 
-  let pack_data (bool, fq, digest, challenge, bulletproof_challenges) =
-    Array.concat
-      [ Array.map (Vector.to_array bool) ~f:List.return
-      ; Array.concat_map (Vector.to_array fq) ~f:(fun x ->
-            let low_bits, high_bit =
-              Common.split_last
-                (Bitstring_lib.Bitstring.Lsb_first.to_list (Fq.unpack_full x))
-            in
-            [|low_bits; [high_bit]|] )
-      ; Vector.to_array digest
-      ; Vector.to_array challenge
-      ; Array.map bulletproof_challenges
-          ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
-            is_square :: prechallenge ) ]
+  (* TODO: No need to hash the entire bulletproof challenges. Could
+   just hash the segment of the public input LDE corresponding to them
+   that we compute when verifying the previous proof. That is a commitment
+   to them.
+*)
 
   let hash_me_only t =
     let sponge = Sponge.create sponge_params in
@@ -628,59 +604,17 @@ module Make (Inputs : Inputs) = struct
           ~f:(fun acc t -> map2 acc t ~f:Shifted.add)
         |> map ~f:Shifted.unshift_nonzero
 
-  module Branching = Nat.S (Branching_pred)
-
-  type 'a vec = ('a, Branching.n) Vector.t
-
-  module Requests = struct
-    open Snarky.Request
-
-    type 'a bp_vec = ('a, Bulletproof_rounds.n) Vector.t
-
-    type _ t +=
-      | Prev_evals :
-          (Field.Constant.t Dlog_marlin_types.Evals.t * Field.Constant.t)
-          Tuple_lib.Triple.t
-          vec
-          t
-      | Prev_messages :
-          (PC.Constant.t, Fp.Packed.Constant.t) Pairing_marlin_types.Messages.t
-          t
-      | Prev_openings_proof : G1.Constant.t Tuple_lib.Triple.t t
-      | Prev_proof_state :
-          ( ( ( Challenge.Constant.t
-              , Fq.Constant.t
-              , (Challenge.Constant.t, bool) Bulletproof_challenge.t bp_vec
-              , Digest.Constant.t )
-              Types.Pairing_based.Proof_state.Per_proof.t
-            * bool )
-            vec
-          , Digest.Constant.t )
-          Types.Pairing_based.Proof_state.t
-          t
-      | Prev_me_onlys :
-          ( ( G1.Constant.t
-            , G1.Constant.t
-              Pairing_marlin_types.Accumulator.Degree_bound_checks
-              .Unshifted_accumulators
-              .t )
-            Pairing_marlin_types.Accumulator.t
-          * Field.Constant.t bp_vec vec )
-          vec
-          t
-      | Pairing_marlin_index : One_hot_vector.Constant.t t
-
-    (*       | Pairing_marlin_index : G1.Constant.t Abc.t Matrix_evals.t t *)
-  end
-
   let assert_eq_marlin
-      (m1: (Field.t, Field.t)  Types.Dlog_based.Proof_state.Deferred_values.Marlin.t)
-      (m2: (Boolean.var list, Field.t)  Types.Dlog_based.Proof_state.Deferred_values.Marlin.t)
-    =
+      (m1 :
+        ( Field.t
+        , Field.t )
+        Types.Dlog_based.Proof_state.Deferred_values.Marlin.t)
+      (m2 :
+        ( Boolean.var list
+        , Field.t )
+        Types.Dlog_based.Proof_state.Deferred_values.Marlin.t) =
     let open Types.Dlog_based.Proof_state.Deferred_values.Marlin in
-    let fp x1 x2 =
-      Field.(Assert.equal x1 x2)
-    in
+    let fp x1 x2 = Field.(Assert.equal x1 x2) in
     let chal c1 c2 = Field.Assert.equal c1 (Field.project c2) in
     chal m1.alpha m2.alpha ;
     chal m1.eta_a m2.eta_a ;
@@ -691,173 +625,4 @@ module Make (Inputs : Inputs) = struct
     chal m1.beta_2 m2.beta_2 ;
     fp m1.sigma_3 m2.sigma_3 ;
     chal m1.beta_3 m2.beta_3
-  ;;
-
-  let main ~pairing_marlin_indices ~wrap_domains:(domain_h, domain_k)
-      ~step_domains
-      ({ proof_state=
-           { deferred_values= {marlin; xi; r; r_xi_sum}
-           ; sponge_digest_before_evaluations
-           ; me_only= me_only_digest
-           ; was_base_case }
-       ; pass_through } :
-        (Field.t, Field.t, _, _, _, _, _) Types.Dlog_based.Statement.t) =
-    (* TODO: prev_proof_state has a fixed size so it should be possible to 
-       just make this one of the public inputs.
-
-       prev_me_onlys also has a fixed size (and in fact it is not even necessary to hash it)
-    *)
-    let prev_proof_state =
-      let open Types.Pairing_based.Proof_state in
-      let typ = typ (module Impl) Branching.n Bulletproof_rounds.n Fq.typ in
-      exists typ ~request:(fun () -> Requests.Prev_proof_state)
-    in
-    let which_index =
-      exists
-        (One_hot_vector.typ (Vector.length pairing_marlin_indices))
-        ~request:(fun () -> Requests.Pairing_marlin_index)
-    in
-    let pairing_marlin_index =
-      choose_key which_index
-        (Vector.map pairing_marlin_indices
-           ~f:(Matrix_evals.map ~f:(Abc.map ~f:G1.constant)))
-    in
-    let prev_me_onlys =
-      let h, k = step_domains in
-      exists
-        (Vector.typ
-           (Typ.tuple2
-              (Pairing_marlin_types.Accumulator.typ
-                 (Int.Set.of_list [Domain.size h - 1; Domain.size k - 1])
-                 G1.typ)
-              (Vector.typ (Vector.typ Fq.typ Bulletproof_rounds.n) Branching.n))
-           Branching.n)
-        ~request:(fun () -> Requests.Prev_me_onlys)
-    in
-    let prev_pairing_accs, prev_old_bulletproof_challenges =
-      Vector.unzip prev_me_onlys
-    in
-    let prev_pairing_acc = combine_pairing_accs prev_pairing_accs in
-    (* print_pairing_acc "combined acc" prev_pairing_acc ; *)
-    let new_bulletproof_challenges =
-      let evals =
-        let ty =
-          let ty = Typ.tuple2 (Evals.typ Fq.typ) Fq.typ in
-          Typ.tuple3 ty ty ty
-        in
-        exists (Vector.typ ty Branching.n) ~request:(fun () ->
-            Requests.Prev_evals )
-      in
-      let chals =
-        Vector.mapn
-          [ prev_proof_state.unfinalized_proofs
-          ; prev_old_bulletproof_challenges
-          ; evals ]
-          ~f:(fun [ ( {deferred_values; sponge_digest_before_evaluations}
-                    , should_verify )
-                  ; old_bulletproof_challenges
-                  ; evals ]
-             ->
-            let sponge =
-              let s = Sponge.create sponge_params in
-              Sponge.absorb s (Fq.pack sponge_digest_before_evaluations) ;
-              s
-            in
-            let verified, chals =
-              finalize_other_proof
-                ~input_domain:(Marlin_checks.domain Input_domain.self)
-                (module Branching)
-                ~shifted_pow:(fun deg x ->
-                  Fq.(Pcs_batch.pow ~one ~mul ~add) x (crs_max_degree - deg) )
-                ~domain_h:(Marlin_checks.domain domain_h)
-                ~domain_k:(Marlin_checks.domain domain_k)
-                ~h_minus_1:(Domain.size domain_h - 1)
-                ~k_minus_1:(Domain.size domain_k - 1)
-                ~sponge
-                (map_challenges deferred_values ~f:Fq.pack)
-                ~old_bulletproof_challenges evals
-            in
-            Boolean.(Assert.any [not should_verify; verified]) ;
-            chals )
-      in
-      chals
-    in
-    Boolean.(
-      Assert.( = ) was_base_case
-        (all
-           Vector.(
-             to_list
-               (map prev_proof_state.unfinalized_proofs
-                  ~f:(fun (_, should_verify) -> not should_verify))))) ;
-    (* What do we actually need from prev_statement? 
-
-       1. The evaluations (or a commitment to the evaluations) used.
-       This is provided by digest_before_evaluations
-
-       2. The unfinalized challenge values
-    *)
-    let prev_statement =
-      (* TODO: A lot of repeated hashing happening here on the dlog_marlin_index *)
-      let prev_me_onlys =
-        Vector.map prev_me_onlys ~f:(fun (pacc, chals) ->
-            hash_me_only
-              {pairing_marlin_acc= pacc; old_bulletproof_challenges= chals} )
-      in
-      { Types.Pairing_based.Statement.pass_through= prev_me_onlys
-      ; proof_state= prev_proof_state }
-    in
-    (* 
-    print_bool "prev_proof_finalized" prev_proofs_finalized ;
-    print_bool "prev_statement.proof_state.was_base_case"
-      prev_statement.proof_state.was_base_case ;
-    Boolean.Assert.any
-      [prev_proofs_finalized; prev_statement.proof_state.was_base_case] ;
-      *)
-    let ( sponge_digest_before_evaluations_actual
-        , pairing_marlin_acc
-        , marlin_actual ) =
-      let messages =
-        exists (Pairing_marlin_types.Messages.typ PC.typ Fp.Packed.typ)
-          ~request:(fun () -> Requests.Prev_messages)
-      in
-      let opening_proofs =
-        exists (Typ.tuple3 G1.typ G1.typ G1.typ) ~request:(fun () ->
-            Requests.Prev_openings_proof )
-      in
-      let sponge = Sponge.create sponge_params in
-      let pack =
-        let pack_fq (x : Fq.t) =
-          let low_bits, high_bit =
-            Common.split_last
-              (Bitstring_lib.Bitstring.Lsb_first.to_list (Fq.unpack_full x))
-          in
-          [|low_bits; [high_bit]|]
-        in
-        fun t ->
-          Spec.pack
-            (module Impl)
-            pack_fq
-            (Types.Pairing_based.Statement.spec Branching.n
-               Bulletproof_rounds.n)
-            (Types.Pairing_based.Statement.to_data t)
-      in
-      let xi = Field.unpack xi ~length:Challenge.length in
-      let r = Field.unpack r ~length:Challenge.length in
-      let r_xi_sum =
-        Field.choose_preimage_var r_xi_sum ~length:Field.size_in_bits
-      in
-      incrementally_verify_pairings
-        ~step_domains:(Double.map step_domains ~f:Marlin_checks.domain)
-        ~pairing_acc:prev_pairing_acc ~xi ~r ~r_xi_sum
-        ~verification_key:pairing_marlin_index ~sponge
-        ~public_input:(Array.append [|[Boolean.true_]|] (pack prev_statement))
-        ~messages ~opening_proofs
-    in
-    Field.Assert.equal me_only_digest
-      (Field.pack
-         (hash_me_only
-            { Types.Dlog_based.Proof_state.Me_only.pairing_marlin_acc
-            ; old_bulletproof_challenges= new_bulletproof_challenges })) ;
-    Field.Assert.equal sponge_digest_before_evaluations
-      (Field.pack sponge_digest_before_evaluations_actual)
 end

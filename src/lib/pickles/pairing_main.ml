@@ -132,10 +132,6 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     in
     (Array.reduce_exn terms ~f:G.( + ), challenges)
 
-  let assert_equal_g g1 g2 =
-    List.iter2_exn ~f:Field.Assert.equal (G.to_field_elements g1)
-      (G.to_field_elements g2)
-
   let equal_g g1 g2 =
     List.map2_exn ~f:Field.equal (G.to_field_elements g1)
       (G.to_field_elements g2)
@@ -143,9 +139,8 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
 
   let h_precomp = G.Scaling_precomputation.create Generators.h
 
-  let check_bulletproof
-      ~(*       ~branching:((module Branching) : (module Nat.Add.Intf_transparent)) *)
-      pcs_batch ~domain_h ~domain_k ~sponge ~xi ~combined_inner_product
+  let check_bulletproof ~pcs_batch ~domain_h ~domain_k ~sponge ~xi
+      ~combined_inner_product
       ~
       (* Corresponds to y in figure 7 of WTS *)
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
@@ -153,11 +148,6 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:({lr; delta; z_1; z_2; sg} :
                         (Fq.t, G.t) Openings.Bulletproof.t) =
-    (*
-    let dlog_pcs_batch =
-      Common.dlog_pcs_batch ~domain_h ~domain_k (Branching.add Nat.N19.n)
-    in
-       *)
     (* a_hat should be equal to
        sum_i < t, r^i pows(beta_i) >
        = sum_i r^i < t, pows(beta_i) > *)
@@ -266,8 +256,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
        Then, in the other proof, we can witness the evaluations and check their correctness
        against "combined_inner_product" *)
     let bulletproof_challenges =
-      (* TODO:
-         This sponge needs to be initialized with (some derivative of)
+      (* This sponge needs to be initialized with (some derivative of)
          1. The polynomial commitments
          2. The combined inner product
          3. The challenge points.
@@ -320,27 +309,6 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
       ; beta_1
       ; beta_2
       ; beta_3 } )
-
-  let marlin_data
-      { Proof_state.Deferred_values.Marlin.sigma_2
-      ; sigma_3
-      ; alpha
-      ; eta_a
-      ; eta_b
-      ; eta_c
-      ; beta_1
-      ; beta_2
-      ; beta_3 } =
-    let fq_data ((x, b) : Fq.t) = ([x], [b]) in
-    Data.concat
-      ( fq_data sigma_2 :: fq_data sigma_3
-      :: List.map ~f:Data.bits
-           [alpha; eta_a; eta_b; eta_c; beta_1; beta_2; beta_3] )
-
-  let chals_data chals =
-    Array.map chals ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
-        Data.bits (is_square :: prechallenge) )
-    |> Array.reduce_exn ~f:Data.append
 
   module Marlin_checks = Marlin_checks.Make (Impl)
 
@@ -403,13 +371,6 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
       ; (marlin_checks, "marlin_checks") ] ;
     Boolean.all [xi_correct; r_correct; r_xi_sum_correct; marlin_checks]
 
-  module type App_state_intf =
-    Intf.App_state_intf
-    with module Impl := Impl
-     and module Branching := Branching
-
-  type 's app_state = (module App_state_intf with type t = 's)
-
   let hash_me_only (type s) ~index
       (state_to_field_elements : s -> Field.t array) =
     let open Types.Pairing_based.Proof_state.Me_only in
@@ -427,19 +388,6 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
              ~g:G.to_field_elements) ;
         Sponge.squeeze sponge ~length:Digest.length )
 
-  let pack_data (bool, fp, challenge, digest) =
-    Array.concat
-      [ Array.map (Vector.to_array bool) ~f:List.return
-      ; Array.of_list_map (Vector.to_list fp) ~f:(fun x ->
-            let t =
-              Bitstring_lib.Bitstring.Lsb_first.to_list (Fp.unpack_full x)
-            in
-            t )
-      ; Vector.to_array challenge
-      ; Vector.to_array digest ]
-
-  let vec typ = Vector.typ typ Branching.n
-
   let assert_eq_marlin m1 m2 =
     let open Types.Dlog_based.Proof_state.Deferred_values.Marlin in
     let fq (x1, b1) (x2, b2) =
@@ -456,40 +404,6 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     chal m1.beta_2 m2.beta_2 ;
     fq m1.sigma_3 m2.sigma_3 ;
     chal m1.beta_3 m2.beta_3
-
-  module Requests = struct
-    open Snarky.Request
-    open Types
-    open Pairing_marlin_types
-
-    type _ t +=
-      | Prev_evals : (Field.Constant.t Evals.t * Field.Constant.t) vec t
-      | Prev_messages : (PC.Constant.t, Fq.Constant.t) Messages.t vec t
-      | Prev_openings_proof :
-          (Fq.Constant.t, G.Constant.t) Pairing_based.Openings.Bulletproof.t
-          vec
-          t
-      | Prev_sg : G.Constant.t vec vec t
-      | Me_only :
-          's App_state_tag.t
-          -> ( G.Constant.t
-             , 's
-             , G.Constant.t vec )
-             Pairing_based.Proof_state.Me_only.t
-             t
-      | Prev_states :
-          's App_state_tag.t
-          -> ( ( Challenge.Constant.t
-               , Fp.Constant.t
-               , bool
-               , Fq.Constant.t
-               , Digest.Constant.t
-               , Digest.Constant.t )
-               Dlog_based.Proof_state.t
-             * 's )
-             vec
-             t
-  end
 
   let verify ~branching ~is_base_case ~sg_old
       ~(opening : _ Openings.Bulletproof.t) ~messages
@@ -535,137 +449,4 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
         in
         Field.Assert.equal c1 c2 ) ;
     bulletproof_success
-
-  (* TODO: Assert equality with the pass through ! *)
-  let main ~bulletproof_log2 ~domain_h ~domain_k ~wrap_domains (type s)
-      ((module A) : s app_state)
-      ({ proof_state= {unfinalized_proofs; me_only= me_only_digest}
-       ; pass_through } :
-        _ Statement.t) =
-    let domain_h, domain_k =
-      Marlin_checks.(domain domain_h, domain domain_k)
-    in
-    let prev_states =
-      exists
-        (vec
-           (Typ.tuple2
-              (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ
-                 Boolean.typ Fq.typ Digest.typ Digest.typ)
-              A.typ))
-        ~request:(fun () -> Requests.Prev_states A.Tag)
-    in
-    let me_only =
-      exists
-        ~request:(fun () -> Requests.Me_only A.Tag)
-        (Types.Pairing_based.Proof_state.Me_only.typ G.typ A.typ Branching.n)
-    in
-    let { Types.Pairing_based.Proof_state.Me_only.app_state
-        ; dlog_marlin_index
-        ; sg } =
-      me_only
-    in
-    let hash_me_only =
-      unstage (hash_me_only A.to_field_elements ~index:dlog_marlin_index)
-    in
-    Field.Assert.equal me_only_digest (Field.pack (hash_me_only me_only)) ;
-    (* TODO: Just group this with prev_states *)
-    let sg_old =
-      exists (vec (vec G.typ)) ~request:(fun () -> Requests.Prev_sg)
-    in
-    let prev_statements =
-      Vector.map2 prev_states sg_old ~f:(fun (proof_state, app_state) sg ->
-          let prev_me_only = hash_me_only {app_state; dlog_marlin_index; sg} in
-          {Types.Dlog_based.Statement.pass_through= prev_me_only; proof_state}
-      )
-    in
-    let prev_evals =
-      let open Pairing_marlin_types in
-      exists
-        (vec (Typ.tuple2 (Evals.typ Field.typ) Field.typ))
-        ~request:(fun () -> Requests.Prev_evals)
-    in
-    let prev_proofs_finalized =
-      let sponge_digests =
-        Vector.map prev_states ~f:(fun (s, _) ->
-            Fp.pack s.sponge_digest_before_evaluations )
-      in
-      Vector.mapn [prev_states; sponge_digests; prev_evals]
-        ~f:(fun [(s, _); sponge_digest; evals] ->
-          let prev_deferred_values =
-            Types.Dlog_based.Proof_state.Deferred_values.map_challenges
-              ~f:Fp.pack s.deferred_values
-          in
-          let sponge =
-            let sponge = Sponge.create sponge_params in
-            Sponge.absorb sponge (`Field sponge_digest) ;
-            sponge
-          in
-          finalize_other_proof
-            ~input_domain:(Marlin_checks.domain Input_domain.self)
-            ~domain_k ~domain_h ~sponge prev_deferred_values evals )
-      |> Vector.to_list |> Boolean.all
-    in
-    let is_base_case = A.is_base_case app_state in
-    let prev_was_base_case =
-      Vector.map prev_statements ~f:(fun s -> s.proof_state.was_base_case)
-      |> Vector.to_list |> Boolean.all
-    in
-    let messages =
-      exists
-        (vec (Pairing_marlin_types.Messages.typ PC.typ Fq.typ))
-        ~request:(fun () -> Requests.Prev_messages)
-    in
-    let openings_proof =
-      exists
-        (vec
-           (Types.Pairing_based.Openings.Bulletproof.typ Fq.typ G.typ
-              ~length:bulletproof_log2))
-        ~request:(fun () -> Requests.Prev_openings_proof)
-    in
-    let bulletproof_success =
-      Vector.mapn
-        [ prev_statements
-        ; sg
-        ; sg_old
-        ; messages
-        ; openings_proof
-        ; unfinalized_proofs ]
-        ~f:(fun [ statement
-                ; sg
-                ; sg_old
-                ; messages
-                ; opening
-                ; ( (unfinalized :
-                      _ Types.Pairing_based.Proof_state.Per_proof.t)
-                  , should_verify ) ]
-           ->
-          assert_equal_g opening.sg sg ;
-          Boolean.Assert.(should_verify = Boolean.not is_base_case) ;
-          verify
-            ~branching:(module Branching)
-            ~is_base_case ~sg_old ~opening ~messages ~wrap_domains
-            ~wrap_verification_key:dlog_marlin_index statement unfinalized )
-      |> Vector.to_list |> Boolean.all
-    in
-    let prev_proof_correct =
-      print_bool "bulletproof_success" bulletproof_success ;
-      print_bool "prev_proof_finalized" prev_proofs_finalized ;
-      print_bool "prev-was-base" prev_was_base_case ;
-      let prev_proof_finalized =
-        Boolean.(prev_proofs_finalized || is_base_case)
-      in
-      let bulletproof_success =
-        Boolean.(bulletproof_success || prev_was_base_case)
-      in
-      print_bool "prev_proof_finalized'" prev_proof_finalized ;
-      print_bool "bulletproof_success''" bulletproof_success ;
-      Boolean.all [bulletproof_success; prev_proof_finalized]
-    in
-    let update_succeeded =
-      A.check_update (Vector.map prev_states ~f:snd) app_state
-    in
-    print_bool "prev_proof_correct" prev_proof_correct ;
-    print_bool "update succeeded" update_succeeded ;
-    print_bool "is base" is_base_case ;
-    Boolean.(Assert.any [prev_proof_correct && update_succeeded; is_base_case])
 end
