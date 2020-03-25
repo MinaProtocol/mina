@@ -141,11 +141,16 @@ let hash (t : t) =
 [%%inject
 "genesis_state_timestamp_string", genesis_state_timestamp]
 
+[%%ifdef
+consensus_mechanism]
+
 [%%inject
 "k", k]
 
 [%%inject
 "delta", delta]
+
+[%%endif]
 
 [%%inject
 "pool_max_size", pool_max_size]

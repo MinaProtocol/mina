@@ -1,6 +1,21 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
-module T = Coda_numbers.Length
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params.Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
+
+module T = Coda_numbers.Length
 
 (*constants actually required for blockchain snark*)
 (* k
@@ -53,6 +68,15 @@ let t_of_value (v : value) : Genesis_constants.Protocol.t =
   ; delta= T.to_int v.delta
   ; genesis_state_timestamp= Block_time.to_time v.genesis_state_timestamp }
 
+let to_input (t : value) =
+  Random_oracle.Input.bitstrings
+    [| T.to_bits t.k
+     ; T.to_bits t.delta
+     ; Block_time.Bits.to_bits t.genesis_state_timestamp |]
+
+[%%if
+defined consensus_mechanism]
+
 type var = (T.Checked.t, T.Checked.t, Block_time.Unpacked.var) Poly.t
 
 let to_hlist ({k; delta; genesis_state_timestamp} : (_, _, _) Poly.t) =
@@ -68,12 +92,6 @@ let data_spec =
 let typ =
   Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
     ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
-
-let to_input (t : value) =
-  Random_oracle.Input.bitstrings
-    [| T.to_bits t.k
-     ; T.to_bits t.delta
-     ; Block_time.Bits.to_bits t.genesis_state_timestamp |]
 
 let var_to_input (var : var) =
   let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
@@ -99,3 +117,5 @@ let%test_unit "value = var" =
       (t_of_value protocol_constants |> value_of_t)
   in
   Quickcheck.test ~trials:100 Value.gen ~examples:[value_of_t compiled] ~f:test
+
+[%%endif]
