@@ -51,7 +51,7 @@ let main () =
       ~chain_id:name ~libp2p_keypair ~net_configs ~snark_worker_key:None
       ~block_production_key:None ~program_dir ~work_selection_method ~trace_dir
       ~offset:Time.Span.zero () ~max_concurrent_connections
-      ~is_archive_rocksdb:false
+      ~is_archive_rocksdb:false ~archive_process_location:None
   in
   let%bind worker = Coda_process.spawn_exn config in
   let%bind _ = after (Time.Span.of_sec 10.) in

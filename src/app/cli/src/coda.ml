@@ -32,16 +32,19 @@ let maybe_sleep _ = Deferred.unit
 
 let chain_id ~genesis_state_hash ~genesis_constants =
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
-  let genesis_constants = Genesis_constants.hash genesis_constants in
+  let genesis_constants_hash = Genesis_constants.hash genesis_constants in
   let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
   let b2 =
     Blake2.digest_string
-      (genesis_state_hash ^ all_snark_keys ^ genesis_constants)
+      (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
   in
   Blake2.to_hex b2
 
 [%%inject
 "daemon_expiry", daemon_expiry]
+
+[%%inject
+"compile_time_current_fork_id", current_fork_id]
 
 let daemon logger =
   let open Command.Let_syntax in
@@ -87,13 +90,19 @@ let daemon logger =
      and genesis_ledger_dir_flag =
        flag "genesis-ledger-dir"
          ~doc:
-           "Dir Directory that contains the genesis ledger and the genesis \
+           "DIR Directory that contains the genesis ledger and the genesis \
             blockchain proof (default: <config-dir>/genesis-ledger)"
          (optional string)
      and run_snark_worker_flag =
        flag "run-snark-worker"
          ~doc:"PUBLICKEY Run the SNARK worker with this public key"
          (optional public_key_compressed)
+     and snark_worker_parallelism_flag =
+       flag "snark-worker-parallelism"
+         ~doc:
+           "NUM Run the SNARK worker using this many threads. Equivalent to \
+            setting OMP_NUM_THREADS, but doesn't affect block production."
+         (optional int)
      and work_selection_method_flag =
        flag "work-selection"
          ~doc:
@@ -202,12 +211,19 @@ let daemon logger =
        flag "genesis-constants"
          ~doc:
            (sprintf
-              "PATH path to the runtime-configurable constants. For example: \
-               %s  (default: compiled constants)"
+              "PATH path to the runtime-configurable constants. (default: \
+               compiled constants) For example: %s"
               ( Genesis_constants.(
                   to_daemon_config compiled |> Daemon_config.to_yojson)
               |> Yojson.Safe.to_string ))
          (optional string)
+     and curr_fork_id =
+       flag "current-fork-id" (optional string)
+         ~doc:
+           (sprintf
+              "HEX-STRING (%d characters) Current fork ID for this node, only \
+               blocks with the same ID accepted"
+              Fork_id.required_length)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -469,6 +485,10 @@ let daemon logger =
            maybe_from_config json_to_publickey_compressed_option
              "run-snark-worker" run_snark_worker_flag
          in
+         let snark_worker_parallelism_flag =
+           maybe_from_config YJ.Util.to_int_option "snark-worker-parallelism"
+             snark_worker_parallelism_flag
+         in
          let coinbase_receiver_flag =
            maybe_from_config json_to_publickey_compressed_option
              "coinbase-receiver" coinbase_receiver_flag
@@ -713,17 +733,24 @@ let daemon logger =
            Option.value_map coinbase_receiver_flag ~default:`Producer
              ~f:(fun pk -> `Other pk)
          in
+         let current_fork_id =
+           Coda_run.get_current_fork_id ~compile_time_current_fork_id ~conf_dir
+             ~logger curr_fork_id
+           |> Fork_id.create_exn
+         in
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                 ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
+                ~initial_fork_id:current_fork_id
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
                 ~snark_worker_config:
                   { Coda_lib.Config.Snark_worker_config.initial_snark_worker_key=
                       run_snark_worker_flag
-                  ; shutdown_on_disconnect= true }
+                  ; shutdown_on_disconnect= true
+                  ; num_threads= snark_worker_parallelism_flag }
                 ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                 ~wallets_disk_location:(conf_dir ^/ "wallets")
                 ~persistent_root_location:(conf_dir ^/ "root")
@@ -873,7 +900,6 @@ let internal_commands =
 let coda_commands logger =
   [ ("accounts", Client.accounts)
   ; ("daemon", daemon logger)
-  ; ("client-old", Client.command)
   ; ("client", Client.client)
   ; ("advanced", Client.advanced)
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
@@ -914,7 +940,8 @@ let coda_commands logger =
         ; (module Full_test)
         ; (module Transaction_snark_profiler)
         ; (module Snark_flame_graphs)
-        ; (module Coda_archive_node_test) ]
+        ; (module Coda_archive_node_test)
+        ; (module Coda_archive_processor_test) ]
         : (module Integration_test) list )
   in
   coda_commands logger

@@ -143,6 +143,7 @@ let process_transition ~logger ~trust_system ~verifier ~frontier
             , _
             , (`Delta_transition_chain, Truth.True delta_state_hashes)
             , _
+            , _
             , _ ) ->
               let timeout_duration =
                 Option.fold

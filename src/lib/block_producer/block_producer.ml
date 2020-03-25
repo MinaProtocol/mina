@@ -408,9 +408,11 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                 External_transition.create ~protocol_state
                                   ~protocol_state_proof ~staged_ledger_diff
                                   ~validation_callback:Fn.ignore
-                                  ~delta_transition_chain_proof }
+                                  ~delta_transition_chain_proof () }
                           |> External_transition.skip_time_received_validation
                                `This_transition_was_not_received_via_gossip
+                          |> External_transition.skip_fork_ids_validation
+                               `This_transition_has_valid_fork_ids
                           |> External_transition
                              .validate_genesis_protocol_state
                                ~genesis_state_hash:
@@ -600,7 +602,7 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   = None ) ;
                 let now = Time.now time_controller in
                 let next_producer_timing =
-                  measure "asking conensus what to do" (fun () ->
+                  measure "asking consensus what to do" (fun () ->
                       Consensus.Hooks.next_producer_timing (time_to_ms now)
                         consensus_state ~local_state:consensus_local_state
                         ~keypairs ~logger ~constants:consensus_constants )

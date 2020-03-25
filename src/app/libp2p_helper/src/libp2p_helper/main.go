@@ -336,6 +336,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		return nil, needsDHT()
 	}
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
+		return true
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
 			app.P2p.Logger.Info("would have validated but it's from us!")
@@ -1000,8 +1001,9 @@ func main() {
 	}()
 
 	lines := bufio.NewScanner(os.Stdin)
-	// 11MiB buffer size, larger than the 10.66MB minimum for 8MiB to be b64'd
-	bufsize := (1024 * 1024) * 11
+	// 22MiB buffer size, larger than the 21.33MB minimum for 16MiB to be b64'd
+	// 4 * (2^24/3) / 2^20 = 21.33
+	bufsize := (1024 * 1024) * 22
 	lines.Buffer(make([]byte, bufsize), bufsize)
 	out := bufio.NewWriter(os.Stdout)
 

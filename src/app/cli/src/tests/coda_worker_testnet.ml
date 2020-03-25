@@ -459,8 +459,9 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test ?is_archive_rocksdb ~name logger n block_production_keys
-    snark_work_public_keys work_selection_method ~max_concurrent_connections =
+let test ?archive_process_location ?is_archive_rocksdb ~name logger n
+    block_production_keys snark_work_public_keys work_selection_method
+    ~max_concurrent_connections =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
   let block_production_interval = Constants.block_window_duration_ms in
   let acceptable_delay =
@@ -475,7 +476,7 @@ let test ?is_archive_rocksdb ~name logger n block_production_keys
       ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))
       ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
-      ~max_concurrent_connections ?is_archive_rocksdb
+      ~max_concurrent_connections ?is_archive_rocksdb ?archive_process_location
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let workers = List.to_array workers in
@@ -576,12 +577,15 @@ end = struct
                           Coda_process.root_length_exn worker
                         in
                         let passed_root = Ivar.create () in
-                        Hashtbl.add_exn user_cmds_under_inspection
-                          ~key:user_cmd
-                          ~data:
-                            { expected_deadline=
-                                root_length + Constants.k + delay
-                            ; passed_root } ;
+                        (* since amount, fee, valid_until fixed for all commands,
+                           might have duplicate commands if there are key duplicates
+                        *)
+                        ignore
+                          (Hashtbl.add user_cmds_under_inspection ~key:user_cmd
+                             ~data:
+                               { expected_deadline=
+                                   root_length + Constants.k + delay
+                               ; passed_root }) ;
                         Option.return passed_root
                     | _ ->
                         return None )

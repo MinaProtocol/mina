@@ -79,6 +79,12 @@ module For_tests : sig
          | `Persistent_frontier_malformed ] )
        Deferred.Result.t
 
+  val gen_genesis_breadcrumb :
+       ?logger:Logger.t
+    -> ?verifier:Verifier.t
+    -> unit
+    -> Breadcrumb.t Quickcheck.Generator.t
+
   val gen_persistence :
        ?logger:Logger.t
     -> ?verifier:Verifier.t

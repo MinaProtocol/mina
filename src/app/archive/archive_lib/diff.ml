@@ -42,7 +42,7 @@ module Transaction_pool = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { added: (User_command.Stable.V1.t * Block_time.Stable.V1.t) list
+        { added: User_command.Stable.V1.t list
         ; removed: User_command.Stable.V1.t list }
 
       let to_latest = Fn.id
@@ -50,7 +50,7 @@ module Transaction_pool = struct
   end]
 
   type t = Stable.Latest.t =
-    {added: (User_command.t * Block_time.t) list; removed: User_command.t list}
+    {added: User_command.t list; removed: User_command.t list}
 end
 
 [%%versioned

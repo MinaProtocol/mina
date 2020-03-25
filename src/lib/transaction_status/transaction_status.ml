@@ -149,7 +149,8 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer [user_command]
+                Strict_pipe.Writer.write local_diffs_writer
+                  ([user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               Logger.info logger "Checking status" ~module_:__MODULE__
@@ -173,7 +174,8 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer [user_command]
+                Strict_pipe.Writer.write local_diffs_writer
+                  ([user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               let status =
@@ -210,7 +212,8 @@ let%test_module "transaction_status" =
                 Non_empty_list.uncons user_commands
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer pool_user_commands
+                Strict_pipe.Writer.write local_diffs_writer
+                  (pool_user_commands, Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               Logger.info logger "Computing status" ~module_:__MODULE__

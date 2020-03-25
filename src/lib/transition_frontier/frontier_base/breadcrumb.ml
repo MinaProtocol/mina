@@ -22,7 +22,8 @@ let create validated_transition staged_ledger =
   {validated_transition; staged_ledger; just_emitted_a_proof= false}
 
 let build ~logger ~verifier ~trust_system ~parent
-    ~transition:transition_with_validation ~sender =
+    ~transition:(transition_with_validation :
+                  External_transition.Almost_validated.t) ~sender =
   O1trace.trace_recurring "Breadcrumb.build" (fun () ->
       let open Deferred.Let_syntax in
       match%bind
@@ -307,12 +308,13 @@ module For_tests = struct
           ~blockchain_state:next_blockchain_state ~consensus_state
           ~constants:(Protocol_state.constants previous_protocol_state)
       in
+      Fork_id.(set_current empty) ;
       let next_external_transition =
-        External_transition.create ~protocol_state
+        External_transition.For_tests.create ~protocol_state
           ~protocol_state_proof:Proof.dummy
           ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
           ~validation_callback:Fn.ignore
-          ~delta_transition_chain_proof:(previous_state_hash, [])
+          ~delta_transition_chain_proof:(previous_state_hash, []) ()
       in
       (* We manually created a verified an external_transition *)
       let (`I_swear_this_is_safe_see_my_comment

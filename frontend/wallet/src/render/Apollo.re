@@ -30,16 +30,22 @@ let client = {
   let retryLink = ApolloLinks.from([|retry, httpLink|]);
 
   let wsUri = "ws://localhost:3085/graphql";
-  let wsLink = ApolloLinks.webSocketLink(~uri=wsUri, ~reconnect=true, ());
+  let wsObject: ReasonApolloTypes.webSocketLinkT = {
+    uri: wsUri,
+    options: {
+      reconnect: true,
+      connectionParams: None,
+    },
+  };
+  let wsLink = ApolloLinks.webSocketLink(wsObject);
 
   let combinedLink =
     ApolloLinks.split(
       operation => {
         let operationDefinition =
-          ApolloUtilities.getMainDefinition(operation##query);
-        operationDefinition##kind == "OperationDefinition"
-        &&
-        operationDefinition##operation == "subscription";
+          ApolloUtilities.getMainDefinition(operation.query);
+        operationDefinition.kind == "OperationDefinition"
+        && operationDefinition.operation == "subscription";
       },
       wsLink,
       retryLink,
@@ -53,7 +59,7 @@ let client = {
 };
 
 module Decoders = {
-  [@bs.val] [@bs.scope "window"] external isFaker: bool = "";
+  [@bs.val] [@bs.scope "window"] external isFaker: bool = "isFaker";
 
   let int64 = pk => {
     let s = Option.getExn(Js.Json.decodeString(pk));

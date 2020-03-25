@@ -274,9 +274,11 @@ let gen_initial_ledger_state :
   let%bind n_accounts = Int.gen_incl 2 10 in
   let%bind keypairs = Quickcheck_lib.replicate_gen Keypair.gen n_accounts in
   let%bind balances =
-    Quickcheck_lib.replicate_gen
-      Currency.Amount.(gen_incl (of_int 500_000_000) (of_int 1_000_000_000))
-      n_accounts
+    let gen_balance =
+      let%map whole_balance = Int.gen_incl 500_000_000 1_000_000_000 in
+      Currency.Amount.of_int (whole_balance * 1_000_000_000)
+    in
+    Quickcheck_lib.replicate_gen gen_balance n_accounts
   in
   let%bind nonces =
     Quickcheck_lib.replicate_gen

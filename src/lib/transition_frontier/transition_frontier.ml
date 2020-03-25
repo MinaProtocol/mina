@@ -429,11 +429,7 @@ module For_tests = struct
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
-        let genesis_transition =
-          External_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
-            ~base_proof:Precomputed_values.base_proof
-            ~genesis_constants:Genesis_constants.compiled
-        in
+        let genesis_transition = External_transition.For_tests.genesis () in
         let genesis_ledger = Lazy.force Test_genesis_ledger.t in
         let genesis_staged_ledger =
           Or_error.ok_exn

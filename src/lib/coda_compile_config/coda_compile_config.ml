@@ -6,7 +6,7 @@
 "proof_level", proof_level]
 
 [%%inject
-"coinbase_int", coinbase]
+"coinbase_string", coinbase]
 
 [%%inject
 "curve_size", curve_size]
@@ -21,11 +21,12 @@
 "ledger_depth", ledger_depth]
 
 [%%inject
-"account_creation_fee_int", account_creation_fee_int]
+"account_creation_fee_string", account_creation_fee_int]
 
-let coinbase = Currency.Amount.of_int coinbase_int
+let account_creation_fee =
+  Currency.Fee.of_formatted_string account_creation_fee_string
 
-let account_creation_fee = Currency.Fee.of_int account_creation_fee_int
+let coinbase = Currency.Amount.of_formatted_string coinbase_string
 
 (*transaction_capacity_log_2: Log of the capacity of transactions per
 transition. 1 will only work if we don't have prover fees. 2 will work with
