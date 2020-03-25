@@ -1,17 +1,17 @@
 open Core_kernel
 
-let domains sys =
+let domains sys : Domains.t =
   let open Snarky_bn382_backend.R1cs_constraint_system in
   let open Domain in
   let weight = Weight.norm sys.weight in
   let witness_size = 1 + sys.public_input_size + sys.auxiliary_input_size in
-  let h =
-    Pow_2_roots_of_unity Int.(ceil_log2 (max sys.constraints witness_size))
-  in
-  let k = Pow_2_roots_of_unity (Int.ceil_log2 weight) in
-  (h, k)
+  { h= Pow_2_roots_of_unity Int.(ceil_log2 (max sys.constraints witness_size))
+  ; k= Pow_2_roots_of_unity (Int.ceil_log2 weight)
+  ; x= Pow_2_roots_of_unity (Int.ceil_log2 (1 + sys.public_input_size)) }
 
-let rough_domains = Domain.(Pow_2_roots_of_unity 17, Pow_2_roots_of_unity 17)
+let rough_domains : Domains.t =
+  let d = Domain.Pow_2_roots_of_unity 17 in
+  {h= d; k= d; x= Pow_2_roots_of_unity 6}
 
 let domains (type field a)
     (module Impl : Snarky.Snark_intf.Run

@@ -49,8 +49,12 @@ module Constant = struct
     let of_fp x =
       of_bits (List.take (Snarky_bn382_backend.Fp.to_bits x) length)
 
+    let to_fp t = Snarky_bn382_backend.Fp.of_bits (to_bits t)
+
     let of_fq x =
       of_bits (List.take (Snarky_bn382_backend.Fq.to_bits x) length)
+
+    let to_fq t = Snarky_bn382_backend.Fq.of_bits (to_bits t)
   end
 end
 

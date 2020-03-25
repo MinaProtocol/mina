@@ -459,8 +459,8 @@ module Make (Inputs : Inputs) = struct
 
   let finalize_other_proof (type b)
       (module Branching : Nat.Add.Intf with type n = b) ?actual_branching
-      ~shifted_pow ~domain_h ~domain_k ~h_minus_1 ~k_minus_1 ~sponge
-      ~(old_bulletproof_challenges : (_, b) Vector.t)
+      ~shifted_pow ~domain_h ~domain_k ~input_domain ~h_minus_1 ~k_minus_1
+      ~sponge ~(old_bulletproof_challenges : (_, b) Vector.t)
       ({xi; r; combined_inner_product; bulletproof_challenges; b; marlin} :
         _ Types.Pairing_based.Proof_state.Deferred_values.t)
       ((beta_1_evals, x_hat1), (beta_2_evals, x_hat2), (beta_3_evals, x_hat3))
@@ -533,7 +533,7 @@ module Make (Inputs : Inputs) = struct
       equal b b_actual
     in
     let marlin_checks_passed =
-      Marlin_checks.check ~input_domain:Input_domain.self ~domain_h ~domain_k
+      Marlin_checks.check ~input_domain ~domain_h ~domain_k
         ~x_hat_beta_1:x_hat1 marlin
         { w_hat= beta_1_evals.w_hat
         ; g_1= beta_1_evals.g_1
@@ -745,6 +745,7 @@ module Make (Inputs : Inputs) = struct
             in
             let verified, chals =
               finalize_other_proof
+                ~input_domain:(Marlin_checks.domain Input_domain.self)
                 (module Branching)
                 ~shifted_pow:(fun deg x ->
                   Fq.(Pcs_batch.pow ~one ~mul ~add) x (crs_max_degree - deg) )

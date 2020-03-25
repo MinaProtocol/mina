@@ -344,7 +344,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
 
   module Marlin_checks = Marlin_checks.Make (Impl)
 
-  let finalize_other_proof ~domain_k ~domain_h ~sponge
+  let finalize_other_proof ~input_domain ~domain_k ~domain_h ~sponge
       ({xi; r; r_xi_sum; marlin} :
         _ Types.Dlog_based.Proof_state.Deferred_values.t) (evals, x_hat_beta_1)
       =
@@ -380,8 +380,8 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
       Fp.equal r_xi_sum r_xi_sum_actual
     in
     let marlin_checks =
-      Marlin_checks.check ~x_hat_beta_1 ~input_domain:Input_domain.self
-        ~domain_h ~domain_k marlin evals
+      Marlin_checks.check ~x_hat_beta_1 ~input_domain ~domain_h ~domain_k
+        marlin evals
     in
     as_prover
       As_prover.(
@@ -600,8 +600,9 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
             Sponge.absorb sponge (`Field sponge_digest) ;
             sponge
           in
-          finalize_other_proof ~domain_k ~domain_h ~sponge prev_deferred_values
-            evals )
+          finalize_other_proof
+            ~input_domain:(Marlin_checks.domain Input_domain.self)
+            ~domain_k ~domain_h ~sponge prev_deferred_values evals )
       |> Vector.to_list |> Boolean.all
     in
     let is_base_case = A.is_base_case app_state in

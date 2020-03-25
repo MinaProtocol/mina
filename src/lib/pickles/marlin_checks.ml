@@ -3,6 +3,8 @@ open Pickles_types
 
 type 'field domain = < size: 'field ; vanishing_polynomial: 'field -> 'field >
 
+let debug = false
+
 module Make (Impl : Snarky.Snark_intf.Run) = struct
   open Impl
   open Util
@@ -13,8 +15,10 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
   (* x^{2 ^ k} - 1 *)
   let vanishing_polynomial domain x =
     let k = Domain.log2_size domain in
-    let rec pow acc i = if i = 0 then acc else pow (F.square acc) (i - 1) in
-    F.(pow x k - one)
+    let rec pow2pow acc i =
+      if i = 0 then acc else pow2pow (F.square acc) (i - 1)
+    in
+    F.(pow2pow x k - one)
 
   let domain (domain : Domain.t) : domain =
     let size = Field.of_int (Domain.size domain) in
@@ -62,7 +66,8 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
     and eta = abc eta_a eta_b eta_c
     and z_ = abc z_hat_a z_hat_b (z_hat_a * z_hat_b) in
     let z_hat =
-      (w_hat * vanishing_polynomial input_domain beta_1) + x_hat_beta_1
+      let v_X_beta_1 = input_domain#vanishing_polynomial beta_1 in
+      (w_hat * v_X_beta_1) + x_hat_beta_1
     in
     let sum = sum' in
     let r_alpha =
@@ -86,24 +91,25 @@ module Make (Impl : Snarky.Snark_intf.Run) = struct
     in
     List.mapi
       ~f:(fun i (x, y) ->
-        as_prover
-          As_prover.(
-            fun () ->
-              let x = read_var x in
-              let y = read_var y in
-              if not (Field.Constant.equal x y) then (
-                Core.printf "bad marlin %d\n%!" i ;
-                Field.Constant.print x ;
-                Core.printf "%!" ;
-                Field.Constant.print y ;
-                Core.printf "%!" )) ;
+        if debug then
+          as_prover
+            As_prover.(
+              fun () ->
+                let x = read_var x in
+                let y = read_var y in
+                if not (Field.Constant.equal x y) then (
+                  Core.printf "bad marlin %d\n%!" i ;
+                  Field.Constant.print x ;
+                  Core.printf "%!" ;
+                  Field.Constant.print y ;
+                  Core.printf "%!" )) ;
         equal x y )
       [ ( h_3 * domain_k#vanishing_polynomial beta_3
         , a_beta_3 - (b_beta_3 * ((beta_3 * g_3) + sigma_3)) )
       ; ( r_alpha beta_2 * sigma_3 * domain_k#size
         , (h_2 * v_h_beta_2) + sigma_2 + (g_2 * beta_2) )
-      ; ( (r_alpha beta_1 * sum ms (fun m -> eta m * z_ m))
-          - (sigma_2 * domain_h#size * z_hat)
-        , (h_1 * v_h_beta_1) + (beta_1 * g_1) ) ]
+      ; ( r_alpha beta_1 * sum ms (fun m -> eta m * z_ m)
+        , (h_1 * v_h_beta_1) + (beta_1 * g_1)
+          + (sigma_2 * domain_h#size * z_hat) ) ]
     |> Boolean.all
 end

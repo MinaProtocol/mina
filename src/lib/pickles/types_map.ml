@@ -11,8 +11,8 @@ module Data = struct
     { typ: ('a_var, 'a_value) Impls.Pairing_based.Typ.t
     ; a_var_to_field_elements: 'a_var -> Impls.Pairing_based.Field.t array
     ; a_value_to_field_elements: 'a_value -> Fp.t array
-    ; wrap_domains: Domain.t * Domain.t
-    ; step_domains: (Domain.t * Domain.t, 'branches) Vector.t }
+    ; wrap_domains: Domains.t
+    ; step_domains: (Domains.t, 'branches) Vector.t }
 
   type ('a_var, 'a_value, 'max_branching, 'branches) t =
     { branches: 'branches Nat.t
@@ -23,8 +23,8 @@ module Data = struct
     ; a_var_to_field_elements: 'a_var -> Impls.Pairing_based.Field.t array
     ; wrap_key: G.Affine.t Abc.t Matrix_evals.t
     ; wrap_vk: Impls.Dlog_based.Verification_key.t
-    ; wrap_domains: Domain.t * Domain.t
-    ; step_domains: (Domain.t * Domain.t, 'branches) Vector.t }
+    ; wrap_domains: Domains.t
+    ; step_domains: (Domains.t, 'branches) Vector.t }
 
   type ('a, 'b, 'c, 'd) data = ('a, 'b, 'c, 'd) t
 
@@ -36,8 +36,8 @@ module Data = struct
       ; a_value_to_field_elements: 'a_value -> Fp.t array
       ; a_var_to_field_elements: 'a_var -> Impls.Pairing_based.Field.t array
       ; wrap_key: Pairing_main_inputs.G.t Abc.t Matrix_evals.t
-      ; wrap_domains: Domain.t * Domain.t
-      ; step_domains: (Domain.t * Domain.t, 'branches) Vector.t }
+      ; wrap_domains: Domains.t
+      ; step_domains: (Domains.t, 'branches) Vector.t }
 
     let create
         ({ branches

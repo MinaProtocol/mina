@@ -30,7 +30,7 @@ let permitted_domains =
   ; Pow_2_roots_of_unity 19 ]
 
 let check_step_domains step_domains =
-  Vector.iter step_domains ~f:(fun (h, k) ->
+  Vector.iter step_domains ~f:(fun {Domains.h; k} ->
       List.iter [h; k] ~f:(fun d ->
           assert (List.mem permitted_domains d ~equal:Domain.equal) ) )
 
@@ -50,13 +50,31 @@ module G1 = Dlog_main_inputs.G1
 module Fqv = Impls.Dlog_based.Field
 module Fpv = Impls.Pairing_based.Field
 
-type fp = Fpv.Constant.t [@@deriving sexp, bin_io]
+type fp = Fpv.Constant.t [@@deriving sexp, bin_io, compare]
 
-type fq = Fqv.Constant.t [@@deriving sexp, bin_io]
+type fq = Fqv.Constant.t [@@deriving sexp, bin_io, compare]
 
 type g = fp * fp [@@deriving sexp, bin_io]
 
 type g1 = fq * fq [@@deriving sexp, bin_io]
+
+let compute_challenge ~is_square x =
+  let nonresidue = Fq.of_int 7 in
+  Fq.sqrt (if is_square then x else Fq.(nonresidue * x))
+
+let compute_challenges chals =
+  Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
+      let prechallenge =
+        Fq.of_bits (Challenge.Constant.to_bits prechallenge)
+      in
+      assert (is_square = Fq.is_square prechallenge) ;
+      compute_challenge ~is_square prechallenge )
+
+let compute_sg chals =
+  Snarky_bn382.Fq_urs.b_poly_commitment
+    (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
+    (Fq.Vector.of_array (Vector.to_array (compute_challenges chals)))
+  |> Snarky_bn382_backend.G.Affine.of_backend
 
 (* We hardcode the number of rounds in the discrete log based proof. *)
 module Wrap_circuit_bulletproof_rounds = Nat.N20
@@ -76,6 +94,7 @@ type dlog_opening = (fq, g) Types.Pairing_based.Openings.Bulletproof.t
 
 module Pmain = Pairing_main.Make (struct
   include Pairing_main_inputs
+
   module Branching_pred = Nat.N0
 end)
 
@@ -363,6 +382,12 @@ module Unfinalized = struct
                 (Fq.of_bits (Challenge.Constant.to_bits prechallenge))
           ; prechallenge } )
 
+    let dummy_bulletproof_challenges_computed =
+      Vector.map dummy_bulletproof_challenges
+        ~f:(fun {is_square; prechallenge} ->
+          compute_challenge ~is_square
+            (Challenge.Constant.to_fq prechallenge) )
+
     let dummy : t =
       let one_chal = Challenge.Constant.of_fq Fq.one in
       let open Ro in
@@ -385,7 +410,7 @@ module Unfinalized = struct
       ; sponge_digest_before_evaluations= Digest.Constant.of_fq Fq.zero }
 
     let corresponding_dummy_sg =
-      lazy (Concrete.compute_sg dummy_bulletproof_challenges)
+      lazy (compute_sg dummy_bulletproof_challenges)
   end
 end
 
@@ -475,11 +500,12 @@ let step_main
        , a_var
        , a_value )
        Inductive_rule.t
-    -> (( (Unfinalized.t, max_branching) Vector.t
-       , Fpv.t
-       , (Fpv.t, max_branching) Vector.t )
-       Types.Pairing_based.Statement.t
-    -> unit) Staged.t =
+    -> (   ( (Unfinalized.t, max_branching) Vector.t
+           , Fpv.t
+           , (Fpv.t, max_branching) Vector.t )
+           Types.Pairing_based.Statement.t
+        -> unit)
+       Staged.t =
  fun (module Req) (module Max_branching) ~self_branches ~local_signature
      ~local_signature_length ~local_branches ~local_branches_length ~branching
      ~lte ~basic ~self rule ->
@@ -620,7 +646,7 @@ let step_main
     end in
     let open Pairing_main_inputs in
     let open Pmain in
-    let prevs_verified =
+    let _prevs_verified =
       let rec go : type vars vals ns1 ns2.
              (vars, ns1, ns2) H3.T(Per_proof_witness).t
           -> (vars, vals, ns1, ns2) H4.T(Types_map.Data.For_step).t
@@ -658,13 +684,15 @@ let step_main
                 Sponge.absorb sponge (`Field sponge_digest) ;
                 sponge
               in
-              let domain_h, domain_k =
-                let hs, ks = Vector.unzip d.step_domains in
-                Pseudo.Domain.
-                  (to_domain (which_index, hs), to_domain (which_index, ks))
+              let [domain_h; domain_k; input_domain] =
+                Vector.map
+                  Domains.[h; k; x]
+                  ~f:(fun f ->
+                    Pseudo.Domain.to_domain
+                      (which_index, Vector.map d.step_domains ~f) )
               in
-              Pmain.finalize_other_proof ~domain_k ~domain_h ~sponge
-                deferred_values prev_evals
+              Pmain.finalize_other_proof ~input_domain ~domain_k ~domain_h
+                ~sponge deferred_values prev_evals
             in
             (* TODO Use a pseudo sg old which masks out the extraneous sgs
                  for the index of this internal proof... *)
@@ -679,17 +707,26 @@ let step_main
               ; proof_state= state }
             in
             let verified =
-              Boolean.(
-                Pmain.verify ~branching:d.max_branching
-                  ~wrap_domains:d.wrap_domains ~is_base_case:should_verify
-                  ~sg_old ~opening ~messages ~wrap_verification_key:d.wrap_key
-                  statement unfinalized
-                && finalized)
+              Pmain.verify ~branching:d.max_branching
+                ~wrap_domains:(d.wrap_domains.h, d.wrap_domains.k)
+                ~is_base_case:should_verify ~sg_old ~opening ~messages
+                ~wrap_verification_key:d.wrap_key statement unfinalized
             in
-            Boolean.(verified || not should_verify)
+            if debug then
+              as_prover
+                As_prover.(
+                  fun () ->
+                    let finalized = read Boolean.typ finalized in
+                    let verified = read Boolean.typ verified in
+                    let should_verify = read Boolean.typ should_verify in
+                    printf "finalized: %b\n%!" finalized ;
+                    printf "verified: %b\n%!" verified ;
+                    printf "should_verify: %b\n\n%!" should_verify) ;
+            Boolean.((verified && finalized) || not should_verify)
             :: go proofs datas unfinalizeds should_verifys
       in
-      Boolean.all (go prevs datas unfinalized_proofs proofs_should_verify)
+      Boolean.Assert.all
+        (go prevs datas unfinalized_proofs proofs_should_verify)
     in
     let () =
       let hash_me_only =
@@ -697,8 +734,7 @@ let step_main
           (Pmain.hash_me_only ~index:me_only.dlog_marlin_index
              basic.a_var_to_field_elements)
       in
-      Field.Assert.equal
-        stmt.proof_state.me_only
+      Field.Assert.equal stmt.proof_state.me_only
         (Field.pack (hash_me_only me_only))
     in
     ()
@@ -841,7 +877,7 @@ let wrap_main
       in
       let chals =
         let ( (wrap_domains :
-                ( Marlin_checks.domain * Marlin_checks.domain
+                ( _
                 , Max_branching.n )
                 Vector.t)
             , hk_minus_1s ) =
@@ -852,7 +888,7 @@ let wrap_main
             let dummy_domains =
               (* TODO: The dummy should really be equal to one of the already present domains. *)
               let d = Domain.Pow_2_roots_of_unity 1 in
-              (d, d)
+              {Domains.h= d; k= d; x= d}
             in
             let module M =
               H4.Map
@@ -879,12 +915,14 @@ let wrap_main
             V.f pi_branches ds
           in
           Vector.map (Vector.transpose ds) ~f:(fun ds ->
-              let hs, ks = Vector.unzip ds in
-              ( ( Pseudo.Domain.to_domain (which_branch, hs)
-                , Pseudo.Domain.to_domain (which_branch, ks) )
-              , ( (which_branch, Vector.map hs ~f:(fun h -> Domain.size h - 1))
-                , (which_branch, Vector.map ks ~f:(fun k -> Domain.size k - 1))
-                ) ) )
+              ( Vector.map
+                  Domains.[h; k; x]
+                  ~f:(fun f ->
+                    Pseudo.Domain.to_domain (which_branch, Vector.map ds ~f) )
+              , ( ( which_branch
+                  , Vector.map ds ~f:(fun d -> Domain.size d.h - 1) )
+                , ( which_branch
+                  , Vector.map ds ~f:(fun d -> Domain.size d.k - 1) ) ) ) )
           |> Vector.unzip
         in
         let actual_branchings =
@@ -906,7 +944,7 @@ let wrap_main
                   ; old_bulletproof_challenges
                   ; actual_branching
                   ; evals
-                  ; (domain_h, domain_k)
+                  ; [domain_h; domain_k; input_domain]
                   ; (h_minus_1, k_minus_1) ]
              ->
             let sponge =
@@ -936,7 +974,7 @@ let wrap_main
                 (Nat.Add.create max_local_max_branching)
                 ~actual_branching ~h_minus_1 ~k_minus_1
                 ~shifted_pow:(Pseudo.Degree_bound.shifted_pow ~crs_max_degree)
-                ~domain_k ~domain_h ~sponge
+                ~input_domain ~domain_k ~domain_h ~sponge
                 (map_challenges deferred_values ~f:Fq.pack)
                 ~old_bulletproof_challenges evals
             in
@@ -993,9 +1031,10 @@ let wrap_main
         Field.choose_preimage_var r_xi_sum ~length:Field.size_in_bits
       in
       let step_domains =
-        ( Pseudo.Domain.to_domain (which_branch, Vector.map ~f:fst step_domains)
-        , Pseudo.Domain.to_domain (which_branch, Vector.map ~f:snd step_domains)
-        )
+        ( Pseudo.Domain.to_domain
+            (which_branch, Vector.map ~f:Domains.h step_domains)
+        , Pseudo.Domain.to_domain
+            (which_branch, Vector.map ~f:Domains.k step_domains) )
       in
       incrementally_verify_pairings ~step_domains ~pairing_acc:prev_pairing_acc
         ~xi ~r ~r_xi_sum ~verification_key:pairing_marlin_index ~sponge
@@ -1015,7 +1054,6 @@ let wrap_main
   ((module Req), main)
 
 module Step_branch_data = struct
-  (* TODO: Get rid of the vector. Just use an Hlist with an E03 *)
   type ( 'a_var
        , 'a_value
        , 'max_branching
@@ -1080,11 +1118,6 @@ module Statement = struct
   module Pairing_based = Types.Pairing_based.Statement
 end
 
-(* TODO: Just use lists but for the bin_io use the vector. *)
-module type BS1 = sig
-  type _ t [@@deriving bin_io, sexp]
-end
-
 module Reduced_me_only = struct
   module Pairing_based = struct
     type ('s, 'sgs) t = {app_state: 's; sg: 'sgs} [@@deriving sexp, bin_io]
@@ -1120,7 +1153,7 @@ module Reduced_me_only = struct
     let prepare ({pairing_marlin_acc; old_bulletproof_challenges} : _ t) =
       { Me_only.Dlog_based.pairing_marlin_acc
       ; old_bulletproof_challenges=
-          Vector.map ~f:Concrete.compute_challenges old_bulletproof_challenges
+          Vector.map ~f:compute_challenges old_bulletproof_challenges
       }
   end
 end
@@ -1530,9 +1563,10 @@ let wrap (type max_branching max_local_max_branchings) max_branching
         map ~f:G1.to_affine_exn (M.f prev_statement.pass_through)
       in
       { pairing_marlin_acc=
-          (let domain_h, domain_k = step_domains in
-           accumulate_pairing_checks ~domain_h ~domain_k proof prev_pairing_acc
-             ~r ~r_k ~r_xi_sum ~beta_1 ~beta_2 ~beta_3 combined_polys)
+          (let {Domains.h; k} = step_domains in
+           accumulate_pairing_checks ~domain_h:h ~domain_k:k proof
+             prev_pairing_acc ~r ~r_k ~r_xi_sum ~beta_1 ~beta_2 ~beta_3
+             combined_polys)
       ; old_bulletproof_challenges=
           Vector.map prev_statement.proof_state.unfinalized_proofs
             ~f:(fun (t, _) -> t.deferred_values.bulletproof_challenges) }
@@ -1602,6 +1636,39 @@ module Prev_proof = struct
     Proof.Dlog_based.t
 end
 
+let pad_pass_throughs
+    (type local_max_branchings max_local_max_branchings max_branching)
+    (module M : Hlist.Maxes.S
+      with type ns = max_local_max_branchings
+       and type length = max_branching)
+    (pass_throughs : local_max_branchings H1.T(Proof.Me_only.Dlog_based).t) =
+  let dummy_chals = Unfinalized.Constant.dummy_bulletproof_challenges in
+  let rec go : type len ms ns.
+         ms H1.T(Nat).t
+      -> ns H1.T(Proof.Me_only.Dlog_based).t
+      -> ms H1.T(Proof.Me_only.Dlog_based).t =
+   fun maxes me_onlys ->
+    match (maxes, me_onlys) with
+    | [], _ :: _ ->
+        assert false
+    | [], [] ->
+        []
+    | m :: maxes, [] ->
+        { pairing_marlin_acc= Dummy.pairing_acc
+        ; old_bulletproof_challenges= Vector.init m ~f:(fun _ -> dummy_chals)
+        }
+        :: go maxes []
+    | m :: maxes, me_only :: me_onlys ->
+        let me_only =
+          { me_only with
+            old_bulletproof_challenges=
+              Vector.extend_exn me_only.old_bulletproof_challenges m
+                dummy_chals }
+        in
+        me_only :: go maxes me_onlys
+  in
+  go M.maxes pass_throughs
+
 module Step
     (A : T0) (A_value : sig
         type t
@@ -1624,7 +1691,9 @@ struct
   end
 
   (* The prover corresponding to the given inductive rule. *)
-  let f (type self_branches prev_vars prev_values local_widths local_heights)
+  let f
+      (type max_local_max_branchings self_branches prev_vars prev_values
+      local_widths local_heights)
       (T branch_data :
         ( A.t
         , A_value.t
@@ -1634,7 +1703,10 @@ struct
         , prev_values
         , local_widths
         , local_heights )
-        Step_branch_data.t) (next_state : A_value.t) ~self ~step_domains
+        Step_branch_data.t) (next_state : A_value.t)
+      ~maxes:(module Maxes : Pickles_types.Hlist.Maxes.S
+        with type length = Max_branching.n
+         and type ns = max_local_max_branchings) ~self ~step_domains
       ~self_dlog_marlin_index pk self_dlog_vk
       (prev_with_proofs :
         (prev_values, local_widths, local_heights) H3.T(Prev_proof).t) :
@@ -1676,8 +1748,9 @@ struct
     end in
     let b_poly = Fq.(Dlog_main.b_poly ~add ~mul ~inv) in
     let unfinalized_proofs, statements_with_hashes, x_hats, witnesses =
-      let f : type var value n m.
-             Impls.Dlog_based.Verification_key.t
+      let f : type var value max n m.
+             max Nat.t
+          -> Impls.Dlog_based.Verification_key.t
           -> 'a
           -> (value, n, m) Prev_proof.t
           -> (var, value, n, m) Tag.t
@@ -1685,12 +1758,12 @@ struct
              * Statement_with_hashes.t
              * X_hat.t
              * (value, n, m) Per_proof_witness.Constant.t =
-       fun dlog_vk dlog_index t tag ->
+       fun max dlog_vk dlog_index t tag ->
         let data = Types_map.lookup tag in
         let statement = t.statement in
         let prev_challenges =
           (* TODO: This is redone in the call to Dlog_based_reduced_me_only.prepare *)
-          Vector.map ~f:Concrete.compute_challenges
+          Vector.map ~f:compute_challenges
             statement.proof_state.me_only.old_bulletproof_challenges
         in
         let prev_statement_with_hashes : _ Statement.Dlog_based.t =
@@ -1703,7 +1776,10 @@ struct
               { statement.proof_state with
                 me_only=
                   Common.hash_dlog_me_only
-                    { old_bulletproof_challenges= prev_challenges
+                    { old_bulletproof_challenges=
+                        Vector.extend_exn prev_challenges max
+                          Unfinalized.Constant
+                          .dummy_bulletproof_challenges_computed
                     ; pairing_marlin_acc=
                         statement.proof_state.me_only.pairing_marlin_acc } } }
         in
@@ -1758,12 +1834,12 @@ struct
                 (snd (Local_max_branching.add Nat.N19.n))
             in
             let open Fq in
-            let domain_h, domain_k = data.wrap_domains in
+            let domains = data.wrap_domains in
             Pcs_batch.combine_evaluations
               (Common.dlog_pcs_batch
                  (Local_max_branching.add Nat.N19.n)
-                 ~h_minus_1:Int.(Domain.size domain_h - 1)
-                 ~k_minus_1:Int.(Domain.size domain_k - 1))
+                 ~h_minus_1:Int.(Domain.size domains.h - 1)
+                 ~k_minus_1:Int.(Domain.size domains.k - 1))
               ~crs_max_degree ~xi ~mul ~add ~one ~evaluation_point:pt v b
           in
           let open Fq in
@@ -1777,7 +1853,7 @@ struct
           in
           let chals =
             Array.map prechals ~f:(fun (x, is_square) ->
-                Concrete.compute_challenge ~is_square x )
+                compute_challenge ~is_square x )
           in
           let b_poly = b_poly chals in
           let b =
@@ -1817,19 +1893,20 @@ struct
         , x_hat
         , witness )
       in
-      let rec go : type vars values ns ms k.
+      let rec go : type vars values ns ms maxes k.
              (values, ns, ms) H3.T(Prev_proof).t
+          -> maxes H1.T(Nat).t
           -> (vars, values, ns, ms) H4.T(Tag).t
           -> (vars, k) Length.t
           -> (Unfinalized.Constant.t, k) Vector.t
              * (Statement_with_hashes.t, k) Vector.t
              * (X_hat.t, k) Vector.t
              * (values, ns, ms) H3.T(Per_proof_witness.Constant).t =
-       fun ps ts l ->
-        match (ps, ts, l) with
-        | [], [], Z ->
+       fun ps maxes ts l ->
+        match (ps, maxes, ts, l) with
+        | [], _, [], Z ->
             ([], [], [], [])
-        | p :: ps, t :: ts, S l ->
+        | p :: ps, max :: maxes, t :: ts, S l ->
             let dlog_vk, dlog_index =
               if Type_equal.Id.same self t then
                 (self_dlog_vk, self_dlog_marlin_index)
@@ -1837,11 +1914,13 @@ struct
                 let d = Types_map.lookup t in
                 (d.wrap_vk, d.wrap_key)
             in
-            let u, s, x, w = f dlog_vk dlog_index p t
-            and us, ss, xs, ws = go ps ts l in
+            let u, s, x, w = f max dlog_vk dlog_index p t
+            and us, ss, xs, ws = go ps maxes ts l in
             (u :: us, s :: ss, x :: xs, w :: ws)
+        | _ :: _, [], _, _ ->
+            assert false
       in
-      go prev_with_proofs branch_data.rule.prevs prev_vars_length
+      go prev_with_proofs Maxes.maxes branch_data.rule.prevs prev_vars_length
     in
     let inners_should_verify =
       let module V = H1.To_vector (Bool) in
@@ -1887,11 +1966,11 @@ struct
             Vector.extend
               (Vector.mapn [unfinalized_proofs; sgs]
                  ~f:(fun [(u, should_verify); sg] ->
-                   (* If it "is base case" we should recompute this based on
+                   (* If it's the base case we should recompute this based on
                 the new_bulletproof_challenges
               *)
                    if not should_verify then
-                     Concrete.compute_sg
+                     compute_sg
                        u.deferred_values.bulletproof_challenges
                    else sg ))
               lte Max_branching.n
@@ -1901,17 +1980,9 @@ struct
       ; pass_through }
     in
     let next_me_only_prepared =
-      let t :
-          ( A_value.t
-          , ( Snarky_bn382_backend.G.Affine.t
-            , Max_branching.n )
-            Pickles_types.Vector.t )
-          Reduced_me_only.Pairing_based.t =
-        next_statement.proof_state.me_only
-      in
-      (* TODO The me_only should be extended before hashing! *)
       Reduced_me_only.Pairing_based.prepare
-        ~dlog_marlin_index:self_dlog_marlin_index t
+        ~dlog_marlin_index:self_dlog_marlin_index
+        next_statement.proof_state.me_only
     in
     let handler (Snarky.Request.With {request; respond}) =
       let k x = respond (Provide x) in
@@ -1933,6 +2004,29 @@ struct
         Impls.Pairing_based.input ~branching:Max_branching.n
           ~bulletproof_log2:Wrap_circuit_bulletproof_rounds.n
       in
+      let rec pad : type n k maxes pvals lws lhs.
+             (Digest.Constant.t, k) Vector.t
+          -> maxes H1.T(Nat).t
+          -> (maxes, n) Hlist.Length.t
+          -> (Digest.Constant.t, n) Vector.t =
+       fun xs maxes l ->
+        match (xs, maxes, l) with
+        | [], [], Z ->
+            []
+        | x :: xs, [], Z ->
+            assert false
+        | x :: xs, _ :: ms, S n ->
+            x :: pad xs ms n
+        | [], m :: ms, S n ->
+            let t : _ Types.Dlog_based.Proof_state.Me_only.t =
+              { pairing_marlin_acc= Dummy.pairing_acc
+              ; old_bulletproof_challenges=
+                  Vector.init m ~f:(fun _ ->
+                      Unfinalized.Constant
+                      .dummy_bulletproof_challenges_computed ) }
+            in
+            Common.hash_dlog_me_only t :: pad [] ms n
+      in
       Impls.Pairing_based.prove pk [input]
         (fun x () ->
           ( Impls.Pairing_based.handle
@@ -1946,11 +2040,11 @@ struct
                 Common.hash_pairing_me_only
                   ~app_state:A_value.to_field_elements next_me_only_prepared }
         ; pass_through=
-            Vector.extend
+            (* TODO: Use the same pad_pass_through function as in wrap *)
+            pad
               (Vector.map statements_with_hashes ~f:(fun s ->
                    s.proof_state.me_only ))
-              lte Max_branching.n
-              (Digest.Constant.of_fp Fp.zero) }
+              Maxes.maxes Maxes.length }
     in
     let prev_evals =
       let module M =
@@ -2074,41 +2168,6 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
     let module V = H4.To_vector (Local_max_branchings) in
     let padded = V.f branches (M.f choices) |> Vector.transpose in
     (padded, Maxes.m padded)
-
-  let pad_pass_throughs
-      (type local_max_branchings max_local_max_branchings max_branching)
-      (module M : Hlist.Maxes.S
-        with type ns = max_local_max_branchings
-         and type length = max_branching)
-      (pass_throughs : local_max_branchings H1.T(Proof.Me_only.Dlog_based).t) =
-    let dummy_chals =
-      Unfinalized.Constant.dummy.deferred_values.bulletproof_challenges
-    in
-    let rec go : type len ms ns.
-           ms H1.T(Nat).t
-        -> ns H1.T(Proof.Me_only.Dlog_based).t
-        -> ms H1.T(Proof.Me_only.Dlog_based).t =
-     fun maxes me_onlys ->
-      match (maxes, me_onlys) with
-      | [], _ :: _ ->
-          assert false
-      | [], [] ->
-          []
-      | m :: maxes, [] ->
-          { pairing_marlin_acc= Dummy.pairing_acc
-          ; old_bulletproof_challenges= Vector.init m ~f:(fun _ -> dummy_chals)
-          }
-          :: go maxes []
-      | m :: maxes, me_only :: me_onlys ->
-          let me_only =
-            { me_only with
-              old_bulletproof_challenges=
-                Vector.extend_exn me_only.old_bulletproof_challenges m
-                  dummy_chals }
-          in
-          me_only :: go maxes me_onlys
-    in
-    go M.maxes pass_throughs
 
   let compile
       : type prev_varss prev_valuess widthss heightss max_branching branches.
@@ -2280,7 +2339,7 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
         in
         let pairing_vk = Impls.Pairing_based.Keypair.vk keypair in
         let wrap prevs next_state =
-          let proof = step prevs next_state in
+          let proof = step ~maxes:(module Maxes) prevs next_state in
           let proof =
             { proof with
               statement=
@@ -2481,6 +2540,8 @@ let%test_module "test" =
       let base12 = Field.Constant.(base1 * base2) in
       let t1 = Txn_snark.base [] base1 in
       let t2 = Txn_snark.base [] base2 in
+      (* Need two separate booleans.
+         Should carry around prev should verify and self should verify *)
       let t12 = Txn_snark.merge [t1; t2] base12 in
       let b_neg_one :
           ( Blockchain_snark.Statement.Constant.t
