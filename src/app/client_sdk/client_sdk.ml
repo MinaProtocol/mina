@@ -91,7 +91,9 @@ let _ =
          let payload =
            User_command_payload.create ~fee ~nonce ~valid_until ~memo ~body
          in
-         let signature = Schnorr.sign sk payload |> signature_to_js_object in
+         let signature =
+           User_command.sign_payload sk payload |> signature_to_js_object
+         in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
            val payment = payment_js
@@ -135,7 +137,9 @@ let _ =
          let payload =
            User_command_payload.create ~fee ~nonce ~valid_until ~memo ~body
          in
-         let signature = Schnorr.sign sk payload |> signature_to_js_object in
+         let signature =
+           User_command.sign_payload sk payload |> signature_to_js_object
+         in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
            val stakeDelegation = stake_delegation_js

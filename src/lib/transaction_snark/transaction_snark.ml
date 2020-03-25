@@ -276,8 +276,9 @@ module Base = struct
 
   let%snarkydef check_signature shifted ~payload ~is_user_command ~sender
       ~signature =
+    let%bind input = Transaction_union_payload.Checked.to_input payload in
     let%bind verifies =
-      Schnorr.Checked.verifies shifted signature sender payload
+      Schnorr.Checked.verifies shifted signature sender input
     in
     Boolean.Assert.any [Boolean.not is_user_command; verifies]
 
@@ -1605,7 +1606,7 @@ let%test_module "transaction_snark" =
                { receiver= receiver.account.public_key
                ; amount= Amount.of_int amt })
       in
-      let signature = Schnorr.sign sender.private_key payload in
+      let signature = User_command.sign_payload sender.private_key payload in
       User_command.check
         User_command.Poly.Stable.Latest.
           { payload

@@ -96,10 +96,17 @@ let valid_until = Fn.compose Payload.valid_until payload
 
 let is_payment = Fn.compose Payload.is_payment payload
 
+let to_input (payload : Payload.t) =
+  Transaction_union_payload.(to_input (of_user_command_payload payload))
+
+let sign_payload (private_key : Signature_lib.Private_key.t)
+    (payload : Payload.t) : Signature.t =
+  Signature_lib.Schnorr.sign private_key (to_input payload)
+
 let sign (kp : Signature_keypair.t) (payload : Payload.t) : t =
   { payload
   ; sender= kp.public_key
-  ; signature= Schnorr.sign kp.private_key payload }
+  ; signature= sign_payload kp.private_key payload }
 
 module For_tests = struct
   (* Pretend to sign a command. Much faster than actually signing. *)
@@ -308,16 +315,16 @@ let check_signature _ = true
 consensus_mechanism]
 
 let check_signature ({payload; sender; signature} : t) =
-  Schnorr.verify signature
+  Signature_lib.Schnorr.verify signature
     (Snark_params.Tick.Inner_curve.of_affine sender)
-    payload
+    (to_input payload)
 
 [%%else]
 
 let check_signature ({payload; sender; signature} : t) =
-  Schnorr.verify signature
+  Signature_lib_nonconsensus.Schnorr.verify signature
     (Snark_params_nonconsensus.Inner_curve.of_affine sender)
-    payload
+    (to_input payload)
 
 [%%endif]
 

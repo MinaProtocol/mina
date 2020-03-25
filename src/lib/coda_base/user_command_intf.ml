@@ -126,6 +126,9 @@ module type S = sig
     include Comparable.S with type t := t
   end
 
+  val sign_payload :
+    Signature_lib.Private_key.t -> User_command_payload.t -> Signature.t
+
   val sign :
     Signature_keypair.t -> User_command_payload.t -> With_valid_signature.t
 
