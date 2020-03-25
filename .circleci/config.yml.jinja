@@ -78,7 +78,7 @@ jobs:
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
                   name: Running test -- test_archive_processor:coda-archive-processor-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_archive_processor:coda-archive-processor-test"'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_archive_processor:coda-archive-processor-test"'
 
     build-archive:
         resource_class: xlarge
