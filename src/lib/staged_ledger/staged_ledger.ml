@@ -2026,16 +2026,7 @@ let%test_module "test" =
           [%sexp_of:
             Ledger.init_state
             * User_command.With_valid_signature.t list
-            * int option list]
-        ~shrinker:
-          (Quickcheck.Shrinker.create (fun (init_state, cmds, iters) ->
-               if List.length iters > 1 then
-                 Sequence.singleton
-                   ( init_state
-                   , List.take cmds (List.length cmds - transaction_capacity)
-                   , List.tl_exn iters )
-               else Sequence.empty ))
-        ~trials:10
+            * int option list] ~trials:10
         ~f:(fun (ledger_init_state, cmds, iters) ->
           async_with_ledgers ledger_init_state (fun sl _test_mask ->
               let logger = Logger.null () in

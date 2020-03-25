@@ -524,13 +524,15 @@ module T = struct
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                  ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
+                 ~initial_fork_id:Fork_id.empty
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
                  ~snark_worker_config:
                    Coda_lib.Config.Snark_worker_config.
                      { initial_snark_worker_key= snark_worker_key
-                     ; shutdown_on_disconnect= true }
+                     ; shutdown_on_disconnect= true
+                     ; num_threads= None }
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~persistent_root_location:(conf_dir ^/ "root")
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")

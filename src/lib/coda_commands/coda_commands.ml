@@ -60,25 +60,18 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   in
   Option.is_some remainder
 
-let schedule_user_command t (txn : User_command.t) account_opt :
-    unit Or_error.t Deferred.t =
-  (* FIXME #3457: return a status from Transaction_pool.add and use it instead
-  *)
-  if not (is_valid_user_command t txn account_opt) then
-    return
-      (Or_error.error_string "Invalid user command: account balance is too low")
-  else
-    let logger =
-      Logger.extend
-        (Coda_lib.top_level_logger t)
-        [("coda_command", `String "scheduling a user command")]
-    in
-    let%map () = Coda_lib.add_transactions t [txn] in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("user_command", User_command.to_yojson txn)]
-      "Submitted transaction $user_command to transaction pool" ;
-    txn_count := !txn_count + 1 ;
-    Or_error.return ()
+let schedule_user_command t (txn : User_command.t) : 'a Or_error.t Deferred.t =
+  let logger =
+    Logger.extend
+      (Coda_lib.top_level_logger t)
+      [("coda_command", `String "scheduling a user command")]
+  in
+  let%map res = Coda_lib.add_transactions t [txn] in
+  Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+    ~metadata:[("user_command", User_command.to_yojson txn)]
+    "Submitted transaction $user_command to transaction pool" ;
+  txn_count := !txn_count + 1 ;
+  res
 
 let get_account t (addr : Account_id.t) =
   let open Participating_state.Let_syntax in
@@ -143,9 +136,22 @@ let send_user_command t (txn : User_command.t) =
   let fee_payer = User_command.fee_payer txn in
   let open Participating_state.Let_syntax in
   let%map account_opt = get_account t fee_payer in
-  let open Deferred.Or_error.Let_syntax in
-  let%map () = schedule_user_command t txn account_opt in
-  record_payment t txn (Option.value_exn account_opt)
+  let%map account_opt = get_account t public_key in
+  let open Deferred.Let_syntax in
+  match%map schedule_user_command t txn with
+  | Ok ([], [failed_txn]) ->
+      Error
+        (Error.of_string
+           (sprintf !"%s"
+              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                .to_yojson (snd failed_txn)
+              |> Yojson.Safe.to_string )))
+  | Ok ([_t], []) ->
+      Ok (record_payment t txn (Option.value_exn account_opt))
+  | Ok _ ->
+      Error (Error.of_string "Invalid result from scheduling a payment")
+  | Error e ->
+      Error e
 
 let get_balance t (addr : Account_id.t) =
   let open Participating_state.Option.Let_syntax in
@@ -207,7 +213,7 @@ let verify_payment t (addr : Account_id.t) (verifying_txn : User_command.t)
 
 (* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
 let schedule_user_commands t (txns : User_command.t list) :
-    unit Deferred.t Participating_state.t =
+    'a Deferred.Or_error.t Participating_state.t =
   Participating_state.return
   @@
   let logger =

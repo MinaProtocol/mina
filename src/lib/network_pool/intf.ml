@@ -44,6 +44,9 @@ module type Resource_pool_diff_intf = sig
 
   type t [@@deriving sexp, to_yojson]
 
+  (** Part of the diff that was not added to the resource pool*)
+  type rejected [@@deriving sexp, to_yojson]
+
   val summary : t -> string
 
   (** Warning: Using this directly could corrupt the resource pool if it
@@ -52,7 +55,12 @@ module type Resource_pool_diff_intf = sig
   val unsafe_apply :
        pool
     -> t Envelope.Incoming.t
-    -> (t, [`Locally_generated of t | `Other of Error.t]) Result.t Deferred.t
+    -> ( t * rejected
+       , [`Locally_generated of t * rejected | `Other of Error.t] )
+       Result.t
+       Deferred.t
+
+  val is_empty : t -> bool
 end
 
 (** A [Resource_pool_intf] ties together an associated pair of
@@ -89,6 +97,8 @@ module type Network_pool_base_intf = sig
 
   type resource_pool_diff
 
+  type rejected_diff
+
   type transition_frontier_diff
 
   type config
@@ -99,7 +109,10 @@ module type Network_pool_base_intf = sig
        config:config
     -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
-    -> local_diffs:resource_pool_diff Strict_pipe.Reader.t
+    -> local_diffs:( resource_pool_diff
+                   * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+                   )
+                   Strict_pipe.Reader.t
     -> frontier_broadcast_pipe:transition_frontier Option.t
                                Broadcast_pipe.Reader.t
     -> logger:Logger.t
@@ -110,7 +123,10 @@ module type Network_pool_base_intf = sig
     -> logger:Logger.t
     -> incoming_diffs:(resource_pool_diff Envelope.Incoming.t * (bool -> unit))
                       Strict_pipe.Reader.t
-    -> local_diffs:resource_pool_diff Strict_pipe.Reader.t
+    -> local_diffs:( resource_pool_diff
+                   * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
+                   )
+                   Strict_pipe.Reader.t
     -> tf_diffs:transition_frontier_diff Strict_pipe.Reader.t
     -> t
 
@@ -120,7 +136,9 @@ module type Network_pool_base_intf = sig
 
   val apply_and_broadcast :
        t
-    -> resource_pool_diff Envelope.Incoming.t * (bool -> unit)
+    -> resource_pool_diff Envelope.Incoming.t
+       * (bool -> unit)
+       * ((resource_pool_diff * rejected_diff) Or_error.t -> unit)
     -> unit Deferred.t
 end
 
@@ -197,6 +215,8 @@ module type Snark_pool_diff_intf = sig
 end
 
 module type Transaction_pool_diff_intf = sig
+  type resource_pool
+
   [%%versioned:
   module Stable : sig
     module V1 : sig
@@ -204,7 +224,60 @@ module type Transaction_pool_diff_intf = sig
     end
   end]
 
-  type t = User_command.t list [@@deriving sexp, to_yojson]
+  type t = Stable.Latest.t [@@deriving sexp]
+
+  module Diff_error : sig
+    module Stable : sig
+      module V1 : sig
+        type t =
+          | Insufficient_replace_fee
+          | Invalid_signature
+          | Duplicate
+          | Sender_account_does_not_exist
+          | Insufficient_amount_for_account_creation
+          | Delegate_not_found
+          | Invalid_nonce
+          | Insufficient_funds
+          | Insufficient_fee
+          | Overflow
+        [@@deriving sexp, yojson, bin_io]
+      end
+
+      module Latest = V1
+    end
+
+    type t = Stable.Latest.t =
+      | Insufficient_replace_fee
+      | Invalid_signature
+      | Duplicate
+      | Sender_account_does_not_exist
+      | Insufficient_amount_for_account_creation
+      | Delegate_not_found
+      | Invalid_nonce
+      | Insufficient_funds
+      | Insufficient_fee
+      | Overflow
+    [@@deriving sexp, yojson]
+  end
+
+  module Rejected : sig
+    module Stable : sig
+      module V1 : sig
+        type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
+        [@@deriving sexp, bin_io, yojson, version]
+      end
+
+      module Latest = V1
+    end
+
+    type t = Stable.Latest.t [@@deriving sexp, yojson]
+  end
+
+  include
+    Resource_pool_diff_intf
+    with type t := t
+     and type pool := resource_pool
+     and type rejected = Rejected.t
 end
 
 module type Transaction_resource_pool_intf = sig
