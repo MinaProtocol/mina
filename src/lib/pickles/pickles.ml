@@ -94,7 +94,6 @@ type dlog_opening = (fq, g) Types.Pairing_based.Openings.Bulletproof.t
 
 module Pmain = Pairing_main.Make (struct
   include Pairing_main_inputs
-
   module Branching_pred = Nat.N0
 end)
 
@@ -385,8 +384,8 @@ module Unfinalized = struct
     let dummy_bulletproof_challenges_computed =
       Vector.map dummy_bulletproof_challenges
         ~f:(fun {is_square; prechallenge} ->
-          compute_challenge ~is_square
-            (Challenge.Constant.to_fq prechallenge) )
+          compute_challenge ~is_square (Challenge.Constant.to_fq prechallenge)
+      )
 
     let dummy : t =
       let one_chal = Challenge.Constant.of_fq Fq.one in
@@ -409,8 +408,7 @@ module Unfinalized = struct
           ; b= fq () }
       ; sponge_digest_before_evaluations= Digest.Constant.of_fq Fq.zero }
 
-    let corresponding_dummy_sg =
-      lazy (compute_sg dummy_bulletproof_challenges)
+    let corresponding_dummy_sg = lazy (compute_sg dummy_bulletproof_challenges)
   end
 end
 
@@ -646,9 +644,10 @@ let step_main
     let open Pairing_main_inputs in
     let open Pmain in
     let pass_throughs =
-      let module V = H1.Of_vector(Digest) in
+      let module V = H1.Of_vector (Digest) in
       V.f branching
-        (Vector.map (Vector.trim stmt.pass_through lte)
+        (Vector.map
+           (Vector.trim stmt.pass_through lte)
            ~f:(Field.unpack ~length:Digest.length))
     in
     let _prevs_verified =
@@ -711,8 +710,7 @@ let step_main
                   {app_state; dlog_marlin_index= d.wrap_key; sg= sg_old}
               in
               { Types.Dlog_based.Statement.pass_through= prev_me_only
-              ; proof_state= { state with me_only = pass_through }
-              }
+              ; proof_state= {state with me_only= pass_through} }
             in
             let verified =
               Pmain.verify ~branching:d.max_branching
@@ -884,11 +882,7 @@ let wrap_main
         exists (Vector.typ ty Max_branching.n) ~request:(fun () -> Req.Evals)
       in
       let chals =
-        let ( (wrap_domains :
-                ( _
-                , Max_branching.n )
-                Vector.t)
-            , hk_minus_1s ) =
+        let (wrap_domains : (_, Max_branching.n) Vector.t), hk_minus_1s =
           let module Ds = struct
             type t = (Domains.t, Max_branching.n) Vector.t
           end in
@@ -1049,9 +1043,7 @@ let wrap_main
         ~public_input:(Array.append [|[Boolean.true_]|] (pack prev_statement))
         ~messages ~opening_proofs
     in
-    assert_eq_marlin
-      marlin 
-      marlin_actual ;
+    assert_eq_marlin marlin marlin_actual ;
     (* TODO: assertion on marlin_actual and pairing_marlin_acc *)
     Field.Assert.equal me_only_digest
       (Field.pack
@@ -1164,8 +1156,7 @@ module Reduced_me_only = struct
     let prepare ({pairing_marlin_acc; old_bulletproof_challenges} : _ t) =
       { Me_only.Dlog_based.pairing_marlin_acc
       ; old_bulletproof_challenges=
-          Vector.map ~f:compute_challenges old_bulletproof_challenges
-      }
+          Vector.map ~f:compute_challenges old_bulletproof_challenges }
   end
 end
 
@@ -1797,7 +1788,7 @@ struct
         let witness =
           ( t.Proof.Dlog_based.statement.pass_through.app_state
           , t.index
-          , { prev_statement_with_hashes.proof_state with me_only = () }
+          , {prev_statement_with_hashes.proof_state with me_only= ()}
           , (t.prev_evals, t.prev_x_hat_beta_1)
           , t.statement.pass_through.sg
           , (t.proof.openings.proof, t.proof.messages) )
@@ -1981,8 +1972,7 @@ struct
                 the new_bulletproof_challenges
               *)
                    if not should_verify then
-                     compute_sg
-                       u.deferred_values.bulletproof_challenges
+                     compute_sg u.deferred_values.bulletproof_challenges
                    else sg ))
               lte Max_branching.n
               (Lazy.force Unfinalized.Constant.corresponding_dummy_sg) }
