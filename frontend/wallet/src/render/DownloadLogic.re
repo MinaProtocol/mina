@@ -35,7 +35,7 @@ module Https = {
       type t =
         pri {
           location: string,
-          [@bs.as "Content-Length"]
+          [@bs.as "content-length"]
           contentLength: string,
         };
     };
@@ -124,11 +124,16 @@ let rec download = (filename, url, encoding, maxRedirects, chunkCb, doneCb) => {
 // TODO: Make this an env var
 let codaRepo = "https://s3-us-west-2.amazonaws.com/wallet.o1test.net/daemon/";
 
-let extractZip = (src, dest) => {
+[@bs.module "electron"] [@bs.scope ("remote", "app")]
+external getPath: string => string = "getPath";
+
+let extractZip = (src, dest, doneCb, errorCb) => {
   let extractArgs = {"path": dest};
 
   Bindings.Stream.Readable.create(src)
-  ->(Bindings.Stream.Readable.pipe(Unzipper.extract(extractArgs)));
+  ->(Bindings.Stream.Readable.pipe(Unzipper.extract(extractArgs)))
+  ->Bindings.Stream.Writable.onFinish(doneCb)
+  ->Bindings.Stream.Writable.onError(errorCb);
 };
 
 /**
@@ -136,21 +141,23 @@ let extractZip = (src, dest) => {
  */
 let downloadCoda = (version, chunkCb, doneCb) => {
   let tempFilename = "coda-daemon-" ++ version ++ ".zip";
-  let installPath = "/tmp/coda/"; // ProjectRoot.getPath(`UserData) ++ "/daemon";
-  download(
-    tempFilename,
-    codaRepo ++ tempFilename,
-    "binary",
-    1,
-    chunkCb,
-    res => {
-      switch (res) {
-      | Belt.Result.Error(e) => Js.log(e)
-      | _ => Js.log("it worked")
-      };
-      Js.log("Results!");
-      extractZip(tempFilename, installPath);
-      doneCb(res);
-    },
+  let installPath = getPath("userData") ++ "/daemon";
+  download(tempFilename, codaRepo ++ tempFilename, "binary", 1, chunkCb, res =>
+    switch (res) {
+    | Belt.Result.Error(_) => doneCb(res)
+    | _ =>
+      extractZip(
+        tempFilename,
+        installPath,
+        () => doneCb(Belt.Result.Ok()),
+        err =>
+          doneCb(
+            Belt.Result.Error(
+              "Error while unzipping the daemon bundle: " ++ err,
+            ),
+          ),
+      );
+      ();
+    }
   );
 };

@@ -38,7 +38,11 @@ let getTranslation = name =>
 [%bs.raw "window.downloadCoda = downloadCoda"];
 [%bs.raw "window.showItemInFolder = showItemInFolder"];
 [%bs.raw "window.openExternal = openExternal"];
+[%bs.raw "window.hotReloadLocation = window.location"];
 [%bs.raw
   "window.fileRoot = require(\"path\").dirname(window.location.pathname)"
+];
+[%bs.raw
+  "window.reload = function () { window.location = window.hotReloadLocation }"
 ];
 [%bs.raw "window.getTranslation = getTranslation"];
