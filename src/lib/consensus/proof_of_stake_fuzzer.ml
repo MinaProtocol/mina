@@ -45,7 +45,7 @@ module Vrf_distribution = struct
    *  [ep + 2R/3 - 1].
    *)
   let create ~stakers ~epoch ~initial_consensus_state =
-    let constants = Coda_constants.compiled_constants_for_test in
+    let constants = Constants.compiled in
     Core_kernel.Printf.printf
       !"[%d] Evaluating %d VRFs for %d stakers\n%!"
       (UInt32.to_int epoch)
@@ -62,20 +62,15 @@ module Vrf_distribution = struct
       else
         Global_slot.of_epoch_and_slot
           (epoch - of_int 1, of_int 2 * constants.slots_per_epoch)
+          ~slots_per_epoch:constants.slots_per_epoch
     in
     let term_slot =
       Global_slot.of_epoch_and_slot
         (epoch, (of_int 2 * constants.slots_per_epoch) - of_int 1)
     in
-    let slot_duration_ms =
-      constants.slot_duration_ms |> Int64.of_int |> Block_time.Span.of_ms
-    in
-    let genesis_state_timestamp =
-      Block_time.of_time coda_constants.genesis_state_timestamp
-    in
-    let epoch_duration =
-      Block_time.Span.of_time_span coda_constants.consensus.epoch_duration
-    in
+    let slot_duration_ms = constants.slot_duration_ms in
+    let genesis_state_timestamp = constants.genesis_state_timestamp in
+    let epoch_duration = constants.epoch_duration in
     let start_time =
       Global_slot.start_time start_slot ~genesis_state_timestamp
         ~epoch_duration ~slot_duration_ms

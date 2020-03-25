@@ -2,7 +2,8 @@ open Core_kernel
 open Snark_params
 open Signed
 open Unsigned
-module T = Coda_numbers.Slot
+
+module T = Coda_numbers.Nat.Make32 ()
 
 include (T : module type of T with module Checked := T.Checked)
 

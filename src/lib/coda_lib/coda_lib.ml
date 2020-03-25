@@ -669,8 +669,6 @@ let start t =
   Snark_worker.start t
 
 let create (config : Config.t) ~genesis_ledger ~base_proof =
-  let coda_constants = Coda_constants.create_t config.genesis_constants in
-  Coda_constants.t_ref := Some coda_constants ;
   let consensus_constants =
     Consensus.Constants.create
       ~protocol_constants:config.genesis_constants.protocol
