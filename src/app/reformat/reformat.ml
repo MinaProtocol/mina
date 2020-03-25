@@ -13,8 +13,7 @@ let dirs_trustlist =
   ; "external"
   ; "ocamlformat"
   ; "node_modules"
-  ; "tablecloth"
-  ; "snarky" ]
+  ; "tablecloth" ]
 
 let rec fold_over_files ~path ~process_path ~init ~f =
   let%bind all = Sys.ls_dir path in
