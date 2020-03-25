@@ -1,8 +1,15 @@
 const path = require('path');
 
 const { createClient } = require('contentful');
-const withMDX = require('@next/mdx')({ options: { remarkPlugins: [require("remark-slug")] } });
+
+const withMDX = require('@next/mdx')({
+  options: {
+    remarkPlugins: [require('remark-slug')],
+    rehypePlugins: [[require('rehype-highlight'), {subset: false}]],
+  } });
+
 const withTM = require('next-transpile-modules');
+
 const withBundleAnalyzer = require('@next/bundle-analyzer')({
   enabled: process.env.ANALYZE === 'true',
 });
