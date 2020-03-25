@@ -111,7 +111,7 @@ jobs:
                   name: Build Archive Process
                   command:  bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make build_archive'
                   environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
+                    DUNE_PROFILE: testnet
             # NOTE: If we were using a machine executor we would be able to mount the sql file in
             # as a volume for the container to seed itself, this is the workaround.
             # Ideally this DB setup step would be handled by the archive process itself.
@@ -273,14 +273,14 @@ jobs:
             - run:
                 name: Build ocaml
                 environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
+                    DUNE_PROFILE: testnet
                     EXTRA_NIX_ARGS: --option sandbox false
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 20m
             - run:
                 name: Build ocaml - generate keypair
                 environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
+                    DUNE_PROFILE: testnet
                 command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
                 no_output_timeout: 20m
             - run:
@@ -362,7 +362,7 @@ jobs:
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
                   no_output_timeout: 10m
-    build-artifacts--testnet_postake_medium_curves:
+    build-artifacts--testnet:
         resource_class: xlarge
         docker:
             - image: codaprotocol/coda:toolchain-39f69e81b5fd8cc0f509631823a17155b63990cf
@@ -387,7 +387,7 @@ jobs:
                   name: Generate PV keys
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
+                    DUNE_PROFILE: testnet
                     EXTRA_NIX_ARGS: --option sandbox false
                   no_output_timeout: 20m
             - run:
@@ -399,7 +399,7 @@ jobs:
                     ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
                     ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
                   environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
+                    DUNE_PROFILE: testnet
                     EXTRA_NIX_ARGS: --option sandbox false
                     GO: /usr/lib/go/bin/go
                     LIBP2P_NIXLESS: 1
@@ -414,8 +414,8 @@ jobs:
                   name: Build deb package with PV keys and PV key tar
                   command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make deb'
                   environment:
-                    DUNE_PROFILE: testnet_postake_medium_curves
                     LIBP2P_NIXLESS: 1
+                    DUNE_PROFILE: testnet
                   no_output_timeout: 20m
             - run:
                   name: Store genesis public/private keypairs
@@ -841,7 +841,7 @@ workflows:
             - build-archive
             - build-macos
             - build-client-sdk
-            - build-artifacts--testnet_postake_medium_curves
+            - build-artifacts--testnet
             - test-unit--dev
             - test-unit--nonconsensus_medium_curves
             - test--fake_hash

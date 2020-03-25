@@ -55,7 +55,7 @@ esac
 
 # only publish wanted jobs
 case "$CIRCLE_JOB" in
-    build-artifacts--testnet_postake_medium_curves | FORCED)
+    build-artifacts--testnet | FORCED)
         echo "Publishing debs: ${DEBS}"
         set -x
         ${DEBS3} --codename "${CODENAME}" "${DEBS}"

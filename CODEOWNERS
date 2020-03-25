@@ -4,7 +4,7 @@
 /scripts/ @CodaProtocol/infra-eng-reviewers @CodaProtocol/protocol-eng-reviewers
 /Makefile @CodaProtocol/infra-eng-reviewers
 /src/config/dev.mlh @CodaProtocol/infra-eng-reviewers @CodaProtocol/protocol-eng-reviewers
-/src/config/testnet_postake_medium_curves.mlh @CodaProtocol/infra-eng-reviewers @CodaProtocol/protocol-eng-reviewers
+/src/config/testnet.mlh @CodaProtocol/infra-eng-reviewers @CodaProtocol/protocol-eng-reviewers
 /CODE_OF_CONDUCT.md @imeckler @emberian
 /CONTRIBUTING.md @CodaProtocol/product-eng-reviewers
 /LICENSE @imeckler

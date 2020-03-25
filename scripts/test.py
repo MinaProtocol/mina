@@ -20,7 +20,7 @@ from readchar import readchar
 
 
 build_artifact_profiles = [
-    'testnet_postake_medium_curves'
+    'testnet'
 ]
 
 unit_test_profiles = ['dev']
@@ -80,7 +80,8 @@ archive_processor_test = {
 }
 
 medium_curve_profiles_full = [
-    'test_postake_medium_curves', 'testnet_postake_medium_curves',
+    'test_postake_medium_curves',
+    'testnet',
     'testnet_postake_many_producers_medium_curves'
 ]
 
