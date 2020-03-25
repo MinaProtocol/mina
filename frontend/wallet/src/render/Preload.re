@@ -11,12 +11,12 @@ let downloadKey = (keyName, chunkCb, doneCb) =>
   );
 
 [@bs.module "electron"] [@bs.scope "shell"] [@bs.val]
-external showItemInFolder: string => unit = "";
+external showItemInFolder: string => unit = "showItemInFolder";
 
 let showItemInFolder = showItemInFolder;
 
 [@bs.module "electron"] [@bs.scope "shell"] [@bs.val]
-external openExternal: string => unit = "";
+external openExternal: string => unit = "openExternal";
 
 let openExternal = openExternal;
 
