@@ -167,6 +167,7 @@ let make = (~currentSlug) => {
           <Page title="Code Reviews" slug="code-reviews" />
           <Page title="Style Guide" slug="style-guide" />
           <Page title="GraphQL API" slug="graphql-api" />
+          <Page title="Archive Node" slug="archive-node" />
         </Folder>
         <Folder title="Coda Protocol Architecture" slug="architecture">
           <Page title="Coda Overview" slug="" />

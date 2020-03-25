@@ -1,0 +1,44 @@
+import Page from '@reason/pages/Docs';
+export default Page({title: "Archive Node"});
+
+# Archive Node
+
+Coda nodes are succinct by default, meaning they don't need to maintain historical information about the network, block, or transactions. For some usecases, it is useful to maintain this historical data, which you can do by running an "archive node".
+
+An archive node is just a regular Coda daemon that is connected to a running archive process. The daemon will regularly send blockchain data to the archive process, which will store it in a postgres database.  Running an archive node therefore requires some knowledge of managing a postgres database instance.
+
+## Setup Instructions
+
+Below are some basic instructions on how to set up everything required to get an archive node running locally. These will be slightly different if you're connecting to a cloud instance of postgres, if your deployment uses docker, or if you want to run these processes on different machines.
+
+<Alert>
+
+Note: Some of these instructions may depend on how your operating system installs postgres (and assume that it is installed in the first place).
+
+</Alert>
+
+1. Start a local postgres server. This will just run it in the foreground for testing, you will likely want to run it in the background or use your OS's service manager (like systemd) to run it for you. Alternatively, you may use a postgres service hosted by a cloud provider.
+```
+postgres -p 5432 -D /usr/local/var/postgres
+```
+
+2. Create database (here called `archiver`) on server and load the schema into it. This will only need to be done the first time the archive node is set up.
+```
+createdb -h localhost -p 5432 -e archiver
+
+psql -h localhost -p 5432 -d archiver -f <(curl -Ls https://raw.githubusercontent.com/CodaProtocol/coda/master/src/app/archive/create_schema.sql)
+```
+
+3. Start archive process on port 3086, connecting to the postgres database we started on port 5432 in step 1.
+```
+coda-archive \
+  -postgres-uri postgres://localhost:5432/archiver \
+  -server-port 3086
+```
+
+4. Start the daemon, connecting it to the archive process that we just started on port 3086. If you want to connect to an archive process on another machine, you can specify a hostname as well, like `localhost:3086`.
+
+<DaemonCommandExample args={[
+  "-archive-address 3086"
+]} />
+
