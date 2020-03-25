@@ -20,13 +20,16 @@ module Checked = struct
     let open Tick in
     let open Tick.Let_syntax in
     let open Snarky_integer in
-    let length_to_int = Coda_numbers.Length.Checked.to_integer in
-    let ck = Integer.mul ~m (length_to_int c) (length_to_int k) in
+    let module Length = Coda_numbers.Length in
+    let integer_mul i i' = make_checked (fun () -> Integer.mul ~m i i') in
+    let to_integer = Length.Checked.to_integer in
+    let%bind ck = integer_mul (to_integer c) (to_integer k) in
     let two = Integer.constant ~m (Bignum_bigint.of_int 2) in
-    let ck_times_2 = Integer.mul ~m ck two in
-    let slot = to_integer slot in
-    let slot_gte_ck = Integer.gte ~m slot ck
-    and slot_lt_ck_times_2 = Integer.lt ~m slot ck_times_2 in
+    let%bind ck_times_2 = integer_mul ck two in
+    let slot_gte_ck = Integer.gte ~m (T.Checked.to_integer slot) ck in
+    let slot_lt_ck_times_2 =
+      Integer.lt ~m (T.Checked.to_integer slot) ck_times_2
+    in
     Boolean.(slot_gte_ck && slot_lt_ck_times_2)
 end
 
@@ -40,16 +43,14 @@ let gen =
 
 let%test_unit "in_seed_update_range unchecked vs. checked equality" =
   let constants = Constants.compiled in
-  let to_var c =
-    let open Snark_params.Tick in
-    let c = exists Coda_numbers.Length.typ ~compute:(As_prover.return c) in
-    run_unchecked c () |> snd
-  in
-  let test =
-    Test_util.test_equal typ Tick.Boolean.typ
-      (Checked.in_seed_update_range ~c:(to_var constants.c)
-         ~k:(to_var constants.k))
-      (in_seed_update_range ~c:constants.c ~k:constants.k)
+  let module Length = Coda_numbers.Length in
+  let test x =
+    Test_util.test_equal
+      (Snarky.Typ.tuple3 Length.typ Length.typ typ)
+      Tick.Boolean.typ
+      (fun (c, k, x) -> Checked.in_seed_update_range ~c ~k x)
+      (fun (c, k, x) -> in_seed_update_range ~c ~k x)
+      (constants.c, constants.k, x)
   in
   let x = UInt32.mul constants.c constants.k |> UInt32.to_int in
   let examples =

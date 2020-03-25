@@ -45,7 +45,7 @@ module Poly = struct
     ; epoch_duration: 'timespan
     ; delta_duration: 'timespan
     ; genesis_state_timestamp: 'time }
-  [@@deriving sexp]
+  [@@deriving sexp, eq, to_yojson]
 end
 
 [%%versioned
@@ -62,15 +62,13 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp]
+type t = Stable.Latest.t [@@deriving sexp, eq, to_yojson]
 
 type var =
   ( Length.Checked.t
   , Block_time.Unpacked.var
   , Block_time.Span.Unpacked.var )
   Poly.t
-
-module type C = Monad.S
 
 module type M_intf = sig
   type t
@@ -233,7 +231,7 @@ let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
     Coda_base.Protocol_constants_checked.value_of_t protocol_constants
   in
   let constants = create' (module Constants_UInt32) ~protocol_constants in
-  let checkpoint_window_size_in_slots, checkpoint_window_slots_per_year =
+  let checkpoint_window_slots_per_year, checkpoint_window_size_in_slots =
     let per_year = 12 in
     let slots_per_year =
       let one_year_ms = Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int in
@@ -249,60 +247,6 @@ let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
   { constants with
     checkpoint_window_size_in_slots
   ; checkpoint_window_slots_per_year }
-
-(*let c = Coda_compile_config.c in
-  let block_window_duration_ms =
-    Coda_compile_config.block_window_duration_ms
-  in
-  let sub_windows_per_window = c in
-  let slots_per_sub_window = protocol_constants.k in
-  let slots_per_window = sub_windows_per_window * slots_per_sub_window in
-  (* Number of slots =24k in ouroboros praos *)
-  let slots_per_epoch = 3 * c * protocol_constants.k in
-  let module Slot = struct
-    let duration_ms = block_window_duration_ms
-  end in
-  let module Epoch = struct
-    let size = slots_per_epoch
-
-    (* Amount of time in total for an epoch *)
-    let duration =
-      Block_time.Span.of_ms (Int64.of_int (Slot.duration_ms * size))
-  end in
-  let module Checkpoint_window = struct
-    let per_year = 12
-
-    let slots_per_year =
-      let one_year_ms = Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int in
-      one_year_ms / Slot.duration_ms
-
-    let size_in_slots =
-      assert (slots_per_year mod per_year = 0) ;
-      slots_per_year / per_year
-  end in
-  let delta_duration =
-    Block_time.Span.of_ms
-      (Int64.of_int (Slot.duration_ms * protocol_constants.delta))
-  in
-  let to_length = Length.of_int in
-  let to_timespan = Fn.compose Block_time.Span.of_ms Int64.of_int in
-  { k= to_length protocol_constants.k
-  ; c= to_length c
-  ; delta= to_length protocol_constants.delta
-  ; block_window_duration_ms= to_timespan block_window_duration_ms
-  ; slots_per_sub_window= to_length slots_per_sub_window
-  ; slots_per_window= to_length slots_per_window
-  ; sub_windows_per_window= to_length sub_windows_per_window
-  ; slots_per_epoch= to_length slots_per_epoch
-  ; slot_duration_ms= to_timespan Slot.duration_ms
-  ; epoch_size= to_length Epoch.size
-  ; epoch_duration= Epoch.duration
-  ; checkpoint_window_slots_per_year=
-      to_length Checkpoint_window.slots_per_year
-  ; checkpoint_window_size_in_slots= to_length Checkpoint_window.size_in_slots
-  ; delta_duration
-  ; genesis_state_timestamp=
-      Block_time.of_time protocol_constants.genesis_state_timestamp }*)
 
 let compiled = create ~protocol_constants:Genesis_constants.compiled.protocol
 
@@ -479,7 +423,10 @@ module Checked = struct
   let create ~(protocol_constants : Coda_base.Protocol_constants_checked.var) :
       (var, _) Checked.t =
     let open Snarky_integer in
-    let constants = create' (module Constants_checked) ~protocol_constants in
+    let%bind constants =
+      make_checked (fun () ->
+          create' (module Constants_checked) ~protocol_constants )
+    in
     let%map checkpoint_window_slots_per_year, checkpoint_window_size_in_slots =
       let constant c = Integer.constant ~m (Bignum_bigint.of_int c) in
       let per_year = constant 12 in
@@ -506,70 +453,19 @@ module Checked = struct
     { constants with
       checkpoint_window_slots_per_year
     ; checkpoint_window_size_in_slots }
-
-  (*let open Snarky_integer in
-    let ( * ) = Integer.mul ~m in
-    let ( / ) = Integer.div_mod ~m in
-    let constant c = Integer.constant ~m (Bignum_bigint.of_int c) in
-    let c = constant Coda_compile_config.c in
-    let block_window_duration_ms =
-      constant Coda_compile_config.block_window_duration_ms
-    in
-    let k = Length.Checked.to_integer protocol_constants.k in
-    let delta = Length.Checked.to_integer protocol_constants.delta in
-    let sub_windows_per_window = c in
-    let slots_per_sub_window = k in
-    let slots_per_window = sub_windows_per_window * slots_per_sub_window in
-    (* Number of slots =24k in ouroboros praos *)
-    let slots_per_epoch = constant 3 * c * k in
-    let module Slot = struct
-      let duration_ms = block_window_duration_ms
-    end in
-    let module Epoch = struct
-      let size = slots_per_epoch
-
-      (* Amount of time in total for an epoch *)
-      let duration = Slot.duration_ms * size
-    end in
-    let module Checkpoint_window = struct
-      let per_year = constant 12
-
-      let slots_per_year, _ =
-        let one_year_ms =
-          constant (Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int)
-        in
-        one_year_ms / Slot.duration_ms
-
-      let size_in_slots =
-        let size_in_slots, rem = slots_per_year / per_year in
-        let%map () =
-          Boolean.Assert.is_true (Integer.equal ~m rem (constant 0))
-        in
-        size_in_slots
-    end in
-    let%map checkpoint_window_size_in_slots =
-      Checkpoint_window.size_in_slots
-    in
-    let to_length = Length.Checked.Unsafe.of_integer in
-    let to_timespan =
-      Fn.compose Block_time.Span.Unpacked.var_of_bits (Integer.to_bits ~m)
-    in
-    let delta_duration = Slot.duration_ms * delta |> to_timespan in
-    { Poly.k= to_length k
-    ; c= to_length c
-    ; delta= to_length delta
-    ; block_window_duration_ms= to_timespan block_window_duration_ms
-    ; slots_per_sub_window= to_length slots_per_sub_window
-    ; slots_per_window= to_length slots_per_window
-    ; sub_windows_per_window= to_length sub_windows_per_window
-    ; slots_per_epoch= to_length slots_per_epoch
-    ; slot_duration_ms= to_timespan Slot.duration_ms
-    ; epoch_size= to_length Epoch.size
-    ; epoch_duration= to_timespan Epoch.duration
-    ; checkpoint_window_slots_per_year=
-        to_length Checkpoint_window.slots_per_year
-    ; checkpoint_window_size_in_slots=
-        to_length checkpoint_window_size_in_slots
-    ; delta_duration
-    ; genesis_state_timestamp= protocol_constants.genesis_state_timestamp }*)
 end
+
+let%test_unit "checked = unchecked" =
+  let open Coda_base in
+  let compiled = Genesis_constants.compiled.protocol in
+  let test =
+    Test_util.test_equal Protocol_constants_checked.typ typ
+      (fun protocol_constants -> Checked.create ~protocol_constants)
+      (fun protocol_constants ->
+        create
+          ~protocol_constants:
+            (Protocol_constants_checked.t_of_value protocol_constants) )
+  in
+  Quickcheck.test ~trials:100 Protocol_constants_checked.Value.gen
+    ~examples:[Protocol_constants_checked.value_of_t compiled]
+    ~f:test

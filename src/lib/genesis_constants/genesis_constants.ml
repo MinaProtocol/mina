@@ -43,6 +43,7 @@ module Protocol = struct
     type ('k, 'delta, 'genesis_state_timestamp) t =
           ('k, 'delta, 'genesis_state_timestamp) Stable.Latest.t =
       {k: 'k; delta: 'delta; genesis_state_timestamp: 'genesis_state_timestamp}
+    [@@deriving eq]
   end
 
   module Stable = struct
@@ -122,7 +123,7 @@ module Protocol = struct
     end
   end
 
-  type t = Stable.Latest.t
+  type t = Stable.Latest.t [@@deriving eq]
 end
 
 type t = {protocol: Protocol.t; txpool_max_size: int}

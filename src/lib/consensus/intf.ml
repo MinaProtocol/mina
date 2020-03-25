@@ -6,7 +6,14 @@ open Signature_lib
 open Coda_base
 
 module type Constants = sig
-  type t
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t
+    end
+  end]
+
+  type t = Stable.Latest.t
 
   val create : protocol_constants:Genesis_constants.Protocol.t -> t
 

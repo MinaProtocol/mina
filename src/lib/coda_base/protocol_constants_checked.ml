@@ -19,13 +19,26 @@ module Value = struct
     module V1 = struct
       type t =
         (T.Stable.V1.t, T.Stable.V1.t, Block_time.Stable.V1.t) Poly.Stable.V1.t
-      [@@deriving eq, ord, hash, sexp, to_yojson]
+      [@@deriving eq, ord, hash, sexp, to_yojson, compare]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t
+  type t = Stable.Latest.t [@@deriving to_yojson, eq, sexp, compare]
+
+  let gen : t Quickcheck.Generator.t =
+    let open Quickcheck.Let_syntax in
+    let%bind k = Int.gen_incl 1 5000 in
+    let%bind delta = Int.gen_incl 0 5000 in
+    (*TODO: Bug -> Block_time.(to_time x |> of_time) != x for certain values.
+    Eg: 34702788243129 <--> 34702788243128, 8094 <--> 8093*)
+    let%bind ms = Int64.(gen_log_uniform_incl 0L 9999999999999L) in
+    let end_time = Block_time.of_int64 999999999999999L in
+    let%map genesis_state_timestamp =
+      Block_time.(gen_incl (of_int64 ms) end_time)
+    in
+    {Poly.k= T.of_int k; delta= T.of_int delta; genesis_state_timestamp}
 end
 
 type value = Value.t
@@ -71,3 +84,18 @@ let var_to_input (var : var) =
   in
   Random_oracle.Input.bitstrings
     (Array.map ~f:s [|k; delta; genesis_state_timestamp|])
+
+let%test_unit "value = var" =
+  let compiled = Genesis_constants.compiled.protocol in
+  let test protocol_constants =
+    let open Snarky in
+    let p_var =
+      let%map p = exists typ ~compute:(As_prover.return protocol_constants) in
+      As_prover.read typ p
+    in
+    let _, res = Or_error.ok_exn (run_and_check p_var ()) in
+    [%test_eq: Value.t] res protocol_constants ;
+    [%test_eq: Value.t] protocol_constants
+      (t_of_value protocol_constants |> value_of_t)
+  in
+  Quickcheck.test ~trials:100 Value.gen ~examples:[value_of_t compiled] ~f:test
