@@ -2,35 +2,6 @@ open Core_kernel
 open Pickles_types
 module Sponge_lib = Sponge
 
-module type App_state_intf = sig
-  module Impl : Snarky.Snark_intf.Run
-
-  module Branching : Nat.Add.Intf_transparent
-
-  type t
-
-  module Constant : sig
-    type t
-
-    val is_base_case : t -> bool
-
-    val to_field_elements : t -> Impl.Field.Constant.t array
-
-    val dummy : t
-  end
-
-  type _ App_state_tag.t += Tag : Constant.t App_state_tag.t
-
-  (* This function should be collision resistant. *)
-  val to_field_elements : t -> Impl.Field.t array
-
-  val typ : (t, Constant.t) Impl.Typ.t
-
-  val check_update : (t, Branching.n) Vector.t -> t -> Impl.Boolean.var
-
-  val is_base_case : t -> Impl.Boolean.var
-end
-
 module Snarkable = struct
   module type S1 = sig
     type _ t
