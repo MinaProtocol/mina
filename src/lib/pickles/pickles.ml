@@ -148,7 +148,7 @@ module Per_proof_witness = struct
       , Pmain.Fp.t
       , Impls.Pairing_based.Boolean.var
       , Pmain.Fq.t
-      , Pmain.Digest.t
+      , unit
       , Pmain.Digest.t )
       Types.Dlog_based.Proof_state.t
     * (Fpv.t Pairing_marlin_types.Evals.t * Fpv.t)
@@ -163,7 +163,7 @@ module Per_proof_witness = struct
         , Fp.t
         , bool
         , fq
-        , Digest.Constant.t
+        , unit
         , Digest.Constant.t )
         Types.Dlog_based.Proof_state.t
       * (Fp.t Pairing_marlin_types.Evals.t * Fp.t)
@@ -181,7 +181,7 @@ module Per_proof_witness = struct
     Snarky.Typ.tuple6 statement
       (One_hot_vector.typ local_branches)
       (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Boolean.typ Fq.typ
-         Digest.typ Digest.typ)
+         (Snarky.Typ.unit ()) Digest.typ)
       (Typ.tuple2 (Pairing_marlin_types.Evals.typ Field.typ) Field.typ)
       (Vector.typ G.typ local_max_branching)
       (Typ.tuple2
@@ -622,7 +622,6 @@ let step_main
       M.f rule.prevs
     in
     let prevs =
-      (* TODO: Must clobber the internal 'me_only's with stmt.pass_through *)
       exists (Prev_typ.f prev_typs) ~request:(fun () -> Req.Prev_proofs)
     in
     let unfinalized_proofs =
@@ -646,19 +645,27 @@ let step_main
     end in
     let open Pairing_main_inputs in
     let open Pmain in
+    let pass_throughs =
+      let module V = H1.Of_vector(Digest) in
+      V.f branching
+        (Vector.map (Vector.trim stmt.pass_through lte)
+           ~f:(Field.unpack ~length:Digest.length))
+    in
     let _prevs_verified =
       let rec go : type vars vals ns1 ns2.
              (vars, ns1, ns2) H3.T(Per_proof_witness).t
           -> (vars, vals, ns1, ns2) H4.T(Types_map.Data.For_step).t
+          -> vars H1.T(E01(Digest)).t
           -> vars H1.T(E01(Unfinalized)).t
           -> vars H1.T(E01(B)).t
           -> B.t list =
-       fun proofs datas unfinalizeds should_verifys ->
-        match (proofs, datas, unfinalizeds, should_verifys) with
-        | [], [], [], [] ->
+       fun proofs datas pass_throughs unfinalizeds should_verifys ->
+        match (proofs, datas, pass_throughs, unfinalizeds, should_verifys) with
+        | [], [], [], [], [] ->
             []
         | ( p :: proofs
           , d :: datas
+          , pass_through :: pass_throughs
           , (unfinalized, b) :: unfinalizeds
           , should_verify :: should_verifys ) ->
             Boolean.Assert.(b = should_verify) ;
@@ -704,7 +711,8 @@ let step_main
                   {app_state; dlog_marlin_index= d.wrap_key; sg= sg_old}
               in
               { Types.Dlog_based.Statement.pass_through= prev_me_only
-              ; proof_state= state }
+              ; proof_state= { state with me_only = pass_through }
+              }
             in
             let verified =
               Pmain.verify ~branching:d.max_branching
@@ -723,10 +731,10 @@ let step_main
                     printf "verified: %b\n%!" verified ;
                     printf "should_verify: %b\n\n%!" should_verify) ;
             Boolean.((verified && finalized) || not should_verify)
-            :: go proofs datas unfinalizeds should_verifys
+            :: go proofs datas pass_throughs unfinalizeds should_verifys
       in
       Boolean.Assert.all
-        (go prevs datas unfinalized_proofs proofs_should_verify)
+        (go prevs datas pass_throughs unfinalized_proofs proofs_should_verify)
     in
     let () =
       let hash_me_only =
@@ -1041,6 +1049,9 @@ let wrap_main
         ~public_input:(Array.append [|[Boolean.true_]|] (pack prev_statement))
         ~messages ~opening_proofs
     in
+    assert_eq_marlin
+      marlin 
+      marlin_actual ;
     (* TODO: assertion on marlin_actual and pairing_marlin_acc *)
     Field.Assert.equal me_only_digest
       (Field.pack
@@ -1786,7 +1797,7 @@ struct
         let witness =
           ( t.Proof.Dlog_based.statement.pass_through.app_state
           , t.index
-          , prev_statement_with_hashes.proof_state
+          , { prev_statement_with_hashes.proof_state with me_only = () }
           , (t.prev_evals, t.prev_x_hat_beta_1)
           , t.statement.pass_through.sg
           , (t.proof.openings.proof, t.proof.messages) )

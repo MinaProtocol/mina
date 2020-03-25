@@ -673,6 +673,26 @@ module Make (Inputs : Inputs) = struct
     (*       | Pairing_marlin_index : G1.Constant.t Abc.t Matrix_evals.t t *)
   end
 
+  let assert_eq_marlin
+      (m1: (Field.t, Field.t)  Types.Dlog_based.Proof_state.Deferred_values.Marlin.t)
+      (m2: (Boolean.var list, Field.t)  Types.Dlog_based.Proof_state.Deferred_values.Marlin.t)
+    =
+    let open Types.Dlog_based.Proof_state.Deferred_values.Marlin in
+    let fp x1 x2 =
+      Field.(Assert.equal x1 x2)
+    in
+    let chal c1 c2 = Field.Assert.equal c1 (Field.project c2) in
+    chal m1.alpha m2.alpha ;
+    chal m1.eta_a m2.eta_a ;
+    chal m1.eta_b m2.eta_b ;
+    chal m1.eta_c m2.eta_c ;
+    chal m1.beta_1 m2.beta_1 ;
+    fp m1.sigma_2 m2.sigma_2 ;
+    chal m1.beta_2 m2.beta_2 ;
+    fp m1.sigma_3 m2.sigma_3 ;
+    chal m1.beta_3 m2.beta_3
+  ;;
+
   let main ~pairing_marlin_indices ~wrap_domains:(domain_h, domain_k)
       ~step_domains
       ({ proof_state=
