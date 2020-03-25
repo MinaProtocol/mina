@@ -136,7 +136,6 @@ let send_user_command t (txn : User_command.t) =
   let fee_payer = User_command.fee_payer txn in
   let open Participating_state.Let_syntax in
   let%map account_opt = get_account t fee_payer in
-  let%map account_opt = get_account t public_key in
   let open Deferred.Let_syntax in
   match%map schedule_user_command t txn with
   | Ok ([], [failed_txn]) ->
