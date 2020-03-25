@@ -7,7 +7,7 @@ open Core_kernel
     the node receives a constant flow of messages, its state should be SYNCED.
     However, when the node is bootstrapping, its state is BOOTSTRAPPING. If it
     hasn’t received messages for some time
-    (Coda_constants.inactivity_secs), then it is OFFLINE. *)
+    (Coda_compile_config.inactivity_secs), then it is OFFLINE. *)
 let to_string = function
   | `Connecting ->
       "Connecting"

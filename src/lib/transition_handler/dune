@@ -2,5 +2,5 @@
   (name transition_handler)
   (public_name transition_handler)
   (inline_tests)
-  (libraries coda_metrics coda_constants perf_histograms core_kernel transition_frontier consensus coda_intf rose_tree pipe_lib otp_lib coda_base cache_lib)
+  (libraries coda_metrics perf_histograms core_kernel transition_frontier consensus coda_intf rose_tree pipe_lib otp_lib coda_base cache_lib)
   (preprocess (pps ppx_coda ppx_jane)))

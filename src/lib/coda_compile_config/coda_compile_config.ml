@@ -1,7 +1,7 @@
 [%%import
 "/src/config.mlh"]
 
-(*This file consists of compile time constants that are not in Coda_constants. i.e., all the constants that are defined at compile-time for both tests and production*)
+(*This file consists of compile time constants that are not in Genesis_constants.t or  i.e., all the constants that are defined at compile-time for both tests and production*)
 [%%inject
 "proof_level", proof_level]
 

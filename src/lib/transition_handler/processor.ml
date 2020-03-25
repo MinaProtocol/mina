@@ -19,10 +19,11 @@ module Transition_frontier_validation =
   External_transition.Transition_frontier_validation (Transition_frontier)
 
 (* TODO: calculate a sensible value from postake consensus arguments *)
-let catchup_timeout_duration genesis_constants =
-  let constants = (Coda_constants.create_t genesis_constants).consensus in
+let catchup_timeout_duration (genesis_constants : Genesis_constants.t) =
   Block_time.Span.of_ms
-    (constants.delta * constants.block_window_duration_ms |> Int64.of_int)
+    ( genesis_constants.protocol.delta
+      * Coda_compile_config.block_window_duration_ms
+    |> Int64.of_int )
 
 let cached_transform_deferred_result ~transform_cached ~transform_result cached
     =

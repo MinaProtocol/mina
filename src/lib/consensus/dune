@@ -9,7 +9,6 @@
     snarky_taylor
     core_kernel
     coda_base
-    coda_constants
     block_time
     with_hash
     test_genesis_ledger

@@ -138,8 +138,8 @@ module Vrf_distribution = struct
   (** Picks a single chain of proposals from a distribution. Does not attempt
    *  to simulate any regular properties of how a real chain would be built. *)
   let pick_chain_unrealistically dist =
-    let constants = Coda_constants.compiled_constants_for_test.consensus in
-    let default_window_size = constants.delta in
+    let constants = Constants.compiled in
+    let default_window_size = UInt32.to_int constants.delta in
     let rec find_potential_proposals acc_proposals window_depth slot =
       let slot_in_dist_range = slot < dist.term_slot in
       let window_expired =
@@ -326,21 +326,14 @@ proof_level]
 (* TODO: update stakers' relative local_states *)
 let propose_block_onto_chain ~logger ~keys
     (previous_transition, previous_staged_ledger) (proposer_pk, block_data) =
-  let coda_constants = Coda_constants.compiled_constants_for_test in
+  let consensus_constants = Constants.compiled in
   let open Deferred.Let_syntax in
   let proposal_slot = Block_data.global_slot block_data in
-  let genesis_state_timestamp =
-    Block_time.of_time coda_constants.genesis_state_timestamp
-  in
-  let epoch_duration =
-    Block_time.Span.of_time_span coda_constants.consensus.epoch_duration
-  in
+  let genesis_state_timestamp = consensus_constants.genesis_state_timestamp in
+  let epoch_duration = consensus_constants.epoch_duration in
   let proposal_time =
     Global_slot.start_time proposal_slot ~genesis_state_timestamp
-      ~epoch_duration
-      ~slot_duration_ms:
-        ( coda_constants.consensus.slot_duration_ms |> Int64.of_int
-        |> Block_time.Span.of_ms )
+      ~epoch_duration ~slot_duration_ms:consensus_constants.slot_duration_ms
   in
   let previous_protocol_state =
     External_transition.protocol_state previous_transition

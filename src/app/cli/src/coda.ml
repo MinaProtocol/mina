@@ -340,8 +340,6 @@ let daemon logger =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
              ~logger ~conf_dir ~daemon_conf:genesis_runtime_constants
          in
-         Coda_constants.t_ref :=
-           Some (Coda_constants.create_t genesis_constants) ;
          let%bind config =
            let configpath = conf_dir ^/ "daemon.json" in
            match%map

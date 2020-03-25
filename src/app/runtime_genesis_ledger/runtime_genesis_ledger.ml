@@ -163,8 +163,6 @@ let read_write_constants read_from_opt write_to =
     | None ->
         Ok Genesis_constants.compiled
   in
-  (*Set this before generating the base proof to use the constants from config file if any*)
-  Coda_constants.t_ref := Some (Coda_constants.create_t constants) ;
   Yojson.Safe.to_file write_to
     Genesis_constants.(to_config_file constants |> Config_file.to_yojson) ;
   constants

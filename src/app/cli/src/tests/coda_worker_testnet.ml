@@ -207,7 +207,21 @@ module Api = struct
     signal
 end
 
-let coda_constants = Coda_constants.compiled_constants_for_test
+let consensus_constants = Consensus.Constants.compiled
+
+module Constants = struct
+  let to_int = Unsigned.UInt32.to_int
+
+  let k = to_int consensus_constants.k
+
+  let c = to_int consensus_constants.c
+
+  let delta = to_int consensus_constants.delta
+
+  let block_window_duration_ms =
+    Block_time.Span.to_ms consensus_constants.block_window_duration_ms
+    |> Int64.to_int_exn
+end
 
 (** the prefix check keeps track of the "best path" for each worker. the
     best path being the list of state hashes from the root to the best tip.
@@ -291,8 +305,7 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               < Time.Span.to_sec acceptable_delay
                 +. epsilon
                 +. Int.to_float
-                     ( (coda_constants.consensus.c - 1)
-                     * coda_constants.consensus.block_window_duration_ms )
+                     ((Constants.c - 1) * Constants.block_window_duration_ms)
                    /. 1000. )
        then (
          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
@@ -334,9 +347,8 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    ()
                | Some (`Bootstrap, signal) ->
                    if
-                     testnet.root_lengths.(i)
-                     + (2 * coda_constants.consensus.k)
-                     + coda_constants.consensus.delta
+                     testnet.root_lengths.(i) + (2 * Constants.k)
+                     + Constants.delta
                      < root_length - 2
                    then (
                      Ivar.fill signal () ;
@@ -344,7 +356,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    else ()
                | Some (`Catchup, signal) ->
                    if
-                     testnet.root_lengths.(i) + (coda_constants.consensus.k / 2)
+                     testnet.root_lengths.(i) + (Constants.k / 2)
                      < root_length - 1
                    then (
                      Logger.info logger !"Filled catchup ivar"
@@ -411,9 +423,7 @@ let events workers start_reader =
                  >>= Linear_pipe.read >>| ignore
                in
                let ms_to_sync =
-                 coda_constants.consensus.delta
-                 * coda_constants.consensus.block_window_duration_ms
-                 + 6_000
+                 (Constants.delta * Constants.block_window_duration_ms) + 6_000
                  |> Float.of_int
                in
                let%map () = after (Time.Span.of_ms ms_to_sync) in
@@ -452,13 +462,10 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
 let test ?is_archive_rocksdb ~name logger n block_production_keys
     snark_work_public_keys work_selection_method ~max_concurrent_connections =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
-  let block_production_interval =
-    coda_constants.consensus.block_window_duration_ms
-  in
+  let block_production_interval = Constants.block_window_duration_ms in
   let acceptable_delay =
     Time.Span.of_ms
-      ( block_production_interval * coda_constants.consensus.delta
-      |> Float.of_int )
+      (block_production_interval * Constants.delta |> Float.of_int)
   in
   let%bind program_dir = Unix.getcwd () in
   Coda_processes.init () ;
@@ -506,8 +513,7 @@ end = struct
               let passed_root = Ivar.create () in
               Hashtbl.add_exn user_cmds_under_inspection ~key:user_cmd
                 ~data:
-                  { expected_deadline=
-                      root_length + coda_constants.consensus.k + delay
+                  { expected_deadline= root_length + Constants.k + delay
                   ; passed_root } ;
               Option.return passed_root
           | _ ->
@@ -574,8 +580,7 @@ end = struct
                           ~key:user_cmd
                           ~data:
                             { expected_deadline=
-                                root_length + coda_constants.consensus.k
-                                + delay
+                                root_length + Constants.k + delay
                             ; passed_root } ;
                         Option.return passed_root
                     | _ ->

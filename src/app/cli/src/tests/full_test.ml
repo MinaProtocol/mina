@@ -9,6 +9,7 @@ open Signature_lib
 open Pipe_lib
 open O1trace
 open Init
+open Coda_numbers
 
 let pk_of_sk sk = Public_key.of_private_key_exn sk |> Public_key.compress
 
@@ -437,15 +438,13 @@ let run_test () : unit Deferred.t =
         else if with_snark then 15.
         else 7.
       in
-      let consensus_constants =
-        Coda_constants.compiled_constants_for_test.consensus
-      in
+      let consensus_constants = Consensus.Constants.compiled in
       let wait_till_length =
-        if medium_curves then Coda_numbers.Length.of_int 1
+        if medium_curves then Length.of_int 1
         else if test_full_epoch then
           (*Note: wait to produce (2*slots_per_epoch) blocks. This could take a while depending on what k and c are*)
-          Coda_numbers.Length.of_int (consensus_constants.slots_per_epoch * 2)
-        else Coda_numbers.Length.of_int 5
+          Length.(to_int consensus_constants.slots_per_epoch * 2 |> of_int)
+        else Length.of_int 5
       in
       let%map () =
         if with_snark then
@@ -458,18 +457,20 @@ let run_test () : unit Deferred.t =
             wait_until_cond
               ~f:(fun t ->
                 blockchain_length t
-                > Coda_numbers.Length.add blockchain_length' wait_till_length
-                )
+                > Length.add blockchain_length' wait_till_length )
               ~timeout_min:
-                ( (consensus_constants.delta + consensus_constants.c)
-                  * ( consensus_constants.block_window_duration_ms
-                    * (Coda_numbers.Length.to_int wait_till_length + 1) )
+                ( ( Length.to_int consensus_constants.delta
+                  + Length.to_int consensus_constants.c )
+                  * ( ( Block_time.Span.to_ms
+                          consensus_constants.block_window_duration_ms
+                      |> Int64.to_int_exn )
+                    * (Length.to_int wait_till_length + 1) )
                   / 1000 / 60
                 |> Float.of_int )
           in
           assert (
             blockchain_length coda
-            > Coda_numbers.Length.add blockchain_length' wait_till_length )
+            > Length.add blockchain_length' wait_till_length )
         else if with_check then
           let%map _ =
             test_multiple_payments other_accounts

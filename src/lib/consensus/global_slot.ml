@@ -60,10 +60,7 @@ let to_input (t : value) =
 
 let gen =
   let open Quickcheck.Let_syntax in
-  let slots_per_epoch =
-    Coda_constants.compiled_constants_for_test.consensus.slots_per_epoch
-    |> Length.of_int
-  in
+  let slots_per_epoch = Constants.compiled.slots_per_epoch in
   let%map slot_number = T.gen in
   {Poly.slot_number; slots_per_epoch}
 
