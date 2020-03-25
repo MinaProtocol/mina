@@ -14,10 +14,6 @@ module type Constants = sig
   (** [k] is the number of blocks required to reach finality *)
   val k : int
 
-  (** The amount of money minted and given to the block producer whenever a
-      block is created *)
-  val coinbase : Currency.Amount.t
-
   val block_window_duration_ms : int
 
   (** The window duration in which blocks are created *)

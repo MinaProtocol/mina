@@ -118,7 +118,7 @@ module Version = {
              (
                switch (response.result) {
                | Loading => "..."
-               | Error(err) => err##message
+               | Error((err: ReasonApolloTypes.apolloError)) => err.message
                | Data(data) =>
                  data##version
                  |> Option.map(~f=prettyVersion)
@@ -165,9 +165,7 @@ module AccountSettingsItem = {
       </span>
       {showModal
          ? <UnlockModal
-             account={
-               account##publicKey;
-             }
+             account={account##publicKey}
              onClose={() => setModalOpen(_ => false)}
              onSuccess={() => {
                setModalOpen(_ => false);
