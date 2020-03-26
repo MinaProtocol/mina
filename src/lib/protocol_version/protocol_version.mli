@@ -3,11 +3,11 @@
 [%%versioned:
 module Stable : sig
   module V1 : sig
-    type t [@@deriving sexp, eq]
+    type t [@@deriving sexp]
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, eq]
+type t = Stable.Latest.t [@@deriving sexp]
 
 val create_exn : major:int -> minor:int -> patch:int -> t
 
@@ -22,6 +22,9 @@ val get_proposed_opt : unit -> t option
 val set_proposed_opt : t option -> unit
 
 val zero : t
+
+(** a daemon can accept blocks or RPC responses with compatible protocol versions *)
+val compatible : t -> t -> bool
 
 val to_string : t -> string
 

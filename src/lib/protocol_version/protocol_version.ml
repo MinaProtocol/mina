@@ -5,14 +5,14 @@ open Core_kernel
 [%%versioned
 module Stable = struct
   module V1 = struct
-    type t = {major: int; minor: int; patch: int} [@@deriving sexp, eq]
+    type t = {major: int; minor: int; patch: int} [@@deriving sexp]
 
     let to_latest = Fn.id
   end
 end]
 
 type t = Stable.Latest.t = {major: int; minor: int; patch: int}
-[@@deriving sexp, eq]
+[@@deriving sexp]
 
 let (current_protocol_version : t option ref) = ref None
 
@@ -39,6 +39,8 @@ let create_opt ~major ~minor ~patch =
   try Some (create_exn ~major ~minor ~patch) with _ -> None
 
 let zero = create_exn ~major:0 ~minor:0 ~patch:0
+
+let compatible pv1 pv2 = Int.equal pv1.major pv2.major
 
 let to_string t = sprintf "%u.%u.%u" t.major t.minor t.patch
 
