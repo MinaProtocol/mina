@@ -179,13 +179,17 @@ describe("Bindings", () =>
 );
 
 describe("CurrencyFormatter", () => {
-  open CurrencyFormatter;
-  let f = CurrencyFormatter.toFormattedString(~int);
+  let toString = CurrencyFormatter.toFormattedString(Int64.of_int(1));
   test("to formatted string", () => {
-    let integer = 1;
-    expect(f(~integer)) |> toBe("0.000000001");
+    expect(toString) |> toBe("0.000000001")
+  });
+
+  let ofString = CurrencyFormatter.ofFormattedString("0.000000001");
+  test("of formatted string", () => {
+    expect(ofString) |> toBe(Int64.of_int(1))
   });
 });
+
 describe("Time", () => {
   let testNow =
     Js.Date.makeWithYMDHMS(
