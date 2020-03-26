@@ -2,11 +2,9 @@ type t [@@deriving eq]
 
 val succ : t -> t
 
-val of_global_slot :
-  Global_slot.t -> slots_per_sub_window:Coda_numbers.Length.t -> t
+val of_global_slot : constants:Constants.t -> Global_slot.t -> t
 
-val sub_window :
-  t -> sub_windows_per_window:Coda_numbers.Length.t -> Sub_window.t
+val sub_window : constants:Constants.t -> t -> Sub_window.t
 
 val constant : Unsigned.UInt32.t -> t
 
@@ -33,12 +31,8 @@ module Checked : sig
   val ( >= ) : t -> t -> (Boolean.var, _) Checked.t
 
   val of_global_slot :
-       Global_slot.Checked.t
-    -> slots_per_sub_window:Coda_numbers.Length.Checked.t
-    -> (t, _) Checked.t
+    constants:Constants.var -> Global_slot.Checked.t -> (t, _) Checked.t
 
   val sub_window :
-       t
-    -> sub_windows_per_window:Coda_numbers.Length.Checked.t
-    -> (Sub_window.Checked.t, _) Checked.t
+    constants:Constants.var -> t -> (Sub_window.Checked.t, _) Checked.t
 end

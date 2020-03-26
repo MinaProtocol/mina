@@ -297,9 +297,8 @@ let get_status ~flag t =
   let consensus_mechanism = Consensus.name in
   let time_controller = config.time_controller in
   let consensus_time_now =
-    Consensus.Data.Consensus_time.of_time_exn
+    Consensus.Data.Consensus_time.of_time_exn ~constants:consensus_constants
       (Block_time.now time_controller)
-      ~constants:consensus_constants
   in
   let consensus_configuration =
     Consensus.Configuration.t ~protocol_constants

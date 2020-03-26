@@ -572,10 +572,10 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   (* Perform block production key swap since we have new
                      keypairs *)
                   Consensus.Data.Local_state.block_production_keys_swap
-                    consensus_local_state
+                    ~constants:consensus_constants consensus_local_state
                     ( Keypair.And_compressed_pk.Set.to_list keypairs
                     |> List.map ~f:snd |> Public_key.Compressed.Set.of_list )
-                    (Time.now time_controller) ~constants:consensus_constants ;
+                    (Time.now time_controller) ;
                   keypairs
               | keypairs, `Same ->
                   keypairs
@@ -596,16 +596,17 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                   |> Breadcrumb.consensus_state
                 in
                 assert (
-                  Consensus.Hooks.required_local_state_sync ~consensus_state
+                  Consensus.Hooks.required_local_state_sync
+                    ~constants:consensus_constants ~consensus_state
                     ~local_state:consensus_local_state
-                    ~constants:consensus_constants
                   = None ) ;
                 let now = Time.now time_controller in
                 let next_producer_timing =
                   measure "asking consensus what to do" (fun () ->
-                      Consensus.Hooks.next_producer_timing (time_to_ms now)
+                      Consensus.Hooks.next_producer_timing
+                        ~constants:consensus_constants (time_to_ms now)
                         consensus_state ~local_state:consensus_local_state
-                        ~keypairs ~logger ~constants:consensus_constants )
+                        ~keypairs ~logger )
                 in
                 set_next_producer_timing next_producer_timing ;
                 match next_producer_timing with

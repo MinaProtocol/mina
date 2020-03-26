@@ -151,11 +151,7 @@ module Types = struct
                   ~protocol_constants:
                     (Coda_lib.config coda).genesis_constants.protocol
               in
-              Block_time.to_string
-              @@ C.start_time global_slot
-                   ~genesis_state_timestamp:constants.genesis_state_timestamp
-                   ~epoch_duration:constants.epoch_duration
-                   ~slot_duration_ms:constants.slot_duration_ms )
+              Block_time.to_string @@ C.start_time ~constants global_slot )
         ; field "endTime" ~typ:(non_null string)
             ~args:Arg.[]
             ~resolve:(fun {ctx= coda; _} global_slot ->
@@ -164,11 +160,7 @@ module Types = struct
                   ~protocol_constants:
                     (Coda_lib.config coda).genesis_constants.protocol
               in
-              Block_time.to_string
-              @@ C.end_time global_slot
-                   ~genesis_state_timestamp:constants.genesis_state_timestamp
-                   ~epoch_duration:constants.epoch_duration
-                   ~slot_duration_ms:constants.slot_duration_ms ) ] )
+              Block_time.to_string @@ C.end_time ~constants global_slot ) ] )
 
   let block_producer_timing :
       ( _

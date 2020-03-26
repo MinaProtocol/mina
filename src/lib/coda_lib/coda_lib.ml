@@ -637,8 +637,8 @@ let staking_ledger t =
       (Transition_frontier.best_tip transition_frontier)
   in
   let local_state = t.config.consensus_local_state in
-  Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
-    ~constants:consensus_constants
+  Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
+    ~consensus_state ~local_state
 
 let find_delegators table pk =
   Option.value_map
@@ -944,13 +944,13 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                          in
                          let tn_production_time =
                            Consensus.Data.Consensus_time.to_time
-                             tn_production_consensus_time
                              ~constants:consensus_constants
+                             tn_production_consensus_time
                          in
                          let tm_slot =
                            lift_consensus_time
-                             (Consensus.Data.Consensus_time.of_time_exn tm
-                                ~constants:consensus_constants)
+                             (Consensus.Data.Consensus_time.of_time_exn
+                                ~constants:consensus_constants tm)
                          in
                          Coda_metrics.Block_latency.Gossip_slots.update
                            (Float.of_int (tm_slot - tn_production_slot)) ;
@@ -1009,8 +1009,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     |> Span.to_ms
                   in
                   match
-                    Consensus.Hooks.received_at_valid_time ~time_received:now
-                      consensus_state ~constants:consensus_constants
+                    Consensus.Hooks.received_at_valid_time
+                      ~constants:consensus_constants ~time_received:now
+                      consensus_state
                   with
                   | Ok () ->
                       Logger.trace config.logger ~module_:__MODULE__

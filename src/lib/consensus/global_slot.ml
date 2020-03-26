@@ -64,15 +64,15 @@ let gen =
   let%map slot_number = T.gen in
   {Poly.slot_number; slots_per_epoch}
 
-let create ~(epoch : Epoch.t) ~(slot : Slot.t) ~(slots_per_epoch : Length.t) :
-    t =
-  { slot_number= UInt32.Infix.(slot + (slots_per_epoch * epoch))
-  ; slots_per_epoch }
+let create ~(constants : Constants.t) ~(epoch : Epoch.t) ~(slot : Slot.t) : t =
+  { slot_number= UInt32.Infix.(slot + (constants.slots_per_epoch * epoch))
+  ; slots_per_epoch= constants.slots_per_epoch }
 
-let of_epoch_and_slot (epoch, slot) ~slots_per_epoch =
-  create ~epoch ~slot ~slots_per_epoch
+let of_epoch_and_slot ~(constants : Constants.t) (epoch, slot) =
+  create ~epoch ~slot ~constants
 
-let zero ~slots_per_epoch : t = {slot_number= T.zero; slots_per_epoch}
+let zero ~(constants : Constants.t) : t =
+  {slot_number= T.zero; slots_per_epoch= constants.slots_per_epoch}
 
 let slot_number {Poly.slot_number; _} = slot_number
 
@@ -91,46 +91,46 @@ let ( + ) (x : t) n : t = {x with slot_number= T.add x.slot_number (T.of_int n)}
 
 let ( < ) (t : t) (t' : t) = t.slot_number < t'.slot_number
 
-let of_slot_number slot_number ~slots_per_epoch =
-  {Poly.slot_number; slots_per_epoch}
+let succ (t : t) = {t with slot_number= T.succ t.slot_number}
 
-let start_time t ~genesis_state_timestamp ~epoch_duration ~slot_duration_ms =
-  let epoch, slot = to_epoch_and_slot t in
-  Epoch.slot_start_time epoch slot ~genesis_state_timestamp ~epoch_duration
-    ~slot_duration_ms
+let of_slot_number ~(constants : Constants.t) slot_number =
+  {Poly.slot_number; slots_per_epoch= constants.slots_per_epoch}
 
-let end_time t ~genesis_state_timestamp ~epoch_duration ~slot_duration_ms =
+let start_time ~(constants : Constants.t) t =
   let epoch, slot = to_epoch_and_slot t in
-  Epoch.slot_end_time epoch slot ~genesis_state_timestamp ~epoch_duration
-    ~slot_duration_ms
+  Epoch.slot_start_time epoch slot ~constants
+
+let end_time ~(constants : Constants.t) t =
+  let epoch, slot = to_epoch_and_slot t in
+  Epoch.slot_end_time epoch slot ~constants
 
 let time_hum t =
   let epoch, slot = to_epoch_and_slot t in
   sprintf "epoch=%d, slot=%d" (Epoch.to_int epoch) (Slot.to_int slot)
 
-let of_time_exn time ~(constants : Constants.t) =
-  let genesis_state_timestamp = constants.genesis_state_timestamp in
-  let epoch_duration = constants.epoch_duration in
-  let slot_duration_ms = constants.slot_duration_ms in
-  let slots_per_epoch = constants.slots_per_epoch in
+let of_time_exn ~(constants : Constants.t) time =
   of_epoch_and_slot
-    (Epoch.epoch_and_slot_of_time_exn time ~genesis_state_timestamp
-       ~epoch_duration ~slot_duration_ms)
-    ~slots_per_epoch
+    (Epoch.epoch_and_slot_of_time_exn time ~constants)
+    ~constants
 
-let diff (t : t) (other_epoch, other_slot) ~epoch_size =
+let diff ~(constants : Constants.t) (t : t) (other_epoch, other_slot) =
   let open UInt32.Infix in
   let epoch, slot = to_epoch_and_slot t in
   let old_epoch =
     epoch - other_epoch - (UInt32.of_int @@ if other_slot > slot then 1 else 0)
   in
-  let old_slot = (slot - other_slot) mod Length.to_uint32 epoch_size in
-  of_epoch_and_slot (old_epoch, old_slot) ~slots_per_epoch:t.slots_per_epoch
+  let old_slot =
+    (slot - other_slot) mod Length.to_uint32 constants.epoch_size
+  in
+  of_epoch_and_slot (old_epoch, old_slot) ~constants
 
 module Checked = struct
   type t = var
 
   let ( < ) (t : t) (t' : t) = T.Checked.(t.slot_number < t'.slot_number)
+
+  let of_slot_number ~(constants : Constants.var) slot_number : t =
+    {slot_number; slots_per_epoch= constants.slots_per_epoch}
 
   let to_bits (t : t) =
     let open Bitstring_lib.Bitstring.Lsb_first in

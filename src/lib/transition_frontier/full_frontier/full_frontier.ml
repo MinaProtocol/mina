@@ -512,9 +512,9 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
     Consensus.Constants.create ~protocol_constants:t.genesis_constants.protocol
   in
   let local_state_was_synced_at_start =
-    Consensus.Hooks.required_local_state_sync
+    Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
       ~consensus_state:(Breadcrumb.consensus_state (best_tip t))
-      ~local_state:t.consensus_local_state ~constants:consensus_constants
+      ~local_state:t.consensus_local_state
     |> Option.is_none
   in
   let new_root, diffs_with_mutants =
@@ -542,10 +542,11 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
     Debug_assert.debug_assert (fun () ->
         match
           Consensus.Hooks.required_local_state_sync
+            ~constants:consensus_constants
             ~consensus_state:
               (Breadcrumb.consensus_state
                  (Hashtbl.find_exn t.table t.best_tip).breadcrumb)
-            ~local_state:t.consensus_local_state ~constants:consensus_constants
+            ~local_state:t.consensus_local_state
         with
         | Some jobs ->
             (* But if there wasn't sync work to do when we started, then there shouldn't be now. *)

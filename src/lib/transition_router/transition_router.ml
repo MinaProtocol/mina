@@ -264,12 +264,12 @@ let initialize ~logger ~network ~verifier ~trust_system ~time_controller
         let%map () =
           match
             Consensus.Hooks.required_local_state_sync
-              ~consensus_state:
-                (Transition_frontier.Breadcrumb.consensus_state root)
-              ~local_state:consensus_local_state
               ~constants:
                 (Consensus.Constants.create
                    ~protocol_constants:genesis_constants.protocol)
+              ~consensus_state:
+                (Transition_frontier.Breadcrumb.consensus_state root)
+              ~local_state:consensus_local_state
           with
           | None ->
               Deferred.unit
@@ -306,7 +306,7 @@ let wait_till_genesis ~logger ~time_controller
   in
   let genesis_state_timestamp = consensus_constants.genesis_state_timestamp in
   try
-    Consensus.Hooks.is_genesis_epoch now ~constants:consensus_constants
+    Consensus.Hooks.is_genesis_epoch ~constants:consensus_constants now
     |> Fn.const Deferred.unit
   with Invalid_argument _ ->
     let time_till_genesis = Time.diff genesis_state_timestamp now in
@@ -320,7 +320,7 @@ let wait_till_genesis ~logger ~time_controller
       let%bind () = after (Time_ns.Span.of_sec 30.) in
       let now = Time.now time_controller in
       try
-        Consensus.Hooks.is_genesis_epoch now ~constants:consensus_constants
+        Consensus.Hooks.is_genesis_epoch ~constants:consensus_constants now
         |> Fn.const Deferred.unit
       with Invalid_argument _ ->
         let tm_remaining = Time.diff genesis_state_timestamp now in

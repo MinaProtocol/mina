@@ -649,8 +649,8 @@ let validate_time_received (t, validation) ~time_received =
     Block_time.to_span_since_epoch time_received |> Block_time.Span.to_ms
   in
   match
-    Consensus.Hooks.received_at_valid_time consensus_state
-      ~time_received:received_unix_timestamp ~constants
+    Consensus.Hooks.received_at_valid_time ~constants consensus_state
+      ~time_received:received_unix_timestamp
   with
   | Ok () ->
       Ok (t, Validation.Unsafe.set_valid_time_received validation)

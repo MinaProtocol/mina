@@ -71,8 +71,8 @@ let add_and_finalize ~logger ~frontier ~catchup_scheduler
       let time_elapsed =
         Block_time.diff
           (Block_time.now time_controller)
-          (Consensus.Data.Consensus_time.to_time transition_time
-             ~constants:consensus_constants)
+          (Consensus.Data.Consensus_time.to_time ~constants:consensus_constants
+             transition_time)
       in
       Coda_metrics.Block_latency.Inclusion_time.update
         (Block_time.Span.to_time_span time_elapsed) ) ;

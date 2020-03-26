@@ -43,7 +43,7 @@ type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
 val to_input : t -> (_, bool) Random_oracle.Input.t
 
-val of_slot_number : 'a -> slots_per_epoch:'b -> ('a, 'b) Poly.t
+val of_slot_number : constants:Constants.t -> Coda_numbers.Global_slot.t -> t
 
 val gen : t Quickcheck.Generator.t
 
@@ -51,13 +51,13 @@ val ( + ) : t -> int -> t
 
 val ( < ) : t -> t -> bool
 
-val create :
-  epoch:Epoch.t -> slot:Slot.t -> slots_per_epoch:Coda_numbers.Length.t -> t
+val succ : t -> t
 
-val of_epoch_and_slot :
-  Epoch.t * Slot.t -> slots_per_epoch:Coda_numbers.Length.t -> t
+val create : constants:Constants.t -> epoch:Epoch.t -> slot:Slot.t -> t
 
-val zero : slots_per_epoch:Coda_numbers.Length.t -> t
+val of_epoch_and_slot : constants:Constants.t -> Epoch.t * Slot.t -> t
+
+val zero : constants:Constants.t -> t
 
 val to_bits : t -> bool list
 
@@ -65,27 +65,17 @@ val epoch : t -> Epoch.t
 
 val slot : t -> Slot.t
 
-val start_time :
-     t
-  -> genesis_state_timestamp:Block_time.t
-  -> epoch_duration:Block_time.Span.t
-  -> slot_duration_ms:Block_time.Span.t
-  -> Block_time.t
+val start_time : constants:Constants.t -> t -> Block_time.t
 
-val end_time :
-     t
-  -> genesis_state_timestamp:Block_time.t
-  -> epoch_duration:Block_time.Span.t
-  -> slot_duration_ms:Block_time.Span.t
-  -> Block_time.t
+val end_time : constants:Constants.t -> t -> Block_time.t
 
 val time_hum : t -> string
 
 val to_epoch_and_slot : t -> Epoch.t * Slot.t
 
-val of_time_exn : Block_time.t -> constants:Constants.t -> t
+val of_time_exn : constants:Constants.t -> Block_time.t -> t
 
-val diff : t -> Epoch.t * Slot.t -> epoch_size:Coda_numbers.Length.t -> t
+val diff : constants:Constants.t -> t -> Epoch.t * Slot.t -> t
 
 [%%ifdef consensus_mechanism]
 
@@ -99,6 +89,9 @@ module Checked : sig
     (Coda_numbers.Global_slot.Checked.t, Coda_numbers.Length.Checked.t) Poly.t
 
   val ( < ) : t -> t -> (Boolean.var, _) Checked.t
+
+  val of_slot_number :
+    constants:Constants.var -> Coda_numbers.Global_slot.Checked.t -> t
 
   val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
 

@@ -274,11 +274,11 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         (* Synchronize consensus local state if necessary *)
         match%bind
           match
-            Consensus.Hooks.required_local_state_sync ~consensus_state
-              ~local_state:consensus_local_state
+            Consensus.Hooks.required_local_state_sync
               ~constants:
                 (Consensus.Constants.create
                    ~protocol_constants:genesis_constants.protocol)
+              ~consensus_state ~local_state:consensus_local_state
           with
           | None ->
               Logger.debug logger ~module_:__MODULE__ ~location:__LOC__

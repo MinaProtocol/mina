@@ -7,10 +7,11 @@ let succ = UInt32.succ
 
 let equal a b = UInt32.compare a b = 0
 
-let of_global_slot (s : Global_slot.t) ~slots_per_sub_window : t =
-  UInt32.Infix.(Global_slot.slot_number s / slots_per_sub_window)
+let of_global_slot ~(constants : Constants.t) (s : Global_slot.t) : t =
+  UInt32.Infix.(Global_slot.slot_number s / constants.slots_per_sub_window)
 
-let sub_window t ~sub_windows_per_window = UInt32.rem t sub_windows_per_window
+let sub_window ~(constants : Constants.t) t =
+  UInt32.rem t constants.sub_windows_per_window
 
 let ( >= ) a b = UInt32.compare a b >= 0
 
@@ -25,23 +26,25 @@ module Checked = struct
 
   type t = field Integer.t
 
-  let of_global_slot (s : Global_slot.Checked.t) ~slots_per_sub_window :
+  let of_global_slot ~(constants : Constants.var) (s : Global_slot.Checked.t) :
       (t, _) Checked.t =
     make_checked (fun () ->
         let q, _ =
           Integer.div_mod ~m
             (Coda_numbers.Global_slot.Checked.to_integer
                (Global_slot.slot_number s))
-            (Coda_numbers.Length.Checked.to_integer slots_per_sub_window)
+            (Coda_numbers.Length.Checked.to_integer
+               constants.slots_per_sub_window)
         in
         q )
 
-  let sub_window (t : t) ~sub_windows_per_window :
+  let sub_window ~(constants : Constants.var) (t : t) :
       (Sub_window.Checked.t, _) Checked.t =
     make_checked (fun () ->
         let _, shift =
           Integer.div_mod ~m t
-            (Coda_numbers.Length.Checked.to_integer sub_windows_per_window)
+            (Coda_numbers.Length.Checked.to_integer
+               constants.sub_windows_per_window)
         in
         Sub_window.Checked.Unsafe.of_integer shift )
 

@@ -58,27 +58,17 @@ module Vrf_distribution = struct
       Global_slot.epoch @@ Consensus_state.global_slot initial_consensus_state
       = epoch ) ;
     let start_slot =
-      if epoch = zero then zero
+      if epoch = zero then Global_slot.zero ~constants
       else
-        Global_slot.of_epoch_and_slot
+        Global_slot.of_epoch_and_slot ~constants
           (epoch - of_int 1, of_int 2 * constants.slots_per_epoch)
-          ~slots_per_epoch:constants.slots_per_epoch
     in
     let term_slot =
-      Global_slot.of_epoch_and_slot
+      Global_slot.of_epoch_and_slot ~constants
         (epoch, (of_int 2 * constants.slots_per_epoch) - of_int 1)
     in
-    let slot_duration_ms = constants.slot_duration_ms in
-    let genesis_state_timestamp = constants.genesis_state_timestamp in
-    let epoch_duration = constants.epoch_duration in
-    let start_time =
-      Global_slot.start_time start_slot ~genesis_state_timestamp
-        ~epoch_duration ~slot_duration_ms
-    in
-    let term_time =
-      Global_slot.start_time term_slot ~genesis_state_timestamp ~epoch_duration
-        ~slot_duration_ms
-    in
+    let start_time = Global_slot.start_time ~constants start_slot in
+    let term_time = Global_slot.start_time ~constants term_slot in
     let proposal_table = Int.Table.create () in
     let record_proposal ~staker ~proposal_data =
       let _, pk = staker.keypair in
@@ -98,7 +88,7 @@ module Vrf_distribution = struct
                in
                let%map proposal_time, proposal_data =
                  match
-                   Hooks.next_producer_timing
+                   Hooks.next_producer_timing ~constants
                      ( Block_time.to_span_since_epoch curr_time
                      |> Block_time.Span.to_ms )
                      dummy_consensus_state ~local_state:staker.local_state
@@ -109,10 +99,7 @@ module Vrf_distribution = struct
                  | `Check_again _ ->
                      None
                  | `Produce_now (_, proposal_data) ->
-                     let slot_span =
-                       Block_time.Span.of_ms
-                       @@ Int64.of_int constants.block_window_duration_ms
-                     in
+                     let slot_span = constants.block_window_duration_ms in
                      let proposal_time = Block_time.add curr_time slot_span in
                      Some (proposal_time, proposal_data)
                  | `Produce (proposal_time, _, proposal_data) ->
@@ -125,9 +112,15 @@ module Vrf_distribution = struct
                let increase_epoch_count =
                  Global_slot.epoch
                    (Consensus_state.global_slot dummy_consensus_state)
-                 < Global_slot.epoch (Block_data.global_slot proposal_data)
+                 < Global_slot.(
+                     epoch
+                       (of_slot_number ~constants
+                          (Block_data.global_slot proposal_data)))
                in
-               let new_global_slot = Block_data.global_slot proposal_data in
+               let new_global_slot =
+                 Global_slot.of_slot_number ~constants
+                   (Block_data.global_slot proposal_data)
+               in
                let next_dummy_consensus_state =
                  Consensus_state.Unsafe.dummy_advance dummy_consensus_state
                    ~increase_epoch_count ~new_global_slot
@@ -147,13 +140,14 @@ module Vrf_distribution = struct
       in
       if (not slot_in_dist_range) || window_expired then acc_proposals
       else
+        let slot_number = Global_slot.slot_number slot in
         let slot_proposals =
-          Hashtbl.find dist.proposal_table (UInt32.to_int slot)
+          Hashtbl.find dist.proposal_table (UInt32.to_int slot_number)
           |> Option.map ~f:Map.to_alist |> Option.value ~default:[]
         in
         find_potential_proposals
           (acc_proposals @ slot_proposals)
-          (window_depth + 1) (UInt32.succ slot)
+          (window_depth + 1) (Global_slot.succ slot)
     in
     let rec extend_proposal_chain acc_chain slot =
       let potential_proposals = find_potential_proposals [] 0 slot in
@@ -163,7 +157,8 @@ module Vrf_distribution = struct
           List.random_element_exn potential_proposals
         in
         extend_proposal_chain (proposal :: acc_chain)
-          (UInt32.succ @@ Block_data.global_slot proposal_data)
+          (Global_slot.of_slot_number ~constants
+             (UInt32.succ @@ Block_data.global_slot proposal_data))
     in
     extend_proposal_chain [] dist.start_slot |> List.rev
 
@@ -328,12 +323,12 @@ let propose_block_onto_chain ~logger ~keys
     (previous_transition, previous_staged_ledger) (proposer_pk, block_data) =
   let consensus_constants = Constants.compiled in
   let open Deferred.Let_syntax in
-  let proposal_slot = Block_data.global_slot block_data in
-  let genesis_state_timestamp = consensus_constants.genesis_state_timestamp in
-  let epoch_duration = consensus_constants.epoch_duration in
+  let proposal_slot =
+    Global_slot.of_slot_number ~constants:consensus_constants
+      (Block_data.global_slot block_data)
+  in
   let proposal_time =
-    Global_slot.start_time proposal_slot ~genesis_state_timestamp
-      ~epoch_duration ~slot_duration_ms:consensus_constants.slot_duration_ms
+    Global_slot.start_time ~constants:consensus_constants proposal_slot
   in
   let previous_protocol_state =
     External_transition.protocol_state previous_transition
@@ -438,12 +433,14 @@ let propose_block_onto_chain ~logger ~keys
     External_transition.create ~protocol_state ~protocol_state_proof
       ~staged_ledger_diff:(Staged_ledger_diff.forget staged_ledger_diff)
       ~delta_transition_chain_proof:dummy_delta_transition_chain_proof
+      ~validation_callback:Fn.ignore ()
   in
   (external_transition, staged_ledger)
 
 let create_genesis_data () =
   let genesis_dummy_pk =
-    Account.public_key (snd (List.hd_exn Test_genesis_ledger.accounts))
+    Account.public_key
+      (snd (List.hd_exn (Lazy.force Test_genesis_ledger.accounts)))
   in
   let empty_diff =
     { Staged_ledger_diff.diff=
@@ -465,6 +462,7 @@ let create_genesis_data () =
       ~staged_ledger_diff:empty_diff
       ~delta_transition_chain_proof:
         (Protocol_state.previous_state_hash genesis_protocol_state, [])
+      ~validation_callback:Fn.ignore ()
   in
   let scan_state = Staged_ledger.Scan_state.empty () in
   let pending_coinbase_collection =
@@ -480,6 +478,7 @@ let create_genesis_data () =
 
 let main () =
   let logger = Logger.create ~id:"fuzz" () in
+  let consensus_constants = Constants.compiled in
   Logger.(
     Consumer_registry.register ~id:"fuzz" ~processor:(Processor.raw ())
       ~transport:
@@ -492,7 +491,8 @@ let main () =
      in
      let%bind keys = Keys_lib.Keys.create () in
      let stakers =
-       List.map Test_genesis_ledger.accounts ~f:(fun (sk_opt, _account) ->
+       List.map (Lazy.force Test_genesis_ledger.accounts)
+         ~f:(fun (sk_opt, _account) ->
            let sk = Option.value_exn sk_opt in
            let raw_keypair = Keypair.of_private_key_exn sk in
            let compressed_pk = Public_key.compress raw_keypair.public_key in
@@ -525,10 +525,14 @@ let main () =
            ~init:(base_transition, base_staged_ledger)
            ~f:(fun previous_chain ((_, block_data) as proposal) ->
              Core.Printf.printf !"[%d] %d --> %d\n%!" (UInt32.to_int epoch)
-               ( UInt32.to_int @@ Consensus_state.global_slot
+               ( UInt32.to_int @@ Global_slot.slot_number
+               @@ Consensus_state.global_slot
                @@ External_transition.consensus_state @@ fst previous_chain )
-               ( UInt32.to_int @@ Global_slot.slot
-               @@ Block_data.global_slot block_data ) ;
+               ( UInt32.to_int
+               @@ Global_slot.(
+                    slot
+                      (of_slot_number ~constants:consensus_constants
+                         (Block_data.global_slot block_data))) ) ;
              propose_block_onto_chain ~logger ~keys previous_chain proposal )
        in
        loop (UInt32.succ epoch) final_chain

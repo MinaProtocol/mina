@@ -280,7 +280,7 @@ module type S = sig
     * This is mostly useful for PoStake and other consensus mechanisms that have their own
     * notions of time.
   *)
-  val time_hum : Block_time.t -> constants:Constants.t -> string
+  val time_hum : constants:Constants.t -> Block_time.t -> string
 
   module Constants = Constants
 
@@ -325,10 +325,10 @@ module type S = sig
       (** Swap in a new set of block production keys and invalidate and/or
           recompute cached data *)
       val block_production_keys_swap :
-           t
+           constants:Constants.t
+        -> t
         -> Signature_lib.Public_key.Compressed.Set.t
         -> Block_time.t
-        -> constants:Constants.t
         -> unit
     end
 
@@ -380,12 +380,12 @@ module type S = sig
 
       val to_string_hum : t -> string
 
-      val to_time : t -> constants:Constants.t -> Block_time.t
+      val to_time : constants:Constants.t -> t -> Block_time.t
 
-      val of_time_exn : Block_time.t -> constants:Constants.t -> t
+      val of_time_exn : constants:Constants.t -> Block_time.t -> t
 
       (** Gets the corresponding a reasonable consensus time that is considered to be "old" and not accepted by other peers by the consensus mechanism *)
-      val get_old : t -> constants:Constants.t -> t
+      val get_old : constants:Constants.t -> t -> t
 
       val to_uint32 : t -> Unsigned.UInt32.t
 
@@ -393,19 +393,9 @@ module type S = sig
 
       val slot : t -> Unsigned.UInt32.t
 
-      val start_time :
-           t
-        -> genesis_state_timestamp:Block_time.t
-        -> epoch_duration:Block_time.Span.t
-        -> slot_duration_ms:Block_time.Span.t
-        -> Block_time.t
+      val start_time : constants:Constants.t -> t -> Block_time.t
 
-      val end_time :
-           t
-        -> genesis_state_timestamp:Block_time.t
-        -> epoch_duration:Block_time.Span.t
-        -> slot_duration_ms:Block_time.Span.t
-        -> Block_time.t
+      val end_time : constants:Constants.t -> t -> Block_time.t
     end
 
     module Consensus_state : sig
@@ -494,15 +484,15 @@ module type S = sig
     end
 
     (* Check whether we are in the genesis epoch *)
-    val is_genesis_epoch : Block_time.t -> constants:Constants.t -> bool
+    val is_genesis_epoch : constants:Constants.t -> Block_time.t -> bool
 
     (**
      * Check that a consensus state was received at a valid time.
     *)
     val received_at_valid_time :
-         Consensus_state.Value.t
+         constants:Constants.t
+      -> Consensus_state.Value.t
       -> time_received:Unix_timestamp.t
-      -> constants:Constants.t
       -> (unit, [`Too_early | `Too_late of int64]) result
 
     (**
@@ -530,12 +520,12 @@ module type S = sig
      * future.
      *)
     val next_producer_timing :
-         Unix_timestamp.t
+         constants:Constants.t
+      -> Unix_timestamp.t
       -> Consensus_state.Value.t
       -> local_state:Local_state.t
       -> keypairs:Signature_lib.Keypair.And_compressed_pk.Set.t
       -> logger:Logger.t
-      -> constants:Constants.t
       -> block_producer_timing
 
     (**
@@ -552,16 +542,16 @@ module type S = sig
      * Indicator of when we should bootstrap
      *)
     val should_bootstrap :
-         existing:Consensus_state.Value.t
+         constants:Constants.t
+      -> existing:Consensus_state.Value.t
       -> candidate:Consensus_state.Value.t
       -> logger:Logger.t
-      -> constants:Constants.t
       -> bool
 
     val get_epoch_ledger :
-         consensus_state:Consensus_state.Value.t
+         constants:Constants.t
+      -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> constants:Constants.t
       -> Coda_base.Sparse_ledger.t
 
     (** Data needed to synchronize the local state. *)
@@ -571,9 +561,9 @@ module type S = sig
      * Predicate indicating whether or not the local state requires synchronization.
      *)
     val required_local_state_sync :
-         consensus_state:Consensus_state.Value.t
+         constants:Constants.t
+      -> consensus_state:Consensus_state.Value.t
       -> local_state:Local_state.t
-      -> constants:Constants.t
       -> local_state_sync Non_empty_list.t option
 
     (**
