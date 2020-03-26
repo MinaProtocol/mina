@@ -65,8 +65,8 @@ module Stream = {
 
   module Readable = {
     type t;
-    [@bs.send] external on: (t, string, Node.Buffer.t => unit) => unit = "";
-    [@bs.send] external pipe: (t, Writable.t) => Writable.t = "";
+    [@bs.send] external on: (t, string, Node.Buffer.t => unit) => unit = "on";
+    [@bs.send] external pipe: (t, Writable.t) => Writable.t = "pipe";
 
     [@bs.module "fs"] external create: string => t = "createReadStream";
   };

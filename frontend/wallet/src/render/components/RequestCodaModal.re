@@ -28,7 +28,7 @@ let make = (~accounts, ~setModalState) => {
   let toast = Hooks.useToast();
   let handleClipboard = (~account, _) => {
     Bindings.Navigator.Clipboard.writeTextTask(PublicKey.toString(account))
-    |> Task.perform(~f=() => setModalState(_ => false));
+    |> Task.perform(~f=_ => setModalState(_ => false));
     toast("Copied public key to clipboard", ToastProvider.Default);
   };
   <Modal title="Request Coda" onRequestClose={() => setModalState(_ => false)}>

@@ -1,7 +1,7 @@
 [@bs.val] [@bs.scope "window"]
 external downloadCoda:
   (string, (int, int) => unit, Belt.Result.t(unit, string) => unit) => unit =
-  "";
+  "downloadCoda";
 
 module Styles = {
   open Css;

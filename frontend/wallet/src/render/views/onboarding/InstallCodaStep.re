@@ -30,7 +30,7 @@ module Styles = {
       ]),
     ]);
 };
-[@bs.scope "window"] [@bs.val] external openExternal: string => unit = "";
+[@bs.scope "window"] [@bs.val] external openExternal: string => unit = "openExternal";
 
 type state =
   | Init
