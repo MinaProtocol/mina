@@ -105,7 +105,8 @@ let make = (~publicKey) => {
          {switch (result) {
           | NotCalled
           | Loading => React.null
-          | Error(err) => <Alert kind=`Danger defaultMessage=err##message />
+          | Error((err: ReasonApolloTypes.apolloError)) =>
+            <Alert kind=`Danger defaultMessage={err.message} />
           | Data(_) =>
             goBack();
             React.null;

@@ -149,10 +149,12 @@ module Styles = {
       fontWeight(`medium),
       fontSize(`rem(2.)),
     ]);
+
+  let profileRow = style([display(`flex), justifyContent(`spaceAround)]);
 };
 
 [@react.component]
-let make = () => {
+let make = (~profiles) => {
   <Page
     title="Genesis"
     description="Join Genesis. Become one of 1000 community members to receive a grant of 66,000 coda tokens. You'll participate in activities that will strengthen the Coda network and community.">
@@ -235,6 +237,37 @@ let make = () => {
               buttonLink="http://bit.ly/GenesisTestnet"
             />
           </div>
+        </div>
+        <Spacer height=7. />
+        <h1 className=Styles.textBlockHeading>
+          {React.string("Meet the Genesis Founding Members")}
+        </h1>
+        <div className=Styles.textBlock>
+          <p className=Styles.heroCopy>
+            {React.string(
+               "Meet a few of the 40 members who are part of Genesis Cohort 1. These community members are crucial to strengthening the Coda network. They are the backbone of the global Coda community.",
+             )}
+          </p>
+        </div>
+        <Spacer height=4. />
+        <div className=Styles.profileRow>
+          {React.array(
+             Array.map(
+               (p: ContentType.GenesisProfile.t) => {
+                 <MemberProfile
+                   key={p.name}
+                   name={p.name}
+                   photo={p.profilePhoto.fields.file.url}
+                   quote={"\"" ++ p.quote ++ "\""}
+                   location={p.memberLocation}
+                   twitter={p.twitter}
+                   github={p.github}
+                   blogPost={p.blogPost.fields.slug}
+                 />
+               },
+               profiles,
+             ),
+           )}
         </div>
         <Spacer height=4. />
         <h1 className=Styles.textBlockHeading> {React.string("Details")} </h1>
@@ -347,3 +380,23 @@ let make = () => {
     </Wrapped>
   </Page>;
 };
+
+Next.injectGetInitialProps(make, _ => {
+  Contentful.getEntries(
+    Lazy.force(Contentful.client),
+    {
+      "include": 1,
+      "content_type": ContentType.GenesisProfile.id,
+      "order": "-fields.publishDate",
+      "limit": 3,
+    },
+  )
+  |> Promise.map((entries: ContentType.GenesisProfile.entries) => {
+       let profiles =
+         Array.map(
+           (e: ContentType.GenesisProfile.entry) => e.fields,
+           entries.items,
+         );
+       {"profiles": profiles};
+     })
+});
