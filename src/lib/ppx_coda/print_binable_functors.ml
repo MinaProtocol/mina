@@ -34,7 +34,12 @@ let is_included_binable_functor_app (inc_decl : include_declaration) =
         ; _ }
     ; _ } ->
       List.mem
-        ["Of_binable"; "Of_sexpable"; "Of_stringable"]
+        [ "Of_binable"
+        ; "Of_binable1"
+        ; "Of_binable2"
+        ; "Of_binable3"
+        ; "Of_sexpable"
+        ; "Of_stringable" ]
         binable_functor ~equal:String.equal
   | { pincl_mod=
         { pmod_desc=
