@@ -18,23 +18,21 @@ let rec pow = a =>
 let precision_exp = Int64.of_int(pow(10, precision));
 let to_formatted_string = amount => {
   let rec go = (num_stripped_zeros, num) =>
-    Int64.(
-      if (num mod 10 == 0 && num != 0) {
-        go(num_stripped_zeros + 1, num / 10);
-      } else {
-        (num_stripped_zeros, num);
-      }
-    );
+    if (num mod 10 == 0 && num != 0) {
+      go(num_stripped_zeros + 1, num / 10);
+    } else {
+      (num_stripped_zeros, num);
+    };
   let whole = Int64.div(amount, precision_exp);
   let remainder = Int64.to_int(Int64.rem(amount, precision_exp));
-  if (Int64.(remainder == 0)) {
+  if (remainder == 0) {
     Int64.to_string(whole);
   } else {
     let (num_stripped_zeros, num) = go(0, remainder);
     Printf.sprintf(
       "%s.%0*d",
       Int64.to_string(whole),
-      Int64.(precision - num_stripped_zeros),
+      precision - num_stripped_zeros,
       num,
     );
   };
@@ -45,13 +43,11 @@ let of_formatted_string = input => {
   | [whole] => Int64.of_string(whole ++ String.make(precision, '0'))
   | [whole, decimal] =>
     let decimal_length = String.length(decimal);
-    if (Int64.(decimal_length > precision)) {
+    if (decimal_length > precision) {
       Int64.of_string(whole ++ String.sub(decimal, 0, precision));
     } else {
       Int64.of_string(
-        whole
-        ++ decimal
-        ++ String.make(Int64.(precision - decimal_length), '0'),
+        whole ++ decimal ++ String.make(precision - decimal_length, '0'),
       );
     };
   | _ => failwith("Currency.of_formatted_string: Invalid currency input")
