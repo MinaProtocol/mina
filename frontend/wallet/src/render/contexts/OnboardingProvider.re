@@ -14,7 +14,7 @@ let createContext = () => {
         Bindings.LocalStorage.getItem(`Onboarding) |> Js.Nullable.toOption;
       switch (temp) {
       | None => true
-      | Some(_) => true
+      | Some(_) => false
       };
     });
 

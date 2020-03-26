@@ -321,7 +321,7 @@ jobs:
             - run:
                 name: Decode Apple Certificates
                 context: org-global
-                command: base64 -O -o Certificates.p12 <<< $APPLE_CERTIFICATES
+                command: base64 -D -o Certificates.p12 <<< $APPLE_CERTIFICATES
             - run:
                 name: Build portable binary
                 command: |

@@ -4800,9 +4800,10 @@ realpath-native@^1.1.0:
   dependencies:
     util.promisify "^1.0.0"
 
-"reason-apollo@github:yawaramin/reason-apollo#bugfix/226-option-annotation":
-  version "0.18.0"
-  resolved "https://codeload.github.com/yawaramin/reason-apollo/tar.gz/66a7f0df6e3f385a6873fa6b430655b5439d4b99"
+reason-apollo@^0.19.0:
+  version "0.19.0"
+  resolved "https://registry.yarnpkg.com/reason-apollo/-/reason-apollo-0.19.0.tgz#16940916cd5c912a74fb9da57f4de063b20b6e6f"
+  integrity sha512-VpKHvdzBiLtIg+T/AC100ZNztr7KklIXzlnSd4o/T2vGnwFgVgHIG6//c+Hz8nFjaVUXfk1tFlxnVfBhhKQC4g==
   dependencies:
     apollo-cache-inmemory "^1.6.0"
     apollo-client "^2.6.3"
@@ -5141,7 +5142,7 @@ set-value@^2.0.0:
     is-plain-object "^2.0.3"
     split-string "^3.0.1"
 
-setimmediate@^1.0.5, setimmediate@~1.0.4:
+setimmediate@~1.0.4:
   version "1.0.5"
   resolved "https://registry.yarnpkg.com/setimmediate/-/setimmediate-1.0.5.tgz#290cbb232e306942d7d7ea9b83732ab7856f8285"
   integrity sha1-KQy7Iy4waULX1+qbg3Mqt4VvgoU=
