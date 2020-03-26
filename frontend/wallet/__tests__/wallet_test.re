@@ -178,6 +178,14 @@ describe("Bindings", () =>
   })
 );
 
+describe("CurrencyFormatter", () => {
+  open CurrencyFormatter;
+  let f = CurrencyFormatter.toFormattedString(~int);
+  test("to formatted string", () => {
+    let integer = 1;
+    expect(f(~integer)) |> toBe("0.000000001");
+  });
+});
 describe("Time", () => {
   let testNow =
     Js.Date.makeWithYMDHMS(

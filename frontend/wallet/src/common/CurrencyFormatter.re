@@ -16,7 +16,7 @@ let rec pow = a =>
       );
     };
 let precision_exp = Int64.of_int(pow(10, precision));
-let to_formatted_string = amount => {
+let toFormattedString = amount => {
   let rec go = (num_stripped_zeros, num) =>
     if (num mod 10 == 0 && num != 0) {
       go(num_stripped_zeros + 1, num / 10);
@@ -37,7 +37,7 @@ let to_formatted_string = amount => {
     );
   };
 };
-let of_formatted_string = input => {
+let ofFormattedString = input => {
   let parts = String.split_on_char('.', input);
   switch (parts) {
   | [whole] => Int64.of_string(whole ++ String.make(precision, '0'))
