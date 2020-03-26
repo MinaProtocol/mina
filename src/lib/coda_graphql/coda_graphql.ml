@@ -1611,16 +1611,17 @@ module Mutations = struct
   let send_unsigned_user_command ~coda ~nonce_opt ~sender ~memo ~fee
       ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
-    let%bind sign_choice =
-      match%map Deferred.return @@ find_identity ~public_key:sender coda with
-      | `Keypair sender_kp ->
-          `Keypair sender_kp
-      | `Hd_index hd_index ->
-          `Hd_index hd_index
-    in
     let%bind user_command_input =
+      (let open Result.Let_syntax in
+      let%bind sign_choice =
+        match%map find_identity ~public_key:sender coda with
+        | `Keypair sender_kp ->
+            `Keypair sender_kp
+        | `Hd_index hd_index ->
+            `Hd_index hd_index
+      in
       create_user_command_input ~nonce_opt ~sender ~memo ~fee ~valid_until
-        ~body ~sign_choice
+        ~body ~sign_choice)
       |> Deferred.return
     in
     send_user_command coda user_command_input

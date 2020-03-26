@@ -41,16 +41,13 @@ let to_user_command (uc_inputs, result_cb, inferred_nonce) logger =
   let setup_user_command (client_input : t) :
       User_command.t Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
-    let opt_error ~error_string opt =
-      Option.value_map
-        ~default:
-          (Or_error.error_string
-             (sprintf "Error creating user command: %s Error: %s"
-                (Yojson.Safe.to_string (to_yojson client_input))
-                error_string))
-        ~f:(fun value -> Ok value)
-        opt
-      |> Deferred.return
+    let opt_error ~error_string = function
+      | None ->
+          Deferred.Or_error.errorf "Error creating user command: %s Error: %s"
+            (Yojson.Safe.to_string (to_yojson client_input))
+            error_string
+      | Some v ->
+          Deferred.Or_error.return v
     in
     let create_user_command nonce =
       let payload =

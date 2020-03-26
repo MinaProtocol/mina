@@ -425,12 +425,12 @@ let get_ledger t staged_ledger_hash_opt =
         "get_ledger: staged ledger hash not found in transition frontier"
 
 let get_inferred_nonce_from_transaction_pool_and_ledger t
-    (addr : Public_key.Compressed.t) =
-  let get_account addr =
+    (public_key : Public_key.Compressed.t) =
+  let get_account pk =
     let open Participating_state.Let_syntax in
     let%map ledger = best_ledger t in
     let open Option.Let_syntax in
-    let%bind loc = Ledger.location_of_key ledger addr in
+    let%bind loc = Ledger.location_of_key ledger pk in
     Ledger.get ledger loc
   in
   let transaction_pool = t.components.transaction_pool in
@@ -439,7 +439,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
   in
   let pooled_transactions =
     Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
-      addr
+      public_key
   in
   let txn_pool_nonce =
     let nonces =
@@ -454,7 +454,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       Participating_state.Option.return (Account.Nonce.succ nonce)
   | None ->
       let open Participating_state.Option.Let_syntax in
-      let%map account = get_account addr in
+      let%map account = get_account public_key in
       account.Account.Poly.nonce
 
 let seen_jobs t = t.seen_jobs

@@ -277,11 +277,7 @@ let run_test () : unit Deferred.t =
                 ~body:(Payment {receiver= receiver_pk; amount})
                 ~sign_choice:(`Keypair (Keypair.of_private_key_exn sender_sk))
             in
-            match nonce_opt with
-            | None ->
-                uc_input ()
-            | Some nonce ->
-                uc_input ~nonce_opt:nonce () )
+            uc_input ?nonce_opt () )
       in
       let assert_ok x = assert (Or_error.is_ok x) in
       let send_payment (payment : User_command_input.t) =
