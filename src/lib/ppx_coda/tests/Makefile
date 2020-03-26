@@ -30,6 +30,10 @@ positive-tests : unexpired.ml
 	@ echo -n "Define locally, should succeed..."
 	@ dune build define_locally_good.cma ${REDIRECT}
 	@ echo "OK"
+# define existing
+	@ echo -n "Define from scope, should succeed..."
+	@ dune build define_from_scope_good.cma ${REDIRECT}
+	@ echo "OK"
 # module versioning
 	@ echo -n "Module versioning, should succeed..."
 	@ dune exec ./versioned_module_good.exe ${REDIRECT}
@@ -52,7 +56,7 @@ negative-tests :
 	@ echo -n "Invalid format, should fail..."
 	@ ! dune build expiry_invalid_format.cma ${REDIRECT}
 	@ echo "OK"
-# version syntax 
+# version syntax
 	@ echo -n "Missing deriving version, should fail..."
 	@ ! dune build bad_version_syntax_missing_version.cma ${REDIRECT}
 	@ echo "OK"
