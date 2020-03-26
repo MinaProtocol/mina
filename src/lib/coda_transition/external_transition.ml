@@ -203,8 +203,7 @@ let protocol_version_status
     Option.for_all proposed_protocol_version_opt ~f:Protocol_version.is_valid
   in
   let matches_daemon =
-    Protocol_version.compatible current_protocol_version
-      (Protocol_version.get_current ())
+    Protocol_version.compatible_with_daemon current_protocol_version
   in
   {valid_current; valid_next; matches_daemon}
 

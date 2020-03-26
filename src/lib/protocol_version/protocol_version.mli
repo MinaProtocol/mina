@@ -24,7 +24,7 @@ val set_proposed_opt : t option -> unit
 val zero : t
 
 (** a daemon can accept blocks or RPC responses with compatible protocol versions *)
-val compatible : t -> t -> bool
+val compatible_with_daemon : t -> bool
 
 val to_string : t -> string
 

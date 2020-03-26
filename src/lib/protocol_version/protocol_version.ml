@@ -40,7 +40,8 @@ let create_opt ~major ~minor ~patch =
 
 let zero = create_exn ~major:0 ~minor:0 ~patch:0
 
-let compatible pv1 pv2 = Int.equal pv1.major pv2.major
+let compatible_with_daemon current_protocol_version =
+  Int.equal current_protocol_version.major (get_current ()).major
 
 let to_string t = sprintf "%u.%u.%u" t.major t.minor t.patch
 
