@@ -55,12 +55,23 @@ module Navigator = {
 };
 
 module Stream = {
+  module Chunk = {
+    type t = {. "length": int};
+  };
+
   module Writable = {
     type t;
+
+    [@bs.module "fs"]
+    external create: (string, {. "encoding": string}) => t = "createWriteStream";
+
     [@bs.send]
-    external onError: (t, [@bs.as "error"] _, string => unit) => unit = "on";
+    external onError: (t, [@bs.as "error"] _, string => unit) => t = "on";
     [@bs.send]
     external onFinish: (t, [@bs.as "finish"] _, unit => unit) => t = "on";
+    [@bs.send] external write: (t, Chunk.t) => unit = "";
+    [@bs.send] external endStream: t => unit = "end";
+      
   };
 
   module Readable = {

@@ -1,24 +1,3 @@
-/** Bindings **/
-module Filestream = {
-  type t;
-
-  module Chunk = {
-    type t = {. "length": int};
-  };
-
-  [@bs.module "fs"]
-  external createWriteStream: (string, {. "encoding": string}) => t = "";
-
-  [@bs.send]
-  external onError: (t, [@bs.as "error"] _, string => unit) => unit = "on";
-  [@bs.send]
-  external onFinish: (t, [@bs.as "finish"] _, unit => unit) => unit = "on";
-
-  [@bs.send] external write: (t, Chunk.t) => unit = "";
-
-  [@bs.send] external endStream: t => unit = "end";
-};
-
 module Https = {
   module Request = {
     type t;
@@ -47,7 +26,7 @@ module Https = {
     [@bs.send] external setEncoding: (t, string) => unit = "";
 
     [@bs.send]
-    external onData: (t, [@bs.as "data"] _, Filestream.Chunk.t => unit) => unit =
+    external onData: (t, [@bs.as "data"] _, Bindings.Stream.Chunk.t => unit) => unit =
       "on";
 
     [@bs.send]
@@ -71,21 +50,20 @@ let handleResponse = (response, filename, dataEncoding, chunkCb, doneCb) => {
     |> Https.Response.getHeaders
     |> Https.Response.Headers.contentLengthGet
     |> int_of_string;
-  let filestream =
-    Filestream.createWriteStream(filename, {"encoding": dataEncoding});
-
-  Filestream.onFinish(filestream, () => doneCb(Belt.Result.Ok()));
-  Filestream.onError(filestream, e => doneCb(Error(e)));
+  let stream =
+    Bindings.Stream.Writable.create(filename, {"encoding": dataEncoding})
+    -> Bindings.Stream.Writable.onFinish(() => doneCb(Belt.Result.Ok()))
+    -> Bindings.Stream.Writable.onError(e => doneCb(Error(e)));
 
   Https.Response.onData(
     response,
     chunk => {
-      Filestream.write(filestream, chunk);
+      Bindings.Stream.Writable.write(stream, chunk);
       chunkCb(chunk##length, total);
     },
   );
 
-  Https.Response.onEnd(response, () => Filestream.endStream(filestream));
+  Https.Response.onEnd(response, () => Bindings.Stream.Writable.endStream(stream));
 };
 
 /**
@@ -130,10 +108,12 @@ external getPath: string => string = "getPath";
 let extractZip = (src, dest, doneCb, errorCb) => {
   let extractArgs = {"path": dest};
 
-  Bindings.Stream.Readable.create(src)
+  let _ = Bindings.Stream.Readable.create(src)
   ->(Bindings.Stream.Readable.pipe(Unzipper.extract(extractArgs)))
   ->Bindings.Stream.Writable.onFinish(doneCb)
   ->Bindings.Stream.Writable.onError(errorCb);
+
+  ();
 };
 
 /**
