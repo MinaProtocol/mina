@@ -36,12 +36,6 @@ end
 module Oracles = struct
   open Snarky_bn382
 
-  let create vk prev_challenge input (pi : Proof.t) =
-    let pi = Proof.to_backend prev_challenge input pi in
-    let t = Fq_oracles.create vk pi in
-    Caml.Gc.finalise Fq_oracles.delete t ;
-    t
-
   let field f t =
     let x = f t in
     Caml.Gc.finalise Fq.delete x ;
@@ -112,7 +106,7 @@ module Keypair = struct
   let set_urs_info, load_urs =
     let urs_info = Set_once.create () in
     let urs = ref None in
-    let set_urs_info ?(degree = 1 lsl 19) path =
+    let set_urs_info ?(degree = 3145_750) path =
       Set_once.set_exn urs_info Lexing.dummy_pos (degree, path)
     in
     let load () =
@@ -141,7 +135,7 @@ module Keypair = struct
     in
     (set_urs_info, load)
 
-  let () = set_urs_info "/home/izzy/pickles-new/dlog-urs"
+  let () = set_urs_info "/home/pavel/urs/dlog-urs"
 
   let create
       { R1cs_constraint_system.public_input_size
