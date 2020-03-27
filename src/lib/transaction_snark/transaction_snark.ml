@@ -397,9 +397,7 @@ module Base = struct
       ({sender; signature; payload} : Transaction_union.var) =
     let nonce = payload.common.nonce in
     let tag = payload.body.tag in
-    let%bind is_user_command =
-      Transaction_union.Tag.Checked.is_user_command tag
-    in
+    let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
     let%bind () =
       let current_global_slot =
         Global_slot.(Checked.constant zero)
@@ -417,12 +415,12 @@ module Base = struct
     let%bind {excess; sender_delta; supply_increase; receiver_increase} =
       Transaction_union_payload.Changes.Checked.of_payload payload
     in
-    let%bind is_stake_delegation =
-      Transaction_union.Tag.Checked.is_stake_delegation tag
+    let is_stake_delegation =
+      Transaction_union.Tag.Unpacked.is_stake_delegation tag
     in
-    let%bind is_payment = Transaction_union.Tag.Checked.is_payment tag in
+    let is_payment = Transaction_union.Tag.Unpacked.is_payment tag in
     let%bind sender_compressed = Public_key.compress_var sender in
-    let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
+    let is_coinbase = Transaction_union.Tag.Unpacked.is_coinbase tag in
     (*push state for any transaction*)
     let state_body_hash =
       Transaction_protocol_state.Block_data.Checked.state_body_hash
@@ -499,8 +497,8 @@ module Base = struct
     in
     let%map new_root =
       let%bind is_writeable =
-        let%bind is_fee_transfer =
-          Transaction_union.Tag.Checked.is_fee_transfer tag
+        let is_fee_transfer =
+          Transaction_union.Tag.Unpacked.is_fee_transfer tag
         in
         Boolean.any [is_fee_transfer; is_coinbase]
       in
