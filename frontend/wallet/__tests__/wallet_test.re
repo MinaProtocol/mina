@@ -184,14 +184,18 @@ describe("CurrencyFormatter", () => {
     |> toBe("0.000000001")
   });
   test("to formatted string", () => {
-    expect(CurrencyFormatter.toFormattedString(Int64.of_string("90000000000"))
+    expect(
+      CurrencyFormatter.toFormattedString(Int64.of_string("90000000000")),
+    )
     |> toBe("90")
   });
-
-
   test("of formatted string", () => {
     expect(CurrencyFormatter.ofFormattedString("0.000000001"))
     |> toBe(Int64.of_int(1))
+  });
+  test("of formatted string", () => {
+    expect(CurrencyFormatter.ofFormattedString("90"))
+    |> toBe(Int64.of_string("90000000000"))
   });
 });
 
