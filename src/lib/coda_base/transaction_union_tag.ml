@@ -10,6 +10,10 @@ consensus_mechanism]
 
 open Snark_params.Tick
 
+[%%else]
+
+module Random_oracle = Random_oracle_nonconsensus
+
 [%%endif]
 
 type t = Payment | Stake_delegation | Fee_transfer | Coinbase
