@@ -24,8 +24,7 @@ module Tock_backend = struct
     let bg_params =
       Group_map.Params.create
         (module Tick0.Field)
-        ~a:Tick_backend.Inner_curve.Coefficients.a
-        ~b:Tick_backend.Inner_curve.Coefficients.b
+        Tick_backend.Inner_curve.Coefficients.{a; b}
 
     include Snarky.Libsnark.Make_bowe_gabizon
               (Full)
