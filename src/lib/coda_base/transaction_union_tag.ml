@@ -30,6 +30,10 @@ module Bits = struct
 
   let coinbase = (true, true)
 
+  let to_bits (b1, b2) = [b1; b2]
+
+  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+
   [%%ifdef
   consensus_mechanism]
 
@@ -38,10 +42,6 @@ module Bits = struct
   let typ = Typ.tuple2 Boolean.typ Boolean.typ
 
   let constant (b1, b2) = Boolean.(var_of_value b1, var_of_value b2)
-
-  let to_bits (b1, b2) = [b1; b2]
-
-  let to_input t = Random_oracle.Input.bitstring (to_bits t)
 
   [%%endif]
 end
