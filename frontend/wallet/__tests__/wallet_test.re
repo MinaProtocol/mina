@@ -179,14 +179,19 @@ describe("Bindings", () =>
 );
 
 describe("CurrencyFormatter", () => {
-  let toString = CurrencyFormatter.toFormattedString(Int64.of_int(1));
   test("to formatted string", () => {
-    expect(toString) |> toBe("0.000000001")
+    expect(CurrencyFormatter.toFormattedString(Int64.of_int(1)))
+    |> toBe("0.000000001")
+  });
+  test("to formatted string", () => {
+    expect(CurrencyFormatter.toFormattedString(Int64.of_string("90000000000"))
+    |> toBe("90")
   });
 
-  let ofString = CurrencyFormatter.ofFormattedString("0.000000001");
+
   test("of formatted string", () => {
-    expect(ofString) |> toBe(Int64.of_int(1))
+    expect(CurrencyFormatter.ofFormattedString("0.000000001"))
+    |> toBe(Int64.of_int(1))
   });
 });
 
