@@ -1696,6 +1696,7 @@ struct
   let f
       (type max_local_max_branchings self_branches prev_vars prev_values
       local_widths local_heights)
+    ?handler
       (T branch_data :
         ( A.t
         , A_value.t
@@ -1985,7 +1986,7 @@ struct
         ~dlog_marlin_index:self_dlog_marlin_index
         next_statement.proof_state.me_only
     in
-    let handler (Snarky.Request.With {request; respond}) =
+    let handler (Snarky.Request.With {request; respond} as r) =
       let k x = respond (Provide x) in
       match request with
       | Req.Prev_proofs ->
@@ -1998,7 +1999,9 @@ struct
                 (*                  Vector.trim next_me_only_prepared.sg lte *)
             }
       | _ ->
-          Snarky.Request.unhandled
+        match handler with
+        | Some f -> f r
+        | None -> Snarky.Request.unhandled
     in
     let (next_proof : Pairing_based.Proof.t) =
       let (T (input, conv)) =
@@ -2097,7 +2100,8 @@ end
 
 module Prover = struct
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
-       ('prev_values, 'local_widths, 'local_heights) H3.T(Prev_proof).t
+    ?handler:(Snarky.Request.request -> Snarky.Request.response)
+    -> ('prev_values, 'local_widths, 'local_heights) H3.T(Prev_proof).t
     -> 'a_value
     -> 'proof
 end
@@ -2327,20 +2331,21 @@ module Make (A : Statement_var_intf) (A_value : Statement_value_intf) = struct
       let f : type prev_vars prev_values local_widths local_heights.
              (prev_vars, prev_values, local_widths, local_heights) Branch_data.t
           -> Impls.Pairing_based.Keypair.t
+          -> ?handler:(Snarky.Request.request -> Snarky.Request.response)
           -> (prev_values, local_widths, local_heights) H3.T(Prev_proof).t
           -> A_value.t
           -> (A_value.t, Max_branching.n, Branches.n) Prev_proof.t =
        fun (T b as branch_data) keypair ->
         let (module Requests) = b.requests in
-        let step prevs next_state =
-          S.f branch_data next_state ~self ~step_domains
+        let step handler prevs next_state =
+          S.f ?handler branch_data next_state ~self ~step_domains
             ~self_dlog_marlin_index
             (Impls.Pairing_based.Keypair.pk keypair)
             wrap_vk prevs
         in
         let pairing_vk = Impls.Pairing_based.Keypair.vk keypair in
-        let wrap prevs next_state =
-          let proof = step ~maxes:(module Maxes) prevs next_state in
+        let wrap ?handler prevs next_state =
+          let proof = step handler ~maxes:(module Maxes) prevs next_state in
           let proof =
             { proof with
               statement=
