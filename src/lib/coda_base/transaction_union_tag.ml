@@ -24,9 +24,9 @@ module Bits = struct
 
   let payment = (false, false)
 
-  let stake_delegation = (false, true)
+  let stake_delegation = (true, false)
 
-  let fee_transfer = (true, false)
+  let fee_transfer = (false, true)
 
   let coinbase = (true, true)
 
