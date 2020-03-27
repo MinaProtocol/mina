@@ -179,23 +179,31 @@ describe("Bindings", () =>
 );
 
 describe("CurrencyFormatter", () => {
-  test("to formatted string", () => {
+  test("toFormattedStringString (1 nanocoda)", () => {
     expect(CurrencyFormatter.toFormattedString(Int64.of_int(1)))
     |> toBe("0.000000001")
   });
-  test("to formatted string", () => {
+  test("toFormattedString (90 coda)", () => {
     expect(
       CurrencyFormatter.toFormattedString(Int64.of_string("90000000000")),
     )
     |> toBe("90")
   });
-  test("of formatted string", () => {
-    expect(CurrencyFormatter.ofFormattedString("0.000000001"))
-    |> toBe(Int64.of_int(1))
+  test("toFormattedString (no trailing zeroes)", () => {
+    expect(CurrencyFormatter.toFormattedString(Int64.of_int(100)))
+    |> toBe("0.0000001")
   });
-  test("of formatted string", () => {
+  test("ofFormattedString (1 nanocoda)", () => {
+    expect(CurrencyFormatter.ofFormattedString("0.000000001"))
+    |> toEqual(Int64.of_string("1"))
+  });
+  test("ofFormattedString (90 coda)", () => {
     expect(CurrencyFormatter.ofFormattedString("90"))
-    |> toBe(Int64.of_string("90000000000"))
+    |> toEqual(Int64.of_string("90000000000"))
+  });
+  test("ofFormattedString (no trailing zeroes)", () => {
+    expect(CurrencyFormatter.ofFormattedString("0.0000001"))
+    |> toEqual(Int64.of_string("100"))
   });
 });
 
