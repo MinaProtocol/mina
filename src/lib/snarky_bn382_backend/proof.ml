@@ -58,7 +58,7 @@ let to_backend vk primary_input
     Caml.Gc.finalise delete t ; t
   in
   let t =
-    Snarky_bn382.Fp_proof.make vk primary_input (g w_comm) (g za_comm) (g zb_comm)
+    Snarky_bn382.Fp_proof.make primary_input (g w_comm) (g za_comm) (g zb_comm)
       (g h1_comm) (g g1_comm_0) (g g1_comm_1) (g h2_comm) (g g2_comm_0)
       (g g2_comm_1) (g h3_comm) (g g3_comm_0) (g g3_comm_1) (g proof1)
       (g proof2) (g proof3) sigma2 sigma3 w za zb h1 g1 h2 g2 h3 g3 row_0 row_1
@@ -108,7 +108,7 @@ let to_backend1 vk primary_input
     Caml.Gc.finalise delete t ; t
   in
   let t =
-    Snarky_bn382.Fp_proof.make vk primary_input (g w_comm) (g za_comm) (g zb_comm)
+    Snarky_bn382.Fp_proof.make primary_input (g w_comm) (g za_comm) (g zb_comm)
       (g h1_comm) (g g1_comm_0) (g g1_comm_1) (g h2_comm) (g g2_comm_0)
       (g g2_comm_1) (g h3_comm) (g g3_comm_0) (g g3_comm_1) (g proof1)
       (g proof2) (g proof3) sigma2 sigma3 w za zb h1 g1 h2 g2 h3 g3 row_0 row_1
