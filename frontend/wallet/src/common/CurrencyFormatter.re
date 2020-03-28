@@ -17,6 +17,9 @@ let rec pow = a =>
     };
 let precision_exp = Int64.of_int(pow(10, precision));
 let toFormattedString = amount => {
+  if (amount < Int64.zero) {
+    failwith("CurrencyFormatter.toFormattedString: negative currency input");
+  };
   let rec go = (num_stripped_zeros, num) =>
     if (num mod 10 == 0 && num != 0) {
       go(num_stripped_zeros + 1, num / 10);
@@ -39,17 +42,23 @@ let toFormattedString = amount => {
 };
 let ofFormattedString = input => {
   let parts = String.split_on_char('.', input);
-  switch (parts) {
-  | [whole] => Int64.of_string(whole ++ String.make(precision, '0'))
-  | [whole, decimal] =>
-    let decimal_length = String.length(decimal);
-    if (decimal_length > precision) {
-      Int64.of_string(whole ++ String.sub(decimal, 0, precision));
-    } else {
-      Int64.of_string(
-        whole ++ decimal ++ String.make(precision - decimal_length, '0'),
-      );
+  let result =
+    switch (parts) {
+    | [whole] => Int64.of_string(whole ++ String.make(precision, '0'))
+    | [whole, decimal] =>
+      let decimal_length = String.length(decimal);
+      if (decimal_length > precision) {
+        Int64.of_string(whole ++ String.sub(decimal, 0, precision));
+      } else {
+        Int64.of_string(
+          whole ++ decimal ++ String.make(precision - decimal_length, '0'),
+        );
+      };
+    | _ =>
+      failwith("CurrencyFormatter.ofFormattedString: Invalid currency input")
     };
-  | _ => failwith("Currency.of_formatted_string: Invalid currency input")
+  if (result < Int64.zero) {
+    failwith("CurrencyFormatter.ofFormattedString: negative currency input");
   };
+  result;
 };
