@@ -1590,20 +1590,15 @@ module Mutations = struct
           result_of_exn User_command_memo.create_from_string_exn memo
             ~error:"Invalid `memo` provided." )
     in
-    { User_command_input.sender
-    ; fee
-    ; nonce_opt
-    ; valid_until
-    ; memo
-    ; body
-    ; sign_choice }
+    User_command_input.create ~sender ~fee ~nonce_opt ~valid_until ~memo ~body
+      ~sign_choice ()
 
   let send_signed_user_command ~signature ~coda ~nonce_opt ~sender ~memo ~fee
       ~valid_until ~body =
     let open Deferred.Result.Let_syntax in
     let%bind user_command_input =
       create_user_command_input ~nonce_opt ~sender ~memo ~fee ~valid_until
-        ~body ~sign_choice:(`Signature signature)
+        ~body ~sign_choice:(User_command_input.Sign_choice.Signature signature)
       |> Deferred.return
     in
     send_user_command coda user_command_input
@@ -1616,9 +1611,9 @@ module Mutations = struct
       let%bind sign_choice =
         match%map find_identity ~public_key:sender coda with
         | `Keypair sender_kp ->
-            `Keypair sender_kp
+            User_command_input.Sign_choice.Keypair sender_kp
         | `Hd_index hd_index ->
-            `Hd_index hd_index
+            Hd_index hd_index
       in
       create_user_command_input ~nonce_opt ~sender ~memo ~fee ~valid_until
         ~body ~sign_choice)

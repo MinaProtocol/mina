@@ -4,43 +4,97 @@ open Coda_numbers
 open Core_kernel
 open Async_kernel
 
+module Payload = struct
+  module Common = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          ( Currency.Fee.Stable.V1.t
+          , Account_nonce.Stable.V1.t option
+          , Global_slot.Stable.V1.t
+          , User_command_memo.Stable.V1.t )
+          User_command_payload.Common.Poly.Stable.V1.t
+        [@@deriving sexp, to_yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+
+    let create ~fee ~nonce_opt ~valid_until ~memo : t =
+      {fee; nonce= nonce_opt; valid_until; memo}
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        ( Common.Stable.V1.t
+        , User_command_payload.Body.Stable.V1.t )
+        User_command_payload.Poly.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+
+  let create ~fee ~nonce_opt ~valid_until ~memo ~body : t =
+    {common= Common.create ~fee ~nonce_opt ~valid_until ~memo; body}
+end
+
+module Sign_choice = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        | Signature of Signature.Stable.V1.t
+        | Hd_index of Unsigned_extended.UInt32.Stable.V1.t
+        | Keypair of Keypair.Stable.V1.t
+      [@@deriving sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t =
+    | Signature of Signature.t
+    | Hd_index of Unsigned_extended.UInt32.t
+    | Keypair of Keypair.t
+  [@@deriving sexp, to_yojson]
+end
+
 [%%versioned
 module Stable = struct
   module V1 = struct
     type t =
-      { sender: Public_key.Compressed.Stable.V1.t
-      ; fee: Currency.Fee.Stable.V1.t
-      ; nonce_opt: Account_nonce.Stable.V1.t option
-      ; valid_until: Account_nonce.Stable.V1.t
-      ; memo: User_command_memo.Stable.V1.t
-      ; body: User_command_payload.Body.Stable.V1.t
-      ; sign_choice:
-          [ `Signature of Signature.Stable.V1.t
-          | `Hd_index of Unsigned_extended.UInt32.Stable.V1.t
-          | `Keypair of Keypair.Stable.V1.t ] }
-    [@@deriving to_yojson]
+      ( Payload.Stable.V1.t
+      , Public_key.Compressed.Stable.V1.t
+      , Sign_choice.Stable.V1.t )
+      User_command.Poly.Stable.V1.t
+    [@@deriving sexp, to_yojson]
 
     let to_latest = Fn.id
   end
 end]
 
-type t = Stable.Latest.t =
-  { sender: Public_key.Compressed.t
-  ; fee: Currency.Fee.t
-  ; nonce_opt: Account_nonce.t option
-  ; valid_until: Account_nonce.t
-  ; memo: User_command_memo.t
-  ; body: User_command_payload.Body.t
-  ; sign_choice:
-      [ `Signature of Signature.t
-      | `Hd_index of Unsigned_extended.UInt32.t
-      | `Keypair of Keypair.t ] }
-[@@deriving make, to_yojson]
+type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
-let to_user_command (uc_inputs, result_cb, inferred_nonce) logger =
+let create ?(nonce_opt = None) ~fee ~valid_until ~memo ~body ~sender
+    ~sign_choice () : t =
+  let payload = Payload.create ~fee ~nonce_opt ~valid_until ~memo ~body in
+  {payload; sender; signature= sign_choice}
+
+let to_user_command ~result_cb ~inferred_nonce ~logger uc_inputs :
+    (User_command.t list * (_ Or_error.t -> unit)) option Deferred.t =
   let setup_user_command (client_input : t) :
       User_command.t Deferred.Or_error.t =
     let open Deferred.Or_error.Let_syntax in
+    let nonce_opt = client_input.payload.common.nonce in
+    let payload_common = client_input.payload.common in
     let opt_error ~error_string = function
       | None ->
           Deferred.Or_error.errorf "Error creating user command: %s Error: %s"
@@ -50,31 +104,32 @@ let to_user_command (uc_inputs, result_cb, inferred_nonce) logger =
           Deferred.Or_error.return v
     in
     let create_user_command nonce =
-      let payload =
-        User_command.Payload.create ~fee:client_input.fee ~nonce
-          ~valid_until:client_input.valid_until ~memo:client_input.memo
-          ~body:client_input.body
+      let user_command_payload =
+        User_command.Payload.create ~fee:payload_common.fee ~nonce
+          ~valid_until:payload_common.valid_until ~memo:payload_common.memo
+          ~body:client_input.payload.body
       in
       (*Capture the errors*)
       let%map signed_user_command =
-        match client_input.sign_choice with
-        | `Signature signature ->
+        match client_input.signature with
+        | Signature signature ->
             User_command.create_with_signature_checked signature
-              client_input.sender payload
+              client_input.sender user_command_payload
             |> opt_error ~error_string:"Invalid signature"
-        | `Keypair sender_kp ->
-            Deferred.Or_error.return (User_command.sign sender_kp payload)
-        | `Hd_index hd_index ->
+        | Keypair sender_kp ->
+            Deferred.Or_error.return
+              (User_command.sign sender_kp user_command_payload)
+        | Hd_index hd_index ->
             Deferred.map
               (Secrets.Hardware_wallets.sign ~hd_index
                  ~public_key:(Public_key.decompress_exn client_input.sender)
-                 ~user_command_payload:payload)
+                 ~user_command_payload)
               ~f:(Result.map_error ~f:Error.of_string)
       in
       User_command.forget_check signed_user_command
     in
     let%bind nonce =
-      match client_input.nonce_opt with
+      match nonce_opt with
       | Some nonce ->
           Deferred.Or_error.return nonce
       | None ->

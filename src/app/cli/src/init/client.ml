@@ -427,7 +427,7 @@ let batch_send_payments =
     and infos = get_infos payments_path in
     let ts : User_command_input.t list =
       List.map infos ~f:(fun {receiver; valid_until; amount; fee} ->
-          User_command_input.make
+          User_command_input.create
             ~sender:(Public_key.compress keypair.public_key)
             ~fee ~memo:User_command_memo.empty
             ~valid_until:
@@ -437,7 +437,7 @@ let batch_send_payments =
               (Payment
                  { receiver= Public_key.Compressed.of_base58_check_exn receiver
                  ; amount })
-            ~sign_choice:(`Keypair keypair) () )
+            ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
     in
     Daemon_rpcs.Client.dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
       ts port

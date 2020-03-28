@@ -945,9 +945,11 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
           (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
-          Strict_pipe.Reader.iter user_command_input_reader ~f:(fun input ->
+          Strict_pipe.Reader.iter user_command_input_reader
+            ~f:(fun (input_list, result_cb, inferred_nonce) ->
               match%bind
-                User_command_input.to_user_command input config.logger
+                User_command_input.to_user_command ~result_cb ~inferred_nonce
+                  ~logger:config.logger input_list
               with
               | Some res ->
                   Strict_pipe.Writer.write local_txns_writer res

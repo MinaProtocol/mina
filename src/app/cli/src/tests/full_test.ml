@@ -271,13 +271,13 @@ let run_test () : unit Deferred.t =
               User_command_memo.create_from_string_exn
                 "A memo created in full-test"
             in
-            let uc_input =
-              User_command_input.make ~sender:(pk_of_sk sender_sk) ~fee ~memo
-                ~valid_until:Coda_numbers.Global_slot.max_value
-                ~body:(Payment {receiver= receiver_pk; amount})
-                ~sign_choice:(`Keypair (Keypair.of_private_key_exn sender_sk))
-            in
-            uc_input ?nonce_opt () )
+            User_command_input.create ~nonce_opt ~sender:(pk_of_sk sender_sk)
+              ~fee ~memo ~valid_until:Coda_numbers.Global_slot.max_value
+              ~body:(Payment {receiver= receiver_pk; amount})
+              ~sign_choice:
+                (User_command_input.Sign_choice.Keypair
+                   (Keypair.of_private_key_exn sender_sk))
+              () )
       in
       let assert_ok x = assert (Or_error.is_ok x) in
       let send_payment (payment : User_command_input.t) =
@@ -305,8 +305,9 @@ let run_test () : unit Deferred.t =
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =
-          build_payment send_amount sender_sk receiver_pk transaction_fee
+          build_payment
             ~nonce_opt:(Some (User_command.nonce user_cmd))
+            send_amount sender_sk receiver_pk transaction_fee
         in
         let%bind p2_res = send_payment payment' in
         assert (Or_error.is_error p2_res) ;

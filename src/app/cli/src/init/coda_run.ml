@@ -254,12 +254,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
       [("coda_run", `String "Setting up server logs")]
   in
   let client_impls =
-    [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
-          Deferred.map
-            ( Coda_commands.setup_and_submit_user_command coda tx
-            |> Participating_state.to_deferred_or_error )
-            ~f:Or_error.join )
-    ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
+    [ implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
           Deferred.map
             ( Coda_commands.setup_and_submit_user_commands coda ts
             |> Participating_state.to_deferred_or_error )

@@ -616,10 +616,12 @@ module T = struct
               Public_key.of_private_key_exn sk |> Public_key.compress
             in
             let build_user_command_input amount sender_sk receiver_pk fee =
-              User_command_input.make ~sender:(pk_of_sk sender_sk) ~fee ~memo
+              User_command_input.create ~sender:(pk_of_sk sender_sk) ~fee ~memo
                 ~valid_until:Coda_numbers.Global_slot.max_value
                 ~body:(Payment {receiver= receiver_pk; amount})
-                ~sign_choice:(`Keypair (Keypair.of_private_key_exn sender_sk))
+                ~sign_choice:
+                  (User_command_input.Sign_choice.Keypair
+                     (Keypair.of_private_key_exn sender_sk))
                 ()
             in
             let payment_input = build_user_command_input amount sk pk fee in
