@@ -13,7 +13,8 @@ module Poly : sig
   end]
 
   type ('payload, 'pk, 'signature) t =
-    ('payload, 'pk, 'signature) Stable.Latest.t
+        ('payload, 'pk, 'signature) Stable.Latest.t =
+    {payload: 'payload; sender: 'pk; signature: 'signature}
   [@@deriving sexp, hash, yojson, eq, compare]
 end
 
