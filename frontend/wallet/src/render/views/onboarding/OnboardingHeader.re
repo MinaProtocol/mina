@@ -1,5 +1,5 @@
 let component = ReasonReact.statelessComponent("Header");
-[@bs.scope "window"] [@bs.val] external openExternal: string => unit = "";
+[@bs.scope "window"] [@bs.val] external openExternal: string => unit = "openExternal";
 
 module Styles = {
   open Css;
