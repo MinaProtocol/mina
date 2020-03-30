@@ -73,8 +73,8 @@ val create :
 
 val to_user_command :
      result_cb:('a Or_error.t -> unit)
-  -> inferred_nonce:(   Public_key.Compressed.t
-                     -> Account_nonce.t option Participating_state.t)
+  -> infer_nonce:(   Public_key.Compressed.t
+                  -> Account_nonce.t option Participating_state.t)
   -> logger:Logger.t
   -> t list
   -> (User_command.t list * ('a Or_error.t -> unit)) option Deferred.t

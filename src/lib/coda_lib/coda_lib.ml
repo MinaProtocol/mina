@@ -946,9 +946,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           in
           (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
           Strict_pipe.Reader.iter user_command_input_reader
-            ~f:(fun (input_list, result_cb, inferred_nonce) ->
+            ~f:(fun (input_list, result_cb, infer_nonce) ->
               match%bind
-                User_command_input.to_user_command ~result_cb ~inferred_nonce
+                User_command_input.to_user_command ~result_cb ~infer_nonce
                   ~logger:config.logger input_list
               with
               | Some res ->
