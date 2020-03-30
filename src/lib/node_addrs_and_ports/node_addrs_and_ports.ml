@@ -12,6 +12,8 @@ type t =
   ; client_port: int }
 [@@deriving fields, sexp]
 
+let _ = Option.map
+
 module Display = struct
   [%%versioned
   module Stable = struct
