@@ -28,10 +28,7 @@ let make = () => {
     let timerId =
       Js.Global.setInterval(
         () => {
-          setCurrentTime(_ => {
-            Js.log(Js.Date.now());
-            Js.Date.now();
-          });
+          setCurrentTime(_ => Js.Date.now());
           ();
         },
         1000,
