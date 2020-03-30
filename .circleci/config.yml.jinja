@@ -291,7 +291,7 @@ jobs:
                 command: |
                     mkdir -p package/keys
                     echo 'keys and genesis'
-                    cp /tmp/s3_cache_dir/* package/keys/.
+                    cp /tmp/s3_cache_dir/* package/keys/. ||:
                     cp $TMPDIR/coda_cache_dir/coda_genesis_*.tar.gz package/keys/.
                     echo 'coda'
                     cp _build/default/src/app/cli/src/coda.exe package/coda
@@ -318,6 +318,14 @@ jobs:
                     openssl dgst -sha256 homebrew-coda-generate-keypair-phase3.tar.gz > homebrew-coda-generate-keypair-phase3.tar.gz.sha256
                     cp homebrew-* ../package/.
                     popd
+            - run:
+                name: Decode Apple Certificates
+                context: org-global
+                command: base64 -D -o Certificates.p12 <<< $APPLE_CERTIFICATES
+            - run:
+                name: Build portable binary
+                command: |
+                    make macos-portable
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh

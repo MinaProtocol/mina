@@ -46,8 +46,8 @@
   Eventually, all uses of this option should be removed.
 
   The "of_binable" option is a synonym for "asserted". It assumes that the type
-  will be serialized using "Binable.Of_binable", which relies on the serialization
-  of some other type.
+  will be serialized using "Binable.Of_binable" (or similar functors), which
+  relies on the serialization of some other type.
 
   The "for_test" option implies "asserted" and "unnumbered", for use in test code.
 
