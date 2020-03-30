@@ -14,7 +14,7 @@ module Stable = struct
 end]
 
 type t = Stable.Latest.t =
-  {fee: Currency.Fee.Stable.V1.t; prover: Public_key.Compressed.Stable.V1.t}
+  {fee: Currency.Fee.t; prover: Public_key.Compressed.t}
 [@@deriving sexp, yojson]
 
 let create ~fee ~prover = Stable.Latest.{fee; prover}

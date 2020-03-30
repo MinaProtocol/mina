@@ -18,7 +18,7 @@ module Node_list = struct
     { transition: External_transition.Validated.t
     ; scan_state: Staged_ledger.Scan_state.t }
 
-  type lite_node = State_hash.Stable.V1.t
+  type lite_node = State_hash.t
 
   (* Full representation unfortunately cannot be breadcrumbs since they
    * will no longer be linked after mutation *)

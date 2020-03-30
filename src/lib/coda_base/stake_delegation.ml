@@ -27,7 +27,7 @@ module Stable = struct
 end]
 
 type t = Stable.Latest.t =
-  | Set_delegate of {new_delegate: Public_key.Compressed.Stable.V1.t}
+  | Set_delegate of {new_delegate: Public_key.Compressed.t}
 [@@deriving eq, sexp, hash, yojson]
 
 let receiver = function Set_delegate {new_delegate} -> new_delegate

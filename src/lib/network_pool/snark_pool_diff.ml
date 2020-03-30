@@ -38,11 +38,8 @@ module Make
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  (* bin_io omitted *)
   type t = Stable.Latest.t =
-    | Add_solved_work of
-        Work.Stable.V1.t
-        * Ledger_proof.Stable.V1.t One_or_two.t Priced_proof.Stable.V1.t
+    | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
   [@@deriving compare, sexp, to_yojson]
 
   module Rejected = struct
