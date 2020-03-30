@@ -53,7 +53,7 @@ module Styles = {
       lineHeight(`rem(1.)),
       color(white),
       height(`rem(1.)),
-      width(`rem(11.9)),
+      width(`rem(12.0)),
       padding2(~h=`rem(0.5), ~v=`zero),
     ]);
   let quote =
