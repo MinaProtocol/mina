@@ -1279,9 +1279,9 @@ module Data = struct
       open Tick.Checked
       open Tick.Checked.Let_syntax
 
-      let%snarkydef update_min_window_density ~constants ~prev_global_slot
-          ~next_global_slot ~prev_sub_window_densities ~prev_min_window_density
-          =
+      let%snarkydef update_min_window_density ~(constants : Constants.var)
+          ~prev_global_slot ~next_global_slot ~prev_sub_window_densities
+          ~prev_min_window_density =
         let open Tick in
         let open Tick.Checked.Let_syntax in
         let%bind prev_global_sub_window =
@@ -1304,7 +1304,7 @@ module Data = struct
         in
         let%bind same_window =
           Global_sub_window.Checked.(
-            add prev_global_sub_window sub_windows_per_window
+            add prev_global_sub_window constants.sub_windows_per_window
             >= next_global_sub_window)
         in
         let if_ cond ~then_ ~else_ =
@@ -1390,7 +1390,7 @@ module Data = struct
           let sub_window_diff =
             UInt32.(
               to_int
-              @@ min (succ sub_windows_per_window)
+              @@ min (succ constants.sub_windows_per_window)
               @@ Global_sub_window.sub next_global_sub_window
                    prev_global_sub_window)
           in
@@ -1486,7 +1486,9 @@ module Data = struct
           let open Quickcheck.Generator in
           let open Quickcheck.Generator.Let_syntax in
           let%bind prev_sub_window_densities =
-            list_with_length (Length.to_int sub_windows_per_window) gen_length
+            list_with_length
+              (Length.to_int constants.sub_windows_per_window)
+              gen_length
           in
           let min_window_density =
             let initial xs = List.(rev (tl_exn (rev xs))) in
@@ -1532,13 +1534,6 @@ module Data = struct
                     , prev_min_window_density )
                next_global_slot
                ->
-              let%bind slots_per_sub_window, sub_windows_per_window =
-                Tick.exists
-                  (Typ.tuple2 Length.typ Length.typ)
-                  ~compute:
-                    (Tick.As_prover.return
-                       (slots_per_sub_window, sub_windows_per_window))
-              in
               let%bind min_window_density, sub_window_densities =
                 f ~constants ~prev_global_slot ~next_global_slot
                   ~prev_sub_window_densities ~prev_min_window_density
@@ -1581,25 +1576,29 @@ module Data = struct
                          Global_slot.typ))
                    (Typ.tuple2 Length.typ
                       (Typ.list
-                         ~length:(Length.to_int sub_windows_per_window)
+                         ~length:
+                           (Length.to_int constants.sub_windows_per_window)
                          Length.typ))
                    Constants.typ)
                 (Typ.tuple3 Global_slot.typ
                    (Typ.list
-                      ~length:(Length.to_int sub_windows_per_window)
+                      ~length:(Length.to_int constants.sub_windows_per_window)
                       Length.typ)
                    Length.typ)
                 (fun ( (prev_global_slot, next_global_slots)
-                     , (prev_min_window_density, prev_sub_window_densities) ) ->
+                     , (prev_min_window_density, prev_sub_window_densities)
+                     , constants ) ->
                   update_several_times_checked
                     ~f:Checked.update_min_window_density ~prev_global_slot
                     ~next_global_slots ~prev_sub_window_densities
-                    ~prev_min_window_density )
+                    ~prev_min_window_density ~constants )
                 (fun ( (prev_global_slot, next_global_slots)
-                     , (prev_min_window_density, prev_sub_window_densities) ) ->
+                     , (prev_min_window_density, prev_sub_window_densities)
+                     , constants ) ->
                   update_several_times ~f:update_min_window_density
                     ~prev_global_slot ~next_global_slots
-                    ~prev_sub_window_densities ~prev_min_window_density )
+                    ~prev_sub_window_densities ~prev_min_window_density
+                    ~constants )
                 (slots, min_window_densities, constants) )
       end )
   end
