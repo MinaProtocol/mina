@@ -301,32 +301,39 @@ let lint_ast =
                   Pmod_apply
                     ( { pmod_desc=
                           Pmod_ident
-                            {txt= Ldot (Lident "Binable", "Of_binable"); _}
+                            {txt= Ldot (Lident "Binable", of_binable); _}
                       ; _ }
                     , {pmod_desc= Pmod_ident {txt= arg; _}; _} )
               ; pmod_loc
               ; _ }
-            , {pmod_desc= Pmod_ident {txt= Lident _; _}; _} ) ->
+            , {pmod_desc= Pmod_ident {txt= Lident _; _}; _} )
+          when List.mem
+                 ["Of_binable"; "Of_binable1"; "Of_binable2"; "Of_binable3"]
+                 of_binable ~equal:String.equal ->
             let include_errors =
               if acc.in_include then []
               else
                 [ ( pmod_loc
-                  , "Binable.Of_binable application must be an argument to an \
-                     include" ) ]
+                  , sprintf
+                      "Binable.%s application must be an argument to an include"
+                      of_binable ) ]
             in
             let path_errors =
               if in_stable_versioned_module acc.module_path then []
               else
                 [ ( pmod_loc
-                  , "Binable.Of_binable applied outside of stable-versioned \
-                     module" ) ]
+                  , sprintf
+                      "Binable.%s applied outside of stable-versioned module"
+                      of_binable ) ]
             in
             let arg_errors =
               if is_versioned_module_ident arg then []
               else
                 [ ( pmod_loc
-                  , "First argument to Binable.Of_binable must be a \
-                     stable-versioned module" ) ]
+                  , sprintf
+                      "First argument to Binable.%s must be a \
+                       stable-versioned module"
+                      of_binable ) ]
             in
             acc_with_accum_errors acc
               (include_errors @ path_errors @ arg_errors)
