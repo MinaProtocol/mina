@@ -135,3 +135,65 @@ module Openings = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
+
+module PolyComm = struct
+  type 'g gsh = 'g option [@@deriving bin_io]
+
+  type 'g t =
+    {unshifted: 'g array; shifted: 'g gsh}
+  [@@deriving bin_io]
+
+  let to_hlist {unshifted; shifted} = Snarky.H_list.[unshifted; shifted]
+
+  let of_hlist ([unshifted; shifted] : (unit, _) Snarky.H_list.t) = {unshifted; shifted}
+
+  let typ g gsh ~length =
+    let open Snarky.Typ in
+    of_hlistable
+      [array ~length g; gsh]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
+end
+
+module Messages = struct
+  type ('pc, 'fq) t =
+    { w_hat: 'pc
+    ; z_hat_a: 'pc
+    ; z_hat_b: 'pc
+    ; gh_1: 'pc * 'pc
+    ; sigma_gh_2: 'fq * ('pc * 'pc)
+    ; sigma_gh_3: 'fq * ('pc * 'pc) }
+  [@@deriving fields, bin_io]
+
+  let to_hlist {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3} =
+    Snarky.H_list.[w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3]
+
+  let of_hlist
+      ([w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3] :
+        (unit, _) Snarky.H_list.t) =
+    {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3}
+
+  let typ pc fq =
+    let open Snarky.Typ in
+    of_hlistable
+      [pc; pc; pc; pc * pc; fq * (pc * pc); fq * (pc * pc)]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
+end
+
+module Proof = struct
+  type ('pc, 'fq, 'openings) t =
+    {messages: ('pc, 'fq) Messages.t; openings: 'openings}
+  [@@(* ('proof, 'fq) Openings.t} *)
+    deriving fields, bin_io]
+
+  let to_hlist {messages; openings} = Snarky.H_list.[messages; openings]
+
+  let of_hlist ([messages; openings] : (unit, _) Snarky.H_list.t) =
+    {messages; openings}
+
+  let typ pc fq openings =
+    Snarky.Typ.of_hlistable
+      [Messages.typ pc fq; openings]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
+end

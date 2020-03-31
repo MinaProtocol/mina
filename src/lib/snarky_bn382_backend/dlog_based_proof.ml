@@ -9,14 +9,16 @@ type message = Challenge_polynomial.t list
 
 type t =
 ( 
-  G.Affine.t, 
+  (
+    G.Affine.t
+  ) Dlog_marlin_types.PolyComm.t, 
   Fq.t, 
   (
     Fq.t, 
     Fq.t array, 
     G.Affine.t
   ) Dlog_marlin_types.Openings.t 
-) Pairing_marlin_types.Proof.t
+) Dlog_marlin_types.Proof.t
 [@@deriving bin_io]
 
 let g t f = G.Affine.of_backend (f t)
@@ -30,6 +32,22 @@ let fqv t f =
   let t = f t in
   Caml.Gc.finalise Fq.Vector.delete t ;
   Array.init (Fq.Vector.length t) (fun i -> Fq.Vector.get t i)
+
+let pc t f =
+    let open Snarky_bn382.Fq_poly_comm in
+    let unshifted =
+      let v = unshifted t in
+      Array.init (Snarky_bn382.G.Affine.Vector.length v) (fun i ->
+          Snarky_bn382.G.Affine.Vector.get v i)
+    in
+    {
+      Dlog_marlin_types.PolyComm.
+      unshifted; 
+      shifted= 
+        match shifted t with
+        Some v -> G.Affine.of_backend (v t)
+        | None -> None
+    }
 
 (* TODO: Lots of leakage here. *)
 let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
