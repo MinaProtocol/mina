@@ -32,8 +32,8 @@ module Styles = {
       marginTop(`rem(-3.)),
       border(`px(1), `solid, Theme.Colors.saville),
       padding(`px(5)),
-      height(`px(102)),
-      width(`px(102)),
+      height(`rem(6.25)),
+      width(`rem(6.25)),
     ]);
   let memberName =
     style([
