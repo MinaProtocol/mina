@@ -132,13 +132,6 @@ module Version = {
   };
 };
 
-type ownedAccounts =
-  Account.t = {
-    locked: option(bool),
-    publicKey: PublicKey.t,
-    balance: {. "total": int64},
-  };
-
 module AccountSettingsItem = {
   [@react.component]
   let make = (~account) => {
@@ -180,7 +173,7 @@ module AccountSettingsItem = {
 module AccountsQueryString = [%graphql
   {|
     query getWallets {
-      ownedWallets {
+      trackedAccounts {
         locked
         publicKey @bsDecoder(fn: "Apollo.Decoders.publicKey")
       }
@@ -211,7 +204,7 @@ let make = () => {
              <div className=Styles.emptyAccountSettings> <Loader /> </div>
            | Error(_) => React.null
            | Data(data) =>
-             data##ownedWallets
+             data##trackedAccounts
              |> Array.map(~f=account => <AccountSettingsItem account />)
              |> React.array
            }}

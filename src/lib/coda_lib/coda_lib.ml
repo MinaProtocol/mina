@@ -53,12 +53,14 @@ type pipes =
       * Block_time.t
       * (bool -> unit) )
       Pipe.Writer.t
-  ; local_txns_writer:
-      ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+  ; user_command_input_writer:
+      ( User_command_input.t list
         * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
               * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
               Or_error.t
            -> unit)
+        * (   Signature_lib.Public_key.Compressed.t
+           -> (Coda_base.Account.Nonce.t, string) Result.t)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -292,6 +294,12 @@ let best_tip = compose_of_option best_tip_opt
 
 let root_length = compose_of_option root_length_opt
 
+let active_or_bootstrapping =
+  compose_of_option (fun t ->
+      Option.bind
+        (Broadcast_pipe.Reader.peek t.components.transition_frontier)
+        ~f:(Fn.const (Some ())) )
+
 [%%if
 mock_frontend_data]
 
@@ -414,6 +422,39 @@ let get_ledger t staged_ledger_hash_opt =
   | None ->
       Deferred.Or_error.error_string
         "get_ledger: staged ledger hash not found in transition frontier"
+
+let get_inferred_nonce_from_transaction_pool_and_ledger t
+    (public_key : Public_key.Compressed.t) =
+  let get_account pk =
+    let open Participating_state.Let_syntax in
+    let%map ledger = best_ledger t in
+    let open Option.Let_syntax in
+    let%bind loc = Ledger.location_of_key ledger pk in
+    Ledger.get ledger loc
+  in
+  let transaction_pool = t.components.transaction_pool in
+  let resource_pool =
+    Network_pool.Transaction_pool.resource_pool transaction_pool
+  in
+  let pooled_transactions =
+    Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
+      public_key
+  in
+  let txn_pool_nonce =
+    let nonces =
+      List.map pooled_transactions
+        ~f:(Fn.compose User_command.nonce User_command.forget_check)
+    in
+    (* The last nonce gives us the maximum nonce in the transaction pool *)
+    List.last nonces
+  in
+  match txn_pool_nonce with
+  | Some nonce ->
+      Participating_state.Option.return (Account.Nonce.succ nonce)
+  | None ->
+      let open Participating_state.Option.Let_syntax in
+      let%map account = get_account public_key in
+      account.Account.Poly.nonce
 
 let seen_jobs t = t.seen_jobs
 
@@ -598,10 +639,24 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
     (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
   |> Deferred.don't_wait_for
 
-let add_transactions t (txns : User_command.t list) =
+let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
-  Strict_pipe.Writer.write t.pipes.local_txns_writer
-    (txns, Ivar.fill result_ivar)
+  let get_current_nonce pk =
+    match
+      Participating_state.active
+        (get_inferred_nonce_from_transaction_pool_and_ledger t pk)
+      |> Option.join
+    with
+    | None ->
+        Error
+          "Couldn't infer nonce for transaction from specified `sender` since \
+           `sender` is not in the ledger or sent a transaction in transaction \
+           pool."
+    | Some nonce ->
+        Ok nonce
+  in
+  Strict_pipe.Writer.write t.pipes.user_command_input_writer
+    (uc_inputs, Ivar.fill result_ivar, get_current_nonce)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -876,6 +931,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           in
           (* tie the knot *)
           net_ref := Some net ;
+          let user_command_input_reader, user_command_input_writer =
+            Strict_pipe.(create ~name:"local transactions" Synchronous)
+          in
           let local_txns_reader, local_txns_writer =
             Strict_pipe.(create ~name:"local transactions" Synchronous)
           in
@@ -893,6 +951,30 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               ~local_diffs:local_txns_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
+          (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
+          Strict_pipe.Reader.iter user_command_input_reader
+            ~f:(fun (input_list, result_cb, get_current_nonce) ->
+              match%bind
+                User_command_input.to_user_commands ~get_current_nonce
+                  input_list
+              with
+              | Ok user_commands ->
+                  if List.is_empty user_commands then (
+                    result_cb
+                      (Error (Error.of_string "No user commands to send")) ;
+                    Deferred.unit )
+                  else
+                    (*callback for the result from transaction_pool.apply_diff*)
+                    Strict_pipe.Writer.write local_txns_writer
+                      (user_commands, result_cb)
+              | Error e ->
+                  Logger.error config.logger
+                    "Failed to submit user commands: $error"
+                    ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                  result_cb (Error e) ;
+                  Deferred.unit )
+          |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
             Broadcast_pipe.create
@@ -1148,7 +1230,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 ; external_transitions_writer=
                     Strict_pipe.Writer.to_linear_pipe
                       external_transitions_writer
-                ; local_txns_writer
+                ; user_command_input_writer
                 ; local_snark_work_writer }
             ; wallets
             ; block_production_keypairs
