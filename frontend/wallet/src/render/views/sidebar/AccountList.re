@@ -38,7 +38,8 @@ let make = () => {
     {response =>
        switch (response.result) {
        | Loading => <Loader.Page> <Loader /> </Loader.Page>
-       | Error(err) => React.string(err##message)
+       | Error((err: ReasonApolloTypes.apolloError)) =>
+         React.string(err.message)
        | Data(accounts) =>
          <BlockListener
            refetch={() => response.refetch(None)}

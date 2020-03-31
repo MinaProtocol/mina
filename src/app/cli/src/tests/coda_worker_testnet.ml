@@ -137,17 +137,16 @@ module Api = struct
     let open Deferred.Option.Let_syntax in
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
-    let%bind nonce = Coda_process.get_nonce_exn worker pk_of_sk in
-    let payload =
-      User_command.Payload.create ~fee ~nonce ~memo:User_command_memo.dummy
-        ~valid_until ~body
+    let user_command_input =
+      User_command_input.create ~sender:pk_of_sk ~fee
+        ~memo:User_command_memo.dummy ~valid_until ~body
+        ~sign_choice:
+          (User_command_input.Sign_choice.Keypair
+             (Keypair.of_private_key_exn sk))
+        ()
     in
-    let user_cmd =
-      ( User_command.sign (Keypair.of_private_key_exn sk) payload
-        :> User_command.t )
-    in
-    let%map _receipt =
-      Coda_process.process_user_command_exn worker user_cmd
+    let%map user_cmd, _receipt =
+      Coda_process.process_user_command_exn worker user_command_input
       |> Deferred.map ~f:Or_error.ok
     in
     user_cmd
@@ -445,8 +444,9 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test ?is_archive_rocksdb ~name logger n block_production_keys
-    snark_work_public_keys work_selection_method ~max_concurrent_connections =
+let test ?archive_process_location ?is_archive_rocksdb ~name logger n
+    block_production_keys snark_work_public_keys work_selection_method
+    ~max_concurrent_connections =
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
   let block_production_interval =
     Consensus.Constants.block_window_duration_ms
@@ -463,7 +463,7 @@ let test ?is_archive_rocksdb ~name logger n block_production_keys
       ~snark_worker_public_keys:(Some (List.init n ~f:snark_work_public_keys))
       ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
-      ~max_concurrent_connections ?is_archive_rocksdb
+      ~max_concurrent_connections ?is_archive_rocksdb ?archive_process_location
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let workers = List.to_array workers in

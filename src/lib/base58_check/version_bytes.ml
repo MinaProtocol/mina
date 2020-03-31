@@ -4,6 +4,8 @@ type t = char
 
 (* each of the following values should be distinct *)
 
+let coinbase : t = '\x04'
+
 let epoch_seed : t = '\x25'
 
 let fee_transfer_single : t = '\x9F'

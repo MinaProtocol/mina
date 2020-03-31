@@ -20,7 +20,7 @@ module Styles = {
 
 type feeSelection =
   | DefaultAmount
-  | Custom(Int64.t);
+  | Custom(string);
 
 type modalState = {
   delegate: option(PublicKey.t),
@@ -45,6 +45,8 @@ module ChangeDelegation = [%graphql
 module ChangeDelegationMutation =
   ReasonApollo.CreateMutation(ChangeDelegation);
 
+let defaultFee = "5";
+
 [@react.component]
 let make = (~publicKey) => {
   // Form state
@@ -61,9 +63,7 @@ let make = (~publicKey) => {
     switch (value) {
     | 0 => changeState(prev => {delegate: prev.delegate, fee: DefaultAmount})
     | _ =>
-      changeState(prev =>
-        {delegate: prev.delegate, fee: Custom(Int64.of_int(5))}
-      )
+      changeState(prev => {delegate: prev.delegate, fee: Custom(defaultFee)})
     };
 
   let goBack = () =>
@@ -81,9 +81,9 @@ let make = (~publicKey) => {
           ),
         ),
       ~fee=
-        Apollo.Encoders.int64(
+        Apollo.Encoders.currency(
           switch (state.fee) {
-          | DefaultAmount => Int64.of_int(5)
+          | DefaultAmount => defaultFee
           | Custom(amount) => amount
           },
         ),
@@ -105,7 +105,8 @@ let make = (~publicKey) => {
          {switch (result) {
           | NotCalled
           | Loading => React.null
-          | Error(err) => <Alert kind=`Danger defaultMessage=err##message />
+          | Error((err: ReasonApolloTypes.apolloError)) =>
+            <Alert kind=`Danger defaultMessage={err.message} />
           | Data(_) =>
             goBack();
             React.null;
@@ -139,34 +140,27 @@ let make = (~publicKey) => {
            </div>
            <div className=Styles.fields>
              <ToggleButton
-               options=[|"Standard: 5 Coda", "Custom Amount"|]
+               options=[|
+                 "Standard: " ++ defaultFee ++ " Coda",
+                 "Custom Amount",
+               |]
                selected=feeSelectedValue
                onChange=onChangeFee
              />
            </div>
            {switch (state.fee) {
             | DefaultAmount => React.null
-            | Custom(feeAmount) =>
+            | Custom(fee) =>
               <>
                 <Spacer height=1. />
                 <TextField.Currency
                   label="Fee"
-                  value={
-                    feeAmount == Int64.zero ? "" : Int64.to_string(feeAmount)
-                  }
+                  value=fee
                   placeholder="0"
                   onChange={value => {
-                    let serializedValue =
-                      switch (value) {
-                      | "" => Int64.zero
-                      | nonEmpty => Int64.of_string(nonEmpty)
-                      };
                     changeState(_ =>
-                      {
-                        delegate: state.delegate,
-                        fee: Custom(serializedValue),
-                      }
-                    );
+                      {delegate: state.delegate, fee: Custom(value)}
+                    )
                   }}
                 />
               </>
