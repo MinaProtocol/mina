@@ -17,7 +17,8 @@
     "react-waypoint": "^9.0.2",
     "reason-apollo": "^0.19.0",
     "reason-react": "^0.7.0",
-    "tablecloth-bucklescript": "file:./tablecloth/bs"
+    "tablecloth-bucklescript": "file:./tablecloth/bs",
+    "unzipper": "^0.10.10"
   },
   "devDependencies": {
     "@baransu/graphql_ppx_re": "^0.7.1",

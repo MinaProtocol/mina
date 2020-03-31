@@ -745,7 +745,14 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                    Public_key.compress public_key )
           in
           let get_telemetry_data _env =
-            let node = config.gossip_net_params.addrs_and_ports.external_ip in
+            let node_ip_addr =
+              config.gossip_net_params.addrs_and_ports.external_ip
+            in
+            let peer_opt = config.gossip_net_params.addrs_and_ports.peer in
+            let node_peer_id =
+              Option.value_map peer_opt ~default:"<UNKNOWN>" ~f:(fun peer ->
+                  peer.peer_id )
+            in
             match !net_ref with
             | None ->
                 (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
@@ -756,9 +763,10 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 @@ Error
                      (Error.of_string
                         (sprintf
-                           !"Node: %{sexp: Unix.Inet_addr.t}, network not \
-                             instantiated when telemetry data requested"
-                           node))
+                           !"Node with IP address=%{sexp: Unix.Inet_addr.t}, \
+                             peer ID=%s, network not instantiated when \
+                             telemetry data requested"
+                           node_ip_addr node_peer_id))
             | Some net -> (
               match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
               | None ->
@@ -766,9 +774,10 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   @@ Error
                        (Error.of_string
                           (sprintf
-                             !"Node: %{sexp: Unix.Inet_addr.t}, could not get \
+                             !"Node with IP address=%{sexp: \
+                               Unix.Inet_addr.t}, peer ID=%s, could not get \
                                transition frontier for telemetry data"
-                             node))
+                             node_ip_addr node_peer_id))
               | Some frontier ->
                   let%map peers = Coda_networking.peers net in
                   let protocol_state_hash =
@@ -789,7 +798,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   in
                   Ok
                     Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
-                      { node
+                      { node_ip_addr
+                      ; node_peer_id
                       ; peers
                       ; block_producers
                       ; protocol_state_hash

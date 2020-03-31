@@ -38,9 +38,11 @@ module Styles = {
       height(`px(32)),
       marginTop(`px(62)),
       display(`flex),
+      alignItems(`center),
       margin3(~top=`rem(4.6), ~h=`auto, ~bottom=`zero),
     ]);
-  let icon = style([height(`auto), alignSelf(`center)]);
+  let icon =
+    style([paddingTop(`px(2)), height(`auto), alignSelf(`center)]);
   let genesisLabel =
     style([
       margin2(~v=`rem(0.6875), ~h=`auto),
@@ -53,7 +55,7 @@ module Styles = {
       lineHeight(`rem(1.)),
       color(white),
       height(`rem(1.)),
-      width(`rem(11.9)),
+      width(`rem(12.0)),
       padding2(~h=`rem(0.5), ~v=`zero),
     ]);
   let quote =
@@ -80,6 +82,7 @@ module Styles = {
   let socialTag =
     style([
       display(`flex),
+      alignItems(`center),
       selector("p", [marginTop(`zero), marginBottom(`zero)]),
     ]);
 
