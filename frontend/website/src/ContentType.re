@@ -82,7 +82,7 @@ module GenesisProfile = {
     quote: string,
     memberLocation: string,
     twitter: string,
-    github: string,
+    github: option(string),
     publishDate: string,
     blogPost: BlogPost.entry,
   };
