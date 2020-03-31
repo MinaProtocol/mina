@@ -78,7 +78,7 @@ jobs:
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
                   name: Running test -- test_archive_processor:coda-archive-processor-test
-                  command: ./scripts/skip_if_only_frontend.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_archive_processor:coda-archive-processor-test"'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_archive_processor:coda-archive-processor-test"'
 
     build-archive:
         resource_class: xlarge
@@ -117,8 +117,8 @@ jobs:
             # Ideally this DB setup step would be handled by the archive process itself.
             - run:
                   name: Set Up Database
-                  command: | 
-                    sudo apt-get install -y postgresql 
+                  command: |
+                    sudo apt-get install -y postgresql
                     PGPASSWORD=codarules psql -h localhost -p 5432 -U admin -d archiver -a -f src/app/archive/create_schema.sql
             - run:
                   name: Configure Hasura
@@ -272,7 +272,7 @@ jobs:
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                     EXTRA_NIX_ARGS: --option sandbox false
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 20m
             - run:
                 name: Build ocaml - generate keypair
@@ -291,7 +291,7 @@ jobs:
                 command: |
                     mkdir -p package/keys
                     echo 'keys and genesis'
-                    cp /tmp/s3_cache_dir/* package/keys/.
+                    cp /tmp/s3_cache_dir/* package/keys/. ||:
                     cp $TMPDIR/coda_cache_dir/coda_genesis_*.tar.gz package/keys/.
                     echo 'coda'
                     cp _build/default/src/app/cli/src/coda.exe package/coda
@@ -319,6 +319,14 @@ jobs:
                     cp homebrew-* ../package/.
                     popd
             - run:
+                name: Decode Apple Certificates
+                context: org-global
+                command: base64 -D -o Certificates.p12 <<< $APPLE_CERTIFICATES
+            - run:
+                name: Build portable binary
+                command: |
+                    make macos-portable
+            - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
             - store_artifacts:
@@ -342,7 +350,7 @@ jobs:
                   command: ./scripts/pin-external-packages.sh
             - run:
                   name: Build client SDK for Javascript
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
                   no_output_timeout: 10m
@@ -366,7 +374,7 @@ jobs:
                   command: ./scripts/pin-external-packages.sh
             - run:
                   name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: {{profile}}
                     EXTRA_NIX_ARGS: --option sandbox false
@@ -377,7 +385,7 @@ jobs:
             - run:
                   name: Rebuild for pvkey changes
                   command: |
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
                     ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
                   environment:
                     DUNE_PROFILE: {{profile}}
