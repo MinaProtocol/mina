@@ -48,7 +48,7 @@ let make = () => {
       />
     | InstallCoda =>
       <InstallCodaStep
-        prevStep={_ => setOnboardingStep(_ => Welcome)}
+        prevStep={_ => setOnboardingStep(_ => SetUpNode)}
         nextStep={_ => setOnboardingStep(_ => RunNode)}
       />
     | PortForward =>
