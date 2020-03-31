@@ -1,12 +1,11 @@
 open Core
 open Async
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type 'a t = [`One of 'a | `Two of 'a * 'a]
-      [@@deriving bin_io, equal, compare, hash, sexp, version, yojson]
-    end
+    type 'a t = [`One of 'a | `Two of 'a * 'a]
+    [@@deriving equal, compare, hash, sexp, yojson]
 
     let to_latest a_latest = function
       | `One x ->
@@ -23,12 +22,8 @@ module Stable = struct
           let open Result.Let_syntax in
           let%map x = a_latest x and y = a_latest y in
           `Two (x, y)
-
-    include T
   end
-
-  module Latest = V1
-end
+end]
 
 type 'a t = 'a Stable.Latest.t [@@deriving compare, equal, hash, sexp, yojson]
 
