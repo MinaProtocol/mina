@@ -130,8 +130,8 @@ end]
 
 (* bin_io omitted *)
 type t = Stable.Latest.t =
-  { protocol_state: Protocol_state.Value.Stable.V1.t
-  ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+  { protocol_state: Protocol_state.Value.t
+  ; protocol_state_proof: Proof.t sexp_opaque
   ; staged_ledger_diff: Staged_ledger_diff.t
   ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
   ; current_fork_id: Fork_id.t

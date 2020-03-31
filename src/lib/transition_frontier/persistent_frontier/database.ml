@@ -294,7 +294,7 @@ let add t ~transition =
       Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs) )
 
 let move_root t ~new_root ~garbage =
-  let open Root_data.Minimal.Stable.V1 in
+  let open Root_data.Minimal in
   let%bind () =
     Result.ok_if_true
       (mem t.db ~key:(Transition new_root.hash))

@@ -272,6 +272,12 @@ module State : sig
     module V1 : sig
       type nonrec ('merge, 'base) t = ('merge, 'base) t
       [@@deriving sexp, bin_io, version]
+
+      val to_latest :
+           ('merge -> 'merge_latest)
+        -> ('base -> 'base_latest)
+        -> ('merge, 'base) t
+        -> ('merge_latest, 'base_latest) t
     end
 
     module Latest = V1

@@ -43,13 +43,12 @@ module Node_list : sig
   val to_lite : full_node list -> lite_node list
 
   module Lite : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t = lite node_list [@@deriving bin_io, version]
+        type t = lite node_list
       end
-
-      module Latest = V1
-    end
+    end]
 
     type t = Stable.Latest.t
   end
@@ -62,19 +61,17 @@ end
  *  by transitioning the root.
  *)
 module Root_transition : sig
-  type 'repr t =
-    {new_root: Root_data.Minimal.Stable.V1.t; garbage: 'repr Node_list.t}
+  type 'repr t = {new_root: Root_data.Minimal.t; garbage: 'repr Node_list.t}
 
   type 'repr root_transition = 'repr t
 
   module Lite : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
-        type t = lite root_transition [@@deriving bin_io, version]
+        type t = lite root_transition
       end
-
-      module Latest = V1
-    end
+    end]
 
     type t = Stable.Latest.t
   end
@@ -132,7 +129,14 @@ module Lite : sig
   type 'mutant t = (lite, 'mutant) diff
 
   module E : sig
-    type t = E : (lite, 'mutant) diff -> t [@@deriving bin_io]
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t = E : (lite, 'mutant) diff -> t
+      end
+    end]
+
+    type t = Stable.Latest.t = E : (lite, 'mutant) diff -> t
   end
 end
 

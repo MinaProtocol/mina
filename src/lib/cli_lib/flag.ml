@@ -314,7 +314,7 @@ module User_command = struct
     flag "HD-index" ~doc:"HD-INDEX Index used by hardware wallet"
       (required hd_index)
 
-  let receiver =
+  let receiver_pk =
     let open Command.Param in
     flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
       (required public_key_compressed)

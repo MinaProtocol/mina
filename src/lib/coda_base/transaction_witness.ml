@@ -9,5 +9,4 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t = {ledger: Sparse_ledger.Stable.V1.t}
-[@@deriving sexp]
+type t = Stable.Latest.t = {ledger: Sparse_ledger.t} [@@deriving sexp]

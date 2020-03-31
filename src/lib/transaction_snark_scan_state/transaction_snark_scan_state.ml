@@ -34,7 +34,6 @@ module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
       type t =
         { transaction_with_info:
             Transaction_logic.Undo.Stable.V1.t
@@ -47,6 +46,7 @@ module Transaction_with_witness = struct
     end
   end]
 
+  (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t = Stable.Latest.t =
     { transaction_with_info: Ledger.Undo.t Transaction_protocol_state.t
     ; statement: Transaction_snark.Statement.t
@@ -140,6 +140,9 @@ module Stable = struct
     include T
     include Registration.Make_latest_version (T)
 
+    (* TODO: Review this. The version bytes for the underlying types are
+       included in the hash, so it can never be stable between versions.
+    *)
     let hash t =
       let state_hash =
         Parallel_scan.State.hash t
@@ -148,16 +151,6 @@ module Stable = struct
       in
       Staged_ledger_hash.Aux_hash.of_bytes
         (state_hash |> Digestif.SHA256.to_raw_string)
-
-    include Binable.Of_binable
-              (T)
-              (struct
-                type nonrec t = t
-
-                let to_binable = Fn.id
-
-                let of_binable = Fn.id
-              end)
   end
 
   module Latest = V1
