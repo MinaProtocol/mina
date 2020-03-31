@@ -61,7 +61,7 @@ type pipes =
               Or_error.t
            -> unit)
         * (   Signature_lib.Public_key.Compressed.t
-           -> Coda_base.Account.Nonce.t option Participating_state.t)
+           -> (Coda_base.Account.Nonce.t, string) Result.t)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -657,9 +657,22 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
 
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
-  let inferred_nonce = get_inferred_nonce_from_transaction_pool_and_ledger t in
+  let get_current_nonce pk =
+    match
+      Participating_state.active
+        (get_inferred_nonce_from_transaction_pool_and_ledger t pk)
+      |> Option.join
+    with
+    | None ->
+        Error
+          "Couldn't infer nonce for transaction from specified `sender` since \
+           `sender` is not in the ledger or sent a transaction in transaction \
+           pool."
+    | Some nonce ->
+        Ok nonce
+  in
   Strict_pipe.Writer.write t.pipes.user_command_input_writer
-    (uc_inputs, Ivar.fill result_ivar, inferred_nonce)
+    (uc_inputs, Ivar.fill result_ivar, get_current_nonce)
   |> Deferred.don't_wait_for ;
   Ivar.read result_ivar
 
@@ -956,14 +969,26 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           in
           (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
           Strict_pipe.Reader.iter user_command_input_reader
-            ~f:(fun (input_list, result_cb, infer_nonce) ->
+            ~f:(fun (input_list, result_cb, get_current_nonce) ->
               match%bind
-                User_command_input.to_user_command ~result_cb ~infer_nonce
-                  ~logger:config.logger input_list
+                User_command_input.to_user_commands ~get_current_nonce
+                  input_list
               with
-              | Some res ->
-                  Strict_pipe.Writer.write local_txns_writer res
-              | None ->
+              | Ok user_commands ->
+                  if List.is_empty user_commands then (
+                    result_cb
+                      (Error (Error.of_string "No user commands to send")) ;
+                    Deferred.unit )
+                  else
+                    (*callback for the result from transaction_pool.apply_diff*)
+                    Strict_pipe.Writer.write local_txns_writer
+                      (user_commands, result_cb)
+              | Error e ->
+                  Logger.error config.logger
+                    "Failed to submit user commands: $error"
+                    ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                  result_cb (Error e) ;
                   Deferred.unit )
           |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
