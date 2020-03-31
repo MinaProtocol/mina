@@ -8,7 +8,8 @@ open Signature_lib
 module Snark_worker_config = struct
   type t =
     { initial_snark_worker_key: Public_key.Compressed.t option
-    ; shutdown_on_disconnect: bool }
+    ; shutdown_on_disconnect: bool
+    ; num_threads: int option }
 end
 
 (** If ledger_db_location is None, will auto-generate a db based on a UUID *)
@@ -26,6 +27,7 @@ type t =
   ; work_reassignment_wait: int
   ; gossip_net_params: Gossip_net.Libp2p.Config.t
   ; net_config: Coda_networking.Config.t
+  ; initial_fork_id: Fork_id.t
   ; snark_pool_disk_location: string
   ; wallets_disk_location: string
   ; persistent_root_location: string

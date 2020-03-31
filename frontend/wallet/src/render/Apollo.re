@@ -30,16 +30,22 @@ let client = {
   let retryLink = ApolloLinks.from([|retry, httpLink|]);
 
   let wsUri = "ws://localhost:3085/graphql";
-  let wsLink = ApolloLinks.webSocketLink(~uri=wsUri, ~reconnect=true, ());
+  let wsObject: ReasonApolloTypes.webSocketLinkT = {
+    uri: wsUri,
+    options: {
+      reconnect: true,
+      connectionParams: None,
+    },
+  };
+  let wsLink = ApolloLinks.webSocketLink(wsObject);
 
   let combinedLink =
     ApolloLinks.split(
       operation => {
         let operationDefinition =
-          ApolloUtilities.getMainDefinition(operation##query);
-        operationDefinition##kind == "OperationDefinition"
-        &&
-        operationDefinition##operation == "subscription";
+          ApolloUtilities.getMainDefinition(operation.query);
+        operationDefinition.kind == "OperationDefinition"
+        && operationDefinition.operation == "subscription";
       },
       wsLink,
       retryLink,
@@ -53,13 +59,13 @@ let client = {
 };
 
 module Decoders = {
-  [@bs.val] [@bs.scope "window"] external isFaker: bool = "";
+  [@bs.val] [@bs.scope "window"] external isFaker: bool = "isFaker";
 
   let int64 = pk => {
     let s = Option.getExn(Js.Json.decodeString(pk));
     // hack for supporting faker
     if (s == "<UInt64>" && isFaker) {
-      Int64.of_int(100);
+      Int64.of_string("66000000000000");
     } else {
       Int64.of_string(s);
     };
@@ -102,4 +108,9 @@ module Decoders = {
 module Encoders = {
   let publicKey = s => s |> PublicKey.toString |> Js.Json.string;
   let int64 = s => s |> Int64.to_string |> Js.Json.string;
+  let currency = s =>
+    s
+    |> CurrencyFormatter.ofFormattedString
+    |> Int64.to_string
+    |> Js.Json.string;
 };

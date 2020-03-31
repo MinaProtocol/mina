@@ -21,7 +21,7 @@ module Test_inputs = struct
       let to_binable = Fee.to_int
     end
 
-    include Binable.Of_binable (Int) (T)
+    include Binable.Of_binable (Core_kernel.Int.Stable.V1) (T)
     include T
   end
 

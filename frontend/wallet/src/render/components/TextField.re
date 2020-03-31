@@ -177,7 +177,7 @@ module Currency = {
         onChange={e => {
           let value =
             ReactEvent.Form.target(e)##value
-            |> Js.String.replaceByRe([%re "/[^0-9]/g"], "");
+            |> Js.String.replaceByRe([%re "/[^0-9.]/g"], "");
           onChange(value);
         }}
         value
