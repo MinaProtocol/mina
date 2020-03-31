@@ -119,19 +119,19 @@ module Openings = struct
 
   open Evals
 
-  type ('fq, 'g) t =
-    {proof: ('fq, 'g) Bulletproof.t; evals: 'fq Evals.t Triple.t}
+  type ('fq, 'fqv, 'g) t =
+    {proof: ('fq, 'g) Bulletproof.t; evals: 'fqv Evals.t Triple.t}
   [@@deriving bin_io]
 
   let to_hlist {proof; evals} = Snarky.H_list.[proof; evals]
 
   let of_hlist ([proof; evals] : (unit, _) Snarky.H_list.t) = {proof; evals}
 
-  let typ fq g ~length =
+  let typ fq fqv g ~length =
     let open Snarky.Typ in
     let triple x = tuple3 x x x in
     of_hlistable
-      [Bulletproof.typ fq g ~length; triple (Evals.typ fq)]
+      [Bulletproof.typ fq g ~length; triple (Evals.typ fqv)]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end

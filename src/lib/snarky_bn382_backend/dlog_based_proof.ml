@@ -8,10 +8,15 @@ end
 type message = Challenge_polynomial.t list
 
 type t =
-  ( G.Affine.t
-  , Fq.t
-  , (Fq.t, G.Affine.t) Dlog_marlin_types.Openings.t )
-  Pairing_marlin_types.Proof.t
+( 
+  G.Affine.t, 
+  Fq.t, 
+  (
+    Fq.t, 
+    Fq.t array, 
+    G.Affine.t
+  ) Dlog_marlin_types.Openings.t 
+) Pairing_marlin_types.Proof.t
 [@@deriving bin_io]
 
 let g t f = G.Affine.of_backend (f t)
@@ -20,6 +25,11 @@ let fq t f =
   let t = f t in
   Caml.Gc.finalise Fq.delete t ;
   t
+
+let fqv t f =
+  let t = f t in
+  Caml.Gc.finalise Fq.Vector.delete t ;
+  Array.init (Fq.Vector.length t) (fun i -> Fq.Vector.get t i)
 
 (* TODO: Lots of leakage here. *)
 let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
@@ -55,24 +65,24 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
            let open Evaluations in
            let abc trip =
              let t = trip e in
-             let fq = fq t in
-             let open Snarky_bn382.Fq_triple in
-             {Abc.a= fq f0; b= fq f1; c= fq f2}
+             let fqv = fqv t in
+             let open Snarky_bn382.Fq_vector_triple in
+             {Abc.a= fqv f0; b= fqv f1; c= fqv f2}
            in
-           let fq = fq e in
-           { Dlog_marlin_types.Evals.w_hat= fq w
-           ; z_hat_a= fq za
-           ; z_hat_b= fq zb
-           ; h_1= fq h1
-           ; h_2= fq h2
-           ; h_3= fq h3
+           let fqv = fqv e in
+           { Dlog_marlin_types.Evals.w_hat= fqv w
+           ; z_hat_a= fqv za
+           ; z_hat_b= fqv zb
+           ; h_1= fqv h1
+           ; h_2= fqv h2
+           ; h_3= fqv h3
            ; row= abc row_nocopy
            ; col= abc col_nocopy
            ; value= abc val_nocopy
            ; rc= abc rc_nocopy
-           ; g_1= fq g1
-           ; g_2= fq g2
-           ; g_3= fq g3 } )
+           ; g_1= fqv g1
+           ; g_2= fqv g2
+           ; g_3= fqv g3 } )
   in
   let fq = fq t in
   { messages=
@@ -131,7 +141,7 @@ let to_backend vk primary_input
           (Snarky_bn382.G.Affine.Pair.make (g l) (g r)) ) ;
     v
   in
-  Snarky_bn382.Fq_proof.make vk primary_input (g w_comm) (g za_comm) (g zb_comm)
+  Snarky_bn382.Fq_proof.make primary_input (g w_comm) (g za_comm) (g zb_comm)
     (g h1_comm) (g g1_comm_0) (g g1_comm_1) (g h2_comm) (g g2_comm_0)
     (g g2_comm_1) (g h3_comm) (g g3_comm_0) (g g3_comm_1) sigma2 sigma3 lr z_1
     z_2 (g delta) (g sg)
