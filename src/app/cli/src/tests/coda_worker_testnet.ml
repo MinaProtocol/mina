@@ -137,22 +137,17 @@ module Api = struct
     let open Deferred.Option.Let_syntax in
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
-    let account_id =
-      Account_id.create pk_of_sk (User_command.Payload.Body.token body)
+    let user_command_input =
+      User_command_input.create ~signer:pk_of_sk ~fee
+        ~fee_token:Token_id.default ~fee_payer_pk:pk_of_sk
+        ~memo:User_command_memo.dummy ~valid_until ~body
+        ~sign_choice:
+          (User_command_input.Sign_choice.Keypair
+             (Keypair.of_private_key_exn sk))
+        ()
     in
-    let%bind nonce = Coda_process.get_nonce_exn worker account_id in
-    let payload =
-      (* TODO: Non-default tokens. *)
-      User_command.Payload.create ~fee ~fee_token:Token_id.default
-        ~fee_payer_pk:pk_of_sk ~nonce ~memo:User_command_memo.dummy
-        ~valid_until ~body
-    in
-    let user_cmd =
-      ( User_command.sign (Keypair.of_private_key_exn sk) payload
-        :> User_command.t )
-    in
-    let%map _receipt =
-      Coda_process.process_user_command_exn worker user_cmd
+    let%map user_cmd, _receipt =
+      Coda_process.process_user_command_exn worker user_command_input
       |> Deferred.map ~f:Or_error.ok
     in
     user_cmd

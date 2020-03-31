@@ -3,23 +3,22 @@ open Import
 module Payload = User_command_payload
 
 module Poly : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type ('payload, 'pk, 'signature) t =
+        {payload: 'payload; signer: 'pk; signature: 'signature}
+      [@@deriving sexp, hash, yojson, eq, compare]
+    end
+  end]
+
   type ('payload, 'pk, 'signature) t =
+        ('payload, 'pk, 'signature) Stable.Latest.t =
     {payload: 'payload; signer: 'pk; signature: 'signature}
   [@@deriving sexp, hash, yojson, eq, compare]
-
-  module Stable :
-    sig
-      module V1 : sig
-        type ('payload, 'pk, 'signature) t =
-          {payload: 'payload; signer: 'pk; signature: 'signature}
-        [@@deriving bin_io, sexp, hash, yojson, eq, compare]
-      end
-
-      module Latest = V1
-    end
-    with type ('payload, 'pk, 'signature) V1.t = ('payload, 'pk, 'signature) t
 end
 
+[%%versioned:
 module Stable : sig
   module V1 : sig
     type t =
@@ -27,7 +26,7 @@ module Stable : sig
       , Public_key.Stable.V1.t
       , Signature.Stable.V1.t )
       Poly.Stable.V1.t
-    [@@deriving bin_io, sexp, hash, yojson, version]
+    [@@deriving sexp, hash, yojson, version]
 
     val version_byte : char (* for base58_check *)
 
@@ -37,8 +36,6 @@ module Stable : sig
 
     val accounts_accessed : t -> Account_id.t list
   end
-
-  module Latest = V1
-end
+end]
 
 include User_command_intf.S with type t = Stable.Latest.t

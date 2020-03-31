@@ -5,7 +5,7 @@ module Stable : sig
     type t =
       { public_key: Public_key.Stable.V1.t
       ; private_key: Private_key.Stable.V1.t sexp_opaque }
-    [@@deriving sexp, bin_io, version]
+    [@@deriving sexp, bin_io, version, to_yojson]
   end
 
   module Latest = V1
@@ -13,7 +13,7 @@ end
 
 type t = Stable.Latest.t =
   {public_key: Public_key.t; private_key: Private_key.t sexp_opaque}
-[@@deriving sexp, compare]
+[@@deriving sexp, compare, to_yojson]
 
 include Comparable.S with type t := t
 

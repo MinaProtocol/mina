@@ -257,14 +257,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
       [("coda_run", `String "Setting up server logs")]
   in
   let client_impls =
-    [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
+    [ implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
           Deferred.map
-            ( Coda_commands.send_user_command coda tx
-            |> Participating_state.to_deferred_or_error )
-            ~f:Or_error.join )
-    ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-          Deferred.map
-            ( Coda_commands.schedule_user_commands coda ts
+            ( Coda_commands.setup_and_submit_user_commands coda ts
             |> Participating_state.to_deferred_or_error )
             ~f:Or_error.join )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () aid ->
@@ -313,8 +308,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_inferred_nonce.rpc (fun () aid ->
           return
-            ( Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger
-                coda aid
+            ( Coda_lib.get_inferred_nonce_from_transaction_pool_and_ledger coda
+                aid
             |> Participating_state.active_error ) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
           Coda_commands.get_status ~flag coda )

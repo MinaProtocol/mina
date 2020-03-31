@@ -443,35 +443,26 @@ let batch_send_payments =
     let open Deferred.Let_syntax in
     let%bind keypair = Secrets.Keypair.Terminal_stdin.read_exn privkey_path
     and infos = get_infos payments_path in
-    let%bind nonce0 =
-      get_nonce_exn ~rpc:Daemon_rpcs.Get_nonce.rpc
-        (Account_id.create
-           (Public_key.compress keypair.public_key)
-           Token_id.default)
-        port
-    in
-    let _, ts =
-      List.fold_map ~init:nonce0 infos
-        ~f:(fun nonce {receiver; valid_until; amount; fee} ->
-          let sender_pk = Public_key.compress keypair.public_key in
-          ( Account.Nonce.succ nonce
-          , User_command.sign keypair
-              (User_command_payload.create ~fee ~fee_token:Token_id.default
-                 ~fee_payer_pk:sender_pk ~nonce ~memo:User_command_memo.empty
-                 ~valid_until:
-                   (Option.value valid_until
-                      ~default:Coda_numbers.Global_slot.max_value)
-                 ~body:
-                   (Payment
-                      { source_pk= sender_pk
-                      ; receiver_pk=
-                          Public_key.Compressed.of_base58_check_exn receiver
-                      ; token_id= Token_id.default
-                      ; amount })) ) )
+    let ts : User_command_input.t list =
+      List.map infos ~f:(fun {receiver; valid_until; amount; fee} ->
+          let signer_pk = Public_key.compress keypair.public_key in
+          User_command_input.create ~signer:signer_pk ~fee
+            ~fee_token:Token_id.default (* TODO: Multiple tokens. *)
+            ~fee_payer_pk:signer_pk ~memo:User_command_memo.empty
+            ~valid_until:
+              (Option.value valid_until
+                 ~default:Coda_numbers.Global_slot.max_value)
+            ~body:
+              (Payment
+                 { source_pk= signer_pk
+                 ; receiver_pk=
+                     Public_key.Compressed.of_base58_check_exn receiver
+                 ; token_id= Token_id.default
+                 ; amount })
+            ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
     in
     Daemon_rpcs.Client.dispatch_with_message Daemon_rpcs.Send_user_commands.rpc
-      (ts :> User_command.t list)
-      port
+      ts port
       ~success:(fun _ -> "Successfully enqueued payments in pool")
       ~error:(fun e ->
         sprintf "Failed to send payments %s" (Error.to_string_hum e) )

@@ -22,14 +22,12 @@ module Body : sig
     | Stake_delegation of Stake_delegation.t
   [@@deriving eq, sexp, hash, yojson]
 
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type nonrec t = t
-      [@@deriving bin_io, version, compare, eq, sexp, hash, yojson]
+      type nonrec t = t [@@deriving compare, eq, sexp, hash, yojson]
     end
-
-    module Latest = V1
-  end
+  end]
 
   val receiver : t -> Account_id.t
 
@@ -38,7 +36,28 @@ end
 
 module Common : sig
   module Poly : sig
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
+          { fee: 'fee
+          ; fee_token: 'token_id
+          ; fee_payer_pk: 'public_key
+          ; nonce: 'nonce
+          ; valid_until: 'global_slot
+          ; memo: 'memo }
+        [@@deriving bin_io, eq, sexp, hash, yojson, version]
+      end
+    end]
+
     type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t =
+          ( 'fee
+          , 'public_key
+          , 'token_id
+          , 'nonce
+          , 'global_slot
+          , 'memo )
+          Stable.Latest.t =
       { fee: 'fee
       ; fee_token: 'token_id
       ; fee_payer_pk: 'public_key
@@ -46,26 +65,9 @@ module Common : sig
       ; valid_until: 'global_slot
       ; memo: 'memo }
     [@@deriving eq, sexp, hash, yojson]
-
-    module Stable :
-      sig
-        module V1 : sig
-          type ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t
-          [@@deriving bin_io, eq, sexp, hash, yojson, version]
-        end
-
-        module Latest = V1
-      end
-      with type ( 'fee
-                , 'public_key
-                , 'token_id
-                , 'nonce
-                , 'global_slot
-                , 'memo )
-                V1.t =
-                  ('fee, 'public_key, 'token_id, 'nonce, 'global_slot, 'memo) t
   end
 
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t =
@@ -76,11 +78,9 @@ module Common : sig
         , Coda_numbers.Global_slot.Stable.V1.t
         , User_command_memo.t )
         Poly.Stable.V1.t
-      [@@deriving bin_io, eq, sexp, hash]
+      [@@deriving eq, sexp, hash]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 
@@ -115,35 +115,32 @@ module Common : sig
 end
 
 module Poly : sig
-  type ('common, 'body) t = {common: 'common; body: 'body}
-  [@@deriving eq, sexp, hash, yojson, compare]
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type ('common, 'body) t = {common: 'common; body: 'body}
+      [@@deriving bin_io, eq, sexp, hash, yojson, compare, version]
 
-  module Stable :
-    sig
-      module V1 : sig
-        type ('common, 'body) t
-        [@@deriving bin_io, eq, sexp, hash, yojson, compare, version]
-
-        val of_latest :
-             ('common1 -> ('common2, 'err) Result.t)
-          -> ('body1 -> ('body2, 'err) Result.t)
-          -> ('common1, 'body1) t
-          -> (('common2, 'body2) t, 'err) Result.t
-      end
-
-      module Latest = V1
+      val of_latest :
+           ('common1 -> ('common2, 'err) Result.t)
+        -> ('body1 -> ('body2, 'err) Result.t)
+        -> ('common1, 'body1) t
+        -> (('common2, 'body2) t, 'err) Result.t
     end
-    with type ('common, 'body) V1.t = ('common, 'body) t
+  end]
+
+  type ('common, 'body) t = ('common, 'body) Stable.Latest.t =
+    {common: 'common; body: 'body}
+  [@@deriving eq, sexp, hash, yojson, compare]
 end
 
+[%%versioned:
 module Stable : sig
   module V1 : sig
     type t = (Common.Stable.V1.t, Body.Stable.V1.t) Poly.Stable.V1.t
-    [@@deriving bin_io, compare, eq, sexp, hash, yojson, version]
+    [@@deriving compare, eq, sexp, hash, yojson]
   end
-
-  module Latest = V1
-end
+end]
 
 type t = Stable.Latest.t [@@deriving compare, eq, sexp, hash]
 
