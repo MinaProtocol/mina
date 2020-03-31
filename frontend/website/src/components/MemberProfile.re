@@ -32,15 +32,19 @@ module Styles = {
       marginTop(`rem(-3.)),
       border(`px(1), `solid, Theme.Colors.saville),
       padding(`px(5)),
+      height(`rem(6.25)),
+      width(`rem(6.25)),
     ]);
   let memberName =
     style([
       height(`px(32)),
       marginTop(`px(62)),
       display(`flex),
+      alignItems(`center),
       margin3(~top=`rem(4.6), ~h=`auto, ~bottom=`zero),
     ]);
-  let icon = style([height(`auto), alignSelf(`center)]);
+  let icon =
+    style([paddingTop(`px(2)), height(`auto), alignSelf(`center)]);
   let genesisLabel =
     style([
       margin2(~v=`rem(0.6875), ~h=`auto),
@@ -53,7 +57,7 @@ module Styles = {
       lineHeight(`rem(1.)),
       color(white),
       height(`rem(1.)),
-      width(`rem(11.9)),
+      width(`rem(12.0)),
       padding2(~h=`rem(0.5), ~v=`zero),
     ]);
   let quote =
@@ -80,6 +84,7 @@ module Styles = {
   let socialTag =
     style([
       display(`flex),
+      alignItems(`center),
       selector("p", [marginTop(`zero), marginBottom(`zero)]),
     ]);
 
@@ -139,13 +144,17 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
             </a>
           </div>
           <Spacer height=1. />
-          <div className=Styles.socialTag>
-            <img src="/static/img/Icon.Git.svg" />
-            <Spacer width=0.34 />
-            <a href={"https://github.com/" ++ github} className=Styles.link>
-              {React.string(github)}
-            </a>
-          </div>
+          {switch (github) {
+           | Some(github) =>
+             <div className=Styles.socialTag>
+               <img src="/static/img/Icon.Git.svg" />
+               <Spacer width=0.34 />
+               <a href={"https://github.com/" ++ github} className=Styles.link>
+                 {React.string(github)}
+               </a>
+             </div>
+           | _ => React.null
+           }}
         </div>
         <Next.Link href="/blog/[slug]" _as={"/blog/" ++ blogPost}>
           <a className=Styles.ctaButton>
