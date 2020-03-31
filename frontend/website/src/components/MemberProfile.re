@@ -32,6 +32,8 @@ module Styles = {
       marginTop(`rem(-3.)),
       border(`px(1), `solid, Theme.Colors.saville),
       padding(`px(5)),
+      height(`px(102)),
+      width(`px(102)),
     ]);
   let memberName =
     style([
@@ -142,13 +144,17 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
             </a>
           </div>
           <Spacer height=1. />
-          <div className=Styles.socialTag>
-            <img src="/static/img/Icon.Git.svg" />
-            <Spacer width=0.34 />
-            <a href={"https://github.com/" ++ github} className=Styles.link>
-              {React.string(github)}
-            </a>
-          </div>
+          {switch (github) {
+           | Some(github) =>
+             <div className=Styles.socialTag>
+               <img src="/static/img/Icon.Git.svg" />
+               <Spacer width=0.34 />
+               <a href={"https://github.com/" ++ github} className=Styles.link>
+                 {React.string(github)}
+               </a>
+             </div>
+           | _ => React.null
+           }}
         </div>
         <Next.Link href="/blog/[slug]" _as={"/blog/" ++ blogPost}>
           <a className=Styles.ctaButton>
