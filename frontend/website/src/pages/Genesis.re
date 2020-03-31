@@ -150,7 +150,13 @@ module Styles = {
       fontSize(`rem(2.)),
     ]);
 
-  let profileRow = style([display(`flex), justifyContent(`spaceAround)]);
+  let profileRow =
+    style([
+      display(`flex),
+      justifyContent(`spaceBetween),
+      flexDirection(`column),
+      media(Theme.MediaQuery.tablet, [flexDirection(`row)]),
+    ]);
 };
 
 [@react.component]
@@ -254,16 +260,19 @@ let make = (~profiles) => {
           {React.array(
              Array.map(
                (p: ContentType.GenesisProfile.t) => {
-                 <MemberProfile
-                   key={p.name}
-                   name={p.name}
-                   photo={p.profilePhoto.fields.file.url}
-                   quote={"\"" ++ p.quote ++ "\""}
-                   location={p.memberLocation}
-                   twitter={p.twitter}
-                   github={p.github}
-                   blogPost={p.blogPost.fields.slug}
-                 />
+                 <>
+                   <MemberProfile
+                     key={p.name}
+                     name={p.name}
+                     photo={p.profilePhoto.fields.file.url}
+                     quote={"\"" ++ p.quote ++ "\""}
+                     location={p.memberLocation}
+                     twitter={p.twitter}
+                     github={p.github}
+                     blogPost={p.blogPost.fields.slug}
+                   />
+                   <Spacer height=5. />
+                 </>
                },
                profiles,
              ),
