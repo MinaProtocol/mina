@@ -41,7 +41,7 @@
     "query-fake": "concurrently --kill-others 'yarn run fake' 'sleep 5 && yarn run query' || true",
     "query-real": "concurrently --kill-others 'yarn run real' 'sleep 15 && yarn run query' || true",
     "reformat": "bsrefmt --in-place $(find src -name '*.re' -or -name '*.rei' -print)",
-    "test": "yarn run build && jest lib/js/",
+    "test": "yarn run build && jest --root-dir lib/js/",
     "dist": "yarn run build && yarn run pack && CSC_IDENTITY_AUTO_DISCOVERY=false electron-builder",
     "dev-real": "yarn run copy-schema && concurrently --kill-others 'bsb -make-world -w' 'fpack watch --development ./lib/js/src/render/Index.js' 'electron ./lib/js/src/main/App.js'",
     "dev": "yarn gen-sdl && GRAPHQL_BACKEND=faker yarn dev-real",
