@@ -26,9 +26,25 @@ module Payload = struct
     let create ~fee ~nonce_opt ~valid_until ~memo : t =
       {fee; nonce= nonce_opt; valid_until; memo}
 
-    let to_user_command_common (t : t) ~nonce : User_command_payload.Common.t =
+    let to_user_command_common (t : t) ~inferred_nonce :
+        (User_command_payload.Common.t, string) Result.t =
+      let open Result.Let_syntax in
+      let%map () =
+        match t.nonce with
+        | None ->
+            (*User did not provide a nonce, use inferred*)
+            Ok ()
+        | Some nonce ->
+            if Account_nonce.equal inferred_nonce nonce then Ok ()
+            else
+              Error
+                (sprintf
+                   !"Input nonce %s different from inferred nonce %s"
+                   (Account_nonce.to_string nonce)
+                   (Account_nonce.to_string inferred_nonce))
+      in
       { User_command_payload.Common.Poly.fee= t.fee
-      ; nonce
+      ; nonce= inferred_nonce
       ; valid_until= t.valid_until
       ; memo= t.memo }
   end
@@ -51,10 +67,11 @@ module Payload = struct
   let create ~fee ~nonce_opt ~valid_until ~memo ~body : t =
     {common= Common.create ~fee ~nonce_opt ~valid_until ~memo; body}
 
-  let to_user_command_payload (t : t) ~nonce : User_command_payload.t =
-    { User_command_payload.Poly.common=
-        Common.to_user_command_common t.common ~nonce
-    ; body= t.body }
+  let to_user_command_payload (t : t) ~inferred_nonce :
+      (User_command_payload.t, string) Result.t =
+    let open Result.Let_syntax in
+    let%map common = Common.to_user_command_common t.common ~inferred_nonce in
+    {User_command_payload.Poly.common; body= t.body}
 end
 
 module Sign_choice = struct
@@ -113,37 +130,30 @@ let sign ~sender ~(user_command_payload : User_command_payload.t) = function
         ~public_key:(Public_key.decompress_exn sender)
         ~user_command_payload
 
-let inferred_nonce ~f ~(sender : Public_key.Compressed.t) nonce_opt =
-  let open Result.Let_syntax in
-  let%bind txn_pool_or_account_nonce =
+let inferred_nonce ~f ~(sender : Public_key.Compressed.t) ~nonce_map =
+  let update_map = Public_key.Compressed.Map.set nonce_map ~key:sender in
+  match Public_key.Compressed.Map.find nonce_map sender with
+  | Some nonce ->
+      (*multiple user commands from a sender*)
+      let next_nonce = Account_nonce.succ nonce in
+      let updated_map = update_map ~data:next_nonce in
+      Ok (next_nonce, updated_map)
+  | None -> (
     match Participating_state.active (f sender) |> Option.join with
     | None ->
         Error
           "Couldn't infer nonce for transaction from specified `sender` since \
            `sender` is not in the ledger or sent a transaction in transaction \
            pool."
-    | Some nonce ->
-        Ok nonce
-  in
-  match nonce_opt with
-  | Some nonce ->
-      if Account_nonce.equal nonce txn_pool_or_account_nonce then Ok nonce
-      else
-        Error
-          (sprintf
-             !"Input nonce %s different from inferred nonce %s"
-             (Account_nonce.to_string nonce)
-             (Account_nonce.to_string txn_pool_or_account_nonce))
-  | None ->
-      Ok txn_pool_or_account_nonce
+    | Some txn_pool_or_account_nonce ->
+        let updated_map = update_map ~data:txn_pool_or_account_nonce in
+        Ok (txn_pool_or_account_nonce, updated_map) )
 
 let to_user_command ~result_cb ~infer_nonce ~logger uc_inputs :
     (User_command.t list * (_ Or_error.t -> unit)) option Deferred.t =
-  let setup_user_command (client_input : t) :
-      User_command.t Deferred.Or_error.t =
+  let setup_user_command (client_input : t) nonce_map =
     (*create a user_command from input*)
     let open Deferred.Or_error.Let_syntax in
-    let nonce_opt = client_input.payload.common.nonce in
     let sender = client_input.sender in
     let to_or_error : type a. (a, string) Result.t -> a Or_error.t =
      fun e ->
@@ -154,13 +164,13 @@ let to_user_command ~result_cb ~infer_nonce ~logger uc_inputs :
       in
       Result.map_error e ~f:(Fn.compose Error.of_string err_with_input)
     in
-    let%bind inferred_nonce =
-      inferred_nonce ~f:infer_nonce ~sender nonce_opt
+    let%bind inferred_nonce, updated_nonce_map =
+      inferred_nonce ~f:infer_nonce ~sender ~nonce_map
       |> to_or_error |> Deferred.return
     in
-    let user_command_payload =
-      Payload.to_user_command_payload client_input.payload
-        ~nonce:inferred_nonce
+    let%bind user_command_payload =
+      Payload.to_user_command_payload client_input.payload ~inferred_nonce
+      |> to_or_error |> Deferred.return
     in
     let%map signed_user_command =
       Deferred.map
@@ -168,31 +178,20 @@ let to_user_command ~result_cb ~infer_nonce ~logger uc_inputs :
            client_input.signature)
         ~f:to_or_error
     in
-    User_command.forget_check signed_user_command
+    (User_command.forget_check signed_user_command, updated_nonce_map)
   in
   let%map user_commands =
-    (*When batching multiple user commands, send all the user commands if they are valid or none if there is an error in one of them*)
-    let rec go acc = function
-      | [] ->
-          return acc
-      | uc :: ucs -> (
-          match%bind setup_user_command uc with
-          | Ok res ->
-              let acc' = Or_error.map acc ~f:(fun acc -> res :: acc) in
-              go acc' ucs
-          | Error e ->
-              Logger.error logger
-                "Failed to submit user commands. Error in $cmd: $error"
-                ~module_:__MODULE__ ~location:__LOC__
-                ~metadata:
-                  [ ("cmd", to_yojson uc)
-                  ; ("error", `String (Error.to_string_hum e)) ] ;
-              return (Error e) )
-    in
-    go (Ok []) uc_inputs
+    (*When batching multiple user commands, keep track of the nonces and send all the user commands if they are valid or none if there is an error in one of them*)
+    Deferred.Or_error.List.fold ~init:([], Public_key.Compressed.Map.empty)
+      uc_inputs ~f:(fun (valid_user_commands, nonce_map) uc_input ->
+        let open Deferred.Or_error.Let_syntax in
+        let%map res, updated_nonce_map =
+          setup_user_command uc_input nonce_map
+        in
+        (res :: valid_user_commands, updated_nonce_map) )
   in
   match user_commands with
-  | Ok ucs ->
+  | Ok (ucs, _) ->
       let user_commands' = List.rev ucs in
       if List.is_empty user_commands' then (
         result_cb (Error (Error.of_string "No user commands to send")) ;
@@ -200,4 +199,8 @@ let to_user_command ~result_cb ~infer_nonce ~logger uc_inputs :
       else Some (user_commands', result_cb)
       (*return the callback for the result from transaction_pool.apply_diff*)
   | Error e ->
-      result_cb (Error e) ; None
+      Logger.error logger "Failed to submit user commands: $error"
+        ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("error", `String (Error.to_string_hum e))] ;
+      result_cb (Error e) ;
+      None
