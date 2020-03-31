@@ -26,6 +26,7 @@ module Worker_state = struct
       Transaction_snark.t -> message:Sok_message.t -> bool
   end
 
+  (* bin_io required by rpc_parallel, please ignore linter warning *)
   type init_arg = {conf_dir: string option; logger: Logger.Stable.Latest.t}
   [@@deriving bin_io]
 

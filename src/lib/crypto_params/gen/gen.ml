@@ -108,7 +108,7 @@ let group_map_params =
 
 let group_map_params_structure ~loc =
   let module T = struct
-    type t = Curve_choice.Tick_backend.Field.t Group_map.Params.t
+    type t = Curve_choice.Tick_backend.Field.t Group_map.Params.Stable.V1.t
     [@@deriving bin_io]
   end in
   let module E = Ppxlib.Ast_builder.Make (struct

@@ -76,7 +76,25 @@ module Constants = Constants
 let epoch_size = UInt32.to_int Constants.Epoch.size
 
 module Configuration = struct
-  type t =
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { delta: int
+        ; k: int
+        ; c: int
+        ; c_times_k: int
+        ; slots_per_epoch: int
+        ; slot_duration: int
+        ; epoch_duration: int
+        ; acceptable_network_delay: int }
+      [@@deriving yojson, fields]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t =
     { delta: int
     ; k: int
     ; c: int
@@ -85,7 +103,7 @@ module Configuration = struct
     ; slot_duration: int
     ; epoch_duration: int
     ; acceptable_network_delay: int }
-  [@@deriving yojson, bin_io, fields]
+  [@@deriving yojson, fields]
 
   let t =
     let open Constants in

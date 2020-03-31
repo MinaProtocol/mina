@@ -230,7 +230,7 @@ module Status = struct
           let str time =
             let open Block_time in
             let current_time =
-              (* TODO: We will temporarily have to create a time controller 
+              (* TODO: We will temporarily have to create a time controller
                   until the inversion relationship between GraphQL and the RPC code inverts *)
               Block_time.now
               @@ Block_time.Controller.basic ~logger:(Logger.create ())
@@ -325,7 +325,7 @@ module Status = struct
         option
     ; consensus_time_now: Consensus.Data.Consensus_time.Stable.V1.t
     ; consensus_mechanism: string
-    ; consensus_configuration: Consensus.Configuration.t
+    ; consensus_configuration: Consensus.Configuration.Stable.V1.t
     ; addrs_and_ports: Node_addrs_and_ports.Display.Stable.V1.t }
   [@@deriving to_yojson, bin_io, fields]
 
