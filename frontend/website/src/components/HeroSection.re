@@ -71,7 +71,7 @@ module Copy = {
           <br />
         </p>
       </div>
-      <GenesisCTA />
+      <NewsletterWidget />
     </div>;
   };
 };

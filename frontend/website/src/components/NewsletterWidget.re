@@ -90,20 +90,52 @@ external urlSearchParams: Js.t('a) => Fetch.urlSearchParams =
 
 [@react.component]
 let make = (~center as centerText=false) => {
-  <div
-    className=Css.(
-      style([marginBottom(px(8)), textAlign(centerText ? `center : `left)])
-    )>
-    <p className=Theme.Body.basic>
-      {React.string(
-         "Get started on Coda by applying for the Genesis Token Program.",
-       )}
-    </p>
-    <Button
-      link="https://codaprotocol.com/genesis"
-      label="Join Genesis"
-      bgColor=Theme.Colors.hyperlink
-      bgColorHover={Theme.Colors.hyperlinkAlpha(1.)}
-    />
-  </div>;
+  let (successState, showSuccess) = React.useState(() => false);
+  let (email, setEmail) = React.useState(() => "");
+
+  <form
+    className=Styles.container
+    onSubmit={e => {
+      ReactEvent.Form.preventDefault(e);
+      ReFetch.fetch(
+        "https://jfs501bgik.execute-api.us-east-2.amazonaws.com/dev/subscribe",
+        ~method_=Post,
+        ~body=
+          Fetch.BodyInit.makeWithUrlSearchParams(
+            urlSearchParams({"email": email}),
+          ),
+        ~mode=NoCORS,
+      )
+      |> Promise.iter(_ => {
+           showSuccess(_ => true);
+           ignore @@ Js.Global.setTimeout(() => showSuccess(_ => false), 5000);
+         });
+    }}>
+    <div
+      className=Css.(
+        style([
+          marginBottom(px(8)),
+          textAlign(centerText ? `center : `left),
+        ])
+      )>
+      {React.string("Subscribe to our newsletter for updates")}
+    </div>
+    {successState
+       ? <div className=Styles.successMessage>
+           {React.string({js|✓ Check your email|js})}
+         </div>
+       : <>
+           <input
+             type_="email"
+             value=email
+             placeholder="janedoe@example.com"
+             onChange={e => {
+               let value = ReactEvent.Form.target(e)##value;
+               setEmail(_ => value);
+             }}
+             className=Styles.textField
+           />
+           <input type_="submit" value="Subscribe" className=Styles.submit />
+         </>}
+  </form>;
 };
