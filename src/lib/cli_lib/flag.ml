@@ -288,9 +288,9 @@ let user_command_common : user_command_common Command.Param.t =
       ~doc:
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
-            (default: %d) (minimum: %d)"
-           (Currency.Fee.to_int Default.transaction_fee)
-           (Currency.Fee.to_int Coda_base.User_command.minimum_fee))
+            (default: %s) (minimum: %s)"
+           (Currency.Fee.to_formatted_string Default.transaction_fee)
+           (Currency.Fee.to_formatted_string Coda_base.User_command.minimum_fee))
       (optional txn_fee)
   and nonce =
     flag "nonce"
@@ -330,9 +330,9 @@ module User_command = struct
       ~doc:
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
-            (default: %d) (minimum: %d)"
-           (Currency.Fee.to_int Default.transaction_fee)
-           (Currency.Fee.to_int Coda_base.User_command.minimum_fee))
+            (default: %s) (minimum: %s)"
+           (Currency.Fee.to_formatted_string Default.transaction_fee)
+           (Currency.Fee.to_formatted_string Coda_base.User_command.minimum_fee))
       (optional txn_fee)
 
   let valid_until =

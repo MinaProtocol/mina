@@ -9,6 +9,8 @@ module Stable = struct
     [@@deriving sexp]
 
     let to_latest = Fn.id
+
+    let to_yojson t = Public_key.Stable.V1.to_yojson t.public_key
   end
 end]
 
@@ -20,6 +22,8 @@ module T = struct
   let compare {public_key= pk1; private_key= _}
       {public_key= pk2; private_key= _} =
     Public_key.compare pk1 pk2
+
+  let to_yojson = Stable.Latest.to_yojson
 end
 
 include T
