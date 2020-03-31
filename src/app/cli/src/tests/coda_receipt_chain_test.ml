@@ -54,7 +54,7 @@ let main () =
     Coda_process.send_user_command_exn worker sender_sk receiver_pk send_amount
       fee User_command_memo.dummy
   in
-  let receipt_chain_hash = Or_error.ok_exn receipt_chain_hash in
+  let _user_cmd, receipt_chain_hash = Or_error.ok_exn receipt_chain_hash in
   let%bind restarted_worker = restart_node ~config worker ~logger in
   let%bind (initial_receipt, _) : Receipt.Chain_hash.t * User_command.t list =
     Coda_process.prove_receipt_exn restarted_worker receipt_chain_hash
