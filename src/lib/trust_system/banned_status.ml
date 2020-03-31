@@ -1,15 +1,13 @@
 open Core_kernel
 open Module_version
 
+[%%versioned_asserted
 module Stable = struct
   module V1 = struct
-    module T = struct
-      (* there's no Time.Stable.Vn, assert version and test for changes in serialization *)
-      type t = Unbanned | Banned_until of Time.t
-      [@@deriving bin_io, version {asserted}]
-    end
+    (* there's no Time.Stable.Vn, assert version and test for changes in serialization *)
+    type t = Unbanned | Banned_until of Time.t
 
-    include T
+    let to_latest = Fn.id
 
     let to_yojson = function
       | Unbanned ->
@@ -26,23 +24,9 @@ module Stable = struct
           Ok (Banned_until (Time.of_string s))
       | _ ->
           Error "Banned_status.of_yojson: unexpected JSON"
-
-    include Registration.Make_latest_version (T)
   end
 
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "banned_status"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-
-  (* see lib/module_version/README-version-asserted.md *)
-  module For_tests = struct
+  module Tests = struct
     let%test "banned status serialization v1" =
       let tm = Time.of_string "2019-10-08 17:51:23.050849Z" in
       let status = V1.Banned_until tm in
@@ -51,7 +35,7 @@ module Stable = struct
       in
       Serialization.check_serialization (module V1) status known_good_hash
   end
-end
+end]
 
 type t = Stable.Latest.t = Unbanned | Banned_until of Time.t
 

@@ -303,18 +303,14 @@ module Consumer_registry = struct
             () )
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t = {null: bool; metadata: Metadata.Stable.V1.t; id: string}
-      [@@deriving bin_io, version]
-    end
+    type t = {null: bool; metadata: Metadata.Stable.V1.t; id: string}
 
-    include T
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-end
+end]
 
 type t = Stable.Latest.t = {null: bool; metadata: Metadata.t; id: string}
 
