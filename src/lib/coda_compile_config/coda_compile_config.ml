@@ -30,10 +30,23 @@ module Currency = Currency_nonconsensus.Currency
 [%%inject
 "account_creation_fee_string", account_creation_fee_int]
 
+[%%inject
+"default_transaction_fee_string", default_transaction_fee]
+
+[%%inject
+"default_snark_worker_fee_string", default_snark_worker_fee]
+
 let account_creation_fee =
   Currency.Fee.of_formatted_string account_creation_fee_string
 
 let coinbase = Currency.Amount.of_formatted_string coinbase_string
+
+
+let default_transaction_fee =
+  Currency.Fee.of_formatted_string default_transaction_fee_string
+
+let default_snark_worker_fee =
+  Currency.Fee.of_formatted_string default_snark_worker_fee_string 
 
 (*transaction_capacity_log_2: Log of the capacity of transactions per
 transition. 1 will only work if we don't have prover fees. 2 will work with

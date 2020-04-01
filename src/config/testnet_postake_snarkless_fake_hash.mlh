@@ -7,6 +7,7 @@
 [%%import "/src/config/proof_level/none.mlh"]
 [%%import "/src/config/txpool_size.mlh"]
 [%%import "/src/config/account_creation_fee/standard.mlh"]
+[%%import "/src/config/amount_defaults/standard.mlh"]
 [%%import "/src/config/fork_id/current.mlh"]
 
 [%%define time_offsets false]
