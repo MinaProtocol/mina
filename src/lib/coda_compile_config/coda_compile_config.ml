@@ -19,6 +19,12 @@
 [%%inject
 "account_creation_fee_string", account_creation_fee_int]
 
+[%%inject
+"default_transaction_fee_string", default_transaction_fee]
+
+[%%inject
+"default_snark_worker_fee", default_snark_worker_fee]
+
 let coinbase = Currency.Amount.of_formatted_string coinbase_string
 
 let account_creation_fee =
