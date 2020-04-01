@@ -155,7 +155,14 @@ module Styles = {
       display(`flex),
       justifyContent(`spaceBetween),
       flexDirection(`column),
+      selector("> :last-child", [marginBottom(`zero)]),
       media(Theme.MediaQuery.tablet, [flexDirection(`row)]),
+    ]);
+
+  let profile =
+    style([
+      marginBottom(`rem(5.)),
+      media(Theme.MediaQuery.tablet, [marginBottom(`zero)]),
     ]);
 };
 
@@ -260,7 +267,7 @@ let make = (~profiles) => {
           {React.array(
              Array.map(
                (p: ContentType.GenesisProfile.t) => {
-                 <>
+                 <div className=Styles.profile>
                    <MemberProfile
                      key={p.name}
                      name={p.name}
@@ -271,13 +278,13 @@ let make = (~profiles) => {
                      github={p.github}
                      blogPost={p.blogPost.fields.slug}
                    />
-                   <Spacer height=5. />
-                 </>
+                 </div>
                },
                profiles,
              ),
            )}
         </div>
+        <Spacer height=4. />
         <h1 className=Styles.textBlockHeading> {React.string("Details")} </h1>
         <Spacer height=1. />
         <div className=Styles.legalListBlock>
