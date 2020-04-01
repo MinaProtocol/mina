@@ -73,19 +73,29 @@ module Styles = {
   let socials =
     style([
       display(`flex),
-      justifyContent(`spaceBetween),
+      justifyContent(`spaceAround),
       flexDirection(`column),
       margin2(~v=`rem(2.), ~h=`auto),
+      selector("> :last-child", [marginBottom(`zero)]),
       media(
         Theme.MediaQuery.tablet,
-        [flexDirection(`row), width(`rem(24.7))],
+        [
+          selector("> :last-child", [marginRight(`zero)]),
+          flexDirection(`row),
+          unsafe("width", "fit-content"),
+        ],
       ),
     ]);
   let socialTag =
     style([
       display(`flex),
       alignItems(`center),
+      marginBottom(`rem(1.)),
       selector("p", [marginTop(`zero), marginBottom(`zero)]),
+      media(
+        Theme.MediaQuery.tablet,
+        [marginBottom(`zero), marginRight(`rem(2.))],
+      ),
     ]);
 
   let ctaButton =
@@ -135,7 +145,6 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
             <Spacer width=0.34 />
             <p className=Theme.Body.basic_small> {React.string(location)} </p>
           </div>
-          <Spacer height=1. />
           <div className=Styles.socialTag>
             <img src="/static/img/Icon.Twitter.svg" />
             <Spacer width=0.34 />
@@ -143,7 +152,6 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
               {React.string(twitter)}
             </a>
           </div>
-          <Spacer height=1. />
           {switch (github) {
            | Some(github) =>
              <div className=Styles.socialTag>
