@@ -320,7 +320,7 @@ let make = (~profiles) => {
           <WhitepaperButton
             label="Technical whitepaper"
             sigil=Icons.technical
-            href="https://cdn.codaprotocol.com/v2/static/coda-whitepaper-05-10-2018-0.pdf"
+            href="https://eprint.iacr.org/2020/352.pdf"
           />
           <Spacer width=2.5 />
           <WhitepaperButton

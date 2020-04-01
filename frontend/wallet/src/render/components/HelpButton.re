@@ -44,7 +44,9 @@ let make =
        <>
          <HelpIcon kind=icon />
          <Spacer width=0.1375 />
-         {React.string(label)}
+         <span className={Css.style([Css.fontSize(`px(13))])}>
+           {React.string(label)}
+         </span>
        </>
      | (Some(link), None) =>
        <a href=link target="_blank"> {React.string(label)} </a>

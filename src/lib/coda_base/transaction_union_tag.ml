@@ -10,6 +10,10 @@ consensus_mechanism]
 
 open Snark_params.Tick
 
+[%%else]
+
+module Random_oracle = Random_oracle_nonconsensus
+
 [%%endif]
 
 type t = Payment | Stake_delegation | Fee_transfer | Coinbase
@@ -19,78 +23,297 @@ let gen =
   Quickcheck.Generator.map (Int.gen_incl min max) ~f:(fun i ->
       Option.value_exn (of_enum i) )
 
-let to_bits = function
+module Bits = struct
+  type t = bool * bool [@@deriving eq]
+
+  let payment = (false, false)
+
+  let stake_delegation = (true, false)
+
+  let fee_transfer = (false, true)
+
+  let coinbase = (true, true)
+
+  let to_bits (b1, b2) = [b1; b2]
+
+  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+
+  [%%ifdef
+  consensus_mechanism]
+
+  type var = Boolean.var * Boolean.var
+
+  let typ = Typ.tuple2 Boolean.typ Boolean.typ
+
+  let constant (b1, b2) = Boolean.(var_of_value b1, var_of_value b2)
+
+  [%%endif]
+end
+
+module Unpacked = struct
+  (* Invariant: exactly one of the tag identifiers must be true. *)
+  module Poly = struct
+    type 'bool t =
+      { is_payment: 'bool
+      ; is_stake_delegation: 'bool
+      ; is_fee_transfer: 'bool
+      ; is_coinbase: 'bool
+      ; is_user_command: 'bool }
+    [@@deriving eq]
+
+    [%%ifdef
+    consensus_mechanism]
+
+    let to_hlist
+        { is_payment
+        ; is_stake_delegation
+        ; is_fee_transfer
+        ; is_coinbase
+        ; is_user_command } =
+      H_list.
+        [ is_payment
+        ; is_stake_delegation
+        ; is_fee_transfer
+        ; is_coinbase
+        ; is_user_command ]
+
+    let of_hlist
+        ([ is_payment
+         ; is_stake_delegation
+         ; is_fee_transfer
+         ; is_coinbase
+         ; is_user_command ] :
+          (unit, _) H_list.t) =
+      { is_payment
+      ; is_stake_delegation
+      ; is_fee_transfer
+      ; is_coinbase
+      ; is_user_command }
+
+    let typ (bool : ('bool_var, 'bool) Typ.t) : ('bool_var t, 'bool t) Typ.t =
+      Typ.of_hlistable
+        [bool; bool; bool; bool; bool]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+
+    [%%endif]
+  end
+
+  type t = bool Poly.t [@@deriving eq]
+
+  (* An invalid value with all types empty. Do not use directly. *)
+  let empty : t =
+    { is_payment= false
+    ; is_stake_delegation= false
+    ; is_fee_transfer= false
+    ; is_coinbase= false
+    ; is_user_command= false }
+
+  let payment = {empty with is_payment= true; is_user_command= true}
+
+  let stake_delegation =
+    {empty with is_stake_delegation= true; is_user_command= true}
+
+  let fee_transfer = {empty with is_fee_transfer= true; is_user_command= false}
+
+  let coinbase = {empty with is_coinbase= true; is_user_command= false}
+
+  let of_bits_t (bits : Bits.t) : t =
+    match
+      List.Assoc.find ~equal:Bits.equal
+        [ (Bits.payment, payment)
+        ; (Bits.stake_delegation, stake_delegation)
+        ; (Bits.fee_transfer, fee_transfer)
+        ; (Bits.coinbase, coinbase) ]
+        bits
+    with
+    | Some t ->
+        t
+    | None ->
+        raise (Invalid_argument "Transaction_union_tag.Unpacked.of_bits_t")
+
+  let to_bits_t (t : t) : Bits.t =
+    match
+      List.Assoc.find ~equal
+        [ (payment, Bits.payment)
+        ; (stake_delegation, Bits.stake_delegation)
+        ; (fee_transfer, Bits.fee_transfer)
+        ; (coinbase, Bits.coinbase) ]
+        t
+    with
+    | Some bits ->
+        bits
+    | None ->
+        raise (Invalid_argument "Transaction_union_tag.Unpacked.to_bits_t")
+
+  [%%ifdef
+  consensus_mechanism]
+
+  type var = Boolean.var Poly.t
+
+  let to_bits_var
+      ({ is_payment
+       ; is_stake_delegation
+       ; is_fee_transfer
+       ; is_coinbase
+       ; is_user_command= _ } :
+        var) =
+    (* For each bit, compute the sum of all the tags for which that bit is true
+       in its bit representation.
+
+       Since we have the invariant that exactly one tag identifier is true,
+       exactly the bits in that tag's bit representation will be true in the
+       resulting bits.
+    *)
+    let b1, b2 =
+      List.fold
+        ~init:Field.(Var.(constant zero, constant zero))
+        [ (Bits.payment, is_payment)
+        ; (Bits.stake_delegation, is_stake_delegation)
+        ; (Bits.fee_transfer, is_fee_transfer)
+        ; (Bits.coinbase, is_coinbase) ]
+        ~f:(fun (acc1, acc2) ((bit1, bit2), bool_var) ->
+          let add_if_true bit acc =
+            if bit then Field.Var.add acc (bool_var :> Field.Var.t) else acc
+          in
+          (add_if_true bit1 acc1, add_if_true bit2 acc2) )
+    in
+    (Boolean.Unsafe.of_cvar b1, Boolean.Unsafe.of_cvar b2)
+
+  let typ : (var, t) Typ.t =
+    let base_typ = Poly.typ Boolean.typ in
+    { base_typ with
+      check=
+        (fun ( { is_payment
+               ; is_stake_delegation
+               ; is_fee_transfer
+               ; is_coinbase
+               ; is_user_command } as t ) ->
+          let open Checked.Let_syntax in
+          let%bind () = base_typ.check t in
+          let%bind () =
+            [%with_label "Only one tag is set"]
+              (Boolean.Assert.exactly_one
+                 [is_payment; is_stake_delegation; is_fee_transfer; is_coinbase])
+          in
+          [%with_label "User command flag is correctly set"]
+            (Boolean.Assert.exactly_one
+               [is_user_command; is_fee_transfer; is_coinbase]) ) }
+
+  let constant
+      ({ is_payment
+       ; is_stake_delegation
+       ; is_fee_transfer
+       ; is_coinbase
+       ; is_user_command } :
+        t) : var =
+    { is_payment= Boolean.var_of_value is_payment
+    ; is_stake_delegation= Boolean.var_of_value is_stake_delegation
+    ; is_fee_transfer= Boolean.var_of_value is_fee_transfer
+    ; is_coinbase= Boolean.var_of_value is_coinbase
+    ; is_user_command= Boolean.var_of_value is_user_command }
+
+  let is_payment ({is_payment; _} : var) = is_payment
+
+  let is_stake_delegation ({is_stake_delegation; _} : var) =
+    is_stake_delegation
+
+  let is_fee_transfer ({is_fee_transfer; _} : var) = is_fee_transfer
+
+  let is_coinbase ({is_coinbase; _} : var) = is_coinbase
+
+  let is_user_command ({is_user_command; _} : var) = is_user_command
+
+  let to_bits t = Bits.to_bits (to_bits_var t)
+
+  let to_input t = Random_oracle.Input.bitstring (to_bits t)
+
+  [%%endif]
+end
+
+let unpacked_t_of_t = function
   | Payment ->
-      (false, false)
+      Unpacked.payment
   | Stake_delegation ->
-      (true, false)
+      Unpacked.stake_delegation
   | Fee_transfer ->
-      (false, true)
+      Unpacked.fee_transfer
   | Coinbase ->
-      (true, true)
+      Unpacked.coinbase
 
-let of_bits = function
-  | false, false ->
-      Payment
-  | true, false ->
-      Stake_delegation
-  | false, true ->
-      Fee_transfer
-  | true, true ->
-      Coinbase
+let to_bits tag = Bits.to_bits (Unpacked.to_bits_t (unpacked_t_of_t tag))
 
-let%test_unit "to_bool of_bool inv" =
-  let open Quickcheck in
-  test (Generator.tuple2 Bool.quickcheck_generator Bool.quickcheck_generator)
-    ~f:(fun b -> assert (b = to_bits (of_bits b)))
+let to_input tag = Random_oracle.Input.bitstring (to_bits tag)
 
 [%%ifdef
 consensus_mechanism]
 
-let typ =
-  Typ.transport Typ.(Boolean.typ * Boolean.typ) ~there:to_bits ~back:of_bits
+let t_of_unpacked_t (unpacked : Unpacked.t) : t =
+  match
+    List.Assoc.find ~equal:Unpacked.equal
+      [ (Unpacked.payment, Payment)
+      ; (Unpacked.stake_delegation, Stake_delegation)
+      ; (Unpacked.fee_transfer, Fee_transfer)
+      ; (Unpacked.coinbase, Coinbase) ]
+      unpacked
+  with
+  | Some t ->
+      t
+  | None ->
+      raise (Invalid_argument "Transaction_union_tag.t_of_unpacked_t")
 
-type var = Boolean.var * Boolean.var
+let bits_t_of_t tag = Unpacked.to_bits_t (unpacked_t_of_t tag)
 
-module Checked = struct
-  open Let_syntax
+let t_of_bits_t tag = t_of_unpacked_t (Unpacked.of_bits_t tag)
 
-  let constant t =
-    let x, y = to_bits t in
-    Boolean.(var_of_value x, var_of_value y)
+let unpacked_of_t tag = Unpacked.constant (unpacked_t_of_t tag)
 
-  (* someday: Make these all cached *)
+let bits_of_t tag = Bits.constant (bits_t_of_t tag)
 
-  let is_payment (b0, b1) = Boolean.((not b0) && not b1)
+let unpacked_typ =
+  Typ.transport Unpacked.typ ~there:unpacked_t_of_t ~back:t_of_unpacked_t
 
-  let is_fee_transfer (b0, b1) = Boolean.((not b0) && b1)
+let bits_typ = Typ.transport Bits.typ ~there:bits_t_of_t ~back:t_of_bits_t
 
-  let is_stake_delegation (b0, b1) = Boolean.(b0 && not b1)
+let%test_module "predicates" =
+  ( module struct
+    let test_predicate checked unchecked =
+      let checked x = Checked.return (checked x) in
+      for i = min to max do
+        Test_util.test_equal unpacked_typ Boolean.typ checked unchecked
+          (Option.value_exn (of_enum i))
+      done
 
-  let is_coinbase (b0, b1) = Boolean.(b0 && b1)
+    let one_of xs t = List.mem xs ~equal t
 
-  let is_user_command (_, b1) = return (Boolean.not b1)
+    let%test_unit "is_payment" =
+      test_predicate Unpacked.is_payment (( = ) Payment)
 
-  let%test_module "predicates" =
-    ( module struct
-      let test_predicate checked unchecked =
-        for i = min to max do
-          Test_util.test_equal typ Boolean.typ checked unchecked
-            (Option.value_exn (of_enum i))
-        done
+    let%test_unit "is_stake_delegation" =
+      test_predicate Unpacked.is_stake_delegation (( = ) Stake_delegation)
 
-      let one_of xs t = List.mem xs ~equal t
+    let%test_unit "is_fee_transfer" =
+      test_predicate Unpacked.is_fee_transfer (( = ) Fee_transfer)
 
-      let%test_unit "is_payment" = test_predicate is_payment (( = ) Payment)
+    let%test_unit "is_coinbase" =
+      test_predicate Unpacked.is_coinbase (( = ) Coinbase)
 
-      let%test_unit "is_fee_transfer" =
-        test_predicate is_fee_transfer (( = ) Fee_transfer)
+    let%test_unit "is_user_command" =
+      test_predicate Unpacked.is_user_command
+        (one_of [Payment; Stake_delegation])
 
-      let%test_unit "is_coinbase" = test_predicate is_coinbase (( = ) Coinbase)
+    let%test_unit "not_user_command" =
+      test_predicate
+        (fun x -> Boolean.not (Unpacked.is_user_command x))
+        (one_of [Fee_transfer; Coinbase])
 
-      let%test_unit "is_user_command" =
-        test_predicate is_user_command (one_of [Payment; Stake_delegation])
-    end )
-end
+    let%test_unit "bit_representation" =
+      for i = min to max do
+        Test_util.test_equal unpacked_typ Bits.typ
+          (Fn.compose Checked.return Unpacked.to_bits_var)
+          bits_t_of_t
+          (Option.value_exn (of_enum i))
+      done
+  end )
 
 [%%endif]

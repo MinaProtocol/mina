@@ -18,11 +18,12 @@ let spawn_exn (config : Coda_worker.Input.t) =
   File_system.dup_stderr process ;
   return (conn, process, config)
 
-let local_config ?block_production_interval:_ ~peers ~addrs_and_ports ~chain_id
-    ~libp2p_keypair ~net_configs:(addrs_and_ports_list, all_peers_list)
-    ~acceptable_delay ~program_dir ~block_production_key ~snark_worker_key
-    ~work_selection_method ~offset ~trace_dir ~max_concurrent_connections
-    ~is_archive_rocksdb ~archive_process_location () =
+let local_config ?block_production_interval:_ ~is_seed ~peers ~addrs_and_ports
+    ~chain_id ~libp2p_keypair
+    ~net_configs:(addrs_and_ports_list, all_peers_list) ~acceptable_delay
+    ~program_dir ~block_production_key ~snark_worker_key ~work_selection_method
+    ~offset ~trace_dir ~max_concurrent_connections ~is_archive_rocksdb
+    ~archive_process_location () =
   let conf_dir =
     match Sys.getenv "CODA_INTEGRATION_TEST_DIR" with
     | Some dir ->
@@ -69,6 +70,7 @@ let local_config ?block_production_interval:_ ~peers ~addrs_and_ports ~chain_id
     ; program_dir
     ; acceptable_delay
     ; is_archive_rocksdb
+    ; is_seed
     ; archive_process_location
     ; max_concurrent_connections }
   in

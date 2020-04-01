@@ -74,7 +74,7 @@ module ViewModel = {
   module Info = {
     type t =
       | Memo(string, option(Js.Date.t))
-      | StakingReward(list((PublicKey.t, int64)), option(Js.Date.t))
+      | StakingReward(array((PublicKey.t, int64)), option(Js.Date.t))
       | MissingReceipts;
   };
 
@@ -83,22 +83,28 @@ module ViewModel = {
     recipient: Actor.t,
     action: Action.t,
     info: Info.t,
-    amountDelta: int64 // signed
+    amountDelta: int64, // unsigned
+    amountPositive: bool // Sign of amount
   };
 
   let ofTransaction =
       (transaction: Transaction.t, ~myAccounts: list(PublicKey.t), ~pending) => {
     switch (transaction) {
-    | UserCommand(userCmd) => {
+    | UserCommand(userCmd) =>
+      let (amountDelta, amountPositive) =
+        if (Caml.List.exists(PublicKey.equal(userCmd.from), myAccounts)) {
+          (userCmd.amount +^ userCmd.fee, false);
+        } else {
+          (userCmd.amount, true);
+        };
+      {
         sender: Actor.Key(userCmd.from),
         recipient: Actor.Key(userCmd.to_),
         action: pending ? Action.Pending : Action.Transfer,
         info: Info.Memo(userCmd.memo, userCmd.date),
-        amountDelta:
-          Caml.List.exists(PublicKey.equal(userCmd.from), myAccounts)
-            ? Int64.(neg(one)) *^ userCmd.amount -^ userCmd.fee
-            : userCmd.amount,
-      }
+        amountDelta,
+        amountPositive,
+      };
     | BlockReward({coinbase, creator, date, feeTransfers}) => {
         sender: Actor.Minted,
         recipient: Actor.Key(creator),
@@ -108,11 +114,11 @@ module ViewModel = {
             Array.map(
               ~f=transfer => (transfer##recipient, transfer##fee),
               feeTransfers,
-            )
-            |> Array.toList,
+            ),
             Some(date),
           ),
         amountDelta: coinbase,
+        amountPositive: true,
       }
     };
   };
@@ -178,13 +184,10 @@ module TimeDisplay = {
 module Amount = {
   module Styles = {
     open Css;
-    let square = value =>
+    let square = positive =>
       style([
         Theme.Typeface.lucidaGrande,
-        color(
-          value >=^ Int64.zero
-            ? Theme.Colors.serpentine : Theme.Colors.roseBud,
-        ),
+        color(positive ? Theme.Colors.serpentine : Theme.Colors.roseBud),
       ]);
 
     let currency =
@@ -192,17 +195,14 @@ module Amount = {
   };
 
   [@react.component]
-  let make = (~value: int64) => {
+  let make = (~value: int64, ~positive: bool) => {
     <>
-      <span className={Styles.square(value)}>
+      <span className={Styles.square(positive)}>
         {ReasonReact.string({j|■|j})}
       </span>
       <span className=Styles.currency>
         {ReasonReact.string(
-           " "
-           ++ Int64.to_string(
-                value < Int64.zero ? value *^ Int64.(neg(one)) : value,
-              ),
+           " " ++ CurrencyFormatter.toFormattedString(value),
          )}
       </span>
     </>;
@@ -266,7 +266,7 @@ module InfoSection = {
            </MainRow>
            {expanded
               ? <ul className=Css.(style([margin(`zero), padding(`zero)]))>
-                  {List.map(rewards, ~f=((pubkey, amount)) =>
+                  {Array.map(rewards, ~f=((pubkey, amount)) =>
                      <li
                        key={
                          PublicKey.toString(pubkey)
@@ -283,19 +283,18 @@ module InfoSection = {
                        <ActorName value={ViewModel.Actor.Key(pubkey)} />
                        <span>
                          <Amount
-                           value={
+                           value=amount
+                           positive={
                              Option.map(
                                ~f=PublicKey.equal(pubkey),
                                activeAccount,
                              )
                              |> Option.withDefault(~default=false)
-                               ? amount : Int64.neg(amount)
                            }
                          />
                        </span>
                      </li>
                    )
-                   |> Array.fromList
                    |> ReasonReact.array}
                 </ul>
               : <span />}
@@ -435,7 +434,10 @@ let make = (~transaction: Transaction.t, ~pending=false) => {
          }}
       </div>
       <span className=TopLevelStyles.RightSide.amount>
-        <Amount value={viewModel.amountDelta} />
+        <Amount
+          value={viewModel.amountDelta}
+          positive={viewModel.amountPositive}
+        />
       </span>
     </span>
   </>;

@@ -63,19 +63,19 @@ module Body = struct
     {tag; public_key; amount}
 
   let to_input0 ~tag ~amount t =
-    let t1, t2 = tag t.tag in
     let {Public_key.Compressed.Poly.x; is_odd} = t.public_key in
-    { Random_oracle.Input.bitstrings= [|[t1; t2]; amount t.amount; [is_odd]|]
+    { Random_oracle.Input.bitstrings= [|tag t.tag; amount t.amount; [is_odd]|]
     ; field_elements= [|x|] }
 
   [%%ifdef
   consensus_mechanism]
 
-  type var = (Tag.var, Public_key.Compressed.var, Amount.var) t_
+  type var = (Tag.Unpacked.var, Public_key.Compressed.var, Amount.var) t_
 
   let to_hlist {tag; public_key; amount} = H_list.[tag; public_key; amount]
 
-  let spec = Data_spec.[Tag.typ; Public_key.Compressed.typ; Amount.typ]
+  let spec =
+    Data_spec.[Tag.unpacked_typ; Public_key.Compressed.typ; Amount.typ]
 
   let typ =
     Typ.of_hlistable spec ~var_to_hlist:to_hlist ~value_to_hlist:to_hlist
@@ -86,12 +86,12 @@ module Body = struct
 
   module Checked = struct
     let constant ({tag; public_key; amount} : t) : var =
-      { tag= Tag.Checked.constant tag
+      { tag= Tag.unpacked_of_t tag
       ; public_key= Public_key.Compressed.var_of_t public_key
       ; amount= Amount.var_of_t amount }
 
     let to_input t =
-      to_input0 t ~tag:Fn.id ~amount:(fun x ->
+      to_input0 t ~tag:Tag.Unpacked.to_bits ~amount:(fun x ->
           (Amount.var_to_bits x :> Boolean.var list) )
   end
 
@@ -232,11 +232,11 @@ module Changes = struct
       let tag = payload.body.tag in
       let fee = payload.common.fee in
       let amount = payload.body.amount in
-      let%bind is_coinbase = Tag.Checked.is_coinbase tag in
-      let%bind is_stake_delegation = Tag.Checked.is_stake_delegation tag in
-      let%bind is_payment = Tag.Checked.is_payment tag in
-      let%bind is_fee_transfer = Tag.Checked.is_fee_transfer tag in
-      let%bind is_user_command = Tag.Checked.is_user_command tag in
+      let is_coinbase = Tag.Unpacked.is_coinbase tag in
+      let is_stake_delegation = Tag.Unpacked.is_stake_delegation tag in
+      let is_payment = Tag.Unpacked.is_payment tag in
+      let is_fee_transfer = Tag.Unpacked.is_fee_transfer tag in
+      let is_user_command = Tag.Unpacked.is_user_command tag in
       let coinbase_amount = amount in
       let%bind supply_increase =
         Amount.Checked.if_ is_coinbase ~then_:coinbase_amount
