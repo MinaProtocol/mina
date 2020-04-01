@@ -201,6 +201,8 @@ let gen_keys () =
     , Transaction_snark_keys.Verification.key_location ~loc
         tx_keys_location.verification )
   in
+  if Array.mem ~equal:String.equal Sys.argv "--generate-keys-only" then
+    Stdlib.exit 0 ;
   match dirty with
   | `Generated_something -> (
     (* If we generated any keys, then we need to make sure to upload these keys
