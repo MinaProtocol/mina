@@ -137,20 +137,18 @@ module Openings = struct
 end
 
 module PolyComm = struct
-  type 'g gsh = 'g option [@@deriving bin_io]
-
   type 'g t =
-    {unshifted: 'g array; shifted: 'g gsh}
+    {unshifted: 'g array; shifted: 'g option}
   [@@deriving bin_io]
 
   let to_hlist {unshifted; shifted} = Snarky.H_list.[unshifted; shifted]
 
   let of_hlist ([unshifted; shifted] : (unit, _) Snarky.H_list.t) = {unshifted; shifted}
 
-  let typ g gsh ~length =
+  let typ g opt ~length =
     let open Snarky.Typ in
     of_hlistable
-      [array ~length g; gsh]
+      [array ~length g; opt]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 end
 

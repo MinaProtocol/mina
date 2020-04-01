@@ -33,20 +33,23 @@ let fqv t f =
   Caml.Gc.finalise Fq.Vector.delete t ;
   Array.init (Fq.Vector.length t) (fun i -> Fq.Vector.get t i)
 
-let pc t f =
+  let pc t f =
+    let t = f t in
     let open Snarky_bn382.Fq_poly_comm in
+    let gvec (type a) (t : a) (f : a -> Snarky_bn382.G.Affine.t) : G.Affine.t =
+      let t = f t in Snarky_bn382.G.Affine.(G.Affine.of_backend t)
+    in
     let unshifted =
       let v = unshifted t in
-      Array.init (Snarky_bn382.G.Affine.Vector.length v) (fun i ->
-          Snarky_bn382.G.Affine.Vector.get v i)
+      Array.init (Snarky_bn382.G.Affine.Vector.length v) (fun i -> gvec v (fun v -> Snarky_bn382.G.Affine.Vector.get v i))
     in
+    let shifted = shifted t in
     {
       Dlog_marlin_types.PolyComm.
-      unshifted; 
-      shifted= 
-        match shifted t with
-        Some v -> G.Affine.of_backend (v t)
-        | None -> None
+        unshifted; 
+        shifted = match shifted with
+          | Some shifted -> Some (Snarky_bn382.G.Affine.(G.Affine.of_backend shifted))
+          | None -> None
     }
 
 (* TODO: Lots of leakage here. *)
@@ -75,7 +78,6 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
     ; sg= g sg }
   in
   let g = g t in
-  let gpair = gpair t in
   let evals =
     let t = evals_nocopy t in
     Evaluations.Triple.(f0 t, f1 t, f2 t)
@@ -103,13 +105,15 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
            ; g_3= fqv g3 } )
   in
   let fq = fq t in
+  let pc = pc t in
+
   { messages=
-      { w_hat= g w_comm
-      ; z_hat_a= g za_comm
-      ; z_hat_b= g zb_comm
-      ; gh_1= (gpair g1_comm_nocopy, g h1_comm)
-      ; sigma_gh_2= (fq sigma2, (gpair g2_comm_nocopy, g h2_comm))
-      ; sigma_gh_3= (fq sigma3, (gpair g3_comm_nocopy, g h3_comm)) }
+      { w_hat= pc w_comm
+      ; z_hat_a= pc za_comm
+      ; z_hat_b= pc zb_comm
+      ; gh_1= (pc g1_comm_nocopy, pc h1_comm)
+      ; sigma_gh_2= (fq sigma2, (pc g2_comm_nocopy, pc h2_comm))
+      ; sigma_gh_3= (fq sigma3, (pc g3_comm_nocopy, pc h3_comm)) }
   ; openings= {proof; evals} }
 
 let eval_to_backend
@@ -135,9 +139,9 @@ let to_backend vk primary_input
          { w_hat= w_comm
          ; z_hat_a= za_comm
          ; z_hat_b= zb_comm
-         ; gh_1= (g1_comm_0, g1_comm_1), h1_comm
-         ; sigma_gh_2= sigma2, ((g2_comm_0, g2_comm_1), h2_comm)
-         ; sigma_gh_3= sigma3, ((g3_comm_0, g3_comm_1), h3_comm) }
+         ; gh_1= g1_comm, h1_comm
+         ; sigma_gh_2= sigma2, (g2_comm, h2_comm)
+         ; sigma_gh_3= sigma3, (g3_comm, h3_comm) }
      ; openings=
          {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1, evals2} } :
       t) : Snarky_bn382.Fq_proof.t =
@@ -175,9 +179,9 @@ let to_backend1 vk primary_input
           w_hat= w_comm
           ; z_hat_a= za_comm
           ; z_hat_b= zb_comm
-          ; gh_1= (g1_comm_0, g1_comm_1), h1_comm
-          ; sigma_gh_2= sigma2, ((g2_comm_0, g2_comm_1), h2_comm)
-          ; sigma_gh_3= sigma3, ((g3_comm_0, g3_comm_1), h3_comm)
+          ; gh_1= g1_comm, h1_comm
+          ; sigma_gh_2= sigma2, (g2_comm, h2_comm)
+          ; sigma_gh_3= sigma3, (g3_comm, h3_comm)
         }
         ; openings=
         {
