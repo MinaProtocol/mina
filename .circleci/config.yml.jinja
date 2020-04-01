@@ -374,7 +374,7 @@ jobs:
                   command: ./scripts/pin-external-packages.sh
             - run:
                   name: Build OCaml
-                  # `make build` below *should* fail, exactly when it hass generated the keys to upload.
+                  # `make build` below *should* fail, exactly when it has generated the keys to upload.
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log || true'
                   environment:
                     DUNE_PROFILE: {{profile}}
