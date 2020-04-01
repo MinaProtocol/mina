@@ -288,6 +288,7 @@ let make = (~profiles) => {
              ),
            )}
         </div>
+        <Spacer height=4. />
         <h1 className=Styles.textBlockHeading> {React.string("Details")} </h1>
         <Spacer height=1. />
         <div className=Styles.legalListBlock>
