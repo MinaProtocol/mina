@@ -45,9 +45,9 @@
   with this option. The type must be contained in the module hierarchy "Stable.Vn.T".
   Eventually, all uses of this option should be removed.
 
-  The "of_binable" option is a synonym for "asserted". It assumes that the type
-  will be serialized using "Binable.Of_binable" (or similar functors), which
-  relies on the serialization of some other type.
+  The "binable" option is a synonym for "asserted". It assumes that the type
+  will be serialized using a "Binable.Of_..." or "Make_binable" functors, which relies
+  on the serialization of some other type.
 
   The "for_test" option implies "asserted" and "unnumbered", for use in test code.
 
@@ -542,7 +542,7 @@ let validate_options valid options =
 let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
   ignore
     (validate_options
-       ["wrapped"; "unnumbered"; "rpc"; "asserted"; "of_binable"; "for_test"]
+       ["wrapped"; "unnumbered"; "rpc"; "asserted"; "binable"; "for_test"]
        options) ;
   let type_decl = get_type_decl_representative type_decls in
   let wrapped = check_for_option "wrapped" options in
@@ -552,7 +552,7 @@ let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
   in
   let asserted =
     check_for_option "asserted" options
-    || check_for_option "of_binable" options
+    || check_for_option "binable" options
     || check_for_option "for_test" options
   in
   let rpc = check_for_option "rpc" options in
