@@ -1,0 +1,5 @@
+(* A payment requires 2 SNARKS, so this should always >= 2x the snark fee.
+ * It is wise to also account for account-creation-fee for testnets. *)
+[%%define default_transaction_fee "5"]
+[%%define default_snark_worker_fee "1"]
+
