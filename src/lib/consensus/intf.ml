@@ -291,7 +291,23 @@ module type S = sig
   val epoch_size : int
 
   module Configuration : sig
-    type t =
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t =
+          { delta: int
+          ; k: int
+          ; c: int
+          ; c_times_k: int
+          ; slots_per_epoch: int
+          ; slot_duration: int
+          ; epoch_duration: int
+          ; acceptable_network_delay: int }
+        [@@deriving yojson, fields]
+      end
+    end]
+
+    type t = Stable.Latest.t =
       { delta: int
       ; k: int
       ; c: int
@@ -300,7 +316,7 @@ module type S = sig
       ; slot_duration: int
       ; epoch_duration: int
       ; acceptable_network_delay: int }
-    [@@deriving yojson, bin_io, fields]
+    [@@deriving yojson, fields]
 
     val t : t
   end
