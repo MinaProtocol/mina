@@ -11,7 +11,10 @@ module Command = {
 
 let (^/) = Filename.concat;
 
-let installPath = ProjectRoot.getPath(`UserData) ++ "/daemon";
+[@bs.module "electron"] [@bs.scope ("remote", "app")]
+external getPath: string => string = "getPath";
+
+let installPath = getPath("userData") ++ "/daemon";
 // let insatllPath = "/usr/local/bin";
 
 let codaCommand = (~port, ~extraArgs) => {
