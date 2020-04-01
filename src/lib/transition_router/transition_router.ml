@@ -184,7 +184,7 @@ let load_frontier ~logger ~verifier ~persistent_frontier ~persistent_root
   | Error (`Failure e) ->
       failwith ("failed to initialize transition frontier: " ^ e)
 
-let wait_for_high_connectivity ~logger ~network =
+let wait_for_high_connectivity ~logger ~network ~is_seed =
   let connectivity_time_upperbound = 60.0 in
   let high_connectivity =
     Coda_networking.on_first_high_connectivity network ~f:Fn.id
@@ -199,21 +199,34 @@ let wait_for_high_connectivity ~logger ~network =
       Coda_networking.peers network
       >>| fun peers ->
       if not @@ Deferred.is_determined high_connectivity then
-        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-          ~metadata:
-            [ ("num peers", `Int (List.length peers))
-            ; ( "max seconds to wait for high connectivity"
-              , `Float connectivity_time_upperbound ) ]
-          "Will start initialization without connecting with too many peers" )
-    ]
+        if List.length peers = 0 then
+          if is_seed then
+            Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+              ~metadata:
+                [ ( "max seconds to wait for high connectivity"
+                  , `Float connectivity_time_upperbound ) ]
+              "Will start initialization without connecting with too any peers"
+          else (
+            Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+              "Failed to find any peers during initialization (crashing \
+               because this is not a seed node)" ;
+            exit 1 )
+        else
+          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+            ~metadata:
+              [ ("num peers", `Int (List.length peers))
+              ; ( "max seconds to wait for high connectivity"
+                , `Float connectivity_time_upperbound ) ]
+            "Will start initialization without connecting with too many peers"
+      ) ]
 
-let initialize ~logger ~network ~verifier ~trust_system ~time_controller
-    ~frontier_w ~producer_transition_reader ~clear_reader
+let initialize ~logger ~network ~is_seed ~verifier ~trust_system
+    ~time_controller ~frontier_w ~producer_transition_reader ~clear_reader
     ~verified_transition_writer ~transition_reader_ref ~transition_writer_ref
     ~most_recent_valid_block_writer ~persistent_root ~persistent_frontier
     ~consensus_local_state ~genesis_state_hash ~genesis_ledger ~base_proof
     ~genesis_constants =
-  let%bind () = wait_for_high_connectivity ~logger ~network in
+  let%bind () = wait_for_high_connectivity ~logger ~network ~is_seed in
   match%bind
     Deferred.both
       (download_best_tip ~logger ~network ~verifier ~trust_system
@@ -336,7 +349,7 @@ let wait_till_genesis ~logger ~time_controller
       (logger_loop ())
     |> Deferred.ignore
 
-let run ~logger ~trust_system ~verifier ~network ~time_controller
+let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
     ~consensus_local_state ~persistent_root_location
     ~persistent_frontier_location
     ~frontier_broadcast_pipe:(frontier_r, frontier_w)
@@ -373,7 +386,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
           ~directory:persistent_root_location
       in
       upon
-        (initialize ~logger ~network ~verifier ~trust_system
+        (initialize ~logger ~network ~is_seed ~verifier ~trust_system
            ~persistent_frontier ~persistent_root ~time_controller ~frontier_w
            ~producer_transition_reader ~clear_reader
            ~verified_transition_writer ~transition_reader_ref

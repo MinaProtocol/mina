@@ -433,7 +433,8 @@ module Rpcs = struct
       module Stable = struct
         module V1 = struct
           type t =
-            { node: Core.Unix.Inet_addr.Stable.V1.t
+            { node_ip_addr: Core.Unix.Inet_addr.Stable.V1.t
+            ; node_peer_id: Network_peer.Peer.Id.Stable.V1.t
             ; peers: Network_peer.Peer.Stable.V1.t list
             ; block_producers:
                 Signature_lib.Public_key.Compressed.Stable.V1.t list
@@ -449,7 +450,9 @@ module Rpcs = struct
            *)
           let to_yojson t =
             `Assoc
-              [ ("node", `String (Unix.Inet_addr.to_string t.node))
+              [ ( "node_ip_addr"
+                , `String (Unix.Inet_addr.to_string t.node_ip_addr) )
+              ; ("node_peer_id", `String t.node_peer_id)
               ; ( "peers"
                 , `List
                     (List.map t.peers ~f:Network_peer.Peer.Stable.V1.to_yojson)
@@ -473,7 +476,8 @@ module Rpcs = struct
       end]
 
       type t = Stable.Latest.t =
-        { node: Unix.Inet_addr.t
+        { node_ip_addr: Unix.Inet_addr.t
+        ; node_peer_id: Network_peer.Peer.Id.t
         ; peers: Network_peer.Peer.t list
         ; block_producers: Signature_lib.Public_key.Compressed.t list
         ; protocol_state_hash: State_hash.t

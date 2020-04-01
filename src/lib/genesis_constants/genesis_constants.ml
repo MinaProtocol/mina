@@ -46,14 +46,12 @@ module Protocol = struct
     [@@deriving eq]
   end
 
+  [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = (int, int, Time.t) Poly.Stable.V1.t
-        [@@deriving bin_io, version {asserted}, eq, ord, hash]
-      end
+      type t = (int, int, Time.t) Poly.Stable.V1.t [@@deriving eq, ord, hash]
 
-      include T
+      let to_latest = Fn.id
 
       let to_yojson (t : t) =
         `Assoc
@@ -91,23 +89,9 @@ module Protocol = struct
           }
         in
         T.sexp_of_t t'
-
-      include Registration.Make_latest_version (T)
     end
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "protocol_constants"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-
-    (* see lib/module_version/README-version-asserted.md *)
-    module For_tests = struct
+    module Tests = struct
       let%test "protocol constants serialization v1" =
         let t : V1.t =
           { k= 1
@@ -121,7 +105,7 @@ module Protocol = struct
         in
         Serialization.check_serialization (module V1) t known_good_hash
     end
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving eq]
 end

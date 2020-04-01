@@ -343,6 +343,7 @@ module type Transition_router_intf = sig
     -> trust_system:Trust_system.t
     -> verifier:Verifier.t
     -> network:network
+    -> is_seed:bool
     -> time_controller:Block_time.Controller.t
     -> consensus_local_state:Consensus.Data.Local_state.t
     -> persistent_root_location:string
