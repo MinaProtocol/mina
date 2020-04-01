@@ -225,9 +225,7 @@ let gen_keys () =
     | Some _, Some profile
       when String.is_substring ~substring:"testnet" profile ->
         (* We are intentionally aborting the build here with a special error code
-        * so that we can signal to our CI job that we'd like to temporarily stop
-        * for key uploading. On CI, we can shell out to an aws utility to upload
-        * keys. Afterwards, when we rebuild we'll hit the `Cache_hit branch.
+        * because we do not want builds to succeed if keys are not uploaded.
         *
         * Exit code is 0xc1 for "CI" *)
         exit 0xc1

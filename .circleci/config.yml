@@ -370,7 +370,7 @@ jobs:
             - run:
                   name: Pin external packages
                   command: ./scripts/pin-external-packages.sh
-            # Builds fail once if keys need to be uploaded
+            # Explicitly generate PV-keys and uploading before building
             # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
                   name: Generate PV keys
