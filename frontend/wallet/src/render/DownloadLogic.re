@@ -139,7 +139,7 @@ let downloadCoda = (version, chunkCb, doneCb) => {
         tempFilename,
         installPath,
         () => doneCb(Belt.Result.Ok()),
-        err =>
+        err => {
           doneCb(
             Belt.Result.Error(
               "Error while unzipping the daemon bundle: "
@@ -148,7 +148,8 @@ let downloadCoda = (version, chunkCb, doneCb) => {
                    Js.Exn.message(err),
                  ),
             ),
-          ),
+          )
+        },
       );
       ();
     }

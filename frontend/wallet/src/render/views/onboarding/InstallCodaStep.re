@@ -44,7 +44,10 @@ module InstallProgress = {
         <Downloader
           onFinish={result =>
             switch (result) {
-            | Belt.Result.Ok(_) => setState(_ => Finished)
+            | Belt.Result.Ok(_) =>
+              Js.log("Install complete...");
+              Bindings.LocalStorage.setItem(~key=`Installed, ~value="true");
+              setState(_ => Finished);
             | Belt.Result.Error(err) => setState(_ => Error(err))
             }
           }

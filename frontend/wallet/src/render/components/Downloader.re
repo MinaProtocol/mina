@@ -20,13 +20,19 @@ let make = (~onFinish, ~finished, ~error) => {
   let ((downloaded, total), updateState) = React.useState(() => (0, 1));
 
   React.useEffect0(() => {
-    downloadCoda(
-      "macos",
-      (chunkSize, totalSize) =>
-        updateState(((downloaded, _)) =>
-          (downloaded + chunkSize, totalSize)
-        ),
-      onFinish,
+    Bindings.(
+      switch (Js.Nullable.toOption(LocalStorage.getItem(`Installed))) {
+      | Some(_) => onFinish(Belt.Result.Ok())
+      | None =>
+        downloadCoda(
+          "macos",
+          (chunkSize, totalSize) =>
+            updateState(((downloaded, _)) =>
+              (downloaded + chunkSize, totalSize)
+            ),
+          onFinish,
+        )
+      }
     );
     None;
   });
@@ -107,7 +113,8 @@ let make = (~onFinish, ~finished, ~error) => {
       />
       <path
         fillRule="evenodd"
-        clipRule="evenodd"d="M0 51H59.0526L29.5263 0L0 51ZM26.842 37.5786H32.2104V42.9471H26.842V37.5786ZM26.842 21.4718H32.2104V32.2086H26.842V21.4718Z" 
+        clipRule="evenodd"
+        d="M0 51H59.0526L29.5263 0L0 51ZM26.842 37.5786H32.2104V42.9471H26.842V37.5786ZM26.842 21.4718H32.2104V32.2086H26.842V21.4718Z"
         fill="#D72B2A"
       />
     </svg>

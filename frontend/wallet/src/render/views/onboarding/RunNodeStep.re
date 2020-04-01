@@ -1,4 +1,5 @@
-[@bs.scope "window"] [@bs.val] external openExternal: string => unit = "openExternal";
+[@bs.scope "window"] [@bs.val]
+external openExternal: string => unit = "openExternal";
 
 module Styles = {
   open Css;
@@ -29,7 +30,11 @@ module Styles = {
 };
 
 [@react.component]
-let make = (~prevStep, ~createAccount) => {
+let make = (~prevStep as _, ~createAccount, ~managed) => {
+  // Start the daemon process if we're in managed setup
+  let dispatch = React.useContext(ProcessDispatchProvider.context);
+  managed ? CodaProcess.useStartEffect(dispatch) : ();
+
   <OnboardingTemplate
     heading="Connecting to the Network"
     description={
@@ -43,12 +48,7 @@ let make = (~prevStep, ~createAccount) => {
       <>
         <Spacer height=2.0 />
         <div className=OnboardingTemplate.Styles.buttonRow>
-          <Button
-            style=Button.HyperlinkBlue2
-            label="Go Back"
-            onClick={_ => prevStep()}
-          />
-          <Spacer width=1.5 />
+          <Spacer width=12. />
           <Button
             label="Continue"
             style=Button.HyperlinkBlue3
