@@ -203,7 +203,22 @@ let gen_keys () =
   in
   match dirty with
   | `Generated_something -> (
-    (* TODO: Check if circleci and die *)
+    (* If we generated any keys, then we need to make sure to upload these keys
+     * to some central store to keep our builds compatible with one-another.
+     *
+     * We used to have a process where we manually upload keys whenever we want
+     * to persist a new change. This is an attempt to make that process
+     * automatic.
+     *
+     * We don't want to force an upload on every change as during development
+     * you could churn on changes. Instead, we force uploads on CI jobs that
+     * build testnet artifacts (as these are the binaries we want to make sure
+     * we can retrieve keys for).
+     * Uploads occur out-of-process in CI.
+     *
+     * See the background section of https://bkase.dev/posts/ocaml-writer
+     * for more info on how this system works.
+     *)
     match (Sys.getenv "CI", Sys.getenv "DUNE_PROFILE") with
     | Some _, Some profile
       when String.is_substring ~substring:"testnet" profile ->
