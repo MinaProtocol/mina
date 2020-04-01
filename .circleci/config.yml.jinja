@@ -372,6 +372,8 @@ jobs:
             - run:
                   name: Pin external packages
                   command: ./scripts/pin-external-packages.sh
+            # Builds fail once if keys need to be uploaded
+            # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
                   name: Build OCaml
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
