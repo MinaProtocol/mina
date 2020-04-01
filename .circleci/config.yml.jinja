@@ -201,7 +201,7 @@ jobs:
 
     build-macos:
         macos:
-            xcode: "10.2.1"
+            xcode: "11.3.0"
         resource_class: large
         working_directory: /Users/distiller/coda
         environment:
@@ -322,6 +322,10 @@ jobs:
                 name: Decode Apple Certificates
                 context: org-global
                 command: base64 -D -o Certificates.p12 <<< $APPLE_CERTIFICATES
+            - run:
+                name: Fastlane
+                context: org-global
+                command: cd frontend/wallet && bundle exec fastlane ci && cd ../..
             - run:
                 name: Build portable binary
                 command: |
