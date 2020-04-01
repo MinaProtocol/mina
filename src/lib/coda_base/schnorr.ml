@@ -50,8 +50,7 @@ module Message = struct
       ; User_command_memo.to_bits memo
       ; Amount.to_bits amount
       ; pk_bits public_key
-      ; (let x, y = Transaction_union_tag.to_bits tag in
-         [x; y]) ]
+      ; Transaction_union_tag.to_bits tag ]
     |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
     |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
     |> Tock.Field.project
