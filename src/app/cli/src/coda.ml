@@ -197,6 +197,7 @@ let daemon logger =
            "KEYFILE Keypair (generated from `coda advanced \
             generate-libp2p-keypair`) to use with libp2p discovery (default: \
             generate per-run temporary keypair)"
+     and is_seed = flag "seed" ~doc:"Start the node as a seed node" no_arg
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
@@ -613,7 +614,11 @@ let daemon logger =
                     "peers" None ~default:[] ]
          in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-         let is_seed = List.is_empty initial_peers in
+         if is_seed then
+           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+             "Starting node as a seed node"
+         else if List.is_empty initial_peers then
+           failwith "no seed or initial peer flags passed" ;
          let gossip_net_params =
            Gossip_net.Libp2p.Config.
              { timeout= Time.Span.of_sec 3.
@@ -664,6 +669,8 @@ let daemon logger =
            Auxiliary_database.External_transition_database.create ~logger
              external_transition_database_dir
          in
+         trace_database_initialization "external_transition_database" __LOC__
+           external_transition_database_dir ;
          (* log terminated child processes *)
          (* FIXME adapt to new system, move into child_processes lib *)
          let pids = Child_processes.Termination.create_pid_table () in
@@ -726,8 +733,8 @@ let daemon logger =
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
-                ~initial_fork_id:current_fork_id
+                ~is_seed ~demo_mode ~coinbase_receiver ~net_config
+                ~gossip_net_params ~initial_fork_id:current_fork_id
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
