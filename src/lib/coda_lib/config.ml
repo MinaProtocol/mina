@@ -19,6 +19,7 @@ type t =
   ; pids: Child_processes.Termination.t
   ; trust_system: Trust_system.t
   ; monitor: Monitor.t option
+  ; is_seed: bool
   ; initial_block_production_keypairs: Keypair.Set.t
   ; coinbase_receiver: [`Producer | `Other of Public_key.Compressed.t]
   ; work_selection_method: (module Work_selector.Selection_method_intf)
