@@ -192,6 +192,8 @@ let create' (type a b c)
   in
   let k = of_length protocol_constants.k in
   let delta = of_length protocol_constants.delta in
+  (*TODO: sub_windows_per_window, slots_per_sub_window are currently dummy
+  values and need to be updated before mainnet*)
   let sub_windows_per_window = c in
   let slots_per_sub_window = k in
   let slots_per_window = sub_windows_per_window * slots_per_sub_window in
