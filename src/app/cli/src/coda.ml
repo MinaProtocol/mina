@@ -144,7 +144,7 @@ let daemon logger =
            (sprintf
               "FEE Amount a worker wants to get compensated for generating a \
                snark proof (default: %d)"
-              (Currency.Fee.to_int Cli_lib.Default.snark_worker_fee))
+              (Currency.Fee.to_int Coda_compile_config.default_snark_worker_fee))
          (optional txn_fee)
      and work_reassignment_wait =
        flag "work-reassignment-wait" (optional int)
@@ -408,7 +408,8 @@ let daemon logger =
              YJ.Util.to_int_option json |> Option.map ~f:Currency.Fee.of_int
            in
            or_from_config json_to_currency_fee_option "snark-worker-fee"
-             ~default:Cli_lib.Default.snark_worker_fee snark_work_fee
+             ~default:Coda_compile_config.default_snark_worker_fee
+             snark_work_fee
          in
          (* FIXME #4095: pass this through to Gossip_net.Libp2p *)
          let _max_concurrent_connections =
