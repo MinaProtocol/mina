@@ -1,4 +1,7 @@
 *
+!.git
+!.gitmodules
+!.nix-key.gpg.asc
 !src/opam.export
 !coda.deb
 !coda-discovery.deb

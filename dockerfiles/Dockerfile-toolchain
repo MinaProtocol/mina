@@ -9,7 +9,7 @@ ARG CODA_DIR=/coda
 # location of external packages
 ARG EXTERNAL_PKG_DIR=$CODA_DIR/src/external
 
-# don't keep sources, to force reinstall of pinned packages from Coda sources
+# don't keep built sources, to force reinstall of pinned packages from Coda sources
 # and to keep Docker image reasonable size
 ARG OPAMKEEPBUILDDIR=false
 ARG OPAMREUSEBUILDDIR=false
@@ -62,24 +62,18 @@ RUN sudo git clone https://github.com/facebook/rocksdb -b v5.17.2 /rocksdb
 # This builds and installs just the static lib for us
 RUN cd /rocksdb && sudo make static_lib PORTABLE=1 -j$(nproc) && sudo cp librocksdb.a /usr/local/lib/librocksdb_coda.a && sudo rm -rf /rocksdb && sudo strip -S /usr/local/lib/librocksdb_coda.a
 
-# clone Coda repo to pin external package and save their commits
-RUN sudo git clone https://github.com/CodaProtocol/coda $CODA_DIR
+# make host source tree available
+ADD / $CODA_DIR
 
-# use HTTPS git clone for submodules
-RUN cd $CODA_DIR && sudo sed --in-place s+git@github.com:+https://github.com/+g .gitmodules
-
-# init submodules for pinning
-RUN cd $CODA_DIR && sudo git submodule update --init --recursive
-
-# save submodule commits
+# save log commits of submodules
 RUN for pkg in async_kernel digestif graphql_ppx ocaml-extlib rpc_parallel ; do \
       # remove leading "-" indicating uninitialized
-      cd $CODA_DIR && sudo bash -c "git submodule status src/external/$pkg | awk '{print \$1}' | sed s/-// > ~opam/opam-repository/$pkg.commit" ; \
+      cd $EXTERNAL_PKG_DIR && sudo bash -c "git submodule status $pkg | awk '{print \$1}' | sed s/-// > ~opam/opam-repository/$pkg.commit" ; \
     done
 
 # save log commits for ocaml-sodium, coda_base58, which are not submodules
 RUN for pkg in ocaml-sodium coda_base58 ; do \
-      cd $CODA_DIR && sudo bash -c "git log --format=oneline -n 1 src/external/$pkg | awk '{print \$1}' > ~opam/opam-repository/$pkg.commit" ; \
+      cd $EXTERNAL_PKG_DIR && sudo bash -c "git log --format=oneline -n 1 $pkg | awk '{print \$1}' > ~opam/opam-repository/$pkg.commit" ; \
     done
 
 # OPAM dependencies
@@ -116,7 +110,7 @@ RUN opam switch import opam.export ; rm opam.export
 
 # Pin packages for vanilla compiler
 RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda_base58 graphql_ppx ; do \
-      cd $EXTERNAL_PKG_DIR/$pkg && opam pin -y add . ; \
+      cd $EXTERNAL_PKG_DIR//$pkg && opam pin -y add . ; \
     done
 
 # Install nix
@@ -124,16 +118,16 @@ RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda
 RUN mkdir --mode=700 /home/opam/.gnupg
 RUN echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
 
-RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://nixos.org/nix/install && \
-    curl -o install-nix-2.3.2.sig https://nixos.org/nix/install.sig && \
+RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://releases.nixos.org/nix/nix-2.3.3/install && \
+    curl -o install-nix-2.3.2.asc https://releases.nixos.org/nix/nix-2.3.3/install.asc && \
     gpg2 --import < $CODA_DIR/.nix-key.gpg.asc && \
-    gpg2 --verify ./install-nix-2.3.2.sig && \
+    gpg2 --recv-keys B541D55301270E0BCF15CA5D8170B4726D7198DE && \
+    gpg2 --verify ./install-nix-2.3.2.asc && \
     sh ./install-nix-2.3.2 && \
     USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && \
     nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
 
-# we used to delete the repo here
-# we now leave it intact, in case updating OPAM in CI requires pinned package sources
+RUN sudo rm -rf $CODA_DIR
 
 # The Ocaml images are set to London time for reason. UTC makes reading the logs
 # easier.
