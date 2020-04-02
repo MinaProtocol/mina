@@ -24,7 +24,7 @@ let make = () => {
   let step =
     switch (onboardingStep) {
     | Welcome =>
-      <WelcomeStep nextStep={_ => setOnboardingStep(_ => InstallCoda)} />
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
     | SetUpNode =>
       <SetupNodeStep
         customSetup={_ => setOnboardingStep(_ => CustomSetupA)}
@@ -33,7 +33,7 @@ let make = () => {
     | CustomSetupA =>
       <CustomSetupA
         prevStep={_ => setOnboardingStep(_ => SetUpNode)}
-        completeSetup={_ => setOnboardingStep(_ => CustomSetupB)}
+        completeSetup={_ => setOnboardingStep(_ => CustomSetupC)}
       />
     | CustomSetupB =>
       <CustomSetupB
