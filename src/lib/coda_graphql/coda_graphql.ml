@@ -639,10 +639,10 @@ module Types = struct
                    with e ->
                      Logger.warn
                        (Coda_lib.top_level_logger coda)
-                       !"Could not retrieve delegate account from sparse \
-                         ledger. The account may not be in the ledger: \
-                         %{sexp:exn}"
-                       e ~module_:__MODULE__ ~location:__LOC__ ;
+                       ~module_:__MODULE__ ~location:__LOC__
+                       ~metadata:[("error", `String (Exn.to_string e))]
+                       "Could not retrieve delegate account from sparse \
+                        ledger. The account may not be in the ledger: $error" ;
                      None )
              ; field "receiptChainHash" ~typ:string
                  ~doc:"Top hash of the receipt chain merkle-list"

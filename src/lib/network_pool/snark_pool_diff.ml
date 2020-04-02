@@ -102,8 +102,9 @@ module Make
           if is_local then (
             Logger.trace (Pool.get_logger pool) ~module_:__MODULE__
               ~location:__LOC__
-              "Rejecting locally generated snark work $work, %s" reason
-              ~metadata:[("work", Work.compact_json work)] ;
+              "Rejecting locally generated snark work $work: $reason"
+              ~metadata:
+                [("work", Work.compact_json work); ("reason", `String reason)] ;
             Deferred.return (Error (`Locally_generated (diff, ()))) )
           else Deferred.return (Error (`Other (Error.of_string reason)))
         in

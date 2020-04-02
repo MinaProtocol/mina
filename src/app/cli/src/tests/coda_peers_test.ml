@@ -40,8 +40,13 @@ let main () =
            in
            let%map peers = Coda_process.peers_exn worker in
            Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-             !"got peers %{sexp: Network_peer.Peer.t list} %{sexp: int list}\n"
-             peers expected_peer_ports ;
+             ~metadata:
+               [ ( "peers"
+                 , `List (List.map ~f:Network_peer.Peer.to_yojson peers) )
+               ; ( "expected_ports"
+                 , `List (List.map ~f:(fun n -> `Int n) expected_peer_ports) )
+               ]
+             "got peers $peers $expected_ports" ;
            let module S = Int.Set in
            assert (
              S.is_subset
