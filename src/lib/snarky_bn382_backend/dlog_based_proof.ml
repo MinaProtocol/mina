@@ -180,11 +180,21 @@ let to_backend vk primary_input
     let t = create a b in
     Caml.Gc.finalise delete t ; t
   in
-  let pc commitment =
+  let pc (commitment : (G.Affine.t) Dlog_marlin_types.PolyComm.t) =
+    let unsh = 
+      let v = Snarky_bn382.G.Affine.Vector.create () in
+      Array.iter commitment.unshifted ~f:(fun c ->
+          (* Very leaky *)
+          Snarky_bn382.G.Affine.Vector.emplace_back v (g c) );
+          v
+    in
+    let sh = match commitment.shifted with
+      | Some shifted -> Some (g shifted)
+      | None -> None
+    in
     let open Snarky_bn382.Fq_poly_comm in
-    let (shifted, unshifted) = commitment in
-    let t = create a b in
-    Caml.Gc.finalise delete t ; t
+    let t = Snarky_bn382.Fq_poly_comm.make unsh sh in
+    t
   in
   let lr =
     let v = Snarky_bn382.G.Affine.Pair.Vector.create () in
@@ -210,8 +220,8 @@ let to_backend vk primary_input
     lr 
     z_1
     z_2 
-    (pc delta) 
-    (pc sg)
+    (g delta) 
+    (g sg)
     (* Leaky! *)
     (eval_to_backend evals0)
     (eval_to_backend evals1)
