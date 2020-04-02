@@ -174,19 +174,8 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
       let b_u = scale u advice.b in
       let z_1_g_plus_b_u = scale (sg + b_u) z_1 in
       let z2_h = G.multiscale_known [|(Fq.to_bits z_2, h_precomp)|] in
-      print_g "Ou" u ;
-      print_g "Ob_u" b_u ;
-      print_g "Oz1 (g + b u)" z_1_g_plus_b_u ;
-      print_g "Oz2 h" z2_h ;
       z_1_g_plus_b_u + z2_h
     in
-    print_chal "Oxi" xi ;
-    print_g "Ocombined_polynomial" combined_polynomial ;
-    print_g "Osg" sg ;
-    print_chal "Oc" c ;
-    print_g "Olr_prod" lr_prod ;
-    print_g "Olhs" lhs ;
-    print_g "Orhs" rhs ;
     (`Success (equal_g lhs rhs), challenges)
 
   let lagrange_precomputations =
@@ -210,19 +199,9 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
         = Domain.size Input_domain.domain ) ;
       G.multiscale_known
         (Array.mapi public_input ~f:(fun i x ->
-             as_prover
-               As_prover.(
-                 fun () ->
-                   let t =
-                     Fq.Constant.of_bits (List.map ~f:(read Boolean.typ) x)
-                   in
-                   print_g (sprintf "g_%d" i)
-                     (G.constant Input_domain.lagrange_commitments.(i)) ;
-                   Fq.Constant.print t) ;
              (x, lagrange_precomputations.(i)) ))
     in
     absorb sponge PC x_hat ;
-    print_g "pmain x_hat" x_hat ;
     let w_hat = receive PC w_hat in
     let z_hat_a = receive PC z_hat_a in
     let z_hat_b = receive PC z_hat_b in
@@ -310,8 +289,6 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
       ; beta_2
       ; beta_3 } )
 
-  module Marlin_checks = Marlin_checks.Make (Impl)
-
   let finalize_other_proof ~input_domain ~domain_k ~domain_h ~sponge
       ({xi; r; r_xi_sum; marlin} :
         _ Types.Dlog_based.Proof_state.Deferred_values.t) (evals, x_hat_beta_1)
@@ -336,20 +313,21 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     let r_xi_sum_correct =
       let r_xi_sum_actual =
         r
-        * ( combined_evaluation Common.pairing_beta_1_pcs_batch marlin.beta_1
+        * ( combined_evaluation Common.Pairing_pcs_batch.beta_1 marlin.beta_1
               beta1
           + r
-            * ( combined_evaluation Common.pairing_beta_2_pcs_batch
+            * ( combined_evaluation Common.Pairing_pcs_batch.beta_2
                   marlin.beta_2 beta2
               + r
-                * combined_evaluation Common.pairing_beta_3_pcs_batch
+                * combined_evaluation Common.Pairing_pcs_batch.beta_3
                     marlin.beta_3 beta3 ) )
       in
       Fp.equal r_xi_sum r_xi_sum_actual
     in
     let marlin_checks =
-      Marlin_checks.check ~x_hat_beta_1 ~input_domain ~domain_h ~domain_k
-        marlin evals
+      Marlin_checks.checked
+        (module Impl)
+        ~x_hat_beta_1 ~input_domain ~domain_h ~domain_k marlin evals
     in
     as_prover
       As_prover.(

@@ -350,15 +350,15 @@ module Make (Inputs : Inputs) = struct
     let pairing_acc =
       let (g1, g1_s), (g2, g2_s), (g3, g3_s) = (g_1, g_2, g_3) in
       let f_1 =
-        combine_commitments Common.pairing_beta_1_pcs_batch
+        combine_commitments Common.Pairing_pcs_batch.beta_1
           [x_hat; w_hat; z_hat_a; z_hat_b; g1; h_1]
           []
       in
       let f_2 =
-        combine_commitments Common.pairing_beta_2_pcs_batch [g2; h_2] []
+        combine_commitments Common.Pairing_pcs_batch.beta_2 [g2; h_2] []
       in
       let f_3 =
-        combine_commitments Common.pairing_beta_3_pcs_batch
+        combine_commitments Common.Pairing_pcs_batch.beta_3
           [ g3
           ; h_3
           ; m.row.a
@@ -369,7 +369,10 @@ module Make (Inputs : Inputs) = struct
           ; m.col.c
           ; m.value.a
           ; m.value.b
-          ; m.value.c ]
+          ; m.value.c
+          ; m.rc.a
+          ; m.rc.b
+          ; m.rc.c ]
           []
       in
       List.iteri [f_1; f_2; f_3] ~f:(ksprintf print_g1 "f_%d") ;
@@ -397,7 +400,6 @@ module Make (Inputs : Inputs) = struct
           accumulate_opening_check opening_check ~r ~r_xi_sum
             (f_1, beta_1, pi_1) (f_2, beta_2, pi_2) (f_3, beta_3, pi_3) }
     in
-    (*     print_pairing_acc "post acculmulattion" pairing_acc ; *)
     let deferred =
       { Types.Dlog_based.Proof_state.Deferred_values.Marlin.sigma_2
       ; sigma_3
@@ -433,8 +435,6 @@ module Make (Inputs : Inputs) = struct
             ~else_:Fq.(nonresidue * prechallenge)
         in
         Fq.sqrt sq )
-
-  module Marlin_checks = Marlin_checks.Make (Impl)
 
   let b_poly = Fq.(b_poly ~add ~mul ~inv)
 
@@ -532,8 +532,9 @@ module Make (Inputs : Inputs) = struct
       equal b b_actual
     in
     let marlin_checks_passed =
-      Marlin_checks.check ~input_domain ~domain_h ~domain_k
-        ~x_hat_beta_1:x_hat1 marlin
+      Marlin_checks.checked
+        (module Impl)
+        ~input_domain ~domain_h ~domain_k ~x_hat_beta_1:x_hat1 marlin
         { w_hat= beta_1_evals.w_hat
         ; g_1= beta_1_evals.g_1
         ; h_1= beta_1_evals.h_1

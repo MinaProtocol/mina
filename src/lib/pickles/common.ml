@@ -24,14 +24,16 @@ let dlog_pcs_batch (type n_branching total)
   Pcs_batch.create ~without_degree_bound
     ~with_degree_bound:[h_minus_1; h_minus_1; k_minus_1]
 
-let pairing_beta_1_pcs_batch : (int, _, _) Pcs_batch.t =
-  Pcs_batch.create ~without_degree_bound:Nat.N6.n ~with_degree_bound:[]
+module Pairing_pcs_batch = struct
+  let beta_1 : (int, _, _) Pcs_batch.t =
+    Pcs_batch.create ~without_degree_bound:Nat.N6.n ~with_degree_bound:[]
 
-let pairing_beta_2_pcs_batch : (int, _, _) Pcs_batch.t =
-  Pcs_batch.create ~without_degree_bound:Nat.N2.n ~with_degree_bound:[]
+  let beta_2 : (int, _, _) Pcs_batch.t =
+    Pcs_batch.create ~without_degree_bound:Nat.N2.n ~with_degree_bound:[]
 
-let pairing_beta_3_pcs_batch : (int, _, _) Pcs_batch.t =
-  Pcs_batch.create ~without_degree_bound:Nat.N11.n ~with_degree_bound:[]
+  let beta_3 : (int, _, _) Pcs_batch.t =
+    Pcs_batch.create ~without_degree_bound:Nat.N14.n ~with_degree_bound:[]
+end
 
 let split_last xs =
   let rec go acc = function

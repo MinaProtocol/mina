@@ -260,11 +260,9 @@ let packed_typ_basic (type field other_field other_field_var)
     | Bool ->
         T (Boolean.typ, Fn.id)
     | Digest ->
-        T (Digest.packed_typ, Fn.id (*Field.unpack ~length:Digest.length *))
+        T (Digest.packed_typ, Fn.id)
     | Challenge ->
-        T
-          ( Challenge.packed_typ
-          , Fn.id (*Field.unpack ~length:Challenge.length*) )
+        T (Challenge.packed_typ, Fn.id)
     | Bulletproof_challenge ->
         let length = Challenge.length + 1 in
         let typ =

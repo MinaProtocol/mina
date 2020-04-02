@@ -135,6 +135,47 @@ module Pairing_acc = struct
   module Projective = struct
     type t = (G1.t, G1.t Int.Map.t) Pairing_marlin_types.Accumulator.t
   end
+
+  let batch_check (ts : t list) =
+    let permitted_shifts =
+      Set.to_sequence ~order:`Increasing permitted_shifts |> Sequence.to_list
+    in
+    let d =
+      let open Snarky_bn382.Usize_vector in
+      let d = create () in
+      List.iter permitted_shifts ~f:(fun x ->
+          emplace_back d (Unsigned.Size_t.of_int x) ) ;
+      d
+    in
+    let open G1.Affine.Vector in
+    let s = create () in
+    let u = create () in
+    let t = create () in
+    let p = create () in
+    List.iter ts
+      ~f:(fun { opening_check= {r_f_minus_r_v_plus_rz_pi; r_pi}
+              ; degree_bound_checks=
+                  {shifted_accumulator; unshifted_accumulators} }
+         ->
+        let push v g = emplace_back v (G1.Affine.to_backend g) in
+        (let us =
+           Map.to_sequence ~order:`Increasing_key unshifted_accumulators
+         in
+         assert (
+           [%eq: int list] permitted_shifts Sequence.(to_list (map us ~f:fst))
+         ) ;
+         Sequence.iter us ~f:(fun (_, g) -> push u g)) ;
+        push s shifted_accumulator ;
+        push t r_f_minus_r_v_plus_rz_pi ;
+        push p r_pi ) ;
+    let res =
+      Snarky_bn382.batch_pairing_check
+        (Snarky_bn382_backend.Pairing_based.Keypair.load_urs ())
+        d s u t p
+    in
+    Snarky_bn382.Usize_vector.delete d ;
+    List.iter ~f:delete [s; u; t; p] ;
+    res
 end
 
 module One_hot_vector = One_hot_vector.Make (Impls.Pairing_based)
@@ -452,7 +493,7 @@ module Dummy = struct
           List.mapi shifts ~f:(fun i s ->
               ( s
               , Snarky_bn382_backend.G1.Affine.of_backend
-                  (Snarky_bn382.G1.Affine.Vector.get t i) ) )
+                  (Snarky_bn382.G1.Affine.Vector.get t (1 + i)) ) )
           |> Int.Map.of_alist_exn }
     in
     {opening_check; degree_bound_checks}
@@ -1044,7 +1085,6 @@ let wrap_main
         ~messages ~opening_proofs
     in
     assert_eq_marlin marlin marlin_actual ;
-    (* TODO: assertion on marlin_actual and pairing_marlin_acc *)
     Field.Assert.equal me_only_digest
       (Field.pack
          (hash_me_only
@@ -1194,6 +1234,13 @@ module Proof = struct
   end
 end
 
+let fq_public_input_of_statement prev_statement =
+  let input =
+    let (T (typ, _conv)) = Impls.Dlog_based.input () in
+    Impls.Dlog_based.generate_public_input [typ] prev_statement
+  in
+  Fq.one :: List.init (Fq.Vector.length input) ~f:(Fq.Vector.get input)
+
 let fp_public_input_of_statement ~max_branching
     (prev_statement : _ Statement.Pairing_based.t) =
   let input =
@@ -1221,7 +1268,8 @@ let combined_evaluation (proof : Pairing_based.Proof.t) ~r ~xi ~beta_1 ~beta_2
       ; g_3
       ; row= {a= row_0; b= row_1; c= row_2}
       ; col= {a= col_0; b= col_1; c= col_2}
-      ; value= {a= val_0; b= val_1; c= val_2} } =
+      ; value= {a= val_0; b= val_1; c= val_2}
+      ; rc= {a= rc_0; b= rc_1; c= rc_2} } =
     proof.openings.evals
   in
   let combine t (pt : Fp.t) =
@@ -1230,14 +1278,27 @@ let combined_evaluation (proof : Pairing_based.Proof.t) ~r ~xi ~beta_1 ~beta_2
       ~evaluation_point:pt ~xi t
   in
   let f_1 =
-    combine Common.pairing_beta_1_pcs_batch beta_1
+    combine Common.Pairing_pcs_batch.beta_1 beta_1
       [x_hat_beta_1; w_hat; z_hat_a; z_hat_b; g_1; h_1]
       []
   in
-  let f_2 = combine Common.pairing_beta_2_pcs_batch beta_2 [g_2; h_2] [] in
+  let f_2 = combine Common.Pairing_pcs_batch.beta_2 beta_2 [g_2; h_2] [] in
   let f_3 =
-    combine Common.pairing_beta_3_pcs_batch beta_3
-      [g_3; h_3; row_0; row_1; row_2; col_0; col_1; col_2; val_0; val_1; val_2]
+    combine Common.Pairing_pcs_batch.beta_3 beta_3
+      [ g_3
+      ; h_3
+      ; row_0
+      ; row_1
+      ; row_2
+      ; col_0
+      ; col_1
+      ; col_2
+      ; val_0
+      ; val_1
+      ; val_2
+      ; rc_0
+      ; rc_1
+      ; rc_2 ]
       []
   in
   Fp.(r * (f_1 + (r * (f_2 + (r * f_3)))))
@@ -1269,11 +1330,11 @@ let combined_polynomials ~xi
       v
     |> Snarky_bn382_backend.G1.Affine.of_backend
   in
-  ( combine Common.pairing_beta_1_pcs_batch
+  ( combine Common.Pairing_pcs_batch.beta_1
       [x_hat; w_hat; z_hat_a; z_hat_b; g1; h1]
       []
-  , combine Common.pairing_beta_2_pcs_batch [g2; h2] []
-  , combine Common.pairing_beta_3_pcs_batch
+  , combine Common.Pairing_pcs_batch.beta_2 [g2; h2] []
+  , combine Common.Pairing_pcs_batch.beta_3
       [ g3
       ; h3
       ; index.row.a
@@ -1284,7 +1345,10 @@ let combined_polynomials ~xi
       ; index.col.c
       ; index.value.a
       ; index.value.b
-      ; index.value.c ]
+      ; index.value.c
+      ; index.rc.a
+      ; index.rc.b
+      ; index.rc.c ]
       [] )
 
 let accumulate_pairing_checks (proof : Pairing_based.Proof.t)
@@ -1679,13 +1743,6 @@ module Step
     end)
     (Max_branching : Nat.Add.Intf_transparent) =
 struct
-  let public_input_of_statement prev_statement =
-    let input =
-      let (T (typ, _conv)) = Impls.Dlog_based.input () in
-      Impls.Dlog_based.generate_public_input [typ] prev_statement
-    in
-    Fq.one :: List.init (Fq.Vector.length input) ~f:(Fq.Vector.get input)
-
   let triple_zip (a1, a2, a3) (b1, b2, b3) = ((a1, b1), (a2, b2), (a3, b3))
 
   module E = struct
@@ -1695,8 +1752,7 @@ struct
   (* The prover corresponding to the given inductive rule. *)
   let f
       (type max_local_max_branchings self_branches prev_vars prev_values
-      local_widths local_heights)
-    ?handler
+      local_widths local_heights) ?handler
       (T branch_data :
         ( A.t
         , A_value.t
@@ -1797,7 +1853,7 @@ struct
         let module O = Snarky_bn382_backend.Dlog_based.Oracles in
         let o =
           let public_input =
-            public_input_of_statement prev_statement_with_hashes
+            fq_public_input_of_statement prev_statement_with_hashes
           in
           O.create dlog_vk
             Vector.(
@@ -1998,10 +2054,8 @@ struct
                 next_me_only_prepared.sg
                 (*                  Vector.trim next_me_only_prepared.sg lte *)
             }
-      | _ ->
-        match handler with
-        | Some f -> f r
-        | None -> Snarky.Request.unhandled
+      | _ -> (
+        match handler with Some f -> f r | None -> Snarky.Request.unhandled )
     in
     let (next_proof : Pairing_based.Proof.t) =
       let (T (input, conv)) =
@@ -2095,12 +2149,12 @@ module type Proof_intf = sig
 
   val statement : t -> statement
 
-  val verify : t -> bool
+  val verify : t list -> bool
 end
 
 module Prover = struct
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
-    ?handler:(Snarky.Request.request -> Snarky.Request.response)
+       ?handler:(Snarky.Request.request -> Snarky.Request.response)
     -> ('prev_values, 'local_widths, 'local_heights) H3.T(Prev_proof).t
     -> 'a_value
     -> 'proof
@@ -2438,6 +2492,8 @@ let compile
     M.compile ~branches ~max_branching ~name ~typ ~choices:(fun ~self ->
         conv_irs (choices ~self) )
   in
+  let data = Types_map.lookup tag in
+  let step_domains = Vector.to_array data.step_domains in
   let (module Max_branching) = max_branching in
   let T = Max_branching.eq in
   let module P = struct
@@ -2457,7 +2513,106 @@ let compile
       Proof.Dlog_based.t
     [@@deriving bin_io]
 
-    let verify _ = true
+    module Marlin = Types.Dlog_based.Proof_state.Deferred_values.Marlin
+
+    let verify (ts : t list) =
+      let module Fp = Impls.Pairing_based.Field.Constant in
+      let fp : _ Marlin_checks.field = (module Fp) in
+      let finalized =
+        List.for_all ts
+          ~f:(fun { statement
+                  ; index
+                  ; prev_x_hat_beta_1= x_hat_beta_1
+                  ; prev_evals= evals }
+             ->
+            let open Pairing_marlin_types in
+            let open Types.Dlog_based.Proof_state in
+            let {Deferred_values.xi; r; marlin; r_xi_sum} =
+              Deferred_values.map_challenges ~f:Challenge.Constant.to_fp
+                statement.proof_state.deferred_values
+            in
+            let marlin_checks =
+              let domains = step_domains.(index) in
+              let open Marlin_checks in
+              checks fp marlin evals ~x_hat_beta_1
+                ~input_domain:(domain fp domains.x)
+                ~domain_h:(domain fp domains.h) ~domain_k:(domain fp domains.k)
+            in
+            let absorb, squeeze =
+              let open Fp_sponge.Bits in
+              let sponge =
+                let s = create Fp_sponge.params in
+                absorb s
+                  (Digest.Constant.to_fp
+                     statement.proof_state.sponge_digest_before_evaluations) ;
+                s
+              in
+              let squeeze () =
+                squeeze sponge ~length:Challenge.Constant.length |> Fp.project
+              in
+              (absorb sponge, squeeze)
+            in
+            absorb x_hat_beta_1 ;
+            Vector.iter ~f:absorb (Evals.to_vector evals) ;
+            let xi_actual = squeeze () in
+            let r_actual = squeeze () in
+            let e1, e2, e3 =
+              Evals.to_combined_vectors ~x_hat:x_hat_beta_1 evals
+            in
+            let r_xi_sum_actual =
+              let open Fp in
+              let combine batch pt without_bound =
+                Pcs_batch.combine_evaluations batch ~crs_max_degree ~mul ~add
+                  ~one ~evaluation_point:pt ~xi without_bound []
+              in
+              let {Marlin.beta_1= b1; beta_2= b2; beta_3= b3; _} = marlin in
+              List.fold ~init:zero
+                ~f:(fun acc x -> r * (x + acc))
+                [ combine Common.Pairing_pcs_batch.beta_3 b3 e3
+                ; combine Common.Pairing_pcs_batch.beta_2 b2 e2
+                ; combine Common.Pairing_pcs_batch.beta_1 b1 e1 ]
+            in
+            let check = List.for_all ~f:(fun (x, y) -> Fp.equal x y) in
+            check marlin_checks
+            && check
+                 [(xi, xi_actual); (r, r_actual); (r_xi_sum, r_xi_sum_actual)]
+        )
+      in
+      let open Snarky_bn382_backend.Dlog_based_proof in
+      finalized
+      && Pairing_acc.batch_check
+           (List.map ts ~f:(fun t ->
+                t.statement.proof_state.me_only.pairing_marlin_acc ))
+      && batch_verify
+           (List.map ts ~f:(fun t ->
+                let prepared_statement : _ Statement.Dlog_based.t =
+                  { pass_through=
+                      Common.hash_pairing_me_only
+                        ~app_state:A_value.to_field_elements
+                        (Reduced_me_only.Pairing_based.prepare
+                           ~dlog_marlin_index:data.wrap_key
+                           t.statement.pass_through)
+                  ; proof_state=
+                      { t.statement.proof_state with
+                        me_only=
+                          Common.hash_dlog_me_only
+                            (Reduced_me_only.Dlog_based.prepare
+                               t.statement.proof_state.me_only) } }
+                in
+                let input = fq_public_input_of_statement prepared_statement in
+                ( t.proof
+                , input
+                , Some
+                    (Vector.to_list
+                       (Vector.map2
+                          ~f:(fun g cs ->
+                            { Challenge_polynomial.challenges=
+                                Vector.to_array (compute_challenges cs)
+                            ; commitment= g } )
+                          t.statement.pass_through.sg
+                          t.statement.proof_state.me_only
+                            .old_bulletproof_challenges)) ) ))
+           data.wrap_vk
 
     let statement (p : t) = p.statement.pass_through.app_state
   end in
@@ -2467,6 +2622,8 @@ module Provers = H3_2.T (Prover)
 
 let%test_module "test" =
   ( module struct
+    let () = assert (Pairing_acc.batch_check [Dummy.pairing_acc])
+
     open Impls.Pairing_based
 
     module Txn_snark = struct
@@ -2544,11 +2701,15 @@ let%test_module "test" =
       let base1 = Field.Constant.of_int 4 in
       let base2 = Field.Constant.of_int 9 in
       let base12 = Field.Constant.(base1 * base2) in
-      let t1 = Txn_snark.base [] base1 in
-      let t2 = Txn_snark.base [] base2 in
+      let t1 = Common.time "t1" (fun () -> Txn_snark.base [] base1) in
+      let t2 = Common.time "t2" (fun () -> Txn_snark.base [] base2) in
+      assert (Txn_snark.Proof.verify [t1; t2]) ;
       (* Need two separate booleans.
          Should carry around prev should verify and self should verify *)
-      let t12 = Txn_snark.merge [t1; t2] base12 in
+      let t12 =
+        Common.time "t12" (fun () -> Txn_snark.merge [t1; t2] base12)
+      in
+      assert (Txn_snark.Proof.verify [t1; t2; t12]) ;
       let b_neg_one :
           ( Blockchain_snark.Statement.Constant.t
           , Pickles_types.Nat.N2.n
@@ -2641,7 +2802,13 @@ let%test_module "test" =
         ; prev_x_hat_beta_1= fp ()
         ; index= 0 }
       in
-      let b0 = Blockchain_snark.step [b_neg_one; t12] Field.Constant.zero in
-      let b1 = Blockchain_snark.step [b0; t12] Field.Constant.one in
-      b1
+      let b0 =
+        Common.time "b0" (fun () ->
+            Blockchain_snark.step [b_neg_one; t12] Field.Constant.zero )
+      in
+      let b1 =
+        Common.time "b1" (fun () ->
+            Blockchain_snark.step [b0; t12] Field.Constant.one )
+      in
+      assert (Blockchain_snark.Proof.verify [b0; b1])
   end )

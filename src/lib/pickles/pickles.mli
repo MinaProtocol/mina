@@ -26,7 +26,7 @@ module type Proof_intf = sig
 
   val statement : t -> statement
 
-  val verify : t -> bool
+  val verify : t list -> bool
 end
 
 module Prev_proof : sig
@@ -35,7 +35,8 @@ end
 
 module Prover : sig
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
-       ('prev_values, 'local_widths, 'local_heights) H3.T(Prev_proof).t
+       ?handler:(Snarky.Request.request -> Snarky.Request.response)
+    -> ('prev_values, 'local_widths, 'local_heights) H3.T(Prev_proof).t
     -> 'a_value
     -> 'proof
 end

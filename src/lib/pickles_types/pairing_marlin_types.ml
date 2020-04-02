@@ -109,7 +109,8 @@ module Evals = struct
       ; h_3
       ; row= {a= row_a; b= row_b; c= row_c}
       ; col= {a= col_a; b= col_b; c= col_c}
-      ; value= {a= value_a; b= value_b; c= value_c} } ~x_hat =
+      ; value= {a= value_a; b= value_b; c= value_c}
+      ; rc= {a= rc_a; b= rc_b; c= rc_c} } ~x_hat =
     Vector.
       ( ([x_hat; w_hat; z_hat_a; z_hat_b; h_1], [g_1])
       , ([h_2], [g_2])
@@ -122,7 +123,10 @@ module Evals = struct
           ; col_c
           ; value_a
           ; value_b
-          ; value_c ]
+          ; value_c
+          ; rc_a
+          ; rc_b
+          ; rc_c ]
         , [g_3] ) )
 
   let to_combined_vectors
@@ -137,7 +141,8 @@ module Evals = struct
       ; h_3
       ; row= {a= row_a; b= row_b; c= row_c}
       ; col= {a= col_a; b= col_b; c= col_c}
-      ; value= {a= value_a; b= value_b; c= value_c} } ~x_hat =
+      ; value= {a= value_a; b= value_b; c= value_c}
+      ; rc= {a= rc_a; b= rc_b; c= rc_c} } ~x_hat =
     Vector.
       ( [x_hat; w_hat; z_hat_a; z_hat_b; g_1; h_1]
       , [g_2; h_2]
@@ -151,7 +156,10 @@ module Evals = struct
         ; col_c
         ; value_a
         ; value_b
-        ; value_c ] )
+        ; value_c
+        ; rc_a
+        ; rc_b
+        ; rc_c ] )
 
   let of_vectors
       Vector.(
@@ -238,12 +246,7 @@ module Accumulator = struct
       Snarky.Typ.of_hlistable
         [ g
         ; Typ.transport (Typ.list ~length:(Set.length shifts) g) ~there ~back
-          |> Typ.transport_var ~there ~back
-          (*
-         Vector.typ
-           (Vector.typ g Unshifted_accumulators_per_branch.n)
-           branches *)
-         ]
+          |> Typ.transport_var ~there ~back ]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
 
