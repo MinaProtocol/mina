@@ -208,6 +208,7 @@ publish-macos:
 
 deb:
 	$(WRAP) ./scripts/rebuild-deb.sh
+	$(WRAP) ./scripts/rebuild-deb-deb10.sh
 	@mkdir -p /tmp/artifacts
 	@cp _build/coda*.deb /tmp/artifacts/.
 	@cp _build/coda_pvkeys_* /tmp/artifacts/.
