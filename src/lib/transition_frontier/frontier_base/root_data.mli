@@ -33,13 +33,13 @@ module Limited : sig
         { transition: External_transition.Validated.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-      [@@deriving bin_io, version]
+      [@@deriving bin_io, version, to_yojson]
     end
 
     module Latest = V1
   end
 
-  type t = Stable.Latest.t
+  type t = Stable.Latest.t [@@deriving to_yojson]
 end
 
 (* Minimal root data contains the smallest amount of information about a root.
