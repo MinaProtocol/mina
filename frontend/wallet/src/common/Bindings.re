@@ -70,7 +70,7 @@ module Stream = {
     external onError: (t, [@bs.as "error"] _, Js.Exn.t => unit) => t = "on";
     [@bs.send]
     external onFinish: (t, [@bs.as "finish"] _, unit => unit) => t = "on";
-    [@bs.send] external write: (t, Chunk.t) => unit;
+    [@bs.send] external write: (t, Chunk.t) => unit = "write";
     [@bs.send] external endStream: t => unit = "end";
   };
 

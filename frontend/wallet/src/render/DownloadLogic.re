@@ -56,7 +56,12 @@ let handleResponse = (response, filename, dataEncoding, chunkCb, doneCb) => {
     ->Bindings.Stream.Writable.onFinish(() => doneCb(Belt.Result.Ok()))
     ->Bindings.Stream.Writable.onError(e =>
         doneCb(
-          Error(Tc.Option.withDefault(~default="", Js.Exn.message(e))),
+          Error(
+            Tc.Option.withDefault(
+              ~default="Unknown error installing daemon.",
+              Js.Exn.message(e),
+            ),
+          ),
         )
       );
 

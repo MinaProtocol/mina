@@ -3,6 +3,12 @@
 [@react.component]
 let make = (~prevStep, ~runNode) => {
   let (ip, setIp) = React.useState(() => "123.43.234.23");
+  let (_, setDaemonHost) = React.useContext(DaemonProvider.context);
+
+  let handleContinue = () => {
+    setDaemonHost(_ => ip);
+    runNode()
+  };
 
   <OnboardingTemplate
     heading="Custom Setup"
@@ -26,7 +32,7 @@ let make = (~prevStep, ~runNode) => {
           <Button
             label="Continue"
             style=Button.HyperlinkBlue3
-            onClick={_ => runNode()}
+            onClick={_ => handleContinue()}
           />
         </div>
       </>
