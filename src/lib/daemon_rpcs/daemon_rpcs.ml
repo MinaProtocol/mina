@@ -5,40 +5,6 @@ open Signature_lib
 module Types = Types
 module Client = Client
 
-module Send_user_command = struct
-  module Query = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = User_command.Stable.V1.t
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    type t = Stable.Latest.t
-  end
-
-  module Response = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t =
-          Receipt.Chain_hash.Stable.V1.t Core_kernel.Or_error.Stable.V1.t
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    type t = Stable.Latest.t
-  end
-
-  let rpc : (Query.t, Response.t) Rpc.Rpc.t =
-    Rpc.Rpc.create ~name:"Send_user_command" ~version:0
-      ~bin_query:Query.Stable.Latest.bin_t
-      ~bin_response:Response.Stable.Latest.bin_t
-end
-
 module Get_transaction_status = struct
   module Query = struct
     [%%versioned
@@ -78,7 +44,7 @@ module Send_user_commands = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = User_command.Stable.V1.t list
+        type t = User_command_input.Stable.V1.t list
 
         let to_latest = Fn.id
       end
@@ -91,7 +57,11 @@ module Send_user_commands = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = unit Core_kernel.Or_error.Stable.V1.t
+        type t =
+          ( Network_pool.Transaction_pool.Resource_pool.Diff.Stable.V1.t
+          * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.Stable.V1
+            .t )
+          Core_kernel.Or_error.Stable.V1.t
 
         let to_latest = Fn.id
       end

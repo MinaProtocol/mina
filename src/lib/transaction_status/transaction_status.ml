@@ -2,31 +2,16 @@ open Core_kernel
 open Coda_base
 open Pipe_lib
 open Network_pool
-open Module_version
 
 module State = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Pending | Included | Unknown
-        [@@deriving equal, sexp, compare, bin_io, version]
-      end
+      type t = Pending | Included | Unknown [@@deriving equal, sexp, compare]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transaction_status_state"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t = Pending | Included | Unknown
   [@@deriving equal, sexp, compare]
@@ -145,7 +130,8 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer [user_command]
+                Strict_pipe.Writer.write local_diffs_writer
+                  ([user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               Logger.info logger "Checking status" ~module_:__MODULE__
@@ -169,7 +155,8 @@ let%test_module "transaction_status" =
                 create_pool ~frontier_broadcast_pipe
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer [user_command]
+                Strict_pipe.Writer.write local_diffs_writer
+                  ([user_command], Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               let status =
@@ -206,7 +193,8 @@ let%test_module "transaction_status" =
                 Non_empty_list.uncons user_commands
               in
               let%bind () =
-                Strict_pipe.Writer.write local_diffs_writer pool_user_commands
+                Strict_pipe.Writer.write local_diffs_writer
+                  (pool_user_commands, Fn.const ())
               in
               let%map () = Async.Scheduler.yield_until_no_jobs_remain () in
               Logger.info logger "Computing status" ~module_:__MODULE__

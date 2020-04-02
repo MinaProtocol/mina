@@ -57,7 +57,17 @@ val work_selection_method : t -> (module Work_selector.Selection_method_intf)
 
 val add_work : t -> Snark_worker.Work.Result.t -> unit
 
-val add_transactions : t -> User_command.t list -> unit Deferred.t
+val add_transactions :
+     t
+  -> User_command_input.t list
+  -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+     * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+     Deferred.Or_error.t
+
+val get_inferred_nonce_from_transaction_pool_and_ledger :
+  t -> Public_key.Compressed.t -> Account.Nonce.t option Participating_state.t
+
+val active_or_bootstrapping : t -> unit Participating_state.t
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 

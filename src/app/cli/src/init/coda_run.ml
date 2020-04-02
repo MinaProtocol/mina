@@ -64,6 +64,64 @@ let get_lite_chain :
       let proof = Lite_compat.proof proof in
       {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
+let get_current_fork_id ~compile_time_current_fork_id ~conf_dir ~logger =
+  let current_fork_id_file = conf_dir ^/ "current_fork_id" in
+  let read_fork_id () =
+    let open Stdlib in
+    let inp = open_in current_fork_id_file in
+    let res = input_line inp in
+    close_in inp ; res
+  in
+  let write_fork_id fork_id =
+    let open Stdlib in
+    let outp = open_out current_fork_id_file in
+    output_string outp (fork_id ^ "\n") ;
+    close_out outp
+  in
+  function
+  | None -> (
+    try
+      (* not provided on command line, try to read from config dir *)
+      let fork_id = read_fork_id () in
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Setting current fork ID to $fork_id from config"
+        ~metadata:[("fork_id", `String fork_id)] ;
+      fork_id
+    with Sys_error _ ->
+      (* not on command-line, not in config dir, use compile-time value *)
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Setting current fork ID to $fork_id from compile-time config"
+        ~metadata:[("fork_id", `String compile_time_current_fork_id)] ;
+      compile_time_current_fork_id )
+  | Some fork_id -> (
+    try
+      (* it's an error if the command line value disagrees with the value in the config *)
+      let config_fork_id = read_fork_id () in
+      if String.equal config_fork_id fork_id then (
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Using current fork ID $fork_id from command line, which matches \
+           the one in the config"
+          ~metadata:[("fork_id", `String fork_id)] ;
+        config_fork_id )
+      else (
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          "Current fork ID $fork_id from the command line disagrees with \
+           $config_fork_id from the Coda config"
+          ~metadata:
+            [ ("fork_id", `String fork_id)
+            ; ("config_fork_id", `String config_fork_id) ] ;
+        failwith
+          "Current fork ID from command line disagrees with fork ID in Coda \
+           config; please delete your Coda config if you wish to use a new \
+           fork ID" )
+    with Sys_error _ ->
+      (* use value provided on command line, write to config dir, possibly overwriting existing entry *)
+      write_fork_id fork_id ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Using current fork ID $fork_id from command line, writing to config"
+        ~metadata:[("fork_id", `String fork_id)] ;
+      fork_id )
+
 (*TODO check deferred now and copy theose files to the temp directory*)
 let log_shutdown ~conf_dir ~top_logger coda_ref =
   let logger =
@@ -196,14 +254,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
       [("coda_run", `String "Setting up server logs")]
   in
   let client_impls =
-    [ implement Daemon_rpcs.Send_user_command.rpc (fun () tx ->
+    [ implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
           Deferred.map
-            ( Coda_commands.send_user_command coda tx
+            ( Coda_commands.setup_and_submit_user_commands coda ts
             |> Participating_state.to_deferred_or_error )
             ~f:Or_error.join )
-    ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-          Coda_commands.schedule_user_commands coda ts
-          |> Participating_state.to_deferred_or_error )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
           return
             ( Coda_commands.get_balance coda pk
@@ -250,8 +305,8 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
             |> Participating_state.active_error ) )
     ; implement Daemon_rpcs.Get_inferred_nonce.rpc (fun () pk ->
           return
-            ( Coda_commands.get_inferred_nonce_from_transaction_pool_and_ledger
-                coda pk
+            ( Coda_lib.get_inferred_nonce_from_transaction_pool_and_ledger coda
+                pk
             |> Participating_state.active_error ) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
           Coda_commands.get_status ~flag coda )

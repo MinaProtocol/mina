@@ -17,3 +17,5 @@ let hash_user_command = Fn.compose digest_string User_command.to_base58_check
 
 let hash_fee_transfer =
   Fn.compose digest_string Fee_transfer.Single.to_base58_check
+
+let hash_coinbase = Fn.compose digest_string Coinbase.to_base58_check

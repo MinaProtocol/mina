@@ -60,26 +60,6 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
   in
   Option.is_some remainder
 
-let schedule_user_command t (txn : User_command.t) account_opt :
-    unit Or_error.t Deferred.t =
-  (* FIXME #3457: return a status from Transaction_pool.add and use it instead
-  *)
-  if not (is_valid_user_command t txn account_opt) then
-    return
-      (Or_error.error_string "Invalid user command: account balance is too low")
-  else
-    let logger =
-      Logger.extend
-        (Coda_lib.top_level_logger t)
-        [("coda_command", `String "scheduling a user command")]
-    in
-    let%map () = Coda_lib.add_transactions t [txn] in
-    Logger.info logger ~module_:__MODULE__ ~location:__LOC__
-      ~metadata:[("user_command", User_command.to_yojson txn)]
-      "Submitted transaction $user_command to transaction pool" ;
-    txn_count := !txn_count + 1 ;
-    Or_error.return ()
-
 let get_account t (addr : Public_key.Compressed.t) =
   let open Participating_state.Let_syntax in
   let%map ledger = Coda_lib.best_ledger t in
@@ -108,44 +88,10 @@ let get_keys_with_details t =
       , account.Account.Poly.balance |> Currency.Balance.to_int
       , account.Account.Poly.nonce |> Account.Nonce.to_int ) )
 
-let get_inferred_nonce_from_transaction_pool_and_ledger t
-    (addr : Public_key.Compressed.t) =
-  let transaction_pool = Coda_lib.transaction_pool t in
-  let resource_pool =
-    Network_pool.Transaction_pool.resource_pool transaction_pool
-  in
-  let pooled_transactions =
-    Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
-      addr
-  in
-  let txn_pool_nonce =
-    let nonces =
-      List.map pooled_transactions
-        ~f:(Fn.compose User_command.nonce User_command.forget_check)
-    in
-    (* The last nonce gives us the maximum nonce in the transaction pool *)
-    List.last nonces
-  in
-  match txn_pool_nonce with
-  | Some nonce ->
-      Participating_state.Option.return (Account.Nonce.succ nonce)
-  | None ->
-      let open Participating_state.Option.Let_syntax in
-      let%map account = get_account t addr in
-      account.Account.Poly.nonce
-
 let get_nonce t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
   let%map account = get_account t addr in
   account.Account.Poly.nonce
-
-let send_user_command t (txn : User_command.t) =
-  let public_key = Public_key.compress txn.sender in
-  let open Participating_state.Let_syntax in
-  let%map account_opt = get_account t public_key in
-  let open Deferred.Or_error.Let_syntax in
-  let%map () = schedule_user_command t txn account_opt in
-  record_payment t txn (Option.value_exn account_opt)
 
 let get_balance t (addr : Public_key.Compressed.t) =
   let open Participating_state.Option.Let_syntax in
@@ -167,14 +113,56 @@ let reset_trust_status t (ip_address : Unix.Inet_addr.Blocking_sexp.t) =
   let trust_system = config.trust_system in
   Trust_system.reset trust_system ip_address
 
-let setup_user_command ~fee ~nonce ~valid_until ~memo ~sender_kp
-    user_command_body =
-  let payload =
-    User_command.Payload.create ~fee ~nonce ~valid_until ~memo
-      ~body:user_command_body
+let replace_block_production_keys keys pks =
+  let kps =
+    List.filter_map pks ~f:(fun pk ->
+        let open Option.Let_syntax in
+        let%map kps =
+          Coda_lib.wallets keys |> Secrets.Wallets.find_unlocked ~needle:pk
+        in
+        (kps, pk) )
   in
-  let signed_user_command = User_command.sign sender_kp payload in
-  User_command.forget_check signed_user_command
+  Coda_lib.replace_block_production_keypairs keys
+    (Keypair.And_compressed_pk.Set.of_list kps) ;
+  kps |> List.map ~f:snd
+
+let setup_and_submit_user_command t (user_command_input : User_command_input.t)
+    =
+  let open Participating_state.Let_syntax in
+  let%map account_opt = get_account t user_command_input.sender in
+  let open Deferred.Let_syntax in
+  let%map result = Coda_lib.add_transactions t [user_command_input] in
+  txn_count := !txn_count + 1 ;
+  match result with
+  | Ok ([], [failed_txn]) ->
+      Error
+        (Error.of_string
+           (sprintf !"%s"
+              ( Network_pool.Transaction_pool.Resource_pool.Diff.Diff_error
+                .to_yojson (snd failed_txn)
+              |> Yojson.Safe.to_string )))
+  | Ok ([txn], []) ->
+      Logger.info
+        (Coda_lib.top_level_logger t)
+        ~module_:__MODULE__ ~location:__LOC__
+        ~metadata:[("user_command", User_command.to_yojson txn)]
+        "Scheduled payment $user_command" ;
+      Ok (txn, record_payment t txn (Option.value_exn account_opt))
+  | Ok _ ->
+      Error (Error.of_string "Invalid result from scheduling a payment")
+  | Error e ->
+      Error e
+
+let setup_and_submit_user_commands t user_command_list =
+  let open Participating_state.Let_syntax in
+  let%map _is_active = Coda_lib.active_or_bootstrapping t in
+  Logger.warn
+    (Coda_lib.top_level_logger t)
+    ~module_:__MODULE__ ~location:__LOC__
+    "batch-send-payments does not yet report errors"
+    ~metadata:
+      [("coda_command", `String "scheduling a batch of user transactions")] ;
+  Coda_lib.add_transactions t user_command_list
 
 module Receipt_chain_hash = struct
   (* Receipt.Chain_hash does not have bin_io *)
@@ -202,20 +190,6 @@ let verify_payment t (addr : Public_key.Compressed.Stable.Latest.t)
     Or_error.errorf
       !"Merkle list proof does not contain payment %{sexp:User_command.t}"
       verifying_txn
-
-(* TODO: Properly record receipt_chain_hash for multiple transactions. See #1143 *)
-let schedule_user_commands t (txns : User_command.t list) :
-    unit Deferred.t Participating_state.t =
-  Participating_state.return
-  @@
-  let logger =
-    Logger.extend
-      (Coda_lib.top_level_logger t)
-      [("coda_command", `String "scheduling a batch of user transactions")]
-  in
-  Logger.warn logger ~module_:__MODULE__ ~location:__LOC__
-    "batch-send-payments does not yet report errors" ;
-  Coda_lib.add_transactions t txns
 
 let prove_receipt t ~proving_receipt ~resulting_receipt =
   let receipt_chain_database = Coda_lib.receipt_chain_database t in

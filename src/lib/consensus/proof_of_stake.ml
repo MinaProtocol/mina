@@ -3095,7 +3095,7 @@ module Hooks = struct
           in
           let total_currency =
             Option.value_exn
-              (Amount.add prev.total_currency Constants.coinbase)
+              (Amount.add prev.total_currency Coda_compile_config.coinbase)
           in
           let prev_epoch, prev_slot =
             Consensus_state.curr_epoch_and_slot prev
