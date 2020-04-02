@@ -180,6 +180,12 @@ let to_backend vk primary_input
     let t = create a b in
     Caml.Gc.finalise delete t ; t
   in
+  let pc commitment =
+    let open Snarky_bn382.Fq_poly_comm in
+    let (shifted, unshifted) = commitment in
+    let t = create a b in
+    Caml.Gc.finalise delete t ; t
+  in
   let lr =
     let v = Snarky_bn382.G.Affine.Pair.Vector.create () in
     Array.iter lr ~f:(fun (l, r) ->
@@ -191,21 +197,21 @@ let to_backend vk primary_input
   Snarky_bn382.Fq_proof.make
     primary_input 
     (pc w_comm) 
-    (g za_comm) 
-    (g zb_comm)
-    (g h1_comm) 
-    (g g1_comm) 
-    (g h2_comm) 
-    (g g2_comm)
-    (g h3_comm) 
-    (g g3_comm) 
+    (pc za_comm) 
+    (pc zb_comm)
+    (pc h1_comm) 
+    (pc g1_comm) 
+    (pc h2_comm) 
+    (pc g2_comm)
+    (pc h3_comm) 
+    (pc g3_comm) 
     sigma2 
     sigma3 
     lr 
     z_1
     z_2 
-    (g delta) 
-    (g sg)
+    (pc delta) 
+    (pc sg)
     (* Leaky! *)
     (eval_to_backend evals0)
     (eval_to_backend evals1)
@@ -219,5 +225,5 @@ let create ?message pk ~primary ~auxiliary =
   t
 
 let verify ?message:_ proof vk auxiliary =
-  let t = to_backend1 vk auxiliary proof in
+  let t = to_backend vk auxiliary proof in
   Snarky_bn382.Fq_proof.verify vk t
