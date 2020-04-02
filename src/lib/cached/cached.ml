@@ -9,7 +9,8 @@ let try_load bin path =
   match%map Storage.Disk.load_with_checksum controller path with
   | Ok {Storage.Checked_data.data; checksum} ->
       Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-        "Loaded value successfully from %s" path ;
+        ~metadata:[("path", `String path)]
+        "Loaded value successfully from $path" ;
       Ok {path; value= data; checksum}
   | Error `Checksum_no_match ->
       Or_error.error_string "Checksum failure"
