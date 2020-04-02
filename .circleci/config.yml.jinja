@@ -52,7 +52,7 @@ jobs:
     test-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9638cde8840455bfbaa0c5d58280b8a7f7d41ff9
+            - image: codaprotocol/coda:toolchain-678790fb5414342d1cf42fac8ce95acaf8931fdf
               environment:
                 CODA_DOCKER: true
             - image: postgres:12
@@ -83,7 +83,7 @@ jobs:
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9638cde8840455bfbaa0c5d58280b8a7f7d41ff9
+            - image: codaprotocol/coda:toolchain-678790fb5414342d1cf42fac8ce95acaf8931fdf
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -129,7 +129,7 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-9638cde8840455bfbaa0c5d58280b8a7f7d41ff9
+            - image: codaprotocol/coda:toolchain-678790fb5414342d1cf42fac8ce95acaf8931fdf
         steps:
             - checkout
             - run:
@@ -158,7 +158,7 @@ jobs:
                   command: ./scripts/require-ppx-coda.py
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-9638cde8840455bfbaa0c5d58280b8a7f7d41ff9
+            - image: codaprotocol/coda:toolchain-678790fb5414342d1cf42fac8ce95acaf8931fdf
         steps:
             - checkout
             - run:
@@ -175,7 +175,7 @@ jobs:
                   command: ./scripts/compare_pr_diff_types.sh
     compare-test-signatures:
         docker:
-            - image: codaprotocol/coda:toolchain-9638cde8840455bfbaa0c5d58280b8a7f7d41ff9
+            - image: codaprotocol/coda:toolchain-678790fb5414342d1cf42fac8ce95acaf8931fdf
         steps:
             - checkout
             - run:
@@ -335,7 +335,7 @@ jobs:
     build-client-sdk:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-9638cde8840455bfbaa0c5d58280b8a7f7d41ff9
+            - image: codaprotocol/coda:toolchain-678790fb5414342d1cf42fac8ce95acaf8931fdf
         steps:
             - checkout
             - run:
@@ -359,7 +359,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9638cde8840455bfbaa0c5d58280b8a7f7d41ff9
+            - image: codaprotocol/coda:toolchain-678790fb5414342d1cf42fac8ce95acaf8931fdf
         steps:
             - checkout
             - run:
@@ -451,7 +451,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9638cde8840455bfbaa0c5d58280b8a7f7d41ff9
+            - image: codaprotocol/coda:toolchain-678790fb5414342d1cf42fac8ce95acaf8931fdf
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -473,7 +473,7 @@ jobs:
     test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9638cde8840455bfbaa0c5d58280b8a7f7d41ff9
+            - image: codaprotocol/coda:toolchain-678790fb5414342d1cf42fac8ce95acaf8931fdf
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -494,7 +494,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9638cde8840455bfbaa0c5d58280b8a7f7d41ff9
+            - image: codaprotocol/coda:toolchain-678790fb5414342d1cf42fac8ce95acaf8931fdf
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -516,7 +516,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-9638cde8840455bfbaa0c5d58280b8a7f7d41ff9
+            - image: codaprotocol/coda:toolchain-678790fb5414342d1cf42fac8ce95acaf8931fdf
         steps:
             - checkout
             - run:
@@ -538,7 +538,7 @@ jobs:
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-9638cde8840455bfbaa0c5d58280b8a7f7d41ff9
+            - image: codaprotocol/coda:toolchain-678790fb5414342d1cf42fac8ce95acaf8931fdf
         steps:
             - checkout
             - run:
