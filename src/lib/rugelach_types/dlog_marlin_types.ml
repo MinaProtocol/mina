@@ -152,6 +152,38 @@ module PolyComm = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 end
 
+module Challenge_message = struct
+  module Challenge_polynomial = struct
+    type ('fq, 'pc) t = {challenges: 'fq array; commitment: 'pc} [@@deriving bin_io]
+
+    open Snarky.H_list
+
+    let to_hlist {challenges; commitment} = [challenges; commitment]
+
+    let of_hlist ([challenges; commitment] : (unit, _) t) = {challenges; commitment}
+
+    let typ fq pc ~length =
+      let open Snarky.Typ in
+      of_hlistable
+        [array ~length fq; pc]
+        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+        ~value_of_hlist:of_hlist
+  end
+
+  type ('fq, 'pc) t = {message: (('fq, 'pc) Challenge_polynomial.t) array} [@@deriving bin_io]
+
+  let to_hlist {message} = Snarky.H_list.[message]
+
+  let of_hlist ([message] : (unit, _) Snarky.H_list.t) = {message}
+
+  let typ ms ~length =
+    let open Snarky.Typ in
+    of_hlistable
+      [array ~length ms]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
+end
+
 module Messages = struct
   type ('pc, 'fq) t =
     { w_hat: 'pc

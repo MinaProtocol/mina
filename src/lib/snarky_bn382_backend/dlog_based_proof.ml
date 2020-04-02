@@ -1,12 +1,6 @@
 open Core_kernel
 open Rugelach_types
 
-module Challenge_polynomial = struct
-  type t = {challenges: Fq.t array; commitment: G.Affine.t} [@@deriving bin_io]
-end
-
-type message = Challenge_polynomial.t list
-
 type t =
 ( 
   (
@@ -192,7 +186,6 @@ let to_backend vk primary_input
       | Some shifted -> Some (g shifted)
       | None -> None
     in
-    let open Snarky_bn382.Fq_poly_comm in
     let t = Snarky_bn382.Fq_poly_comm.make unsh sh in
     t
   in
