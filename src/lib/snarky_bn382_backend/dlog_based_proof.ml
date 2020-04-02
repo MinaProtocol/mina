@@ -116,8 +116,14 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
       ; sigma_gh_3= (fq sigma3, (pc g3_comm_nocopy, pc h3_comm)) }
   ; openings= {proof; evals} }
 
+let evalvec arr =
+  let open Snarky_bn382.Fq in
+  let vec = Snarky_bn382.Fq.Vector.create () in
+  Array.iter arr ~f:(fun fe -> Snarky_bn382.Fq.Vector.emplace_back vec fe ) ;
+  vec
+
 let eval_to_backend
-    { Dlog_marlin_types.Evals.w_hat
+    {Dlog_marlin_types.Evals.w_hat
     ; z_hat_a
     ; z_hat_b
     ; h_1
@@ -130,9 +136,28 @@ let eval_to_backend
     ; g_1
     ; g_2
     ; g_3 } =
-  Snarky_bn382.Fq_proof.Evaluations.make w_hat z_hat_a z_hat_b h_1 g_1 h_2 g_2
-    h_3 g_3 row_a row_b row_c col_a col_b col_c value_a value_b value_c rc_a
-    rc_b rc_c
+  Snarky_bn382.Fq_proof.Evaluations.make
+    (evalvec w_hat)
+    (evalvec z_hat_a)
+    (evalvec z_hat_b)
+    (evalvec h_1)
+    (evalvec g_1)
+    (evalvec h_2)
+    (evalvec g_2)
+    (evalvec h_3)
+    (evalvec g_3)
+    (evalvec row_a)
+    (evalvec row_b)
+    (evalvec row_c)
+    (evalvec col_a)
+    (evalvec col_b)
+    (evalvec col_c)
+    (evalvec value_a)
+    (evalvec value_b)
+    (evalvec value_c)
+    (evalvec rc_a)
+    (evalvec rc_b)
+    (evalvec rc_c)
 
 let to_backend vk primary_input
     ({ messages=
@@ -163,52 +188,29 @@ let to_backend vk primary_input
           (Snarky_bn382.G.Affine.Pair.make (g l) (g r)) ) ;
     v
   in
-  Snarky_bn382.Fq_proof.make primary_input (g w_comm) (g za_comm) (g zb_comm)
-    (g h1_comm) (g g1_comm_0) (g g1_comm_1) (g h2_comm) (g g2_comm_0)
-    (g g2_comm_1) (g h3_comm) (g g3_comm_0) (g g3_comm_1) sigma2 sigma3 lr z_1
-    z_2 (g delta) (g sg)
+  Snarky_bn382.Fq_proof.make
+    primary_input 
+    (pc w_comm) 
+    (g za_comm) 
+    (g zb_comm)
+    (g h1_comm) 
+    (g g1_comm) 
+    (g h2_comm) 
+    (g g2_comm)
+    (g h3_comm) 
+    (g g3_comm) 
+    sigma2 
+    sigma3 
+    lr 
+    z_1
+    z_2 
+    (g delta) 
+    (g sg)
     (* Leaky! *)
     (eval_to_backend evals0)
-    (eval_to_backend evals1) (eval_to_backend evals2)
-
-let to_backend1 vk primary_input
-    (
-      {
-        messages=
-        {
-          w_hat= w_comm
-          ; z_hat_a= za_comm
-          ; z_hat_b= zb_comm
-          ; gh_1= g1_comm, h1_comm
-          ; sigma_gh_2= sigma2, (g2_comm, h2_comm)
-          ; sigma_gh_3= sigma3, (g3_comm, h3_comm)
-        }
-        ; openings=
-        {
-          proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1, evals2
-        }
-      } : t
-    ) : Snarky_bn382.Fq_proof.t =
-  let g (a, b) =
-    let open Snarky_bn382.G.Affine in
-    let t = create a b in
-    Caml.Gc.finalise delete t ; t
-  in
-  let lr =
-    let v = Snarky_bn382.G.Affine.Pair.Vector.create () in
-    Array.iter lr ~f:(fun (l, r) ->
-        (* Very leaky *)
-        Snarky_bn382.G.Affine.Pair.Vector.emplace_back v
-          (Snarky_bn382.G.Affine.Pair.make (g l) (g r)) ) ;
-    v
-  in
-  Snarky_bn382.Fq_proof.make vk primary_input (g w_comm) (g za_comm) (g zb_comm)
-    (g h1_comm) (g g1_comm_0) (g g1_comm_1) (g h2_comm) (g g2_comm_0)
-    (g g2_comm_1) (g h3_comm) (g g3_comm_0) (g g3_comm_1) sigma2 sigma3 lr z_1
-    z_2 (g delta) (g sg)
-    (* Leaky! *)
-    (eval_to_backend evals0)
-    (eval_to_backend evals1) (eval_to_backend evals2)
+    (eval_to_backend evals1)
+    (eval_to_backend evals2)
+    primary_input (*this is temporary dummy*)
 
 let create ?message pk ~primary ~auxiliary =
   let res = Snarky_bn382.Fq_proof.create pk primary auxiliary in
