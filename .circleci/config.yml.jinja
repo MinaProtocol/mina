@@ -330,6 +330,7 @@ jobs:
                 name: Build portable binary
                 command: |
                     make macos-portable
+                    cp _build/coda-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
