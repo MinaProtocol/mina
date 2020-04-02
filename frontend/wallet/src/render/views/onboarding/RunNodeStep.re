@@ -33,7 +33,7 @@ module Styles = {
 let make = (~prevStep as _, ~createAccount, ~managed) => {
   // Start the daemon process if we're in managed setup
   let dispatch = React.useContext(ProcessDispatchProvider.context);
-  managed ? CodaProcess.useStartEffect(dispatch) : ();
+  CodaProcess.useStartEffect(managed ? Some(dispatch) : None);
 
   <OnboardingTemplate
     heading="Connecting to the Network"

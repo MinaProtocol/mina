@@ -62,15 +62,15 @@ let useHook = () => {
   dispatch;
 };
 
-let useStartEffect = dispatch => {
+let useStartEffect = optDispatch => {
   React.useEffect0(() => {
     let token = MainCommunication.listen();
-    let args =
-      switch (getLocalStorageNetwork()) {
-      | "" => []
-      | s => ["-peer", s]
-      };
-    dispatch(Action.StartCoda(args));
+    let args = defaultArgs;
+
+    switch (optDispatch) {
+    | Some(dispatch) => dispatch(Action.StartCoda(args))
+    | None => ()
+    };
 
     // Passback a handler to cancel the listener.
     Some(() => MainCommunication.stopListening(token));
