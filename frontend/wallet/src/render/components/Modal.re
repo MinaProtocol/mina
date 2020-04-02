@@ -73,8 +73,8 @@ module Binding = {
     "react-modal";
 
   type document;
-  [@bs.val] external document: document = "";
-  [@bs.send] external getElementById: (document, string) => Dom.element = "";
+  [@bs.val] external document: document = "document";
+  [@bs.send] external getElementById: (document, string) => Dom.element = "getElementById";
 };
 
 // Wrap react-modal with a default style

@@ -65,7 +65,7 @@ module Decoders = {
     let s = Option.getExn(Js.Json.decodeString(pk));
     // hack for supporting faker
     if (s == "<UInt64>" && isFaker) {
-      Int64.of_int(100);
+      Int64.of_string("66000000000000");
     } else {
       Int64.of_string(s);
     };
@@ -108,4 +108,9 @@ module Decoders = {
 module Encoders = {
   let publicKey = s => s |> PublicKey.toString |> Js.Json.string;
   let int64 = s => s |> Int64.to_string |> Js.Json.string;
+  let currency = s =>
+    s
+    |> CurrencyFormatter.ofFormattedString
+    |> Int64.to_string
+    |> Js.Json.string;
 };
