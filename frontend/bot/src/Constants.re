@@ -6,7 +6,8 @@ let getEnvOrFail = name =>
 
 let getEnv = (~default, name) =>
   Js.Dict.get(Node.Process.process##env, name)
-  ->Belt.Option.getWithDefault(default);
+  ->Belt.Option.getWithDefault(default)
+  ->Js.String2.trim;
 
 let getEnvOpt = name => Js.Dict.get(Node.Process.process##env, name);
 
