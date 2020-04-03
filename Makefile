@@ -113,9 +113,7 @@ macos-portable:
 	@rm -rf _build/coda-daemon-macos/
 	@rm -rf _build/coda-daemon-macos.zip
 	@./scripts/macos-portable.sh _build/default/src/app/cli/src/coda.exe src/app/libp2p_helper/result/bin/libp2p_helper _build/coda-daemon-macos
-	@cd _build/coda-daemon-macos
-	@zip -r ../coda-daemon-macos.zip .
-	@cd ../..
+	@zip -r -j _build/coda-daemon-macos.zip _build/coda-daemon-macos/
 	@echo Find coda-daemon-macos.zip inside _build/
 
 update-graphql:
