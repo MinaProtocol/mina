@@ -3,15 +3,8 @@ open Rugelach_types
 
 type t =
 ( 
-  (
-    G.Affine.t
-  ) Dlog_marlin_types.PolyComm.t, 
   Fq.t, 
-  (
-    Fq.t, 
-    Fq.t array, 
-    G.Affine.t
-  ) Dlog_marlin_types.Openings.t 
+  G.Affine.t
 ) Dlog_marlin_types.Proof.t
 [@@deriving bin_io]
 
@@ -108,7 +101,7 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
       ; gh_1= (pc g1_comm_nocopy, pc h1_comm)
       ; sigma_gh_2= (fq sigma2, (pc g2_comm_nocopy, pc h2_comm))
       ; sigma_gh_3= (fq sigma3, (pc g3_comm_nocopy, pc h3_comm)) }
-  ; openings= {proof; evals} }
+  ; opening= {proof; evals} }
 
 let evalvec arr =
   let open Snarky_bn382.Fq in
@@ -161,9 +154,10 @@ let to_backend vk primary_input
          ; gh_1= g1_comm, h1_comm
          ; sigma_gh_2= sigma2, (g2_comm, h2_comm)
          ; sigma_gh_3= sigma3, (g3_comm, h3_comm) }
-     ; openings=
+     ; opening=
          {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1, evals2} } :
       t) : Snarky_bn382.Fq_proof.t =
+
   let primary_input =
     let v = Fq.Vector.create () in
     List.iter ~f:(Fq.Vector.emplace_back v) primary_input ;

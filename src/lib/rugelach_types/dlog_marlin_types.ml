@@ -3,19 +3,19 @@ open Core_kernel
 
 module Evals = struct
   type 'a t =
-    { w_hat: 'a
-    ; z_hat_a: 'a
-    ; z_hat_b: 'a
-    ; h_1: 'a
-    ; h_2: 'a
-    ; h_3: 'a
-    ; row: 'a Abc.t
-    ; col: 'a Abc.t
-    ; value: 'a Abc.t
-    ; rc: 'a Abc.t
-    ; g_1: 'a
-    ; g_2: 'a
-    ; g_3: 'a }
+    { w_hat: 'a array
+    ; z_hat_a: 'a array
+    ; z_hat_b: 'a array
+    ; h_1: 'a array
+    ; h_2: 'a array
+    ; h_3: 'a array
+    ; row: 'a array Abc.t
+    ; col: 'a array Abc.t
+    ; value: 'a array Abc.t
+    ; rc: 'a array Abc.t
+    ; g_1: 'a array
+    ; g_2: 'a array
+    ; g_3: 'a array }
   [@@deriving fields, bin_io]
 
   let to_vectors
@@ -73,7 +73,7 @@ module Evals = struct
          ; rc_b
          ; rc_c ]
        , [g_1; g_2; g_3] ) :
-        ('a, _) Vector.t * ('a, _) Vector.t) : 'a t =
+        ('a array, _) Vector.t * ('a array, _) Vector.t) : 'a t =
     { w_hat
     ; z_hat_a
     ; z_hat_b
@@ -88,9 +88,9 @@ module Evals = struct
     ; g_2
     ; g_3 }
 
-  let typ fq =
+  let typ fg =
     let t =
-      Snarky.Typ.tuple2 (Vector.typ fq Nat.N18.n) (Vector.typ fq Nat.N3.n)
+      Snarky.Typ.tuple2 (Vector.typ fg Nat.N18.n) (Vector.typ fg Nat.N3.n)
     in
     Snarky.Typ.transport t ~there:to_vectors ~back:of_vectors
     |> Snarky.Typ.transport_var ~there:to_vectors ~back:of_vectors
@@ -98,8 +98,8 @@ end
 
 module Openings = struct
   module Bulletproof = struct
-    type ('fq, 'g) t =
-      {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
+    type ('fg, 'g) t =
+      {lr: ('g * 'g) array; z_1: 'fg; z_2: 'fg; delta: 'g; sg: 'g}
     [@@deriving bin_io]
 
     open Snarky.H_list
@@ -109,29 +109,29 @@ module Openings = struct
     let of_hlist ([lr; z_1; z_2; delta; sg] : (unit, _) t) =
       {lr; z_1; z_2; delta; sg}
 
-    let typ fq g ~length =
+    let typ fg g ~length =
       let open Snarky.Typ in
       of_hlistable
-        [array ~length (g * g); fq; fq; g; g]
+        [array ~length (g * g); fg; fg; g; g]
         ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
         ~value_of_hlist:of_hlist
   end
 
   open Evals
 
-  type ('fq, 'fqv, 'g) t =
-    {proof: ('fq, 'g) Bulletproof.t; evals: 'fqv Evals.t Triple.t}
+  type ('fg, 'g) t =
+    {proof: ('fg, 'g) Bulletproof.t; evals: 'fg Evals.t Triple.t}
   [@@deriving bin_io]
 
   let to_hlist {proof; evals} = Snarky.H_list.[proof; evals]
 
   let of_hlist ([proof; evals] : (unit, _) Snarky.H_list.t) = {proof; evals}
 
-  let typ fq fqv g ~length =
+  let typ fg fgv g ~length =
     let open Snarky.Typ in
     let triple x = tuple3 x x x in
     of_hlistable
-      [Bulletproof.typ fq g ~length; triple (Evals.typ fqv)]
+      [Bulletproof.typ fg g ~length; triple (Evals.typ fgv)]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
@@ -152,46 +152,31 @@ module PolyComm = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist ~value_of_hlist:of_hlist
 end
 
-module Challenge_message = struct
-  module Challenge_polynomial = struct
-    type ('fq, 'pc) t = {challenges: 'fq array; commitment: 'pc} [@@deriving bin_io]
+module Challenge_polynomial = struct
+  type ('fg, 'g) t = {challenges: 'fg array; commitment: ('g) PolyComm.t} [@@deriving bin_io]
 
-    open Snarky.H_list
+  open Snarky.H_list
 
-    let to_hlist {challenges; commitment} = [challenges; commitment]
+  let to_hlist {challenges; commitment} = [challenges; commitment]
 
-    let of_hlist ([challenges; commitment] : (unit, _) t) = {challenges; commitment}
+  let of_hlist ([challenges; commitment] : (unit, _) t) = {challenges; commitment}
 
-    let typ fq pc ~length =
-      let open Snarky.Typ in
-      of_hlistable
-        [array ~length fq; pc]
-        ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-        ~value_of_hlist:of_hlist
-  end
-
-  type ('fq, 'pc) t = {message: (('fq, 'pc) Challenge_polynomial.t) array} [@@deriving bin_io]
-
-  let to_hlist {message} = Snarky.H_list.[message]
-
-  let of_hlist ([message] : (unit, _) Snarky.H_list.t) = {message}
-
-  let typ ms ~length =
+  let typ fg pc ~length =
     let open Snarky.Typ in
     of_hlistable
-      [array ~length ms]
+      [array ~length fg; pc]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
 
 module Messages = struct
-  type ('pc, 'fq) t =
-    { w_hat: 'pc
-    ; z_hat_a: 'pc
-    ; z_hat_b: 'pc
-    ; gh_1: 'pc * 'pc
-    ; sigma_gh_2: 'fq * ('pc * 'pc)
-    ; sigma_gh_3: 'fq * ('pc * 'pc) }
+  type ('fg, 'g) t =
+    { w_hat: (('g) PolyComm.t)
+    ; z_hat_a: (('g) PolyComm.t)
+    ; z_hat_b: (('g) PolyComm.t)
+    ; gh_1: (('g) PolyComm.t) * (('g) PolyComm.t)
+    ; sigma_gh_2: 'fg * ((('g) PolyComm.t) * (('g) PolyComm.t))
+    ; sigma_gh_3: 'fg * ((('g) PolyComm.t) * (('g) PolyComm.t)) }
   [@@deriving fields, bin_io]
 
   let to_hlist {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3} =
@@ -202,28 +187,56 @@ module Messages = struct
         (unit, _) Snarky.H_list.t) =
     {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3}
 
-  let typ pc fq =
+  let typ fg g opt ~length =
     let open Snarky.Typ in
+    let pc = PolyComm.typ g opt ~length in
     of_hlistable
-      [pc; pc; pc; pc * pc; fq * (pc * pc); fq * (pc * pc)]
+      [pc; pc; pc; pc * pc; fg * (pc * pc); fg * (pc * pc)]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
-
+(*
 module Proof = struct
-  type ('pc, 'fq, 'openings) t =
-    {messages: ('pc, 'fq) Messages.t; openings: 'openings}
-  [@@(* ('proof, 'fq) Openings.t} *)
+  type ('fg, 'g) t =
+    {
+      messages: ('fg, 'g) Messages.t; 
+      opening: ('fg, 'g) Openings.t; 
+      challenges: (('fg, ('g) PolyComm.t) Challenge_polynomial.t) array;
+    }
+  [@@(* ('proof, 'fg) Openings.t} *)
     deriving fields, bin_io]
 
-  let to_hlist {messages; openings} = Snarky.H_list.[messages; openings]
+  let to_hlist {messages; opening; challenges} = Snarky.H_list.[messages; opening; challenges]
 
-  let of_hlist ([messages; openings] : (unit, _) Snarky.H_list.t) =
-    {messages; openings}
+  let of_hlist ([messages; opening; challenges] : (unit, _) Snarky.H_list.t) =
+    {messages; opening; challenges}
 
-  let typ pc fq openings =
+  let typ pc fg fgv opening challenges ~length =
+    let open Snarky.Typ in
     Snarky.Typ.of_hlistable
-      [Messages.typ pc fq; openings]
+      [Messages.typ pc fg; opening; array ~length challenges]
+      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
+      ~value_of_hlist:of_hlist
+end
+*)
+module Proof = struct
+  type ('fg, 'g) t =
+    {
+      messages: ('fg, 'g) Messages.t; 
+      opening: ('fg, 'g) Openings.t; 
+    }
+  [@@(* ('proof, 'fg) Openings.t} *)
+    deriving fields, bin_io]
+
+  let to_hlist {messages; opening;} = Snarky.H_list.[messages; opening;]
+
+  let of_hlist ([messages; opening;] : (unit, _) Snarky.H_list.t) =
+    {messages; opening;}
+
+  let typ fg fgv g opt ~length =
+    let open Snarky.Typ in
+    Snarky.Typ.of_hlistable
+      [Messages.typ fg g opt ~length; Openings.typ fg fgv g ~length]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
