@@ -35,7 +35,7 @@ let client = host => {
 
   let retryLink = ApolloLinks.from([|retry, httpLink|]);
 
-  let wsUri = "ws://localhost:3085/graphql";
+  let wsUri = "ws://" ++ parsedHost ++ ":3085/graphql";
   let wsObject: ReasonApolloTypes.webSocketLinkT = {
     uri: wsUri,
     options: {
