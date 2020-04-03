@@ -8,7 +8,6 @@ external createRetryLink: retryOptions => ReasonApolloTypes.apolloLink =
 
 let client = host => {
   let defaultPort = "3085";
-  Js.log(host);
   let parsedHost = switch (String.contains(~substring=":", host)) {
   | true => host
   | false => host ++ ":" ++ defaultPort
@@ -35,7 +34,7 @@ let client = host => {
 
   let retryLink = ApolloLinks.from([|retry, httpLink|]);
 
-  let wsUri = "ws://" ++ parsedHost ++ ":3085/graphql";
+  let wsUri = "ws://" ++ parsedHost ++ "/graphql";
   let wsObject: ReasonApolloTypes.webSocketLinkT = {
     uri: wsUri,
     options: {
