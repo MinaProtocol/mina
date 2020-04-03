@@ -1,6 +1,6 @@
 let getEnvOrFail = name =>
   switch (Js.Dict.get(Node.Process.process##env, name)) {
-  | Some(value) => value
+  | Some(value) => Js.String.trim(value)
   | None => failwith({j|Couldn't find env var: `$name`"|j})
   };
 
