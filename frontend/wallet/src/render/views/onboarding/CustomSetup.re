@@ -13,6 +13,7 @@ let make = (~prevStep, ~completeSetup) => {
     }
     miscLeft=
       <>
+        <Spacer height=1. />
         <Button
           label="Coda Install Guide"
           width=14.

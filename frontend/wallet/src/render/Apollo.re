@@ -8,6 +8,7 @@ external createRetryLink: retryOptions => ReasonApolloTypes.apolloLink =
 
 let client = host => {
   let defaultPort = "3085";
+  Js.log(host);
   let parsedHost = switch (String.contains(~substring=":", host)) {
   | true => host
   | false => host ++ ":" ++ defaultPort
