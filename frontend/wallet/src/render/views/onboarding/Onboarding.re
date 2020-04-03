@@ -1,9 +1,8 @@
 type onboardingPage =
   | Welcome
   | SetUpNode
-  | CustomSetupA
-  | CustomSetupB
-  | CustomSetupC
+  | CustomSetup
+  | PostCustomSetup
   | InstallCoda
   | PortForward
   | MachineConfigure
@@ -27,23 +26,17 @@ let make = () => {
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
     | SetUpNode =>
       <SetupNodeStep
-        customSetup={_ => setOnboardingStep(_ => CustomSetupA)}
+        customSetup={_ => setOnboardingStep(_ => CustomSetup)}
         expressSetup={_ => setOnboardingStep(_ => InstallCoda)}
       />
-    | CustomSetupA =>
-      <CustomSetupA
+    | CustomSetup =>
+      <CustomSetup
         prevStep={_ => setOnboardingStep(_ => SetUpNode)}
-        completeSetup={_ => setOnboardingStep(_ => CustomSetupC)}
+        completeSetup={_ => setOnboardingStep(_ => PostCustomSetup)}
       />
-    | CustomSetupB =>
-      <CustomSetupB
-        prevStep={_ => setOnboardingStep(_ => CustomSetupA)}
-        runNode={_ => setOnboardingStep(_ => RunNode(false))}
-        nextStep={_ => setOnboardingStep(_ => CustomSetupC)}
-      />
-    | CustomSetupC =>
-      <CustomSetupC
-        prevStep={_ => setOnboardingStep(_ => CustomSetupA)}
+    | PostCustomSetup =>
+      <PostCustomSetup
+        prevStep={_ => setOnboardingStep(_ => CustomSetup)}
         runNode={_ => setOnboardingStep(_ => RunNode(false))}
       />
     | InstallCoda =>
@@ -64,7 +57,9 @@ let make = () => {
         managed
       />
     | PortForwardError =>
-      <PortForwardErrorStep retry={_ => setOnboardingStep(_ => RunNode(true))} />
+      <PortForwardErrorStep
+        retry={_ => setOnboardingStep(_ => RunNode(true))}
+      />
     | DaemonError =>
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
     | AccountCreation =>
