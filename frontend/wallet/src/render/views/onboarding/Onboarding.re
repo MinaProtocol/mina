@@ -43,7 +43,7 @@ let make = () => {
       />
     | CustomSetupC =>
       <CustomSetupC
-        prevStep={_ => setOnboardingStep(_ => CustomSetupB)}
+        prevStep={_ => setOnboardingStep(_ => CustomSetupA)}
         runNode={_ => setOnboardingStep(_ => RunNode(false))}
       />
     | InstallCoda =>
