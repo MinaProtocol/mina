@@ -6,10 +6,15 @@ type retryOptions;
 external createRetryLink: retryOptions => ReasonApolloTypes.apolloLink =
   "RetryLink";
 
-let client = {
+let client = host => {
+  let defaultPort = "3085";
+  let parsedHost = switch (String.contains(~substring=":", host)) {
+  | true => host
+  | false => host ++ ":" ++ defaultPort
+  }
   let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
 
-  let httpUri = "http://localhost:3085/graphql";
+  let httpUri = "http://" ++ parsedHost ++ "/graphql";
   let httpLink =
     ApolloLinks.createHttpLink(~uri=httpUri, ~fetch=Bindings.Fetch.fetch, ());
 
