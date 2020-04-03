@@ -360,6 +360,7 @@ size_t camlsnark_bn382_fq_index_max_degree(void*);
 
 void camlsnark_bn382_fp_proof_delete(void *);
 void *camlsnark_bn382_fp_proof_create(void *, void* , void*);
+bool camlsnark_bn382_fp_proof_batch_verify(void *, void*);
 void *camlsnark_bn382_fp_proof_make(void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *,void *);
 
 void *camlsnark_bn382_fp_proof_w_comm(void *);
@@ -401,10 +402,23 @@ void *camlsnark_bn382_fp_proof_evals_0(void *);
 void *camlsnark_bn382_fp_proof_evals_1(void *);
 void *camlsnark_bn382_fp_proof_evals_2(void *);
 
+// Fp proof vector
+
+void *camlsnark_bn382_fp_proof_vector_create();
+
+int camlsnark_bn382_fp_proof_vector_length(void *);
+
+void camlsnark_bn382_fp_proof_vector_emplace_back(void *, void *);
+
+void *camlsnark_bn382_fp_proof_vector_get(void *, int);
+
+void camlsnark_bn382_fp_proof_vector_delete(void *);
+
 // Fq proof
 
 void camlsnark_bn382_fq_proof_delete(void *);
 void *camlsnark_bn382_fq_proof_create(void *, void* , void*, void*, void*);
+bool camlsnark_bn382_fq_proof_batch_verify(void *, void*);
 void *camlsnark_bn382_fq_proof_make(
     void*,
     void*, void*, void*,
@@ -437,6 +451,18 @@ void *camlsnark_bn382_fq_proof_proof(void *);
 
 void *camlsnark_bn382_fq_proof_sigma2(void *);
 void *camlsnark_bn382_fq_proof_sigma3(void *);
+
+// Fp proof vector
+
+void *camlsnark_bn382_fq_proof_vector_create();
+
+int camlsnark_bn382_fq_proof_vector_length(void *);
+
+void camlsnark_bn382_fq_proof_vector_emplace_back(void *, void *);
+
+void *camlsnark_bn382_fq_proof_vector_get(void *, int);
+
+void camlsnark_bn382_fq_proof_vector_delete(void *);
 
 // Fq proof evaluations
 
@@ -544,3 +570,6 @@ void camlsnark_bn382_g1_affine_pair_vector_delete(void *);
 void *camlsnark_bn382_fq_triple_0(void *);
 void *camlsnark_bn382_fq_triple_1(void *);
 void *camlsnark_bn382_fq_triple_2(void *);
+
+// Misc
+bool camlsnark_bn382_batch_pairing_check(void *,void *,void *,void *,void *,void *);

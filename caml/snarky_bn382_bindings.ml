@@ -321,18 +321,20 @@ module Pairing_marlin_proof
     (AffineCurve : Type)
     (ScalarField : Type)
     (Index : Type)
+    (VerifierIndex : Type)
     (FieldVector : Type)
     (F : Ctypes.FOREIGN) =
 struct
   open F
 
-  include (
-    struct
-        type t = unit ptr
+  module T : Type = struct
+    type t = unit ptr
 
-        let typ = ptr void
-      end :
-      Type )
+    let typ = ptr void
+  end
+
+  include T
+  module Vector = Vector (P) (T) (F)
 
   module Evals = struct
     include (
@@ -359,6 +361,10 @@ struct
   let create =
     foreign (prefix "create")
       (Index.typ @-> FieldVector.typ @-> FieldVector.typ @-> returning typ)
+
+  let batch_verify =
+    foreign (prefix "batch_verify")
+      (VerifierIndex.typ @-> Vector.typ @-> returning bool)
 
   let make =
     foreign (prefix "make")
@@ -524,6 +530,7 @@ module Dlog_marlin_proof
     end)
     (ScalarField : Type)
     (Index : Type)
+    (VerifierIndex : Type)
     (FieldVector : Type)
     (FieldTriple : Type)
     (OpeningProof : Type)
@@ -531,13 +538,14 @@ module Dlog_marlin_proof
 struct
   open F
 
-  include (
-    struct
-        type t = unit ptr
+  module T : Type = struct
+    type t = unit ptr
 
-        let typ = ptr void
-      end :
-      Type )
+    let typ = ptr void
+  end
+
+  include T
+  module Vector = Vector (P) (T) (F)
 
   module Evaluations = struct
     module T : Type = struct
@@ -617,6 +625,10 @@ struct
     foreign (prefix "create")
       ( Index.typ @-> FieldVector.typ @-> FieldVector.typ @-> FieldVector.typ
       @-> AffineCurve.Vector.typ @-> returning typ )
+
+  let batch_verify =
+    foreign (prefix "batch_verify")
+      (VerifierIndex.typ @-> Vector.typ @-> returning bool)
 
   let delete = foreign (prefix "delete") (typ @-> returning void)
 
@@ -957,6 +969,7 @@ module Full (F : Ctypes.FOREIGN) = struct
       (G1.Affine)
       (Fp)
       (Fp_index)
+      (Fp_verifier_index)
       (Fp.Vector)
       (F)
 
@@ -1024,6 +1037,7 @@ module Full (F : Ctypes.FOREIGN) = struct
       (G.Affine)
       (Fq)
       (Fq_index)
+      (Fq_verifier_index)
       (Fq.Vector)
       (Fq_triple)
       (Fq_opening_proof)
@@ -1038,4 +1052,12 @@ module Full (F : Ctypes.FOREIGN) = struct
       (Fq_proof)
       (Fq_triple)
       (F)
+
+  let batch_pairing_check =
+    let open F in
+    foreign
+      (prefix "batch_pairing_check")
+      ( Fp_urs.typ @-> Usize_vector.typ @-> G1.Affine.Vector.typ
+      @-> G1.Affine.Vector.typ @-> G1.Affine.Vector.typ
+      @-> G1.Affine.Vector.typ @-> returning bool )
 end
