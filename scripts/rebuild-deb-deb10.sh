@@ -25,7 +25,7 @@ else
     VERSION="${GITTAG}+${CIRCLE_BUILD_NUM}-${GITBRANCH}-${GITHASH}-PV${PVKEYHASH}"
 fi
 
-BUILDDIR="deb_build"
+BUILDDIR="deb10_build"
 
 mkdir -p "${BUILDDIR}/DEBIAN"
 cat << EOF > "${BUILDDIR}/DEBIAN/control"
