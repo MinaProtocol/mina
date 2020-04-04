@@ -89,7 +89,8 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
            ; rc= abc rc_nocopy
            ; g_1= fqv g1
            ; g_2= fqv g2
-           ; g_3= fqv g3 } )
+           ; g_3= fqv g3
+          } )
   in
   let fq = fq t in
   let pc = pc t in
@@ -101,7 +102,8 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
       ; gh_1= (pc g1_comm_nocopy, pc h1_comm)
       ; sigma_gh_2= (fq sigma2, (pc g2_comm_nocopy, pc h2_comm))
       ; sigma_gh_3= (fq sigma3, (pc g3_comm_nocopy, pc h3_comm)) }
-  ; opening= {proof; evals} }
+  ; opening= {proof; evals}
+  (*; challenges=*) }
 
 let evalvec arr =
   let open Snarky_bn382.Fq in

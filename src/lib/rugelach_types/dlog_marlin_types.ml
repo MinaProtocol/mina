@@ -161,10 +161,10 @@ module Challenge_polynomial = struct
 
   let of_hlist ([challenges; commitment] : (unit, _) t) = {challenges; commitment}
 
-  let typ fg pc ~length =
+  let typ fg g opt ~length:length1 ~length:length2 =
     let open Snarky.Typ in
     of_hlistable
-      [array ~length fg; pc]
+      [array ~length:length1 fg; PolyComm.typ g opt ~length:length2]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
@@ -195,13 +195,14 @@ module Messages = struct
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
+
 (*
 module Proof = struct
   type ('fg, 'g) t =
     {
       messages: ('fg, 'g) Messages.t; 
       opening: ('fg, 'g) Openings.t; 
-      challenges: (('fg, ('g) PolyComm.t) Challenge_polynomial.t) array;
+      challenges: (('fg, 'g) Challenge_polynomial.t) array;
     }
   [@@(* ('proof, 'fg) Openings.t} *)
     deriving fields, bin_io]
@@ -211,14 +212,19 @@ module Proof = struct
   let of_hlist ([messages; opening; challenges] : (unit, _) Snarky.H_list.t) =
     {messages; opening; challenges}
 
-  let typ pc fg fgv opening challenges ~length =
+  let typ fg fgv g opt ~length:length1 ~length:length2 ~length:length3 ~length:length4 ~length:length5 =
     let open Snarky.Typ in
     Snarky.Typ.of_hlistable
-      [Messages.typ pc fg; opening; array ~length challenges]
+      [
+        Messages.typ fg g opt ~length:length1; 
+        Openings.typ fg fgv g ~length:length2; 
+        array (Challenge_polynomial.typ fg g opt ~length:length3 ~length:length4) ~length:length5
+      ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
 *)
+
 module Proof = struct
   type ('fg, 'g) t =
     {
@@ -228,15 +234,18 @@ module Proof = struct
   [@@(* ('proof, 'fg) Openings.t} *)
     deriving fields, bin_io]
 
-  let to_hlist {messages; opening;} = Snarky.H_list.[messages; opening;]
+  let to_hlist {messages; opening} = Snarky.H_list.[messages; opening]
 
-  let of_hlist ([messages; opening;] : (unit, _) Snarky.H_list.t) =
-    {messages; opening;}
+  let of_hlist ([messages; opening] : (unit, _) Snarky.H_list.t) =
+    {messages; opening}
 
-  let typ fg fgv g opt ~length =
+  let typ fg fgv g opt ~length:length1 ~length:length2 =
     let open Snarky.Typ in
     Snarky.Typ.of_hlistable
-      [Messages.typ fg g opt ~length; Openings.typ fg fgv g ~length]
+      [
+        Messages.typ fg g opt ~length:length1; 
+        Openings.typ fg fgv g ~length:length2; 
+      ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist
 end
