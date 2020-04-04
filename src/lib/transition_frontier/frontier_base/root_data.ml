@@ -52,7 +52,6 @@ module Limited = struct
           ; ("scan_state", `String "<opaque>")
           ; ("pending_coinbase", Pending_coinbase.to_yojson pending_coinbase)
           ]
-      let to_latest = Fn.id
     end
   end]
 
@@ -60,6 +59,9 @@ module Limited = struct
     { transition: External_transition.Validated.t
     ; scan_state: Staged_ledger.Scan_state.t
     ; pending_coinbase: Pending_coinbase.t }
+
+  [%%define_locally
+  Stable.Latest.(to_yojson)]
 end
 
 module Minimal = struct
