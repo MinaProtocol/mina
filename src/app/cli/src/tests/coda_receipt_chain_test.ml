@@ -34,7 +34,7 @@ let main () =
   let receiver_pk = Public_key.compress another_account_keypair.public_key in
   let sender_sk = largest_account_keypair.private_key in
   let send_amount = Currency.Amount.of_int 10 in
-  let fee = User_command.minimum_fee in
+  let fee = Coda_compile_config.minimum_transaction_fee in
   let%bind program_dir = Unix.getcwd () in
   let work_selection_method =
     Cli_lib.Arg_type.Work_selection_method.Sequence
