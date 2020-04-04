@@ -6,9 +6,12 @@ let getEnvOrFail = name =>
 
 let getEnv = (~default, name) =>
   Js.Dict.get(Node.Process.process##env, name)
-  ->Belt.Option.getWithDefault(default);
+  ->Belt.Option.getWithDefault(default)
+  ->Js.String.trim;
 
-let getEnvOpt = name => Js.Dict.get(Node.Process.process##env, name);
+let getEnvOpt = name =>
+  Js.Dict.get(Node.Process.process##env, name)
+  ->Belt.Option.map(Js.String.trim);
 
 let echoKey = getEnvOpt("ECHO_PUBLICKEY");
 let echoPassword = getEnvOpt("ECHO_PASSWORD");

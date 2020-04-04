@@ -45,6 +45,14 @@ module Limited = struct
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
 
       let to_latest = Fn.id
+
+      let to_yojson {transition; scan_state= _; pending_coinbase} =
+        `Assoc
+          [ ("transition", External_transition.Validated.to_yojson transition)
+          ; ("scan_state", `String "<opaque>")
+          ; ("pending_coinbase", Pending_coinbase.to_yojson pending_coinbase)
+          ]
+      let to_latest = Fn.id
     end
   end]
 
