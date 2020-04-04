@@ -6,7 +6,6 @@
 open Core
 open Async
 open Coda_base
-open Module_version
 open Pipe_lib
 open Signature_lib
 open Network_peer
@@ -477,30 +476,15 @@ struct
       t
 
     module Diff = struct
+      [%%versioned
       module Stable = struct
         module V1 = struct
-          module T = struct
-            type t = User_command.Stable.V1.t list
-            [@@deriving bin_io, sexp, yojson, version]
-          end
+          type t = User_command.Stable.V1.t list [@@deriving sexp, yojson]
 
-          include T
-          include Registration.Make_latest_version (T)
+          let to_latest = Fn.id
         end
+      end]
 
-        module Latest = V1
-
-        module Module_decl = struct
-          let name = "transaction_pool_diff"
-
-          type latest = Latest.t
-        end
-
-        module Registrar = Registration.Make (Module_decl)
-        module Registered_V1 = Registrar.Register (V1)
-      end
-
-      (* bin_io omitted *)
       type t = Stable.Latest.t [@@deriving sexp, yojson]
 
       module Diff_error = struct
