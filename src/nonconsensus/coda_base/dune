@@ -4,9 +4,9 @@
  (library_flags -linkall)
  (libraries
     coda_numbers_nonconsensus
-    coda_compile_config_nonconsensus
     currency_nonconsensus
     hash_prefix_states_nonconsensus
+    coda_compile_config_nonconsensus
     outside_pedersen_image_nonconsensus
     signature_lib_nonconsensus
     snark_params_nonconsensus
