@@ -6,7 +6,7 @@ Woof! I can help you get some coda on the testnet.
 Just send me a message in the #faucet channel with the following contents:
 `$request <public-key>`
 Once a mod approves, `|}
-  ++ Int64.to_string(Constants.faucetAmount)
+  ++ CurrencyFormatter.toFormattedString(Constants.faucetAmount)
   ++ {| coda` will be sent to the requested address!|};
 
 let requestError = {|
