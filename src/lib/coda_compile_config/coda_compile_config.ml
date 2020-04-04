@@ -28,6 +28,13 @@
 [%%inject
 "minimum_transaction_fee_string", minimum_transaction_fee]
 
+[%%ifndef
+consensus_mechanism]
+
+module Currency = Currency_nonconsensus.Currency
+
+[%%endif]
+
 let coinbase = Currency.Amount.of_formatted_string coinbase_string
 
 let account_creation_fee =
