@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 
-# compare representations of versioned types in OCaml files
+# compare representations of binable functors in OCaml files
 
-# expects two Ocaml files possibly containing versioned types
+# expects two Ocaml files possibly containing included binable functors
 #
 # the first file is the original, the second is the modified file
 
@@ -16,4 +16,4 @@ if __name__ == "__main__":
         print("The .ml files must have the same name, with different paths")
         sys.exit(1)
 
-    run_comparison('Versioned types',sys.argv[1],sys.argv[2])
+    run_comparison('Binable functors',sys.argv[1],sys.argv[2])
