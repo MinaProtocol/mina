@@ -55,6 +55,13 @@ module Limited = struct
           ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
           ; pending_coinbase: Pending_coinbase.Stable.V1.t }
         [@@deriving bin_io, version]
+
+        let to_yojson {transition; scan_state= _; pending_coinbase} =
+          `Assoc
+            [ ("transition", External_transition.Validated.to_yojson transition)
+            ; ("scan_state", `String "<opaque>")
+            ; ("pending_coinbase", Pending_coinbase.to_yojson pending_coinbase)
+            ]
       end
 
       include T

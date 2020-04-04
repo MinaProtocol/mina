@@ -83,7 +83,7 @@ jobs:
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
+            - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -129,7 +129,7 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
+            - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
         steps:
             - checkout
             - run:
@@ -158,7 +158,7 @@ jobs:
                   command: ./scripts/require-ppx-coda.py
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
+            - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
         steps:
             - checkout
             - run:
@@ -178,7 +178,7 @@ jobs:
                   command: ./scripts/compare_ci_diff_binables.sh
     compare-test-signatures:
         docker:
-            - image: codaprotocol/coda:toolchain-cf3d5dc87c195afd8eec14a2c4eaf9980004ee26
+            - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
         steps:
             - checkout
             - run:
@@ -324,11 +324,16 @@ jobs:
             - run:
                 name: Decode Apple Certificates
                 context: org-global
-                command: base64 -D -o Certificates.p12 <<< $APPLE_CERTIFICATES
+                command: base64 -D -o frontend/wallet/Certificates.p12 <<< $APPLE_CERTIFICATES
+            - run:
+                name: Fastlane
+                context: org-global
+                command: cd frontend/wallet && bundle exec fastlane ci && cd ../..
             - run:
                 name: Build portable binary
                 command: |
                     make macos-portable
+                    cp _build/coda-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
@@ -338,7 +343,7 @@ jobs:
     build-client-sdk:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-cf3d5dc87c195afd8eec14a2c4eaf9980004ee26
+            - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
         steps:
             - checkout
             - run:
@@ -362,7 +367,7 @@ jobs:
     build-artifacts--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
+            - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
         steps:
             - checkout
             - run:
@@ -375,9 +380,11 @@ jobs:
             - run:
                   name: Pin external packages
                   command: ./scripts/pin-external-packages.sh
+            # Explicitly generate PV-keys and uploading before building
+            # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
-                  name: Build OCaml
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  name: Generate PV keys
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: {{profile}}
                     EXTRA_NIX_ARGS: --option sandbox false
@@ -452,7 +459,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
+            - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -474,7 +481,7 @@ jobs:
     test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
+            - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -495,7 +502,7 @@ jobs:
     test-unit--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
+            - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -517,7 +524,7 @@ jobs:
     test--{{profile}}:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
+            - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
         steps:
             - checkout
             - run:
@@ -529,17 +536,17 @@ jobs:
             {%- for test in small_curves_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "{{profile}}:{{test}}"'
             {%- endfor %}
             - store_artifacts:
-                  path: test_logs
+                  path: test_output/artifacts
     {%- endfor %}
 
     {%- for profile in medium_curves_and_other_tests.keys() | sort %}
     test--{{profile}}:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-ccd2abf0c78d6b78024ec6add601aee6fc01044d
+            - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
         steps:
             - checkout
             - run:
@@ -551,13 +558,13 @@ jobs:
             {%- for test in medium_curves_and_other_tests[profile] %}
             - run:
                   name: Running test -- {{profile}}:{{test}}
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run "{{profile}}:{{test}}"'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "{{profile}}:{{test}}"'
                   {%- if profile in medium_curve_profiles %}
                   no_output_timeout: 20m
                   {%- endif %}
             {%- endfor %}
             - store_artifacts:
-                  path: test_logs
+                  path: test_output/artifacts
     {%- endfor %}
 
 workflows:

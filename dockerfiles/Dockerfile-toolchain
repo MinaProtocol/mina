@@ -42,7 +42,7 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     zlib1g-dev \
     libbz2-dev
 
-RUN sudo pip install sexpdata awscli
+RUN sudo pip install sexpdata awscli readchar
 
 RUN sudo gem install deb-s3
 
@@ -124,10 +124,11 @@ RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda
 RUN mkdir --mode=700 /home/opam/.gnupg
 RUN echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
 
-RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://nixos.org/nix/install && \
-    curl -o install-nix-2.3.2.sig https://nixos.org/nix/install.sig && \
+RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://releases.nixos.org/nix/nix-2.3.3/install && \
+    curl -o install-nix-2.3.2.asc https://releases.nixos.org/nix/nix-2.3.3/install.asc && \
     gpg2 --import < $CODA_DIR/.nix-key.gpg.asc && \
-    gpg2 --verify ./install-nix-2.3.2.sig && \
+    gpg2 --recv-keys B541D55301270E0BCF15CA5D8170B4726D7198DE && \
+    gpg2 --verify ./install-nix-2.3.2.asc && \
     sh ./install-nix-2.3.2 && \
     USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && \
     nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install

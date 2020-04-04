@@ -28,6 +28,7 @@ module Input = struct
     ; peers: string list
     ; max_concurrent_connections: int option
     ; is_archive_rocksdb: bool
+    ; is_seed: bool
     ; archive_process_location: Core.Host_and_port.t option }
   [@@deriving bin_io]
 end
@@ -428,6 +429,7 @@ module T = struct
         ; peers
         ; max_concurrent_connections= _ (* FIXME #4095: use this *)
         ; is_archive_rocksdb
+        ; is_seed
         ; archive_process_location
         ; _ } =
       let logger =
@@ -544,8 +546,8 @@ module T = struct
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
-                 ~initial_fork_id:Fork_id.empty
+                 ~is_seed ~coinbase_receiver:`Producer ~net_config
+                 ~gossip_net_params ~initial_fork_id:Fork_id.empty
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
