@@ -25,6 +25,9 @@
 [%%inject
 "default_snark_worker_fee_string", default_snark_worker_fee]
 
+[%%inject
+"minimum_transaction_fee_string", minimum_transaction_fee]
+
 let coinbase = Currency.Amount.of_formatted_string coinbase_string
 
 let account_creation_fee =
@@ -35,3 +38,6 @@ let default_transaction_fee =
 
 let default_snark_worker_fee =
   Currency.Fee.of_formatted_string default_snark_worker_fee_string
+
+let minimum_transaction_fee =
+  Currency.Fee.of_formatted_string minimum_transaction_fee_string

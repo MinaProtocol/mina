@@ -486,7 +486,7 @@ end = struct
   let delegate_stake ?acceptable_delay:(delay = 7) (testnet : Api.t) ~node
       ~delegator ~delegatee =
     let valid_until = Coda_numbers.Global_slot.max_value in
-    let fee = User_command.minimum_fee in
+    let fee = Coda_compile_config.minimum_transaction_fee in
     let worker = testnet.workers.(node) in
     let%bind _ =
       let open Deferred.Option.Let_syntax in
@@ -538,7 +538,7 @@ end = struct
       ~node ~keypairs ~n =
     let amount = Currency.Amount.of_int 10 in
     let valid_until = Coda_numbers.Global_slot.max_value in
-    let fee = User_command.minimum_fee in
+    let fee = Coda_compile_config.minimum_transaction_fee in
     let%bind (_ : unit option list) =
       Deferred.List.init n ~f:(fun _ ->
           let open Deferred.Option.Let_syntax in
@@ -593,7 +593,7 @@ end = struct
   let send_batch_consecutive_payments (testnet : Api.t) ~node ~sender
       ~(keypairs : Keypair.t list) ~n =
     let amount = Currency.Amount.of_int 10 in
-    let fee = User_command.minimum_fee in
+    let fee = Coda_compile_config.minimum_transaction_fee in
     let valid_until = Coda_numbers.Global_slot.max_value in
     let%bind new_payment_readers =
       Deferred.List.init (Array.length testnet.workers) ~f:(fun i ->
