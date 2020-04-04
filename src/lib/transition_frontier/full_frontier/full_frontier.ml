@@ -6,7 +6,10 @@ open Frontier_base
 
 module Node = struct
   type t =
-    {breadcrumb: Breadcrumb.t; successor_hashes: State_hash.t list; length: int}
+    { breadcrumb: Breadcrumb.t
+    ; successor_hashes: State_hash.t list
+    ; length: int
+    ; scan_state_ref_count: int }
   [@@deriving sexp, fields]
 
   type display =
@@ -32,6 +35,10 @@ module Node = struct
     {state_hash; blockchain_state; length= t.length; consensus_state}
 end
 
+module Protocol_state_node = struct
+  type t = {protocol_state: Protocol_state.value; scan_state_ref_count: int}
+end
+
 (* Invariant: The path from the root to the tip inclusively, will be max_length *)
 type t =
   { root_ledger: Ledger.Any_ledger.witness
@@ -40,6 +47,7 @@ type t =
   ; mutable hash: Frontier_hash.t
   ; logger: Logger.t
   ; table: Node.t State_hash.Table.t
+  ; protocol_state_table: Protocol_state_node.t State_hash.Table.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; max_length: int }
 
@@ -61,6 +69,27 @@ let find_exn t hash =
   let node = Hashtbl.find_exn t.table hash in
   node.breadcrumb
 
+let find_protocol_state (t : t) hash =
+  let open Option.Let_syntax in
+  match find t hash with
+  | None ->
+      let%map node = Hashtbl.find t.protocol_state_table hash in
+      node.protocol_state
+  | Some breadcrumb ->
+      Some
+        ( Breadcrumb.validated_transition breadcrumb
+        |> External_transition.Validated.protocol_state )
+
+let _find_protocol_state_exn t hash =
+  match find_protocol_state t hash with
+  | Some s ->
+      s
+  | None ->
+      failwith
+        (sprintf
+           !"Protocol state with hash %s not found"
+           (State_body_hash.to_yojson hash |> Yojson.Safe.to_string))
+
 let root t = find_exn t t.root
 
 let best_tip t = find_exn t t.best_tip
@@ -76,6 +105,25 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
   let open Root_data in
   let root_hash =
     External_transition.Validated.state_hash root_data.transition
+  in
+  let protocol_state_table =
+    (*TODO: from root_data*)
+    let root_protocol_states : Protocol_state.value list = [] in
+    let required_protocol_states =
+      Staged_ledger.Scan_state.required_protocol_states
+        (Staged_ledger.scan_state root_data.staged_ledger)
+    in
+    let protocol_states_persisted =
+      (*TODO: Deepthi store hashes as well?*)
+      List.fold root_protocol_states ~init:State_hash.Map.empty ~f:(fun m ps ->
+          State_hash.Map.set m ~key:(Protocol_state.hash ps)
+            ~data:
+              {Protocol_state_node.protocol_state= ps; scan_state_ref_count= 1}
+      )
+    in
+    List.map required_protocol_states ~f:(fun hash ->
+        (hash, State_hash.Map.find_exn protocol_states_persisted hash) )
+    |> State_hash.Table.of_alist_exn
   in
   let root_protocol_state =
     External_transition.Validated.protocol_state root_data.transition
@@ -94,8 +142,12 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
   let root_breadcrumb =
     Breadcrumb.create root_data.transition root_data.staged_ledger
   in
+  (*Scan_state_ref_count is zero and not one because protocol states in scan state are behind by 1. When the nex block is added to the frontier, ref count for this state would be incremented*)
   let root_node =
-    {Node.breadcrumb= root_breadcrumb; successor_hashes= []; length= 0}
+    { Node.breadcrumb= root_breadcrumb
+    ; successor_hashes= []
+    ; length= 0
+    ; scan_state_ref_count= 0 }
   in
   let table = State_hash.Table.of_alist_exn [(root_hash, root_node)] in
   Coda_metrics.(Gauge.set Transition_frontier.active_breadcrumbs 1.0) ;
@@ -107,7 +159,8 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     ; hash= base_hash
     ; table
     ; consensus_local_state
-    ; max_length }
+    ; max_length
+    ; protocol_state_table }
   in
   t
 
@@ -417,11 +470,25 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let parent_hash = Breadcrumb.parent_hash breadcrumb in
       let parent_node = Hashtbl.find_exn t.table parent_hash in
       Hashtbl.add_exn t.table ~key:breadcrumb_hash
-        ~data:{breadcrumb; successor_hashes= []; length= parent_node.length + 1} ;
+        ~data:
+          { breadcrumb
+          ; successor_hashes= []
+          ; scan_state_ref_count= 0
+          ; length= parent_node.length + 1 } ;
+      let update_ref_count =
+        if
+          List.is_empty
+            (External_transition.Validated.transactions
+               (Breadcrumb.validated_transition breadcrumb))
+        then 0
+        else 1
+      in
       Hashtbl.set t.table ~key:parent_hash
         ~data:
           { parent_node with
-            successor_hashes= breadcrumb_hash :: parent_node.successor_hashes
+            scan_state_ref_count=
+              parent_node.scan_state_ref_count + update_ref_count
+          ; successor_hashes= breadcrumb_hash :: parent_node.successor_hashes
           } ;
       ((), None)
   | Best_tip_changed new_best_tip ->

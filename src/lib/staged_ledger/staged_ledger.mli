@@ -34,16 +34,12 @@ module Scan_state : sig
 
   val snark_job_list_json : t -> string
 
-  val partition_if_overflowing : t -> Space_partition.t
-
-  val target_merkle_root : t -> Frozen_ledger_hash.t option
-
   val staged_transactions : t -> Transaction.t list Or_error.t
 
   val all_work_statements : t -> Transaction_snark_work.Statement.t list
 
-  val work_statements_for_new_diff :
-    t -> Transaction_snark_work.Statement.t list
+  (** Hashes of the protocol states required for proving transactions*)
+  val required_protocol_states : t -> State_hash.t list
 end
 
 module Pre_diff_info : Pre_diff_info.S

@@ -644,3 +644,8 @@ let fill_work_and_enqueue_transactions t transactions work =
         else Or_error.error_string "Unexpected ledger proof emitted" )
   in
   (result_opt, updated_scan_state)
+
+let required_protocol_states _t =
+  (* TODO: when merging into #4244 
+  List.map (Parallel_scan.pending_data t) ~f:(...)*)
+  []

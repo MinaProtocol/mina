@@ -359,6 +359,8 @@ include struct
 
   let best_tip_path_length_exn = proxy1 best_tip_path_length_exn
 
+  let find_protocol_state = proxy1 find_protocol_state
+
   (* why can't this one be proxied? *)
   let path_map {full_frontier; _} breadcrumb ~f =
     path_map full_frontier breadcrumb ~f

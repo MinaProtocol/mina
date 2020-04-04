@@ -134,6 +134,9 @@ val next_on_new_tree : t -> bool
 (**update scan state metrics*)
 val update_metrics : t -> unit Or_error.t
 
+(** Hashes of the protocol states required for proving transactions*)
+val required_protocol_states : t -> State_hash.t list
+
 (** All the proof bundles for snark workers*)
 val all_work_pairs_exn :
      t
