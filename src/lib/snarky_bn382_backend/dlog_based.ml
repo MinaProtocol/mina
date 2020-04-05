@@ -41,6 +41,11 @@ module Oracles = struct
     Caml.Gc.finalise Fq.delete x ;
     x
 
+  let fieldvec f t =
+    let x = f t in
+    Caml.Gc.finalise Fq.Vector.delete x ;
+    x
+
   open Fq_oracles
 
   let alpha = field alpha
@@ -69,8 +74,8 @@ module Oracles = struct
 
   let x_hat t =
     let t = x_hat_nocopy t in
-    let fq f = field f t in
-    Snarky_bn382.Fq_triple.(fq f0, fq f1, fq f2)
+    let fqv f = fieldvec f t in
+    Snarky_bn382.Fq_vector_triple.(fqv f0, fqv f1, fqv f2)
 
   let digest_before_evaluations = field digest_before_evaluations
 end
@@ -154,7 +159,8 @@ module Keypair = struct
 
   open Rugelach_types
 
-  let vk_commitments t : G.Affine.t Abc.t Matrix_evals.t =
+  let vk_commitments t : Snarky_bn382.Fq_poly_comm.t Abc.t Matrix_evals.t =
+    let f t = t in
     { row=
         { Abc.a= Fq_index.a_row_comm t
         ; b= Fq_index.b_row_comm t
@@ -171,5 +177,5 @@ module Keypair = struct
         { a= Fq_index.a_rc_comm t
         ; b= Fq_index.b_rc_comm t
         ; c= Fq_index.c_rc_comm t } }
-    |> Matrix_evals.map ~f:(Abc.map ~f:G.Affine.of_backend)
+    |> Matrix_evals.map ~f:(Abc.map ~f:f)
 end

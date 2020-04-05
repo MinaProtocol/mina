@@ -20,24 +20,24 @@ let fqv t f =
   Caml.Gc.finalise Fq.Vector.delete t ;
   Array.init (Fq.Vector.length t) (fun i -> Fq.Vector.get t i)
 
-  let pc t f =
-    let t = f t in
-    let open Snarky_bn382.Fq_poly_comm in
-    let gvec (type a) (t : a) (f : a -> Snarky_bn382.G.Affine.t) : G.Affine.t =
-      let t = f t in Snarky_bn382.G.Affine.(G.Affine.of_backend t)
-    in
-    let unshifted =
-      let v = unshifted t in
-      Array.init (Snarky_bn382.G.Affine.Vector.length v) (fun i -> gvec v (fun v -> Snarky_bn382.G.Affine.Vector.get v i))
-    in
-    let shifted = shifted t in
-    {
-      Dlog_marlin_types.PolyComm.
-        unshifted; 
-        shifted = match shifted with
-          | Some shifted -> Some (Snarky_bn382.G.Affine.(G.Affine.of_backend shifted))
-          | None -> None
-    }
+let pc t f =
+  let t = f t in
+  let open Snarky_bn382.Fq_poly_comm in
+  let gvec (type a) (t : a) (f : a -> Snarky_bn382.G.Affine.t) : G.Affine.t =
+    let t = f t in Snarky_bn382.G.Affine.(G.Affine.of_backend t)
+  in
+  let unshifted =
+    let v = unshifted t in
+    Array.init (Snarky_bn382.G.Affine.Vector.length v) (fun i -> gvec v (fun v -> Snarky_bn382.G.Affine.Vector.get v i))
+  in
+  let shifted = shifted t in
+  {
+    Dlog_marlin_types.PolyComm.
+      unshifted; 
+      shifted = match shifted with
+        | Some shifted -> Some (Snarky_bn382.G.Affine.(G.Affine.of_backend shifted))
+        | None -> None
+  }
 
 (* TODO: Lots of leakage here. *)
 let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
