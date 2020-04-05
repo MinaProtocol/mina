@@ -168,7 +168,8 @@ let to_backend vk primary_input
          ; sigma_gh_2= sigma2, (g2_comm, h2_comm)
          ; sigma_gh_3= sigma3, (g3_comm, h3_comm) }
      ; opening=
-         {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1, evals2} } :
+         {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1, evals2}
+     ; challenges=  challenges} :
       t) : Snarky_bn382.Fq_proof.t =
 
   let primary_input =
@@ -204,6 +205,14 @@ let to_backend vk primary_input
           (Snarky_bn382.G.Affine.Pair.make (g l) (g r)) ) ;
     v
   in
+  let challenges =
+    let v = Snarky_bn382.Fq_chal_poly.Vector.create () in
+    Array.iter challenges ~f:(fun (challenge) ->
+        (* Very leaky *)
+        Snarky_bn382.Fq_chal_poly.Vector.emplace_back v
+          (Snarky_bn382.Fq_chal_poly.create (evalvec challenge.challenges) (pc challenge.commitment)) ) ;
+    v
+  in
   Snarky_bn382.Fq_proof.make
     primary_input 
     (pc w_comm) 
@@ -226,7 +235,7 @@ let to_backend vk primary_input
     (eval_to_backend evals0)
     (eval_to_backend evals1)
     (eval_to_backend evals2)
-    primary_input (*this is temporary dummy*)
+    challenges
 
 let create ?message pk ~primary ~auxiliary =
   let res = Snarky_bn382.Fq_proof.create pk primary auxiliary in
