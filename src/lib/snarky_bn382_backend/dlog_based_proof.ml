@@ -75,7 +75,6 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
       Array.init (Snarky_bn382.Fq_chal_poly.Vector.length t) (fun i ->
           chalpoly t (fun v -> Snarky_bn382.Fq_chal_poly.Vector.get t i) )
   in
-  let g = g t in
   let evals =
     let t = evals_nocopy t in
     Evaluations.Triple.(f0 t, f1 t, f2 t)
@@ -172,11 +171,6 @@ let to_backend vk primary_input
      ; challenges=  challenges} :
       t) : Snarky_bn382.Fq_proof.t =
 
-  let primary_input =
-    let v = Fq.Vector.create () in
-    List.iter ~f:(Fq.Vector.emplace_back v) primary_input ;
-    v
-  in
   let g (a, b) =
     let open Snarky_bn382.G.Affine in
     let t = create a b in
@@ -236,6 +230,8 @@ let to_backend vk primary_input
     (eval_to_backend evals1)
     (eval_to_backend evals2)
     challenges
+
+type message = unit
 
 let create ?message pk ~primary ~auxiliary =
   let res = Snarky_bn382.Fq_proof.create pk primary auxiliary in
