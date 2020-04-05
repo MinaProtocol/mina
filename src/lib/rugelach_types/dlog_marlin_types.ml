@@ -196,7 +196,6 @@ module Messages = struct
       ~value_of_hlist:of_hlist
 end
 
-(*
 module Proof = struct
   type ('fg, 'g) t =
     {
@@ -219,32 +218,6 @@ module Proof = struct
         Messages.typ fg g opt ~length:length1; 
         Openings.typ fg fgv g ~length:length2; 
         array (Challenge_polynomial.typ fg g opt ~length:length3 ~length:length4) ~length:length5
-      ]
-      ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
-      ~value_of_hlist:of_hlist
-end
-*)
-
-module Proof = struct
-  type ('fg, 'g) t =
-    {
-      messages: ('fg, 'g) Messages.t; 
-      opening: ('fg, 'g) Openings.t; 
-    }
-  [@@(* ('proof, 'fg) Openings.t} *)
-    deriving fields, bin_io]
-
-  let to_hlist {messages; opening} = Snarky.H_list.[messages; opening]
-
-  let of_hlist ([messages; opening] : (unit, _) Snarky.H_list.t) =
-    {messages; opening}
-
-  let typ fg fgv g opt ~length:length1 ~length:length2 =
-    let open Snarky.Typ in
-    Snarky.Typ.of_hlistable
-      [
-        Messages.typ fg g opt ~length:length1; 
-        Openings.typ fg fgv g ~length:length2; 
       ]
       ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist ~value_to_hlist:to_hlist
       ~value_of_hlist:of_hlist

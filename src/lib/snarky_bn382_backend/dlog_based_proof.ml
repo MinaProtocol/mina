@@ -64,6 +64,17 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
     ; delta= g delta
     ; sg= g sg }
   in
+  let challenges =
+    let t = challenges t in
+    let open Snarky_bn382.Fq_chal_poly in
+    let chalpoly (type a) (t : a) (f : a -> Snarky_bn382.Fq_chal_poly.t) :
+        (Fq.t, G.Affine.t) Dlog_marlin_types.Challenge_polynomial.t =
+      let t = f t in
+      {Dlog_marlin_types.Challenge_polynomial.challenges=fqv t challenges; commitment=pc t commitment}
+    in
+      Array.init (Snarky_bn382.Fq_chal_poly.Vector.length t) (fun i ->
+          chalpoly t (fun v -> Snarky_bn382.Fq_chal_poly.Vector.get t i) )
+  in
   let g = g t in
   let evals =
     let t = evals_nocopy t in
@@ -103,7 +114,7 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
       ; sigma_gh_2= (fq sigma2, (pc g2_comm_nocopy, pc h2_comm))
       ; sigma_gh_3= (fq sigma3, (pc g3_comm_nocopy, pc h3_comm)) }
   ; opening= {proof; evals}
-  (*; challenges=*) }
+  ; challenges= challenges}
 
 let evalvec arr =
   let open Snarky_bn382.Fq in
