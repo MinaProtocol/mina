@@ -1,52 +1,37 @@
 open Rugelach_types
 
 type t =
-  (
-    G1.Affine.t,
-    Fp.t,
-    (
-      G1.Affine.t,
-      Fp.t
-    ) Pairing_marlin_types.Openings.t
-  ) Pairing_marlin_types.Proof.t
-
+  ( G1.Affine.t
+  , Fp.t
+  , (G1.Affine.t, Fp.t) Pairing_marlin_types.Openings.t )
+  Pairing_marlin_types.Proof.t
 [@@deriving bin_io]
 
 let to_backend vk primary_input
-  (
-    {
-      messages=
-      {
-        w_hat= w_comm
-        ; z_hat_a= za_comm
-        ; z_hat_b= zb_comm
-        ; gh_1= (g1_comm_0, g1_comm_1), h1_comm
-        ; sigma_gh_2= sigma2, ((g2_comm_0, g2_comm_1), h2_comm)
-        ; sigma_gh_3= sigma3, ((g3_comm_0, g3_comm_1), h3_comm)
-      }
-      ; openings=
-      {
-        proofs= proof1, proof2, proof3
-        ; evals=
-        {
-          w_hat= w
-          ; z_hat_a= za
-          ; z_hat_b= zb
-          ; h_1= h1
-          ; h_2= h2
-          ; h_3= h3
-          ; g_1= g1
-          ; g_2= g2
-          ; g_3= g3
-          ; row= {a= row_0; b= row_1; c= row_2}
-          ; col= {a= col_0; b= col_1; c= col_2}
-          ; value= {a= val_0; b= val_1; c= val_2}
-          ; rc= {a= rc_0; b= rc_1; c= rc_2}
-        }
-      }
-    } :
-    t
-  ) =
+    ({ messages=
+         { w_hat= w_comm
+         ; z_hat_a= za_comm
+         ; z_hat_b= zb_comm
+         ; gh_1= (g1_comm_0, g1_comm_1), h1_comm
+         ; sigma_gh_2= sigma2, ((g2_comm_0, g2_comm_1), h2_comm)
+         ; sigma_gh_3= sigma3, ((g3_comm_0, g3_comm_1), h3_comm) }
+     ; openings=
+         { proofs= proof1, proof2, proof3
+         ; evals=
+             { w_hat= w
+             ; z_hat_a= za
+             ; z_hat_b= zb
+             ; h_1= h1
+             ; h_2= h2
+             ; h_3= h3
+             ; g_1= g1
+             ; g_2= g2
+             ; g_3= g3
+             ; row= {a= row_0; b= row_1; c= row_2}
+             ; col= {a= col_0; b= col_1; c= col_2}
+             ; value= {a= val_0; b= val_1; c= val_2}
+             ; rc= {a= rc_0; b= rc_1; c= rc_2} } } } :
+      t) =
   let primary_input =
     let v = Fp.Vector.create () in
     List.iter (Fp.Vector.emplace_back v) primary_input ;
@@ -68,40 +53,30 @@ let to_backend vk primary_input
   t
 
 let to_backend1 vk primary_input
-  (
-    {
-      messages=
-      {
-        w_hat= w_comm
-        ; z_hat_a= za_comm
-        ; z_hat_b= zb_comm
-        ; gh_1= (g1_comm_0, g1_comm_1), h1_comm
-        ; sigma_gh_2= sigma2, ((g2_comm_0, g2_comm_1), h2_comm)
-        ; sigma_gh_3= sigma3, ((g3_comm_0, g3_comm_1), h3_comm)
-      }
-      ; openings=
-      {
-        proofs= proof1, proof2, proof3
-        ; evals=
-        {
-          w_hat= w
-          ; z_hat_a= za
-          ; z_hat_b= zb
-          ; h_1= h1
-          ; h_2= h2
-          ; h_3= h3
-          ; g_1= g1
-          ; g_2= g2
-          ; g_3= g3
-          ; row= {a= row_0; b= row_1; c= row_2}
-          ; col= {a= col_0; b= col_1; c= col_2}
-          ; value= {a= val_0; b= val_1; c= val_2}
-          ; rc= {a= rc_0; b= rc_1; c= rc_2}
-        }
-      }
-    } :
-    t
-  ) =
+    ({ messages=
+         { w_hat= w_comm
+         ; z_hat_a= za_comm
+         ; z_hat_b= zb_comm
+         ; gh_1= (g1_comm_0, g1_comm_1), h1_comm
+         ; sigma_gh_2= sigma2, ((g2_comm_0, g2_comm_1), h2_comm)
+         ; sigma_gh_3= sigma3, ((g3_comm_0, g3_comm_1), h3_comm) }
+     ; openings=
+         { proofs= proof1, proof2, proof3
+         ; evals=
+             { w_hat= w
+             ; z_hat_a= za
+             ; z_hat_b= zb
+             ; h_1= h1
+             ; h_2= h2
+             ; h_3= h3
+             ; g_1= g1
+             ; g_2= g2
+             ; g_3= g3
+             ; row= {a= row_0; b= row_1; c= row_2}
+             ; col= {a= col_0; b= col_1; c= col_2}
+             ; value= {a= val_0; b= val_1; c= val_2}
+             ; rc= {a= rc_0; b= rc_1; c= rc_2} } } } :
+      t) =
   let g (a, b) =
     let open Snarky_bn382.G1.Affine in
     let t = create a b in
@@ -151,37 +126,29 @@ let of_backend t : t =
     in
     t
   in
-  {
-    messages=
-    {
-      w_hat= g1 w_comm
+  { messages=
+      { w_hat= g1 w_comm
       ; z_hat_a= g1 za_comm
       ; z_hat_b= g1 zb_comm
       ; gh_1= (g_i g1_comm_nocopy, g1 h1_comm)
       ; sigma_gh_2= (fp sigma2, (g_i g2_comm_nocopy, g1 h2_comm))
-      ; sigma_gh_3= (fp sigma3, (g_i g3_comm_nocopy, g1 h3_comm))
-    }
-    ; openings=
-    {
-      proofs= Triple.map ~f:g1 (proof1, proof2, proof3)
+      ; sigma_gh_3= (fp sigma3, (g_i g3_comm_nocopy, g1 h3_comm)) }
+  ; openings=
+      { proofs= Triple.map ~f:g1 (proof1, proof2, proof3)
       ; evals=
-      {
-        w_hat= fp w_eval
-        ; z_hat_a= fp za_eval
-        ; z_hat_b= fp zb_eval
-        ; h_1= fp h1_eval
-        ; h_2= fp h2_eval
-        ; h_3= fp h3_eval
-        ; g_1= fp g1_eval
-        ; g_2= fp g2_eval
-        ; g_3= fp g3_eval
-        ; row= abc row_evals
-        ; col= abc col_evals
-        ; value= abc val_evals
-        ; rc= abc rc_evals
-      }
-    }
-  }
+          { w_hat= fp w_eval
+          ; z_hat_a= fp za_eval
+          ; z_hat_b= fp zb_eval
+          ; h_1= fp h1_eval
+          ; h_2= fp h2_eval
+          ; h_3= fp h3_eval
+          ; g_1= fp g1_eval
+          ; g_2= fp g2_eval
+          ; g_3= fp g3_eval
+          ; row= abc row_evals
+          ; col= abc col_evals
+          ; value= abc val_evals
+          ; rc= abc rc_evals } } }
 
 type message = unit
 

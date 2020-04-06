@@ -177,5 +177,5 @@ module Keypair = struct
         { a= Fq_index.a_rc_comm t
         ; b= Fq_index.b_rc_comm t
         ; c= Fq_index.c_rc_comm t } }
-    |> Matrix_evals.map ~f:(Abc.map ~f:f)
+    |> Matrix_evals.map ~f:(Abc.map ~f)
 end

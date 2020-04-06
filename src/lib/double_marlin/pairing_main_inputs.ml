@@ -212,7 +212,6 @@ end
 
 module Generators = struct
   let h =
-    Snarky_bn382.Fq_urs.h
-      (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
+    Snarky_bn382.Fq_urs.h (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
     |> Snarky_bn382_backend.G.Affine.of_backend
 end

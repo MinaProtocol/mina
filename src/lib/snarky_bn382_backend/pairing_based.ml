@@ -19,27 +19,39 @@ open Core_kernel
 let field_size : Bigint.R.t = Snarky_bn382.Fp.size ()
 
 module Field = Fp
+
 module Proving_key = struct
   open Core
   open Snarky_bn382
+
   type t = Fp_index.t
+
   include Binable.Of_binable
             (Unit)
             (struct
               type t = Fp_index.t
+
               let to_binable _ = ()
+
               let of_binable () = failwith "TODO"
             end)
+
   let is_initialized _ = `Yes
+
   let set_constraint_system _ _ = ()
+
   let to_string _ = failwith "TODO"
+
   let of_string _ = failwith "TODO"
 end
 
 module Verification_key = struct
   open Snarky_bn382
+
   type t = Fp_verifier_index.t
+
   let to_string _ = failwith "TODO"
+
   let of_string _ = failwith "TODO"
 end
 

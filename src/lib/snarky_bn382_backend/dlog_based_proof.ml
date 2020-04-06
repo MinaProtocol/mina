@@ -1,12 +1,7 @@
 open Core_kernel
 open Rugelach_types
 
-type t =
-( 
-  Fq.t, 
-  G.Affine.t
-) Dlog_marlin_types.Proof.t
-[@@deriving bin_io]
+type t = (Fq.t, G.Affine.t) Dlog_marlin_types.Proof.t [@@deriving bin_io]
 
 let g t f = G.Affine.of_backend (f t)
 
@@ -24,20 +19,22 @@ let pc t f =
   let t = f t in
   let open Snarky_bn382.Fq_poly_comm in
   let gvec (type a) (t : a) (f : a -> Snarky_bn382.G.Affine.t) : G.Affine.t =
-    let t = f t in Snarky_bn382.G.Affine.(G.Affine.of_backend t)
+    let t = f t in
+    Snarky_bn382.G.Affine.(G.Affine.of_backend t)
   in
   let unshifted =
     let v = unshifted t in
-    Array.init (Snarky_bn382.G.Affine.Vector.length v) (fun i -> gvec v (fun v -> Snarky_bn382.G.Affine.Vector.get v i))
+    Array.init (Snarky_bn382.G.Affine.Vector.length v) (fun i ->
+        gvec v (fun v -> Snarky_bn382.G.Affine.Vector.get v i) )
   in
   let shifted = shifted t in
-  {
-    Dlog_marlin_types.PolyComm.
-      unshifted; 
-      shifted = match shifted with
-        | Some shifted -> Some (Snarky_bn382.G.Affine.(G.Affine.of_backend shifted))
-        | None -> None
-  }
+  { Dlog_marlin_types.PolyComm.unshifted
+  ; shifted=
+      ( match shifted with
+      | Some shifted ->
+          Some Snarky_bn382.G.Affine.(G.Affine.of_backend shifted)
+      | None ->
+          None ) }
 
 (* TODO: Lots of leakage here. *)
 let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
@@ -70,10 +67,11 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
     let chalpoly (type a) (t : a) (f : a -> Snarky_bn382.Fq_chal_poly.t) :
         (Fq.t, G.Affine.t) Dlog_marlin_types.Challenge_polynomial.t =
       let t = f t in
-      {Dlog_marlin_types.Challenge_polynomial.challenges=fqv t challenges; commitment=pc t commitment}
+      { Dlog_marlin_types.Challenge_polynomial.challenges= fqv t challenges
+      ; commitment= pc t commitment }
     in
-      Array.init (Snarky_bn382.Fq_chal_poly.Vector.length t) (fun i ->
-          chalpoly t (fun v -> Snarky_bn382.Fq_chal_poly.Vector.get t i) )
+    Array.init (Snarky_bn382.Fq_chal_poly.Vector.length t) (fun i ->
+        chalpoly t (fun v -> Snarky_bn382.Fq_chal_poly.Vector.get t i) )
   in
   let evals =
     let t = evals_nocopy t in
@@ -99,12 +97,10 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
            ; rc= abc rc_nocopy
            ; g_1= fqv g1
            ; g_2= fqv g2
-           ; g_3= fqv g3
-          } )
+           ; g_3= fqv g3 } )
   in
   let fq = fq t in
   let pc = pc t in
-
   { messages=
       { w_hat= pc w_comm
       ; z_hat_a= pc za_comm
@@ -113,16 +109,16 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
       ; sigma_gh_2= (fq sigma2, (pc g2_comm_nocopy, pc h2_comm))
       ; sigma_gh_3= (fq sigma3, (pc g3_comm_nocopy, pc h3_comm)) }
   ; opening= {proof; evals}
-  ; challenges= challenges}
+  ; challenges }
 
 let evalvec arr =
   let open Snarky_bn382.Fq in
   let vec = Snarky_bn382.Fq.Vector.create () in
-  Array.iter arr ~f:(fun fe -> Snarky_bn382.Fq.Vector.emplace_back vec fe ) ;
+  Array.iter arr ~f:(fun fe -> Snarky_bn382.Fq.Vector.emplace_back vec fe) ;
   vec
 
 let eval_to_backend
-    {Dlog_marlin_types.Evals.w_hat
+    { Dlog_marlin_types.Evals.w_hat
     ; z_hat_a
     ; z_hat_b
     ; h_1
@@ -135,27 +131,11 @@ let eval_to_backend
     ; g_1
     ; g_2
     ; g_3 } =
-  Snarky_bn382.Fq_proof.Evaluations.make
-    (evalvec w_hat)
-    (evalvec z_hat_a)
-    (evalvec z_hat_b)
-    (evalvec h_1)
-    (evalvec g_1)
-    (evalvec h_2)
-    (evalvec g_2)
-    (evalvec h_3)
-    (evalvec g_3)
-    (evalvec row_a)
-    (evalvec row_b)
-    (evalvec row_c)
-    (evalvec col_a)
-    (evalvec col_b)
-    (evalvec col_c)
-    (evalvec value_a)
-    (evalvec value_b)
-    (evalvec value_c)
-    (evalvec rc_a)
-    (evalvec rc_b)
+  Snarky_bn382.Fq_proof.Evaluations.make (evalvec w_hat) (evalvec z_hat_a)
+    (evalvec z_hat_b) (evalvec h_1) (evalvec g_1) (evalvec h_2) (evalvec g_2)
+    (evalvec h_3) (evalvec g_3) (evalvec row_a) (evalvec row_b) (evalvec row_c)
+    (evalvec col_a) (evalvec col_b) (evalvec col_c) (evalvec value_a)
+    (evalvec value_b) (evalvec value_c) (evalvec rc_a) (evalvec rc_b)
     (evalvec rc_c)
 
 let to_backend vk primary_input
@@ -168,25 +148,27 @@ let to_backend vk primary_input
          ; sigma_gh_3= sigma3, (g3_comm, h3_comm) }
      ; opening=
          {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1, evals2}
-     ; challenges=  challenges} :
+     ; challenges } :
       t) : Snarky_bn382.Fq_proof.t =
-
   let g (a, b) =
     let open Snarky_bn382.G.Affine in
     let t = create a b in
     Caml.Gc.finalise delete t ; t
   in
-  let pc (commitment : (G.Affine.t) Dlog_marlin_types.PolyComm.t) =
-    let unsh = 
+  let pc (commitment : G.Affine.t Dlog_marlin_types.PolyComm.t) =
+    let unsh =
       let v = Snarky_bn382.G.Affine.Vector.create () in
       Array.iter commitment.unshifted ~f:(fun c ->
           (* Very leaky *)
-          Snarky_bn382.G.Affine.Vector.emplace_back v (g c) );
-          v
+          Snarky_bn382.G.Affine.Vector.emplace_back v (g c) ) ;
+      v
     in
-    let sh = match commitment.shifted with
-      | Some shifted -> Some (g shifted)
-      | None -> None
+    let sh =
+      match commitment.shifted with
+      | Some shifted ->
+          Some (g shifted)
+      | None ->
+          None
     in
     let t = Snarky_bn382.Fq_poly_comm.make unsh sh in
     t
@@ -201,35 +183,20 @@ let to_backend vk primary_input
   in
   let challenges =
     let v = Snarky_bn382.Fq_chal_poly.Vector.create () in
-    Array.iter challenges ~f:(fun (challenge) ->
+    Array.iter challenges ~f:(fun challenge ->
         (* Very leaky *)
         Snarky_bn382.Fq_chal_poly.Vector.emplace_back v
-          (Snarky_bn382.Fq_chal_poly.create (evalvec challenge.challenges) (pc challenge.commitment)) ) ;
+          (Snarky_bn382.Fq_chal_poly.create
+             (evalvec challenge.challenges)
+             (pc challenge.commitment)) ) ;
     v
   in
-  Snarky_bn382.Fq_proof.make
-    primary_input 
-    (pc w_comm) 
-    (pc za_comm) 
-    (pc zb_comm)
-    (pc h1_comm) 
-    (pc g1_comm) 
-    (pc h2_comm) 
-    (pc g2_comm)
-    (pc h3_comm) 
-    (pc g3_comm) 
-    sigma2 
-    sigma3 
-    lr 
-    z_1
-    z_2 
-    (g delta) 
-    (g sg)
+  Snarky_bn382.Fq_proof.make primary_input (pc w_comm) (pc za_comm)
+    (pc zb_comm) (pc h1_comm) (pc g1_comm) (pc h2_comm) (pc g2_comm)
+    (pc h3_comm) (pc g3_comm) sigma2 sigma3 lr z_1 z_2 (g delta) (g sg)
     (* Leaky! *)
     (eval_to_backend evals0)
-    (eval_to_backend evals1)
-    (eval_to_backend evals2)
-    challenges
+    (eval_to_backend evals1) (eval_to_backend evals2) challenges
 
 type message = unit
 
