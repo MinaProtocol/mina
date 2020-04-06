@@ -124,18 +124,6 @@ let type_decls_to_stri type_decls =
   (* type derivers only work with recursive types *)
   {pstr_desc= Pstr_type (Ast.Recursive, type_decls); pstr_loc= Location.none}
 
-(* replace newlines in standard formmatter with a space, so type is all on one line *)
-let formatter =
-  let std_formatter = Format.std_formatter in
-  let funs = Format.pp_get_formatter_out_functions std_formatter () in
-  let funs' =
-    { funs with
-      out_newline= (fun () -> funs.out_spaces 1)
-    ; out_indent= (fun _ -> ()) }
-  in
-  Format.pp_set_formatter_out_functions std_formatter funs' ;
-  std_formatter
-
 (* prints module_path:type_definition *)
 let print_type ~options:_ ~path type_decls =
   let path_len = List.length path in
@@ -147,8 +135,8 @@ let print_type ~options:_ ~path type_decls =
     List.map type_decls ~f:filter_type_decls_attrs
   in
   let stri = type_decls_to_stri type_decls_filtered_attrs in
-  Pprintast.structure_item formatter stri ;
-  Format.print_flush () ;
+  Pprintast.structure_item Versioned_util.diff_formatter stri ;
+  Format.pp_print_flush Versioned_util.diff_formatter () ;
   printf "\n%!" ;
   []
 

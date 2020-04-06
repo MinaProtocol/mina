@@ -172,7 +172,10 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Compare versioned types in PR
-                  command: ./scripts/compare_pr_diff_types.sh
+                  command: ./scripts/compare_ci_diff_types.sh
+            - run:
+                  name: Compare binable functors in PR
+                  command: ./scripts/compare_ci_diff_binables.sh
     compare-test-signatures:
         docker:
             - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
