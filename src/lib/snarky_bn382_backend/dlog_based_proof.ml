@@ -28,13 +28,14 @@ let pc t f =
         gvec v (fun v -> Snarky_bn382.G.Affine.Vector.get v i) )
   in
   let shifted = shifted t in
-  { Dlog_marlin_types.PolyComm.unshifted
-  ; shifted=
-      ( match shifted with
-      | Some shifted ->
-          Some Snarky_bn382.G.Affine.(G.Affine.of_backend shifted)
-      | None ->
-          None ) }
+  let open Dlog_marlin_types.Poly_comm in
+  match shifted with
+  | Some g ->
+    `With_degree_bound
+      { With_degree_bound.unshifted
+      ; shifted= G.Affine.of_backend g
+      }
+  | None -> `Without_degree_bound unshifted
 
 (* TODO: Lots of leakage here. *)
 let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
@@ -68,7 +69,11 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
         (Fq.t, G.Affine.t) Dlog_marlin_types.Challenge_polynomial.t =
       let t = f t in
       { Dlog_marlin_types.Challenge_polynomial.challenges= fqv t challenges
-      ; commitment= pc t commitment }
+      ; commitment=
+          (match pc t commitment with
+          | `Without_degree_bound [|g|] -> g
+          | _ -> assert false)
+      }
     in
     Array.init (Snarky_bn382.Fq_chal_poly.Vector.length t) (fun i ->
         chalpoly t (fun v -> Snarky_bn382.Fq_chal_poly.Vector.get t i) )
@@ -101,15 +106,24 @@ let of_backend (t : Snarky_bn382.Fq_proof.t) : t =
   in
   let fq = fq t in
   let pc = pc t in
+  let wo x =
+    match pc x with
+    | `Without_degree_bound gs -> gs
+    | _ -> assert false
+  in
+  let w x =
+    match pc x with
+    | `With_degree_bound t -> t
+    | _ -> assert false
+  in
   { messages=
-      { w_hat= pc w_comm
-      ; z_hat_a= pc za_comm
-      ; z_hat_b= pc zb_comm
-      ; gh_1= (pc g1_comm_nocopy, pc h1_comm)
+      { w_hat= wo w_comm
+      ; z_hat_a= wo za_comm
+      ; z_hat_b= wo zb_comm
+      ; gh_1= (w g1_comm_nocopy, wo h1_comm)
       ; sigma_gh_2= (fq sigma2, (pc g2_comm_nocopy, pc h2_comm))
       ; sigma_gh_3= (fq sigma3, (pc g3_comm_nocopy, pc h3_comm)) }
-  ; opening= {proof; evals}
-  ; challenges }
+  ; openings= {proof; evals} }
 
 let evalvec arr =
   let open Snarky_bn382.Fq in
