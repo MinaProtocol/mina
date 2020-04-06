@@ -1,6 +1,6 @@
 let log = (w, fmt) => Logger.log("Repeater", w, fmt);
 
-let start = (~fromKey, ~toKey, ~amount, ~fee, ~timeout) => {
+let start = (~fromKey, ~toKey, ~amount, ~fee, ~timeout, ~password) => {
   log(
     `Info,
     "Starting -- amount: %s, fee: %s, timeout: %d, from pubkey: %s to pubkey: %s",
@@ -12,7 +12,7 @@ let start = (~fromKey, ~toKey, ~amount, ~fee, ~timeout) => {
   );
   Js.Global.setInterval(
     () =>
-      Coda.sendPayment(~from=fromKey, ~to_=toKey, ~amount, ~fee)
+      Coda.sendPayment(~from=fromKey, ~to_=toKey, ~amount, ~fee, ~password)
       |> Wonka.forEach((. {ReasonUrql.Client.ClientTypes.response}) =>
            switch (response) {
            | Data(data) =>

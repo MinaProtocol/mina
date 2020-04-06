@@ -1,8 +1,22 @@
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
-open Snark_bits
 open Fold_lib
 open Tuple_lib
 open Unsigned
+
+[%%ifdef
+consensus_mechanism]
+
+open Snark_bits
+
+[%%else]
+
+open Snark_bits_nonconsensus
+module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
+
+[%%endif]
 
 module type S_unchecked = sig
   type t [@@deriving sexp, compare, hash, yojson]
@@ -45,6 +59,9 @@ module type S_unchecked = sig
   val fold : t -> bool Triple.t Fold.t
 end
 
+[%%ifdef
+consensus_mechanism]
+
 module type S_checked = sig
   type unchecked
 
@@ -77,6 +94,7 @@ module type S_checked = sig
 
   val if_ : Boolean.var -> then_:t -> else_:t -> (t, _) Checked.t
 
+  (** warning: this typ does not work correctly with the generic if_ *)
   val typ : (t, unchecked) Snark_params.Tick.Typ.t
 
   val equal : t -> t -> (Boolean.var, _) Checked.t
@@ -96,12 +114,24 @@ module type S_checked = sig
   end
 end
 
+[%%endif]
+
 module type S = sig
   include S_unchecked
 
+  [%%ifdef consensus_mechanism]
+
+  open Snark_params.Tick
+  open Bitstring_lib
+
   module Checked : S_checked with type unchecked := t
 
+  (** warning: this typ does not work correctly with the generic if_ *)
   val typ : (Checked.t, t) Snark_params.Tick.Typ.t
+
+  val var_to_bits : Checked.t -> Boolean.var Bitstring.Lsb_first.t
+
+  [%%endif]
 end
 
 module type UInt32 = sig

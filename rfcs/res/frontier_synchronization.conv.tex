@@ -1,0 +1,125 @@
+\documentclass[convert={outext=.tex.png}]{standalone}
+\usepackage{ulem,tikz,xcolor}
+\usetikzlibrary{arrows,arrows.meta,calc,fit,positioning,shapes.geometric}
+
+\tikzset{
+  queue/.pic={
+    %TODO \coordinate (-south) at ($(0,#1)+(0,2)$);
+    \coordinate (-south) at (0,0);
+    \coordinate (-north) at ($(0,#1)+(0,2)$);
+    \draw ($(-2,#1)+(0,2)$) -- (-2,0) -- (2,0) -- ($(2,#1)+(0,2)$);
+    \foreach \i in {1,...,#1} {
+      \draw (-2,\i) -- (2,\i);
+    }
+  }
+}
+
+\begin{document}
+\begin{tikzpicture}
+  \pagecolor[RGB]{255,255,255}
+
+  %%%%%%%%%%%%
+  %%% sync %%%
+  %%%%%%%%%%%%
+
+  % nodes
+  \node[draw] (handle-reads) at (5, 0) {Handle Reads};
+  \node[draw] (handle-write) at (0, 0) {Handle Write};
+  \node[draw] (apply) at (2.5, -3) {Apply Diffs};
+  \node[draw] (update-extensions) at (7.5, -3) {Update Extensions};
+  \node[draw] (extension-subscriptions) at (7.5, -6) {Extension Subscriptions};
+  \node[draw] (persistence-sync) at (2.5, -6.5) {Persistence Sync};
+  \node[draw,ellipse] (memory-data) at (-2, -4) {In Memory Data};
+  \node[draw,ellipse] (persistent-root) at (-2, -5.5) {Persistent Root};
+  \node[draw,ellipse] (persistent-frontier) at (-2, -7) {Persistent Frontier};
+
+  % cycle edges
+  \draw[-latex] (handle-reads) -- (handle-write);
+  \draw[-latex] (handle-write) |- (apply)
+    node[midway,xshift=-0.7cm,yshift=1.25cm] (diffs-label) {diffs};
+  \draw[-latex] (apply) -- (update-extensions);
+  \draw[-latex] (update-extensions) |- (handle-reads);
+
+  % extensions edges
+  \foreach \bend in {20, 40, 60} {
+    \draw[-latex] (update-extensions) to[bend right=\bend] (extension-subscriptions);
+    \draw[-latex] (extension-subscriptions) to[bend right=\bend] (update-extensions);
+  }
+
+  % data edges
+  \draw[-latex,dashed] (apply) -- (persistence-sync)
+    node[midway] (persistence-sync-midway) {};
+  \draw (memory-data) -- (persistent-root);
+  \draw[-latex,green] (apply.south west) to[bend left=10] (memory-data.east);
+  \draw[-latex,green] (apply.south west) to[bend left=10] (persistent-root.east);
+  \draw[-latex,green] (persistence-sync.south west) to[bend left=10] (persistent-frontier.east);
+
+  % numbers
+  \tikzstyle{num} = [draw,circle,scale=0.75]
+  \node[num,above left=0.3cm] at (handle-reads.north west) {1};
+  \node[num,above left=0.3cm] at (handle-write.north west) {2};
+  \node[num,above left=0.1cm] at (diffs-label.north west) {3};
+  %\node[num,left=0.45cm,yshift=-0.05cm] at (apply.south west) {4};
+  \node[num,above left=0.3cm] at (apply.north west) {4};
+  \node[num,left=0.2cm] at (persistence-sync-midway) {5};
+  \node[num,above left=0.3cm] at (update-extensions.north west) {6};
+  \node[num,left=1.3cm] at ($(update-extensions)!0.5!(extension-subscriptions)$) {7};
+
+  %%%%%%%%%%%%%%%%%
+  %%% interface %%%
+  %%%%%%%%%%%%%%%%%
+
+  \pic[draw,scale=0.65] (write-queue) at (0, 2.5) {queue={3}};
+  \node (write-queue-label) at (-2.5, 3.45) {Write Queue};
+  \draw[-latex] (write-queue-south) -- (handle-write) node[at end,xshift=0.8cm,yshift=0.8cm] {pop one};
+  \foreach \name/\x/\y/\xshift in {A/-1/0/-0.6, B/0/1/0, C/1/0/0.6} {
+    \node[draw,circle] (read-\name) at ($(5,3)+(\x,\y)$) {Read};
+    \draw[-latex] ($(handle-reads.north)+(\xshift,0)+(0.1,0)$) to[bend right=5] (read-\name);
+    \draw[-latex] (read-\name) to[bend right=5] ($(handle-reads.north)+(\xshift,0)-(0.1,0)$);
+  }
+
+  %%%%%%%%%%%%%%%%
+  %%% external %%%
+  %%%%%%%%%%%%%%%%
+
+  \node[
+    draw, inner sep=2cm, yshift=8cm,
+    fit={(write-queue-south) (read-C)}
+  ] (external-code) {External Code};
+  \draw[-latex] ($(write-queue-north |- external-code.south)-(0.5,0)$) -- ($(write-queue-north)-(0.5,0)$);
+  \draw[-latex] ($(write-queue-north)+(0.5,0)$) --  ($(write-queue-north |- external-code.south)+(0.5,0)$) ;
+
+  \foreach \name in {A, B, C} {
+    \draw[-latex] ($(read-\name |- external-code.south)-(0.1,0)$) to[bend right=5] (read-\name);
+    \draw[-latex] (read-\name) to[bend right=5] ($(read-\name |- external-code.south)+(0.1,0)$);
+  }
+
+  %%%%%%%%%%%%%%%%%%%%%%
+  %%% bounding boxes %%%
+  %%%%%%%%%%%%%%%%%%%%%%
+
+  \node[inner sep=1.5cm, fit={
+    (handle-write) (handle-reads)
+    (apply) (update-extensions)
+    (extension-subscriptions) (persistence-sync)
+    (memory-data) (persistent-root)
+    (persistent-frontier)
+  }] (sync-box) {};
+  \node[inner sep=1.5cm, fit={
+    (write-queue-north) (write-queue-south) (write-queue-label)
+    (read-A) (read-B) (read-C)
+    % tmp hack
+    (persistent-frontier) (extension-subscriptions)
+  }] (interface-box) {};
+  % external box is unused, only exists for margin
+  \node[inner sep=1.5cm, fit={(external-code)}] {};
+
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+  %%% bounding box dividers %%%
+  %%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+  \draw[dashed] ($(sync-box.north west)+(0.5,0)$) -- ($(sync-box.north east)-(0.5,0)$);
+  %\draw[dashed] ($(sync-box.north west)+(0.5,0)$ |- interface-box.north west) -- ($(interface-box.north east)-(0.5,0)$);
+  \draw[dashed] ($(interface-box.north west)+(0.5,0)$) -- ($(interface-box.north east)-(0.5,0)$);
+\end{tikzpicture}
+\end{document}

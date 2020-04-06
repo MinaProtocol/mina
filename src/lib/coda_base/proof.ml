@@ -1,7 +1,7 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
-open Core
+open Core_kernel
 open Snark_params
 open Module_version
 

@@ -88,11 +88,13 @@ module Worker_state = struct
                    { Keys.Step.Prover_state.prev_proof= chain.proof
                    ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
                    ; prev_state= chain.state
+                   ; genesis_state_hash=
+                       Coda_state.Protocol_state.genesis_state_hash chain.state
                    ; expected_next_state= Some next_state
                    ; update= block }
                  in
                  let main x =
-                   Tick.handle (Keys.Step.main x)
+                   Tick.handle (Keys.Step.main ~logger x)
                      (Consensus.Data.Prover_state.handler state_for_handler
                         ~pending_coinbase)
                  in
@@ -136,11 +138,13 @@ module Worker_state = struct
                    { Keys.Step.Prover_state.prev_proof= chain.proof
                    ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
                    ; prev_state= chain.state
+                   ; genesis_state_hash=
+                       Coda_state.Protocol_state.genesis_state_hash chain.state
                    ; expected_next_state= Some next_state
                    ; update= block }
                  in
                  let main x =
-                   Tick.handle (Keys.Step.main x)
+                   Tick.handle (Keys.Step.main ~logger x)
                      (Consensus.Data.Prover_state.handler state_for_handler
                         ~pending_coinbase)
                  in
@@ -178,6 +182,7 @@ module Worker_state = struct
          | _ ->
              failwith "unknown proof_level set in compile config"
        in
+       Memory_stats.log_memory_stats logger ~process:"prover" ;
        m)
 
   let get = Fn.id

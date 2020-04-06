@@ -8,18 +8,26 @@ open Init
 
 module Input = struct
   type t =
-    { addrs_and_ports: Kademlia.Node_addrs_and_ports.t
+    { addrs_and_ports: Node_addrs_and_ports.Display.Stable.V1.t
+    ; libp2p_keypair: Coda_net2.Keypair.Stable.V1.t
+    ; net_configs:
+        ( Node_addrs_and_ports.Display.Stable.V1.t
+        * Coda_net2.Keypair.Stable.Latest.t )
+        list
+        * Node_addrs_and_ports.Display.Stable.V1.t list list
     ; snark_worker_key: Public_key.Compressed.Stable.V1.t option
     ; env: (string * string) list
-    ; proposer: int option
+    ; block_production_key: int option
     ; work_selection_method: Cli_lib.Arg_type.Work_selection_method.Stable.V1.t
     ; conf_dir: string
     ; trace_dir: string option
     ; program_dir: string
     ; acceptable_delay: Time.Span.t
-    ; peers: Host_and_port.t list
+    ; chain_id: string
+    ; peers: string list
     ; max_concurrent_connections: int option
-    ; is_archive_node: bool }
+    ; is_archive_rocksdb: bool
+    ; archive_process_location: Core.Host_and_port.t option }
   [@@deriving bin_io]
 end
 
@@ -97,6 +105,8 @@ module T = struct
         , unit
         , Coda_lib.Root_diff.t Pipe.Reader.t )
         Rpc_parallel.Function.t
+    ; initialization_finish_signal:
+        ('worker, unit, unit Pipe.Reader.t) Rpc_parallel.Function.t
     ; prove_receipt:
         ( 'worker
         , Receipt.Chain_hash.t * Receipt.Chain_hash.t
@@ -155,6 +165,7 @@ module T = struct
            unit
         -> External_transition.Validated.Stable.V1.t Pipe.Reader.t Deferred.t
     ; coda_root_diff: unit -> Coda_lib.Root_diff.t Pipe.Reader.t Deferred.t
+    ; coda_initialization_finish_signal: unit -> unit Pipe.Reader.t Deferred.t
     ; coda_prove_receipt:
            Receipt.Chain_hash.t * Receipt.Chain_hash.t
         -> (Receipt.Chain_hash.t * User_command.t list) Deferred.t
@@ -208,6 +219,9 @@ module T = struct
 
     let root_diff_impl ~worker_state ~conn_state:() () =
       worker_state.coda_root_diff ()
+
+    let initialization_finish_signal_impl ~worker_state ~conn_state:() () =
+      worker_state.coda_initialization_finish_signal ()
 
     let get_balance_impl ~worker_state ~conn_state:() pk =
       worker_state.coda_get_balance pk
@@ -322,6 +336,11 @@ module T = struct
       C.create_pipe ~name:"root_diff" ~f:root_diff_impl ~bin_input:Unit.bin_t
         ~bin_output:[%bin_type_class: Coda_lib.Root_diff.Stable.V1.t] ()
 
+    let initialization_finish_signal =
+      C.create_pipe ~name:"initialization_finish_signal"
+        ~f:initialization_finish_signal_impl ~bin_input:Unit.bin_t
+        ~bin_output:Unit.bin_t ()
+
     let sync_status =
       C.create_pipe ~name:"sync_status" ~f:sync_status_impl
         ~bin_input:Unit.bin_t ~bin_output:Sync_status.Stable.V1.bin_t ()
@@ -366,6 +385,7 @@ module T = struct
       ; start
       ; verified_transitions
       ; root_diff
+      ; initialization_finish_signal
       ; get_balance
       ; get_nonce
       ; root_length
@@ -385,22 +405,23 @@ module T = struct
 
     let init_worker_state
         { addrs_and_ports
-        ; proposer
+        ; libp2p_keypair
+        ; block_production_key
         ; snark_worker_key
         ; work_selection_method
         ; conf_dir
         ; trace_dir
+        ; chain_id
         ; peers
-        ; max_concurrent_connections
-        ; is_archive_node
+        ; max_concurrent_connections= _ (* FIXME #4095: use this *)
+        ; is_archive_rocksdb
+        ; archive_process_location
         ; _ } =
       let logger =
         Logger.create
           ~metadata:
-            [ ( "host"
-              , `String (Unix.Inet_addr.to_string addrs_and_ports.external_ip)
-              )
-            ; ("port", `Int addrs_and_ports.communication_port) ]
+            [ ("host", `String addrs_and_ports.external_ip)
+            ; ("port", `Int addrs_and_ports.libp2p_port) ]
           ()
       in
       let pids = Child_processes.Termination.create_pid_table () in
@@ -449,78 +470,94 @@ module T = struct
           let time_controller =
             Block_time.Controller.create (Block_time.Controller.basic ~logger)
           in
-          let propose_keypair =
-            Option.map proposer ~f:(fun i ->
-                List.nth_exn Genesis_ledger.accounts i
-                |> Genesis_ledger.keypair_of_account_record_exn )
+          let block_production_keypair =
+            Option.map block_production_key ~f:(fun i ->
+                List.nth_exn (Lazy.force Test_genesis_ledger.accounts) i
+                |> Test_genesis_ledger.keypair_of_account_record_exn )
           in
-          let initial_propose_keypairs =
-            Keypair.Set.of_list (propose_keypair |> Option.to_list)
+          let initial_block_production_keypairs =
+            Keypair.Set.of_list (block_production_keypair |> Option.to_list)
           in
-          let initial_propose_keys =
+          let initial_block_production_keys =
             Public_key.Compressed.Set.of_list
-              ( Option.map propose_keypair ~f:(fun keypair ->
+              ( Option.map block_production_keypair ~f:(fun keypair ->
                     let open Keypair in
                     Public_key.compress keypair.public_key )
               |> Option.to_list )
           in
           let consensus_local_state =
-            Consensus.Data.Local_state.create initial_propose_keys
+            Consensus.Data.Local_state.create initial_block_production_keys
+              ~genesis_ledger:Test_genesis_ledger.t
           in
           let gossip_net_params =
-            Gossip_net.Real.Config.
+            Gossip_net.Libp2p.Config.
               { timeout= Time.Span.of_sec 3.
-              ; target_peer_count= 8
+              ; initial_peers= List.map ~f:Coda_net2.Multiaddr.of_string peers
+              ; addrs_and_ports=
+                  Node_addrs_and_ports.of_display addrs_and_ports
               ; conf_dir
-              ; initial_peers= peers
-              ; chain_id= "bogus chain id for testing"
-              ; addrs_and_ports
+              ; chain_id
               ; logger
+              ; unsafe_no_trust_ip= true
               ; trust_system
-              ; enable_libp2p= false
-              ; disable_haskell= false
-              ; libp2p_keypair= None
-              ; libp2p_peers= []
-              ; max_concurrent_connections }
+              ; keypair= Some libp2p_keypair }
           in
           let net_config =
             { Coda_networking.Config.logger
             ; trust_system
             ; time_controller
             ; consensus_local_state
+            ; is_seed= List.is_empty peers
+            ; genesis_ledger_hash=
+                Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
             ; log_gossip_heard=
-                { snark_pool_diff= false
-                ; transaction_pool_diff= false
-                ; new_state= false }
+                { snark_pool_diff= true
+                ; transaction_pool_diff= true
+                ; new_state= true }
             ; creatable_gossip_net=
                 Coda_networking.Gossip_net.(
-                  Any.Creatable ((module Real), Real.create gossip_net_params))
-            }
+                  Any.Creatable
+                    ((module Libp2p), Libp2p.create gossip_net_params)) }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
+          let genesis_state_hash =
+            Coda_state.Genesis_protocol_state.t
+              ~genesis_ledger:Test_genesis_ledger.t
+            |> With_hash.hash
+          in
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~net_config ~gossip_net_params
+                 ~coinbase_receiver:`Producer ~net_config ~gossip_net_params
+                 ~initial_fork_id:Fork_id.empty
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
                  ~snark_worker_config:
                    Coda_lib.Config.Snark_worker_config.
                      { initial_snark_worker_key= snark_worker_key
-                     ; shutdown_on_disconnect= true }
+                     ; shutdown_on_disconnect= true
+                     ; num_threads= None }
                  ~snark_pool_disk_location:(conf_dir ^/ "snark_pool")
                  ~persistent_root_location:(conf_dir ^/ "root")
                  ~persistent_frontier_location:(conf_dir ^/ "frontier")
                  ~wallets_disk_location:(conf_dir ^/ "wallets")
                  ~time_controller ~receipt_chain_database
                  ~snark_work_fee:(Currency.Fee.of_int 0)
-                 ~initial_propose_keypairs ~monitor ~consensus_local_state
-                 ~transaction_database ~external_transition_database
-                 ~is_archive_node ~work_reassignment_wait:420000 ())
+                 ~initial_block_production_keypairs ~monitor
+                 ~consensus_local_state ~transaction_database
+                 ~external_transition_database ~is_archive_rocksdb
+                 ~work_reassignment_wait:420000 ~genesis_state_hash ()
+                 ~archive_process_location:
+                   (Option.map archive_process_location
+                      ~f:(fun host_and_port ->
+                        Cli_lib.Flag.Types.
+                          {name= "dummy"; value= host_and_port} )))
+              ~genesis_ledger:Test_genesis_ledger.t
+              ~base_proof:Precomputed_values.base_proof
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger
@@ -538,7 +575,7 @@ module T = struct
           in
           Logger.info logger "Worker finish setting up coda"
             ~module_:__MODULE__ ~location:__LOC__ ;
-          let coda_peers () = return (Coda_lib.peers coda) in
+          let coda_peers () = Coda_lib.peers coda in
           let coda_start () = Coda_lib.start coda in
           let coda_get_all_transitions pk =
             let external_transition_database =
@@ -579,14 +616,16 @@ module T = struct
               User_command.sign (Keypair.of_private_key_exn sender_sk) payload
             in
             let payment = build_txn amount sk pk fee in
-            Coda_commands.send_user_command coda (payment :> User_command.t)
-            |> Participating_state.to_deferred_or_error
-            |> Deferred.map ~f:Or_error.join
+            Deferred.map
+              ( Coda_commands.send_user_command coda (payment :> User_command.t)
+              |> Participating_state.to_deferred_or_error )
+              ~f:Or_error.join
           in
           let coda_process_user_command cmd =
-            Coda_commands.send_user_command coda (cmd :> User_command.t)
-            |> Participating_state.to_deferred_or_error
-            |> Deferred.map ~f:Or_error.join
+            Deferred.map
+              ( Coda_commands.send_user_command coda (cmd :> User_command.t)
+              |> Participating_state.to_deferred_or_error )
+              ~f:Or_error.join
           in
           let coda_prove_receipt (proving_receipt, resulting_receipt) =
             match%map
@@ -659,6 +698,13 @@ module T = struct
                    Linear_pipe.write_if_open w diff )) ;
             return r.pipe
           in
+          let coda_initialization_finish_signal () =
+            let r, w = Linear_pipe.create () in
+            upon
+              (Ivar.read @@ Coda_lib.initialization_finish_signal coda)
+              (fun () -> don't_wait_for @@ Linear_pipe.write_if_open w ()) ;
+            return r.pipe
+          in
           let coda_dump_tf () =
             Deferred.return
               ( Coda_lib.dump_tf coda |> Or_error.ok
@@ -708,6 +754,8 @@ module T = struct
           { coda_peers= with_monitor coda_peers
           ; coda_verified_transitions= with_monitor coda_verified_transitions
           ; coda_root_diff= with_monitor coda_root_diff
+          ; coda_initialization_finish_signal=
+              with_monitor coda_initialization_finish_signal
           ; coda_get_balance= with_monitor coda_get_balance
           ; coda_get_nonce= with_monitor coda_get_nonce
           ; coda_root_length= with_monitor coda_root_length

@@ -2,8 +2,6 @@ open Core
 open Async
 
 module type Config_intf = sig
-  val address : string
-
   val headers : string String.Map.t
 
   val preprocess_variables_string : string -> string
@@ -69,9 +67,7 @@ module Connection_error = struct
 end
 
 module Make (Config : Config_intf) = struct
-  let local_uri port = make_local_uri port Config.address
-
-  let query query_obj port =
+  let query query_obj uri =
     let variables_string =
       Config.preprocess_variables_string
       @@ Yojson.Basic.to_string query_obj#variables
@@ -92,7 +88,7 @@ module Make (Config : Config_intf) = struct
       Deferred.Or_error.try_with ~extract_exn:true (fun () ->
           Cohttp_async.Client.post ~headers
             ~body:(Cohttp_async.Body.of_string body_string)
-            (local_uri port) )
+            uri )
       |> Deferred.Result.map_error ~f:(fun e ->
              `Failed_request (Error.to_string_hum e) )
     in

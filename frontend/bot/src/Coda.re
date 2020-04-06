@@ -1,30 +1,3 @@
-module SendPayment = [%graphql
-  {| mutation send($from: PublicKey, $to_: PublicKey, $amount: UInt64, $fee: UInt64) {
-    sendPayment(input: {from: $from, to:$to_, amount:$amount, fee:$fee}) {
-      payment {
-        id
-        to_: to @bsDecoder(fn: "Graphql.Decoders.publicKey")
-      }
-  }} |}
-];
-
-let sendPayment = (~from, ~to_, ~amount, ~fee) => {
-  ReasonUrql.Client.executeMutation(
-    ~client=Graphql.client,
-    ~request=
-      Graphql.Encoders.(
-        SendPayment.make(
-          ~from=publicKey(from),
-          ~to_=publicKey(to_),
-          ~amount=int64(amount),
-          ~fee=int64(fee),
-          (),
-        )
-      ),
-    (),
-  );
-};
-
 module Unlock = [%graphql
   {| mutation unlock($password: String, $publicKey: PublicKey) {
       unlockWallet(input: {password: $password, publicKey: $publicKey}) {
@@ -46,7 +19,7 @@ let unlock = (~publicKey, ~password) => {
       ),
     (),
   )
-  |> Wonka.forEach((. {ReasonUrql.Client.ClientTypes.response}) =>
+  |> Wonka.map((. {ReasonUrql.Client.ClientTypes.response}) =>
        switch (response) {
        | Data(_) => log(`Info, "Unlock successful of %s", publicKey)
        | Error(e) =>
@@ -56,11 +29,32 @@ let unlock = (~publicKey, ~password) => {
      );
 };
 
-let unlockOpt = (~publicKey, ~password) => {
-  switch (publicKey, password) {
-  | (Some(publicKey), Some(password)) => unlock(~publicKey, ~password)
-  | (Some(publicKey), None) =>
-    Logger.log("Unlock", `Error, "No password provided for %s", publicKey)
-  | (None, _) => () // Nothing to unlock
-  };
+module SendPayment = [%graphql
+  {| mutation send($from: PublicKey, $to_: PublicKey, $amount: UInt64, $fee: UInt64) {
+    sendPayment(input: {from: $from, to:$to_, amount:$amount, fee:$fee}) {
+      payment {
+        id
+        to_: to @bsDecoder(fn: "Graphql.Decoders.publicKey")
+      }
+  }} |}
+];
+
+let sendPayment = (~from, ~to_, ~amount, ~fee, ~password) => {
+  unlock(~publicKey=from, ~password)
+  |> Wonka.mergeMap((. _success) =>
+       ReasonUrql.Client.executeMutation(
+         ~client=Graphql.client,
+         ~request=
+           Graphql.Encoders.(
+             SendPayment.make(
+               ~from=publicKey(from),
+               ~to_=publicKey(to_),
+               ~amount=int64(amount),
+               ~fee=int64(fee),
+               (),
+             )
+           ),
+         (),
+       )
+     );
 };

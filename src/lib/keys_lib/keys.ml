@@ -8,6 +8,7 @@ module type S = sig
       { wrap_vk: Tock.Verification_key.t
       ; prev_proof: Tock.Proof.t
       ; prev_state: Protocol_state.value
+      ; genesis_state_hash: Coda_base.State_hash.t
       ; expected_next_state: Protocol_state.value option
       ; update: Snark_transition.value }
   end
@@ -33,7 +34,10 @@ module type S = sig
 
     val instance_hash : Protocol_state.value -> Tick.Field.t
 
-    val main : Tick.Field.Var.t -> (unit, Prover_state.t) Tick.Checked.t
+    val main :
+         logger:Logger.t
+      -> Tick.Field.Var.t
+      -> (unit, Prover_state.t) Tick.Checked.t
   end
 
   module Wrap : sig
@@ -88,6 +92,7 @@ let create () : (module S) Async.Deferred.t =
             { wrap_vk: Tock.Verification_key.t
             ; prev_proof: Tock.Proof.t
             ; prev_state: Protocol_state.value
+            ; genesis_state_hash: Coda_base.State_hash.t
             ; expected_next_state: Protocol_state.value option
             ; update: Snark_transition.value }
         end
@@ -112,16 +117,18 @@ let create () : (module S) Async.Deferred.t =
               (Blockchain_snark.Blockchain_transition.instance_hash
                  (Tock.Keypair.vk Wrap.keys))
 
-          let main x =
+          let main ~logger x =
             let there
                 { Prover_state.wrap_vk
                 ; prev_proof
                 ; prev_state
+                ; genesis_state_hash
                 ; update
                 ; expected_next_state } =
               { Step.Prover_state.wrap_vk
               ; prev_proof
               ; prev_state
+              ; genesis_state_hash
               ; update
               ; expected_next_state }
             in
@@ -129,11 +136,13 @@ let create () : (module S) Async.Deferred.t =
                 { Step.Prover_state.wrap_vk
                 ; prev_proof
                 ; prev_state
+                ; genesis_state_hash
                 ; update
                 ; expected_next_state } =
               { Prover_state.wrap_vk
               ; prev_proof
               ; prev_state
+              ; genesis_state_hash
               ; update
               ; expected_next_state }
             in
@@ -141,7 +150,7 @@ let create () : (module S) Async.Deferred.t =
             with_state
               ~and_then:(fun s -> As_prover.set_state (back s))
               As_prover.(map get_state ~f:there)
-              (main (Logger.create ()) x)
+              (main logger x)
         end
 
         module Wrap = struct

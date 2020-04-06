@@ -1,5 +1,20 @@
+(* stake_delegation.ml *)
+
+[%%import
+"/src/config.mlh"]
+
 open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Signature_lib
+
+[%%else]
+
+open Signature_lib_nonconsensus
+
+[%%endif]
 
 [%%versioned
 module Stable = struct
@@ -14,6 +29,8 @@ end]
 type t = Stable.Latest.t =
   | Set_delegate of {new_delegate: Public_key.Compressed.Stable.V1.t}
 [@@deriving eq, sexp, hash, yojson]
+
+let receiver = function Set_delegate {new_delegate} -> new_delegate
 
 let gen =
   Quickcheck.Generator.map Public_key.Compressed.gen ~f:(fun k ->

@@ -3,6 +3,7 @@ open Core
 open Coda_base
 open Gadt_lib
 open Signature_lib
+open Network_peer
 module Gossip_net = Coda_networking.Gossip_net
 
 (* There must be at least 2 peers to create a network *)
@@ -34,14 +35,17 @@ let setup (type n) ?(logger = Logger.null ())
   let _, peers =
     Vect.fold_map states
       ~init:(Constants.init_ip, Constants.init_discovery_port)
-      ~f:(fun (ip, discovery_port) _ ->
+      ~f:(fun (ip, libp2p_port) _ ->
         (* each peer has a distinct IP address, so we lookup frontiers by IP *)
         let peer =
           Network_peer.Peer.create
             (Unix.Inet_addr.inet4_addr_of_int32 ip)
-            ~discovery_port ~communication_port:(discovery_port + 1)
+            ~libp2p_port
+            ~peer_id:
+              (Peer.Id.unsafe_of_string
+                 (sprintf "fake peer at port %d" libp2p_port))
         in
-        ((Int32.( + ) Int32.one ip, discovery_port + 2), peer) )
+        ((Int32.( + ) Int32.one ip, libp2p_port + 1), peer) )
   in
   let fake_gossip_network =
     Gossip_net.Fake.create_network (Vect.to_list peers)
@@ -52,6 +56,9 @@ let setup (type n) ?(logger = Logger.null ())
     ; trust_system
     ; time_controller
     ; consensus_local_state
+    ; is_seed= Vect.is_empty peers
+    ; genesis_ledger_hash=
+        Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
     ; creatable_gossip_net=
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
@@ -97,8 +104,9 @@ let setup (type n) ?(logger = Logger.null ())
                   Deferred.return
                     (Sync_handler.Root.prove ~logger ~frontier
                        (Envelope.Incoming.data query_env)) )
-                ~get_bootstrappable_best_tip:(fun _ ->
-                  failwith "Get_bootstrappable_best_tip unimplemented" )
+                ~get_best_tip:(fun _ -> failwith "Get_best_tip unimplemented")
+                ~get_telemetry_data:(fun _ ->
+                  failwith "Get_telemetry data unimplemented" )
                 ~get_transition_chain_proof:(fun query_env ->
                   Deferred.return
                     (Transition_chain_prover.prove ~frontier
@@ -121,6 +129,7 @@ module Generator = struct
   let fresh_peer ~max_frontier_length =
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
+        ~genesis_ledger:Test_genesis_ledger.t
     in
     let%map frontier =
       Transition_frontier.For_tests.gen ~consensus_local_state
@@ -131,6 +140,7 @@ module Generator = struct
   let peer_with_branch ~frontier_branch_size ~max_frontier_length =
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
+        ~genesis_ledger:Test_genesis_ledger.t
     in
     let%map frontier, branch =
       Transition_frontier.For_tests.gen_with_branch

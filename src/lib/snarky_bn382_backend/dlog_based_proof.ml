@@ -1,5 +1,5 @@
 open Core_kernel
-open Rugelach_types
+open Pickles_types
 
 type t = (Fq.t, G.Affine.t) Dlog_marlin_types.Proof.t [@@deriving bin_io]
 
@@ -138,7 +138,12 @@ let eval_to_backend
     (evalvec value_b) (evalvec value_c) (evalvec rc_a) (evalvec rc_b)
     (evalvec rc_c)
 
-let to_backend vk primary_input
+let field_vector_of_list xs =
+  let v = Fq.Vector.create () in
+  List.iter ~f:(Fq.Vector.emplace_back v) xs ;
+  v
+
+let to_backend' chal_polys primary_input
     ({ messages=
          { w_hat= w_comm
          ; z_hat_a= za_comm
@@ -200,12 +205,26 @@ let to_backend vk primary_input
 
 type message = unit
 
+let to_backend chal_polys primary_input t =
+  to_backend' chal_polys (field_vector_of_list primary_input) t
+
 let create ?message pk ~primary ~auxiliary =
   let res = Snarky_bn382.Fq_proof.create pk primary auxiliary in
   let t = of_backend res in
   Snarky_bn382.Fq_proof.delete res ;
   t
 
-let verify ?message:_ proof vk auxiliary =
-  let t = to_backend vk auxiliary proof in
-  Snarky_bn382.Fq_proof.verify vk t
+let batch_verify' (conv : 'a -> Fq.Vector.t)
+    (ts : (t * 'a * message option) list)
+    (vk : Snarky_bn382.Fq_verifier_index.t) =
+  let open Snarky_bn382.Fq_proof in
+  let v = Vector.create () in
+  List.iter ts ~f:(fun (t, xs, m) ->
+      let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
+      Vector.emplace_back v p ; delete p ) ;
+  let res = batch_verify vk v in
+  Vector.delete v ; res
+
+let batch_verify = batch_verify' field_vector_of_list
+
+let verify ?message t vk xs : bool = batch_verify' Fn.id [(t, xs, message)] vk

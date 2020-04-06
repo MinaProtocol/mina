@@ -1,5 +1,5 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
 open Core_kernel
 open Fold_lib
@@ -11,22 +11,19 @@ module Field = Crypto_params.Tock.Fq
 type t = Crypto_params.Tock.G1.t
 
 module Compressed = struct
+  [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = {x: Field.t; is_odd: bool}
-        [@@deriving bin_io, eq, sexp, version {asserted}]
+      type t = {x: Field.t; is_odd: bool} [@@deriving eq, sexp]
 
-        module Display = struct
-          type t = {x: string; is_odd: bool} [@@deriving to_yojson]
-        end
+      let to_latest = Fn.id
 
-        let to_yojson {x; is_odd} =
-          Display.to_yojson {Display.x= Field.to_string x; is_odd}
+      module Display = struct
+        type t = {x: string; is_odd: bool} [@@deriving to_yojson]
       end
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_yojson {x; is_odd} =
+        Display.to_yojson {Display.x= Field.to_string x; is_odd}
 
       let gen =
         let open Quickcheck.Let_syntax in
@@ -35,19 +32,7 @@ module Compressed = struct
         {x; is_odd}
     end
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "public_key"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-
-    (* see lib/module_version/README-version-asserted.md *)
-    module For_tests = struct
+    module Tests = struct
       [%%if
       curve_size = 298]
 
@@ -56,7 +41,7 @@ module Compressed = struct
           Quickcheck.random_value ~seed:(`Deterministic "public key") V1.gen
         in
         let known_good_hash =
-          "\x7F\x07\x2A\x75\x70\x5C\x9A\x00\x44\x7C\x26\x3B\xC7\x05\xCF\x83\x8D\x2F\x9D\xB6\x2E\x4B\xE7\x64\x8B\x33\xF4\xC8\x08\x56\x1F\x86"
+          "\x20\x1E\xC9\xEC\x67\x5E\x76\x79\x18\xBB\x28\x2C\x51\x5B\x36\x37\x5B\x5F\x39\x18\x21\x3A\x33\x4C\x69\x4B\x8C\xC6\x09\x24\xAD\xE7"
         in
         Serialization.check_serialization (module V1) pk known_good_hash
 
@@ -68,7 +53,7 @@ module Compressed = struct
           Quickcheck.random_value ~seed:(`Deterministic "public key") V1.gen
         in
         let known_good_hash =
-          "\x45\x3D\x4F\x3B\xE7\x79\x9C\xFD\x18\xFB\x49\x58\xD6\x62\xF7\xCB\xA1\xA6\xEA\x56\x24\x66\x29\x9B\xCE\xF7\x07\x26\x10\xAA\x5B\xB5"
+          "\xBE\x4C\x9B\xAC\xD4\xEA\x2A\x78\xCF\xC6\x70\x70\x8E\xB0\x31\xCA\x6B\x09\xB2\xD5\x28\xB3\x19\xCA\x18\xC8\x4E\x4A\xA2\xCC\xCB\xDF"
         in
         Serialization.check_serialization (module V1) pk known_good_hash
 
@@ -78,7 +63,7 @@ module Compressed = struct
 
       [%%endif]
     end
-  end
+  end]
 
   type t = Stable.Latest.t = {x: Field.t; is_odd: bool} [@@deriving eq, sexp]
 

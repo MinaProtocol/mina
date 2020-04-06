@@ -3,14 +3,15 @@ open Currency
 open Signature_lib
 
 module Statement : sig
-  type t = Transaction_snark.Statement.t One_or_two.t [@@deriving sexp, yojson]
+  type t = Transaction_snark.Statement.t One_or_two.t
+  [@@deriving sexp, yojson, eq]
 
   include Hashable.S with type t := t
 
   module Stable :
     sig
       module V1 : sig
-        type t [@@deriving bin_io, compare, sexp, version, yojson]
+        type t [@@deriving bin_io, compare, sexp, version, yojson, eq]
 
         include Hashable.S_binable with type t := t
       end
@@ -57,6 +58,8 @@ val fee : t -> Fee.t
 
 val info : t -> Info.t
 
+val statement : t -> Statement.t
+
 module Stable :
   sig
     module V1 : sig
@@ -77,6 +80,8 @@ module Checked : sig
   module Stable : module type of Stable
 
   val create_unsafe : unchecked -> t
+
+  val statement : t -> Statement.t
 end
 
 val forget : Checked.t -> t

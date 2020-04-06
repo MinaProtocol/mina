@@ -1,5 +1,21 @@
-open Core
+(* receipt.ml *)
+
+[%%import
+"/src/config.mlh"]
+
+open Core_kernel
+
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params.Tick
+
+[%%else]
+
+open Snark_params_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+
+[%%endif]
 
 module Chain_hash = struct
   include Data_hash.Make_full_size ()
@@ -24,8 +40,7 @@ module Chain_hash = struct
     let of_string = of_string
   end)
 
-  let empty =
-    of_hash (Pedersen.(State.salt "CodaReceiptEmpty") |> Pedersen.State.digest)
+  let empty = of_hash Random_oracle.(salt "CodaReceiptEmpty" |> digest)
 
   let cons payload (t : t) =
     let open Random_oracle in
@@ -33,10 +48,14 @@ module Chain_hash = struct
       (pack_input
          Input.(
            append
-             Transaction_union_payload.(
-               to_input (of_user_command_payload payload))
+             ( Transaction_union_payload.(
+                 to_input (of_user_command_payload payload))
+               : (Field.t, bool) Input.t )
              (field (t :> Field.t))))
     |> of_hash
+
+  [%%if
+  defined consensus_mechanism]
 
   module Checked = struct
     let constant (t : t) =
@@ -79,4 +98,6 @@ module Chain_hash = struct
   let%test_unit "json" =
     Quickcheck.test ~trials:20 gen ~sexp_of:sexp_of_t ~f:(fun t ->
         assert (For_tests.check_encoding ~equal t) )
+
+  [%%endif]
 end

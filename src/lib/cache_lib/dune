@@ -3,4 +3,5 @@
   (public_name cache_lib)
   (inline_tests)
   (libraries async_kernel core_kernel logger)
+  (preprocessor_deps ../../config.mlh)
   (preprocess (pps ppx_coda ppx_base ppx_let ppx_custom_printf ppx_inline_test ppx_optcomp)))

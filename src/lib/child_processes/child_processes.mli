@@ -30,7 +30,9 @@ val termination_status : t -> Unix.Exit_or_signal.t option
     exception.
 *)
 type output_handling =
-  [`Log of Logger.Level.t | `Don't_log] * [`Pipe | `No_pipe]
+  [`Log of Logger.Level.t | `Don't_log]
+  * [`Pipe | `No_pipe]
+  * [`Keep_empty | `Filter_empty]
 
 (** Start a process, handling a lock file, termination, optional logging, and
     the standard in, out and error fds. This is for "custom" processes, as

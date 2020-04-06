@@ -1,17 +1,27 @@
 {
   "name": "website",
-  "reason" : {"react-jsx" : 3},
-  "sources": {
+  "sources": [
+    {
       "dir": "src",
       "subdirs": true
-  },
+    }
+  ],
   "bs-dependencies": [
     "reason-react",
-    "bs-css"
+    "bs-css",
+    "bsc-stdlib-polyfill",
+    "bs-fetch"
   ],
-  "warnings": {
-    "error": "+101",
-    "number": "-40-44+6+7+27+32..39+45"
+  "reason": {
+    "react-jsx": 3
   },
+  "package-specs": {
+    "module": "es6"
+  },
+  "suffix": ".bs.js",
+  "bsc-flags": [
+    "-bs-super-errors",
+    "-open BscStdlibPolyfill"
+  ],
   "refmt": 3
 }

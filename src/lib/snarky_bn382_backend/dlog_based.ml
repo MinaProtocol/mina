@@ -111,7 +111,7 @@ module Keypair = struct
   let set_urs_info, load_urs =
     let urs_info = Set_once.create () in
     let urs = ref None in
-    let set_urs_info ?(degree = 3145_750) path =
+    let set_urs_info ?(degree = 1 lsl 20) path =
       Set_once.set_exn urs_info Lexing.dummy_pos (degree, path)
     in
     let load () =
@@ -157,7 +157,7 @@ module Keypair = struct
 
   let pk = Fn.id
 
-  open Rugelach_types
+  open Pickles_types
 
   let vk_commitments t : Snarky_bn382.Fq_poly_comm.t Abc.t Matrix_evals.t =
     let f t = t in

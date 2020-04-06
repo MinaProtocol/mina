@@ -21,7 +21,7 @@ sysctl -n machdep.cpu.brand_string
 echo "========="
 echo "== Verify static initilization works"
 echo "========="
-CODA_KADEMLIA_PATH=$PWD/kademlia ./coda.exe -help
+./coda.exe -help
 
 # Re-enable if you want to debug illegal instructions
 # lldb -o run ./coda.exe transaction-snark-profiler
@@ -36,5 +36,5 @@ rm -rf ~/.coda-config
 echo "========="
 echo "== Verify full test"
 echo "========="
-CODA_KADEMLIA_PATH=$PWD/kademlia ./coda.exe integration-tests full-test
+./coda.exe integration-tests full-test
 

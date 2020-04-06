@@ -1,7 +1,7 @@
 [%%import
-"../../config.mlh"]
+"/src/config.mlh"]
 
-include Intf
+module Intf = Intf
 
 [%%if
 consensus_mechanism = "proof_of_stake"]
@@ -17,3 +17,5 @@ consesus_mechanism]
 "invalid value for \"consensus_mechanism\""]
 
 [%%endif]
+
+module Proof_of_stake = Proof_of_stake

@@ -20,6 +20,10 @@ module type Pagination = sig
       if none are provided *)
   val get_total_values : t -> Public_key.Compressed.t option -> int option
 
+  (** [get_value t cursor] returns the value corresponding with the provided
+      cursor, if it can be found *)
+  val get_value : t -> cursor -> value option
+
   (** [query t pk cursor n] makes a pagination query based on different inputs.
       If [cursor] is some value and the underlying pagination data structure
       contains the value, the pagination queries are offset by [cursor]. If

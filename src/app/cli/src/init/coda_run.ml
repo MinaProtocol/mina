@@ -64,6 +64,64 @@ let get_lite_chain :
       let proof = Lite_compat.proof proof in
       {Lite_base.Lite_chain.proof; ledger; protocol_state} )
 
+let get_current_fork_id ~compile_time_current_fork_id ~conf_dir ~logger =
+  let current_fork_id_file = conf_dir ^/ "current_fork_id" in
+  let read_fork_id () =
+    let open Stdlib in
+    let inp = open_in current_fork_id_file in
+    let res = input_line inp in
+    close_in inp ; res
+  in
+  let write_fork_id fork_id =
+    let open Stdlib in
+    let outp = open_out current_fork_id_file in
+    output_string outp (fork_id ^ "\n") ;
+    close_out outp
+  in
+  function
+  | None -> (
+    try
+      (* not provided on command line, try to read from config dir *)
+      let fork_id = read_fork_id () in
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Setting current fork ID to $fork_id from config"
+        ~metadata:[("fork_id", `String fork_id)] ;
+      fork_id
+    with Sys_error _ ->
+      (* not on command-line, not in config dir, use compile-time value *)
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Setting current fork ID to $fork_id from compile-time config"
+        ~metadata:[("fork_id", `String compile_time_current_fork_id)] ;
+      compile_time_current_fork_id )
+  | Some fork_id -> (
+    try
+      (* it's an error if the command line value disagrees with the value in the config *)
+      let config_fork_id = read_fork_id () in
+      if String.equal config_fork_id fork_id then (
+        Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+          "Using current fork ID $fork_id from command line, which matches \
+           the one in the config"
+          ~metadata:[("fork_id", `String fork_id)] ;
+        config_fork_id )
+      else (
+        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+          "Current fork ID $fork_id from the command line disagrees with \
+           $config_fork_id from the Coda config"
+          ~metadata:
+            [ ("fork_id", `String fork_id)
+            ; ("config_fork_id", `String config_fork_id) ] ;
+        failwith
+          "Current fork ID from command line disagrees with fork ID in Coda \
+           config; please delete your Coda config if you wish to use a new \
+           fork ID" )
+    with Sys_error _ ->
+      (* use value provided on command line, write to config dir, possibly overwriting existing entry *)
+      write_fork_id fork_id ;
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "Using current fork ID $fork_id from command line, writing to config"
+        ~metadata:[("fork_id", `String fork_id)] ;
+      fork_id )
+
 (*TODO check deferred now and copy theose files to the temp directory*)
 let log_shutdown ~conf_dir ~top_logger coda_ref =
   let logger =
@@ -102,13 +160,17 @@ let summary exn_str =
     ; ("Machine", `String (Core.Unix.Utsname.machine uname))
     ; ("Sys_name", `String (Core.Unix.Utsname.sysname uname))
     ; ("Exception", `String exn_str)
-    ; ("Command", `String daemon_command) ]
+    ; ("Command", `String daemon_command)
+    ; ("Coda_branch", `String Coda_version.branch)
+    ; ("Coda_commit", `String Coda_version.commit_id) ]
 
 let coda_status coda_ref =
   Option.value_map coda_ref
-    ~default:(`String "Shutdown before Coda instance was created") ~f:(fun t ->
+    ~default:
+      (Deferred.return (`String "Shutdown before Coda instance was created"))
+    ~f:(fun t ->
       Coda_commands.get_status ~flag:`Performance t
-      |> Daemon_rpcs.Types.Status.to_yojson )
+      >>| Daemon_rpcs.Types.Status.to_yojson )
 
 let make_report exn_str ~conf_dir ~top_logger coda_ref =
   let _ = remove_prev_crash_reports ~conf_dir in
@@ -120,7 +182,7 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   let report_file = temp_config ^ ".tar.gz" in
   (*Coda status*)
   let status_file = temp_config ^/ "coda_status.json" in
-  let status = coda_status !coda_ref in
+  let%map status = coda_status !coda_ref in
   Yojson.Safe.to_file status_file status ;
   (*coda logs*)
   let coda_log = conf_dir ^/ "coda.log" in
@@ -174,10 +236,11 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   else Some (report_file, temp_config)
 
 (* TODO: handle participation_status more appropriately than doing participate_exn *)
-let setup_local_server ?(client_whitelist = []) ?rest_server_port
+let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ?(insecure_rest_server = false) coda =
-  let client_whitelist =
-    Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_whitelist)
+  let client_trustlist =
+    ref
+      (Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_trustlist))
   in
   (* Setup RPC server for client interactions *)
   let implement rpc f =
@@ -197,8 +260,10 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
             |> Participating_state.to_deferred_or_error )
             ~f:Or_error.join )
     ; implement Daemon_rpcs.Send_user_commands.rpc (fun () ts ->
-          Coda_commands.schedule_user_commands coda ts
-          |> Participating_state.to_deferred_or_error )
+          Deferred.map
+            ( Coda_commands.schedule_user_commands coda ts
+            |> Participating_state.to_deferred_or_error )
+            ~f:Or_error.join )
     ; implement Daemon_rpcs.Get_balance.rpc (fun () pk ->
           return
             ( Coda_commands.get_balance coda pk
@@ -249,9 +314,9 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                 coda pk
             |> Participating_state.active_error ) )
     ; implement_notrace Daemon_rpcs.Get_status.rpc (fun () flag ->
-          return (Coda_commands.get_status ~flag coda) )
+          Coda_commands.get_status ~flag coda )
     ; implement Daemon_rpcs.Clear_hist_status.rpc (fun () flag ->
-          return (Coda_commands.clear_hist_status ~flag coda) )
+          Coda_commands.clear_hist_status ~flag coda )
     ; implement Daemon_rpcs.Get_ledger.rpc (fun () lh ->
           Coda_lib.get_ledger coda lh )
     ; implement Daemon_rpcs.Stop_daemon.rpc (fun () () ->
@@ -278,9 +343,31 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
               ~f:(fun ({Keypair.Stable.Latest.public_key; _} as keypair) ->
                 (keypair, Public_key.compress public_key) )
           in
-          Coda_lib.replace_propose_keypairs coda
+          Coda_lib.replace_block_production_keypairs coda
             (Keypair.And_compressed_pk.Set.of_list keypair_and_compressed_key) ;
-          Deferred.unit ) ]
+          Deferred.unit )
+    ; implement Daemon_rpcs.Add_trustlist.rpc (fun () ip ->
+          return
+            (let ip_str = Unix.Inet_addr.to_string ip in
+             if Unix.Inet_addr.Set.mem !client_trustlist ip then
+               Or_error.errorf "%s already present in trustlist" ip_str
+             else (
+               client_trustlist := Unix.Inet_addr.Set.add !client_trustlist ip ;
+               Ok () )) )
+    ; implement Daemon_rpcs.Remove_trustlist.rpc (fun () ip ->
+          return
+            (let ip_str = Unix.Inet_addr.to_string ip in
+             if not @@ Unix.Inet_addr.Set.mem !client_trustlist ip then
+               Or_error.errorf "%s not present in trustlist" ip_str
+             else (
+               client_trustlist :=
+                 Unix.Inet_addr.Set.remove !client_trustlist ip ;
+               Ok () )) )
+    ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
+          return (Set.to_list !client_trustlist) )
+    ; implement Daemon_rpcs.Get_telemetry_data.rpc (fun () peers ->
+          Telemetry.get_telemetry_data_from_peers (Coda_lib.net coda) peers )
+    ]
   in
   let snark_worker_impls =
     [ implement Snark_worker.Rpcs.Get_work.Latest.rpc (fun () () ->
@@ -315,7 +402,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
               | `Transition ->
                   Perf_histograms.add_span ~name:"snark_worker_transition_time"
                     total ) ;
-          Coda_lib.add_work coda work ) ]
+          Deferred.return @@ Coda_lib.add_work coda work ) ]
   in
   Option.iter rest_server_port ~f:(fun rest_server_port ->
       trace_task "REST server" (fun () ->
@@ -340,9 +427,9 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
               (fun ~body _sock req ->
                 let uri = Cohttp.Request.uri req in
                 let status flag =
+                  let%bind status = Coda_commands.get_status ~flag coda in
                   Server.respond_string
-                    ( Coda_commands.get_status ~flag coda
-                    |> Daemon_rpcs.Types.Status.to_yojson
+                    ( status |> Daemon_rpcs.Types.Status.to_yojson
                     |> Yojson.Safe.pretty_to_string )
                 in
                 let lift x = `Response x in
@@ -363,7 +450,7 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                     >>| lift ))
           |> Deferred.map ~f:(fun _ ->
                  Logger.info logger
-                   !"Created GraphQL server and status endpoints at port : %i"
+                   !"Created GraphQL server at: http://localhost:%i/graphql"
                    rest_server_port ~module_:__MODULE__ ~location:__LOC__ ) )
   ) ;
   let where_to_listen =
@@ -385,10 +472,10 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
               where_to_listen
               (fun address reader writer ->
                 let address = Socket.Address.Inet.addr address in
-                if not (Set.mem client_whitelist address) then (
+                if not (Set.mem !client_trustlist address) then (
                   Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                     !"Rejecting client connection from $address, it is not \
-                      present in the whitelist."
+                      present in the trustlist."
                     ~metadata:
                       [("$address", `String (Unix.Inet_addr.to_string address))] ;
                   Deferred.unit )
@@ -414,26 +501,49 @@ let setup_local_server ?(client_whitelist = []) ?rest_server_port
                               ] ;
                           Deferred.unit )) ) )))
 
+let coda_crash_message ~log_issue ~action ~error =
+  let followup =
+    if log_issue then
+      sprintf
+        !{err| The Coda Protocol developers would like to know why!
+
+    Please:
+      Open an issue:
+        <https://github.com/CodaProtocol/coda/issues/new>
+
+      Briefly describe what you were doing and %s
+
+    %!|err}
+        action
+    else action
+  in
+  sprintf !{err|
+
+  ☠  Coda Daemon %s.
+  %s
+%!|err} error followup
+
+let no_report exn_str status =
+  sprintf
+    "include the last 20 lines from .coda-config/coda.log and then paste the \
+     following:\n\
+     Summary:\n\
+     %s\n\
+     Status:\n\
+     %s\n"
+    (Yojson.Safe.to_string status)
+    (Yojson.Safe.to_string (summary exn_str))
+
 let handle_crash e ~conf_dir ~top_logger coda_ref =
   let exn_str = Exn.to_string e in
   Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
     "Unhandled top-level exception: $exn\nGenerating crash report"
     ~metadata:[("exn", `String exn_str)] ;
-  let no_report () =
-    sprintf
-      "include the last 20 lines from .coda-config/coda.log and then paste \
-       the following:\n\
-       Summary:\n\
-       %s\n\
-       Status:\n\
-       %s\n"
-      (Yojson.Safe.to_string (coda_status !coda_ref))
-      (Yojson.Safe.to_string (summary exn_str))
-  in
-  let action_string =
-    match
-      try Ok (make_report exn_str ~conf_dir coda_ref ~top_logger)
-      with exn -> Error (Error.of_exn exn)
+  let%bind status = coda_status !coda_ref in
+  let%map action_string =
+    match%map
+      try make_report exn_str ~conf_dir coda_ref ~top_logger >>| fun k -> Ok k
+      with exn -> return (Error (Error.of_exn exn))
     with
     | Ok (Some (report_file, temp_config)) ->
         ( try Core.Sys.command (sprintf "rm -rf %s" temp_config) |> ignore
@@ -441,41 +551,48 @@ let handle_crash e ~conf_dir ~top_logger coda_ref =
         sprintf "attach the crash report %s" report_file
     | Ok None ->
         (*TODO: tar failed, should we ask people to zip the temp directory themselves?*)
-        no_report ()
+        no_report exn_str status
     | Error e ->
         Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
           "Exception when generating crash report: $exn"
           ~metadata:[("exn", `String (Error.to_string_hum e))] ;
-        no_report ()
+        no_report exn_str status
   in
-  Core.eprintf
-    !{err|
-
-  ☠  Coda daemon crashed. The Coda Protocol developers would like to know why!
-
-  Please:
-    Open an issue:
-      <https://github.com/CodaProtocol/coda/issues/new>
-
-    Briefly describe what you were doing and %s
-%!|err}
-    action_string
+  let message =
+    coda_crash_message ~error:"crashed" ~action:action_string ~log_issue:true
+  in
+  Core.print_string message
 
 let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
-      ( match Monitor.extract_exn exn with
-      | Coda_networking.No_initial_peers ->
-          Core.eprintf
-            !{err|
-
-  ☠  Coda Daemon failed to connect to any initial peers.
-
-You might be trying to connect to a different network version, or need to troubleshoot your configuration. See https://codaprotocol.com/docs/troubleshooting/ for details.
-
-%!|err}
-      | _ ->
-          handle_crash exn ~conf_dir ~top_logger coda_ref ) ;
-      Stdlib.exit 1 ) ;
+      don't_wait_for
+        (let%bind () =
+           match Monitor.extract_exn exn with
+           | Coda_networking.No_initial_peers ->
+               let message =
+                 coda_crash_message
+                   ~error:"failed to connect to any initial peers"
+                   ~action:
+                     "You might be trying to connect to a different network \
+                      version, or need to troubleshoot your configuration. \
+                      See https://codaprotocol.com/docs/troubleshooting/ for \
+                      details."
+                   ~log_issue:false
+               in
+               Core.print_string message ; Deferred.unit
+           | Genesis_ledger_helper.Genesis_state_initialization_error ->
+               let message =
+                 coda_crash_message
+                   ~error:"failed to initialize the genesis state"
+                   ~action:
+                     "include the last 50 lines from .coda-config/coda.log"
+                   ~log_issue:true
+               in
+               Core.print_string message ; Deferred.unit
+           | _ ->
+               handle_crash exn ~conf_dir ~top_logger coda_ref
+         in
+         Stdlib.exit 1) ) ;
   Async_unix.Signal.(
     handle terminating ~f:(fun signal ->
         log_shutdown ~conf_dir ~top_logger coda_ref ;

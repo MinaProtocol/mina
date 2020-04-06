@@ -9,6 +9,7 @@ open Signature_lib
 open Coda_base
 open Coda_state
 open Coda_transition
+open Network_peer
 
 type t [@@deriving sexp, eq, compare, to_yojson]
 
@@ -55,7 +56,7 @@ val state_hash : t -> State_hash.t
 
 val parent_hash : t -> State_hash.t
 
-val proposer : t -> Signature_lib.Public_key.Compressed.t
+val block_producer : t -> Signature_lib.Public_key.Compressed.t
 
 val user_commands : t -> User_command.t list
 
