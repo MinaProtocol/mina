@@ -119,3 +119,59 @@ As a snark worker, you get to share some of the block reward for each block your
 Snark workers can be fairly compute intensive, so if you need to limit their CPU usage, you can specify the number of threads snark workers use with the `-snark-worker-parallelism` flag. This can be especially useful if you're trying to run a block producer and snark worker on the same machine and having issues producing blocks in time.
 
 That about covers the roles and responsibilities as a Code node operator. Since Coda is a permissionless peer-to-peer network, everything is managed and run in a decentralized manner by nodes all over the world. Similarly, the Coda project is also distributed and permissionless to join. The code is all open source, and there is much work to be done, both technical and non-technical. To learn more about how you can get involved with Coda, please check out the [Contributing to Coda section](./contributing).
+
+## Running coda as a service
+
+You might want to run the coda daemon in the background. You have a couple of options:
+
+- Use the `-background` flag to `coda daemon`. This will not autorestart the daemon for you.
+- Use your OS service manager to run it for you, and get the ability to have it restart automatically and other features.
+
+Either way, your logs will be saved to `~/.coda-config/coda.log` and configuration can be specified in the [`daemon.json`](#using-daemonjson-to-configure-your-coda-daemon) file.
+
+### macOS
+
+- [Install coda](/docs/getting-started#macOS) as usual.
+- You can then start the coda service like this:
+```
+brew services start coda
+```
+
+### Ubuntu 18.04 / Debian 9
+
+- [Install coda](/docs/getting-started#ubuntu-1804--debian-9) as usual.
+- Now you can check [here](https://github.com/jkrauska/coda-systemd) and [here](https://forums.codaprotocol.com/t/autodeploy-kinda-coda-node-and-systemd-integration-script/284) for some community-provided solutions to running coda as a service using systemd.
+
+<Alert>
+
+Interested in making it easier to use coda with systemd? [Help us](https://github.com/CodaProtocol/coda/issues/4493) to make the experience on Linux better!
+
+</Alert>
+
+### Using daemon.json to configure your coda daemon
+
+By creating a file at `~/.coda-config/daemon.json`, you can configure your coda daemon without needing to provide options on the commandline. This can be useful for running coda as a service as well as just for avoiding repetitive typing!
+
+Most of the options that can be passed to `coda daemon` on the commandline can also be provided as options in the config file. See `coda daemon -help` for more documentation of the options. Below is an example of usage of all the usable configuration parameters (in your file, you only need to specify the ones you want to change):
+
+```json
+{
+  "client-port": 1000,
+  "libp2p-port": 1001,
+  "rest-port": 1002,
+  "block-producer-key": "/path/to/privkey-file",
+  "block-producer-password": "mypassword",
+  "block-producer-pubkey": "<MY PUBLICKEY>",
+  "coinbase-receiver": "<MY PUBLICKEY>",
+  "log-block-creation": false,
+  "log-received-blocks": false,
+  "log-snark-work-gossip": false,
+  "log-txn-pool-gossip": false,
+  "peers": ["seed-one.o1test.net", "seed-two.o1test.net"],
+  "run-snark-worker": "<MY PUBLICKEY>",
+  "snark-worker-fee": 10,
+  "snark-worker-parallelism": 1,
+  "work-reassignment-wait": 420000,
+  "work-selection": "seq"
+}
+```
