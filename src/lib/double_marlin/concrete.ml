@@ -193,7 +193,7 @@ module MerkleTree (Snark : Snarky.Snark_intf.S) = struct
     let () = Core.printf "Verified: %b\n" verified
 end
 
-(*include RootExample(Snarky.Snark.Run.Make(Snarky_bn382_backend.Pairing_based) (Core.Unit))
-include RootExample(Snarky.Snark.Run.Make(Snarky_bn382_backend.Dlog_based) (Core.Unit))
-include MerkleTree(Snarky.Snark.Make (Snarky_bn382_backend.Pairing_based))*)
-include MerkleTree(Snarky.Snark.Make (Snarky_bn382_backend.Dlog_based))
+include RootExample(Snarky.Snark.Run.Make(Snarky_bn382_backend.Pairing_based) (Core.Unit))
+(*include RootExample(Snarky.Snark.Run.Make(Snarky_bn382_backend.Dlog_based) (Core.Unit))
+include MerkleTree(Snarky.Snark.Make (Snarky_bn382_backend.Pairing_based))
+include MerkleTree(Snarky.Snark.Make (Snarky_bn382_backend.Dlog_based))*)
