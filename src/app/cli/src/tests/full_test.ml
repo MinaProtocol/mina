@@ -186,7 +186,7 @@ let run_test () : unit Deferred.t =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
-             ~gossip_net_params ~initial_fork_id:Fork_id.empty
+             ~gossip_net_params ~is_seed:true ~initial_fork_id:Fork_id.empty
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
@@ -265,29 +265,23 @@ let run_test () : unit Deferred.t =
       *)
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
-      let build_payment amount sender_sk receiver_pk fee =
+      let build_payment ?(nonce_opt = None) amount sender_sk receiver_pk fee =
         trace_recurring "build_payment" (fun () ->
-            let nonce =
-              Option.value_exn
-                ( Coda_commands.get_nonce coda (pk_of_sk sender_sk)
-                |> Participating_state.active_exn )
-            in
             let memo =
               User_command_memo.create_from_string_exn
                 "A memo created in full-test"
             in
-            let payload : User_command.Payload.t =
-              User_command.Payload.create ~fee ~nonce ~memo
-                ~valid_until:Coda_numbers.Global_slot.max_value
-                ~body:(Payment {receiver= receiver_pk; amount})
-            in
-            (* verify memo is in the payload *)
-            assert (User_command_memo.equal memo payload.common.memo) ;
-            User_command.sign (Keypair.of_private_key_exn sender_sk) payload )
+            User_command_input.create ~nonce_opt ~sender:(pk_of_sk sender_sk)
+              ~fee ~memo ~valid_until:Coda_numbers.Global_slot.max_value
+              ~body:(Payment {receiver= receiver_pk; amount})
+              ~sign_choice:
+                (User_command_input.Sign_choice.Keypair
+                   (Keypair.of_private_key_exn sender_sk))
+              () )
       in
       let assert_ok x = assert (Or_error.is_ok x) in
-      let send_payment (payment : User_command.With_valid_signature.t) =
-        Coda_commands.send_user_command coda (payment :> User_command.t)
+      let send_payment (payment : User_command_input.t) =
+        Coda_commands.setup_and_submit_user_command coda payment
         |> Participating_state.to_deferred_or_error
         |> Deferred.map ~f:Or_error.join
       in
@@ -307,10 +301,13 @@ let run_test () : unit Deferred.t =
         in
         let%bind p1_res = send_payment payment in
         assert_ok p1_res ;
+        let user_cmd, _receipt = p1_res |> Or_error.ok_exn in
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =
-          build_payment send_amount sender_sk receiver_pk transaction_fee
+          build_payment
+            ~nonce_opt:(Some (User_command.nonce user_cmd))
+            send_amount sender_sk receiver_pk transaction_fee
         in
         let%bind p2_res = send_payment payment' in
         assert (Or_error.is_error p2_res) ;

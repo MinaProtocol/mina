@@ -3,12 +3,6 @@ export default Page({title: "Become a Node Operator"});
 
 # Become a Node Operator
 
-<Alert kind="danger">
-
-  Node operator commands are still being stabilized, so they may change. Feel free to try them out and open a pull request to fix anything!
-
-</Alert>
-
 Now that we've set up our Coda node and sent our first transaction, let's turn our attention to the other ways we can interact with the Coda network - namely, participating in consensus, and helping compress data by generating zk-SNARKs. By operating a node that helps secure the network, you can receive coda for your efforts.
 
 ## Participating in Consensus
@@ -17,59 +11,47 @@ The Coda network is secured by [Proof-of-Stake consensus](/docs/glossary/#proof-
 
 ### Staking coda
 
-<!-- Since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can configure that wallet to stake its coda by issuing the following command, passing in the file path for the associated private key (we previously created the keypair in `keys/my-wallet`): -->
+Normally we'd want to have more funds before staking, but since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can try out staking its coda by issuing the following command:
 
-<!-- coda client set-staking -privkey-path keys/my-wallet -->
+    coda client set-staking -public-key $CODA_PUBLIC_KEY
 
-Since we have some funds in our wallet from [the previous step](/docs/my-first-transaction), we can now start the daemon with the `-propose-key` flag to begin staking coda. 
-Let's stop our current daemon process, and restart it with the following command, passing in the file path for the associated private key (by default, keypairs live in `~/.coda-config/wallets/store`). Since we conveniently saved it as an environment variable in the previous step, we can run the following command:
+Alternatively, you can restart the daemon with the `-block-producer-pubkey` flag:
 
-    coda daemon \
-        -external-port 8302 \
-        -discovery-port 8303 \
-        -peer /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/ipfs/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH \
-        -peer /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/ipfs/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA \
-        -propose-key $CODA_PRIVATE_KEY_FILE
-
-<Alert>
-
-  You can provide a list of key files to turn on staking for multiple accounts at the same time
-
-</Alert>
+<DaemonCommandExample args={[
+ "-block-producer-pubkey $CODA_PUBLIC_KEY",
+]}/>
 
 We can always check which accounts we're currently staking with, by using the `coda client status` command:
 
-    coda client status
-    
-    Coda daemon status
-    -----------------------------------
+```
+coda client status
 
-    Global number of accounts:  372
-    Block height:               20
-    Max observed block length:  20
-    Local uptime:               1m48s
-    Ledger Merkle root:         ...
-    Protocol state hash:        ...
-    Staged Hash:                ...
-    Git SHA-1:                  ...
-    Configuration directory:    ...
-    Peers:                      5 (...)
-    User_commands sent:         0
-    SNARK worker:               None
-    SNARK work fee:             1
-    Sync status:                Synced
-    Block producers running:    1 (...)
-    Best tip consensus time:    epoch=0, slot=133
-    Next proposal:              None this epoch… checking at in 5.284h
-    Consensus time now:         epoch=0, slot=134
-    Consensus mechanism:        proof_of_stake
-    Consensus configuration:
-      ...
+Coda daemon status
+-----------------------------------
 
-    Addresses and ports:
-      ...
-
-    Libp2p PeerID:              ...
+Global number of accounts:  372
+Block height:               20
+Max observed block length:  20
+Local uptime:               1m48s
+Ledger Merkle root:         ...
+Protocol state hash:        ...
+Staged Hash:                ...
+Git SHA-1:                  ...
+Configuration directory:    ...
+Peers:                      5 (...)
+User_commands sent:         0
+SNARK worker:               None
+SNARK work fee:             1
+Sync status:                Synced
+Block producers running:    1 (...)
+Best tip consensus time:    epoch=0, slot=133
+Next proposal:              None this epoch… checking at in 5.284h
+Consensus time now:         epoch=0, slot=134
+Consensus mechanism:        proof_of_stake
+Consensus configuration:    ...
+Addresses and ports:        ...
+Libp2p PeerID:              ...
+```
 
 The `Block producers running` field in the response above returns the number of accounts currently staking, with the associated key.
 
@@ -81,10 +63,7 @@ The `Block producers running` field in the response above returns the number of 
 
 ### Delegating coda
 
-Delegating coda is an alternative option to staking it directly, with the benefit of not having to remain connected to the network at all times. However, keep in mind that:
-
-- you will need to pay a small transaction fee to make a delegate change, as this change is issued as a transaction recorded on the blockchain
-- the delegate staking for you may choose to charge you a commission for providing the staking service
+Delegating coda is an alternative option to staking it directly, with the benefit of not having to maintain a node that is always connected to the network.
 
 First make sure you've unlocked your account:
 
@@ -93,24 +72,27 @@ First make sure you've unlocked your account:
 And then run this command to delegate your stake:
 
     coda client delegate-stake \
-        -delegate <delegate-public-key> \
-        -privkey-path <file> \
-        -fee <fee>
+        -receiver <DELEGATE-PUBLIC-KEY> \
+        -sender $CODA_PUBLIC_KEY \
+        -fee 0.1
 
 The fields in this command:
 
-- The `delegate` flag requires the public key of the delegate you've chosen
-- `privkey-path` is the file path to your private key with the funds that you wish to delegate
+- The `receiver` flag is the public key of the receiver of your stake delegation
+- `sender` is the public key of the account from which you want to delegate
 - `fee` is the transaction fee to record your transaction on the blockchain
+
+You'll notice that this command looks suspiciously like a [payment](/docs/my-first-transaction#make-a-payment) transaction. That's because a stake delegation is also a transaction! This is why we have to pay a small transaction fee in order to change this setting.
 
 Delegating your stake might be useful if you're interested in:
 
 - Running your own staking node that uses funds from a "cold wallet"
 - Delegating to a "staking pool" which will provide token payouts periodically
+- Or if you don't have enough tokens to make managing a block producer full-time worthwhile
 
 <Alert>
 
-  There is a waiting period of a day before this change will come into effect to prevent abuse of the network
+There is a waiting period of a day or two before your new stake delegation comes into effect to prevent abuse of the network
 
 </Alert>
 
@@ -120,19 +102,21 @@ The Coda protocol is unique in that it doesn't require nodes to maintain the ful
 
 However, this isn't data encoding or compression in the traditional sense - rather nodes "compress" data in the network by generating cryptographic proofs. Node operators play a crucial role in this process by designating themselves as "snark-workers" that generate zk-SNARKs for transactions that have been added to blocks.
 
-When you [start the daemon](/docs/my-first-transaction/#start-up-a-node), set these extra arguments to also start a snark-worker:
+You can start a snark-worker using these commands:
 
-    coda daemon \
-        -external-port 8302 \
-        -discovery-port 8303 \
-        -peer /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/ipfs/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH \
-        -peer /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/ipfs/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA \
-        -run-snark-worker $CODA_PUBLIC_KEY \
-        -snark-worker-fee <fee>
+    coda client set-snark-work-fee <FEE>
+    coda client set-snark-worker -address $CODA_PUBLIC_KEY
+
+Alternatively, you can restart the daemon with these flags:
+
+<DaemonCommandExample args={[
+  "-run-snark-worker $CODA_PUBLIC_KEY",
+  "-snark-worker-fee <fee>",
+]}/>
 
 As a snark worker, you get to share some of the block reward for each block your compressed transactions make it in to. The block producer is responsible for gathering compressed transactions before including them into a block, and will be incentivized by the protocol to reward snark-workers.
 
-Snark workers can be fairly compute intensive, so if you need to limit their CPU usage, you can specify the number of threads snark workers use. Coda uses the OPENMP library to support parallel CPU processing of SNARKs. Thus each snark worker can be configured with the `OMP_NUM_THREADS` environment variable to determine how many threads to spawn. It defaults to the number of detected logical cores. The daemon also uses this environment variable when it is proving the blockchain snark. You can run `export OMP_NUM_THREAD=4` to set this environmental variable before you begin the daemon.
+Snark workers can be fairly compute intensive, so if you need to limit their CPU usage, you can specify the number of threads snark workers use with the `-snark-worker-parallelism` flag. This can be especially useful if you're trying to run a block producer and snark worker on the same machine and having issues producing blocks in time.
 
 That about covers the roles and responsibilities as a Code node operator. Since Coda is a permissionless peer-to-peer network, everything is managed and run in a decentralized manner by nodes all over the world. Similarly, the Coda project is also distributed and permissionless to join. The code is all open source, and there is much work to be done, both technical and non-technical. To learn more about how you can get involved with Coda, please check out the [Contributing to Coda section](./contributing).
 

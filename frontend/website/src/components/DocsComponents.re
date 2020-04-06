@@ -40,6 +40,9 @@ module Wrap = (C: Component) => {
   let make = props => {
     ReasonReact.cloneElement(C.element, ~props, [||]);
   };
+
+  [@bs.obj]
+  external makeProps: (~children: 'a, unit) => {. "children": 'a} = "";
 };
 
 module WrapHeader = (C: Component) => {
@@ -138,15 +141,12 @@ module Strong =
 external writeText: string => Js.Promise.t(unit) = "writeText";
 
 module Pre = {
-  let make = props => {
+  [@react.component]
+  let make = (~children) => {
     let text =
       Js.String.trim(
         Js.String.make(
-          {
-            let props =
-              ReactExt.Children.only(props##children) |> ReactExt.props;
-            props##children;
-          },
+          (ReactExt.Children.only(children) |> ReactExt.props)##children,
         ),
       );
     <div className={style([position(`relative)])}>
@@ -182,7 +182,7 @@ module Pre = {
           overflow(`scroll),
           selector("code", [Theme.Typeface.pragmataPro]),
         ])}>
-        {props##children}
+        children
       </pre>
     </div>;
   };
@@ -214,8 +214,23 @@ module Img =
     let element = <img width="100%" />;
   });
 
+module DaemonCommandExample = {
+  let defaultArgs = [
+    "coda daemon",
+    "-peer /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/ipfs/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH",
+    "-peer /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/ipfs/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA",
+  ];
+  [@react.component]
+  let make = (~args: array(string)=[||]) => {
+    let processed_args =
+      String.concat(" \\\n    ", defaultArgs @ Array.to_list(args));
+    <Pre> <Code> {React.string(processed_args)} </Code> </Pre>;
+  };
+};
+
 let allComponents = () => {
   "Alert": Alert.make,
+  "DaemonCommandExample": DaemonCommandExample.make,
   "h1": H1.make,
   "h2": H2.make,
   "h3": H3.make,
