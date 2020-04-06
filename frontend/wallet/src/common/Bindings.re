@@ -70,7 +70,7 @@ module Stream = {
     external onError: (t, [@bs.as "error"] _, Js.Exn.t => unit) => t = "on";
     [@bs.send]
     external onFinish: (t, [@bs.as "finish"] _, unit => unit) => t = "on";
-    [@bs.send] external write: (t, Chunk.t) => unit;
+    [@bs.send] external write: (t, Chunk.t) => unit = "write";
     [@bs.send] external endStream: t => unit = "end";
   };
 
@@ -212,6 +212,7 @@ module LocalStorage = {
     (
       ~key: [@bs.string] [
               | [@bs.as "network"] `Network
+              | [@bs.as "daemonHost"] `DaemonHost
               | [@bs.as "addressbook"] `AddressBook
               | [@bs.as "onboarding"] `Onboarding
               | [@bs.as "installed"] `Installed
@@ -227,6 +228,7 @@ module LocalStorage = {
     [@bs.string]
     [
       | [@bs.as "network"] `Network
+      | [@bs.as "daemonHost"] `DaemonHost
       | [@bs.as "addressbook"] `AddressBook
       | [@bs.as "onboarding"] `Onboarding
       | [@bs.as "installed"] `Installed

@@ -56,7 +56,12 @@ let handleResponse = (response, filename, dataEncoding, chunkCb, doneCb) => {
     ->Bindings.Stream.Writable.onFinish(() => doneCb(Belt.Result.Ok()))
     ->Bindings.Stream.Writable.onError(e =>
         doneCb(
-          Error(Tc.Option.withDefault(~default="", Js.Exn.message(e))),
+          Error(
+            Tc.Option.withDefault(
+              ~default="Unknown error installing daemon.",
+              Js.Exn.message(e),
+            ),
+          ),
         )
       );
 
@@ -129,8 +134,8 @@ let extractZip = (src, dest, doneCb, errorCb) => {
   Unique helper to download and unzip a coda daemon executable.
  */
 let downloadCoda = (version, chunkCb, doneCb) => {
-  let tempFilename = "coda-daemon-" ++ version ++ ".zip";
-  let installPath = getPath("userData") ++ "/daemon";
+  let tempFilename = getPath("temp") ++ "/coda-daemon-" ++ version ++ ".zip";
+  let installPath = getPath("userData") ++ "/coda";
   download(tempFilename, codaRepo ++ tempFilename, "binary", 1, chunkCb, res =>
     switch (res) {
     | Belt.Result.Error(_) => doneCb(res)

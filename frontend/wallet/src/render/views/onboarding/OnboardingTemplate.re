@@ -57,7 +57,12 @@ module Styles = {
       maxWidth(`percent(100.)),
     ]);
   let buttonRow = {
-    style([display(`flex), flexDirection(`row)]);
+    style([
+      width(`percent(100.)),
+      display(`flex),
+      flexDirection(`row),
+      selector("button", [flexGrow(1.)]),
+    ]);
   };
 };
 
