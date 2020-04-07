@@ -243,7 +243,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                              (envelope, Ivar.fill valid_ivar))
                           ~f:(fun () -> Ivar.read valid_ivar)
                       else Deferred.return true )
-                ~bin_prot:Message.V1.T.bin_msg
+                ~bin_prot:Message.Latest.T.bin_msg
                 ~on_decode_failure:
                   (`Call
                     (fun envelope (err : Error.t) ->
