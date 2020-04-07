@@ -67,7 +67,6 @@ The Ledger python loader exists [here](https://github.com/LedgerHQ/blue-loader-p
 and can be downloaded/installed with the following:
 ```
 sudo apt install -y libudev-dev libusb
-pip install ledgerblue
 pip3 install ledgerblue
 ```
 
@@ -86,6 +85,7 @@ Running the following will install the Coda app on your Ledger device:
 ```
 git clone git@github.com:CodaProtocol/ledger-coda-app.git
 cd ledger-coda-app
+git checkout 4574d3c
 make load
 ```
 
@@ -93,7 +93,7 @@ make load
 
 The coda hardware wallet command line tool is a python package called `coda-ledger-cli`:
 ```
-python3 -mpip install coda-ledger-cli
+python3 -mpip install coda-ledger-cli==0.0.5
 ```
 
 If you have connection issues with your hardware wallet, please take a look at [the troubleshooting help on the Ledger support page](https://support.ledger.com/hc/en-us/articles/115005165269-Fix-connection-issues).
