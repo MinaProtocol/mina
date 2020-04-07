@@ -82,7 +82,7 @@ module Minimal = struct
     ; scan_state: Staged_ledger.Scan_state.t
     ; pending_coinbase: Pending_coinbase.t }
 
-  let of_limited {Limited.Stable.V1.transition; scan_state; pending_coinbase} =
+  let of_limited {Limited.transition; scan_state; pending_coinbase} =
     let hash = External_transition.Validated.state_hash transition in
     {hash; scan_state; pending_coinbase}
 
@@ -91,22 +91,20 @@ module Minimal = struct
       State_hash.equal
         (External_transition.Validated.state_hash transition)
         hash ) ;
-    {Limited.Stable.V1.transition; scan_state; pending_coinbase}
+    {Limited.transition; scan_state; pending_coinbase}
 end
 
 type t =
   {transition: External_transition.Validated.t; staged_ledger: Staged_ledger.t}
 
 let minimize {transition; staged_ledger} =
-  let open Minimal.Stable.Latest in
-  { hash= External_transition.Validated.state_hash transition
+  { Minimal.hash= External_transition.Validated.state_hash transition
   ; scan_state= Staged_ledger.scan_state staged_ledger
   ; pending_coinbase= Staged_ledger.pending_coinbase_collection staged_ledger
   }
 
 let limit {transition; staged_ledger} =
-  let open Limited.Stable.Latest in
-  { transition
+  { Limited.transition
   ; scan_state= Staged_ledger.scan_state staged_ledger
   ; pending_coinbase= Staged_ledger.pending_coinbase_collection staged_ledger
   }

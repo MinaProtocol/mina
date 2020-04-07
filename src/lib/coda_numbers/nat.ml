@@ -58,6 +58,11 @@ struct
         (sprintf "to_bits: %s" __LOC__)
         (make_checked (fun () -> Integer.to_bits ~length:N.length_in_bits ~m t))
 
+    let to_input t =
+      Checked.map (to_bits t) ~f:(fun bits ->
+          Random_oracle.Input.bitstring
+            (Bitstring_lib.Bitstring.Lsb_first.to_list bits) )
+
     let constant n =
       Integer.constant ~length:N.length_in_bits ~m
         (Bignum_bigint.of_int (N.to_int n))
@@ -145,6 +150,8 @@ struct
   let to_bits = Bits.to_bits
 
   let of_bits = Bits.of_bits
+
+  let to_input t = Random_oracle.Input.bitstring (to_bits t)
 
   let fold t = Fold.group3 ~default:false (Bits.fold t)
 
