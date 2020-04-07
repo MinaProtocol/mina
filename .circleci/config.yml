@@ -172,7 +172,10 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Compare versioned types in PR
-                  command: ./scripts/compare_pr_diff_types.sh
+                  command: ./scripts/compare_ci_diff_types.sh
+            - run:
+                  name: Compare binable functors in PR
+                  command: ./scripts/compare_ci_diff_binables.sh
     compare-test-signatures:
         docker:
             - image: codaprotocol/coda:toolchain-133674cbc6003c087bc2add74d3e9d18f091768d
@@ -321,11 +324,16 @@ jobs:
             - run:
                 name: Decode Apple Certificates
                 context: org-global
-                command: base64 -D -o Certificates.p12 <<< $APPLE_CERTIFICATES
+                command: base64 -D -o frontend/wallet/Certificates.p12 <<< $APPLE_CERTIFICATES
+            - run:
+                name: Fastlane
+                context: org-global
+                command: cd frontend/wallet && bundle exec fastlane ci && cd ../..
             - run:
                 name: Build portable binary
                 command: |
                     make macos-portable
+                    cp _build/coda-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh scripts/artifacts.sh
