@@ -1,0 +1,6 @@
+{
+  "dependencies": {
+    "@google-cloud/storage": "^4.7.0",
+    "fast-crc32c": "^2.0.0"
+  }
+}
