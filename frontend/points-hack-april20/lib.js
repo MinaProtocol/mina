@@ -31,7 +31,7 @@ const apolloClient = new ApolloClient({
 const {Storage} = require('@google-cloud/storage');
 const { Readable } = require('stream');
 
-const storage = new Storage({keyFilename: 'o1labs-192920-7e170ede82f5.json'});
+const storage = new Storage();
 
 function uploadFile(result) {
   const bucketName = "points-data-hack-april20";
