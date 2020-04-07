@@ -137,10 +137,13 @@ let get_accounts accounts_json_file n =
         (Account_config.to_yojson all_accounts) ) ;
   all_accounts
 
+let genesis_dir_name =
+  Cache_dir.genesis_dir_name ~commit_id_short:Coda_version.commit_id_short
+
 let create_tar top_dir =
-  let tar_file = top_dir ^/ Cache_dir.genesis_dir_name ^ ".tar.gz" in
+  let tar_file = top_dir ^/ genesis_dir_name ^ ".tar.gz" in
   let tar_command =
-    sprintf "tar -C %s -czf %s %s" top_dir tar_file Cache_dir.genesis_dir_name
+    sprintf "tar -C %s -czf %s %s" top_dir tar_file genesis_dir_name
   in
   let exit = Core.Sys.command tar_command in
   if exit = 2 then
@@ -152,7 +155,7 @@ let main accounts_json_file dir n =
   let open Deferred.Let_syntax in
   let top_dir = Option.value ~default:Cache_dir.autogen_path dir in
   let%bind genesis_dir =
-    let dir = top_dir ^/ Cache_dir.genesis_dir_name in
+    let dir = top_dir ^/ genesis_dir_name in
     let%map () = File_system.create_dir dir ~clear_if_exists:true in
     dir
   in

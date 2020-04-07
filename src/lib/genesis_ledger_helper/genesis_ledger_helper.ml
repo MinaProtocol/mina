@@ -4,10 +4,10 @@ open Coda_base
 
 type exn += Genesis_state_initialization_error
 
-let retrieve_genesis_state dir_opt ~logger ~conf_dir :
+let retrieve_genesis_state dir_opt ~commit_id_short ~logger ~conf_dir :
     (Ledger.t lazy_t * Proof.t) Deferred.t =
   let open Cache_dir in
-  let tar_filename = Cache_dir.genesis_dir_name ^ ".tar.gz" in
+  let tar_filename = Cache_dir.genesis_dir_name ~commit_id_short ^ ".tar.gz" in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
     "Looking for the genesis tar file $filename"
     ~metadata:[("filename", `String tar_filename)] ;
@@ -15,7 +15,7 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir :
     "https://s3-us-west-2.amazonaws.com/snark-keys.o1test.net" ^/ tar_filename
   in
   let extract tar_dir =
-    let target_dir = conf_dir ^/ Cache_dir.genesis_dir_name in
+    let target_dir = conf_dir ^/ Cache_dir.genesis_dir_name ~commit_id_short in
     match%map
       Monitor.try_with_or_error ~extract_exn:true (fun () ->
           (*Delete any old genesis state*)
@@ -23,7 +23,9 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir :
             File_system.remove_dir (conf_dir ^/ "coda_genesis_*")
           in
           (*Look for the tar and extract*)
-          let tar_file = tar_dir ^/ Cache_dir.genesis_dir_name ^ ".tar.gz" in
+          let tar_file =
+            tar_dir ^/ Cache_dir.genesis_dir_name ~commit_id_short ^ ".tar.gz"
+          in
           let%map _result =
             Process.run_exn ~prog:"tar"
               ~args:["-C"; conf_dir; "-xzf"; tar_file]
@@ -45,7 +47,9 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir :
       "Retrieving genesis ledger and genesis proof from $path"
       ~metadata:[("path", `String tar_dir)] ;
     let%bind () = extract tar_dir in
-    let extract_target = conf_dir ^/ Cache_dir.genesis_dir_name in
+    let extract_target =
+      conf_dir ^/ Cache_dir.genesis_dir_name ~commit_id_short
+    in
     let ledger_dir = extract_target ^/ "ledger" in
     let proof_file = extract_target ^/ "genesis_proof" in
     if

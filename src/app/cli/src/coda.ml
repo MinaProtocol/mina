@@ -341,7 +341,7 @@ let daemon logger =
        let coda_initialization_deferred () =
          let%bind genesis_ledger, base_proof =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
-             ~logger ~conf_dir
+             ~commit_id_short:Coda_version.commit_id_short ~logger ~conf_dir
          in
          let%bind config =
            let configpath = conf_dir ^/ "daemon.json" in
