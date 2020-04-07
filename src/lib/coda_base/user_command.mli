@@ -7,14 +7,14 @@ module Poly : sig
   module Stable : sig
     module V1 : sig
       type ('payload, 'pk, 'signature) t =
-        {payload: 'payload; sender: 'pk; signature: 'signature}
+        {payload: 'payload; signer: 'pk; signature: 'signature}
       [@@deriving sexp, hash, yojson, eq, compare]
     end
   end]
 
   type ('payload, 'pk, 'signature) t =
         ('payload, 'pk, 'signature) Stable.Latest.t =
-    {payload: 'payload; sender: 'pk; signature: 'signature}
+    {payload: 'payload; signer: 'pk; signature: 'signature}
   [@@deriving sexp, hash, yojson, eq, compare]
 end
 
@@ -34,7 +34,7 @@ module Stable : sig
 
     include Hashable.S with type t := t
 
-    val accounts_accessed : t -> Public_key.Compressed.t list
+    val accounts_accessed : t -> Account_id.t list
   end
 end]
 

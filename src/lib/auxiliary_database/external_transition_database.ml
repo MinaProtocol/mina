@@ -22,7 +22,7 @@ end
 
 module Pagination =
   Pagination.Make
-    (State_hash.Stable.V1)
+    (State_hash)
     (struct
       type t = (Filtered_external_transition.t, State_hash.t) With_hash.t
     end)
@@ -33,7 +33,7 @@ module Pagination =
       let compare a b = -compare a b
     end)
 
-let fee_transfer_participants (pk, _) = [pk]
+let fee_transfer_participants (pk, _) = [Account_id.create pk Token_id.default]
 
 type t = {pagination: Pagination.t; database: Database.t; logger: Logger.t}
 
@@ -49,8 +49,9 @@ let add_user_blocks (pagination : Pagination.t)
     List.concat_map transactions.user_commands
       ~f:User_command.accounts_accessed
   in
+  let creator_aid = Account_id.create creator Token_id.default in
   Pagination.add pagination
-    ((creator :: fee_transfer_participants) @ user_command_participants)
+    ((creator_aid :: fee_transfer_participants) @ user_command_participants)
     state_hash external_transition time
 
 let create ~logger directory =
@@ -67,9 +68,9 @@ let add {database; pagination; logger}
   | Some _ ->
       Logger.trace logger
         !"Not adding transition into external transition database since it \
-          already exists: $transaction"
+          already exists: $state_hash"
         ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:[("transaction", State_hash.to_yojson state_hash)]
+        ~metadata:[("state_hash", State_hash.to_yojson state_hash)]
   | None ->
       Database.set database ~key:state_hash
         ~data:(filtered_external_transition, date) ;
