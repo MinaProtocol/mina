@@ -138,7 +138,8 @@ module Api = struct
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
     let user_command_input =
-      User_command_input.create ~sender:pk_of_sk ~fee
+      User_command_input.create ~signer:pk_of_sk ~fee
+        ~fee_token:Token_id.default ~fee_payer_pk:pk_of_sk
         ~memo:User_command_memo.dummy ~valid_until ~body
         ~sign_choice:
           (User_command_input.Sign_choice.Keypair
@@ -152,12 +153,20 @@ module Api = struct
     user_cmd
 
   let delegate_stake t i delegator_sk delegate_pk fee valid_until =
+    let delegator =
+      Public_key.compress @@ Public_key.of_private_key_exn delegator_sk
+    in
     run_user_command t i delegator_sk fee valid_until
-      ~body:(Stake_delegation (Set_delegate {new_delegate= delegate_pk}))
+      ~body:
+        (Stake_delegation (Set_delegate {delegator; new_delegate= delegate_pk}))
 
   let send_payment t i sender_sk receiver_pk amount fee valid_until =
+    let source_pk =
+      Public_key.compress @@ Public_key.of_private_key_exn sender_sk
+    in
     run_user_command t i sender_sk fee valid_until
-      ~body:(Payment {receiver= receiver_pk; amount})
+      ~body:
+        (Payment {source_pk; receiver_pk; token_id= Token_id.default; amount})
 
   (* TODO: resulting_receipt should be replaced with the sender's pk so that we prove the
      merkle_list of receipts up to the current state of a sender's receipt_chain hash for some blockchain.
@@ -335,8 +344,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
   don't_wait_for
     (Linear_pipe.iter root_pipe ~f:(function
          | `Root
-             ( worker_id
-             , {Coda_lib.Root_diff.Stable.V1.user_commands; root_length} )
+             (worker_id, ({user_commands; root_length} : Coda_lib.Root_diff.t))
          ->
          ( match testnet.status.(worker_id) with
          | `On (`Synced user_cmds_under_inspection) ->
@@ -664,8 +672,8 @@ end = struct
       List.map expected_payments ~f:(fun user_command ->
           match user_command.payload.body with
           | Payment payment_payload ->
-              ( Public_key.compress user_command.sender
-              , payment_payload.receiver )
+              ( Public_key.compress user_command.signer
+              , payment_payload.receiver_pk )
           | Stake_delegation _ ->
               failwith "Expected a list of payments" )
       |> List.unzip

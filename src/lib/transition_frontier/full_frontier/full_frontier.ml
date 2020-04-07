@@ -229,7 +229,7 @@ let visualize_to_string t =
 
 (* given an heir, calculate the diff that will transition the root to that heir *)
 let calculate_root_transition_diff t heir =
-  let open Root_data.Minimal.Stable.V1 in
+  let open Root_data.Minimal in
   let root = root t in
   let heir_hash = Breadcrumb.state_hash heir in
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in

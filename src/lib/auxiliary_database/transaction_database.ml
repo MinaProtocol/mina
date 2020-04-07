@@ -12,7 +12,7 @@ module Make (Transaction : sig
 
   include Hashable.S with type t := t
 
-  val accounts_accessed : t -> Public_key.Compressed.t list
+  val accounts_accessed : t -> Account_id.t list
 end) (Time : sig
   type t [@@deriving bin_io, compare, sexp]
 

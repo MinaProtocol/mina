@@ -114,7 +114,7 @@ module Get_balance = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Public_key.Compressed.Stable.V1.t
+        type t = Account_id.Stable.V1.t
 
         let to_latest = Fn.id
       end
@@ -251,7 +251,7 @@ module Verify_proof = struct
     module Stable = struct
       module V1 = struct
         type t =
-          Public_key.Compressed.Stable.V1.t
+          Account_id.Stable.V1.t
           * User_command.Stable.V1.t
           * (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list)
 
@@ -286,8 +286,7 @@ module Prove_receipt = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t =
-          Receipt.Chain_hash.Stable.V1.t * Public_key.Compressed.Stable.V1.t
+        type t = Receipt.Chain_hash.Stable.V1.t * Account_id.Stable.V1.t
 
         let to_latest = Fn.id
       end
@@ -322,7 +321,7 @@ module Get_inferred_nonce = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Public_key.Compressed.Stable.V1.t
+        type t = Account_id.Stable.V1.t
 
         let to_latest = Fn.id
       end
@@ -356,7 +355,7 @@ module Get_nonce = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Public_key.Compressed.Stable.V1.t
+        type t = Account_id.Stable.V1.t
 
         let to_latest = Fn.id
       end

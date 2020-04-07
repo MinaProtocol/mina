@@ -59,8 +59,7 @@ type pipes =
               * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
               Or_error.t
            -> unit)
-        * (   Signature_lib.Public_key.Compressed.t
-           -> (Coda_base.Account.Nonce.t, string) Result.t)
+        * (Account_id.t -> (Coda_base.Account.Nonce.t, string) Result.t)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
@@ -424,12 +423,12 @@ let get_ledger t staged_ledger_hash_opt =
         "get_ledger: staged ledger hash not found in transition frontier"
 
 let get_inferred_nonce_from_transaction_pool_and_ledger t
-    (public_key : Public_key.Compressed.t) =
-  let get_account pk =
+    (account_id : Account_id.t) =
+  let get_account aid =
     let open Participating_state.Let_syntax in
     let%map ledger = best_ledger t in
     let open Option.Let_syntax in
-    let%bind loc = Ledger.location_of_key ledger pk in
+    let%bind loc = Ledger.location_of_account ledger aid in
     Ledger.get ledger loc
   in
   let transaction_pool = t.components.transaction_pool in
@@ -437,8 +436,8 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
     Network_pool.Transaction_pool.resource_pool transaction_pool
   in
   let pooled_transactions =
-    Network_pool.Transaction_pool.Resource_pool.all_from_user resource_pool
-      public_key
+    Network_pool.Transaction_pool.Resource_pool.all_from_account resource_pool
+      account_id
   in
   let txn_pool_nonce =
     let nonces =
@@ -453,7 +452,7 @@ let get_inferred_nonce_from_transaction_pool_and_ledger t
       Participating_state.Option.return (Account.Nonce.succ nonce)
   | None ->
       let open Participating_state.Option.Let_syntax in
-      let%map account = get_account public_key in
+      let%map account = get_account account_id in
       account.Account.Poly.nonce
 
 let seen_jobs t = t.seen_jobs
@@ -529,7 +528,7 @@ let root_diff t =
       (Buffered (`Capacity 30, `Overflow Crash))
   in
   trace_recurring_task "root diff pipe reader" (fun () ->
-      let open Root_diff.Stable.V1 in
+      let open Root_diff.Stable.Latest in
       let length_of_breadcrumb =
         Fn.compose Unsigned.UInt32.to_int
           Transition_frontier.Breadcrumb.blockchain_length
@@ -641,10 +640,10 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
 
 let add_transactions t (uc_inputs : User_command_input.t list) =
   let result_ivar = Ivar.create () in
-  let get_current_nonce pk =
+  let get_current_nonce aid =
     match
       Participating_state.active
-        (get_inferred_nonce_from_transaction_pool_and_ledger t pk)
+        (get_inferred_nonce_from_transaction_pool_and_ledger t aid)
       |> Option.join
     with
     | None ->
