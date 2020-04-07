@@ -33,6 +33,8 @@ module type Gen_intf = sig
                  Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
       -> max_amount:int
+      -> ?fee_token:Token_id.t
+      -> ?payment_token:Token_id.t
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -47,6 +49,8 @@ module type Gen_intf = sig
       -> keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
       -> max_amount:int
+      -> ?fee_token:Token_id.t
+      -> ?payment_token:Token_id.t
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -55,6 +59,7 @@ module type Gen_intf = sig
          key_gen:(Signature_keypair.t * Signature_keypair.t)
                  Quickcheck.Generator.t
       -> ?nonce:Account_nonce.t
+      -> ?fee_token:Token_id.t
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -62,6 +67,7 @@ module type Gen_intf = sig
     val stake_delegation_with_random_participants :
          keys:Signature_keypair.t array
       -> ?nonce:Account_nonce.t
+      -> ?fee_token:Token_id.t
       -> max_fee:int
       -> unit
       -> t Quickcheck.Generator.t
@@ -82,15 +88,31 @@ module type S = sig
 
   include Comparable.S with type t := t
 
+  include Hashable.S with type t := t
+
   val payload : t -> User_command_payload.t
 
   val fee : t -> Currency.Fee.t
 
   val nonce : t -> Account_nonce.t
 
-  val sender : t -> Public_key.Compressed.t
+  val signer : t -> Public_key.t
 
-  val receiver : t -> Public_key.Compressed.t
+  val fee_token : t -> Token_id.t
+
+  val fee_payer_pk : t -> Public_key.Compressed.t
+
+  val fee_payer : t -> Account_id.t
+
+  val token : t -> Token_id.t
+
+  val source_pk : t -> Public_key.Compressed.t
+
+  val source : t -> Account_id.t
+
+  val receiver_pk : t -> Public_key.Compressed.t
+
+  val receiver : t -> Account_id.t
 
   val amount : t -> Currency.Amount.t option
 
@@ -150,7 +172,7 @@ module type S = sig
   (** Forget the signature check. *)
   val forget_check : With_valid_signature.t -> t
 
-  val accounts_accessed : t -> Public_key.Compressed.t list
+  val accounts_accessed : t -> Account_id.t list
 
   val filter_by_participant : t list -> Public_key.Compressed.t -> t list
 

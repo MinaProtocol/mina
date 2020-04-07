@@ -186,7 +186,7 @@ let run_test () : unit Deferred.t =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
-             ~gossip_net_params ~initial_fork_id:Fork_id.empty
+             ~gossip_net_params ~is_seed:true ~initial_fork_id:Fork_id.empty
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
@@ -225,10 +225,10 @@ let run_test () : unit Deferred.t =
         in
         Deferred.any [after (Time.Span.of_min timeout_min); go ()]
       in
-      let balance_change_or_timeout ~initial_receiver_balance receiver_pk =
+      let balance_change_or_timeout ~initial_receiver_balance receiver_id =
         let cond t =
           match
-            Coda_commands.get_balance t receiver_pk
+            Coda_commands.get_balance t receiver_id
             |> Participating_state.active_exn
           with
           | Some b when not (Currency.Balance.equal b initial_receiver_balance)
@@ -239,20 +239,21 @@ let run_test () : unit Deferred.t =
         in
         wait_until_cond ~f:cond ~timeout_min:3.
       in
-      let assert_balance pk amount =
+      let assert_balance account_id amount =
         match
-          Coda_commands.get_balance coda pk |> Participating_state.active_exn
+          Coda_commands.get_balance coda account_id
+          |> Participating_state.active_exn
         with
         | Some balance ->
             if not (Currency.Balance.equal balance amount) then
               failwithf
-                !"Balance in account (%{sexp: Public_key.Compressed.t}) \
-                  %{sexp: Currency.Balance.t} is not asserted balance %{sexp: \
+                !"Balance in account (%{sexp: Account_id.t}) %{sexp: \
+                  Currency.Balance.t} is not asserted balance %{sexp: \
                   Currency.Balance.t}"
-                pk balance amount ()
+                account_id balance amount ()
         | None ->
             failwith
-              (sprintf !"Invalid Account: %{sexp: Public_key.Compressed.t}" pk)
+              (sprintf !"Invalid Account: %{sexp: Account_id.t}" account_id)
       in
       Coda_run.setup_local_server coda ;
       let%bind () = Coda_lib.start coda in
@@ -265,64 +266,72 @@ let run_test () : unit Deferred.t =
       *)
       let send_amount = Currency.Amount.of_int 10 in
       (* Send money to someone *)
-      let build_payment amount sender_sk receiver_pk fee =
+      let build_payment ?nonce amount sender_sk receiver_pk fee =
         trace_recurring "build_payment" (fun () ->
-            let nonce =
-              Option.value_exn
-                ( Coda_commands.get_nonce coda (pk_of_sk sender_sk)
-                |> Participating_state.active_exn )
-            in
+            let signer = pk_of_sk sender_sk in
             let memo =
               User_command_memo.create_from_string_exn
                 "A memo created in full-test"
             in
-            let payload : User_command.Payload.t =
-              User_command.Payload.create ~fee ~nonce ~memo
-                ~valid_until:Coda_numbers.Global_slot.max_value
-                ~body:(Payment {receiver= receiver_pk; amount})
-            in
-            (* verify memo is in the payload *)
-            assert (User_command_memo.equal memo payload.common.memo) ;
-            User_command.sign (Keypair.of_private_key_exn sender_sk) payload )
+            User_command_input.create ?nonce ~signer ~fee ~fee_payer_pk:signer
+              ~fee_token:Token_id.default ~memo
+              ~valid_until:Coda_numbers.Global_slot.max_value
+              ~body:
+                (Payment
+                   { source_pk= signer
+                   ; receiver_pk
+                   ; token_id= Token_id.default
+                   ; amount })
+              ~sign_choice:
+                (User_command_input.Sign_choice.Keypair
+                   (Keypair.of_private_key_exn sender_sk))
+              () )
       in
       let assert_ok x = assert (Or_error.is_ok x) in
-      let send_payment (payment : User_command.With_valid_signature.t) =
-        Coda_commands.send_user_command coda (payment :> User_command.t)
+      let send_payment (payment : User_command_input.t) =
+        Coda_commands.setup_and_submit_user_command coda payment
         |> Participating_state.to_deferred_or_error
         |> Deferred.map ~f:Or_error.join
       in
       let test_sending_payment sender_sk receiver_pk =
+        let sender_id =
+          Account_id.create (pk_of_sk sender_sk) Token_id.default
+        in
+        let receiver_id = Account_id.create receiver_pk Token_id.default in
         let payment =
           build_payment send_amount sender_sk receiver_pk transaction_fee
         in
         let prev_sender_balance =
           Option.value_exn
-            ( Coda_commands.get_balance coda (pk_of_sk sender_sk)
+            ( Coda_commands.get_balance coda sender_id
             |> Participating_state.active_exn )
         in
         let prev_receiver_balance =
-          Coda_commands.get_balance coda receiver_pk
+          Coda_commands.get_balance coda receiver_id
           |> Participating_state.active_exn
           |> Option.value ~default:Currency.Balance.zero
         in
         let%bind p1_res = send_payment payment in
         assert_ok p1_res ;
+        let user_cmd, _receipt = p1_res |> Or_error.ok_exn in
         (* Send a similar payment twice on purpose; this second one will be rejected
            because the nonce is wrong *)
         let payment' =
-          build_payment send_amount sender_sk receiver_pk transaction_fee
+          build_payment
+            ~nonce:(User_command.nonce user_cmd)
+            send_amount sender_sk receiver_pk transaction_fee
         in
         let%bind p2_res = send_payment payment' in
         assert (Or_error.is_error p2_res) ;
         (* Let the system settle, mine some blocks *)
         let%map () =
           balance_change_or_timeout
-            ~initial_receiver_balance:prev_receiver_balance receiver_pk
+            ~initial_receiver_balance:prev_receiver_balance receiver_id
         in
-        assert_balance receiver_pk
+        assert_balance receiver_id
           (Option.value_exn
              (Currency.Balance.( + ) prev_receiver_balance send_amount)) ;
-        assert_balance (pk_of_sk sender_sk)
+        assert_balance sender_id
           (Option.value_exn
              (Currency.Balance.( - ) prev_sender_balance
                 (Option.value_exn
@@ -386,7 +395,8 @@ let run_test () : unit Deferred.t =
         let%map () = wait_for_proof_or_timeout timeout_min () in
         assert (Option.is_some @@ Coda_lib.staged_ledger_ledger_proof coda) ;
         Map.fold updated_balance_sheet ~init:() ~f:(fun ~key ~data () ->
-            assert_balance key data ) ;
+            let account_id = Account_id.create key Token_id.default in
+            assert_balance account_id data ) ;
         blockchain_length coda
       in
       let test_duplicate_payments (sender_keypair : Signature_lib.Keypair.t)

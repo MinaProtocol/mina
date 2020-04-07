@@ -10,6 +10,9 @@ let downloadKey = (keyName, chunkCb, doneCb) =>
     doneCb,
   );
 
+let downloadCoda = (version, chunkCb, doneCb) =>
+  DownloadLogic.downloadCoda(version, chunkCb, doneCb);
+
 [@bs.module "electron"] [@bs.scope "shell"] [@bs.val]
 external showItemInFolder: string => unit = "showItemInFolder";
 
@@ -32,6 +35,7 @@ let getTranslation = name =>
 
 [%bs.raw "window.isFaker = isFaker"];
 [%bs.raw "window.downloadKey = downloadKey"];
+[%bs.raw "window.downloadCoda = downloadCoda"];
 [%bs.raw "window.showItemInFolder = showItemInFolder"];
 [%bs.raw "window.openExternal = openExternal"];
 [%bs.raw

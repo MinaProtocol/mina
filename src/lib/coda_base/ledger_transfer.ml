@@ -1,11 +1,10 @@
 open Core_kernel
-open Signature_lib
 
 module type Base_ledger_intf =
   Merkle_ledger.Base_ledger_intf.S
   with type account := Account.t
-   and type key := Public_key.Compressed.t
-   and type key_set := Public_key.Compressed.Set.t
+   and type account_id := Account_id.t
+   and type account_id_set := Account_id.Set.t
    and type hash := Ledger_hash.t
    and type root_hash := Ledger_hash.t
 
@@ -20,7 +19,7 @@ end = struct
              Source.Addr.compare addr1 addr2 )
     in
     List.iter sorted ~f:(fun (_addr, account) ->
-        let key = Account.public_key account in
+        let key = Account.identifier account in
         ignore (Dest.get_or_create_account_exn dest key account) ) ;
     let src_hash = Source.merkle_root src in
     let dest_hash = Dest.merkle_root dest in

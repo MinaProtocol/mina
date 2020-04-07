@@ -2,6 +2,7 @@ open Core_kernel
 
 type ('field, 'bool) t =
   {field_elements: 'field array; bitstrings: 'bool list array}
+[@@deriving sexp]
 
 let append t1 t2 =
   { field_elements= Array.append t1.field_elements t2.field_elements
