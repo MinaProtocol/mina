@@ -165,6 +165,7 @@ module Styles = {
 
   let profile =
     style([
+      marginRight(`rem(2.)),
       marginBottom(`rem(5.)),
       media(Theme.MediaQuery.tablet, [marginBottom(`zero)]),
     ]);
