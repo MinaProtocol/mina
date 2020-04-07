@@ -20,26 +20,28 @@ sudo apt install libusb-1.0-0-dev libudev1 libudev-dev
 ```
 
 ### Make sure your computer is recognising the Ledger device
-- Plug in the Ledger device, unlock, go to menu (not inside any app!)
-- Run `lsusb`, see if the device is listed. It will have ID `2c97:0001`
-  - If not, see if these instructions help https://support.ledger.com/hc/en-us/articles/115005165269-Fix-connection-issues
-  - Get into the menu of the ledger by clicking both buttons — it shouldnt say ‘go to ledger live to install applications’ and should show the settings menu and two arrows
+
+- Plug in the Ledger device, unlock it with your passcode, and go to the menu. Don't open any app,
+- Run `lsusb`, and see if the device is listed -- it will have ID `2c97:0001`
+- If the Ledger device is not listed, follow the suggestions [here](https://support.ledger.com/hc/en-us/articles/115005165269-Fix-connection-issues).
 
 ### Build/download the Coda Ledger application
 
 Either download the precompiled app binary from [here](...).
 
 #### System-wide installation
-Or install gcc and clang. 
-This can be done in two ways. You can install them with 
+
+Or install gcc and clang.
+This can be done in two ways. You can install them with
 ` sudo apt install gcc clang`
 
-#### Downloading precompiled gcc and clang
+##### Downloading precompiled gcc and clang
+
 Or , following the instructions at [the Ledger Wiki](https://ledger.readthedocs.io/en/latest/userspace/getting_started.html):
 - Install standard gcc (for microcontroller firmware and secure device linking)
 (link from ledger link?), by downloading a precompiled binary from [here](https://developer.arm.com/tools-and-software/open-source-software/developer-tools/gnu-toolchain/gnu-rm/downloads)
 - Install a standard clang with ROPI support (for secure processor applications), following the instructions [here](https://clang.llvm.org/get_started.html) to build from source or download a precompiled binary.
-- Once you have downloaded the binaries, unzip and install them, for example with 
+- Once you have downloaded the binaries, unzip and install them, for example with
   `cd Downloads`
   `tar -xf clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-16.04.tar.xz`
   `bzip2 -dk gcc-arm-none-eabi-5_3-2016q1tar.bz2`
@@ -51,10 +53,9 @@ Or , following the instructions at [the Ledger Wiki](https://ledger.readthedocs.
   PATH=~/bolos-devenv/clang+llvm-7.0.0-x86_64-linux-gnu-ubuntu-16.04/bin:$PATH
   ```
 
-
-Next, use `sudo apt install gcc-multilib g++-multilib` or equivalent to install the cross compilation 
-headers required. 
-Then install the Nano S SDK with 
+Next, use `sudo apt install gcc-multilib g++-multilib` or equivalent to install the cross compilation
+headers required.
+Then install the Nano S SDK with
 ```
 git clone git@github.com:LedgerHQ/nanos-secure-sdk.git
 ```
@@ -62,8 +63,8 @@ and add `export BOLOS_SDK=<PATH-TO-SDK>` to your `~/.bashrc` or `~/.profile`.
 
 ### Install the python app loader
 
-The Ledger python loader exists [here](https://github.com/LedgerHQ/blue-loader-python) 
-and can also be downloaded/installed with the following:
+The Ledger python loader exists [here](https://github.com/LedgerHQ/blue-loader-python)
+and can be downloaded/installed with the following:
 ```
 sudo apt install -y libudev-dev libusb
 pip install ledgerblue
@@ -80,6 +81,7 @@ SUBSYSTEMS=="usb", ATTRS{idVendor}=="2c97", ATTRS{idProduct}=="0004", MODE="0660
 ```
 
 ### Download the Coda Ledger app
+
 Running the following will install the Coda app on your Ledger device:
 ```
 git clone git@github.com:CodaProtocol/ledger-coda-app.git
@@ -87,9 +89,11 @@ cd ledger-coda-app
 make load
 ```
 
+# Using the hardware wallet
+
 The coda hardware wallet command line tool is a python package called `coda-ledger-cli`:
 ```
-python3 -mpip install coda-ledger-cli 
+python3 -mpip install coda-ledger-cli
 ```
 
 If you have connection issues with your hardware wallet, please take a look at [the troubleshooting help on the Ledger support page](https://support.ledger.com/hc/en-us/articles/115005165269-Fix-connection-issues).
