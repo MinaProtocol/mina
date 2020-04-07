@@ -153,14 +153,19 @@ module Styles = {
   let profileRow =
     style([
       display(`flex),
-      justifyContent(`spaceBetween),
       flexDirection(`column),
-      selector("> :last-child", [marginBottom(`zero)]),
-      media(Theme.MediaQuery.tablet, [flexDirection(`row)]),
+      justifyContent(`center),
+      margin(`auto),
+      selector("> :last-child", [marginBottom(`zero), marginRight(`zero)]),
+      media(
+        Theme.MediaQuery.tablet,
+        [justifyContent(`flexStart), flexDirection(`row)],
+      ),
     ]);
 
   let profile =
     style([
+      marginRight(`rem(2.)),
       marginBottom(`rem(5.)),
       media(Theme.MediaQuery.tablet, [marginBottom(`zero)]),
     ]);

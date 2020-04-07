@@ -5,25 +5,28 @@ module Styles = {
       display(`flex),
       justifyContent(`center),
       alignContent(`center),
-      width(`percent(100.)),
     ]);
   let container =
     style([
       position(`relative),
       display(`flex),
+      paddingBottom(`rem(3.)),
       justifyContent(`center),
       alignContent(`center),
       width(`rem(21.25)),
-      height(`rem(35.875)),
+      height(`rem(31.5)),
       borderRadius(`px(6)),
       background(`hex("F5F5F5")),
       border(`px(1), `solid, Theme.Colors.teal),
-      media(
-        Theme.MediaQuery.tablet,
-        [width(`rem(30.)), height(`rem(25.5))],
-      ),
     ]);
   let innerFlex = style([display(`flex), flexDirection(`column)]);
+  let info =
+    style([
+      display(`flex),
+      height(`rem(29.375)),
+      justifyContent(`spaceBetween),
+      flexDirection(`column),
+    ]);
   let profilePic =
     style([
       position(`absolute),
@@ -63,39 +66,22 @@ module Styles = {
   let quote =
     merge([
       Theme.Body.basic,
-      style([
-        margin2(~v=`zero, ~h=`rem(1.5)),
-        width(`rem(16.625)),
-        alignSelf(`center),
-        media(Theme.MediaQuery.tablet, [width(`rem(24.))]),
-      ]),
+      style([margin2(~v=`zero, ~h=`rem(1.5)), alignSelf(`center)]),
     ]);
   let socials =
     style([
       display(`flex),
       justifyContent(`spaceAround),
       flexDirection(`column),
-      margin2(~v=`rem(2.), ~h=`auto),
+      margin2(~v=`zero, ~h=`auto),
       selector("> :last-child", [marginBottom(`zero)]),
-      media(
-        Theme.MediaQuery.tablet,
-        [
-          selector("> :last-child", [marginRight(`zero)]),
-          flexDirection(`row),
-          unsafe("width", "fit-content"),
-        ],
-      ),
     ]);
   let socialTag =
     style([
       display(`flex),
       alignItems(`center),
-      marginBottom(`rem(1.)),
+      marginBottom(`rem(0.5)),
       selector("p", [marginTop(`zero), marginBottom(`zero)]),
-      media(
-        Theme.MediaQuery.tablet,
-        [marginBottom(`zero), marginRight(`rem(2.))],
-      ),
     ]);
 
   let ctaButton =
@@ -138,38 +124,44 @@ let make = (~name, ~photo, ~quote, ~location, ~twitter, ~github, ~blogPost) => {
         <p className=Styles.genesisLabel>
           {React.string("Genesis Founding Member")}
         </p>
-        <p className=Styles.quote> {React.string(quote)} </p>
-        <div className=Styles.socials>
-          <div className=Styles.socialTag>
-            <img src="/static/img/Location.svg" />
-            <Spacer width=0.34 />
-            <p className=Theme.Body.basic_small> {React.string(location)} </p>
+        <span className=Styles.info>
+          <p className=Styles.quote> {React.string(quote)} </p>
+          <div className=Styles.socials>
+            <div className=Styles.socialTag>
+              <img src="/static/img/Location.svg" />
+              <Spacer width=0.34 />
+              <p className=Theme.Body.basic_small>
+                {React.string(location)}
+              </p>
+            </div>
+            <div className=Styles.socialTag>
+              <img src="/static/img/Icon.Twitter.svg" />
+              <Spacer width=0.34 />
+              <a
+                href={"https://twitter.com/" ++ twitter} className=Styles.link>
+                {React.string(twitter)}
+              </a>
+            </div>
+            {switch (github) {
+             | Some(github) =>
+               <div className=Styles.socialTag>
+                 <img src="/static/img/Icon.Git.svg" />
+                 <Spacer width=0.34 />
+                 <a
+                   href={"https://github.com/" ++ github}
+                   className=Styles.link>
+                   {React.string(github)}
+                 </a>
+               </div>
+             | _ => React.null
+             }}
           </div>
-          <div className=Styles.socialTag>
-            <img src="/static/img/Icon.Twitter.svg" />
-            <Spacer width=0.34 />
-            <a href={"https://twitter.com/" ++ twitter} className=Styles.link>
-              {React.string(twitter)}
+          <Next.Link href="/blog/[slug]" _as={"/blog/" ++ blogPost}>
+            <a className=Styles.ctaButton>
+              {React.string({js|Learn More|js})}
             </a>
-          </div>
-          {switch (github) {
-           | Some(github) =>
-             <div className=Styles.socialTag>
-               <img src="/static/img/Icon.Git.svg" />
-               <Spacer width=0.34 />
-               <a href={"https://github.com/" ++ github} className=Styles.link>
-                 {React.string(github)}
-               </a>
-             </div>
-           | _ => React.null
-           }}
-        </div>
-        <Next.Link href="/blog/[slug]" _as={"/blog/" ++ blogPost}>
-          <a className=Styles.ctaButton>
-            {React.string({js|Learn More|js})}
-          </a>
-        </Next.Link>
-        <Spacer height=3. />
+          </Next.Link>
+        </span>
       </div>
     </div>
   </div>;
