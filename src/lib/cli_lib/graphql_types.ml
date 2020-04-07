@@ -27,3 +27,31 @@ module Pending_snark_work = struct
 
   type t = Work.t array array [@@deriving yojson]
 end
+
+module Coda_constants = struct
+  module UInt32 = struct
+    include Unsigned.UInt32
+
+    let to_yojson t = `String (to_string t)
+  end
+
+  module UInt64 = struct
+    include Unsigned.UInt64
+
+    let to_yojson t = `String (to_string t)
+  end
+
+  type t =
+    { genesis_timestamp: string
+    ; k: UInt32.t
+    ; coinbase: UInt64.t
+    ; block_window_duration_ms: UInt64.t
+    ; delta: UInt32.t
+    ; c: UInt32.t
+    ; inactivity_ms: UInt64.t
+    ; sub_windows_per_window: UInt32.t
+    ; slots_per_sub_window: UInt32.t
+    ; slots_per_window: UInt32.t
+    ; slots_per_epoch: UInt32.t }
+  [@@deriving to_yojson]
+end

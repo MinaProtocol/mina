@@ -796,7 +796,28 @@ let coda_constants =
            (Graphql_client.query_exn
               (Graphql_queries.Coda_constants.make ())
               graphql_endpoint)
-           ~f:(fun response -> print_string response#codaConstants) ))
+           ~f:(fun response ->
+             let constants =
+               { Cli_lib.Graphql_types.Coda_constants.c=
+                   (response#codaConstants)#c
+               ; genesis_timestamp= (response#codaConstants)#genesisTimestamp
+               ; k= (response#codaConstants)#k
+               ; coinbase= (response#codaConstants)#coinbase
+               ; block_window_duration_ms=
+                   (response#codaConstants)#blockWindowDurationMs
+               ; delta= (response#codaConstants)#delta
+               ; inactivity_ms= (response#codaConstants)#inactivityMs
+               ; sub_windows_per_window=
+                   (response#codaConstants)#subWindowsPerWindow
+               ; slots_per_sub_window=
+                   (response#codaConstants)#slotsPerSubWindow
+               ; slots_per_window= (response#codaConstants)#slotsPerWindow
+               ; slots_per_epoch= (response#codaConstants)#slotsPerEpoch }
+             in
+             print_string
+               (Yojson.Safe.to_string
+                  (constants |> Cli_lib.Graphql_types.Coda_constants.to_yojson))
+             ) ))
 
 let start_tracing =
   let open Deferred.Let_syntax in

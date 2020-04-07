@@ -162,6 +162,52 @@ module Types = struct
               in
               Block_time.to_string @@ C.end_time ~constants global_slot ) ] )
 
+  let coda_constants =
+    let module C = Consensus.Constants in
+    obj "CodaConstants" ~fields:(fun _ ->
+        [ field "genesisTimestamp" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun _ (consensus_const : C.t) ->
+              Block_time.to_string consensus_const.genesis_state_timestamp )
+        ; field "k" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ (consensus_const : C.t) -> consensus_const.k)
+        ; field "coinbase" ~typ:(non_null uint64)
+            ~args:Arg.[]
+            ~resolve:(fun _ _ ->
+              Currency.Amount.to_uint64 Coda_compile_config.coinbase )
+        ; field "blockWindowDurationMs" ~typ:(non_null uint64)
+            ~args:Arg.[]
+            ~resolve:(fun _ (consensus_const : C.t) ->
+              Block_time.Span.to_ms consensus_const.block_window_duration_ms
+              |> Unsigned.UInt64.of_int64 )
+        ; field "delta" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ (consensus_const : C.t) -> consensus_const.delta)
+        ; field "c" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ (consensus_const : C.t) -> consensus_const.c)
+        ; field "inactivityMs" ~typ:(non_null uint64)
+            ~args:Arg.[]
+            ~resolve:(fun _ _ ->
+              Unsigned.UInt64.of_int Coda_compile_config.inactivity_ms )
+        ; field "subWindowsPerWindow" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ (consensus_const : C.t) ->
+              consensus_const.sub_windows_per_window )
+        ; field "slotsPerSubWindow" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ (consensus_const : C.t) ->
+              consensus_const.slots_per_sub_window )
+        ; field "slotsPerWindow" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ (consensus_const : C.t) ->
+              consensus_const.slots_per_window )
+        ; field "slotsPerEpoch" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ (consensus_const : C.t) ->
+              consensus_const.slots_per_epoch ) ] )
+
   let block_producer_timing :
       ( _
       , [`Check_again of Block_time.t | `Produce of Block_time.t | `Produce_now]
@@ -1838,9 +1884,11 @@ module Queries = struct
   let coda_constants =
     field "codaConstants" ~doc:"Coda constants"
       ~args:Arg.[]
-      ~typ:(non_null string)
+      ~typ:(non_null Types.coda_constants)
       ~resolve:(fun {ctx= coda; _} () ->
-        Yojson.Safe.to_string @@ Coda_commands.coda_constants coda )
+        Consensus.Constants.create
+          ~protocol_constants:(Coda_lib.config coda).genesis_constants.protocol
+        )
 
   let trust_status =
     field "trustStatus" ~typ:Types.Payload.trust_status

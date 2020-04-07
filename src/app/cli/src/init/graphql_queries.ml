@@ -107,9 +107,21 @@ query pendingSnarkWork {
 module Coda_constants =
 [%graphql
 {|
-  query codaConstants {
-    codaConstants
+  query coda_constants {
+    codaConstants {
+      genesisTimestamp
+      k @bsDecoder(fn: "Decoders.uint32")
+      coinbase @bsDecoder(fn: "Decoders.uint64")
+      blockWindowDurationMs @bsDecoder(fn: "Decoders.uint64")
+      delta @bsDecoder(fn: "Decoders.uint32")
+      c @bsDecoder(fn: "Decoders.uint32")
+      inactivityMs @bsDecoder(fn: "Decoders.uint64")
+      subWindowsPerWindow @bsDecoder(fn: "Decoders.uint32")
+      slotsPerSubWindow @bsDecoder(fn: "Decoders.uint32")
+      slotsPerWindow @bsDecoder(fn: "Decoders.uint32")
+      slotsPerEpoch @bsDecoder(fn: "Decoders.uint32")
     }
+}
 |}]
 
 module Set_staking =
