@@ -210,34 +210,6 @@ type active_state_fields =
   ; state_hash: string option
   ; consensus_time_best_tip: Consensus.Data.Consensus_time.t option }
 
-let coda_constants t =
-  let consensus_constants =
-    Consensus.Constants.create
-      ~protocol_constants:(Coda_lib.config t).genesis_constants.protocol
-  in
-  let to_int = Unsigned.UInt32.to_int in
-  `Assoc
-    [ ( "genesis_state_timestamp"
-      , `String
-          (Core.Time.to_string_iso8601_basic ~zone:Core.Time.Zone.utc
-             (Block_time.to_time consensus_constants.genesis_state_timestamp))
-      )
-    ; ("k", `Int (to_int consensus_constants.k))
-    ; ("coinbase", `Int (Currency.Amount.to_int Coda_compile_config.coinbase))
-    ; ( "block_window_duration_ms"
-      , `Int
-          ( Block_time.Span.to_ms consensus_constants.block_window_duration_ms
-          |> Int64.to_int_exn ) )
-    ; ("delta", `Int (to_int consensus_constants.delta))
-    ; ("c", `Int (to_int consensus_constants.c))
-    ; ("inactivity_ms", `Int Coda_compile_config.inactivity_ms)
-    ; ( "sub_windows_per_window"
-      , `Int (to_int consensus_constants.sub_windows_per_window) )
-    ; ( "slots_per_sub_window"
-      , `Int (to_int consensus_constants.slots_per_sub_window) )
-    ; ("slots_per_window", `Int (to_int consensus_constants.slots_per_window))
-    ; ("slots_per_epoch", `Int (to_int consensus_constants.slots_per_epoch)) ]
-
 let get_status ~flag t =
   let open Coda_lib.Config in
   let config = Coda_lib.config t in
