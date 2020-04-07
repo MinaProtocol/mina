@@ -11,7 +11,6 @@ module Historical = struct
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t
         ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
-      [@@deriving bin_io, version]
 
       let to_latest = Fn.id
     end
@@ -22,8 +21,6 @@ module Historical = struct
     ; scan_state: Staged_ledger.Scan_state.t
     ; pending_coinbase: Pending_coinbase.t
     ; staged_ledger_target_ledger_hash: Ledger_hash.t }
-
-  include (Stable.Latest : module type of Stable.Latest with type t := t)
 
   let of_breadcrumb breadcrumb =
     let transition = Breadcrumb.validated_transition breadcrumb in
@@ -46,9 +43,15 @@ module Limited = struct
         { transition: External_transition.Validated.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-      [@@deriving bin_io, version]
 
       let to_latest = Fn.id
+
+      let to_yojson {transition; scan_state= _; pending_coinbase} =
+        `Assoc
+          [ ("transition", External_transition.Validated.to_yojson transition)
+          ; ("scan_state", `String "<opaque>")
+          ; ("pending_coinbase", Pending_coinbase.to_yojson pending_coinbase)
+          ]
     end
   end]
 
@@ -57,7 +60,8 @@ module Limited = struct
     ; scan_state: Staged_ledger.Scan_state.t
     ; pending_coinbase: Pending_coinbase.t }
 
-  include (Stable.Latest : module type of Stable.Latest with type t := t)
+  [%%define_locally
+  Stable.Latest.(to_yojson)]
 end
 
 module Minimal = struct
@@ -68,7 +72,6 @@ module Minimal = struct
         { hash: State_hash.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-      [@@deriving bin_io, version]
 
       let to_latest = Fn.id
     end
@@ -78,8 +81,6 @@ module Minimal = struct
     { hash: State_hash.t
     ; scan_state: Staged_ledger.Scan_state.t
     ; pending_coinbase: Pending_coinbase.t }
-
-  include (Stable.Latest : module type of Stable.Latest with type t := t)
 
   let of_limited {Limited.transition; scan_state; pending_coinbase} =
     let hash = External_transition.Validated.state_hash transition in

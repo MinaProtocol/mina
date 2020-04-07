@@ -80,14 +80,18 @@ module Body = struct
   consensus_mechanism]
 
   type var =
-    (Tag.var, Public_key.Compressed.var, Token_id.var, Currency.Amount.var) t_
+    ( Tag.Unpacked.var
+    , Public_key.Compressed.var
+    , Token_id.var
+    , Currency.Amount.var )
+    t_
 
   let to_hlist {tag; source_pk; receiver_pk; token_id; amount} =
     H_list.[tag; source_pk; receiver_pk; token_id; amount]
 
   let spec =
     Data_spec.
-      [ Tag.typ
+      [ Tag.unpacked_typ
       ; Public_key.Compressed.typ
       ; Public_key.Compressed.typ
       ; Token_id.typ
@@ -104,18 +108,15 @@ module Body = struct
 
   module Checked = struct
     let constant ({tag; source_pk; receiver_pk; token_id; amount} : t) : var =
-      { tag= Tag.Checked.constant tag
+      { tag= Tag.unpacked_of_t tag
       ; source_pk= Public_key.Compressed.var_of_t source_pk
       ; receiver_pk= Public_key.Compressed.var_of_t receiver_pk
       ; token_id= Token_id.var_of_t token_id
       ; amount= Currency.Amount.var_of_t amount }
 
     let to_input {tag; source_pk; receiver_pk; token_id; amount} =
-      let bitstring = Random_oracle.Input.bitstring in
       Array.reduce_exn ~f:Random_oracle.Input.append
-        [| bitstring
-             (let tag1, tag2 = tag in
-              [tag1; tag2])
+        [| Tag.Unpacked.to_input tag
          ; Public_key.Compressed.Checked.to_input source_pk
          ; Public_key.Compressed.Checked.to_input receiver_pk
          ; Token_id.Checked.to_input token_id
@@ -125,11 +126,8 @@ module Body = struct
   [%%endif]
 
   let to_input {tag; source_pk; receiver_pk; token_id; amount} =
-    let bitstring = Random_oracle.Input.bitstring in
     Array.reduce_exn ~f:Random_oracle.Input.append
-      [| bitstring
-           (let tag1, tag2 = Tag.to_bits tag in
-            [tag1; tag2])
+      [| Tag.to_input tag
        ; Public_key.Compressed.to_input source_pk
        ; Public_key.Compressed.to_input receiver_pk
        ; Token_id.to_input token_id
@@ -270,11 +268,11 @@ module Changes = struct
       let tag = payload.body.tag in
       let fee = payload.common.fee in
       let amount = payload.body.amount in
-      let%bind is_coinbase = Tag.Checked.is_coinbase tag in
-      let%bind is_stake_delegation = Tag.Checked.is_stake_delegation tag in
-      let%bind is_payment = Tag.Checked.is_payment tag in
-      let%bind is_fee_transfer = Tag.Checked.is_fee_transfer tag in
-      let%bind is_user_command = Tag.Checked.is_user_command tag in
+      let is_coinbase = Tag.Unpacked.is_coinbase tag in
+      let is_stake_delegation = Tag.Unpacked.is_stake_delegation tag in
+      let is_payment = Tag.Unpacked.is_payment tag in
+      let is_fee_transfer = Tag.Unpacked.is_fee_transfer tag in
+      let is_user_command = Tag.Unpacked.is_user_command tag in
       let coinbase_amount = amount in
       let%bind supply_increase =
         Amount.Checked.if_ is_coinbase ~then_:coinbase_amount

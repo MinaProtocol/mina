@@ -698,9 +698,8 @@ module Base = struct
       root pending_coinbase_stack_before pending_coinbase_after
       state_body_hash_opt
       ({signer; signature; payload} as txn : Transaction_union.var) =
-    let%bind is_user_command =
-      Transaction_union.Tag.Checked.is_user_command payload.body.tag
-    in
+    let tag = payload.body.tag in
+    let is_user_command = Transaction_union.Tag.Unpacked.is_user_command tag in
     let%bind () =
       [%with_label "Check transaction signature"]
         (check_signature shifted ~payload ~is_user_command ~signer ~signature)
@@ -723,15 +722,12 @@ module Base = struct
       Account_id.Checked.create payload.common.fee_payer_pk fee_token
     in
     (* Compute transaction kind. *)
-    let tag = payload.body.tag in
-    let%bind is_payment = Transaction_union.Tag.Checked.is_payment tag in
-    let%bind is_fee_transfer =
-      Transaction_union.Tag.Checked.is_fee_transfer tag
+    let is_payment = Transaction_union.Tag.Unpacked.is_payment tag in
+    let is_fee_transfer = Transaction_union.Tag.Unpacked.is_fee_transfer tag in
+    let is_stake_delegation =
+      Transaction_union.Tag.Unpacked.is_stake_delegation tag
     in
-    let%bind is_stake_delegation =
-      Transaction_union.Tag.Checked.is_stake_delegation tag
-    in
-    let%bind is_coinbase = Transaction_union.Tag.Checked.is_coinbase tag in
+    let is_coinbase = Transaction_union.Tag.Unpacked.is_coinbase tag in
     let%bind tokens_equal = Token_id.Checked.equal token fee_token in
     let%bind token_default =
       Token_id.(Checked.equal token (var_of_t default))

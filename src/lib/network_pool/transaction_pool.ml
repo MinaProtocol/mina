@@ -500,7 +500,6 @@ struct
         end
       end]
 
-      (* bin_io omitted *)
       type t = User_command.t list [@@deriving sexp, yojson]
 
       module Diff_error = struct

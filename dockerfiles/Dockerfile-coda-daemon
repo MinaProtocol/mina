@@ -33,8 +33,14 @@ mkdir -p .coda-config\n\
 touch .coda-config/coda-prover.log\n\
 touch .coda-config/coda-verifier.log\n\
 coda "$@" 2>&1 >coda.log &\n\
+coda_pid=$!\n\
 tail -q -f coda.log -f .coda-config/coda-prover.log -f .coda-config/coda-verifier.log &\n\
-wait -n'\
+tail_pid=$!\n\
+wait "$coda_pid"\n\
+echo "Coda process exited with status code $?"\n\
+sleep 10\n\
+kill "$tail_pid"\n\
+exit 0'\
 > init_coda.sh
 
 RUN chmod +x init_coda.sh

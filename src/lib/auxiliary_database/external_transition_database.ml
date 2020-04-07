@@ -68,9 +68,9 @@ let add {database; pagination; logger}
   | Some _ ->
       Logger.trace logger
         !"Not adding transition into external transition database since it \
-          already exists: $transaction"
+          already exists: $state_hash"
         ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:[("transaction", State_hash.to_yojson state_hash)]
+        ~metadata:[("state_hash", State_hash.to_yojson state_hash)]
   | None ->
       Database.set database ~key:state_hash
         ~data:(filtered_external_transition, date) ;
