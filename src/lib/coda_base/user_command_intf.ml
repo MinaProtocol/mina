@@ -100,9 +100,6 @@ module type S = sig
 
   val valid_until : t -> Global_slot.t
 
-  (* for filtering *)
-  val minimum_fee : Currency.Fee.t
-
   val is_trivial : t -> bool
 
   include Gen_intf with type t := t

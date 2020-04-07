@@ -1577,12 +1577,13 @@ module Mutations = struct
     in
     let%bind () =
       Result.ok_if_true
-        Currency.Fee.(fee >= User_command.minimum_fee)
+        Currency.Fee.(fee >= Coda_compile_config.minimum_transaction_fee)
         ~error:
           (sprintf
              !"Invalid user command. Fee %s is less than the minimum fee, %s."
              (Currency.Fee.to_formatted_string fee)
-             (Currency.Fee.to_formatted_string User_command.minimum_fee))
+             (Currency.Fee.to_formatted_string
+                Coda_compile_config.minimum_transaction_fee))
     in
     let%map memo =
       Option.value_map memo ~default:(Ok User_command_memo.empty)

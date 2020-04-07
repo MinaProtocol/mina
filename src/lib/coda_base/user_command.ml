@@ -7,6 +7,8 @@ open Import
 [%%ifndef
 consensus_mechanism]
 
+module Coda_compile_config =
+  Coda_compile_config_nonconsensus.Coda_compile_config
 module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Currency = Currency_nonconsensus.Currency
 module Quickcheck_lib = Quickcheck_lib_nonconsensus.Quickcheck_lib
@@ -80,9 +82,7 @@ let fee = Fn.compose Payload.fee payload
 let nonce = Fn.compose Payload.nonce payload
 
 (* for filtering *)
-let minimum_fee = Fee.of_int 2_000_000_000
-
-let is_trivial t = Fee.(fee t < minimum_fee)
+let is_trivial t = Fee.(fee t < Coda_compile_config.minimum_transaction_fee)
 
 let sender t = Public_key.compress Poly.(t.sender)
 
