@@ -107,6 +107,10 @@ module Types = struct
 
   let uint32 = uint32 ()
 
+  let block_time : (_, Block_time.t option) typ =
+    scalar "Time" ~coerce:(fun time ->
+        `String (Block_time.to_time time |> Time.to_string) )
+
   let sync_status : ('context, Sync_status.t option) typ =
     enum "SyncStatus" ~doc:"Sync status of daemon"
       ~values:
@@ -298,7 +302,8 @@ module Types = struct
           @@ Consensus.Configuration.Fields.fold ~init:[] ~delta:nn_int
                ~k:nn_int ~c:nn_int ~c_times_k:nn_int ~slots_per_epoch:nn_int
                ~slot_duration:nn_int ~epoch_duration:nn_int
-               ~acceptable_network_delay:nn_int )
+               ~acceptable_network_delay:nn_int
+               ~genesis_state_timestamp:(id ~typ:(non_null block_time)) )
 
     let peer : (_, Network_peer.Peer.Display.Stable.V1.t option) typ =
       obj "Peer" ~fields:(fun _ ->

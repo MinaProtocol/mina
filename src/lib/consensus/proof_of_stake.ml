@@ -75,7 +75,26 @@ module Segment_id = Coda_numbers.Nat.Make32 ()
 module Typ = Crypto_params.Tick0.Typ
 
 module Configuration = struct
-  type t =
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { delta: int
+        ; k: int
+        ; c: int
+        ; c_times_k: int
+        ; slots_per_epoch: int
+        ; slot_duration: int
+        ; epoch_duration: int
+        ; genesis_state_timestamp: Block_time.Stable.V1.t
+        ; acceptable_network_delay: int }
+      [@@deriving yojson, fields]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t =
     { delta: int
     ; k: int
     ; c: int
@@ -83,8 +102,9 @@ module Configuration = struct
     ; slots_per_epoch: int
     ; slot_duration: int
     ; epoch_duration: int
+    ; genesis_state_timestamp: Block_time.t
     ; acceptable_network_delay: int }
-  [@@deriving yojson, bin_io, fields]
+  [@@deriving yojson, fields]
 
   let t ~protocol_constants =
     let constants = Constants.create ~protocol_constants in
@@ -97,6 +117,7 @@ module Configuration = struct
     ; slots_per_epoch= of_int32 constants.epoch_size
     ; slot_duration= of_span constants.slot_duration_ms
     ; epoch_duration= of_span constants.epoch_duration
+    ; genesis_state_timestamp= constants.genesis_state_timestamp
     ; acceptable_network_delay= of_span constants.delta_duration }
 end
 

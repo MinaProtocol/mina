@@ -285,7 +285,24 @@ module type S = sig
   module Constants = Constants
 
   module Configuration : sig
-    type t =
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t =
+          { delta: int
+          ; k: int
+          ; c: int
+          ; c_times_k: int
+          ; slots_per_epoch: int
+          ; slot_duration: int
+          ; epoch_duration: int
+          ; genesis_state_timestamp: Block_time.Stable.V1.t
+          ; acceptable_network_delay: int }
+        [@@deriving yojson, fields]
+      end
+    end]
+
+    type t = Stable.Latest.t =
       { delta: int
       ; k: int
       ; c: int
@@ -293,8 +310,9 @@ module type S = sig
       ; slots_per_epoch: int
       ; slot_duration: int
       ; epoch_duration: int
+      ; genesis_state_timestamp: Block_time.t
       ; acceptable_network_delay: int }
-    [@@deriving yojson, bin_io, fields]
+    [@@deriving yojson, fields]
 
     val t : protocol_constants:Genesis_constants.Protocol.t -> t
   end
