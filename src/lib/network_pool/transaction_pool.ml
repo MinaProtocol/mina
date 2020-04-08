@@ -813,7 +813,8 @@ struct
                                 if is_sender_local then
                                   Logger.error t.logger ~module_:__MODULE__
                                     ~location:__LOC__
-                                    "rejecting $cmd because of $reason"
+                                    "rejecting $cmd because of $reason. \
+                                     ($error_extra)"
                                     ~metadata:
                                       [ ("cmd", User_command.to_yojson tx)
                                       ; ( "reason"
@@ -823,7 +824,8 @@ struct
                                   trust_record
                                     ( Trust_system.Actions.Sent_useless_gossip
                                     , Some
-                                        ( "rejecting $cmd because of $reason"
+                                        ( "rejecting $cmd because of $reason. \
+                                           ($error_extra)"
                                         , [ ("cmd", User_command.to_yojson tx)
                                           ; ("reason", yojson_fail_reason err)
                                           ; ("error_extra", `Assoc err_extra)
