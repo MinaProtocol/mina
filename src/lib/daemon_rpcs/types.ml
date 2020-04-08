@@ -58,7 +58,7 @@ module Status = struct
   module Rpc_timings = struct
     module Rpc_pair = struct
       type 'a t = {dispatch: 'a; impl: 'a}
-      [@@deriving to_yojson, bin_io, fields]
+      [@@deriving to_yojson, bin_io_unversioned, fields]
     end
 
     type t =
@@ -67,7 +67,7 @@ module Status = struct
       ; get_ancestry: Perf_histograms.Report.t option Rpc_pair.t
       ; get_transition_chain_proof: Perf_histograms.Report.t option Rpc_pair.t
       ; get_transition_chain: Perf_histograms.Report.t option Rpc_pair.t }
-    [@@deriving to_yojson, bin_io, fields]
+    [@@deriving to_yojson, bin_io_unversioned, fields]
 
     let to_text s =
       let entries =
@@ -110,7 +110,7 @@ module Status = struct
       ; accepted_transition_remote_latency: Perf_histograms.Report.t option
       ; snark_worker_transition_time: Perf_histograms.Report.t option
       ; snark_worker_merge_time: Perf_histograms.Report.t option }
-    [@@deriving to_yojson, bin_io, fields]
+    [@@deriving to_yojson, bin_io_unversioned, fields]
 
     let to_text s =
       let entries =
@@ -230,7 +230,7 @@ module Status = struct
           let str time =
             let open Block_time in
             let current_time =
-              (* TODO: We will temporarily have to create a time controller 
+              (* TODO: We will temporarily have to create a time controller
                   until the inversion relationship between GraphQL and the RPC code inverts *)
               Block_time.now
               @@ Block_time.Controller.basic ~logger:(Logger.create ())
@@ -308,26 +308,27 @@ module Status = struct
     ; uptime_secs: int
     ; ledger_merkle_root: string option
     ; state_hash: string option
-    ; commit_id: Git_sha.Stable.V1.t
+    ; commit_id: Git_sha.Stable.Latest.t
     ; conf_dir: string
     ; peers: string list
     ; user_commands_sent: int
     ; snark_worker: string option
     ; snark_work_fee: int
-    ; sync_status: Sync_status.Stable.V1.t
+    ; sync_status: Sync_status.Stable.Latest.t
     ; block_production_keys: string list
     ; histograms: Histograms.t option
-    ; consensus_time_best_tip: Consensus.Data.Consensus_time.Stable.V1.t option
+    ; consensus_time_best_tip:
+        Consensus.Data.Consensus_time.Stable.Latest.t option
     ; next_block_production:
-        [ `Check_again of Block_time.Stable.V1.t
-        | `Produce of Block_time.Stable.V1.t
+        [ `Check_again of Block_time.Stable.Latest.t
+        | `Produce of Block_time.Stable.Latest.t
         | `Produce_now ]
         option
-    ; consensus_time_now: Consensus.Data.Consensus_time.Stable.V1.t
+    ; consensus_time_now: Consensus.Data.Consensus_time.Stable.Latest.t
     ; consensus_mechanism: string
     ; consensus_configuration: Consensus.Configuration.t
-    ; addrs_and_ports: Node_addrs_and_ports.Display.Stable.V1.t }
-  [@@deriving to_yojson, bin_io, fields]
+    ; addrs_and_ports: Node_addrs_and_ports.Display.Stable.Latest.t }
+  [@@deriving to_yojson, bin_io_unversioned, fields]
 
   let entries (s : t) =
     let module M = Make_entries (struct

@@ -19,9 +19,10 @@ let deriver = "bin_io_unversioned"
 let bin_io_gens :
     (   ctxt:Expansion_context.Deriver.t
      -> rec_flag * type_declaration list
+     -> (string * expression) list
      -> structure_item list)
     list =
-  List.map ["bin_read"; "bin_write"; "bin_type_class"; "bin_shape"]
+  List.map ["bin_shape"; "bin_read"; "bin_write"; "bin_type_class"]
     ~f:(fun name ->
       let deriver = Option.value_exn (Ppx_derivers.lookup name) in
       (* deriver is an instance of Ppxlib.Deriving.Deriver.deriver
@@ -41,28 +42,15 @@ let bin_io_gens :
              definition
 
            from the Actual_deriver.t, we pull out the 1st field, the Generator.t with the label
-             str_type_decl; it has 5 fields, corresponding to the GADT definition
-
-           from the Generator.t, we pull out the first field, which is the expander we want to apply
-
+             str_type_decl; we then apply the generator
         *)
       let actual_deriver = Obj.(obj (field (field (repr deriver) 1) 0)) in
       let name = Obj.(obj (field (repr actual_deriver) 0)) in
-      eprintf "DERIVER NAME: %s\n%!" name ;
-      eprintf "NUM ACTUAL DERIVER FIELDS: %d\n%!"
-        Obj.(size (repr actual_deriver)) ;
       let generator :
           (structure, rec_flag * type_declaration list) Deriving.Generator.t =
         Option.value_exn Obj.(obj (field (repr actual_deriver) 1))
       in
-      eprintf "NUM GENERATOR FIELDS: %d\n%!" Obj.(size (repr generator)) ;
-      let gen :
-             ctxt:Expansion_context.Deriver.t
-          -> rec_flag * type_declaration list
-          -> structure_item list =
-        Obj.(obj (field (repr generator) 1))
-      in
-      gen )
+      Deriving.Generator.apply ~name generator )
 
 let validate_type_decl inner2_modules type_decl =
   match inner2_modules with
@@ -105,9 +93,8 @@ let rewrite_to_bin_io ~options ~path type_decls =
     let base = Expansion_context.Base.top_level ~omp_config ~file_path:"" in
     Expansion_context.Deriver.make ~derived_item_loc ~base ()
   in
-  (* oops, gets a SEGV *)
   List.concat_map bin_io_gens ~f:(fun gen ->
-      gen ~ctxt (Nonrecursive, type_decls) )
+      gen ~ctxt (Nonrecursive, type_decls) [] )
 
 let () =
   Ppx_deriving.(register (create deriver ~type_decl_str:rewrite_to_bin_io ()))

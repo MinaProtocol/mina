@@ -56,11 +56,22 @@ let is_bin_io_ident = is_ident "bin_io"
 
 let payload_has_bin_io = payload_has_item is_bin_io_ident
 
+let is_bin_io_unversioned_ident = is_ident "bin_io_unversioned"
+
+let payload_has_bin_io_unversioned =
+  payload_has_item is_bin_io_unversioned_ident
+
 let attribute_has_deriving_version ((name, payload) : attribute) =
   String.equal name.txt "deriving" && payload_has_version payload
 
 let attributes_have_deriving_version (attrs : attribute list) =
   List.exists attrs ~f:attribute_has_deriving_version
+
+let attribute_has_deriving_bin_io_unversioned ((name, payload) : attribute) =
+  String.equal name.txt "deriving" && payload_has_bin_io_unversioned payload
+
+let attributes_have_deriving_bin_io_unversioned (attrs : attribute list) =
+  List.exists attrs ~f:attribute_has_deriving_bin_io_unversioned
 
 let type_has_deriving_version type_decl =
   attributes_have_deriving_version type_decl.ptype_attributes
@@ -179,18 +190,20 @@ let is_versioned_type_lident = function
   | _ ->
       false
 
-let rec core_types_misuses core_types =
-  List.concat_map core_types ~f:get_core_type_versioned_type_misuses
+let rec core_types_misuses attrs core_types =
+  List.concat_map core_types ~f:(get_core_type_versioned_type_misuses attrs)
 
-and get_core_type_versioned_type_misuses core_type =
+and get_core_type_versioned_type_misuses condone_versioned_type core_type =
   match core_type.ptyp_desc with
   | Ptyp_arrow (_label, core_type1, core_type2) ->
-      core_types_misuses [core_type1; core_type2]
+      core_types_misuses condone_versioned_type [core_type1; core_type2]
   | Ptyp_tuple core_types ->
-      core_types_misuses core_types
+      core_types_misuses condone_versioned_type core_types
   | Ptyp_constr (lident, core_types) ->
-      let core_type_errors = core_types_misuses core_types in
-      if is_versioned_type_lident lident.txt then
+      let core_type_errors =
+        core_types_misuses condone_versioned_type core_types
+      in
+      if is_versioned_type_lident lident.txt && not condone_versioned_type then
         let err =
           ( lident.loc
           , "Versioned type used in a non-versioned type declaration" )
@@ -206,11 +219,11 @@ and get_core_type_versioned_type_misuses core_type =
             core_type
       in
       let core_types = List.map fields ~f:core_type_of_field in
-      core_types_misuses core_types
+      core_types_misuses condone_versioned_type core_types
   | Ptyp_class (_lident, core_types) ->
-      core_types_misuses core_types
+      core_types_misuses condone_versioned_type core_types
   | Ptyp_alias (core_type, _label) ->
-      get_core_type_versioned_type_misuses core_type
+      get_core_type_versioned_type_misuses condone_versioned_type core_type
   | Ptyp_variant (row_fields, _closed_flag, _labels_opt) ->
       let core_types_of_row_field field =
         match field with
@@ -220,14 +233,14 @@ and get_core_type_versioned_type_misuses core_type =
             [core_type]
       in
       let core_types = List.concat_map row_fields ~f:core_types_of_row_field in
-      core_types_misuses core_types
+      core_types_misuses condone_versioned_type core_types
   | Ptyp_poly (_labels, core_type) ->
-      get_core_type_versioned_type_misuses core_type
+      get_core_type_versioned_type_misuses condone_versioned_type core_type
   | Ptyp_package (_module, type_constraints) ->
       let core_types =
         List.map type_constraints ~f:(fun (_ty, core_type) -> core_type)
       in
-      core_types_misuses core_types
+      core_types_misuses condone_versioned_type core_types
   | Ptyp_extension _ext ->
       []
   | Ptyp_any ->
@@ -268,9 +281,12 @@ let get_versioned_type_misuses type_decl =
   in
   let kind_types = types_of_type_kind type_decl.ptype_kind in
   let manifest_types = Option.to_list type_decl.ptype_manifest in
+  let condone_versioned_type =
+    attributes_have_deriving_bin_io_unversioned type_decl.ptype_attributes
+  in
   List.concat_map
     (params_types @ cstr_types @ kind_types @ manifest_types)
-    ~f:get_core_type_versioned_type_misuses
+    ~f:(get_core_type_versioned_type_misuses condone_versioned_type)
 
 let include_versioned_module_error loc =
   (loc, "Cannot include a stable versioned module")
@@ -417,6 +433,9 @@ let lint_ast =
             else if acc.in_functor then validate_neither_bin_io_nor_version
             else validate_version_if_bin_io
           in
+          (* allow stable-versioned types for types with [@deriving bin_io_unversioned],
+             so detect that attribute
+          *)
           let versioned_type_misuse_errors_fun =
             if not @@ in_versioned_type_module acc.module_path then
               get_versioned_type_misuses
