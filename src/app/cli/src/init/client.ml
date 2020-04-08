@@ -807,38 +807,6 @@ let pending_snark_work =
              in
              print_string (Yojson.Safe.to_string lst) ) ))
 
-let coda_constants =
-  let open Command.Param in
-  Command.async ~summary:"Coda constants"
-    (Cli_lib.Background_daemon.graphql_init (return ())
-       ~f:(fun graphql_endpoint () ->
-         Deferred.map
-           (Graphql_client.query_exn
-              (Graphql_queries.Coda_constants.make ())
-              graphql_endpoint)
-           ~f:(fun response ->
-             let constants =
-               { Cli_lib.Graphql_types.Coda_constants.c=
-                   (response#codaConstants)#c
-               ; genesis_timestamp= (response#codaConstants)#genesisTimestamp
-               ; k= (response#codaConstants)#k
-               ; coinbase= (response#codaConstants)#coinbase
-               ; block_window_duration_ms=
-                   (response#codaConstants)#blockWindowDurationMs
-               ; delta= (response#codaConstants)#delta
-               ; inactivity_ms= (response#codaConstants)#inactivityMs
-               ; sub_windows_per_window=
-                   (response#codaConstants)#subWindowsPerWindow
-               ; slots_per_sub_window=
-                   (response#codaConstants)#slotsPerSubWindow
-               ; slots_per_window= (response#codaConstants)#slotsPerWindow
-               ; slots_per_epoch= (response#codaConstants)#slotsPerEpoch }
-             in
-             print_string
-               (Yojson.Safe.to_string
-                  (constants |> Cli_lib.Graphql_types.Coda_constants.to_yojson))
-             ) ))
-
 let start_tracing =
   let open Deferred.Let_syntax in
   let open Command.Param in
@@ -1432,7 +1400,6 @@ let advanced =
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
-    ; ("coda-constants", coda_constants)
     ; ("telemetry", telemetry)
     ; ("visualization", Visualization.command_group)
     ; ("generate-receipt", generate_receipt)
