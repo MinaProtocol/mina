@@ -48,6 +48,8 @@ end) : sig
   include S with type t = Unsigned.t
 
   [%%endif]
+
+  val scale : t -> int -> t option
 end = struct
   let max_int = Unsigned.max_int
 
@@ -171,6 +173,11 @@ end = struct
   let add x y =
     let z = Unsigned.add x y in
     if z < x then None else Some z
+
+  let scale u64 i =
+    let i = Unsigned.of_int i in
+    let max_val = Unsigned.(div max_int i) in
+    if max_val >= u64 then Some (Unsigned.mul u64 i) else None
 
   let ( + ) = add
 
