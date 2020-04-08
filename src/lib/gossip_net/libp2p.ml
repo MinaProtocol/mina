@@ -92,7 +92,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let conf_dir = config.conf_dir ^/ "coda_net2" in
       let%bind () = Unix.mkdir ~p:() conf_dir in
       match%bind
-        Monitor.try_with (fun () ->
+        Monitor.try_with ~rest:`Raise (fun () ->
             trace "coda_net2" (fun () ->
                 Coda_net2.create ~logger:config.logger ~conf_dir ) )
       with
@@ -120,6 +120,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
             ~location:__LOC__ ~module_:__MODULE__
             ~metadata:[("peer_id", `String my_peer_id)] ;
           let ctr = ref 0 in
+          let throttle =
+            Throttle.create ~max_concurrent_jobs:1 ~continue_on_error:true
+          in
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             let open Deferred.Or_error.Let_syntax in
             let%bind () =
@@ -138,11 +141,15 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   if !ctr < 4 then incr ctr
                   else Ivar.fill_if_empty high_connectivity_ivar () ;
                   don't_wait_for
-                    (let open Deferred.Let_syntax in
-                    let%map peers = peers net2 in
-                    Coda_metrics.(
-                      Gauge.set Network.peers
-                        (List.length peers |> Int.to_float))) )
+                    (Throttle.enqueue throttle (fun () ->
+                         let open Deferred.Let_syntax in
+                         let%bind peers = peers net2 in
+                         Coda_metrics.(
+                           Gauge.set Network.peers
+                             (List.length peers |> Int.to_float)) ;
+                         after (Time.Span.of_sec 2.)
+                         (* don't spam the helper with peer fetches, only try update it every 2 seconds *)
+                     )) )
             in
             let implementation_list =
               List.bind rpc_handlers ~f:create_rpc_implementations

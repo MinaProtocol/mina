@@ -54,6 +54,7 @@ type app struct {
 	Validators      map[int]*validationStatus
 	ValidatorMutex  *sync.Mutex
 	Streams         map[int]net.Stream
+	StreamsMutex    sync.Mutex
 	OutLock         sync.Mutex
 	Out             *bufio.Writer
 	UnsafeNoTrustIP bool
@@ -608,6 +609,8 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 		return nil, badp2p(err)
 	}
 
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
 	app.Streams[streamIdx] = stream
 	go func() {
 		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
@@ -625,6 +628,8 @@ func (cs *closeStreamMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
 		err := stream.Close()
 		if err != nil {
@@ -643,6 +648,8 @@ func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
 		err := stream.Reset()
 		delete(app.Streams, cs.StreamIdx)
@@ -668,6 +675,8 @@ func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
 		n, err := stream.Write(data)
 		if err != nil {
@@ -700,6 +709,8 @@ func (as *addStreamHandlerMsg) run(app *app) (interface{}, error) {
 			return
 		}
 		streamIdx := <-seqs
+		app.StreamsMutex.Lock()
+		defer app.StreamsMutex.Unlock()
 		app.Streams[streamIdx] = stream
 		app.writeMsg(incomingStreamUpcall{
 			Upcall:    "incomingStream",
