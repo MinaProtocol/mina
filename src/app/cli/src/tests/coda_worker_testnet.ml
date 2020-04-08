@@ -133,14 +133,14 @@ module Api = struct
     let%bind () = wait_for_no_rpcs () in
     Coda_process.disconnect t.workers.(i) ~logger
 
-  let run_user_command t i (sk : Private_key.t) fee valid_until ~body =
+  let run_user_command ~memo t i (sk : Private_key.t) fee valid_until ~body =
     let open Deferred.Option.Let_syntax in
     let worker = t.workers.(i) in
     let pk_of_sk = Public_key.of_private_key_exn sk |> Public_key.compress in
     let user_command_input =
       User_command_input.create ~signer:pk_of_sk ~fee
-        ~fee_token:Token_id.default ~fee_payer_pk:pk_of_sk
-        ~memo:User_command_memo.dummy ~valid_until ~body
+        ~fee_token:Token_id.default ~fee_payer_pk:pk_of_sk ~memo ~valid_until
+        ~body
         ~sign_choice:
           (User_command_input.Sign_choice.Keypair
              (Keypair.of_private_key_exn sk))
@@ -156,7 +156,9 @@ module Api = struct
     let delegator =
       Public_key.compress @@ Public_key.of_private_key_exn delegator_sk
     in
-    run_user_command t i delegator_sk fee valid_until
+    run_user_command
+      ~memo:(User_command_memo.create_from_string_exn (sprintf "sd%i" i))
+      t i delegator_sk fee valid_until
       ~body:
         (Stake_delegation (Set_delegate {delegator; new_delegate= delegate_pk}))
 
@@ -164,7 +166,9 @@ module Api = struct
     let source_pk =
       Public_key.compress @@ Public_key.of_private_key_exn sender_sk
     in
-    run_user_command t i sender_sk fee valid_until
+    run_user_command
+      ~memo:(User_command_memo.create_from_string_exn (sprintf "pay%i" i))
+      t i sender_sk fee valid_until
       ~body:
         (Payment {source_pk; receiver_pk; token_id= Token_id.default; amount})
 
