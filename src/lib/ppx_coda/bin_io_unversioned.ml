@@ -44,11 +44,27 @@ let bin_io_gens :
            from the Actual_deriver.t, we pull out the 1st field, the Generator.t with the label
              str_type_decl; we then apply the generator
         *)
-      let actual_deriver = Obj.(obj (field (field (repr deriver) 1) 0)) in
-      let name = Obj.(obj (field (repr actual_deriver) 0)) in
+      let actual_deriver =
+        let constructor_argument_idx = 0 in
+        let extension_constructor_argument_idx = 1 in
+        Obj.(
+          repr deriver
+          (* Ppxlib.Deriving.Deriver.T x -> x *)
+          |> (fun r -> field r extension_constructor_argument_idx)
+          (* Ppxlib.Deriving.Deriver.Actual_deriver x -> x *)
+          |> fun r -> field r constructor_argument_idx)
+      in
+      let name =
+        (* Ppxlib.Deriving.Deriver.Actual_deriver.t, 0th field is name *)
+        let name_idx = 0 in
+        actual_deriver |> fun r -> Obj.(field r name_idx |> obj)
+      in
       let generator :
           (structure, rec_flag * type_declaration list) Deriving.Generator.t =
-        Option.value_exn Obj.(obj (field (repr actual_deriver) 1))
+        (* Ppxlib.Deriving.Deriver.Actual_deriver.t, 1st field is str_type_decl *)
+        let str_type_decl_idx = 1 in
+        Option.value_exn
+          (actual_deriver |> fun r -> Obj.(field r str_type_decl_idx |> obj))
       in
       Deriving.Generator.apply ~name generator )
 
