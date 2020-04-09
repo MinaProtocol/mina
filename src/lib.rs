@@ -21,10 +21,10 @@ use algebra::{
 };
 use commitment_pairing::urs::{URS};
 use evaluation_domains::EvaluationDomains;
-use circuits_pairing::index::{Index, VerifierIndex, MatrixValues, URSSpec, URSValue};
+use circuits_pairing::index::{Index, VerifierIndex, MatrixValues, URSSpec};
 use ff_fft::{Evaluations, DensePolynomial, EvaluationDomain};
 use num_bigint::BigUint;
-use oracle::{self, marlin_sponge::{DefaultFqSponge, DefaultFrSponge}, FqSponge, poseidon, poseidon::Sponge};
+use oracle::{marlin_sponge::{DefaultFqSponge, DefaultFrSponge}, poseidon, poseidon::Sponge};
 use protocol_pairing::{prover::{ ProverProof, ProofEvaluations, RandomOracles}};
 use rand::rngs::StdRng;
 use rand_core;
@@ -32,18 +32,13 @@ use sprs::{CsMat, CsVecView, CSR};
 use std::os::raw::c_char;
 use std::ffi::CStr;
 use std::fs::File;
+use groupmap::GroupMap;
 
-use commitment_dlog::{commitment::{product, b_poly_coefficients, OpeningProof}, srs::{SRS}};
+use commitment_dlog::{commitment::{CommitmentCurve, PolyComm, product, b_poly_coefficients, OpeningProof}, srs::{SRS}};
 use circuits_dlog::index::{Index as DlogIndex, VerifierIndex as DlogVerifierIndex, SRSSpec, SRSValue};
 use protocol_dlog::prover::{ProverProof as DlogProof, ProofEvaluations as DlogProofEvaluations};
 
-fn ceil_pow2(x : usize) -> usize {
-    let mut res = 1;
-    while x > res {
-        res *= 2;
-    }
-    res
-}
+use algebra::curves::bn_382::g::Affine;
 
 fn witness_position_to_index(public_inputs: usize, h_to_x_ratio: usize, w: usize) -> usize {
     if w % h_to_x_ratio == 0 {
@@ -86,16 +81,12 @@ fn index_to_witness_position(public_inputs: usize, h_to_x_ratio: usize, i: usize
 
 fn rows_to_csmat<F: Clone + Copy + std::fmt::Debug>(
     public_inputs: usize,
+    h_group_size : usize,
     h_to_x_ratio: usize,
     v: &Vec<(Vec<usize>, Vec<F>)>,
 ) -> CsMat<F> {
-    let constraints = ceil_pow2(v.len());
-
-    // By using "constraints" as the number of columns, we are
-    // implicitly padding this matrix to be square.
-
-    let mut m = CsMat::empty(CSR, /* number of columns */ constraints);
-    m.reserve_outer_dim(constraints);
+    let mut m = CsMat::empty(CSR, /* number of columns */ h_group_size);
+    m.reserve_outer_dim(h_group_size);
 
     for (indices, coefficients) in v.iter() {
         let mut shifted: Vec<(usize, F)> = indices
@@ -110,14 +101,14 @@ fn rows_to_csmat<F: Clone + Copy + std::fmt::Debug>(
         let shifted_indices : Vec<usize> = shifted.iter().map(|(i, _)| *i).collect();
         let shifted_coefficients : Vec<F> = shifted.iter().map(|(_, x)| *x).collect();
 
-        match CsVecView::<F>::new_view(constraints, &shifted_indices, &shifted_coefficients) {
-            Ok(v) => m = m.append_outer_csvec(v),
+        match CsVecView::<F>::new_view(h_group_size, &shifted_indices, &shifted_coefficients) {
+            Ok(r) => m = m.append_outer_csvec(r),
             Err(e) => panic!("new_view failed {} ({:?}, {:?})", e, shifted_indices, shifted_coefficients)
         };
     }
 
-    for _ in 0..(constraints - v.len()) {
-        match CsVecView::<F>::new_view(constraints, & vec![], & vec![]) {
+    for _ in 0..(h_group_size - v.len()) {
+        match CsVecView::<F>::new_view(h_group_size, & vec![], & vec![]) {
             Ok(v) => m = m.append_outer_csvec(v),
             Err(e) => panic!("new_view failed {}", e)
         };
@@ -596,7 +587,7 @@ pub extern "C" fn camlsnark_bn382_fp_sponge_absorb(
     let params = unsafe { &(*params) };
     let x = unsafe { &(*x) };
 
-    sponge.absorb(params, x);
+    sponge.absorb(params, &[*x]);
 }
 
 #[no_mangle]
@@ -630,7 +621,29 @@ pub extern "C" fn camlsnark_bn382_fp_proof_create(
 }
 
 #[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_proof_verify(
+    index: *const VerifierIndex<Bn_382>,
+    proof: *const ProverProof<Bn_382>,
+) -> bool {
+
+    let index = unsafe { &(*index) };
+    let proof = unsafe { (*proof).clone() };
+
+    match ProverProof::verify::<DefaultFqSponge<Bn_382G1Parameters>, DefaultFrSponge<Fp>>
+    (
+        &[proof].to_vec(),
+        &index,
+        &mut rand_core::OsRng
+    )
+    {
+        Ok(status) => status,
+        _ => false
+    }
+}
+
+#[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_make(
+    index: *const VerifierIndex<Bn_382>,
     primary_input : *const Vec<Fp>,
 
     w_comm        : *const G1Affine,
@@ -678,7 +691,11 @@ pub extern "C" fn camlsnark_bn382_fp_proof_make(
     rc_1: *const Fp,
     rc_2: *const Fp,
 ) -> *const ProverProof<Bn_382> {
-    let public = unsafe { &(*primary_input) }.clone();
+    let index = unsafe { &(*index) };
+    let mut public = vec![Fp::one()];
+    let mut p = unsafe { &(*primary_input) }.clone();
+    public.append(&mut p);
+    public.resize(index.domains.x.size(), Fp::zero());
 
     let proof = ProverProof {
         w_comm: (unsafe { *w_comm }).clone(),
@@ -759,7 +776,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_h1_comm(p: *mut ProverProof<Bn_382>) 
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_g1_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
-    let x = (unsafe { (*p).g1_comm });
+    let x = unsafe {(*p).g1_comm};
     return Box::into_raw(Box::new(x));
 }
 
@@ -771,7 +788,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_h2_comm(p: *mut ProverProof<Bn_382>) 
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_g2_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
-    let x = (unsafe { (*p).g2_comm });
+    let x = unsafe { (*p).g2_comm };
     return Box::into_raw(Box::new(x));
 }
 
@@ -783,7 +800,7 @@ pub extern "C" fn camlsnark_bn382_fp_proof_h3_comm(p: *mut ProverProof<Bn_382>) 
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_proof_g3_comm_nocopy(p: *mut ProverProof<Bn_382>) -> *const (G1Affine, G1Affine) {
-    let x = (unsafe { (*p).g3_comm });
+    let x = unsafe { (*p).g3_comm };
     return Box::into_raw(Box::new(x));
 }
 
@@ -1161,21 +1178,33 @@ pub extern "C" fn camlsnark_bn382_fp_urs_commit_evaluations(
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_urs_dummy_degree_bound_checks(
     urs : *const URS<Bn_382>,
-    bound1 : usize,
-    bound2 : usize
+    bounds : *const Vec<usize>,
     )
 -> *const Vec<G1Affine> {
     let urs = unsafe { &*urs };
-    let p1 = DensePolynomial::<Fp>::from_coefficients_vec((0..bound1).map(|x| (x as u64).into()).collect());
-    let p2 = DensePolynomial::<Fp>::from_coefficients_vec((0..bound2).map(|x| (x as u64).into()).collect());
-    let (c1, s1) = urs.commit_with_degree_bound(&p1, bound1).unwrap();
-    let (c2, s2) = urs.commit_with_degree_bound(&p2, bound2).unwrap();
+    let bounds = unsafe { &*bounds };
+    let comms : Vec<_> = bounds.iter().map(|b| {
+        let p = DensePolynomial::<Fp>::from_coefficients_vec((0..*b).map(|i| {
+            if i == 0 {
+                Fp::one()
+            } else {
+                Fp::zero()
+            }
+        }).collect());
+        urs.commit_with_degree_bound(&p, *b).unwrap()
+    }).collect();
 
-    let r1 = (2u64).into();
-    let r2 = (3u64).into();
+    let cs = comms.iter().map(|(c, _)| *c);
+    let ss = comms.iter().map(|(_, s)| *s);
 
-    let shifted = (s1.into_projective() * &r1 + &(s2.into_projective() * &r2)).into_affine();
-    let res = vec![ shifted, (c1.into_projective() * &r1).into_affine(), (c2.into_projective() * &r2).into_affine() ];
+    let rs : Vec<Fp> = bounds.iter().enumerate().map(|(_, i)| ((i + 2) as u64).into()).collect();
+
+    let shifted = ss.zip(rs.iter()).map(|(s, r)| s.into_projective() * r)
+        .fold(G1Projective::zero(), |acc, x| acc + &x).into_affine();
+
+    let mut res = vec![ shifted ];
+    res.extend(
+        cs.zip(rs).map(|(c, r)| (c.into_projective() * &r).into_affine()));
 
     Box::into_raw(Box::new(res))
 }
@@ -1210,7 +1239,7 @@ pub extern "C" fn camlsnark_bn382_fp_urs_dummy_opening_check(
 // Fq URS stubs
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_urs_create(depth : usize) -> *const SRS<GAffine> {
-    Box::into_raw(Box::new(SRS::create(depth, &mut rand_core::OsRng)))
+    Box::into_raw(Box::new(SRS::create(depth)))
 }
 
 #[no_mangle]
@@ -1234,13 +1263,13 @@ pub extern "C" fn camlsnark_bn382_fq_urs_lagrange_commitment(
     urs : *const SRS<GAffine>,
     domain_size : usize,
     i: usize)
--> *const GAffine {
+-> *const PolyComm<GAffine> {
     let urs = unsafe { &*urs };
     let x_domain = EvaluationDomain::<Fq>::new(domain_size).unwrap();
 
     let evals = (0..domain_size).map(|j| if i == j { Fq::one() } else { Fq::zero() }).collect();
     let p = Evaluations::<Fq>::from_vec_and_domain(evals, x_domain).interpolate();
-    let res = urs.commit_no_degree_bound(&p).unwrap();
+    let res = urs.commit(&p, None);
 
     Box::into_raw(Box::new(res))
 }
@@ -1250,13 +1279,13 @@ pub extern "C" fn camlsnark_bn382_fq_urs_commit_evaluations(
     urs : *const SRS<GAffine>,
     domain_size : usize,
     evals : *const Vec<Fq>)
--> *const GAffine {
+-> *const PolyComm<GAffine> {
     let urs = unsafe { &*urs };
     let x_domain = EvaluationDomain::<Fq>::new(domain_size).unwrap();
 
     let evals = unsafe { &*evals };
     let p = Evaluations::<Fq>::from_vec_and_domain(evals.clone(), x_domain).interpolate();
-    let res = urs.commit_no_degree_bound(&p).unwrap();
+    let res = urs.commit(&p, None);
 
     Box::into_raw(Box::new(res))
 }
@@ -1265,7 +1294,7 @@ pub extern "C" fn camlsnark_bn382_fq_urs_commit_evaluations(
 pub extern "C" fn camlsnark_bn382_fq_urs_b_poly_commitment(
     urs : *const SRS<GAffine>,
     chals : *const Vec<Fq>)
--> *const GAffine {
+-> *const PolyComm<GAffine> {
     let chals = unsafe { & *chals };
     let urs = unsafe { &*urs };
 
@@ -1273,7 +1302,7 @@ pub extern "C" fn camlsnark_bn382_fq_urs_b_poly_commitment(
     let chal_squareds : Vec<Fq> = chals.iter().map(|x| x.square()).collect();
     let coeffs = b_poly_coefficients(s0, &chal_squareds);
     let p = DensePolynomial::<Fq>::from_coefficients_vec(coeffs);
-    let g = urs.commit_no_degree_bound(&p).unwrap();
+    let g = urs.commit(&p, None);
 
     Box::into_raw(Box::new(g))
 }
@@ -1315,20 +1344,20 @@ pub extern "C" fn camlsnark_bn382_fp_index_create<'a>(
     let c = unsafe { &*c };
 
     let num_constraints = a.len();
-    println!("num constraints, num_vars: {}, {}", num_constraints, vars);
-    assert!(num_constraints >= vars);
 
+    let m = if num_constraints > vars { num_constraints } else { vars };
+
+    let h_group_size = EvaluationDomain::<Fp>::compute_size_of_domain(m).unwrap();
     let h_to_x_ratio = {
         let x_group_size = EvaluationDomain::<Fp>::compute_size_of_domain(public_inputs).unwrap();
-        let h_group_size = EvaluationDomain::<Fp>::compute_size_of_domain(num_constraints).unwrap();
         h_group_size / x_group_size
     };
 
     return Box::into_raw(Box::new(
         Index::<Bn_382>::create(
-            rows_to_csmat(public_inputs, h_to_x_ratio, a),
-            rows_to_csmat(public_inputs, h_to_x_ratio, b),
-            rows_to_csmat(public_inputs, h_to_x_ratio, c),
+            rows_to_csmat(public_inputs, h_group_size, h_to_x_ratio, a),
+            rows_to_csmat(public_inputs, h_group_size, h_to_x_ratio, b),
+            rows_to_csmat(public_inputs, h_group_size, h_to_x_ratio, c),
             public_inputs,
             oracle::bn_382::fp::params(),
             oracle::bn_382::fq::params(),
@@ -1477,34 +1506,35 @@ pub extern "C" fn camlsnark_bn382_fq_index_create<'a>(
     c: *mut Vec<(Vec<usize>, Vec<Fq>)>,
     vars: usize,
     public_inputs: usize,
-    urs : *mut SRS<GAffine>
+    srs : *mut SRS<GAffine>
 ) -> *mut DlogIndex<'a, GAffine> {
     assert!(public_inputs > 0);
 
-    let urs = unsafe { &*urs };
+    let srs = unsafe { &*srs };
     let a = unsafe { &*a };
     let b = unsafe { &*b };
     let c = unsafe { &*c };
 
     let num_constraints = a.len();
-    println!("dlog num constraints, vars {}, {}", num_constraints, vars);
-    assert!(num_constraints >= vars);
 
+    let m = if num_constraints > vars { num_constraints } else { vars };
+
+    let h_group_size = EvaluationDomain::<Fq>::compute_size_of_domain(m).unwrap();
     let h_to_x_ratio = {
         let x_group_size = EvaluationDomain::<Fq>::compute_size_of_domain(public_inputs).unwrap();
-        let h_group_size = EvaluationDomain::<Fq>::compute_size_of_domain(num_constraints).unwrap();
         h_group_size / x_group_size
     };
 
     return Box::into_raw(Box::new(
         DlogIndex::<GAffine>::create(
-            rows_to_csmat(public_inputs, h_to_x_ratio, a),
-            rows_to_csmat(public_inputs, h_to_x_ratio, b),
-            rows_to_csmat(public_inputs, h_to_x_ratio, c),
+            rows_to_csmat(public_inputs, h_group_size, h_to_x_ratio, a),
+            rows_to_csmat(public_inputs, h_group_size, h_to_x_ratio, b),
+            rows_to_csmat(public_inputs, h_group_size, h_to_x_ratio, c),
             public_inputs,
+            srs.max_degree(),
             oracle::bn_382::fq::params(),
             oracle::bn_382::fp::params(),
-            SRSSpec::Use(urs),
+            SRSSpec::Use(srs),
         )
         .unwrap(),
     ));
@@ -1518,85 +1548,85 @@ pub extern "C" fn camlsnark_bn382_fq_index_delete(x: *mut DlogIndex<GAffine>) {
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_index_a_row_comm(
     index: *const DlogIndex<GAffine>,
-) -> *const GAffine {
-    Box::into_raw(Box::new((unsafe { (*index).compiled[0].row_comm }).clone()))
+) -> *const PolyComm<GAffine> {
+    Box::into_raw(Box::new((unsafe { &(*index).compiled[0].row_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_index_a_col_comm(
     index: *const DlogIndex<GAffine>,
-) -> *const GAffine {
-    Box::into_raw(Box::new((unsafe { (*index).compiled[0].col_comm }).clone()))
+) -> *const PolyComm<GAffine> {
+    Box::into_raw(Box::new((unsafe { &(*index).compiled[0].col_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_index_a_val_comm(
     index: *const DlogIndex<GAffine>,
-) -> *const GAffine {
-    Box::into_raw(Box::new((unsafe { (*index).compiled[0].val_comm }).clone()))
+) -> *const PolyComm<GAffine> {
+    Box::into_raw(Box::new((unsafe { &(*index).compiled[0].val_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_index_a_rc_comm(
     index: *const DlogIndex<GAffine>,
-) -> *const GAffine {
-    Box::into_raw(Box::new((unsafe { (*index).compiled[0].rc_comm }).clone()))
+) -> *const PolyComm<GAffine> {
+    Box::into_raw(Box::new((unsafe { &(*index).compiled[0].rc_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_index_b_row_comm(
     index: *const DlogIndex<GAffine>,
-) -> *const GAffine {
-    Box::into_raw(Box::new((unsafe { (*index).compiled[1].row_comm }).clone()))
+) -> *const PolyComm<GAffine> {
+    Box::into_raw(Box::new((unsafe { &(*index).compiled[1].row_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_index_b_col_comm(
     index: *const DlogIndex<GAffine>,
-) -> *const GAffine {
-    Box::into_raw(Box::new((unsafe { (*index).compiled[1].col_comm }).clone()))
+) -> *const PolyComm<GAffine> {
+    Box::into_raw(Box::new((unsafe { &(*index).compiled[1].col_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_index_b_val_comm(
     index: *const DlogIndex<GAffine>,
-) -> *const GAffine {
-    Box::into_raw(Box::new((unsafe { (*index).compiled[1].val_comm }).clone()))
+) -> *const PolyComm<GAffine> {
+    Box::into_raw(Box::new((unsafe { &(*index).compiled[1].val_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_index_b_rc_comm(
     index: *const DlogIndex<GAffine>,
-) -> *const GAffine {
-    Box::into_raw(Box::new((unsafe { (*index).compiled[1].rc_comm }).clone()))
+) -> *const PolyComm<GAffine> {
+    Box::into_raw(Box::new((unsafe { &(*index).compiled[1].rc_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_index_c_row_comm(
     index: *const DlogIndex<GAffine>,
-) -> *const GAffine {
-    Box::into_raw(Box::new((unsafe { (*index).compiled[2].row_comm }).clone()))
+) -> *const PolyComm<GAffine> {
+    Box::into_raw(Box::new((unsafe { &(*index).compiled[2].row_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_index_c_col_comm(
     index: *const DlogIndex<GAffine>,
-) -> *const GAffine {
-    Box::into_raw(Box::new((unsafe { (*index).compiled[2].col_comm }).clone()))
+) -> *const PolyComm<GAffine> {
+    Box::into_raw(Box::new((unsafe { &(*index).compiled[2].col_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_index_c_val_comm(
     index: *const DlogIndex<GAffine>,
-) -> *const GAffine {
-    Box::into_raw(Box::new((unsafe { (*index).compiled[2].val_comm }).clone()))
+) -> *const PolyComm<GAffine> {
+    Box::into_raw(Box::new((unsafe { &(*index).compiled[2].val_comm }).clone()))
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_index_c_rc_comm(
     index: *const DlogIndex<GAffine>,
-) -> *const GAffine {
-    Box::into_raw(Box::new((unsafe { (*index).compiled[2].rc_comm }).clone()))
+) -> *const PolyComm<GAffine> {
+    Box::into_raw(Box::new((unsafe { &(*index).compiled[2].rc_comm }).clone()))
 }
 
 #[no_mangle]
@@ -1653,34 +1683,34 @@ pub extern "C" fn camlsnark_bn382_fq_verifier_index_make<'a>(
     public_inputs: usize,
     variables: usize,
     nonzero_entries: usize,
-    max_degree: usize,
+    max_poly_size: usize,
     urs: *const SRS<GAffine>,
-    row_a: *const GAffine,
-    col_a: *const GAffine,
-    val_a: *const GAffine,
-    rc_a: *const GAffine,
+    row_a: *const PolyComm<GAffine>,
+    col_a: *const PolyComm<GAffine>,
+    val_a: *const PolyComm<GAffine>,
+    rc_a: *const PolyComm<GAffine>,
 
-    row_b: *const GAffine,
-    col_b: *const GAffine,
-    val_b: *const GAffine,
-    rc_b: *const GAffine,
+    row_b: *const PolyComm<GAffine>,
+    col_b: *const PolyComm<GAffine>,
+    val_b: *const PolyComm<GAffine>,
+    rc_b: *const PolyComm<GAffine>,
 
-    row_c: *const GAffine,
-    col_c: *const GAffine,
-    val_c: *const GAffine,
-    rc_c: *const GAffine,
+    row_c: *const PolyComm<GAffine>,
+    col_c: *const PolyComm<GAffine>,
+    val_c: *const PolyComm<GAffine>,
+    rc_c: *const PolyComm<GAffine>,
 ) -> *const DlogVerifierIndex<'a, GAffine> {
     let srs : SRS<GAffine> = (unsafe { &*urs }).clone();
     let index = DlogVerifierIndex::<GAffine> {
         domains: EvaluationDomains::create(variables, public_inputs, nonzero_entries).unwrap(),
         matrix_commitments: [
-            circuits_dlog::index::MatrixValues { row: (unsafe {*row_a}).clone(), col: (unsafe {*col_a}).clone(), val: (unsafe {*val_a}).clone(), rc: (unsafe {*rc_a}).clone() },
-            circuits_dlog::index::MatrixValues { row: (unsafe {*row_b}).clone(), col: (unsafe {*col_b}).clone(), val: (unsafe {*val_b}).clone(), rc: (unsafe {*rc_b}).clone() },
-            circuits_dlog::index::MatrixValues { row: (unsafe {*row_c}).clone(), col: (unsafe {*col_c}).clone(), val: (unsafe {*val_c}).clone(), rc: (unsafe {*rc_c}).clone() },
+            circuits_dlog::index::MatrixValues { row: (unsafe {&*row_a}).clone(), col: (unsafe {&*col_a}).clone(), val: (unsafe {&*val_a}).clone(), rc: (unsafe {&*rc_a}).clone() },
+            circuits_dlog::index::MatrixValues { row: (unsafe {&*row_b}).clone(), col: (unsafe {&*col_b}).clone(), val: (unsafe {&*val_b}).clone(), rc: (unsafe {&*rc_b}).clone() },
+            circuits_dlog::index::MatrixValues { row: (unsafe {&*row_c}).clone(), col: (unsafe {&*col_c}).clone(), val: (unsafe {&*val_c}).clone(), rc: (unsafe {&*rc_c}).clone() },
         ],
         fq_sponge_params: oracle::bn_382::fp::params(),
         fr_sponge_params: oracle::bn_382::fq::params(),
-        max_degree,
+        max_poly_size,
         public_inputs,
         srs: SRSValue::Value(srs),
     };
@@ -2250,9 +2280,9 @@ pub extern "C" fn camlsnark_bn382_fq_sponge_absorb(
 ) {
     let sponge = unsafe { &mut (*sponge) };
     let params = unsafe { &(*params) };
-    let x = unsafe { &(*x) };
+    let x = unsafe { (*x) };
 
-    sponge.absorb(params, x);
+    sponge.absorb(params, &[x]);
 }
 
 #[no_mangle]
@@ -2286,7 +2316,26 @@ pub extern "C" fn camlsnark_bn382_fq_triple_2(evals: *const [Fq; 3]) -> *const F
     return Box::into_raw(Box::new(x));
 }
 
-// G1 affine pair
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_vector_triple_0(evals: *const [Vec<Fq>; 3]) -> *const Vec<Fq> {
+    let x = (unsafe { &(*evals) })[0].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_vector_triple_1(evals: *const [Vec<Fq>; 3]) -> *const Vec<Fq> {
+    let x = (unsafe { &(*evals) })[1].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_vector_triple_2(evals: *const [Vec<Fq>; 3]) -> *const Vec<Fq> {
+    let x = (unsafe { &(*evals) })[2].clone();
+    return Box::into_raw(Box::new(x));
+}
+
+
+// G1 affine pair#[no_mangle]
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_g1_affine_pair_0(
     p: *const (G1Affine, G1Affine)) -> *const G1Affine {
@@ -2409,12 +2458,12 @@ pub extern "C" fn camlsnark_bn382_fq_oracles_create(
     let x_hat = 
         Evaluations::<Fq>::from_vec_and_domain(proof.public.clone(), index.domains.x).interpolate();
         // TODO: Should have no degree bound when we add the correct degree bound method
-    let x_hat_comm = index.srs.get_ref().commit_no_degree_bound(&x_hat).unwrap();
+    let x_hat_comm = index.srs.get_ref().commit(&x_hat, None);
 
     let (mut sponge, o) = proof.oracles::<
         DefaultFqSponge<Bn_382GParameters>,
         DefaultFrSponge<Fq>,
-        >(index, &x_hat, x_hat_comm).unwrap();
+        >(index, x_hat_comm, &x_hat);
     let opening_prechallenges = proof.proof.prechallenges(&mut sponge);
 
     return Box::into_raw(Box::new(FqOracles { o, opening_prechallenges }));
@@ -2493,8 +2542,8 @@ pub extern "C" fn camlsnark_bn382_fq_oracles_evals(
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_oracles_x_hat_nocopy(
     oracles: *const FqOracles,
-) -> *const [Fq; 3] {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).o.x_hat ));
+) -> *const [Vec<Fq>; 3] {
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).o.x_hat.clone() ));
 }
 
 #[no_mangle]
@@ -2511,7 +2560,6 @@ pub extern "C" fn camlsnark_bn382_fq_oracles_delete(
     let _box = unsafe { Box::from_raw(x) };
 }
 
-
 // Fq proof
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_proof_create(
@@ -2527,39 +2575,77 @@ pub extern "C" fn camlsnark_bn382_fq_proof_create(
 
     let witness = prepare_witness(index.domains, primary_input, auxiliary_input);
 
-    let prev : Vec<(Vec<Fq>, GAffine)> = {
+    let prev : Vec<(Vec<Fq>, PolyComm<GAffine>)> = {
         let prev_challenges = unsafe { &*prev_challenges};
         let prev_sgs = unsafe { &*prev_sgs };
-        let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
-        prev_sgs.iter().enumerate().map( |(i, sg)| {
-            (prev_challenges[(i * challenges_per_sg)..(i+1)*challenges_per_sg].iter().map(|x| *x).collect(), sg.clone())
-        }).collect()
+        if prev_challenges.len() == 0 {Vec::new()} else
+        {
+            let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
+            prev_sgs.iter().enumerate().map( |(i, sg)| {
+                (
+                    prev_challenges[(i * challenges_per_sg)..(i+1)*challenges_per_sg].iter().map(|x| *x).collect(),
+                    PolyComm::<GAffine>{unshifted: vec![sg.clone()], shifted: None}
+                )
+            }).collect()
+        }
     };
-
+    
     let rng = &mut rand_core::OsRng;
 
+    let map = <Affine as CommitmentCurve>::Map::setup();
     let proof = DlogProof::create::<DefaultFqSponge<Bn_382GParameters>, DefaultFrSponge<Fq> >
-        (&witness, &index, prev, rng).unwrap();
+        (&map, &witness, &index, prev, rng).unwrap();
 
     return Box::into_raw(Box::new(proof));
 }
 
 #[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_proof_verify(
+    index: *const DlogVerifierIndex<GAffine>,
+    proof: *const DlogProof<GAffine>,
+) -> bool {
+
+    let index = unsafe { &(*index) };
+    let proof = unsafe { (*proof).clone() };
+    let group_map = <Affine as CommitmentCurve>::Map::setup();
+
+    DlogProof::verify::<DefaultFqSponge<Bn_382GParameters>, DefaultFrSponge<Fq>>
+    (
+        &group_map,
+        &[proof].to_vec(),
+        &index,
+        &mut rand_core::OsRng
+    )
+}
+
+// TODO: Batch verify across different indexes
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_proof_batch_verify(
+    index: *const DlogVerifierIndex<GAffine>,
+    proofs: *const Vec<DlogProof<GAffine>>,
+) -> bool {
+    let index = unsafe { &(*index) };
+    let proofs = unsafe { &(*proofs) };
+    let group_map = <Affine as CommitmentCurve>::Map::setup();
+
+    DlogProof::<GAffine>::verify::<DefaultFqSponge<Bn_382GParameters>, DefaultFrSponge<Fq> >(
+        &group_map, proofs, index, &mut rand_core::OsRng)
+}
+
+#[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_proof_make(
+    index: *const DlogVerifierIndex<GAffine>,
     primary_input : *const Vec<Fq>,
 
-    w_comm        : *const GAffine,
-    za_comm       : *const GAffine,
-    zb_comm       : *const GAffine,
-    h1_comm       : *const GAffine,
-    g1_comm_0     : *const GAffine,
-    g1_comm_1     : *const GAffine,
-    h2_comm       : *const GAffine,
-    g2_comm_0     : *const GAffine,
-    g2_comm_1     : *const GAffine,
-    h3_comm       : *const GAffine,
-    g3_comm_0     : *const GAffine,
-    g3_comm_1     : *const GAffine,
+    w_comm        : *const PolyComm<GAffine>,
+    za_comm       : *const PolyComm<GAffine>,
+    zb_comm       : *const PolyComm<GAffine>,
+    h1_comm       : *const PolyComm<GAffine>,
+    g1_comm       : *const PolyComm<GAffine>,
+    h2_comm       : *const PolyComm<GAffine>,
+    g2_comm       : *const PolyComm<GAffine>,
+    h3_comm       : *const PolyComm<GAffine>,
+    g3_comm       : *const PolyComm<GAffine>,
 
     sigma2        : *const Fq,
     sigma3        : *const Fq, 
@@ -2577,17 +2663,30 @@ pub extern "C" fn camlsnark_bn382_fq_proof_make(
     prev_challenges: *const Vec<Fq>,
     prev_sgs : *const Vec<GAffine>,
     ) -> *const DlogProof<GAffine> {
+    
+    let index = unsafe { &(*index) };
+    let mut public = vec![Fq::one()];
+    let mut p = unsafe { &(*primary_input) }.clone();
+    public.append(&mut p);
+    public.resize(index.domains.x.size(), Fq::zero());    
 
-    let prev : Vec<(Vec<Fq>, GAffine)> = {
+    let prev : Vec<(Vec<Fq>, PolyComm<GAffine>)> = {
         let prev_challenges = unsafe { &*prev_challenges};
         let prev_sgs = unsafe { &*prev_sgs };
-        let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
-        prev_sgs.iter().enumerate().map( |(i, sg)| {
-            (prev_challenges[(i * challenges_per_sg)..(i+1)*challenges_per_sg].iter().map(|x| *x).collect(), sg.clone())
-        }).collect()
+        if prev_challenges.len() == 0 {Vec::new()} else
+        {
+            let challenges_per_sg = prev_challenges.len() / prev_sgs.len();
+            prev_sgs.iter().enumerate().map( |(i, sg)| {
+                (
+                    prev_challenges[(i * challenges_per_sg)..(i+1)*challenges_per_sg].iter().map(|x| *x).collect(),
+                    PolyComm::<GAffine>{unshifted: vec![sg.clone()], shifted: None}
+                )
+            }).collect()
+        }
     };
 
     let res = DlogProof {
+
         prev_challenges: prev,
         proof: OpeningProof {
             lr: (unsafe { &*lr }).clone(),
@@ -2596,20 +2695,20 @@ pub extern "C" fn camlsnark_bn382_fq_proof_make(
             delta: (unsafe { *delta }).clone(),
             sg: (unsafe { *sg }).clone(),
         },
-        w_comm: (unsafe { *w_comm }).clone(),
-        za_comm: (unsafe { *za_comm }).clone() ,
-        zb_comm: (unsafe { *zb_comm }).clone() ,
-        h1_comm: (unsafe { *h1_comm }).clone() ,
-        g1_comm: ((unsafe { *g1_comm_0 }).clone(),(unsafe { *g1_comm_1 }).clone()),
-        h2_comm: (unsafe { *h2_comm }).clone() ,
-        g2_comm: ((unsafe { *g2_comm_0 }).clone(),(unsafe { *g2_comm_1 }).clone()),
-        h3_comm: (unsafe { *h3_comm }).clone() ,
-        g3_comm: ((unsafe { *g3_comm_0 }).clone(),(unsafe { *g3_comm_1 }).clone()),
+        w_comm: (unsafe { &*w_comm }).clone(),
+        za_comm: (unsafe { &*za_comm }).clone() ,
+        zb_comm: (unsafe { &*zb_comm }).clone() ,
+        h1_comm: (unsafe { &*h1_comm }).clone() ,
+        g1_comm: (unsafe { &*g1_comm }).clone(),
+        h2_comm: (unsafe { &*h2_comm }).clone() ,
+        g2_comm: (unsafe { &*g2_comm }).clone(),
+        h3_comm: (unsafe { &*h3_comm }).clone() ,
+        g3_comm: (unsafe { &*g3_comm }).clone(),
 
         sigma2: (unsafe { *sigma2 }).clone(),
         sigma3: (unsafe { *sigma3 }).clone(),
 
-        public: (unsafe { &(*primary_input) }.clone()),
+        public,
         evals: [(unsafe { &*evals0 }).clone(), (unsafe {& *evals1 }).clone(), (unsafe { &*evals2 }).clone(), ],
     };
     return Box::into_raw(Box::new(res));
@@ -2621,56 +2720,56 @@ pub extern "C" fn camlsnark_bn382_fq_proof_delete(x: *mut DlogProof<GAffine>) {
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_w_comm(p: *mut DlogProof<GAffine>) -> *const GAffine {
-    let x = (unsafe { (*p).w_comm }).clone();
+pub extern "C" fn camlsnark_bn382_fq_proof_w_comm(p: *mut DlogProof<GAffine>) -> *const PolyComm<GAffine> {
+    let x = (unsafe { &((*p).w_comm )}).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_za_comm(p: *mut DlogProof<GAffine>) -> *const GAffine {
-    let x = (unsafe { (*p).za_comm }).clone();
+pub extern "C" fn camlsnark_bn382_fq_proof_za_comm(p: *mut DlogProof<GAffine>) -> *const PolyComm<GAffine> {
+    let x = (unsafe {&((*p).za_comm )}).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_zb_comm(p: *mut DlogProof<GAffine>) -> *const GAffine {
-    let x = (unsafe { (*p).zb_comm }).clone();
+pub extern "C" fn camlsnark_bn382_fq_proof_zb_comm(p: *mut DlogProof<GAffine>) -> *const PolyComm<GAffine> {
+    let x = (unsafe {&((*p).zb_comm )}).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_h1_comm(p: *mut DlogProof<GAffine>) -> *const GAffine {
-    let x = (unsafe { (*p).h1_comm }).clone();
+pub extern "C" fn camlsnark_bn382_fq_proof_h1_comm(p: *mut DlogProof<GAffine>) -> *const PolyComm<GAffine> {
+    let x = (unsafe {&((*p).h1_comm )}).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_g1_comm_nocopy(p: *mut DlogProof<GAffine>) -> *const (GAffine, GAffine) {
-    let x = (unsafe { (*p).g1_comm });
+pub extern "C" fn camlsnark_bn382_fq_proof_g1_comm_nocopy(p: *mut DlogProof<GAffine>) -> *const PolyComm<GAffine> {
+    let x = (unsafe { &(*p).g1_comm }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_h2_comm(p: *mut DlogProof<GAffine>) -> *const GAffine {
-    let x = (unsafe { (*p).h2_comm }).clone();
+pub extern "C" fn camlsnark_bn382_fq_proof_h2_comm(p: *mut DlogProof<GAffine>) -> *const PolyComm<GAffine> {
+    let x = (unsafe {&((*p).h2_comm )}).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_g2_comm_nocopy(p: *mut DlogProof<GAffine>) -> *const (GAffine, GAffine) {
-    let x = (unsafe { (*p).g2_comm });
+pub extern "C" fn camlsnark_bn382_fq_proof_g2_comm_nocopy(p: *mut DlogProof<GAffine>) -> *const PolyComm<GAffine> {
+    let x = (unsafe { &(*p).g2_comm }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_h3_comm(p: *mut DlogProof<GAffine>) -> *const GAffine {
-    let x = (unsafe { (*p).h3_comm }).clone();
+pub extern "C" fn camlsnark_bn382_fq_proof_h3_comm(p: *mut DlogProof<GAffine>) -> *const PolyComm<GAffine> {
+    let x = (unsafe { &(*p).h3_comm }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_g3_comm_nocopy(p: *mut DlogProof<GAffine>) -> *const (GAffine, GAffine) {
-    let x = (unsafe { (*p).g3_comm });
+pub extern "C" fn camlsnark_bn382_fq_proof_g3_comm_nocopy(p: *mut DlogProof<GAffine>) -> *const PolyComm<GAffine> {
+    let x = (unsafe { &(*p).g3_comm }).clone();
     return Box::into_raw(Box::new(x));
 }
 
@@ -2696,6 +2795,39 @@ pub extern "C" fn camlsnark_bn382_fq_proof_proof(p: *mut DlogProof<GAffine>) -> 
 pub extern "C" fn camlsnark_bn382_fq_proof_evals_nocopy(p: *mut DlogProof<GAffine>) -> *const [DlogProofEvaluations<Fq>; 3] {
     let x = (unsafe { &(*p).evals }).clone();
     return Box::into_raw(Box::new(x));
+}
+
+// Fq proof vector
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_proof_vector_create() -> *mut Vec<DlogProof<GAffine>> {
+    return Box::into_raw(Box::new(Vec::new()));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_proof_vector_length(v: *const Vec<DlogProof<GAffine>>) -> i32 {
+    let v_ = unsafe { &(*v) };
+    return v_.len() as i32;
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_proof_vector_emplace_back(v: *mut Vec<DlogProof<GAffine>>, x: *const DlogProof<GAffine>) {
+    let v_ = unsafe { &mut (*v) };
+    let x_ = unsafe { &(*x) };
+    v_.push(x_.clone());
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_proof_vector_get(v: *mut Vec<DlogProof<GAffine>>, i: u32) -> *mut DlogProof<GAffine> {
+    let v_ = unsafe { &mut (*v) };
+    return Box::into_raw(Box::new((*v_)[i as usize].clone()));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_proof_vector_delete(v: *mut Vec<DlogProof<GAffine>>) {
+    // Deallocation happens automatically when a box variable goes out of
+    // scope.
+    let _box = unsafe { Box::from_raw(v) };
 }
 
 // Fq opening proof
@@ -2739,80 +2871,80 @@ pub extern "C" fn camlsnark_bn382_fq_opening_proof_delta(p: *const OpeningProof<
 // Fq proof evaluations
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_w(e: *const DlogProofEvaluations<Fq>) -> *const Fq {
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_w(e: *const DlogProofEvaluations<Fq>) -> *const Vec<Fq> {
     let x = (unsafe { & (*e).w }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_za(e: *const DlogProofEvaluations<Fq>) -> *const Fq {
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_za(e: *const DlogProofEvaluations<Fq>) -> *const Vec<Fq> {
     let x = (unsafe { & (*e).za }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_zb(e: *const DlogProofEvaluations<Fq>) -> *const Fq {
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_zb(e: *const DlogProofEvaluations<Fq>) -> *const Vec<Fq> {
     let x = (unsafe { & (*e).zb }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_h1(e: *const DlogProofEvaluations<Fq>) -> *const Fq {
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_h1(e: *const DlogProofEvaluations<Fq>) -> *const Vec<Fq> {
     let x = (unsafe { & (*e).h1 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_h2(e: *const DlogProofEvaluations<Fq>) -> *const Fq {
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_h2(e: *const DlogProofEvaluations<Fq>) -> *const Vec<Fq> {
     let x = (unsafe { & (*e).h2 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_h3(e: *const DlogProofEvaluations<Fq>) -> *const Fq {
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_h3(e: *const DlogProofEvaluations<Fq>) -> *const Vec<Fq> {
     let x = (unsafe { & (*e).h3 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_g1(e: *const DlogProofEvaluations<Fq>) -> *const Fq {
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_g1(e: *const DlogProofEvaluations<Fq>) -> *const Vec<Fq> {
     let x = (unsafe { & (*e).g1 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_g2(e: *const DlogProofEvaluations<Fq>) -> *const Fq {
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_g2(e: *const DlogProofEvaluations<Fq>) -> *const Vec<Fq> {
     let x = (unsafe { & (*e).g2 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_g3(e: *const DlogProofEvaluations<Fq>) -> *const Fq {
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_g3(e: *const DlogProofEvaluations<Fq>) -> *const Vec<Fq> {
     let x = (unsafe { & (*e).g3 }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_row_nocopy(e: *const DlogProofEvaluations<Fq>) -> *const [Fq; 3] {
-    let x = (unsafe { (*e).row });
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_row_nocopy(e: *const DlogProofEvaluations<Fq>) -> *const [Vec<Fq>; 3] {
+    let x = (unsafe { &(*e).row }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_val_nocopy(e: *const DlogProofEvaluations<Fq>) -> *const [Fq; 3] {
-    let x = (unsafe { (*e).val });
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_val_nocopy(e: *const DlogProofEvaluations<Fq>) -> *const [Vec<Fq>; 3] {
+    let x = (unsafe { &(*e).val }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_col_nocopy(e: *const DlogProofEvaluations<Fq>) -> *const [Fq; 3] {
-    let x = (unsafe { (*e).col });
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_col_nocopy(e: *const DlogProofEvaluations<Fq>) -> *const [Vec<Fq>; 3] {
+    let x = (unsafe { &(*e).col }).clone();
     return Box::into_raw(Box::new(x));
 }
 
 #[no_mangle]
-pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_rc_nocopy(e: *const DlogProofEvaluations<Fq>) -> *const [Fq; 3] {
-    let x = (unsafe { (*e).rc });
+pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_rc_nocopy(e: *const DlogProofEvaluations<Fq>) -> *const [Vec<Fq>; 3] {
+    let x = (unsafe { &(*e).rc }).clone();
     return Box::into_raw(Box::new(x));
 }
 
@@ -2836,59 +2968,97 @@ pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_triple_2(e: *const [DlogP
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_proof_evaluations_make(
-    w: *const Fq,
-    za: *const Fq,
-    zb: *const Fq,
-    h1: *const Fq,
-    g1: *const Fq,
-    h2: *const Fq,
-    g2: *const Fq,
-    h3: *const Fq,
-    g3: *const Fq,
+    w: *const Vec<Fq>,
+    za: *const Vec<Fq>,
+    zb: *const Vec<Fq>,
+    h1: *const Vec<Fq>,
+    g1: *const Vec<Fq>,
+    h2: *const Vec<Fq>,
+    g2: *const Vec<Fq>,
+    h3: *const Vec<Fq>,
+    g3: *const Vec<Fq>,
 
-    row_0: *const Fq,
-    row_1: *const Fq,
-    row_2: *const Fq,
+    row_0: *const Vec<Fq>,
+    row_1: *const Vec<Fq>,
+    row_2: *const Vec<Fq>,
 
-    col_0: *const Fq,
-    col_1: *const Fq,
-    col_2: *const Fq,
+    col_0: *const Vec<Fq>,
+    col_1: *const Vec<Fq>,
+    col_2: *const Vec<Fq>,
 
-    val_0: *const Fq,
-    val_1: *const Fq,
-    val_2: *const Fq,
+    val_0: *const Vec<Fq>,
+    val_1: *const Vec<Fq>,
+    val_2: *const Vec<Fq>,
 
-    rc_0: *const Fq,
-    rc_1: *const Fq,
-    rc_2: *const Fq) -> *const DlogProofEvaluations<Fq> {
+    rc_0: *const Vec<Fq>,
+    rc_1: *const Vec<Fq>,
+    rc_2: *const Vec<Fq>) -> *const DlogProofEvaluations<Fq> {
     let res : DlogProofEvaluations<Fq> = DlogProofEvaluations {
-        w: (unsafe { *w }).clone(),
-        za: (unsafe { *za }).clone(),
-        zb: (unsafe { *zb }).clone(),
-        g1: (unsafe { *g1 }).clone(),
-        g2: (unsafe { *g2 }).clone(),
-        g3: (unsafe { *g3 }).clone(),
-        h1: (unsafe { *h1 }).clone(),
-        h2: (unsafe { *h2 }).clone(),
-        h3: (unsafe { *h3 }).clone(),
+        w: (unsafe { &*w }).clone(),
+        za: (unsafe { &*za }).clone(),
+        zb: (unsafe { &*zb }).clone(),
+        g1: (unsafe { &*g1 }).clone(),
+        g2: (unsafe { &*g2 }).clone(),
+        g3: (unsafe { &*g3 }).clone(),
+        h1: (unsafe { &*h1 }).clone(),
+        h2: (unsafe { &*h2 }).clone(),
+        h3: (unsafe { &*h3 }).clone(),
         row:
-            [ (unsafe {*row_0}).clone(),
-                (unsafe {*row_1}).clone(),
-                (unsafe {*row_2}).clone() ],
+            [ (unsafe {&*row_0}).clone(),
+                (unsafe {&*row_1}).clone(),
+                (unsafe {&*row_2}).clone() ],
         col:
-            [ (unsafe {*col_0}).clone(),
-                (unsafe {*col_1}).clone(),
-                (unsafe {*col_2}).clone() ],
+            [ (unsafe {&*col_0}).clone(),
+                (unsafe {&*col_1}).clone(),
+                (unsafe {&*col_2}).clone() ],
         val:
-            [ (unsafe {*val_0}).clone(),
-                (unsafe {*val_1}).clone(),
-                (unsafe {*val_2}).clone() ],
+            [ (unsafe {&*val_0}).clone(),
+                (unsafe {&*val_1}).clone(),
+                (unsafe {&*val_2}).clone() ],
         rc:
-            [ (unsafe {*rc_0}).clone(),
-                (unsafe {*rc_1}).clone(),
-                (unsafe {*rc_2}).clone() ],
+            [ (unsafe {&*rc_0}).clone(),
+                (unsafe {&*rc_1}).clone(),
+                (unsafe {&*rc_2}).clone() ],
     };
 
     return Box::into_raw(Box::new(res));
 }
 
+// fq poly comm
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_poly_comm_unshifted(c: *const PolyComm<GAffine>) -> *const Vec<GAffine> {
+    let c = unsafe {& (*c) };
+    return Box::into_raw(Box::new(c.unshifted.clone()));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_poly_comm_shifted(c: *const PolyComm<GAffine>) -> *const GAffine {
+    let c = unsafe {& (*c) };
+    match c.shifted {
+        Some(g) => Box::into_raw(Box::new(g.clone())),
+        None =>  std::ptr::null()
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_poly_comm_make
+(
+    unshifted: *const Vec<GAffine>,
+    shifted: *const GAffine
+) -> *const PolyComm<GAffine>
+{
+    let unsh = unsafe {& (*unshifted) };
+
+    let commitment = PolyComm
+    {
+        unshifted: unsh.clone(),
+        shifted: if shifted == std::ptr::null() {None} else {Some ({let sh = unsafe {& (*shifted) }; *sh})}
+    };
+
+    Box::into_raw(Box::new(commitment))
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_poly_comm_delete(c: *mut PolyComm<GAffine>) {
+    let _box = unsafe { Box::from_raw(c) };
+}
