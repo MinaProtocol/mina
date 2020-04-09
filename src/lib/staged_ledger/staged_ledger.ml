@@ -867,8 +867,8 @@ module T = struct
                 fill the last two slots of the tree with coinbase trnasactions
                 and if there's any work in [works] then that has to be included,
                 either in the coinbase or as fee transfers that gets paid by
-                the transaction fees. So having it as coinbase ft will atleast
-                get reduce the slots occupied by fee transfers*)
+                the transaction fees. So having it as coinbase ft will at least
+                reduce the slots occupied by fee transfers*)
               in
               (cb, diff works (Sequence.of_list [stmt w1; stmt w2]))
             else if Amount.(of_fee w1.fee <= Coda_compile_config.coinbase) then
@@ -1420,11 +1420,17 @@ module T = struct
         ~f:(fun (seq, count) w ->
           match get_completed_work w with
           | Some cw_checked ->
-              (*If new provers can't pay the account-creation-fee then discard their work. To encourage using an existing account for snark workers*)
+              (*If new provers can't pay the account-creation-fee then discard
+              their work unless their fee is zero in which case their account
+              won't be created. This is to encourage using an existing accounts
+              for snarking.
+              This also imposes new snarkers to have a min fee until one of
+              their snarks are purchased and their accounts get created*)
               if
-                (not (is_new_account cw_checked.prover))
+                Currency.Fee.(cw_checked.fee = zero)
                 || Currency.Fee.(
                      cw_checked.fee >= Coda_compile_config.account_creation_fee)
+                || not (is_new_account cw_checked.prover)
               then
                 Continue
                   ( Sequence.append seq (Sequence.singleton cw_checked)
