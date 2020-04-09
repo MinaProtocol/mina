@@ -44,10 +44,10 @@ let net_configs n =
 
 let offset =
   lazy
-    Core.Time.(
-      diff (now ())
-        ( Consensus.Constants.genesis_state_timestamp
-        |> Coda_base.Block_time.to_time ))
+    (let consensus_constants = Consensus.Constants.compiled in
+     Core.Time.(
+       diff (now ())
+         (Block_time.to_time consensus_constants.genesis_state_timestamp)))
 
 let local_configs ?block_production_interval
     ?(block_production_keys = Fn.const None)
