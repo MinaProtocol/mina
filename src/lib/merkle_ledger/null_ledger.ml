@@ -11,7 +11,10 @@ module Make (Inputs : Inputs_intf) : sig
     Base_ledger_intf.S
     with module Addr = Inputs.Location.Addr
     with module Location = Inputs.Location
-    with type account_id := Inputs.Account_id.t
+    with type key := Inputs.Key.t
+     and type token_id := Inputs.Token_id.t
+     and type token_id_set := Inputs.Token_id.Set.t
+     and type account_id := Inputs.Account_id.t
      and type account_id_set := Inputs.Account_id.Set.t
      and type hash := Inputs.Hash.t
      and type root_hash := Inputs.Hash.t
@@ -110,6 +113,12 @@ end = struct
   let location_of_account _t _ = None
 
   let accounts _t = Account_id.Set.empty
+
+  let token_owner _t _tid = None
+
+  let token_owners _t = Account_id.Set.empty
+
+  let tokens _t _pk = Token_id.Set.empty
 
   let iteri _t ~f:_ = ()
 

@@ -54,7 +54,8 @@ let gen_non_default = Field.gen_uniform_incl (next default) field_max
 
 let unpack = Field.unpack
 
-include Comparable.Make (Stable.Latest)
+include Hashable.Make_binable (Stable.Latest)
+include Comparable.Make_binable (Stable.Latest)
 
 [%%ifdef
 consensus_mechanism]
