@@ -19,7 +19,7 @@ let make = (~prevStep, ~completeSetup) => {
           icon=Icon.Docs
           style=Button.OffWhite
           onClick={_ =>
-            openExternal("https://codaprotocol.com/docs/gui-wallet/")
+            openExternal("https://codaprotocol.com/docs/getting-started/")
           }
         />
         <Spacer height=2.5 />
