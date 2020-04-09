@@ -63,6 +63,16 @@ let client = host => {
   );
 };
 
+module Provider = {
+  [@react.component]
+  let make = (~children) => {
+    let (daemonHost, _) = React.useContext(DaemonProvider.context);
+    <ReasonApollo.Provider client={client(daemonHost)}>
+    {children}
+    </ReasonApollo.Provider>
+  };
+};
+
 module Decoders = {
   [@bs.val] [@bs.scope "window"] external isFaker: bool = "isFaker";
 
