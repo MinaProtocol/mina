@@ -8,7 +8,10 @@ let%test_module "test functor on in memory databases" =
 
     module type DB =
       Merkle_ledger.Database_intf.S
-      with type account_id := Account_id.t
+      with type key := Key.t
+       and type token_id := Token_id.t
+       and type token_id_set := Token_id.Set.t
+       and type account_id := Account_id.t
        and type account_id_set := Account_id.Set.t
        and type account := Account.t
        and type root_hash := Hash.t

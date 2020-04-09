@@ -49,6 +49,7 @@ module Make (Inputs : Inputs_intf.S) = struct
   type t =
     { uuid: Uuid.Stable.V1.t
     ; account_tbl: Account.t Location.Table.t
+    ; token_owners: Key.Stable.Latest.t Token_id.Table.t
     ; mutable parent: Parent.t
     ; hash_tbl: Hash.t Addr.Table.t
     ; location_tbl: Location.t Account_id.Table.t
@@ -61,6 +62,7 @@ module Make (Inputs : Inputs_intf.S) = struct
     { uuid= Uuid_unix.create ()
     ; parent= None
     ; account_tbl= Location.Table.create ()
+    ; token_owners= Token_id.Table.create ()
     ; hash_tbl= Addr.Table.create ()
     ; location_tbl= Account_id.Table.create ()
     ; current_location= None }
@@ -359,6 +361,7 @@ module Make (Inputs : Inputs_intf.S) = struct
       { uuid= Uuid_unix.create ()
       ; parent= Some (get_parent t)
       ; account_tbl= Location.Table.copy t.account_tbl
+      ; token_owners= Token_id.Table.copy t.token_owners
       ; location_tbl= Account_id.Table.copy t.location_tbl
       ; hash_tbl= Addr.Table.copy t.hash_tbl
       ; current_location= t.current_location }
@@ -436,6 +439,21 @@ module Make (Inputs : Inputs_intf.S) = struct
       in
       let parent_keys = Base.accounts (get_parent t) in
       Account_id.Set.union parent_keys mask_keys
+
+    let token_owner t tid = Token_id.Table.find t.token_owners tid
+
+    let token_owners t =
+      Token_id.Table.to_alist t.token_owners
+      |> List.map ~f:(fun (tid, pk) -> Account_id.create pk tid)
+      |> Account_id.Set.of_list
+
+    let tokens t pk =
+      Account_id.Table.keys t.location_tbl
+      |> List.filter_map ~f:(fun aid ->
+             if Key.equal pk (Account_id.public_key aid) then
+               Some (Account_id.token_id aid)
+             else None )
+      |> Token_id.Set.of_list
 
     let num_accounts t =
       assert_is_attached t ;
