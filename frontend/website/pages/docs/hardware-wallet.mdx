@@ -1,7 +1,16 @@
-# Hardware wallets
+import Page from '@reason/pages/Docs';
+export default Page({title: "Hardware Wallet"});
+
+# Hardware Wallet
 
 Coda now supports the usage of hardware wallets such as Ledger to interact with
 the protocol, and sign transactions.
+
+<Alert kind="warning">
+
+Disclaimer: Ledger support is experimental. Don't use it on a Ledger device that is handling or has ever handled private keys associated with any accounts of value.
+
+</Alert>
 
 ## Requirements
 
@@ -9,7 +18,7 @@ the protocol, and sign transactions.
 
 Note: macOS and Windows are not officially supported at this time.
 
-**Hardware**: Currently only `Ledger Nano S` is supported
+**Hardware**: Currently only [Ledger Nano S](https://shop.ledger.com/products/ledger-nano-s) is supported
 
 ## Installation
 
@@ -32,7 +41,7 @@ sudo apt install libusb-1.0-0-dev libudev1 libudev-dev
 ### Build/download the Coda Ledger application
 
 Either download the precompiled app binary from [here](...), or follow the instructions
-at the end of this document to build the app from source.
+at the end of this document to [build the app from source](/docs/hardware-wallet#building-from-source).
 
 ### Install the python app loader
 
@@ -78,7 +87,7 @@ following command to automatically add the rules and reload udev:
 wget -q -O - https://raw.githubusercontent.com/LedgerHQ/udev-rules/master/add_udev_rules.sh | sudo bash
 ```
 
-## Create a new account using the hardware wallet
+## Create a new account
 
 Run the following command which will create a public and private keypair in the hardware wallet:
 
@@ -107,17 +116,15 @@ properly by trying `echo $CODA_PUBLIC_KEY`.
 
 ## Make a payment
 
-Sending a payment with a hardware wallet is almost the same as send a payment
-from an ordinary account.
+You can use the same commands to send payments found in
+[the docs](/docs/my-first-transaction/).
 
-There are only 2 differences:
+There are 2 differences:
 1. You do not need to unlock your account before sending the transaction because
   your account is protected by your hardware wallet already.
 2. Your hardware wallet may ask you to confirm the operation while signing the
   transaction.
 
-You can simply use the same commands to send payments found in
-[the docs](/docs/my-first-transaction/).
 
 ## Troubleshooting
 
