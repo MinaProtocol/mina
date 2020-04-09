@@ -14,7 +14,8 @@ module Extensions = Extensions
 module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 
-let global_max_length = Consensus.Constants.k
+let global_max_length (genesis_constants : Genesis_constants.t) =
+  genesis_constants.protocol.k
 
 type t =
   { logger: Logger.t
@@ -28,9 +29,11 @@ type t =
   ; extensions: Extensions.t
   ; genesis_state_hash: State_hash.t }
 
-let genesis_root_data ~genesis_ledger ~base_proof =
+let genesis_root_data ~genesis_ledger ~base_proof ~genesis_constants =
   let open Root_data.Limited.Stable.Latest in
-  let transition = External_transition.genesis ~genesis_ledger ~base_proof in
+  let transition =
+    External_transition.genesis ~genesis_ledger ~base_proof ~genesis_constants
+  in
   let scan_state = Staged_ledger.Scan_state.empty () in
   let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
   {transition; scan_state; pending_coinbase}
@@ -38,7 +41,7 @@ let genesis_root_data ~genesis_ledger ~base_proof =
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
     ~persistent_frontier_instance ~genesis_state_hash
-    ignore_consensus_local_state =
+    ignore_consensus_local_state ~genesis_constants =
   let open Deferred.Result.Let_syntax in
   let root_identifier =
     match
@@ -85,7 +88,8 @@ let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
          persistent_frontier_instance ~max_length
          ~root_ledger:
            (Persistent_root.Instance.snarked_ledger persistent_root_instance)
-         ~consensus_local_state ~ignore_consensus_local_state)
+         ~consensus_local_state ~ignore_consensus_local_state
+         ~genesis_constants)
       ~f:
         (Result.map_error ~f:(function
           | `Sync_cannot_be_running ->
@@ -126,6 +130,7 @@ let rec load_with_max_length :
     -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
     -> ?base_proof:Proof.t
+    -> genesis_constants:Genesis_constants.t
     -> unit
     -> ( t
        , [> `Bootstrap_required
@@ -135,7 +140,7 @@ let rec load_with_max_length :
  fun ~max_length ?(retry_with_fresh_db = true) ~logger ~verifier
      ~consensus_local_state ~persistent_root ~persistent_frontier
      ~genesis_state_hash ~genesis_ledger
-     ?(base_proof = Precomputed_values.base_proof) () ->
+     ?(base_proof = Precomputed_values.base_proof) ~genesis_constants () ->
   let open Deferred.Let_syntax in
   (* TODO: #3053 *)
   let continue persistent_frontier_instance ~ignore_consensus_local_state =
@@ -146,7 +151,7 @@ let rec load_with_max_length :
       load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
         ~max_length ~persistent_root ~persistent_root_instance
         ~persistent_frontier ~persistent_frontier_instance ~genesis_state_hash
-        ignore_consensus_local_state
+        ~genesis_constants ignore_consensus_local_state
     with
     | Ok _ as result ->
         return result
@@ -166,7 +171,8 @@ let rec load_with_max_length :
     in
     let%bind () =
       Persistent_frontier.reset_database_exn persistent_frontier
-        ~root_data:(genesis_root_data ~genesis_ledger ~base_proof)
+        ~root_data:
+          (genesis_root_data ~genesis_ledger ~base_proof ~genesis_constants)
     in
     let%bind () =
       Persistent_root.reset_to_genesis_exn persistent_root ~genesis_ledger
@@ -207,7 +213,7 @@ let rec load_with_max_length :
         load_with_max_length ~max_length ~logger ~verifier
           ~consensus_local_state ~persistent_root ~persistent_frontier
           ~retry_with_fresh_db:false () ~genesis_state_hash ~genesis_ledger
-          ~base_proof
+          ~base_proof ~genesis_constants
         >>| Result.map_error ~f:(function
               | `Persistent_frontier_malformed ->
                   `Failure
@@ -219,7 +225,13 @@ let rec load_with_max_length :
   | Ok () ->
       continue persistent_frontier_instance ~ignore_consensus_local_state:true
 
-let load = load_with_max_length ~max_length:global_max_length
+let load ?(retry_with_fresh_db = true) ~logger ~verifier ~consensus_local_state
+    ~persistent_root ~persistent_frontier ~genesis_state_hash ~genesis_ledger
+    ?(base_proof = Precomputed_values.base_proof) ~genesis_constants () =
+  let max_length = global_max_length genesis_constants in
+  load_with_max_length ~max_length ~retry_with_fresh_db ~logger ~verifier
+    ~consensus_local_state ~persistent_root ~persistent_frontier
+    ~genesis_state_hash ~genesis_ledger ~base_proof ~genesis_constants ()
 
 (* The persistent root and persistent frontier as safe to ignore here
  * because their lifecycle is longer than the transition frontier's *)
@@ -348,6 +360,8 @@ include struct
 
   let find = proxy1 find
 
+  let genesis_constants = proxy1 genesis_constants
+
   (* TODO: find -> option externally, find_exn internally *)
   let find_exn = proxy1 find_exn
 
@@ -415,11 +429,7 @@ module For_tests = struct
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
-        let genesis_transition =
-          External_transition.For_tests.genesis
-            ~genesis_ledger:Test_genesis_ledger.t
-            ~base_proof:Precomputed_values.base_proof
-        in
+        let genesis_transition = External_transition.For_tests.genesis () in
         let genesis_ledger = Lazy.force Test_genesis_ledger.t in
         let genesis_staged_ledger =
           Or_error.ok_exn
@@ -497,6 +507,7 @@ module For_tests = struct
     let open Quickcheck.Generator.Let_syntax in
     let genesis_state_hash =
       Coda_state.Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+        ~genesis_constants:Genesis_constants.compiled
       |> With_hash.hash
     in
     let verifier =
@@ -553,7 +564,7 @@ module For_tests = struct
             ~verifier ~consensus_local_state ~persistent_root
             ~persistent_frontier ~genesis_state_hash
             ~genesis_ledger:(lazy root_snarked_ledger)
-            () )
+            ~genesis_constants:Genesis_constants.compiled () )
     in
     let frontier =
       let fail msg = failwith ("failed to load transition frontier: " ^ msg) in

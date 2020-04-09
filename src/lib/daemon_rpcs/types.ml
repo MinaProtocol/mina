@@ -1,6 +1,5 @@
 open Core_kernel
 open Async
-open Coda_base
 
 module Git_sha = struct
   [%%versioned
@@ -262,6 +261,7 @@ module Status = struct
       let ms_to_string i =
         float_of_int i |> Time.Span.of_ms |> Time.Span.to_string
       in
+      let time_to_string = Fn.compose Time.to_string Block_time.to_time in
       let render conf =
         let fmt_field name op field = (name, op (Field.get field conf)) in
         Consensus.Configuration.Fields.to_list
@@ -274,6 +274,8 @@ module Status = struct
           ~epoch_duration:(fmt_field "Epoch duration" ms_to_string)
           ~acceptable_network_delay:
             (fmt_field "Acceptable network delay" ms_to_string)
+          ~genesis_state_timestamp:
+            (fmt_field "Genesis state timestamp" time_to_string)
         |> List.map ~f:(fun (s, v) -> ("\t" ^ s, v))
         |> digest_entries ~title:""
       in
@@ -326,7 +328,7 @@ module Status = struct
         option
     ; consensus_time_now: Consensus.Data.Consensus_time.Stable.Latest.t
     ; consensus_mechanism: string
-    ; consensus_configuration: Consensus.Configuration.t
+    ; consensus_configuration: Consensus.Configuration.Stable.Latest.t
     ; addrs_and_ports: Node_addrs_and_ports.Display.Stable.Latest.t }
   [@@deriving to_yojson, bin_io_unversioned, fields]
 
