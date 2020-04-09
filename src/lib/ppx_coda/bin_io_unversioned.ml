@@ -68,6 +68,12 @@ let validate_type_decl inner2_modules type_decl =
   | _ ->
       ()
 
+let ctxt_base =
+  let omp_config =
+    Migrate_parsetree.Driver.make_config ~tool_name:"ppxlib_driver" ()
+  in
+  Expansion_context.Base.top_level ~omp_config ~file_path:""
+
 let rewrite_to_bin_io ~options ~path type_decls =
   let type_decl1 = List.hd_exn type_decls in
   let type_decl2 = List.last_exn type_decls in
@@ -85,13 +91,8 @@ let rewrite_to_bin_io ~options ~path type_decls =
   let inner2_modules = List.take (List.rev path) 2 in
   validate_type_decl inner2_modules type_decl1 ;
   let ctxt =
-    let derived_item_loc = Location.none in
-    let omp_config =
-      Migrate_parsetree.Driver.make_config ~debug:true
-        ~tool_name:"ppxlib_driver" ()
-    in
-    let base = Expansion_context.Base.top_level ~omp_config ~file_path:"" in
-    Expansion_context.Deriver.make ~derived_item_loc ~base ()
+    let derived_item_loc = loc in
+    Expansion_context.Deriver.make ~derived_item_loc ~base:ctxt_base ()
   in
   List.concat_map bin_io_gens ~f:(fun gen ->
       gen ~ctxt (Nonrecursive, type_decls) [] )
