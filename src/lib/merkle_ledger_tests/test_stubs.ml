@@ -207,11 +207,7 @@ module Key = struct
   include Comparable.Make (Stable.Latest)
 end
 
-module Token_id = struct
-  type t = Coda_base.Token_id.t [@@deriving sexp, compare]
-
-  let default = Coda_base.Token_id.default
-end
+module Token_id = Coda_base.Token_id
 
 module Account_id = struct
   [%%versioned
