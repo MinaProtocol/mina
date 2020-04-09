@@ -6,9 +6,9 @@ module Types = Types
 module Client = Client
 
 module Get_transaction_status = struct
-  type query = User_command.Stable.V1.t [@@deriving bin_io_unversioned]
+  type query = User_command.Stable.Latest.t [@@deriving bin_io_unversioned]
 
-  type response = Transaction_status.State.Stable.V1.t Or_error.Stable.V1.t
+  type response = Transaction_status.State.Stable.Latest.t Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -17,13 +17,14 @@ module Get_transaction_status = struct
 end
 
 module Send_user_commands = struct
-  type query = User_command_input.Stable.V1.t list
+  type query = User_command_input.Stable.Latest.t list
   [@@deriving bin_io_unversioned]
 
   type response =
-    ( Network_pool.Transaction_pool.Resource_pool.Diff.Stable.V1.t
-    * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.Stable.V1.t )
-    Or_error.Stable.V1.t
+    ( Network_pool.Transaction_pool.Resource_pool.Diff.Stable.Latest.t
+    * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.Stable.Latest.t
+    )
+    Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -32,10 +33,10 @@ module Send_user_commands = struct
 end
 
 module Get_ledger = struct
-  type query = Staged_ledger_hash.Stable.V1.t option
+  type query = Staged_ledger_hash.Stable.Latest.t option
   [@@deriving bin_io_unversioned]
 
-  type response = Account.Stable.V1.t list Or_error.Stable.V1.t
+  type response = Account.Stable.Latest.t list Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -43,9 +44,9 @@ module Get_ledger = struct
 end
 
 module Get_balance = struct
-  type query = Account_id.Stable.V1.t [@@deriving bin_io_unversioned]
+  type query = Account_id.Stable.Latest.t [@@deriving bin_io_unversioned]
 
-  type response = Currency.Balance.Stable.V1.t option Or_error.Stable.V1.t
+  type response = Currency.Balance.Stable.Latest.t option Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -53,9 +54,9 @@ module Get_balance = struct
 end
 
 module Get_trust_status = struct
-  type query = Unix.Inet_addr.Stable.V1.t [@@deriving bin_io_unversioned]
+  type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
 
-  type response = Trust_system.Peer_status.Stable.V1.t
+  type response = Trust_system.Peer_status.Stable.Latest.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -66,7 +67,7 @@ module Get_trust_status_all = struct
   type query = unit [@@deriving bin_io_unversioned]
 
   type response =
-    (Unix.Inet_addr.Stable.V1.t * Trust_system.Peer_status.Stable.V1.t) list
+    (Unix.Inet_addr.t * Trust_system.Peer_status.Stable.Latest.t) list
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -75,9 +76,9 @@ module Get_trust_status_all = struct
 end
 
 module Reset_trust_status = struct
-  type query = Unix.Inet_addr.Stable.V1.t [@@deriving bin_io_unversioned]
+  type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
 
-  type response = Trust_system.Peer_status.Stable.V1.t
+  type response = Trust_system.Peer_status.Stable.Latest.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -87,24 +88,24 @@ end
 
 module Verify_proof = struct
   type query =
-    Account_id.Stable.V1.t
-    * User_command.Stable.V1.t
-    * (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list)
+    Account_id.Stable.Latest.t
+    * User_command.Stable.Latest.t
+    * (Receipt.Chain_hash.Stable.Latest.t * User_command.Stable.Latest.t list)
   [@@deriving bin_io_unversioned]
 
-  type response = unit Or_error.Stable.V1.t [@@deriving bin_io_unversioned]
+  type response = unit Or_error.t [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Verify_proof" ~version:0 ~bin_query ~bin_response
 end
 
 module Prove_receipt = struct
-  type query = Receipt.Chain_hash.Stable.V1.t * Account_id.Stable.V1.t
+  type query = Receipt.Chain_hash.Stable.Latest.t * Account_id.Stable.Latest.t
   [@@deriving bin_io_unversioned]
 
   type response =
-    (Receipt.Chain_hash.Stable.V1.t * User_command.Stable.V1.t list)
-    Or_error.Stable.V1.t
+    (Receipt.Chain_hash.Stable.Latest.t * User_command.Stable.Latest.t list)
+    Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -112,9 +113,9 @@ module Prove_receipt = struct
 end
 
 module Get_inferred_nonce = struct
-  type query = Account_id.Stable.V1.t [@@deriving bin_io_unversioned]
+  type query = Account_id.Stable.Latest.t [@@deriving bin_io_unversioned]
 
-  type response = Account.Nonce.Stable.V1.t option Or_error.Stable.V1.t
+  type response = Account.Nonce.Stable.Latest.t option Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -123,9 +124,9 @@ module Get_inferred_nonce = struct
 end
 
 module Get_nonce = struct
-  type query = Account_id.Stable.V1.t [@@deriving bin_io_unversioned]
+  type query = Account_id.Stable.Latest.t [@@deriving bin_io_unversioned]
 
-  type response = Account.Nonce.Stable.V1.t option Or_error.Stable.V1.t
+  type response = Account.Nonce.Stable.Latest.t option Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -154,7 +155,7 @@ end
 module Get_public_keys_with_details = struct
   type query = unit [@@deriving bin_io_unversioned]
 
-  type response = (string * int * int) list Or_error.Stable.V1.t
+  type response = (string * int * int) list Or_error.t
   [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
@@ -165,8 +166,7 @@ end
 module Get_public_keys = struct
   type query = unit [@@deriving bin_io_unversioned]
 
-  type response = string list Or_error.Stable.V1.t
-  [@@deriving bin_io_unversioned]
+  type response = string list Or_error.t [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_public_keys" ~version:0 ~bin_query ~bin_response
@@ -184,7 +184,7 @@ end
 module Snark_job_list = struct
   type query = unit [@@deriving bin_io_unversioned]
 
-  type response = string Or_error.Stable.V1.t [@@deriving bin_io_unversioned]
+  type response = string Or_error.t [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Snark_job_list" ~version:0 ~bin_query ~bin_response
@@ -218,7 +218,7 @@ module Stop_tracing = struct
 end
 
 module Set_staking = struct
-  type query = Keypair.Stable.V1.t list [@@deriving bin_io_unversioned]
+  type query = Keypair.Stable.Latest.t list [@@deriving bin_io_unversioned]
 
   type response = unit [@@deriving bin_io_unversioned]
 
@@ -250,18 +250,18 @@ module Visualization = struct
 end
 
 module Add_trustlist = struct
-  type query = Unix.Inet_addr.Stable.V1.t [@@deriving bin_io_unversioned]
+  type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
 
-  type response = unit Or_error.Stable.V1.t [@@deriving bin_io_unversioned]
+  type response = unit Or_error.t [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Add_trustlist" ~version:0 ~bin_query ~bin_response
 end
 
 module Remove_trustlist = struct
-  type query = Unix.Inet_addr.Stable.V1.t [@@deriving bin_io_unversioned]
+  type query = Unix.Inet_addr.t [@@deriving bin_io_unversioned]
 
-  type response = unit Or_error.Stable.V1.t [@@deriving bin_io_unversioned]
+  type response = unit Or_error.t [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Remove_trustlist" ~version:0 ~bin_query ~bin_response
@@ -270,8 +270,7 @@ end
 module Get_trustlist = struct
   type query = unit [@@deriving bin_io_unversioned]
 
-  type response = Unix.Inet_addr.Stable.V1.t list
-  [@@deriving bin_io_unversioned]
+  type response = Unix.Inet_addr.t list [@@deriving bin_io_unversioned]
 
   let rpc : (query, response) Rpc.Rpc.t =
     Rpc.Rpc.create ~name:"Get_trustlist" ~version:0 ~bin_query ~bin_response
@@ -281,12 +280,12 @@ end
     Coda_networking's Get_telemetry_data for each provided peer
 *)
 module Get_telemetry_data = struct
-  type query = Network_peer.Peer.Id.Stable.V1.t list option
+  type query = Network_peer.Peer.Id.Stable.Latest.t list option
   [@@deriving bin_io_unversioned]
 
   type response =
-    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.Stable.V1.t
-    Or_error.Stable.V1.t
+    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.Stable.Latest.t
+    Or_error.t
     list
   [@@deriving bin_io_unversioned]
 
