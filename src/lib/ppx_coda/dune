@@ -2,12 +2,10 @@
  (name ppx_coda)
  (public_name ppx_coda)
  (kind ppx_deriver)
- (ppx_runtime_libraries bin_prot ppx_bin_prot ppxlib ppx_deriving)
  (modules (:standard \ run_ppx_coda))
- (libraries compiler-libs.common ppxlib ppx_deriving.api ppx_deriving.runtime ppx_bin_prot ppx_type_conv core_kernel)
- (library_flags -linkall)
+ (libraries compiler-libs.common ppxlib ppx_deriving.api ppx_bin_prot core_kernel)
  (preprocessor_deps ../../config.mlh)
- (preprocess (pps ppxlib.metaquot ppx_bin_prot ppxlib ppx_deriving ppx_type_conv ppx_optcomp)))
+ (preprocess (pps ppxlib.metaquot ppx_optcomp)))
 
 (executable
  (name run_ppx_coda)
