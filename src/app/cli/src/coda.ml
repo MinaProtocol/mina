@@ -211,6 +211,9 @@ let daemon logger =
               "HEX-STRING (%d characters) Current fork ID for this node, only \
                blocks with the same ID accepted"
               Fork_id.required_length)
+     and disable_telemetry =
+       flag "disable-telemetry" no_arg
+         ~doc:"Disable reporting telemetry to other nodes"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -734,8 +737,8 @@ let daemon logger =
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~is_seed ~demo_mode ~coinbase_receiver ~net_config
-                ~gossip_net_params ~initial_fork_id:current_fork_id
+                ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
+                ~net_config ~gossip_net_params ~initial_fork_id:current_fork_id
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
