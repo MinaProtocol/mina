@@ -46,6 +46,9 @@ module type Test_intf = sig
      and type unattached_mask := Mask.t
      and type attached_mask := Mask.Attached.t
      and type t := Base.t
+     and type key := Key.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
 
