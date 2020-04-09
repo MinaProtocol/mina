@@ -46,8 +46,11 @@ let of_transaction : Transaction.t -> t = function
       ; signer
       ; signature }
   | Coinbase {receiver; fee_transfer; amount} ->
-      let other_pk, other_amount =
-        Option.value ~default:(receiver, Fee.zero) fee_transfer
+      let {Coinbase.Fee_transfer.receiver_pk= other_pk; fee= other_amount} =
+        Option.value
+          ~default:
+            (Coinbase.Fee_transfer.create ~receiver_pk:receiver ~fee:Fee.zero)
+          fee_transfer
       in
       { payload=
           { common=
