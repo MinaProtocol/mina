@@ -5,8 +5,6 @@ open Snark_params.Tick
 module T = Coda_numbers.Global_slot
 module Length = Coda_numbers.Length
 
-(*include (T : module type of T with module Checked := T.Checked)*)
-
 module Poly = struct
   [%%versioned
   module Stable = struct
@@ -32,9 +30,6 @@ module Stable = struct
     let to_latest = Fn.id
   end
 end]
-
-(*type 'a t_ = 'a Poly.t = {slot_number: 'a; slots_per_epoch: 'a}
-[@@deriving sexp, eq, compare, hash, yojson]*)
 
 type t = Stable.Latest.t [@@deriving sexp, eq, compare, hash, yojson]
 
