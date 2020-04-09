@@ -7,7 +7,7 @@ type onboardingPage =
   | PortForward
   | MachineConfigure
   | CloudServerConfigure
-  | RunNode(bool)
+  | ConnectionStatus
   | PortForwardError
   | DaemonError
   | AccountCreation
@@ -37,12 +37,12 @@ let make = () => {
     | PostCustomSetup =>
       <PostCustomSetup
         prevStep={_ => setOnboardingStep(_ => CustomSetup)}
-        runNode={_ => setOnboardingStep(_ => RunNode(false))}
+        nextStep={_ => setOnboardingStep(_ => AccountCreation)}
       />
     | InstallCoda =>
       <InstallCodaStep
         prevStep={_ => setOnboardingStep(_ => SetUpNode)}
-        nextStep={_ => setOnboardingStep(_ => RunNode(true))}
+        nextStep={_ => setOnboardingStep(_ => AccountCreation)}
       />
     | PortForward =>
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
@@ -50,23 +50,17 @@ let make = () => {
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
     | CloudServerConfigure =>
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
-    | RunNode(managed) =>
-      <RunNodeStep
+    | ConnectionStatus =>
+      <ConnectionStatus
         prevStep={_ => setOnboardingStep(_ => InstallCoda)}
         createAccount={_ => setOnboardingStep(_ => AccountCreation)}
-        managed
       />
     | PortForwardError =>
-      <PortForwardErrorStep
-        retry={_ => setOnboardingStep(_ => RunNode(true))}
-      />
+      <PortForwardErrorStep retry={_ => setOnboardingStep(_ => InstallCoda)} />
     | DaemonError =>
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
     | AccountCreation =>
-      <AccountCreationStep
-        prevStep={_ => setOnboardingStep(_ => RunNode(false))}
-        nextStep={_ => setOnboardingStep(_ => StakeCoda)}
-      />
+      <AccountCreationStep nextStep={_ => setOnboardingStep(_ => StakeCoda)} />
     | StakeCoda =>
       <StakeCodaStep
         prevStep={_ => setOnboardingStep(_ => AccountCreation)}

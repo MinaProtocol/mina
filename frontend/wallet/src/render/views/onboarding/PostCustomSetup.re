@@ -1,13 +1,51 @@
 [@bs.scope "window"] [@bs.val]
 external openExternal: string => unit = "openExternal";
 
+type state =
+  | Default
+  | Checking
+  | Success
+  | Error(string);
+
+module DaemonChecker = {
+  module StatusQueryString = [%graphql
+    {|
+      query StatusQuery {
+        syncStatus
+      }
+    |}
+  ];
+  module StatusQuery = ReasonApollo.CreateQuery(StatusQueryString);
+
+  [@react.component]
+  let make = (~onFinish) =>
+    <StatusQuery>
+      {response =>
+         switch (response.result) {
+         | Loading =>
+           <p> {React.string("Attempting to connect to daemon...")} </p>
+         | Error((err: ReasonApolloTypes.apolloError)) =>
+           onFinish(Error(err.message));
+           React.null;
+         | Data(_) =>
+           onFinish(Success);
+           React.null;
+         }}
+    </StatusQuery>;
+};
+
 [@react.component]
-let make = (~prevStep, ~runNode) => {
+let make = (~prevStep, ~nextStep) => {
   let (ip, setIp) = React.useState(() => "");
+  let (state, setState) = React.useState(() => Default);
   let (_, setDaemonHost) = React.useContext(DaemonProvider.context);
   let handleContinue = () => {
     setDaemonHost(_ => ip);
-    runNode();
+    setState(_ => Checking);
+  };
+
+  if (state === Success) {
+    nextStep();
   };
 
   <OnboardingTemplate
@@ -39,9 +77,19 @@ let make = (~prevStep, ~runNode) => {
           <Button
             label="Continue"
             style=Button.HyperlinkBlue3
-            onClick={_ => runNode()}
+            disabled={state === Checking}
+            onClick={_ => handleContinue()}
           />
         </div>
       </>
+    miscRight={
+      switch (state) {
+      | Checking
+      | Error(_) =>
+        <DaemonChecker onFinish={newState => setState(_ => newState)} />
+      | Default
+      | Success => React.null
+      }
+    }
   />;
 };

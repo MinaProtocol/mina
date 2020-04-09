@@ -9,11 +9,15 @@ include ContextProvider.Make(DaemonContextType);
 
 let createContext = () => {
   let (daemon, setDaemon) =
-    React.useState(() =>
-      Bindings.LocalStorage.getItem(`DaemonHost)
-      |> Js.Nullable.toOption
-      |> Tc.Option.withDefault(~default="localhost")
-    );
+    React.useState(() => {
+      let daemonCache =
+        Bindings.LocalStorage.getItem(`DaemonHost) |> Js.Nullable.toOption;
+      switch (daemonCache) {
+      | None => "localhost"
+      | Some("") => "localhost"
+      | Some(value) => value
+      };
+    });
   (
     daemon,
     (nextValue: string => string) => {

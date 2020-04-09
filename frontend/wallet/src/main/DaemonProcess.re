@@ -17,7 +17,7 @@ external getPath: string => string = "getPath";
 let codaCommand = (~port, ~extraArgs) => {
   let env = ChildProcess.Process.env;
   let path = Js.Dict.get(env, "PATH") |> Option.with_default(~default="");
-  let installPath = getPath("userData") ++ "/daemon";
+  let installPath = getPath("userData") ++ "/coda";
   Js.Dict.set(env, "PATH", path ++ Node.Path.delimiter ++ installPath);
   {
     Command.executable: "coda",

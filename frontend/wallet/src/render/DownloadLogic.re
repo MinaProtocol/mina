@@ -101,7 +101,7 @@ let rec download = (filename, url, encoding, maxRedirects, chunkCb, doneCb) => {
           doneCb(Belt.Result.Error("Too many redirects."));
         }
       | 200 => handleResponse(response, filename, encoding, chunkCb, doneCb)
-      | _ => doneCb(Belt.Result.Error("Unable to download the daemon."))
+      | _ => ()
       }
     );
   Https.Request.onError(request, e => doneCb(Error(e)));
@@ -129,14 +129,16 @@ let extractZip = (src, dest, doneCb, errorCb) => {
   Unique helper to download and unzip a coda daemon executable.
  */
 let downloadCoda = (version, chunkCb, doneCb) => {
-  let tempFilename = getPath("temp") ++ "/coda-daemon-" ++ version ++ ".zip";
+  let filename = "coda-daemon-" ++ version ++ ".zip";
+  let tempPath = getPath("temp") ++ "/" ++ filename;
   let installPath = getPath("userData") ++ "/coda";
-  download(tempFilename, codaRepo ++ tempFilename, "binary", 1, chunkCb, res =>
+  Js.log(installPath);
+  download(tempPath, codaRepo ++ filename, "binary", 1, chunkCb, res =>
     switch (res) {
     | Belt.Result.Error(_) => doneCb(res)
     | _ =>
       extractZip(
-        tempFilename,
+        tempPath,
         installPath,
         () => doneCb(Belt.Result.Ok()),
         err => {
