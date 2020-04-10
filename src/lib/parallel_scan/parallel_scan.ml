@@ -91,6 +91,9 @@ module Base = struct
           ; seq_no: Sequence_number.Stable.V1.t
           ; status: Job_status.Stable.V1.t }
         [@@deriving sexp]
+
+        let to_latest base_latest {job; seq_no; status} =
+          {job= base_latest job; seq_no; status}
       end
     end]
 
@@ -103,6 +106,12 @@ module Base = struct
       module V1 = struct
         type 'base t = Empty | Full of 'base Record.Stable.V1.t
         [@@deriving sexp]
+
+        let to_latest base_latest = function
+          | Empty ->
+              Empty
+          | Full b ->
+              Full (Record.Stable.V1.to_latest base_latest b)
       end
     end]
 
@@ -117,6 +126,9 @@ module Base = struct
     module V1 = struct
       type 'base t = Weight.Stable.V1.t * 'base Job.Stable.V1.t
       [@@deriving sexp]
+
+      let to_latest base_latest (w, job) =
+        (w, Job.Stable.V1.to_latest base_latest job)
     end
   end]
 
@@ -135,6 +147,9 @@ module Merge = struct
           ; seq_no: Sequence_number.Stable.V1.t
           ; status: Job_status.Stable.V1.t }
         [@@deriving sexp]
+
+        let to_latest merge_latest {left; right; seq_no; status} =
+          {left= merge_latest left; right= merge_latest right; seq_no; status}
       end
     end]
 
@@ -150,6 +165,14 @@ module Merge = struct
           | Part of 'merge (*When only the left component of the job is available since we always complete the jobs from left to right*)
           | Full of 'merge Record.Stable.V1.t
         [@@deriving sexp]
+
+        let to_latest merge_latest = function
+          | Empty ->
+              Empty
+          | Part merge ->
+              Part (merge_latest merge)
+          | Full rcd ->
+              Full (Record.Stable.V1.to_latest merge_latest rcd)
       end
     end]
 
@@ -174,6 +197,9 @@ module Merge = struct
       type 'merge t =
         (Weight.Stable.V1.t * Weight.Stable.V1.t) * 'merge Job.Stable.V1.t
       [@@deriving sexp]
+
+      let to_latest merge_latest ((w1, w2), job) =
+        ((w1, w2), Job.Stable.V1.to_latest merge_latest job)
     end
   end]
 
@@ -310,6 +336,25 @@ module Tree = struct
             ; value: 'merge_t
             ; sub_tree: ('merge_t * 'merge_t, 'base_t * 'base_t) t }
       [@@deriving sexp]
+
+      let rec to_latest :
+                'merge_t 'merge_t_latest 'base_t 'base_t_latest.    (   'merge_t
+                                                                     -> 'merge_t_latest)
+                -> ('base_t -> 'base_t_latest) -> ('merge_t, 'base_t) t
+                -> ('merge_t_latest, 'base_t_latest) t =
+       fun merge_t_latest base_t_latest t ->
+        match t with
+        | Leaf base ->
+            Leaf (base_t_latest base)
+        | Node {depth; value; sub_tree} ->
+            Node
+              { depth
+              ; value= merge_t_latest value
+              ; sub_tree=
+                  to_latest
+                    (fun (x, y) -> (merge_t_latest x, merge_t_latest y))
+                    (fun (x, y) -> (base_t_latest x, base_t_latest y))
+                    sub_tree }
     end
   end]
 
@@ -877,6 +922,22 @@ module T = struct
               ; max_base_jobs: int (*transaction_capacity_log_2*)
               ; delay: int }
             [@@deriving sexp]
+
+            let to_latest merge_latest base_latest
+                {trees; acc; curr_job_seq_no; max_base_jobs; delay} =
+              { trees=
+                  Non_empty_list.map
+                    ~f:
+                      (Tree.Stable.V1.to_latest
+                         (Merge.Stable.V1.to_latest merge_latest)
+                         (Base.Stable.V1.to_latest base_latest))
+                    trees
+              ; acc=
+                  Option.map acc ~f:(fun (m, bs) ->
+                      (merge_latest m, List.map ~f:base_latest bs) )
+              ; curr_job_seq_no
+              ; max_base_jobs
+              ; delay }
           end
         end]
 
@@ -895,7 +956,7 @@ module T = struct
       end
 
       (* V1.t *)
-      type ('merge, 'base) t = ('merge, 'base) T.Stable.Latest.t =
+      type ('merge, 'base) t = ('merge, 'base) T.Stable.V1.t =
         { trees:
             ('merge Merge.Stable.V1.t, 'base Base.Stable.V1.t) Tree.Stable.V1.t
             Non_empty_list.Stable.V1.t
@@ -904,6 +965,8 @@ module T = struct
         ; max_base_jobs: int
         ; delay: int }
       [@@deriving sexp, version]
+
+      let to_latest = T.Stable.Latest.to_latest
 
       (* Delete all the completed jobs because
          1. They are completed

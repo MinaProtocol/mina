@@ -273,7 +273,10 @@ module type S = sig
     -> t
 
   val genesis :
-    genesis_ledger:Ledger.t Lazy.t -> base_proof:Proof.t -> Validated.t
+       genesis_ledger:Ledger.t Lazy.t
+    -> base_proof:Proof.t
+    -> genesis_constants:Genesis_constants.t
+    -> Validated.t
 
   module For_tests : sig
     val create :
@@ -286,8 +289,7 @@ module type S = sig
       -> unit
       -> t
 
-    val genesis :
-      genesis_ledger:Ledger.t Lazy.t -> base_proof:Proof.t -> Validated.t
+    val genesis : unit -> Validated.t
   end
 
   val timestamp : t -> Block_time.t

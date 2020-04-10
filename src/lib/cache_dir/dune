@@ -1,5 +1,14 @@
 (library
  (name cache_dir)
  (public_name cache_dir)
- (libraries core async logger blake2 consensus snark_params)
+ (libraries
+   ; opam deps
+   async
+   core
+   ; libs
+   blake2
+   coda_compile_config
+   consensus
+   genesis_constants
+   logger)
  (preprocess (pps ppx_coda ppx_let ppx_custom_printf)))
