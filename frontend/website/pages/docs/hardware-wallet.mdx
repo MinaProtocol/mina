@@ -40,7 +40,8 @@ sudo apt install libusb-1.0-0-dev libudev1 libudev-dev
 
 ### Build/download the Coda Ledger application
 
-Either download the precompiled app binary from [here](...), or follow the instructions
+Either download the precompiled app binary from
+[here](https://github.com/CodaProtocol/ledger-coda-app/releases/tag/v0.1.0), or follow the instructions
 at the end of this document to [build the app from source](/docs/hardware-wallet#building-from-source).
 
 ### Install the python app loader
@@ -62,8 +63,11 @@ SUBSYSTEMS=="usb", ATTRS{idVendor}=="2c97", ATTRS{idProduct}=="0001", MODE="0660
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="2c97", ATTRS{idProduct}=="0004", MODE="0660", TAG+="uaccess", TAG+="udev-acl" OWNER="<UNIX username>"
 ```
 
-To load the precompiled app onto the Ledger device, run the following:
+To load the precompiled app onto the Ledger device, after downloading `ledger-precompile.zip`
+from the link above, navigate to the directory that `ledger-precompile.zip` is in, and run the following:
 ```
+unzip ledger-precompile.zip
+cd ledger-precompile
 ./load.sh
 ```
 
