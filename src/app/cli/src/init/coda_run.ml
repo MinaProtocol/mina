@@ -176,6 +176,9 @@ let coda_status coda_ref =
       >>| Daemon_rpcs.Types.Status.to_yojson )
 
 let make_report exn_str ~conf_dir ~top_logger coda_ref =
+  (* TEMP MAKE REPORT TRACE *)
+  Logger.trace top_logger ~module_:__MODULE__ ~location:__LOC__
+    "make_report: enter" ;
   let _ = remove_prev_crash_reports ~conf_dir in
   let crash_time = Time.to_filename_string ~zone:Time.Zone.utc (Time.now ()) in
   let temp_config = conf_dir ^/ "coda_crash_report_" ^ crash_time in
@@ -187,6 +190,9 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   let status_file = temp_config ^/ "coda_status.json" in
   let%map status = coda_status !coda_ref in
   Yojson.Safe.to_file status_file status ;
+  (* TEMP MAKE REPORT TRACE *)
+  Logger.trace top_logger ~module_:__MODULE__ ~location:__LOC__
+    "make_report: acquired and wrote status" ;
   (*coda logs*)
   let coda_log = conf_dir ^/ "coda.log" in
   let () =
@@ -532,28 +538,40 @@ let no_report exn_str status =
     (Yojson.Safe.to_string status)
     (Yojson.Safe.to_string (summary exn_str))
 
-let handle_crash e ~conf_dir ~top_logger coda_ref =
+let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
   let exn_str = Exn.to_string e in
   Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
     "Unhandled top-level exception: $exn\nGenerating crash report"
     ~metadata:[("exn", `String exn_str)] ;
   let%bind status = coda_status !coda_ref in
+  (* TEMP MAKE REPORT TRACE *)
+  Logger.trace top_logger ~module_:__MODULE__ ~location:__LOC__
+    "handle_crash: acquired coda status" ;
   let%map action_string =
     match%map
-      try make_report exn_str ~conf_dir coda_ref ~top_logger >>| fun k -> Ok k
-      with exn -> return (Error (Error.of_exn exn))
+      Coda_base.Block_time.Timeout.await
+        ~timeout_duration:(Block_time.Span.of_ms 30_000L)
+        time_controller
+        ( try
+            make_report exn_str ~conf_dir coda_ref ~top_logger
+            >>| fun k -> Ok k
+          with exn -> return (Error (Error.of_exn exn)) )
     with
-    | Ok (Some (report_file, temp_config)) ->
+    | `Ok (Ok (Some (report_file, temp_config))) ->
         ( try Core.Sys.command (sprintf "rm -rf %s" temp_config) |> ignore
           with _ -> () ) ;
         sprintf "attach the crash report %s" report_file
-    | Ok None ->
+    | `Ok (Ok None) ->
         (*TODO: tar failed, should we ask people to zip the temp directory themselves?*)
         no_report exn_str status
-    | Error e ->
+    | `Ok (Error e) ->
         Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
           "Exception when generating crash report: $exn"
           ~metadata:[("exn", `String (Error.to_string_hum e))] ;
+        no_report exn_str status
+    | `Timeout ->
+        Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
+          "Timed out while generated crash report" ;
         no_report exn_str status
   in
   let message =
@@ -561,7 +579,7 @@ let handle_crash e ~conf_dir ~top_logger coda_ref =
   in
   Core.print_string message
 
-let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
+let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
       don't_wait_for
         (let%bind () =
@@ -588,7 +606,7 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
                in
                Core.print_string message ; Deferred.unit
            | _ ->
-               handle_crash exn ~conf_dir ~top_logger coda_ref
+               handle_crash exn ~time_controller ~conf_dir ~top_logger coda_ref
          in
          Stdlib.exit 1) ) ;
   Async_unix.Signal.(
