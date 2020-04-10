@@ -140,7 +140,7 @@ module Keypair = struct
     in
     (set_urs_info, load)
 
-  let () = set_urs_info "/home/pavel/urs/dlog-urs"
+  let () = set_urs_info "/tmp/dlog-urs"
 
   let create
       { R1cs_constraint_system.public_input_size
