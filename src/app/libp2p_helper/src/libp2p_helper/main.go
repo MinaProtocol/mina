@@ -385,6 +385,8 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			(*app.Validators[seqno]).TimedOutAt = new(time.Time)
 			*((*app.Validators[seqno]).TimedOutAt) = time.Now()
 
+			app.ValidatorMutex.Unlock()
+
 			if app.UnsafeNoTrustIP {
 				app.P2p.Logger.Info("validated anyway!")
 				return true
