@@ -982,6 +982,7 @@ module Base = struct
              { Account.Poly.balance
              ; public_key
              ; token_id
+             ; token_owner= account.token_owner
              ; nonce= next_nonce
              ; receipt_chain_hash
              ; delegate
@@ -1093,6 +1094,7 @@ module Base = struct
              { Account.Poly.balance
              ; public_key
              ; token_id
+             ; token_owner= account.token_owner
              ; nonce= account.nonce
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
@@ -1188,6 +1190,7 @@ module Base = struct
              { Account.Poly.balance
              ; public_key= account.public_key
              ; token_id= account.token_id
+             ; token_owner= account.token_owner
              ; nonce= account.nonce
              ; receipt_chain_hash= account.receipt_chain_hash
              ; delegate
