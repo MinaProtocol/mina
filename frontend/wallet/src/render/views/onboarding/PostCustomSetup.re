@@ -23,7 +23,7 @@ module DaemonChecker = {
       {response =>
          switch (response.result) {
          | Loading =>
-           <p> {React.string("Attempting to connect to daemon...")} </p>
+           React.null
          | Error((err: ReasonApolloTypes.apolloError)) =>
            onFinish(Error(err.message));
            React.null;

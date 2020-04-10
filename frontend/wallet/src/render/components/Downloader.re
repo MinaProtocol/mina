@@ -44,6 +44,49 @@ module DaemonStarter = {
   };
 };
 
+module SuccessIcon = {
+  [@react.component]
+  let make = (~radius=52.) =>
+       <svg width="120" height="120">
+         <circle
+           stroke="#00D400"
+           strokeWidth="7"
+           fill="transparent"
+           r={Js.Float.toString(radius)}
+           cx="60"
+           cy="60"
+         />
+         <path
+           transform="translate(35,40)"
+           fillRule="evenodd"
+           clipRule="evenodd"
+           d="M18.3265 38.15L0 19.8439L5.16806 14.6815L18.3265 27.7887L46.146 0L51.3141 5.19894L18.3265 38.15Z" fill="#00D400"
+         />
+       </svg>;
+}
+
+module ErrorIcon = {
+  [@react.component]
+  let make = (~radius=52.) =>
+       <svg width="120" height="120" viewBox="-30 -30 120 120">
+         <circle
+           stroke="#EA001C"
+           strokeWidth="7"
+           fill="transparent"
+           r={Js.Float.toString(radius)}
+           cx="30"
+           cy="30"
+         />
+         <path
+           fillRule="evenodd"
+           clipRule="evenodd"
+           d="M0 51H59.0526L29.5263 0L0 51ZM26.842 37.5786H32.2104V42.9471H26.842V37.5786ZM26.842 21.4718H32.2104V32.2086H26.842V21.4718Z"
+           fill="#D72B2A"
+         />
+       </svg>;
+
+}
+
 [@react.component]
 let make = (~onFinish, ~finished, ~error) => {
   let ((downloaded, total, installed), updateState) =
@@ -84,23 +127,7 @@ let make = (~onFinish, ~finished, ~error) => {
   <>
     {switch (finished, error) {
      | (true, _) =>
-       <svg width="120" height="120">
-         <circle
-           stroke="#00D400"
-           strokeWidth="7"
-           fill="transparent"
-           r={Js.Float.toString(radius)}
-           cx="60"
-           cy="60"
-         />
-         <path
-           transform="translate(35,40)"
-           fillRule="evenodd"
-           clipRule="evenodd"
-           d="M18.3265 38.15L0 19.8439L5.16806 14.6815L18.3265 27.7887L46.146 0L51.3141 5.19894L18.3265 38.15Z"
-           fill="#00D400"
-         />
-       </svg>
+      <SuccessIcon />
      | (false, false) =>
        <svg width="120" height="120">
          <circle
@@ -138,22 +165,7 @@ let make = (~onFinish, ~finished, ~error) => {
          </text>
        </svg>
      | (_, true) =>
-       <svg width="120" height="120" viewBox="-30 -30 120 120">
-         <circle
-           stroke="#EA001C"
-           strokeWidth="7"
-           fill="transparent"
-           r={Js.Float.toString(radius)}
-           cx="30"
-           cy="30"
-         />
-         <path
-           fillRule="evenodd"
-           clipRule="evenodd"
-           d="M0 51H59.0526L29.5263 0L0 51ZM26.842 37.5786H32.2104V42.9471H26.842V37.5786ZM26.842 21.4718H32.2104V32.2086H26.842V21.4718Z"
-           fill="#D72B2A"
-         />
-       </svg>
+       <ErrorIcon />
      }}
     {installed ? <DaemonStarter onFinish /> : React.null}
   </>;

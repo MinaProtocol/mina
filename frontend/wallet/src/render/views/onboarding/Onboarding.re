@@ -53,14 +53,14 @@ let make = () => {
     | ConnectionStatus =>
       <ConnectionStatus
         prevStep={_ => setOnboardingStep(_ => InstallCoda)}
-        createAccount={_ => setOnboardingStep(_ => AccountCreation)}
+        createAccount={_ => setOnboardingStep(_ => LastStep)}
       />
     | PortForwardError =>
       <PortForwardErrorStep retry={_ => setOnboardingStep(_ => InstallCoda)} />
     | DaemonError =>
       <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
     | AccountCreation =>
-      <AccountCreationStep nextStep={_ => setOnboardingStep(_ => StakeCoda)} />
+      <AccountCreationStep nextStep={_ => setOnboardingStep(_ => ConnectionStatus)} />
     | StakeCoda =>
       <StakeCodaStep
         prevStep={_ => setOnboardingStep(_ => AccountCreation)}
@@ -68,7 +68,7 @@ let make = () => {
       />
     | LastStep =>
       <CompletionStep
-        prevStep={_ => setOnboardingStep(_ => StakeCoda)}
+        prevStep={_ => setOnboardingStep(_ => ConnectionStatus)}
         closeOnboarding
       />
     };
