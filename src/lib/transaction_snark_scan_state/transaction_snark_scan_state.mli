@@ -146,5 +146,3 @@ val all_work_pairs_exn :
      Snark_work_lib.Work.Single.Spec.t
      One_or_two.t
      list
-
-module Constants : Snark_params.Scan_state_constants.S

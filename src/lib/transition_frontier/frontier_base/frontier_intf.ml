@@ -48,4 +48,6 @@ module type S = sig
   val visualize_to_string : t -> string
 
   val visualize : filename:string -> t -> unit
+
+  val genesis_constants : t -> Genesis_constants.t
 end

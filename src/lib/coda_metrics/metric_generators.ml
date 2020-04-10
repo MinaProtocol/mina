@@ -47,26 +47,30 @@ module Moving_bucketed_average (Spec : Bucketed_average_spec_intf) () :
 
   let empty_bucket_entry = (0.0, 0)
 
-  let empty_buckets = List.init num_buckets ~f:(Fn.const empty_bucket_entry)
+  let empty_buckets () = List.init num_buckets ~f:(Fn.const empty_bucket_entry)
 
-  let buckets = ref empty_buckets
+  let buckets = ref None
 
-  let clear () = buckets := empty_buckets
+  let clear () = buckets := Some (empty_buckets ())
 
   let update datum =
-    match !buckets with
+    if Option.is_none !buckets then buckets := Some (empty_buckets ()) ;
+    match Option.value_exn !buckets with
     | [] ->
         failwith "Moving_bucketed_average buckets are malformed"
     | (value, num_entries) :: t ->
-        buckets := (value +. datum, num_entries + 1) :: t
+        buckets := Some ((value +. datum, num_entries + 1) :: t)
 
   let () =
     let rec tick () =
       upon
         (after (Time_ns.Span.of_ns @@ Time.Span.to_ns bucket_interval))
         (fun () ->
-          Gauge.set v (render_average !buckets) ;
-          buckets := empty_bucket_entry :: List.take !buckets (num_buckets - 1) ;
+          if Option.is_none !buckets then buckets := Some (empty_buckets ()) ;
+          let buckets_val = Option.value_exn !buckets in
+          Gauge.set v (render_average buckets_val) ;
+          buckets :=
+            Some (empty_bucket_entry :: List.take buckets_val (num_buckets - 1)) ;
           tick () )
     in
     tick ()

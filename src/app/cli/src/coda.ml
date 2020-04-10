@@ -30,10 +30,14 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
-let chain_id ~genesis_state_hash =
+let chain_id ~genesis_state_hash ~genesis_constants =
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
+  let genesis_constants_hash = Genesis_constants.hash genesis_constants in
   let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
-  let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
+  let b2 =
+    Blake2.digest_string
+      (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
+  in
   Blake2.to_hex b2
 
 [%%inject
@@ -204,6 +208,16 @@ let daemon logger =
            "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             discovery"
          (listed string)
+     and genesis_runtime_constants =
+       flag "genesis-constants"
+         ~doc:
+           (sprintf
+              "PATH path to the runtime-configurable constants. (default: \
+               compiled constants) For example: %s"
+              ( Genesis_constants.(
+                  to_daemon_config compiled |> Daemon_config.to_yojson)
+              |> Yojson.Safe.to_string ))
+         (optional string)
      and curr_fork_id =
        flag "current-fork-id" (optional string)
          ~doc:
@@ -252,7 +266,7 @@ let daemon logger =
            "Daemon will expire at $exp"
            ~metadata:[("exp", `String daemon_expiry)] ;
          let tm =
-           (* same approach as in Consensus.Constants.genesis_state_timestamp *)
+           (* same approach as in Genesis_constants.genesis_state_timestamp *)
            let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
            Core.Time.of_string_gen
              ~if_no_timezone:(`Use_this_one default_timezone) daemon_expiry
@@ -339,9 +353,9 @@ let daemon logger =
            {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
        end in
        let coda_initialization_deferred () =
-         let%bind genesis_ledger, base_proof =
+         let%bind genesis_ledger, base_proof, genesis_constants =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
-             ~logger ~conf_dir
+             ~logger ~conf_dir ~daemon_conf:genesis_runtime_constants
          in
          let%bind config =
            let configpath = conf_dir ^/ "daemon.json" in
@@ -584,6 +598,7 @@ let daemon logger =
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let genesis_state_hash =
            Coda_state.Genesis_protocol_state.t ~genesis_ledger
+             ~genesis_constants
            |> With_hash.hash
          in
          let genesis_ledger_hash =
@@ -624,7 +639,7 @@ let daemon logger =
              { timeout= Time.Span.of_sec 3.
              ; logger
              ; conf_dir
-             ; chain_id= chain_id ~genesis_state_hash
+             ; chain_id= chain_id ~genesis_state_hash ~genesis_constants
              ; unsafe_no_trust_ip= false
              ; initial_peers
              ; addrs_and_ports
@@ -752,7 +767,7 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~genesis_state_hash ~log_block_creation ())
+                ~genesis_state_hash ~log_block_creation ~genesis_constants ())
              ~genesis_ledger ~base_proof
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}

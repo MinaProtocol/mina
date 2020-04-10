@@ -124,7 +124,7 @@ let create ~logger ~wallets ~time_controller ~external_transition_database
                 {With_hash.hash; data= filtered_external_transition}
               in
               let participants =
-                Filtered_external_transition.participants
+                Filtered_external_transition.participant_pks
                   filtered_external_transition
               in
               let block_time = Block_time.now time_controller in
