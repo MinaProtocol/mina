@@ -97,7 +97,10 @@ module Styles = {
             backgroundColor(hoverBgColor(mode)),
             color(hoverColor(mode)),
           ]),
-          active([backgroundColor(hoverBgColor(mode))]),
+          active([
+            backgroundColor(hoverBgColor(mode)),
+            color(hoverColor(mode)),
+          ]),
         ]),
       ]);
   };
