@@ -1981,7 +1981,7 @@ let%test_module "test" =
               test_simple ledger_init_state cmds iters sl test_mask `One_prover
                 stmt_to_work_one_prover ) )
 
-    let%test_unit "Zero proof-fee should not create a fee transfer)" =
+    let%test_unit "Zero proof-fee should not create a fee transfer" =
       let stmt_to_work_zero_fee stmts =
         Some
           { Transaction_snark_work.Checked.fee= Currency.Fee.zero
