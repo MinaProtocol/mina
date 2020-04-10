@@ -1981,6 +1981,27 @@ let%test_module "test" =
               test_simple ledger_init_state cmds iters sl test_mask `One_prover
                 stmt_to_work_one_prover ) )
 
+    let%test_unit "Zero proof-fee should not create a fee transfer)" =
+      let stmt_to_work_zero_fee stmts =
+        Some
+          { Transaction_snark_work.Checked.fee= Currency.Fee.zero
+          ; proofs= proofs stmts
+          ; prover= snark_worker_pk }
+      in
+      let expected_proof_count = 3 in
+      Quickcheck.test (gen_at_capacity_fixed_blocks expected_proof_count)
+        ~trials:20 ~f:(fun (ledger_init_state, cmds, iters) ->
+          async_with_ledgers ledger_init_state (fun sl test_mask ->
+              let%map () =
+                test_simple ~expected_proof_count:(Some expected_proof_count)
+                  ledger_init_state cmds iters sl test_mask `One_prover
+                  stmt_to_work_zero_fee
+              in
+              assert (
+                Option.is_none
+                  (Coda_base.Ledger.location_of_key test_mask snark_worker_pk)
+              ) ) )
+
     let%test_unit "Invalid diff test: check zero fee excess for partitions" =
       let create_diff_with_non_zero_fee_excess txns completed_works
           (partition : Sl.Scan_state.Space_partition.t) : Staged_ledger_diff.t
