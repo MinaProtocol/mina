@@ -18,14 +18,14 @@ module Time : sig
     val basic : logger:Logger.t -> t
   end
 
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type nonrec t = t
-      [@@deriving sexp, bin_io, compare, eq, hash, yojson, version]
+      type nonrec t = t [@@deriving sexp, compare, eq, hash, yojson]
 
       include Hashable.S with type t := t
     end
-  end
+  end]
 
   module Bits : Bits_intf.Convertible_bits with type t := t
 
