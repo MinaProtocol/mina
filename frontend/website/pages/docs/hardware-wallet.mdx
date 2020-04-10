@@ -38,12 +38,6 @@ sudo apt install libusb-1.0-0-dev libudev1 libudev-dev
 - If the Ledger device is not listed, follow the suggestions
   [here](https://support.ledger.com/hc/en-us/articles/115005165269-Fix-connection-issues).
 
-### Build/download the Coda Ledger application
-
-Either download the precompiled app binary from
-[here](https://github.com/CodaProtocol/ledger-coda-app/releases/tag/v0.1.0), or follow the instructions
-at the end of this document to [build the app from source](/docs/hardware-wallet#building-from-source).
-
 ### Install the python app loader
 
 The Ledger python loader exists [here](https://github.com/LedgerHQ/blue-loader-python)
@@ -62,6 +56,12 @@ SUBSYSTEMS=="usb", ATTRS{idVendor}=="2c97", ATTRS{idProduct}=="0000", MODE="0660
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="2c97", ATTRS{idProduct}=="0001", MODE="0660", TAG+="uaccess", TAG+="udev-acl" OWNER="<UNIX username>"
 SUBSYSTEMS=="usb", ATTRS{idVendor}=="2c97", ATTRS{idProduct}=="0004", MODE="0660", TAG+="uaccess", TAG+="udev-acl" OWNER="<UNIX username>"
 ```
+
+### Build/download the Coda Ledger application
+
+Either download the precompiled app binary from
+[here](https://github.com/CodaProtocol/ledger-coda-app/releases/tag/v0.1.0), or follow the instructions
+at the end of this document to [build the app from source](/docs/hardware-wallet#building-from-source).
 
 To load the precompiled app onto the Ledger device, after downloading `ledger-precompile.zip`
 from the link above, navigate to the directory that `ledger-precompile.zip` is in, and run the following:
@@ -124,6 +124,7 @@ You can use the same commands to send payments found in
 [the docs](/docs/my-first-transaction/).
 
 There are 2 differences:
+
 1. You do not need to unlock your account before sending the transaction because
   your account is protected by your hardware wallet already.
 2. Your hardware wallet may ask you to confirm the operation while signing the
@@ -181,24 +182,7 @@ git clone git@github.com:LedgerHQ/nanos-secure-sdk.git
 ```
 and add `export BOLOS_SDK=<PATH-TO-SDK>` to your `~/.bashrc` or `~/.profile`.
 
-### Install the python app loader
-
-The Ledger python loader exists [here](https://github.com/LedgerHQ/blue-loader-python)
-and can be downloaded/installed with the following:
-```
-sudo apt install -y libudev-dev libusb
-pip3 install ledgerblue
-```
-After installing, make sure the following rules have been added to `/etc/udev/rules.d/`
-(e.g. with `sudo vim /etc/udev/rules.d/20-hw1.rules`), changing `<UNIX username>` to your unix username:
-
-```
-SUBSYSTEMS=="usb", ATTRS{idVendor}=="2c97", ATTRS{idProduct}=="0000", MODE="0660", TAG+="uaccess", TAG+="udev-acl" OWNER="<UNIX username>"
-SUBSYSTEMS=="usb", ATTRS{idVendor}=="2c97", ATTRS{idProduct}=="0001", MODE="0660", TAG+="uaccess", TAG+="udev-acl" OWNER="<UNIX username>"
-SUBSYSTEMS=="usb", ATTRS{idVendor}=="2c97", ATTRS{idProduct}=="0004", MODE="0660", TAG+="uaccess", TAG+="udev-acl" OWNER="<UNIX username>"
-```
-
-### Download the Coda Ledger app
+### Build and Load the Coda Ledger app
 
 Running the following will install the Coda app on your Ledger device:
 ```
