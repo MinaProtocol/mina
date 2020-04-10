@@ -172,13 +172,15 @@ module Instance = struct
     in
     let%bind () = Deferred.return (assert_no_sync t) in
     (* read basic information from the database *)
-    let%bind root, root_transition, best_tip, base_hash =
+    let%bind root, root_transition, best_tip, base_hash, protocol_states =
       (let open Result.Let_syntax in
       let%bind root = Database.get_root t.db in
       let%bind root_transition = Database.get_transition t.db root.hash in
       let%bind best_tip = Database.get_best_tip t.db in
+      let protocol_states = [] in
+      (*TODO: Deepthi persist*)
       let%map base_hash = Database.get_frontier_hash t.db in
-      (root, root_transition, best_tip, base_hash))
+      (root, root_transition, best_tip, base_hash, protocol_states))
       |> Result.map_error ~f:(fun err ->
              `Failure (Database.Error.not_found_message err) )
       |> Deferred.return
@@ -202,7 +204,9 @@ module Instance = struct
     let frontier =
       Full_frontier.create ~logger:t.factory.logger ~base_hash
         ~root_data:
-          {transition= root_transition; staged_ledger= root_staged_ledger}
+          { transition= root_transition
+          ; staged_ledger= root_staged_ledger
+          ; protocol_states }
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger.Db) root_ledger)
         ~consensus_local_state ~max_length ~genesis_constants
     in

@@ -108,7 +108,7 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     External_transition.Validated.state_hash root_data.transition
   in
   let protocol_state_table =
-    (*TODO: from root_data*)
+    (*
     let root_protocol_states : Protocol_state.value list = [] in
     let required_protocol_states =
       Staged_ledger.Scan_state.required_protocol_states
@@ -124,7 +124,14 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     in
     List.map required_protocol_states ~f:(fun hash ->
         (hash, State_hash.Map.find_exn protocol_states_persisted hash) )
-    |> State_hash.Table.of_alist_exn
+    |> *)
+    State_hash.Table.of_alist_exn
+      (List.map
+         ~f:(fun (h, ps) ->
+           ( h
+           , {Protocol_state_node.protocol_state= ps; scan_state_ref_count= 1}
+           ) )
+         root_data.protocol_states)
   in
   let root_protocol_state =
     External_transition.Validated.protocol_state root_data.transition
@@ -170,7 +177,10 @@ let root_data t =
   let open Root_data in
   let root = root t in
   { transition= Breadcrumb.validated_transition root
-  ; staged_ledger= Breadcrumb.staged_ledger root }
+  ; staged_ledger= Breadcrumb.staged_ledger root
+  ; protocol_states=
+      State_hash.Table.to_alist t.protocol_state_table
+      |> List.map ~f:(fun (h, ps_node) -> (h, ps_node.protocol_state)) }
 
 let max_length {max_length; _} = max_length
 

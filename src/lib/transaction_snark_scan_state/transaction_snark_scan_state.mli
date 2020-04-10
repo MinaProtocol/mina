@@ -135,7 +135,12 @@ val next_on_new_tree : t -> bool
 val update_metrics : t -> unit Or_error.t
 
 (** Hashes of the protocol states required for proving transactions*)
-val required_protocol_states : t -> State_hash.t list
+val required_state_hashes : t -> State_hash.t list
+
+val check_required_protocol_states :
+     t
+  -> protocol_states:Coda_state.Protocol_state.value list
+  -> (State_hash.t * Coda_state.Protocol_state.value) list Or_error.t
 
 (** All the proof bundles for snark workers*)
 val all_work_pairs_exn :

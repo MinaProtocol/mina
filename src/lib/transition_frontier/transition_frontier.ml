@@ -35,8 +35,10 @@ let genesis_root_data ~genesis_ledger ~base_proof ~genesis_constants =
     External_transition.genesis ~genesis_ledger ~base_proof ~genesis_constants
   in
   let scan_state = Staged_ledger.Scan_state.empty () in
+  (*if scan state is empty the protocol states required is also empty*)
+  let protocol_states = [] in
   let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
-  {transition; scan_state; pending_coinbase}
+  {transition; scan_state; pending_coinbase; protocol_states}
 
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
@@ -499,12 +501,20 @@ module For_tests = struct
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
+  let gen_genesis_breadcrumb_with_protocol_states ~logger ?verifier () =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map root = gen_genesis_breadcrumb ~logger ?verifier () in
+    (* List of protocol states required to prove transactions in the scan state; empty scan state at genesis*)
+    let protocol_states = [] in
+    (root, protocol_states)
+
   let gen ?(logger = Logger.null ()) ?verifier ?trust_system
       ?consensus_local_state
       ?(root_ledger_and_accounts =
         ( Lazy.force Test_genesis_ledger.t
         , Lazy.force Test_genesis_ledger.accounts ))
-      ?(gen_root_breadcrumb = gen_genesis_breadcrumb ~logger ?verifier ())
+      ?(gen_root_breadcrumb =
+        gen_genesis_breadcrumb_with_protocol_states ~logger ?verifier ())
       ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
     let genesis_state_hash =
@@ -533,11 +543,16 @@ module For_tests = struct
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)
-    let%bind (Rose_tree.T (root, branches)) =
-      Quickcheck.Generator.with_size ~size
-        (Quickcheck_lib.gen_imperative_rose_tree gen_root_breadcrumb
-           (Breadcrumb.For_tests.gen_non_deferred ~logger ~verifier
-              ~trust_system ~accounts_with_secret_keys:root_ledger_accounts))
+    let%bind root, branches, protocol_states =
+      let%bind root, protocol_states = gen_root_breadcrumb in
+      let%map (Rose_tree.T (root, branches)) =
+        Quickcheck.Generator.with_size ~size
+          (Quickcheck_lib.gen_imperative_rose_tree
+             (Quickcheck.Generator.return root)
+             (Breadcrumb.For_tests.gen_non_deferred ~logger ~verifier
+                ~trust_system ~accounts_with_secret_keys:root_ledger_accounts))
+      in
+      (root, branches, protocol_states)
     in
     let root_data =
       { Root_data.Limited.Stable.Latest.transition=
@@ -545,7 +560,8 @@ module For_tests = struct
       ; scan_state= Breadcrumb.staged_ledger root |> Staged_ledger.scan_state
       ; pending_coinbase=
           Breadcrumb.staged_ledger root
-          |> Staged_ledger.pending_coinbase_collection }
+          |> Staged_ledger.pending_coinbase_collection
+      ; protocol_states }
     in
     let%map persistent_root, persistent_frontier =
       gen_persistence ~logger ()

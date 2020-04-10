@@ -195,7 +195,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       let%bind ( scan_state
                , expected_merkle_root
                , pending_coinbases
-               , _protocol_states ) =
+               , protocol_states ) =
         Coda_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
           t.network sender_peer_id hash
       in
@@ -224,7 +224,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       (* Construct the staged ledger before constructing the transition
        * frontier in order to verify the scan state we received.
        * TODO: reorganize the code to avoid doing this twice (#3480)  *)
-      let%map _ =
+      let%bind _ =
         let open Deferred.Let_syntax in
         let temp_mask = Ledger.of_database temp_snarked_ledger in
         let%map result =
@@ -235,7 +235,38 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         ignore (Ledger.Maskable.unregister_mask_exn temp_mask) ;
         result
       in
-      (scan_state, pending_coinbases, new_root)
+      let%map protocol_states =
+        (*let required_state_hashes =*)
+        Staged_ledger.Scan_state.check_required_protocol_states scan_state
+          ~protocol_states
+        |> Deferred.return
+        (*in
+        let check_length states =
+          let required = List.length required_state_hashes in
+          let received = List.length states in
+          if required = received then Deferred.Or_error.return ()
+          else
+            Deferred.return
+              (Or_error.errorf
+                 !"Required %d protocol states but received %d"
+                 required received)
+        in
+        let%bind () = check_length protocol_states in
+        let received_state_map =
+          (*TODO: Deepthi store hashes as well?*)
+          List.fold protocol_states ~init:State_hash.Map.empty ~f:(fun m ps ->
+              State_hash.Map.set m ~key:(Protocol_state.hash ps) ~data:ps )
+        in
+        let protocol_states_assoc =
+          List.filter_map required_state_hashes ~f:(fun hash ->
+              let open Option.Let_syntax in
+              let%map state = State_hash.Map.find received_state_map hash in
+              (hash, state) )
+        in
+        let%map () = check_length protocol_states_assoc in
+        protocol_states_assoc*)
+      in
+      (scan_state, pending_coinbases, new_root, protocol_states)
     in
     Transition_frontier.Persistent_root.Instance.destroy
       temp_persistent_root_instance ;
@@ -262,7 +293,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
            bootstrap" ;
         Writer.close sync_ledger_writer ;
         loop ()
-    | Ok (scan_state, pending_coinbase, new_root) -> (
+    | Ok (scan_state, pending_coinbase, new_root, protocol_states) -> (
         let%bind () =
           Trust_system.(
             record t.trust_system t.logger sender_host
@@ -322,7 +353,10 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         | Ok () ->
             (* Close the old frontier and reload a new on from disk. *)
             let new_root_data : Transition_frontier.Root_data.Limited.t =
-              {transition= new_root; scan_state; pending_coinbase}
+              { transition= new_root
+              ; scan_state
+              ; pending_coinbase
+              ; protocol_states }
             in
             let%bind () =
               Transition_frontier.Persistent_frontier.reset_database_exn

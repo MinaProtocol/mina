@@ -35,7 +35,11 @@ module Limited : sig
       type t =
         { transition: External_transition.Validated.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
+        ; pending_coinbase: Pending_coinbase.Stable.V1.t
+        ; protocol_states:
+            ( Coda_base.State_hash.Stable.V1.t
+            * Coda_state.Protocol_state.Value.Stable.V1.t )
+            list }
       [@@deriving to_yojson]
     end
   end]
@@ -66,11 +70,18 @@ module Minimal : sig
 
   val of_limited : Limited.t -> t
 
-  val upgrade : t -> External_transition.Validated.t -> Limited.t
+  val upgrade :
+       t
+    -> transition:External_transition.Validated.t
+    -> protocol_states:(State_hash.t * Coda_state.Protocol_state.value) list
+    -> Limited.t
 end
 
 type t =
-  {transition: External_transition.Validated.t; staged_ledger: Staged_ledger.t}
+  { transition: External_transition.Validated.t
+  ; staged_ledger: Staged_ledger.t
+  ; protocol_states:
+      (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
 
 val minimize : t -> Minimal.t
 
