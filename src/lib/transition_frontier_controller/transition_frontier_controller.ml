@@ -30,16 +30,6 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
     Strict_pipe.create ~name:"catchup breadcrumbs"
       (Buffered (`Capacity 30, `Overflow Crash))
   in
-  let producer_transition_reader_copy, producer_transition_writer_copy =
-    Strict_pipe.create ~name:"block producer transition copy" Synchronous
-  in
-  Strict_pipe.transfer_while_writer_alive producer_transition_reader
-    producer_transition_writer_copy ~f:(fun new_breadcrumb ->
-      Coda_networking.broadcast_state network
-        ( Transition_frontier.Breadcrumb.validated_transition new_breadcrumb
-        |> Coda_transition.External_transition.Validation.forget_validation ) ;
-      new_breadcrumb )
-  |> don't_wait_for ;
   let unprocessed_transition_cache =
     Transition_handler.Unprocessed_transition_cache.create ~logger
   in
@@ -62,7 +52,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       Transition_handler.Processor.run ~logger ~genesis_constants
         ~time_controller ~trust_system ~verifier ~frontier
         ~primary_transition_reader
-        ~producer_transition_reader:producer_transition_reader_copy
+        ~producer_transition_reader
         ~clean_up_catchup_scheduler ~catchup_job_writer
         ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
         ~processed_transition_writer ) ;
@@ -77,7 +67,6 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
       kill processed_transition_writer ;
       kill catchup_job_writer ;
       kill catchup_breadcrumbs_writer ;
-      kill producer_transition_writer_copy ;
       Ivar.fill clean_up_catchup_scheduler () )
   |> don't_wait_for ;
   processed_transition_reader
