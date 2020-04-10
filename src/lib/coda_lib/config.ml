@@ -45,5 +45,6 @@ type t =
         [@default None]
   ; demo_mode: bool [@default false]
   ; genesis_state_hash: State_hash.t
-  ; log_block_creation: bool [@default false] }
+  ; log_block_creation: bool [@default false]
+  ; genesis_constants: Genesis_constants.t }
 [@@deriving make]

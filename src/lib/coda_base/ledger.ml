@@ -5,7 +5,7 @@ open Merkle_ledger
 
 module Ledger_inner = struct
   module Depth = struct
-    let depth = ledger_depth
+    let depth = Coda_compile_config.ledger_depth
   end
 
   module Location0 : Merkle_ledger.Location_intf.S =
@@ -94,6 +94,9 @@ module Ledger_inner = struct
     with module Addr = Location_at_depth.Addr
     with type root_hash := Ledger_hash.t
      and type hash := Ledger_hash.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
      and type account := Account.t
      and type account_id_set := Account_id.Set.t
      and type account_id := Account_id.t =
@@ -105,6 +108,9 @@ module Ledger_inner = struct
     Merkle_ledger.Any_ledger.S
     with module Location = Location_at_depth
     with type account := Account.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
      and type hash := Hash.t =
@@ -115,6 +121,9 @@ module Ledger_inner = struct
     with module Location = Location_at_depth
      and module Attached.Addr = Location_at_depth.Addr
     with type account := Account.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
      and type hash := Hash.t
@@ -130,6 +139,9 @@ module Ledger_inner = struct
     with module Location = Location_at_depth
     with module Addr = Location_at_depth.Addr
     with type account := Account.t
+     and type key := Public_key.Compressed.t
+     and type token_id := Token_id.t
+     and type token_id_set := Token_id.Set.t
      and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
      and type hash := Hash.t

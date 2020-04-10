@@ -1255,13 +1255,6 @@ let trustlist_list =
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
-let compile_time_constants =
-  Command.basic
-    ~summary:"Print a JSON map of the compile-time consensus parameters"
-    (Command.Param.return (fun () ->
-         Core.printf "%s\n%!"
-           (Yojson.Safe.to_string Consensus.Constants.all_constants) ))
-
 let telemetry =
   let open Command.Param in
   let open Deferred.Let_syntax in
@@ -1407,7 +1400,6 @@ let advanced =
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
-    ; ("compile-time-constants", compile_time_constants)
     ; ("telemetry", telemetry)
     ; ("visualization", Visualization.command_group)
     ; ("generate-receipt", generate_receipt)
