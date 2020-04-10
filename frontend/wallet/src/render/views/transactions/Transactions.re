@@ -172,6 +172,7 @@ let make = () => {
        let transactionQuery =
          TransactionsQueryString.make(
            ~publicKey=Apollo.Encoders.publicKey(pubkey),
+           ~after="",
            (),
          );
        <TransactionsQuery variables=transactionQuery##variables>

@@ -1116,7 +1116,7 @@ struct
 end
 
 module T = Make (struct
-  let depth = Snark_params.pending_coinbase_depth
+  let depth = Coda_compile_config.pending_coinbase_depth
 end)
 
 include T

@@ -12,7 +12,7 @@ module Make (Transaction : sig
 
   include Hashable.S with type t := t
 
-  val accounts_accessed : t -> Public_key.Compressed.t list
+  val accounts_accessed : t -> Account_id.t list
 end) (Time : sig
   type t [@@deriving bin_io, compare, sexp]
 
@@ -58,7 +58,7 @@ struct
   let query {pagination; _} = Pagination.query pagination
 end
 
-module Block_time = Coda_base.Block_time
+module Block_time = Block_time
 module T = Make (User_command.Stable.V1) (Block_time.Time.Stable.V1)
 include T
 

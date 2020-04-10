@@ -129,8 +129,8 @@ end]
 
 (* bin_io omitted *)
 type t = Stable.Latest.t =
-  { protocol_state: Protocol_state.Value.Stable.V1.t
-  ; protocol_state_proof: Proof.Stable.V1.t sexp_opaque
+  { protocol_state: Protocol_state.Value.t
+  ; protocol_state_proof: Proof.t sexp_opaque
   ; staged_ledger_diff: Staged_ledger_diff.t
   ; delta_transition_chain_proof: State_hash.t * State_body_hash.t list
   ; current_fork_id: Fork_id.t
@@ -609,14 +609,19 @@ let skip_genesis_protocol_state_validation
   (t, Validation.Unsafe.set_valid_genesis_state validation)
 
 let validate_time_received (t, validation) ~time_received =
-  let consensus_state =
-    With_hash.data t |> protocol_state |> Protocol_state.consensus_state
+  let protocol_state = With_hash.data t |> protocol_state in
+  let constants =
+    Consensus.Constants.create
+      ~protocol_constants:
+        ( Protocol_state.constants protocol_state
+        |> Protocol_constants_checked.t_of_value )
   in
+  let consensus_state = Protocol_state.consensus_state protocol_state in
   let received_unix_timestamp =
     Block_time.to_span_since_epoch time_received |> Block_time.Span.to_ms
   in
   match
-    Consensus.Hooks.received_at_valid_time consensus_state
+    Consensus.Hooks.received_at_valid_time ~constants consensus_state
       ~time_received:received_unix_timestamp
   with
   | Ok () ->
@@ -905,9 +910,9 @@ module Validated = struct
     |> Validation.reset_staged_ledger_diff_validation
 end
 
-let genesis ~genesis_ledger ~base_proof =
+let genesis ~genesis_ledger ~base_proof ~genesis_constants =
   let genesis_protocol_state =
-    Coda_state.Genesis_protocol_state.t ~genesis_ledger
+    Coda_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_constants
   in
   let creator = fst Consensus_state_hooks.genesis_winner in
   let empty_diff =
@@ -938,9 +943,11 @@ module For_tests = struct
     create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
       ~delta_transition_chain_proof ~validation_callback ?next_fork_id_opt ()
 
-  let genesis ~genesis_ledger ~base_proof =
+  let genesis () =
     Fork_id.(set_current empty) ;
-    genesis ~genesis_ledger ~base_proof
+    genesis ~genesis_ledger:Test_genesis_ledger.t
+      ~base_proof:Precomputed_values.base_proof
+      ~genesis_constants:Genesis_constants.compiled
 end
 
 module Transition_frontier_validation (Transition_frontier : sig

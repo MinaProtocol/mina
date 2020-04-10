@@ -265,8 +265,11 @@ let initialize t ~root_data ~base_hash =
     External_transition.Validated.erase root_data.transition
   in
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-    ~metadata:[("root_state_hash", State_hash.to_yojson root_state_hash)]
-    "Initializing persistent frontier database with $minimal_root_data" ;
+    ~metadata:
+      [ ("root_data", Root_data.Limited.to_yojson root_data)
+      ; ("frontier_hash", Frontier_hash.to_yojson base_hash) ]
+    "Initializing persistent frontier database with $root_data and \
+     $frontier_hash" ;
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Db_version ~data:version ;
       Batch.set batch ~key:(Transition root_state_hash) ~data:root_transition ;
@@ -294,7 +297,7 @@ let add t ~transition =
       Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs) )
 
 let move_root t ~new_root ~garbage =
-  let open Root_data.Minimal.Stable.V1 in
+  let open Root_data.Minimal in
   let%bind () =
     Result.ok_if_true
       (mem t.db ~key:(Transition new_root.hash))
