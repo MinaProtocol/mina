@@ -53,7 +53,8 @@ let make = () => {
     | ConnectionStatus =>
       <ConnectionStatus
         prevStep={_ => setOnboardingStep(_ => InstallCoda)}
-        createAccount={_ => setOnboardingStep(_ => LastStep)}
+        nextStep={_ => setOnboardingStep(_ => LastStep)}
+        errorStep={_ => setOnboardingStep(_ => DaemonError)}
       />
     | PortForwardError =>
       <PortForwardErrorStep retry={_ => setOnboardingStep(_ => InstallCoda)} />

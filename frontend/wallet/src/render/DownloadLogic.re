@@ -101,7 +101,7 @@ let rec download = (filename, url, encoding, maxRedirects, chunkCb, doneCb) => {
           doneCb(Belt.Result.Error("Too many redirects."));
         }
       | 200 => handleResponse(response, filename, encoding, chunkCb, doneCb)
-      | _ => ()
+      | _ => doneCb(Belt.Result.Error("Unable to download the daemon."))
       }
     );
   Https.Request.onError(request, e => doneCb(Error(e)));

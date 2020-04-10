@@ -15,10 +15,12 @@ let (^/) = Filename.concat;
 external getPath: string => string = "getPath";
 
 let codaCommand = (~port, ~extraArgs) => {
+  let del = Node.Path.delimiter;
   let env = ChildProcess.Process.env;
   let path = Js.Dict.get(env, "PATH") |> Option.with_default(~default="");
-  let installPath = getPath("userData") ++ "/coda";
-  Js.Dict.set(env, "PATH", path ++ Node.Path.delimiter ++ installPath);
+  let installPath = getPath("userData") ++ del ++ "coda";
+  Js.Dict.set(env, "PATH", path ++ del ++ installPath);
+  Js.Dict.set(env, "CODA_LIBP2P_HELPER_PATH", installPath ++ del ++ "libp2p-helper");
   {
     Command.executable: "coda",
     args:

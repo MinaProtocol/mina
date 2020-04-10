@@ -39,7 +39,7 @@ module StatusQueryString = [%graphql
 module StatusQuery = ReasonApollo.CreateQuery(StatusQueryString);
 
 [@react.component]
-let make = (~prevStep as _, ~createAccount) => {
+let make = (~prevStep as _, ~nextStep, ~errorStep as _) => {
   // Start the daemon process if we're in managed setup
   let dispatch = React.useContext(ProcessDispatchProvider.context);
   CodaProcess.useStartEffect(Some(dispatch));
@@ -62,9 +62,14 @@ let make = (~prevStep as _, ~createAccount) => {
                <Spacer width=12. />
                <Button
                  label="Continue"
-                 disabled={response.result === Loading}
+                 disabled={
+                   switch (response.result) {
+                   | Data(_) => false
+                   | _ => true
+                   }
+                 }
                  style=Button.HyperlinkBlue3
-                 onClick={_ => createAccount()}
+                 onClick={_ => nextStep()}
                />
              </div>
            </>
@@ -81,7 +86,13 @@ let make = (~prevStep as _, ~createAccount) => {
                     </p>
                   </>
                 | Error(_) =>
-                  <p className=Styles.smallText> {React.string("Error")} </p>
+                  <>
+                    <Downloader.ErrorIcon />
+                    <Spacer height=1.25 />
+                    <p className=Styles.smallText>
+                      {React.string("Unable to connect to daemon")}
+                    </p>
+                  </>
                 | Data(_) =>
                   <>
                     <Downloader.SuccessIcon />
