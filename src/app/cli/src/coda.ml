@@ -341,6 +341,9 @@ let daemon logger =
          type ('a, 'b, 'c) t =
            {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
        end in
+       let time_controller =
+         Block_time.Controller.create @@ Block_time.Controller.basic ~logger
+       in
        let coda_initialization_deferred () =
          let%bind genesis_ledger, base_proof =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
@@ -593,9 +596,6 @@ let daemon logger =
          let genesis_ledger_hash =
            Lazy.force genesis_ledger |> Ledger.merkle_root
          in
-         let time_controller =
-           Block_time.Controller.create @@ Block_time.Controller.basic ~logger
-         in
          let initial_block_production_keypairs =
            block_production_keypair |> Option.to_list |> Keypair.Set.of_list
          in
@@ -763,7 +763,8 @@ let daemon logger =
        in
        (* Breaks a dependency cycle with monitor initilization and coda *)
        let coda_ref : Coda_lib.t option ref = ref None in
-       Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger coda_ref ;
+       Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+         ~top_logger:logger coda_ref ;
        Async.Scheduler.within' ~monitor
        @@ fun () ->
        let%bind {Coda_initialization.coda; client_trustlist; rest_server_port}
