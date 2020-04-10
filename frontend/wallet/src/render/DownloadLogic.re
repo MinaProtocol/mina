@@ -132,7 +132,6 @@ let downloadCoda = (version, chunkCb, doneCb) => {
   let filename = "coda-daemon-" ++ version ++ ".zip";
   let tempPath = getPath("temp") ++ "/" ++ filename;
   let installPath = getPath("userData") ++ "/coda";
-  Js.log(installPath);
   download(tempPath, codaRepo ++ filename, "binary", 1, chunkCb, res =>
     switch (res) {
     | Belt.Result.Error(_) => doneCb(res)
