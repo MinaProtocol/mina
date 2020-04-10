@@ -193,7 +193,7 @@ let create ~logger ~pids ~conf_dir =
          return
          @@ Logger.error logger ~module_:__MODULE__ ~location:__LOC__
               "Verifier stderr: $stderr"
-              ~metadata:[("stdout", `String stderr)] ) ;
+              ~metadata:[("stderr", `String stderr)] ) ;
   connection
 
 let verify_blockchain_snark t chain =

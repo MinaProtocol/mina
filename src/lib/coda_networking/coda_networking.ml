@@ -1299,7 +1299,9 @@ let glue_sync_ledger :
               Logger.info t.logger ~module_:__MODULE__ ~location:__LOC__
                 "Peer $peer didn't have enough information to answer \
                  ledger_hash query. See error for more details: $error"
-                ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                ~metadata:
+                  [ ("error", `String (Error.to_string_hum e))
+                  ; ("peer", Peer.to_yojson peer) ] ;
               Hash_set.add peers_tried peer ;
               None
           | Connected {data= Error e; _} ->
