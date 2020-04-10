@@ -80,8 +80,10 @@ let setup (type n) ?(logger = Logger.null ())
                   let input = Envelope.Incoming.data query_env in
                   Deferred.return
                     (let open Option.Let_syntax in
-                    let%map scan_state, expected_merkle_root, pending_coinbases
-                        =
+                    let%map ( scan_state
+                            , expected_merkle_root
+                            , pending_coinbases
+                            , protocol_states ) =
                       Sync_handler
                       .get_staged_ledger_aux_and_pending_coinbases_at_hash
                         ~frontier input
@@ -97,7 +99,10 @@ let setup (type n) ?(logger = Logger.null ())
                           , Staged_ledger_hash.to_yojson staged_ledger_hash )
                         ]
                       "sending scan state and pending coinbase" ;
-                    (scan_state, expected_merkle_root, pending_coinbases)) )
+                    ( scan_state
+                    , expected_merkle_root
+                    , pending_coinbases
+                    , protocol_states )) )
                 ~answer_sync_ledger_query:(fun _ ->
                   failwith "Answer_sync_ledger_query unimplemented" )
                 ~get_ancestry:(fun query_env ->
