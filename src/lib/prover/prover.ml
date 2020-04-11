@@ -50,9 +50,9 @@ module Worker_state = struct
     val verify : Protocol_state.Value.t -> Proof.t -> bool
   end
 
-  (* bin_io required by rpc_parallel, please ignore linter warning *)
+  (* bin_io required by rpc_parallel *)
   type init_arg = {conf_dir: string; logger: Logger.Stable.Latest.t}
-  [@@deriving bin_io]
+  [@@deriving bin_io_unversioned]
 
   type t = (module S) Deferred.t
 
@@ -230,7 +230,8 @@ module Worker = struct
     module Worker_state = Worker_state
 
     module Connection_state = struct
-      type init_arg = unit [@@deriving bin_io]
+      (* bin_io required by rpc_parallel *)
+      type init_arg = unit [@@deriving bin_io_unversioned]
 
       type t = unit
     end
