@@ -38,13 +38,18 @@ RUN sudo apt-get update && sudo apt-get install --yes \
     pkg-config \
     python-jinja2 \
     python-pip \
+    python3-pip \
     rubygems \
     zlib1g-dev \
     libbz2-dev
 
-RUN sudo pip install sexpdata awscli readchar
+RUN sudo pip install awscli readchar
+
+RUN sudo pip3 install sexpdata
 
 RUN sudo gem install deb-s3
+
+RUN false
 
 RUN VER="19.03.4" && \
     curl -L -o /tmp/docker-$VER.tgz https://download.docker.com/linux/static/stable/x86_64/docker-$VER.tgz && \
