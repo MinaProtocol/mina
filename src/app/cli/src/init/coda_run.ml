@@ -246,7 +246,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ?(insecure_rest_server = false) coda =
   let client_trustlist =
     ref
-      (Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_trustlist))
+      (Unix.Cidr.Set.of_list
+         ( Unix.Cidr.create ~base_address:Unix.Inet_addr.localhost ~bits:32
+         :: client_trustlist ))
   in
   (* Setup RPC server for client interactions *)
   let implement rpc f =
@@ -347,22 +349,21 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           Coda_lib.replace_block_production_keypairs coda
             (Keypair.And_compressed_pk.Set.of_list keypair_and_compressed_key) ;
           Deferred.unit )
-    ; implement Daemon_rpcs.Add_trustlist.rpc (fun () ip ->
+    ; implement Daemon_rpcs.Add_trustlist.rpc (fun () cidr ->
           return
-            (let ip_str = Unix.Inet_addr.to_string ip in
-             if Unix.Inet_addr.Set.mem !client_trustlist ip then
-               Or_error.errorf "%s already present in trustlist" ip_str
+            (let cidr_str = Unix.Cidr.to_string cidr in
+             if Unix.Cidr.Set.mem !client_trustlist cidr then
+               Or_error.errorf "%s already present in trustlist" cidr_str
              else (
-               client_trustlist := Unix.Inet_addr.Set.add !client_trustlist ip ;
+               client_trustlist := Unix.Cidr.Set.add !client_trustlist cidr ;
                Ok () )) )
-    ; implement Daemon_rpcs.Remove_trustlist.rpc (fun () ip ->
+    ; implement Daemon_rpcs.Remove_trustlist.rpc (fun () cidr ->
           return
-            (let ip_str = Unix.Inet_addr.to_string ip in
-             if not @@ Unix.Inet_addr.Set.mem !client_trustlist ip then
-               Or_error.errorf "%s not present in trustlist" ip_str
+            (let cidr_str = Unix.Cidr.to_string cidr in
+             if not @@ Unix.Cidr.Set.mem !client_trustlist cidr then
+               Or_error.errorf "%s not present in trustlist" cidr_str
              else (
-               client_trustlist :=
-                 Unix.Inet_addr.Set.remove !client_trustlist ip ;
+               client_trustlist := Unix.Cidr.Set.remove !client_trustlist cidr ;
                Ok () )) )
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
           return (Set.to_list !client_trustlist) )
@@ -473,7 +474,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               where_to_listen
               (fun address reader writer ->
                 let address = Socket.Address.Inet.addr address in
-                if not (Set.mem !client_trustlist address) then (
+                if
+                  not
+                    (Set.exists !client_trustlist ~f:(fun cidr ->
+                         Unix.Cidr.does_match cidr address ))
+                then (
                   Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                     !"Rejecting client connection from $address, it is not \
                       present in the trustlist."
