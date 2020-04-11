@@ -162,7 +162,7 @@ module SendForm = {
         label="Fee"
         onChange={value => setModalState(s => {...s, feeStr: value})}
         value=feeStr
-        placeholder="0"
+        placeholder="0.1"
       />
       spacer
       {switch (memoOpt) {

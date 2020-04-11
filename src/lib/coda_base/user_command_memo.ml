@@ -188,7 +188,7 @@ let typ : (Checked.t, t) Typ.t =
   Typ.transport
     (Typ.array ~length:length_in_bits Boolean.typ)
     ~there:(fun (t : t) -> Blake2.string_to_bits (t :> string))
-    ~back:(fun bs -> of_string (Blake2.bits_to_string bs))
+    ~back:(fun bs -> (Blake2.bits_to_string bs :> t))
 
 [%%endif]
 
@@ -221,4 +221,27 @@ let%test_module "user_command_memo" =
         let _ = create_from_string_exn s in
         false
       with Too_long_user_memo_input -> true
+
+    [%%ifdef
+    consensus_mechanism]
+
+    let%test_unit "typ is identity" =
+      let s = "this is a string" in
+      let memo = create_by_digesting_string_exn s in
+      let read_constant = function
+        | Snarky.Cvar.Constant x ->
+            x
+        | _ ->
+            assert false
+      in
+      let memo_var =
+        Snarky.Typ_monads.Store.run (typ.store memo) (fun x ->
+            Snarky.Cvar.Constant x )
+      in
+      let memo_read =
+        Snarky.Typ_monads.Read.run (typ.read memo_var) read_constant
+      in
+      [%test_eq: string] memo memo_read
+
+    [%%endif]
   end )

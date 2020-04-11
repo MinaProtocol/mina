@@ -15,6 +15,7 @@ open Snark_bits
 
 open Snark_bits_nonconsensus
 module Unsigned_extended = Unsigned_extended_nonconsensus.Unsigned_extended
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
@@ -56,6 +57,8 @@ module type S_unchecked = sig
 
   val of_bits : bool list -> t
 
+  val to_input : t -> (_, bool) Random_oracle.Input.t
+
   val fold : t -> bool Triple.t Fold.t
 end
 
@@ -87,6 +90,8 @@ module type S_checked = sig
   val of_bits : Boolean.var Bitstring.Lsb_first.t -> t
 
   val to_bits : t -> (Boolean.var Bitstring.Lsb_first.t, _) Checked.t
+
+  val to_input : t -> ((_, Boolean.var) Random_oracle.Input.t, _) Checked.t
 
   val to_integer : t -> field Snarky_integer.Integer.t
 

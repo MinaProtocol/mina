@@ -113,7 +113,7 @@ macos-portable:
 	@rm -rf _build/coda-daemon-macos/
 	@rm -rf _build/coda-daemon-macos.zip
 	@./scripts/macos-portable.sh _build/default/src/app/cli/src/coda.exe src/app/libp2p_helper/result/bin/libp2p_helper _build/coda-daemon-macos
-	@zip -r _build/coda-daemon-macos.zip _build/coda-daemon-macos/
+	@zip -r -j _build/coda-daemon-macos.zip _build/coda-daemon-macos/
 	@echo Find coda-daemon-macos.zip inside _build/
 
 update-graphql:
@@ -211,6 +211,11 @@ deb:
 	@mkdir -p /tmp/artifacts
 	@cp _build/coda*.deb /tmp/artifacts/.
 	@cp _build/coda_pvkeys_* /tmp/artifacts/.
+
+build_pv_keys:
+	$(info Building keys)
+	ulimit -s 65532 && (ulimit -n 10240 || true) && $(WRAPAPP) env CODA_COMMIT_SHA1=$(GITLONGHASH) dune exec --profile=$(DUNE_PROFILE) src/lib/snark_keys/gen_keys/gen_keys.exe -- --generate-keys-only
+	$(info Keys built)
 
 publish_deb:
 	@./scripts/publish-deb.sh

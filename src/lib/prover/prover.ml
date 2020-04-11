@@ -24,11 +24,11 @@ module Extend_blockchain_input = struct
   end]
 
   type t = Stable.Latest.t =
-    { chain: Blockchain.Stable.V1.t
-    ; next_state: Protocol_state.Value.Stable.V1.t
-    ; block: Snark_transition.Value.Stable.V1.t
-    ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
-    ; pending_coinbase: Pending_coinbase_witness.Stable.V1.t }
+    { chain: Blockchain.t
+    ; next_state: Protocol_state.Value.t
+    ; block: Snark_transition.Value.t
+    ; prover_state: Consensus.Data.Prover_state.t
+    ; pending_coinbase: Pending_coinbase_witness.t }
   [@@deriving sexp]
 end
 
