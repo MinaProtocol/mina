@@ -2,7 +2,6 @@ open Async_kernel
 open Core_kernel
 open Coda_base
 open Coda_state
-open Module_version
 
 module Validate_content = struct
   type t = bool -> unit
@@ -138,6 +137,9 @@ type t = Stable.Latest.t =
   ; mutable validation_callback: Validate_content.t }
 [@@deriving sexp]
 
+(* another name, so we can avoid cyclic type below *)
+type t_ = t
+
 type external_transition = t
 
 let broadcast {validation_callback; _} = validation_callback true
@@ -199,47 +201,6 @@ let fork_id_status {current_fork_id; next_fork_id_opt; _} =
   {valid_current; valid_next; matches_daemon}
 
 module Validation = struct
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type ( 'time_received
-             , 'genesis_state
-             , 'proof
-             , 'delta_transition_chain
-             , 'frontier_dependencies
-             , 'staged_ledger_diff
-             , 'fork_ids )
-             t =
-          'time_received
-          * 'genesis_state
-          * 'proof
-          * 'delta_transition_chain
-          * 'frontier_dependencies
-          * 'staged_ledger_diff
-          * 'fork_ids
-          constraint 'time_received = [`Time_received] * (unit, _) Truth.t
-          constraint 'genesis_state = [`Genesis_state] * (unit, _) Truth.t
-          constraint 'proof = [`Proof] * (unit, _) Truth.t
-          constraint
-            'delta_transition_chain =
-            [`Delta_transition_chain]
-            * (State_hash.Stable.V1.t Non_empty_list.Stable.V1.t, _) Truth.t
-          constraint
-            'frontier_dependencies =
-            [`Frontier_dependencies] * (unit, _) Truth.t
-          constraint
-            'staged_ledger_diff =
-            [`Staged_ledger_diff] * (unit, _) Truth.t
-          constraint 'fork_ids = [`Fork_ids] * (unit, _) Truth.t
-        [@@deriving version {of_binable}]
-      end
-
-      include T
-    end
-
-    module Latest = V1
-  end
-
   type ( 'time_received
        , 'genesis_state
        , 'proof
@@ -248,14 +209,25 @@ module Validation = struct
        , 'staged_ledger_diff
        , 'fork_ids )
        t =
-    ( 'time_received
-    , 'genesis_state
-    , 'proof
-    , 'delta_transition_chain
-    , 'frontier_dependencies
-    , 'staged_ledger_diff
-    , 'fork_ids )
-    Stable.Latest.t
+    'time_received
+    * 'genesis_state
+    * 'proof
+    * 'delta_transition_chain
+    * 'frontier_dependencies
+    * 'staged_ledger_diff
+    * 'fork_ids
+    constraint 'time_received = [`Time_received] * (unit, _) Truth.t
+    constraint 'genesis_state = [`Genesis_state] * (unit, _) Truth.t
+    constraint 'proof = [`Proof] * (unit, _) Truth.t
+    constraint
+      'delta_transition_chain =
+      [`Delta_transition_chain]
+      * (State_hash.Stable.V1.t Non_empty_list.Stable.V1.t, _) Truth.t
+    constraint
+      'frontier_dependencies =
+      [`Frontier_dependencies] * (unit, _) Truth.t
+    constraint 'staged_ledger_diff = [`Staged_ledger_diff] * (unit, _) Truth.t
+    constraint 'fork_ids = [`Fork_ids] * (unit, _) Truth.t
 
   type fully_invalid =
     ( [`Time_received] * unit Truth.false_t
@@ -636,14 +608,19 @@ let skip_genesis_protocol_state_validation
   (t, Validation.Unsafe.set_valid_genesis_state validation)
 
 let validate_time_received (t, validation) ~time_received =
-  let consensus_state =
-    With_hash.data t |> protocol_state |> Protocol_state.consensus_state
+  let protocol_state = With_hash.data t |> protocol_state in
+  let constants =
+    Consensus.Constants.create
+      ~protocol_constants:
+        ( Protocol_state.constants protocol_state
+        |> Protocol_constants_checked.t_of_value )
   in
+  let consensus_state = Protocol_state.consensus_state protocol_state in
   let received_unix_timestamp =
     Block_time.to_span_since_epoch time_received |> Block_time.Span.to_ms
   in
   match
-    Consensus.Hooks.received_at_valid_time consensus_state
+    Consensus.Hooks.received_at_valid_time ~constants consensus_state
       ~time_received:received_unix_timestamp
   with
   | Ok () ->
@@ -794,122 +771,103 @@ module Almost_validated = struct
 end
 
 module Validated = struct
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
-          * ( [`Time_received] * (unit, Truth.True.t) Truth.t
-            , [`Genesis_state] * (unit, Truth.True.t) Truth.t
-            , [`Proof] * (unit, Truth.True.t) Truth.t
-            , [`Delta_transition_chain]
-              * ( State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
-                , Truth.True.t )
-                Truth.t
-            , [`Frontier_dependencies] * (unit, Truth.True.t) Truth.t
-            , [`Staged_ledger_diff] * (unit, Truth.True.t) Truth.t
-            , [`Fork_ids] * (unit, Truth.True.t) Truth.t )
-            Validation.Stable.V1.t
-        [@@deriving version {of_binable}]
+      type t =
+        (t_, State_hash.t) With_hash.t
+        * ( [`Time_received] * (unit, Truth.True.t) Truth.t
+          , [`Genesis_state] * (unit, Truth.True.t) Truth.t
+          , [`Proof] * (unit, Truth.True.t) Truth.t
+          , [`Delta_transition_chain]
+            * (State_hash.t Non_empty_list.t, Truth.True.t) Truth.t
+          , [`Frontier_dependencies] * (unit, Truth.True.t) Truth.t
+          , [`Staged_ledger_diff] * (unit, Truth.True.t) Truth.t
+          , [`Fork_ids] * (unit, Truth.True.t) Truth.t )
+          Validation.t
 
-        module Erased = struct
-          (* if this type receives a new version, that changes the serialization of
+      let to_latest = Fn.id
+
+      module Erased = struct
+        (* if this type receives a new version, that changes the serialization of
              the type `t', so that type must also get a new version
-          *)
-          [%%versioned
-          module Stable = struct
-            module V1 = struct
-              type t =
-                (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
-                * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
-              [@@deriving sexp]
+        *)
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type t =
+              (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
+              * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
+            [@@deriving sexp]
 
-              let to_latest = Fn.id
-            end
-          end]
-        end
-
-        type erased = Erased.Stable.Latest.t [@@deriving sexp]
-
-        let erase (transition_with_hash, validation) =
-          ( transition_with_hash
-          , Validation.extract_delta_transition_chain_witness validation )
-
-        let elaborate (transition_with_hash, delta_transition_chain_witness) =
-          ( transition_with_hash
-          , ( (`Time_received, Truth.True ())
-            , (`Genesis_state, Truth.True ())
-            , (`Proof, Truth.True ())
-            , ( `Delta_transition_chain
-              , Truth.True delta_transition_chain_witness )
-            , (`Frontier_dependencies, Truth.True ())
-            , (`Staged_ledger_diff, Truth.True ())
-            , (`Fork_ids, Truth.True ()) ) )
-
-        include Sexpable.Of_sexpable (struct
-                    type t = erased [@@deriving sexp]
-                  end)
-                  (struct
-                    type nonrec t = t
-
-                    let of_sexpable = elaborate
-
-                    let to_sexpable = erase
-                  end)
-
-        include Binable.Of_binable (struct
-                    type t = Erased.Stable.Latest.t [@@deriving bin_io]
-                  end)
-                  (struct
-                    type nonrec t = t
-
-                    let of_binable = elaborate
-
-                    let to_binable = erase
-                  end)
-
-        let to_yojson (transition_with_hash, _) =
-          With_hash.to_yojson to_yojson State_hash.to_yojson
-            transition_with_hash
-
-        let create_unsafe_pre_hashed t =
-          `I_swear_this_is_safe_see_my_comment
-            ( Validation.wrap t
-            |> skip_time_received_validation
-                 `This_transition_was_not_received_via_gossip
-            |> skip_genesis_protocol_state_validation
-                 `This_transition_was_generated_internally
-            |> skip_proof_validation `This_transition_was_generated_internally
-            |> skip_delta_transition_chain_validation
-                 `This_transition_was_not_received_via_gossip
-            |> skip_frontier_dependencies_validation
-                 `This_transition_belongs_to_a_detached_subtree
-            |> skip_staged_ledger_diff_validation
-                 `This_transition_has_a_trusted_staged_ledger
-            |> skip_fork_ids_validation `This_transition_has_valid_fork_ids )
-
-        let create_unsafe t =
-          create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hash)
-
-        include With_validation
+            let to_latest = Fn.id
+          end
+        end]
       end
 
-      include T
-      include Comparable.Make (T)
-      include Registration.Make_latest_version (T)
+      type erased = Erased.Stable.Latest.t [@@deriving sexp]
+
+      let erase (transition_with_hash, validation) =
+        ( transition_with_hash
+        , Validation.extract_delta_transition_chain_witness validation )
+
+      let elaborate (transition_with_hash, delta_transition_chain_witness) =
+        ( transition_with_hash
+        , ( (`Time_received, Truth.True ())
+          , (`Genesis_state, Truth.True ())
+          , (`Proof, Truth.True ())
+          , (`Delta_transition_chain, Truth.True delta_transition_chain_witness)
+          , (`Frontier_dependencies, Truth.True ())
+          , (`Staged_ledger_diff, Truth.True ())
+          , (`Fork_ids, Truth.True ()) ) )
+
+      include Sexpable.Of_sexpable (struct
+                  type t = erased [@@deriving sexp]
+                end)
+                (struct
+                  type nonrec t = t
+
+                  let of_sexpable = elaborate
+
+                  let to_sexpable = erase
+                end)
+
+      include Binable.Of_binable (struct
+                  type t = Erased.Stable.Latest.t [@@deriving bin_io]
+                end)
+                (struct
+                  type nonrec t = t
+
+                  let of_binable = elaborate
+
+                  let to_binable = erase
+                end)
+
+      let to_yojson (transition_with_hash, _) =
+        With_hash.to_yojson to_yojson State_hash.to_yojson transition_with_hash
+
+      let create_unsafe_pre_hashed t =
+        `I_swear_this_is_safe_see_my_comment
+          ( Validation.wrap t
+          |> skip_time_received_validation
+               `This_transition_was_not_received_via_gossip
+          |> skip_genesis_protocol_state_validation
+               `This_transition_was_generated_internally
+          |> skip_proof_validation `This_transition_was_generated_internally
+          |> skip_delta_transition_chain_validation
+               `This_transition_was_not_received_via_gossip
+          |> skip_frontier_dependencies_validation
+               `This_transition_belongs_to_a_detached_subtree
+          |> skip_staged_ledger_diff_validation
+               `This_transition_has_a_trusted_staged_ledger
+          |> skip_fork_ids_validation `This_transition_has_valid_fork_ids )
+
+      let create_unsafe t =
+        create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hash)
+
+      include With_validation
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "external_transition_validated"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t
 
@@ -951,9 +909,9 @@ module Validated = struct
     |> Validation.reset_staged_ledger_diff_validation
 end
 
-let genesis ~genesis_ledger ~base_proof =
+let genesis ~genesis_ledger ~base_proof ~genesis_constants =
   let genesis_protocol_state =
-    Coda_state.Genesis_protocol_state.t ~genesis_ledger
+    Coda_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_constants
   in
   let creator = fst Consensus_state_hooks.genesis_winner in
   let empty_diff =
@@ -984,9 +942,11 @@ module For_tests = struct
     create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
       ~delta_transition_chain_proof ~validation_callback ?next_fork_id_opt ()
 
-  let genesis ~genesis_ledger ~base_proof =
+  let genesis () =
     Fork_id.(set_current empty) ;
-    genesis ~genesis_ledger ~base_proof
+    genesis ~genesis_ledger:Test_genesis_ledger.t
+      ~base_proof:Precomputed_values.base_proof
+      ~genesis_constants:Genesis_constants.compiled
 end
 
 module Transition_frontier_validation (Transition_frontier : sig

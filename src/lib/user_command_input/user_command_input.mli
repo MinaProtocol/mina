@@ -15,6 +15,8 @@ module Payload : sig
     end]
 
     type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+
+    val fee_payer : t -> Account_id.t
   end
 
   [%%versioned:
@@ -25,6 +27,8 @@ module Payload : sig
   end]
 
   type t = Stable.Latest.t [@@deriving sexp, to_yojson]
+
+  val fee_payer : t -> Account_id.t
 end
 
 module Sign_choice : sig
@@ -60,19 +64,29 @@ end]
 
 type t = Stable.Latest.t [@@deriving sexp, to_yojson]
 
+val fee_payer : t -> Account_id.t
+
 val create :
-     ?nonce_opt:Account.Nonce.t option
+     ?nonce:Account.Nonce.t
   -> fee:Currency.Fee.t
+  -> fee_token:Token_id.t
+  -> fee_payer_pk:Public_key.Compressed.t
   -> valid_until:Global_slot.t
   -> memo:User_command_memo.t
   -> body:User_command_payload.Body.t
-  -> sender:Public_key.Compressed.t
+  -> signer:Public_key.Compressed.t
   -> sign_choice:Sign_choice.t
   -> unit
   -> t
 
+val to_user_command :
+     ?nonce_map:Account.Nonce.t Account_id.Map.t
+  -> get_current_nonce:(Account_id.t -> (Account_nonce.t, string) Result.t)
+  -> t
+  -> (User_command.t * Account.Nonce.t Account_id.Map.t) Deferred.Or_error.t
+
 val to_user_commands :
-     get_current_nonce:(   Public_key.Compressed.t
-                        -> (Account_nonce.t, string) Result.t)
+     ?nonce_map:Account.Nonce.t Account_id.Map.t
+  -> get_current_nonce:(Account_id.t -> (Account_nonce.t, string) Result.t)
   -> t list
   -> User_command.t list Deferred.Or_error.t

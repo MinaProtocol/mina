@@ -1,5 +1,4 @@
 open Core
-open Coda_base
 open Gadt_lib
 
 (* There must be at least 2 peers to create a network *)

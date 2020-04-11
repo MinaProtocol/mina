@@ -1,3 +1,4 @@
+open Core_kernel
 open Coda_base
 
 module type S = sig
@@ -6,6 +7,10 @@ module type S = sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
+      val to_latest : t -> t
+
+      val of_latest : t -> (t, _) Result.t
+
       type nonrec t = t [@@deriving compare, sexp, to_yojson]
     end
   end]
