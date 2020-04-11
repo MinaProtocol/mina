@@ -83,6 +83,11 @@ module Reflection = struct
 
     let nn_string a x = id ~typ:(non_null string) a x
 
+    let nn_time a x =
+      reflect
+        (fun t -> Block_time.to_time t |> Time.to_string)
+        ~typ:(non_null string) a x
+
     let string a x = id ~typ:string a x
 
     module F = struct
@@ -130,21 +135,64 @@ module Types = struct
                 "The transaction has either been snarked, reached finality \
                  through consensus or has been dropped" ]
 
+  let consensus_time =
+    let module C = Consensus.Data.Consensus_time in
+    obj "ConsensusTime" ~fields:(fun _ ->
+        [ field "epoch" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ global_slot -> C.epoch global_slot)
+        ; field "slot" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ global_slot -> C.slot global_slot)
+        ; field "globalSlot" ~typ:(non_null uint32)
+            ~args:Arg.[]
+            ~resolve:(fun _ (global_slot : Consensus.Data.Consensus_time.t) ->
+              C.to_uint32 global_slot )
+        ; field "startTime" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} global_slot ->
+              let constants =
+                Consensus.Constants.create
+                  ~protocol_constants:
+                    (Coda_lib.config coda).genesis_constants.protocol
+              in
+              Block_time.to_string @@ C.start_time ~constants global_slot )
+        ; field "endTime" ~typ:(non_null string)
+            ~args:Arg.[]
+            ~resolve:(fun {ctx= coda; _} global_slot ->
+              let constants =
+                Consensus.Constants.create
+                  ~protocol_constants:
+                    (Coda_lib.config coda).genesis_constants.protocol
+              in
+              Block_time.to_string @@ C.end_time ~constants global_slot ) ] )
+
   let block_producer_timing :
       ( _
       , [`Check_again of Block_time.t | `Produce of Block_time.t | `Produce_now]
         option )
       typ =
     obj "BlockProducerTimings" ~fields:(fun _ ->
-        let of_time = Consensus.Data.Consensus_time.of_time_exn in
+        let of_time ~consensus_constants =
+          Consensus.Data.Consensus_time.of_time_exn
+            ~constants:consensus_constants
+        in
         [ field "times"
-            ~typ:
-              ( non_null @@ list @@ non_null
-              @@ Consensus.Data.Consensus_time.graphql_type () )
+            ~typ:(non_null @@ list @@ non_null consensus_time)
             ~args:Arg.[]
-            ~resolve:(fun {ctx= coda; _} -> function `Check_again _time -> []
-              | `Produce time -> [of_time time] | `Produce_now ->
-                  [ of_time
+            ~resolve:(fun {ctx= coda; _} ->
+              let consensus_constants =
+                Consensus.Constants.create
+                  ~protocol_constants:
+                    (Coda_lib.config coda).genesis_constants.protocol
+              in
+              function
+              | `Check_again _time ->
+                  []
+              | `Produce time ->
+                  [of_time time ~consensus_constants]
+              | `Produce_now ->
+                  [ of_time ~consensus_constants
                     @@ Block_time.now (Coda_lib.config coda).time_controller ]
               ) ] )
 
@@ -209,7 +257,8 @@ module Types = struct
           @@ Consensus.Configuration.Fields.fold ~init:[] ~delta:nn_int
                ~k:nn_int ~c:nn_int ~c_times_k:nn_int ~slots_per_epoch:nn_int
                ~slot_duration:nn_int ~epoch_duration:nn_int
-               ~acceptable_network_delay:nn_int )
+               ~acceptable_network_delay:nn_int
+               ~genesis_state_timestamp:nn_time )
 
     let peer : (_, Network_peer.Peer.Display.Stable.V1.t option) typ =
       obj "Peer" ~fields:(fun _ ->
@@ -243,14 +292,8 @@ module Types = struct
                ~block_production_keys:
                  (id ~typ:Schema.(non_null @@ list (non_null string)))
                ~histograms:(id ~typ:histograms)
-               ~consensus_time_best_tip:
-                 (id ~typ:(Consensus.Data.Consensus_time.graphql_type ()))
-               ~consensus_time_now:
-                 (id
-                    ~typ:
-                      Schema.(
-                        non_null
-                          (Consensus.Data.Consensus_time.graphql_type ())))
+               ~consensus_time_best_tip:(id ~typ:consensus_time)
+               ~consensus_time_now:(id ~typ:Schema.(non_null consensus_time))
                ~consensus_mechanism:nn_string
                ~addrs_and_ports:(id ~typ:(non_null addrs_and_ports))
                ~consensus_configuration:

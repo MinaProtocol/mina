@@ -2231,7 +2231,8 @@ let%test_module "transaction_snark" =
 
     type wallet = {private_key: Private_key.t; account: Account.t}
 
-    let random_wallets ?(n = min (Int.pow 2 ledger_depth) (1 lsl 10)) () =
+    let random_wallets
+        ?(n = min (Int.pow 2 Coda_compile_config.ledger_depth) (1 lsl 10)) () =
       let random_wallet () : wallet =
         let private_key = Private_key.create () in
         let public_key =

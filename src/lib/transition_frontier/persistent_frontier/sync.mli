@@ -5,7 +5,6 @@
  *)
 
 open Async_kernel
-open Coda_base
 open Frontier_base
 
 type t
