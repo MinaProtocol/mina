@@ -6,7 +6,7 @@ module Tag = Transaction_union_tag
 module Payload = Transaction_union_payload
 
 type ('payload, 'pk, 'signature) t_ =
-  {payload: 'payload; sender: 'pk; signature: 'signature}
+  {payload: 'payload; signer: 'pk; signature: 'signature}
 [@@deriving eq, sexp, hash]
 
 type t = (Payload.t, Public_key.t, Signature.t) t_
@@ -37,7 +37,7 @@ let typ : (var, t) Typ.t =
 *)
 let of_transaction : Transaction.t -> t = function
   | User_command cmd ->
-      let User_command.Poly.{sender; payload; signature} =
+      let User_command.Poly.{payload; signer; signature} =
         (cmd :> User_command.t)
       in
       { payload= Transaction_union_payload.of_user_command_payload payload
