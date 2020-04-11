@@ -20,6 +20,8 @@ module Prod : Ledger_proof_intf.S with type t = Transaction_snark.t = struct
       [@@deriving compare, sexp, to_yojson]
 
       let to_latest = Fn.id
+
+      let of_latest t = Ok t
     end
   end]
 
@@ -59,6 +61,8 @@ struct
       [@@deriving compare, hash, sexp, yojson]
 
       let to_latest = Fn.id
+
+      let of_latest t = Ok t
     end
   end]
 

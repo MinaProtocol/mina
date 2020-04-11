@@ -6,6 +6,22 @@ module Stable = struct
   module V1 = struct
     type 'a t = [`One of 'a | `Two of 'a * 'a]
     [@@deriving equal, compare, hash, sexp, yojson]
+
+    let to_latest a_latest = function
+      | `One x ->
+          `One (a_latest x)
+      | `Two (x, y) ->
+          `Two (a_latest x, a_latest y)
+
+    let of_latest a_latest = function
+      | `One x ->
+          let open Result.Let_syntax in
+          let%map x = a_latest x in
+          `One x
+      | `Two (x, y) ->
+          let open Result.Let_syntax in
+          let%map x = a_latest x and y = a_latest y in
+          `Two (x, y)
   end
 end]
 

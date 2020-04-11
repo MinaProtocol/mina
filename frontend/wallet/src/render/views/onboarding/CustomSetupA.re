@@ -18,7 +18,9 @@ let make = (~prevStep, ~completeSetup) => {
           width=14.
           icon=Icon.Docs
           style=Button.OffWhite
-          onClick={_ => openExternal("https://codaprotocol.com/docs/")}
+          onClick={_ =>
+            openExternal("https://codaprotocol.com/docs/getting-started/")
+          }
         />
         <Spacer height=2.5 />
         <div className=OnboardingTemplate.Styles.buttonRow>

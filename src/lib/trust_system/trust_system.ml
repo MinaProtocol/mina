@@ -1,24 +1,7 @@
-[%%import
-"/src/config.mlh"]
-
 (** The trust system, instantiated with Coda-specific stuff. *)
 open Core
 
 open Async
-
-[%%if
-consensus_mechanism = "proof_of_stake"]
-
-[%%inject
-"delta_int", delta]
-
-let delta = float_of_int delta_int
-
-[%%else]
-
-let delta = 1.0
-
-[%%endif]
 
 module Actions = struct
   type action =
@@ -26,8 +9,8 @@ module Actions = struct
         (** Connection error while peer connected to node. *)
     | Outgoing_connection_error
         (** Encountered connection error while connecting to a peer. *)
-    | Gossiped_old_transition of int64
-        (** Peer gossiped a transition which was too old. Includes time before cutoff period in which the transition was received, expressed in slots. *)
+    | Gossiped_old_transition of int64 * int
+        (** Peer gossiped a transition which was too old. Includes time before cutoff period in which the transition was received, expressed in slots and delta. *)
     | Gossiped_future_transition
         (** Peer gossiped a transition before its slot. *)
     | Gossiped_invalid_transition
@@ -83,7 +66,7 @@ module Actions = struct
     let epoch_ledger_provided_increment = 10. *. fulfilled_increment in
     let old_gossip_increment = Peer_trust.max_rate 20. in
     match action with
-    | Gossiped_old_transition slot_diff ->
+    | Gossiped_old_transition (slot_diff, delta) ->
         (* NOTE: slot_diff here is [received_slot - (produced_slot + Δ)]
          *
          * We want to decrease the score exponentially based on how out of date the transition
@@ -98,7 +81,7 @@ module Actions = struct
          * giving us [f(x) = (1/(Δ^2/2))x^2 + c].
          *)
         let c = 0.1 in
-        let y = (delta ** 2.0) /. 2.0 in
+        let y = (Float.of_int delta ** 2.0) /. 2.0 in
         let f x = (1.0 /. y *. (x ** 2.0)) +. c in
         Trust_decrease (f (Int64.to_float slot_diff))
     | Gossiped_future_transition ->
@@ -180,8 +163,8 @@ let record_envelope_sender :
   | Local ->
       let action_fmt, action_metadata = Actions.to_log action in
       Logger.debug logger ~module_:__MODULE__ ~location:__LOC__
-        ~metadata:action_metadata
-        "Attempted to record trust action of ourselves: %s" action_fmt ;
+        ~metadata:(("action", `String action_fmt) :: action_metadata)
+        "Attempted to record trust action of ourselves: $action" ;
       Deferred.unit
   | Remote (inet_addr, _peer_id) ->
       record t logger inet_addr action

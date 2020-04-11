@@ -25,4 +25,7 @@ platform :mac do
       certificate_password: ENV["CERTIFICATE_PASSWORD"] || "default"
     )
   end
+
+  lane :ci do
+  end
 end
