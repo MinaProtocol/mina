@@ -63,3 +63,52 @@ let combine_evaluations (type f) t ~crs_max_degree ~(mul : f -> f -> f) ~add
   combine_evaluations' t evals0 evals1
     ~shifted_pow:(fun deg x -> pow x (crs_max_degree - deg))
     ~mul ~add ~one ~evaluation_point ~xi
+
+open Dlog_marlin_types.Poly_comm
+
+let combine_split_commitments t ~scale ~add ~xi (type n)
+    (without_degree_bound : (_, n) Vector.t) with_degree_bound =
+  match without_degree_bound with
+  | [] ->
+      failwith "combine_commitments: empty list"
+  | init :: without_degree_bound ->
+    match Array.to_list init with
+    | [] -> failwith "Empty initial array"
+    | init0 :: inits ->
+      let polys =
+        inits @
+         List.concat_map (Vector.to_list without_degree_bound)
+          ~f:Array.to_list
+        @ List.concat_map (Vector.to_list with_degree_bound)
+          ~f:(fun {With_degree_bound.unshifted; shifted} ->
+              Array.to_list unshifted @ [shifted] )
+      in
+      List.fold_left polys ~init:init0 ~f:(fun acc p -> add p (scale acc xi))
+
+let combine_split_evaluations' (type a n m f)
+    ({without_degree_bound; with_degree_bound} : (a, n, m) t)
+    ~shifted_pow ~(mul : f -> f -> f) ~add ~one
+    ~(evaluation_point: f)
+    ~(xi:f)
+    (evals0 : (f array, n ) Vector.t)
+    (evals1 : (f array, m) Vector.t)
+  : f
+  =
+  match evals0 with
+  | [] -> failwith "combine_split_evaluations: empty list"
+  | init:: evals0 ->
+    match Array.to_list init with
+    | [] -> failwith "Empty initial array"
+    | init :: inits ->
+    let evals =
+      inits@ List.concat_map (Vector.to_list evals0) ~f:Array.to_list
+      @ List.concat
+          (Vector.to_list
+             (Vector.map2 with_degree_bound evals1 ~f:(fun deg unshifted ->
+                  let u = unshifted.(Array.length unshifted - 1) in
+                  Array.to_list unshifted @
+                  [mul (shifted_pow deg evaluation_point) u]
+               )))
+    in
+    List.fold_left evals ~init ~f:(fun acc fx -> add fx (mul acc xi))
+

@@ -432,7 +432,7 @@ module Make (Inputs : Inputs
       ~evaluation_point
       ((without_degree_bound : (_, b_plus_19) Vector.t), with_degree_bound)
       ~h_minus_1 ~k_minus_1 =
-    Pcs_batch.combine_evaluations'
+    Pcs_batch.combine_split_evaluations'
       (Common.dlog_pcs_batch b_plus_19 ~h_minus_1 ~k_minus_1)
       ~shifted_pow ~mul:Fq.mul ~add:Fq.add ~one:Fq.one ~evaluation_point
       ~xi
@@ -476,6 +476,22 @@ module Make (Inputs : Inputs
   let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t) =
     Field.pack (Challenge.to_bits t)
 
+  let actual_evaluation 
+      (e : Field.t array) (pt : Field.t) : Field.t =
+    let pt_n =
+      let max_degree_log2 = failwith "TODO" in
+      let rec go acc i =
+        if i = 0
+        then acc
+        else go Field.(acc * acc) (i - 1)
+      in
+      go pt max_degree_log2
+    in
+    match List.rev (Array.to_list e) with
+    | e :: es ->
+      List.fold ~init:e es ~f:(fun acc y -> Field.(y + pt_n * acc))
+    | [] -> failwith "empty list"
+
   let finalize_other_proof (type b)
       (module Branching : Nat.Add.Intf with type n = b) ?actual_branching
       ~shifted_pow ~domain_h ~domain_k ~input_domain ~h_minus_1 ~k_minus_1
@@ -498,8 +514,8 @@ module Make (Inputs : Inputs
     let absorb_evals x_hat e =
       let xs, ys = Evals.to_vectors e in
       List.iter
-        Vector.(x_hat :: (to_list xs @ to_list ys))
-        ~f:(Sponge.absorb sponge)
+        Vector.([|x_hat|] :: (to_list xs @ to_list ys))
+        ~f:(Array.iter ~f:(Sponge.absorb sponge))
     in
     (* A lot of hashing. *)
     absorb_evals x_hat1 beta_1_evals ;
@@ -533,22 +549,24 @@ module Make (Inputs : Inputs
         in
         let combine pt x_hat e =
           let pi = Branching.add Nat.N19.n in
-          let a, b = Evals.to_vectors e in
+          let a, b = Evals.to_vectors (e : Fq.t array Evals.t)  in
           let sg_evals =
             match actual_branching with
             | None ->
-                Vector.map sg_olds ~f:(fun f -> f pt)
+              Vector.map sg_olds ~f:(fun f -> [|f pt|])
             | Some branching ->
                 let mask =
                   ones_vector ~first_zero:branching (Vector.length sg_olds)
                 in
-                Vector.map2 mask sg_olds ~f:(fun b f -> (b :> Field.t) * f pt)
+                Vector.map2 mask sg_olds ~f:(fun b f -> [|(b :> Field.t) * f pt|])
           in
-          let v = Vector.append sg_evals (x_hat :: a) (snd pi) in
-          combined_evaluation pi ~shifted_pow ~xi ~evaluation_point:pt (v, b)
+          let v = Vector.append sg_evals ([|x_hat|] :: a) (snd pi) in
+          combined_evaluation pi ~shifted_pow ~xi ~evaluation_point:pt 
+            (v, b)
             ~h_minus_1 ~k_minus_1
         in
-        combine marlin.beta_1 x_hat1 beta_1_evals
+        combine 
+          marlin.beta_1 x_hat1 beta_1_evals
         + r
           * ( combine marlin.beta_2 x_hat2 beta_2_evals
             + (r * combine marlin.beta_3 x_hat3 beta_3_evals) )
@@ -565,23 +583,29 @@ module Make (Inputs : Inputs
       equal b b_actual
     in
     let marlin_checks_passed =
+      let e = actual_evaluation in
       Marlin_checks.checked
         (module Impl)
         ~input_domain ~domain_h ~domain_k ~x_hat_beta_1:x_hat1
         marlin
-        { w_hat= beta_1_evals.w_hat
-        ; g_1= beta_1_evals.g_1
-        ; h_1= beta_1_evals.h_1
-        ; z_hat_a= beta_1_evals.z_hat_a
-        ; z_hat_b= beta_1_evals.z_hat_b
-        ; g_2= beta_2_evals.g_2
-        ; h_2= beta_2_evals.h_2
-        ; g_3= beta_3_evals.g_3
-        ; h_3= beta_3_evals.h_3
-        ; row= beta_3_evals.row
-        ; col= beta_3_evals.col
-        ; value= beta_3_evals.value
-        ; rc= beta_3_evals.rc }
+        { w_hat= e beta_1_evals.w_hat marlin.beta_1
+        ; g_1= e beta_1_evals.g_1 marlin.beta_1
+        ; h_1= e beta_1_evals.h_1 marlin.beta_1
+        ; z_hat_a= e beta_1_evals.z_hat_a marlin.beta_1
+        ; z_hat_b= e beta_1_evals.z_hat_b marlin.beta_1
+        ; g_2=e beta_2_evals.g_2 marlin.beta_2
+        ; h_2=e beta_2_evals.h_2 marlin.beta_2
+        ; g_3=e beta_3_evals.g_3 marlin.beta_3
+        ; h_3=e beta_3_evals.h_3 marlin.beta_3
+        ; row=
+            Abc.map beta_3_evals.row ~f:(Fn.flip e marlin.beta_3)
+        ; col=
+            Abc.map beta_3_evals.col ~f:(Fn.flip e marlin.beta_3)
+        ; value =
+            Abc.map beta_3_evals.value ~f:(Fn.flip e marlin.beta_3)
+        ; rc=
+            Abc.map beta_3_evals.rc ~f:(Fn.flip e marlin.beta_3)
+        }
     in
     print_bool "xi_and_r_correct" xi_and_r_correct ;
     print_bool "combined_inner_product_correct" combined_inner_product_correct ;

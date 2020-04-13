@@ -20,7 +20,7 @@ let unrelated_g (x, y) =
   let str = Fn.compose bits_to_bytes Fp.to_bits in
   group_map (fp_random_oracle (str x ^ str y))
 
-let crs_max_degree = 1 lsl 22
+let dlog_crs_max_degree = 1 lsl 17
 
 open Impl
 
@@ -76,12 +76,20 @@ module Input_domain = struct
   let lagrange_commitments =
     let domain_size = Domain.size domain in
     let u = Unsigned.Size_t.of_int in
+    assert (domain_size < dlog_crs_max_degree) ;
     time "lagrange" (fun () ->
         Array.init domain_size ~f:(fun i ->
+            let c =
+                Snarky_bn382.Fq_urs.lagrange_commitment
+                (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
+                 (u domain_size) (u i)
+            in
+            let v = Snarky_bn382.Fq_poly_comm.unshifted c in
+            assert (G.Affine.Vector.length v = 1);
+            let g = G.Affine.Vector.get v 0 in
             Snarky_bn382_backend.G.Affine.of_backend
-              (Snarky_bn382.Fq_urs.lagrange_commitment
-                 (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
-                 (u domain_size) (u i)) ) )
+              g
+          ) )
 end
 
 module G = struct

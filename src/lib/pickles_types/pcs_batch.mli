@@ -42,3 +42,27 @@ val combine_evaluations' :
   -> ('f, 'n) Vector.t
   -> ('f, 'm) Vector.t
   -> 'f
+
+open Dlog_marlin_types.Poly_comm
+
+val combine_split_commitments :
+     (int, 'n, 'm) t
+  -> scale:('g -> 'f -> 'g)
+  -> add:('g -> 'g -> 'g)
+  -> xi:'f
+  -> ('g Without_degree_bound.t, 'n) Vector.t
+  -> ('g With_degree_bound.t, 'm) Vector.t
+  -> 'g
+
+val combine_split_evaluations' :
+     ('a, 'n, 'm) t
+  -> shifted_pow:('a -> 'f -> 'f)
+  -> mul:('f -> 'f -> 'f)
+  -> add:('f -> 'f -> 'f)
+  -> one:'f
+  -> evaluation_point:'f
+  -> xi:'f
+  -> ('f array, 'n) Vector.t
+  -> ('f array, 'm) Vector.t
+  -> 'f
+

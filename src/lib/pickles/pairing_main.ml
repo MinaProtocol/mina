@@ -98,10 +98,18 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
         let low_bits, high_bit = t in
         Sponge.absorb sponge (`Field low_bits) ;
         Sponge.absorb sponge (`Bits [high_bit])
+    | Without_degree_bound ->
+      Array.iter t ~f:(fun t ->
+        absorb sponge PC t )
+    | With_degree_bound ->
+      Array.iter t.unshifted ~f:(fun t ->
+          absorb sponge PC t ) ;
+      absorb sponge PC t.shifted
     | ty1 :: ty2 ->
         let t1, t2 = t in
         let absorb t = absorb sponge t in
         absorb ty1 t1 ; absorb ty2 t2
+  ;;
 
   module Scalar_challenge = SC.Make(Impl)(G)(Challenge)(Endo.Dlog)
 
@@ -162,7 +170,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
       (advice : _ Openings.Bulletproof.Advice.t)
       ~polynomials:(without_degree_bound, with_degree_bound)
       ~openings_proof:({lr; delta; z_1; z_2; sg} :
-                        (Fq.t, G.t) Openings.Bulletproof.t) =
+                         (G.t, Fq.t) Openings.Bulletproof.t) =
     (* a_hat should be equal to
        sum_i < t, r^i pows(beta_i) >
        = sum_i r^i < t, pows(beta_i) > *)
@@ -172,7 +180,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
     in
     let open G in
     let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
-      Pcs_batch.combine_commitments
+      Pcs_batch.combine_split_commitments
         pcs_batch ~scale:Scalar_challenge.endo ~add:( + ) ~xi
         without_degree_bound with_degree_bound
     in
@@ -204,14 +212,14 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
       ~xi
       ~sponge ~public_input
       ~(sg_old : (_, Branching.n) Vector.t) ~combined_inner_product ~advice
-      ~messages ~openings_proof =
+      ~(messages : _ Dlog_marlin_types.Messages.t) ~openings_proof =
     let receive ty f =
       let x = f messages in
       absorb sponge ty x ; x
     in
     let sample () = Sponge.squeeze sponge ~length:Challenge.length in
     let sample_scalar () = squeeze_scalar sponge in
-    let open Pairing_marlin_types.Messages in
+    let open Dlog_marlin_types.Messages in
     let x_hat =
       assert (
         Int.ceil_pow2 (Array.length public_input)
@@ -220,26 +228,28 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
         (Array.mapi public_input ~f:(fun i x ->
              (x, lagrange_precomputations.(i)) ))
     in
+    let without = Type.Without_degree_bound in
+    let with_ = Type.With_degree_bound in
     absorb sponge PC x_hat ;
-    let w_hat = receive PC w_hat in
-    let z_hat_a = receive PC z_hat_a in
-    let z_hat_b = receive PC z_hat_b in
+    let w_hat = receive without w_hat in
+    let z_hat_a = receive without z_hat_a in
+    let z_hat_b = receive without z_hat_b in
     let alpha = sample () in
     let eta_a = sample () in
     let eta_b = sample () in
     let eta_c = sample () in
-    let g_1, h_1 = receive ((PC :: PC) :: PC) gh_1 in
+    let g_1, h_1 = receive (with_ :: without) gh_1 in
     let beta_1 = sample_scalar () in
     (* At this point, we should use the previous "bulletproof_challenges" to
        compute to compute f(beta_1) outside the snark
        where f is the polynomial corresponding to sg_old
     *)
     let sigma_2, (g_2, h_2) =
-      receive (Scalar :: Type.degree_bounded_pc :: PC) sigma_gh_2
+      receive (Scalar :: with_ :: without) sigma_gh_2
     in
     let beta_2 = sample_scalar () in
     let sigma_3, (g_3, h_3) =
-      receive (Scalar :: Type.degree_bounded_pc :: PC) sigma_gh_3
+      receive (Scalar :: with_ :: without) sigma_gh_3
     in
     let beta_3 = sample_scalar () in
     let sponge_before_evaluations = Sponge.copy sponge in
@@ -265,7 +275,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
       let without_degree_bound =
         let T = Branching.eq in
         Vector.append sg_old
-          [ x_hat
+          [ [| x_hat |]
           ; w_hat
           ; z_hat_a
           ; z_hat_b
