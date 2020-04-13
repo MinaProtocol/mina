@@ -247,7 +247,7 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
   let client_trustlist =
     ref
       (Unix.Cidr.Set.of_list
-         ( Unix.Cidr.create ~base_address:Unix.Inet_addr.localhost ~bits:32
+         ( Unix.Cidr.create ~base_address:Unix.Inet_addr.localhost ~bits:8
          :: client_trustlist ))
   in
   (* Setup RPC server for client interactions *)
