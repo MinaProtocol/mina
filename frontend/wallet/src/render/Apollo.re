@@ -6,10 +6,15 @@ type retryOptions;
 external createRetryLink: retryOptions => ReasonApolloTypes.apolloLink =
   "RetryLink";
 
-let client = {
+let client = host => {
+  let defaultPort = "3085";
+  let parsedHost = switch (String.contains(~substring=":", host)) {
+  | true => host
+  | false => host ++ ":" ++ defaultPort
+  }
   let inMemoryCache = ApolloInMemoryCache.createInMemoryCache();
 
-  let httpUri = "http://localhost:3085/graphql";
+  let httpUri = "http://" ++ parsedHost ++ "/graphql";
   let httpLink =
     ApolloLinks.createHttpLink(~uri=httpUri, ~fetch=Bindings.Fetch.fetch, ());
 
@@ -29,7 +34,7 @@ let client = {
 
   let retryLink = ApolloLinks.from([|retry, httpLink|]);
 
-  let wsUri = "ws://localhost:3085/graphql";
+  let wsUri = "ws://" ++ parsedHost ++ "/graphql";
   let wsObject: ReasonApolloTypes.webSocketLinkT = {
     uri: wsUri,
     options: {
@@ -56,6 +61,16 @@ let client = {
     ~cache=inMemoryCache,
     (),
   );
+};
+
+module Provider = {
+  [@react.component]
+  let make = (~children) => {
+    let (daemonHost, _) = React.useContext(DaemonProvider.context);
+    <ReasonApollo.Provider client={client(daemonHost)}>
+    {children}
+    </ReasonApollo.Provider>
+  };
 };
 
 module Decoders = {
