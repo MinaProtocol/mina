@@ -194,7 +194,7 @@ let pack_basic (type field other_field other_field_var)
         [|Challenge.to_bits x|]
     | Bulletproof_challenge ->
         let Scalar_challenge pre = x.prechallenge in
-        [|x.is_square :: Challenge.to_bits pre|]
+        [| [x.is_square] ; Challenge.to_bits pre|]
     | _ ->
         failwith "unknown basic spec"
   in
@@ -254,9 +254,9 @@ let packed_typ_basic (type field other_field other_field_var)
       ; challenge1: Challenge.Constant.t
       ; challenge2: (* Challenge.t *) Field.t
       ; bulletproof_challenge1:
-          (Challenge.Constant.t Sc.t, bool) Bulletproof_challenge.t
+          ( Challenge.Constant.t Sc.t, bool) Bulletproof_challenge.t
       ; bulletproof_challenge2:
-          (Challenge.t Sc.t, Boolean.var) Bulletproof_challenge.t
+          (Field.t Sc.t, Boolean.var) Bulletproof_challenge.t
       ; .. >
       as
       'a
@@ -276,26 +276,18 @@ let packed_typ_basic (type field other_field other_field_var)
     | Challenge ->
         T (Challenge.packed_typ, Fn.id)
     | Bulletproof_challenge ->
-        let length = Challenge.length + 1 in
         let typ =
-          Typ.transport Typ.field
-            ~there:(fun {Bulletproof_challenge.prechallenge=Sc.Scalar_challenge pre; is_square} ->
-              Field.Constant.project
-                (is_square :: Challenge.Constant.to_bits pre) )
-            ~back:(fun x ->
-              match List.take (Field.Constant.unpack x) length with
-              | is_square :: bs ->
-                  {is_square; prechallenge= Scalar_challenge (Challenge.Constant.of_bits bs)}
-              | _ ->
-                  assert false )
+          let there = fun {Bulletproof_challenge.prechallenge=Sc.Scalar_challenge pre; is_square} ->
+                (is_square, pre)  in
+          let back = fun (is_square, pre) ->
+                {Bulletproof_challenge.is_square
+                ; prechallenge= Sc.Scalar_challenge pre}  in
+          Typ.transport Typ.(Boolean.typ * Challenge.packed_typ)
+            ~there
+            ~back
+          |> Typ.transport_var ~there ~back
         in
-        T (typ, fun x ->
-        (* TODO: Not sure this unpacking is quite necessary. *)
-            let t = Bulletproof_challenge.unpack
-              (Field.unpack ~length x)
-            in
-            { t with prechallenge = Scalar_challenge t.prechallenge }
-          )
+        T (typ,           Fn.id)
     | _ ->
         failwith "etyp: unhandled variant"
   in

@@ -367,20 +367,6 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
         (module Impl)
         ~x_hat_beta_1 ~input_domain ~domain_h ~domain_k marlin evals
     in
-(* TODO
-    as_prover
-      As_prover.(
-        fun () ->
-          if not (read Boolean.typ r_correct) then (
-            print_fp "r" r ;
-            print_fp "r_actual" (Field.pack r_actual) )) ;
-    as_prover
-      As_prover.(
-        fun () ->
-          if not (read Boolean.typ xi_correct) then (
-            print_fp "xi" xi ;
-            print_fp "xi_actual" (Field.pack xi_actual) )) ;
-*)
     List.iter
       ~f:(Tuple2.uncurry (Fn.flip print_bool))
       [ (xi_correct, "xi_correct")
@@ -469,7 +455,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
         let c2 = bulletproof_challenges_actual.(i) in
         Boolean.Assert.( = ) c1.Bulletproof_challenge.is_square
           (Boolean.if_ is_base_case ~then_:c1.is_square ~else_:c2.is_square) ;
-        let c1 = pack_scalar_challenge c1.prechallenge in
+        let Pickles_types.Scalar_challenge.Scalar_challenge c1 = c1.prechallenge in
         let c2 =
           Field.if_ is_base_case ~then_:c1 ~else_:(pack_scalar_challenge c2.prechallenge)
         in

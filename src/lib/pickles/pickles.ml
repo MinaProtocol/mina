@@ -27,7 +27,7 @@ end
 
 (* Making this dynamic was a bit complicated. *)
 let permitted_domains =
-  [ Domain.Pow_2_roots_of_unity 14
+  [ Domain.Pow_2_roots_of_unity 13
   ; Domain.Pow_2_roots_of_unity 17
   ; Pow_2_roots_of_unity 18
   ; Pow_2_roots_of_unity 19 ]
@@ -35,7 +35,9 @@ let permitted_domains =
 let check_step_domains step_domains =
   Vector.iter step_domains ~f:(fun {Domains.h; k} ->
       List.iter [h; k] ~f:(fun d ->
-          assert (List.mem permitted_domains d ~equal:Domain.equal) ) )
+          if not (List.mem permitted_domains d ~equal:Domain.equal) 
+          then failwithf "Bad domain size 2^%d" (Domain.log2_size d) ()
+        ) )
 
 let permitted_shifts =
   List.map permitted_domains ~f:(fun d -> Domain.size d - 1) |> Int.Set.of_list
@@ -401,7 +403,7 @@ module Unfinalized = struct
     ( Field.t
     , Field.t Scalar_challenge.t
     , Fq.t
-    , ( ( Challenge.t Scalar_challenge.t, Boolean.var) Bulletproof_challenge.t
+    , ( ( Field.t Scalar_challenge.t, Boolean.var) Bulletproof_challenge.t
       , Wrap_circuit_bulletproof_rounds.n )
       Pickles_types.Vector.t
     , Fpv.t )

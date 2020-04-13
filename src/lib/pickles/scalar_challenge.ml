@@ -143,11 +143,19 @@ module Make
   E.g., try
   sx = (1 + (endo - 1) * bits.(2*i + 1)) * x
 *)
+
+        (*
         Field.(
         (* (endo - 1) * bits.(2*i + 1) * x = sx - x *)
           assert_r1cs
             (scale (b_2i1 :> t) Constant.(Endo.base - one)) x
-            (sx - x)) ;
+            (sx - x)) ; *)
+
+        Field.(
+        (* (endo - 1) * bits.(2*i + 1) * x = sx - x *)
+          assert_r1cs
+            (scale (b_2i1 :> t) Constant.(Endo.base - one) + one) x
+            sx) ;
         go (p_plus_q_plus_p acc (sx, y)) (i - 1)
     in
     let phi (x, y) = (Field.scale x Endo.base, y) in
