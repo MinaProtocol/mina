@@ -100,7 +100,6 @@ module type S = sig
         'staged_ledger_diff =
         [`Staged_ledger_diff] * (unit, _) Truth.t
       constraint 'protocol_versions = [`Protocol_versions] * (unit, _) Truth.t
->>>>>>> develop
 
     type fully_invalid =
       ( [`Time_received] * unit Truth.false_t

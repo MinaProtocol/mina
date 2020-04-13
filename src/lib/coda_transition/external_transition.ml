@@ -782,102 +782,6 @@ module Validated = struct
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
-          * ( [`Time_received] * (unit, Truth.True.t) Truth.t
-            , [`Genesis_state] * (unit, Truth.True.t) Truth.t
-            , [`Proof] * (unit, Truth.True.t) Truth.t
-            , [`Delta_transition_chain]
-              * ( State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
-                , Truth.True.t )
-                Truth.t
-            , [`Frontier_dependencies] * (unit, Truth.True.t) Truth.t
-            , [`Staged_ledger_diff] * (unit, Truth.True.t) Truth.t
-            , [`Protocol_versions] * (unit, Truth.True.t) Truth.t )
-            Validation.Stable.V1.t
-        [@@deriving version {of_binable}]
-
-        module Erased = struct
-          (* if this type receives a new version, that changes the serialization of
-             the type `t', so that type must also get a new version
-          *)
-          [%%versioned
-          module Stable = struct
-            module V1 = struct
-              type t =
-                (Stable.V1.t, State_hash.Stable.V1.t) With_hash.Stable.V1.t
-                * State_hash.Stable.V1.t Non_empty_list.Stable.V1.t
-              [@@deriving sexp]
-
-              let to_latest = Fn.id
-            end
-          end]
-        end
-
-        type erased = Erased.Stable.Latest.t [@@deriving sexp]
-
-        let erase (transition_with_hash, validation) =
-          ( transition_with_hash
-          , Validation.extract_delta_transition_chain_witness validation )
-
-        let elaborate (transition_with_hash, delta_transition_chain_witness) =
-          ( transition_with_hash
-          , ( (`Time_received, Truth.True ())
-            , (`Genesis_state, Truth.True ())
-            , (`Proof, Truth.True ())
-            , ( `Delta_transition_chain
-              , Truth.True delta_transition_chain_witness )
-            , (`Frontier_dependencies, Truth.True ())
-            , (`Staged_ledger_diff, Truth.True ())
-            , (`Protocol_versions, Truth.True ()) ) )
-
-        include Sexpable.Of_sexpable (struct
-                    type t = erased [@@deriving sexp]
-                  end)
-                  (struct
-                    type nonrec t = t
-
-                    let of_sexpable = elaborate
-
-                    let to_sexpable = erase
-                  end)
-
-        include Binable.Of_binable (Erased.Stable.V1)
-                  (struct
-                    type nonrec t = t
-
-                    let of_binable = elaborate
-
-                    let to_binable = erase
-                  end)
-
-        let to_yojson (transition_with_hash, _) =
-          With_hash.to_yojson to_yojson State_hash.to_yojson
-            transition_with_hash
-
-        let create_unsafe_pre_hashed t =
-          `I_swear_this_is_safe_see_my_comment
-            ( Validation.wrap t
-            |> skip_time_received_validation
-                 `This_transition_was_not_received_via_gossip
-            |> skip_genesis_protocol_state_validation
-                 `This_transition_was_generated_internally
-            |> skip_proof_validation `This_transition_was_generated_internally
-            |> skip_delta_transition_chain_validation
-                 `This_transition_was_not_received_via_gossip
-            |> skip_frontier_dependencies_validation
-                 `This_transition_belongs_to_a_detached_subtree
-            |> skip_staged_ledger_diff_validation
-                 `This_transition_has_a_trusted_staged_ledger
-            |> skip_protocol_versions_validation
-                 `This_transition_has_valid_protocol_versions )
-
-        let create_unsafe t =
-          create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hash)
-
-        include With_validation
-=======
       type t =
         (t_, State_hash.t) With_hash.t
         * ( [`Time_received] * (unit, Truth.True.t) Truth.t
@@ -907,10 +811,7 @@ module Validated = struct
             let to_latest = Fn.id
           end
         end]
->>>>>>> develop
       end
-
-      type erased = Erased.Stable.Latest.t [@@deriving sexp]
 
       let erase (transition_with_hash, validation) =
         ( transition_with_hash
@@ -924,11 +825,10 @@ module Validated = struct
           , (`Delta_transition_chain, Truth.True delta_transition_chain_witness)
           , (`Frontier_dependencies, Truth.True ())
           , (`Staged_ledger_diff, Truth.True ())
-          , (`Fork_ids, Truth.True ()) ) )
+          , (`Protocol_versions, Truth.True ()) ) )
 
-      include Sexpable.Of_sexpable (struct
-                  type t = erased [@@deriving sexp]
-                end)
+      include Sexpable.Of_sexpable
+                (Erased.Stable.V1)
                 (struct
                   type nonrec t = t
 
@@ -937,9 +837,8 @@ module Validated = struct
                   let to_sexpable = erase
                 end)
 
-      include Binable.Of_binable (struct
-                  type t = Erased.Stable.Latest.t [@@deriving bin_io]
-                end)
+      include Binable.Of_binable
+                (Erased.Stable.V1)
                 (struct
                   type nonrec t = t
 
@@ -965,7 +864,8 @@ module Validated = struct
                `This_transition_belongs_to_a_detached_subtree
           |> skip_staged_ledger_diff_validation
                `This_transition_has_a_trusted_staged_ledger
-          |> skip_fork_ids_validation `This_transition_has_valid_fork_ids )
+          |> skip_protocol_versions_validation
+               `This_transition_has_valid_protocol_versions )
 
       let create_unsafe t =
         create_unsafe_pre_hashed (With_hash.of_data t ~hash_data:state_hash)
@@ -1049,7 +949,7 @@ module For_tests = struct
       ~delta_transition_chain_proof ~validation_callback
       ?proposed_protocol_version_opt ()
 
-  let genesis ~genesis_ledger ~base_proof =
+  let genesis () =
     Protocol_version.(set_current zero) ;
     genesis ~genesis_ledger:Test_genesis_ledger.t
       ~base_proof:Precomputed_values.base_proof

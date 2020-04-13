@@ -187,7 +187,8 @@ let run_test () : unit Deferred.t =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
-             ~gossip_net_params ~is_seed:true ~initial_protocol_version:Protocol_version.zero
+             ~gossip_net_params ~is_seed:true
+             ~initial_protocol_version:Protocol_version.zero
              ~proposed_protocol_version_opt:None
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
