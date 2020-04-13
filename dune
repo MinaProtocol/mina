@@ -14,6 +14,7 @@
    (source_tree ../ff-fft)
    (source_tree ../gm17)
    (source_tree ../groth16)
+   (source_tree ../groupmap)
    (source_tree ../r1cs-core)
    (source_tree ../r1cs-std))
  (action

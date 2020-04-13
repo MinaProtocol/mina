@@ -109,7 +109,7 @@ struct
 
   let make =
     foreign (prefix "make")
-      ( size_t @-> size_t @-> size_t @-> size_t @-> Urs.typ
+      ( size_t @-> size_t @-> size_t @-> size_t @-> size_t @-> Urs.typ
       @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ
       @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ
       @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ @-> G1Affine.typ
@@ -332,13 +332,14 @@ module Pairing_marlin_proof
 struct
   open F
 
-  include (
-    struct
-        type t = unit ptr
+  module T : Type = struct
+    type t = unit ptr
 
-        let typ = ptr void
-      end :
-      Type )
+    let typ = ptr void
+  end
+
+  include T
+  module Vector = Vector (P) (T) (F)
 
   module Evals = struct
     include (
@@ -369,6 +370,10 @@ struct
   let verify =
     foreign (prefix "verify")
       (VerifierIndex.typ @-> typ @-> returning bool)
+
+  let batch_verify =
+    foreign (prefix "batch_verify")
+      (VerifierIndex.typ @-> Vector.typ @-> returning bool)
 
   let make =
     foreign (prefix "make")
@@ -673,6 +678,10 @@ struct
   let verify =
     foreign (prefix "verify")
       (VerifierIndex.typ @-> typ @-> returning bool)
+
+  let batch_verify =
+    foreign (prefix "batch_verify")
+      (VerifierIndex.typ @-> Vector.typ @-> returning bool)
 
   let delete = foreign (prefix "delete") (typ @-> returning void)
 
@@ -1124,4 +1133,28 @@ module Full (F : Ctypes.FOREIGN) = struct
       (Fq_proof)
       (Fq_vector_triple)
       (F)
+
+  module Endo = struct
+    let endo typ which =
+      let open F in
+      F.foreign (prefix which) (void @-> returning typ)
+
+    module Pairing = struct
+      let base = endo Fq.typ "fp_endo_base"
+      let scalar = endo Fp.typ "fp_endo_scalar"
+    end
+
+    module Dlog = struct
+      let base = endo Fp.typ "fq_endo_base"
+      let scalar = endo Fq.typ "fq_endo_scalar"
+    end
+  end
+
+  let batch_pairing_check =
+    let open F in
+    foreign
+      (prefix "batch_pairing_check")
+      ( Fp_urs.typ @-> Usize_vector.typ @-> G1.Affine.Vector.typ
+      @-> G1.Affine.Vector.typ @-> G1.Affine.Vector.typ
+      @-> G1.Affine.Vector.typ @-> returning bool )
 end
