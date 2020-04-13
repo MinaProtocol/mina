@@ -561,7 +561,7 @@ let daemon logger =
          let%bind client_trustlist =
            Reader.load_sexp
              (conf_dir ^/ "client_trustlist")
-             [%of_sexp: Unix.Inet_addr.Blocking_sexp.t list]
+             [%of_sexp: Unix.Cidr.t list]
            >>| Or_error.ok
          in
          Stream.iter
