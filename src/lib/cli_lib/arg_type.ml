@@ -69,6 +69,9 @@ let hd_index =
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
 
+let cidr_mask =
+  Command.Arg_type.map Command.Param.string ~f:Unix.Cidr.of_string
+
 let log_level =
   Command.Arg_type.map Command.Param.string ~f:(fun log_level_str_with_case ->
       let open Logger in

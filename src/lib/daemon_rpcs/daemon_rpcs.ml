@@ -741,7 +741,7 @@ module Add_trustlist = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Core.Unix.Inet_addr.Stable.V1.t
+        type t = Core.Unix.Cidr.Stable.V1.t
 
         let to_latest = Fn.id
       end
@@ -774,7 +774,7 @@ module Remove_trustlist = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Core.Unix.Inet_addr.Stable.V1.t
+        type t = Core.Unix.Cidr.Stable.V1.t
 
         let to_latest = Fn.id
       end
@@ -820,7 +820,7 @@ module Get_trustlist = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type t = Core.Unix.Inet_addr.Stable.V1.t list
+        type t = Core.Unix.Cidr.Stable.V1.t list
 
         let to_latest = Fn.id
       end
