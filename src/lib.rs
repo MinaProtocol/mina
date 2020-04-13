@@ -2781,11 +2781,8 @@ pub extern "C" fn camlsnark_bn382_fq_proof_batch_verify(
     let index = unsafe { &(*index) };
     let proofs = unsafe { &(*proofs) };
 
-    match DlogProof::<GAffine>::verify::<DefaultFqSponge<Bn_382GParameters>, DefaultFrSponge<Fq> >(
-        proofs, index, &mut rand_core::OsRng) {
-        Ok(_) => true,
-        Err(_) => false
-    }
+    DlogProof::<GAffine>::verify::<DefaultFqSponge<Bn_382GParameters>, DefaultFrSponge<Fq> >(
+        proofs, index, &mut rand_core::OsRng)
 }
 
 #[no_mangle]
