@@ -671,10 +671,6 @@ struct
       ( Index.typ @-> ScalarFieldVector.typ @-> ScalarFieldVector.typ
       @-> ScalarFieldVector.typ @-> AffineCurve.Vector.typ @-> returning typ )
 
-  let batch_verify =
-    foreign (prefix "batch_verify")
-      (VerifierIndex.typ @-> Vector.typ @-> returning bool)
-
   let verify =
     foreign (prefix "verify")
       (VerifierIndex.typ @-> typ @-> returning bool)
