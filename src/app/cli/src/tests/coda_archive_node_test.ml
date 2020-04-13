@@ -40,7 +40,7 @@ let main () =
   let observed_hashset = State_hash.Hash_set.of_list observed_hashes in
   let%bind stored_transitions =
     Coda_worker_testnet.Api.get_all_transitions testnet 1
-      largest_account_public_key
+      (Account_id.create largest_account_public_key Token_id.default)
   in
   let stored_state_hashes =
     State_hash.Hash_set.of_list

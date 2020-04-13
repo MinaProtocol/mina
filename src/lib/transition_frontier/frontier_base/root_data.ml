@@ -1,37 +1,26 @@
 open Core_kernel
 open Coda_base
 open Coda_transition
-open Module_version
 
 module Historical = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { transition: External_transition.Validated.Stable.V1.t
-          ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
-          ; pending_coinbase: Pending_coinbase.Stable.V1.t
-          ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
-        [@@deriving bin_io, version]
-      end
+      type t =
+        { transition: External_transition.Validated.Stable.V1.t
+        ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
+        ; pending_coinbase: Pending_coinbase.Stable.V1.t
+        ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transition_frontier_limited_root_data"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  include Stable.Latest
+  type t = Stable.Latest.t =
+    { transition: External_transition.Validated.t
+    ; scan_state: Staged_ledger.Scan_state.t
+    ; pending_coinbase: Pending_coinbase.t
+    ; staged_ledger_target_ledger_hash: Ledger_hash.t }
 
   let of_breadcrumb breadcrumb =
     let transition = Breadcrumb.validated_transition breadcrumb in
@@ -47,65 +36,53 @@ module Historical = struct
 end
 
 module Limited = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { transition: External_transition.Validated.Stable.V1.t
-          ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
-          ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-        [@@deriving bin_io, version]
-      end
+      type t =
+        { transition: External_transition.Validated.Stable.V1.t
+        ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
+        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
+
+      let to_yojson {transition; scan_state= _; pending_coinbase} =
+        `Assoc
+          [ ("transition", External_transition.Validated.to_yojson transition)
+          ; ("scan_state", `String "<opaque>")
+          ; ("pending_coinbase", Pending_coinbase.to_yojson pending_coinbase)
+          ]
     end
+  end]
 
-    module Latest = V1
+  type t = Stable.Latest.t =
+    { transition: External_transition.Validated.t
+    ; scan_state: Staged_ledger.Scan_state.t
+    ; pending_coinbase: Pending_coinbase.t }
 
-    module Module_decl = struct
-      let name = "transition_frontier_limited_root_data"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  include Stable.Latest
+  [%%define_locally
+  Stable.Latest.(to_yojson)]
 end
 
 module Minimal = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { hash: State_hash.Stable.V1.t
-          ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
-          ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-        [@@deriving bin_io, version]
-      end
+      type t =
+        { hash: State_hash.Stable.V1.t
+        ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
+        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
+  type t = Stable.Latest.t =
+    { hash: State_hash.t
+    ; scan_state: Staged_ledger.Scan_state.t
+    ; pending_coinbase: Pending_coinbase.t }
 
-    module Module_decl = struct
-      let name = "transition_frontier_minimal_root_data"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  include Stable.Latest
-
-  let of_limited {Limited.Stable.V1.transition; scan_state; pending_coinbase} =
+  let of_limited {Limited.transition; scan_state; pending_coinbase} =
     let hash = External_transition.Validated.state_hash transition in
     {hash; scan_state; pending_coinbase}
 
@@ -114,22 +91,20 @@ module Minimal = struct
       State_hash.equal
         (External_transition.Validated.state_hash transition)
         hash ) ;
-    {Limited.Stable.V1.transition; scan_state; pending_coinbase}
+    {Limited.transition; scan_state; pending_coinbase}
 end
 
 type t =
   {transition: External_transition.Validated.t; staged_ledger: Staged_ledger.t}
 
 let minimize {transition; staged_ledger} =
-  let open Minimal.Stable.Latest in
-  { hash= External_transition.Validated.state_hash transition
+  { Minimal.hash= External_transition.Validated.state_hash transition
   ; scan_state= Staged_ledger.scan_state staged_ledger
   ; pending_coinbase= Staged_ledger.pending_coinbase_collection staged_ledger
   }
 
 let limit {transition; staged_ledger} =
-  let open Limited.Stable.Latest in
-  { transition
+  { Limited.transition
   ; scan_state= Staged_ledger.scan_state staged_ledger
   ; pending_coinbase= Staged_ledger.pending_coinbase_collection staged_ledger
   }

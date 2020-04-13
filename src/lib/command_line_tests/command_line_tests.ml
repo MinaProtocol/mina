@@ -55,6 +55,7 @@ let%test_module "Command line tests" =
           Process.run ~prog:coda_exe
             ~args:
               [ "daemon"
+              ; "-seed"
               ; "-working-dir"
               ; working_dir
               ; "-background"

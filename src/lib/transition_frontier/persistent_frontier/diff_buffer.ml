@@ -1,11 +1,13 @@
 (* TODO: flush on timeout interval in addition to meeting flush capacity *)
 open Async_kernel
 open Core_kernel
-open Coda_base
 open Frontier_base
 
 let max_latency =
-  Block_time.Span.(Consensus.Constants.block_window_duration * of_ms 5L)
+  Block_time.Span.(
+    ( Coda_compile_config.block_window_duration_ms |> Int64.of_int
+    |> Block_time.Span.of_ms )
+    * of_ms 5L)
 
 module Capacity = struct
   let flush = 30

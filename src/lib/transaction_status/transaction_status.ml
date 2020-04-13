@@ -2,31 +2,16 @@ open Core_kernel
 open Coda_base
 open Pipe_lib
 open Network_pool
-open Module_version
 
 module State = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Pending | Included | Unknown
-        [@@deriving equal, sexp, compare, bin_io, version]
-      end
+      type t = Pending | Included | Unknown [@@deriving equal, sexp, compare]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transaction_status_state"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t = Pending | Included | Unknown
   [@@deriving equal, sexp, compare]
@@ -88,6 +73,8 @@ let%test_module "transaction_status" =
 
     let trust_system = Trust_system.null ()
 
+    let pool_max_size = Genesis_constants.compiled.txpool_max_size
+
     let key_gen =
       let open Quickcheck.Generator in
       let open Quickcheck.Generator.Let_syntax in
@@ -115,7 +102,9 @@ let%test_module "transaction_status" =
       let local_reader, local_writer =
         Strict_pipe.(create ~name:"transaction_status local diff" Synchronous)
       in
-      let config = Transaction_pool.Resource_pool.make_config ~trust_system in
+      let config =
+        Transaction_pool.Resource_pool.make_config ~trust_system ~pool_max_size
+      in
       let transaction_pool =
         Transaction_pool.create ~config ~incoming_diffs:pool_reader ~logger
           ~local_diffs:local_reader ~frontier_broadcast_pipe

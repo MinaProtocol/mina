@@ -41,7 +41,8 @@ type t =
   ; logger: Logger.t
   ; table: Node.t State_hash.Table.t
   ; consensus_local_state: Consensus.Data.Local_state.t
-  ; max_length: int }
+  ; max_length: int
+  ; genesis_constants: Genesis_constants.t }
 
 let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -72,7 +73,7 @@ let close t =
        (Breadcrumb.mask (root t)))
 
 let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
-    ~max_length =
+    ~max_length ~genesis_constants =
   let open Root_data in
   let root_hash =
     External_transition.Validated.state_hash root_data.transition
@@ -107,7 +108,8 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     ; hash= base_hash
     ; table
     ; consensus_local_state
-    ; max_length }
+    ; max_length
+    ; genesis_constants }
   in
   t
 
@@ -151,6 +153,8 @@ let path_map t breadcrumb ~f =
 let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
 
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
+
+let genesis_constants t = t.genesis_constants
 
 let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
@@ -225,7 +229,7 @@ let visualize_to_string t =
 
 (* given an heir, calculate the diff that will transition the root to that heir *)
 let calculate_root_transition_diff t heir =
-  let open Root_data.Minimal.Stable.V1 in
+  let open Root_data.Minimal in
   let root = root t in
   let heir_hash = Breadcrumb.state_hash heir in
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in
@@ -504,8 +508,11 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
     "Applying %d diffs to full frontier (%s --> ?)" (List.length diffs)
     (Frontier_hash.to_string t.hash) ;
+  let consensus_constants =
+    Consensus.Constants.create ~protocol_constants:t.genesis_constants.protocol
+  in
   let local_state_was_synced_at_start =
-    Consensus.Hooks.required_local_state_sync
+    Consensus.Hooks.required_local_state_sync ~constants:consensus_constants
       ~consensus_state:(Breadcrumb.consensus_state (best_tip t))
       ~local_state:t.consensus_local_state
     |> Option.is_none
@@ -535,6 +542,7 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
     Debug_assert.debug_assert (fun () ->
         match
           Consensus.Hooks.required_local_state_sync
+            ~constants:consensus_constants
             ~consensus_state:
               (Breadcrumb.consensus_state
                  (Hashtbl.find_exn t.table t.best_tip).breadcrumb)

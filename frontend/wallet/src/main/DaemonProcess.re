@@ -11,10 +11,16 @@ module Command = {
 
 let (^/) = Filename.concat;
 
+[@bs.module "electron"] [@bs.scope ("app")]
+external getPath: string => string = "getPath";
+
 let codaCommand = (~port, ~extraArgs) => {
+  let del = Node.Path.delimiter;
   let env = ChildProcess.Process.env;
   let path = Js.Dict.get(env, "PATH") |> Option.with_default(~default="");
-  Js.Dict.set(env, "PATH", path ++ Node.Path.delimiter ++ "/usr/local/bin");
+  let installPath = getPath("userData") ++ del ++ "coda";
+  Js.Dict.set(env, "PATH", path ++ del ++ installPath);
+  Js.Dict.set(env, "CODA_LIBP2P_HELPER_PATH", installPath ++ del ++ "libp2p-helper");
   {
     Command.executable: "coda",
     args:

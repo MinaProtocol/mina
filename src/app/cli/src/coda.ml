@@ -30,10 +30,14 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
-let chain_id ~genesis_state_hash =
+let chain_id ~genesis_state_hash ~genesis_constants =
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
+  let genesis_constants_hash = Genesis_constants.hash genesis_constants in
   let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
-  let b2 = Blake2.digest_string (genesis_state_hash ^ all_snark_keys) in
+  let b2 =
+    Blake2.digest_string
+      (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
+  in
   Blake2.to_hex b2
 
 [%%inject
@@ -197,6 +201,7 @@ let daemon logger =
            "KEYFILE Keypair (generated from `coda advanced \
             generate-libp2p-keypair`) to use with libp2p discovery (default: \
             generate per-run temporary keypair)"
+     and is_seed = flag "seed" ~doc:"Start the node as a seed node" no_arg
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
@@ -211,6 +216,16 @@ let daemon logger =
      and proposed_protocol_version =
        flag "proposed-protocol-version" (optional string)
          ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
+     and genesis_runtime_constants =
+       flag "genesis-constants"
+         ~doc:
+           (sprintf
+              "PATH path to the runtime-configurable constants. (default: \
+               compiled constants) For example: %s"
+              ( Genesis_constants.(
+                  to_daemon_config compiled |> Daemon_config.to_yojson)
+              |> Yojson.Safe.to_string ))
+         (optional string)
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -252,7 +267,7 @@ let daemon logger =
            "Daemon will expire at $exp"
            ~metadata:[("exp", `String daemon_expiry)] ;
          let tm =
-           (* same approach as in Consensus.Constants.genesis_state_timestamp *)
+           (* same approach as in Genesis_constants.genesis_state_timestamp *)
            let default_timezone = Core.Time.Zone.of_utc_offset ~hours:(-8) in
            Core.Time.of_string_gen
              ~if_no_timezone:(`Use_this_one default_timezone) daemon_expiry
@@ -339,9 +354,9 @@ let daemon logger =
            {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
        end in
        let coda_initialization_deferred () =
-         let%bind genesis_ledger, base_proof =
+         let%bind genesis_ledger, base_proof, genesis_constants =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
-             ~logger ~conf_dir
+             ~logger ~conf_dir ~daemon_conf:genesis_runtime_constants
          in
          let%bind config =
            let configpath = conf_dir ^/ "daemon.json" in
@@ -584,6 +599,7 @@ let daemon logger =
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let genesis_state_hash =
            Coda_state.Genesis_protocol_state.t ~genesis_ledger
+             ~genesis_constants
            |> With_hash.hash
          in
          let genesis_ledger_hash =
@@ -614,13 +630,17 @@ let daemon logger =
                     "peers" None ~default:[] ]
          in
          if enable_tracing then Coda_tracing.start conf_dir |> don't_wait_for ;
-         let is_seed = List.is_empty initial_peers in
+         if is_seed then
+           Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+             "Starting node as a seed node"
+         else if List.is_empty initial_peers then
+           failwith "no seed or initial peer flags passed" ;
          let gossip_net_params =
            Gossip_net.Libp2p.Config.
              { timeout= Time.Span.of_sec 3.
              ; logger
              ; conf_dir
-             ; chain_id= chain_id ~genesis_state_hash
+             ; chain_id= chain_id ~genesis_state_hash ~genesis_constants
              ; unsafe_no_trust_ip= false
              ; initial_peers
              ; addrs_and_ports
@@ -665,6 +685,8 @@ let daemon logger =
            Auxiliary_database.External_transition_database.create ~logger
              external_transition_database_dir
          in
+         trace_database_initialization "external_transition_database" __LOC__
+           external_transition_database_dir ;
          (* log terminated child processes *)
          (* FIXME adapt to new system, move into child_processes lib *)
          let pids = Child_processes.Termination.create_pid_table () in
@@ -731,7 +753,7 @@ let daemon logger =
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
+                ~is_seed ~demo_mode ~coinbase_receiver ~net_config ~gossip_net_params
                 ~initial_protocol_version:current_protocol_version
                 ~proposed_protocol_version_opt
                 ~work_selection_method:
@@ -751,7 +773,7 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~genesis_state_hash ~log_block_creation ())
+                ~genesis_state_hash ~log_block_creation ~genesis_constants ())
              ~genesis_ledger ~base_proof
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}

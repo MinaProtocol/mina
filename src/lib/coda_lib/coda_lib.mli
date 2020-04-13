@@ -59,10 +59,15 @@ val add_work : t -> Snark_worker.Work.Result.t -> unit
 
 val add_transactions :
      t
-  -> User_command.t list
+  -> User_command_input.t list
   -> ( Network_pool.Transaction_pool.Resource_pool.Diff.t
      * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
      Deferred.Or_error.t
+
+val get_inferred_nonce_from_transaction_pool_and_ledger :
+  t -> Account_id.t -> Account.Nonce.t option Participating_state.t
+
+val active_or_bootstrapping : t -> unit Participating_state.t
 
 val best_staged_ledger : t -> Staged_ledger.t Participating_state.t
 
@@ -88,14 +93,12 @@ val validated_transitions :
   t -> External_transition.Validated.t Strict_pipe.Reader.t
 
 module Root_diff : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t = {user_commands: User_command.Stable.V1.t list; root_length: int}
-      [@@deriving bin_io]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t
 end

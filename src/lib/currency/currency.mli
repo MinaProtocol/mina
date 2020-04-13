@@ -137,6 +137,12 @@ module Balance : sig
 
     val sub_amount : var -> Amount.var -> (var, _) Checked.t
 
+    val sub_amount_flagged :
+      var -> Amount.var -> (var * [`Underflow of Boolean.var], _) Checked.t
+
+    val add_amount_flagged :
+      var -> Amount.var -> (var * [`Overflow of Boolean.var], _) Checked.t
+
     val ( + ) : var -> Amount.var -> (var, _) Checked.t
 
     val ( - ) : var -> Amount.var -> (var, _) Checked.t
