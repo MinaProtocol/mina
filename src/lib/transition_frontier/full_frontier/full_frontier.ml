@@ -47,7 +47,7 @@ type t =
   ; mutable hash: Frontier_hash.t
   ; logger: Logger.t
   ; table: Node.t State_hash.Table.t
-  ; protocol_state_table: Protocol_state_node.t State_hash.Table.t
+  ; mutable protocol_state_map: Protocol_state_node.t State_hash.Map.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; max_length: int
   ; genesis_constants: Genesis_constants.t }
@@ -74,7 +74,7 @@ let find_protocol_state (t : t) hash =
   let open Option.Let_syntax in
   match find t hash with
   | None ->
-      let%map node = Hashtbl.find t.protocol_state_table hash in
+      let%map node = State_hash.Map.find t.protocol_state_map hash in
       node.protocol_state
   | Some breadcrumb ->
       Some
@@ -107,7 +107,7 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
   let root_hash =
     External_transition.Validated.state_hash root_data.transition
   in
-  let protocol_state_table =
+  let protocol_state_map =
     (*
     let root_protocol_states : Protocol_state.value list = [] in
     let required_protocol_states =
@@ -125,7 +125,7 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     List.map required_protocol_states ~f:(fun hash ->
         (hash, State_hash.Map.find_exn protocol_states_persisted hash) )
     |> *)
-    State_hash.Table.of_alist_exn
+    State_hash.Map.of_alist_exn
       (List.map
          ~f:(fun (h, ps) ->
            ( h
@@ -169,7 +169,7 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     ; consensus_local_state
     ; max_length
     ; genesis_constants
-    ; protocol_state_table }
+    ; protocol_state_map }
   in
   t
 
@@ -179,7 +179,7 @@ let root_data t =
   { transition= Breadcrumb.validated_transition root
   ; staged_ledger= Breadcrumb.staged_ledger root
   ; protocol_states=
-      State_hash.Table.to_alist t.protocol_state_table
+      State_hash.Map.to_alist t.protocol_state_map
       |> List.map ~f:(fun (h, ps_node) -> (h, ps_node.protocol_state)) }
 
 let max_length {max_length; _} = max_length
@@ -364,6 +364,7 @@ let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
    *     7) unattach and destroy `mt`
    *)
   let old_root_node = Hashtbl.find_exn t.table t.root in
+  let old_root_hash = t.root in
   let new_root_node = Hashtbl.find_exn t.table new_root_hash in
   (* STEP 0 *)
   if not ignore_consensus_local_state then
@@ -389,6 +390,7 @@ let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
     (* STEP 2 *)
     (* go ahead and remove the old root from the frontier *)
     Hashtbl.remove t.table t.root ;
+    (*Deepthi: Remove unreferenced protocol states*)
     O1trace.measure "committing new root mask" (fun () -> Ledger.commit m1) ;
     [%test_result: Ledger_hash.t]
       ~message:
@@ -434,6 +436,25 @@ let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
       (Breadcrumb.validated_transition new_root_node.breadcrumb)
       new_staged_ledger
   in
+  (*Update the protocol states required for scan state at the new root*)
+  let new_protocol_states_map =
+    let required_state_hashes =
+      Staged_ledger.(
+        Scan_state.required_state_hashes
+          (Breadcrumb.staged_ledger new_root_breadcrumb |> scan_state))
+    in
+    let protocol_state_map =
+      State_hash.Map.set t.protocol_state_map ~key:old_root_hash
+        ~data:
+          { Protocol_state_node.protocol_state=
+              Breadcrumb.protocol_state old_root_node.breadcrumb
+          ; scan_state_ref_count= 0 }
+    in
+    List.map required_state_hashes ~f:(fun hash ->
+        (hash, State_hash.Map.find_exn protocol_state_map hash) )
+    |> State_hash.Map.of_alist_exn
+  in
+  t.protocol_state_map <- new_protocol_states_map ;
   let new_root_node = {new_root_node with breadcrumb= new_root_breadcrumb} in
   (* update the new root breadcrumb in the frontier *)
   Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
