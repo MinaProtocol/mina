@@ -215,16 +215,16 @@ module Img =
   });
 
 module DaemonCommandExample = {
-  let defaultArgs = [
-    "coda daemon",
-    "-peer /dns4/seed-one.genesis-redux.o1test.net/tcp/10002/ipfs/12D3KooWP7fTKbyiUcYJGajQDpCFo2rDexgTHFJTxCH8jvcL1eAH",
-    "-peer /dns4/seed-two.genesis-redux.o1test.net/tcp/10002/ipfs/12D3KooWL9ywbiXNfMBqnUKHSB1Q1BaHFNUzppu6JLMVn9TTPFSA",
-  ];
+  let defaultArgs = ["coda daemon", "-peer $SEED1", "-peer $SEED2"];
   [@react.component]
   let make = (~args: array(string)=[||]) => {
-    let processed_args =
-      String.concat(" \\\n    ", defaultArgs @ Array.to_list(args));
-    <Pre> <Code> {React.string(processed_args)} </Code> </Pre>;
+    let allArgs = defaultArgs @ Array.to_list(args);
+    let argsLength =
+      List.fold_left((a, e) => a + String.length(e), 0, allArgs);
+    let sep = argsLength > 60 ? " \\\n    " : " ";
+    let processedArgs =
+      String.concat(sep, defaultArgs @ Array.to_list(args));
+    <Pre> <Code> {React.string(processedArgs)} </Code> </Pre>;
   };
 };
 
