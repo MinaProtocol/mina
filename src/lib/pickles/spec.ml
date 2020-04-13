@@ -3,6 +3,8 @@ open Core_kernel
 open Pickles_types
 open Hlist
 
+module Sc = Pickles_types.Scalar_challenge
+
 module Basic = struct
   type (_, _, _) t = ..
 end
@@ -30,6 +32,7 @@ type (_, _, _) Basic.t +=
 module rec T : sig
   type (_, _, _) t =
     | B : ('a, 'b, 'env) Basic.t -> ('a, 'b, 'env) t
+    | Scalar : ('a, 'b, < challenge1:'a; challenge2:'b; ..> as 'env) Basic.t -> ('a Sc.t, 'b Sc.t, 'env) t
     | Vector :
         ('t1, 't2, 'env) t * 'n Nat.t
         -> (('t1, 'n) Vector.t, ('t2, 'n) Vector.t, 'env) t
@@ -51,6 +54,9 @@ let rec pack : type t v env.
   match spec with
   | B spec ->
       p.pack spec t
+  | Scalar chal ->
+    let Scalar_challenge t = t in
+    p.pack chal t
   | Vector (spec, _) ->
       Array.concat_map (Vector.to_array t) ~f:(pack p spec)
   | Struct [] ->
@@ -73,6 +79,8 @@ let rec typ : type f var value env.
     match spec with
     | B spec ->
         t.typ spec
+    | Scalar chal ->
+      Sc.typ (t.typ chal)
     | Vector (spec, n) ->
         Vector.typ (typ t spec) n
     | Array (spec, n) ->
@@ -112,6 +120,9 @@ let rec etyp : type f var value env.
     match spec with
     | B spec ->
         e.etyp spec
+    | Scalar chal ->
+      let T (typ, f) = e.etyp chal in
+      T (Sc.typ typ, Sc.map ~f)
     | Vector (spec, n) ->
         let (T (typ, f)) = etyp e spec in
         T (Vector.typ typ n, Vector.map ~f)
@@ -152,9 +163,9 @@ module Common (Impl : Snarky.Snark_intf.Run) = struct
       ; challenge1: Challenge.Constant.t
       ; challenge2: Challenge.t
       ; bulletproof_challenge1:
-          (Challenge.Constant.t, bool) Bulletproof_challenge.t
+          (Challenge.Constant.t Sc.t, bool) Bulletproof_challenge.t
       ; bulletproof_challenge2:
-          (Challenge.t, Boolean.var) Bulletproof_challenge.t
+          (Challenge.t Sc.t, Boolean.var) Bulletproof_challenge.t
       ; .. >
       as
       'a
@@ -180,9 +191,10 @@ let pack_basic (type field other_field other_field_var)
     | Digest ->
         [|x|]
     | Challenge ->
-        [|x|]
+        [|Challenge.to_bits x|]
     | Bulletproof_challenge ->
-        [|x.is_square :: x.prechallenge|]
+        let Scalar_challenge pre = x.prechallenge in
+        [|x.is_square :: Challenge.to_bits pre|]
     | _ ->
         failwith "unknown basic spec"
   in
@@ -216,7 +228,7 @@ let typ_basic (type field other_field other_field_var)
         let back (prechallenge, is_square) =
           {Bulletproof_challenge.prechallenge; is_square}
         in
-        Typ.transport ~there ~back (Typ.tuple2 Challenge.typ Boolean.typ)
+        Typ.transport ~there ~back (Typ.tuple2 (Sc.typ Challenge.typ) Boolean.typ)
         |> Typ.transport_var ~there ~back
     | _ ->
         failwith "unknown basic spec"
@@ -242,9 +254,9 @@ let packed_typ_basic (type field other_field other_field_var)
       ; challenge1: Challenge.Constant.t
       ; challenge2: (* Challenge.t *) Field.t
       ; bulletproof_challenge1:
-          (Challenge.Constant.t, bool) Bulletproof_challenge.t
+          (Challenge.Constant.t Sc.t, bool) Bulletproof_challenge.t
       ; bulletproof_challenge2:
-          (Challenge.t, Boolean.var) Bulletproof_challenge.t
+          (Challenge.t Sc.t, Boolean.var) Bulletproof_challenge.t
       ; .. >
       as
       'a
@@ -267,17 +279,23 @@ let packed_typ_basic (type field other_field other_field_var)
         let length = Challenge.length + 1 in
         let typ =
           Typ.transport Typ.field
-            ~there:(fun {Bulletproof_challenge.prechallenge; is_square} ->
+            ~there:(fun {Bulletproof_challenge.prechallenge=Sc.Scalar_challenge pre; is_square} ->
               Field.Constant.project
-                (is_square :: Challenge.Constant.to_bits prechallenge) )
+                (is_square :: Challenge.Constant.to_bits pre) )
             ~back:(fun x ->
               match List.take (Field.Constant.unpack x) length with
               | is_square :: bs ->
-                  {is_square; prechallenge= Challenge.Constant.of_bits bs}
+                  {is_square; prechallenge= Scalar_challenge (Challenge.Constant.of_bits bs)}
               | _ ->
                   assert false )
         in
-        T (typ, fun x -> Bulletproof_challenge.unpack (Field.unpack ~length x))
+        T (typ, fun x ->
+        (* TODO: Not sure this unpacking is quite necessary. *)
+            let t = Bulletproof_challenge.unpack
+              (Field.unpack ~length x)
+            in
+            { t with prechallenge = Scalar_challenge t.prechallenge }
+          )
     | _ ->
         failwith "etyp: unhandled variant"
   in

@@ -47,6 +47,9 @@ module Oracles = struct
     Caml.Gc.finalise Field.delete x ;
     x
 
+  let scalar_challenge f t =
+    Pickles_types.Scalar_challenge.create (field f t)
+
   open Fp_oracles
 
   let alpha = field alpha
@@ -57,17 +60,17 @@ module Oracles = struct
 
   let eta_c = field eta_c
 
-  let beta1 = field beta1
+  let beta1 = scalar_challenge beta1
 
-  let beta2 = field beta2
+  let beta2 = scalar_challenge beta2
 
-  let beta3 = field beta3
+  let beta3 = scalar_challenge beta3
 
-  let batch = field batch
+  let batch = scalar_challenge batch
 
-  let r_k = field r_k
+  let r_k = scalar_challenge r_k
 
-  let r = field r
+  let r = scalar_challenge r
 
   let x_hat_beta1 = field x_hat_beta1
 
@@ -120,6 +123,8 @@ module Keypair = struct
       ; m= {a; b; c}
       ; weight } =
     let vars = 1 + public_input_size + auxiliary_input_size in
+    Core.printf "pairing weight %d\n%!"
+      (R1cs_constraint_system.Weight.norm weight);
     Fp_index.create a b c
       (Unsigned.Size_t.of_int vars)
       (Unsigned.Size_t.of_int (public_input_size + 1))

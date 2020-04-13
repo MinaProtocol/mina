@@ -47,6 +47,9 @@ module Oracles = struct
     Caml.Gc.finalise Fq.delete x ;
     x
 
+  let scalar_challenge f t =
+    Pickles_types.Scalar_challenge.create (field f t)
+
   open Fq_oracles
 
   let alpha = field alpha
@@ -57,21 +60,22 @@ module Oracles = struct
 
   let eta_c = field eta_c
 
-  let beta1 = field beta1
+  let beta1 = scalar_challenge beta1
 
-  let beta2 = field beta2
+  let beta2 = scalar_challenge beta2
 
-  let beta3 = field beta3
+  let beta3 = scalar_challenge beta3
 
-  let polys = field polys
+  let polys = scalar_challenge polys
 
-  let evals = field evals
+  let evals = scalar_challenge evals
 
   (* TODO: Leaky *)
   let opening_prechallenges t =
     let open Snarky_bn382 in
     let t = opening_prechallenges t in
-    Array.init (Fq.Vector.length t) ~f:(Fq.Vector.get t)
+    Array.init (Fq.Vector.length t) ~f:(fun i ->
+        Pickles_types.Scalar_challenge.create (Fq.Vector.get t i))
 
   let x_hat t =
     let t = x_hat_nocopy t in
@@ -149,6 +153,8 @@ module Keypair = struct
       ; m= {a; b; c}
       ; weight } =
     let vars = 1 + public_input_size + auxiliary_input_size in
+    Core.printf "dlog weight %d\n%!"
+      (R1cs_constraint_system.Weight.norm weight);
     Fq_index.create a b c
       (Unsigned.Size_t.of_int vars)
       (Unsigned.Size_t.of_int (public_input_size + 1))

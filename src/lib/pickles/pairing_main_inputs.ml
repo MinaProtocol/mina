@@ -129,6 +129,10 @@ module G = struct
     module Constant = struct
       include G.Affine
 
+      module Scalar = Impls.Dlog_based.Field.Constant
+
+      let scale (t : t) x : t = G.(to_affine_exn (scale (of_affine t) x))
+
       let random () = G.(to_affine_exn (random ()))
 
       let ( + ) x y = G.(to_affine_exn (of_affine x + of_affine y))

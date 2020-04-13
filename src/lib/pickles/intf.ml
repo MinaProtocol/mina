@@ -142,14 +142,20 @@ module Group (Impl : Snarky.Snark_intf.Run) = struct
     module Constant : sig
       type t
 
-      val to_affine_exn : t -> Field.Constant.t * Field.Constant.t
+      module Scalar : Marlin_checks.Field_intf
 
-      val of_affine : Field.Constant.t * Field.Constant.t -> t
+      val scale : t -> Scalar.t -> t
+
+      val to_affine_exn : t -> field * field
+
+      val of_affine : field * field -> t
     end
 
-    val typ : (t, Constant.t) Typ.t
+    val typ : (t, Constant.t, field) Snarky.Typ.t
 
     val ( + ) : t -> t -> t
+
+    val double : t -> t
 
     val scale : t -> Boolean.var list -> t
 
@@ -226,7 +232,7 @@ module Dlog_main_inputs = struct
     end
 
     module Generators : sig
-      val g : G1.t
+      val g : G1.Constant.t
     end
 
     module Input_domain : sig
@@ -251,22 +257,10 @@ module Pairing_main_inputs = struct
 
     module Impl : Snarky.Snark_intf.Run with type prover_state = unit
 
-    module Fq : sig
-      type t [@@deriving sexp]
-
-      val to_bits : t -> bool list
-
-      val of_bits : bool list -> t
-
-      val is_square : t -> bool
-
-      val print : t -> unit
-    end
-
     module G : sig
       open Impl
 
-      include Group(Impl).S
+      include Group(Impl).S with type t = Field.t * Field.t
 
       val one : t
 
@@ -277,6 +271,18 @@ module Pairing_main_inputs = struct
       val scale_by_quadratic_nonresidue : t -> t
 
       val scale_by_quadratic_nonresidue_inv : t -> t
+    end
+
+    module Fq : sig
+      type t = G.Constant.Scalar.t [@@deriving sexp]
+
+      val to_bits : t -> bool list
+
+      val of_bits : bool list -> t
+
+      val is_square : t -> bool
+
+      val print : t -> unit
     end
 
     module Generators : sig

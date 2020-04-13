@@ -5,6 +5,7 @@ module type Inputs = Intf.Dlog_main_inputs.S
 open Core_kernel
 open Import
 open Util
+module SC = Scalar_challenge
 open Pickles_types
 open Dlog_marlin_types
 module Accumulator = Pairing_marlin_types.Accumulator
@@ -77,12 +78,12 @@ let accumulate_degree_bound_checks' ~domain_h ~domain_k ~add =
    sum_i r^i e(pi_i, beta_i*g) - e(z*pi - (U - v_i * g), g) = 0
 *)
 
-let accumulate_opening_check ~add ~negate ~scale ~generator ~r
+let accumulate_opening_check ~add ~negate ~endo ~scale_generator ~r
     ~(* r should be exposed. *) r_xi_sum (* s should be exposed *)
     {Accumulator.Opening_check.r_f_minus_r_v_plus_rz_pi; r_pi}
     (f_1, beta_1, pi_1) (f_2, beta_2, pi_2) (f_3, beta_3, pi_3) =
   let ( + ) = add in
-  let ( * ) s p = scale p s in
+  let ( * ) s p = endo p s in
   let r_f_minus_r_v_plus_rz_pi =
     let rz_pi_term =
       let zpi_1 = beta_1 * pi_1 in
@@ -93,7 +94,7 @@ let accumulate_opening_check ~add ~negate ~scale ~generator ~r
       (* sum_{i=1}^3 r^i beta_i pi_i *)
     in
     let f_term = r * (f_1 + (r * (f_2 + (r * f_3)))) in
-    let v_term = r_xi_sum * generator in
+    let v_term = scale_generator r_xi_sum in
     r_f_minus_r_v_plus_rz_pi + f_term + negate v_term + rz_pi_term
   in
   let pi_term =
@@ -102,7 +103,10 @@ let accumulate_opening_check ~add ~negate ~scale ~generator ~r
   in
   {Accumulator.Opening_check.r_f_minus_r_v_plus_rz_pi; r_pi= r_pi + pi_term}
 
-module Make (Inputs : Inputs) = struct
+module Make (Inputs : Inputs
+             with type Impl.field = Snarky_bn382_backend.Fq.t
+              and type G1.Constant.Scalar.t =Snarky_bn382_backend.Fp.t
+            ) = struct
   open Inputs
   open Impl
 
@@ -179,6 +183,7 @@ module Make (Inputs : Inputs) = struct
   module Fq = Field
   module Challenge = Challenge.Make (Impl)
   module Digest = D.Make (Impl)
+  module Scalar_challenge = SC.Make(Impl)(G1)(Challenge)(Endo.Pairing)
 
   let product m f = List.reduce_exn (List.init m ~f) ~f:Field.( * )
 
@@ -199,17 +204,26 @@ module Make (Inputs : Inputs) = struct
     absorb ~absorb_field:(Sponge.absorb sponge)
       ~g1_to_field_elements:G1.to_field_elements ~pack_scalar:Fn.id ty t
 
+  let squeeze_scalar sponge : Scalar_challenge.t =
+    Scalar_challenge
+      (Sponge.squeeze sponge ~length:Challenge.length)
+
   let combined_commitment ~xi (polys : _ Vector.t) =
     let (p0 :: ps) = polys in
     List.fold_left (Vector.to_list ps) ~init:p0 ~f:(fun acc p ->
         G1.(p + scale acc xi) )
 
   let accumulate_degree_bound_checks =
-    accumulate_degree_bound_checks ~add:G1.( + ) ~scale:G1.scale
+    accumulate_degree_bound_checks
+      ~add:G1.( + )
+      ~scale:Scalar_challenge.endo
 
   let accumulate_opening_check =
     let open G1 in
-    accumulate_opening_check ~add:( + ) ~negate ~scale ~generator:Generators.g
+    let g = G1.Scaling_precomputation.create Generators.g in
+    accumulate_opening_check ~add:( + ) ~negate
+      ~endo:Scalar_challenge.endo
+      ~scale_generator:(fun bits -> G1.multiscale_known [|(bits, g)|])
 
   module One_hot_vector = One_hot_vector.Make (Impl)
 
@@ -299,6 +313,7 @@ module Make (Inputs : Inputs) = struct
       absorb sponge ty x ; x
     in
     let sample () = Sponge.squeeze sponge ~length:Challenge.length in
+    let sample_scalar () = squeeze_scalar sponge in
     let open Pairing_marlin_types.Messages in
     Set_once.set_if_none input_domain Stdlib.Lexing.dummy_pos
       (Domain.Pow_2_roots_of_unity (Int.ceil_log2 (Array.length public_input))) ;
@@ -317,16 +332,16 @@ module Make (Inputs : Inputs) = struct
     let eta_b = sample () in
     let eta_c = sample () in
     let g_1, h_1 = receive (Type.degree_bounded_pc :: PC) gh_1 in
-    let beta_1 = sample () in
+    let beta_1 = sample_scalar () in
     let sigma_2, (g_2, h_2) =
       receive (Scalar :: Type.degree_bounded_pc :: PC) sigma_gh_2
     in
-    let beta_2 = sample () in
+    let beta_2 = sample_scalar () in
     let sigma_3, (g_3, h_3) =
       receive (Scalar :: Type.degree_bounded_pc :: PC) sigma_gh_3
     in
-    let beta_3 = sample () in
-    let r_k = sample () in
+    let beta_3 = sample_scalar () in
+    let r_k = sample_scalar () in
     print_g1 "x_hat" x_hat ;
     print_g1 "w" w_hat ;
     print_g1 "za" z_hat_a ;
@@ -336,16 +351,15 @@ module Make (Inputs : Inputs) = struct
       ; ("eta_a", eta_a)
       ; ("eta_b", eta_b)
       ; ("eta_c", eta_c)
-      ; ("r_k", r_k)
-      ; ("beta_1", beta_1)
-      ; ("beta_2", beta_2)
-      ; ("beta_3", beta_3) ] ~f:(fun (lab, x) -> print_chal lab x) ;
+      ] ~f:(fun (lab, x) -> print_chal lab x) ;
     let digest_before_evaluations =
       Sponge.squeeze sponge ~length:Digest.length
     in
     let open Vector in
     let combine_commitments t =
-      Pcs_batch.combine_commitments ~scale:G1.scale ~add:G1.( + ) ~xi t
+      Pcs_batch.combine_commitments
+        ~scale:Scalar_challenge.endo ~add:G1.( + )
+        ~xi t
     in
     let pairing_acc =
       let (g1, g1_s), (g2, g2_s), (g3, g3_s) = (g_1, g_2, g_3) in
@@ -397,7 +411,8 @@ module Make (Inputs : Inputs) = struct
               |> add step_k uk |> List.zip_exn keys |> Int.Map.of_alist_exn )
             degree_bound_checks ~r_h:r ~r_k g_1 g_2 g_3
       ; opening_check=
-          accumulate_opening_check opening_check ~r ~r_xi_sum
+          accumulate_opening_check opening_check
+            ~r ~r_xi_sum
             (f_1, beta_1, pi_1) (f_2, beta_2, pi_2) (f_3, beta_3, pi_3) }
     in
     let deferred =
@@ -419,20 +434,22 @@ module Make (Inputs : Inputs) = struct
       ~h_minus_1 ~k_minus_1 =
     Pcs_batch.combine_evaluations'
       (Common.dlog_pcs_batch b_plus_19 ~h_minus_1 ~k_minus_1)
-      ~shifted_pow ~mul:Fq.mul ~add:Fq.add ~one:Fq.one ~evaluation_point ~xi
+      ~shifted_pow ~mul:Fq.mul ~add:Fq.add ~one:Fq.one ~evaluation_point
+      ~xi
       without_degree_bound with_degree_bound
 
   let sum' xs f = List.reduce_exn (List.map xs ~f) ~f:Fq.( + )
 
   let prod xs f = List.reduce_exn (List.map xs ~f) ~f:Fq.( * )
 
-  let compute_challenges chals =
+  let compute_challenges ~scalar chals =
     (* TODO: Put this in the functor argument. *)
     let nonresidue = Fq.of_int 7 in
     Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
+        let pre = scalar prechallenge in
         let sq =
-          Fq.if_ is_square ~then_:prechallenge
-            ~else_:Fq.(nonresidue * prechallenge)
+          Fq.if_ is_square ~then_:pre
+            ~else_:Fq.(nonresidue * pre)
         in
         Fq.sqrt sq )
 
@@ -455,6 +472,9 @@ module Make (Inputs : Inputs) = struct
           value :: go value (i + 1) m
     in
     go Boolean.true_ 0 n
+
+  let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t) =
+    Field.pack (Challenge.to_bits t)
 
   let finalize_other_proof (type b)
       (module Branching : Nat.Add.Intf with type n = b) ?actual_branching
@@ -485,12 +505,25 @@ module Make (Inputs : Inputs) = struct
     absorb_evals x_hat1 beta_1_evals ;
     absorb_evals x_hat2 beta_2_evals ;
     absorb_evals x_hat3 beta_3_evals ;
+
     let xi_and_r_correct =
       let xi_actual = Sponge.squeeze sponge ~length:Challenge.length in
       let r_actual = Sponge.squeeze sponge ~length:Challenge.length in
       (* Sample new sg challenge point here *)
-      Boolean.all [equal (pack xi_actual) xi; equal (pack r_actual) r]
+      Boolean.all [equal (pack xi_actual) (pack_scalar_challenge xi); equal (pack r_actual) (pack_scalar_challenge r)]
     in
+    let scalar =
+      SC.to_field_checked (module Impl)
+        ~endo:Endo.Dlog.scalar
+    in
+    let marlin =
+      Types.Pairing_based.Proof_state.Deferred_values.Marlin.map_challenges
+        ~f:Field.pack
+        ~scalar
+        marlin
+    in
+    let xi = scalar xi in
+    let r = scalar r in
     let combined_inner_product_correct =
       (* sum_i r^i sum_j xi^j f_j(beta_i) *)
       let actual_combined_inner_product =
@@ -522,7 +555,7 @@ module Make (Inputs : Inputs) = struct
       in
       equal combined_inner_product actual_combined_inner_product
     in
-    let bulletproof_challenges = compute_challenges bulletproof_challenges in
+    let bulletproof_challenges = compute_challenges ~scalar bulletproof_challenges in
     let b_correct =
       let b_poly = b_poly (Vector.to_array bulletproof_challenges) in
       let b_actual =
@@ -534,7 +567,8 @@ module Make (Inputs : Inputs) = struct
     let marlin_checks_passed =
       Marlin_checks.checked
         (module Impl)
-        ~input_domain ~domain_h ~domain_k ~x_hat_beta_1:x_hat1 marlin
+        ~input_domain ~domain_h ~domain_k ~x_hat_beta_1:x_hat1
+        marlin
         { w_hat= beta_1_evals.w_hat
         ; g_1= beta_1_evals.g_1
         ; h_1= beta_1_evals.h_1
@@ -566,17 +600,17 @@ module Make (Inputs : Inputs) = struct
       ; xi
       ; r
       ; bulletproof_challenges
-      ; b } ~f =
+      ; b } ~f ~scalar =
     { Types.Pairing_based.Proof_state.Deferred_values.marlin=
         Types.Pairing_based.Proof_state.Deferred_values.Marlin.map_challenges
-          marlin ~f
+          marlin ~f ~scalar
     ; combined_inner_product
     ; bulletproof_challenges=
         Vector.map bulletproof_challenges
           ~f:(fun (r : _ Bulletproof_challenge.t) ->
-            {r with prechallenge= f r.prechallenge} )
-    ; xi= f xi
-    ; r= f r
+            {r with prechallenge= scalar r.prechallenge} )
+    ; xi= scalar xi
+    ; r= scalar r
     ; b }
 
   (* TODO: No need to hash the entire bulletproof challenges. Could
@@ -604,6 +638,7 @@ module Make (Inputs : Inputs) = struct
           ~init:(map a ~f:(fun x -> Shifted.(add zero x)))
           ~f:(fun acc t -> map2 acc t ~f:Shifted.add)
         |> map ~f:Shifted.unshift_nonzero
+(* TODO
 
   let assert_eq_marlin
       (m1 :
@@ -626,4 +661,6 @@ module Make (Inputs : Inputs) = struct
     chal m1.beta_2 m2.beta_2 ;
     fp m1.sigma_3 m2.sigma_3 ;
     chal m1.beta_3 m2.beta_3
+*)
+  let assert_eq_marlin _ _ = ()
 end

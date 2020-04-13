@@ -89,6 +89,10 @@ module G1 = struct
     module Constant = struct
       include G1.Affine
 
+      module Scalar = Impls.Pairing_based.Field.Constant
+
+      let scale (t : t) x : t = G1.(to_affine_exn (scale (of_affine t) x))
+
       let random () = G1.(to_affine_exn (random ()))
 
       let ( + ) x y = G1.(to_affine_exn (of_affine x + of_affine y))
@@ -191,7 +195,7 @@ module G1 = struct
 end
 
 module Generators = struct
-  let g = G1.one
+  let g = G1.Params.one
 end
 
 let sponge_params_constant =

@@ -1,5 +1,6 @@
 open Tuple_lib
 module D = Digest
+module SC = Scalar_challenge
 open Core_kernel
 module Digest = D
 open Pickles_types
@@ -20,6 +21,8 @@ module Ro = struct
   let fp = ro "fp" Digest.Constant.length Fp.of_bits
 
   let chal = ro "chal" Challenge.Constant.length Challenge.Constant.of_bits
+
+  let scalar_chal () = Scalar_challenge.Scalar_challenge (chal ())
 end
 
 (* Making this dynamic was a bit complicated. *)
@@ -60,15 +63,13 @@ type g1 = fq * fq [@@deriving sexp, bin_io]
 
 let compute_challenge ~is_square x =
   let nonresidue = Fq.of_int 7 in
+  let x = Endo.Dlog.to_field x in
+  assert (is_square = Fq.is_square x) ;
   Fq.sqrt (if is_square then x else Fq.(nonresidue * x))
 
 let compute_challenges chals =
   Vector.map chals ~f:(fun {Bulletproof_challenge.prechallenge; is_square} ->
-      let prechallenge =
-        Fq.of_bits (Challenge.Constant.to_bits prechallenge)
-      in
-      assert (is_square = Fq.is_square prechallenge) ;
-      compute_challenge ~is_square prechallenge )
+      compute_challenge ~is_square prechallenge  )
 
 let compute_sg chals =
   Snarky_bn382.Fq_urs.b_poly_commitment
@@ -185,6 +186,7 @@ module Per_proof_witness = struct
     'local_statement
     * 'local_num_branches One_hot_vector.t
     * ( Pmain.Challenge.t
+      , Pmain.Challenge.t Scalar_challenge.t
       , Pmain.Fp.t
       , Impls.Pairing_based.Boolean.var
       , Pmain.Fq.t
@@ -200,6 +202,7 @@ module Per_proof_witness = struct
       'local_statement
       * One_hot_vector.Constant.t
       * ( Challenge.Constant.t
+        , Challenge.Constant.t Scalar_challenge.t
         , Fp.t
         , bool
         , fq
@@ -257,8 +260,9 @@ module Requests = struct
             max_local_max_branchings H1.T(Challenges_vector.Constant).t t
         | Proof_state :
             ( ( ( Challenge.Constant.t
+                , Challenge.Constant.t Scalar_challenge.t
                 , Field.Constant.t
-                , ( (Challenge.Constant.t, bool) Bulletproof_challenge.t
+                , ( (Challenge.Constant.t Scalar_challenge.t, bool) Bulletproof_challenge.t
                   , Wrap_circuit_bulletproof_rounds.n )
                   Vector.t
                 , Digest.Constant.t )
@@ -304,8 +308,9 @@ module Requests = struct
               max_local_max_branchings H1.T(Challenges_vector.Constant).t t
           | Proof_state :
               ( ( ( Challenge.Constant.t
+                  , Challenge.Constant.t Scalar_challenge.t
                   , fq
-                  , ( (Challenge.Constant.t, bool) Bulletproof_challenge.t
+                  , ( (Challenge.Constant.t Scalar_challenge.t, bool) Bulletproof_challenge.t
                     , Wrap_circuit_bulletproof_rounds.n )
                     Vector.t
                   , Digest.Constant.t )
@@ -394,8 +399,9 @@ module Unfinalized = struct
 
   type t =
     ( Field.t
+    , Field.t Scalar_challenge.t
     , Fq.t
-    , ( (Boolean.var list, Boolean.var) Bulletproof_challenge.t
+    , ( ( Challenge.t Scalar_challenge.t, Boolean.var) Bulletproof_challenge.t
       , Wrap_circuit_bulletproof_rounds.n )
       Pickles_types.Vector.t
     , Fpv.t )
@@ -407,8 +413,9 @@ module Unfinalized = struct
 
     type t =
       ( Challenge.Constant.t
+      , Challenge.Constant.t Scalar_challenge.t
       , Fq.t
-      , ( (Challenge.Constant.t, bool) Bulletproof_challenge.t
+      , ( (Challenge.Constant.t Scalar_challenge.t, bool) Bulletproof_challenge.t
         , Wrap_circuit_bulletproof_rounds.n )
         Vector.t
       , Digest.Constant.t )
@@ -416,20 +423,21 @@ module Unfinalized = struct
 
     let dummy_bulletproof_challenges =
       Vector.init Wrap_circuit_bulletproof_rounds.n ~f:(fun _ ->
-          let prechallenge = Ro.chal () in
+          let prechallenge = Ro.scalar_chal () in
           { Bulletproof_challenge.is_square=
               Fq.is_square
-                (Fq.of_bits (Challenge.Constant.to_bits prechallenge))
+                (Endo.Dlog.to_field prechallenge)
           ; prechallenge } )
 
     let dummy_bulletproof_challenges_computed =
       Vector.map dummy_bulletproof_challenges
-        ~f:(fun {is_square; prechallenge} ->
-          compute_challenge ~is_square (Challenge.Constant.to_fq prechallenge)
-      )
+        ~f:(fun {is_square; prechallenge} : Fq.t ->
+            compute_challenge ~is_square
+              prechallenge
+               )
 
     let dummy : t =
-      let one_chal = Challenge.Constant.of_fq Fq.one in
+      let one_chal = Challenge.Constant.dummy in
       let open Ro in
       { deferred_values=
           { marlin=
@@ -439,15 +447,16 @@ module Unfinalized = struct
               ; eta_a= chal ()
               ; eta_b= chal ()
               ; eta_c= chal ()
-              ; beta_1= chal ()
-              ; beta_2= chal ()
-              ; beta_3= chal () }
+              ; beta_1= Scalar_challenge (chal ())
+              ; beta_2= Scalar_challenge (chal ())
+              ; beta_3= Scalar_challenge (chal () )
+              }
           ; combined_inner_product= fq ()
-          ; xi= one_chal
-          ; r= one_chal
+          ; xi= Scalar_challenge one_chal
+          ; r= Scalar_challenge one_chal
           ; bulletproof_challenges= dummy_bulletproof_challenges
           ; b= fq () }
-      ; sponge_digest_before_evaluations= Digest.Constant.of_fq Fq.zero }
+      ; sponge_digest_before_evaluations= Digest.Constant.dummy }
 
     let corresponding_dummy_sg = lazy (compute_sg dummy_bulletproof_challenges)
   end
@@ -614,6 +623,7 @@ let step_main
 
       type 'a t =
         ( Challenge.t
+        , Challenge.t Scalar_challenge.t
         , Fp.t
         , Boolean.var
         , unit
@@ -721,10 +731,6 @@ let step_main
               let sponge_digest =
                 Fp.pack state.sponge_digest_before_evaluations
               in
-              let deferred_values =
-                Types.Dlog_based.Proof_state.Deferred_values.map_challenges
-                  ~f:Fp.pack state.deferred_values
-              in
               let sponge =
                 let open Pairing_main_inputs in
                 let sponge = Sponge.create sponge_params in
@@ -739,7 +745,7 @@ let step_main
                       (which_index, Vector.map d.step_domains ~f) )
               in
               Pmain.finalize_other_proof ~input_domain ~domain_k ~domain_h
-                ~sponge deferred_values prev_evals
+                ~sponge state.deferred_values prev_evals
             in
             (* TODO Use a pseudo sg old which masks out the extraneous sgs
                  for the index of this internal proof... *)
@@ -757,7 +763,9 @@ let step_main
               Pmain.verify ~branching:d.max_branching
                 ~wrap_domains:(d.wrap_domains.h, d.wrap_domains.k)
                 ~is_base_case:should_verify ~sg_old ~opening ~messages
-                ~wrap_verification_key:d.wrap_key statement unfinalized
+                ~wrap_verification_key:d.wrap_key
+                statement
+                unfinalized
             in
             if debug then
               as_prover
@@ -857,7 +865,8 @@ let wrap_main
       let typ =
         typ
           (module Impl)
-          Max_branching.n Wrap_circuit_bulletproof_rounds.n Fq.typ
+          Max_branching.n Wrap_circuit_bulletproof_rounds.n
+          Fq.typ
       in
       exists typ ~request:(fun () -> Req.Proof_state)
     in
@@ -1018,7 +1027,7 @@ let wrap_main
                 ~actual_branching ~h_minus_1 ~k_minus_1
                 ~shifted_pow:(Pseudo.Degree_bound.shifted_pow ~crs_max_degree)
                 ~input_domain ~domain_k ~domain_h ~sponge
-                (map_challenges deferred_values ~f:Fq.pack)
+                deferred_values
                 ~old_bulletproof_challenges evals
             in
             Boolean.(Assert.any [not should_verify; verified]) ;
@@ -1068,8 +1077,14 @@ let wrap_main
                Wrap_circuit_bulletproof_rounds.n)
             (Types.Pairing_based.Statement.to_data t)
       in
-      let xi = Field.unpack xi ~length:Challenge.length in
-      let r = Field.unpack r ~length:Challenge.length in
+      let xi =
+        Pickles_types.Scalar_challenge.map xi
+          ~f:(Field.unpack ~length:Challenge.length)
+      in
+      let r = 
+        Pickles_types.Scalar_challenge.map r
+          ~f:(Field.unpack ~length:Challenge.length)
+      in
       let r_xi_sum =
         Field.choose_preimage_var r_xi_sum ~length:Field.size_in_bits
       in
@@ -1080,7 +1095,8 @@ let wrap_main
             (which_branch, Vector.map ~f:Domains.k step_domains) )
       in
       incrementally_verify_pairings ~step_domains ~pairing_acc:prev_pairing_acc
-        ~xi ~r ~r_xi_sum ~verification_key:pairing_marlin_index ~sponge
+        ~xi ~r
+        ~r_xi_sum ~verification_key:pairing_marlin_index ~sponge
         ~public_input:(Array.append [|[Boolean.true_]|] (pack prev_statement))
         ~messages ~opening_proofs
     in
@@ -1171,7 +1187,7 @@ module Reduced_me_only = struct
 
   module Dlog_based = struct
     module Challenges_vector = struct
-      type t = (Challenge.Constant.t, bool) Bulletproof_challenge.t Bp_vec.t
+      type t = (Challenge.Constant.t Scalar_challenge.t, bool) Bulletproof_challenge.t Bp_vec.t
       [@@deriving bin_io]
 
       module Prepared = struct
@@ -1196,7 +1212,8 @@ module Reduced_me_only = struct
     let prepare ({pairing_marlin_acc; old_bulletproof_challenges} : _ t) =
       { Me_only.Dlog_based.pairing_marlin_acc
       ; old_bulletproof_challenges=
-          Vector.map ~f:compute_challenges old_bulletproof_challenges }
+          Vector.map ~f:compute_challenges
+            old_bulletproof_challenges }
   end
 end
 
@@ -1219,6 +1236,7 @@ module Proof = struct
     type ('s, 'dlog_me_only, 'sgs) t =
       { statement:
           ( Challenge.Constant.t
+          , Challenge.Constant.t Scalar_challenge.t
           , fp
           , bool
           , fq
@@ -1366,7 +1384,8 @@ let accumulate_pairing_checks (proof : Pairing_based.Proof.t)
         Dlog_main.accumulate_degree_bound_checks' ~domain_h ~domain_k
           prev_acc.degree_bound_checks ~add ~scale ~r_h:r ~r_k g1 g2 g3
     ; opening_check=
-        Dlog_main.accumulate_opening_check ~add ~negate ~scale ~generator:one
+        Dlog_main.accumulate_opening_check
+          ~add ~negate ~scale_generator:(scale one) ~endo:scale
           ~r ~r_xi_sum prev_acc.opening_check (f_1, beta_1, proof1)
           (f_2, beta_2, proof2) (f_3, beta_3, proof3) }
 
@@ -1428,7 +1447,8 @@ let make_step_data
       Impls.Pairing_based.input ~branching:max_branching
         ~bulletproof_log2:Wrap_circuit_bulletproof_rounds.n
     in
-    Fix_domains.domains (module Impls.Pairing_based) etyp main
+    Fix_domains.domains (module Impls.Pairing_based) etyp 
+      main
   in
   Step_branch_data.T
     { branching= (self_width, branching)
@@ -1596,23 +1616,44 @@ let wrap (type max_branching max_local_max_branchings) max_branching
   let o = O.create pairing_vk public_input proof in
   let x_hat_beta_1 = O.x_hat_beta1 o in
   let next_statement : _ Statement.Dlog_based.t =
+    let scalar_chal f =
+      Scalar_challenge.map ~f:Challenge.Constant.of_fp (f o)
+    in
     let sponge_digest_before_evaluations = O.digest_before_evaluations o in
-    let r = O.r o in
-    let r_k = O.r_k o in
-    let xi = O.batch o in
-    let beta_1 = O.beta1 o in
-    let beta_2 = O.beta2 o in
-    let beta_3 = O.beta3 o in
+    let r = scalar_chal O.r in
+    let r_k = scalar_chal O.r_k in
+    let xi = scalar_chal O.batch in
+    let beta_1 =scalar_chal O.beta1 in
+    let beta_2 =scalar_chal O.beta2 in
+    let beta_3 =scalar_chal O.beta3 in
     let alpha = O.alpha o in
     let eta_a = O.eta_a o in
     let eta_b = O.eta_b o in
     let eta_c = O.eta_c o in
+    let module As_field = struct
+      let to_field =  SC.to_field_constant (module Fp) ~endo:Endo.Pairing.scalar
+      let r = to_field r
+      let r_k = to_field r_k
+      let xi = to_field xi
+      let beta_1 = to_field beta_1
+      let beta_2 = to_field beta_2
+      let beta_3 = to_field beta_3
+    end
+    in
     let r_xi_sum =
-      combined_evaluation ~x_hat_beta_1 ~r ~xi ~beta_1 ~beta_2 ~beta_3 proof
+      let open As_field in
+      combined_evaluation
+        ~x_hat_beta_1
+        ~r
+        ~xi
+        ~beta_1
+        ~beta_2
+        ~beta_3
+        proof
     in
     let me_only : _ Types.Dlog_based.Proof_state.Me_only.t =
       let combined_polys =
-        combined_polynomials ~xi ~pairing_marlin_index public_input proof
+        combined_polynomials ~xi:As_field.xi ~pairing_marlin_index public_input proof
       in
       let prev_pairing_acc =
         let module G1 = Snarky_bn382_backend.G1 in
@@ -1630,6 +1671,7 @@ let wrap (type max_branching max_local_max_branchings) max_branching
       in
       { pairing_marlin_acc=
           (let {Domains.h; k} = step_domains in
+           let open As_field in
            accumulate_pairing_checks ~domain_h:h ~domain_k:k proof
              prev_pairing_acc ~r ~r_k ~r_xi_sum ~beta_1 ~beta_2 ~beta_3
              combined_polys)
@@ -1640,8 +1682,8 @@ let wrap (type max_branching max_local_max_branchings) max_branching
     let chal = Challenge.Constant.of_fp in
     { proof_state=
         { deferred_values=
-            { xi= chal xi
-            ; r= chal r
+            { xi
+            ; r
             ; r_xi_sum
             ; marlin=
                 { sigma_2= fst proof.messages.sigma_gh_2
@@ -1650,9 +1692,9 @@ let wrap (type max_branching max_local_max_branchings) max_branching
                 ; eta_a= chal eta_a
                 ; eta_b= chal eta_b
                 ; eta_c= chal eta_c
-                ; beta_1= chal beta_1
-                ; beta_2= chal beta_2
-                ; beta_3= chal beta_3 } }
+                ; beta_1
+                ; beta_2
+                ; beta_3} }
         ; was_base_case=
             List.for_all
               ~f:(fun (_, should_verify) -> not should_verify)
@@ -1797,6 +1839,7 @@ struct
     let module Statement_with_hashes = struct
       type t =
         ( Challenge.Constant.t
+        , Challenge.Constant.t Scalar_challenge.t
         , Snarky_bn382_backend.Fp.t
         , bool
         , Snarky_bn382_backend.Fq.t
@@ -1867,16 +1910,29 @@ struct
             public_input t.proof
         in
         let ((x_hat_1, x_hat_2, x_hat_3) as x_hat) = O.x_hat o in
-        let beta_1 = O.beta1 o in
-        let beta_2 = O.beta2 o in
-        let beta_3 = O.beta3 o in
+        let scalar_chal f =
+          Scalar_challenge.map
+            ~f:Challenge.Constant.of_fq (f o)
+        in
+        let beta_1 =scalar_chal O.beta1 in
+        let beta_2 =scalar_chal O.beta2 in
+        let beta_3 =scalar_chal O.beta3 in
         let alpha = O.alpha o in
         let eta_a = O.eta_a o in
         let eta_b = O.eta_b o in
         let eta_c = O.eta_c o in
-        let xi = O.polys o in
-        let r = O.evals o in
+        let xi = scalar_chal O.polys in
+        let r = scalar_chal O.evals in
         let sponge_digest_before_evaluations = O.digest_before_evaluations o in
+        let to_field =  SC.to_field_constant (module Fq) ~endo:Endo.Dlog.scalar in
+        let module As_field = struct
+          let r = to_field r
+          let xi = to_field xi
+          let beta_1 = to_field beta_1
+          let beta_2 = to_field beta_2
+          let beta_3 = to_field beta_3
+        end
+        in
         let combined_inner_product =
           let (module Local_max_branching) = data.max_branching in
           let T = Local_max_branching.eq in
@@ -1884,6 +1940,7 @@ struct
           let b_polys =
             Vector.map ~f:(Fn.compose b_poly Vector.to_array) prev_challenges
           in
+          let open As_field in
           let combine x_hat pt e =
             let a, b = Dlog_marlin_types.Evals.to_vectors e in
             let v =
@@ -1899,7 +1956,9 @@ struct
                  (Local_max_branching.add Nat.N19.n)
                  ~h_minus_1:Int.(Domain.size domains.h - 1)
                  ~k_minus_1:Int.(Domain.size domains.k - 1))
-              ~crs_max_degree ~xi ~mul ~add ~one ~evaluation_point:pt v b
+              ~crs_max_degree
+              ~xi
+              ~mul ~add ~one ~evaluation_point:pt v b
           in
           let open Fq in
           combine x_hat_1 beta_1 e1
@@ -1908,20 +1967,22 @@ struct
         let new_bulletproof_challenges, b =
           let prechals =
             Array.map (O.opening_prechallenges o) ~f:(fun x ->
-                (x, Fq.is_square x) )
+                let x = Scalar_challenge.map ~f:Challenge.Constant.of_fq x in
+                (x, Fq.is_square (to_field x)) )
           in
           let chals =
             Array.map prechals ~f:(fun (x, is_square) ->
                 compute_challenge ~is_square x )
           in
           let b_poly = b_poly chals in
+          let open As_field in
           let b =
             let open Fq in
             b_poly beta_1 + (r * (b_poly beta_2 + (r * b_poly beta_3)))
           in
           let prechals =
             Array.map prechals ~f:(fun (x, is_square) ->
-                { Bulletproof_challenge.prechallenge= Challenge.Constant.of_fq x
+                { Bulletproof_challenge.prechallenge=x
                 ; is_square } )
           in
           (prechals, b)
@@ -1935,12 +1996,12 @@ struct
                   ; eta_a= chal eta_a
                   ; eta_b= chal eta_b
                   ; eta_c= chal eta_c
-                  ; beta_1= chal beta_1
-                  ; beta_2= chal beta_2
-                  ; beta_3= chal beta_3 }
+                  ; beta_1= beta_1
+                  ; beta_2= beta_2
+                  ; beta_3= beta_3 }
               ; combined_inner_product
-              ; xi= chal xi
-              ; r= chal r
+              ; xi= xi
+              ; r= r
               ; bulletproof_challenges=
                   Vector.of_list_and_length_exn
                     (Array.to_list new_bulletproof_challenges)
@@ -2528,7 +2589,9 @@ let compile
             let open Pairing_marlin_types in
             let open Types.Dlog_based.Proof_state in
             let {Deferred_values.xi; r; marlin; r_xi_sum} =
-              Deferred_values.map_challenges ~f:Challenge.Constant.to_fp
+              Deferred_values.map_challenges
+                ~f:Challenge.Constant.to_fp
+                ~scalar:(SC.to_field_constant (module Fp) ~endo:Endo.Pairing.scalar)
                 statement.proof_state.deferred_values
             in
             let marlin_checks =
@@ -2720,8 +2783,8 @@ let%test_module "test" =
         { statement=
             { proof_state=
                 { deferred_values=
-                    { xi= chal ()
-                    ; r= chal ()
+                    { xi= scalar_chal ()
+                    ; r= scalar_chal ()
                     ; r_xi_sum= fp ()
                     ; marlin=
                         { sigma_2= fp ()
@@ -2730,9 +2793,9 @@ let%test_module "test" =
                         ; eta_a= chal ()
                         ; eta_b= chal ()
                         ; eta_c= chal ()
-                        ; beta_1= chal ()
-                        ; beta_2= chal ()
-                        ; beta_3= chal () } }
+                        ; beta_1= scalar_chal ()
+                        ; beta_2= scalar_chal ()
+                        ; beta_3= scalar_chal () } }
                 ; sponge_digest_before_evaluations=
                     Digest.Constant.of_fq Snarky_bn382_backend.Fq.zero
                 ; was_base_case= true

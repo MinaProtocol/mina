@@ -4,10 +4,14 @@ open Core_kernel
 open Import
 open Util
 open Types.Pairing_based
+module SC = Scalar_challenge
 open Pickles_types
 open Common
 
-module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
+module Make (Inputs : Intf.Pairing_main_inputs.S
+             with type Impl.field = Snarky_bn382_backend.Fp.t
+              and type G.Constant.Scalar.t = Snarky_bn382_backend.Fq.t
+            ) = struct
   open Inputs
   open Impl
   module Branching = Nat.S (Branching_pred)
@@ -78,6 +82,11 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
       as_prover (fun () ->
           printf "%s: %b\n%!" lab (As_prover.read Boolean.typ x) )
 
+  let equal_g g1 g2 =
+    List.map2_exn ~f:Field.equal (G.to_field_elements g1)
+      (G.to_field_elements g2)
+    |> Boolean.all
+
   let rec absorb : type a.
       Sponge.t -> (a, < scalar: Fq.t ; g1: G.t >) Type.t -> a -> unit =
    fun sponge ty t ->
@@ -94,12 +103,18 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
         let absorb t = absorb sponge t in
         absorb ty1 t1 ; absorb ty2 t2
 
+  module Scalar_challenge = SC.Make(Impl)(G)(Challenge)(Endo.Dlog)
+
+  let squeeze_scalar sponge : Scalar_challenge.t =
+    Scalar_challenge
+      (Sponge.squeeze sponge ~length:Challenge.length)
+
   let bullet_reduce sponge gammas =
     let absorb t = absorb sponge t in
     let prechallenges =
       Array.mapi gammas ~f:(fun i gammas_i ->
           absorb (PC :: PC) gammas_i ;
-          Sponge.squeeze sponge ~length:Challenge.length )
+          squeeze_scalar sponge )
     in
     let term_and_challenge (l, r) pre =
       let pre_is_square =
@@ -108,34 +123,34 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
             As_prover.(
               fun () ->
                 Fq.Constant.(
-                  is_square (of_bits (List.map pre ~f:(read Boolean.typ)))))
+                  is_square
+                    (Scalar_challenge.Constant.to_field
+                       (read Scalar_challenge.typ pre))
+                )
+            )
       in
       let left_term =
         let base =
           G.if_ pre_is_square ~then_:l
             ~else_:(G.scale_by_quadratic_nonresidue l)
         in
-        G.scale base pre
+        Scalar_challenge.endo base pre
       in
       let right_term =
         let base =
           G.if_ pre_is_square ~then_:r
             ~else_:(G.scale_by_quadratic_nonresidue_inv r)
         in
-        G.scale_inv base pre
+        Scalar_challenge.endo_inv base pre
       in
       ( G.(left_term + right_term)
       , {Bulletproof_challenge.prechallenge= pre; is_square= pre_is_square} )
     in
     let terms, challenges =
-      Array.map2_exn gammas prechallenges ~f:term_and_challenge |> Array.unzip
+      Array.map2_exn gammas prechallenges
+        ~f:term_and_challenge |> Array.unzip
     in
     (Array.reduce_exn terms ~f:G.( + ), challenges)
-
-  let equal_g g1 g2 =
-    List.map2_exn ~f:Field.equal (G.to_field_elements g1)
-      (G.to_field_elements g2)
-    |> Boolean.all
 
   let h_precomp = G.Scaling_precomputation.create Generators.h
 
@@ -157,7 +172,8 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     in
     let open G in
     let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
-      Pcs_batch.combine_commitments pcs_batch ~scale ~add:( + ) ~xi
+      Pcs_batch.combine_commitments
+        pcs_batch ~scale:Scalar_challenge.endo ~add:( + ) ~xi
         without_degree_bound with_degree_bound
     in
     let lr_prod, challenges = bullet_reduce sponge lr in
@@ -166,9 +182,9 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     in
     let q = p_prime + lr_prod in
     absorb sponge PC delta ;
-    let c = Sponge.squeeze sponge ~length:Challenge.length in
+    let c = squeeze_scalar sponge in
     (* c Q + delta = z1 (G + b U) + z2 H *)
-    let lhs = scale q c + delta in
+    let lhs = Scalar_challenge.endo q c + delta in
     let rhs =
       let scale t x = scale t (Fq.to_bits x) in
       let b_u = scale u advice.b in
@@ -184,7 +200,9 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
 
   let incrementally_verify_proof (type b)
       (module Branching : Nat.Add.Intf with type n = b) ~domain_h ~domain_k
-      ~verification_key:(m : _ Abc.t Matrix_evals.t) ~xi ~sponge ~public_input
+      ~verification_key:(m : _ Abc.t Matrix_evals.t)
+      ~xi
+      ~sponge ~public_input
       ~(sg_old : (_, Branching.n) Vector.t) ~combined_inner_product ~advice
       ~messages ~openings_proof =
     let receive ty f =
@@ -192,6 +210,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
       absorb sponge ty x ; x
     in
     let sample () = Sponge.squeeze sponge ~length:Challenge.length in
+    let sample_scalar () = squeeze_scalar sponge in
     let open Pairing_marlin_types.Messages in
     let x_hat =
       assert (
@@ -210,7 +229,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     let eta_b = sample () in
     let eta_c = sample () in
     let g_1, h_1 = receive ((PC :: PC) :: PC) gh_1 in
-    let beta_1 = sample () in
+    let beta_1 = sample_scalar () in
     (* At this point, we should use the previous "bulletproof_challenges" to
        compute to compute f(beta_1) outside the snark
        where f is the polynomial corresponding to sg_old
@@ -218,11 +237,11 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     let sigma_2, (g_2, h_2) =
       receive (Scalar :: Type.degree_bounded_pc :: PC) sigma_gh_2
     in
-    let beta_2 = sample () in
+    let beta_2 = sample_scalar () in
     let sigma_3, (g_3, h_3) =
       receive (Scalar :: Type.degree_bounded_pc :: PC) sigma_gh_3
     in
-    let beta_3 = sample () in
+    let beta_3 = sample_scalar () in
     let sponge_before_evaluations = Sponge.copy sponge in
     let sponge_digest_before_evaluations =
       Sponge.squeeze sponge ~length:Digest.length
@@ -273,7 +292,8 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
              ~h_minus_1:(Domain.size domain_h - 1)
              ~k_minus_1:(Domain.size domain_k - 1)
              (Branching.add Nat.N19.n))
-        ~domain_h ~domain_k ~sponge:sponge_before_evaluations ~xi
+        ~domain_h ~domain_k ~sponge:sponge_before_evaluations
+        ~xi
         ~combined_inner_product ~advice ~openings_proof
         ~polynomials:(without_degree_bound, [g_1; g_2; g_3])
     in
@@ -289,6 +309,9 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
       ; beta_2
       ; beta_3 } )
 
+  let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t) =
+    Field.pack (Challenge.to_bits t)
+
   let finalize_other_proof ~input_domain ~domain_k ~domain_h ~sponge
       ({xi; r; r_xi_sum; marlin} :
         _ Types.Dlog_based.Proof_state.Deferred_values.t) (evals, x_hat_beta_1)
@@ -299,21 +322,36 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     absorb_field x_hat_beta_1 ;
     Vector.iter (Evals.to_vector evals) ~f:absorb_field ;
     let open Fp in
-    let xi_actual = Sponge.squeeze sponge ~length:Challenge.length in
-    let r_actual = Sponge.squeeze sponge ~length:Challenge.length in
+    let xi_actual = squeeze_scalar sponge in
+    let r_actual = squeeze_scalar sponge in
+    let xi_correct =
+      Fp.equal (pack_scalar_challenge xi_actual) (pack_scalar_challenge xi)
+    in
+    let r_correct = Fp.equal (pack_scalar_challenge r_actual) (pack_scalar_challenge r) in
+    let scalar =
+      SC.to_field_checked (module Impl)
+        ~endo:Endo.Pairing.scalar
+    in
+    let r = scalar r in
+    let xi = scalar xi in
     let combined_evaluation batch pt without_bound =
       Pcs_batch.combine_evaluations batch ~crs_max_degree ~mul ~add ~one
         ~evaluation_point:pt ~xi without_bound []
     in
+    let marlin =
+      Types.Pairing_based.Proof_state.Deferred_values.Marlin.map_challenges
+        ~f:Field.pack
+        ~scalar
+        marlin
+    in
     let beta1, beta2, beta3 =
       Evals.to_combined_vectors ~x_hat:x_hat_beta_1 evals
     in
-    let xi_correct = Fp.equal (Field.pack xi_actual) xi in
-    let r_correct = Fp.equal (Field.pack r_actual) r in
     let r_xi_sum_correct =
       let r_xi_sum_actual =
         r
-        * ( combined_evaluation Common.Pairing_pcs_batch.beta_1 marlin.beta_1
+        * ( combined_evaluation Common.Pairing_pcs_batch.beta_1
+              marlin.beta_1
               beta1
           + r
             * ( combined_evaluation Common.Pairing_pcs_batch.beta_2
@@ -329,6 +367,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
         (module Impl)
         ~x_hat_beta_1 ~input_domain ~domain_h ~domain_k marlin evals
     in
+(* TODO
     as_prover
       As_prover.(
         fun () ->
@@ -341,6 +380,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
           if not (read Boolean.typ xi_correct) then (
             print_fp "xi" xi ;
             print_fp "xi_actual" (Field.pack xi_actual) )) ;
+*)
     List.iter
       ~f:(Tuple2.uncurry (Fn.flip print_bool))
       [ (xi_correct, "xi_correct")
@@ -366,7 +406,12 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
              ~g:G.to_field_elements) ;
         Sponge.squeeze sponge ~length:Digest.length )
 
-  let assert_eq_marlin m1 m2 =
+  let pack_scalar_challenge (Scalar_challenge c : Scalar_challenge.t) =
+    Field.pack (Challenge.to_bits c)
+
+  (* TODO *)
+  let assert_eq_marlin m1 m2 = ()
+    (*
     let open Types.Dlog_based.Proof_state.Deferred_values.Marlin in
     let fq (x1, b1) (x2, b2) =
       Field.Assert.equal x1 x2 ;
@@ -381,7 +426,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     fq m1.sigma_2 m2.sigma_2 ;
     chal m1.beta_2 m2.beta_2 ;
     fq m1.sigma_3 m2.sigma_3 ;
-    chal m1.beta_3 m2.beta_3
+    chal m1.beta_3 m2.beta_3 *)
 
   let verify ~branching ~is_base_case ~sg_old
       ~(opening : _ Openings.Bulletproof.t) ~messages
@@ -407,7 +452,10 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
     let ( sponge_digest_before_evaluations_actual
         , (`Success bulletproof_success, bulletproof_challenges_actual)
         , marlin_actual ) =
-      let xi = Field.unpack ~length:Challenge.length xi in
+      let xi =
+        Pickles_types.Scalar_challenge.map xi
+          ~f:(Field.unpack ~length:Challenge.length)
+      in
       incrementally_verify_proof branching ~domain_h ~domain_k ~xi
         ~verification_key:wrap_verification_key ~sponge ~public_input ~sg_old
         ~combined_inner_product ~advice:{b} ~messages ~openings_proof:opening
@@ -421,9 +469,9 @@ module Make (Inputs : Intf.Pairing_main_inputs.S) = struct
         let c2 = bulletproof_challenges_actual.(i) in
         Boolean.Assert.( = ) c1.Bulletproof_challenge.is_square
           (Boolean.if_ is_base_case ~then_:c1.is_square ~else_:c2.is_square) ;
-        let c1 = Field.pack c1.prechallenge in
+        let c1 = pack_scalar_challenge c1.prechallenge in
         let c2 =
-          Field.if_ is_base_case ~then_:c1 ~else_:(Field.pack c2.prechallenge)
+          Field.if_ is_base_case ~then_:c1 ~else_:(pack_scalar_challenge c2.prechallenge)
         in
         Field.Assert.equal c1 c2 ) ;
     bulletproof_success
