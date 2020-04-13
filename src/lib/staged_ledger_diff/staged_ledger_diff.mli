@@ -91,8 +91,8 @@ end
 
 module Diff : sig
   type t =
-    Pre_diff_with_at_most_two_coinbase.Stable.V1.t
-    * Pre_diff_with_at_most_one_coinbase.Stable.V1.t option
+    Pre_diff_with_at_most_two_coinbase.t
+    * Pre_diff_with_at_most_one_coinbase.t option
   [@@deriving sexp, to_yojson]
 
   module Stable :

@@ -46,5 +46,7 @@ module V1 = struct
         "transaction pool diff"
 end
 
+module Latest = V1
+
 [%%define_locally
-V1.(summary)]
+Latest.(summary)]

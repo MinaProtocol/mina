@@ -84,6 +84,9 @@ module Decoders = struct
   let uint64 json =
     Yojson.Basic.Util.to_string json |> Unsigned.UInt64.of_string
 
+  let uint32 json =
+    Yojson.Basic.Util.to_string json |> Unsigned.UInt32.of_string
+
   let balance json =
     Yojson.Basic.Util.to_string json |> Currency.Balance.of_string
 

@@ -16,9 +16,9 @@ end]
 module T = struct
   module T0 = struct
     type t = Stable.Latest.t =
-      | User_command of User_command.With_valid_signature.Stable.Latest.t
-      | Fee_transfer of Fee_transfer.Stable.Latest.t
-      | Coinbase of Coinbase.Stable.Latest.t
+      | User_command of User_command.With_valid_signature.t
+      | Fee_transfer of Fee_transfer.t
+      | Coinbase of Coinbase.t
     [@@deriving sexp, compare, eq, hash, yojson]
   end
 
