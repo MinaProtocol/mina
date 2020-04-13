@@ -1053,6 +1053,22 @@ module Full (F : Ctypes.FOREIGN) = struct
       (Fq_triple)
       (F)
 
+  module Endo = struct
+    let endo typ which =
+      let open F in
+      F.foreign (prefix which) (void @-> returning typ)
+
+    module Pairing = struct
+      let base = endo Fq.typ "fp_endo_base"
+      let scalar = endo Fp.typ "fp_endo_scalar"
+    end
+
+    module Dlog = struct
+      let base = endo Fp.typ "fq_endo_base"
+      let scalar = endo Fq.typ "fq_endo_scalar"
+    end
+  end
+
   let batch_pairing_check =
     let open F in
     foreign

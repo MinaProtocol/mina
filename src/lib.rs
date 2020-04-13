@@ -22,10 +22,10 @@ use algebra::{
 };
 use commitment_pairing::urs::{URS};
 use evaluation_domains::EvaluationDomains;
-use circuits_pairing::index::{Index, VerifierIndex, MatrixValues, URSSpec, URSValue};
+use circuits_pairing::index::{Index, VerifierIndex, MatrixValues, URSSpec};
 use ff_fft::{Evaluations, DensePolynomial, EvaluationDomain};
 use num_bigint::BigUint;
-use oracle::{self, marlin_sponge::{DefaultFqSponge, DefaultFrSponge}, FqSponge, poseidon, poseidon::Sponge};
+use oracle::{self, marlin_sponge::{ScalarChallenge, DefaultFqSponge, DefaultFrSponge}, poseidon, poseidon::Sponge};
 use protocol_pairing::{prover::{ ProverProof, ProofEvaluations, RandomOracles}};
 use rand::rngs::StdRng;
 use rand_core;
@@ -319,6 +319,18 @@ pub extern "C" fn camlsnark_bn382_bigint_find_wnaf(
 }
 
 // Fp stubs
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_endo_base() -> *const Fq {
+    let (endo_q, _endo_r) = circuits_pairing::index::endos::<Bn_382>();
+    return Box::into_raw(Box::new(endo_q));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fp_endo_scalar() -> *const Fp {
+    let (_endo_q, endo_r) = circuits_pairing::index::endos::<Bn_382>();
+    return Box::into_raw(Box::new(endo_r));
+}
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_size_in_bits() -> i32 {
@@ -1124,42 +1136,42 @@ pub extern "C" fn camlsnark_bn382_fp_oracles_eta_c(
 pub extern "C" fn camlsnark_bn382_fp_oracles_beta1(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[0].clone() ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[0].0.clone() ));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_oracles_beta2(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[1].clone() ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[1].0.clone() ));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_oracles_beta3(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[2].clone() ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).beta[2].0.clone() ));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_oracles_r_k(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).r_k.clone() ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).r_k.0.clone() ));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_oracles_batch(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).batch.clone() ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).batch.0.clone() ));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fp_oracles_r(
     oracles: *const RandomOracles<Fp>,
 ) -> *const Fp {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).r.clone() ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).r.0.clone() ));
 }
 
 #[no_mangle]
@@ -1223,6 +1235,7 @@ pub extern "C" fn camlsnark_bn382_fp_verifier_index_make(
     rc_c: *const G1Affine,
 ) -> *const VerifierIndex<Bn_382> {
     let urs : URS<Bn_382> = (unsafe { &*urs }).clone();
+    let (endo_q, endo_r) = circuits_pairing::index::endos::<Bn_382>();
     let index = VerifierIndex {
         domains: EvaluationDomains::create(variables, constraints, public_inputs, nonzero_entries).unwrap(),
         matrix_commitments: [
@@ -1235,6 +1248,7 @@ pub extern "C" fn camlsnark_bn382_fp_verifier_index_make(
         max_degree,
         public_inputs,
         urs,
+        endo_q, endo_r
     };
     Box::into_raw(Box::new(index))
 }
@@ -1472,6 +1486,8 @@ pub extern "C" fn camlsnark_bn382_fp_index_create<'a>(
 
     let m = if num_constraints > vars { num_constraints } else { vars };
 
+    println!("pairing vars, constraints: {}, {}", vars, num_constraints);
+
     let h_group_size = EvaluationDomain::<Fp>::compute_size_of_domain(m).unwrap();
     let h_to_x_ratio = {
         let x_group_size = EvaluationDomain::<Fp>::compute_size_of_domain(public_inputs).unwrap();
@@ -1643,6 +1659,7 @@ pub extern "C" fn camlsnark_bn382_fq_index_create<'a>(
     let num_constraints = a.len();
 
     let m = if num_constraints > vars { num_constraints } else { vars };
+    println!("dlog vars, constraints: {}, {}", vars, num_constraints);
 
     let h_group_size = EvaluationDomain::<Fq>::compute_size_of_domain(m).unwrap();
     let h_to_x_ratio = {
@@ -2135,6 +2152,18 @@ pub extern "C" fn camlsnark_bn382_g1_affine_vector_delete(v: *mut Vec<G1Affine>)
 // Fq stubs
 
 #[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_endo_base() -> *const Fp {
+    let (endo_q, _endo_r) = commitment_dlog::srs::endos::<GAffine>();
+    return Box::into_raw(Box::new(endo_q));
+}
+
+#[no_mangle]
+pub extern "C" fn camlsnark_bn382_fq_endo_scalar() -> *const Fq {
+    let (_endo_q, endo_r) = commitment_dlog::srs::endos::<GAffine>();
+    return Box::into_raw(Box::new(endo_r));
+}
+
+#[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_size_in_bits() -> i32 {
     return Fq_params::MODULUS_BITS as i32;
 }
@@ -2550,7 +2579,7 @@ pub extern "C" fn camlsnark_bn382_g_affine_pair_vector_delete(v: *mut Vec<(GAffi
 // Fq oracles
 pub struct FqOracles {
     o: protocol_dlog::prover::RandomOracles<Fq>,
-    opening_prechallenges: Vec<Fq>,
+    opening_prechallenges: Vec<ScalarChallenge<Fq>>,
 }
 
 #[no_mangle]
@@ -2579,7 +2608,7 @@ pub extern "C" fn camlsnark_bn382_fq_oracles_create(
 pub extern "C" fn camlsnark_bn382_fq_oracles_opening_prechallenges(
     oracles: *const FqOracles
 ) -> *const Vec<Fq> {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).opening_prechallenges.clone() ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).opening_prechallenges.iter().map(|x| x.0).collect() ));
 }
 
 #[no_mangle]
@@ -2614,35 +2643,35 @@ pub extern "C" fn camlsnark_bn382_fq_oracles_eta_c(
 pub extern "C" fn camlsnark_bn382_fq_oracles_beta1(
     oracles: *const FqOracles,
 ) -> *const Fq {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).o.beta[0].clone() ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).o.beta[0].0.clone() ));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_oracles_beta2(
     oracles: *const FqOracles,
 ) -> *const Fq {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).o.beta[1].clone() ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).o.beta[1].0.clone() ));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_oracles_beta3(
     oracles: *const FqOracles,
 ) -> *const Fq {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).o.beta[2].clone() ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).o.beta[2].0.clone() ));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_oracles_polys(
     oracles: *const FqOracles,
 ) -> *const Fq {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).o.polys.clone() ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).o.polys.0.clone() ));
 }
 
 #[no_mangle]
 pub extern "C" fn camlsnark_bn382_fq_oracles_evals(
     oracles: *const FqOracles,
 ) -> *const Fq {
-    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).o.evals.clone() ));
+    return Box::into_raw(Box::new( (unsafe {&(*oracles)}).o.evals.0.clone() ));
 }
 
 #[no_mangle]

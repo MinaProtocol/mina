@@ -46,6 +46,10 @@ void *camlsnark_bn382_bigint_find_wnaf(size_t, void *);
 
 int camlsnark_bn382_fp_size_in_bits();
 
+void* camlsnark_bn382_fp_endo_base();
+
+void* camlsnark_bn382_fp_endo_scalar();
+
 void *camlsnark_bn382_fp_size();
 
 bool camlsnark_bn382_fp_is_square(void *);
@@ -131,6 +135,10 @@ void *camlsnark_bn382_fp_sponge_squeeze(void *, void *);
 // Fq
 
 int camlsnark_bn382_fq_size_in_bits();
+
+void* camlsnark_bn382_fq_endo_base();
+
+void* camlsnark_bn382_fq_endo_scalar();
 
 void *camlsnark_bn382_fq_size();
 
