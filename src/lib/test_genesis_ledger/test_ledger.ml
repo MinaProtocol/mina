@@ -27,5 +27,5 @@ include Make (struct
        let keypairs = Lazy.force Coda_base.Sample_keypairs.keypairs in
        List.mapi balances ~f:(fun i b ->
            let pk, sk = keypairs.(i) in
-           {pk; sk; balance= b * 1_000_000_000} ))
+           {pk; sk; balance= b} ))
 end)

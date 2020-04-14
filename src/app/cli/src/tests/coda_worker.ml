@@ -533,6 +533,7 @@ module T = struct
           let genesis_state_hash =
             Coda_state.Genesis_protocol_state.t
               ~genesis_ledger:Test_genesis_ledger.t
+              ~genesis_constants:Genesis_constants.compiled
             |> With_hash.hash
           in
           let coda_deferred () =
@@ -557,12 +558,14 @@ module T = struct
                  ~initial_block_production_keypairs ~monitor
                  ~consensus_local_state ~transaction_database
                  ~external_transition_database ~is_archive_rocksdb
-                 ~work_reassignment_wait:420000 ~genesis_state_hash ()
+                 ~work_reassignment_wait:420000 ~genesis_state_hash
+                 ~genesis_constants:Genesis_constants.compiled
                  ~archive_process_location:
                    (Option.map archive_process_location
                       ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
-                          {name= "dummy"; value= host_and_port} )))
+                          {name= "dummy"; value= host_and_port} ))
+                 ())
               ~genesis_ledger:Test_genesis_ledger.t
               ~base_proof:Precomputed_values.base_proof
           in
