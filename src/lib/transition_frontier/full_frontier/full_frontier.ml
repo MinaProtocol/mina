@@ -294,6 +294,7 @@ let visualize_to_string t =
 let calculate_root_transition_diff t heir =
   let open Root_data.Minimal in
   let root = root t in
+  let root_hash = t.root in
   let heir_hash = Breadcrumb.state_hash heir in
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in
   let heir_siblings =
@@ -314,11 +315,28 @@ let calculate_root_transition_diff t heir =
         in
         {transition; scan_state} )
   in
+  let protocol_states =
+    let required_state_hashes =
+      Staged_ledger.(
+        Scan_state.required_state_hashes
+          (Staged_ledger.scan_state heir_staged_ledger))
+    in
+    let protocol_state_map =
+      State_hash.Map.set t.protocol_state_map ~key:root_hash
+        ~data:
+          { Protocol_state_node.protocol_state= Breadcrumb.protocol_state root
+          ; scan_state_ref_count= 0 }
+    in
+    List.map required_state_hashes ~f:(fun hash ->
+        (hash, (State_hash.Map.find_exn protocol_state_map hash).protocol_state)
+    )
+  in
   let new_root_data =
     { hash= heir_hash
     ; scan_state= Staged_ledger.scan_state heir_staged_ledger
     ; pending_coinbase=
-        Staged_ledger.pending_coinbase_collection heir_staged_ledger }
+        Staged_ledger.pending_coinbase_collection heir_staged_ledger
+    ; protocol_states }
   in
   Diff.Full.E.E
     (Root_transitioned {new_root= new_root_data; garbage= Full garbage_nodes})
@@ -436,7 +454,7 @@ let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
       (Breadcrumb.validated_transition new_root_node.breadcrumb)
       new_staged_ledger
   in
-  (*Update the protocol states required for scan state at the new root*)
+  (*Deepthi: already in the diff (root_data) Update the protocol states required for scan state at the new root*)
   let new_protocol_states_map =
     let required_state_hashes =
       Staged_ledger.(

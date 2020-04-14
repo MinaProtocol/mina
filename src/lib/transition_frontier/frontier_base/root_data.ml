@@ -78,7 +78,11 @@ module Minimal = struct
       type t =
         { hash: State_hash.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
+        ; pending_coinbase: Pending_coinbase.Stable.V1.t
+        ; protocol_states:
+            ( Coda_base.State_hash.Stable.V1.t
+            * Coda_state.Protocol_state.Value.Stable.V1.t )
+            list }
 
       let to_latest = Fn.id
     end
@@ -87,14 +91,16 @@ module Minimal = struct
   type t = Stable.Latest.t =
     { hash: State_hash.t
     ; scan_state: Staged_ledger.Scan_state.t
-    ; pending_coinbase: Pending_coinbase.t }
+    ; pending_coinbase: Pending_coinbase.t
+    ; protocol_states:
+        (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
 
   let of_limited
-      {Limited.transition; scan_state; pending_coinbase; protocol_states= _} =
+      {Limited.transition; scan_state; pending_coinbase; protocol_states} =
     let hash = External_transition.Validated.state_hash transition in
-    {hash; scan_state; pending_coinbase}
+    {hash; scan_state; pending_coinbase; protocol_states}
 
-  let upgrade {hash; scan_state; pending_coinbase} ~transition ~protocol_states
+  let upgrade {hash; scan_state; pending_coinbase; protocol_states} ~transition
       =
     assert (
       State_hash.equal
@@ -109,11 +115,11 @@ type t =
   ; protocol_states:
       (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
 
-let minimize {transition; staged_ledger; protocol_states= _} =
+let minimize {transition; staged_ledger; protocol_states} =
   { Minimal.hash= External_transition.Validated.state_hash transition
   ; scan_state= Staged_ledger.scan_state staged_ledger
   ; pending_coinbase= Staged_ledger.pending_coinbase_collection staged_ledger
-  }
+  ; protocol_states }
 
 let limit {transition; staged_ledger; protocol_states} =
   { Limited.transition

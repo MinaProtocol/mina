@@ -59,22 +59,24 @@ module Minimal : sig
       type t =
         { hash: State_hash.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
+        ; pending_coinbase: Pending_coinbase.Stable.V1.t
+        ; protocol_states:
+            ( Coda_base.State_hash.Stable.V1.t
+            * Coda_state.Protocol_state.Value.Stable.V1.t )
+            list }
     end
   end]
 
   type t = Stable.Latest.t =
     { hash: State_hash.t
     ; scan_state: Staged_ledger.Scan_state.t
-    ; pending_coinbase: Pending_coinbase.t }
+    ; pending_coinbase: Pending_coinbase.t
+    ; protocol_states:
+        (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
 
   val of_limited : Limited.t -> t
 
-  val upgrade :
-       t
-    -> transition:External_transition.Validated.t
-    -> protocol_states:(State_hash.t * Coda_state.Protocol_state.value) list
-    -> Limited.t
+  val upgrade : t -> transition:External_transition.Validated.t -> Limited.t
 end
 
 type t =

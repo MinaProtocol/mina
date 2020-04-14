@@ -26,7 +26,8 @@ module Error : sig
     | `New_root_transition
     | `Old_root_transition
     | `Transition of State_hash.t
-    | `Arcs of State_hash.t ]
+    | `Arcs of State_hash.t
+    | `Protocol_states_for_root_scan_state ]
 
   type not_found = [`Not_found of not_found_member]
 
@@ -54,7 +55,8 @@ val check :
             | `Root
             | `Root_transition
             | `Transition of State_hash.t
-            | `Arcs of State_hash.t ] ] ] )
+            | `Arcs of State_hash.t
+            | `Protocol_states_for_root_scan_state ] ] ] )
      Result.t
 
 val initialize :
@@ -88,6 +90,12 @@ val get_arcs :
   -> (State_hash.t list, [> `Not_found of [> `Arcs of State_hash.t]]) Result.t
 
 val get_root : t -> (Root_data.Minimal.t, [> `Not_found of [> `Root]]) Result.t
+
+val get_protocol_states_for_root_scan_state :
+     t
+  -> ( Coda_state.Protocol_state.value list
+     , [> `Not_found of [> `Protocol_states_for_root_scan_state]] )
+     Result.t
 
 val get_root_hash : t -> (State_hash.t, [> `Not_found of [> `Root]]) Result.t
 

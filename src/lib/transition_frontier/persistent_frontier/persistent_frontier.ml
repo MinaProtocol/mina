@@ -177,8 +177,9 @@ module Instance = struct
       let%bind root = Database.get_root t.db in
       let%bind root_transition = Database.get_transition t.db root.hash in
       let%bind best_tip = Database.get_best_tip t.db in
-      let protocol_states = [] in
-      (*TODO: Deepthi persist*)
+      let%bind protocol_states =
+        Database.get_protocol_states_for_root_scan_state t.db
+      in
       let%map base_hash = Database.get_frontier_hash t.db in
       (root, root_transition, best_tip, base_hash, protocol_states))
       |> Result.map_error ~f:(fun err ->
@@ -206,7 +207,9 @@ module Instance = struct
         ~root_data:
           { transition= root_transition
           ; staged_ledger= root_staged_ledger
-          ; protocol_states }
+          ; protocol_states=
+              List.map protocol_states ~f:(fun s -> (Protocol_state.hash s, s))
+          }
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger.Db) root_ledger)
         ~consensus_local_state ~max_length ~genesis_constants
     in
