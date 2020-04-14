@@ -20,6 +20,7 @@ module Body : sig
   type t =
     | Payment of Payment_payload.t
     | Stake_delegation of Stake_delegation.t
+    | Mint of Mint_payload.t
   [@@deriving eq, sexp, hash, yojson]
 
   [%%versioned:

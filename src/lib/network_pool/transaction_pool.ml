@@ -1312,6 +1312,9 @@ let%test_module _ =
               ; body=
                   Stake_delegation
                     (Set_delegate {payload with delegator= sender_pk}) }
+          | {common; body= Mint payload} ->
+              { common= {common with fee_payer_pk= sender_pk}
+              ; body= Mint {payload with token_owner_pk= sender_pk} }
         in
         User_command.forget_check @@ User_command.sign sender_kp payload
       in

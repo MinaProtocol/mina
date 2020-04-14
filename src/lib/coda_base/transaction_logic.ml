@@ -58,6 +58,7 @@ module Undo = struct
             | Payment of {previous_empty_accounts: Account_id.Stable.V1.t list}
             | Stake_delegation of
                 { previous_delegate: Public_key.Compressed.Stable.V1.t }
+            | Mint
             | Failed
           [@@deriving sexp]
 
@@ -68,6 +69,7 @@ module Undo = struct
       type t = Stable.Latest.t =
         | Payment of {previous_empty_accounts: Account_id.t list}
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+        | Mint
         | Failed
       [@@deriving sexp]
     end
@@ -178,6 +180,7 @@ module type S = sig
         type t = Undo.User_command_undo.Body.t =
           | Payment of {previous_empty_accounts: Account_id.t list}
           | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+          | Mint
           | Failed
         [@@deriving sexp]
       end
@@ -597,6 +600,43 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             ; (receiver_location, receiver_account)
             ; (source_location, source_account) ]
           , Undo.User_command_undo.Body.Payment {previous_empty_accounts} )
+      | Mint {amount; _} ->
+          let%bind receiver_location, receiver_account =
+            get_with_location ledger receiver
+          in
+          let%bind () =
+            if receiver_location = `New then return ()
+            else Or_error.errorf "The receiver account does not exist"
+          in
+          let%bind receiver_account =
+            let%map balance = add_amount receiver_account.balance amount in
+            {receiver_account with balance}
+          in
+          let%bind source_location, source_account =
+            if Account_id.equal source receiver then
+              return (receiver_location, receiver_account)
+            else get_with_location ledger receiver
+          in
+          let%bind () =
+            if source_location = `New then return ()
+            else Or_error.errorf "The source account does not exist"
+          in
+          let%bind () =
+            (*TODO(4673): Integrate with [token_owner] field. *)
+            Or_error.errorf "The source account does not own the token"
+          in
+          let%map source_account =
+            let%bind timing =
+              validate_timing ~txn_amount:amount
+                ~txn_global_slot:current_global_slot ~account:source_account
+            in
+            let%map balance = sub_amount source_account.balance amount in
+            {source_account with timing; balance}
+          in
+          ( [ (fee_payer_location, fee_payer_account)
+            ; (receiver_location, receiver_account)
+            ; (source_location, source_account) ]
+          , Undo.User_command_undo.Body.Mint )
     in
     match compute_updates () with
     | Ok (located_accounts, undo_body) ->
@@ -894,6 +934,31 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         set ledger receiver_location receiver_account ;
         set ledger source_location source_account ;
         remove_accounts_exn ledger previous_empty_accounts
+    | Mint {amount; _}, Mint ->
+        let source = User_command.source user_command in
+        let receiver = User_command.receiver user_command in
+        let%bind receiver_location, receiver_account =
+          let%bind location = location_of_account' ledger "receiver" source in
+          let%bind account = get' ledger "receiver" location in
+          let%map balance = sub_amount account.balance amount in
+          (location, {account with balance})
+        in
+        let%map source_location, source_account =
+          let%bind location, account =
+            if Account_id.equal source receiver then
+              return (receiver_location, receiver_account)
+            else
+              let%bind location =
+                location_of_account' ledger "source" source
+              in
+              let%map account = get' ledger "source" location in
+              (location, account)
+          in
+          let%map balance = add_amount account.balance amount in
+          (location, {account with balance})
+        in
+        set ledger receiver_location receiver_account ;
+        set ledger source_location source_account
     | _, _ ->
         failwith "Undo/command mismatch"
 

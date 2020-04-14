@@ -45,6 +45,12 @@ module Body = struct
         ; receiver_pk= new_delegate
         ; token_id= Token_id.default
         ; amount= Currency.Amount.zero }
+    | Mint {token_owner_pk; receiver_pk; token; amount} ->
+        { tag= Tag.Mint
+        ; source_pk= token_owner_pk
+        ; receiver_pk
+        ; token_id= token
+        ; amount }
 
   let gen ~fee =
     let open Quickcheck.Generator.Let_syntax in
@@ -60,6 +66,8 @@ module Body = struct
             (Amount.zero, max_amount_without_overflow)
         | Stake_delegation ->
             (Amount.zero, max_amount_without_overflow)
+        | Mint ->
+            (Amount.zero, max_amount_without_overflow)
         | Fee_transfer ->
             (Amount.zero, max_amount_without_overflow)
         | Coinbase ->
@@ -72,7 +80,13 @@ module Body = struct
     and source_pk = Public_key.Compressed.gen
     and receiver_pk = Public_key.Compressed.gen
     and token_id =
-      match tag with Payment -> Token_id.gen | _ -> return Token_id.default
+      match tag with
+      | Payment ->
+          Token_id.gen
+      | Mint ->
+          Token_id.gen_non_default
+      | _ ->
+          return Token_id.default
     in
     {tag; source_pk; receiver_pk; token_id; amount}
 
@@ -199,6 +213,8 @@ let excess (payload : t) : Amount.Signed.t =
       Amount.Signed.of_unsigned (Amount.of_fee fee)
   | Stake_delegation ->
       Amount.Signed.of_unsigned (Amount.of_fee fee)
+  | Mint ->
+      Amount.Signed.of_unsigned (Amount.of_fee fee)
   | Fee_transfer ->
       Option.value_exn (Amount.add_fee amount fee)
       |> Amount.Signed.of_unsigned |> Amount.Signed.negate
@@ -210,5 +226,5 @@ let supply_increase (payload : payload) =
   match tag with
   | Coinbase ->
       payload.body.amount
-  | Payment | Stake_delegation | Fee_transfer ->
+  | Payment | Stake_delegation | Fee_transfer | Mint ->
       Amount.zero

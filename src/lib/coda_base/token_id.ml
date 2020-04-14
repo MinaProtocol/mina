@@ -32,7 +32,7 @@ module Stable = struct
   end
 end]
 
-type t = Stable.Latest.t [@@deriving sexp, compare]
+type t = Stable.Latest.t [@@deriving sexp, compare, yojson, sexp, hash]
 
 let to_input (x : t) = Random_oracle.Input.field x
 

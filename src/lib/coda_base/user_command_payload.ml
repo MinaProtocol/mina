@@ -186,6 +186,7 @@ module Body = struct
       type t =
         | Payment of Payment_payload.Stable.V1.t
         | Stake_delegation of Stake_delegation.Stable.V1.t
+        | Mint of Mint_payload.Stable.V1.t
       [@@deriving compare, eq, sexp, hash, yojson]
 
       let to_latest = Fn.id
@@ -195,6 +196,7 @@ module Body = struct
   type t = Stable.Latest.t =
     | Payment of Payment_payload.t
     | Stake_delegation of Stake_delegation.t
+    | Mint of Mint_payload.t
   [@@deriving eq, sexp, hash, yojson]
 
   module Tag = Transaction_union_tag
@@ -220,6 +222,8 @@ module Body = struct
         payload.source_pk
     | Stake_delegation (Set_delegate payload) ->
         payload.delegator
+    | Mint payload ->
+        payload.token_owner_pk
 
   let receiver_pk (t : t) =
     match t with
@@ -227,6 +231,8 @@ module Body = struct
         payload.receiver_pk
     | Stake_delegation payload ->
         Stake_delegation.receiver_pk payload
+    | Mint payload ->
+        payload.receiver_pk
 
   let token (t : t) =
     match t with
@@ -234,6 +240,8 @@ module Body = struct
         payload.token_id
     | Stake_delegation _ ->
         Token_id.default
+    | Mint payload ->
+        payload.token
 
   let source t = Account_id.create (source_pk t) (token t)
 
@@ -305,12 +313,20 @@ let token (t : t) = Body.token t.body
 let amount (t : t) =
   match t.body with
   | Payment payload ->
-      Some payload.Payment_payload.Poly.amount
+      Some payload.amount
   | Stake_delegation _ ->
       None
+  | Mint payload ->
+      Some payload.amount
 
 let is_payment (t : t) =
-  match t.body with Payment _ -> true | Stake_delegation _ -> false
+  match t.body with
+  | Payment _ ->
+      true
+  | Stake_delegation _ ->
+      false
+  | Mint _ ->
+      false
 
 let accounts_accessed (t : t) = [fee_payer t; source t; receiver t]
 
