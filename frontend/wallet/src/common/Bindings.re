@@ -203,6 +203,9 @@ module Fs = {
 
   [@bs.val] [@bs.module "fs"]
   external chmodSync: (string, int) => unit = "chmodSync";
+
+  [@bs.val] [@bs.module "fs"]
+  external symlinkSync: (string, string) => unit = "symLinkSync";
 };
 
 module Fetch = {

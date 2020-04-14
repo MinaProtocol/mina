@@ -129,10 +129,10 @@ let extractZip = (src, dest, doneCb) => {
         doneCb(
           Belt.Result.Error(
             "Error while unzipping the daemon bundle: "
-            ++ Tc.Option.withDefault(
-                 ~default="an unknown error occured.",
-                 Js.Exn.message(err),
-               ),
+            ++ (
+              Js.Exn.message(err)
+              |> Tc.Option.withDefault(~default="an unknown error occured.")
+            ),
           ),
         )
       );
@@ -142,8 +142,16 @@ let extractZip = (src, dest, doneCb) => {
 
 let installCoda = (tempPath, doneCb) => {
   let installPath = getPath("userData") ++ "/coda";
-  let keysPath = "/var/lib/coda/keys/";
-  extractZip(tempPath, installPath, doneCb(Belt.Result.Ok()));
+  let _keysPath = "/usr/local/var/coda/keys";
+  extractZip(tempPath, installPath, res =>
+    switch (res) {
+    | Belt.Result.Ok () =>
+      Bindings.Fs.chmodSync(installPath ++ "/coda.exe", 0o755);
+      Bindings.Fs.chmodSync(installPath ++ "/libp2p_helper", 0o755);
+      doneCb(res);
+    | Belt.Result.Error(_) => doneCb(res)
+    }
+  );
   ();
 };
 
