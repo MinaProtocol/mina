@@ -58,8 +58,9 @@ let create ~amount ~receiver ~fee_transfer =
     let adjusted_fee_transfer =
       Option.bind fee_transfer ~f:(fun fee_transfer ->
           Option.some_if
-            (Public_key.Compressed.equal receiver
-               (Fee_transfer.receiver_pk fee_transfer))
+            (not
+               (Public_key.Compressed.equal receiver
+                  (Fee_transfer.receiver_pk fee_transfer)))
             fee_transfer )
     in
     Ok {t with fee_transfer= adjusted_fee_transfer}
