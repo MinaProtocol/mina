@@ -663,6 +663,10 @@ let next_producer_timing t = t.next_producer_timing
 
 let staking_ledger t =
   let open Option.Let_syntax in
+  let consensus_constants =
+    Consensus.Constants.create
+      ~protocol_constants:t.config.genesis_constants.protocol
+  in
   let%map transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
@@ -671,7 +675,8 @@ let staking_ledger t =
       (Transition_frontier.best_tip transition_frontier)
   in
   let local_state = t.config.consensus_local_state in
-  Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
+  Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
+    ~consensus_state ~local_state
 
 let find_delegators table pk =
   Option.value_map
@@ -715,10 +720,15 @@ let start t =
     ~consensus_local_state:t.config.consensus_local_state
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
-    ~log_block_creation:t.config.log_block_creation ;
+    ~log_block_creation:t.config.log_block_creation
+    ~genesis_constants:t.config.genesis_constants ;
   Snark_worker.start t
 
 let create (config : Config.t) ~genesis_ledger ~base_proof =
+  let consensus_constants =
+    Consensus.Constants.create
+      ~protocol_constants:config.genesis_constants.protocol
+  in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->
@@ -942,6 +952,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config
               ~trust_system:config.trust_system
+              ~pool_max_size:config.genesis_constants.txpool_max_size
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
@@ -978,6 +989,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               =
             Broadcast_pipe.create
               ( External_transition.genesis ~genesis_ledger ~base_proof
+                  ~genesis_constants:config.genesis_constants
               |> External_transition.Validated.to_initial_validated )
           in
           let valid_transitions, initialization_finish_signal =
@@ -1008,11 +1020,13 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                          in
                          let tn_production_time =
                            Consensus.Data.Consensus_time.to_time
+                             ~constants:consensus_constants
                              tn_production_consensus_time
                          in
                          let tm_slot =
                            lift_consensus_time
-                             (Consensus.Data.Consensus_time.of_time_exn tm)
+                             (Consensus.Data.Consensus_time.of_time_exn
+                                ~constants:consensus_constants tm)
                          in
                          Coda_metrics.Block_latency.Gossip_slots.update
                            (Float.of_int (tm_slot - tn_production_slot)) ;
@@ -1035,7 +1049,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                          breadcrumb ))
                   ~most_recent_valid_block
                   ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
-                  ~base_proof )
+                  ~base_proof ~genesis_constants:config.genesis_constants )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -1071,7 +1085,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     |> Span.to_ms
                   in
                   match
-                    Consensus.Hooks.received_at_valid_time ~time_received:now
+                    Consensus.Hooks.received_at_valid_time
+                      ~constants:consensus_constants ~time_received:now
                       consensus_state
                   with
                   | Ok () ->

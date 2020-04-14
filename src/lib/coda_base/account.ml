@@ -14,11 +14,12 @@ open Snark_bits
 
 [%%else]
 
-open Snark_params_nonconsensus
 open Snark_bits_nonconsensus
 module Currency = Currency_nonconsensus.Currency
 module Coda_numbers = Coda_numbers_nonconsensus.Coda_numbers
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+module Coda_compile_config =
+  Coda_compile_config_nonconsensus.Coda_compile_config
 
 [%%endif]
 
@@ -36,6 +37,8 @@ module Index = struct
       let to_latest = Fn.id
     end
   end]
+
+  let ledger_depth = Coda_compile_config.ledger_depth
 
   type t = Stable.Latest.t [@@deriving to_yojson, sexp]
 

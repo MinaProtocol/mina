@@ -18,6 +18,12 @@ open Core_kernel
 module type S = sig
   type account_id
 
+  type token_id
+
+  type token_id_set
+
+  type account_id
+
   type account_id_set
 
   type account
@@ -34,7 +40,10 @@ module type S = sig
     Base_ledger_intf.S
     with module Addr = Location.Addr
     with module Location = Location
-    with type account_id := account_id
+    with type key := key
+     and type token_id := token_id
+     and type token_id_set := token_id_set
+     and type account_id := account_id
      and type account_id_set := account_id_set
      and type hash := hash
      and type root_hash := hash
@@ -54,7 +63,10 @@ end
 module Make_base (Inputs : Inputs_intf) :
   S
   with module Location = Inputs.Location
-  with type account_id := Inputs.Account_id.t
+  with type key := Inputs.Key.t
+   and type token_id := Inputs.Token_id.t
+   and type token_id_set := Inputs.Token_id.Set.t
+   and type account_id := Inputs.Account_id.t
    and type hash := Inputs.Hash.t
    and type account_id_set := Inputs.Account_id.Set.t
    and type account := Inputs.Account.t = struct
@@ -65,7 +77,10 @@ module Make_base (Inputs : Inputs_intf) :
     Base_ledger_intf.S
     with module Addr = Location.Addr
     with module Location = Location
-    with type account_id := Account_id.t
+    with type key := Inputs.Key.t
+     and type token_id := Inputs.Token_id.t
+     and type token_id_set := Inputs.Token_id.Set.t
+     and type account_id := Account_id.t
      and type account_id_set := Account_id.Set.t
      and type hash := Hash.t
      and type root_hash := Hash.t
@@ -137,6 +152,12 @@ module Make_base (Inputs : Inputs_intf) :
     let fold_until (T ((module Base), t)) = Base.fold_until t
 
     let accounts (T ((module Base), t)) = Base.accounts t
+
+    let token_owner (T ((module Base), t)) tid = Base.token_owner t tid
+
+    let tokens (T ((module Base), t)) pk = Base.tokens t pk
+
+    let token_owners (T ((module Base), t)) = Base.token_owners t
 
     let iteri (T ((module Base), t)) = Base.iteri t
 

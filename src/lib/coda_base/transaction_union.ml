@@ -7,11 +7,9 @@ module Payload = Transaction_union_payload
 
 type ('payload, 'pk, 'signature) t_ =
   {payload: 'payload; signer: 'pk; signature: 'signature}
-[@@deriving bin_io, eq, sexp, hash]
+[@@deriving eq, sexp, hash]
 
-(* OK to use Latest, rather than Vn, because t is not bin_io'ed *)
-type t = (Payload.t, Public_key.Stable.Latest.t, Signature.Stable.Latest.t) t_
-[@@deriving sexp]
+type t = (Payload.t, Public_key.t, Signature.t) t_ [@@deriving sexp]
 
 type var = (Payload.var, Public_key.var, Signature.var) t_
 
@@ -39,7 +37,7 @@ let typ : (var, t) Typ.t =
 *)
 let of_transaction : Transaction.t -> t = function
   | User_command cmd ->
-      let User_command.Poly.Stable.Latest.{signer; payload; signature} =
+      let User_command.Poly.{payload; signer; signature} =
         (cmd :> User_command.t)
       in
       { payload= Transaction_union_payload.of_user_command_payload payload

@@ -135,20 +135,23 @@ module Processor = struct
   type t = T : (module S with type t = 't) * 't -> t
 
   module Raw = struct
-    type t = unit
+    type t = Level.t
 
-    let create () = ()
+    let create ~log_level = log_level
 
-    let process () msg =
-      let msg_json_fields =
-        Message.to_yojson msg |> Yojson.Safe.Util.to_assoc
-      in
-      let json =
-        if Level.compare msg.level Spam = 0 then
-          `Assoc (List.filter msg_json_fields ~f:(fun (k, _) -> k <> "source"))
-        else `Assoc msg_json_fields
-      in
-      Some (Yojson.Safe.to_string json)
+    let process log_level (msg : Message.t) =
+      if msg.level < log_level then None
+      else
+        let msg_json_fields =
+          Message.to_yojson msg |> Yojson.Safe.Util.to_assoc
+        in
+        let json =
+          if Level.compare msg.level Level.Spam = 0 then
+            `Assoc
+              (List.filter msg_json_fields ~f:(fun (k, _) -> k <> "source"))
+          else `Assoc msg_json_fields
+        in
+        Some (Yojson.Safe.to_string json)
   end
 
   module Pretty = struct
@@ -183,7 +186,7 @@ module Processor = struct
               ^ formatted_extra )
   end
 
-  let raw () = T ((module Raw), Raw.create ())
+  let raw ?(log_level = Level.Spam) () = T ((module Raw), Raw.create ~log_level)
 
   let pretty ~log_level ~config =
     T ((module Pretty), Pretty.create ~log_level ~config)

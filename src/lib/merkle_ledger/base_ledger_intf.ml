@@ -9,6 +9,12 @@ module type S = sig
 
   type account_id
 
+  type token_id
+
+  type token_id_set
+
+  type account_id
+
   type account_id_set
 
   type index = int
@@ -60,6 +66,15 @@ module type S = sig
 
   (** set of account ids associated with accounts *)
   val accounts : t -> account_id_set
+
+  (** Get the public key that owns a token. *)
+  val token_owner : t -> token_id -> key option
+
+  (** Get the set of all accounts which own a token. *)
+  val token_owners : t -> account_id_set
+
+  (** Get all of the tokens for which a public key has accounts. *)
+  val tokens : t -> key -> token_id_set
 
   val location_of_account : t -> account_id -> Location.t option
 
