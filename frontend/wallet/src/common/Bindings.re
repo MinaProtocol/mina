@@ -212,6 +212,7 @@ module LocalStorage = {
     (
       ~key: [@bs.string] [
               | [@bs.as "network"] `Network
+              | [@bs.as "daemonHost"] `DaemonHost
               | [@bs.as "addressbook"] `AddressBook
               | [@bs.as "onboarding"] `Onboarding
               | [@bs.as "installed"] `Installed
@@ -227,6 +228,7 @@ module LocalStorage = {
     [@bs.string]
     [
       | [@bs.as "network"] `Network
+      | [@bs.as "daemonHost"] `DaemonHost
       | [@bs.as "addressbook"] `AddressBook
       | [@bs.as "onboarding"] `Onboarding
       | [@bs.as "installed"] `Installed
