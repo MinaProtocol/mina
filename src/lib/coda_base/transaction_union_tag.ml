@@ -140,6 +140,7 @@ module Unpacked = struct
       List.Assoc.find ~equal:Bits.equal
         [ (Bits.payment, payment)
         ; (Bits.stake_delegation, stake_delegation)
+        ; (Bits.mint, mint)
         ; (Bits.fee_transfer, fee_transfer)
         ; (Bits.coinbase, coinbase) ]
         bits
@@ -154,6 +155,7 @@ module Unpacked = struct
       List.Assoc.find ~equal
         [ (payment, Bits.payment)
         ; (stake_delegation, Bits.stake_delegation)
+        ; (mint, Bits.mint)
         ; (fee_transfer, Bits.fee_transfer)
         ; (coinbase, Bits.coinbase) ]
         t
@@ -324,8 +326,7 @@ let%test_module "predicates" =
     let%test_unit "is_stake_delegation" =
       test_predicate Unpacked.is_stake_delegation (( = ) Stake_delegation)
 
-    let%test_unit "is_mint" =
-      test_predicate Unpacked.is_stake_delegation (( = ) Mint)
+    let%test_unit "is_mint" = test_predicate Unpacked.is_mint (( = ) Mint)
 
     let%test_unit "is_fee_transfer" =
       test_predicate Unpacked.is_fee_transfer (( = ) Fee_transfer)
@@ -335,7 +336,7 @@ let%test_module "predicates" =
 
     let%test_unit "is_user_command" =
       test_predicate Unpacked.is_user_command
-        (one_of [Payment; Stake_delegation])
+        (one_of [Payment; Stake_delegation; Mint])
 
     let%test_unit "not_user_command" =
       test_predicate
