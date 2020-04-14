@@ -293,7 +293,7 @@ module Base = struct
       ; source_bad_timing: 'bool (* Payment only *)
       ; not_token_owner: 'bool (* Mint only *) }
 
-    let num_fields = 8
+    let num_fields = 9
 
     let to_list
         { predicate_failed
