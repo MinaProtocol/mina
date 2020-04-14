@@ -1,5 +1,5 @@
 open Core_kernel
-open Signature_lib
+open Import
 
 [%%versioned
 module Stable = struct

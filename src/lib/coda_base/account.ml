@@ -132,6 +132,9 @@ module Poly = struct
     ; timing: 'timing }
   [@@deriving sexp, eq, compare, hash, yojson, fields]
 
+  [%%ifdef
+  consensus_mechanism]
+
   let of_hlist
       ([ public_key
        ; token_id
@@ -173,6 +176,8 @@ module Poly = struct
       ; delegate
       ; voting_for
       ; timing ]
+
+  [%%endif]
 end
 [@@warning "-27"]
 

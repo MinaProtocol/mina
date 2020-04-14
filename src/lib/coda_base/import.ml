@@ -7,6 +7,7 @@
 consensus_mechanism]
 
 module Signature_lib = Signature_lib_nonconsensus
+module Currency = Currency_nonconsensus.Currency
 
 [%%endif]
 
