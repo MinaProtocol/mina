@@ -564,6 +564,17 @@ let daemon logger =
              [%of_sexp: Unix.Cidr.t list]
            >>| Or_error.ok
          in
+         let client_trustlist =
+           match Unix.getenv "CODA_CLIENT_TRUSTLIST" with
+           | Some envstr ->
+               let cidrs =
+                 String.split ~on:',' envstr |> List.map ~f:Unix.Cidr.of_string
+               in
+               Some
+                 (List.append cidrs (Option.value ~default:[] client_trustlist))
+           | None ->
+               client_trustlist
+         in
          Stream.iter
            (Async.Scheduler.long_cycles
               ~at_least:(sec 0.5 |> Time_ns.Span.of_span_float_round_nearest))
