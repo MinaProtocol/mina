@@ -200,6 +200,9 @@ module Fs = {
 
   [@bs.val] [@bs.module "fs"]
   external watchFile: (string, unit => unit) => unit = "watchFile";
+
+  [@bs.val] [@bs.module "fs"]
+  external chmodSync: (string, int) => unit = "chmodSync";
 };
 
 module Fetch = {
