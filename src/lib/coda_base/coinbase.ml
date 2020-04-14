@@ -90,6 +90,15 @@ module Gen = struct
     let%map fee_transfer =
       Option.quickcheck_generator (Fee_transfer.Gen.gen ~max_fee)
     in
+    let fee_transfer =
+      match fee_transfer with
+      | Some {Fee_transfer.receiver_pk; _}
+        when Public_key.Compressed.equal receiver receiver_pk ->
+          (* Erase fee transfer, to mirror [create]. *)
+          None
+      | _ ->
+          fee_transfer
+    in
     {receiver; amount; fee_transfer}
 
   let with_random_receivers ~keys ~min_amount ~max_amount ~fee_transfer =
@@ -100,5 +109,14 @@ module Gen = struct
       >>| fun keypair -> Public_key.compress keypair.Keypair.public_key
     and amount = Int.gen_incl min_amount max_amount >>| Currency.Amount.of_int
     and fee_transfer = Option.quickcheck_generator fee_transfer in
+    let fee_transfer =
+      match fee_transfer with
+      | Some {Fee_transfer.receiver_pk; _}
+        when Public_key.Compressed.equal receiver receiver_pk ->
+          (* Erase fee transfer, to mirror [create]. *)
+          None
+      | _ ->
+          fee_transfer
+    in
     {receiver; amount; fee_transfer}
 end
