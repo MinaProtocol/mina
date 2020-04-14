@@ -10,7 +10,7 @@ src/config/config.mlh
 src/external/ocaml-rocksdb/rocksdb
 .stack-work/
 /wallet-keys/
-test_logs
+test_output
 .firebase/
 node_modules/
 .DS_Store

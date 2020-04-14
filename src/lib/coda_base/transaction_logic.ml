@@ -10,17 +10,17 @@ module type Ledger_intf = sig
 
   val get : t -> location -> Account.t option
 
-  val location_of_key : t -> Account.key -> location option
+  val location_of_account : t -> Account_id.t -> location option
 
   val set : t -> location -> Account.t -> unit
 
   val get_or_create :
-    t -> Account.key -> [`Added | `Existed] * Account.t * location
+    t -> Account_id.t -> [`Added | `Existed] * Account.t * location
 
   val get_or_create_account_exn :
-    t -> Account.key -> Account.t -> [`Added | `Existed] * location
+    t -> Account_id.t -> Account.t -> [`Added | `Existed] * location
 
-  val remove_accounts_exn : t -> Account.key list -> unit
+  val remove_accounts_exn : t -> Account_id.t list -> unit
 
   val merkle_root : t -> Ledger_hash.t
 
@@ -55,11 +55,10 @@ module Undo = struct
       module Stable = struct
         module V1 = struct
           type t =
-            | Payment of
-                { previous_empty_accounts:
-                    Public_key.Compressed.Stable.V1.t list }
+            | Payment of {previous_empty_accounts: Account_id.Stable.V1.t list}
             | Stake_delegation of
                 { previous_delegate: Public_key.Compressed.Stable.V1.t }
+            | Failed
           [@@deriving sexp]
 
           let to_latest = Fn.id
@@ -67,8 +66,9 @@ module Undo = struct
       end]
 
       type t = Stable.Latest.t =
-        | Payment of {previous_empty_accounts: Public_key.Compressed.t list}
+        | Payment of {previous_empty_accounts: Account_id.t list}
         | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+        | Failed
       [@@deriving sexp]
     end
 
@@ -93,7 +93,7 @@ module Undo = struct
       module V1 = struct
         type t =
           { fee_transfer: Fee_transfer.Stable.V1.t
-          ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+          ; previous_empty_accounts: Account_id.Stable.V1.t list }
         [@@deriving sexp]
 
         let to_latest = Fn.id
@@ -101,8 +101,7 @@ module Undo = struct
     end]
 
     type t = Stable.Latest.t =
-      { fee_transfer: Fee_transfer.t
-      ; previous_empty_accounts: Public_key.Compressed.t list }
+      {fee_transfer: Fee_transfer.t; previous_empty_accounts: Account_id.t list}
     [@@deriving sexp]
   end
 
@@ -112,7 +111,7 @@ module Undo = struct
       module V1 = struct
         type t =
           { coinbase: Coinbase.Stable.V1.t
-          ; previous_empty_accounts: Public_key.Compressed.Stable.V1.t list }
+          ; previous_empty_accounts: Account_id.Stable.V1.t list }
         [@@deriving sexp]
 
         let to_latest = Fn.id
@@ -121,8 +120,7 @@ module Undo = struct
 
     (* bin_io omitted *)
     type t = Stable.Latest.t =
-      { coinbase: Coinbase.t
-      ; previous_empty_accounts: Public_key.Compressed.t list }
+      {coinbase: Coinbase.t; previous_empty_accounts: Account_id.t list}
     [@@deriving sexp]
   end
 
@@ -178,8 +176,9 @@ module type S = sig
 
       module Body : sig
         type t = Undo.User_command_undo.Body.t =
-          | Payment of {previous_empty_accounts: Public_key.Compressed.t list}
+          | Payment of {previous_empty_accounts: Account_id.t list}
           | Stake_delegation of {previous_delegate: Public_key.Compressed.t}
+          | Failed
         [@@deriving sexp]
       end
 
@@ -190,14 +189,13 @@ module type S = sig
     module Fee_transfer_undo : sig
       type t = Undo.Fee_transfer_undo.t =
         { fee_transfer: Fee_transfer.t
-        ; previous_empty_accounts: Public_key.Compressed.t list }
+        ; previous_empty_accounts: Account_id.t list }
       [@@deriving sexp]
     end
 
     module Coinbase_undo : sig
       type t = Undo.Coinbase_undo.t =
-        { coinbase: Coinbase.t
-        ; previous_empty_accounts: Public_key.Compressed.t list }
+        {coinbase: Coinbase.t; previous_empty_accounts: Account_id.t list}
       [@@deriving sexp]
     end
 
@@ -236,6 +234,73 @@ module type S = sig
   end
 end
 
+let validate_timing ~account ~txn_amount ~txn_global_slot =
+  let open Account.Poly in
+  let open Account.Timing.Poly in
+  match account.timing with
+  | Untimed ->
+      (* no time restrictions *)
+      Or_error.return Untimed
+  | Timed
+      {initial_minimum_balance; cliff_time; vesting_period; vesting_increment}
+    ->
+      let open Or_error.Let_syntax in
+      let%map curr_min_balance =
+        let account_balance = account.balance in
+        let nsf_error () =
+          Or_error.errorf
+            !"For timed account, the requested transaction for amount %{sexp: \
+              Amount.t} at global slot %{sexp: Global_slot.t}, the balance \
+              %{sexp: Balance.t} is insufficient"
+            txn_amount txn_global_slot account_balance
+        in
+        let min_balance_error min_balance =
+          Or_error.errorf
+            !"For timed account, the requested transaction for amount %{sexp: \
+              Amount.t} at global slot %{sexp: Global_slot.t}, applying the \
+              transaction would put the balance below the calculated minimum \
+              balance of %{sexp: Balance.t}"
+            txn_amount txn_global_slot min_balance
+        in
+        match Balance.(account_balance - txn_amount) with
+        | None ->
+            (* checking for sufficient funds may be redundant with a check elsewhere
+               regardless, the transaction would put the account below any calculated minimum balance
+               so don't bother with the remaining computations
+            *)
+            nsf_error ()
+        | Some proposed_new_balance ->
+            let open Unsigned in
+            let curr_min_balance =
+              if Global_slot.(txn_global_slot < cliff_time) then
+                initial_minimum_balance
+              else
+                (* take advantage of fact that global slots are uint32's *)
+                let num_periods =
+                  UInt32.(
+                    Infix.((txn_global_slot - cliff_time) / vesting_period)
+                    |> to_int64 |> UInt64.of_int64)
+                in
+                let min_balance_decrement =
+                  UInt64.Infix.(
+                    num_periods * Amount.to_uint64 vesting_increment)
+                  |> Amount.of_uint64
+                in
+                match
+                  Balance.(initial_minimum_balance - min_balance_decrement)
+                with
+                | None ->
+                    Balance.zero
+                | Some amt ->
+                    amt
+            in
+            if Balance.(proposed_new_balance < curr_min_balance) then
+              min_balance_error curr_min_balance
+            else Or_error.return curr_min_balance
+      in
+      (* once the calculated minimum balance becomes zero, the account becomes untimed *)
+      if Balance.(curr_min_balance > zero) then account.timing else Untimed
+
 module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   open L
 
@@ -243,13 +308,37 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let error_opt e = Option.value_map ~default:(error e) ~f:Or_error.return
 
+  let get_with_location ledger account_id =
+    match location_of_account ledger account_id with
+    | Some location -> (
+      match get ledger location with
+      | Some account ->
+          Ok (`Existing location, account)
+      | None ->
+          Or_error.errorf
+            !"Account %{sexp: Account_id.t} has a location in the ledger, but \
+              is not present"
+            account_id )
+    | None ->
+        Ok (`New, Account.create account_id Balance.zero)
+
+  let set_with_location ledger location account =
+    match location with
+    | `Existing location ->
+        set ledger location account
+    | `New ->
+        ignore
+        @@ get_or_create_account_exn ledger
+             (Account.identifier account)
+             account
+
   let get' ledger tag location =
     error_opt (sprintf "%s account not found" tag) (get ledger location)
 
-  let location_of_key' ledger tag key =
+  let location_of_account' ledger tag key =
     error_opt
       (sprintf "%s location not found" tag)
-      (location_of_key ledger key)
+      (location_of_account ledger key)
 
   let add_amount balance amount =
     error_opt "overflow" (Balance.add_amount balance amount)
@@ -268,6 +357,11 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Amount.(sub amount (of_fee fee))
     else Ok amount
 
+  let add_account_creation_fee_bal action balance =
+    let fee = Coda_compile_config.account_creation_fee in
+    if action = `Added then add_amount balance (Amount.of_fee fee)
+    else Ok balance
+
   let check b =
     ksprintf (fun s -> if b then Ok () else Or_error.error_string s)
 
@@ -284,73 +378,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       !"Current global slot %{sexp: Global_slot.t} greater than transaction \
         expiry slot %{sexp: Global_slot.t}"
       current_global_slot valid_until
-
-  let validate_timing ~account ~txn_amount ~txn_global_slot =
-    let open Account.Poly in
-    let open Account.Timing.Poly in
-    match account.timing with
-    | Untimed ->
-        (* no time restrictions *)
-        Or_error.return Untimed
-    | Timed
-        {initial_minimum_balance; cliff_time; vesting_period; vesting_increment}
-      ->
-        let open Or_error.Let_syntax in
-        let%map curr_min_balance =
-          let account_balance = account.balance in
-          let nsf_error () =
-            Or_error.errorf
-              !"For timed account, the requested transaction for amount \
-                %{sexp: Amount.t} at global slot %{sexp: Global_slot.t}, the \
-                balance %{sexp: Balance.t} is insufficient"
-              txn_amount txn_global_slot account_balance
-          in
-          let min_balance_error min_balance =
-            Or_error.errorf
-              !"For timed account, the requested transaction for amount \
-                %{sexp: Amount.t} at global slot %{sexp: Global_slot.t}, \
-                applying the transaction would put the balance below the \
-                calculated minimum balance of %{sexp: Balance.t}"
-              txn_amount txn_global_slot min_balance
-          in
-          match Balance.(account_balance - txn_amount) with
-          | None ->
-              (* checking for sufficient funds may be redundant with a check elsewhere
-               regardless, the transaction would put the account below any calculated minimum balance
-               so don't bother with the remaining computations
-            *)
-              nsf_error ()
-          | Some proposed_new_balance ->
-              let open Unsigned in
-              let curr_min_balance =
-                if Global_slot.(txn_global_slot < cliff_time) then
-                  initial_minimum_balance
-                else
-                  (* take advantage of fact that global slots are uint32's *)
-                  let num_periods =
-                    UInt32.(
-                      Infix.((txn_global_slot - cliff_time) / vesting_period)
-                      |> to_int64 |> UInt64.of_int64)
-                  in
-                  let min_balance_decrement =
-                    UInt64.Infix.(
-                      num_periods * Amount.to_uint64 vesting_increment)
-                    |> Amount.of_uint64
-                  in
-                  match
-                    Balance.(initial_minimum_balance - min_balance_decrement)
-                  with
-                  | None ->
-                      Balance.zero
-                  | Some amt ->
-                      amt
-              in
-              if Balance.(proposed_new_balance < curr_min_balance) then
-                min_balance_error curr_min_balance
-              else Or_error.return curr_min_balance
-        in
-        (* once the calculated minimum balance becomes zero, the account becomes untimed *)
-        if Balance.(curr_min_balance > zero) then account.timing else Untimed
 
   module Undo = struct
     include Undo
@@ -374,112 +401,268 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
   in the case that the sender is equal to the receiver, but it complicates the SNARK, so
   we don't for now. *)
   let apply_user_command_unchecked ledger
-      ({payload; sender; signature= _} as user_command : User_command.t) =
-    let sender = Public_key.compress sender in
-    let nonce = User_command.Payload.nonce payload in
+      ({payload; signer; signature= _} as user_command : User_command.t) =
     let open Or_error.Let_syntax in
-    let%bind sender_location = location_of_key' ledger "" sender in
-    (* We unconditionally deduct the fee if this transaction succeeds *)
-    let%bind sender_account, common =
-      let%bind account = get' ledger "sender" sender_location in
-      let%bind balance =
-        sub_amount account.balance
-          (Amount.of_fee (User_command.Payload.fee payload))
+    let signer_pk = Public_key.compress signer in
+    (* TODO: Put actual value here. See issue #4036. *)
+    let current_global_slot = Global_slot.zero in
+    let%bind () =
+      validate_time
+        ~valid_until:(User_command.valid_until user_command)
+        ~current_global_slot
+    in
+    (* Fee-payer information *)
+    let fee_token = User_command.fee_token user_command in
+    let fee_payer = User_command.fee_payer user_command in
+    let nonce = User_command.nonce user_command in
+    let%bind () =
+      (* TODO: Enable multi-sig. *)
+      if
+        Public_key.Compressed.equal (Account_id.public_key fee_payer) signer_pk
+      then return ()
+      else
+        Or_error.errorf
+          "Cannot pay fees from a public key that did not sign the transaction"
+    in
+    let%bind () =
+      (* TODO: Remove this check and update the transaction snark once we have
+         an exchange rate mechanism. See issue #4447.
+      *)
+      if Token_id.equal fee_token Token_id.default then return ()
+      else
+        Or_error.errorf
+          "Cannot create transactions with fee_token different from the default"
+    in
+    let%bind fee_payer_location, fee_payer_account, undo_common =
+      let%bind location, account = get_with_location ledger fee_payer in
+      let%bind () =
+        match location with
+        | `Existing _ ->
+            return ()
+        | `New ->
+            Or_error.errorf "The fee-payer account does not exist"
       in
-      let common : Undo.User_command_undo.Common.t =
+      let fee = Amount.of_fee (User_command.fee user_command) in
+      let%bind balance = sub_amount account.balance fee in
+      let%bind () = validate_nonces nonce account.nonce in
+      let undo_common : Undo.User_command_undo.Common.t =
         {user_command; previous_receipt_chain_hash= account.receipt_chain_hash}
       in
-      let%bind () = validate_nonces nonce account.nonce in
-      (* TODO: Put actual value here. See issue #4036. *)
-      let current_global_slot = Global_slot.zero in
-      let%bind () =
-        validate_time ~valid_until:payload.common.valid_until
-          ~current_global_slot
-      in
       let%map timing =
-        if User_command.Payload.is_payment payload then
-          let txn_amount =
-            match User_command.Payload.body payload with
-            | Payment {amount; _} ->
-                amount
-            | _ ->
-                failwith "Expected payment when validating transaction timing"
-          in
-          validate_timing ~txn_amount ~txn_global_slot:current_global_slot
-            ~account
-        else return account.timing
+        validate_timing ~txn_amount:fee ~txn_global_slot:current_global_slot
+          ~account
       in
-      let account =
-        { account with
-          nonce= Account.Nonce.succ account.nonce
+      ( location
+      , { account with
+          balance
+        ; nonce= Account.Nonce.succ account.nonce
         ; receipt_chain_hash=
             Receipt.Chain_hash.cons payload account.receipt_chain_hash
         ; timing }
-      in
-      ({account with balance}, common)
+      , undo_common )
     in
-    match User_command.Payload.body payload with
-    | Stake_delegation (Set_delegate {new_delegate}) ->
-        (*new delegate should be in the ledger*)
-        (*TODO transaction snark doesn't check this*)
-        let%bind delegate_location = location_of_key' ledger "" new_delegate in
-        let%map _ = get' ledger "new_delegate" delegate_location in
-        set ledger sender_location {sender_account with delegate= new_delegate} ;
-        { Undo.User_command_undo.common
-        ; body= Stake_delegation {previous_delegate= sender_account.delegate}
-        }
-    | Payment Payment_payload.Poly.{amount; receiver} ->
-        let%bind sender_balance' = sub_amount sender_account.balance amount in
-        let undo emptys : Undo.User_command_undo.t =
-          {common; body= Payment {previous_empty_accounts= emptys}}
-        in
-        if Public_key.Compressed.equal sender receiver then (
-          ignore @@ set ledger sender_location sender_account ;
-          return (undo []) )
+    (* Charge the fee. This must happen, whether or not the command itself
+       succeeds, to ensure that the network is compensated for processing this
+       command.
+    *)
+    set_with_location ledger fee_payer_location fee_payer_account ;
+    let source = User_command.source user_command in
+    let receiver = User_command.receiver user_command in
+    let exception Reject of Error.t in
+    let compute_updates () =
+      (* Compute the necessary changes to apply the command, failing if any of
+         the conditions are not met.
+      *)
+      let%bind () =
+        if
+          Public_key.Compressed.equal
+            (User_command.fee_payer_pk user_command)
+            (User_command.source_pk user_command)
+        then return ()
         else
-          let action, receiver_account, receiver_location =
-            get_or_create ledger receiver
+          (* TODO(#4554): Hook predicate evaluation in here once implemented. *)
+          Or_error.errorf
+            "The fee-payer is not authorised to issue commands for the source \
+             account"
+      in
+      match payload.body with
+      | Stake_delegation _ ->
+          let%bind receiver_location, _receiver_account =
+            (* Check that receiver account exists. *)
+            get_with_location ledger receiver
+          in
+          let%bind source_location, source_account =
+            get_with_location ledger source
+          in
+          let%map () =
+            match (source_location, receiver_location) with
+            | `Existing _, `Existing _ ->
+                return ()
+            | `New, _ ->
+                Or_error.errorf "The delegating account does not exist"
+            | _, `New ->
+                Or_error.errorf "The delegated-to account does not exist"
+          in
+          let previous_delegate = source_account.delegate in
+          let source_account =
+            {source_account with delegate= Account_id.public_key receiver}
+          in
+          ( [(source_location, source_account)]
+          , Undo.User_command_undo.Body.Stake_delegation {previous_delegate} )
+      | Payment {amount; token_id= token; _} ->
+          let%bind receiver_location, receiver_account =
+            get_with_location ledger receiver
+          in
+          (* Charge the account creation fee. *)
+          let%bind receiver_amount, creation_fee =
+            match receiver_location with
+            | `Existing _ ->
+                return (amount, Amount.zero)
+            | `New ->
+                if Token_id.equal fee_token token then
+                  (* Subtract the creation fee from the transaction amount. *)
+                  let%map amount = sub_account_creation_fee `Added amount in
+                  (amount, Amount.zero)
+                else
+                  (* Charge the fee-payer for creating the account.
+                 Note: We don't have a better choice here: there is no other
+                 source of tokens in this transaction that is known to have
+                 accepted value.
+               *)
+                  let account_creation_fee =
+                    Amount.of_fee Coda_compile_config.account_creation_fee
+                  in
+                  return (amount, account_creation_fee)
+          in
+          (* NOTE: From here on, either [fee_payer_account] is unchanged, or
+             [fee_payer] is distinct from both [source] and [receiver], due to
+             the [Token_id.equal] check above.
+          *)
+          let%bind fee_payer_account =
+            let%bind balance =
+              sub_amount fee_payer_account.balance creation_fee
+            in
+            let%map timing =
+              validate_timing ~txn_amount:creation_fee
+                ~txn_global_slot:current_global_slot ~account:fee_payer_account
+            in
+            {fee_payer_account with balance; timing}
+          in
+          let%bind receiver_account =
+            let%map balance =
+              add_amount receiver_account.balance receiver_amount
+            in
+            {receiver_account with balance}
+          in
+          let%map source_location, source_account =
+            let ret =
+              let%bind location, account =
+                if Account_id.equal source receiver then
+                  match receiver_location with
+                  | `Existing _ ->
+                      return (receiver_location, receiver_account)
+                  | `New ->
+                      Or_error.errorf "The source account does not exist"
+                else get_with_location ledger source
+              in
+              let%bind () =
+                match location with
+                | `Existing _ ->
+                    return ()
+                | `New ->
+                    Or_error.errorf "The source account does not exist"
+              in
+              let%bind timing =
+                validate_timing ~txn_amount:amount
+                  ~txn_global_slot:current_global_slot ~account
+              in
+              let%map balance = sub_amount account.balance amount in
+              (location, {account with timing; balance})
+            in
+            if Account_id.equal fee_payer source then
+              (* Don't process transactions with insufficient balance from the
+                 fee-payer.
+              *)
+              match ret with Ok _ -> ret | Error err -> raise (Reject err)
+            else ret
           in
           let previous_empty_accounts =
-            previous_empty_accounts action receiver
+            match receiver_location with
+            | `Existing _ ->
+                []
+            | `New ->
+                [receiver]
           in
-          let%map receiver_balance' =
-            (*deduct the account creation fee*)
-            let%bind amount' = sub_account_creation_fee action amount in
-            add_amount receiver_account.balance amount'
-          in
-          set ledger sender_location
-            {sender_account with balance= sender_balance'} ;
-          set ledger receiver_location
-            {receiver_account with balance= receiver_balance'} ;
-          undo previous_empty_accounts
+          ( [ (fee_payer_location, fee_payer_account)
+            ; (receiver_location, receiver_account)
+            ; (source_location, source_account) ]
+          , Undo.User_command_undo.Body.Payment {previous_empty_accounts} )
+    in
+    match compute_updates () with
+    | Ok (located_accounts, undo_body) ->
+        (* Update the ledger. *)
+        List.iter located_accounts ~f:(fun (location, account) ->
+            set_with_location ledger location account ) ;
+        return
+          ({common= undo_common; body= undo_body} : Undo.User_command_undo.t)
+    | Error _ ->
+        (* Do not update the ledger. *)
+        return ({common= undo_common; body= Failed} : Undo.User_command_undo.t)
+    | exception Reject err ->
+        (* TODO: These transactions should never reach this stage, this error
+           should be fatal.
+        *)
+        Error err
 
   let apply_user_command ledger
       (user_command : User_command.With_valid_signature.t) =
-    apply_user_command_unchecked ledger (user_command :> User_command.t)
+    apply_user_command_unchecked ledger
+      (User_command.forget_check user_command)
 
   let process_fee_transfer t (transfer : Fee_transfer.t) ~modify_balance =
     let open Or_error.Let_syntax in
+    (* TODO(#4555): Allow token_id to vary from default. *)
     match transfer with
     | `One (pk, fee) ->
-        let action, a, loc = get_or_create t pk in
-        let emptys = previous_empty_accounts action pk in
-        let%map balance = modify_balance action pk a.balance fee in
+        let account_id = Account_id.create pk Token_id.default in
+        (* TODO(#4496): Do not use get_or_create here; we should not create a
+           new account before we know that the transaction will go through and
+           thus the creation fee has been paid.
+        *)
+        let action, a, loc = get_or_create t account_id in
+        let emptys = previous_empty_accounts action account_id in
+        let%map balance = modify_balance action account_id a.balance fee in
         set t loc {a with balance} ;
         emptys
     | `Two ((pk1, fee1), (pk2, fee2)) ->
-        let action1, a1, l1 = get_or_create t pk1 in
-        let emptys1 = previous_empty_accounts action1 pk1 in
+        let account_id1 = Account_id.create pk1 Token_id.default in
+        (* TODO(#4496): Do not use get_or_create here; we should not create a
+           new account before we know that the transaction will go through and
+           thus the creation fee has been paid.
+        *)
+        let action1, a1, l1 = get_or_create t account_id1 in
+        let emptys1 = previous_empty_accounts action1 account_id1 in
         if Public_key.Compressed.equal pk1 pk2 then (
           let%bind fee = error_opt "overflow" (Fee.add fee1 fee2) in
-          let%map balance = modify_balance action1 pk1 a1.balance fee in
+          let%map balance =
+            modify_balance action1 account_id1 a1.balance fee
+          in
           set t l1 {a1 with balance} ;
           emptys1 )
         else
-          let action2, a2, l2 = get_or_create t pk2 in
-          let emptys2 = previous_empty_accounts action2 pk2 in
-          let%bind balance1 = modify_balance action1 pk1 a1.balance fee1 in
-          let%map balance2 = modify_balance action2 pk1 a2.balance fee2 in
+          let account_id2 = Account_id.create pk2 Token_id.default in
+          (* TODO(#4496): Do not use get_or_create here; we should not create a
+             new account before we know that the transaction will go through
+             and thus the creation fee has been paid.
+          *)
+          let action2, a2, l2 = get_or_create t account_id2 in
+          let emptys2 = previous_empty_accounts action2 account_id2 in
+          let%bind balance1 =
+            modify_balance action1 account_id1 a1.balance fee1
+          in
+          let%map balance2 =
+            modify_balance action2 account_id2 a2.balance fee2
+          in
           set t l1 {a1 with balance= balance1} ;
           set t l2 {a2 with balance= balance2} ;
           emptys1 @ emptys2
@@ -500,9 +683,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
       ({previous_empty_accounts; fee_transfer} : Undo.Fee_transfer_undo.t) =
     let open Or_error.Let_syntax in
     let%map _ =
-      process_fee_transfer t fee_transfer ~modify_balance:(fun _ pk b f ->
+      process_fee_transfer t fee_transfer ~modify_balance:(fun _ aid b f ->
           let action =
-            if List.mem ~equal:Account.equal_key previous_empty_accounts pk
+            if List.mem ~equal:Account_id.equal previous_empty_accounts aid
             then `Added
             else `Existed
           in
@@ -523,15 +706,20 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           return (coinbase_amount, [], None)
       | Some (transferee, fee) ->
           assert (not @@ Public_key.Compressed.equal transferee receiver) ;
+          let transferee_id = Account_id.create transferee Token_id.default in
           let fee = Amount.of_fee fee in
           let%bind receiver_reward =
             error_opt "Coinbase fee transfer too large"
               (Amount.sub coinbase_amount fee)
           in
           let action, transferee_account, transferee_location =
-            get_or_create t transferee
+            (* TODO(#4496): Do not use get_or_create here; we should not create
+               a new account before we know that the transaction will go
+               through and thus the creation fee has been paid.
+            *)
+            get_or_create t transferee_id
           in
-          let emptys = previous_empty_accounts action transferee in
+          let emptys = previous_empty_accounts action transferee_id in
           let%map balance =
             let%bind amount = sub_account_creation_fee action fee in
             add_amount transferee_account.balance amount
@@ -540,10 +728,15 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           , emptys
           , Some (transferee_location, {transferee_account with balance}) )
     in
+    let receiver_id = Account_id.create receiver Token_id.default in
     let action2, receiver_account, receiver_location =
-      get_or_create t receiver
+      (* TODO(#4496): Do not use get_or_create here; we should not create a new
+         account before we know that the transaction will go through and thus
+         the creation fee has been paid.
+      *)
+      get_or_create t receiver_id
     in
-    let emptys2 = previous_empty_accounts action2 receiver in
+    let emptys2 = previous_empty_accounts action2 receiver_id in
     let%map receiver_balance =
       let%bind amount = sub_account_creation_fee action2 receiver_reward in
       add_amount receiver_account.balance amount
@@ -565,8 +758,9 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           coinbase_amount
       | Some (transferee, fee) ->
           let fee = Amount.of_fee fee in
+          let transferee_id = Account_id.create transferee Token_id.default in
           let transferee_location =
-            Or_error.ok_exn (location_of_key' t "transferee" transferee)
+            Or_error.ok_exn (location_of_account' t "transferee" transferee_id)
           in
           let transferee_account =
             Or_error.ok_exn (get' t "transferee" transferee_location)
@@ -574,8 +768,8 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
           let transferee_balance =
             let action =
               if
-                List.mem previous_empty_accounts transferee
-                  ~equal:Account.equal_key
+                List.mem previous_empty_accounts transferee_id
+                  ~equal:Account_id.equal
               then `Added
               else `Existed
             in
@@ -589,15 +783,16 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             {transferee_account with balance= transferee_balance} ;
           Option.value_exn (Amount.sub coinbase_amount fee)
     in
+    let receiver_id = Account_id.create receiver Token_id.default in
     let receiver_location =
-      Or_error.ok_exn (location_of_key' t "receiver" receiver)
+      Or_error.ok_exn (location_of_account' t "receiver" receiver_id)
     in
     let receiver_account =
       Or_error.ok_exn (get' t "receiver" receiver_location)
     in
     let receiver_balance =
       let action =
-        if List.mem previous_empty_accounts receiver ~equal:Account.equal_key
+        if List.mem previous_empty_accounts receiver_id ~equal:Account_id.equal
         then `Added
         else `Existed
       in
@@ -611,60 +806,94 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
 
   let undo_user_command ledger
       { Undo.User_command_undo.common=
-          { user_command= {payload; sender; signature= _}
+          { user_command= {payload; signer= _; signature= _} as user_command
           ; previous_receipt_chain_hash }
       ; body } =
-    let sender = Public_key.compress sender in
-    let nonce = User_command.Payload.nonce payload in
     let open Or_error.Let_syntax in
-    let%bind sender_location = location_of_key' ledger "sender" sender in
-    let%bind sender_account =
-      let%bind account = get' ledger "sender" sender_location in
-      let%bind balance =
-        add_amount account.balance
-          (Amount.of_fee (User_command.Payload.fee payload))
-      in
-      let%bind () = validate_nonces (Account.Nonce.succ nonce) account.nonce in
-      return
-        { account with
-          balance
-        ; nonce
-        ; receipt_chain_hash= previous_receipt_chain_hash }
+    (* Fee-payer information *)
+    let fee_token = User_command.fee_token user_command in
+    let fee_payer = User_command.fee_payer user_command in
+    let nonce = User_command.nonce user_command in
+    let%bind fee_payer_location =
+      location_of_account' ledger "fee payer" fee_payer
     in
+    (* Refund the fee to the fee-payer. *)
+    let%bind fee_payer_account =
+      let%bind account = get' ledger "fee payer" fee_payer_location in
+      let%bind () = validate_nonces (Account.Nonce.succ nonce) account.nonce in
+      let%map balance =
+        add_amount account.balance
+          (Amount.of_fee (User_command.fee user_command))
+      in
+      { account with
+        balance
+      ; nonce
+      ; receipt_chain_hash= previous_receipt_chain_hash }
+    in
+    (* Update the fee-payer's account. *)
+    set ledger fee_payer_location fee_payer_account ;
+    (* Reverse any other effects that the user command had. *)
     match (User_command.Payload.body payload, body) with
+    | _, Failed ->
+        (* The user command failed, only the fee was charged. *)
+        return ()
     | Stake_delegation (Set_delegate _), Stake_delegation {previous_delegate}
       ->
-        set ledger sender_location
-          {sender_account with delegate= previous_delegate} ;
+        let source = User_command.source user_command in
+        let%bind source_location =
+          location_of_account' ledger "source" source
+        in
+        let%bind source_account = get' ledger "source" source_location in
+        set ledger source_location
+          {source_account with delegate= previous_delegate} ;
         return ()
-    | Payment {amount; receiver}, Payment {previous_empty_accounts} ->
-        let%bind sender_balance' = add_amount sender_account.balance amount in
-        if Public_key.Compressed.equal sender receiver then (
-          set ledger sender_location sender_account ;
-          return () )
-        else
-          let%bind receiver_location =
-            location_of_key' ledger "receiver" receiver
+    | Payment {amount; token_id= token; _}, Payment {previous_empty_accounts}
+      ->
+        let source = User_command.source user_command in
+        let receiver = User_command.receiver user_command in
+        let%bind fee_payer_account =
+          let%map balance =
+            if
+              Token_id.equal fee_token token
+              || List.is_empty previous_empty_accounts
+            then return fee_payer_account.balance
+            else add_account_creation_fee_bal `Added fee_payer_account.balance
           in
-          let%bind receiver_account =
-            get' ledger "receiver" receiver_location
+          {fee_payer_account with balance}
+        in
+        let%bind receiver_location, receiver_account =
+          let%bind location =
+            location_of_account' ledger "receiver" receiver
           in
-          let%map receiver_balance' =
-            let action =
-              if
-                List.mem previous_empty_accounts receiver
-                  ~equal:Account.equal_key
-              then `Added
-              else `Existed
-            in
-            let%bind amount' = sub_account_creation_fee action amount in
-            sub_amount receiver_account.balance amount'
+          let%map account = get' ledger "receiver" location in
+          let balance =
+            (* NOTE: [sub_amount] is only [None] if the account creation fee
+               was charged, in which case this account will be deleted by
+               [remove_accounts_exn] below anyway.
+            *)
+            Option.value ~default:Balance.zero
+              (Balance.sub_amount account.balance amount)
           in
-          set ledger sender_location
-            {sender_account with balance= sender_balance'} ;
-          set ledger receiver_location
-            {receiver_account with balance= receiver_balance'} ;
-          remove_accounts_exn ledger previous_empty_accounts
+          (location, {account with balance})
+        in
+        let%map source_location, source_account =
+          let%bind location, account =
+            if Account_id.equal source receiver then
+              return (receiver_location, receiver_account)
+            else
+              let%bind location =
+                location_of_account' ledger "source" source
+              in
+              let%map account = get' ledger "source" location in
+              (location, account)
+          in
+          let%map balance = add_amount account.balance amount in
+          (location, {account with balance})
+        in
+        set ledger fee_payer_location fee_payer_account ;
+        set ledger receiver_location receiver_account ;
+        set ledger source_location source_account ;
+        remove_accounts_exn ledger previous_empty_accounts
     | _, _ ->
         failwith "Undo/command mismatch"
 

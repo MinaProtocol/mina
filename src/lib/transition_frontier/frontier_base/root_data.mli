@@ -6,6 +6,7 @@ open Coda_transition
  * were available on a breadcrumb in the transition frontier when this was
  * created. *)
 module Historical : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t =
@@ -13,13 +14,14 @@ module Historical : sig
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t
         ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
-      [@@deriving bin_io, version]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t
+  type t =
+    { transition: External_transition.Validated.t
+    ; scan_state: Staged_ledger.Scan_state.t
+    ; pending_coinbase: Pending_coinbase.t
+    ; staged_ledger_target_ledger_hash: Ledger_hash.t }
 
   val of_breadcrumb : Breadcrumb.t -> t
 end
@@ -27,19 +29,18 @@ end
 (* Limited root data is similar to Minimal root data, except that it contains
  * the full validated transition at a root instead of just a pointer to one *)
 module Limited : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t =
         { transition: External_transition.Validated.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-      [@@deriving bin_io, version]
+      [@@deriving to_yojson]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t
+  type t = Stable.Latest.t [@@deriving to_yojson]
 end
 
 (* Minimal root data contains the smallest amount of information about a root.
@@ -48,19 +49,20 @@ end
  * pending_coinbase).
  *)
 module Minimal : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t =
         { hash: State_hash.Stable.V1.t
         ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t }
-      [@@deriving bin_io, version]
     end
+  end]
 
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t
+  type t = Stable.Latest.t =
+    { hash: State_hash.t
+    ; scan_state: Staged_ledger.Scan_state.t
+    ; pending_coinbase: Pending_coinbase.t }
 
   val of_limited : Limited.t -> t
 

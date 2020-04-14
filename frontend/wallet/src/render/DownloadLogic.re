@@ -1,24 +1,3 @@
-module Filestream = {
-  type t;
-
-  module Chunk = {
-    type t = {. "length": int};
-  };
-
-  [@bs.module "fs"]
-  external create: (string, {. "encoding": string}) => t =
-    "createWriteStream";
-
-  [@bs.send]
-  external onError: (t, [@bs.as "error"] _, string => unit) => unit = "on";
-  [@bs.send]
-  external onFinish: (t, [@bs.as "finish"] _, unit => unit) => unit = "on";
-
-  [@bs.send] external write: (t, Chunk.t) => unit = "";
-
-  [@bs.send] external endStream: t => unit = "end";
-};
-
 module Https = {
   module Request = {
     type t;
@@ -44,10 +23,11 @@ module Https = {
 
     [@bs.get] external getHeaders: t => Headers.t = "headers";
 
-    [@bs.send] external setEncoding: (t, string) => unit = "";
+    [@bs.send] external setEncoding: (t, string) => unit = "setEncoding";
 
     [@bs.send]
-    external onData: (t, [@bs.as "data"] _, Filestream.Chunk.t => unit) => unit =
+    external onData:
+      (t, [@bs.as "data"] _, Bindings.Stream.Chunk.t => unit) => unit =
       "on";
 
     [@bs.send]
@@ -55,7 +35,13 @@ module Https = {
   };
 
   [@bs.module "https"]
-  external get: (string, Response.t => unit) => Request.t = "";
+  external get: (string, Response.t => unit) => Request.t = "get";
+};
+
+module Unzipper = {
+  type extractOpts = {. "path": string};
+  [@bs.module "unzipper"]
+  external extract: extractOpts => Bindings.Stream.Writable.t = "Extract";
 };
 
 let handleResponse = (response, filename, dataEncoding, chunkCb, doneCb) => {
@@ -65,22 +51,32 @@ let handleResponse = (response, filename, dataEncoding, chunkCb, doneCb) => {
     |> Https.Response.getHeaders
     |> Https.Response.Headers.contentLengthGet
     |> int_of_string;
-  let filestream = Filestream.create(filename, {"encoding": dataEncoding});
-
-  Filestream.onFinish(filestream, () => doneCb(Belt.Result.Ok()));
-  Filestream.onError(filestream, e => doneCb(Error(e)));
+  let stream =
+    Bindings.Stream.Writable.create(filename, {"encoding": dataEncoding})
+    ->Bindings.Stream.Writable.onFinish(() => doneCb(Belt.Result.Ok()))
+    ->Bindings.Stream.Writable.onError(e =>
+        doneCb(
+          Error(Tc.Option.withDefault(~default="", Js.Exn.message(e))),
+        )
+      );
 
   Https.Response.onData(
     response,
     chunk => {
-      Filestream.write(filestream, chunk);
+      Bindings.Stream.Writable.write(stream, chunk);
       chunkCb(chunk##length, total);
     },
   );
 
-  Https.Response.onEnd(response, () => Filestream.endStream(filestream));
+  Https.Response.onEnd(response, () =>
+    Bindings.Stream.Writable.endStream(stream)
+  );
 };
 
+/**
+  Recusively follows redirects until non-redirect resource is hit, or
+  we reach `maxRedirects`, then passes onto handleResonse.
+ */
 let rec download = (filename, url, encoding, maxRedirects, chunkCb, doneCb) => {
   let request =
     Https.get(url, response =>
@@ -104,8 +100,59 @@ let rec download = (filename, url, encoding, maxRedirects, chunkCb, doneCb) => {
         } else {
           doneCb(Belt.Result.Error("Too many redirects."));
         }
-      | _ => handleResponse(response, filename, encoding, chunkCb, doneCb)
+      | 200 => handleResponse(response, filename, encoding, chunkCb, doneCb)
+      | _ => doneCb(Belt.Result.Error("Unable to download the daemon."))
       }
     );
   Https.Request.onError(request, e => doneCb(Error(e)));
+};
+
+// TODO: Make this an env var
+let codaRepo = "https://s3-us-west-2.amazonaws.com/wallet.o1test.net/daemon/";
+
+[@bs.module "electron"] [@bs.scope ("remote", "app")]
+external getPath: string => string = "getPath";
+
+let extractZip = (src, dest, doneCb, errorCb) => {
+  let extractArgs = {"path": dest};
+
+  let _ =
+    Bindings.Stream.Readable.create(src)
+    ->(Bindings.Stream.Readable.pipe(Unzipper.extract(extractArgs)))
+    ->Bindings.Stream.Writable.onFinish(doneCb)
+    ->Bindings.Stream.Writable.onError(errorCb);
+
+  ();
+};
+
+/**
+  Unique helper to download and unzip a coda daemon executable.
+ */
+let downloadCoda = (version, chunkCb, doneCb) => {
+  let filename = "coda-daemon-" ++ version ++ ".zip";
+  let tempPath = getPath("temp") ++ "/" ++ filename;
+  let installPath = getPath("userData") ++ "/coda";
+  download(tempPath, codaRepo ++ filename, "binary", 1, chunkCb, res =>
+    switch (res) {
+    | Belt.Result.Error(_) => doneCb(res)
+    | _ =>
+      extractZip(
+        tempPath,
+        installPath,
+        () => doneCb(Belt.Result.Ok()),
+        err => {
+          doneCb(
+            Belt.Result.Error(
+              "Error while unzipping the daemon bundle: "
+              ++ Tc.Option.withDefault(
+                   ~default="an unknown error occured.",
+                   Js.Exn.message(err),
+                 ),
+            ),
+          )
+        },
+      );
+      ();
+    }
+  );
 };

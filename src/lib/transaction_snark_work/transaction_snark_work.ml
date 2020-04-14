@@ -45,34 +45,20 @@ module Statement = struct
 end
 
 module Info = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { statements: Statement.Stable.V1.t
-          ; work_ids: int One_or_two.Stable.V1.t
-          ; fee: Fee.Stable.V1.t
-          ; prover: Public_key.Compressed.Stable.V1.t }
-        [@@deriving sexp, to_yojson, bin_io, version]
-      end
+      type t =
+        { statements: Statement.Stable.V1.t
+        ; work_ids: int One_or_two.Stable.V1.t
+        ; fee: Fee.Stable.V1.t
+        ; prover: Public_key.Compressed.Stable.V1.t }
+      [@@deriving sexp, to_yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transaction_snark_work"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t =
     { statements: Statement.t
     ; work_ids: int One_or_two.t
@@ -82,33 +68,19 @@ module Info = struct
 end
 
 module T = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          { fee: Fee.Stable.V1.t
-          ; proofs: Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-          ; prover: Public_key.Compressed.Stable.V1.t }
-        [@@deriving sexp, to_yojson, bin_io, version]
-      end
+      type t =
+        { fee: Fee.Stable.V1.t
+        ; proofs: Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+        ; prover: Public_key.Compressed.Stable.V1.t }
+      [@@deriving sexp, to_yojson]
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
+  end]
 
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transaction_snark_work"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  (* bin_io omitted *)
   type t = Stable.Latest.t =
     { fee: Fee.t
     ; proofs: Ledger_proof.t One_or_two.t
