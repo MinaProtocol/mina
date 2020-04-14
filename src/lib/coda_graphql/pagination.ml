@@ -155,9 +155,14 @@ module Make (Inputs : Inputs_intf) = struct
                 let%map decoded = Cursor.deserialize data in
                 Some decoded
           in
+          let account_id =
+            (* TODO: Support multiple tokens. *)
+            Option.map public_key ~f:(fun public_key ->
+                Account_id.create public_key Token_id.default )
+          in
           let value_filter_specification =
-            Option.value_map public_key ~default:`All ~f:(fun public_key ->
-                `User_only public_key )
+            Option.value_map account_id ~default:`All ~f:(fun account_id ->
+                `User_only account_id )
           in
           let%map ( (queried_nodes, has_earlier_page, has_later_page)
                   , total_counts ) =
@@ -173,13 +178,13 @@ module Make (Inputs : Inputs_intf) = struct
                 let%map cursor = resolve_cursor cursor in
                 ( Pagination_database.query database ~navigation:`Earlier
                     ~value_filter_specification ~cursor ~num_items
-                , Pagination_database.get_total_values database public_key )
+                , Pagination_database.get_total_values database account_id )
             | None, _, num_items, cursor ->
                 let open Result.Let_syntax in
                 let%map cursor = resolve_cursor cursor in
                 ( Pagination_database.query database ~navigation:`Later
                     ~value_filter_specification ~cursor ~num_items
-                , Pagination_database.get_total_values database public_key )
+                , Pagination_database.get_total_values database account_id )
           in
           ( ( List.map queried_nodes ~f:(fun node ->
                   {Edge.node; cursor= Cursor.serialize @@ to_cursor node} )

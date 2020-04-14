@@ -42,6 +42,9 @@ include (
         [@@deprecated "Use public_key_compressed in commandline args"]
     end )
 
+let token_id =
+  Command.Arg_type.map ~f:Coda_base.Token_id.of_string Command.Param.string
+
 let receipt_chain_hash =
   Command.Arg_type.map Command.Param.string
     ~f:Coda_base.Receipt.Chain_hash.of_string

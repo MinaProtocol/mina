@@ -233,13 +233,19 @@ let generate_receipt =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
+  let token_flag =
+    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
+    Command.Param.return Token_id.default
+  in
   Command.async ~summary:"Generate a receipt for a sent payment"
     (Cli_lib.Background_daemon.rpc_init
-       (Args.zip2 receipt_hash_flag address_flag)
-       ~f:(fun port (receipt_chain_hash, pk) ->
+       (Args.zip3 receipt_hash_flag address_flag token_flag)
+       ~f:(fun port (receipt_chain_hash, pk, token_id) ->
+         let account_id = Account_id.create pk token_id in
          Daemon_rpcs.Client.dispatch_with_message Prove_receipt.rpc
-           (receipt_chain_hash, pk) port
-           ~success:Cli_lib.Render.Prove_receipt.to_text
+           (receipt_chain_hash, account_id)
+           port ~success:Cli_lib.Render.Prove_receipt.to_text
            ~error:Error.to_string_hum ~join_error:Or_error.join ))
 
 let read_json filepath ~flag =
@@ -274,10 +280,16 @@ let verify_receipt =
     flag "address" ~doc:"PUBLICKEY Public-key address of sender"
       (required public_key_compressed)
   in
+  let token_flag =
+    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
+    Command.Param.return Token_id.default
+  in
   Command.async ~summary:"Verify a receipt of a sent payment"
     (Cli_lib.Background_daemon.rpc_init
-       (Args.zip3 payment_path_flag proof_path_flag address_flag)
-       ~f:(fun port (payment_path, proof_path, pk) ->
+       (Args.zip4 payment_path_flag proof_path_flag address_flag token_flag)
+       ~f:(fun port (payment_path, proof_path, pk, token_id) ->
+         let account_id = Account_id.create pk token_id in
          let dispatch_result =
            let open Deferred.Or_error.Let_syntax in
            let%bind payment_json =
@@ -302,7 +314,8 @@ let verify_receipt =
                   ~error:
                     (sprintf "Proof file %s has invalid json format" proof_path)
            in
-           Daemon_rpcs.Client.dispatch Verify_proof.rpc (pk, payment, proof)
+           Daemon_rpcs.Client.dispatch Verify_proof.rpc
+             (account_id, payment, proof)
              port
          in
          match%map dispatch_result with
@@ -313,17 +326,13 @@ let verify_receipt =
                (Error.to_string_hum e) ))
 
 let get_nonce :
-       rpc:( Public_key.Compressed.t
-           , Account.Nonce.t option Or_error.t )
-           Rpc.Rpc.t
-    -> Public_key.t
+       rpc:(Account_id.t, Account.Nonce.t option Or_error.t) Rpc.Rpc.t
+    -> Account_id.t
     -> Host_and_port.t
     -> (Account.Nonce.t, string) Deferred.Result.t =
- fun ~rpc addr port ->
+ fun ~rpc account_id port ->
   let open Deferred.Let_syntax in
-  let%map res =
-    Daemon_rpcs.Client.dispatch rpc (Public_key.compress addr) port
-  in
+  let%map res = Daemon_rpcs.Client.dispatch rpc account_id port in
   match Or_error.join res with
   | Ok (Some n) ->
       Ok n
@@ -337,11 +346,20 @@ let get_nonce_cmd =
   (* Ignores deprecation of public_key type for backwards compatibility *)
   let[@warning "-3"] address_flag =
     flag "address" ~doc:"PUBLICKEY Public-key address you want the nonce for"
-      (required Cli_lib.Arg_type.public_key)
+      (required Cli_lib.Arg_type.public_key_compressed)
   in
+  let token_flag =
+    (*flag "token" ~doc:"TOKEN_ID The token ID for the account"
+      (optional_with_default Token_id.default Cli_lib.Arg_type.token_id)*)
+    Command.Param.return Token_id.default
+  in
+  let flags = Args.zip2 address_flag token_flag in
   Command.async ~summary:"Get the current nonce for an account"
-    (Cli_lib.Background_daemon.rpc_init address_flag ~f:(fun port address ->
-         match%bind get_nonce ~rpc:Daemon_rpcs.Get_nonce.rpc address port with
+    (Cli_lib.Background_daemon.rpc_init flags ~f:(fun port (pk, token_flag) ->
+         let account_id = Account_id.create pk token_flag in
+         match%bind
+           get_nonce ~rpc:Daemon_rpcs.Get_nonce.rpc account_id port
+         with
          | Error e ->
              eprintf "Failed to get nonce\n%s\n" e ;
              exit 2
@@ -427,15 +445,19 @@ let batch_send_payments =
     and infos = get_infos payments_path in
     let ts : User_command_input.t list =
       List.map infos ~f:(fun {receiver; valid_until; amount; fee} ->
-          User_command_input.create
-            ~sender:(Public_key.compress keypair.public_key)
-            ~fee ~memo:User_command_memo.empty
+          let signer_pk = Public_key.compress keypair.public_key in
+          User_command_input.create ~signer:signer_pk ~fee
+            ~fee_token:Token_id.default (* TODO: Multiple tokens. *)
+            ~fee_payer_pk:signer_pk ~memo:User_command_memo.empty
             ~valid_until:
               (Option.value valid_until
                  ~default:Coda_numbers.Global_slot.max_value)
             ~body:
               (Payment
-                 { receiver= Public_key.Compressed.of_base58_check_exn receiver
+                 { source_pk= signer_pk
+                 ; receiver_pk=
+                     Public_key.Compressed.of_base58_check_exn receiver
+                 ; token_id= Token_id.default
                  ; amount })
             ~sign_choice:(User_command_input.Sign_choice.Keypair keypair) () )
     in
@@ -525,20 +547,18 @@ let cancel_transaction_graphql =
     (Cli_lib.Background_daemon.graphql_init txn_id_flag
        ~f:(fun graphql_endpoint user_command ->
          let receiver =
-           match
-             User_command.Payload.body (User_command.payload user_command)
-           with
-           | Payment payment ->
-               payment.receiver
-           | Stake_delegation (Set_delegate {new_delegate}) ->
-               new_delegate
+           user_command |> User_command.payload |> User_command.Payload.body
+           |> User_command.Payload.Body.receiver
          in
+         let receiver_pk = Account_id.public_key receiver in
+         let cancel_sender = User_command.fee_payer user_command in
+         let cancel_sender_pk = Account_id.public_key cancel_sender in
          let open Deferred.Let_syntax in
          let%bind nonce_response =
            let open Graphql_client.Encoders in
            Graphql_client.query_exn
              (Graphql_queries.Get_inferred_nonce.make
-                ~public_key:(public_key (User_command.sender user_command))
+                ~public_key:(public_key cancel_sender_pk)
                 ())
              graphql_endpoint
          in
@@ -571,8 +591,8 @@ let cancel_transaction_graphql =
          let cancel_query =
            let open Graphql_client.Encoders in
            Graphql_queries.Send_payment.make
-             ~sender:(public_key (User_command.sender user_command))
-             ~receiver:(public_key receiver) ~fee:(fee cancel_fee)
+             ~sender:(public_key cancel_sender_pk)
+             ~receiver:(public_key receiver_pk) ~fee:(fee cancel_fee)
              ~amount:(amount Currency.Amount.zero)
              ~nonce:
                (uint32
@@ -1235,13 +1255,6 @@ let trustlist_list =
              eprintf "Unknown error doing daemon RPC: %s"
                (Error.to_string_hum e) ))
 
-let compile_time_constants =
-  Command.basic
-    ~summary:"Print a JSON map of the compile-time consensus parameters"
-    (Command.Param.return (fun () ->
-         Core.printf "%s\n%!"
-           (Yojson.Safe.to_string Consensus.Constants.all_constants) ))
-
 let telemetry =
   let open Command.Param in
   let open Deferred.Let_syntax in
@@ -1387,7 +1400,6 @@ let advanced =
     ; ("snark-pool-list", snark_pool_list)
     ; ("pending-snark-work", pending_snark_work)
     ; ("generate-libp2p-keypair", generate_libp2p_keypair)
-    ; ("compile-time-constants", compile_time_constants)
     ; ("telemetry", telemetry)
     ; ("visualization", Visualization.command_group)
     ; ("generate-receipt", generate_receipt)

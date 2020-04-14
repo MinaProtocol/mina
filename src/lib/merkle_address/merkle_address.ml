@@ -1,6 +1,5 @@
 open Core
 open Bitstring
-open Module_version
 
 module type S = sig
   type t [@@deriving sexp, hash, eq, compare, to_yojson]
@@ -119,59 +118,46 @@ module T = struct
 
   let of_tuple (length, string) = slice (bitstring_of_string string) 0 length
 
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Bitstring.t [@@deriving version]
+      type t = Bitstring.t
 
-        include Binable.Of_binable (struct
-                    type t = int * string [@@deriving bin_io]
-                  end)
-                  (struct
-                    type nonrec t = t
+      let to_latest = Fn.id
 
-                    let to_binable = to_tuple
+      include Binable.Of_binable (struct
+                  type t = int * string [@@deriving bin_io]
+                end)
+                (struct
+                  type nonrec t = t
 
-                    let of_binable = of_tuple
-                  end)
+                  let to_binable = to_tuple
 
-        let sexp_of_t = Fn.compose sexp_of_string to_string
+                  let of_binable = of_tuple
+                end)
 
-        let t_of_sexp =
-          let of_string buf =
-            String.to_list buf
-            |> List.map ~f:(Fn.compose Direction.of_int_exn Char.to_int)
-            |> of_directions
-          in
-          Fn.compose of_string string_of_sexp
+      let sexp_of_t = Fn.compose sexp_of_string to_string
 
-        let hash = Fn.compose [%hash: int * string] to_tuple
+      let t_of_sexp =
+        let of_string buf =
+          String.to_list buf
+          |> List.map ~f:(Fn.compose Direction.of_int_exn Char.to_int)
+          |> of_directions
+        in
+        Fn.compose of_string string_of_sexp
 
-        let hash_fold_t hash_state t =
-          [%hash_fold: int * string] hash_state (to_tuple t)
+      let hash = Fn.compose [%hash: int * string] to_tuple
 
-        let compare = compare
+      let hash_fold_t hash_state t =
+        [%hash_fold: int * string] hash_state (to_tuple t)
 
-        let equal = equals
+      let compare = compare
 
-        let to_yojson = to_yojson
-      end
+      let equal = equals
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_yojson = to_yojson
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "merkle_address"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 end
 
 module Stable = T.Stable
@@ -179,6 +165,11 @@ module Stable = T.Stable
 module Make (Input : sig
   val depth : int
 end) : S = struct
+  (* TODO: this "include" puts a stable-versioned type inside a functor
+     (hard to detect this statically)
+     that should be hoisted outside the functor
+  *)
+
   include T
 
   let byte_count_of_bits n = (n / 8) + min 1 (n % 8)

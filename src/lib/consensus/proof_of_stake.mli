@@ -11,7 +11,7 @@ module Exported : sig
   module Block_data : sig
     include module type of Data.Block_data with type t = Data.Block_data.t
 
-    val global_slot : t -> Global_slot.t
+    val global_slot : t -> Coda_numbers.Global_slot.t
   end
 
   module Consensus_state : sig

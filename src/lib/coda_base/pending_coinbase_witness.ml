@@ -12,5 +12,5 @@ module Stable = struct
 end]
 
 type t = Stable.Latest.t =
-  {pending_coinbases: Pending_coinbase.Stable.V1.t; is_new_stack: bool}
+  {pending_coinbases: Pending_coinbase.t; is_new_stack: bool}
 [@@deriving to_yojson, sexp]

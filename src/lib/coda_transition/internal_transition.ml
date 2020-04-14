@@ -42,9 +42,9 @@ end]
 
 (* bin_io, version omitted *)
 type t = Stable.Latest.t =
-  { snark_transition: Snark_transition.Value.Stable.V1.t
-  ; prover_state: Consensus.Data.Prover_state.Stable.V1.t
-  ; staged_ledger_diff: Staged_ledger_diff.Stable.V1.t }
+  { snark_transition: Snark_transition.Value.t
+  ; prover_state: Consensus.Data.Prover_state.t
+  ; staged_ledger_diff: Staged_ledger_diff.t }
 [@@deriving sexp, fields, to_yojson]
 
 let create ~snark_transition ~prover_state ~staged_ledger_diff =
