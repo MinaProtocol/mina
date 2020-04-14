@@ -61,7 +61,7 @@ let currency_consumed :
           amount
         else (* The payment won't affect the balance of this account. *)
           zero
-    | Stake_delegation _ ->
+    | Stake_delegation _ | Mint _ ->
         zero)
 
 let currency_consumed' :

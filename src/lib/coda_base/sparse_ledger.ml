@@ -258,6 +258,37 @@ let apply_user_command_exn t
         [ (fee_payer_idx, fee_payer_account)
         ; (receiver_idx, receiver_account)
         ; (source_idx, source_account) ]
+    | Mint {amount; _} ->
+        let receiver_idx = find_index_exn t receiver in
+        let receiver_account =
+          let account = get_exn t receiver_idx in
+          (* Check that receiver account exists. *)
+          assert (not Public_key.Compressed.(equal empty account.public_key)) ;
+          { account with
+            balance=
+              Balance.add_amount account.balance amount
+              |> Option.value_exn ?here:None ?error:None ?message:None }
+        in
+        let source_idx = find_index_exn t source in
+        let source_account =
+          let account =
+            if Account_id.equal source receiver then receiver_account
+            else get_exn t source_idx
+          in
+          (* Check that source account exists. *)
+          assert (not Public_key.Compressed.(equal empty account.public_key)) ;
+          { account with
+            balance=
+              Balance.sub_amount account.balance amount
+              |> Option.value_exn ?here:None ?error:None ?message:None
+          ; timing=
+              Or_error.ok_exn
+              @@ Transaction_logic.validate_timing ~txn_amount:amount
+                   ~txn_global_slot:current_global_slot ~account }
+        in
+        [ (fee_payer_idx, fee_payer_account)
+        ; (receiver_idx, receiver_account)
+        ; (source_idx, source_account) ]
   in
   try
     let indexed_accounts = compute_updates () in

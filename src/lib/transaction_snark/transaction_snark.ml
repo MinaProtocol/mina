@@ -282,7 +282,7 @@ module Base = struct
     type 'bool t =
       { predicate_failed: 'bool (* All *)
       ; source_not_present: 'bool (* All *)
-      ; receiver_not_present: 'bool (* Delegate only *)
+      ; receiver_not_present: 'bool (* Delegate and mint only *)
       ; amount_insufficient_to_create: 'bool
             (* Payment only, token=fee_token *)
       ; fee_payer_balance_insufficient_to_create: 'bool
@@ -290,7 +290,8 @@ module Base = struct
       ; fee_payer_bad_timing_for_create: 'bool
             (* Payment only, token<>fee_token *)
       ; source_insufficient_balance: 'bool (* Payment only *)
-      ; source_bad_timing: 'bool (* Payment only *) }
+      ; source_bad_timing: 'bool (* Payment only *)
+      ; not_token_owner: 'bool (* Mint only *) }
 
     let num_fields = 8
 
@@ -302,7 +303,8 @@ module Base = struct
         ; fee_payer_balance_insufficient_to_create
         ; fee_payer_bad_timing_for_create
         ; source_insufficient_balance
-        ; source_bad_timing } =
+        ; source_bad_timing
+        ; not_token_owner } =
       [ predicate_failed
       ; source_not_present
       ; receiver_not_present
@@ -310,7 +312,8 @@ module Base = struct
       ; fee_payer_balance_insufficient_to_create
       ; fee_payer_bad_timing_for_create
       ; source_insufficient_balance
-      ; source_bad_timing ]
+      ; source_bad_timing
+      ; not_token_owner ]
 
     let of_list = function
       | [ predicate_failed
@@ -320,7 +323,8 @@ module Base = struct
         ; fee_payer_balance_insufficient_to_create
         ; fee_payer_bad_timing_for_create
         ; source_insufficient_balance
-        ; source_bad_timing ] ->
+        ; source_bad_timing
+        ; not_token_owner ] ->
           { predicate_failed
           ; source_not_present
           ; receiver_not_present
@@ -328,7 +332,8 @@ module Base = struct
           ; fee_payer_balance_insufficient_to_create
           ; fee_payer_bad_timing_for_create
           ; source_insufficient_balance
-          ; source_bad_timing }
+          ; source_bad_timing
+          ; not_token_owner }
       | _ ->
           failwith
             "Transaction_snark.Base.User_command_failure.to_list: bad length"
@@ -414,7 +419,8 @@ module Base = struct
                 ; fee_payer_balance_insufficient_to_create= false
                 ; fee_payer_bad_timing_for_create= false
                 ; source_insufficient_balance= false
-                ; source_bad_timing= false } )
+                ; source_bad_timing= false
+                ; not_token_owner= false } )
           | Payment ->
               let receiver_account =
                 if Account_id.equal receiver fee_payer then fee_payer_account
@@ -494,7 +500,43 @@ module Base = struct
                 ; fee_payer_balance_insufficient_to_create
                 ; fee_payer_bad_timing_for_create
                 ; source_insufficient_balance
-                ; source_bad_timing } ) )
+                ; source_bad_timing
+                ; not_token_owner= false } )
+          | Mint ->
+              let receiver_account =
+                if Account_id.equal receiver fee_payer then fee_payer_account
+                else receiver_account
+              in
+              let receiver_not_present =
+                let id = Account.identifier receiver_account in
+                if Account_id.equal Account_id.empty id then true
+                else if Account_id.equal receiver id then false
+                else fail "bad receiver account ID"
+              in
+              let source_account =
+                if Account_id.equal source fee_payer then fee_payer_account
+                else source_account
+              in
+              let source_not_present =
+                let id = Account.identifier source_account in
+                if Account_id.equal Account_id.empty id then true
+                else if Account_id.equal source id then false
+                else fail "bad source account ID"
+              in
+              let not_token_owner =
+                (*TODO(4673): Integrate with [token_owner] field. *)
+                true
+              in
+              ( `Should_pay_to_create false
+              , { predicate_failed
+                ; source_not_present
+                ; receiver_not_present
+                ; amount_insufficient_to_create= false
+                ; fee_payer_balance_insufficient_to_create= false
+                ; fee_payer_bad_timing_for_create= false
+                ; source_insufficient_balance= false
+                ; source_bad_timing= false
+                ; not_token_owner } ) )
 
     let%snarkydef compute_as_prover ~txn_global_slot
         (txn : Transaction_union.var) =
@@ -723,6 +765,7 @@ module Base = struct
     in
     (* Compute transaction kind. *)
     let is_payment = Transaction_union.Tag.Unpacked.is_payment tag in
+    let is_mint = Transaction_union.Tag.Unpacked.is_mint tag in
     let is_fee_transfer = Transaction_union.Tag.Unpacked.is_fee_transfer tag in
     let is_stake_delegation =
       Transaction_union.Tag.Unpacked.is_stake_delegation tag
@@ -835,6 +878,7 @@ module Base = struct
              (* this account is:
                - the fee-payer for payments
                - the fee-payer for stake delegation
+               - the fee-payer for minting
                - the fee-receiver for a coinbase 
                - the second receiver for a fee transfer
              *)
@@ -992,6 +1036,7 @@ module Base = struct
     let%bind receiver_increase =
       (* - payments:         payload.body.amount
          - stake delegation: 0
+         - minting:          payload.body.amount
          - coinbase:         payload.body.amount - payload.common.fee
          - fee transfer:     payload.body.amount
       *)
@@ -1016,22 +1061,26 @@ module Base = struct
              (* this account is:
                - the receiver for payments
                - the delegated-to account for stake delegation
+               - the receiver for minting
                - the receiver for a coinbase 
                - the first receiver for a fee transfer
              *)
-             let%bind is_empty_delegatee =
-               Boolean.(is_empty_and_writeable && is_stake_delegation)
+             let%bind is_empty_failure =
+               let%bind needs_command =
+                 Boolean.any [is_stake_delegation; is_mint]
+               in
+               Boolean.(is_empty_and_writeable && needs_command)
              in
              let%bind () =
                [%with_label "Receiver existence failure matches predicted"]
-                 (Boolean.Assert.( = ) is_empty_delegatee
+                 (Boolean.Assert.( = ) is_empty_failure
                     user_command_failure.receiver_not_present)
              in
              let is_empty_and_writeable =
-               (* is_empty_and_writable && not is_stake_delegation *)
+               (* is_empty_and_writable && is_empty_and_writeable_allowed *)
                Boolean.Unsafe.of_cvar
                @@ Field.Var.(
-                    sub (is_empty_and_writeable :> t) (is_empty_delegatee :> t))
+                    sub (is_empty_and_writeable :> t) (is_empty_failure :> t))
              in
              let%bind () =
                [%with_label "Validate should_pay_for_receiver"]
@@ -1112,6 +1161,7 @@ module Base = struct
              (* this account is:
                - the source for payments
                - the delegator for stake delegation
+               - the token owner for minting
                - the fee-receiver for a coinbase 
                - the second receiver for a fee transfer
              *)
@@ -1178,6 +1228,12 @@ module Base = struct
                  (Boolean.Assert.( = ) underflow
                     user_command_failure.source_insufficient_balance)
              in
+             let%bind () =
+               (*TODO(4673): Integrate with [token_owner] field. *)
+               Boolean.(
+                 Assert.exactly_one
+                   [is_mint; not user_command_failure.not_token_owner])
+             in
              let%map delegate =
                Public_key.Compressed.Checked.if_ is_stake_delegation
                  ~then_:(Account_id.Checked.public_key receiver)
@@ -1200,6 +1256,7 @@ module Base = struct
     let%bind fee_excess =
       (* - payments:         payload.common.fee
          - stake delegation: payload.common.fee
+         - minting: payload.common.fee
          - coinbase:         0 (fee already paid above)
          - fee transfer:     - payload.body.amount - payload.common.fee
       *)

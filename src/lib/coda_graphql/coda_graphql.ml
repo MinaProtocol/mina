@@ -777,9 +777,7 @@ module Types = struct
             ~resolve:(fun _ user_command ->
               User_command.to_base58_check user_command )
         ; field "isDelegation" ~typ:(non_null bool)
-            ~doc:
-              "If true, this represents a delegation of stake, otherwise it \
-               is a payment"
+            ~doc:"If true, this represents a delegation of stake"
             ~args:Arg.[]
             ~resolve:(fun _ user_command ->
               match
@@ -788,6 +786,8 @@ module Types = struct
               | Stake_delegation _ ->
                   true
               | Payment _ ->
+                  false
+              | Mint _ ->
                   false )
         ; field "nonce" ~typ:(non_null int) ~doc:"Nonce of the transaction"
             ~args:Arg.[]
@@ -828,7 +828,7 @@ module Types = struct
               match
                 User_command_payload.body (User_command.payload payment)
               with
-              | Payment {Payment_payload.Poly.amount; _} ->
+              | Payment {Payment_payload.Poly.amount; _} | Mint {amount; _} ->
                   Ok (amount |> Currency.Amount.to_uint64)
               | Stake_delegation _ ->
                   (* Stake delegation does not have an amount, so we set it to 0 *)

@@ -51,7 +51,7 @@ let is_valid_user_command _t (txn : User_command.t) account_opt =
     and cost =
       let fee = txn.payload.common.fee in
       match txn.payload.body with
-      | Stake_delegation (Set_delegate _) ->
+      | Stake_delegation (Set_delegate _) | Mint _ ->
           Some (Currency.Amount.of_fee fee)
       | Payment {amount; _} ->
           Currency.Amount.add_fee amount fee
