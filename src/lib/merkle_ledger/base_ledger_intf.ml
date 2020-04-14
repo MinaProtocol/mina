@@ -7,7 +7,7 @@ module type S = sig
 
   type account
 
-  type account_id
+  type key
 
   type token_id
 

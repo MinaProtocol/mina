@@ -13,7 +13,7 @@ module type S = sig
 
   type hash
 
-  type account_id
+  type key
 
   type token_id
 
