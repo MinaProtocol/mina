@@ -46,9 +46,11 @@ end
 
 module Base58_check = Codable.Make_base58_check (T)
 
-let to_string t = Base58_check.String_ops.to_string t
+[%%define_locally
+Base58_check.String_ops.(to_string, of_string)]
 
-let of_string s = Base58_check.String_ops.of_string s
+[%%define_locally
+Base58_check.(to_yojson,of_yojson)]
 
 let merge ~height (h1 : t) (h2 : t) =
   Random_oracle.hash
