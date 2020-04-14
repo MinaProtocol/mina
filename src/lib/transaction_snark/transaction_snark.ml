@@ -2578,20 +2578,23 @@ let%test_module "transaction_snark" =
           let coinbase_count = 3 in
           let ft_count = 2 in
           Ledger.with_ledger ~f:(fun ledger ->
-              let cbs =
-                List.init coinbase_count ~f:(fun i ->
-                    let ft =
-                      if i < ft_count then
-                        Some
-                          (Coinbase.Fee_transfer.create
-                             ~receiver_pk:other.account.public_key
-                             ~fee:Coda_compile_config.account_creation_fee)
-                      else None
+              let _, cbs =
+                let fts =
+                  List.map (List.init ft_count ~f:Fn.id) ~f:(fun _ ->
+                      Coinbase.Fee_transfer.create
+                        ~receiver_pk:other.account.public_key
+                        ~fee:Coda_compile_config.account_creation_fee )
+                in
+                List.fold ~init:(fts, []) (List.init coinbase_count ~f:Fn.id)
+                  ~f:(fun (fts, cbs) _ ->
+                    let cb =
+                      Coinbase.create
+                        ~amount:(Currency.Amount.of_int reward)
+                        ~receiver:receiver.account.public_key
+                        ~fee_transfer:(List.hd fts)
+                      |> Or_error.ok_exn
                     in
-                    Coinbase.create
-                      ~amount:(Currency.Amount.of_int reward)
-                      ~receiver:receiver.account.public_key ~fee_transfer:ft
-                    |> Or_error.ok_exn )
+                    (Option.value ~default:[] (List.tl fts), cb :: cbs) )
               in
               Ledger.create_new_account_exn ledger
                 (Account.identifier dummy_account.account)
