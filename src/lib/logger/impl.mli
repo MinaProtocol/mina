@@ -64,7 +64,7 @@ end
 module Processor : sig
   type t
 
-  val raw : unit -> t
+  val raw : ?log_level:Level.t -> unit -> t
 
   val pretty : log_level:Level.t -> config:Logproc_lib.Interpolator.config -> t
 end

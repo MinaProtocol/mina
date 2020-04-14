@@ -1,5 +1,5 @@
 (*
-   
+
    This follows the approach of SvdW06 to construct a "near injection" from
    a field into an elliptic curve defined over that field. WB19 is also a useful
    reference that details several constructions which are more appropriate in other
@@ -8,12 +8,12 @@
    Fix an elliptic curve E given by y^2 = x^3 + ax + b over a field "F"
    Let f(x) = x^3 + ax + b.
 
-   Define the variety V to be 
+   Define the variety V to be
    (x1, x2, x3, x4) : f(x1) f(x2) f(x3) = x4^2.
 
    By a not-too-hard we have a map `V -> E`. Thus, a map of type `F -> V` yields a
-   map of type `F -> E` by composing. 
-   
+   map of type `F -> E` by composing.
+
    Our goal is to construct such a map of type `F -> V`. The paper SvdW06 constructs
    a family of such maps, defined by a collection of values which we'll term `params`.
 
@@ -32,7 +32,7 @@
       iii. -f(u) is not a square.
    - conic_c = 3/4 u^2 + a
    - {z; y} satisfy
-      i. z^2 + conic_c * y^2 = -f(u) 
+      i. z^2 + conic_c * y^2 = -f(u)
 
    We will define a map of type `params -> (F -> V)`. Thus, fixing a choice of
    a value of type params, we obtain a map `F -> V` as desired.
@@ -46,12 +46,12 @@ WB19: Riad S. Wahby and Dan Boneh, Fast and simple constant-time hashing to the 
    V(F) : f(x1)f(x2)f(x3) = x4^2,
    (f is y^2 = x^3 + Bx + C)) (note choice of constant names
    -- A is coeff of x^2 so A = 0 for us)
-  
+
    To construct a rational point on V(F), the authors define
    the surface S(F) and the rational map φ1:S(F)→ V(F), which
    is invertible on its image [SvdW06, Lemma 6]:
    S(F) : y^2(u^2 + uv + v^2 + a) = −f(u)
-  
+
    φ(t) : t → ( u, α(t)/β(t) - u/2, β(t) )
    φ1: (u, v, y) →  ( v, −u − v, u + y^2,
                    f(u + y^2)·(y^2 + uv + v^2 + ay)/y )
@@ -74,7 +74,14 @@ struct
 end
 
 module Conic = struct
-  type 'f t = {z: 'f; y: 'f} [@@deriving bin_io]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'f t = {z: 'f; y: 'f}
+    end
+  end]
+
+  type 'f t = 'f Stable.Latest.t = {z: 'f; y: 'f}
 
   let map {z; y} ~f = {z= f z; y= f y}
 end
@@ -94,14 +101,28 @@ module V = struct
 end
 
 module Params = struct
-  type 'f t =
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'f t =
+        { u: 'f
+        ; u_over_2: 'f
+        ; projection_point: 'f Conic.Stable.V1.t
+        ; conic_c: 'f
+        ; a: 'f
+        ; b: 'f }
+      [@@deriving fields]
+    end
+  end]
+
+  type 'f t = 'f Stable.Latest.t =
     { u: 'f
     ; u_over_2: 'f
     ; projection_point: 'f Conic.t
     ; conic_c: 'f
     ; a: 'f
     ; b: 'f }
-  [@@deriving fields, bin_io]
+  [@@deriving fields]
 
   let map {u; u_over_2; projection_point; conic_c; a; b} ~f =
     { u= f u
@@ -143,7 +164,7 @@ module Params = struct
           (* imeckler: I added this condition. It prevents the possibility of having
    a point (z, 0) on the conic, which is useful because in the map from the
    conic to S we divide by the "y" coordinate of the conic. It's not strictly
-   necessary when we have a random input in a large field, but it is still nice to avoid the 
+   necessary when we have a random input in a large field, but it is still nice to avoid the
    bad case in theory (and for the tests below with a small field). *)
       )
     in
@@ -356,7 +377,7 @@ let%test_module "test" =
         Quickcheck.test ~sexp_of:F.sexp_of_t gen ~f:(fun t ->
             assert (on_s (Fn.compose M.conic_to_s M.field_to_conic t)) )
 
-      (* Schwarz-zippel says if this tests succeeds once, then the probability that 
+      (* Schwarz-zippel says if this tests succeeds once, then the probability that
    the implementation is correct is at least 1 - (D / field-size), where D is
    the total degree of the polynomial defining_equation_of_V(s_to_v(t)) which should
    be less than, say, 10. So, this test succeeding gives good evidence of the

@@ -82,7 +82,7 @@ module With_private = struct
             ( Some sk
             , Account.create
                 (Account_id.create pk Token_id.default)
-                (Balance.of_int balance) ) )
+                (Balance.of_formatted_string (Int.to_string balance)) ) )
     end)
   end
 end

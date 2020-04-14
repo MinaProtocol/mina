@@ -127,7 +127,6 @@ module Stable = struct
   end
 end]
 
-(* bin_io omitted *)
 type t = Stable.Latest.t =
   { protocol_state: Protocol_state.Value.t
   ; protocol_state_proof: Proof.t sexp_opaque

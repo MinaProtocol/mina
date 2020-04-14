@@ -996,18 +996,7 @@ module Data = struct
       {ledger; seed; start_checkpoint; lock_checkpoint; epoch_length}
 
     module Make (Lock_checkpoint : sig
-      module Stable : sig
-        module V1 : sig
-          type t
-          [@@deriving sexp, bin_io, eq, compare, hash, to_yojson, version]
-        end
-
-        module Latest : sig
-          type t [@@deriving sexp, bin_io, compare, hash, to_yojson, version]
-        end
-      end
-
-      type t = Stable.Latest.t
+      type t [@@deriving sexp, compare, hash, to_yojson]
 
       val typ : (Coda_base.State_hash.var, t) Typ.t
 
@@ -1026,28 +1015,12 @@ module Data = struct
       open Snark_params
 
       module Value = struct
-        [%%versioned
-        module Stable = struct
-          module V1 = struct
-            type t =
-              ( Epoch_ledger.Value.Stable.V1.t
-              , Epoch_seed.Stable.V1.t
-              , Coda_base.State_hash.Stable.V1.t
-              , Lock_checkpoint.Stable.V1.t
-              , Length.Stable.V1.t )
-              Poly.Stable.V1.t
-            [@@deriving sexp, eq, compare, hash, to_yojson]
-
-            let to_latest = Fn.id
-          end
-        end]
-
         type t =
-          ( Epoch_ledger.Value.Stable.Latest.t
-          , Epoch_seed.Stable.Latest.t
-          , Coda_base.State_hash.Stable.Latest.t
-          , Lock_checkpoint.Stable.Latest.t
-          , Length.Stable.Latest.t )
+          ( Epoch_ledger.Value.t
+          , Epoch_seed.t
+          , Coda_base.State_hash.t
+          , Lock_checkpoint.t
+          , Length.t )
           Poly.t
         [@@deriving sexp, compare, hash, to_yojson]
       end
@@ -1151,6 +1124,58 @@ module Data = struct
 
     module Staking = Make (T)
     module Next = Make (T)
+
+    (* stable-versioned types are disallowed as functor application results
+       we create them outside the results, and make sure they match the corresponding non-versioned types
+    *)
+
+    module Staking_value_versioned = struct
+      module Value = struct
+        module Lock_checkpoint = Coda_base.State_hash
+
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type t =
+              ( Epoch_ledger.Value.Stable.V1.t
+              , Epoch_seed.Stable.V1.t
+              , Coda_base.State_hash.Stable.V1.t
+              , Lock_checkpoint.Stable.V1.t
+              , Length.Stable.V1.t )
+              Poly.Stable.V1.t
+            [@@deriving sexp, compare, eq, hash, to_yojson]
+
+            let to_latest = Fn.id
+          end
+        end]
+
+        type _unused = unit constraint Stable.Latest.t = Staking.Value.t
+      end
+    end
+
+    module Next_value_versioned = struct
+      module Value = struct
+        module Lock_checkpoint = Coda_base.State_hash
+
+        [%%versioned
+        module Stable = struct
+          module V1 = struct
+            type t =
+              ( Epoch_ledger.Value.Stable.V1.t
+              , Epoch_seed.Stable.V1.t
+              , Coda_base.State_hash.Stable.V1.t
+              , Lock_checkpoint.Stable.V1.t
+              , Length.Stable.V1.t )
+              Poly.Stable.V1.t
+            [@@deriving sexp, compare, eq, hash, to_yojson]
+
+            let to_latest = Fn.id
+          end
+        end]
+
+        type _unused = unit constraint Stable.Latest.t = Next.Value.t
+      end
+    end
 
     let next_to_staking (next : Next.Value.t) : Staking.Value.t = next
 
@@ -1729,11 +1754,11 @@ module Data = struct
             , Vrf.Output.Truncated.Stable.V1.t
             , Amount.Stable.V1.t
             , Global_slot.Stable.V1.t
-            , Epoch_data.Staking.Value.Stable.V1.t
-            , Epoch_data.Next.Value.Stable.V1.t
+            , Epoch_data.Staking_value_versioned.Value.Stable.V1.t
+            , Epoch_data.Next_value_versioned.Value.Stable.V1.t
             , bool )
             Poly.Stable.V1.t
-          [@@deriving sexp, bin_io, eq, compare, hash, version]
+          [@@deriving sexp, eq, compare, hash]
 
           let to_latest = Fn.id
 
@@ -2405,7 +2430,8 @@ module Hooks = struct
 
       module V1 = struct
         module T = struct
-          type query = Coda_base.Ledger_hash.Stable.V1.t [@@deriving bin_io]
+          type query = Coda_base.Ledger_hash.Stable.V1.t
+          [@@deriving bin_io, version {rpc}]
 
           type response =
             ( Coda_base.Sparse_ledger.Stable.V1.t
