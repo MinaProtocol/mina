@@ -45,7 +45,7 @@ module ChangeDelegation = [%graphql
 module ChangeDelegationMutation =
   ReasonApollo.CreateMutation(ChangeDelegation);
 
-let defaultFee = "5";
+let defaultFee = "0.1";
 
 [@react.component]
 let make = (~publicKey) => {

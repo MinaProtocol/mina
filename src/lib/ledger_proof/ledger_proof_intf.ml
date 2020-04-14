@@ -2,7 +2,7 @@ open Core_kernel
 open Coda_base
 
 module type S = sig
-  type t [@@deriving sexp, to_yojson]
+  type t [@@deriving compare, sexp, to_yojson]
 
   [%%versioned:
   module Stable : sig

@@ -53,7 +53,9 @@ val gen_non_default : t Quickcheck.Generator.t
 
 val unpack : t -> bool list
 
-include Comparable.S with type t := t
+include Comparable.S_binable with type t := t
+
+include Hashable.S_binable with type t := t
 
 [%%ifdef consensus_mechanism]
 

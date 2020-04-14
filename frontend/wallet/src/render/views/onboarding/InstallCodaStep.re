@@ -33,6 +33,7 @@ external openExternal: string => unit = "openExternal";
 type state =
   | Init
   | Downloading
+  | Starting
   | Error(string)
   | Finished;
 
