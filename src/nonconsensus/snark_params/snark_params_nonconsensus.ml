@@ -116,11 +116,18 @@ module Inner_curve = struct
       , ( + )
       , ( - )
       , ( * )
-      , gen
-      , gen_uniform
       , gen_uniform_incl
       , negate
       , hash_fold_t )]
+
+    (* Mnt4.Fq.gen uses the interval starting at zero
+       here we the gen in Snark_params.Make_inner_curve_scalar, using
+         an interval starting at one
+    *)
+
+    let gen = Mnt4.Fq.(gen_incl one (size - one))
+
+    let gen_uniform = gen_uniform_incl one (size - one)
 
     let of_bits bits = Tock.Field.project bits
   end
