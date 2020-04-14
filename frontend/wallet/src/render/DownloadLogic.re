@@ -142,12 +142,22 @@ let extractZip = (src, dest, doneCb) => {
 
 let installCoda = (tempPath, doneCb) => {
   let installPath = getPath("userData") ++ "/coda";
-  let _keysPath = "/usr/local/var/coda/keys";
+  let keysPath = "/usr/local/var/coda/keys/";
+  let rec moveKeys = files =>
+    switch (files) {
+    | [] => ()
+    | [hd, ...rest] =>
+      Bindings.Fs.renameSync(installPath ++ "/keys/" ++ hd, keysPath ++ hd);
+      moveKeys(rest);
+    };
   extractZip(tempPath, installPath, res =>
     switch (res) {
     | Belt.Result.Ok () =>
       Bindings.Fs.chmodSync(installPath ++ "/coda.exe", 0o755);
       Bindings.Fs.chmodSync(installPath ++ "/libp2p_helper", 0o755);
+      Bindings.Fs.readdirSync(installPath ++ "/keys")
+      |> Array.to_list
+      |> moveKeys;
       doneCb(res);
     | Belt.Result.Error(_) => doneCb(res)
     }

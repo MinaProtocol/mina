@@ -206,6 +206,12 @@ module Fs = {
 
   [@bs.val] [@bs.module "fs"]
   external symlinkSync: (string, string) => unit = "symLinkSync";
+
+  [@bs.val] [@bs.module "fs"]
+  external readdirSync: (string) => array(string) = "readdirSync";
+
+  [@bs.val] [@bs.module "fs"]
+  external renameSync: (string, string) => unit = "renameSync";
 };
 
 module Fetch = {
