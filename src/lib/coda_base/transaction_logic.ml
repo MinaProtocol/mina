@@ -622,6 +622,10 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             else Or_error.errorf "The source account does not exist"
           in
           let%bind () =
+            if source_account.token_owner then return ()
+            else Or_error.errorf "The source account does not own the token"
+          in
+          let%bind () =
             (*TODO(4673): Integrate with [token_owner] field. *)
             Or_error.errorf "The source account does not own the token"
           in

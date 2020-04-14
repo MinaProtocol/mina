@@ -523,10 +523,7 @@ module Base = struct
                 else if Account_id.equal source id then false
                 else fail "bad source account ID"
               in
-              let not_token_owner =
-                (*TODO(4673): Integrate with [token_owner] field. *)
-                true
-              in
+              let not_token_owner = not source_account.token_owner in
               ( `Should_pay_to_create false
               , { predicate_failed
                 ; source_not_present
@@ -1229,10 +1226,12 @@ module Base = struct
                     user_command_failure.source_insufficient_balance)
              in
              let%bind () =
-               (*TODO(4673): Integrate with [token_owner] field. *)
-               Boolean.(
-                 Assert.exactly_one
-                   [is_mint; not user_command_failure.not_token_owner])
+               let%bind is_non_owner_minting =
+                 Boolean.(is_mint && account.token_owner)
+               in
+               Field.Checked.Assert.equal
+                 (user_command_failure.not_token_owner :> Field.Var.t)
+                 (is_non_owner_minting :> Field.Var.t)
              in
              let%map delegate =
                Public_key.Compressed.Checked.if_ is_stake_delegation
