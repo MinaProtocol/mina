@@ -22,13 +22,17 @@ end
 module type Inputs_intf = sig
   module Key : Intf.Key
 
+  module Token_id : Intf.Token_id
+
+  module Account_id :
+    Intf.Account_id with type key := Key.t and type token_id := Token_id.t
+
   module Balance : Intf.Balance
 
-  module Account : sig
-    include Intf.Account with type key := Key.t
-
-    val balance : t -> Balance.t
-  end
+  module Account :
+    Intf.Account
+    with type account_id := Account_id.t
+     and type balance := Balance.t
 
   module Hash : Intf.Hash with type account := Account.t
 
@@ -38,8 +42,8 @@ module type Inputs_intf = sig
     Base_ledger_intf.S
     with module Addr = Location.Addr
      and module Location = Location
-     and type key := Key.t
-     and type key_set := Key.Set.t
+     and type account_id := Account_id.t
+     and type account_id_set := Account_id.Set.t
      and type hash := Hash.t
      and type root_hash := Hash.t
      and type account := Account.t
@@ -79,9 +83,9 @@ struct
 
   module Addr = Location.Addr
 
-  let string_of_account_key account =
-    account |> Account.public_key
-    |> Visualization.display_short_sexp (module Key)
+  let string_of_account_id account =
+    account |> Account.identifier
+    |> Visualization.display_short_sexp (module Account_id)
 
   let empty_hashes =
     Empty_hashes.cache (module Hash) ~init_hash:Hash.empty_account Ledger.depth
@@ -101,7 +105,7 @@ struct
             match Ledger.get t (Location.Account address) with
             | Some new_account ->
                 (* let public_key = Account.public_key new_account in
-                let location = Ledger.location_of_key t public_key |> Option.value_exn in
+                let location = Ledger.location_of_account t public_key |> Option.value_exn in
                 let queried_account = Ledger.get t location |> Option.value_exn in
                 assert (Account.equal queried_account new_account); *)
                 assert (not @@ Set.mem accounts new_account) ;
@@ -147,7 +151,7 @@ struct
               ( (empty_account_counter, empty_hash_counter)
               , {source; target= Pretty_hash (string_of_hash target_hash)} )
           | Account account ->
-              let string_key = string_of_account_key account in
+              let string_key = string_of_account_id account in
               let pretty_account =
                 { public_key= string_key
                 ; balance= Account.balance account |> Balance.to_int }

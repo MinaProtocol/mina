@@ -13,7 +13,14 @@ end) : sig
 end
 
 module Params : sig
-  type 'f t [@@deriving bin_io]
+  type 'f t
+
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type nonrec 'f t = 'f t
+    end
+  end]
 
   val map : 'a t -> f:('a -> 'b) -> 'b t
 

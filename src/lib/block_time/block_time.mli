@@ -18,14 +18,14 @@ module Time : sig
     val basic : logger:Logger.t -> t
   end
 
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type nonrec t = t
-      [@@deriving sexp, bin_io, compare, eq, hash, yojson, version]
+      type nonrec t = t [@@deriving sexp, compare, eq, hash, yojson]
 
       include Hashable.S with type t := t
     end
-  end
+  end]
 
   module Bits : Bits_intf.Convertible_bits with type t := t
 
@@ -36,17 +36,20 @@ module Time : sig
      and type Packed.var = private Tick.Field.Var.t
 
   module Span : sig
-    type t [@@deriving sexp, compare]
+    type t [@@deriving sexp, compare, yojson]
 
     module Stable : sig
       module V1 : sig
-        type nonrec t = t [@@deriving bin_io, sexp, compare]
+        type nonrec t = t
+        [@@deriving bin_io, eq, sexp, compare, hash, yojson, version]
       end
     end
 
     val of_time_span : Time.Span.t -> t
 
     val to_time_span : t -> Time.Span.t
+
+    module Bits : Bits_intf.Convertible_bits with type t := t
 
     include
       Tick.Snarkable.Bits.Faithful
