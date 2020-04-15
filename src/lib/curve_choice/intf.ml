@@ -329,7 +329,10 @@ module type Backend_intf = sig
        and type r1cs_constraint_system := R1CS_constraint_system.t
   end
 
-  include Common_intf with type Field.t = Common.Field.t
+  include
+    Common_intf
+    with module Field = Common.Field
+    with module Bigint = Common.Bigint
 
   val field_size : Bigint.R.t
 
