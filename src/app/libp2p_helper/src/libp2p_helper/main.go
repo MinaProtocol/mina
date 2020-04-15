@@ -198,6 +198,7 @@ type configureMsg struct {
 	ListenOn        []string `json:"ifaces"`
 	External        string   `json:"external_maddr"`
 	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
+	Flood           bool     `json:"flood_gossip"`
 }
 
 type discoveredPeerUpcall struct {
@@ -233,6 +234,19 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	if err != nil {
 		return nil, badHelper(err)
 	}
+
+	var pubsub *pubsub.Pubsub
+	if m.Flood {
+		pubsub, err = pubsub.NewFloodSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
+	} else {
+		pubsub, err = pubsub.NewRandomSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
+	}
+
+	if err != nil {
+		return nil, badHelper(err)
+	}
+
+	helper.Pubsub = pubsub
 	app.P2p = helper
 
 	return "configure success", nil
