@@ -204,13 +204,14 @@ let apply_user_command_exn t
           get_or_initialize_exn receiver t receiver_idx
         in
         let receiver_amount, creation_fee =
-          if Token_id.equal fee_token token then
+          if Token_id.(equal default) token then
             (sub_account_creation_fee action amount, Amount.zero)
-          else if action = `Added then
+          else if action = `Added then (
+            assert (Token_id.(equal default) fee_token) ;
             let account_creation_fee =
               Amount.of_fee Coda_compile_config.account_creation_fee
             in
-            (amount, account_creation_fee)
+            (amount, account_creation_fee) )
           else (amount, Amount.zero)
         in
         let fee_payer_account =

@@ -295,6 +295,7 @@ module Base = struct
       { predicate_failed: 'bool (* All *)
       ; source_not_present: 'bool (* All *)
       ; receiver_not_present: 'bool (* Delegate only *)
+      ; token_cannot_create: 'bool (* Payment only *)
       ; amount_insufficient_to_create: 'bool
             (* Payment only, token=fee_token *)
       ; fee_payer_balance_insufficient_to_create: 'bool
@@ -310,6 +311,7 @@ module Base = struct
         { predicate_failed
         ; source_not_present
         ; receiver_not_present
+        ; token_cannot_create
         ; amount_insufficient_to_create
         ; fee_payer_balance_insufficient_to_create
         ; fee_payer_bad_timing_for_create
@@ -318,6 +320,7 @@ module Base = struct
       [ predicate_failed
       ; source_not_present
       ; receiver_not_present
+      ; token_cannot_create
       ; amount_insufficient_to_create
       ; fee_payer_balance_insufficient_to_create
       ; fee_payer_bad_timing_for_create
@@ -328,6 +331,7 @@ module Base = struct
       | [ predicate_failed
         ; source_not_present
         ; receiver_not_present
+        ; token_cannot_create
         ; amount_insufficient_to_create
         ; fee_payer_balance_insufficient_to_create
         ; fee_payer_bad_timing_for_create
@@ -336,6 +340,7 @@ module Base = struct
           { predicate_failed
           ; source_not_present
           ; receiver_not_present
+          ; token_cannot_create
           ; amount_insufficient_to_create
           ; fee_payer_balance_insufficient_to_create
           ; fee_payer_bad_timing_for_create
@@ -422,6 +427,7 @@ module Base = struct
               , { predicate_failed
                 ; source_not_present
                 ; receiver_not_present
+                ; token_cannot_create= false
                 ; amount_insufficient_to_create= false
                 ; fee_payer_balance_insufficient_to_create= false
                 ; fee_payer_bad_timing_for_create= false
@@ -438,18 +444,24 @@ module Base = struct
                 else if Account_id.equal receiver id then false
                 else fail "bad receiver account ID"
               in
-              let fee_token_is_token = Token_id.equal fee_token token in
-              let amount_insufficient_to_create, creation_fee =
+              let token_is_default = Token_id.(equal default) token in
+              let ( token_cannot_create
+                  , amount_insufficient_to_create
+                  , creation_fee ) =
                 let creation_amount =
                   Amount.of_fee Coda_compile_config.account_creation_fee
                 in
                 if receiver_needs_creating then
-                  if fee_token_is_token then
-                    ( Option.is_none
+                  if token_is_default then
+                    ( false
+                    , Option.is_none
                         (Amount.sub payload.body.amount creation_amount)
                     , Amount.zero )
-                  else (false, creation_amount)
-                else (false, Amount.zero)
+                  else
+                    ( not Token_id.(equal default fee_token)
+                    , false
+                    , creation_amount )
+                else (false, false, Amount.zero)
               in
               let fee_payer_balance_insufficient_to_create =
                 Amount.(
@@ -478,7 +490,7 @@ module Base = struct
                 &&
                 if Account_id.equal source receiver then
                   (* The final balance will be [0 - account_creation_fee]. *)
-                  receiver_needs_creating && fee_token_is_token
+                  receiver_needs_creating && token_is_default
                 else
                   Amount.(
                     Balance.to_amount source_account.balance
@@ -490,7 +502,7 @@ module Base = struct
                    &&
                    if Account_id.equal source receiver then
                      (* The final balance will be [0 - account_creation_fee]. *)
-                     receiver_needs_creating && fee_token_is_token
+                     receiver_needs_creating && token_is_default
                    else
                      Or_error.is_error
                        (Transaction_logic.validate_timing
@@ -498,10 +510,11 @@ module Base = struct
                           ~account:source_account)
               in
               ( `Should_pay_to_create
-                  (receiver_needs_creating && not fee_token_is_token)
+                  (receiver_needs_creating && not token_is_default)
               , { predicate_failed
                 ; source_not_present
                 ; receiver_not_present= false
+                ; token_cannot_create
                 ; amount_insufficient_to_create
                 ; fee_payer_balance_insufficient_to_create
                 ; fee_payer_bad_timing_for_create
@@ -740,22 +753,24 @@ module Base = struct
       Transaction_union.Tag.Unpacked.is_stake_delegation tag
     in
     let is_coinbase = Transaction_union.Tag.Unpacked.is_coinbase tag in
-    let%bind tokens_equal = Token_id.Checked.equal token fee_token in
     let%bind token_default =
       Token_id.(Checked.equal token (var_of_t default))
     in
     let%bind fee_token_default =
-      (* TODO: Account creation fees should not be charged in this token. *)
       Token_id.(Checked.equal token (var_of_t default))
     in
     let%bind () =
       [%with_label "Validate tokens"]
         (let%bind () =
            [%with_label "Coinbases only use the default token"]
-             (Boolean.Assert.is_true fee_token_default)
+             Boolean.(Assert.any [fee_token_default; not is_coinbase])
          in
-         [%with_label "Validate delegated token is default"]
-           Boolean.(Assert.any [token_default; not is_stake_delegation]))
+         (* NOTE: This must be updated for every new command that may use
+                  non-default tokens.
+         *)
+         [%with_label
+           "Validate coinbases, stake delegation only use the default token"]
+           Boolean.(Assert.any [token_default; is_payment; is_fee_transfer]))
     in
     let current_global_slot =
       Global_slot.(Checked.constant zero)
@@ -930,7 +945,13 @@ module Base = struct
              in
              let%bind () =
                [%with_label "Validate fee_payer failures"]
-                 (let failed_pay_for_receiver =
+                 (let%bind () =
+                    [%with_label "Token cannot create matches predicated"]
+                      ( Boolean.(should_pay_to_create && not fee_token_default)
+                      >>= Boolean.Assert.( = )
+                            user_command_failure.token_cannot_create )
+                  in
+                  let failed_pay_for_receiver =
                     (* should_pay_to_create && user_command_fails *)
                     Boolean.Unsafe.of_cvar
                       Field.Var.(
@@ -1046,7 +1067,7 @@ module Base = struct
              in
              let%bind () =
                [%with_label "Validate should_pay_for_receiver"]
-                 ( Boolean.(is_empty_and_writeable && not tokens_equal)
+                 ( Boolean.(is_empty_and_writeable && not token_default)
                  >>= Boolean.Assert.( = ) should_pay_to_create )
              in
              let%bind balance =

@@ -427,7 +427,7 @@ struct
             "nonzero fee excess"
         and () =
           clarify_error
-            (Token_id.equal fee_token default)
+            Token_id.(equal default fee_token)
             "statement has a non-default fee token"
         in
         ()

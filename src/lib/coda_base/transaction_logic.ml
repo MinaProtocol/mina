@@ -424,15 +424,6 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
         Or_error.errorf
           "Cannot pay fees from a public key that did not sign the transaction"
     in
-    let%bind () =
-      (* TODO: Remove this check and update the transaction snark once we have
-         an exchange rate mechanism. See issue #4447.
-      *)
-      if Token_id.equal fee_token Token_id.default then return ()
-      else
-        Or_error.errorf
-          "Cannot create transactions with fee_token different from the default"
-    in
     let%bind fee_payer_location, fee_payer_account, undo_common =
       let%bind location, account = get_with_location ledger fee_payer in
       let%bind () =
@@ -519,20 +510,20 @@ module Make (L : Ledger_intf) : S with type ledger := L.t = struct
             | `Existing _ ->
                 return (amount, Amount.zero)
             | `New ->
-                if Token_id.equal fee_token token then
+                if Token_id.(equal default) token then
                   (* Subtract the creation fee from the transaction amount. *)
                   let%map amount = sub_account_creation_fee `Added amount in
                   (amount, Amount.zero)
-                else
-                  (* Charge the fee-payer for creating the account.
-                 Note: We don't have a better choice here: there is no other
-                 source of tokens in this transaction that is known to have
-                 accepted value.
-               *)
+                else if Token_id.(equal default) fee_token then
+                  (* Charge the fee-payer for creating the account. *)
                   let account_creation_fee =
                     Amount.of_fee Coda_compile_config.account_creation_fee
                   in
                   return (amount, account_creation_fee)
+                else
+                  Or_error.errorf
+                    "Cannot charge the account creation fee: this transaction \
+                     does not involve the default token"
           in
           (* NOTE: From here on, either [fee_payer_account] is unchanged, or
              [fee_payer] is distinct from both [source] and [receiver], due to
