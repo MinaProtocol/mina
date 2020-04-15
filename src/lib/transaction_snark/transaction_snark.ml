@@ -2357,7 +2357,9 @@ let%test_module "transaction_snark" =
           ~amount:(Currency.Amount.of_int 10_000_000_000)
           ~receiver
           ~fee_transfer:
-            (Some (other, Coda_compile_config.account_creation_fee))
+            (Some
+               (Coinbase.Fee_transfer.create ~receiver_pk:other
+                  ~fee:Coda_compile_config.account_creation_fee))
         |> Or_error.ok_exn
       in
       let txn_in_block =
@@ -2464,10 +2466,8 @@ let%test_module "transaction_snark" =
                   Account_id.create key Token_id.default )
               |> One_or_two.to_list
             , pending_coinbase_stack )
-        | Coinbase ({receiver; fee_transfer; _} as cb) ->
-            ( Account_id.create receiver Token_id.default
-              :: Option.value_map ~default:[] fee_transfer ~f:(fun ft ->
-                     [Account_id.create (fst ft) Token_id.default] )
+        | Coinbase cb ->
+            ( Coinbase.accounts_accessed cb
             , Pending_coinbase.Stack.push_coinbase cb pending_coinbase_stack )
       in
       let signer =
@@ -2584,8 +2584,9 @@ let%test_module "transaction_snark" =
               let _, cbs =
                 let fts =
                   List.map (List.init ft_count ~f:Fn.id) ~f:(fun _ ->
-                      ( other.account.public_key
-                      , Coda_compile_config.account_creation_fee ) )
+                      Coinbase.Fee_transfer.create
+                        ~receiver_pk:other.account.public_key
+                        ~fee:Coda_compile_config.account_creation_fee )
                 in
                 List.fold ~init:(fts, []) (List.init coinbase_count ~f:Fn.id)
                   ~f:(fun (fts, cbs) _ ->
