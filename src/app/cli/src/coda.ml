@@ -202,7 +202,8 @@ let daemon logger =
        flag "enable-flooding"
          ~doc:
            "Enable pubsub flooding, gossiping every message to every peer \
-            (uses lots of bandwidth! default: false)" no_arg
+            (uses lots of bandwidth! default: false)"
+         no_arg
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
