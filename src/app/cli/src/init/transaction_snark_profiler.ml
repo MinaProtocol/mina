@@ -250,10 +250,8 @@ let run profiler num_transactions repeats preeval =
            | User_command t ->
                let t = (t :> User_command.t) in
                User_command.accounts_accessed t
-           | Coinbase {receiver; fee_transfer; _} ->
-               List.map ~f:aid_of_pk
-                 (receiver :: Option.to_list (Option.map fee_transfer ~f:fst))
-       ))
+           | Coinbase cb ->
+               Coinbase.accounts_accessed cb ))
   in
   for i = 1 to repeats do
     let message = profiler sparse_ledger transitions preeval in
