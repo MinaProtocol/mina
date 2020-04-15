@@ -158,7 +158,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
               hashes
         in
         `Assoc
-          [ ("new_root", State_hash.to_yojson new_root.hash)
+          [ ("new_root", State_hash.to_yojson (Root_data.Minimal.hash new_root))
           ; ("garbage", `List (List.map ~f:State_hash.to_yojson garbage_hashes))
           ]
     | Best_tip_changed breadcrumb ->

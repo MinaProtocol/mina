@@ -353,10 +353,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         | Ok () ->
             (* Close the old frontier and reload a new on from disk. *)
             let new_root_data : Transition_frontier.Root_data.Limited.t =
-              { transition= new_root
-              ; scan_state
-              ; pending_coinbase
-              ; protocol_states }
+              Transition_frontier.Root_data.Limited.create ~transition:new_root
+                ~scan_state ~pending_coinbase ~protocol_states
             in
             let%bind () =
               Transition_frontier.Persistent_frontier.reset_database_exn

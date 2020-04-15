@@ -99,13 +99,19 @@ let merge_scan_state acc scan_state =
   merge_string acc (Staged_ledger_hash.Aux_hash.to_bytes hash)
 
 (*Deepthi: let merge_protocol_states*)
+let merge_protocol_states acc protocol_states =
+  List.fold protocol_states ~init:acc ~f:(fun acc (h, _) ->
+      merge_state_hash acc h )
 
-let merge_root_data acc
-    {Root_data.Minimal.hash; scan_state; pending_coinbase; protocol_states= _}
-    =
-  merge_pending_coinbase
-    (merge_scan_state (merge_state_hash acc hash) scan_state)
-    pending_coinbase
+let merge_root_data acc (root_data : Root_data.Minimal.t) =
+  let open Root_data.Minimal in
+  merge_protocol_states
+    (merge_pending_coinbase
+       (merge_scan_state
+          (merge_state_hash acc (hash root_data))
+          (scan_state root_data))
+       (pending_coinbase root_data))
+    (protocol_states root_data)
 
 let merge_diff : type mutant. t -> (Diff.lite, mutant) Diff.t -> t =
  fun acc diff ->

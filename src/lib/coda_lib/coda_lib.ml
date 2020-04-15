@@ -554,14 +554,16 @@ let root_diff t =
                       Deferred.unit
                   | Transition_frontier.Diff.Full.With_mutant.E
                       (Root_transitioned {new_root; _}, _) ->
+                      let root_hash =
+                        Transition_frontier.Root_data.Minimal.hash new_root
+                      in
                       let new_root_breadcrumb =
-                        Transition_frontier.find_exn frontier new_root.hash
+                        Transition_frontier.(find_exn frontier root_hash)
                       in
                       Strict_pipe.Writer.write root_diff_writer
                         { user_commands=
                             Transition_frontier.Breadcrumb.user_commands
-                              (Transition_frontier.find_exn frontier
-                                 new_root.hash)
+                              new_root_breadcrumb
                         ; root_length= length_of_breadcrumb new_root_breadcrumb
                         } ;
                       Deferred.unit )) ) ) ;

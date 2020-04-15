@@ -241,6 +241,7 @@ let check t =
   (* checks the pointers, frontier hash, and checks pointer references *)
   let check_base () =
     let%bind root = get t.db ~key:Root ~error:(`Corrupt (`Not_found `Root)) in
+    let root_hash = Root_data.Minimal.hash root in
     let%bind best_tip =
       get t.db ~key:Best_tip ~error:(`Corrupt (`Not_found `Best_tip))
     in
@@ -248,7 +249,7 @@ let check t =
       get t.db ~key:Frontier_hash ~error:(`Corrupt (`Not_found `Frontier_hash))
     in
     let%bind _ =
-      get t.db ~key:(Transition root.hash)
+      get t.db ~key:(Transition root_hash)
         ~error:(`Corrupt (`Not_found `Root_transition))
     in
     let%bind _ =
@@ -259,7 +260,7 @@ let check t =
       get t.db ~key:(Transition best_tip)
         ~error:(`Corrupt (`Not_found `Best_tip_transition))
     in
-    root.hash
+    root_hash
   in
   let rec check_arcs pred_hash =
     let%bind successors =
@@ -279,9 +280,9 @@ let check t =
   check_arcs root_hash
 
 let initialize t ~root_data ~base_hash =
-  let open Root_data.Limited.Stable.Latest in
+  let open Root_data.Limited in
   let {With_hash.hash= root_state_hash; data= root_transition}, _ =
-    External_transition.Validated.erase root_data.transition
+    External_transition.Validated.erase (transition root_data)
   in
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
     ~metadata:
@@ -297,7 +298,7 @@ let initialize t ~root_data ~base_hash =
       Batch.set batch ~key:Best_tip ~data:root_state_hash ;
       Batch.set batch ~key:Frontier_hash ~data:base_hash ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(List.unzip root_data.protocol_states |> snd) )
+        ~data:(List.unzip (protocol_states root_data) |> snd) )
 
 let add t ~transition =
   let parent_hash = External_transition.Validated.parent_hash transition in
@@ -321,18 +322,19 @@ let move_root t ~new_root ~garbage =
   let open Root_data.Minimal in
   let%bind () =
     Result.ok_if_true
-      (mem t.db ~key:(Transition new_root.hash))
+      (mem t.db ~key:(Transition (hash new_root)))
       ~error:(`Not_found `New_root_transition)
   in
   let%map old_root =
     get t.db ~key:Root ~error:(`Not_found `Old_root_transition)
   in
+  let old_root_hash = hash old_root in
   (* TODO: Result compatible rocksdb batch transaction *)
   Batch.with_batch t.db ~f:(fun batch ->
       Batch.set batch ~key:Root ~data:new_root ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
-        ~data:(List.unzip new_root.protocol_states |> snd) ;
-      List.iter (old_root.hash :: garbage) ~f:(fun node_hash ->
+        ~data:(List.unzip (protocol_states new_root) |> snd) ;
+      List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
           (* because we are removing entire forks of the tree, there is
            * no need to have extra logic to any remove arcs to the node
            * we are deleting since there we are deleting all of a node's
@@ -340,7 +342,7 @@ let move_root t ~new_root ~garbage =
            *)
           Batch.remove batch ~key:(Transition node_hash) ;
           Batch.remove batch ~key:(Arcs node_hash) ) ) ;
-  old_root.hash
+  old_root_hash
 
 let get_transition t hash =
   let%map transition =
@@ -363,7 +365,7 @@ let get_protocol_states_for_root_scan_state t =
 
 let get_root_hash t =
   let%map root = get_root t in
-  root.hash
+  Root_data.Minimal.hash root
 
 let get_best_tip t = get t.db ~key:Best_tip ~error:(`Not_found `Best_tip)
 

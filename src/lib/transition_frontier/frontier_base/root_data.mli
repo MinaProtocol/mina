@@ -26,15 +26,12 @@ module Historical : sig
   val of_breadcrumb : Breadcrumb.t -> t
 end
 
-(* Limited root data is similar to Minimal root data, except that it contains
- * the full validated transition at a root instead of just a pointer to one *)
-module Limited : sig
+(*module Common : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
       type t =
-        { transition: External_transition.Validated.Stable.V1.t
-        ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
+        { scan_state: Staged_ledger.Scan_state.Stable.V1.t
         ; pending_coinbase: Pending_coinbase.Stable.V1.t
         ; protocol_states:
             ( Coda_base.State_hash.Stable.V1.t
@@ -44,7 +41,41 @@ module Limited : sig
     end
   end]
 
+  type t = Stable.Latest.t =
+    { scan_state: Staged_ledger.Scan_state.t
+    ; pending_coinbase: Pending_coinbase.t
+    ; protocol_states:
+        (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
+  [@@deriving to_yojson]
+end*)
+
+(* Limited root data is similar to Minimal root data, except that it contains
+ * the full validated transition at a root instead of just a pointer to one *)
+module Limited : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t [@@deriving to_yojson]
+    end
+  end]
+
   type t = Stable.Latest.t [@@deriving to_yojson]
+
+  val transition : t -> External_transition.Validated.t
+
+  val scan_state : t -> Staged_ledger.Scan_state.t
+
+  val pending_coinbase : t -> Pending_coinbase.t
+
+  val protocol_states :
+    t -> (State_hash.t * Coda_state.Protocol_state.value) list
+
+  val create :
+       transition:External_transition.Validated.t
+    -> scan_state:Staged_ledger.Scan_state.t
+    -> pending_coinbase:Pending_coinbase.t
+    -> protocol_states:(State_hash.t * Coda_state.Protocol_state.value) list
+    -> t
 end
 
 (* Minimal root data contains the smallest amount of information about a root.
@@ -56,27 +87,31 @@ module Minimal : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t =
-        { hash: State_hash.Stable.V1.t
-        ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t
-        ; protocol_states:
-            ( Coda_base.State_hash.Stable.V1.t
-            * Coda_state.Protocol_state.Value.Stable.V1.t )
-            list }
+      type t
     end
   end]
 
-  type t = Stable.Latest.t =
-    { hash: State_hash.t
-    ; scan_state: Staged_ledger.Scan_state.t
-    ; pending_coinbase: Pending_coinbase.t
-    ; protocol_states:
-        (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
+  type t = Stable.Latest.t
+
+  val hash : t -> State_hash.t
+
+  val scan_state : t -> Staged_ledger.Scan_state.t
+
+  val pending_coinbase : t -> Pending_coinbase.t
+
+  val protocol_states :
+    t -> (State_hash.t * Coda_state.Protocol_state.value) list
 
   val of_limited : Limited.t -> t
 
   val upgrade : t -> transition:External_transition.Validated.t -> Limited.t
+
+  val create :
+       hash:State_hash.t
+    -> scan_state:Staged_ledger.Scan_state.t
+    -> pending_coinbase:Pending_coinbase.t
+    -> protocol_states:(State_hash.t * Coda_state.Protocol_state.value) list
+    -> t
 end
 
 type t =

@@ -30,7 +30,7 @@ type t =
   ; genesis_state_hash: State_hash.t }
 
 let genesis_root_data ~genesis_ledger ~base_proof ~genesis_constants =
-  let open Root_data.Limited.Stable.Latest in
+  let open Root_data.Limited in
   let transition =
     External_transition.genesis ~genesis_ledger ~base_proof ~genesis_constants
   in
@@ -38,7 +38,7 @@ let genesis_root_data ~genesis_ledger ~base_proof ~genesis_constants =
   (*if scan state is empty the protocol states required is also empty*)
   let protocol_states = [] in
   let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
-  {transition; scan_state; pending_coinbase; protocol_states}
+  create ~transition ~scan_state ~pending_coinbase ~protocol_states
 
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
@@ -555,13 +555,13 @@ module For_tests = struct
       (root, branches, protocol_states)
     in
     let root_data =
-      { Root_data.Limited.Stable.Latest.transition=
-          Breadcrumb.validated_transition root
-      ; scan_state= Breadcrumb.staged_ledger root |> Staged_ledger.scan_state
-      ; pending_coinbase=
-          Breadcrumb.staged_ledger root
-          |> Staged_ledger.pending_coinbase_collection
-      ; protocol_states }
+      Root_data.Limited.create
+        ~transition:(Breadcrumb.validated_transition root)
+        ~scan_state:(Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
+        ~pending_coinbase:
+          ( Breadcrumb.staged_ledger root
+          |> Staged_ledger.pending_coinbase_collection )
+        ~protocol_states
     in
     let%map persistent_root, persistent_frontier =
       gen_persistence ~logger ()
@@ -572,7 +572,8 @@ module For_tests = struct
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         Persistent_root.Instance.set_root_state_hash instance
           ~genesis_state_hash
-          (External_transition.Validated.state_hash root_data.transition) ;
+          (External_transition.Validated.state_hash
+             (Root_data.Limited.transition root_data)) ;
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;

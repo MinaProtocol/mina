@@ -292,7 +292,6 @@ let visualize_to_string t =
 
 (* given an heir, calculate the diff that will transition the root to that heir *)
 let calculate_root_transition_diff t heir =
-  let open Root_data.Minimal in
   let root = root t in
   let root_hash = t.root in
   let heir_hash = Breadcrumb.state_hash heir in
@@ -332,11 +331,11 @@ let calculate_root_transition_diff t heir =
     )
   in
   let new_root_data =
-    { hash= heir_hash
-    ; scan_state= Staged_ledger.scan_state heir_staged_ledger
-    ; pending_coinbase=
-        Staged_ledger.pending_coinbase_collection heir_staged_ledger
-    ; protocol_states }
+    Root_data.Minimal.create ~hash:heir_hash
+      ~scan_state:(Staged_ledger.scan_state heir_staged_ledger)
+      ~pending_coinbase:
+        (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
+      ~protocol_states
   in
   Diff.Full.E.E
     (Root_transitioned {new_root= new_root_data; garbage= Full garbage_nodes})
@@ -548,8 +547,8 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let old_best_tip = t.best_tip in
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
-  | Root_transitioned
-      {new_root= {hash= new_root_hash; _}; garbage= Full garbage} ->
+  | Root_transitioned {new_root; garbage= Full garbage} ->
+      let new_root_hash = Root_data.Minimal.hash new_root in
       let old_root_hash = t.root in
       move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state ;
       (old_root_hash, Some new_root_hash)
