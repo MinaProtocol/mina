@@ -368,8 +368,8 @@ module T = struct
           User_command.accounts_accessed t
       | Coinbase c ->
           let ft_receivers =
-            Option.value_map c.fee_transfer ~default:[] ~f:(fun ft ->
-                Fee_transfer.receiver_ids (`One ft) |> One_or_two.to_list )
+            Option.map ~f:Coinbase.Fee_transfer.receiver c.fee_transfer
+            |> Option.to_list
           in
           Account_id.create c.receiver Token_id.default :: ft_receivers
     in
@@ -801,8 +801,7 @@ module T = struct
       ; completed_work_rev: Transaction_snark_work.Checked.t Sequence.t
       ; fee_transfers: Fee.t Public_key.Compressed.Map.t
       ; add_coinbase: bool
-      ; coinbase:
-          (Public_key.Compressed.t * Fee.t) Staged_ledger_diff.At_most_two.t
+      ; coinbase: Coinbase.Fee_transfer.t Staged_ledger_diff.At_most_two.t
       ; receiver_pk: Public_key.Compressed.t
       ; budget: Fee.t Or_error.t
       ; discarded: Discarded.t
@@ -814,7 +813,8 @@ module T = struct
       (* Here we could not add the fee transfer if the prover=receiver_pk but
       retaining it to preserve that information in the
       staged_ledger_diff. It will be checked in apply_diff before adding*)
-      Option.some_if (cw.fee > Fee.zero) (cw.prover, cw.fee)
+      Option.some_if (cw.fee > Fee.zero)
+        (Coinbase.Fee_transfer.create ~receiver_pk:cw.prover ~fee:cw.fee)
 
     let cheapest_two_work (works : Transaction_snark_work.Checked.t Sequence.t)
         =
@@ -1122,10 +1122,10 @@ module T = struct
     let discard_user_command t =
       let decr_coinbase t =
         (*When discarding coinbase's fee transfer, add the fee transfer to the fee_transfers map so that budget checks can be done *)
-        let update_fee_transfers t ft coinbase =
+        let update_fee_transfers t (ft : Coinbase.Fee_transfer.t) coinbase =
           let updated_fee_transfers =
-            Public_key.Compressed.Map.update t.fee_transfers (fst ft)
-              ~f:(fun _ -> snd ft)
+            Public_key.Compressed.Map.update t.fee_transfers ft.receiver_pk
+              ~f:(fun _ -> ft.fee)
           in
           let new_t =
             {t with coinbase; fee_transfers= updated_fee_transfers}
@@ -1726,7 +1726,7 @@ let%test_module "test" =
               coinbase_second_prediff d.coinbase |> snd )
       in
       List.fold coinbase_fts ~init:Currency.Fee.zero ~f:(fun total ft ->
-          Currency.Fee.add total (snd ft) |> Option.value_exn )
+          Currency.Fee.add total ft.fee |> Option.value_exn )
 
     (* These tests do a lot of updating Merkle ledgers so making Pedersen
        hashing faster is a big win.
@@ -2351,7 +2351,9 @@ let%test_module "test" =
                       Fee.compare w.fee w'.fee ) )
             in
             let () =
-              let assert_ft ft ft' = assert (Fee.equal (snd ft) (snd ft')) in
+              let assert_same_fee {Coinbase.Fee_transfer.fee; _} fee' =
+                assert (Fee.equal fee fee')
+              in
               let first_pre_diff, second_pre_diff_opt = diff.diff in
               match
                 ( first_pre_diff.coinbase
@@ -2369,7 +2371,7 @@ let%test_module "test" =
                         List.hd_exn (sorted_work_from_diff1 first_pre_diff)
                         |> Transaction_snark_work.forget
                       in
-                      assert_ft single (work.prover, work.fee) )
+                      assert_same_fee single work.fee )
               | Zero, One ft_opt ->
                   Option.value_map ft_opt ~default:() ~f:(fun single ->
                       let work =
@@ -2377,19 +2379,19 @@ let%test_module "test" =
                           (sorted_work_from_diff2 second_pre_diff_opt)
                         |> Transaction_snark_work.forget
                       in
-                      assert_ft single (work.prover, work.fee) )
+                      assert_same_fee single work.fee )
               | Two (Some (ft, ft_opt)), Zero ->
                   let work_done = sorted_work_from_diff1 first_pre_diff in
                   let work =
                     List.hd_exn work_done |> Transaction_snark_work.forget
                   in
-                  assert_ft ft (work.prover, work.fee) ;
+                  assert_same_fee ft work.fee ;
                   Option.value_map ft_opt ~default:() ~f:(fun single ->
                       let work =
                         List.hd_exn (List.drop work_done 1)
                         |> Transaction_snark_work.forget
                       in
-                      assert_ft single (work.prover, work.fee) )
+                      assert_same_fee single work.fee )
               | _ ->
                   failwith
                     (sprintf

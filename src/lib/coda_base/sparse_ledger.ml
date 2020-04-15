@@ -306,13 +306,13 @@ let apply_coinbase_exn t
     match fee_transfer with
     | None ->
         (coinbase_amount, t)
-    | Some (transferee, fee) ->
+    | Some ({receiver_pk= _; fee} as ft) ->
         let fee = Amount.of_fee fee in
         let reward =
           Amount.sub coinbase_amount fee
           |> Option.value_exn ?here:None ?message:None ?error:None
         in
-        let transferee_id = Account_id.create transferee Token_id.default in
+        let transferee_id = Coinbase.Fee_transfer.receiver ft in
         (reward, add_to_balance t transferee_id fee)
   in
   let receiver_id = Account_id.create receiver Token_id.default in
