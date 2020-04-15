@@ -305,7 +305,7 @@ module Base = struct
       ; source_insufficient_balance: 'bool (* Payment only *)
       ; source_bad_timing: 'bool (* Payment only *) }
 
-    let num_fields = 8
+    let num_fields = 9
 
     let to_list
         { predicate_failed
@@ -757,7 +757,7 @@ module Base = struct
       Token_id.(Checked.equal token (var_of_t default))
     in
     let%bind fee_token_default =
-      Token_id.(Checked.equal token (var_of_t default))
+      Token_id.(Checked.equal fee_token (var_of_t default))
     in
     let%bind () =
       [%with_label "Validate tokens"]
@@ -946,7 +946,7 @@ module Base = struct
              let%bind () =
                [%with_label "Validate fee_payer failures"]
                  (let%bind () =
-                    [%with_label "Token cannot create matches predicated"]
+                    [%with_label "Token cannot create matches predicted"]
                       ( Boolean.(should_pay_to_create && not fee_token_default)
                       >>= Boolean.Assert.( = )
                             user_command_failure.token_cannot_create )
