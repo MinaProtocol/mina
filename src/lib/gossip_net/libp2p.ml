@@ -140,7 +140,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   Ivar.fill_if_empty first_peer_ivar () ;
                   if !ctr < 4 then incr ctr
                   else Ivar.fill_if_empty high_connectivity_ivar () ;
-                  if Throttle.num_jobs_waiting_to_start throttle <> 0 then
+                  if Throttle.num_jobs_waiting_to_start throttle = 0 then
                     don't_wait_for
                       (Throttle.enqueue throttle (fun () ->
                            let open Deferred.Let_syntax in
