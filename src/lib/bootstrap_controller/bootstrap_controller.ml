@@ -395,9 +395,9 @@ let%test_module "Bootstrap_controller tests" =
   ( module struct
     open Pipe_lib
 
-    let max_frontier_length = 10
+    let max_frontier_length = Transition_frontier.max_length
 
-    let logger = Logger.null ()
+    let logger = Logger.create ()
 
     let trust_system = Trust_system.null ()
 
@@ -504,19 +504,35 @@ let%test_module "Bootstrap_controller tests" =
             (External_transition.Set.of_list saved_transitions)
             ~expect:(External_transition.Set.of_list expected_transitions) )
 
-    (*
-    let run_bootstrap ~timeout_duration ~my_net ~transition_reader ~should_ask_best_tip =
+    let run_bootstrap ~timeout_duration ~my_net ~transition_reader =
       let open Fake_network in
-      let verifier = Async.Thread_safe.block_on_async_exn (fun () -> Verifier.create ~logger ~pids) in
-      let persistent_root = Transition_frontier.persistent_root my_net.state.frontier in
-      let persistent_frontier = Transition_frontier.persistent_frontier my_net.state.frontier in
-      let initial_root_transition = Transition_frontier.(Breadcrumb.validated_transition (root my_net.state.frontier)) in
+      let verifier =
+        Async.Thread_safe.block_on_async_exn (fun () ->
+            Verifier.create ~conf_dir:None ~logger ~pids )
+      in
+      let genesis_state_hash =
+        Transition_frontier.genesis_state_hash my_net.state.frontier
+      in
+      let genesis_ledger = Test_genesis_ledger.t in
+      let time_controller = Block_time.Controller.basic ~logger in
+      let persistent_root =
+        Transition_frontier.persistent_root my_net.state.frontier
+      in
+      let persistent_frontier =
+        Transition_frontier.persistent_frontier my_net.state.frontier
+      in
+      let initial_root_transition =
+        Transition_frontier.(
+          Breadcrumb.validated_transition (root my_net.state.frontier))
+      in
       let%bind () = Transition_frontier.close my_net.state.frontier in
-      Block_time.Timeout.await_exn time_controller ~timeout_duration (
-        run ~logger ~verifier ~trust_system ~network:my_net.network
-          ~consensus_local_state:my_net.state.consensus_local_state ~transition_reader
-          ~should_ask_best_tip ~persistent_root ~persistent_frontier
-          ~initial_root_transition)
+      Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+        "bootstrap begin" ;
+      Block_time.Timeout.await_exn time_controller ~timeout_duration
+        (run ~logger ~trust_system ~verifier ~network:my_net.network
+           ~consensus_local_state:my_net.state.consensus_local_state
+           ~transition_reader ~persistent_root ~persistent_frontier
+           ~initial_root_transition ~genesis_state_hash ~genesis_ledger)
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions :
@@ -548,28 +564,42 @@ let%test_module "Bootstrap_controller tests" =
 
     let%test_unit "sync with one node after receiving a transition" =
       Quickcheck.test ~trials:1
-        Fake_network.Generator.(gen ~max_frontier_length [fresh_peer; peer_with_branch ~frontier_branch_size:10])
+        Fake_network.Generator.(
+          gen ~max_frontier_length
+            [ fresh_peer
+            ; peer_with_branch
+                ~frontier_branch_size:((max_frontier_length * 2) + 2) ])
         ~f:(fun fake_network ->
           let [my_net; peer_net] = fake_network.peer_networks in
-          let transition_reader, _ =
+          let transition_reader, transition_writer =
             Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Drop_head))
           in
-          Coda_networking.broadcast_state peer_net.network (
-            Transition_frontier.best_tip peer_net.state.frontier
-            |> Transition_frontier.Breadcrumb.validated_transition
-            |> External_transition.Validation.forget_validation);
+          Envelope.Incoming.wrap
+            ~data:
+              ( Transition_frontier.best_tip peer_net.state.frontier
+              |> Transition_frontier.Breadcrumb.validated_transition
+              |> External_transition.Validated.to_initial_validated )
+            ~sender:
+              (Envelope.Sender.Remote
+                 (peer_net.peer.host, peer_net.peer.peer_id))
+          |> Pipe_lib.Strict_pipe.Writer.write transition_writer ;
           let new_frontier, sorted_external_transitions =
             Async.Thread_safe.block_on_async_exn (fun () ->
-              run_bootstrap ~timeout_duration:(Block_time.Span.of_ms 10_000L) ~my_net ~transition_reader ~should_ask_best_tip:false)
+                run_bootstrap
+                  ~timeout_duration:(Block_time.Span.of_ms 30_000L)
+                  ~my_net ~transition_reader )
           in
           assert_transitions_increasingly_sorted
             ~root:(Transition_frontier.root new_frontier)
             sorted_external_transitions ;
           [%test_result: Ledger_hash.t]
-            (Ledger.Db.merkle_root @@ Transition_frontier.root_snarked_ledger new_frontier)
-            ~expect:(Ledger.Db.merkle_root @@ Transition_frontier.root_snarked_ledger peer_net.state.frontier))
-    *)
+            ( Ledger.Db.merkle_root
+            @@ Transition_frontier.root_snarked_ledger new_frontier )
+            ~expect:
+              ( Ledger.Db.merkle_root
+              @@ Transition_frontier.root_snarked_ledger
+                   peer_net.state.frontier ) )
 
     (* TODO: move test to scan state module *)
     (*
