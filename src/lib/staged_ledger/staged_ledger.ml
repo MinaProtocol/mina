@@ -337,10 +337,20 @@ module T = struct
     let%map undo =
       Ledger.apply_transaction ledger s |> to_staged_ledger_or_error
     in
+    let fee_token =
+      match s with
+      | User_command t ->
+          User_command.(fee_token (forget_check t))
+      | Fee_transfer _ ->
+          (* TODO *) Token_id.default
+      | Coinbase _ ->
+          Token_id.default
+    in
     ( undo
     , { Transaction_snark.Statement.source
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
       ; fee_excess
+      ; fee_token
       ; supply_increase
       ; pending_coinbase_stack_state=
           {source= current_stack; target= pending_coinbase_after}

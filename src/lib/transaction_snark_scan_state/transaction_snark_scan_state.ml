@@ -214,7 +214,8 @@ let create_expected_statement
       { Transaction_snark.Pending_coinbase_stack_state.source=
           pending_coinbase_before
       ; target= pending_coinbase_after }
-  ; proof_type= `Base }
+  ; proof_type= `Base
+  ; fee_token= statement.fee_token }
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
     'a Or_error.t =
@@ -233,6 +234,9 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
       and supply_increase =
         Currency.Amount.add s.supply_increase s'.supply_increase
         |> option "Error adding supply_increases"
+      and fee_token =
+        if Token_id.equal s.fee_token s'.fee_token then return s.fee_token
+        else Or_error.errorf "Incompatible fee tokens"
       in
       let statement =
         { Transaction_snark.Statement.source= s.source
@@ -242,7 +246,8 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
             { source= s.pending_coinbase_stack_state.source
             ; target= s'.pending_coinbase_stack_state.target }
         ; fee_excess
-        ; proof_type= `Merge }
+        ; proof_type= `Merge
+        ; fee_token }
       in
       ( Ledger_proof.create ~statement ~sok_digest ~proof
       , Sok_message.create ~fee ~prover )
@@ -404,7 +409,8 @@ struct
         ; target
         ; supply_increase= _
         ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
-        ; proof_type= _ } ->
+        ; proof_type= _
+        ; fee_token= _ } ->
         let open Or_error.Let_syntax in
         let%map () =
           Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
@@ -449,6 +455,10 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
         Currency.Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
       and supply_increase =
         Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
+      and fee_token =
+        Option.some_if
+          (Token_id.equal stmt1.fee_token stmt2.fee_token)
+          stmt1.fee_token
       in
       { Transaction_snark.Statement.source= stmt1.source
       ; target= stmt2.target
@@ -457,7 +467,8 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
           { source= stmt1.pending_coinbase_stack_state.source
           ; target= stmt2.pending_coinbase_stack_state.target }
       ; fee_excess
-      ; proof_type= `Merge }
+      ; proof_type= `Merge
+      ; fee_token }
 
 let create ~work_delay ~transaction_capacity_log_2 =
   let k = Int.pow 2 transaction_capacity_log_2 in

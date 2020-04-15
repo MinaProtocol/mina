@@ -45,6 +45,7 @@ module Statement : sig
             ( Currency.Fee.Stable.V1.t
             , Sgn.Stable.V1.t )
             Currency.Signed_poly.Stable.V1.t
+        ; fee_token: Coda_base.Token_id.Stable.V1.t
         ; proof_type: Proof_type.Stable.V1.t }
       [@@deriving compare, equal, hash, sexp, yojson]
     end
@@ -56,6 +57,7 @@ module Statement : sig
     ; supply_increase: Currency.Amount.t
     ; pending_coinbase_stack_state: Pending_coinbase_stack_state.t
     ; fee_excess: Currency.Fee.Signed.t
+    ; fee_token: Coda_base.Token_id.t
     ; proof_type: Proof_type.t }
   [@@deriving compare, equal, hash, sexp, yojson]
 
@@ -84,6 +86,7 @@ val create :
   -> supply_increase:Currency.Amount.t
   -> pending_coinbase_stack_state:Pending_coinbase_stack_state.t
   -> fee_excess:Currency.Amount.Signed.t
+  -> fee_token:Coda_base.Token_id.t
   -> sok_digest:Sok_message.Digest.t
   -> proof:Tock.Proof.t
   -> t
