@@ -121,7 +121,7 @@ module Inner_curve = struct
       , hash_fold_t )]
 
     (* Mnt4.Fq.gen uses the interval starting at zero
-       here we the gen in Snark_params.Make_inner_curve_scalar, using
+       here we follow the gen in Snark_params.Make_inner_curve_scalar, using
          an interval starting at one
     *)
 
