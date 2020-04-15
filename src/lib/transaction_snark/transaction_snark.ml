@@ -2935,6 +2935,66 @@ let%test_module "transaction_snark" =
                 Balance.equal receiver_account.balance
                   expected_receiver_balance ) ) )
 
+    let%test_unit "failed transfer of non-default tokens to a new account \
+                   with fee in non-default tokens" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer =
+                Keypair.of_private_key_exn wallets.(0).private_key
+              in
+              let fee_payer_pk = Public_key.compress signer.public_key in
+              let source_pk = fee_payer_pk in
+              let receiver_pk = wallets.(1).account.public_key in
+              let fee_token, token_id =
+                Quickcheck.random_value
+                  (Quickcheck.Generator.tuple2 Token_id.gen_non_default
+                     Token_id.gen_non_default)
+              in
+              let fee_payer = Account_id.create fee_payer_pk fee_token in
+              let source = Account_id.create source_pk token_id in
+              let receiver = Account_id.create receiver_pk token_id in
+              let create_account aid balance =
+                Account.create aid (Balance.of_int balance)
+              in
+              let accounts =
+                [| create_account fee_payer 20_000_000_000
+                 ; create_account source 30_000_000_000 |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let amount =
+                Amount.of_int (random_int_incl 0 30 * 1_000_000_000)
+              in
+              let valid_until = Global_slot.max_value in
+              let nonce = accounts.(0).nonce in
+              let () =
+                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
+                  ~fee_payer_pk ~fee_token ~valid_until ~nonce
+                  (Payment {source_pk; receiver_pk; token_id; amount})
+              in
+              let get_account aid =
+                Option.bind
+                  (Ledger.location_of_account ledger aid)
+                  ~f:(Ledger.get ledger)
+              in
+              let fee_payer_account =
+                Option.value_exn (get_account fee_payer)
+              in
+              let source_account = Option.value_exn (get_account source) in
+              let sub_amount amt bal =
+                Option.value_exn (Balance.sub_amount bal amt)
+              in
+              let expected_fee_payer_balance =
+                sub_amount (Amount.of_fee fee) accounts.(0).balance
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              let expected_source_balance = accounts.(1).balance in
+              assert (
+                Balance.equal source_account.balance expected_source_balance ) ;
+              assert (Option.is_none (get_account receiver)) ) )
+
     let%test_unit "transfer non-default tokens to an existing account" =
       Test_util.with_randomness 123456789 (fun () ->
           Ledger.with_ledger ~f:(fun ledger ->
@@ -2948,6 +3008,79 @@ let%test_module "transaction_snark" =
               let fee_token = Token_id.default in
               let token_id =
                 Quickcheck.random_value Token_id.gen_non_default
+              in
+              let fee_payer = Account_id.create fee_payer_pk fee_token in
+              let source = Account_id.create source_pk token_id in
+              let receiver = Account_id.create receiver_pk token_id in
+              let create_account aid balance =
+                Account.create aid (Balance.of_int balance)
+              in
+              let accounts =
+                [| create_account fee_payer 20_000_000_000
+                 ; create_account source 30_000_000_000
+                 ; create_account receiver 0 |]
+              in
+              let fee = Fee.of_int (random_int_incl 2 15 * 1_000_000_000) in
+              let amount =
+                Amount.of_int (random_int_incl 0 30 * 1_000_000_000)
+              in
+              let valid_until = Global_slot.max_value in
+              let nonce = accounts.(0).nonce in
+              let () =
+                test_user_command_with_accounts ~ledger ~accounts ~signer ~fee
+                  ~fee_payer_pk ~fee_token ~valid_until ~nonce
+                  (Payment {source_pk; receiver_pk; token_id; amount})
+              in
+              let get_account aid =
+                Option.bind
+                  (Ledger.location_of_account ledger aid)
+                  ~f:(Ledger.get ledger)
+              in
+              let fee_payer_account =
+                Option.value_exn (get_account fee_payer)
+              in
+              let source_account = Option.value_exn (get_account source) in
+              let receiver_account = Option.value_exn (get_account receiver) in
+              let sub_amount amt bal =
+                Option.value_exn (Balance.sub_amount bal amt)
+              in
+              let add_amount amt bal =
+                Option.value_exn (Balance.add_amount bal amt)
+              in
+              let sub_fee fee = sub_amount (Amount.of_fee fee) in
+              let expected_fee_payer_balance =
+                accounts.(0).balance |> sub_fee fee
+              in
+              assert (
+                Balance.equal fee_payer_account.balance
+                  expected_fee_payer_balance ) ;
+              let expected_source_balance =
+                accounts.(1).balance |> sub_amount amount
+              in
+              assert (
+                Balance.equal source_account.balance expected_source_balance ) ;
+              let expected_receiver_balance =
+                accounts.(2).balance |> add_amount amount
+              in
+              assert (
+                Balance.equal receiver_account.balance
+                  expected_receiver_balance ) ) )
+
+    let%test_unit "transfer non-default tokens to an existing account with \
+                   fee in non-default tokens" =
+      Test_util.with_randomness 123456789 (fun () ->
+          Ledger.with_ledger ~f:(fun ledger ->
+              let wallets = random_wallets ~n:2 () in
+              let signer =
+                Keypair.of_private_key_exn wallets.(0).private_key
+              in
+              let fee_payer_pk = Public_key.compress signer.public_key in
+              let source_pk = fee_payer_pk in
+              let receiver_pk = wallets.(1).account.public_key in
+              let fee_token, token_id =
+                Quickcheck.random_value
+                  (Quickcheck.Generator.tuple2 Token_id.gen_non_default
+                     Token_id.gen_non_default)
               in
               let fee_payer = Account_id.create fee_payer_pk fee_token in
               let source = Account_id.create source_pk token_id in
