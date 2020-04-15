@@ -30,7 +30,9 @@ let fee_transfer_gen =
 
 let coinbase_gen =
   Coinbase.Gen.with_random_receivers ~keys ~min_amount:20 ~max_amount:100
-    ~fee_transfer:fee_transfer_gen
+    ~fee_transfer:
+      (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
+         ~max_fee:(Currency.Fee.of_int 10))
 
 let%test_unit "User_command: read and write" =
   let conn = Lazy.force conn_lazy in
