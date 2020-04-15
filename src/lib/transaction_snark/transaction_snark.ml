@@ -1411,7 +1411,7 @@ module Merge = struct
   module Verifier = Tick.Verifier
 
   let construct_input_checked ~prefix ~sok_digest ~state1 ~state2
-      ~supply_increase ~fee_excess ~pending_coinbase_stack1
+      ~supply_increase ~fee_excess ~fee_token ~pending_coinbase_stack1
       ~pending_coinbase_stack2 =
     let open Random_oracle in
     let input =
@@ -1425,7 +1425,8 @@ module Merge = struct
         ; bitstring
             (Bitstring_lib.Bitstring.Lsb_first.to_list
                (Amount.var_to_bits supply_increase))
-        ; Amount.Signed.Checked.to_input fee_excess ]
+        ; Amount.Signed.Checked.to_input fee_excess
+        ; Token_id.Checked.to_input fee_token ]
     in
     make_checked (fun () ->
         Random_oracle.Checked.(
@@ -1442,7 +1443,7 @@ module Merge = struct
      accept on one of [ H(s1, s2, excess); H(s1, s2, excess, tock_vk) ] *)
   let verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
       get_transition_data s1 s2 ~pending_coinbase_stack1
-      ~pending_coinbase_stack2 supply_increase fee_excess =
+      ~pending_coinbase_stack2 supply_increase fee_excess fee_token =
     let%bind is_base =
       let get_type s = get_transition_data s |> Transition_data.proof |> fst in
       with_label __LOC__
@@ -1461,7 +1462,7 @@ module Merge = struct
     let%bind input =
       construct_input_checked ~prefix:top_hash_init ~sok_digest ~state1:s1
         ~state2:s2 ~pending_coinbase_stack1 ~pending_coinbase_stack2
-        ~supply_increase ~fee_excess
+        ~supply_increase ~fee_excess ~fee_token
       >>= Wrap_input.Checked.tick_field_to_scalars
     in
     let%bind proof =
@@ -1503,6 +1504,12 @@ module Merge = struct
       exists' Amount.typ
         ~f:
           (Fn.compose Transition_data.supply_increase Prover_state.transition23)
+    and fee_token12 =
+      exists' Token_id.typ
+        ~f:(Fn.compose Transition_data.fee_token Prover_state.transition12)
+    and fee_token23 =
+      exists' Token_id.typ
+        ~f:(Fn.compose Transition_data.fee_token Prover_state.transition23)
     and pending_coinbase1 =
       exists' Pending_coinbase.Stack.typ
         ~f:Prover_state.pending_coinbase_stack1
@@ -1531,6 +1538,78 @@ module Merge = struct
       let%bind supply_increase =
         Amount.Checked.add supply_increase12 supply_increase23
       in
+      let%bind fee_token =
+        (* 3 cases may apply here.
+           - If the fee excess of one transition is zero, and this is a
+             coinbase (in the default token), and we blindly adopt the other
+             token.
+           - If the fee excess of one transition is zero, and this is *not* a
+             coinbase, then the transactions in the transition will
+             definitionally have no effect on fees carried over from earlier
+             transactions.
+             * This is equivalent to the coinbase case above in terms of
+               checks; knowing that the fee excess is zero guarantees that we
+               are not converting between tokens inadvertantly.
+             * We can technically use this to use multiple fee tokens within
+               blocks. This is not implemented.
+           - If neither fee excess is zero, the tokens must be equal.
+        *)
+        let%bind fee_excess12_is_zero =
+          let%bind fee_excess12 =
+            Amount.Signed.Checked.to_field_var fee_excess12
+          in
+          Field.(Checked.equal (Var.constant zero) fee_excess12)
+        in
+        let%bind fee_excess23_is_zero =
+          let%bind fee_excess23 =
+            Amount.Signed.Checked.to_field_var fee_excess23
+          in
+          Field.(Checked.equal (Var.constant zero) fee_excess23)
+        in
+        (*                   | fee_token12' | fee_token23'
+           ------------------+--------------+-------------
+           fee_excess12 =  0 | fee_token23  | fee_token23
+           fee_excess23 =  0 |              |
+           ------------------+--------------+-------------
+           fee_excess12 <> 0 | fee_token12  | fee_token12
+           fee_excess23 =  0 |              |
+           ------------------+--------------+-------------
+           fee_excess12 =  0 | fee_token23  | fee_token23
+           fee_excess23 <> 0 |              |
+           ------------------+--------------+-------------
+           fee_excess12 <> 0 | fee_token12  | fee_token23
+           fee_excess23 <> 0 |              |
+        *)
+        let%bind fee_token12' =
+          Token_id.Checked.if_ fee_excess12_is_zero ~then_:fee_token23
+            ~else_:fee_token12
+        in
+        let%bind fee_token23' =
+          Token_id.Checked.if_ fee_excess23_is_zero ~then_:fee_token12'
+            ~else_:fee_token23
+        in
+        let%bind () =
+          [%with_label "Fee tokens are compatible"]
+            (Token_id.Checked.Assert.equal fee_token12' fee_token23')
+        in
+        (* Calculate the final token. This is either
+           * the default token, if the combined transition has no fee excess.
+             - This is needed for compatibility with [verify_complete_merge]
+               below, so that the token for a complete block can be statically
+               known.
+           * the token for which there is a fee excess (as caluated above)
+             otherwise.
+             - This is unique, due to the 'compatibility' constraint above.
+        *)
+        let%bind total_fee_is_zero =
+          let%bind total_fees =
+            Amount.Signed.Checked.to_field_var total_fees
+          in
+          Field.(Checked.equal (Var.constant zero) total_fees)
+        in
+        Token_id.Checked.if_ total_fee_is_zero ~then_:fee_token12'
+          ~else_:Token_id.(var_of_t default)
+      in
       let%bind input =
         let%bind sok_digest =
           exists' Sok_message.Digest.typ ~f:Prover_state.sok_digest
@@ -1538,7 +1617,7 @@ module Merge = struct
         construct_input_checked ~prefix:wrap_vk_hash_state ~sok_digest
           ~state1:s1 ~state2:s3 ~pending_coinbase_stack1:pending_coinbase1
           ~pending_coinbase_stack2:pending_coinbase3 ~supply_increase
-          ~fee_excess:total_fees
+          ~fee_excess:total_fees ~fee_token
       in
       Field.Checked.Assert.equal top_hash input
     and verify_12 =
@@ -1546,13 +1625,13 @@ module Merge = struct
         Prover_state.transition12 s1 s2
         ~pending_coinbase_stack1:pending_coinbase1
         ~pending_coinbase_stack2:pending_coinbase2 supply_increase12
-        fee_excess12
+        fee_excess12 fee_token12
     and verify_23 =
       verify_transition tock_vk tock_vk_precomp wrap_vk_hash_state
         Prover_state.transition23 s2 s3
         ~pending_coinbase_stack1:pending_coinbase2
         ~pending_coinbase_stack2:pending_coinbase3 supply_increase23
-        fee_excess23
+        fee_excess23 fee_token23
     in
     Boolean.Assert.all [verify_12; verify_23]
 
@@ -1675,6 +1754,7 @@ module Verification = struct
           ~state1:s1 ~state2:s2 ~pending_coinbase_stack1
           ~pending_coinbase_stack2 ~sok_digest ~supply_increase
           ~fee_excess:Amount.Signed.(Checked.constant zero)
+          ~fee_token:Token_id.(var_of_t default)
       in
       let%bind input = Wrap_input.Checked.tick_field_to_scalars top_hash in
       let%map result =

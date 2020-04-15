@@ -410,7 +410,7 @@ struct
         ; supply_increase= _
         ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
         ; proof_type= _
-        ; fee_token= _ } ->
+        ; fee_token } ->
         let open Or_error.Let_syntax in
         let%map () =
           Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
@@ -425,6 +425,10 @@ struct
           clarify_error
             (Currency.Fee.Signed.equal Currency.Fee.Signed.zero fee_excess)
             "nonzero fee excess"
+        and () =
+          clarify_error
+            (Token_id.equal fee_token default)
+            "statement has a non-default fee token"
         in
         ()
 end
