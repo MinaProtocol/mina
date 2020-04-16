@@ -1029,7 +1029,7 @@ let create (config : Config.t)
                   ] ;
             let diff' =
               List.filter diff ~f:(fun cmd ->
-                  if User_command.is_trivial cmd then (
+                  if User_command.has_insufficient_fee cmd then (
                     Logger.debug config.logger ~module_:__MODULE__
                       ~location:__LOC__
                       "Filtering trivial user command in transaction-pool \
