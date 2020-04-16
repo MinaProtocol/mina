@@ -74,7 +74,9 @@ let _ =
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let payload = payload_of_payment_js payment_js in
-         let signature = Schnorr.sign sk payload |> signature_to_js_object in
+         let signature =
+           User_command.sign_payload sk payload |> signature_to_js_object
+         in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
            val payment = payment_js
@@ -105,7 +107,9 @@ let _ =
          let sk_base58_check = Js.to_string sk_base58_check_js in
          let sk = Private_key.of_base58_check_exn sk_base58_check in
          let payload = payload_of_stake_delegation_js stake_delegation_js in
-         let signature = Schnorr.sign sk payload |> signature_to_js_object in
+         let signature =
+           User_command.sign_payload sk payload |> signature_to_js_object
+         in
          let publicKey = _self##publicKeyOfPrivateKey sk_base58_check_js in
          object%js
            val stakeDelegation = stake_delegation_js
