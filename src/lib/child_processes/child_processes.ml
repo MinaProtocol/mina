@@ -201,8 +201,7 @@ let reader_to_strict_pipe_with_logging :
                      Some
                        (Logger.Source.create ~module_:__MODULE__
                           ~location:__LOC__)
-                 ; message=
-                     "Output from process $child_name: $line"
+                 ; message= "Output from process $child_name: $line"
                  ; metadata=
                      String.Map.set ~key:"child_name" ~data:(`String name)
                        (String.Map.set ~key:"line" ~data:(`String line)
