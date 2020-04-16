@@ -95,6 +95,7 @@ RUN eval $(opam env)
 
 # Install OPAM packages for spacetime compiler; use ulimited stack for camlp4 build
 ADD /src/opam.export .
+RUN opam install dune.1.11.4
 RUN ulimit -s unlimited && opam switch import opam.export
 
 # Remove .git files for submodules
@@ -124,10 +125,8 @@ RUN for pkg in ocaml-sodium rpc_parallel ocaml-extlib digestif async_kernel coda
 RUN mkdir --mode=700 /home/opam/.gnupg
 RUN echo "disable-ipv6" >> /home/opam/.gnupg/dirmngr.conf
 
-RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://nixos.org/nix/install && \
-    curl -o install-nix-2.3.2.sig https://nixos.org/nix/install.sig && \
-    gpg2 --import < $CODA_DIR/.nix-key.gpg.asc && \
-    gpg2 --verify ./install-nix-2.3.2.sig && \
+RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://releases.nixos.org/nix/nix-2.3.2/install && \
+    curl -o install-nix-2.3.2.sig https://releases.nixos.org/nix/nix-2.3.2/install.sig && \
     sh ./install-nix-2.3.2 && \
     USER=opam . ~/.nix-profile/etc/profile.d/nix.sh && \
     nix-env --option sandbox false -iA cachix -f https://cachix.org/api/v1/install
