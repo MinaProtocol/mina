@@ -175,7 +175,7 @@ module type Snark_resource_pool_intf = sig
     -> Transaction_snark_work.Statement.t
     -> Ledger_proof.t One_or_two.t Priced_proof.t option
 
-  val snark_pool_json : t -> Yojson.Safe.json
+  val snark_pool_json : t -> Yojson.Safe.t
 
   val all_completed_work : t -> Transaction_snark_work.Info.t list
 
@@ -205,7 +205,7 @@ module type Snark_pool_diff_intf = sig
   include
     Resource_pool_diff_intf with type t := t and type pool := resource_pool
 
-  val compact_json : t -> Yojson.Safe.json
+  val compact_json : t -> Yojson.Safe.t
 
   val of_result :
        ( ('a, 'b, 'c) Snark_work_lib.Work.Single.Spec.t

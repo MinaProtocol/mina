@@ -118,7 +118,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         ; logger
         ; removed_counter= removed_breadcrumb_wait }
 
-      let snark_pool_json t : Yojson.Safe.json =
+      let snark_pool_json t : Yojson.Safe.t =
         `List
           (Statement_table.fold ~init:[] t.snark_tables.all
              ~f:(fun ~key ~data:{proof= _; fee= {fee; prover}} acc ->

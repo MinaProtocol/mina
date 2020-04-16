@@ -61,7 +61,7 @@ module Helper = struct
   type t =
     { subprocess: Child_processes.t
     ; conf_dir: string
-    ; outstanding_requests: (int, Yojson.Safe.json Or_error.t Ivar.t) Hashtbl.t
+    ; outstanding_requests: (int, Yojson.Safe.t Or_error.t Ivar.t) Hashtbl.t
           (**
       seqno is used to assign unique IDs to our outbound requests and index the
       tables below.

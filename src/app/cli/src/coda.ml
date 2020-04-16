@@ -378,7 +378,7 @@ let daemon logger =
                    [("error", `String e); ("configpath", `String configpath)] ;
                None )
          in
-         let maybe_from_config (type a) (f : YJ.json -> a option)
+         let maybe_from_config (type a) (f : YJ.t -> a option)
              (keyname : string) (actual_value : a option) : a option =
            let open Option.Let_syntax in
            let open YJ.Util in

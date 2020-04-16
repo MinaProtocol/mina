@@ -4,7 +4,7 @@ module Combinators = struct
   module Scalar = struct
     type t = Int of int | String of string | Null
 
-    let is_json_equal : t -> Yojson.Basic.json -> bool = function
+    let is_json_equal : t -> Yojson.Basic.t -> bool = function
       | Int int_value -> (
           function
           | `Int json_int_value ->
@@ -22,14 +22,13 @@ module Combinators = struct
   end
 
   module Pattern = struct
-    let list : Yojson.Basic.json -> Yojson.Basic.json list option = function
+    let list : Yojson.Basic.t -> Yojson.Basic.t list option = function
       | `List list ->
           Some list
       | _ ->
           None
 
-    let assoc_list :
-        Yojson.Basic.json -> (string * Yojson.Basic.json) list option =
+    let assoc_list : Yojson.Basic.t -> (string * Yojson.Basic.t) list option =
       function
       | `Assoc assoc ->
           Some assoc
@@ -37,16 +36,14 @@ module Combinators = struct
           None
 
     let assoc_list_elem :
-        string -> (string * Yojson.Basic.json) list -> Yojson.Basic.json option
-        =
+        string -> (string * Yojson.Basic.t) list -> Yojson.Basic.t option =
      fun test_name assoc_list ->
-      let get_individual_value test_name (key, (value_json : Yojson.Basic.json))
-          =
+      let get_individual_value test_name (key, (value_json : Yojson.Basic.t)) =
         Option.some_if (String.equal key test_name) value_json
       in
       List.find_map assoc_list ~f:(get_individual_value test_name)
 
-    let is_equal_scalar : Scalar.t -> Yojson.Basic.json -> bool option =
+    let is_equal_scalar : Scalar.t -> Yojson.Basic.t -> bool option =
      fun target_json json ->
       Option.some @@ Scalar.is_json_equal target_json json
 
@@ -72,8 +69,8 @@ module Combinators = struct
   module Change = struct
     open Pattern
 
-    let list json
-        ~(f : Yojson.Basic.json list -> Yojson.Basic.json list Or_error.t) =
+    let list json ~(f : Yojson.Basic.t list -> Yojson.Basic.t list Or_error.t)
+        =
       let open Result.Let_syntax in
       let%bind list =
         Result.of_option (list json) ~error:(Error.of_string "Expected list")
@@ -83,8 +80,8 @@ module Combinators = struct
 
     let association_list json
         ~(f :
-              (string * Yojson.Basic.json) list
-           -> (string * Yojson.Basic.json) list Or_error.t) =
+              (string * Yojson.Basic.t) list
+           -> (string * Yojson.Basic.t) list Or_error.t) =
       let open Result.Let_syntax in
       let%bind assoc_list =
         Result.of_option (assoc_list json)
@@ -93,8 +90,8 @@ module Combinators = struct
       let%map result = f assoc_list in
       `Assoc result
 
-    let key_value_pair (assoc_list : (string * Yojson.Basic.json) list)
-        ~(f : string * Yojson.Basic.json -> Yojson.Basic.json Or_error.t) =
+    let key_value_pair (assoc_list : (string * Yojson.Basic.t) list)
+        ~(f : string * Yojson.Basic.t -> Yojson.Basic.t Or_error.t) =
       let open Result.Let_syntax in
       let have_all_errors, result =
         List.fold_map assoc_list ~init:false
@@ -114,9 +111,8 @@ module Combinators = struct
       in
       result
 
-    let value_with_name
-        ~(f : Yojson.Basic.json -> Yojson.Basic.json Or_error.t) test_name
-        (assoc_list : (string * Yojson.Basic.json) list) =
+    let value_with_name ~(f : Yojson.Basic.t -> Yojson.Basic.t Or_error.t)
+        test_name (assoc_list : (string * Yojson.Basic.t) list) =
       Result.map_error
         ~f:
           (Fn.const
@@ -135,8 +131,7 @@ module Combinators = struct
   end
 end
 
-let rec stitch (json : Yojson.Basic.json) ~predicate ~action :
-    Yojson.Basic.json =
+let rec stitch (json : Yojson.Basic.t) ~predicate ~action : Yojson.Basic.t =
   if predicate json then Or_error.ok_exn (action json)
   else
     match json with
