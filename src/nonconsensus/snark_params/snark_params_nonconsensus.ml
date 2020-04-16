@@ -84,7 +84,7 @@ module Tock = struct
 
     type _unused = unit constraint t = Arg.t
 
-    module T = struct
+    module Stringable_arg = struct
       type nonrec t = t
 
       let to_string = Core_kernel.Binable.to_string (module Arg)
@@ -92,8 +92,8 @@ module Tock = struct
       let of_string = Core_kernel.Binable.of_string (module Arg)
     end
 
-    include Core_kernel.Binable.Of_stringable (T)
-    include Core_kernel.Sexpable.Of_stringable (T)
+    include Core_kernel.Binable.Of_stringable (Stringable_arg)
+    include Core_kernel.Sexpable.Of_stringable (Stringable_arg)
 
     let dummy =
       { a= Mnt6.G1.one
