@@ -555,7 +555,7 @@ let root_diff t =
                   | Transition_frontier.Diff.Full.With_mutant.E
                       (Root_transitioned {new_root; _}, _) ->
                       let root_hash =
-                        Transition_frontier.Root_data.Minimal.hash new_root
+                        Transition_frontier.Root_data.Limited.hash new_root
                       in
                       let new_root_breadcrumb =
                         Transition_frontier.(find_exn frontier root_hash)

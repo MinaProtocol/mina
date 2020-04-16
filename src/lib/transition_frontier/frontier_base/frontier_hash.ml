@@ -103,8 +103,8 @@ let merge_protocol_states acc protocol_states =
   List.fold protocol_states ~init:acc ~f:(fun acc (h, _) ->
       merge_state_hash acc h )
 
-let merge_root_data acc (root_data : Root_data.Minimal.t) =
-  let open Root_data.Minimal in
+let merge_root_data acc (root_data : Root_data.Limited.t) =
+  let open Root_data.Limited in
   merge_protocol_states
     (merge_pending_coinbase
        (merge_scan_state

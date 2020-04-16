@@ -11,8 +11,19 @@
 
 open Coda_base
 open Frontier_base
+open Coda_state
 
 include Frontier_intf.S
+
+module Protocol_states_for_root_scan_state : sig
+  type t = Protocol_state.value State_hash.Map.t
+
+  val protocol_states_for_next_root_scan_state :
+       t
+    -> new_scan_state:Staged_ledger.Scan_state.t
+    -> old_root_state:(Protocol_state.value, State_hash.t) With_hash.t
+    -> (State_hash.t * Protocol_state.value) list
+end
 
 val create :
      logger:Logger.t

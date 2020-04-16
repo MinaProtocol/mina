@@ -2,6 +2,7 @@ open Core_kernel
 open Async
 open Coda_base
 open Coda_transition
+open Frontier_base
 open Network_peer
 
 module type Inputs_intf = sig
@@ -23,6 +24,13 @@ module Make (Inputs : Inputs_intf) :
       get_extension (Transition_frontier.extensions frontier) Root_history
     in
     Root_history.lookup root_history state_hash
+
+  let protocol_states_in_root_history frontier state_hash =
+    let open Transition_frontier.Extensions in
+    let root_history =
+      get_extension (Transition_frontier.extensions frontier) Root_history
+    in
+    Root_history.protocol_states_for_scan_state root_history state_hash
 
   let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
@@ -90,12 +98,14 @@ module Make (Inputs : Inputs_intf) :
     | Some res ->
         Some res
     | None ->
+        let open Root_data.Historical in
         let%bind root = find_in_root_history frontier state_hash in
-        (*Deepthi: store protocol states in the root history separately. Also why do we need the history*)
-        let%map scan_state_protocol_states = protocol_states root.scan_state in
-        ( root.scan_state
-        , root.staged_ledger_target_ledger_hash
-        , root.pending_coinbase
+        let%map scan_state_protocol_states =
+          protocol_states_in_root_history frontier state_hash
+        in
+        ( scan_state root
+        , staged_ledger_target_ledger_hash root
+        , pending_coinbase root
         , scan_state_protocol_states )
 
   let get_transition_chain ~frontier hashes =
@@ -106,7 +116,8 @@ module Make (Inputs : Inputs_intf) :
              Option.merge
                Transition_frontier.(
                  find frontier hash >>| Breadcrumb.validated_transition)
-               (find_in_root_history frontier hash >>| fun x -> x.transition)
+               ( find_in_root_history frontier hash
+               >>| fun x -> Root_data.Historical.transition x )
                ~f:Fn.const
            in
            External_transition.Validation.forget_validation

@@ -70,7 +70,7 @@ module Node_list = struct
 end
 
 module Root_transition = struct
-  type 'repr t = {new_root: Root_data.Minimal.t; garbage: 'repr Node_list.t}
+  type 'repr t = {new_root: Root_data.Limited.t; garbage: 'repr Node_list.t}
 
   type 'repr root_transition = 'repr t
 
@@ -79,7 +79,7 @@ module Root_transition = struct
     module Stable = struct
       module V1 = struct
         type t =
-          { new_root: Root_data.Minimal.Stable.V1.t
+          { new_root: Root_data.Limited.Stable.V1.t
           ; garbage: Node_list.Lite.Stable.V1.t }
 
         let to_latest = Fn.id
@@ -88,7 +88,7 @@ module Root_transition = struct
 
     include struct
       type t = Stable.Latest.t =
-        {new_root: Root_data.Minimal.t; garbage: Node_list.Lite.t}
+        {new_root: Root_data.Limited.t; garbage: Node_list.Lite.t}
     end [@ocaml.warning "-34"]
   end
 
@@ -158,7 +158,7 @@ let to_yojson (type repr mutant) (key : (repr, mutant) t) =
               hashes
         in
         `Assoc
-          [ ("new_root", State_hash.to_yojson (Root_data.Minimal.hash new_root))
+          [ ("new_root", State_hash.to_yojson (Root_data.Limited.hash new_root))
           ; ("garbage", `List (List.map ~f:State_hash.to_yojson garbage_hashes))
           ]
     | Best_tip_changed breadcrumb ->

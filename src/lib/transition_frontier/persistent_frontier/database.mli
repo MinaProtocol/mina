@@ -71,7 +71,7 @@ val add :
 
 val move_root :
      t
-  -> new_root:Root_data.Minimal.t
+  -> new_root:Root_data.Limited.t
   -> garbage:State_hash.t list
   -> ( State_hash.t
      , [> `Not_found of [> `New_root_transition | `Old_root_transition]] )

@@ -319,7 +319,7 @@ let add t ~transition =
       Batch.set batch ~key:(Arcs parent_hash) ~data:(hash :: parent_arcs) )
 
 let move_root t ~new_root ~garbage =
-  let open Root_data.Minimal in
+  let open Root_data.Limited in
   let%bind () =
     Result.ok_if_true
       (mem t.db ~key:(Transition (hash new_root)))
@@ -328,10 +328,10 @@ let move_root t ~new_root ~garbage =
   let%map old_root =
     get t.db ~key:Root ~error:(`Not_found `Old_root_transition)
   in
-  let old_root_hash = hash old_root in
+  let old_root_hash = Root_data.Minimal.hash old_root in
   (* TODO: Result compatible rocksdb batch transaction *)
   Batch.with_batch t.db ~f:(fun batch ->
-      Batch.set batch ~key:Root ~data:new_root ;
+      Batch.set batch ~key:Root ~data:(Root_data.Minimal.of_limited new_root) ;
       Batch.set batch ~key:Protocol_states_for_root_scan_state
         ~data:(List.unzip (protocol_states new_root) |> snd) ;
       List.iter (old_root_hash :: garbage) ~f:(fun node_hash ->
