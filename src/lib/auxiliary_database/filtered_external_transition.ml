@@ -70,8 +70,8 @@ let participants {transactions= {user_commands; fee_transfers; _}; creator; _}
         union set (of_list @@ User_command.accounts_accessed user_command) )
   in
   let fee_transfer_participants =
-    List.fold fee_transfers ~init:empty ~f:(fun set (pk, _) ->
-        add set (Account_id.create pk Token_id.default) )
+    List.fold fee_transfers ~init:empty ~f:(fun set ft ->
+        add set (Fee_transfer.Single.receiver ft) )
   in
   add
     (union user_command_set fee_transfer_participants)
@@ -87,7 +87,8 @@ let participant_pks
         @@ User_command.accounts_accessed user_command )
   in
   let fee_transfer_participants =
-    List.fold fee_transfers ~init:empty ~f:(fun set (pk, _) -> add set pk)
+    List.fold fee_transfers ~init:empty ~f:(fun set ft ->
+        add set ft.receiver_pk )
   in
   add (union user_command_set fee_transfer_participants) creator
 
@@ -136,14 +137,16 @@ let of_transition external_transition tracked_participants
                 user_commands= user_command :: acc_transactions.user_commands
               } )
       | Fee_transfer fee_transfer ->
-          let fee_transfer_list = One_or_two.to_list fee_transfer in
+          let fee_transfer_list =
+            Coda_base.Fee_transfer.to_list fee_transfer
+          in
           let fee_transfers =
             match tracked_participants with
             | `All ->
                 fee_transfer_list
             | `Some interested_participants ->
                 List.filter
-                  ~f:(fun (pk, _) ->
+                  ~f:(fun {receiver_pk= pk; _} ->
                     Public_key.Compressed.Set.mem interested_participants pk )
                   fee_transfer_list
           in

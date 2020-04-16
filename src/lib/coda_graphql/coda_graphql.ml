@@ -307,11 +307,12 @@ module Types = struct
             ~args:Arg.[]
             ~doc:"Public key of fee transfer recipient"
             ~typ:(non_null public_key)
-            ~resolve:(fun _ (pk, _) -> pk)
+            ~resolve:(fun _ {Fee_transfer.receiver_pk= pk; _} -> pk)
         ; field "fee" ~typ:(non_null uint64)
             ~args:Arg.[]
             ~doc:"Amount that the recipient is paid in this fee transfer"
-            ~resolve:(fun _ (_, fee) -> Currency.Fee.to_uint64 fee) ] )
+            ~resolve:(fun _ {Fee_transfer.fee; _} -> Currency.Fee.to_uint64 fee)
+        ] )
 
   let completed_work =
     obj "CompletedWork" ~doc:"Completed snark works" ~fields:(fun _ ->

@@ -70,7 +70,9 @@ let create_ledger_and_transactions num_transitions =
                 (add acc
                    (User_command.Payload.fee (t :> User_command.t).payload)) )
         in
-        `One (Public_key.compress keys.(0).public_key, total_fee)
+        Fee_transfer.create_single
+          ~receiver_pk:(Public_key.compress keys.(0).public_key)
+          ~fee:total_fee ~fee_token:Token_id.default
       in
       let coinbase =
         Coinbase.create ~amount:Coda_compile_config.coinbase
@@ -239,14 +241,12 @@ let generate_base_snarks_witness sparse_ledger0
 
 let run profiler num_transactions repeats preeval =
   let ledger, transitions = create_ledger_and_transactions num_transactions in
-  let aid_of_pk pk = Account_id.create pk Token_id.default in
   let sparse_ledger =
     Coda_base.Sparse_ledger.of_ledger_subset_exn ledger
       (List.concat_map transitions ~f:(fun t ->
            match t with
            | Fee_transfer t ->
-               One_or_two.map t ~f:(fun (pk, _) -> aid_of_pk pk)
-               |> One_or_two.to_list
+               Fee_transfer.receivers t
            | User_command t ->
                let t = (t :> User_command.t) in
                User_command.accounts_accessed t

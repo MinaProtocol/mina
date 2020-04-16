@@ -27,6 +27,7 @@ let user_command_gen =
 
 let fee_transfer_gen =
   Fee_transfer.Single.Gen.with_random_receivers ~keys ~max_fee:10
+    ~token:(Quickcheck.Generator.return Token_id.default)
 
 let coinbase_gen =
   Coinbase.Gen.with_random_receivers ~keys ~min_amount:20 ~max_amount:100

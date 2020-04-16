@@ -352,7 +352,7 @@ module T = struct
     let open Deferred.Let_syntax in
     let public_keys = function
       | Transaction.Fee_transfer t ->
-          Fee_transfer.receiver_ids t |> One_or_two.to_list
+          Fee_transfer.receivers t
       | User_command t ->
           let t = (t :> User_command.t) in
           User_command.accounts_accessed t
