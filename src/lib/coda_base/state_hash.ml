@@ -29,7 +29,7 @@ Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
 Base58_check.String_ops.(to_string, of_string)]
 
 [%%define_locally
-Base58_check.(to_yojson,of_yojson)]
+Base58_check.(to_yojson, of_yojson)]
 
 let dummy = of_hash Outside_pedersen_image.t
 

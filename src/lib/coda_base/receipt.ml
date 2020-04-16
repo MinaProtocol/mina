@@ -32,7 +32,7 @@ module Chain_hash = struct
   Base58_check.String_ops.(to_string, of_string)]
 
   [%%define_locally
-  Base58_check.(to_yojson,of_yojson)]
+  Base58_check.(to_yojson, of_yojson)]
 
   let empty = of_hash Random_oracle.(salt "CodaReceiptEmpty" |> digest)
 
