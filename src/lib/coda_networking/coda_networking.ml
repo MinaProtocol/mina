@@ -998,7 +998,10 @@ let create (config : Config.t)
               Logger.debug config.logger ~module_:__MODULE__ ~location:__LOC__
                 "Received a block $block from $sender"
                 ~metadata:
-                  [ ("block", External_transition.to_yojson state)
+                  [ ("external_transition", External_transition.to_yojson state)
+                  ; ( "state_hash"
+                    , External_transition.state_hash state
+                      |> State_hash.to_yojson )
                   ; ( "sender"
                     , Envelope.(Sender.to_yojson (Incoming.sender envelope)) )
                   ] ;
