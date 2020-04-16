@@ -201,8 +201,12 @@ let reader_to_strict_pipe_with_logging :
                      Some
                        (Logger.Source.create ~module_:__MODULE__
                           ~location:__LOC__)
-                 ; message= sprintf "Output from process %s: %s" name line
-                 ; metadata= Logger.metadata logger }
+                 ; message=
+                     "Output from process $child_name: $line"
+                 ; metadata=
+                     String.Map.set ~key:"child_name" ~data:(`String name)
+                       (String.Map.set ~key:"line" ~data:(`String line)
+                          (Logger.metadata logger)) }
              in
              match
                Option.try_with (fun () -> Yojson.Safe.from_string line)
