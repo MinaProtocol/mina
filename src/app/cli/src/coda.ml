@@ -202,6 +202,12 @@ let daemon logger =
             generate-libp2p-keypair`) to use with libp2p discovery (default: \
             generate per-run temporary keypair)"
      and is_seed = flag "seed" ~doc:"Start the node as a seed node" no_arg
+     and enable_flooding =
+       flag "enable-flooding"
+         ~doc:
+           "Enable pubsub flooding, gossiping every message to every peer \
+            (uses lots of bandwidth! default: false)"
+         no_arg
      and libp2p_peers_raw =
        flag "peer"
          ~doc:
@@ -658,6 +664,7 @@ let daemon logger =
              ; initial_peers
              ; addrs_and_ports
              ; trust_system
+             ; flood= enable_flooding
              ; keypair= libp2p_keypair }
          in
          let net_config =
