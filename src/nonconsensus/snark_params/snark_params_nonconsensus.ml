@@ -94,13 +94,6 @@ module Tock = struct
 
     include Core_kernel.Binable.Of_stringable (Stringable_arg)
     include Core_kernel.Sexpable.Of_stringable (Stringable_arg)
-
-    let dummy =
-      { a= Mnt6.G1.one
-      ; b= Mnt6.G2.one
-      ; c= Mnt6.G1.one
-      ; delta_prime= Mnt6.G2.one
-      ; z= Mnt6.G1.one }
   end
 end
 

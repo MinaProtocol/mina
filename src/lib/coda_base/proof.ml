@@ -63,18 +63,8 @@ type t = Stable.Latest.t
 [%%define_locally
 Stable.Latest.(to_yojson, of_yojson, sexp_of_t, t_of_sexp)]
 
-(* for consensus, Tock.Proof.dummy is generated in Dummy_values,
-    it's difficult to tell how the value is constructed
-   the [get_dummy ()] value used here is 1 for each field, so it's easy
-    to make the same value for nonconsensus
-*)
-
 [%%ifdef
 consensus_mechanism]
-
-let dummy = Tock_backend.Proof.get_dummy ()
-
-[%%else]
 
 let dummy = Tock.Proof.dummy
 
@@ -86,7 +76,22 @@ let%test_module "proof-tests" =
        in Tock_backend.Proof, which is not versioned
     *)
 
-    let test_proof = dummy
+    [%%ifdef
+    consensus_mechanism]
+
+    let test_proof = Tock_backend.Proof.get_dummy ()
+
+    [%%else]
+
+    let test_proof =
+      Tock.Proof.
+        { a= Mnt6.G1.one
+        ; b= Mnt6.G2.one
+        ; c= Mnt6.G1.one
+        ; delta_prime= Mnt6.G2.one
+        ; z= Mnt6.G1.one }
+
+    [%%endif]
 
     [%%if
     curve_size = 298]
