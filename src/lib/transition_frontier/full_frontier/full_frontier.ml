@@ -111,23 +111,6 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     External_transition.Validated.state_hash root_data.transition
   in
   let protocol_states_for_root_scan_state =
-    (*
-    let root_protocol_states : Protocol_state.value list = [] in
-    let required_protocol_states =
-      Staged_ledger.Scan_state.required_protocol_states
-        (Staged_ledger.scan_state root_data.staged_ledger)
-    in
-    let protocol_states_persisted =
-      (*TODO: Deepthi store hashes as well?*)
-      List.fold root_protocol_states ~init:State_hash.Map.empty ~f:(fun m ps ->
-          State_hash.Map.set m ~key:(Protocol_state.hash ps)
-            ~data:
-              {Protocol_state_node.protocol_state= ps; scan_state_ref_count= 1}
-      )
-    in
-    List.map required_protocol_states ~f:(fun hash ->
-        (hash, State_hash.Map.find_exn protocol_states_persisted hash) )
-    |> *)
     State_hash.Map.of_alist_exn root_data.protocol_states
   in
   let root_protocol_state =
@@ -392,7 +375,6 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
     (* STEP 2 *)
     (* go ahead and remove the old root from the frontier *)
     Hashtbl.remove t.table t.root ;
-    (*Deepthi: Remove unreferenced protocol states*)
     O1trace.measure "committing new root mask" (fun () -> Ledger.commit m1) ;
     [%test_result: Ledger_hash.t]
       ~message:

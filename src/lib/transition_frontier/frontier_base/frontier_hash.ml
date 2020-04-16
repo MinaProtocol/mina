@@ -98,7 +98,6 @@ let merge_scan_state acc scan_state =
   let hash = Staged_ledger.Scan_state.hash scan_state in
   merge_string acc (Staged_ledger_hash.Aux_hash.to_bytes hash)
 
-(*Deepthi: let merge_protocol_states*)
 let merge_protocol_states acc protocol_states =
   List.fold protocol_states ~init:acc ~f:(fun acc (h, _) ->
       merge_state_hash acc h )

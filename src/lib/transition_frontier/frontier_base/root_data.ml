@@ -71,36 +71,6 @@ module Historical = struct
     {transition; common; staged_ledger_target_ledger_hash}
 end
 
-(*module Poly = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type 'transition t = {transition: 'transition; common: Common.Stable.V1.t}
-      [@@deriving to_yojson]
-    end
-  end]
-
-  type 'transition t = 'transition Stable.Latest.t =
-    {transition: 'transition; common: Common.t}
-  [@@deriving to_yojson]
-
-  let create ~transition ~scan_state ~pending_coinbase ~protocol_states =
-    let common = {Common.scan_state; pending_coinbase} in
-    {transition; common}
-
-  let of_transition_and_common ~transition ~common = {transition; common}
-
-  let transition t = t.transition
-
-  let common t = t.common
-
-  let scan_state t = t.common.scan_state
-
-  let pending_coinbase t = t.common.pending_coinbase
-
-  let protocol_states t = t.common.protocol_states
-end*)
-
 module Limited = struct
   [%%versioned
   module Stable = struct
@@ -146,15 +116,6 @@ module Limited = struct
   let scan_state t = Common.scan_state t.common
 
   let pending_coinbase t = Common.pending_coinbase t.common
-
-  (*Poly.
-    ( create
-    , transition
-    , common
-    , scan_state
-    , pending_coinbase
-    , protocol_states
-    , of_transition_and_common )]*)
 end
 
 module Minimal = struct
@@ -170,16 +131,6 @@ module Minimal = struct
 
   type t = Stable.Latest.t = {hash: State_hash.t; common: Common.t}
   [@@driving to_yojson]
-
-  (*[%%define_locally
-  Poly.
-    ( create
-    , transition
-    , common
-    , scan_state
-    , pending_coinbase
-    , protocol_states
-    , of_transition_and_common )]*)
 
   let hash t = t.hash
 

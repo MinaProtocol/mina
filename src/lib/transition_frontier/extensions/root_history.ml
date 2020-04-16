@@ -95,12 +95,12 @@ let protocol_states_for_scan_state
     ~f:(fun acc hash ->
       let res =
         match Queue.lookup history hash with
-        | None ->
-            (*Not in the history*)
-            State_hash.Map.find protocol_states_for_root_scan_state hash
         | Some data ->
             Some
               (External_transition.Validated.protocol_state (transition data))
+        | None ->
+            (*Not present in the history queue, check in the protocol states map that has all the protocol states required for transactions in the root*)
+            State_hash.Map.find protocol_states_for_root_scan_state hash
       in
       match res with None -> Stop None | Some state -> Continue (state :: acc)
       )

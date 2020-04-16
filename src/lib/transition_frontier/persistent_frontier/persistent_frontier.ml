@@ -215,6 +215,7 @@ module Instance = struct
           { transition= root_transition
           ; staged_ledger= root_staged_ledger
           ; protocol_states=
+              (*TODO: store the hashes as well?*)
               List.map protocol_states ~f:(fun s -> (Protocol_state.hash s, s))
           }
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger.Db) root_ledger)

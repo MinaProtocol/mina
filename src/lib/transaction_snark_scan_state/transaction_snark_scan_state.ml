@@ -657,7 +657,6 @@ let check_required_protocol_states t ~protocol_states =
   (*Don't check further if the lengths dont match*)
   let%bind () = check_length protocol_states in
   let received_state_map =
-    (*TODO: Deepthi store hashes as well?*)
     List.fold protocol_states ~init:Coda_base.State_hash.Map.empty
       ~f:(fun m ps ->
         State_hash.Map.set m ~key:(Coda_state.Protocol_state.hash ps) ~data:ps

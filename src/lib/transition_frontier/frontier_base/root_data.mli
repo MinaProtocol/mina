@@ -26,29 +26,6 @@ module Historical : sig
   val of_breadcrumb : Breadcrumb.t -> t
 end
 
-(*module Common : sig
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t =
-        { scan_state: Staged_ledger.Scan_state.Stable.V1.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t
-        ; protocol_states:
-            ( Coda_base.State_hash.Stable.V1.t
-            * Coda_state.Protocol_state.Value.Stable.V1.t )
-            list }
-      [@@deriving to_yojson]
-    end
-  end]
-
-  type t = Stable.Latest.t =
-    { scan_state: Staged_ledger.Scan_state.t
-    ; pending_coinbase: Pending_coinbase.t
-    ; protocol_states:
-        (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
-  [@@deriving to_yojson]
-end*)
-
 (* Limited root data is similar to Minimal root data, except that it contains
  * the full validated transition at a root instead of just a pointer to one and protocol states for the root scan state *)
 module Limited : sig
