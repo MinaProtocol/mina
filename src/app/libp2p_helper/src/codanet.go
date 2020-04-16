@@ -135,18 +135,13 @@ func MakeHelper(ctx context.Context, listenOn []ma.Multiaddr, externalAddr ma.Mu
 
 	kad := <-kadch
 
-	pubsub, err := pubsub.NewRandomSub(ctx, host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
-	if err != nil {
-		return nil, err
-	}
-
 	// nil fields are initialized by beginAdvertising
 	return &Helper{
 		Host:            host,
 		Ctx:             ctx,
 		Mdns:            nil,
 		Dht:             kad,
-		Pubsub:          pubsub,
+		Pubsub:          nil,
 		Logger:          logger,
 		DiscoveredPeers: nil,
 		Rendezvous:      rendezvousString,

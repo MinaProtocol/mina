@@ -57,6 +57,7 @@ type app struct {
 	StreamsMutex    sync.Mutex
 	OutLock         sync.Mutex
 	Out             *bufio.Writer
+	OutChan         chan interface{}
 	UnsafeNoTrustIP bool
 }
 
@@ -103,25 +104,7 @@ type envelope struct {
 }
 
 func (app *app) writeMsg(msg interface{}) {
-	app.OutLock.Lock()
-	defer app.OutLock.Unlock()
-	bytes, err := json.Marshal(msg)
-	if err == nil {
-		n, err := app.Out.Write(bytes)
-		if err != nil {
-			panic(err)
-		}
-		if n != len(bytes) {
-			// TODO: handle this correctly.
-			panic("short write :(")
-		}
-		app.Out.WriteByte(0x0a)
-		if err := app.Out.Flush(); err != nil {
-			panic(err)
-		}
-	} else {
-		panic(err)
-	}
+	app.OutChan <- msg
 }
 
 type action interface {
@@ -215,6 +198,7 @@ type configureMsg struct {
 	ListenOn        []string `json:"ifaces"`
 	External        string   `json:"external_maddr"`
 	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
+	Flood           bool     `json:"flood_gossip"`
 }
 
 type discoveredPeerUpcall struct {
@@ -250,6 +234,19 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	if err != nil {
 		return nil, badHelper(err)
 	}
+
+	var ps *pubsub.PubSub
+	if m.Flood {
+		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
+	} else {
+		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
+	}
+
+	if err != nil {
+		return nil, badHelper(err)
+	}
+
+	helper.Pubsub = ps
 	app.P2p = helper
 
 	return "configure success", nil
@@ -421,17 +418,21 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		for {
 			msg, err := sub.Next(ctx)
 			if err == nil {
-				sender, err := findPeerInfo(app, msg.ReceivedFrom)
+				//sender, err := findPeerInfo(app, msg.ReceivedFrom)
 				if err != nil && !app.UnsafeNoTrustIP {
 					app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us an already-validated pubsub message, dropping it", peer.IDB58Encode(msg.ReceivedFrom))
 				} else {
-					data := codaEncode(msg.Data)
-					app.writeMsg(publishUpcall{
-						Upcall:       "publish",
-						Subscription: s.Subscription,
-						Data:         data,
-						Sender:       sender,
-					})
+					/* Don't bother informing the helper about this message; it ignores it
+					   and we don't want to block here or else we might lose messages
+					   due to 'subscriber too slow'?
+						data := codaEncode(msg.Data)
+						app.writeMsg(publishUpcall{
+							Upcall:       "publish",
+							Subscription: s.Subscription,
+							Data:         data,
+							Sender:       sender,
+						})
+					*/
 				}
 			} else {
 				if ctx.Err() != context.Canceled {
@@ -1026,9 +1027,35 @@ func main() {
 		ValidatorMutex: &sync.Mutex{},
 		Validators:     make(map[int]*validationStatus),
 		Streams:        make(map[int]net.Stream),
+		OutChan:        make(chan interface{}, 4096),
 		// OutLock doesn't need to be initialized
 		Out: out,
 	}
+
+	go func() {
+		for {
+			msg := <-app.OutChan
+			app.OutLock.Lock()
+			defer app.OutLock.Unlock()
+			bytes, err := json.Marshal(msg)
+			if err == nil {
+				n, err := app.Out.Write(bytes)
+				if err != nil {
+					panic(err)
+				}
+				if n != len(bytes) {
+					// TODO: handle this correctly.
+					panic("short write :(")
+				}
+				app.Out.WriteByte(0x0a)
+				if err := app.Out.Flush(); err != nil {
+					panic(err)
+				}
+			} else {
+				panic(err)
+			}
+		}
+	}()
 
 	for lines.Scan() {
 		line := lines.Text()

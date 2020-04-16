@@ -28,6 +28,7 @@ module Config = struct
     ; logger: Logger.t
     ; unsafe_no_trust_ip: bool
     ; trust_system: Trust_system.t
+    ; flood: bool
     ; keypair: Coda_net2.Keypair.t option }
   [@@deriving make]
 end
@@ -126,7 +127,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           let initializing_libp2p_result : _ Deferred.Or_error.t =
             let open Deferred.Or_error.Let_syntax in
             let%bind () =
-              configure net2 ~me ~maddrs:[]
+              configure net2 ~me ~maddrs:[] ~flood:config.flood
                 ~external_maddr:
                   (Multiaddr.of_string
                      (sprintf "/ip4/%s/tcp/%d"
@@ -140,16 +141,17 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                   Ivar.fill_if_empty first_peer_ivar () ;
                   if !ctr < 4 then incr ctr
                   else Ivar.fill_if_empty high_connectivity_ivar () ;
-                  don't_wait_for
-                    (Throttle.enqueue throttle (fun () ->
-                         let open Deferred.Let_syntax in
-                         let%bind peers = peers net2 in
-                         Coda_metrics.(
-                           Gauge.set Network.peers
-                             (List.length peers |> Int.to_float)) ;
-                         after (Time.Span.of_sec 2.)
-                         (* don't spam the helper with peer fetches, only try update it every 2 seconds *)
-                     )) )
+                  if Throttle.num_jobs_waiting_to_start throttle = 0 then
+                    don't_wait_for
+                      (Throttle.enqueue throttle (fun () ->
+                           let open Deferred.Let_syntax in
+                           let%bind peers = peers net2 in
+                           Coda_metrics.(
+                             Gauge.set Network.peers
+                               (List.length peers |> Int.to_float)) ;
+                           after (Time.Span.of_sec 2.)
+                           (* don't spam the helper with peer fetches, only try update it every 2 seconds *)
+                       )) )
             in
             let implementation_list =
               List.bind rpc_handlers ~f:create_rpc_implementations
