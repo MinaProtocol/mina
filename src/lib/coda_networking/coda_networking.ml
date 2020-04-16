@@ -1032,8 +1032,8 @@ let create (config : Config.t)
                   if User_command.has_insufficient_fee cmd then (
                     Logger.debug config.logger ~module_:__MODULE__
                       ~location:__LOC__
-                      "Filtering trivial user command in transaction-pool \
-                       diff $cmd from $sender"
+                      "Filtering user command with insufficient fee from \
+                       transaction-pool diff $cmd from $sender"
                       ~metadata:
                         [ ("cmd", User_command.to_yojson cmd)
                         ; ( "sender"
