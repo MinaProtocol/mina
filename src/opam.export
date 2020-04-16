@@ -97,7 +97,7 @@ installed: [
   "fpath.0.7.2"
   "graphql.0.13.0"
   "graphql-async.0.13.0"
-  "graphql-cohttp.0.13.1"
+  "graphql-cohttp.0.13.0"
   "graphql_parser.0.12.2"
   "incremental.v0.12.0"
   "integers.0.2.2"
