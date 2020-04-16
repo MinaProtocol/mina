@@ -35,7 +35,7 @@ let proof_filename_root = "genesis_proof"
 [%%ifdef
 consensus_mechanism]
 
-let constants_filename_root = "genesis_constant.json"
+let constants_filename_root = "genesis_constants.json"
 
 let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
     (Ledger.t lazy_t * Proof.t * Genesis_constants.t) Deferred.t =
