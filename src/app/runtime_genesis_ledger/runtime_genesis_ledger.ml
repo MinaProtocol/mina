@@ -177,9 +177,13 @@ let main accounts_json_file dir n constants_file =
     let%map () = File_system.create_dir dir ~clear_if_exists:true in
     dir
   in
+  (* ledger goes in tgz file *)
   let ledger_path = genesis_dir ^/ "ledger" in
-  let proof_path = genesis_dir ^/ "genesis_proof" in
-  let constants_path = genesis_dir ^/ "genesis_constants.json" in
+  (* proof and constants not in tgz file so they can be downloaded from Javascript code *)
+  let proof_path = top_dir ^/ "genesis_proof." ^ genesis_dirname in
+  let constants_path =
+    top_dir ^/ "genesis_constants.json." ^ genesis_dirname
+  in
   let%bind accounts = get_accounts accounts_json_file n in
   let%bind () =
     match

@@ -1,8 +1,18 @@
 [%%import
 "/src/config.mlh"]
 
-open Core_kernel
+[%%ifdef
+consensus_mechanism]
+
 open Snark_params
+
+[%%else]
+
+open Snark_params_nonconsensus
+
+[%%endif]
+
+open Core_kernel
 open Module_version
 
 [%%versioned_binable
@@ -15,9 +25,9 @@ module Stable = struct
     module T = struct
       type nonrec t = t
 
-      let to_string = Binable.to_string (module Tock_backend.Proof)
+      let to_string = Binable.to_string (module Tock.Proof)
 
-      let of_string = Binable.of_string (module Tock_backend.Proof)
+      let of_string = Binable.of_string (module Tock.Proof)
     end
 
     (* TODO: Figure out what the right thing to do is for conversion failures *)
@@ -50,12 +60,10 @@ end]
 
 type t = Stable.Latest.t
 
-let dummy = Tock.Proof.dummy
-
-include Sexpable.Of_stringable (Stable.Latest.T)
-
 [%%define_locally
-Stable.Latest.(to_yojson, of_yojson)]
+Stable.Latest.(to_yojson, of_yojson, sexp_of_t, t_of_sexp)]
+
+let dummy = Tock.Proof.dummy
 
 let%test_module "proof-tests" =
   ( module struct
@@ -67,9 +75,9 @@ let%test_module "proof-tests" =
     curve_size = 298]
 
     let%test "proof serialization v1" =
-      let proof = Tock_backend.Proof.get_dummy () in
+      let proof = dummy in
       let known_good_hash =
-        "\x22\x36\x54\x9F\x8A\x0A\xBC\x8C\x4E\x90\x22\x91\x30\x20\x4D\x4C\xE1\x11\x01\xD4\xBA\x6B\x38\xEE\x8B\x95\x51\x7E\x6C\x40\xA7\x88"
+        "\x2B\xD6\xE9\x9E\x7A\xC6\x47\x6E\xB2\x45\xF9\x49\x4A\xD5\x19\x48\x1B\xF2\x72\xE8\xC6\x6A\x44\x37\x6F\x1E\x70\x58\x82\xB2\x7E\xFB"
       in
       Serialization.check_serialization
         (module Stable.V1)
@@ -79,9 +87,9 @@ let%test_module "proof-tests" =
     curve_size = 753]
 
     let%test "proof serialization v1" =
-      let proof = Tock_backend.Proof.get_dummy () in
+      let proof = dummy in
       let known_good_hash =
-        "\xA6\x52\x85\xCE\x46\xC0\xB9\x24\x99\xA2\x3C\x90\x54\xC8\xAE\x7B\x17\x3A\x99\x64\x94\x3A\xE7\x6C\x66\xD9\x48\x5E\x5D\xD4\x83\x3F"
+        "\x72\x8D\x8A\x9A\xEF\xD7\x61\x78\x73\x07\x0A\xBD\x47\x00\x80\xF8\x12\x2E\x6C\x43\x37\x7A\x24\x20\xA6\x6F\x28\x9E\xAF\xC7\x06\xAE"
       in
       Serialization.check_serialization
         (module Stable.V1)

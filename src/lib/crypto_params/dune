@@ -5,16 +5,17 @@
  (library_flags -linkall)
  (inline_tests)
  (libraries
-  hash_prefixes
-  group_map
-  chunked_pedersen_lib
-  snarky
-  bignum_bigint
-  curve_choice
-  chunk_table
-  bowe_gabizon_hash
-  random_oracle
-  tuple_lib)
+   core_kernel
+   hash_prefixes
+   group_map
+   chunked_pedersen_lib
+   snarky
+   bignum_bigint
+   curve_choice
+   chunk_table
+   bowe_gabizon_hash
+   random_oracle
+   tuple_lib)
  (preprocess
   (pps ppx_coda ppx_jane bisect_ppx -- -conditional))
  (synopsis "Cryptographic parameters"))

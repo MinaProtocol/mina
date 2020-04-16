@@ -62,6 +62,46 @@ module Tock = struct
         ~message:"Snark_params_nonconsensus.Tock.Field.project"
         (Mnt4.Fq.of_bits bits)
   end
+
+  module Arg = struct
+    type t =
+      { a: Mnt6.G1.t
+      ; b: Mnt6.G2.t
+      ; c: Mnt6.G1.t
+      ; delta_prime: Mnt6.G2.t
+      ; z: Mnt6.G1.t }
+    [@@deriving bin_io_unversioned]
+  end
+
+  (* this type is used in Coda_base.Proof, where its serialization is tested *)
+  module Proof = struct
+    type t = Arg.t =
+      { a: Mnt6.G1.t
+      ; b: Mnt6.G2.t
+      ; c: Mnt6.G1.t
+      ; delta_prime: Mnt6.G2.t
+      ; z: Mnt6.G1.t }
+
+    type _unused = unit constraint t = Arg.t
+
+    module T = struct
+      type nonrec t = t
+
+      let to_string = Core_kernel.Binable.to_string (module Arg)
+
+      let of_string = Core_kernel.Binable.of_string (module Arg)
+    end
+
+    include Core_kernel.Binable.Of_stringable (T)
+    include Core_kernel.Sexpable.Of_stringable (T)
+
+    let dummy =
+      { a= Mnt6.G1.one
+      ; b= Mnt6.G2.one
+      ; c= Mnt6.G1.one
+      ; delta_prime= Mnt6.G2.one
+      ; z= Mnt6.G1.one }
+  end
 end
 
 module Inner_curve = struct
@@ -78,11 +118,8 @@ module Inner_curve = struct
   Mnt6.G1.(of_affine, to_affine, to_affine_exn, one, ( + ), negate)]
 
   module Scalar = struct
-    (* though we have bin_io, not versioned here; this type exists for Private_key.t,
-       where it is versioned-asserted and its serialization tested
-       we make linter error a warning
-     *)
-    type t = Mnt4.Fq.t [@@deriving bin_io, sexp]
+    (* this type exists for Private_key.t, where it is versioned-asserted and its serialization tested *)
+    type t = Mnt4.Fq.t [@@deriving bin_io_unversioned, sexp]
 
     type _unused = unit constraint t = Tock.Field.t
 

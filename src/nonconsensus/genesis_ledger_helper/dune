@@ -1,0 +1,6 @@
+(library
+  (public_name genesis_ledger_helper_nonconsensus)
+  (name genesis_ledger_helper_nonconsensus)
+  (libraries core_kernel coda_base_nonconsensus cache_dir_nonconsensus)
+  (preprocessor_deps "../../config.mlh")
+  (preprocess (pps ppx_coda ppx_optcomp ppx_let)))

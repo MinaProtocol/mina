@@ -1,0 +1,8 @@
+(library
+ (name cache_dir_nonconsensus)
+ (public_name cache_dir_nonconsensus)
+ ; when we move to Javascript, the dependencies on Core and Async should disappear
+ ; or maybe have finer-grained conditional compilation
+ (libraries core async logger)
+ (preprocessor_deps ../../config.mlh)
+ (preprocess (pps ppx_coda ppx_let ppx_optcomp ppx_custom_printf)))

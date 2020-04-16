@@ -1,3 +1,11 @@
+(* cache_dir.ml *)
+
+[%%import
+"/src/config.mlh"]
+
+[%%ifdef
+consensus_mechanism]
+
 open Core
 open Async
 
@@ -53,7 +61,7 @@ let possible_paths base =
   List.map [env_path; brew_install_path; s3_install_path; autogen_path]
     ~f:(fun d -> d ^/ base)
 
-let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
+let load_from_s3 s3_bucket_prefixes s3_install_paths ~logger =
   Deferred.map ~f:Result.join
   @@ Monitor.try_with (fun () ->
          let each_uri (uri_string, file_path) =
@@ -71,7 +79,31 @@ let load_from_s3 s3_bucket_prefix s3_install_path ~logger =
                ; ("result", `String result) ] ;
            Result.return ()
          in
-         Deferred.List.map ~f:each_uri
-           (List.zip_exn s3_bucket_prefix s3_install_path)
+         Deferred.List.map
+           (List.zip_exn s3_bucket_prefixes s3_install_paths)
+           ~f:each_uri
          |> Deferred.map ~f:Result.all_unit )
   |> Deferred.Result.map_error ~f:Error.of_exn
+
+[%%else]
+
+(* nonconsensus native code; use curl, but as a stepping-stone to Javascript,
+   don't use file system
+*)
+let load_from_s3_to_strings s3_bucket_prefixes ~logger =
+  let open Core in
+  let open Async in
+  Monitor.try_with (fun () ->
+      let open Deferred.Let_syntax in
+      let each_uri uri_string =
+        let%map result = Process.run_exn ~prog:"curl" ~args:[uri_string] () in
+        Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
+          "Curl finished"
+          ~metadata:[("url", `String uri_string); ("result", `String result)] ;
+        result
+      in
+      Deferred.List.map s3_bucket_prefixes ~f:each_uri )
+
+(* TODO : nonconsensus Javascript code -- no curl, no file system *)
+
+[%%endif]

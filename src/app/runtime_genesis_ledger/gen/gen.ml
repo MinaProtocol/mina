@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 let main genesis_constants =
   Out_channel.write_all "genesis_filename.txt"
