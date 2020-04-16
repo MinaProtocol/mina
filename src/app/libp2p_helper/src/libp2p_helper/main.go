@@ -235,18 +235,18 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 		return nil, badHelper(err)
 	}
 
-	var pubsub *pubsub.Pubsub
+	var ps *pubsub.PubSub
 	if m.Flood {
-		pubsub, err = pubsub.NewFloodSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
+		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
 	} else {
-		pubsub, err = pubsub.NewRandomSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
+		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
 	}
 
 	if err != nil {
 		return nil, badHelper(err)
 	}
 
-	helper.Pubsub = pubsub
+	helper.Pubsub = ps
 	app.P2p = helper
 
 	return "configure success", nil
