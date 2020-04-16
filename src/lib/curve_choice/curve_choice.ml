@@ -1,6 +1,8 @@
 [%%import
 "/src/config.mlh"]
 
+module Intf = Intf
+
 [%%if
 curve_size = 298]
 

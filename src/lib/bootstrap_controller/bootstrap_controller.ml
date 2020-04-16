@@ -503,7 +503,7 @@ let%test_module "Bootstrap_controller tests" =
         in
         (fake_network, branch))
         ~f:(fun (fake_network, branch) ->
-          let [me; _] = fake_network.peer_networks in
+          let [me; other] = fake_network.peer_networks in
           let genesis_root =
             Transition_frontier.(
               Breadcrumb.validated_transition @@ root me.state.frontier)
@@ -529,7 +529,7 @@ let%test_module "Bootstrap_controller tests" =
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->
                     Strict_pipe.Writer.write sync_ledger_writer
-                      (downcast_breadcrumb ~sender:me.peer breadcrumb) )
+                      (downcast_breadcrumb ~sender:other.peer breadcrumb) )
               in
               Strict_pipe.Writer.close sync_ledger_writer ;
               sync_deferred ) ;
