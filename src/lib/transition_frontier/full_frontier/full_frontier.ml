@@ -42,6 +42,9 @@ module Protocol_states_for_root_scan_state = struct
       Staged_ledger.Scan_state.required_state_hashes new_scan_state
     in
     let protocol_state_map =
+      (*Note: Protocol states for the next root should all be in this map
+      assuming roots transition to their successors and do not skip any node in
+      between*)
       State_hash.Map.set protocol_states_for_old_root ~key:old_root_state.hash
         ~data:old_root_state.data
     in
@@ -89,16 +92,6 @@ let find_protocol_state (t : t) hash =
       Some
         ( Breadcrumb.validated_transition breadcrumb
         |> External_transition.Validated.protocol_state )
-
-let _find_protocol_state_exn t hash =
-  match find_protocol_state t hash with
-  | Some s ->
-      s
-  | None ->
-      failwith
-        (sprintf
-           !"Protocol state with hash %s not found"
-           (State_body_hash.to_yojson hash |> Yojson.Safe.to_string))
 
 let root t = find_exn t t.root
 
@@ -679,6 +672,16 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
   `New_root_and_diffs_with_mutants (new_root, diffs_with_mutants)
 
 module For_tests = struct
+  let find_protocol_state_exn t hash =
+    match find_protocol_state t hash with
+    | Some s ->
+        s
+    | None ->
+        failwith
+          (sprintf
+             !"Protocol state with hash %s not found"
+             (State_body_hash.to_yojson hash |> Yojson.Safe.to_string))
+
   let equal t1 t2 =
     let sort_breadcrumbs = List.sort ~compare:Breadcrumb.compare in
     let equal_breadcrumb breadcrumb1 breadcrumb2 =

@@ -250,7 +250,8 @@ let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
     checkpoint_window_size_in_slots
   ; checkpoint_window_slots_per_year }
 
-let compiled = create ~protocol_constants:Genesis_constants.compiled.protocol
+let compiled : t =
+  create ~protocol_constants:Genesis_constants.compiled.protocol
 
 let to_hlist
     ({ k

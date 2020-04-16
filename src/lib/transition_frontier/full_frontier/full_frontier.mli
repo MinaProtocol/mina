@@ -54,4 +54,7 @@ val apply_diffs :
 
 module For_tests : sig
   val equal : t -> t -> bool
+
+  val find_protocol_state_exn :
+    t -> State_hash.t -> Coda_state.Protocol_state.value
 end

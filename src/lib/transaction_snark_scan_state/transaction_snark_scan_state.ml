@@ -639,7 +639,7 @@ let fill_work_and_enqueue_transactions t transactions work =
 
 let required_state_hashes _t =
   (* TODO: when merging into #4244
-  List.map (Parallel_scan.pending_data t) ~f:(...)*)
+  List.map (Parallel_scan.pending_data t) ~f:(fun (t : Transaction_with_witness.t) -> ...*)
   []
 
 let check_required_protocol_states t ~protocol_states =
@@ -654,7 +654,6 @@ let check_required_protocol_states t ~protocol_states =
         !"Required %d protocol states but received %d"
         required received
   in
-  let%bind () = check_length protocol_states in
   let received_state_map =
     (*TODO: Deepthi store hashes as well?*)
     List.fold protocol_states ~init:Coda_base.State_hash.Map.empty
