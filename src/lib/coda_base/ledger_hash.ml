@@ -32,7 +32,7 @@ module Merkle_tree =
       let hash = Checked.digest
     end)
 
-let depth = Snark_params.ledger_depth
+let depth = Coda_compile_config.ledger_depth
 
 include Data_hash.Make_full_size ()
 

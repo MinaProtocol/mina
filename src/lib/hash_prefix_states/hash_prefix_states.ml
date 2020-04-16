@@ -4,18 +4,16 @@
 [%%ifdef
 consensus_mechanism]
 
-open Snark_params
-
 [%%else]
 
-open Snark_params_nonconsensus
 module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+module Coda_compile_config =
+  Coda_compile_config_nonconsensus.Coda_compile_config
 
 [%%endif]
 
 open Core_kernel
 open Hash_prefixes
-open Scan_state_constants
 
 let salt (s : Hash_prefixes.t) = Random_oracle.salt (s :> string)
 
@@ -41,10 +39,12 @@ let protocol_state = salt protocol_state
 
 let protocol_state_body = salt protocol_state_body
 
-let merkle_tree = Array.init ledger_depth ~f:(fun i -> salt (merkle_tree i))
+let merkle_tree =
+  Array.init Coda_compile_config.ledger_depth ~f:(fun i -> salt (merkle_tree i))
 
 let coinbase_merkle_tree =
-  Array.init pending_coinbase_depth ~f:(fun i -> salt (coinbase_merkle_tree i))
+  Array.init Coda_compile_config.pending_coinbase_depth ~f:(fun i ->
+      salt (coinbase_merkle_tree i) )
 
 let vrf_message = salt vrf_message
 

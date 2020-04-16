@@ -58,7 +58,7 @@ struct
   let query {pagination; _} = Pagination.query pagination
 end
 
-module Block_time = Coda_base.Block_time
+module Block_time = Block_time
 module T = Make (User_command.Stable.V1) (Block_time.Time.Stable.V1)
 include T
 
