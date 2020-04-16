@@ -39,7 +39,7 @@ module Scan_state : sig
   val all_work_statements : t -> Transaction_snark_work.Statement.t list
 
   (** Hashes of the protocol states required for proving pending transactions*)
-  val required_state_hashes : t -> State_hash.t list
+  val required_state_hashes : t -> State_hash.Set.t
 
   (** Validate protocol states required for proving the transactions. Returns an association list of state_hash and the corresponding state*)
   val check_required_protocol_states :

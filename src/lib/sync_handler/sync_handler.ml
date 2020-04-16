@@ -66,6 +66,7 @@ module Make (Inputs : Inputs_intf) :
     let open Option.Let_syntax in
     let protocol_states scan_state =
       Staged_ledger.Scan_state.required_state_hashes scan_state
+      |> State_hash.Set.to_list
       |> List.fold_until ~init:(Some [])
            ~f:(fun acc hash ->
              match

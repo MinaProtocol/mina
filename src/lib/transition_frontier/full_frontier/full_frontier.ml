@@ -40,6 +40,7 @@ module Protocol_states_for_root_scan_state = struct
       ~(old_root_state : (Protocol_state.value, State_hash.t) With_hash.t) =
     let required_state_hashes =
       Staged_ledger.Scan_state.required_state_hashes new_scan_state
+      |> State_hash.Set.to_list
     in
     let protocol_state_map =
       (*Note: Protocol states for the next root should all be in this map
@@ -313,17 +314,6 @@ let calculate_root_transition_diff t heir =
       ~new_scan_state:(Staged_ledger.scan_state heir_staged_ledger)
       ~old_root_state:
         {With_hash.hash= root_hash; data= Breadcrumb.protocol_state root}
-    (*let required_state_hashes =
-      Staged_ledger.(
-        Scan_state.required_state_hashes
-          (Staged_ledger.scan_state heir_staged_ledger))
-    in
-    let protocol_state_map =
-      State_hash.Map.set t.protocol_states_for_root_scan_state ~key:root_hash
-        ~data:(Breadcrumb.protocol_state root)
-    in
-    List.map required_state_hashes ~f:(fun hash ->
-        (hash, State_hash.Map.find_exn protocol_state_map hash) )*)
   in
   let new_root_data =
     Root_data.Limited.create ~transition:heir_transition
@@ -448,22 +438,9 @@ let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
       (Breadcrumb.validated_transition new_root_node.breadcrumb)
       new_staged_ledger
   in
-  (*Deepthi: already in the diff (root_data) Update the protocol states required for scan state at the new root*)
+  (*Update the protocol states required for scan state at the new root*)
   let new_protocol_states_map =
     State_hash.Map.of_alist_exn new_root_protocol_states
-    (*let required_state_hashes =
-      Staged_ledger.(
-        Scan_state.required_state_hashes
-          (Breadcrumb.staged_ledger new_root_breadcrumb |> scan_state))
-    in
-    let protocol_state_map =
-      State_hash.Map.set t.protocol_states_for_root_scan_state
-        ~key:old_root_hash
-        ~data:(Breadcrumb.protocol_state old_root_node.breadcrumb)
-    in
-    List.map required_state_hashes ~f:(fun hash ->
-        (hash, State_hash.Map.find_exn protocol_state_map hash) )
-    |> State_hash.Map.of_alist_exn*)
   in
   t.protocol_states_for_root_scan_state <- new_protocol_states_map ;
   let new_root_node = {new_root_node with breadcrumb= new_root_breadcrumb} in

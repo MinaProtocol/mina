@@ -236,35 +236,9 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         result
       in
       let%map protocol_states =
-        (*let required_state_hashes =*)
         Staged_ledger.Scan_state.check_required_protocol_states scan_state
           ~protocol_states
         |> Deferred.return
-        (*in
-        let check_length states =
-          let required = List.length required_state_hashes in
-          let received = List.length states in
-          if required = received then Deferred.Or_error.return ()
-          else
-            Deferred.return
-              (Or_error.errorf
-                 !"Required %d protocol states but received %d"
-                 required received)
-        in
-        let%bind () = check_length protocol_states in
-        let received_state_map =
-          (*TODO: Deepthi store hashes as well?*)
-          List.fold protocol_states ~init:State_hash.Map.empty ~f:(fun m ps ->
-              State_hash.Map.set m ~key:(Protocol_state.hash ps) ~data:ps )
-        in
-        let protocol_states_assoc =
-          List.filter_map required_state_hashes ~f:(fun hash ->
-              let open Option.Let_syntax in
-              let%map state = State_hash.Map.find received_state_map hash in
-              (hash, state) )
-        in
-        let%map () = check_length protocol_states_assoc in
-        protocol_states_assoc*)
       in
       (scan_state, pending_coinbases, new_root, protocol_states)
     in

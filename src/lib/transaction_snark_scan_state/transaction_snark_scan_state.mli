@@ -135,7 +135,7 @@ val next_on_new_tree : t -> bool
 val update_metrics : t -> unit Or_error.t
 
 (** Hashes of the protocol states required for proving transactions*)
-val required_state_hashes : t -> State_hash.t list
+val required_state_hashes : t -> State_hash.Set.t
 
 val check_required_protocol_states :
      t

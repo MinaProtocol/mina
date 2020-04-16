@@ -49,24 +49,6 @@ module T = struct
                 External_transition.Validated.state_hash
                   (transition oldest_root) }
         |> State_hash.Map.of_alist_exn
-        (*
-        let required_state_hashes =
-          Staged_ledger.(
-            Scan_state.required_state_hashes new_oldest_root.scan_state)
-        in
-        let protocol_states_in_root_scan_state =
-          State_hash.Map.set t.protocol_states_for_root_scan_state
-            ~key:
-              (External_transition.Validated.state_hash oldest_root.transition)
-            ~data:
-              (External_transition.Validated.protocol_state
-                 oldest_root.transition)
-        in
-        List.map required_state_hashes ~f:(fun hash ->
-            ( hash
-            , State_hash.Map.find_exn protocol_states_in_root_scan_state hash
-            ) )
-        |> State_hash.Map.of_alist_exn*)
       in
       t.protocol_states_for_root_scan_state <- new_protocol_states_map ) ;
     assert (
@@ -105,6 +87,7 @@ let protocol_states_for_scan_state
   let%bind data = Queue.lookup history state_hash in
   let required_state_hashes =
     Staged_ledger.Scan_state.required_state_hashes (scan_state data)
+    |> State_hash.Set.to_list
   in
   List.fold_until ~init:[]
     ~finish:(fun lst -> Some lst)
