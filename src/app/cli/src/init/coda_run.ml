@@ -554,7 +554,7 @@ let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
     "handle_crash: acquired coda status" ;
   let%map action_string =
     match%map
-      Coda_base.Block_time.Timeout.await
+      Block_time.Timeout.await
         ~timeout_duration:(Block_time.Span.of_ms 30_000L)
         time_controller
         ( try

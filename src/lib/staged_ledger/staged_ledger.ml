@@ -1994,8 +1994,9 @@ let%test_module "test" =
               in
               assert (
                 Option.is_none
-                  (Coda_base.Ledger.location_of_key test_mask snark_worker_pk)
-              ) ) )
+                  (Coda_base.Ledger.location_of_account test_mask
+                     (Account_id.create snark_worker_pk Token_id.default)) ) )
+      )
 
     let%test_unit "Invalid diff test: check zero fee excess for partitions" =
       let create_diff_with_non_zero_fee_excess txns completed_works

@@ -51,8 +51,7 @@ let run ~logger ~trust_system ~verifier ~network ~time_controller
   trace_recurring "processor" (fun () ->
       Transition_handler.Processor.run ~logger ~genesis_constants
         ~time_controller ~trust_system ~verifier ~frontier
-        ~primary_transition_reader
-        ~producer_transition_reader
+        ~primary_transition_reader ~producer_transition_reader
         ~clean_up_catchup_scheduler ~catchup_job_writer
         ~catchup_breadcrumbs_reader ~catchup_breadcrumbs_writer
         ~processed_transition_writer ) ;
