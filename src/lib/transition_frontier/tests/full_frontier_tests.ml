@@ -151,7 +151,7 @@ let%test_module "Full_frontier tests" =
               let frontier = create_frontier () in
               let root = Full_frontier.root frontier in
               let%map rest = make_seq root in
-              List.iter (root :: rest) ~f:(fun breadcrumb ->
+              List.iter rest ~f:(fun breadcrumb ->
                   add_breadcrumb frontier breadcrumb ;
                   let required_state_hashes =
                     Breadcrumb.staged_ledger breadcrumb
