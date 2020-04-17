@@ -172,7 +172,7 @@ let make = () => {
        let variables =
          Js.Dict.fromList([
            ("publicKey", Apollo.Encoders.publicKey(pubkey)),
-           ("after", [%bs.raw "null"]),
+           ("after", Js.Json.null),
          ])
          |> Js.Json.object_;
        <TransactionsQuery variables>
