@@ -115,7 +115,8 @@ macos-portable:
 	@./scripts/macos-portable.sh _build/default/src/app/cli/src/coda.exe src/app/libp2p_helper/result/bin/libp2p_helper _build/coda-daemon-macos
 	@cp -a package/keys/. _build/coda-daemon-macos/keys/
 	@cd _build/coda-daemon-macos
-	@zip -r ../../coda-daemon-macos.zip .
+	@zip -r coda-daemon-macos.zip .
+	@mv coda-daemon-macos.zip ../..
 	@cd ../..
 	@echo Find coda-daemon-macos.zip inside _build/
 
