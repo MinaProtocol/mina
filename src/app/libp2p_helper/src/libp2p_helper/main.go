@@ -55,7 +55,6 @@ type app struct {
 	ValidatorMutex  *sync.Mutex
 	Streams         map[int]net.Stream
 	StreamsMutex    sync.Mutex
-	OutLock         sync.Mutex
 	Out             *bufio.Writer
 	OutChan         chan interface{}
 	UnsafeNoTrustIP bool
@@ -1028,15 +1027,12 @@ func main() {
 		Validators:     make(map[int]*validationStatus),
 		Streams:        make(map[int]net.Stream),
 		OutChan:        make(chan interface{}, 4096),
-		// OutLock doesn't need to be initialized
 		Out: out,
 	}
 
 	go func() {
 		for {
 			msg := <-app.OutChan
-			app.OutLock.Lock()
-			defer app.OutLock.Unlock()
 			bytes, err := json.Marshal(msg)
 			if err == nil {
 				n, err := app.Out.Write(bytes)
