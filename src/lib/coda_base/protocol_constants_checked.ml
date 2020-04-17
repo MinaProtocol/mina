@@ -50,7 +50,9 @@ module Value = struct
     let open Quickcheck.Let_syntax in
     let%bind k = Int.gen_incl 1 5000 in
     let%bind delta = Int.gen_incl 0 5000 in
-    let%bind block_window_duration_ms = Int.gen_incl 0 300000 in
+    let%bind block_window_duration_ms =
+      Quickcheck.Generator.of_list [2000; 3000; 4000; 6000; 9000]
+    in
     let%bind ms = Int64.(gen_log_uniform_incl 0L 9999999999999L) in
     let end_time = Block_time.of_int64 999999999999999L in
     let rec create_genesis_state_timestamp attempts =

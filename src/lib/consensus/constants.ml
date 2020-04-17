@@ -165,13 +165,15 @@ module Constants_checked :
 
   let of_time = Fn.compose (Integer.of_bits ~m) Block_time.Unpacked.var_to_bits
 
-  let to_time = Fn.compose Block_time.Unpacked.var_of_bits (Integer.to_bits ~m)
+  let to_time =
+    Fn.compose Block_time.Unpacked.var_of_bits (Integer.to_bits ~length:64 ~m)
 
   let of_timespan =
     Fn.compose (Integer.of_bits ~m) Block_time.Span.Unpacked.var_to_bits
 
   let to_timespan =
-    Fn.compose Block_time.Span.Unpacked.var_of_bits (Integer.to_bits ~m)
+    Fn.compose Block_time.Span.Unpacked.var_of_bits
+      (Integer.to_bits ~length:64 ~m)
 
   let ( / ) (t : t) (t' : t) = Integer.div_mod ~m t t' |> fst
 
@@ -436,11 +438,12 @@ module Checked = struct
         Integer.of_bits ~m
           (Block_time.Span.Unpacked.var_to_bits constants.slot_duration_ms)
       in
-      let slots_per_year =
-        let one_year_ms =
-          constant (Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int)
-        in
-        fst (Integer.div_mod ~m one_year_ms slot_duration_ms)
+      let%bind slots_per_year =
+        make_checked (fun () ->
+            let one_year_ms =
+              constant (Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int)
+            in
+            fst (Integer.div_mod ~m one_year_ms slot_duration_ms) )
       in
       let%map size_in_slots =
         let size_in_slots, rem = Integer.div_mod ~m slots_per_year per_year in
