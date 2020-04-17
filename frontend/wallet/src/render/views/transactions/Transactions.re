@@ -169,13 +169,13 @@ let make = () => {
   <div className=Styles.container>
     {switch (activeAccount) {
      | Some(pubkey) =>
-       let transactionQuery =
-         TransactionsQueryString.make(
-           ~publicKey=Apollo.Encoders.publicKey(pubkey),
-           ~after="",
-           (),
-         );
-       <TransactionsQuery variables=transactionQuery##variables>
+       let variables =
+         Js.Dict.fromList([
+           ("publicKey", Apollo.Encoders.publicKey(pubkey)),
+           ("after", [%bs.raw "null"]),
+         ])
+         |> Js.Json.object_;
+       <TransactionsQuery variables>
          (
            response =>
              switch (response.result) {
@@ -192,7 +192,7 @@ let make = () => {
                  );
                <BlockListener
                  refetch={() =>
-                   response.refetch(Some(transactionQuery##variables))
+                   response.refetch(Some(variables))
                  }
                  subscribeToMore={response.subscribeToMore}>
                  <div className=Styles.headerRow>
