@@ -751,6 +751,14 @@ let server ~port ~logger =
     (Async_extra.Tcp.Where_to_listen.of_port port)
     callback
 
+let () =
+  if Ppx_inline_test_lib.Runtime.am_running_inline_test then
+    (* We're running inline tests, set block_window_duration to the value set
+       in the compile-time config.
+    *)
+    set_block_window_duration_and_start
+      Genesis_constants.compiled.protocol.block_window_duration_ms
+
 (* re-export a constrained subset of prometheus to keep consumers of this module abstract over implementation *)
 include (
   Prometheus :
