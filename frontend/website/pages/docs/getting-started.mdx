@@ -96,26 +96,6 @@ Windows is not yet supported. If you are interested in receiving a grant to deve
 
 If you're running another Linux distro or a different version of macOS, you can [try building Coda from source code](https://github.com/CodaProtocol/coda/blob/master/README-dev.md#building-coda). Please note that other operating systems haven't been tested thoroughly, and may have issues. Feel free to share any logs and get troubleshooting help in the [Discord server](https://bit.ly/CodaDiscord).
 
-### Docker Demo Container
-
-<Alert>
-
-This option will **NOT** connect you to the live network, instead it will create a single node network that allows you to play with some of the protocol features without the instability of a live network.
-
-</Alert>
-
-To get started quickly and play with some of the core featues of the protocol you can use this docker demo container. This node will support multiple accounts, sending transactions between them, and will also support delegating and staking. In fact since it's a single node network, you'll get all the block rewards! This process is supported on MacOS and Linux.  
-
-In order to use the demo container, you'll need to install Docker, the simplest way will be to use [Docker Desktop](https://www.docker.com/products/docker-desktop).
-
-After you have Docker installed run the following command to spin up the container.
-
-```
-docker run --publish 3085:3085 -it codaprotocol/coda-demo:0.0.12-beta-demo-mode-sync-status-a6de071
-```
-
-Now you have a node running on your local machine, head over to https://localhost:3085/graphql to play with the GraphQL API of your node! Check out [this document](https://github.com/CodaProtocol/coda/blob/develop/docs/demo.md) for more information on the demo container.
-
 ## Set up port forwarding and any firewalls
 
 If you are running a firewall, you should allow traffic on TCP port 8303. Additionally, unless the `-external-ip YOUR_IP` flag is provided, the daemon will use HTTPS (443) and HTTP (80) to try and determine its own IP address.
