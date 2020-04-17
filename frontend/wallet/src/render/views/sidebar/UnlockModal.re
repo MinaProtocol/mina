@@ -102,7 +102,12 @@ let make = (~account, ~onClose, ~onSuccess) => {
               }}
             />
             <Spacer width=1. />
-            <Button label="Unlock" style=Button.Green type_="submit" />
+            <Button
+              disabled={result === Loading}
+              label="Unlock"
+              style=Button.Green
+              type_="submit"
+            />
           </div>
         </form>
       }

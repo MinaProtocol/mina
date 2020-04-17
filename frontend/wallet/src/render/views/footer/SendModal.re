@@ -103,7 +103,7 @@ module SendForm = {
   open ModalState.Unvalidated;
 
   [@react.component]
-  let make = (~onSubmit, ~onClose) => {
+  let make = (~onSubmit, ~onClose, ~loading) => {
     let activeAccount = Hooks.useActiveAccount();
     let (addressBook, _) = React.useContext(AddressBookProvider.context);
     let (sendState, setModalState) =
@@ -187,9 +187,19 @@ module SendForm = {
       <Spacer height=1.0 />
       //Disable Modal button if no active wallet
       <div className=Css.(style([display(`flex)]))>
-        <Button label="Cancel" style=Button.Gray onClick={_ => onClose()} />
+        <Button
+          disabled={loading}
+          label="Cancel"
+          style=Button.Gray
+          onClick={_ => onClose()}
+        />
         <Spacer width=1. />
-        <Button label="Send" style=Button.Green type_="submit" />
+        <Button
+          disabled={loading}
+          label="Send"
+          style=Button.Green
+          type_="submit"
+        />
       </div>
     </form>;
   };
@@ -199,9 +209,10 @@ module SendForm = {
 let make = (~onClose) => {
   <Modal title="Send Coda" onRequestClose={_ => onClose()}>
     <SendPaymentMutation>
-      {(mutation, _) =>
+      {(mutation, {result}) =>
          <SendForm
            onClose
+           loading={result === Loading}
            onSubmit={(
              {from, to_, amountFormatted, feeFormatted, memoOpt}: ModalState.Validated.t,
              afterSubmit,
