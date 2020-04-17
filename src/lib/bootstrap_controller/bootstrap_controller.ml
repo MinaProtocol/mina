@@ -403,7 +403,8 @@ let%test_module "Bootstrap_controller tests" =
   ( module struct
     open Pipe_lib
 
-    let max_frontier_length = Transition_frontier.max_length
+    let max_frontier_length =
+      Transition_frontier.global_max_length Genesis_constants.compiled
 
     let logger = Logger.create ()
 
@@ -541,7 +542,8 @@ let%test_module "Bootstrap_controller tests" =
         (run ~logger ~trust_system ~verifier ~network:my_net.network
            ~consensus_local_state:my_net.state.consensus_local_state
            ~transition_reader ~persistent_root ~persistent_frontier
-           ~initial_root_transition ~genesis_state_hash ~genesis_ledger)
+           ~initial_root_transition ~genesis_state_hash ~genesis_ledger
+           ~genesis_constants:Genesis_constants.compiled)
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions :
@@ -610,22 +612,13 @@ let%test_module "Bootstrap_controller tests" =
               @@ Transition_frontier.root_snarked_ledger
                    peer_net.state.frontier ) )
 
-    (* TODO: move test to scan state module *)
-    (*
-    let%test_unit "reconstruct staged_ledgers using of_scan_state_and_snarked_ledger" =
-      let pids = Child_processes.Termination.create_pid_table () in
-      let num_breadcrumbs = 10 in
-      let accounts = Test_genesis_ledger.accounts in
-      heartbeat_flag := true ;
-      Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat hb_logger |> don't_wait_for ;
-          let%bind frontier = create_root_frontier ~logger ~pids accounts in
-          let%bind () =
-            build_frontier_randomly frontier
-              ~gen_root_breadcrumb_builder:
-                (gen_linear_breadcrumbs ~logger ~pids ~trust_system
-                   ~size:num_breadcrumbs ~accounts_with_secret_keys:accounts)
-          in
+    let%test_unit "reconstruct staged_ledgers using \
+                   of_scan_state_and_snarked_ledger" =
+      Quickcheck.test ~trials:1
+        (Transition_frontier.For_tests.gen ~max_length:max_frontier_length
+           ~size:max_frontier_length ()) ~f:(fun frontier ->
+          Thread_safe.block_on_async_exn
+          @@ fun () ->
           Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)
             ~f:(fun breadcrumb ->
               let staged_ledger =
@@ -635,13 +628,16 @@ let%test_module "Bootstrap_controller tests" =
                 Staged_ledger.ledger staged_ledger |> Ledger.merkle_root
               in
               let snarked_ledger =
-                Transition_frontier.shallow_copy_root_snarked_ledger frontier
+                Transition_frontier.root_snarked_ledger frontier
+                |> Ledger.of_database
               in
               let scan_state = Staged_ledger.scan_state staged_ledger in
               let pending_coinbases =
                 Staged_ledger.pending_coinbase_collection staged_ledger
               in
-              let%bind verifier = Verifier.create ~logger ~pids in
+              let%bind verifier =
+                Verifier.create ~conf_dir:None ~logger ~pids
+              in
               let%map actual_staged_ledger =
                 Staged_ledger
                 .of_scan_state_pending_coinbases_and_snarked_ledger ~scan_state
@@ -649,208 +645,63 @@ let%test_module "Bootstrap_controller tests" =
                   ~pending_coinbases
                 |> Deferred.Or_error.ok_exn
               in
-              heartbeat_flag := false ;
               assert (
                 Staged_ledger_hash.equal
                   (Staged_ledger.hash staged_ledger)
                   (Staged_ledger.hash actual_staged_ledger) ) ) )
-    *)
 
-    (* TODO: port these tests *)
     (*
-    let%test "sync with one node eagerly" =
-      Backtrace.elide := false ;
-      heartbeat_flag := true ;
-      Printexc.record_backtrace true ;
-      let pids = Child_processes.Termination.create_pid_table () in
-      let num_breadcrumbs = (2 * max_length) + Consensus.Constants.delta + 2 in
-      Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat hb_logger |> don't_wait_for ;
-          let%bind syncing_frontier, peer, network =
-            Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
-              ~num_breadcrumbs
-              ~source_accounts:[List.hd_exn Test_genesis_ledger.accounts]
-              ~target_accounts:Test_genesis_ledger.accounts
+    let%test_unit "if we see a new transition that is better than the \
+                   transition that we are syncing from, than we should \
+                   retarget our root" =
+      Quickcheck.test ~trials:1
+        Fake_network.Generator.(
+          gen ~max_frontier_length
+            [ fresh_peer
+            ; peer_with_branch ~frontier_branch_size:max_frontier_length
+            ; peer_with_branch
+                ~frontier_branch_size:((max_frontier_length * 2) + 2) ])
+        ~f:(fun fake_network ->
+          let [me; weaker_chain; stronger_chain] =
+            fake_network.peer_networks
           in
-          let transition_reader, _ = make_transition_pipe () in
-          let ledger_db =
-            Transition_frontier.For_tests.root_snarked_ledger syncing_frontier
+          let transition_reader, transition_writer =
+            Pipe_lib.Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
+              (Buffered (`Capacity 10, `Overflow Drop_head))
           in
-          let%bind run =
-            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger ~pids
-              ~trust_system
-          in
-          let%map ( new_frontier
-                  , (sorted_transitions :
-                      External_transition.Initial_validated.t
-                      Envelope.Incoming.t
-                      list) ) =
-            run ~network ~frontier:syncing_frontier ~ledger_db
-              ~transition_reader ~should_ask_best_tip:true
-          in
-          let root = Transition_frontier.(root new_frontier) in
-          assert_transitions_increasingly_sorted ~root sorted_transitions ;
-          heartbeat_flag := false ;
-          Ledger_hash.equal (root_hash new_frontier) (root_hash peer.frontier)
-      )
-
-    let%test "when eagerly syncing to multiple nodes, you should sync to the \
-              node with the highest transition_frontier" =
-      heartbeat_flag := true ;
-      let pids = Child_processes.Termination.create_pid_table () in
-      let unsynced_peer_num_breadcrumbs = 6 in
-      let unsynced_peers_accounts =
-        List.take Test_genesis_ledger.accounts
-          (List.length Test_genesis_ledger.accounts / 2)
-      in
-      let synced_peer_num_breadcrumbs = unsynced_peer_num_breadcrumbs * 2 in
-      let source_accounts = [List.hd_exn Test_genesis_ledger.accounts] in
-      Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat hb_logger |> don't_wait_for ;
-          let%bind {me; peers; network} =
-            Network_builder.setup ~source_accounts ~logger ~pids ~trust_system
-              [ { num_breadcrumbs= unsynced_peer_num_breadcrumbs
-                ; accounts= unsynced_peers_accounts }
-              ; { num_breadcrumbs= synced_peer_num_breadcrumbs
-                ; accounts= Test_genesis_ledger.accounts } ]
-          in
-          let transition_reader, _ = make_transition_pipe () in
-          let ledger_db =
-            Transition_frontier.For_tests.root_snarked_ledger me
-          in
-          let synced_peer = List.nth_exn peers 1 in
-          let%bind run =
-            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger ~pids
-              ~trust_system
-          in
-          let%map ( new_frontier
-                  , (sorted_external_transitions :
-                      External_transition.Initial_validated.t
-                      Envelope.Incoming.t
-                      list) ) =
-            run ~network ~frontier:me ~ledger_db ~transition_reader
-              ~should_ask_best_tip:true
+          Envelope.Incoming.wrap
+            ~data:
+              ( Transition_frontier.best_tip weaker_chain.state.frontier
+              |> Transition_frontier.Breadcrumb.validated_transition
+              |> External_transition.Validated.to_initial_validated )
+            ~sender:
+              (Envelope.Sender.Remote
+                 (weaker_chain.peer.host, weaker_chain.peer.peer_id))
+          |> Pipe_lib.Strict_pipe.Writer.write transition_writer ;
+          Envelope.Incoming.wrap
+            ~data:
+              ( Transition_frontier.best_tip stronger_chain.state.frontier
+              |> Transition_frontier.Breadcrumb.validated_transition
+              |> External_transition.Validated.to_initial_validated )
+            ~sender:
+              (Envelope.Sender.Remote
+                 (stronger_chain.peer.host, stronger_chain.peer.peer_id))
+          |> Pipe_lib.Strict_pipe.Writer.write transition_writer ;
+          let new_frontier, sorted_external_transitions =
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                run_bootstrap
+                  ~timeout_duration:(Block_time.Span.of_ms 60_000L)
+                  ~my_net:me ~transition_reader )
           in
           assert_transitions_increasingly_sorted
             ~root:(Transition_frontier.root new_frontier)
             sorted_external_transitions ;
-          heartbeat_flag := false ;
-          Ledger_hash.equal (root_hash new_frontier)
-            (root_hash synced_peer.frontier) )
-
-    let%test "if we see a new transition that is better than the transition \
-              that we are syncing from, than we should retarget our root" =
-      Backtrace.elide := false ;
-      Printexc.record_backtrace true ;
-      heartbeat_flag := true ;
-      let pids = Child_processes.Termination.create_pid_table () in
-      let small_peer_num_breadcrumbs = 6 in
-      let large_peer_num_breadcrumbs = small_peer_num_breadcrumbs * 2 in
-      let source_accounts = [List.hd_exn Test_genesis_ledger.accounts] in
-      let small_peer_accounts =
-        List.take Test_genesis_ledger.accounts
-          (List.length Test_genesis_ledger.accounts / 2)
-      in
-      Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat hb_logger |> don't_wait_for ;
-          let large_peer_accounts = Test_genesis_ledger.accounts in
-          let%bind {me; peers; network} =
-            Network_builder.setup ~source_accounts ~logger ~pids ~trust_system
-              [ { num_breadcrumbs= small_peer_num_breadcrumbs
-                ; accounts= small_peer_accounts }
-              ; { num_breadcrumbs= large_peer_num_breadcrumbs
-                ; accounts= large_peer_accounts } ]
-          in
-          let transition_reader, transition_writer = make_transition_pipe () in
-          let small_peer, large_peer =
-            (List.nth_exn peers 0, List.nth_exn peers 1)
-          in
-          let ledger_db =
-            Transition_frontier.For_tests.root_snarked_ledger me
-          in
-          Network_builder.send_transition ~logger ~transition_writer
-            ~peer:small_peer
-            (get_best_tip_hash small_peer) ;
-          (* Have a bit of delay when sending the more recent transition *)
-          let%bind () =
-            after (Core.Time.Span.of_sec 1.0)
-            >>| fun () ->
-            Network_builder.send_transition ~logger ~transition_writer
-              ~peer:large_peer
-              (get_best_tip_hash large_peer)
-          in
-          let%bind run =
-            f_with_verifier ~f:Bootstrap_controller.For_tests.run ~logger ~pids
-              ~trust_system
-          in
-          let%map ( new_frontier
-                  , (sorted_external_transitions :
-                      External_transition.Initial_validated.t
-                      Envelope.Incoming.t
-                      list) ) =
-            run ~network ~frontier:me ~ledger_db ~transition_reader
-              ~should_ask_best_tip:false
-          in
-          heartbeat_flag := false ;
-          assert_transitions_increasingly_sorted
-            ~root:(Transition_frontier.root new_frontier)
-            sorted_external_transitions ;
-          Ledger_hash.equal (root_hash new_frontier)
-            (root_hash large_peer.frontier) )
-
-    let%test "`on_transition` should deny outdated transitions" =
-      heartbeat_flag := true ;
-      let pids = Child_processes.Termination.create_pid_table () in
-      let num_breadcrumbs = 10 in
-      Thread_safe.block_on_async_exn (fun () ->
-          print_heartbeat hb_logger |> don't_wait_for ;
-          let%bind syncing_frontier, peer_with_frontier, network =
-            Network_builder.setup_me_and_a_peer ~logger ~pids ~trust_system
-              ~num_breadcrumbs ~source_accounts:Test_genesis_ledger.accounts
-              ~target_accounts:Test_genesis_ledger.accounts
-          in
-          let root_sync_ledger =
-            Root_sync_ledger.create
-              (Transition_frontier.For_tests.root_snarked_ledger
-                 syncing_frontier)
-              ~logger ~trust_system
-          in
-          let query_reader = Root_sync_ledger.query_reader root_sync_ledger in
-          let response_writer =
-            Root_sync_ledger.answer_writer root_sync_ledger
-          in
-          Network.glue_sync_ledger network query_reader response_writer ;
-          let genesis_root =
-            Transition_frontier.root syncing_frontier
-            |> Transition_frontier.Breadcrumb.validated_transition
-          in
-          let open Bootstrap_controller.For_tests in
-          let%bind make =
-            f_with_verifier ~f:make_bootstrap ~logger ~pids ~trust_system
-          in
-          let bootstrap = make ~genesis_root ~network in
-          let best_transition =
-            Transition_frontier.best_tip peer_with_frontier.frontier
-            |> Transition_frontier.Breadcrumb.validated_transition
-            |> External_transition.Validation.forget_validation
-          in
-          let%bind should_sync =
-            Bootstrap_controller.For_tests.on_transition bootstrap
-              ~root_sync_ledger ~sender:peer_with_frontier.peer.host
-              best_transition
-          in
-          assert (is_syncing should_sync) ;
-          let outdated_transition =
-            Transition_frontier.root peer_with_frontier.frontier
-            |> Transition_frontier.Breadcrumb.validated_transition
-            |> External_transition.Validation.forget_validation
-          in
-          let%map should_not_sync =
-            Bootstrap_controller.For_tests.on_transition bootstrap
-              ~root_sync_ledger ~sender:peer_with_frontier.peer.host
-              outdated_transition
-          in
-          heartbeat_flag := false ;
-          should_not_sync = `Ignored )
-    *)
+          [%test_result: Ledger_hash.t]
+            ( Ledger.Db.merkle_root
+            @@ Transition_frontier.root_snarked_ledger new_frontier )
+            ~expect:
+              ( Ledger.Db.merkle_root
+              @@ Transition_frontier.root_snarked_ledger
+                   stronger_chain.state.frontier ) )
+*)
   end )
