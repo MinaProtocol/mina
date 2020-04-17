@@ -51,13 +51,28 @@ module Value = struct
     let%bind k = Int.gen_incl 1 5000 in
     let%bind delta = Int.gen_incl 0 5000 in
     let%bind block_window_duration_ms = Int.gen_incl 0 300000 in
-    (*TODO: Bug -> Block_time.(to_time x |> of_time) != x for certain values.
-    Eg: 34702788243129 <--> 34702788243128, 8094 <--> 8093*)
     let%bind ms = Int64.(gen_log_uniform_incl 0L 9999999999999L) in
     let end_time = Block_time.of_int64 999999999999999L in
-    let%map genesis_state_timestamp =
-      Block_time.(gen_incl (of_int64 ms) end_time)
+    let rec create_genesis_state_timestamp attempts =
+      let%bind genesis_state_timestamp =
+        Block_time.(gen_incl (of_int64 ms) end_time)
+      in
+      if
+        attempts > 0
+        && not
+             Block_time.(
+               genesis_state_timestamp |> to_time |> of_time
+               |> equal genesis_state_timestamp)
+      then
+        (* Block_time.(to_time x |> of_time) != x for certain values.
+           Generate a new one.
+        *)
+        create_genesis_state_timestamp (attempts - 1)
+      else
+        (* Found a workable value, or ran out of attempts. *)
+        return genesis_state_timestamp
     in
+    let%map genesis_state_timestamp = create_genesis_state_timestamp 5 in
     { Poly.k= T.of_int k
     ; delta= T.of_int delta
     ; genesis_state_timestamp
