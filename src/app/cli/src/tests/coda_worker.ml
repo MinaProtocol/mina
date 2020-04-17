@@ -496,6 +496,9 @@ module T = struct
             Consensus.Data.Local_state.create initial_block_production_keys
               ~genesis_ledger:Test_genesis_ledger.t
           in
+          let genesis_constants = Genesis_constants.compiled in
+          Coda_metrics.set_block_window_duration_and_start
+            genesis_constants.protocol.block_window_duration_ms ;
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
               { timeout= Time.Span.of_sec 3.
@@ -524,7 +527,8 @@ module T = struct
             ; creatable_gossip_net=
                 Coda_networking.Gossip_net.(
                   Any.Creatable
-                    ((module Libp2p), Libp2p.create gossip_net_params)) }
+                    ((module Libp2p), Libp2p.create gossip_net_params))
+            ; genesis_constants }
           in
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
@@ -532,8 +536,7 @@ module T = struct
           in
           let genesis_state_hash =
             Coda_state.Genesis_protocol_state.t
-              ~genesis_ledger:Test_genesis_ledger.t
-              ~genesis_constants:Genesis_constants.compiled
+              ~genesis_ledger:Test_genesis_ledger.t ~genesis_constants
             |> With_hash.hash
           in
           let coda_deferred () =
@@ -559,7 +562,7 @@ module T = struct
                  ~consensus_local_state ~transaction_database
                  ~external_transition_database ~is_archive_rocksdb
                  ~work_reassignment_wait:420000 ~genesis_state_hash
-                 ~genesis_constants:Genesis_constants.compiled
+                 ~genesis_constants
                  ~archive_process_location:
                    (Option.map archive_process_location
                       ~f:(fun host_and_port ->

@@ -6,7 +6,8 @@ type 'n num_peers = 'n Peano.gt_1
 
 type peer_state =
   { frontier: Transition_frontier.t
-  ; consensus_local_state: Consensus.Data.Local_state.t }
+  ; consensus_local_state: Consensus.Data.Local_state.t
+  ; genesis_constants: Genesis_constants.t }
 
 type peer_network =
   {peer: Network_peer.Peer.t; state: peer_state; network: Coda_networking.t}
@@ -26,14 +27,18 @@ val setup :
 module Generator : sig
   open Quickcheck
 
-  type peer_config = max_frontier_length:int -> peer_state Generator.t
+  type peer_config =
+       genesis_constants:Genesis_constants.t
+    -> max_frontier_length:int
+    -> peer_state Generator.t
 
   val fresh_peer : peer_config
 
   val peer_with_branch : frontier_branch_size:int -> peer_config
 
   val gen :
-       max_frontier_length:int
+       genesis_constants:Genesis_constants.t
+    -> max_frontier_length:int
     -> (peer_config, 'n num_peers) Vect.t
     -> 'n num_peers t Generator.t
 end

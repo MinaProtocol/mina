@@ -137,6 +137,9 @@ let run_test () : unit Deferred.t =
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
+      let genesis_constants = Genesis_constants.compiled in
+      Coda_metrics.set_block_window_duration_and_start
+        genesis_constants.protocol.block_window_duration_ms ;
       let client_port = 8123 in
       let libp2p_port = 8002 in
       let gossip_net_params =
@@ -172,7 +175,7 @@ let run_test () : unit Deferred.t =
           ; creatable_gossip_net=
               Coda_networking.Gossip_net.(
                 Any.Creatable ((module Libp2p), Libp2p.create gossip_net_params))
-          }
+          ; genesis_constants }
       in
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
@@ -208,7 +211,7 @@ let run_test () : unit Deferred.t =
              ~genesis_state_hash:
                (Coda_state.Genesis_protocol_state.For_tests.genesis_state_hash
                   ())
-             ~genesis_constants:Genesis_constants.compiled ())
+             ~genesis_constants)
           ~genesis_ledger:Test_genesis_ledger.t
           ~base_proof:Precomputed_values.base_proof
       in

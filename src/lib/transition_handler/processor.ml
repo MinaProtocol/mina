@@ -22,7 +22,7 @@ module Transition_frontier_validation =
 let catchup_timeout_duration (genesis_constants : Genesis_constants.t) =
   Block_time.Span.of_ms
     ( genesis_constants.protocol.delta
-      * Coda_compile_config.block_window_duration_ms
+      * genesis_constants.protocol.block_window_duration_ms
     |> Int64.of_int )
 
 let cached_transform_deferred_result ~transform_cached ~transform_result cached
@@ -378,7 +378,9 @@ let%test_module "Transition_handler.Processor tests" =
       let max_length = frontier_size + branch_size in
       Quickcheck.test ~trials:4
         (Transition_frontier.For_tests.gen_with_branch ~max_length
-           ~frontier_size ~branch_size ()) ~f:(fun (frontier, branch) ->
+           ~frontier_size ~branch_size
+           ~genesis_constants:Genesis_constants.compiled ())
+        ~f:(fun (frontier, branch) ->
           assert (
             Thread_safe.block_on_async_exn (fun () ->
                 let pids = Child_processes.Termination.create_pid_table () in

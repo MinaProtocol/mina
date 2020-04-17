@@ -379,7 +379,8 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
         ~initialization_finish_signal ~genesis_state_hash ~genesis_constants ;
       let persistent_frontier =
         Transition_frontier.Persistent_frontier.create ~logger ~verifier
-          ~time_controller ~directory:persistent_frontier_location
+          ~time_controller ~genesis_constants
+          ~directory:persistent_frontier_location
       in
       let persistent_root =
         Transition_frontier.Persistent_root.create ~logger

@@ -138,7 +138,8 @@ module Config : sig
     ; genesis_ledger_hash: Ledger_hash.t
     ; creatable_gossip_net: Gossip_net.Any.creatable
     ; is_seed: bool
-    ; log_gossip_heard: log_gossip_heard }
+    ; log_gossip_heard: log_gossip_heard
+    ; genesis_constants: Genesis_constants.t }
   [@@deriving make]
 end
 

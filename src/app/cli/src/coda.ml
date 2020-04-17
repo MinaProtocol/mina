@@ -657,7 +657,8 @@ let daemon logger =
            ; creatable_gossip_net=
                Coda_networking.Gossip_net.(
                  Any.Creatable
-                   ((module Libp2p), Libp2p.create gossip_net_params)) }
+                   ((module Libp2p), Libp2p.create gossip_net_params))
+           ; genesis_constants }
          in
          let receipt_chain_dir_name = conf_dir ^/ "receipt_chain" in
          let%bind () = Async.Unix.mkdir ~p:() receipt_chain_dir_name in

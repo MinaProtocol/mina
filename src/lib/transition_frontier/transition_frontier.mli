@@ -88,6 +88,7 @@ module For_tests : sig
   val gen_persistence :
        ?logger:Logger.t
     -> ?verifier:Verifier.t
+    -> genesis_constants:Genesis_constants.t
     -> unit
     -> (Persistent_root.t * Persistent_frontier.t) Quickcheck.Generator.t
 
@@ -99,6 +100,7 @@ module For_tests : sig
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:Breadcrumb.t Quickcheck.Generator.t
+    -> genesis_constants:Genesis_constants.t
     -> max_length:int
     -> size:int
     -> unit
@@ -113,6 +115,7 @@ module For_tests : sig
                                  * (Private_key.t option * Account.t) list
     -> ?gen_root_breadcrumb:Breadcrumb.t Quickcheck.Generator.t
     -> ?get_branch_root:(t -> Breadcrumb.t)
+    -> genesis_constants:Genesis_constants.t
     -> max_length:int
     -> frontier_size:int
     -> branch_size:int

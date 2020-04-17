@@ -88,7 +88,7 @@ let%test_module "transaction_status" =
 
     let gen_frontier =
       Transition_frontier.For_tests.gen ~logger ~trust_system ~max_length
-        ~size:frontier_size ()
+        ~size:frontier_size ~genesis_constants:Genesis_constants.compiled ()
 
     let gen_user_command =
       User_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10

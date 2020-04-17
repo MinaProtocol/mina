@@ -634,7 +634,8 @@ module Config = struct
     ; genesis_ledger_hash: Ledger_hash.t
     ; creatable_gossip_net: Gossip_net.Any.creatable
     ; is_seed: bool
-    ; log_gossip_heard: log_gossip_heard }
+    ; log_gossip_heard: log_gossip_heard
+    ; genesis_constants: Genesis_constants.t }
   [@@deriving make]
 end
 
@@ -658,15 +659,19 @@ type t =
   ; first_received_message_signal: unit Ivar.t }
 [@@deriving fields]
 
-let offline_time =
-  Block_time.Span.of_ms @@ Int64.of_int Coda_compile_config.inactivity_ms
+let offline_time block_window_duration =
+  Block_time.Span.of_ms @@ Int64.of_int
+  @@ (Coda_compile_config.inactivity_factor * block_window_duration)
 
-let setup_timer time_controller sync_state_broadcaster =
-  Block_time.Timeout.create time_controller offline_time ~f:(fun _ ->
+let setup_timer ~block_window_time_in_ms time_controller sync_state_broadcaster
+    =
+  Block_time.Timeout.create time_controller
+    (offline_time block_window_time_in_ms) ~f:(fun _ ->
       Broadcast_pipe.Writer.write sync_state_broadcaster `Offline
       |> don't_wait_for )
 
-let online_broadcaster time_controller received_messages =
+let online_broadcaster ~block_window_time_in_ms time_controller
+    received_messages =
   let online_reader, online_writer = Broadcast_pipe.create `Offline in
   let init =
     Block_time.Timeout.create time_controller
@@ -676,7 +681,7 @@ let online_broadcaster time_controller received_messages =
   Strict_pipe.Reader.fold received_messages ~init ~f:(fun old_timeout _ ->
       let%map () = Broadcast_pipe.Writer.write online_writer `Online in
       Block_time.Timeout.cancel time_controller old_timeout () ;
-      setup_timer time_controller online_writer )
+      setup_timer ~block_window_time_in_ms time_controller online_writer )
   |> Deferred.ignore |> don't_wait_for ;
   online_reader
 
@@ -978,7 +983,10 @@ let create (config : Config.t)
       (Gossip_net.Any.received_message_reader gossip_net)
   in
   let online_status =
-    online_broadcaster config.time_controller online_notifier
+    online_broadcaster
+      ~block_window_time_in_ms:
+        config.genesis_constants.protocol.block_window_duration_ms
+      config.time_controller online_notifier
   in
   let first_received_message_signal = Ivar.create () in
   let states, snark_pool_diffs, transaction_pool_diffs =

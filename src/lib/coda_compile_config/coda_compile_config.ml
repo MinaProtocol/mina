@@ -89,8 +89,5 @@ consensus_mechanism]
 
 [%%endif]
 
-[%%inject
-"block_window_duration_ms", block_window_duration]
-
 (* This is a bit of a hack, see #3232. *)
-let inactivity_ms = block_window_duration_ms * 8
+let inactivity_factor = 8

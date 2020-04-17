@@ -183,12 +183,12 @@ let create' (type a b c)
       with type length = a
        and type time = b
        and type timespan = c)
-    ~(protocol_constants : (a, a, b) Genesis_constants.Protocol.Poly.t) :
+    ~(protocol_constants : (a, a, b, a) Genesis_constants.Protocol.Poly.t) :
     (a, b, c) Poly.t =
   let open M in
   let c = constant Coda_compile_config.c in
   let block_window_duration_ms =
-    constant Coda_compile_config.block_window_duration_ms
+    of_length protocol_constants.block_window_duration_ms
   in
   let k = of_length protocol_constants.k in
   let delta = of_length protocol_constants.delta in

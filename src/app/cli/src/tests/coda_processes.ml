@@ -1,6 +1,3 @@
-[%%import
-"/src/config.mlh"]
-
 open Core
 open Async
 

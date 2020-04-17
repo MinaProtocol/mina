@@ -3,10 +3,9 @@ open Async_kernel
 open Core_kernel
 open Frontier_base
 
-let max_latency =
+let max_latency block_window_duration_ms =
   Block_time.Span.(
-    ( Coda_compile_config.block_window_duration_ms |> Int64.of_int
-    |> Block_time.Span.of_ms )
+    (block_window_duration_ms |> Int64.of_int |> Block_time.Span.of_ms)
     * of_ms 5L)
 
 module Capacity = struct
@@ -77,7 +76,8 @@ let flush t =
   assert (t.flush_job = None) ;
   if DynArray.length t.diff_array > 0 then t.flush_job <- Some (flush_job t)
 
-let create ~time_controller ~base_hash ~worker =
+let create ~(genesis_constants : Genesis_constants.t) ~time_controller
+    ~base_hash ~worker =
   let t =
     { diff_array= DynArray.create ()
     ; worker
@@ -89,7 +89,7 @@ let create ~time_controller ~base_hash ~worker =
   let timer =
     Timer.create ~time_controller
       ~f:(fun () -> if t.flush_job = None then flush t)
-      max_latency
+      (max_latency genesis_constants.protocol.block_window_duration_ms)
   in
   t.timer <- Some timer ;
   t

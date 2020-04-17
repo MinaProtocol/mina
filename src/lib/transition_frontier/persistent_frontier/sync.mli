@@ -13,6 +13,7 @@ val create :
      logger:Logger.t
   -> time_controller:Block_time.Controller.t
   -> base_hash:Frontier_hash.t
+  -> genesis_constants:Genesis_constants.t
   -> db:Database.t
   -> t
 

@@ -32,24 +32,37 @@ module Protocol = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
-        type ('k, 'delta, 'genesis_state_timestamp) t =
+        type ( 'k
+             , 'delta
+             , 'genesis_state_timestamp
+             , 'block_window_duration_ms )
+             t =
           { k: 'k
           ; delta: 'delta
-          ; genesis_state_timestamp: 'genesis_state_timestamp }
+          ; genesis_state_timestamp: 'genesis_state_timestamp
+          ; block_window_duration_ms: 'block_window_duration_ms }
         [@@deriving eq, ord, hash, sexp, yojson]
       end
     end]
 
-    type ('k, 'delta, 'genesis_state_timestamp) t =
-          ('k, 'delta, 'genesis_state_timestamp) Stable.Latest.t =
-      {k: 'k; delta: 'delta; genesis_state_timestamp: 'genesis_state_timestamp}
+    type ('k, 'delta, 'genesis_state_timestamp, 'block_window_duration_ms) t =
+          ( 'k
+          , 'delta
+          , 'genesis_state_timestamp
+          , 'block_window_duration_ms )
+          Stable.Latest.t =
+      { k: 'k
+      ; delta: 'delta
+      ; genesis_state_timestamp: 'genesis_state_timestamp
+      ; block_window_duration_ms: 'block_window_duration_ms }
     [@@deriving eq]
   end
 
   [%%versioned_asserted
   module Stable = struct
     module V1 = struct
-      type t = (int, int, Time.t) Poly.Stable.V1.t [@@deriving eq, ord, hash]
+      type t = (int, int, Time.t, int) Poly.Stable.V1.t
+      [@@deriving eq, ord, hash]
 
       let to_latest = Fn.id
 
@@ -60,16 +73,23 @@ module Protocol = struct
           ; ( "genesis_state_timestamp"
             , `String
                 (Time.to_string_abs t.genesis_state_timestamp
-                   ~zone:Time.Zone.utc) ) ]
+                   ~zone:Time.Zone.utc) )
+          ; ("block_window_duration_ms", `Int t.block_window_duration_ms) ]
 
       let of_yojson = function
         | `Assoc
             [ ("k", `Int k)
             ; ("delta", `Int delta)
-            ; ("genesis_state_timestamp", `String time_str) ] -> (
+            ; ("genesis_state_timestamp", `String time_str)
+            ; ("block_window_duration_ms", `Int block_window_duration_ms) ]
+          -> (
           match validate_time time_str with
           | Ok genesis_state_timestamp ->
-              Ok {Poly.k; delta; genesis_state_timestamp}
+              Ok
+                { Poly.k
+                ; delta
+                ; genesis_state_timestamp
+                ; block_window_duration_ms }
           | Error e ->
               Error (sprintf !"Genesis_constants.Protocol.of_yojson: %s" e) )
         | _ ->
@@ -79,14 +99,14 @@ module Protocol = struct
 
       let sexp_of_t (t : t) =
         let module T = struct
-          type t = (int, int, string) Poly.Stable.V1.t [@@deriving sexp]
+          type t = (int, int, string, int) Poly.Stable.V1.t [@@deriving sexp]
         end in
         let t' : T.t =
           { k= t.k
           ; delta= t.delta
           ; genesis_state_timestamp=
               Time.to_string_abs t.genesis_state_timestamp ~zone:Time.Zone.utc
-          }
+          ; block_window_duration_ms= t.block_window_duration_ms }
         in
         T.sexp_of_t t'
     end
@@ -97,11 +117,12 @@ module Protocol = struct
           { k= 1
           ; delta= 100
           ; genesis_state_timestamp=
-              Time.of_string "2019-10-08 17:51:23.050849Z" }
+              Time.of_string "2019-10-08 17:51:23.050849Z"
+          ; block_window_duration_ms= 2000 }
         in
         (*from the print statement in Serialization.check_serialization*)
         let known_good_hash =
-          "\x18\x3E\xF4\x11\xAC\x44\x83\xBF\x0E\x0F\x76\x5B\xF7\xE6\xFA\xE7\xEB\x24\xF6\xF7\xAA\xC8\x37\x71\xF7\xB9\x54\x66\xF6\x38\xB3\xF1"
+          "\x1A\x5B\x19\x58\xE8\xE9\x92\x1B\xA7\x86\x90\x6A\xEE\x6E\xF0\x74\x0B\x0A\x6C\x24\x09\x1D\x0C\x84\x10\x9A\x74\x52\xCD\x26\xAB\x86"
         in
         Serialization.check_serialization (module V1) t known_good_hash
     end
@@ -139,12 +160,16 @@ consensus_mechanism]
 [%%inject
 "pool_max_size", pool_max_size]
 
+[%%inject
+"block_window_duration_ms", block_window_duration]
+
 let compiled : t =
   { protocol=
       { k
       ; delta
       ; genesis_state_timestamp=
-          genesis_timestamp_of_string genesis_state_timestamp_string }
+          genesis_timestamp_of_string genesis_state_timestamp_string
+      ; block_window_duration_ms }
   ; txpool_max_size= pool_max_size }
 
 module Config_file = struct
@@ -152,7 +177,8 @@ module Config_file = struct
     { k: int option
     ; delta: int option
     ; txpool_max_size: int option
-    ; genesis_state_timestamp: string option }
+    ; genesis_state_timestamp: string option
+    ; block_window_duration_ms: int option }
   [@@deriving yojson]
 
   let of_yojson s =
@@ -178,7 +204,10 @@ let of_config_file ~(default : t) (t : Config_file.t) : t =
     ; delta= opt default.protocol.delta t.delta
     ; genesis_state_timestamp=
         Option.value_map ~default:default.protocol.genesis_state_timestamp
-          t.genesis_state_timestamp ~f:genesis_timestamp_of_string }
+          t.genesis_state_timestamp ~f:genesis_timestamp_of_string
+    ; block_window_duration_ms=
+        opt default.protocol.block_window_duration_ms
+          t.block_window_duration_ms }
   in
   {protocol; txpool_max_size= opt default.txpool_max_size t.txpool_max_size}
 
@@ -189,7 +218,8 @@ let to_config_file t : Config_file.t =
   ; genesis_state_timestamp=
       Some
         (Core.Time.format t.protocol.genesis_state_timestamp
-           "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }
+           "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc)
+  ; block_window_duration_ms= Some t.protocol.block_window_duration_ms }
 
 let of_daemon_config ~(default : t)
     ({txpool_max_size; genesis_state_timestamp} : Daemon_config.t) : t =

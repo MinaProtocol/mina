@@ -12,7 +12,8 @@ type 'n num_peers = 'n Peano.gt_1
 (* TODO: make transition frontier a mutable option *)
 type peer_state =
   { frontier: Transition_frontier.t
-  ; consensus_local_state: Consensus.Data.Local_state.t }
+  ; consensus_local_state: Consensus.Data.Local_state.t
+  ; genesis_constants: Genesis_constants.t }
 
 type peer_network =
   {peer: Network_peer.Peer.t; state: peer_state; network: Coda_networking.t}
@@ -50,7 +51,7 @@ let setup (type n) ?(logger = Logger.null ())
   let fake_gossip_network =
     Gossip_net.Fake.create_network (Vect.to_list peers)
   in
-  let config peer consensus_local_state =
+  let config peer genesis_constants consensus_local_state =
     let open Coda_networking.Config in
     { logger
     ; trust_system
@@ -65,7 +66,7 @@ let setup (type n) ?(logger = Logger.null ())
           , Gossip_net.Fake.create_instance fake_gossip_network peer )
     ; log_gossip_heard=
         {snark_pool_diff= true; transaction_pool_diff= true; new_state= true}
-    }
+    ; genesis_constants }
   in
   let peer_networks =
     Vect.map2 peers states ~f:(fun peer state ->
@@ -74,7 +75,8 @@ let setup (type n) ?(logger = Logger.null ())
           Thread_safe.block_on_async_exn (fun () ->
               (* TODO: merge implementations with coda_lib *)
               Coda_networking.create
-                (config peer state.consensus_local_state)
+                (config peer state.genesis_constants
+                   state.consensus_local_state)
                 ~get_staged_ledger_aux_and_pending_coinbases_at_hash:
                   (fun query_env ->
                   let input = Envelope.Incoming.data query_env in
@@ -124,39 +126,43 @@ module Generator = struct
   open Quickcheck
   open Generator.Let_syntax
 
-  type peer_config = max_frontier_length:int -> peer_state Generator.t
+  type peer_config =
+       genesis_constants:Genesis_constants.t
+    -> max_frontier_length:int
+    -> peer_state Generator.t
 
-  let fresh_peer ~max_frontier_length =
+  let fresh_peer ~genesis_constants ~max_frontier_length =
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
         ~genesis_ledger:Test_genesis_ledger.t
     in
     let%map frontier =
       Transition_frontier.For_tests.gen ~consensus_local_state
-        ~max_length:max_frontier_length ~size:0 ()
+        ~genesis_constants ~max_length:max_frontier_length ~size:0 ()
     in
-    {frontier; consensus_local_state}
+    {frontier; consensus_local_state; genesis_constants}
 
-  let peer_with_branch ~frontier_branch_size ~max_frontier_length =
+  let peer_with_branch ~frontier_branch_size ~genesis_constants
+      ~max_frontier_length =
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
         ~genesis_ledger:Test_genesis_ledger.t
     in
     let%map frontier, branch =
-      Transition_frontier.For_tests.gen_with_branch
+      Transition_frontier.For_tests.gen_with_branch ~genesis_constants
         ~max_length:max_frontier_length ~frontier_size:0
         ~branch_size:frontier_branch_size ~consensus_local_state ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Deferred.List.iter branch
           ~f:(Transition_frontier.add_breadcrumb_exn frontier) ) ;
-    {frontier; consensus_local_state}
+    {frontier; consensus_local_state; genesis_constants}
 
-  let gen ~max_frontier_length configs =
+  let gen ~genesis_constants ~max_frontier_length configs =
     let open Quickcheck.Generator.Let_syntax in
     let%map states =
-      Vect.Quickcheck_generator.map configs ~f:(fun config ->
-          config ~max_frontier_length )
+      Vect.Quickcheck_generator.map configs ~f:(fun (config : peer_config) ->
+          config ~genesis_constants ~max_frontier_length )
     in
     setup states
 end

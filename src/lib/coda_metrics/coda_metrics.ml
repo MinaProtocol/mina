@@ -6,6 +6,18 @@ open Prometheus
 open Namespace
 open Metric_generators
 
+(* TODO: This is a hack to avoid a large refactor. *)
+let set_block_window_duration_and_start block_window_duration =
+  Metric_generators.block_window_duration := Some block_window_duration ;
+  match !Metric_generators.ticks with
+  | Some l ->
+      Metric_generators.ticks := None ;
+      List.iter l ~f:(fun f -> f ())
+  | None ->
+      failwith "Coda_metrics.block_window_duration has already been set."
+
+let block_window_duration = Metric_generators.lazy_block_window_duration
+
 (* textformat serialization and runtime metrics taken from github.com/mirage/prometheus:/app/prometheus_app.ml *)
 module TextFormat_0_0_4 = struct
   let re_unquoted_escapes = Re.compile @@ Re.set "\\\n"
@@ -563,9 +575,9 @@ module Transition_frontier = struct
 
   module TPS_30min =
     Moving_bucketed_average (struct
-        let bucket_interval = Core.Time.Span.of_min 3.0
+        let bucket_interval _ = Core.Time.Span.of_min 3.0
 
-        let num_buckets = 10
+        let num_buckets _ = 10
 
         let render_average buckets =
           let total =
@@ -654,23 +666,20 @@ end
 module Block_latency = struct
   let subsystem = "Block_latency"
 
-  [%%inject
-  "block_window_duration", block_window_duration]
-
   module Latency_time_spec = struct
-    let tick_interval =
+    let tick_interval block_window_duration =
       Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
 
-    let rolling_interval =
+    let rolling_interval block_window_duration =
       Core.Time.Span.of_ms (Int.to_float (block_window_duration * 20))
   end
 
   module Gossip_slots =
     Moving_bucketed_average (struct
-        let bucket_interval =
+        let bucket_interval block_window_duration =
           Core.Time.Span.of_ms (Int.to_float (block_window_duration / 2))
 
-        let num_buckets = 40
+        let num_buckets _ = 40
 
         let subsystem = subsystem
 

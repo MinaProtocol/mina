@@ -445,7 +445,8 @@ module For_tests = struct
         in
         Breadcrumb.create genesis_transition genesis_staged_ledger )
 
-  let gen_persistence ?(logger = Logger.null ()) ?verifier () =
+  let gen_persistence ?(logger = Logger.null ()) ?verifier ~genesis_constants
+      () =
     let open Core in
     let verifier =
       match verifier with
@@ -486,7 +487,7 @@ module For_tests = struct
         let persistent_frontier =
           Persistent_frontier.create ~logger ~verifier
             ~time_controller:(Block_time.Controller.basic ~logger)
-            ~directory:frontier_dir
+            ~directory:frontier_dir ~genesis_constants
         in
         Gc.Expert.add_finalizer_exn persistent_root clean_temp_dirs ;
         Gc.Expert.add_finalizer_exn persistent_frontier (fun x ->
@@ -503,7 +504,7 @@ module For_tests = struct
         ( Lazy.force Test_genesis_ledger.t
         , Lazy.force Test_genesis_ledger.accounts ))
       ?(gen_root_breadcrumb = gen_genesis_breadcrumb ~logger ?verifier ())
-      ~max_length ~size () =
+      ~genesis_constants ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
     let genesis_state_hash =
       Coda_state.Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
@@ -546,7 +547,7 @@ module For_tests = struct
           |> Staged_ledger.pending_coinbase_collection }
     in
     let%map persistent_root, persistent_frontier =
-      gen_persistence ~logger ()
+      gen_persistence ~logger ~genesis_constants ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_frontier.reset_database_exn persistent_frontier ~root_data
@@ -587,12 +588,13 @@ module For_tests = struct
       ?(root_ledger_and_accounts =
         ( Lazy.force Test_genesis_ledger.t
         , Lazy.force Test_genesis_ledger.accounts )) ?gen_root_breadcrumb
-      ?(get_branch_root = root) ~max_length ~frontier_size ~branch_size () =
+      ?(get_branch_root = root) ~genesis_constants ~max_length ~frontier_size
+      ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
       gen ?logger ?verifier ?trust_system ?consensus_local_state
         ?gen_root_breadcrumb ~root_ledger_and_accounts ~max_length
-        ~size:frontier_size ()
+        ~size:frontier_size ~genesis_constants ()
     in
     let%map make_branch =
       Breadcrumb.For_tests.gen_seq ?logger ?verifier ?trust_system

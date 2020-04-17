@@ -453,7 +453,9 @@ let%test_module "Bootstrap_controller tests" =
         (* we only need one node for this test, but we need more than one peer so that coda_networking does not throw an error *)
         let%bind fake_network =
           Fake_network.Generator.(
-            gen ~max_frontier_length [fresh_peer; fresh_peer])
+            gen ~max_frontier_length
+              ~genesis_constants:Genesis_constants.compiled
+              [fresh_peer; fresh_peer])
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq

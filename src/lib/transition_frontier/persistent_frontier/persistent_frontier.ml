@@ -42,6 +42,7 @@ and Factory_type : sig
   type t =
     { logger: Logger.t
     ; directory: string
+    ; genesis_constants: Genesis_constants.t
     ; verifier: Verifier.t
     ; time_controller: Block_time.Controller.t
     ; mutable instance: Instance_type.t option }
@@ -77,7 +78,8 @@ module Instance = struct
     t.sync
     <- Some
          (Sync.create ~logger:t.factory.logger
-            ~time_controller:t.factory.time_controller ~base_hash ~db:t.db)
+            ~time_controller:t.factory.time_controller ~base_hash
+            ~genesis_constants:t.factory.genesis_constants ~db:t.db)
 
   let stop_sync t =
     let open Deferred.Let_syntax in
@@ -270,8 +272,13 @@ end
 
 type t = Factory_type.t
 
-let create ~logger ~verifier ~time_controller ~directory =
-  {logger; verifier; time_controller; directory; instance= None}
+let create ~logger ~verifier ~time_controller ~directory ~genesis_constants =
+  { logger
+  ; verifier
+  ; time_controller
+  ; directory
+  ; genesis_constants
+  ; instance= None }
 
 let destroy_database_exn t =
   assert (t.instance = None) ;

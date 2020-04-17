@@ -306,7 +306,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
-           ~frontier_size:1 ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
+           ~genesis_constants:Genesis_constants.compiled ~frontier_size:1
+           ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
           let catchup_job_reader, catchup_job_writer =
             Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
@@ -359,7 +360,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
-           ~frontier_size:1 ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
+           ~genesis_constants:Genesis_constants.compiled ~frontier_size:1
+           ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
           let cache = Unprocessed_transition_cache.create ~logger in
           let register_breadcrumb breadcrumb =
             Unprocessed_transition_cache.register_exn cache
@@ -443,7 +445,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
       in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
-           ~frontier_size:1 ~branch_size:5 ()) ~f:(fun (frontier, branch) ->
+           ~genesis_constants:Genesis_constants.compiled ~frontier_size:1
+           ~branch_size:5 ()) ~f:(fun (frontier, branch) ->
           let catchup_job_reader, catchup_job_writer =
             Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
