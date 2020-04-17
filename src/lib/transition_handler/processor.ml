@@ -355,7 +355,9 @@ let%test_module "Transition_handler.Processor tests" =
     let () =
       Backtrace.elide := false ;
       Printexc.record_backtrace true ;
-      Async.Scheduler.set_record_backtraces true
+      Async.Scheduler.set_record_backtraces true ;
+      Coda_metrics.set_block_window_duration_and_start
+        Genesis_constants.compiled.protocol.block_window_duration_ms
 
     let logger = Logger.create ()
 

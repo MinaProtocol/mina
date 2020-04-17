@@ -13,7 +13,12 @@ let lazy_block_window_duration =
     | Some x ->
         x
     | None ->
-        failwith "Coda_metrics.block_window_duration is not set" )
+        if Ppx_inline_test_lib.Runtime.am_running_inline_test then
+          (* We're running inline tests, set block_window_duration to the value
+             set in the compile-time config.
+          *)
+          Genesis_constants.compiled.protocol.block_window_duration_ms
+        else failwith "Coda_metrics.block_window_duration is not set" )
 
 module type Metric_spec_intf = sig
   val subsystem : string

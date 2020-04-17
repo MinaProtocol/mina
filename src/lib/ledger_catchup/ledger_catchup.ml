@@ -402,7 +402,9 @@ let%test_module "Ledger_catchup tests" =
   ( module struct
     let () =
       Core.Backtrace.elide := false ;
-      Async.Scheduler.set_record_backtraces true
+      Async.Scheduler.set_record_backtraces true ;
+      Coda_metrics.set_block_window_duration_and_start
+        Genesis_constants.compiled.protocol.block_window_duration_ms
 
     let max_frontier_length = 10
 
