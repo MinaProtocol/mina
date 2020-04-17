@@ -30,7 +30,9 @@ let make =
       ~bgColor=Theme.Colors.hyperlink,
       ~bgColorHover=Theme.Colors.hyperlinkAlpha(1.),
     ) => {
-  <a className={Styles.button(bgColor, bgColorHover)} href=link>
-    {React.string(label)}
-  </a>;
+  <Next.Link href=link>
+    <a className={Styles.button(bgColor, bgColorHover)}>
+      {React.string(label)}
+    </a>
+  </Next.Link>;
 };
