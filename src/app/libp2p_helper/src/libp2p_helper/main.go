@@ -1053,6 +1053,12 @@ func main() {
 		}
 	}()
 
+	defer func() {
+		if r := recover(); r != nil {
+			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
+		}
+	}()
+
 	for lines.Scan() {
 		line := lines.Text()
 		var raw json.RawMessage
@@ -1068,11 +1074,6 @@ func main() {
 			log.Print("when unmarshaling the method invocation...")
 			log.Panic(err)
 		}
-		defer func() {
-			if r := recover(); r != nil {
-				helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
-			}
-		}()
 		start := time.Now()
 		res, err := msg.run(app)
 		if err == nil {
