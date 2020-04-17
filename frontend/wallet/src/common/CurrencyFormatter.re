@@ -15,7 +15,8 @@ let rec pow = a =>
         }
       );
     };
-let precision_exp = Int64.of_int(pow(10, precision));
+let precissionExp = Int64.of_int(pow(10, precision));
+let maxFormattedLength = 9;
 let toFormattedString = amount => {
   if (amount < Int64.zero) {
     failwith("CurrencyFormatter.toFormattedString: negative currency input");
@@ -26,18 +27,23 @@ let toFormattedString = amount => {
     } else {
       (num_stripped_zeros, num);
     };
-  let whole = Int64.div(amount, precision_exp);
-  let remainder = Int64.to_int(Int64.rem(amount, precision_exp));
+  let whole = Int64.div(amount, precissionExp);
+  let remainder = Int64.to_int(Int64.rem(amount, precissionExp));
   if (remainder == 0) {
     Int64.to_string(whole);
   } else {
     let (num_stripped_zeros, num) = go(0, remainder);
-    Printf.sprintf(
+    let formattedOutput = Printf.sprintf(
       "%s.%0*d",
       Int64.to_string(whole),
       precision - num_stripped_zeros,
       num,
     );
+    if (String.length(formattedOutput) > maxFormattedLength) {
+      String.sub(formattedOutput, 0, maxFormattedLength) ++ {js|…|js} 
+    } else {
+      formattedOutput
+    }
   };
 };
 let ofFormattedString = input => {

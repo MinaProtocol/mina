@@ -175,7 +175,7 @@ let make = () => {
            ("after", Js.Json.null),
          ])
          |> Js.Json.object_;
-       <TransactionsQuery variables>
+       <TransactionsQuery variables fetchPolicy="network-only">
          (
            response =>
              switch (response.result) {
