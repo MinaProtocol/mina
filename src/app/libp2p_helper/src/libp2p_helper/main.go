@@ -1053,6 +1053,8 @@ func main() {
 		}
 	}()
 
+	var line string
+
 	defer func() {
 		if r := recover(); r != nil {
 			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
@@ -1060,7 +1062,7 @@ func main() {
 	}()
 
 	for lines.Scan() {
-		line := lines.Text()
+		line = lines.Text()
 		var raw json.RawMessage
 		env := envelope{
 			Body: &raw,

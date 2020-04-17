@@ -380,6 +380,9 @@ jobs:
             - run:
                   name: Pin external packages
                   command: ./scripts/pin-external-packages.sh
+            - run:
+                name: Build libp2p_helper
+                command: make libp2p_helper
             # Explicitly generate PV-keys and uploading before building
             # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
