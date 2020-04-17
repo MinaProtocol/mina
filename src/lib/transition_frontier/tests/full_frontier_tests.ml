@@ -158,7 +158,8 @@ let%test_module "Full_frontier tests" =
                     |> Staged_ledger.scan_state
                     |> Staged_ledger.Scan_state.required_state_hashes
                   in
-                  List.iter required_state_hashes ~f:(fun hash ->
+                  List.iter (State_hash.Set.to_list required_state_hashes)
+                    ~f:(fun hash ->
                       Full_frontier.For_tests.find_protocol_state_exn frontier
                         hash
                       |> ignore ) ) ) )

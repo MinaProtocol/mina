@@ -47,7 +47,7 @@ let main () =
       * i
       |> Float.of_int
     in
-    (*Wait till root transitions once *)
+    (*Wait till the root transitions once *)
     Async.after (Core.Time.Span.of_ms (root_transition_time 1))
   in
   (*bootstrap again*)
@@ -60,7 +60,7 @@ let main () =
     Sync_status.Table.find_exn previous_status `Bootstrap
   in
   let synced_count = Sync_status.Table.find_exn previous_status `Synced in
-  (*Status changes when the node the first starts, when triggered bootstrap twice*)
+  (*Statuses change when the node first starts and when bootstrap is triggered twice*)
   assert (bootstrap_count >= 3 && synced_count >= 3) ;
   Coda_worker_testnet.Api.teardown testnet ~logger
 

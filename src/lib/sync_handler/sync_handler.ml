@@ -70,10 +70,9 @@ module Make (Inputs : Inputs_intf) :
       |> List.fold_until ~init:(Some [])
            ~f:(fun acc hash ->
              match
-               acc
-               >>= fun ps ->
-               Transition_frontier.find_protocol_state frontier hash
-               >>= fun p -> Some (p :: ps)
+               Option.map2
+                 (Transition_frontier.find_protocol_state frontier hash)
+                 acc ~f:List.cons
              with
              | None ->
                  Stop None

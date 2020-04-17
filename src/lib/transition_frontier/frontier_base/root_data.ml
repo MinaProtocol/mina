@@ -145,7 +145,7 @@ module Minimal = struct
         (External_transition.Validated.state_hash transition)
         hash ) ;
     Staged_ledger.Scan_state.check_required_protocol_states t.common.scan_state
-      ~protocol_states:(List.unzip protocol_states |> snd)
+      ~protocol_states:(List.map ~f:snd protocol_states)
     |> Or_error.ok_exn |> ignore ;
     {Limited.transition; protocol_states; common= t.common}
 
