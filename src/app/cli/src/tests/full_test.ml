@@ -211,7 +211,7 @@ let run_test () : unit Deferred.t =
              ~genesis_state_hash:
                (Coda_state.Genesis_protocol_state.For_tests.genesis_state_hash
                   ())
-             ~genesis_constants)
+             ~genesis_constants ())
           ~genesis_ledger:Test_genesis_ledger.t
           ~base_proof:Precomputed_values.base_proof
       in
