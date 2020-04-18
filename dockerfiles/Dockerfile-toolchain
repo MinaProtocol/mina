@@ -95,6 +95,7 @@ RUN eval $(opam env)
 
 # Install OPAM packages for spacetime compiler; use ulimited stack for camlp4 build
 ADD /src/opam.export .
+RUN opam install dune.1.11.4
 RUN ulimit -s unlimited && opam switch import opam.export
 
 # Remove .git files for submodules
