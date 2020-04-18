@@ -1,6 +1,13 @@
 open Core_kernel
 
-type 'a t = {checksum: Md5.t; data: 'a} [@@deriving bin_io]
+[%%versioned
+module Stable = struct
+  module V1 = struct
+    type 'a t = {checksum: Core_kernel.Md5.Stable.V1.t; data: 'a}
+  end
+end]
+
+type 'a t = 'a Stable.Latest.t = {checksum: Md5.t; data: 'a}
 
 let md5 (tc : 'a Binable.m) data =
   Md5.digest_string (Binable.to_string tc data)

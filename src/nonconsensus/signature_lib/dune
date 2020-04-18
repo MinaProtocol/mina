@@ -3,7 +3,16 @@
  (public_name signature_lib_nonconsensus)
  (library_flags -linkall)
  (inline_tests)
- (libraries snark_params_nonconsensus bignum_bigint core_kernel non_zero_curve_point_nonconsensus yojson blake2 random_oracle_nonconsensus module_version)
+ (libraries
+   bignum_bigint
+   blake2
+   core_kernel
+   hash_prefix_states_nonconsensus
+   module_version
+   non_zero_curve_point_nonconsensus
+   random_oracle_nonconsensus
+   snark_params_nonconsensus
+   yojson)
  (preprocessor_deps ../../config.mlh)
  (preprocess
   (pps ppx_coda -lint-version-syntax-warnings ppx_optcomp ppx_sexp_conv
