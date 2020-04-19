@@ -89,6 +89,8 @@ type t =
   ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
 [@@deriving fields]
 
+let time_controller t = t.config.time_controller
+
 let subscription t = t.subscriptions
 
 let peek_frontier frontier_broadcast_pipe =
