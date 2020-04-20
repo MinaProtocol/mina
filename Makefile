@@ -15,6 +15,10 @@ ifeq ($(DUNE_PROFILE),)
 DUNE_PROFILE := dev
 endif
 
+ifeq ($(GO),)
+GO := go
+endif
+
 TMPDIR ?= /tmp
 
 ifeq ($(USEDOCKER),TRUE)
@@ -65,7 +69,7 @@ libp2p_helper:
 
 # TEMP HACK (for circle-ci)
 libp2p_helper_nixless:
-	$(WRAPAPP) bash -c "set -e && cd src/app/libp2p_helper && rm -rf result && mkdir -p result/bin && cd src && go mod download && cd .. && for f in generate_methodidx libp2p_helper; do cd src/\$$f && go build; cp \$$f ../../result/bin/\$$f; cd ../../; done"
+	$(WRAPAPP) bash -c "set -e && cd src/app/libp2p_helper && rm -rf result && mkdir -p result/bin && cd src && $(GO) mod download && cd .. && for f in generate_methodidx libp2p_helper; do cd src/\$$f && $(GO) build; cp \$$f ../../result/bin/\$$f; cd ../../; done"
 
 GENESIS_DIR := $(TMPDIR)/coda_cache_dir
 
