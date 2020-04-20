@@ -137,6 +137,9 @@ RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://releases.ni
 # we used to delete the repo here
 # we now leave it intact, in case updating OPAM in CI requires pinned package sources
 
+# TEMP HACK (for libp2p_helper nixless builds)
+RUN sudo apt-get install --yes golang-1.8
+
 # The Ocaml images are set to London time for reason. UTC makes reading the logs
 # easier.
 RUN sudo ln -sf /usr/share/zoneinfo/UTC /etc/localtime

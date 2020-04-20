@@ -63,6 +63,10 @@ clean:
 libp2p_helper:
 	$(WRAPAPP) bash -c "set -o pipefail ; if [ -z \"$${USER}\" ]; then export USER=opam ; fi && source ~/.nix-profile/etc/profile.d/nix.sh && (if [ -z \"$${CACHIX_SIGNING_KEY+x}\" ]; then cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix;  else cachix use codaprotocol && cd src/app/libp2p_helper && nix-build $${EXTRA_NIX_ARGS} default.nix | cachix push codaprotocol ; fi)"
 
+# TEMP HACK (for circle-ci)
+libp2p_helper_nixless:
+	$(WRAPAPP) bash -c "set -e && cd src/app/libp2p_helper && rm -rf result && mkdir -p result/bin && cd src && go mod download && cd .. && for f in generate_methodidx libp2p_helper; do cd src/\$$f && go build; cp \$$f ../../result/bin/\$$f; cd ../../; done"
+
 GENESIS_DIR := $(TMPDIR)/coda_cache_dir
 
 # generate the actual ledger and store in a tar
