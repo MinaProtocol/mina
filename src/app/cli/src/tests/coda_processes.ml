@@ -102,17 +102,13 @@ let stabalize_and_start_or_timeout ?(timeout_ms = 20000.) nodes =
   | `Ready ->
       Deferred.List.iter nodes ~f:(fun node -> Coda_process.start_exn node)
 
-let spawn_local_processes_exn ?(first_delay = 0.0) configs =
+let spawn_local_processes_exn configs =
   match configs with
   | [] ->
       failwith "Configs should be non-empty"
-  | first :: rest ->
-      let%bind first_created = Coda_process.spawn_exn first in
-      let%bind () = after (Time.Span.of_sec first_delay) in
-      let%bind rest_created =
-        Deferred.List.all
-          (List.map rest ~f:(fun c -> Coda_process.spawn_exn c))
+  | _ ->
+      let%bind all_created =
+        Deferred.List.all (List.map configs ~f:Coda_process.spawn_exn)
       in
-      let all_created = first_created :: rest_created in
       let%map () = stabalize_and_start_or_timeout all_created in
       all_created
