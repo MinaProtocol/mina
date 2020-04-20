@@ -258,47 +258,50 @@ module InfoSection = {
            <Link> {React.string("+ Insert transaction receipts")} </Link>
          </MainRow>
        | StakingReward(rewards, _) =>
-         <>
-           <MainRow>
-             <Link>
-               {React.string(expanded ? "Collapse" : "Show fee transfers")}
-             </Link>
-           </MainRow>
-           {expanded
-              ? <ul className=Css.(style([margin(`zero), padding(`zero)]))>
-                  {Array.map(rewards, ~f=((pubkey, amount)) =>
-                     <li
-                       key={
-                         PublicKey.toString(pubkey)
-                         ++ Int64.to_string(amount)
-                       }
-                       className=Css.(
-                         style([
-                           display(`flex),
-                           justifyContent(`spaceBetween),
-                           alignItems(`center),
-                           marginBottom(`rem(1.)),
-                         ])
-                       )>
-                       <ActorName value={ViewModel.Actor.Key(pubkey)} />
-                       <span>
-                         <Amount
-                           value=amount
-                           positive={
-                             Option.map(
-                               ~f=PublicKey.equal(pubkey),
-                               activeAccount,
-                             )
-                             |> Option.withDefault(~default=false)
+         Array.length(rewards) === 0
+           ? React.null
+           : <>
+               <MainRow>
+                 <Link>
+                   {React.string(expanded ? "Collapse" : "Show fee transfers")}
+                 </Link>
+               </MainRow>
+               {expanded
+                  ? <ul
+                      className=Css.(style([margin(`zero), padding(`zero)]))>
+                      {Array.map(rewards, ~f=((pubkey, amount)) =>
+                         <li
+                           key={
+                             PublicKey.toString(pubkey)
+                             ++ Int64.to_string(amount)
                            }
-                         />
-                       </span>
-                     </li>
-                   )
-                   |> ReasonReact.array}
-                </ul>
-              : <span />}
-         </>
+                           className=Css.(
+                             style([
+                               display(`flex),
+                               justifyContent(`spaceBetween),
+                               alignItems(`center),
+                               marginBottom(`rem(1.)),
+                             ])
+                           )>
+                           <ActorName value={ViewModel.Actor.Key(pubkey)} />
+                           <span>
+                             <Amount
+                               value=amount
+                               positive={
+                                 Option.map(
+                                   ~f=PublicKey.equal(pubkey),
+                                   activeAccount,
+                                 )
+                                 |> Option.withDefault(~default=false)
+                               }
+                             />
+                           </span>
+                         </li>
+                       )
+                       |> ReasonReact.array}
+                    </ul>
+                  : <span />}
+             </>
        }}
     </div>;
   };
