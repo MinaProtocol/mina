@@ -138,7 +138,9 @@ RUN sudo apt-get install gnupg2 && curl -o install-nix-2.3.2 https://releases.ni
 # we now leave it intact, in case updating OPAM in CI requires pinned package sources
 
 # TEMP HACK (for libp2p_helper nixless builds)
-RUN sudo apt-get install --yes golang-1.8
+RUN sudo apt-get install --yes wget 
+RUN cd /usr/lib && sudo wget https://dl.google.com/go/go1.13.10.linux-amd64.tar.gz && sudo tar -xvf go1.13.10.linux-amd64.tar.gz && sudo rm go1.13.10.linux-amd64.tar.gz
+RUN echo 'export PATH="$PATH:/usr/lib/go/bin"' >> /home/opam/.bashrc
 
 # The Ocaml images are set to London time for reason. UTC makes reading the logs
 # easier.
