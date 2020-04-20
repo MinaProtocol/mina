@@ -50,6 +50,10 @@ Now that we've started up a node and are running the Coda daemon, open up anothe
 
 It may take up to a minute before `coda client status` connects to the daemon when first starting up. So if you see `Error: daemon not running. See coda daemon`, just a wait a bit and try again.
 
+If you are using the [Sandbox Node](/docs/developers/sandbox-node), due to a quirk in the way we communicate for the coda client status command, you will need to run `coda client status` inside the container itself:
+
+`docker exec -it coda bash`
+
 </Alert>
 
 Most likely we will see a response that include the fields below:
