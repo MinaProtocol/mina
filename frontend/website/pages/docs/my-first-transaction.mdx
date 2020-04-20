@@ -6,16 +6,13 @@ export default Page({title: "My First Transaction"});
 
 In this section, we'll make our first transaction on the Coda network. After [installing the software](./getting-started), we'll need to create a new account before we can send or receive coda. Let's first start up the node so that we can start issuing commands.
 
-## Get the network information
+<Alert kind="welcome">
 
-Because only 200 participants can join testnet 3.2, you'll first need to get the peer addresses of the seed nodes. The 200 participants have already been selected, but you can sign up for the waitlist [here](https://docs.google.com/forms/d/e/1FAIpQLSfjfd8Tr9iy1gObKrfiI8upauksFpe5Tf_0ApZHri9jj4YIEA/viewform) in case a spot opens up. 
+For the 3.2a testnet, we are not running a live network. Instead, we encourage you to play with the [Sandbox Node](/docs/developers/sandbox-node).
 
-Once you're in, you'll receive an email close to release 3.2 launch date with the seed node addresses and updated commands. We can start by storing the seed addresses as environment variables to help with the next steps:
+Once you set up the sandbox node, you can skip steps that pertain to running `coda daemon`.
 
-```
-export SEED1='<seed-address-1>'
-export SEED2='<seed-address-2>'
-```
+</Alert>
 
 ## Start up a node
 
@@ -27,7 +24,7 @@ export SEED2='<seed-address-2>'
 
 </Alert>
 
-Run the following command to start up a Coda node instance and connect to the network:
+Run the following command to start up a Coda node instance and connect to the live network:
 
 <DaemonCommandExample />
 
