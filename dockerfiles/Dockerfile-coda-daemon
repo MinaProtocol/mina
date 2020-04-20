@@ -15,6 +15,7 @@ RUN apt-get -y update && \
     libgmp10 \
     libgomp1 \
     libffi6 \
+    libsodium18 \
     apt-transport-https \
     ca-certificates \
     dnsutils \
@@ -26,7 +27,7 @@ RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/ap
   && apt-get update \
   && apt-get install --force-yes coda-testnet-postake-medium-curves=$coda_version -y
 
-WORKDIR /root 
+WORKDIR /root
 
 RUN echo '#!/bin/bash\n\
 mkdir -p .coda-config\n\
