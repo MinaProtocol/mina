@@ -178,13 +178,11 @@ describe("Bindings", () =>
   })
 );
 
-let ellipsis = {js|…|js};
-
 describe("CurrencyFormatter", () => {
   describe("toFormattedString", () => {
     test("1 nanocoda", () => {
       expect(CurrencyFormatter.toFormattedString(Int64.of_int(1)))
-      |> toBe("0.0000000" ++ ellipsis)
+      |> toBe("0.000000001")
     });
     test("90 coda", () => {
       expect(
