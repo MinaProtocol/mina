@@ -11,7 +11,7 @@ module AddAccount = [%graphql
 module AddAccountMutation = ReasonApollo.CreateMutation(AddAccount);
 
 [@react.component]
-let make = (~nextStep, ~prevStep) => {
+let make = (~nextStep) => {
   let (accountName, setName) = React.useState(() => "");
   let (password, setPassword) = React.useState(() => "");
 
@@ -32,7 +32,7 @@ let make = (~nextStep, ~prevStep) => {
         <FadeIn duration=500 delay=150>
           <Spacer height=0.5 />
           <OnboardingTextField
-            label="Name"
+            label="Account Name"
             onChange={value => setName(_ => value)}
             value=accountName
           />
@@ -46,18 +46,13 @@ let make = (~nextStep, ~prevStep) => {
           <Spacer height=2. />
         </FadeIn>
         <div className=OnboardingTemplate.Styles.buttonRow>
-          <Button
-            style=Button.HyperlinkBlue2
-            label="Go Back"
-            onClick={_ => prevStep()}
-          />
-          <Spacer width=1.5 />
           <AddAccountMutation>
             {(mutation, {result}) =>
                <>
                  <Button
                    label="Continue"
                    style=Button.HyperlinkBlue3
+                   width=9.
                    disabled={
                      switch (result) {
                      | Loading => true

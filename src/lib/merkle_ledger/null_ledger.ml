@@ -12,7 +12,10 @@ module Make (Inputs : Inputs_intf) : sig
     with module Addr = Inputs.Location.Addr
     with module Location = Inputs.Location
     with type key := Inputs.Key.t
-     and type key_set := Inputs.Key.Set.t
+     and type token_id := Inputs.Token_id.t
+     and type token_id_set := Inputs.Token_id.Set.t
+     and type account_id := Inputs.Account_id.t
+     and type account_id_set := Inputs.Account_id.Set.t
      and type hash := Inputs.Hash.t
      and type root_hash := Inputs.Hash.t
      and type account := Inputs.Account.t
@@ -81,7 +84,8 @@ end = struct
   let merkle_path_at_index_exn t index =
     merkle_path_at_addr_exn t (Addr.of_int_exn index)
 
-  let index_of_key_exn _t = failwith "index_of_key_exn: null ledgers are empty"
+  let index_of_account_exn _t =
+    failwith "index_of_account_exn: null ledgers are empty"
 
   let set_at_index_exn _t =
     failwith "set_at_index_exn: null ledgers cannot be mutated"
@@ -106,15 +110,21 @@ end = struct
   let get_or_create_account _t =
     failwith "get_or_create_account: null ledgers cannot be mutated"
 
-  let location_of_key _t _ = None
+  let location_of_account _t _ = None
 
-  let keys _t = Key.Set.empty
+  let accounts _t = Account_id.Set.empty
+
+  let token_owner _t _tid = None
+
+  let token_owners _t = Account_id.Set.empty
+
+  let tokens _t _pk = Token_id.Set.empty
 
   let iteri _t ~f:_ = ()
 
   let fold_until _t ~init ~f:_ ~finish = finish init
 
-  let foldi_with_ignored_keys _t _ ~init ~f:_ = init
+  let foldi_with_ignored_accounts _t _ ~init ~f:_ = init
 
   let foldi _t ~init ~f:_ = init
 

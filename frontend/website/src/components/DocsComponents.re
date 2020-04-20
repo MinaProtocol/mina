@@ -2,8 +2,8 @@ module Style = {
   open Css;
   let header =
     style([
-      display(`flex),
       marginTop(rem(2.)),
+      textAlign(`left),
       marginBottom(`rem(0.5)),
       color(Theme.Colors.denimTwo),
       hover([selector(".headerlink", [display(`inlineBlock)])]),
@@ -70,8 +70,8 @@ module H1 =
     let element =
       <h1
         className={merge([
-          Style.header,
           Theme.H1.hero,
+          Style.header,
           style([alignItems(`baseline), fontWeight(`light)]),
         ])}
       />;
@@ -82,8 +82,8 @@ module H2 =
     let element =
       <h2
         className={merge([
-          Style.header,
           Theme.H2.basic,
+          Style.header,
           style([alignItems(`baseline), fontWeight(`light)]),
         ])}
       />;
@@ -92,10 +92,10 @@ module H2 =
 module H3 =
   WrapHeader({
     let element =
-      <h2
+      <h3
         className={merge([
-          Style.header,
           Theme.H3.basic,
+          Style.header,
           style([alignItems(`center), fontWeight(`medium)]),
         ])}
       />;
@@ -103,7 +103,7 @@ module H3 =
 
 module H4 =
   WrapHeader({
-    let element = <h2 className={merge([Style.header, Theme.H4.basic])} />;
+    let element = <h4 className={merge([Theme.H4.basic, Style.header])} />;
   });
 
 module P =
@@ -149,14 +149,7 @@ module Pre = {
           },
         ),
       );
-    <pre
-      className={style([
-        backgroundColor(Theme.Colors.slateAlpha(0.05)),
-        borderRadius(`px(9)),
-        padding2(~v=`rem(0.5), ~h=`rem(1.)),
-        overflow(`scroll),
-        position(`relative),
-      ])}>
+    <div className={style([position(`relative)])}>
       <div
         className={style([
           position(`absolute),
@@ -181,8 +174,17 @@ module Pre = {
           |> Promise.iter(() => {Js.log("copied")})
         }}
       />
-      {props##children}
-    </pre>;
+      <pre
+        className={style([
+          backgroundColor(Theme.Colors.slateAlpha(0.05)),
+          borderRadius(`px(9)),
+          padding2(~v=`rem(0.5), ~h=`rem(1.)),
+          overflow(`scroll),
+          selector("code", [Theme.Typeface.pragmataPro]),
+        ])}>
+        {props##children}
+      </pre>
+    </div>;
   };
 };
 
@@ -206,3 +208,24 @@ module Ol =
   Wrap({
     let element = <ol className=Style.list />;
   });
+
+module Img =
+  Wrap({
+    let element = <img width="100%" />;
+  });
+
+let allComponents = () => {
+  "Alert": Alert.make,
+  "h1": H1.make,
+  "h2": H2.make,
+  "h3": H3.make,
+  "h4": H4.make,
+  "p": P.make,
+  "a": A.make,
+  "strong": Strong.make,
+  "pre": Pre.make,
+  "code": Code.make,
+  "ul": Ul.make,
+  "ol": Ol.make,
+  "img": Img.make,
+};

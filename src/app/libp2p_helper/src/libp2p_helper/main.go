@@ -42,17 +42,21 @@ type subscription struct {
 	Cancel context.CancelFunc
 }
 
+type validationStatus struct {
+	Completion chan bool
+	TimedOutAt *time.Time
+}
+
 type app struct {
 	P2p             *codanet.Helper
 	Ctx             context.Context
 	Subs            map[int]subscription
-	Validators      map[int]chan bool
+	Validators      map[int]*validationStatus
 	ValidatorMutex  *sync.Mutex
 	Streams         map[int]net.Stream
 	OutLock         sync.Mutex
 	Out             *bufio.Writer
 	UnsafeNoTrustIP bool
-	Extra           *os.File
 }
 
 var seqs = make(chan int)
@@ -83,6 +87,8 @@ const (
 	unbanIP
 )
 
+const validationTimeout = 5 * time.Minute
+
 type codaPeerInfo struct {
 	Libp2pPort int    `json:"libp2p_port"`
 	Host       string `json:"host"`
@@ -99,7 +105,6 @@ func (app *app) writeMsg(msg interface{}) {
 	app.OutLock.Lock()
 	defer app.OutLock.Unlock()
 	bytes, err := json.Marshal(msg)
-	app.Extra.Write(bytes)
 	if err == nil {
 		n, err := app.Out.Write(bytes)
 		if err != nil {
@@ -331,6 +336,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		return nil, needsDHT()
 	}
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
+		return true
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
 			app.P2p.Logger.Info("would have validated but it's from us!")
@@ -340,7 +346,8 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		seqno := <-seqs
 		ch := make(chan bool, 1)
 		app.ValidatorMutex.Lock()
-		app.Validators[seqno] = ch
+		app.Validators[seqno] = new(validationStatus)
+		(*app.Validators[seqno]).Completion = ch
 		app.ValidatorMutex.Unlock()
 
 		app.P2p.Logger.Info("validating a new pubsub message ...")
@@ -371,8 +378,14 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			// validationComplete will remove app.Validators[seqno] once the
 			// coda process gets around to it.
 			app.P2p.Logger.Error("validation timed out :(")
+
+			app.ValidatorMutex.Lock()
+
+			(*app.Validators[seqno]).TimedOutAt = new(time.Time)
+			*((*app.Validators[seqno]).TimedOutAt) = time.Now()
+
 			if app.UnsafeNoTrustIP {
-				app.P2p.Logger.Info("validated!")
+				app.P2p.Logger.Info("validated anyway!")
 				return true
 			}
 			app.P2p.Logger.Info("unvalidated :(")
@@ -385,7 +398,7 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 			}
 			return res
 		}
-	}, pubsub.WithValidatorTimeout(5*time.Minute))
+	}, pubsub.WithValidatorTimeout(validationTimeout))
 
 	if err != nil {
 		return nil, badp2p(err)
@@ -466,8 +479,11 @@ func (r *validationCompleteMsg) run(app *app) (interface{}, error) {
 	}
 	app.ValidatorMutex.Lock()
 	defer app.ValidatorMutex.Unlock()
-	if ch, ok := app.Validators[r.Seqno]; ok {
-		ch <- r.Valid
+	if st, ok := app.Validators[r.Seqno]; ok {
+		st.Completion <- r.Valid
+		if st.TimedOutAt != nil {
+			app.P2p.Logger.Errorf("validation for item %d took %d seconds", r.Seqno, time.Now().Add(validationTimeout).Sub(*st.TimedOutAt))
+		}
 		delete(app.Validators, r.Seqno)
 		return "validationComplete success", nil
 	}
@@ -816,7 +832,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 	// report dht peers
 	go func() {
 		// wait a bit for our advertisement to go out and get some responses
-		time.Sleep(5 * time.Second)
+		time.Sleep(1 * time.Second)
 
 		for {
 			// default is to yield only 100 peers at a time. for now, always be
@@ -829,7 +845,7 @@ func (ap *beginAdvertisingMsg) run(app *app) (interface{}, error) {
 			for info := range dhtpeers {
 				foundPeer(info, "dht")
 			}
-			time.Sleep(5 * time.Minute)
+			time.Sleep(30 * time.Second)
 		}
 	}()
 
@@ -971,13 +987,8 @@ type successResult struct {
 }
 
 func main() {
-    logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
-    os.Mkdir("/tmp/artifacts", os.ModePerm)
-	logfile, err := os.Create("/tmp/artifacts/helper.log")
-	if err != nil {
-		panic(err)
-	}
-	log.SetOutput(logfile)
+	logwriter.Configure(logwriter.Output(os.Stderr), logwriter.LdJSONFormatter)
+	log.SetOutput(os.Stderr)
 	logging.SetAllLoggers(logging2.INFO)
 	helperLog := logging.Logger("helper top-level JSON handling")
 
@@ -990,8 +1001,9 @@ func main() {
 	}()
 
 	lines := bufio.NewScanner(os.Stdin)
-	// 11MiB buffer size, larger than the 10.66MB minimum for 8MiB to be b64'd
-	bufsize := (1024 * 1024) * 11
+	// 22MiB buffer size, larger than the 21.33MB minimum for 16MiB to be b64'd
+	// 4 * (2^24/3) / 2^20 = 21.33
+	bufsize := (1024 * 1024) * 22
 	lines.Buffer(make([]byte, bufsize), bufsize)
 	out := bufio.NewWriter(os.Stdout)
 
@@ -1000,9 +1012,8 @@ func main() {
 		Ctx:            context.Background(),
 		Subs:           make(map[int]subscription),
 		ValidatorMutex: &sync.Mutex{},
-		Validators:     make(map[int]chan bool),
+		Validators:     make(map[int]*validationStatus),
 		Streams:        make(map[int]net.Stream),
-		Extra:          logfile,
 		// OutLock doesn't need to be initialized
 		Out: out,
 	}

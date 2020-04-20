@@ -11,7 +11,6 @@ open Strict_pipe
 open Signature_lib
 open O1trace
 open Otp_lib
-open Module_version
 open Network_peer
 module Config = Config
 module Subscriptions = Coda_subscriptions
@@ -54,13 +53,22 @@ type pipes =
       * Block_time.t
       * (bool -> unit) )
       Pipe.Writer.t
-  ; local_txns_writer:
-      ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+  ; user_command_input_writer:
+      ( User_command_input.t list
+        * (   ( Network_pool.Transaction_pool.Resource_pool.Diff.t
+              * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.t )
+              Or_error.t
+           -> unit)
+        * (Account_id.t -> (Coda_base.Account.Nonce.t, string) Result.t)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t
   ; local_snark_work_writer:
       ( Network_pool.Snark_pool.Resource_pool.Diff.t
+        * (   ( Network_pool.Snark_pool.Resource_pool.Diff.t
+              * Network_pool.Snark_pool.Resource_pool.Diff.rejected )
+              Or_error.t
+           -> unit)
       , Strict_pipe.synchronous
       , unit Deferred.t )
       Strict_pipe.Writer.t }
@@ -80,6 +88,8 @@ type t =
   ; subscriptions: Coda_subscriptions.t
   ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
 [@@deriving fields]
+
+let time_controller t = t.config.time_controller
 
 let subscription t = t.subscriptions
 
@@ -105,10 +115,15 @@ let replace_block_production_keypairs t kps =
   Agent.update t.block_production_keypairs kps
 
 module Snark_worker = struct
-  let run_process ~logger client_port kill_ivar =
+  let run_process ~logger client_port kill_ivar num_threads =
+    let env =
+      Option.map
+        ~f:(fun num -> `Extend [("OMP_NUM_THREADS", string_of_int num)])
+        num_threads
+    in
     let%map snark_worker_process =
       let our_binary = Sys.executable_name in
-      Process.create_exn () ~prog:our_binary
+      Process.create_exn () ~prog:our_binary ?env
         ~args:
           ( "internal" :: Snark_worker.Intf.command_name
           :: Snark_worker.arguments
@@ -168,6 +183,7 @@ module Snark_worker = struct
         let%map snark_worker_process =
           run_process ~logger:t.config.logger
             t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
+            t.config.snark_worker_config.num_threads
         in
         Logger.debug t.config.logger ~module_:__MODULE__ ~location:__LOC__
           ~metadata:
@@ -278,6 +294,12 @@ let compose_of_option f =
 let best_tip = compose_of_option best_tip_opt
 
 let root_length = compose_of_option root_length_opt
+
+let active_or_bootstrapping =
+  compose_of_option (fun t ->
+      Option.bind
+        (Broadcast_pipe.Reader.peek t.components.transition_frontier)
+        ~f:(Fn.const (Some ())) )
 
 [%%if
 mock_frontend_data]
@@ -402,6 +424,39 @@ let get_ledger t staged_ledger_hash_opt =
       Deferred.Or_error.error_string
         "get_ledger: staged ledger hash not found in transition frontier"
 
+let get_inferred_nonce_from_transaction_pool_and_ledger t
+    (account_id : Account_id.t) =
+  let get_account aid =
+    let open Participating_state.Let_syntax in
+    let%map ledger = best_ledger t in
+    let open Option.Let_syntax in
+    let%bind loc = Ledger.location_of_account ledger aid in
+    Ledger.get ledger loc
+  in
+  let transaction_pool = t.components.transaction_pool in
+  let resource_pool =
+    Network_pool.Transaction_pool.resource_pool transaction_pool
+  in
+  let pooled_transactions =
+    Network_pool.Transaction_pool.Resource_pool.all_from_account resource_pool
+      account_id
+  in
+  let txn_pool_nonce =
+    let nonces =
+      List.map pooled_transactions
+        ~f:(Fn.compose User_command.nonce User_command.forget_check)
+    in
+    (* The last nonce gives us the maximum nonce in the transaction pool *)
+    List.last nonces
+  in
+  match txn_pool_nonce with
+  | Some nonce ->
+      Participating_state.Option.return (Account.Nonce.succ nonce)
+  | None ->
+      let open Participating_state.Option.Let_syntax in
+      let%map account = get_account account_id in
+      account.Account.Poly.nonce
+
 let seen_jobs t = t.seen_jobs
 
 let add_block_subscriber t public_key =
@@ -449,29 +504,14 @@ let staged_ledger_ledger_proof t =
 let validated_transitions t = t.pipes.validated_transitions_reader
 
 module Root_diff = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t =
-          {user_commands: User_command.Stable.V1.t list; root_length: int}
-        [@@deriving bin_io, version]
-      end
+      type t = {user_commands: User_command.Stable.V1.t list; root_length: int}
 
-      include T
-      include Registration.Make_latest_version (T)
+      let to_latest = Fn.id
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "transition_frontier_diff_node_list"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 
   type t = Stable.Latest.t =
     {user_commands: User_command.t list; root_length: int}
@@ -490,7 +530,7 @@ let root_diff t =
       (Buffered (`Capacity 30, `Overflow Crash))
   in
   trace_recurring_task "root diff pipe reader" (fun () ->
-      let open Root_diff.Stable.V1 in
+      let open Root_diff.Stable.Latest in
       let length_of_breadcrumb =
         Fn.compose Unsigned.UInt32.to_int
           Transition_frontier.Breadcrumb.blockchain_length
@@ -597,16 +637,38 @@ let add_work t (work : Snark_worker_lib.Work.Result.t) =
   set_seen_jobs t (Work_selection_method.remove (seen_jobs t) spec) ;
   let _ = Or_error.try_with (fun () -> update_metrics ()) in
   Strict_pipe.Writer.write t.pipes.local_snark_work_writer
-    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work)
+    (Network_pool.Snark_pool.Resource_pool.Diff.of_result work, Fn.const ())
   |> Deferred.don't_wait_for
 
-let add_transactions t (txns : User_command.t list) =
-  Strict_pipe.Writer.write t.pipes.local_txns_writer txns
+let add_transactions t (uc_inputs : User_command_input.t list) =
+  let result_ivar = Ivar.create () in
+  let get_current_nonce aid =
+    match
+      Participating_state.active
+        (get_inferred_nonce_from_transaction_pool_and_ledger t aid)
+      |> Option.join
+    with
+    | None ->
+        Error
+          "Couldn't infer nonce for transaction from specified `sender` since \
+           `sender` is not in the ledger or sent a transaction in transaction \
+           pool."
+    | Some nonce ->
+        Ok nonce
+  in
+  Strict_pipe.Writer.write t.pipes.user_command_input_writer
+    (uc_inputs, Ivar.fill result_ivar, get_current_nonce)
+  |> Deferred.don't_wait_for ;
+  Ivar.read result_ivar
 
 let next_producer_timing t = t.next_producer_timing
 
 let staking_ledger t =
   let open Option.Let_syntax in
+  let consensus_constants =
+    Consensus.Constants.create
+      ~protocol_constants:t.config.genesis_constants.protocol
+  in
   let%map transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
   in
@@ -615,7 +677,8 @@ let staking_ledger t =
       (Transition_frontier.best_tip transition_frontier)
   in
   let local_state = t.config.consensus_local_state in
-  Consensus.Hooks.get_epoch_ledger ~consensus_state ~local_state
+  Consensus.Hooks.get_epoch_ledger ~constants:consensus_constants
+    ~consensus_state ~local_state
 
 let find_delegators table pk =
   Option.value_map
@@ -659,10 +722,15 @@ let start t =
     ~consensus_local_state:t.config.consensus_local_state
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
-    ~log_block_creation:t.config.log_block_creation ;
+    ~log_block_creation:t.config.log_block_creation
+    ~genesis_constants:t.config.genesis_constants ;
   Snark_worker.start t
 
 let create (config : Config.t) ~genesis_ledger ~base_proof =
+  let consensus_constants =
+    Consensus.Constants.create
+      ~protocol_constants:config.genesis_constants.protocol
+  in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
       trace "coda" (fun () ->
@@ -707,6 +775,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     ; kill_ivar= Ivar.create () }
                   , config.snark_work_fee ) )
           in
+          Fork_id.set_current config.initial_fork_id ;
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
           in
@@ -742,7 +811,14 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                    Public_key.compress public_key )
           in
           let get_telemetry_data _env =
-            let node = config.gossip_net_params.addrs_and_ports.external_ip in
+            let node_ip_addr =
+              config.gossip_net_params.addrs_and_ports.external_ip
+            in
+            let peer_opt = config.gossip_net_params.addrs_and_ports.peer in
+            let node_peer_id =
+              Option.value_map peer_opt ~default:"<UNKNOWN>" ~f:(fun peer ->
+                  peer.peer_id )
+            in
             match !net_ref with
             | None ->
                 (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
@@ -753,9 +829,10 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 @@ Error
                      (Error.of_string
                         (sprintf
-                           !"Node: %{sexp: Unix.Inet_addr.t}, network not \
-                             instantiated when telemetry data requested"
-                           node))
+                           !"Node with IP address=%{sexp: Unix.Inet_addr.t}, \
+                             peer ID=%s, network not instantiated when \
+                             telemetry data requested"
+                           node_ip_addr node_peer_id))
             | Some net -> (
               match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
               | None ->
@@ -763,9 +840,10 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   @@ Error
                        (Error.of_string
                           (sprintf
-                             !"Node: %{sexp: Unix.Inet_addr.t}, could not get \
+                             !"Node with IP address=%{sexp: \
+                               Unix.Inet_addr.t}, peer ID=%s, could not get \
                                transition frontier for telemetry data"
-                             node))
+                             node_ip_addr node_peer_id))
               | Some frontier ->
                   let%map peers = Coda_networking.peers net in
                   let protocol_state_hash =
@@ -786,7 +864,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                   in
                   Ok
                     Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
-                      { node
+                      { node_ip_addr
+                      ; node_peer_id
                       ; peers
                       ; block_producers
                       ; protocol_state_hash
@@ -863,6 +942,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           in
           (* tie the knot *)
           net_ref := Some net ;
+          let user_command_input_reader, user_command_input_writer =
+            Strict_pipe.(create ~name:"local transactions" Synchronous)
+          in
           let local_txns_reader, local_txns_writer =
             Strict_pipe.(create ~name:"local transactions" Synchronous)
           in
@@ -872,6 +954,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config
               ~trust_system:config.trust_system
+              ~pool_max_size:config.genesis_constants.txpool_max_size
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
@@ -880,16 +963,42 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               ~local_diffs:local_txns_reader
               ~frontier_broadcast_pipe:frontier_broadcast_pipe_r
           in
+          (*Read from user_command_input_reader that has the user command inputs from client, infer nonce, create user command, and write it to the pipe consumed by the network pool*)
+          Strict_pipe.Reader.iter user_command_input_reader
+            ~f:(fun (input_list, result_cb, get_current_nonce) ->
+              match%bind
+                User_command_input.to_user_commands ~get_current_nonce
+                  input_list
+              with
+              | Ok user_commands ->
+                  if List.is_empty user_commands then (
+                    result_cb
+                      (Error (Error.of_string "No user commands to send")) ;
+                    Deferred.unit )
+                  else
+                    (*callback for the result from transaction_pool.apply_diff*)
+                    Strict_pipe.Writer.write local_txns_writer
+                      (user_commands, result_cb)
+              | Error e ->
+                  Logger.error config.logger
+                    "Failed to submit user commands: $error"
+                    ~module_:__MODULE__ ~location:__LOC__
+                    ~metadata:[("error", `String (Error.to_string_hum e))] ;
+                  result_cb (Error e) ;
+                  Deferred.unit )
+          |> Deferred.don't_wait_for ;
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
             Broadcast_pipe.create
               ( External_transition.genesis ~genesis_ledger ~base_proof
+                  ~genesis_constants:config.genesis_constants
               |> External_transition.Validated.to_initial_validated )
           in
           let valid_transitions, initialization_finish_signal =
             trace "transition router" (fun () ->
                 Transition_router.run ~logger:config.logger
                   ~trust_system:config.trust_system ~verifier ~network:net
+                  ~is_seed:config.is_seed
                   ~time_controller:config.time_controller
                   ~consensus_local_state:config.consensus_local_state
                   ~persistent_root_location:config.persistent_root_location
@@ -913,11 +1022,13 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                          in
                          let tn_production_time =
                            Consensus.Data.Consensus_time.to_time
+                             ~constants:consensus_constants
                              tn_production_consensus_time
                          in
                          let tm_slot =
                            lift_consensus_time
-                             (Consensus.Data.Consensus_time.of_time_exn tm)
+                             (Consensus.Data.Consensus_time.of_time_exn
+                                ~constants:consensus_constants tm)
                          in
                          Coda_metrics.Block_latency.Gossip_slots.update
                            (Float.of_int (tm_slot - tn_production_slot)) ;
@@ -940,7 +1051,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                          breadcrumb ))
                   ~most_recent_valid_block
                   ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
-                  ~base_proof )
+                  ~base_proof ~genesis_constants:config.genesis_constants )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -976,7 +1087,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     |> Span.to_ms
                   in
                   match
-                    Consensus.Hooks.received_at_valid_time ~time_received:now
+                    Consensus.Hooks.received_at_valid_time
+                      ~constants:consensus_constants ~time_received:now
                       consensus_state
                   with
                   | Ok () ->
@@ -1135,7 +1247,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                 ; external_transitions_writer=
                     Strict_pipe.Writer.to_linear_pipe
                       external_transitions_writer
-                ; local_txns_writer
+                ; user_command_input_writer
                 ; local_snark_work_writer }
             ; wallets
             ; block_production_keypairs

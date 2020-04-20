@@ -38,16 +38,16 @@ module Url = {
 
   module SearchParams = {
     type t;
-    [@bs.send] external get: (t, string) => string = "";
+    [@bs.send] external get: (t, string) => string = "get";
   };
 
-  [@bs.get] external searchParams: t => SearchParams.t = "";
+  [@bs.get] external searchParams: t => SearchParams.t = "searchParams";
 };
 
 module Navigator = {
   module Clipboard = {
     [@bs.val] [@bs.scope ("navigator", "clipboard")]
-    external writeText: string => Js.Promise.t(unit) = "";
+    external writeText: string => Js.Promise.t(unit) = "writeText";
 
     let writeTextTask: string => Task.t('x, unit) =
       str => Task.liftPromise(() => writeText(str));
@@ -55,13 +55,31 @@ module Navigator = {
 };
 
 module Stream = {
-  module Readable = {
-    type t;
-    [@bs.send] external on: (t, string, Node.Buffer.t => unit) => unit = "";
+  module Chunk = {
+    type t = {. "length": int};
   };
 
   module Writable = {
     type t;
+
+    [@bs.module "fs"]
+    external create: (string, {. "encoding": string}) => t =
+      "createWriteStream";
+
+    [@bs.send]
+    external onError: (t, [@bs.as "error"] _, Js.Exn.t => unit) => t = "on";
+    [@bs.send]
+    external onFinish: (t, [@bs.as "finish"] _, unit => unit) => t = "on";
+    [@bs.send] external write: (t, Chunk.t) => unit;
+    [@bs.send] external endStream: t => unit = "end";
+  };
+
+  module Readable = {
+    type t;
+    [@bs.send] external on: (t, string, Node.Buffer.t => unit) => unit = "on";
+    [@bs.send] external pipe: (t, Writable.t) => Writable.t = "pipe";
+
+    [@bs.module "fs"] external create: string => t = "createReadStream";
   };
 };
 
@@ -75,7 +93,7 @@ module ChildProcess = {
   };
 
   module Process = {
-    [@bs.val] [@bs.module "process"] external env: Js.Dict.t(string) = "";
+    [@bs.val] [@bs.module "process"] external env: Js.Dict.t(string) = "env";
 
     [@bs.deriving abstract]
     type t = {
@@ -83,7 +101,7 @@ module ChildProcess = {
       stderr: Stream.Readable.t,
     };
 
-    [@bs.send] external kill: (t, string) => unit = "";
+    [@bs.send] external kill: (t, string) => unit = "kill";
 
     [@bs.send]
     external onError: (t, [@bs.as "error"] _, Error.t => unit) => unit = "on";
@@ -164,24 +182,24 @@ module Fs = {
       (Js.Nullable.t(Js.Exn.t), Js.Nullable.t(string)) => unit
     ) =>
     unit =
-    "";
+    "readFile";
 
   [@bs.val] [@bs.module "fs"]
   external readFileSync: (string, string) => string = "readFileSync";
 
   [@bs.val] [@bs.module "fs"]
-  external openSync: (string, string) => Stream.Writable.t = "";
+  external openSync: (string, string) => Stream.Writable.t = "openSync";
 
   [@bs.val] [@bs.module "fs"]
   external writeFile:
     (string, string, string, Js.Nullable.t(Js.Exn.t) => unit) => unit =
-    "";
+    "writeFile";
 
   [@bs.val] [@bs.module "fs"]
-  external writeSync: (Stream.Writable.t, string) => unit = "";
+  external writeSync: (Stream.Writable.t, string) => unit = "writeSync";
 
   [@bs.val] [@bs.module "fs"]
-  external watchFile: (string, unit => unit) => unit = "";
+  external watchFile: (string, unit => unit) => unit = "watchFile";
 };
 
 module Fetch = {
@@ -194,13 +212,15 @@ module LocalStorage = {
     (
       ~key: [@bs.string] [
               | [@bs.as "network"] `Network
+              | [@bs.as "daemonHost"] `DaemonHost
               | [@bs.as "addressbook"] `AddressBook
               | [@bs.as "onboarding"] `Onboarding
+              | [@bs.as "installed"] `Installed
             ],
       ~value: string
     ) =>
     unit =
-    "";
+    "setItem";
 
   [@bs.val] [@bs.scope "localStorage"]
   external getItem:
@@ -208,10 +228,12 @@ module LocalStorage = {
     [@bs.string]
     [
       | [@bs.as "network"] `Network
+      | [@bs.as "daemonHost"] `DaemonHost
       | [@bs.as "addressbook"] `AddressBook
       | [@bs.as "onboarding"] `Onboarding
+      | [@bs.as "installed"] `Installed
     ]
     ) =>
     Js.nullable(string) =
-    "";
+    "getItem";
 };

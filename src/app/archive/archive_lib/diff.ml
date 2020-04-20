@@ -1,5 +1,4 @@
 open Coda_transition
-open Signature_lib
 open Core_kernel
 open Coda_base
 module Breadcrumb = Transition_frontier.Breadcrumb
@@ -17,9 +16,8 @@ module Transition_frontier = struct
                 , State_hash.Stable.V1.t )
                 With_hash.Stable.V1.t
             ; sender_receipt_chains_from_parent_ledger:
-                ( Public_key.Compressed.Stable.V1.t
-                * Receipt.Chain_hash.Stable.V1.t )
-                list }
+                (Account_id.Stable.V1.t * Receipt.Chain_hash.Stable.V1.t) list
+            }
         | Root_transitioned of
             Transition_frontier.Diff.Root_transition.Lite.Stable.V1.t
         | Bootstrap of {lost_blocks: State_hash.Stable.V1.t list}
@@ -32,7 +30,7 @@ module Transition_frontier = struct
     | Breadcrumb_added of
         { block: (External_transition.t, State_hash.t) With_hash.t
         ; sender_receipt_chains_from_parent_ledger:
-            (Public_key.Compressed.t * Receipt.Chain_hash.t) list }
+            (Account_id.t * Receipt.Chain_hash.t) list }
     | Root_transitioned of Transition_frontier.Diff.Root_transition.Lite.t
     | Bootstrap of {lost_blocks: State_hash.t list}
 end
@@ -42,7 +40,7 @@ module Transaction_pool = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { added: (User_command.Stable.V1.t * Block_time.Stable.V1.t) list
+        { added: User_command.Stable.V1.t list
         ; removed: User_command.Stable.V1.t list }
 
       let to_latest = Fn.id
@@ -50,7 +48,7 @@ module Transaction_pool = struct
   end]
 
   type t = Stable.Latest.t =
-    {added: (User_command.t * Block_time.t) list; removed: User_command.t list}
+    {added: User_command.t list; removed: User_command.t list}
 end
 
 [%%versioned
@@ -79,7 +77,7 @@ module Builder = struct
     let sender_receipt_chains_from_parent_ledger =
       let user_commands = User_command.Set.of_list user_commands in
       let senders =
-        Public_key.Compressed.Set.map user_commands ~f:User_command.sender
+        Account_id.Set.map user_commands ~f:User_command.fee_payer
       in
       let ledger =
         Staged_ledger.ledger @@ Breadcrumb.staged_ledger breadcrumb
@@ -89,7 +87,7 @@ module Builder = struct
              Option.value_exn
                (let open Option.Let_syntax in
                let%bind ledger_location =
-                 Ledger.location_of_key ledger sender
+                 Ledger.location_of_account ledger sender
                in
                let%map {receipt_chain_hash; _} =
                  Ledger.get ledger ledger_location

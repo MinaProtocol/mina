@@ -44,14 +44,15 @@ let net_configs n =
 
 let offset =
   lazy
-    Core.Time.(
-      diff (now ())
-        ( Consensus.Constants.genesis_state_timestamp
-        |> Coda_base.Block_time.to_time ))
+    (let consensus_constants = Consensus.Constants.compiled in
+     Core.Time.(
+       diff (now ())
+         (Block_time.to_time consensus_constants.genesis_state_timestamp)))
 
 let local_configs ?block_production_interval
     ?(block_production_keys = Fn.const None)
-    ?(is_archive_rocksdb = Fn.const false) n ~acceptable_delay ~chain_id
+    ?(is_archive_rocksdb = Fn.const false)
+    ?(archive_process_location = Fn.const None) n ~acceptable_delay ~chain_id
     ~program_dir ~snark_worker_public_keys ~work_selection_method ~trace_dir
     ~max_concurrent_connections =
   let%map net_configs = net_configs n in
@@ -68,12 +69,13 @@ let local_configs ?block_production_interval
           Node_addrs_and_ports.to_display addrs_and_ports
         in
         let peers = List.map ~f:Node_addrs_and_ports.to_multiaddr_exn peers in
-        Coda_process.local_config ?block_production_interval ~addrs_and_ports
-          ~libp2p_keypair ~net_configs ~peers ~snark_worker_key:public_key
-          ~program_dir ~acceptable_delay ~chain_id
+        Coda_process.local_config ?block_production_interval ~is_seed:true
+          ~addrs_and_ports ~libp2p_keypair ~net_configs ~peers
+          ~snark_worker_key:public_key ~program_dir ~acceptable_delay ~chain_id
           ~block_production_key:(block_production_keys i)
           ~work_selection_method ~trace_dir
           ~is_archive_rocksdb:(is_archive_rocksdb i)
+          ~archive_process_location:(archive_process_location i)
           ~offset:(Lazy.force offset) ~max_concurrent_connections () )
   in
   configs

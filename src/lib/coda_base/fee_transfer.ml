@@ -26,6 +26,21 @@ module Single = struct
 
   [%%define_locally
   Base58_check.String_ops.(to_string, of_string)]
+
+  let receiver (receiver, _) = receiver
+
+  let fee (_, fee) = fee
+
+  module Gen = struct
+    let with_random_receivers ~keys ~max_fee : t Quickcheck.Generator.t =
+      let open Quickcheck.Generator.Let_syntax in
+      let%map receiver =
+        let open Signature_lib in
+        Quickcheck_lib.of_array keys
+        >>| fun keypair -> Public_key.compress keypair.Keypair.public_key
+      and fee = Int.gen_incl 0 max_fee >>| Currency.Fee.of_int in
+      (receiver, fee)
+  end
 end
 
 [%%versioned
@@ -55,3 +70,6 @@ let fee_excess = function
     )
 
 let receivers t = One_or_two.map t ~f:(fun (pk, _) -> pk)
+
+let receiver_ids =
+  One_or_two.map ~f:(fun (pk, _) -> Account_id.create pk Token_id.default)

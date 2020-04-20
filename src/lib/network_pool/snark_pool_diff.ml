@@ -38,12 +38,24 @@ module Make
     module Registered_V1 = Registrar.Register (V1)
   end
 
-  (* bin_io omitted *)
   type t = Stable.Latest.t =
-    | Add_solved_work of
-        Work.Stable.V1.t
-        * Ledger_proof.Stable.V1.t One_or_two.t Priced_proof.Stable.V1.t
+    | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
   [@@deriving compare, sexp, to_yojson]
+
+  module Rejected = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = unit [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t [@@deriving sexp, yojson]
+  end
+
+  type rejected = Rejected.t [@@deriving sexp, yojson]
 
   let compact_json = function
     | Add_solved_work (work, {proof= _; fee= {fee; prover}}) ->
@@ -58,6 +70,8 @@ module Make
           !"Snark_pool_diff for work %s added with fee-prover %s"
           (Yojson.Safe.to_string @@ Work.compact_json work)
           (Yojson.Safe.to_string @@ Coda_base.Fee_with_prover.to_yojson fee)
+
+  let is_empty _ = false
 
   let of_result
       (res :
@@ -77,7 +91,7 @@ module Make
       | `Statement_not_referenced ->
           Error (`Other (Error.of_string "statement not referenced"))
       | `Added ->
-          Ok diff
+          Ok (diff, ())
     in
     match diff with
     | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) -> (
@@ -85,9 +99,10 @@ module Make
           if is_local then (
             Logger.trace (Pool.get_logger pool) ~module_:__MODULE__
               ~location:__LOC__
-              "Rejecting locally generated snark work $work, %s" reason
-              ~metadata:[("work", Work.compact_json work)] ;
-            Deferred.return (Error (`Locally_generated diff)) )
+              "Rejecting locally generated snark work $work: $reason"
+              ~metadata:
+                [("work", Work.compact_json work); ("reason", `String reason)] ;
+            Deferred.return (Error (`Locally_generated (diff, ()))) )
           else Deferred.return (Error (`Other (Error.of_string reason)))
         in
         let check_and_add () =

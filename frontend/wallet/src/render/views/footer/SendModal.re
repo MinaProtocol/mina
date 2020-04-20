@@ -38,8 +38,8 @@ module ModalState = {
     type t = {
       from: PublicKey.t,
       to_: PublicKey.t,
-      amount: string,
-      fee: string,
+      amountFormatted: string,
+      feeFormatted: string,
       memoOpt: option(string),
     };
   };
@@ -65,9 +65,9 @@ let emptyModal: option(PublicKey.t) => ModalState.Unvalidated.t =
     errorOpt: None,
   };
 
-let validateInt64 = s =>
-  switch (Int64.of_string(s)) {
-  | i => i > Int64.zero
+let validateCurrency = s =>
+  switch (CurrencyFormatter.ofFormattedString(s)) {
+  | _ => true
   | exception (Failure(_)) => false
   };
 
@@ -85,16 +85,16 @@ let validate:
       Error("Please specify an account to send from.")
     | ({toStr: ""}, _) => Error("Please specify a destination address.")
     | (_, None) => Error("Destination is invalid public key.")
-    | ({amountStr}, _) when !validateInt64(amountStr) =>
-      Error("Please specify a non-zero amount.")
-    | ({feeStr}, _) when !validateInt64(feeStr) =>
-      Error("Please specify a non-zero fee.")
+    | ({amountStr}, _) when !validateCurrency(amountStr) =>
+      Error("Please specify a positive amount.")
+    | ({feeStr}, _) when !validateCurrency(feeStr) =>
+      Error("Please specify a positive fee.")
     | ({fromStr: Some(fromPk), amountStr, feeStr, memoOpt}, Some(toPk)) =>
       Ok({
         from: PublicKey.ofStringExn(fromPk),
         to_: toPk,
-        amount: amountStr,
-        fee: feeStr,
+        amountFormatted: amountStr,
+        feeFormatted: feeStr,
         memoOpt,
       })
     };
@@ -162,7 +162,7 @@ module SendForm = {
         label="Fee"
         onChange={value => setModalState(s => {...s, feeStr: value})}
         value=feeStr
-        placeholder="0"
+        placeholder="0.1"
       />
       spacer
       {switch (memoOpt) {
@@ -203,15 +203,15 @@ let make = (~onClose) => {
          <SendForm
            onClose
            onSubmit={(
-             {from, to_, amount, fee, memoOpt}: ModalState.Validated.t,
+             {from, to_, amountFormatted, feeFormatted, memoOpt}: ModalState.Validated.t,
              afterSubmit,
            ) => {
              let variables =
                SendPayment.make(
                  ~from=Apollo.Encoders.publicKey(from),
                  ~to_=Apollo.Encoders.publicKey(to_),
-                 ~amount=Js.Json.string(amount),
-                 ~fee=Js.Json.string(fee),
+                 ~amount=Apollo.Encoders.currency(amountFormatted),
+                 ~fee=Apollo.Encoders.currency(feeFormatted),
                  ~memo=?memoOpt,
                  (),
                )##variables;
@@ -230,7 +230,9 @@ let make = (~onClose) => {
                      let message =
                        err
                        |> Array.get(~index=0)
-                       |> Option.map(~f=e => e##message)
+                       |> Option.map(~f=(e: ReasonApolloTypes.graphqlError) =>
+                            e.message
+                          )
                        |> Option.withDefault(~default="Server error");
                      afterSubmit(Error(message));
                    },

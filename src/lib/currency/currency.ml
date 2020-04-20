@@ -55,19 +55,6 @@ end = struct
 
   type t = Unsigned.t [@@deriving sexp, compare, hash]
 
-  module Arg = struct
-    type typ = t [@@deriving sexp, hash, compare]
-
-    type t = typ [@@deriving sexp, hash, compare]
-
-    [%%define_locally
-    Unsigned.(of_int, to_int)]
-  end
-
-  include Codable.Make_of_int (Arg)
-  include Hashable.Make (Arg)
-  include Comparable.Make (Arg)
-
   [%%define_locally
   Unsigned.(to_uint64, of_uint64, of_int, to_int, of_string, to_string)]
 
@@ -104,6 +91,20 @@ end = struct
             (whole ^ decimal ^ String.make Int.(precision - decimal_length) '0')
     | _ ->
         failwith "Currency.of_formatted_string: Invalid currency input"
+
+  module Arg = struct
+    type typ = t [@@deriving sexp, hash, compare]
+
+    type t = typ [@@deriving sexp, hash, compare]
+
+    let to_string = to_formatted_string
+
+    let of_string = of_formatted_string
+  end
+
+  include Codable.Make_of_string (Arg)
+  include Hashable.Make (Arg)
+  include Comparable.Make (Arg)
 
   let gen_incl a b : t Quickcheck.Generator.t =
     let a = Bignum_bigint.of_string Unsigned.(to_string a) in
@@ -256,6 +257,8 @@ end = struct
 
       let of_unsigned magnitude = {magnitude; sgn= Sgn.Checked.pos}
 
+      let negate {magnitude; sgn} = {magnitude; sgn= Sgn.Checked.negate sgn}
+
       let if_ cond ~then_ ~else_ =
         let%map sgn = Sgn.Checked.if_ cond ~then_:then_.sgn ~else_:else_.sgn
         and magnitude =
@@ -311,6 +314,11 @@ end = struct
           (l, r)
         in
         ({sgn= l_sgn; magnitude= l_mag}, {sgn= r_sgn; magnitude= r_mag})
+
+      let scale (f : Field.Var.t) (t : var) =
+        let%bind x = Field.Checked.mul (pack_var t.magnitude) f in
+        let%map x = unpack_var x in
+        {sgn= t.sgn; magnitude= x}
     end
 
     [%%endif]
@@ -363,6 +371,10 @@ end = struct
     let add_signed (t : var) (d : Signed.var) =
       let%bind d = Signed.Checked.to_field_var d in
       Field.Var.add (pack_var t) d |> unpack_var
+
+    let scale (f : Field.Var.t) (t : var) =
+      let%bind x = Field.Checked.mul (pack_var t) f in
+      unpack_var x
 
     let%test_module "currency_test" =
       ( module struct
@@ -489,16 +501,6 @@ end
 let currency_length = 64
 
 module Fee = struct
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t = Unsigned_extended.UInt64.Stable.V1.t
-      [@@deriving sexp, compare, hash, eq, yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-
   module T =
     Make
       (Unsigned_extended.UInt64)
@@ -508,22 +510,24 @@ module Fee = struct
 
   include T
 
-  type _unused = unit constraint Signed.t = (t, Sgn.t) Signed_poly.t
-
-  include Codable.Make_of_int (T)
-end
-
-module Amount = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t = Unsigned_extended.UInt64.Stable.V1.t
-      [@@deriving sexp, compare, hash, eq, yojson]
+      [@@deriving sexp, compare, hash, eq]
+
+      let to_yojson = to_yojson
+
+      let of_yojson = of_yojson
 
       let to_latest = Fn.id
     end
   end]
 
+  type _unused = unit constraint Signed.t = (t, Sgn.t) Signed_poly.t
+end
+
+module Amount = struct
   module T =
     Make
       (Unsigned_extended.UInt64)
@@ -547,7 +551,19 @@ module Amount = struct
 
   [%%endif]
 
-  include Codable.Make_of_int (T)
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Unsigned_extended.UInt64.Stable.V1.t
+      [@@deriving sexp, compare, hash, eq, yojson]
+
+      let to_yojson = to_yojson
+
+      let of_yojson = of_yojson
+
+      let to_latest = Fn.id
+    end
+  end]
 
   let of_fee (fee : Fee.t) : t = fee
 
@@ -612,6 +628,10 @@ module Balance = struct
     let add_amount = Amount.Checked.add
 
     let sub_amount = Amount.Checked.sub
+
+    let add_amount_flagged = Amount.Checked.add_flagged
+
+    let sub_amount_flagged = Amount.Checked.sub_flagged
 
     let ( + ) = add_amount
 

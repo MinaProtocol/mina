@@ -53,7 +53,7 @@ let%test_module "network pool test" =
           in
           don't_wait_for
             (Mock_snark_pool.apply_and_broadcast network_pool
-               (Envelope.Incoming.local command, Fn.const ())) ;
+               (Envelope.Incoming.local command, Fn.const (), Fn.const ())) ;
           let%map _ =
             Linear_pipe.read (Mock_snark_pool.broadcasts network_pool)
           in
@@ -99,7 +99,7 @@ let%test_module "network pool test" =
                |> Deferred.don't_wait_for ) ;
         List.map (List.drop works per_reader) ~f:create_work
         |> List.iter ~f:(fun diff ->
-               Strict_pipe.Writer.write local_writer diff
+               Strict_pipe.Writer.write local_writer (diff, Fn.const ())
                |> Deferred.don't_wait_for ) ;
         let%bind () = Async.Scheduler.yield_until_no_jobs_remain () in
         let frontier_broadcast_pipe_r, _ =

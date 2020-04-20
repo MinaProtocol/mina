@@ -112,8 +112,6 @@ module Port = struct
 
   let default_libp2p = 8302
 
-  let default_hasura_port = 9000
-
   let of_raw raw =
     let open Or_error.Let_syntax in
     let%bind () =
@@ -198,7 +196,7 @@ module Host_and_port = struct
 
   module Daemon = struct
     let archive =
-      create ~name:"archive-port" ~arg_type
+      create ~name:"archive-address" ~arg_type
         (make_doc_builder "Daemon to archive process communication"
            Port.default_archive)
         Optional
@@ -243,22 +241,18 @@ module Uri = struct
   end
 
   module Archive = struct
-    let hasura =
+    let postgres =
       let doc_builder =
         Doc_builder.create ~display:to_string
           ~examples:
-            [ Port.to_uri ~path:"graphql" Port.default_client
-            ; Uri.of_string
-                ( example_host ^ ":"
-                ^ Int.to_string Port.default_client
-                ^/ "v1/graphql" ) ]
-          "URI/LOCALHOST-PORT" "Srchive process to communicate with Hasura"
+            [Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"]
+          "URI" "URI for postgresql database"
       in
-      create ~name:"hasura-port"
-        ~arg_type:(arg_type ~path:"v1/graphql")
+      create ~name:"postgres-uri"
+        ~arg_type:(Command.Arg_type.map Command.Param.string ~f:Uri.of_string)
         doc_builder
         (Resolve_with_default
-           (Port.to_uri ~path:"graphql" Port.default_hasura_port))
+           (Uri.of_string "postgres://admin:codarules@postgres:5432/archiver"))
   end
 end
 
@@ -294,9 +288,9 @@ let user_command_common : user_command_common Command.Param.t =
       ~doc:
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
-            (default: %d) (minimum: %d)"
-           (Currency.Fee.to_int Default.transaction_fee)
-           (Currency.Fee.to_int Coda_base.User_command.minimum_fee))
+            (default: %s) (minimum: %s)"
+           (Currency.Fee.to_formatted_string Default.transaction_fee)
+           (Currency.Fee.to_formatted_string Coda_base.User_command.minimum_fee))
       (optional txn_fee)
   and nonce =
     flag "nonce"
@@ -320,7 +314,7 @@ module User_command = struct
     flag "HD-index" ~doc:"HD-INDEX Index used by hardware wallet"
       (required hd_index)
 
-  let receiver =
+  let receiver_pk =
     let open Command.Param in
     flag "receiver" ~doc:"PUBLICKEY Public key to which you want to send money"
       (required public_key_compressed)
@@ -336,9 +330,9 @@ module User_command = struct
       ~doc:
         (Printf.sprintf
            "FEE Amount you are willing to pay to process the transaction \
-            (default: %d) (minimum: %d)"
-           (Currency.Fee.to_int Default.transaction_fee)
-           (Currency.Fee.to_int Coda_base.User_command.minimum_fee))
+            (default: %s) (minimum: %s)"
+           (Currency.Fee.to_formatted_string Default.transaction_fee)
+           (Currency.Fee.to_formatted_string Coda_base.User_command.minimum_fee))
       (optional txn_fee)
 
   let valid_until =

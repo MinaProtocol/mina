@@ -21,7 +21,7 @@ include Frontier_intf.S
 (* This is the max length which is used when the transition frontier is initialized
  * via `load`. In other words, this will always be the max length of the transition
  * frontier as long as the `For_tests.load_with_max_length` is not used *)
-val global_max_length : int
+val global_max_length : Genesis_constants.t -> int
 
 val load :
      ?retry_with_fresh_db:bool
@@ -33,6 +33,7 @@ val load :
   -> genesis_state_hash:State_hash.t
   -> genesis_ledger:Ledger.t Lazy.t
   -> ?base_proof:Coda_base.Proof.t
+  -> genesis_constants:Genesis_constants.t
   -> unit
   -> ( t
      , [> `Failure of string
@@ -70,12 +71,19 @@ module For_tests : sig
     -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
     -> ?base_proof:Coda_base.Proof.t
+    -> genesis_constants:Genesis_constants.t
     -> unit
     -> ( t
        , [> `Failure of string
          | `Bootstrap_required
          | `Persistent_frontier_malformed ] )
        Deferred.Result.t
+
+  val gen_genesis_breadcrumb :
+       ?logger:Logger.t
+    -> ?verifier:Verifier.t
+    -> unit
+    -> Breadcrumb.t Quickcheck.Generator.t
 
   val gen_persistence :
        ?logger:Logger.t
