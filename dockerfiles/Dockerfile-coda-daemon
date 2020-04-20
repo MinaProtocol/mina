@@ -29,7 +29,7 @@ RUN echo "deb [trusted=yes] http://packages.o1test.net $deb_repo main" > /etc/ap
 
 WORKDIR /root
 
-RUN echo '#!/bin/bash\n\
+RUN echo '#!/bin/bash -x\n\
 mkdir -p .coda-config\n\
 touch .coda-config/coda-prover.log\n\
 touch .coda-config/coda-verifier.log\n\
