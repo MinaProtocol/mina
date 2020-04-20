@@ -40,7 +40,7 @@ module Styles = {
 module TransactionsQueryString = [%graphql
   {|
     query transactions($after: String, $publicKey: PublicKey!) {
-      blocks(first: 5, after: $after, filter: { relatedTo: $publicKey }) {
+      blocks(last: 5, before: $after, filter: { relatedTo: $publicKey }) {
         nodes {
           creator @bsDecoder(fn: "Apollo.Decoders.publicKey")
           protocolState {

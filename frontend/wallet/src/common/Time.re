@@ -1,4 +1,4 @@
-let monthOfIntExn =
+let _monthOfIntExn =
   fun
   | 0 => "January"
   | 1 => "Februrary"
@@ -14,7 +14,7 @@ let monthOfIntExn =
   | 11 => "December"
   | x => failwith(Printf.sprintf("Not a month: %d", x));
 
-let thOfDate = x =>
+let _thOfDate = x =>
   switch (x mod 10) {
   | 1 => "st"
   | 2 => "nd"
@@ -35,17 +35,12 @@ let render = (~date, ~now) => {
       (militaryHours == 0 ? 12 : militaryHours, "am");
     };
 
+  Js.log(Js.Date.getTimezoneOffset(date));
+
   let hoursMins = Printf.sprintf("%d:%02d%s", hours, minutes, meridiem);
   if (Js.Date.getDay(date) == Js.Date.getDay(now)) {
     hoursMins;
   } else {
-    let dateDay = int(Js.Date.getDate, date);
-    Printf.sprintf(
-      "%s %d%s - %s",
-      int(Js.Date.getMonth, date) |> monthOfIntExn,
-      dateDay,
-      thOfDate(dateDay),
-      hoursMins,
-    );
+    Js.Date.toLocaleString(date);
   };
 };
