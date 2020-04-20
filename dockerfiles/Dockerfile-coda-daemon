@@ -15,7 +15,6 @@ RUN apt-get -y update && \
     libgmp10 \
     libgomp1 \
     libffi6 \
-    libsodium23 \
     apt-transport-https \
     ca-certificates \
     dnsutils \
