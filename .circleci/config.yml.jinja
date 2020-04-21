@@ -398,11 +398,12 @@ jobs:
             - run:
                   name: Rebuild for pvkey changes
                   command: |
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
                     ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
                   environment:
                     DUNE_PROFILE: {{profile}}
                     EXTRA_NIX_ARGS: --option sandbox false
+                    LIBP2P_NIXLESS: 1
 
                   no_output_timeout: 20m
             - run:
@@ -412,16 +413,21 @@ jobs:
                   no_output_timeout: 20m
             - run:
                   name: Build deb package with PV keys and PV key tar
-                  command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make deb'
+                  command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make deb'
                   environment:
                     DUNE_PROFILE: {{profile}}
+                    LIBP2P_NIXLESS: 1
                   no_output_timeout: 20m
             - run:
                   name: Store genesis public/private keypairs
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make genesiskeys'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make genesiskeys'
+                  environment:
+                    LIBP2P_NIXLESS: 1
             - run:
                   name: Upload deb to repo
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make publish_deb'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make publish_deb'
+                  environment:
+                    LIBP2P_NIXLESS: 1
                   no_output_timeout: 20m
             - run:
                   name: Copy artifacts to cloud
