@@ -3,17 +3,37 @@
 [%%import
 "/src/config.mlh"]
 
+[%%if
+ocaml_backend = "native"]
+
+(* these load-from-disk paths are available to consensus code, and to
+   nonconsensus code when compiling to native code
+*)
+
+let autogen_path = Core_kernel.Filename.temp_dir_name ^ "/coda_cache_dir"
+
+let s3_install_path = "/tmp/s3_cache_dir"
+
+let manual_install_path = "/var/lib/coda"
+
+let brew_install_path =
+  match
+    let p = Core.Unix.open_process_in "brew --prefix 2>/dev/null" in
+    let r = Core.In_channel.input_lines p in
+    (r, Core.Unix.close_process_in p)
+  with
+  | brew :: _, Ok () ->
+      brew ^ "/var/coda"
+  | _ ->
+      "/usr/local/var/coda"
+
+[%%endif]
+
 [%%ifdef
 consensus_mechanism]
 
 open Core
 open Async
-
-let autogen_path = Filename.temp_dir_name ^/ "coda_cache_dir"
-
-let s3_install_path = "/tmp/s3_cache_dir"
-
-let manual_install_path = "/var/lib/coda"
 
 let genesis_dir_name (genesis_constants : Genesis_constants.t) =
   let digest =
@@ -38,17 +58,6 @@ let genesis_dir_name (genesis_constants : Genesis_constants.t) =
     else String.sub digest ~pos:0 ~len
   in
   "coda_genesis" ^ "_" ^ Coda_version.commit_id_short ^ "_" ^ digest_short
-
-let brew_install_path =
-  match
-    let p = Core.Unix.open_process_in "brew --prefix 2>/dev/null" in
-    let r = In_channel.input_lines p in
-    (r, Core.Unix.close_process_in p)
-  with
-  | brew :: _, Ok () ->
-      brew ^ "/var/coda"
-  | _ ->
-      "/usr/local/var/coda"
 
 let env_path =
   match Sys.getenv "CODA_KEYS_PATH" with
@@ -87,6 +96,9 @@ let load_from_s3 s3_bucket_prefixes s3_install_paths ~logger =
 
 [%%else]
 
+[%%if
+ocaml_backend = "native"]
+
 (* nonconsensus native code; use curl, but as a stepping-stone to Javascript,
    don't use file system
 *)
@@ -104,6 +116,12 @@ let load_from_s3_to_strings s3_bucket_prefixes ~logger =
       in
       Deferred.List.map s3_bucket_prefixes ~f:each_uri )
 
-(* TODO : nonconsensus Javascript code -- no curl, no file system *)
+[%%elif
+ocaml_backend = "js_of_ocaml"]
+
+[%%error
+"load_from_s3_to_strings: not yet implemented for Javascript"]
+
+[%%endif]
 
 [%%endif]
