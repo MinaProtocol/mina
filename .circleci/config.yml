@@ -70,7 +70,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Set Up Database
                   command: |
@@ -109,7 +109,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Build Archive Process
-                  command:  bash -c 'eval `opam config env` && make build_archive'
+                  command:  bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make build_archive'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
             # NOTE: If we were using a machine executor we would be able to mount the sql file in
@@ -140,10 +140,10 @@ jobs:
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
-                  command: eval `opam config env` && make check-format
+                  command: eval `opam config env` && LIBP2P_NIXLESS=1 make check-format
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
-                  command: make check-snarky-submodule
+                  command: LIBP2P_NIXLESS=1 make check-snarky-submodule
             - run:
                   name: Check ppx_optcomp preprocessor_deps
                   command: ./scripts/lint_preprocessor_deps.sh
@@ -254,8 +254,8 @@ jobs:
                 keys:
                     - opam-v8-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install macos dependencies - opam -- make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh make macos-setup-compile
+                name: Install macos dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
             - save_cache:
                 name: Save cache - opam
                 key: opam-v8-{{ checksum "opam_ci_cache.sig" }}
@@ -275,7 +275,7 @@ jobs:
                 environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                     EXTRA_NIX_ARGS: --option sandbox false
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/buildocaml.log'
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build 2>&1 | tee /tmp/buildocaml.log'
                 no_output_timeout: 20m
             - run:
                 name: Build ocaml - generate keypair
@@ -332,7 +332,7 @@ jobs:
             - run:
                 name: Build portable binary
                 command: |
-                    make macos-portable
+                    LIBP2P_NIXLESS=1 make macos-portable
                     cp _build/coda-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud
@@ -358,7 +358,7 @@ jobs:
                   command: ./scripts/pin-external-packages.sh
             - run:
                   name: Build client SDK for Javascript
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
                   no_output_timeout: 10m
@@ -380,12 +380,12 @@ jobs:
                   command: ./scripts/pin-external-packages.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: GO=/usr/lib/go/bin/go LIBP2P_NIXLESS=1 make libp2p_helper
             # Explicitly generate PV-keys and uploading before building
             # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
                   name: Generate PV keys
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                     EXTRA_NIX_ARGS: --option sandbox false
@@ -396,7 +396,7 @@ jobs:
             - run:
                   name: Rebuild for pvkey changes
                   command: |
-                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
+                    ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build 2>&1 | tee /tmp/artifacts/buildocaml2.log'
                     ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'eval `opam config env` && dune build src/app/generate_keypair/generate_keypair.exe'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
@@ -410,16 +410,16 @@ jobs:
                   no_output_timeout: 20m
             - run:
                   name: Build deb package with PV keys and PV key tar
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh make deb
+                  command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make deb'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                   no_output_timeout: 20m
             - run:
                   name: Store genesis public/private keypairs
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh make genesiskeys
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make genesiskeys'
             - run:
                   name: Upload deb to repo
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh make publish_deb
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make publish_deb'
                   no_output_timeout: 20m
             - run:
                   name: Copy artifacts to cloud
@@ -464,10 +464,10 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && LIBP2P_NIXLESS=1 make build && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
                   environment:
                     DUNE_PROFILE: dev
                   no_output_timeout: 30m
@@ -487,7 +487,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && (dune runtest src/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
@@ -506,10 +506,10 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build && (dune runtest src/lib --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && LIBP2P_NIXLESS=1 make build && (dune runtest src/lib --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   environment:
                     DUNE_PROFILE: dev_medium_curves
                   no_output_timeout: 1h
@@ -526,7 +526,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- fake_hash:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "fake_hash:full-test"'
@@ -543,7 +543,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake:full-test"'
@@ -563,7 +563,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_bootstrap:coda-bootstrap-test"'
@@ -583,7 +583,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_catchup:coda-restart-node-test"'
@@ -600,7 +600,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_delegation:coda-delegation-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_delegation:coda-delegation-test"'
@@ -617,7 +617,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments"'
@@ -634,7 +634,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_snarkless:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless:full-test"'
@@ -654,7 +654,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
@@ -671,7 +671,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-peers-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_snarkless:coda-peers-test"'
@@ -706,7 +706,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_three_producers:coda-txns-and-restart-non-producers
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_three_producers:coda-txns-and-restart-non-producers"'
@@ -723,7 +723,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_txns:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_txns:coda-shared-state-test"'
@@ -743,7 +743,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_full_epoch:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_full_epoch:full-test"'
@@ -760,7 +760,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_medium_curves:full-test"'
@@ -782,7 +782,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless_medium_curves:full-test"'
@@ -802,7 +802,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: GO=/usr/lib/go/bin/go make libp2p_helper_nixless
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
