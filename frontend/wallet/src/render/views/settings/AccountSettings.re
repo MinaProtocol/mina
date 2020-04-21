@@ -561,8 +561,6 @@ let make = (~publicKey) => {
         </KeypathQuery>
       </div>
     </div>
-    <Spacer height=1.5 />
-    <BlockRewards publicKey />
     <Spacer height=4.0 />
     <DeleteButton publicKey />
   </div>;

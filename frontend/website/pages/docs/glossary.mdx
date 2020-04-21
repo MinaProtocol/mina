@@ -48,6 +48,10 @@ The Coda daemon is a background process that implements the Coda protocol and ru
 
 Because staking coda requires nodes to be online, some nodes may desire to delegate their coda to another node which runs a staking service. This process is called delegating a stake, and often the service provider or staking pool operator may charge a fee for running this service, which will be deducted any time the delegator gets selected to be a block producer.
 
+#### External port
+
+This is the port that the Coda daemon uses to connect to other nodes on the network. It can be set using `-external-port` when starting the daemon.
+
 #### Full Node
 
 A Coda node that is able to verify the state of the network trustlessly. In Coda, every node is a full node since all nodes can receive and verify zk-SNARKs.
@@ -63,7 +67,6 @@ A node is a machine running the coda daemon.
 #### Peer-to-peer
 
 Networking systems that rely on peer nodes to distribute information amongst each other are called peer-to-peer networks. These networks are often distributed in nature, and unlike client-server networking models, do not rely on any centralized resource broker.
-
 
 #### Libp2p
 
@@ -115,4 +118,4 @@ A proof by which one party (a prover) can prove to another party (verifiers) tha
 
 #### zk-SNARK
 
-A type of zero-knowledge proof - the acronym stands for zero knowledge succinct non-interactive argument of knowledge. The specific properties of interest in Coda's implementation of SNARKs are succinctness and non-interactivity, which allow for any node to quickly verify the state of the network.
+A type of zero-knowledge proof - the acronym stands for "zero-knowledge succinct non-interactive argument of knowledge". The specific properties of interest in Coda's implementation of SNARKs are succinctness and non-interactivity, which allow for any node to quickly verify the state of the network.
