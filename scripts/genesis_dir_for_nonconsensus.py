@@ -20,7 +20,7 @@ def generate_genesis_dir_ml_file () :
 
     if not got_file :
         print ('Could not find genesis filename at ' + genesis_filename,file=sys.stderr)
-        print ('Please build runtime_genesis_ledger and run this script again',file=sys.stderr)
+        print ('Please run \'make genesis_ledger\' and run this script again',file=sys.stderr)
         exit (1)
 
     with open(genesis_filename,'r') as file :
