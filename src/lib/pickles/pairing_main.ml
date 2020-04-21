@@ -390,8 +390,11 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
     let open Types.Pairing_based.Proof_state.Me_only in
     let after_index =
       let sponge = Sponge.create sponge_params in
-      Array.iter (Types.index_to_field_elements ~g:G.to_field_elements index)
-        ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
+      Array.iter (Types.index_to_field_elements 
+       ~g:(fun (z : Inputs.G.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t) -> 
+       List.init (Array.length z * 2)
+        (fun i ->  let xy = G.to_field_elements (Array.get z (i/2)) in if (i mod 2) = 0 then List.nth_exn xy 0 else List.nth_exn xy 1) ) index)
+       ~f:(fun x -> Sponge.absorb sponge (`Field x)) ;
       sponge
     in
     stage (fun t ->
@@ -425,7 +428,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
     chal m1.beta_3 m2.beta_3 *)
 
   let verify ~branching ~is_base_case ~sg_old
-      ~(opening : _ Openings.Bulletproof.t) ~messages
+      ~(opening : _ Pickles_types.Dlog_marlin_types.Openings.Bulletproof.t) ~messages
       ~wrap_domains:(domain_h, domain_k) ~wrap_verification_key statement
       (unfinalized : _ Types.Pairing_based.Proof_state.Per_proof.t) =
     let public_input =

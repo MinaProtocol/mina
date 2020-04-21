@@ -74,9 +74,13 @@ let compute_challenges chals =
       compute_challenge ~is_square prechallenge  )
 
 let compute_sg chals =
+  let open Snarky_bn382.Fq_poly_comm in
+  let comm =
   Snarky_bn382.Fq_urs.b_poly_commitment
     (Snarky_bn382_backend.Dlog_based.Keypair.load_urs ())
     (Fq.Vector.of_array (Vector.to_array (compute_challenges chals)))
+  in
+  Snarky_bn382.G.Affine.Vector.get (unshifted comm) 0
   |> Snarky_bn382_backend.G.Affine.of_backend
 
 (* We hardcode the number of rounds in the discrete log based proof. *)
@@ -95,13 +99,14 @@ module Bp_vec = Nvector (Wrap_circuit_bulletproof_rounds)
 
 type dlog_opening = (fq, g) Types.Pairing_based.Openings.Bulletproof.t
 
-module Pmain = Pairing_main.Make (struct
-  include Pairing_main_inputs
-  module Branching_pred = Nat.N0
-end)
-
 let crs_max_degree =
   1 lsl Pickles_types.Nat.to_int Wrap_circuit_bulletproof_rounds.n
+
+module Pmain = Pairing_main.Make (struct
+  include Pairing_main_inputs
+  let crs_max_degree = crs_max_degree
+  module Branching_pred = Nat.N0
+end)
 
 module Dmain = Dlog_main.Make (struct
   include Dlog_main_inputs
@@ -116,10 +121,9 @@ module Dlog_proof = struct
   type t = dlog_opening * (g, fq) Pickles_types.Pairing_marlin_types.Messages.t
 
   type var =
-    (Impls.Pairing_based.Fq.t, G.t) Types.Pairing_based.Openings.Bulletproof.t
-    * ( G.t
-      , Impls.Pairing_based.Fq.t )
-      Pickles_types.Pairing_marlin_types.Messages.t
+    (G.t, Pmain.Fq.t) Pickles_types.Dlog_marlin_types.Openings.Bulletproof.t
+    * (G.t, Pmain.Fq.t)
+      Pickles_types.Dlog_marlin_types.Messages.t
 end
 
 module Challenges_vector = struct
@@ -196,7 +200,7 @@ module Per_proof_witness = struct
       , Pmain.Digest.t )
       Types.Dlog_based.Proof_state.t
     * (Fpv.t Pairing_marlin_types.Evals.t * Fpv.t)
-    * (G.t, 'local_max_branching) Vector.t
+    * ((G.t) Dlog_marlin_types.Poly_comm.Without_degree_bound.t, 'local_max_branching) Vector.t
     * Dlog_proof.var
 
   module Constant = struct
@@ -218,22 +222,22 @@ module Per_proof_witness = struct
 
   let typ (type n avar aval m)
       (statement : (avar, aval) Impls.Pairing_based.Typ.t)
-      (local_max_branching : n Nat.t) (local_branches : m Nat.t) :
+      (local_max_branching : n Nat.t)
+      (local_branches : m Nat.t) :
       ((avar, n, m) t, (aval, n, m) Constant.t) Impls.Pairing_based.Typ.t =
     let open Impls.Pairing_based in
     let open Pairing_main_inputs in
     let open Pmain in
-    Snarky.Typ.tuple6 statement
+    Snarky.Typ.tuple6
+      statement
       (One_hot_vector.typ local_branches)
-      (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Boolean.typ Fq.typ
-         (Snarky.Typ.unit ()) Digest.typ)
+      (Types.Dlog_based.Proof_state.typ Challenge.typ Fp.typ Boolean.typ Fq.typ (Snarky.Typ.unit ()) Digest.typ)
       (Typ.tuple2 (Pairing_marlin_types.Evals.typ Field.typ) Field.typ)
       (Vector.typ G.typ local_max_branching)
       (Typ.tuple2
-         (Types.Pairing_based.Openings.Bulletproof.typ
-            ~length:(Nat.to_int Wrap_circuit_bulletproof_rounds.n)
-            Fq.typ G.typ)
-         (Pickles_types.Pairing_marlin_types.Messages.typ G.typ Fq.typ))
+         (Types.Pairing_based.Openings.Bulletproof.typ ~length:(Nat.to_int Wrap_circuit_bulletproof_rounds.n) Fq.typ G.typ)
+         (Pickles_types.Pairing_marlin_types.Messages.typ G.typ Fq.typ)
+      )
 end
 
 module Requests = struct
@@ -352,7 +356,7 @@ module Requests = struct
         | Me_only :
             ( g
             , statement
-            , (g, max_branching) Vector.t )
+            , (g Dlog_marlin_types.Poly_comm.Without_degree_bound.t, max_branching) Vector.t )
             Types.Pairing_based.Proof_state.Me_only.t
             t
     end
@@ -388,7 +392,7 @@ module Requests = struct
           | Me_only :
               ( g
               , statement
-              , (g, max_branching) Vector.t )
+              , (g Dlog_marlin_types.Poly_comm.Without_degree_bound.t, max_branching) Vector.t )
               Types.Pairing_based.Proof_state.Me_only.t
               t
       end in
@@ -756,7 +760,7 @@ let step_main
                 (* TODO: Don't rehash when it's not necessary *)
                 unstage
                   (hash_me_only ~index:d.wrap_key d.a_var_to_field_elements)
-                  {app_state; dlog_marlin_index= d.wrap_key; sg= sg_old}
+                  {app_state; dlog_marlin_index= d.wrap_key; sg= Vector.map sg_old ~f:(fun c -> Array.get c 0)}
               in
               { Types.Dlog_based.Statement.pass_through= prev_me_only
               ; proof_state= {state with me_only= pass_through} }
@@ -1715,8 +1719,8 @@ let wrap (type max_branching max_local_max_branchings) max_branching
       ~message:
         ( Vector.map2 prev_statement.proof_state.me_only.sg
             me_only_prepared.old_bulletproof_challenges ~f:(fun sg chals ->
-              { Snarky_bn382_backend.Dlog_based_proof.Challenge_polynomial
-                .commitment= sg
+              { Dlog_marlin_types.Challenge_polynomial
+                .commitment= Array.get sg 0
               ; challenges= Vector.to_array chals } )
         |> Vector.to_list )
       [input]
@@ -1905,7 +1909,7 @@ struct
               map2 statement.pass_through.sg
                 (* This should indeed have length max_branching... No! It should have type max_branching_a. That is, the max_branching specific to a proof of this type...*)
                 prev_challenges ~f:(fun commitment chals ->
-                  { Snarky_bn382_backend.Dlog_based_proof.Challenge_polynomial
+                  { Dlog_marlin_types.Challenge_polynomial
                     .commitment
                   ; challenges= Vector.to_array chals } )
               |> to_list)
@@ -1943,7 +1947,7 @@ struct
             Vector.map ~f:(Fn.compose b_poly Vector.to_array) prev_challenges
           in
           let open As_field in
-          let combine x_hat pt e =
+          let combine (x_hat: Snarky_bn382_backend.Fq.t array) pt e =
             let a, b = Dlog_marlin_types.Evals.to_vectors e in
             let v =
               Vector.append
@@ -2671,7 +2675,7 @@ let compile
                     (Vector.to_list
                        (Vector.map2
                           ~f:(fun g cs ->
-                            { Challenge_polynomial.challenges=
+                            { Dlog_marlin_types.Challenge_polynomial.challenges=
                                 Vector.to_array (compute_challenges cs)
                             ; commitment= g } )
                           t.statement.pass_through.sg
@@ -2782,6 +2786,15 @@ let%test_module "test" =
           Prev_proof.t =
         let open Ro in
         let g = G.(to_affine_exn one) in
+        let evals =
+          let open Snarky_bn382_backend in
+          let e =
+            Dlog_marlin_types.Evals.of_vectors
+              ( Vector.init Nat.N18.n ~f:(fun _ -> [|Fq.one|])
+              , Vector.init Nat.N3.n ~f:(fun _ -> [|Fq.one|]) )
+          in
+          (e, e, e)
+        in
         { statement=
             { proof_state=
                 { deferred_values=
@@ -2815,12 +2828,12 @@ let%test_module "test" =
                     ) } }
         ; proof=
             { messages=
-                { w_hat= g
-                ; z_hat_a= g
-                ; z_hat_b= g
-                ; gh_1= ((g, g), g)
-                ; sigma_gh_2= (fq (), ((g, g), g))
-                ; sigma_gh_3= (fq (), ((g, g), g)) }
+                { w_hat= [|g|]
+                ; z_hat_a= [|g|]
+                ; z_hat_b= [|g|]
+                ; gh_1= ({unshifted=[|g|]; shifted=g}, [|g|])
+                ; sigma_gh_2= (fq (), ({unshifted=[|g|]; shifted=g}, [|g|]))
+                ; sigma_gh_3= (fq (), ({unshifted=[|g|]; shifted=g}, [|g|])) }
             ; openings=
                 { proof=
                     { lr=
@@ -2831,24 +2844,7 @@ let%test_module "test" =
                     ; z_2= fq ()
                     ; delta= g
                     ; sg= g }
-                ; evals=
-                    (let e : _ Dlog_marlin_types.Evals.t =
-                       let abc () = {Abc.a= fq (); b= fq (); c= fq ()} in
-                       { w_hat= fq ()
-                       ; z_hat_a= fq ()
-                       ; z_hat_b= fq ()
-                       ; g_1= fq ()
-                       ; h_1= fq ()
-                       ; g_2= fq ()
-                       ; h_2= fq ()
-                       ; g_3= fq ()
-                       ; h_3= fq ()
-                       ; row= abc ()
-                       ; col= abc ()
-                       ; value= abc ()
-                       ; rc= abc () }
-                     in
-                     (e, e, e)) } }
+                ; evals= evals } }
         ; prev_evals=
             (let abc () = {Abc.a= fp (); b= fp (); c= fp ()} in
              { w_hat= fp ()

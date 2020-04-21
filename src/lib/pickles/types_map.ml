@@ -21,7 +21,7 @@ module Data = struct
     ; typ: ('a_var, 'a_value) Impls.Pairing_based.Typ.t
     ; a_value_to_field_elements: 'a_value -> Fp.t array
     ; a_var_to_field_elements: 'a_var -> Impls.Pairing_based.Field.t array
-    ; wrap_key: G.Affine.t Abc.t Matrix_evals.t
+    ; wrap_key: G.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t Abc.t Matrix_evals.t
     ; wrap_vk: Impls.Dlog_based.Verification_key.t
     ; wrap_domains: Domains.t
     ; step_domains: (Domains.t, 'branches) Vector.t }
@@ -35,7 +35,7 @@ module Data = struct
       ; typ: ('a_var, 'a_value) Impls.Pairing_based.Typ.t
       ; a_value_to_field_elements: 'a_value -> Fp.t array
       ; a_var_to_field_elements: 'a_var -> Impls.Pairing_based.Field.t array
-      ; wrap_key: Pairing_main_inputs.G.t Abc.t Matrix_evals.t
+      ; wrap_key: Pairing_main_inputs.G.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t Abc.t Matrix_evals.t
       ; wrap_domains: Domains.t
       ; step_domains: (Domains.t, 'branches) Vector.t }
 
@@ -56,7 +56,7 @@ module Data = struct
       ; a_var_to_field_elements
       ; wrap_key=
           Matrix_evals.map wrap_key
-            ~f:(Abc.map ~f:Pairing_main_inputs.G.constant)
+            ~f:(Abc.map ~f:Pairing_main_inputs.G.constantv)
       ; wrap_domains
       ; step_domains }
   end

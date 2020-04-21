@@ -3,16 +3,16 @@ open Pickles_types
 let hash_pairing_me_only ~app_state t =
   Fp_sponge.digest Fp_sponge.params
     (Types.Pairing_based.Proof_state.Me_only.to_field_elements t
-       ~g:(fun ((x, y) : Snarky_bn382_backend.G.Affine.t) -> [x; y])
+       ~g:(fun (x : Snarky_bn382_backend.G.Affine.t Dlog_marlin_types.Poly_comm.Without_degree_bound.t) -> 
+       List.init (Array.length x * 2)
+        (fun i ->  let (xx, yy) = Array.get x (i/2) in if (i mod 2) = 0 then xx else yy) )
        ~app_state)
   |> Digest.Constant.of_bits
 
 let hash_dlog_me_only t =
   Fq_sponge.digest Fq_sponge.params
     (Types.Dlog_based.Proof_state.Me_only.to_field_elements t
-       ~g1:(fun (g : Snarky_bn382_backend.G1.Affine.t) ->
-         let x, y = g in
-         [x; y] ))
+       ~g1:(fun ((x, y) : Snarky_bn382_backend.G1.Affine.t) -> [x; y] ))
   |> Digest.Constant.of_bits
 
 open Core_kernel

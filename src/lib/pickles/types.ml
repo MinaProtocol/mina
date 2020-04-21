@@ -2,7 +2,7 @@ open Pickles_types
 module Scalar_challenge = Pickles_types.Scalar_challenge
 open Core_kernel
 
-let index_to_field_elements ({row; col; value} : _ Abc.t Matrix_evals.t)
+let index_to_field_elements ({row; col; value} : 'a Abc.t Matrix_evals.t)
     ~g:g_to_field_elements =
   Array.concat_map [|row; col; value|] ~f:(fun {a; b; c} ->
       Array.concat_map [|a; b; c|] ~f:(fun g ->
@@ -202,7 +202,7 @@ module Dlog_based = struct
 
   module Pass_through = struct
     type ('g, 's, 'sg) t =
-      {app_state: 's; dlog_marlin_index: 'g Abc.t Matrix_evals.t; sg: 'sg}
+      {app_state: 's; dlog_marlin_index: 'g Dlog_marlin_types.Poly_comm.Without_degree_bound.t Abc.t Matrix_evals.t; sg: 'sg}
 
     let to_field_elements {app_state; dlog_marlin_index; sg}
         ~app_state:app_state_to_field_elements ~g =

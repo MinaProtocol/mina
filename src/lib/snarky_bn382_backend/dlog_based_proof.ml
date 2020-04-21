@@ -233,7 +233,7 @@ let create ?message pk ~primary ~auxiliary =
   Snarky_bn382.Fq_proof.delete res ;
   t
 
-let batch_verify' vk (conv : 'a -> Fq.Vector.t)
+let batch_verify' (conv : 'a -> Fq.Vector.t)
     (ts : (t * 'a * message option) list)
     (vk : Snarky_bn382.Fq_verifier_index.t) =
   let open Snarky_bn382.Fq_proof in
@@ -244,6 +244,6 @@ let batch_verify' vk (conv : 'a -> Fq.Vector.t)
   let res = batch_verify vk v in
   Vector.delete v ; res
 
-let batch_verify vk = batch_verify' vk field_vector_of_list
+let batch_verify vk = batch_verify' field_vector_of_list
 
-let verify ?message t vk xs : bool = batch_verify' vk Fn.id [(t, xs, message)] vk
+let verify ?message t vk xs : bool = batch_verify' Fn.id [(t, xs, message)] vk
