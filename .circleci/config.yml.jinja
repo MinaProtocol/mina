@@ -403,6 +403,7 @@ jobs:
                   environment:
                     DUNE_PROFILE: {{profile}}
                     EXTRA_NIX_ARGS: --option sandbox false
+                    GO: /usr/lib/go/bin/go
                     LIBP2P_NIXLESS: 1
 
                   no_output_timeout: 20m
