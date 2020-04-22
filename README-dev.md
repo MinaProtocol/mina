@@ -219,12 +219,12 @@ Container Stages:
 ## Overriding Genesis Constants
 
 Coda genesis constants consists of constants for the consensus algorithm, sizes for various data structures like transaction pool, scan state, ledger etc.
-All the constants can be set at compile-time. A subset of the compile-time constants can be overriden when generating the genesis state using `runtime_genesis_ledger.exe`, and a subset of those can again be overriden at runtime by passing the new values to the daemon.
+All the constants can be set at compile-time. A subset of the compile-time constants can be overriden when generating the genesis state using `runtime_genesis_ledger.exe`, and a subset of those can again be overridden at runtime by passing the new values to the daemon.
 
-The constants at compile-time is set for different configurations using optional compilation. This is how integration tests/builds with multiple configurations are run.
+The constants at compile-time are set for different configurations using optional compilation. This is how integration tests/builds with multiple configurations are run.
 Currently some of these constants (defined [here](src/lib/coda_compile_config/coda_compile_config.ml)) cannot be changed after building and would require creating a new build profile (*.mlh files) for any change in the values.
 
-<b> 1. Constants that can be overriden when generating the genesis state are:</b>
+<b> 1. Constants that can be overridden when generating the genesis state are:</b>
 
 * k (consensus constant)
 * delta (consensus constant)
