@@ -122,6 +122,11 @@ ocaml_backend = "js_of_ocaml"]
 [%%error
 "load_from_s3_to_strings: not yet implemented for Javascript"]
 
+[%%else]
+
+[%%error
+"Unsupported OCaml backend"]
+
 [%%endif]
 
 [%%endif]
