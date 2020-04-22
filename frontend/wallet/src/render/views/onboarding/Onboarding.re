@@ -23,7 +23,7 @@ let make = () => {
   let step =
     switch (onboardingStep) {
     | Welcome =>
-      <WelcomeStep nextStep={_ => setOnboardingStep(_ => SetUpNode)} />
+      <WelcomeStep nextStep={_ => setOnboardingStep(_ => CustomSetup)} />
     | SetUpNode =>
       <SetupNodeStep
         customSetup={_ => setOnboardingStep(_ => CustomSetup)}

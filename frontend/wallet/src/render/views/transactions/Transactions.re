@@ -40,7 +40,7 @@ module Styles = {
 module TransactionsQueryString = [%graphql
   {|
     query transactions($after: String, $publicKey: PublicKey!) {
-      blocks(first: 5, after: $after, filter: { relatedTo: $publicKey }) {
+      blocks(last: 5, before: $after, filter: { relatedTo: $publicKey }) {
         nodes {
           creator @bsDecoder(fn: "Apollo.Decoders.publicKey")
           protocolState {
@@ -169,13 +169,13 @@ let make = () => {
   <div className=Styles.container>
     {switch (activeAccount) {
      | Some(pubkey) =>
-       let transactionQuery =
-         TransactionsQueryString.make(
-           ~publicKey=Apollo.Encoders.publicKey(pubkey),
-           ~after="",
-           (),
-         );
-       <TransactionsQuery variables=transactionQuery##variables>
+       let variables =
+         Js.Dict.fromList([
+           ("publicKey", Apollo.Encoders.publicKey(pubkey)),
+           ("after", Js.Json.null),
+         ])
+         |> Js.Json.object_;
+       <TransactionsQuery variables fetchPolicy="network-only">
          (
            response =>
              switch (response.result) {
@@ -192,7 +192,7 @@ let make = () => {
                  );
                <BlockListener
                  refetch={() =>
-                   response.refetch(Some(transactionQuery##variables))
+                   response.refetch(Some(variables))
                  }
                  subscribeToMore={response.subscribeToMore}>
                  <div className=Styles.headerRow>
