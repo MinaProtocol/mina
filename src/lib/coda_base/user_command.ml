@@ -368,9 +368,12 @@ let create_with_signature_checked signature signer payload =
   Option.some_if (check_signature t) t
 
 let gen_test =
-  let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
-  Gen.payment_with_random_participants ~sign_type:`Real ~keys ~max_amount:10000
-    ~max_fee:1000 ()
+  let open Quickcheck.Let_syntax in
+  let%bind keys =
+    Quickcheck.Generator.list_with_length 2 Signature_keypair.gen
+  in
+  Gen.payment_with_random_participants ~sign_type:`Real
+    ~keys:(Array.of_list keys) ~max_amount:10000 ~max_fee:1000 ()
 
 let%test_unit "completeness" =
   Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))
