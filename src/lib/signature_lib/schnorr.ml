@@ -116,7 +116,7 @@ module type S = sig
   val verify : Signature.t -> Public_key.t -> Message.t -> bool
 end
 
-module Schnorr
+module Make
     (Impl : Snarky.Snark_intf.S) (Curve : sig
         open Impl
 
@@ -291,56 +291,6 @@ end
 
 open Snark_params
 
-module Message = struct
-  include Tick.Field
-
-  let derive t ~private_key ~public_key =
-    let input =
-      let x, y = Tick.Inner_curve.to_affine_exn public_key in
-      { Random_oracle.Input.field_elements= [|t; x; y|]
-      ; bitstrings= [|Tock.Field.unpack private_key|] }
-    in
-    Tick.Field.unpack Random_oracle.(hash (pack_input input))
-    |> Tock.Field.project
-
-  let hash t ~public_key ~r =
-    let x, y = Tick.Inner_curve.to_affine_exn public_key in
-    Tick.Field.unpack Random_oracle.(hash [|t; r; x; y|]) |> Tock.Field.project
-
-  type var = Tick.Field.Var.t
-
-  let hash_checked t ~public_key ~r =
-    Tick.make_checked (fun () ->
-        let x, y = public_key in
-        Random_oracle.Checked.hash [|t; r; x; y|]
-        |> Tick.Run.Field.choose_preimage_var ~length:Tick.Field.size_in_bits
-        |> Bitstring_lib.Bitstring.Lsb_first.of_list )
-end
-
-module S = Schnorr (Tick) (Tick.Inner_curve) (Message)
-
-let gen =
-  let open Quickcheck.Let_syntax in
-  let%map pk = Private_key.gen and msg = Message.gen in
-  (pk, msg)
-
-let%test_unit "schnorr checked + unchecked" =
-  Quickcheck.test ~trials:5 gen ~f:(fun (pk, msg) ->
-      let s = S.sign pk msg in
-      let pubkey = Tick.Inner_curve.(scale one pk) in
-      assert (S.verify s pubkey msg) ;
-      (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
-         Tick.Typ.(tuple3 Tick.Inner_curve.typ Message.typ S.Signature.typ)
-         Tick.Boolean.typ
-         (fun (public_key, msg, s) ->
-           let open Tick.Checked in
-           let%bind (module Shifted) =
-             Tick.Inner_curve.Checked.Shifted.create ()
-           in
-           S.Checked.verifies (module Shifted) s public_key msg )
-         (fun _ -> true))
-        (pubkey, msg, s) )
-
 [%%else]
 
 (* nonconsensus version of the functor; yes, there's some repeated code,
@@ -377,7 +327,7 @@ module type S = sig
   val verify : Signature.t -> Public_key.t -> Message.t -> bool
 end
 
-module Schnorr
+module Make
     (Impl : module type of Snark_params_nonconsensus) (Curve : sig
         open Impl
 
@@ -457,4 +407,124 @@ module Schnorr
         is_even ry && Impl.Field.(equal rx r)
 end
 
+module Tick = Snark_params_nonconsensus
+module Random_oracle = Random_oracle_nonconsensus.Random_oracle
+open Hash_prefix_states_nonconsensus
+
 [%%endif]
+
+module Message = struct
+  open Tick
+
+  type t = (Field.t, bool) Random_oracle.Input.t
+
+  let challenge_length = 128
+
+  let derive t ~private_key ~public_key =
+    let input =
+      let x, y = Tick.Inner_curve.to_affine_exn public_key in
+      Random_oracle.Input.append t
+        { field_elements= [|x; y|]
+        ; bitstrings= [|Tock.Field.unpack private_key|] }
+    in
+    Random_oracle.Input.to_bits ~unpack:Field.unpack input
+    |> Array.of_list |> Blake2.bits_to_string |> Blake2.digest_string
+    |> Blake2.to_raw_string |> Blake2.string_to_bits |> Array.to_list
+    |> Tock.Field.project
+
+  let hash t ~public_key ~r =
+    let input =
+      let px, py = Inner_curve.to_affine_exn public_key in
+      Random_oracle.Input.append t
+        {field_elements= [|px; py; r|]; bitstrings= [||]}
+    in
+    let open Random_oracle in
+    hash ~init:Hash_prefix_states.signature (pack_input input)
+    |> Digest.to_bits ~length:challenge_length
+    |> Inner_curve.Scalar.of_bits
+
+  [%%ifdef
+  consensus_mechanism]
+
+  type var = (Field.Var.t, Boolean.var) Random_oracle.Input.t
+
+  let%snarkydef hash_checked t ~public_key ~r =
+    let input =
+      let px, py = public_key in
+      Random_oracle.Input.append t
+        {field_elements= [|px; py; r|]; bitstrings= [||]}
+    in
+    make_checked (fun () ->
+        let open Random_oracle.Checked in
+        hash ~init:Hash_prefix_states.signature (pack_input input)
+        |> Digest.to_bits ~length:challenge_length
+        |> Bitstring_lib.Bitstring.Lsb_first.of_list )
+
+  [%%endif]
+end
+
+module S = Make (Tick) (Tick.Inner_curve) (Message)
+
+[%%ifdef
+consensus_mechanism]
+
+let gen =
+  let open Quickcheck.Let_syntax in
+  let%map pk = Private_key.gen and msg = Tick.Field.gen in
+  (pk, Random_oracle.Input.field_elements [|msg|])
+
+(* Use for reading only. *)
+let message_typ () : (Message.var, Message.t) Tick.Typ.t =
+  let open Tick.Typ in
+  { alloc= Alloc.return (Random_oracle.Input.field_elements [||])
+  ; store=
+      Store.Let_syntax.(
+        fun {Random_oracle.Input.field_elements; bitstrings} ->
+          let%bind field_elements =
+            Store.all @@ Array.to_list
+            @@ Array.map ~f:(store Tick.Field.typ) field_elements
+          in
+          let%map bitstrings =
+            Store.all @@ Array.to_list
+            @@ Array.map bitstrings ~f:(fun l ->
+                   Store.all @@ List.map ~f:(store Tick.Boolean.typ) l )
+          in
+          { Random_oracle.Input.field_elements= Array.of_list field_elements
+          ; bitstrings= Array.of_list bitstrings })
+  ; read=
+      Read.Let_syntax.(
+        fun {Random_oracle.Input.field_elements; bitstrings} ->
+          let%bind field_elements =
+            Read.all @@ Array.to_list
+            @@ Array.map ~f:(read Tick.Field.typ) field_elements
+          in
+          let%map bitstrings =
+            Read.all @@ Array.to_list
+            @@ Array.map bitstrings ~f:(fun l ->
+                   Read.all @@ List.map ~f:(read Tick.Boolean.typ) l )
+          in
+          { Random_oracle.Input.field_elements= Array.of_list field_elements
+          ; bitstrings= Array.of_list bitstrings })
+  ; check= (fun _ -> Tick.Checked.return ()) }
+
+let%test_unit "schnorr checked + unchecked" =
+  Quickcheck.test ~trials:5 gen ~f:(fun (pk, msg) ->
+      let s = S.sign pk msg in
+      let pubkey = Tick.Inner_curve.(scale one pk) in
+      assert (S.verify s pubkey msg) ;
+      (Tick.Test.test_equal ~sexp_of_t:[%sexp_of: bool] ~equal:Bool.equal
+         Tick.Typ.(
+           tuple3 Tick.Inner_curve.typ (message_typ ()) S.Signature.typ)
+         Tick.Boolean.typ
+         (fun (public_key, msg, s) ->
+           let open Tick.Checked in
+           let%bind (module Shifted) =
+             Tick.Inner_curve.Checked.Shifted.create ()
+           in
+           S.Checked.verifies (module Shifted) s public_key msg )
+         (fun _ -> true))
+        (pubkey, msg, s) )
+
+[%%endif]
+
+include S

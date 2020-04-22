@@ -9,7 +9,7 @@
 [%%import "/src/config/account_creation_fee/high.mlh"]
 [%%import "/src/config/protocol_version/current.mlh"]
 
-[%%define time_offsets false]
+[%%define time_offsets true]
 [%%define fake_hash false]
 
 [%%define genesis_ledger "test"]

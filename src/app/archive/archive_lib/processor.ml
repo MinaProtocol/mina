@@ -284,7 +284,9 @@ module Coinbase = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          Public_key.add_if_doesn't_exist (module Conn) (Coinbase.receiver t)
+          Public_key.add_if_doesn't_exist
+            (module Conn)
+            (Coinbase.receiver_pk t)
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -450,9 +452,9 @@ module Block = struct
                   ( acc_user_commands
                   , acc_fee_transfers
                   , coinbase :: acc_coinbases )
-              | Some fee_transfer ->
+              | Some {receiver_pk; fee} ->
                   ( acc_user_commands
-                  , fee_transfer :: acc_fee_transfers
+                  , (receiver_pk, fee) :: acc_fee_transfers
                   , coinbase :: acc_coinbases ) ) )
         in
         let%bind user_command_ids =
@@ -526,7 +528,7 @@ module Block = struct
                           (Coinbase.amount coinbase1)
                           (Coinbase.amount coinbase2)
                       |> Core.Option.value_exn )
-                    ~receiver:(Coinbase.receiver coinbase1)
+                    ~receiver:(Coinbase.receiver_pk coinbase1)
                     ~fee_transfer:None
                   |> Core.Result.map_error ~f:(fun _ ->
                          failwith "Coinbase_combination_failed" )
