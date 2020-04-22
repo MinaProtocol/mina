@@ -15,7 +15,7 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 include Data_hash.Make_full_size ()
 
 module Base58_check = Codable.Make_base58_check (struct
-  include Stable.Latest
+  type t = Stable.Latest.t [@@deriving bin_io_unversioned]
 
   let version_byte = Base58_check.Version_bytes.state_hash
 

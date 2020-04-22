@@ -118,6 +118,17 @@ module T = struct
 
   let of_tuple (length, string) = slice (bitstring_of_string string) 0 length
 
+  module Binable_arg = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = int * string
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
   [%%versioned_binable
   module Stable = struct
     module V1 = struct
@@ -125,9 +136,8 @@ module T = struct
 
       let to_latest = Fn.id
 
-      include Binable.Of_binable (struct
-                  type t = int * string [@@deriving bin_io]
-                end)
+      include Binable.Of_binable
+                (Binable_arg.Stable.V1)
                 (struct
                   type nonrec t = t
 
