@@ -176,6 +176,9 @@ let coda_status coda_ref =
       >>| Daemon_rpcs.Types.Status.to_yojson )
 
 let make_report exn_str ~conf_dir ~top_logger coda_ref =
+  (* TEMP MAKE REPORT TRACE *)
+  Logger.trace top_logger ~module_:__MODULE__ ~location:__LOC__
+    "make_report: enter" ;
   let _ = remove_prev_crash_reports ~conf_dir in
   let crash_time = Time.to_filename_string ~zone:Time.Zone.utc (Time.now ()) in
   let temp_config = conf_dir ^/ "coda_crash_report_" ^ crash_time in
@@ -187,6 +190,9 @@ let make_report exn_str ~conf_dir ~top_logger coda_ref =
   let status_file = temp_config ^/ "coda_status.json" in
   let%map status = coda_status !coda_ref in
   Yojson.Safe.to_file status_file status ;
+  (* TEMP MAKE REPORT TRACE *)
+  Logger.trace top_logger ~module_:__MODULE__ ~location:__LOC__
+    "make_report: acquired and wrote status" ;
   (*coda logs*)
   let coda_log = conf_dir ^/ "coda.log" in
   let () =
@@ -243,7 +249,9 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
     ?(insecure_rest_server = false) coda =
   let client_trustlist =
     ref
-      (Unix.Inet_addr.Set.of_list (Unix.Inet_addr.localhost :: client_trustlist))
+      (Unix.Cidr.Set.of_list
+         ( Unix.Cidr.create ~base_address:Unix.Inet_addr.localhost ~bits:8
+         :: client_trustlist ))
   in
   (* Setup RPC server for client interactions *)
   let implement rpc f =
@@ -344,22 +352,21 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
           Coda_lib.replace_block_production_keypairs coda
             (Keypair.And_compressed_pk.Set.of_list keypair_and_compressed_key) ;
           Deferred.unit )
-    ; implement Daemon_rpcs.Add_trustlist.rpc (fun () ip ->
+    ; implement Daemon_rpcs.Add_trustlist.rpc (fun () cidr ->
           return
-            (let ip_str = Unix.Inet_addr.to_string ip in
-             if Unix.Inet_addr.Set.mem !client_trustlist ip then
-               Or_error.errorf "%s already present in trustlist" ip_str
+            (let cidr_str = Unix.Cidr.to_string cidr in
+             if Unix.Cidr.Set.mem !client_trustlist cidr then
+               Or_error.errorf "%s already present in trustlist" cidr_str
              else (
-               client_trustlist := Unix.Inet_addr.Set.add !client_trustlist ip ;
+               client_trustlist := Unix.Cidr.Set.add !client_trustlist cidr ;
                Ok () )) )
-    ; implement Daemon_rpcs.Remove_trustlist.rpc (fun () ip ->
+    ; implement Daemon_rpcs.Remove_trustlist.rpc (fun () cidr ->
           return
-            (let ip_str = Unix.Inet_addr.to_string ip in
-             if not @@ Unix.Inet_addr.Set.mem !client_trustlist ip then
-               Or_error.errorf "%s not present in trustlist" ip_str
+            (let cidr_str = Unix.Cidr.to_string cidr in
+             if not @@ Unix.Cidr.Set.mem !client_trustlist cidr then
+               Or_error.errorf "%s not present in trustlist" cidr_str
              else (
-               client_trustlist :=
-                 Unix.Inet_addr.Set.remove !client_trustlist ip ;
+               client_trustlist := Unix.Cidr.Set.remove !client_trustlist cidr ;
                Ok () )) )
     ; implement Daemon_rpcs.Get_trustlist.rpc (fun () () ->
           return (Set.to_list !client_trustlist) )
@@ -470,7 +477,11 @@ let setup_local_server ?(client_trustlist = []) ?rest_server_port
               where_to_listen
               (fun address reader writer ->
                 let address = Socket.Address.Inet.addr address in
-                if not (Set.mem !client_trustlist address) then (
+                if
+                  not
+                    (Set.exists !client_trustlist ~f:(fun cidr ->
+                         Unix.Cidr.does_match cidr address ))
+                then (
                   Logger.error logger ~module_:__MODULE__ ~location:__LOC__
                     !"Rejecting client connection from $address, it is not \
                       present in the trustlist."
@@ -532,28 +543,40 @@ let no_report exn_str status =
     (Yojson.Safe.to_string status)
     (Yojson.Safe.to_string (summary exn_str))
 
-let handle_crash e ~conf_dir ~top_logger coda_ref =
+let handle_crash e ~time_controller ~conf_dir ~top_logger coda_ref =
   let exn_str = Exn.to_string e in
   Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
     "Unhandled top-level exception: $exn\nGenerating crash report"
     ~metadata:[("exn", `String exn_str)] ;
   let%bind status = coda_status !coda_ref in
+  (* TEMP MAKE REPORT TRACE *)
+  Logger.trace top_logger ~module_:__MODULE__ ~location:__LOC__
+    "handle_crash: acquired coda status" ;
   let%map action_string =
     match%map
-      try make_report exn_str ~conf_dir coda_ref ~top_logger >>| fun k -> Ok k
-      with exn -> return (Error (Error.of_exn exn))
+      Block_time.Timeout.await
+        ~timeout_duration:(Block_time.Span.of_ms 30_000L)
+        time_controller
+        ( try
+            make_report exn_str ~conf_dir coda_ref ~top_logger
+            >>| fun k -> Ok k
+          with exn -> return (Error (Error.of_exn exn)) )
     with
-    | Ok (Some (report_file, temp_config)) ->
+    | `Ok (Ok (Some (report_file, temp_config))) ->
         ( try Core.Sys.command (sprintf "rm -rf %s" temp_config) |> ignore
           with _ -> () ) ;
         sprintf "attach the crash report %s" report_file
-    | Ok None ->
+    | `Ok (Ok None) ->
         (*TODO: tar failed, should we ask people to zip the temp directory themselves?*)
         no_report exn_str status
-    | Error e ->
+    | `Ok (Error e) ->
         Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
           "Exception when generating crash report: $exn"
           ~metadata:[("exn", `String (Error.to_string_hum e))] ;
+        no_report exn_str status
+    | `Timeout ->
+        Logger.fatal top_logger ~module_:__MODULE__ ~location:__LOC__
+          "Timed out while generated crash report" ;
         no_report exn_str status
   in
   let message =
@@ -561,7 +584,7 @@ let handle_crash e ~conf_dir ~top_logger coda_ref =
   in
   Core.print_string message
 
-let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
+let handle_shutdown ~monitor ~time_controller ~conf_dir ~top_logger coda_ref =
   Monitor.detach_and_iter_errors monitor ~f:(fun exn ->
       don't_wait_for
         (let%bind () =
@@ -588,7 +611,7 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
                in
                Core.print_string message ; Deferred.unit
            | _ ->
-               handle_crash exn ~conf_dir ~top_logger coda_ref
+               handle_crash exn ~time_controller ~conf_dir ~top_logger coda_ref
          in
          Stdlib.exit 1) ) ;
   Async_unix.Signal.(
