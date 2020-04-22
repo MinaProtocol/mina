@@ -510,7 +510,7 @@ jobs:
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && (dune runtest src/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
                   environment:
-                    DUNE_PROFILE: {{profile}}
+                    DUNE_PROFILE: nonconsensus_medium_curves
                     LIBP2P_NIXLESS: 1
                     GO: /usr/lib/go/bin/go
             - store_artifacts:
