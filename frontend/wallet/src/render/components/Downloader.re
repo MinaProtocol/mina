@@ -109,7 +109,8 @@ let make = (~onFinish, ~finished, ~error) => {
               updateState(((downloaded, total, _)) =>
                 (downloaded, total, true)
               )
-            | Error(_) => onFinish(result)
+            | Error(_) => 
+              onFinish(result)
             }
           },
         )
