@@ -221,7 +221,7 @@ let daemon logger =
               "PATH path to the runtime-configurable constants. (default: \
                compiled constants) For example: %s"
               ( Genesis_constants.(
-                  to_daemon_config compiled |> Daemon_config.to_yojson)
+                  Daemon_config.(of_genesis_constants compiled |> to_yojson))
               |> Yojson.Safe.to_string ))
          (optional string)
      and curr_fork_id =
@@ -369,6 +369,11 @@ let daemon logger =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
              ~logger ~conf_dir ~daemon_conf:genesis_runtime_constants
          in
+         Logger.info logger ~module_:__MODULE__ ~location:__LOC__
+           "Initializing with genesis constants $genesis_constants"
+           ~metadata:
+             [ ( "genesis_constants"
+               , Genesis_constants.to_yojson genesis_constants ) ] ;
          let%bind config =
            let configpath = conf_dir ^/ "daemon.json" in
            match%map

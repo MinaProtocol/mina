@@ -214,3 +214,48 @@ Container Stages:
 * Stage 0: Initial Image [ocaml/opam2:debian-9-ocaml-4.07](https://hub.docker.com/r/ocaml/opam2/) (opam community image, ~880MB)
 * Stage 1: [coda toolchain](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile-toolchain) (built by us, stored on docker hub, ~2GB compressed)
 * Stage 2: [codabuilder](https://github.com/CodaProtocol/coda/blob/master/dockerfiles/Dockerfile) (built with `make codabuilder`, used with `make build`, ~2GB compressed)
+
+
+## Overriding Genesis Constants
+
+Coda genesis constants consists of constants for the consensus algorithm, sizes for various data structures like transaction pool, scan state, ledger etc.
+All the constants can be set at compile-time. A subset of the compile-time constants can be overriden when generating the genesis state using `runtime_genesis_ledger.exe`, and a subset of those can again be overridden at runtime by passing the new values to the daemon.
+
+The constants at compile-time are set for different configurations using optional compilation. This is how integration tests/builds with multiple configurations are run.
+Currently some of these constants (defined [here](src/lib/coda_compile_config/coda_compile_config.ml)) cannot be changed after building and would require creating a new build profile (*.mlh files) for any change in the values.
+
+<b> 1. Constants that can be overridden when generating the genesis state are:</b>
+
+* k (consensus constant)
+* delta (consensus constant)
+* genesis_state_timestamp
+* transaction pool max size
+
+To override the above listed constants, pass a json file to `runtime_genesis_ledger.exe` with the format:
+
+```json
+{
+    "k": 10,
+    "delta": 3,
+    "txpool_max_size": 3000,
+    "genesis_state_timestamp": "2020-04-20 11:00:00-07:00"
+}
+```
+
+The exe will then package the overriden constants along with the genesis ledger and the genesis proof for the daemon to consume.
+
+<b> 2. Constants that can be overriden at runtime are:</b>
+
+* genesis_state_timestamp
+* transaction pool max size
+
+To do this, pass a json file to the daemon using the flag `genesis-constants` with the format:
+
+```json
+{
+    "txpool_max_size": 3000,
+    "genesis_state_timestamp": "2020-04-20 11:00:00-07:00"
+}
+```
+
+The daemon logs should reflect these changes. Also, `coda client status` displays some of the constants.
