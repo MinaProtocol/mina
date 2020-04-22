@@ -77,7 +77,7 @@ let make = (~prevStep, ~nextStep) => {
           <Button
             label="Continue"
             style=Button.HyperlinkBlue3
-            disabled={state === Checking}
+            disabled={ip === "" || state === Checking}
             onClick={_ => handleContinue()}
           />
         </div>

@@ -42,10 +42,11 @@ let verification_key =
       key)
 
 module Doc = struct
-  let date =
+  let date ?(extra = "") s =
     sprintf
       !"%s (stringified Unix time - number of milliseconds since January 1, \
-        1970)"
+        1970)%s"
+      s extra
 
   let bin_prot =
     sprintf !"%s (base58-encoded janestreet/bin_prot serialization)"
@@ -393,6 +394,20 @@ module Types = struct
             ~args:Arg.[]
             ~resolve:(fun _ {Coda_state.Blockchain_state.Poly.timestamp; _} ->
               Block_time.to_string timestamp )
+        ; field "utcDate" ~typ:(non_null string)
+            ~doc:
+              (Doc.date
+                 ~extra:
+                   ". Time offsets are adjusted to reflect true wall-clock \
+                    time instead of genesis time."
+                 "utcDate")
+            ~args:Arg.[]
+            ~resolve:
+              (fun {ctx= coda; _}
+                   {Coda_state.Blockchain_state.Poly.timestamp; _} ->
+              Block_time.to_string_system_time
+                (Coda_lib.time_controller coda)
+                timestamp )
         ; field "snarkedLedgerHash" ~typ:(non_null string)
             ~doc:"Base58Check-encoded hash of the snarked ledger"
             ~args:Arg.[]
