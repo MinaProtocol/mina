@@ -107,20 +107,24 @@ module Protocol = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving eq]
+  type t = Stable.Latest.t [@@deriving eq, to_yojson]
 end
 
-type t = {protocol: Protocol.t; txpool_max_size: int}
+module T = struct
+  type t = {protocol: Protocol.t; txpool_max_size: int} [@@deriving to_yojson]
 
-let hash (t : t) =
-  let str =
-    ( List.map
-        [t.protocol.k; t.protocol.delta; t.txpool_max_size]
-        ~f:Int.to_string
-    |> String.concat ~sep:"" )
-    ^ Core.Time.to_string t.protocol.genesis_state_timestamp
-  in
-  Blake2.digest_string str |> Blake2.to_hex
+  let hash (t : t) =
+    let str =
+      ( List.map
+          [t.protocol.k; t.protocol.delta; t.txpool_max_size]
+          ~f:Int.to_string
+      |> String.concat ~sep:"" )
+      ^ Core.Time.to_string t.protocol.genesis_state_timestamp
+    in
+    Blake2.digest_string str |> Blake2.to_hex
+end
+
+include T
 
 [%%inject
 "genesis_state_timestamp_string", genesis_state_timestamp]
@@ -147,7 +151,15 @@ let compiled : t =
           genesis_timestamp_of_string genesis_state_timestamp_string }
   ; txpool_max_size= pool_max_size }
 
-module Config_file = struct
+module type Config_intf = sig
+  type t [@@deriving yojson]
+
+  val to_genesis_constants : default:T.t -> t -> T.t
+
+  val of_genesis_constants : T.t -> t
+end
+
+module Config_file : Config_intf = struct
   type t =
     { k: int option
     ; delta: int option
@@ -159,52 +171,52 @@ module Config_file = struct
     Result.(
       of_yojson s
       >>= fun t -> validate_time t.genesis_state_timestamp >>= fun _ -> Ok t)
+
+  let to_genesis_constants ~(default : T.t) (t : t) : T.t =
+    let opt default x = Option.value ~default x in
+    let protocol =
+      { Protocol.Poly.k= opt default.protocol.k t.k
+      ; delta= opt default.protocol.delta t.delta
+      ; genesis_state_timestamp=
+          Option.value_map ~default:default.protocol.genesis_state_timestamp
+            t.genesis_state_timestamp ~f:genesis_timestamp_of_string }
+    in
+    {protocol; txpool_max_size= opt default.txpool_max_size t.txpool_max_size}
+
+  let of_genesis_constants (genesis_constants : T.t) : t =
+    { k= Some genesis_constants.protocol.k
+    ; delta= Some genesis_constants.protocol.delta
+    ; txpool_max_size= Some genesis_constants.txpool_max_size
+    ; genesis_state_timestamp=
+        Some
+          (Core.Time.format genesis_constants.protocol.genesis_state_timestamp
+             "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }
 end
 
-module Daemon_config = struct
+module Daemon_config : Config_intf = struct
   type t = {txpool_max_size: int option; genesis_state_timestamp: string option}
-  [@@deriving yojson, eq]
+  [@@deriving yojson]
 
   let of_yojson s =
     Result.(
       of_yojson s
       >>= fun t -> validate_time t.genesis_state_timestamp >>= fun _ -> Ok t)
-end
 
-let of_config_file ~(default : t) (t : Config_file.t) : t =
-  let opt default x = Option.value ~default x in
-  let protocol =
-    { Protocol.Poly.k= opt default.protocol.k t.k
-    ; delta= opt default.protocol.delta t.delta
+  let to_genesis_constants ~(default : T.t)
+      ({txpool_max_size; genesis_state_timestamp} : t) : T.t =
+    { txpool_max_size=
+        Option.value ~default:default.txpool_max_size txpool_max_size
+    ; protocol=
+        { default.protocol with
+          genesis_state_timestamp=
+            Option.value_map genesis_state_timestamp
+              ~default:default.protocol.genesis_state_timestamp
+              ~f:genesis_timestamp_of_string } }
+
+  let of_genesis_constants (genesis_constants : T.t) : t =
+    { txpool_max_size= Some genesis_constants.txpool_max_size
     ; genesis_state_timestamp=
-        Option.value_map ~default:default.protocol.genesis_state_timestamp
-          t.genesis_state_timestamp ~f:genesis_timestamp_of_string }
-  in
-  {protocol; txpool_max_size= opt default.txpool_max_size t.txpool_max_size}
-
-let to_config_file t : Config_file.t =
-  { Config_file.k= Some t.protocol.k
-  ; delta= Some t.protocol.delta
-  ; txpool_max_size= Some t.txpool_max_size
-  ; genesis_state_timestamp=
-      Some
-        (Core.Time.format t.protocol.genesis_state_timestamp
-           "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }
-
-let of_daemon_config ~(default : t)
-    ({txpool_max_size; genesis_state_timestamp} : Daemon_config.t) : t =
-  { txpool_max_size=
-      Option.value ~default:default.txpool_max_size txpool_max_size
-  ; protocol=
-      { default.protocol with
-        genesis_state_timestamp=
-          Option.value_map genesis_state_timestamp
-            ~default:default.protocol.genesis_state_timestamp
-            ~f:genesis_timestamp_of_string } }
-
-let to_daemon_config (t : t) : Daemon_config.t =
-  { txpool_max_size= Some t.txpool_max_size
-  ; genesis_state_timestamp=
-      Some
-        (Core.Time.format t.protocol.genesis_state_timestamp
-           "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }
+        Some
+          (Core.Time.format genesis_constants.protocol.genesis_state_timestamp
+             "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }
+end
