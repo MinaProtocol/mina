@@ -52,15 +52,12 @@ module Tock_backend = struct
     module Field = Full.Field
     module Bigint = Full.Bigint
     module Var = Full.Var
-    module R1CS_constraint = Full.R1CS_constraint
 
     module R1CS_constraint_system = struct
       include Full.R1CS_constraint_system
 
       let finalize = swap_AB_if_beneficial
     end
-
-    module Linear_combination = Full.Linear_combination
 
     let field_size = Full.field_size
   end
