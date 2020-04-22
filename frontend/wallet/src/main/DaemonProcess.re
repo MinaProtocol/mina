@@ -19,6 +19,8 @@ let codaCommand = (~port, ~extraArgs) => {
   let env = ChildProcess.Process.env;
   let path = Js.Dict.get(env, "PATH") |> Option.with_default(~default="");
   let installPath = getPath("userData") ++ del ++ "coda";
+  // NOTE: This is a workaround for keys that's very specific to unix based systems
+  let keysPath = "/usr/local/var/coda/keys";
   Js.Dict.set(env, "PATH", path ++ del ++ installPath);
   Js.Dict.set(env, "CODA_LIBP2P_HELPER_PATH", installPath ++ del ++ "libp2p-helper");
   {
@@ -29,6 +31,8 @@ let codaCommand = (~port, ~extraArgs) => {
           "daemon",
           "-rest-port",
           Js.Int.toString(port),
+          "-genesis-ledger-dir",
+          keysPath,
           "-config-directory",
           ProjectRoot.userData ^/ "coda-config",
         |],

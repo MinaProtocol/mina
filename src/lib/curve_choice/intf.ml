@@ -71,73 +71,6 @@ module type Common_intf = sig
     val create : int -> t
   end
 
-  module Linear_combination : sig
-    type t = Field.t Snarky.Backend_types.Linear_combination.t
-
-    val typ : t Ctypes_static.typ
-
-    val create : unit -> t
-
-    val of_var : Var.t -> t
-
-    val of_int : int -> t
-
-    val of_field : Field.t -> t
-
-    val print : t -> unit
-
-    module Term : sig
-      type t = Field.t Snarky.Backend_types.Linear_combination.Term.t
-
-      val create : Field.t -> Var.t -> t
-
-      val coeff : t -> Field.t
-
-      val var : t -> Var.t
-
-      module Vector : sig
-        type elt = t
-
-        type nonrec t = elt Snarky.Vector.t
-
-        val typ : t Ctypes_static.typ
-
-        val delete : t -> unit
-
-        val create : unit -> t
-
-        val get : t -> int -> elt
-
-        val emplace_back : t -> elt -> unit
-
-        val length : t -> int
-      end
-    end
-
-    val terms : t -> Term.Vector.t
-
-    module Vector : Snarky.Vector.S with type elt = t
-
-    val add_term : t -> Field.t -> Var.t -> unit
-  end
-
-  module R1CS_constraint : sig
-    type t = Field.t Snarky.Backend_types.R1CS_constraint.t
-
-    val typ : t Ctypes_static.typ
-
-    val create :
-      Linear_combination.t -> Linear_combination.t -> Linear_combination.t -> t
-
-    val set_is_square : t -> bool -> unit
-
-    val a : t -> Linear_combination.t
-
-    val b : t -> Linear_combination.t
-
-    val c : t -> Linear_combination.t
-  end
-
   module R1CS_constraint_system : sig
     type t = Field.t Snarky.Backend_types.R1CS_constraint_system.t
 
@@ -147,16 +80,15 @@ module type Common_intf = sig
 
     val clear : t -> unit
 
-    val delete : t -> unit
+    val finalize : t -> unit
 
-    val report_statistics : t -> unit
+    val add_constraint :
+         ?label:string
+      -> t
+      -> Field.t Snarky.Cvar.t Snarky.Constraint.basic
+      -> unit
 
-    val swap_AB_if_beneficial : t -> unit
-
-    val add_constraint : t -> R1CS_constraint.t -> unit
-
-    val add_constraint_with_annotation :
-      t -> R1CS_constraint.t -> string -> unit
+    val digest : t -> Core_kernel.Md5.t
 
     val set_primary_input_size : t -> int -> unit
 
@@ -166,20 +98,15 @@ module type Common_intf = sig
 
     val get_auxiliary_input_size : t -> int
 
-    val check_exn : t -> unit
-
-    val is_satisfied :
+    val to_json :
          t
-      -> primary_input:Field.Vector.t
-      -> auxiliary_input:Field.Vector.t
-      -> bool
+      -> ([> `Assoc of (string * 'a) list
+          | `List of 'a list
+          | `String of string ]
+          as
+          'a)
 
-    val digest : t -> Core.Md5.t
-
-    val iter_constraints : f:(R1CS_constraint.t -> unit) -> t -> unit
-
-    val fold_constraints :
-      f:('a -> R1CS_constraint.t -> 'a) -> init:'a -> t -> 'a
+    val swap_AB_if_beneficial : t -> unit
   end
 
   val field_size : Bigint.R.t
@@ -197,7 +124,7 @@ module type Proof_system_intf = sig
 
     val typ : t Ctypes.typ
 
-    val r1cs_constraint_system : t -> r1cs_constraint_system
+    val is_initialized : t -> [`No of r1cs_constraint_system | `Yes]
 
     val delete : t -> unit
 
@@ -375,13 +302,13 @@ module type Backend_intf = sig
 
     include
       Common_intf
-      with type Field.t = Common.Field.t
-      with module R1CS_constraint_system := Common.R1CS_constraint_system
+      with module Field = Common.Field
+      with module R1CS_constraint_system := R1CS_constraint_system
 
     include
       Proof_system_intf
       with type field_vector := Common.Field.Vector.t
-       and type r1cs_constraint_system := Common.R1CS_constraint_system.t
+       and type r1cs_constraint_system := R1CS_constraint_system.t
   end
 
   module GM : sig
@@ -393,16 +320,19 @@ module type Backend_intf = sig
 
     include
       Common_intf
-      with type Field.t = Common.Field.t
-      with module R1CS_constraint_system := Common.R1CS_constraint_system
+      with module Field = Common.Field
+      with module R1CS_constraint_system := R1CS_constraint_system
 
     include
       Proof_system_intf
       with type field_vector := Common.Field.Vector.t
-       and type r1cs_constraint_system := Common.R1CS_constraint_system.t
+       and type r1cs_constraint_system := R1CS_constraint_system.t
   end
 
-  include Common_intf with type Field.t = Common.Field.t
+  include
+    Common_intf
+    with module Field = Common.Field
+    with module Bigint = Common.Bigint
 
   val field_size : Bigint.R.t
 
@@ -476,8 +406,8 @@ module type Backend_intf = sig
 
     include
       Common_intf
-      with type Field.t = Common.Field.t
-      with module R1CS_constraint_system := Common.R1CS_constraint_system
+      with module Field = Common.Field
+      with module R1CS_constraint_system := R1CS_constraint_system
 
     module Verification_key : sig
       type t = Default.Verification_key.t
