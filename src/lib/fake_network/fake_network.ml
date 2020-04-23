@@ -98,8 +98,21 @@ let setup (type n) ?(logger = Logger.null ())
                         ]
                       "sending scan state and pending coinbase" ;
                     (scan_state, expected_merkle_root, pending_coinbases)) )
-                ~answer_sync_ledger_query:(fun _ ->
-                  failwith "Answer_sync_ledger_query unimplemented" )
+                ~answer_sync_ledger_query:(fun query_env ->
+                  let ledger_hash, _ = Envelope.Incoming.data query_env in
+                  Sync_handler.answer_query ~frontier ledger_hash
+                    (Envelope.Incoming.map ~f:Tuple2.get2 query_env)
+                    ~logger:(Logger.create ())
+                    ~trust_system:(Trust_system.null ())
+                  |> Deferred.map
+                     (* begin error string prefix so we can pattern-match *)
+                       ~f:
+                         (Result.of_option
+                            ~error:
+                              (Error.createf
+                                 !"%s for ledger_hash: %{sexp:Ledger_hash.t}"
+                                 Coda_networking.refused_answer_query_string
+                                 ledger_hash)) )
                 ~get_ancestry:(fun query_env ->
                   Deferred.return
                     (Sync_handler.Root.prove ~logger ~frontier
