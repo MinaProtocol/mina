@@ -38,6 +38,8 @@ let staged_ledger_hash_pending_coinbase_aux : t = '\x81'
 
 let state_hash : t = '\x20'
 
+let state_body_hash : t = '\x21'
+
 let transaction_hash : t = '\x9E'
 
 let user_command : t = '\x17'
