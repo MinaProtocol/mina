@@ -23,7 +23,7 @@
  *
  * {!empty} to create the initial state
  *
- * {!update} adding raw data that will be lifted and processed later; adding 
+ * {!update} adding raw data that will be lifted and processed later; adding
  * merges for the completed raw/merged data. This moves us closer to emitting
  * something from a tree
  *
@@ -35,26 +35,24 @@ open Core_kernel
 open Coda_digestif
 
 module Sequence_number : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = int [@@deriving sexp, bin_io, version]
+      type t = int [@@deriving sexp]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t [@@deriving sexp]
 end
 
 (**Each node on the tree is viewed as a job that needs to be completed. When a job is completed, it creates a new "Todo" job and marks the old job as "Done"*)
 module Job_status : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = Todo | Done [@@deriving sexp, bin_io, version]
+      type t = Todo | Done [@@deriving sexp]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t = Todo | Done [@@deriving sexp]
 
@@ -63,13 +61,12 @@ end
 
 (**number of jobs that can be added to this tree. This number corresponding to a specific level of the tree. New jobs received is distributed across the tree based on this number. *)
 module Weight : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = {base: int; merge: int} [@@deriving sexp, bin_io, version]
+      type t = {base: int; merge: int} [@@deriving sexp]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t = {base: int; merge: int} [@@deriving sexp]
 end
@@ -77,30 +74,28 @@ end
 (**Base Job: Proving new transactions*)
 module Base : sig
   module Record : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type 'base t =
           { job: 'base
           ; seq_no: Sequence_number.Stable.V1.t
           ; status: Job_status.Stable.V1.t }
-        [@@deriving sexp, bin_io, version]
+        [@@deriving sexp]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type 'base t = 'base Stable.Latest.t [@@deriving sexp]
   end
 
   module Job : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type 'base t = Empty | Full of 'base Record.Stable.V1.t
-        [@@deriving sexp, bin_io, version]
+        [@@deriving sexp]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type 'base t = 'base Stable.Latest.t =
       | Empty
@@ -123,6 +118,7 @@ end
 (** Merge Job: Merging two proofs*)
 module Merge : sig
   module Record : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type 'merge t =
@@ -130,27 +126,24 @@ module Merge : sig
           ; right: 'merge
           ; seq_no: Sequence_number.Stable.V1.t
           ; status: Job_status.Stable.V1.t }
-        [@@deriving sexp, bin_io, version]
+        [@@deriving sexp]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type 'merge t = 'merge Stable.Latest.t [@@deriving sexp]
   end
 
   module Job : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type 'merge t =
           | Empty
           | Part of 'merge (*When only the left component of the job is available since we always complete the jobs from left to right*)
           | Full of 'merge Record.Stable.V1.t
-        [@@deriving sexp, bin_io, version]
+        [@@deriving sexp]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type 'merge t = 'merge Stable.Latest.t =
       | Empty
@@ -159,15 +152,14 @@ module Merge : sig
     [@@deriving sexp]
   end
 
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type 'merge t =
         (Weight.Stable.V1.t * Weight.Stable.V1.t) * 'merge Job.Stable.V1.t
-      [@@deriving sexp, bin_io, version]
+      [@@deriving sexp]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type 'merge t = 'merge Stable.Latest.t [@@deriving sexp]
 end
@@ -175,36 +167,24 @@ end
 (** An available job is an incomplete job that has enough information for one
 * to process it into a completed job *)
 module Available_job : sig
-  module Stable : sig
-    module V1 : sig
-      type ('merge, 'base) t = Base of 'base | Merge of 'merge * 'merge
-      [@@deriving sexp]
-    end
-
-    module Latest = V1
-  end
-
-  type ('merge, 'base) t = ('merge, 'base) Stable.Latest.t =
-    | Base of 'base
-    | Merge of 'merge * 'merge
+  type ('merge, 'base) t = Base of 'base | Merge of 'merge * 'merge
   [@@deriving sexp]
 end
 
-(**Space available and number of jobs required to enqueue data. 
- first = space on the current tree and number of jobs required 
+(**Space available and number of jobs required to enqueue data.
+ first = space on the current tree and number of jobs required
  to be completed
- second = If the current-tree space is less than <max_base_jobs> 
+ second = If the current-tree space is less than <max_base_jobs>
  then remaining number of slots on a new tree and the corresponding
  job count.*)
 module Space_partition : sig
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type t = {first: int * int; second: (int * int) option}
       [@@deriving sexp, bin_io, version]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type t = Stable.Latest.t = {first: int * int; second: (int * int) option}
   [@@deriving sexp]
@@ -212,15 +192,14 @@ end
 
 module Job_view : sig
   module Extra : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type t =
           {seq_no: Sequence_number.Stable.V1.t; status: Job_status.Stable.V1.t}
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type t = Stable.Latest.t =
       {seq_no: Sequence_number.Stable.V1.t; status: Job_status.Stable.V1.t}
@@ -228,6 +207,7 @@ module Job_view : sig
   end
 
   module Node : sig
+    [%%versioned:
     module Stable : sig
       module V1 : sig
         type 'a t =
@@ -236,11 +216,9 @@ module Job_view : sig
           | MEmpty
           | MPart of 'a
           | MFull of ('a * 'a * Extra.Stable.V1.t)
-        [@@deriving sexp, bin_io]
+        [@@deriving sexp]
       end
-
-      module Latest = V1
-    end
+    end]
 
     type 'a t = 'a Stable.Latest.t =
       | BEmpty
@@ -251,14 +229,12 @@ module Job_view : sig
     [@@deriving sexp]
   end
 
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type 'a t = {position: int; value: 'a Node.Stable.V1.t}
-      [@@deriving sexp, bin_io]
+      type 'a t = {position: int; value: 'a Node.Stable.V1.t} [@@deriving sexp]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type 'a t = 'a Stable.Latest.t = {position: int; value: 'a Node.Stable.V1.t}
   [@@deriving sexp]
@@ -268,20 +244,12 @@ module State : sig
   (* bin_io, version omitted intentionally *)
   type ('merge, 'base) t [@@deriving sexp]
 
+  [%%versioned:
   module Stable : sig
     module V1 : sig
-      type nonrec ('merge, 'base) t = ('merge, 'base) t
-      [@@deriving sexp, bin_io, version]
-
-      val to_latest :
-           ('merge -> 'merge_latest)
-        -> ('base -> 'base_latest)
-        -> ('merge, 'base) t
-        -> ('merge_latest, 'base_latest) t
+      type nonrec ('merge, 'base) t = ('merge, 'base) t [@@deriving sexp]
     end
-
-    module Latest = V1
-  end
+  end]
 
   module Hash : sig
     type t = Digestif.SHA256.t
@@ -364,12 +332,12 @@ val view_jobs_with_position :
   -> ('base -> 'c)
   -> 'c Job_view.t list list
 
-(** All the base jobs that are part of the latest tree being filled 
- * i.e., does not include base jobs that are part of previous trees not 
+(** All the base jobs that are part of the latest tree being filled
+ * i.e., does not include base jobs that are part of previous trees not
  * promoted to the merge jobs yet*)
 val base_jobs_on_latest_tree : ('merge, 'base) State.t -> 'base list
 
-(** Returns true only if the next 'd that could be enqueued is  
+(** Returns true only if the next 'd that could be enqueued is
 on a new tree*)
 val next_on_new_tree : ('merge, 'base) State.t -> bool
 
