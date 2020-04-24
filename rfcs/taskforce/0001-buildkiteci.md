@@ -8,14 +8,15 @@
 
 - CircleCI is expensive because it's hosted (P1)
 - Slow builds (P2)
-    - Our configuration is not scheduled optimally — this leads to slower builds than are actually possible (P2.1)
-        - Parallelism is not granular but rather just at the outskirts (P2.1.1)
-        - Test execution doesn't share artifacts before fanning out (P2.1.2)
-    - Instances are not as large as we'd want them to be (even at the "largest" size) (P2.2)
-    - Test execution is not granular (P2.3)
+  - Our configuration is not scheduled optimally — this leads to slower builds than are actually possible (P2.1)
+    - Parallelism is not granular but rather just at the outskirts (P2.1.1)
+    - Test execution doesn't share artifacts before fanning out (P2.1.2)
+  - Instances are not as large as we'd want them to be (even at the "largest" size) (P2.2)
+  - Test execution is not granular (P2.3)
 - Requires a manual template expansion step (test.py) (P3)
-- Iterating on builds is requires running things on our existing build infrastructure (P4)
+- Iterating on builds requires running things on our existing build infrastructure (P4)
 - Flaky tests don't have a good story ;; It isn't clear which tests are truly "flaky and we want to ignore the flake" and this failure is important to look at (P5)
+- Nix builds don't work in CircleCI's infrastructure anymore (P6)
 
 ## Impact of this project
 
@@ -43,7 +44,7 @@ We run the following sorts of jobs:
 13. Various integration tests
 14. Nightly builds with larger configurations that we don't pay attention to
 
-The longer builds are unit tests (30min !!!) and integration tests (~20min average ;; 8min is just the build). The artifact medium curves build  (~45min !!!)
+The longer builds are unit tests (30min !!!) and integration tests (~20min average ;; 8min is just the build). The artifact medium curves build (~45min !!!)
 
 ### Breakdown of longest job (build-artifacts-medium-curves)
 
@@ -82,12 +83,14 @@ Engineers who are iterating on build rules can run nodes locally or spin up inst
 
 ### Description of pipelines
 
-Pipeline are configured with Dhall rather than jinja-templated yaml. Dynamic pipelines support this as a first-class citizen, we do not require running the equivalent "`[test.py](http://test.py)`" before pushing. I have already implemented this on a [side project](https://github.com/bkase/gameboy/blob/master/.buildkite/pipeline.yaml).
+<div id="pipeline-automatic-dhall">
+
+Pipeline are configured with Dhall rather than jinja-templated yaml. Dynamic pipelines support this as a first-class citizen, we do not require running the equivalent "`test.py`" before pushing. I have already implemented this on a [side project](https://github.com/bkase/gameboy/blob/master/.buildkite). Notice that there is a small `pipeline.yaml` to bootstrap the `pipeline.dhall` -- `pipeline.dhall` is rendered at _build_ time, not commit time.
 
 **General Pipeline Writing Things**
 
-* Use the [BuildKite monorepo plugin](https://github.com/chronotc/monorepo-diff-buildkite-plugin) for granular test execution.
-* Explicitly opt-in to the dependency graph. Don't support the "wait" instruction that blocks all parallel work.
+- Use the [BuildKite monorepo plugin](https://github.com/chronotc/monorepo-diff-buildkite-plugin) for granular test execution.
+- Explicitly opt-in to the dependency graph. Don't support the "wait" instruction that blocks all parallel work.
 
 Assuming this proposal is accepted, more details will follow on how to structure the Dhall descriptions, but here is a rough cut of what it could look like:
 
@@ -119,7 +122,7 @@ let packageDebStep =
 
 Run buildkite agents locally or on manually spun up compute instances to test rules by targeting specific agents with tags and using the CLI [https://github.com/buildkite/cli](https://github.com/buildkite/cli)
 
-Liberal use of artifact uploading/downloading to keep build re-playable from different steps
+Liberal use of artifact uploading/downloading to keep build re-playable from different steps and allow build artifacts to be reused in more pipelines.
 
 ## This design solves the above issues
 
@@ -133,11 +136,13 @@ P2.2 → We can choose whatever machines we want
 
 P2.3 → We use dynamic pipelines to expand work based on files touched
 
-P3 → Manual adhoc template expansion is replaced with *automatic* expansion using Dhall
+P3 → Manual adhoc template expansion is replaced with [automatic](#pipeline-automatic-dhall) expansion using Dhall
 
 P4 → BuildKite agents can be installed and tagged locally (or on your own instances) to iterate on builds on your own hardware before putting it into production
 
 P5 → Flakiness is explicit in the Dhall configuration
+
+P6 → Nix builds work inside docker containers "on my machine" so there is no evidence that they won't work on gcloud.
 
 ## Mapping of resource utilization to tasks
 
@@ -145,11 +150,13 @@ Big machines — 8core, 30GB of RAM
 
 - Builds
 - Heavy integration tests
+- All unit tests
 
 Light machines — 1core, 3.75GB of RAM
 
 - Linting
 - Small tools
+- (when we break up unit tests)
 
 ## Projected Spend
 
@@ -168,24 +175,26 @@ Work can be parallelized across working on the deploy infrastructure, pipeline c
 3. Move over a very high impact job — build-artifacts-medium-curves + all dependencies. Parallelize the crap out of it and set us up to reuse artifacts for other jobs.
 4. Put in the new integration tests (blocked on implementing the new integration tests)
 
-=== This is the point at which we can stop for task force (and would need further fleshing out) ===
+=== This is the point at which we can stop for task force (or maybe we'll want 5) ===
 
-5. Use pre-emptible instances
+5. Split unit tests into more granular parallel jobs
 
-6. Auto-scaling
+6. Use pre-emptible instances
 
-7. Move the rest of the work over other than mac builds
+7. Auto-scaling
 
-8. Paying some mac data center to host mac pros for us and switching to Buildkite for those too and spinning down Circle completely
+8. Move the rest of the work over other than mac builds
+
+9. Handling mac builds ourselves either with an in-house mac machine or with mac in a data center
 
 ## Explicitly NOT in scope for this project
 
 - Autoscaling
 - Granular test execution beyond Project level granularity
-- Retooling *how* builds work
-    - Incremental builds
-    - Retooling of docker toolchain
-    - Changing the manner in which builds and tests are executed (ie touching how dune is configured)
+- Retooling _how_ builds work
+  - Incremental builds
+  - Retooling of docker toolchain
+  - Changing the manner in which builds and tests are executed (ie touching how dune is configured)
     - Changing the Docker upload step; through this investigation that has been identified as a high-impact potentially low hanging fruit thing to fix
 - Supporting pre-emptible instances with retries
 - Retooling unit tests
@@ -205,11 +214,10 @@ Cons:
 
 # Outstanding Questions
 
-* Are there any details here that aren't fleshed out enough?
+- Are there any details here that aren't fleshed out enough?
 
-* Brandon has set up buildkite on remote macos machines and locally on his laptop, but has not deployed instances on cloud infrastructure before. Does anyone see any issues with that in particular?
+- Brandon has set up buildkite on remote macos machines and locally on his laptop, but has not deployed instances on cloud infrastructure before. Does anyone see any issues with that in particular?
 
 # Epic Link
 
 Issue #4762
-
