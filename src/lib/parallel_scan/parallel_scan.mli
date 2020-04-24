@@ -103,14 +103,13 @@ module Base : sig
     [@@deriving sexp]
   end
 
+  [%%versioned:
   module Stable : sig
     module V1 : sig
       type 'base t = Weight.Stable.V1.t * 'base Job.Stable.V1.t
-      [@@deriving sexp, bin_io, version]
+      [@@deriving sexp]
     end
-
-    module Latest = V1
-  end
+  end]
 
   type 'base t = 'base Stable.Latest.t [@@deriving sexp]
 end
@@ -181,8 +180,7 @@ module Space_partition : sig
   [%%versioned:
   module Stable : sig
     module V1 : sig
-      type t = {first: int * int; second: (int * int) option}
-      [@@deriving sexp, bin_io, version]
+      type t = {first: int * int; second: (int * int) option} [@@deriving sexp]
     end
   end]
 
@@ -241,7 +239,6 @@ module Job_view : sig
 end
 
 module State : sig
-  (* bin_io, version omitted intentionally *)
   type ('merge, 'base) t [@@deriving sexp]
 
   [%%versioned:
