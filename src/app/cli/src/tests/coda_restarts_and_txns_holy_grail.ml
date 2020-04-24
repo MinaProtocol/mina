@@ -4,11 +4,17 @@ open Coda_base
 
 let name = "coda-restarts-and-txns-holy-grail"
 
-let main n () =
+let main ~runtime_config n () =
+  let logger = Logger.create () in
+  let%bind {Precomputed_values.genesis_ledger; base_proof; runtime_config; _} =
+    Deferred.Or_error.ok_exn
+    @@ Precomputed_values.load_values ~logger ~not_found:`Generate_and_store
+         ~runtime_config ()
+  in
+  let (module Genesis_ledger : Genesis_ledger.Intf.S) = genesis_ledger in
   let wait_time = Time.Span.of_min 2. in
   assert (n > 1) ;
-  let logger = Logger.create () in
-  let accounts = Lazy.force Test_genesis_ledger.accounts in
+  let accounts = Lazy.force Genesis_ledger.accounts in
   let snark_work_public_keys =
     Fn.const @@ Some (List.nth_exn accounts 5 |> snd |> Account.public_key)
   in
@@ -16,11 +22,11 @@ let main n () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~runtime_config ~base_proof
   in
   (* SEND TXNS *)
   let keypairs =
-    List.map accounts ~f:Test_genesis_ledger.keypair_of_account_record_exn
+    List.map accounts ~f:Genesis_ledger.keypair_of_account_record_exn
   in
   let random_block_producer () = Random.int 2 + 1 in
   let random_non_block_producer () = Random.int 2 + 3 in
@@ -51,6 +57,9 @@ let main n () =
   let%bind () = after wait_time in
   Coda_worker_testnet.Api.teardown testnet ~logger
 
+(* TODO: Test-specific runtime config. *)
+let default_runtime_config = Runtime_config.compile_config
+
 let command =
   let open Command.Let_syntax in
   Command.async
@@ -60,5 +69,5 @@ let command =
     (let%map_open num_block_producers =
        flag "num-block-producers" ~doc:"NUM number of block producers to have"
          (required int)
-     in
-     main num_block_producers)
+     and runtime_config = Runtime_config.from_flags default_runtime_config in
+     main ~runtime_config num_block_producers)

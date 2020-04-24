@@ -46,5 +46,6 @@ type t =
   ; demo_mode: bool [@default false]
   ; genesis_state_hash: State_hash.t
   ; log_block_creation: bool [@default false]
-  ; genesis_constants: Genesis_constants.t }
+  ; runtime_config: Runtime_config.t
+  ; genesis_ledger: Genesis_ledger.Packed.t }
 [@@deriving make]

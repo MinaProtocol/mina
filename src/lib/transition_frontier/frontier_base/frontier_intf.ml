@@ -46,5 +46,5 @@ module type S = sig
 
   val visualize : filename:string -> t -> unit
 
-  val genesis_constants : t -> Genesis_constants.t
+  val runtime_config : t -> Runtime_config.t
 end

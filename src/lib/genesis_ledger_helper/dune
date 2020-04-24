@@ -1,6 +1,0 @@
-(library
-  (public_name genesis_ledger_helper)
-  (name genesis_ledger_helper)
-  (libraries core_kernel coda_base signature_lib genesis_constants cache_dir coda_lib)
-  (preprocessor_deps "../../config.mlh")
-  (preprocess (pps ppx_coda ppx_optcomp ppx_let)))

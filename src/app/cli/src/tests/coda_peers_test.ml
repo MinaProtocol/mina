@@ -3,11 +3,18 @@ open Async
 
 let name = "coda-peers-test"
 
-let main () =
-  let consensus_constants = Consensus.Constants.compiled in
+let main ~runtime_config () =
+  let logger = Logger.create () in
+  let%bind {Precomputed_values.base_proof; runtime_config; _} =
+    Deferred.Or_error.ok_exn
+    @@ Precomputed_values.load_values ~logger ~not_found:`Generate_and_store
+         ~runtime_config ()
+  in
+  let consensus_constants =
+    Consensus.Constants.create ~protocol_config:runtime_config.protocol
+  in
   let%bind program_dir = Unix.getcwd () in
   let n = 3 in
-  let logger = Logger.create () in
   let block_production_interval =
     consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
     |> Int64.to_int_exn
@@ -27,7 +34,7 @@ let main () =
       ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~block_production_keys:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~runtime_config ~base_proof
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let _, expected_peers = (List.hd_exn configs).net_configs in
@@ -59,7 +66,14 @@ let main () =
   in
   Deferred.List.iter workers ~f:(Coda_process.disconnect ~logger)
 
+(* TODO: Test-specific runtime config. *)
+let default_runtime_config = Runtime_config.compile_config
+
 let command =
   Command.async
     ~summary:"integration test with two peers spawned alongside a seed"
-    (Command.Param.return main)
+    (let open Command.Let_syntax in
+    let%map runtime_config =
+      Runtime_config.from_flags default_runtime_config
+    in
+    main ~runtime_config)

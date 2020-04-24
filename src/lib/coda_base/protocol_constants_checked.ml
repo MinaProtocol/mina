@@ -26,7 +26,7 @@ module T = Coda_numbers.Length
   ,checkpoint_window_size_in_slots
   ,block_window_duration_ms*)
 
-module Poly = Genesis_constants.Protocol.Poly
+module Poly = Runtime_config.Protocol.Poly
 
 module Value = struct
   [%%versioned
@@ -58,12 +58,12 @@ end
 
 type value = Value.t
 
-let value_of_t (t : Genesis_constants.Protocol.t) : value =
+let value_of_t (t : Runtime_config.Protocol.t) : value =
   { k= T.of_int t.k
   ; delta= T.of_int t.delta
   ; genesis_state_timestamp= Block_time.of_time t.genesis_state_timestamp }
 
-let t_of_value (v : value) : Genesis_constants.Protocol.t =
+let t_of_value (v : value) : Runtime_config.Protocol.t =
   { k= T.to_int v.k
   ; delta= T.to_int v.delta
   ; genesis_state_timestamp= Block_time.to_time v.genesis_state_timestamp }
@@ -104,7 +104,7 @@ let var_to_input (var : var) =
     (Array.map ~f:s [|k; delta; genesis_state_timestamp|])
 
 let%test_unit "value = var" =
-  let compiled = Genesis_constants.compiled.protocol in
+  let test_config = Runtime_config.for_unit_tests.protocol in
   let test protocol_constants =
     let open Snarky in
     let p_var =
@@ -116,6 +116,7 @@ let%test_unit "value = var" =
     [%test_eq: Value.t] protocol_constants
       (t_of_value protocol_constants |> value_of_t)
   in
-  Quickcheck.test ~trials:100 Value.gen ~examples:[value_of_t compiled] ~f:test
+  Quickcheck.test ~trials:100 Value.gen ~examples:[value_of_t test_config]
+    ~f:test
 
 [%%endif]

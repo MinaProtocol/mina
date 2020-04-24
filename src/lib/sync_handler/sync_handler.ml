@@ -107,11 +107,11 @@ module Make (Inputs : Inputs_intf) :
       let%map () = Option.some_if is_tip_better () in
       best_tip_with_witness
 
-    let verify ~logger ~verifier ~genesis_constants observed_state peer_root =
+    let verify ~logger ~verifier ~runtime_config observed_state peer_root =
       let open Deferred.Result.Let_syntax in
       let%bind ( (`Root _, `Best_tip (best_tip_transition, _)) as
                verified_witness ) =
-        Best_tip_prover.verify ~verifier ~genesis_constants peer_root
+        Best_tip_prover.verify ~verifier ~runtime_config peer_root
       in
       let is_before_best_tip candidate =
         Consensus.Hooks.select

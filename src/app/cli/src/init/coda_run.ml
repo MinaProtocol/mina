@@ -578,15 +578,6 @@ let handle_shutdown ~monitor ~conf_dir ~top_logger coda_ref =
                    ~log_issue:false
                in
                Core.print_string message ; Deferred.unit
-           | Genesis_ledger_helper.Genesis_state_initialization_error ->
-               let message =
-                 coda_crash_message
-                   ~error:"failed to initialize the genesis state"
-                   ~action:
-                     "include the last 50 lines from .coda-config/coda.log"
-                   ~log_issue:true
-               in
-               Core.print_string message ; Deferred.unit
            | _ ->
                handle_crash exn ~conf_dir ~top_logger coda_ref
          in

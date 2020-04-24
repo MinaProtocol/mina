@@ -667,7 +667,7 @@ let staking_ledger t =
   let open Option.Let_syntax in
   let consensus_constants =
     Consensus.Constants.create
-      ~protocol_constants:t.config.genesis_constants.protocol
+      ~protocol_config:t.config.runtime_config.protocol
   in
   let%map transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
@@ -723,13 +723,13 @@ let start t =
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
-    ~genesis_constants:t.config.genesis_constants ;
+    ~runtime_config:t.config.runtime_config
+    ~genesis_ledger:(Genesis_ledger.Packed.t t.config.genesis_ledger) ;
   Snark_worker.start t
 
 let create (config : Config.t) ~genesis_ledger ~base_proof =
   let consensus_constants =
-    Consensus.Constants.create
-      ~protocol_constants:config.genesis_constants.protocol
+    Consensus.Constants.create ~protocol_config:config.runtime_config.protocol
   in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
@@ -954,7 +954,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config
               ~trust_system:config.trust_system
-              ~pool_max_size:config.genesis_constants.txpool_max_size
+              ~pool_max_size:config.runtime_config.txpool_max_size
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
@@ -991,7 +991,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               =
             Broadcast_pipe.create
               ( External_transition.genesis ~genesis_ledger ~base_proof
-                  ~genesis_constants:config.genesis_constants
+                  ~runtime_config:config.runtime_config
               |> External_transition.Validated.to_initial_validated )
           in
           let valid_transitions, initialization_finish_signal =
@@ -1051,7 +1051,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                          breadcrumb ))
                   ~most_recent_valid_block
                   ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
-                  ~base_proof ~genesis_constants:config.genesis_constants )
+                  ~base_proof ~runtime_config:config.runtime_config )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

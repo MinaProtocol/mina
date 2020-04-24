@@ -51,17 +51,18 @@ let medium_curves = false
 [%%if
 time_offsets = true]
 
-let setup_time_offsets () =
+let setup_time_offsets runtime_config =
   Unix.putenv ~key:"CODA_TIME_OFFSET"
     ~data:
-      ( Time.Span.to_int63_seconds_round_down_exn (force Coda_processes.offset)
+      ( Time.Span.to_int63_seconds_round_down_exn
+          (Coda_processes.offset runtime_config)
       |> Int63.to_int
       |> Option.value_exn ?here:None ?message:None ?error:None
       |> Int.to_string )
 
 [%%else]
 
-let setup_time_offsets () = ()
+let setup_time_offsets _ = ()
 
 [%%endif]
 
@@ -81,15 +82,25 @@ let print_heartbeat logger =
   in
   loop ()
 
-let run_test () : unit Deferred.t =
+let run_test ~runtime_config () =
   let logger = Logger.create () in
+  let%bind { Precomputed_values.genesis_ledger
+           ; genesis_protocol_state
+           ; base_proof
+           ; runtime_config
+           ; _ } =
+    Deferred.Or_error.ok_exn
+    @@ Precomputed_values.load_values ~logger ~not_found:`Generate_and_store
+         ~runtime_config ()
+  in
+  let (module Genesis_ledger : Genesis_ledger.Intf.S) = genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
-  setup_time_offsets () ;
+  setup_time_offsets runtime_config ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
   File_system.with_temp_dir (Filename.temp_dir_name ^/ "full_test_config")
     ~f:(fun temp_conf_dir ->
-      let keypair = Test_genesis_ledger.largest_account_keypair_exn () in
+      let keypair = Genesis_ledger.largest_account_keypair_exn () in
       let%bind () =
         match Unix.getenv "CODA_TRACING" with
         | Some trace_dir ->
@@ -133,7 +144,7 @@ let run_test () : unit Deferred.t =
       in
       let time_controller = Block_time.Controller.(create @@ basic ~logger) in
       let consensus_local_state =
-        Consensus.Data.Local_state.create ~genesis_ledger:Test_genesis_ledger.t
+        Consensus.Data.Local_state.create ~genesis_ledger:Genesis_ledger.t
           (Public_key.Compressed.Set.singleton
              (Public_key.compress keypair.public_key))
       in
@@ -164,7 +175,7 @@ let run_test () : unit Deferred.t =
           ; consensus_local_state
           ; is_seed= true
           ; genesis_ledger_hash=
-              Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
+              Ledger.merkle_root (Lazy.force Genesis_ledger.t)
           ; log_gossip_heard=
               { snark_pool_diff= false
               ; transaction_pool_diff= false
@@ -177,7 +188,7 @@ let run_test () : unit Deferred.t =
       Core.Backtrace.elide := false ;
       Async.Scheduler.set_record_backtraces true ;
       let largest_account_keypair =
-        Test_genesis_ledger.largest_account_keypair_exn ()
+        Genesis_ledger.largest_account_keypair_exn ()
       in
       let fee = Currency.Fee.of_int in
       let snark_work_fee, transaction_fee =
@@ -205,12 +216,9 @@ let run_test () : unit Deferred.t =
              ~time_controller ~receipt_chain_database ~snark_work_fee
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
-             ~genesis_state_hash:
-               (Coda_state.Genesis_protocol_state.For_tests.genesis_state_hash
-                  ())
-             ~genesis_constants:Genesis_constants.compiled ())
-          ~genesis_ledger:Test_genesis_ledger.t
-          ~base_proof:Precomputed_values.base_proof
+             ~genesis_state_hash:genesis_protocol_state.hash ~runtime_config
+             ~genesis_ledger ())
+          ~genesis_ledger:Genesis_ledger.t ~base_proof
       in
       don't_wait_for
         (Strict_pipe.Reader.iter_without_pushback
@@ -413,20 +421,20 @@ let run_test () : unit Deferred.t =
         sending multiple payments*)
       let receiver_keypair =
         let receiver =
-          Test_genesis_ledger.find_new_account_record_exn
+          Genesis_ledger.find_new_account_record_exn
             [largest_account_keypair.public_key]
         in
-        Test_genesis_ledger.keypair_of_account_record_exn receiver
+        Genesis_ledger.keypair_of_account_record_exn receiver
       in
       let sender_keypair =
         let sender =
-          Test_genesis_ledger.find_new_account_record_exn
+          Genesis_ledger.find_new_account_record_exn
             [largest_account_keypair.public_key; receiver_keypair.public_key]
         in
-        Test_genesis_ledger.keypair_of_account_record_exn sender
+        Genesis_ledger.keypair_of_account_record_exn sender
       in
       let other_accounts =
-        List.filter (Lazy.force Test_genesis_ledger.accounts)
+        List.filter (Lazy.force Genesis_ledger.accounts)
           ~f:(fun (_, account) ->
             let reserved_public_keys =
               [ largest_account_keypair.public_key
@@ -439,7 +447,7 @@ let run_test () : unit Deferred.t =
                      (Public_key.decompress_exn @@ Account.public_key account)
                )) )
         |> List.map ~f:(fun (sk, account) ->
-               ( Test_genesis_ledger.keypair_of_account_record_exn (sk, account)
+               ( Genesis_ledger.keypair_of_account_record_exn (sk, account)
                , account ) )
       in
       let timeout_mins =
@@ -447,7 +455,9 @@ let run_test () : unit Deferred.t =
         else if with_snark then 15.
         else 7.
       in
-      let consensus_constants = Consensus.Constants.compiled in
+      let consensus_constants =
+        Consensus.Constants.create ~protocol_config:runtime_config.protocol
+      in
       let wait_till_length =
         if medium_curves then Length.of_int 1
         else if test_full_epoch then
@@ -497,7 +507,14 @@ let run_test () : unit Deferred.t =
       in
       heartbeat_flag := false )
 
+(* TODO: Test-specific runtime config. *)
+let default_runtime_config = Runtime_config.compile_config
+
 let command =
   let open Async in
   Command.async ~summary:"Full coda end-to-end test"
-    (Command.Param.return run_test)
+    (let open Command.Let_syntax in
+    let%map runtime_config =
+      Runtime_config.from_flags default_runtime_config
+    in
+    run_test ~runtime_config)

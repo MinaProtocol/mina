@@ -30,7 +30,7 @@ end
 
 let setup (type n) ?(logger = Logger.null ())
     ?(trust_system = Trust_system.null ())
-    ?(time_controller = Block_time.Controller.basic ~logger)
+    ?(time_controller = Block_time.Controller.basic ~logger) ~genesis_ledger
     (states : (peer_state, n num_peers) Vect.t) : n num_peers t =
   let _, peers =
     Vect.fold_map states
@@ -57,8 +57,7 @@ let setup (type n) ?(logger = Logger.null ())
     ; time_controller
     ; consensus_local_state
     ; is_seed= Vect.is_empty peers
-    ; genesis_ledger_hash=
-        Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
+    ; genesis_ledger_hash= Ledger.merkle_root (Lazy.force genesis_ledger)
     ; creatable_gossip_net=
         Gossip_net.Any.Creatable
           ( (module Gossip_net.Fake)
@@ -124,27 +123,35 @@ module Generator = struct
   open Quickcheck
   open Generator.Let_syntax
 
-  type peer_config = max_frontier_length:int -> peer_state Generator.t
+  type peer_config =
+       genesis_ledger:Genesis_ledger.Packed.t
+    -> runtime_config:Runtime_config.t
+    -> base_proof:Coda_base.Proof.t
+    -> max_frontier_length:int
+    -> peer_state Generator.t
 
-  let fresh_peer ~max_frontier_length =
+  let fresh_peer ~genesis_ledger ~runtime_config ~base_proof
+      ~max_frontier_length =
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~genesis_ledger:Test_genesis_ledger.t
+        ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
     in
     let%map frontier =
-      Transition_frontier.For_tests.gen ~consensus_local_state
-        ~max_length:max_frontier_length ~size:0 ()
+      Transition_frontier.For_tests.gen ~genesis_ledger ~base_proof
+        ~runtime_config ~consensus_local_state ~max_length:max_frontier_length
+        ~size:0 ()
     in
     {frontier; consensus_local_state}
 
-  let peer_with_branch ~frontier_branch_size ~max_frontier_length =
+  let peer_with_branch ~frontier_branch_size ~genesis_ledger ~runtime_config
+      ~base_proof ~max_frontier_length =
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
-        ~genesis_ledger:Test_genesis_ledger.t
+        ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
     in
     let%map frontier, branch =
-      Transition_frontier.For_tests.gen_with_branch
-        ~max_length:max_frontier_length ~frontier_size:0
+      Transition_frontier.For_tests.gen_with_branch ~genesis_ledger ~base_proof
+        ~runtime_config ~max_length:max_frontier_length ~frontier_size:0
         ~branch_size:frontier_branch_size ~consensus_local_state ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
@@ -152,13 +159,15 @@ module Generator = struct
           ~f:(Transition_frontier.add_breadcrumb_exn frontier) ) ;
     {frontier; consensus_local_state}
 
-  let gen ~max_frontier_length configs =
+  let gen ~genesis_ledger ~runtime_config ~base_proof ~max_frontier_length
+      configs =
     let open Quickcheck.Generator.Let_syntax in
     let%map states =
       Vect.Quickcheck_generator.map configs ~f:(fun config ->
-          config ~max_frontier_length )
+          config ~genesis_ledger ~runtime_config ~base_proof
+            ~max_frontier_length )
     in
-    setup states
+    setup ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger) states
 end
 
 (*

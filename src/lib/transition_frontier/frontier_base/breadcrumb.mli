@@ -26,6 +26,7 @@ val build :
      logger:Logger.t
   -> verifier:Verifier.t
   -> trust_system:Trust_system.t
+  -> genesis_ledger:Ledger.t Lazy.t
   -> parent:t
   -> transition:External_transition.Almost_validated.t
   -> sender:Envelope.Sender.t option
@@ -75,6 +76,7 @@ module For_tests : sig
        ?logger:Logger.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
+    -> genesis_ledger:Ledger.t Lazy.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
     -> (t -> t Deferred.t) Quickcheck.Generator.t
 
@@ -82,6 +84,7 @@ module For_tests : sig
        ?logger:Logger.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
+    -> genesis_ledger:Ledger.t Lazy.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
     -> (t -> t) Quickcheck.Generator.t
 
@@ -89,6 +92,7 @@ module For_tests : sig
        ?logger:Logger.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
+    -> genesis_ledger:Ledger.t Lazy.t
     -> accounts_with_secret_keys:(Private_key.t option * Account.t) list
     -> int
     -> (t -> t list Deferred.t) Quickcheck.Generator.t

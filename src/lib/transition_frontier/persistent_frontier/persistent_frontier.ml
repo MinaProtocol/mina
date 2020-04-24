@@ -145,8 +145,8 @@ module Instance = struct
          required ($current_root --> $target_root)" ;
       Error `Bootstrap_required )
 
-  let load_full_frontier t ~root_ledger ~consensus_local_state ~max_length
-      ~ignore_consensus_local_state ~genesis_constants =
+  let load_full_frontier t ~genesis_ledger ~root_ledger ~consensus_local_state
+      ~max_length ~ignore_consensus_local_state ~runtime_config =
     let open Deferred.Result.Let_syntax in
     let downgrade_transition transition genesis_state_hash :
         ( External_transition.Almost_validated.t
@@ -204,7 +204,7 @@ module Instance = struct
         ~root_data:
           {transition= root_transition; staged_ledger= root_staged_ledger}
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger.Db) root_ledger)
-        ~consensus_local_state ~max_length ~genesis_constants
+        ~consensus_local_state ~max_length ~runtime_config
     in
     let%bind extensions =
       Deferred.map
@@ -235,7 +235,7 @@ module Instance = struct
              in
              let%bind breadcrumb =
                Breadcrumb.build ~logger:t.factory.logger
-                 ~verifier:t.factory.verifier
+                 ~verifier:t.factory.verifier ~genesis_ledger
                  ~trust_system:(Trust_system.null ()) ~parent ~transition
                  ~sender:None
              in

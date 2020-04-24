@@ -611,7 +611,7 @@ let validate_time_received (t, validation) ~time_received =
   let protocol_state = With_hash.data t |> protocol_state in
   let constants =
     Consensus.Constants.create
-      ~protocol_constants:
+      ~protocol_config:
         ( Protocol_state.constants protocol_state
         |> Protocol_constants_checked.t_of_value )
   in
@@ -909,9 +909,9 @@ module Validated = struct
     |> Validation.reset_staged_ledger_diff_validation
 end
 
-let genesis ~genesis_ledger ~base_proof ~genesis_constants =
+let genesis ~genesis_ledger ~base_proof ~runtime_config =
   let genesis_protocol_state =
-    Coda_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_constants
+    Coda_state.Genesis_protocol_state.t ~genesis_ledger ~runtime_config
   in
   let creator = fst Consensus_state_hooks.genesis_winner in
   let empty_diff =
@@ -942,11 +942,11 @@ module For_tests = struct
     create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
       ~delta_transition_chain_proof ~validation_callback ?next_fork_id_opt ()
 
-  let genesis () =
+  let unit_test_genesis () =
     Fork_id.(set_current empty) ;
-    genesis ~genesis_ledger:Test_genesis_ledger.t
-      ~base_proof:Precomputed_values.base_proof
-      ~genesis_constants:Genesis_constants.compiled
+    genesis ~genesis_ledger:Genesis_ledger.Unit_test_ledger.t
+      ~base_proof:Precomputed_values.unit_test_base_proof
+      ~runtime_config:Runtime_config.for_unit_tests
 end
 
 module Transition_frontier_validation (Transition_frontier : sig
@@ -1018,6 +1018,7 @@ module Staged_ledger_validation = struct
          Validation.with_transition
       -> logger:Logger.t
       -> verifier:Verifier.t
+      -> genesis_ledger:Ledger.t Lazy.t
       -> parent_staged_ledger:Staged_ledger.t
       -> parent_protocol_state:Protocol_state.value
       -> ( [`Just_emitted_a_proof of bool]
@@ -1038,7 +1039,7 @@ module Staged_ledger_validation = struct
            | `Staged_ledger_application_failed of
              Staged_ledger.Staged_ledger_error.t ] )
          Deferred.Result.t =
-   fun (t, validation) ~logger ~verifier ~parent_staged_ledger
+   fun (t, validation) ~logger ~verifier ~genesis_ledger ~parent_staged_ledger
        ~parent_protocol_state ->
     let open Deferred.Result.Let_syntax in
     let transition = With_hash.data t in
@@ -1065,7 +1066,7 @@ module Staged_ledger_validation = struct
             ~f:target_hash_of_ledger_proof
             ~default:
               (Frozen_ledger_hash.of_ledger_hash
-                 (Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)))
+                 (Ledger.merkle_root (Lazy.force genesis_ledger)))
       | Some (proof, _) ->
           target_hash_of_ledger_proof proof
     in

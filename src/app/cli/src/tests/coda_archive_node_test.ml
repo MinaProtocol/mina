@@ -5,10 +5,16 @@ open Coda_base
 
 let name = "coda-archive-node-test"
 
-let main () =
+let main ~runtime_config () =
   let logger = Logger.create () in
+  let%bind {Precomputed_values.genesis_ledger; base_proof; runtime_config; _} =
+    Deferred.Or_error.ok_exn
+    @@ Precomputed_values.load_values ~logger ~not_found:`Generate_and_store
+         ~runtime_config ()
+  in
+  let (module Genesis_ledger : Genesis_ledger.Intf.S) = genesis_ledger in
   let largest_account_keypair =
-    Test_genesis_ledger.largest_account_keypair_exn ()
+    Genesis_ledger.largest_account_keypair_exn ()
   in
   let largest_account_public_key =
     Public_key.compress largest_account_keypair.public_key
@@ -22,7 +28,8 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None ~is_archive_rocksdb
+      ~max_concurrent_connections:None ~is_archive_rocksdb ~runtime_config
+      ~base_proof
   in
   let%bind new_block_pipe =
     let%map pipe =
@@ -50,9 +57,16 @@ let main () =
   assert (Hash_set.equal observed_hashset stored_state_hashes) ;
   Coda_worker_testnet.Api.teardown testnet ~logger
 
+(* TODO: Test-specific runtime config. *)
+let default_runtime_config = Runtime_config.compile_config
+
 let command =
   Command.async
     ~summary:
       "Test showing that an archive node stores all the transitions that it \
        has seen"
-    (Command.Param.return main)
+    (let open Command.Let_syntax in
+    let%map runtime_config =
+      Runtime_config.from_flags default_runtime_config
+    in
+    main ~runtime_config)

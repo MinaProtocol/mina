@@ -183,15 +183,15 @@ let create' (type a b c)
       with type length = a
        and type time = b
        and type timespan = c)
-    ~(protocol_constants : (a, a, b) Genesis_constants.Protocol.Poly.t) :
+    ~(protocol_config : (a, a, b) Runtime_config.Protocol.Poly.t) :
     (a, b, c) Poly.t =
   let open M in
   let c = constant Coda_compile_config.c in
   let block_window_duration_ms =
     constant Coda_compile_config.block_window_duration_ms
   in
-  let k = of_length protocol_constants.k in
-  let delta = of_length protocol_constants.delta in
+  let k = of_length protocol_config.k in
+  let delta = of_length protocol_config.delta in
   (*TODO: sub_windows_per_window, slots_per_sub_window are currently dummy
   values and need to be updated before mainnet*)
   let sub_windows_per_window = c in
@@ -224,15 +224,15 @@ let create' (type a b c)
     ; checkpoint_window_slots_per_year= to_length zero
     ; checkpoint_window_size_in_slots= to_length zero
     ; delta_duration= to_timespan delta_duration
-    ; genesis_state_timestamp= protocol_constants.genesis_state_timestamp }
+    ; genesis_state_timestamp= protocol_config.genesis_state_timestamp }
   in
   res
 
-let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
-  let protocol_constants =
-    Coda_base.Protocol_constants_checked.value_of_t protocol_constants
+let create ~(protocol_config : Runtime_config.Protocol.t) : t =
+  let protocol_config =
+    Coda_base.Protocol_constants_checked.value_of_t protocol_config
   in
-  let constants = create' (module Constants_UInt32) ~protocol_constants in
+  let constants = create' (module Constants_UInt32) ~protocol_config in
   let checkpoint_window_slots_per_year, checkpoint_window_size_in_slots =
     let per_year = 12 in
     let slots_per_year =
@@ -250,7 +250,8 @@ let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
     checkpoint_window_size_in_slots
   ; checkpoint_window_slots_per_year }
 
-let compiled = create ~protocol_constants:Genesis_constants.compiled.protocol
+let for_unit_tests =
+  create ~protocol_config:Runtime_config.for_unit_tests.protocol
 
 let to_hlist
     ({ k
@@ -422,12 +423,12 @@ module Checked = struct
           ; delta_duration
           ; genesis_state_timestamp |])
 
-  let create ~(protocol_constants : Coda_base.Protocol_constants_checked.var) :
+  let create ~(protocol_config : Coda_base.Protocol_constants_checked.var) :
       (var, _) Checked.t =
     let open Snarky_integer in
     let%bind constants =
       make_checked (fun () ->
-          create' (module Constants_checked) ~protocol_constants )
+          create' (module Constants_checked) ~protocol_config )
     in
     let%map checkpoint_window_slots_per_year, checkpoint_window_size_in_slots =
       let constant c = Integer.constant ~m (Bignum_bigint.of_int c) in
@@ -459,15 +460,15 @@ end
 
 let%test_unit "checked = unchecked" =
   let open Coda_base in
-  let compiled = Genesis_constants.compiled.protocol in
+  let test_config = Runtime_config.for_unit_tests.protocol in
   let test =
     Test_util.test_equal Protocol_constants_checked.typ typ
-      (fun protocol_constants -> Checked.create ~protocol_constants)
-      (fun protocol_constants ->
+      (fun protocol_config -> Checked.create ~protocol_config)
+      (fun protocol_config ->
         create
-          ~protocol_constants:
-            (Protocol_constants_checked.t_of_value protocol_constants) )
+          ~protocol_config:
+            (Protocol_constants_checked.t_of_value protocol_config) )
   in
   Quickcheck.test ~trials:100 Protocol_constants_checked.Value.gen
-    ~examples:[Protocol_constants_checked.value_of_t compiled]
+    ~examples:[Protocol_constants_checked.value_of_t test_config]
     ~f:test

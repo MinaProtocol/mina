@@ -26,9 +26,11 @@ module Api = struct
         [stop] below will set the status to `Off, and we only try doing an RPC if the status is `On,
         so eventually the counter _must_ become 0, ensuring progress. *)
     ; root_lengths: int Array.t
-    ; restart_signals: (restart_type * unit Ivar.t) Option.t Array.t }
+    ; restart_signals: (restart_type * unit Ivar.t) Option.t Array.t
+    ; runtime_config: Runtime_config.t
+    ; consensus_constants: Consensus.Constants.t }
 
-  let create configs workers start_writer =
+  let create ~runtime_config configs workers start_writer =
     let status =
       Array.init (Array.length workers) ~f:(fun _ ->
           let user_cmds_under_inspection =
@@ -50,7 +52,10 @@ module Api = struct
     ; status
     ; locks
     ; root_lengths
-    ; restart_signals }
+    ; restart_signals
+    ; runtime_config
+    ; consensus_constants=
+        Consensus.Constants.create ~protocol_config:runtime_config.protocol }
 
   let online t i = match t.status.(i) with `On _ -> true | `Off -> false
 
@@ -215,20 +220,19 @@ module Api = struct
     signal
 end
 
-let consensus_constants = Consensus.Constants.compiled
-
 module Constants = struct
   let to_int = Unsigned.UInt32.to_int
 
-  let k = to_int consensus_constants.k
+  let block_time_to_int bt = Block_time.Span.to_ms bt |> Int64.to_int_exn
 
-  let c = to_int consensus_constants.c
+  let k (t : Api.t) = to_int t.consensus_constants.k
 
-  let delta = to_int consensus_constants.delta
+  let c (t : Api.t) = to_int t.consensus_constants.c
 
-  let block_window_duration_ms =
-    Block_time.Span.to_ms consensus_constants.block_window_duration_ms
-    |> Int64.to_int_exn
+  let delta (t : Api.t) = to_int t.consensus_constants.delta
+
+  let block_window_duration_ms (t : Api.t) =
+    block_time_to_int t.consensus_constants.block_window_duration_ms
 end
 
 (** the prefix check keeps track of the "best path" for each worker. the
@@ -313,7 +317,8 @@ let start_prefix_check logger workers events testnet ~acceptable_delay =
               < Time.Span.to_sec acceptable_delay
                 +. epsilon
                 +. Int.to_float
-                     ((Constants.c - 1) * Constants.block_window_duration_ms)
+                     ( (Constants.c testnet - 1)
+                     * Constants.block_window_duration_ms testnet )
                    /. 1000. )
        then (
          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
@@ -354,8 +359,9 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    ()
                | Some (`Bootstrap, signal) ->
                    if
-                     testnet.root_lengths.(i) + (2 * Constants.k)
-                     + Constants.delta
+                     testnet.root_lengths.(i)
+                     + (2 * Constants.k testnet)
+                     + Constants.delta testnet
                      < root_length - 2
                    then (
                      Ivar.fill signal () ;
@@ -363,7 +369,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
                    else ()
                | Some (`Catchup, signal) ->
                    if
-                     testnet.root_lengths.(i) + (Constants.k / 2)
+                     testnet.root_lengths.(i) + (Constants.k testnet / 2)
                      < root_length - 1
                    then (
                      Logger.info logger !"Filled catchup ivar"
@@ -407,7 +413,7 @@ let start_payment_check logger root_pipe (testnet : Api.t) =
          | _ ->
              Deferred.unit ) ))
 
-let events workers start_reader =
+let events workers start_reader testnet =
   let event_r, event_w = Linear_pipe.create () in
   let root_r, root_w = Linear_pipe.create () in
   let connect_worker i worker =
@@ -430,7 +436,9 @@ let events workers start_reader =
                  >>= Linear_pipe.read >>| ignore
                in
                let ms_to_sync =
-                 (Constants.delta * Constants.block_window_duration_ms) + 6_000
+                 Constants.delta testnet
+                 * Constants.block_window_duration_ms testnet
+                 + 6_000
                  |> Float.of_int
                in
                let%map () = after (Time.Span.of_ms ms_to_sync) in
@@ -442,7 +450,7 @@ let events workers start_reader =
 
 let start_checks logger (workers : Coda_process.t array) start_reader testnet
     ~acceptable_delay =
-  let event_reader, root_reader = events workers start_reader in
+  let event_reader, root_reader = events workers start_reader testnet in
   let%bind initialization_finish_signals =
     Deferred.Array.map workers ~f:(fun worker ->
         Coda_process.initialization_finish_signal_exn worker )
@@ -466,14 +474,20 @@ let start_checks logger (workers : Coda_process.t array) start_reader testnet
    *   implement stop/start
    *   change live whether nodes are producing, snark producing
    *   change network connectivity *)
-let test ?archive_process_location ?is_archive_rocksdb ~name logger n
-    block_production_keys snark_work_public_keys work_selection_method
-    ~max_concurrent_connections =
+let test ?archive_process_location ?is_archive_rocksdb ~name ~runtime_config
+    ~base_proof logger n block_production_keys snark_work_public_keys
+    work_selection_method ~max_concurrent_connections =
+  let consensus_constants =
+    Consensus.Constants.create
+      ~protocol_config:runtime_config.Runtime_config.protocol
+  in
   let logger = Logger.extend logger [("worker_testnet", `Bool true)] in
-  let block_production_interval = Constants.block_window_duration_ms in
+  let block_production_interval =
+    Constants.block_time_to_int consensus_constants.block_window_duration_ms
+  in
+  let delta = Constants.to_int consensus_constants.delta in
   let acceptable_delay =
-    Time.Span.of_ms
-      (block_production_interval * Constants.delta |> Float.of_int)
+    Time.Span.of_ms (block_production_interval * delta |> Float.of_int)
   in
   let%bind program_dir = Unix.getcwd () in
   Coda_processes.init () ;
@@ -484,11 +498,12 @@ let test ?archive_process_location ?is_archive_rocksdb ~name logger n
       ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
       ~max_concurrent_connections ?is_archive_rocksdb ?archive_process_location
+      ~runtime_config ~base_proof
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let workers = List.to_array workers in
   let start_reader, start_writer = Linear_pipe.create () in
-  let testnet = Api.create configs workers start_writer in
+  let testnet = Api.create ~runtime_config configs workers start_writer in
   let%map () =
     start_checks logger workers start_reader testnet ~acceptable_delay
   in
@@ -521,7 +536,7 @@ end = struct
               let passed_root = Ivar.create () in
               Hashtbl.add_exn user_cmds_under_inspection ~key:user_cmd
                 ~data:
-                  { expected_deadline= root_length + Constants.k + delay
+                  { expected_deadline= root_length + Constants.k testnet + delay
                   ; passed_root } ;
               Option.return passed_root
           | _ ->
@@ -591,7 +606,7 @@ end = struct
                           (Hashtbl.add user_cmds_under_inspection ~key:user_cmd
                              ~data:
                                { expected_deadline=
-                                   root_length + Constants.k + delay
+                                   root_length + Constants.k testnet + delay
                                ; passed_root }) ;
                         Option.return passed_root
                     | _ ->

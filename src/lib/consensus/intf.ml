@@ -15,7 +15,7 @@ module type Constants = sig
 
   type t = Stable.Latest.t
 
-  val create : protocol_constants:Genesis_constants.Protocol.t -> t
+  val create : protocol_config:Runtime_config.Protocol.t -> t
 
   val gc_parameters :
        t
@@ -314,7 +314,7 @@ module type S = sig
       ; acceptable_network_delay: int }
     [@@deriving yojson, fields]
 
-    val t : protocol_constants:Genesis_constants.Protocol.t -> t
+    val t : protocol_config:Runtime_config.Protocol.t -> t
   end
 
   module Data : sig
@@ -435,20 +435,20 @@ module type S = sig
 
       val negative_one :
            genesis_ledger:Ledger.t Lazy.t
-        -> protocol_constants:Genesis_constants.Protocol.t
+        -> protocol_config:Runtime_config.Protocol.t
         -> Value.t
 
       val create_genesis_from_transition :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> consensus_transition:Consensus_transition.Value.t
         -> genesis_ledger:Ledger.t Lazy.t
-        -> protocol_constants:Genesis_constants.Protocol.t
+        -> protocol_config:Runtime_config.Protocol.t
         -> Value.t
 
       val create_genesis :
            negative_one_protocol_state_hash:Coda_base.State_hash.t
         -> genesis_ledger:Ledger.t Lazy.t
-        -> protocol_constants:Genesis_constants.Protocol.t
+        -> protocol_config:Runtime_config.Protocol.t
         -> Value.t
 
       open Snark_params.Tick

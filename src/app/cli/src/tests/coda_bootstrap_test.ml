@@ -4,10 +4,16 @@ open Signature_lib
 
 let name = "coda-bootstrap-test"
 
-let main () =
+let main ~runtime_config () =
   let logger = Logger.create () in
+  let%bind {Precomputed_values.genesis_ledger; base_proof; runtime_config; _} =
+    Deferred.Or_error.ok_exn
+    @@ Precomputed_values.load_values ~logger ~not_found:`Generate_and_store
+         ~runtime_config ()
+  in
+  let (module Genesis_ledger : Genesis_ledger.Intf.S) = genesis_ledger in
   let largest_account_keypair =
-    Test_genesis_ledger.largest_account_keypair_exn ()
+    Genesis_ledger.largest_account_keypair_exn ()
   in
   let n = 2 in
   let block_production_keys i = Some i in
@@ -18,7 +24,7 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n block_production_keys
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~runtime_config ~base_proof
   in
   let previous_status = Sync_status.Hash_set.create () in
   let bootstrapping_node = 1 in
@@ -43,6 +49,13 @@ let main () =
   assert (Hash_set.mem previous_status `Synced) ;
   Coda_worker_testnet.Api.teardown testnet ~logger
 
+(* TODO: Test-specific runtime config. *)
+let default_runtime_config = Runtime_config.compile_config
+
 let command =
   Command.async ~summary:"Test that triggers bootstrap once"
-    (Command.Param.return main)
+    (let open Command.Let_syntax in
+    let%map runtime_config =
+      Runtime_config.from_flags default_runtime_config
+    in
+    main ~runtime_config)

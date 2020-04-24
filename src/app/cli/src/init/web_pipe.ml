@@ -24,7 +24,10 @@ module Make_broadcaster (Put_request : Web_request.Intf.S) = struct
     let open Keypair in
     let get_lite_chain_exn = Option.value_exn Coda_run.get_lite_chain in
     (* HACK: we are just passing in the block producer path for this demo *)
-    let keypair = Test_genesis_ledger.largest_account_keypair_exn () in
+    let keypair =
+      Genesis_ledger.Packed.largest_account_keypair_exn
+        (Coda_lib.config coda).genesis_ledger ()
+    in
     let keys = [Public_key.compress keypair.public_key] in
     get_lite_chain_exn coda keys
 
@@ -121,7 +124,10 @@ let run_service coda ~conf_dir ~logger =
             >>| Or_error.return )
         |> don't_wait_for ;
         let get_lite_chain = Option.value_exn Coda_run.get_lite_chain in
-        let keypair = Test_genesis_ledger.largest_account_keypair_exn () in
+        let keypair =
+          Genesis_ledger.Packed.largest_account_keypair_exn
+            (Coda_lib.config coda).genesis_ledger ()
+        in
         Strict_pipe.Reader.iter (Coda_lib.validated_transitions coda)
           ~f:(fun _ ->
             Writer.save (path ^/ "chain")

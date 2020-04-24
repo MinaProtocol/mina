@@ -89,9 +89,9 @@ module Duplicate_block_detector = struct
     ; block_producer }
 
   (* every gc_interval blocks seen, discard blocks more than gc_width ago *)
-  let table_gc ~(genesis_constants : Genesis_constants.t) t block =
+  let table_gc ~(runtime_config : Runtime_config.t) t block =
     let consensus_constants =
-      Consensus.Constants.create ~protocol_constants:genesis_constants.protocol
+      Consensus.Constants.create ~protocol_config:runtime_config.protocol
     in
     let ( `Acceptable_network_delay _
         , `Gc_width _
@@ -108,7 +108,7 @@ module Duplicate_block_detector = struct
 
   let create () = {table= Map.empty (module Blocks); latest_epoch= 0}
 
-  let check ~genesis_constants t logger external_transition_with_hash =
+  let check ~runtime_config t logger external_transition_with_hash =
     let external_transition = external_transition_with_hash.With_hash.data in
     let protocol_state_hash = external_transition_with_hash.hash in
     let open Consensus.Data.Consensus_state in
@@ -121,7 +121,7 @@ module Duplicate_block_detector = struct
     in
     let block = Blocks.{consensus_time; block_producer} in
     (* try table GC *)
-    table_gc ~genesis_constants t block ;
+    table_gc ~runtime_config t block ;
     match Map.find t.table block with
     | None ->
         t.table <- Map.add_exn t.table ~key:block ~data:protocol_state_hash
@@ -143,7 +143,7 @@ end
 
 let run ~logger ~trust_system ~verifier ~transition_reader
     ~valid_transition_writer ~initialization_finish_signal ~genesis_state_hash
-    ~genesis_constants =
+    ~runtime_config =
   let open Deferred.Let_syntax in
   let duplicate_checker = Duplicate_block_detector.create () in
   don't_wait_for
@@ -161,7 +161,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                     (Fn.compose Protocol_state.hash
                        External_transition.protocol_state)
            in
-           Duplicate_block_detector.check ~genesis_constants duplicate_checker
+           Duplicate_block_detector.check ~runtime_config duplicate_checker
              logger transition_with_hash ;
            let sender = Envelope.Incoming.sender transition_env in
            let defer f = Fn.compose Deferred.return f in
@@ -194,5 +194,5 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                is_valid_cb false ;
                handle_validation_error ~logger ~trust_system ~sender
                  ~state_hash:(With_hash.hash transition_with_hash)
-                 ~delta:genesis_constants.protocol.delta error )
+                 ~delta:runtime_config.protocol.delta error )
          else Deferred.unit ))

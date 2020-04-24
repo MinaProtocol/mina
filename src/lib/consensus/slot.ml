@@ -34,16 +34,17 @@ module Checked = struct
     Boolean.(slot_gte_ck && slot_lt_ck_times_2)
 end
 
-let gen =
+let gen ~protocol_config =
   let open Quickcheck.Let_syntax in
-  let constants = Constants.compiled in
+  let constants = Constants.create protocol_config in
   let ck3 =
     UInt32.Infix.(constants.c * constants.k * UInt32.of_int 3) |> UInt32.to_int
   in
   Core.Int.gen_incl 0 ck3 >>| UInt32.of_int
 
 let%test_unit "in_seed_update_range unchecked vs. checked equality" =
-  let constants = Constants.compiled in
+  let protocol_config = Runtime_config.for_unit_tests.protocol in
+  let constants = Constants.create ~protocol_config in
   let module Length = Coda_numbers.Length in
   let test x =
     Test_util.test_equal
@@ -57,4 +58,4 @@ let%test_unit "in_seed_update_range unchecked vs. checked equality" =
   let examples =
     List.map ~f:UInt32.of_int [x; x - 1; x + 1; x * 2; (x * 2) - 1; (x * 2) + 1]
   in
-  Quickcheck.test ~trials:100 ~examples gen ~f:test
+  Quickcheck.test ~trials:100 ~examples (gen ~protocol_config) ~f:test

@@ -251,8 +251,8 @@ let download_transitions ~logger ~trust_system ~network ~num_peers
                ) ) )
 
 let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
-    ~frontier ~unprocessed_transition_cache ~transitions ~target_hash ~subtrees
-    =
+    ~genesis_ledger ~frontier ~unprocessed_transition_cache ~transitions
+    ~target_hash ~subtrees =
   let open Deferred.Or_error.Let_syntax in
   let%bind transitions_with_initial_validation, initial_hash =
     fold_until (List.rev transitions) ~init:[]
@@ -293,7 +293,8 @@ let verify_transitions_and_build_breadcrumbs ~logger ~trust_system ~verifier
   let open Deferred.Let_syntax in
   match%bind
     Transition_handler.Breadcrumb_builder.build_subtrees_of_breadcrumbs ~logger
-      ~verifier ~trust_system ~frontier ~initial_hash trees_of_transitions
+      ~verifier ~trust_system ~genesis_ledger ~frontier ~initial_hash
+      trees_of_transitions
   with
   | Ok result ->
       Deferred.Or_error.return result
@@ -309,7 +310,8 @@ let garbage_collect_subtrees ~logger ~subtrees =
   Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
     "garbage collected failed cached transitions"
 
-let run ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
+let run ~logger ~trust_system ~verifier ~genesis_ledger ~network ~frontier
+    ~catchup_job_reader
     ~(catchup_breadcrumbs_writer :
        ( (Transition_frontier.Breadcrumb.t, State_hash.t) Cached.t Rose_tree.t
          list
@@ -351,8 +353,9 @@ let run ~logger ~trust_system ~verifier ~network ~frontier ~catchup_job_reader
                     ~hashes_of_missing_transitions
               in
               verify_transitions_and_build_breadcrumbs ~logger ~trust_system
-                ~verifier ~frontier ~unprocessed_transition_cache ~transitions
-                ~target_hash ~subtrees
+                ~verifier ~genesis_ledger ~frontier
+                ~unprocessed_transition_cache ~transitions ~target_hash
+                ~subtrees
             with
             | Ok trees_of_breadcrumbs ->
                 Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
@@ -412,6 +415,12 @@ let%test_module "Ledger_catchup tests" =
 
     let time_controller = Block_time.Controller.basic ~logger
 
+    let genesis_ledger = Genesis_ledger.for_unit_tests
+
+    let runtime_config = Runtime_config.for_unit_tests
+
+    let base_proof = Precomputed_values.unit_test_base_proof
+
     let downcast_transition transition =
       let transition =
         transition
@@ -460,7 +469,8 @@ let%test_module "Ledger_catchup tests" =
       let%map verifier = Verifier.create ~logger ~conf_dir:None ~pids in
       run ~logger ~verifier ~trust_system ~network ~frontier
         ~catchup_breadcrumbs_writer ~catchup_job_reader
-        ~unprocessed_transition_cache ;
+        ~unprocessed_transition_cache
+        ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger) ;
       { cache= unprocessed_transition_cache
       ; job_writer= catchup_job_writer
       ; breadcrumbs_reader= catchup_breadcrumbs_reader }
@@ -527,7 +537,7 @@ let%test_module "Ledger_catchup tests" =
           let%bind peer_branch_size =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
-          gen ~max_frontier_length
+          gen ~genesis_ledger ~runtime_config ~base_proof ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size ])
         ~f:(fun network ->
@@ -546,7 +556,7 @@ let%test_module "Ledger_catchup tests" =
                    in the frontier" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~max_frontier_length
+          gen ~genesis_ledger ~runtime_config ~base_proof ~max_frontier_length
             [fresh_peer; peer_with_branch ~frontier_branch_size:1])
         ~f:(fun network ->
           let open Fake_network in
@@ -560,7 +570,7 @@ let%test_module "Ledger_catchup tests" =
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~max_frontier_length
+          gen ~genesis_ledger ~runtime_config ~base_proof ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])

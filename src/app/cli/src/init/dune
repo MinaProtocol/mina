@@ -15,6 +15,6 @@
     coda_base coda_graphql coda_lib coda_state coda_compile_config
     consensus coda_transition coda_version fork_id lite_compat
     lite_lib o1trace telemetry transition_frontier web_client_pipe
-    web_request graphql_lib genesis_ledger_helper)
+    web_request graphql_lib)
   (preprocessor_deps ../../../../config.mlh)
   (preprocess (pps graphql_ppx ppx_coda ppx_jane ppx_deriving_yojson)))

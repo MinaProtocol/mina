@@ -11,7 +11,7 @@
     coda_base
     block_time
     with_hash
-    test_genesis_ledger
+    genesis_ledger
     snark_params
     perf_histograms
     rc_pool

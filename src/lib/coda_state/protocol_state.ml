@@ -271,7 +271,7 @@ let hash s =
 
 [%%endif]
 
-let negative_one ~genesis_ledger ~protocol_constants =
+let negative_one ~genesis_ledger ~protocol_config =
   { Poly.Stable.Latest.previous_state_hash=
       State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
   ; body=
@@ -283,6 +283,5 @@ let negative_one ~genesis_ledger ~protocol_constants =
           State_hash.of_hash Snark_params.Tick.Pedersen.zero_hash
       ; consensus_state=
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger
-            ~protocol_constants
-      ; constants= Protocol_constants_checked.value_of_t protocol_constants }
-  }
+            ~protocol_config
+      ; constants= Protocol_constants_checked.value_of_t protocol_config } }

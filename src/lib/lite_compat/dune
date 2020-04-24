@@ -9,7 +9,7 @@
       coda_base
       coda_state
       lite_base
-      test_genesis_ledger
+      genesis_ledger
       lite_compat_algebra
     )
    (preprocess (pps ppx_coda ppx_jane ppxlib.runner))

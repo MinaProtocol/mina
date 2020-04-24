@@ -275,7 +275,7 @@ module type S = sig
   val genesis :
        genesis_ledger:Ledger.t Lazy.t
     -> base_proof:Proof.t
-    -> genesis_constants:Genesis_constants.t
+    -> runtime_config:Runtime_config.t
     -> Validated.t
 
   module For_tests : sig
@@ -289,7 +289,7 @@ module type S = sig
       -> unit
       -> t
 
-    val genesis : unit -> Validated.t
+    val unit_test_genesis : unit -> Validated.t
   end
 
   val timestamp : t -> Block_time.t
@@ -606,6 +606,7 @@ module type S = sig
          Validation.with_transition
       -> logger:Logger.t
       -> verifier:Verifier.t
+      -> genesis_ledger:Ledger.t Lazy.t
       -> parent_staged_ledger:Staged_ledger.t
       -> parent_protocol_state:Protocol_state.value
       -> ( [`Just_emitted_a_proof of bool]

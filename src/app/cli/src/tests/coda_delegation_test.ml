@@ -7,10 +7,16 @@ let name = "coda-delegation-test"
 
 include Heartbeat.Make ()
 
-let main () =
+let main ~runtime_config () =
   let logger = Logger.create () in
+  let%bind {Precomputed_values.genesis_ledger; base_proof; runtime_config; _} =
+    Deferred.Or_error.ok_exn
+    @@ Precomputed_values.load_values ~logger ~not_found:`Generate_and_store
+         ~runtime_config ()
+  in
+  let (module Genesis_ledger : Genesis_ledger.Intf.S) = genesis_ledger in
   let num_block_producers = 3 in
-  let accounts = Lazy.force Test_genesis_ledger.accounts in
+  let accounts = Lazy.force Genesis_ledger.accounts in
   let snark_work_public_keys ndx =
     List.nth_exn accounts ndx
     |> fun (_, acct) -> Some (Account.public_key acct)
@@ -18,14 +24,14 @@ let main () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger num_block_producers Option.some
       snark_work_public_keys Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~runtime_config ~base_proof
   in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__ "Started test net" ;
   (* keep CI alive *)
   Deferred.don't_wait_for (print_heartbeat logger) ;
   (* dump account info to log *)
   List.iteri accounts ~f:(fun ndx ((_, acct) as record) ->
-      let keypair = Test_genesis_ledger.keypair_of_account_record_exn record in
+      let keypair = Genesis_ledger.keypair_of_account_record_exn record in
       Logger.info logger ~module_:__MODULE__ ~location:__LOC__
         "Account: $account_number"
         ~metadata:
@@ -42,7 +48,7 @@ let main () =
   let ((_, delegator_account) as delegator) = List.nth_exn accounts 2 in
   let delegator_pubkey = Account.public_key delegator_account in
   let delegator_keypair =
-    Test_genesis_ledger.keypair_of_account_record_exn delegator
+    Genesis_ledger.keypair_of_account_record_exn delegator
   in
   (* zeroth account is delegatee *)
   let _, delegatee_account = List.nth_exn accounts 0 in
@@ -127,9 +133,16 @@ let main () =
   heartbeat_flag := false ;
   Coda_worker_testnet.Api.teardown testnet ~logger
 
+(* TODO: Test-specific runtime config. *)
+let default_runtime_config = Runtime_config.compile_config
+
 let command =
   Command.async
     ~summary:
       "Test whether stake delegation from a high-balance account to a \
        low-balance account works"
-    (Command.Param.return main)
+    (let open Command.Let_syntax in
+    let%map runtime_config =
+      Runtime_config.from_flags default_runtime_config
+    in
+    main ~runtime_config)

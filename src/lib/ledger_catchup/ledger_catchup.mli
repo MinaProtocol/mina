@@ -13,6 +13,7 @@ val run :
      logger:Logger.t
   -> trust_system:Trust_system.t
   -> verifier:Verifier.t
+  -> genesis_ledger:Ledger.t Lazy.t
   -> network:Coda_networking.t
   -> frontier:Transition_frontier.t
   -> catchup_job_reader:( State_hash.t

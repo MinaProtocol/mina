@@ -12,17 +12,25 @@ let restart_node worker ~config ~logger =
   let%bind () = Coda_process.disconnect worker ~logger in
   Coda_process.spawn_exn config
 
-let main () =
-  let consensus_constants = Consensus.Constants.compiled in
-  let open Keypair in
+let main ~runtime_config () =
   let logger = Logger.create () in
+  let%bind {Precomputed_values.genesis_ledger; base_proof; runtime_config; _} =
+    Deferred.Or_error.ok_exn
+    @@ Precomputed_values.load_values ~logger ~not_found:`Generate_and_store
+         ~runtime_config ()
+  in
+  let (module Genesis_ledger : Genesis_ledger.Intf.S) = genesis_ledger in
+  let consensus_constants =
+    Consensus.Constants.create ~protocol_config:runtime_config.protocol
+  in
+  let open Keypair in
   let largest_account_keypair =
-    Test_genesis_ledger.largest_account_keypair_exn ()
+    Genesis_ledger.largest_account_keypair_exn ()
   in
   let another_account_keypair =
-    Test_genesis_ledger.find_new_account_record_exn
+    Genesis_ledger.find_new_account_record_exn
       [largest_account_keypair.public_key]
-    |> Test_genesis_ledger.keypair_of_account_record_exn
+    |> Genesis_ledger.keypair_of_account_record_exn
   in
   let block_production_interval =
     consensus_constants.block_window_duration_ms |> Block_time.Span.to_ms
@@ -49,7 +57,7 @@ let main () =
       ~acceptable_delay ~chain_id:name ~snark_worker_public_keys:None
       ~block_production_keys:(Fn.const None) ~work_selection_method
       ~trace_dir:(Unix.getenv "CODA_TRACING")
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~runtime_config ~base_proof
   in
   let%bind workers = Coda_processes.spawn_local_processes_exn configs in
   let worker = List.hd_exn workers in
@@ -68,6 +76,13 @@ let main () =
   assert result ;
   Deferred.List.iter workers ~f:(Coda_process.disconnect ~logger)
 
+(* TODO: Test-specific runtime config. *)
+let default_runtime_config = Runtime_config.compile_config
+
 let command =
   Command.async ~summary:"Test that peers can prove sent payments"
-    (Command.Param.return main)
+    (let open Command.Let_syntax in
+    let%map runtime_config =
+      Runtime_config.from_flags default_runtime_config
+    in
+    main ~runtime_config)

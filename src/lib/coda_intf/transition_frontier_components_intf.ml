@@ -172,7 +172,7 @@ module type Best_tip_prover_intf = sig
 
   val verify :
        verifier:Verifier.t
-    -> genesis_constants:Genesis_constants.t
+    -> runtime_config:Runtime_config.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
        Proof_carrying_data.t
@@ -199,7 +199,7 @@ module type Consensus_best_tip_prover_intf = sig
   val verify :
        logger:Logger.t
     -> verifier:Verifier.t
-    -> genesis_constants:Genesis_constants.t
+    -> runtime_config:Runtime_config.t
     -> Consensus.Data.Consensus_state.Value.t
     -> ( External_transition.t
        , State_body_hash.t list * External_transition.t )
@@ -271,7 +271,7 @@ module type Bootstrap_controller_intf = sig
     -> initial_root_transition:External_transition.Validated.t
     -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
-    -> genesis_constants:Genesis_constants.t
+    -> runtime_config:Runtime_config.t
     -> ( transition_frontier
        * External_transition.Initial_validated.t Envelope.Incoming.t list )
        Deferred.t
@@ -323,7 +323,7 @@ module type Initial_validator_intf = sig
                                , unit )
                                Strict_pipe.Writer.t
     -> genesis_state_hash:State_hash.t
-    -> genesis_constants:Genesis_constants.t
+    -> runtime_config:Runtime_config.t
     -> unit
 end
 
@@ -366,7 +366,7 @@ module type Transition_router_intf = sig
     -> genesis_state_hash:State_hash.t
     -> genesis_ledger:Ledger.t Lazy.t
     -> base_proof:Coda_base.Proof.t
-    -> genesis_constants:Genesis_constants.t
+    -> runtime_config:Runtime_config.t
     -> ( [`Transition of External_transition.Validated.t]
        * [`Source of [`Gossip | `Catchup | `Internal]] )
        Strict_pipe.Reader.t

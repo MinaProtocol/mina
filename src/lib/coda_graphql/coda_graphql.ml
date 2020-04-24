@@ -154,8 +154,8 @@ module Types = struct
             ~resolve:(fun {ctx= coda; _} global_slot ->
               let constants =
                 Consensus.Constants.create
-                  ~protocol_constants:
-                    (Coda_lib.config coda).genesis_constants.protocol
+                  ~protocol_config:
+                    (Coda_lib.config coda).runtime_config.protocol
               in
               Block_time.to_string @@ C.start_time ~constants global_slot )
         ; field "endTime" ~typ:(non_null string)
@@ -163,8 +163,8 @@ module Types = struct
             ~resolve:(fun {ctx= coda; _} global_slot ->
               let constants =
                 Consensus.Constants.create
-                  ~protocol_constants:
-                    (Coda_lib.config coda).genesis_constants.protocol
+                  ~protocol_config:
+                    (Coda_lib.config coda).runtime_config.protocol
               in
               Block_time.to_string @@ C.end_time ~constants global_slot ) ] )
 
@@ -184,8 +184,8 @@ module Types = struct
             ~resolve:(fun {ctx= coda; _} ->
               let consensus_constants =
                 Consensus.Constants.create
-                  ~protocol_constants:
-                    (Coda_lib.config coda).genesis_constants.protocol
+                  ~protocol_config:
+                    (Coda_lib.config coda).runtime_config.protocol
               in
               function
               | `Check_again _time ->

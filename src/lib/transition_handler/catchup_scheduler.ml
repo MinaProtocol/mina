@@ -56,7 +56,8 @@ type t =
         list )
       Capped_supervisor.t }
 
-let create ~logger ~verifier ~trust_system ~frontier ~time_controller
+let create ~logger ~verifier ~trust_system ~genesis_ledger ~frontier
+    ~time_controller
     ~(catchup_job_writer :
        ( State_hash.t
          * ( External_transition.Initial_validated.t Envelope.Incoming.t
@@ -92,7 +93,7 @@ let create ~logger ~verifier ~trust_system ~frontier ~time_controller
                   (Logger.extend logger
                      [ ( "catchup_scheduler"
                        , `String "Called from catchup scheduler" ) ])
-                ~verifier ~trust_system ~frontier ~initial_hash
+                ~verifier ~trust_system ~genesis_ledger ~frontier ~initial_hash
                 transition_branches
             with
             | Ok trees_of_breadcrumbs ->
@@ -304,9 +305,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
         Async.Thread_safe.block_on_async_exn (fun () ->
             Verifier.create ~logger ~conf_dir:None ~pids )
       in
+      let genesis_ledger = Genesis_ledger.for_unit_tests in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
-           ~frontier_size:1 ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
+           ~genesis_ledger ~runtime_config:Runtime_config.for_unit_tests
+           ~base_proof:Precomputed_values.unit_test_base_proof ~frontier_size:1
+           ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
           let catchup_job_reader, catchup_job_writer =
             Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
@@ -318,6 +322,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           let disjoint_breadcrumb = List.last_exn branch in
           let scheduler =
             create ~frontier ~verifier ~catchup_job_writer
+              ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration
@@ -357,9 +362,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
         Async.Thread_safe.block_on_async_exn (fun () ->
             Verifier.create ~logger ~conf_dir:None ~pids )
       in
+      let genesis_ledger = Genesis_ledger.for_unit_tests in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
-           ~frontier_size:1 ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
+           ~genesis_ledger ~runtime_config:Runtime_config.for_unit_tests
+           ~base_proof:Precomputed_values.unit_test_base_proof ~frontier_size:1
+           ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
           let cache = Unprocessed_transition_cache.create ~logger in
           let register_breadcrumb breadcrumb =
             Unprocessed_transition_cache.register_exn cache
@@ -379,6 +387,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let scheduler =
             create ~frontier ~verifier ~catchup_job_writer
+              ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           watch scheduler ~timeout_duration
@@ -441,9 +450,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
         Async.Thread_safe.block_on_async_exn (fun () ->
             Verifier.create ~logger ~conf_dir:None ~pids )
       in
+      let genesis_ledger = Genesis_ledger.for_unit_tests in
       Quickcheck.test ~trials:3
         (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
-           ~frontier_size:1 ~branch_size:5 ()) ~f:(fun (frontier, branch) ->
+           ~genesis_ledger ~runtime_config:Runtime_config.for_unit_tests
+           ~base_proof:Precomputed_values.unit_test_base_proof ~frontier_size:1
+           ~branch_size:5 ()) ~f:(fun (frontier, branch) ->
           let catchup_job_reader, catchup_job_writer =
             Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
               (Buffered (`Capacity 10, `Overflow Crash))
@@ -454,6 +466,7 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
           in
           let scheduler =
             create ~frontier ~verifier ~catchup_job_writer
+              ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
               ~catchup_breadcrumbs_writer ~clean_up_signal:(Ivar.create ())
           in
           let[@warning "-8"] (oldest_breadcrumb :: dependent_breadcrumbs) =

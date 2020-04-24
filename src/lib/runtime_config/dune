@@ -1,6 +1,6 @@
 (library
- (name genesis_constants)
- (public_name genesis_constants)
+ (name runtime_config)
+ (public_name coda_runtime_config)
  (library_flags -linkall)
  (inline_tests)
  (libraries core blake2 module_version)

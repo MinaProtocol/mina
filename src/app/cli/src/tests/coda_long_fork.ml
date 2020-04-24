@@ -3,13 +3,21 @@ open Async
 
 let name = "coda-long-fork"
 
-let main n waiting_time () =
-  let consensus_constants = Consensus.Constants.compiled in
+let main ~runtime_config n waiting_time () =
   let logger = Logger.create () in
+  let%bind {Precomputed_values.genesis_ledger; base_proof; runtime_config; _} =
+    Deferred.Or_error.ok_exn
+    @@ Precomputed_values.load_values ~logger ~not_found:`Generate_and_store
+         ~runtime_config ()
+  in
+  let (module Genesis_ledger : Genesis_ledger.Intf.S) = genesis_ledger in
+  let consensus_constants =
+    Consensus.Constants.create ~protocol_config:runtime_config.protocol
+  in
   let keypairs =
     List.map
-      (Lazy.force Test_genesis_ledger.accounts)
-      ~f:Test_genesis_ledger.keypair_of_account_record_exn
+      (Lazy.force Genesis_ledger.accounts)
+      ~f:Genesis_ledger.keypair_of_account_record_exn
   in
   let snark_work_public_keys i =
     Some
@@ -19,7 +27,7 @@ let main n waiting_time () =
   let%bind testnet =
     Coda_worker_testnet.test ~name logger n Option.some snark_work_public_keys
       Cli_lib.Arg_type.Work_selection_method.Sequence
-      ~max_concurrent_connections:None
+      ~max_concurrent_connections:None ~runtime_config ~base_proof
   in
   let epoch_duration =
     let block_window_duration_ms =
@@ -38,6 +46,9 @@ let main n waiting_time () =
   let%bind () = after (Time.Span.of_sec (waiting_time |> Float.of_int)) in
   Coda_worker_testnet.Api.teardown testnet ~logger
 
+(* TODO: Test-specific runtime config. *)
+let default_runtime_config = Runtime_config.compile_config
+
 let command =
   let open Command.Let_syntax in
   Command.async ~summary:"Test that one worker goes offline for a long time"
@@ -48,5 +59,5 @@ let command =
        flag "waiting-time"
          ~doc:"the waiting time after the nodes coming back alive"
          (optional_with_default 120 int)
-     in
-     main num_block_producers waiting_time)
+     and runtime_config = Runtime_config.from_flags default_runtime_config in
+     main ~runtime_config num_block_producers waiting_time)

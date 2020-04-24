@@ -106,8 +106,8 @@ module Configuration = struct
     ; acceptable_network_delay: int }
   [@@deriving yojson, fields]
 
-  let t ~protocol_constants =
-    let constants = Constants.create ~protocol_constants in
+  let t ~protocol_config =
+    let constants = Constants.create ~protocol_config in
     let of_int32 = UInt32.to_int in
     let of_span = Fn.compose Int64.to_int Block_time.Span.to_ms in
     { delta= of_int32 constants.delta
@@ -2063,8 +2063,8 @@ module Data = struct
       make_checked (fun () -> same_checkpoint_window ~constants ~prev ~next)
 
     let negative_one ~genesis_ledger
-        ~(protocol_constants : Genesis_constants.Protocol.t) =
-      let constants = Constants.create ~protocol_constants in
+        ~(protocol_config : Runtime_config.Protocol.t) =
+      let constants = Constants.create ~protocol_config in
       let max_sub_window_density = constants.slots_per_sub_window in
       let max_window_density = constants.slots_per_window in
       { Poly.blockchain_length= Length.zero
@@ -2083,7 +2083,7 @@ module Data = struct
       ; has_ancestor_in_same_checkpoint_window= false }
 
     let create_genesis_from_transition ~negative_one_protocol_state_hash
-        ~consensus_transition ~genesis_ledger ~protocol_constants : Value.t =
+        ~consensus_transition ~genesis_ledger ~protocol_config : Value.t =
       let producer_vrf_result =
         let _, sk = Vrf.Precomputed.genesis_winner in
         Vrf.eval ~private_key:sk
@@ -2097,19 +2097,19 @@ module Data = struct
       in
       Or_error.ok_exn
         (update
-           ~constants:(Constants.create ~protocol_constants)
+           ~constants:(Constants.create ~protocol_config)
            ~producer_vrf_result
            ~previous_consensus_state:
-             (negative_one ~genesis_ledger ~protocol_constants)
+             (negative_one ~genesis_ledger ~protocol_config)
            ~previous_protocol_state_hash:negative_one_protocol_state_hash
            ~consensus_transition ~supply_increase:Currency.Amount.zero
            ~snarked_ledger_hash)
 
     let create_genesis ~negative_one_protocol_state_hash ~genesis_ledger
-        ~protocol_constants : Value.t =
+        ~protocol_config : Value.t =
       create_genesis_from_transition ~negative_one_protocol_state_hash
         ~consensus_transition:Consensus_transition.genesis ~genesis_ledger
-        ~protocol_constants
+        ~protocol_config
 
     (* Check that both epoch and slot are zero.
     *)
@@ -3040,7 +3040,8 @@ module Hooks = struct
 
   let%test "should_bootstrap is sane" =
     (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
-    should_bootstrap_len ~constants:Constants.compiled ~existing:Length.zero
+    should_bootstrap_len ~constants:Constants.for_unit_tests
+      ~existing:Length.zero
       ~candidate:(Length.of_int 100_000_000)
 
   let to_unix_timestamp recieved_time =
@@ -3048,41 +3049,40 @@ module Hooks = struct
     |> Unix_timestamp.of_int64
 
   let%test "Receive a valid consensus_state with a bit of delay" =
+    let protocol_config = Runtime_config.for_unit_tests.protocol in
     let curr_epoch, curr_slot =
       Consensus_state.curr_epoch_and_slot
-        (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-           ~protocol_constants:Genesis_constants.compiled.protocol)
+        (Consensus_state.negative_one
+           ~genesis_ledger:Genesis_ledger.Unit_test_ledger.t ~protocol_config)
     in
-    let constants = Constants.compiled in
+    let constants = Constants.for_unit_tests in
     let delay = UInt32.(div constants.delta (of_int 2)) in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time ~constants curr_epoch new_slot in
     received_at_valid_time ~constants
-      (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-         ~protocol_constants:Genesis_constants.compiled.protocol)
+      (Consensus_state.negative_one
+         ~genesis_ledger:Genesis_ledger.Unit_test_ledger.t ~protocol_config)
       ~time_received:(to_unix_timestamp time_received)
     |> Result.is_ok
 
   let%test "Receive an invalid consensus_state" =
     let epoch = Epoch.of_int 5 in
-    let constants = Constants.compiled in
-    let protocol_constants = Genesis_constants.compiled.protocol in
+    let constants = Constants.for_unit_tests in
+    let protocol_config = Runtime_config.for_unit_tests.protocol in
     let start_time = Epoch.start_time ~constants epoch in
     let ((curr_epoch, curr_slot) as curr) =
       Epoch_and_slot.of_time_exn ~constants start_time
     in
+    let genesis_ledger = Genesis_ledger.Unit_test_ledger.t in
     let consensus_state =
-      { (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-           ~protocol_constants)
-        with
+      { (Consensus_state.negative_one ~genesis_ledger ~protocol_config) with
         curr_global_slot= Global_slot.of_epoch_and_slot ~constants curr }
     in
     let too_early =
       (* TODO: Does this make sense? *)
       Epoch.start_time ~constants
         (Consensus_state.curr_slot
-           (Consensus_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-              ~protocol_constants))
+           (Consensus_state.negative_one ~genesis_ledger ~protocol_config))
     in
     let too_late =
       let delay = UInt32.(mul constants.delta (of_int 2)) in
@@ -3149,7 +3149,7 @@ module Hooks = struct
       in
       let constants =
         Constants.create
-          ~protocol_constants:
+          ~protocol_config:
             ( Protocol_state.constants previous_protocol_state
             |> Coda_base.Protocol_constants_checked.t_of_value )
       in
@@ -3222,7 +3222,7 @@ module Hooks = struct
           let curr_global_slot =
             Global_slot.(prev.curr_global_slot + slot_advancement)
           in
-          let constants = Constants.compiled in
+          let constants = Constants.for_unit_tests in
           let curr_epoch, curr_slot =
             Global_slot.to_epoch_and_slot curr_global_slot
           in
@@ -3277,20 +3277,23 @@ let%test_module "Proof of stake tests" =
     open Data
     open Consensus_state
 
+    let genesis_ledger = Genesis_ledger.Unit_test_ledger.t
+
+    let protocol_config = Runtime_config.for_unit_tests.protocol
+
     let%test_unit "update, update_var agree starting from same genesis state" =
       (* build pieces needed to apply "update" *)
       let snarked_ledger_hash =
         Frozen_ledger_hash.of_ledger_hash
-          (Ledger.merkle_root (Lazy.force Test_genesis_ledger.t))
+          (Ledger.merkle_root (Lazy.force genesis_ledger))
       in
       let previous_protocol_state_hash = State_hash.(of_hash zero) in
       let previous_consensus_state =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
-          ~genesis_ledger:Test_genesis_ledger.t
-          ~protocol_constants:Genesis_constants.compiled.protocol
+          ~genesis_ledger ~protocol_config
       in
-      let constants = Constants.compiled in
+      let constants = Constants.for_unit_tests in
       let global_slot =
         Core_kernel.Time.now () |> Time.of_time
         |> Epoch_and_slot.of_time_exn ~constants
@@ -3303,10 +3306,12 @@ let%test_module "Proof of stake tests" =
       (* setup ledger, needed to compute producer_vrf_result here and handler below *)
       let open Coda_base in
       (* choose largest account as most likely to produce a block *)
-      let ledger_data = Lazy.force Test_genesis_ledger.t in
+      let ledger_data = Lazy.force genesis_ledger in
       let ledger = Ledger.Any_ledger.cast (module Ledger) ledger_data in
       let pending_coinbases = Pending_coinbase.create () |> Or_error.ok_exn in
-      let maybe_sk, account = Test_genesis_ledger.largest_account_exn () in
+      let maybe_sk, account =
+        Genesis_ledger.Unit_test_ledger.largest_account_exn ()
+      in
       let private_key = Option.value_exn maybe_sk in
       let public_key_compressed = Account.public_key account in
       let account_id =
@@ -3366,7 +3371,7 @@ let%test_module "Proof of stake tests" =
             ~compute:
               (As_prover.return
                  (Coda_base.Protocol_constants_checked.value_of_t
-                    Genesis_constants.compiled.protocol))
+                    Runtime_config.for_unit_tests.protocol))
         in
         let result =
           update_var previous_state transition_data

@@ -42,7 +42,7 @@ type t =
   ; table: Node.t State_hash.Table.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; max_length: int
-  ; genesis_constants: Genesis_constants.t }
+  ; runtime_config: Runtime_config.t }
 
 let consensus_local_state {consensus_local_state; _} = consensus_local_state
 
@@ -73,7 +73,7 @@ let close t =
        (Breadcrumb.mask (root t)))
 
 let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
-    ~max_length ~genesis_constants =
+    ~max_length ~runtime_config =
   let open Root_data in
   let root_hash =
     External_transition.Validated.state_hash root_data.transition
@@ -109,7 +109,7 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     ; table
     ; consensus_local_state
     ; max_length
-    ; genesis_constants }
+    ; runtime_config }
   in
   t
 
@@ -154,7 +154,7 @@ let best_tip_path t = path_map t (best_tip t) ~f:Fn.id
 
 let hash_path t breadcrumb = path_map t breadcrumb ~f:Breadcrumb.state_hash
 
-let genesis_constants t = t.genesis_constants
+let runtime_config t = t.runtime_config
 
 let iter t ~f = Hashtbl.iter t.table ~f:(fun n -> f n.breadcrumb)
 
@@ -509,7 +509,7 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
     "Applying %d diffs to full frontier (%s --> ?)" (List.length diffs)
     (Frontier_hash.to_string t.hash) ;
   let consensus_constants =
-    Consensus.Constants.create ~protocol_constants:t.genesis_constants.protocol
+    Consensus.Constants.create ~protocol_config:t.runtime_config.protocol
   in
   let local_state_was_synced_at_start =
     Consensus.Hooks.required_local_state_sync ~constants:consensus_constants

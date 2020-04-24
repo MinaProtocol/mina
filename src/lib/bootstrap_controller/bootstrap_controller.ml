@@ -80,8 +80,8 @@ let start_sync_job_with_peer ~sender ~root_sync_ledger t peer_best_tip
   | `Repeat ->
       `Ignored
 
-let on_transition t ~sender:(host, peer_id) ~root_sync_ledger
-    ~genesis_constants (candidate_transition : External_transition.t) =
+let on_transition t ~sender:(host, peer_id) ~root_sync_ledger ~runtime_config
+    (candidate_transition : External_transition.t) =
   let candidate_state =
     External_transition.consensus_state candidate_transition
   in
@@ -100,7 +100,7 @@ let on_transition t ~sender:(host, peer_id) ~root_sync_ledger
     | Ok peer_root_with_proof -> (
         match%bind
           Sync_handler.Root.verify ~logger:t.logger ~verifier:t.verifier
-            ~genesis_constants candidate_state peer_root_with_proof.data
+            ~runtime_config candidate_state peer_root_with_proof.data
         with
         | Ok (`Root root, `Best_tip best_tip) ->
             if done_syncing_root root_sync_ledger then return `Ignored
@@ -111,7 +111,7 @@ let on_transition t ~sender:(host, peer_id) ~root_sync_ledger
             return (received_bad_proof t host e |> Fn.const `Ignored) )
 
 let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
-    ~genesis_constants =
+    ~runtime_config =
   let query_reader = Sync_ledger.Db.query_reader root_sync_ledger in
   let response_writer = Sync_ledger.Db.answer_writer root_sync_ledger in
   Coda_networking.glue_sync_ledger t.network query_reader response_writer ;
@@ -135,8 +135,7 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
             ; ("external_transition", External_transition.to_yojson transition)
             ] ;
         Deferred.ignore
-        @@ on_transition t ~sender ~root_sync_ledger ~genesis_constants
-             transition )
+        @@ on_transition t ~sender ~root_sync_ledger ~runtime_config transition )
       else Deferred.unit )
 
 (* We conditionally ask other peers for their best tip. This is for testing
@@ -145,7 +144,7 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
 let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     ~transition_reader ~persistent_root ~persistent_frontier
     ~initial_root_transition ~genesis_state_hash ~genesis_ledger
-    ~(genesis_constants : Genesis_constants.t) =
+    ~(runtime_config : Runtime_config.t) ~base_proof =
   let rec loop () =
     let sync_ledger_reader, sync_ledger_writer =
       create ~name:"sync ledger pipe"
@@ -182,7 +181,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       in
       don't_wait_for
         (sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
-           ~genesis_constants) ;
+           ~runtime_config) ;
       (* We ignore the resulting ledger returned here since it will always
        * be the same as the ledger we started with because we are syncing
        * a db ledger. *)
@@ -277,7 +276,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
             Consensus.Hooks.required_local_state_sync
               ~constants:
                 (Consensus.Constants.create
-                   ~protocol_constants:genesis_constants.protocol)
+                   ~protocol_config:runtime_config.protocol)
               ~consensus_state ~local_state:consensus_local_state
           with
           | None ->
@@ -339,7 +338,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               Transition_frontier.load ~retry_with_fresh_db:false ~logger
                 ~verifier ~consensus_local_state ~persistent_root
                 ~persistent_frontier ~genesis_state_hash ~genesis_ledger
-                ~genesis_constants ()
+                ~runtime_config ~base_proof ()
               >>| function
               | Ok frontier ->
                   frontier
@@ -409,6 +408,12 @@ let%test_module "Bootstrap_controller tests" =
 
     let trust_system = Trust_system.null ()
 
+    let genesis_ledger = Genesis_ledger.for_unit_tests
+
+    let runtime_config = Runtime_config.for_unit_tests
+
+    let base_proof = Precomputed_values.unit_test_base_proof
+
     let pids = Child_processes.Termination.create_pid_table ()
 
     let downcast_transition ~sender transition =
@@ -453,12 +458,14 @@ let%test_module "Bootstrap_controller tests" =
         (* we only need one node for this test, but we need more than one peer so that coda_networking does not throw an error *)
         let%bind fake_network =
           Fake_network.Generator.(
-            gen ~max_frontier_length [fresh_peer; fresh_peer])
+            gen ~genesis_ledger ~runtime_config ~base_proof
+              ~max_frontier_length [fresh_peer; fresh_peer])
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq
+            ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
             ~accounts_with_secret_keys:
-              (Lazy.force Test_genesis_ledger.accounts)
+              (Lazy.force (Genesis_ledger.Packed.accounts genesis_ledger))
             branch_size
         in
         let [me; _] = fake_network.peer_networks in
@@ -488,8 +495,7 @@ let%test_module "Bootstrap_controller tests" =
           Async.Thread_safe.block_on_async_exn (fun () ->
               let sync_deferred =
                 sync_ledger bootstrap ~root_sync_ledger ~transition_graph
-                  ~sync_ledger_reader
-                  ~genesis_constants:Genesis_constants.compiled
+                  ~sync_ledger_reader ~runtime_config
               in
               let%bind () =
                 Deferred.List.iter branch ~f:(fun breadcrumb ->

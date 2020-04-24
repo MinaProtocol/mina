@@ -10,7 +10,7 @@
     bignum_bigint
     block_time
     coda_compile_config
-    genesis_constants
+    runtime_config
     coda_digestif
     coda_numbers
     codable

@@ -30,13 +30,13 @@ let maybe_sleep _ = Deferred.unit
 
 [%%endif]
 
-let chain_id ~genesis_state_hash ~genesis_constants =
+let chain_id ~genesis_state_hash ~runtime_config =
   let genesis_state_hash = State_hash.to_base58_check genesis_state_hash in
-  let genesis_constants_hash = Genesis_constants.hash genesis_constants in
+  let runtime_config_hash = Runtime_config.hash runtime_config in
   let all_snark_keys = String.concat ~sep:"" Snark_keys.key_hashes in
   let b2 =
     Blake2.digest_string
-      (genesis_state_hash ^ all_snark_keys ^ genesis_constants_hash)
+      (genesis_state_hash ^ all_snark_keys ^ runtime_config_hash)
   in
   Blake2.to_hex b2
 
@@ -91,7 +91,7 @@ let daemon logger =
        flag "genesis-ledger-dir"
          ~doc:
            "DIR Directory that contains the genesis ledger and the genesis \
-            blockchain proof (default: <config-dir>/genesis-ledger)"
+            blockchain proof"
          (optional string)
      and run_snark_worker_flag =
        flag "run-snark-worker"
@@ -208,16 +208,13 @@ let daemon logger =
            "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             discovery"
          (listed string)
-     and genesis_runtime_constants =
-       flag "genesis-constants"
+     and runtime_config = Runtime_config.(from_flags compile_config)
+     and generate_base_proof =
+       flag "--generate-genesis-proof"
          ~doc:
-           (sprintf
-              "PATH path to the runtime-configurable constants. (default: \
-               compiled constants) For example: %s"
-              ( Genesis_constants.(
-                  to_daemon_config compiled |> Daemon_config.to_yojson)
-              |> Yojson.Safe.to_string ))
-         (optional string)
+           "true|false Generate the genesis proof for the runtime \
+            configuration if one cannot be found"
+         (optional bool)
      and curr_fork_id =
        flag "current-fork-id" (optional string)
          ~doc:
@@ -353,9 +350,44 @@ let daemon logger =
            {coda: 'a; client_trustlist: 'b; rest_server_port: 'c}
        end in
        let coda_initialization_deferred () =
-         let%bind genesis_ledger, base_proof, genesis_constants =
-           Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
-             ~logger ~conf_dir ~daemon_conf:genesis_runtime_constants
+         let%bind { Precomputed_values.genesis_ledger
+                  ; base_proof
+                  ; runtime_config
+                  ; genesis_protocol_state
+                  ; _ } =
+           let%bind from_config_dir =
+             match genesis_ledger_dir_flag with
+             | Some dirname -> (
+                 let values =
+                   Precomputed_values.load_base_proof ~logger dirname
+                 in
+                 match values with
+                 | Some (runtime_config, base_proof) ->
+                     let%map values =
+                       Precomputed_values.of_base_proof ~runtime_config
+                         ~base_proof
+                     in
+                     Some values
+                 | None ->
+                     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
+                       "Failed to read configuration from $dirname"
+                       ~metadata:[("dirname", `String dirname)] ;
+                     return None )
+             | None ->
+                 return None
+           in
+           match from_config_dir with
+           | Some values ->
+               return values
+           | None ->
+               let not_found =
+                 if Option.value ~default:true generate_base_proof then
+                   `Generate_and_store
+                 else `Error
+               in
+               Deferred.Or_error.ok_exn
+               @@ Precomputed_values.load_values ~logger ~not_found
+                    ~runtime_config ()
          in
          let%bind config =
            let configpath = conf_dir ^/ "daemon.json" in
@@ -596,13 +628,10 @@ let daemon logger =
          let%bind () = Async.Unix.mkdir ~p:() trust_dir in
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
-         let genesis_state_hash =
-           Coda_state.Genesis_protocol_state.t ~genesis_ledger
-             ~genesis_constants
-           |> With_hash.hash
-         in
+         let genesis_state_hash = With_hash.hash genesis_protocol_state in
          let genesis_ledger_hash =
-           Lazy.force genesis_ledger |> Ledger.merkle_root
+           genesis_ledger |> Genesis_ledger.Packed.t |> Lazy.force
+           |> Ledger.merkle_root
          in
          let time_controller =
            Block_time.Controller.create @@ Block_time.Controller.basic ~logger
@@ -611,7 +640,8 @@ let daemon logger =
            block_production_keypair |> Option.to_list |> Keypair.Set.of_list
          in
          let consensus_local_state =
-           Consensus.Data.Local_state.create ~genesis_ledger
+           Consensus.Data.Local_state.create
+             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
              ( Option.map block_production_keypair ~f:(fun keypair ->
                    let open Keypair in
                    Public_key.compress keypair.public_key )
@@ -639,7 +669,7 @@ let daemon logger =
              { timeout= Time.Span.of_sec 3.
              ; logger
              ; conf_dir
-             ; chain_id= chain_id ~genesis_state_hash ~genesis_constants
+             ; chain_id= chain_id ~genesis_state_hash ~runtime_config
              ; unsafe_no_trust_ip= false
              ; initial_peers
              ; addrs_and_ports
@@ -767,8 +797,10 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~genesis_state_hash ~log_block_creation ~genesis_constants ())
-             ~genesis_ledger ~base_proof
+                ~genesis_state_hash ~log_block_creation ~runtime_config
+                ~genesis_ledger ())
+             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
+             ~base_proof
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in
@@ -912,7 +944,30 @@ let coda_commands logger =
   ; ("internal", Command.group ~summary:"Internal commands" internal_commands)
   ; (Parallel.worker_command_name, Parallel.worker_command)
   ; (Snark_flame_graphs.name, Snark_flame_graphs.command)
-  ; ("transaction-snark-profiler", Transaction_snark_profiler.command) ]
+  ; ("transaction-snark-profiler", Transaction_snark_profiler.command)
+  ; ( "generate-genesis-proof"
+    , Command.async
+        ~summary:"Generate a genesis proof for a runtime configuration"
+        (let open Command.Param in
+        let open Command.Let_syntax in
+        let%map tar_file =
+          flag "--tar-file" ~doc:"PATH path to the .tar.gz file to generate"
+            (optional string)
+        and runtime_config = Runtime_config.(from_flags compile_config) in
+        fun () ->
+          let logger = Logger.create () in
+          let open Async in
+          let%bind values =
+            Deferred.Or_error.ok_exn
+            @@ Precomputed_values.load_values ~logger
+                 ~not_found:`Generate_and_store ~runtime_config ()
+          in
+          let root_directory = Cache_dir.autogen_path in
+          let%bind () =
+            Precomputed_values.store_base_proof ~root_directory values
+          in
+          Precomputed_values.create_tar ~base_hash:values.base_hash ?tar_file
+            root_directory) ) ]
 
 [%%if
 integration_tests]

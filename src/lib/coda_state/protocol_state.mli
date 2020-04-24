@@ -122,7 +122,7 @@ val constants : (_, (_, _, _, 'a) Body.t) Poly.t -> 'a
 
 val negative_one :
      genesis_ledger:Coda_base.Ledger.t Lazy.t
-  -> protocol_constants:Genesis_constants.Protocol.t
+  -> protocol_config:Runtime_config.Protocol.t
   -> Value.t
 
 val hash_checked : var -> (State_hash.var * State_body_hash.var, _) Checked.t

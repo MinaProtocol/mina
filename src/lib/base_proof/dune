@@ -1,0 +1,9 @@
+(library
+ (name base_proof)
+ (public_name coda_base_proof)
+ (libraries
+   coda_base
+   coda_state
+   keys_lib
+   runtime_config
+   with_hash))
