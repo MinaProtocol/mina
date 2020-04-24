@@ -41,12 +41,15 @@ module Accounts = struct
       { balance: int
       ; public_key: (string option[@default None])
       ; private_key: (string option[@default None])
-      ; delegate: (string option[@default None])}
+      ; delegate: (string option[@default None]) }
     [@@deriving yojson]
   end
 
   type account = Account.t =
-    {balance: int; public_key: string option; private_key: string option; delegate: string option}
+    { balance: int
+    ; public_key: string option
+    ; private_key: string option
+    ; delegate: string option }
 
   type account_list = Account.t list [@@deriving yojson]
 
@@ -191,14 +194,16 @@ module Stable = struct
     type t =
       { protocol: Protocol.Stable.V1.t
       ; txpool_max_size: int
-      ; accounts: Accounts.Stable.V1.t } [@@deriving yojson]
+      ; accounts: Accounts.Stable.V1.t }
+    [@@deriving yojson]
 
     let to_latest = Fn.id
   end
 end]
 
 type t = Stable.Latest.t =
-  {protocol: Protocol.t; txpool_max_size: int; accounts: Accounts.t} [@@deriving yojson]
+  {protocol: Protocol.t; txpool_max_size: int; accounts: Accounts.t}
+[@@deriving yojson]
 
 let hash (t : t) =
   let str =
@@ -336,8 +341,7 @@ let from_flags (default : t) =
   let accounts = Option.value ~default:default.accounts accounts in
   let genesis_state_timestamp =
     Option.value_map ~default:default.protocol.genesis_state_timestamp
-      genesis_state_timestamp
-      ~f:(fun genesis_state_timestamp ->
+      genesis_state_timestamp ~f:(fun genesis_state_timestamp ->
         match validate_time (Some genesis_state_timestamp) with
         | Ok ts ->
             ts
