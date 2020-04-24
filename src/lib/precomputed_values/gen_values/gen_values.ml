@@ -37,7 +37,9 @@ end
 module Make_real (Keys : Keys_lib.Keys.S) = struct
   let loc = Ppxlib.Location.none
 
-  let protocol_state_with_hash = Genesis_protocol_state.compile_time_genesis ()
+  let protocol_state_with_hash =
+    Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+      ~genesis_constants:Genesis_constants.compiled
 
   let base_hash = Keys.Step.instance_hash protocol_state_with_hash.data
 

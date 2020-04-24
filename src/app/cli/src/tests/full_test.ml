@@ -208,9 +208,9 @@ let run_test () : unit Deferred.t =
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
              ~genesis_state_hash:
-               (Coda_state.Genesis_protocol_state.For_tests.genesis_state_hash
-                  ())
-             ~genesis_constants:Genesis_constants.compiled ())
+               (Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+                  ~genesis_constants:Genesis_constants.compiled)
+                 .hash ~genesis_constants:Genesis_constants.compiled ())
           ~genesis_ledger:Test_genesis_ledger.t
           ~base_proof:Precomputed_values.base_proof
       in
