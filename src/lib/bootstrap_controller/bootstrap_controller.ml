@@ -459,7 +459,7 @@ let%test_module "Bootstrap_controller tests" =
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq
             ~accounts_with_secret_keys:
-              (Lazy.force Test_genesis_ledger.accounts)
+              (Lazy.force Genesis_ledger.Unit_test_ledger.accounts)
             branch_size
         in
         let [me; _] = fake_network.peer_networks in
@@ -523,7 +523,7 @@ let%test_module "Bootstrap_controller tests" =
       let genesis_state_hash =
         Transition_frontier.genesis_state_hash my_net.state.frontier
       in
-      let genesis_ledger = Test_genesis_ledger.t in
+      let genesis_ledger = Genesis_ledger.Unit_test_ledger.t in
       let time_controller = Block_time.Controller.basic ~logger in
       let persistent_root =
         Transition_frontier.persistent_root my_net.state.frontier
