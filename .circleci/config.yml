@@ -331,6 +331,7 @@ jobs:
                 command: cd frontend/wallet && bundle exec fastlane ci && cd ../..
             - run:
                 name: Build portable binary
+                context: org-global
                 command: |
                     LIBP2P_NIXLESS=1 make macos-portable
                     cp _build/coda-daemon-macos.zip package/.
