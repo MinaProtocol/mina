@@ -12,7 +12,7 @@
 ###
 
 if [ -z $AWS_ACCESS_KEY_ID ]; then
-    HAS_AWS_ACCESS_KEY_ID=""
+    AWS_ACCESS_KEY_ID=""
 fi
 
 set -euo pipefail
