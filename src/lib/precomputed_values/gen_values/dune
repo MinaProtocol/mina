@@ -5,5 +5,5 @@
    global_signer_private_key)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
-  (pps ppx_optcomp ppx_let ppxlib.metaquot ppxlib.runner))
+  (pps ppx_optcomp ppx_let ppxlib.metaquot))
  (modes native))
