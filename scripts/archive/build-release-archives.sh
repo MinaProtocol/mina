@@ -3,6 +3,18 @@
 # This script makes a .deb archive for the Coda Archive process
 # and releases it to the AWS .deb repository packages.o1test.net
 
+###
+# Set missing variables
+#
+# We do this here because setting the -u flag will cause an error for undefined
+# variables later in the script, and external contributors will not have these
+# variables available.
+###
+
+if [ -z $AWS_ACCESS_KEY_ID ]; then
+    HAS_AWS_ACCESS_KEY_ID=""
+fi
+
 set -euo pipefail
 
 # Set up variables for build
