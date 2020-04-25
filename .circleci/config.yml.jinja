@@ -324,11 +324,11 @@ jobs:
             - run:
                 name: Decode Apple Certificates
                 context: org-global
-                command: base64 -D -o frontend/wallet/Certificates.p12 <<< $APPLE_CERTIFICATES
+                command: bash -c '[ -z $APPLE_CERTIFICATES ] || base64 -D -o frontend/wallet/Certificates.p12 <<< $APPLE_CERTIFICATES'
             - run:
                 name: Fastlane
                 context: org-global
-                command: cd frontend/wallet && bundle exec fastlane ci && cd ../..
+                command: bash -c '[ -z $APPLE_CERTIFICATES ] || cd frontend/wallet && bundle exec fastlane ci && cd ../..'
             - run:
                 name: Build portable binary
                 command: |

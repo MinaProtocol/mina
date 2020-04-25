@@ -73,10 +73,12 @@ GITBRANCH=$(git rev-parse --symbolic-full-name --abbrev-ref HEAD |  sed 's!/!-!;
 DEBS3='deb-s3 upload --s3-region=us-west-2 --bucket packages.o1test.net --preserve-versions --cache-control=max-age=120'
 
 # check for AWS Creds
+set +u
 if [ -z "$AWS_ACCESS_KEY_ID" ]; then
     echo "WARNING: AWS_ACCESS_KEY_ID not set, publish commands not run"
     exit 0
 else
+    set -u
     # Determine deb repo to use
     case $GITBRANCH in
         master)
@@ -105,8 +107,12 @@ fi
 mkdir docker_build 
 mv coda-*.deb docker_build/.
 
-echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
+if [ -z $DOCKER_PASSWORD ]; then
+  echo "Skipping docker push because building without env var permissions"
+else
+  echo "$DOCKER_PASSWORD" | docker login --username $DOCKER_USERNAME --password-stdin
 
-docker build -t codaprotocol/coda-archive:$VERSION -f $SCRIPT_PATH/Dockerfile docker_build
+  docker build -t codaprotocol/coda-archive:$VERSION -f $SCRIPT_PATH/Dockerfile docker_build
 
-docker push codaprotocol/coda-archive:$VERSION
+  docker push codaprotocol/coda-archive:$VERSION
+fi

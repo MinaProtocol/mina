@@ -16,10 +16,17 @@ DIST_DIR="$3"
 
 mkdir -p "$DIST_DIR"
 
+# move and sign coda.exe (if has rights)
 cp "$1" "$DIST_DIR/$LOCAL_CODA_EXE"
-codesign -s "$APPLE_ID" "$DIST_DIR/$LOCAL_CODA_EXE"
+set +u
+[ -z $APPLE_ID ] || codesign -s "$APPLE_ID" "$DIST_DIR/$LOCAL_CODA_EXE"
+set -u
+
+# move and sign libp2p helper (if has rights)
 cp "$2" "$DIST_DIR/$LOCAL_LIBP2P"
-codesign -s "$APPLE_ID" "$DIST_DIR/$LOCAL_LIBP2P"
+set +u
+[ -z $APPLE_ID ] || codesign -s "$APPLE_ID" "$DIST_DIR/$LOCAL_LIBP2P"
+set -u
 chmod +w "$DIST_DIR/$LOCAL_LIBP2P"
 
 pushd "$DIST_DIR"
