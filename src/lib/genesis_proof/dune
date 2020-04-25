@@ -6,4 +6,5 @@
    coda_state
    keys_lib
    genesis_constants
-   with_hash))
+   with_hash)
+ (preprocess (pps ppx_coda)))
