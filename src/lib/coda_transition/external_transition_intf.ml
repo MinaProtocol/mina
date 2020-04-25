@@ -289,7 +289,12 @@ module type S = sig
       -> unit
       -> t
 
-    val genesis : unit -> Validated.t
+    val genesis :
+         genesis_ledger:Ledger.t Lazy.t
+      -> base_proof:Proof.t
+      -> genesis_constants:Genesis_constants.t
+      -> unit
+      -> Validated.t
   end
 
   val timestamp : t -> Block_time.t

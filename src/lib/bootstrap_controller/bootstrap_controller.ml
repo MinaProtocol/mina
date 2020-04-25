@@ -410,6 +410,14 @@ let%test_module "Bootstrap_controller tests" =
 
     let trust_system = Trust_system.null ()
 
+    let genesis_ledger = Genesis_ledger.for_unit_tests
+
+    let base_proof = Precomputed_values.base_proof
+
+    let genesis_constants = Genesis_constants.compiled
+
+    module Genesis_ledger = (val genesis_ledger)
+
     let pids = Child_processes.Termination.create_pid_table ()
 
     let downcast_transition ~sender transition =
@@ -454,12 +462,12 @@ let%test_module "Bootstrap_controller tests" =
         (* we only need one node for this test, but we need more than one peer so that coda_networking does not throw an error *)
         let%bind fake_network =
           Fake_network.Generator.(
-            gen ~max_frontier_length [fresh_peer; fresh_peer])
+            gen ~max_frontier_length ~genesis_ledger ~base_proof
+              ~genesis_constants [fresh_peer; fresh_peer])
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq
-            ~accounts_with_secret_keys:
-              (Lazy.force Test_genesis_ledger.accounts)
+            ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)
             branch_size
         in
         let [me; _] = fake_network.peer_networks in
@@ -523,7 +531,7 @@ let%test_module "Bootstrap_controller tests" =
       let genesis_state_hash =
         Transition_frontier.genesis_state_hash my_net.state.frontier
       in
-      let genesis_ledger = Test_genesis_ledger.t in
+      let genesis_ledger = Genesis_ledger.t in
       let time_controller = Block_time.Controller.basic ~logger in
       let persistent_root =
         Transition_frontier.persistent_root my_net.state.frontier
@@ -576,7 +584,8 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "sync with one node after receiving a transition" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~max_frontier_length
+          gen ~max_frontier_length ~genesis_ledger ~base_proof
+            ~genesis_constants
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2) ])
@@ -615,7 +624,8 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
       Quickcheck.test ~trials:1
-        (Transition_frontier.For_tests.gen ~max_length:max_frontier_length
+        (Transition_frontier.For_tests.gen ~genesis_ledger ~base_proof
+           ~genesis_constants ~max_length:max_frontier_length
            ~size:max_frontier_length ()) ~f:(fun frontier ->
           Thread_safe.block_on_async_exn
           @@ fun () ->

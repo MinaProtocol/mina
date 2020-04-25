@@ -279,6 +279,12 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
 
     let trust_system = Trust_system.null ()
 
+    let genesis_ledger = Genesis_ledger.for_unit_tests
+
+    let base_proof = Precomputed_values.base_proof
+
+    let genesis_constants = Genesis_constants.compiled
+
     let pids = Child_processes.Termination.create_pid_table ()
 
     let time_controller = Block_time.Controller.basic ~logger
@@ -305,7 +311,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Verifier.create ~logger ~conf_dir:None ~pids )
       in
       Quickcheck.test ~trials:3
-        (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
+        (Transition_frontier.For_tests.gen_with_branch ~verifier
+           ~genesis_ledger ~base_proof ~genesis_constants ~max_length
            ~frontier_size:1 ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
           let catchup_job_reader, catchup_job_writer =
             Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)
@@ -358,7 +365,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Verifier.create ~logger ~conf_dir:None ~pids )
       in
       Quickcheck.test ~trials:3
-        (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
+        (Transition_frontier.For_tests.gen_with_branch ~verifier
+           ~genesis_ledger ~base_proof ~genesis_constants ~max_length
            ~frontier_size:1 ~branch_size:2 ()) ~f:(fun (frontier, branch) ->
           let cache = Unprocessed_transition_cache.create ~logger in
           let register_breadcrumb breadcrumb =
@@ -442,7 +450,8 @@ let%test_module "Transition_handler.Catchup_scheduler tests" =
             Verifier.create ~logger ~conf_dir:None ~pids )
       in
       Quickcheck.test ~trials:3
-        (Transition_frontier.For_tests.gen_with_branch ~verifier ~max_length
+        (Transition_frontier.For_tests.gen_with_branch ~verifier
+           ~genesis_ledger ~base_proof ~genesis_constants ~max_length
            ~frontier_size:1 ~branch_size:5 ()) ~f:(fun (frontier, branch) ->
           let catchup_job_reader, catchup_job_writer =
             Strict_pipe.create ~name:(__MODULE__ ^ __LOC__)

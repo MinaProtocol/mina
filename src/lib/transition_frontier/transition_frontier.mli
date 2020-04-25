@@ -82,6 +82,9 @@ module For_tests : sig
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
     -> ?verifier:Verifier.t
+    -> genesis_ledger:Ledger.t Lazy.t
+    -> base_proof:Proof.t
+    -> genesis_constants:Genesis_constants.t
     -> unit
     -> Breadcrumb.t Quickcheck.Generator.t
 
@@ -94,6 +97,9 @@ module For_tests : sig
   val gen :
        ?logger:Logger.t
     -> ?verifier:Verifier.t
+    -> genesis_ledger:Genesis_ledger.Packed.t
+    -> base_proof:Proof.t
+    -> genesis_constants:Genesis_constants.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> ?root_ledger_and_accounts:Ledger.t
@@ -107,6 +113,9 @@ module For_tests : sig
   val gen_with_branch :
        ?logger:Logger.t
     -> ?verifier:Verifier.t
+    -> genesis_ledger:Genesis_ledger.Packed.t
+    -> base_proof:Proof.t
+    -> genesis_constants:Genesis_constants.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
     -> ?root_ledger_and_accounts:Ledger.t

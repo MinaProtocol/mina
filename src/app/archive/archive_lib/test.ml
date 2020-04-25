@@ -34,6 +34,15 @@ let coinbase_gen =
       (Coinbase.Fee_transfer.Gen.with_random_receivers ~keys
          ~max_fee:(Currency.Fee.of_int 10))
 
+(* TODO: It's not clear whether this should use the unit test ledger or not. *)
+module Genesis_ledger = Test_genesis_ledger
+
+let genesis_ledger = Genesis_ledger.t
+
+let base_proof = Precomputed_values.base_proof
+
+let genesis_constants = Genesis_constants.compiled
+
 let%test_unit "User_command: read and write" =
   let conn = Lazy.force conn_lazy in
   Thread_safe.block_on_async_exn
@@ -103,11 +112,11 @@ let%test_unit "Block: read and write" =
   Quickcheck.test ~trials:20
     ( Quickcheck.Generator.with_size ~size:10
     @@ Quickcheck_lib.gen_imperative_list
-         (Transition_frontier.For_tests.gen_genesis_breadcrumb ())
+         (Transition_frontier.For_tests.gen_genesis_breadcrumb ~genesis_ledger
+            ~base_proof ~genesis_constants ())
          (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
             ?logger:None ?verifier:None ?trust_system:None
-            ~accounts_with_secret_keys:
-              (Lazy.force Test_genesis_ledger.accounts)) )
+            ~accounts_with_secret_keys:(Lazy.force Genesis_ledger.accounts)) )
     ~f:(fun breadcrumbs ->
       Thread_safe.block_on_async_exn
       @@ fun () ->

@@ -75,6 +75,12 @@ let%test_module "transaction_status" =
 
     let pool_max_size = Genesis_constants.compiled.txpool_max_size
 
+    let genesis_ledger = Genesis_ledger.for_unit_tests
+
+    let base_proof = Precomputed_values.base_proof
+
+    let genesis_constants = Genesis_constants.compiled
+
     let key_gen =
       let open Quickcheck.Generator in
       let open Quickcheck.Generator.Let_syntax in
@@ -87,8 +93,8 @@ let%test_module "transaction_status" =
           (Option.value_exn random_key_opt) )
 
     let gen_frontier =
-      Transition_frontier.For_tests.gen ~logger ~trust_system ~max_length
-        ~size:frontier_size ()
+      Transition_frontier.For_tests.gen ~logger ~genesis_ledger ~base_proof
+        ~genesis_constants ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
       User_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10

@@ -418,7 +418,8 @@ module For_tests = struct
   *)
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
-  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ?verifier () =
+  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ?verifier
+      ~genesis_ledger ~base_proof ~genesis_constants () =
     let verifier =
       match verifier with
       | Some x ->
@@ -429,8 +430,11 @@ module For_tests = struct
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
-        let genesis_transition = External_transition.For_tests.genesis () in
-        let genesis_ledger = Lazy.force Test_genesis_ledger.t in
+        let genesis_transition =
+          External_transition.For_tests.genesis ~genesis_ledger ~base_proof
+            ~genesis_constants ()
+        in
+        let genesis_ledger = Lazy.force genesis_ledger in
         let genesis_staged_ledger =
           Or_error.ok_exn
             (Async.Thread_safe.block_on_async_exn (fun () ->
@@ -497,16 +501,19 @@ module For_tests = struct
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
-  let gen ?(logger = Logger.null ()) ?verifier ?trust_system
-      ?consensus_local_state
+  let gen ?(logger = Logger.null ()) ?verifier ~genesis_ledger ~base_proof
+      ~genesis_constants ?trust_system ?consensus_local_state
       ?(root_ledger_and_accounts =
-        ( Lazy.force Test_genesis_ledger.t
-        , Lazy.force Test_genesis_ledger.accounts ))
-      ?(gen_root_breadcrumb = gen_genesis_breadcrumb ~logger ?verifier ())
-      ~max_length ~size () =
+        ( Lazy.force (Genesis_ledger.Packed.t genesis_ledger)
+        , Lazy.force (Genesis_ledger.Packed.accounts genesis_ledger) ))
+      ?(gen_root_breadcrumb =
+        gen_genesis_breadcrumb ~logger ?verifier ~base_proof ~genesis_constants
+          ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
+          ()) ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
+    let genesis_ledger = Genesis_ledger.Packed.t genesis_ledger in
     let genesis_state_hash =
-      Coda_state.Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
+      Coda_state.Genesis_protocol_state.t ~genesis_ledger
         ~genesis_constants:Genesis_constants.compiled
       |> With_hash.hash
     in
@@ -525,8 +532,7 @@ module For_tests = struct
     let consensus_local_state =
       Option.value consensus_local_state
         ~default:
-          (Consensus.Data.Local_state.create
-             ~genesis_ledger:Test_genesis_ledger.t
+          (Consensus.Data.Local_state.create ~genesis_ledger
              Public_key.Compressed.Set.empty)
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
@@ -583,16 +589,18 @@ module For_tests = struct
           ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) ) ;
     frontier
 
-  let gen_with_branch ?logger ?verifier ?trust_system ?consensus_local_state
+  let gen_with_branch ?logger ?verifier ~genesis_ledger ~base_proof
+      ~genesis_constants ?trust_system ?consensus_local_state
       ?(root_ledger_and_accounts =
-        ( Lazy.force Test_genesis_ledger.t
-        , Lazy.force Test_genesis_ledger.accounts )) ?gen_root_breadcrumb
-      ?(get_branch_root = root) ~max_length ~frontier_size ~branch_size () =
+        ( Lazy.force (Genesis_ledger.Packed.t genesis_ledger)
+        , Lazy.force (Genesis_ledger.Packed.accounts genesis_ledger) ))
+      ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
+      ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
-      gen ?logger ?verifier ?trust_system ?consensus_local_state
-        ?gen_root_breadcrumb ~root_ledger_and_accounts ~max_length
-        ~size:frontier_size ()
+      gen ?logger ?verifier ~genesis_ledger ~base_proof ~genesis_constants
+        ?trust_system ?consensus_local_state ?gen_root_breadcrumb
+        ~root_ledger_and_accounts ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
       Breadcrumb.For_tests.gen_seq ?logger ?verifier ?trust_system

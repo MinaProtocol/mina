@@ -363,6 +363,12 @@ let%test_module "Transition_handler.Processor tests" =
 
     let trust_system = Trust_system.null ()
 
+    let genesis_ledger = Genesis_ledger.for_unit_tests
+
+    let base_proof = Precomputed_values.base_proof
+
+    let genesis_constants = Genesis_constants.compiled
+
     let downcast_breadcrumb breadcrumb =
       let transition =
         Transition_frontier.Breadcrumb.validated_transition breadcrumb
@@ -377,8 +383,9 @@ let%test_module "Transition_handler.Processor tests" =
       let branch_size = 10 in
       let max_length = frontier_size + branch_size in
       Quickcheck.test ~trials:4
-        (Transition_frontier.For_tests.gen_with_branch ~max_length
-           ~frontier_size ~branch_size ()) ~f:(fun (frontier, branch) ->
+        (Transition_frontier.For_tests.gen_with_branch ~genesis_ledger
+           ~base_proof ~genesis_constants ~max_length ~frontier_size
+           ~branch_size ()) ~f:(fun (frontier, branch) ->
           assert (
             Thread_safe.block_on_async_exn (fun () ->
                 let pids = Child_processes.Termination.create_pid_table () in

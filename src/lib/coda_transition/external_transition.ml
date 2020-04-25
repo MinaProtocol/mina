@@ -945,11 +945,9 @@ module For_tests = struct
     create ~protocol_state ~protocol_state_proof ~staged_ledger_diff
       ~delta_transition_chain_proof ~validation_callback ?next_fork_id_opt ()
 
-  let genesis () =
+  let genesis ~genesis_ledger ~base_proof ~genesis_constants () =
     Fork_id.(set_current empty) ;
-    genesis ~genesis_ledger:Test_genesis_ledger.t
-      ~base_proof:Precomputed_values.base_proof
-      ~genesis_constants:Genesis_constants.compiled
+    genesis ~genesis_ledger ~base_proof ~genesis_constants
 end
 
 module Transition_frontier_validation (Transition_frontier : sig

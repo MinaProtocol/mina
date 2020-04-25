@@ -410,6 +410,12 @@ let%test_module "Ledger_catchup tests" =
 
     let trust_system = Trust_system.null ()
 
+    let genesis_ledger = Genesis_ledger.for_unit_tests
+
+    let base_proof = Precomputed_values.base_proof
+
+    let genesis_constants = Genesis_constants.compiled
+
     let time_controller = Block_time.Controller.basic ~logger
 
     let downcast_transition transition =
@@ -527,7 +533,8 @@ let%test_module "Ledger_catchup tests" =
           let%bind peer_branch_size =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
-          gen ~max_frontier_length
+          gen ~max_frontier_length ~genesis_ledger ~base_proof
+            ~genesis_constants
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size ])
         ~f:(fun network ->
@@ -546,7 +553,8 @@ let%test_module "Ledger_catchup tests" =
                    in the frontier" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~max_frontier_length
+          gen ~max_frontier_length ~genesis_ledger ~base_proof
+            ~genesis_constants
             [fresh_peer; peer_with_branch ~frontier_branch_size:1])
         ~f:(fun network ->
           let open Fake_network in
@@ -560,7 +568,8 @@ let%test_module "Ledger_catchup tests" =
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~max_frontier_length
+          gen ~max_frontier_length ~genesis_ledger ~base_proof
+            ~genesis_constants
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])
