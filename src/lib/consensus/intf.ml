@@ -243,6 +243,7 @@ module type State_hooks = sig
     -> snarked_ledger_hash:Coda_base.Frozen_ledger_hash.t
     -> supply_increase:Currency.Amount.t
     -> logger:Logger.t
+    -> protocol_constants:Genesis_constants.Protocol.t
     -> protocol_state * consensus_transition
 
   (**

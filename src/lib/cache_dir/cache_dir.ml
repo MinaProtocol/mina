@@ -11,13 +11,14 @@ let genesis_dir_name (genesis_constants : Genesis_constants.t) =
   let digest =
     (*include all the time constants that would affect the genesis
     ledger and the proof*)
+    let module P = Genesis_constants.Protocol in
     let str =
       ( List.map
           [ Coda_compile_config.curve_size
           ; Coda_compile_config.ledger_depth
           ; Coda_compile_config.fake_accounts_target
           ; Coda_compile_config.c
-          ; genesis_constants.protocol.k ]
+          ; P.k genesis_constants.protocol ]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
       ^ Coda_compile_config.proof_level ^ Coda_compile_config.genesis_ledger

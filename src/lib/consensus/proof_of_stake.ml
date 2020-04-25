@@ -2132,7 +2132,10 @@ module Data = struct
            Coda_base.Frozen_ledger_hash.var)
         ~(protocol_constants : Coda_base.Protocol_constants_checked.var) =
       let open Snark_params.Tick in
-      let%bind constants = Constants.Checked.create protocol_constants in
+      let%bind constants =
+        Constants.In_snark.Checked.create
+          ~in_snark_constants:protocol_constants
+      in
       let {Poly.curr_global_slot= prev_global_slot; _} = previous_state in
       let next_global_slot =
         Global_slot.Checked.of_slot_number ~constants transition_data
@@ -3143,16 +3146,12 @@ module Hooks = struct
 
     let generate_transition ~(previous_protocol_state : Protocol_state.Value.t)
         ~blockchain_state ~current_time ~(block_data : Block_data.t)
-        ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger =
+        ~transactions:_ ~snarked_ledger_hash ~supply_increase ~logger
+        ~protocol_constants =
       let previous_consensus_state =
         Protocol_state.consensus_state previous_protocol_state
       in
-      let constants =
-        Constants.create
-          ~protocol_constants:
-            ( Protocol_state.constants previous_protocol_state
-            |> Coda_base.Protocol_constants_checked.t_of_value )
-      in
+      let constants = Constants.create ~protocol_constants in
       (let actual_global_slot =
          let time = Time.of_span_since_epoch (Time.Span.of_ms current_time) in
          Global_slot.of_epoch_and_slot ~constants
@@ -3366,7 +3365,7 @@ let%test_module "Proof of stake tests" =
             ~compute:
               (As_prover.return
                  (Coda_base.Protocol_constants_checked.value_of_t
-                    Genesis_constants.compiled.protocol))
+                    Genesis_constants.compiled.protocol.checked))
         in
         let result =
           update_var previous_state transition_data

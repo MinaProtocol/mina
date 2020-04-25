@@ -28,7 +28,163 @@ let validate_time time_str =
 
 (*Protocol constants required for consensus and snarks. Consensus constants is generated using these*)
 module Protocol = struct
-  module Poly = struct
+  (* Constants for blockchain snark*)
+  module Checked = struct
+    module Poly = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type ('k, 'delta) t = {k: 'k; delta: 'delta}
+          [@@deriving eq, ord, hash, sexp, yojson]
+        end
+      end]
+
+      type ('k, 'delta) t = ('k, 'delta) Stable.Latest.t =
+        {k: 'k; delta: 'delta}
+      [@@deriving eq]
+    end
+
+    [%%versioned_asserted
+    module Stable = struct
+      module V1 = struct
+        type t = (int, int) Poly.Stable.V1.t
+        [@@deriving eq, ord, hash, sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+
+      module Tests = struct
+        let%test "checked protocol constants serialization v1" =
+          let t : V1.t = {k= 1; delta= 100} in
+          (*from the print statement in Serialization.check_serialization*)
+          let known_good_hash =
+            "\x18\x3E\xF4\x11\xAC\x44\x83\xBF\x0E\x0F\x76\x5B\xF7\xE6\xFA\xE7\xEB\x24\xF6\xF7\xAA\xC8\x37\x71\xF7\xB9\x54\x66\xF6\x38\xB3\xF1"
+          in
+          Serialization.check_serialization (module V1) t known_good_hash
+      end
+    end]
+
+    type t = Stable.Latest.t [@@deriving eq, ord, hash, sexp, yojson]
+
+    let create ~k ~delta = {Poly.k; delta}
+
+    let k t = t.Poly.k
+
+    let delta t = t.Poly.delta
+  end
+
+  module Unchecked = struct
+    module Poly = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type 'genesis_state_timestamp t =
+            {genesis_state_timestamp: 'genesis_state_timestamp}
+          [@@deriving eq, ord, hash, sexp, yojson]
+        end
+      end]
+
+      type 'genesis_state_timestamp t =
+            'genesis_state_timestamp Stable.Latest.t =
+        {genesis_state_timestamp: 'genesis_state_timestamp}
+      [@@deriving eq, ord, hash, sexp, yojson]
+    end
+
+    [%%versioned_asserted
+    module Stable = struct
+      module V1 = struct
+        type t = Time.t Poly.Stable.V1.t [@@deriving eq, ord, hash]
+
+        let to_latest = Fn.id
+
+        let to_yojson (t : t) : Yojson.Safe.json =
+          `Assoc
+            [ ( "genesis_state_timestamp"
+              , `String
+                  (Time.to_string_abs t.genesis_state_timestamp
+                     ~zone:Time.Zone.utc) ) ]
+
+        let of_yojson = function
+          | `Assoc [("genesis_state_timestamp", `String time_str)] -> (
+            match validate_time (Some time_str) with
+            | Ok genesis_state_timestamp ->
+                Ok {Poly.genesis_state_timestamp}
+            | Error e ->
+                Error
+                  (sprintf
+                     !"Genesis_constants.Protocol.Unchecked.of_yojson: %s"
+                     e) )
+          | _ ->
+              Error
+                "Genesis_constants.Protocol.Unchecked.of_yojson: unexpected \
+                 JSON"
+
+        let t_of_sexp _ = failwith "t_of_sexp: not implemented"
+
+        let sexp_of_t (t : t) =
+          let module T = struct
+            type t = string Poly.Stable.V1.t [@@deriving sexp]
+          end in
+          let t' : T.t =
+            { genesis_state_timestamp=
+                Time.to_string_abs t.genesis_state_timestamp
+                  ~zone:Time.Zone.utc }
+          in
+          T.sexp_of_t t'
+      end
+
+      module Tests = struct
+        let%test "unchecked protocol constants serialization v1" =
+          let t : V1.t =
+            { genesis_state_timestamp=
+                Time.of_string "2019-10-08 17:51:23.050849Z" }
+          in
+          (*from the print statement in Serialization.check_serialization*)
+          let known_good_hash =
+            "\x18\x3E\xF4\x11\xAC\x44\x83\xBF\x0E\x0F\x76\x5B\xF7\xE6\xFA\xE7\xEB\x24\xF6\xF7\xAA\xC8\x37\x71\xF7\xB9\x54\x66\xF6\x38\xB3\xF1"
+          in
+          Serialization.check_serialization (module V1) t known_good_hash
+      end
+    end]
+
+    type t = Stable.Latest.t [@@deriving eq, yojson]
+
+    let create ~genesis_state_timestamp = {Poly.genesis_state_timestamp}
+
+    let genesis_state_timestamp t = t.Poly.genesis_state_timestamp
+  end
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = {checked: Checked.Stable.V1.t; unchecked: Unchecked.Stable.V1.t}
+      [@@deriving eq, ord, hash, sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t = {checked: Checked.t; unchecked: Unchecked.t}
+  [@@deriving eq, to_yojson]
+
+  let create ~k ~delta ~genesis_state_timestamp =
+    { checked= Checked.create ~k ~delta
+    ; unchecked= Unchecked.create ~genesis_state_timestamp }
+
+  [%%define_locally
+  Checked.(k, delta)]
+
+  [%%define_locally
+  Unchecked.(genesis_state_timestamp)]
+
+  let k t = k t.checked
+
+  let delta t = delta t.checked
+
+  let genesis_state_timestamp t = genesis_state_timestamp t.unchecked
+end
+
+(*module Poly = struct
     [%%versioned
     module Stable = struct
       module V1 = struct
@@ -108,7 +264,7 @@ module Protocol = struct
   end]
 
   type t = Stable.Latest.t [@@deriving eq, to_yojson]
-end
+end*)
 
 module T = struct
   type t = {protocol: Protocol.t; txpool_max_size: int} [@@deriving to_yojson]
@@ -116,10 +272,10 @@ module T = struct
   let hash (t : t) =
     let str =
       ( List.map
-          [t.protocol.k; t.protocol.delta; t.txpool_max_size]
+          [Protocol.k t.protocol; Protocol.delta t.protocol; t.txpool_max_size]
           ~f:Int.to_string
       |> String.concat ~sep:"" )
-      ^ Core.Time.to_string t.protocol.genesis_state_timestamp
+      ^ Core.Time.to_string (Protocol.genesis_state_timestamp t.protocol)
     in
     Blake2.digest_string str |> Blake2.to_hex
 end
@@ -145,10 +301,9 @@ consensus_mechanism]
 
 let compiled : t =
   { protocol=
-      { k
-      ; delta
-      ; genesis_state_timestamp=
-          genesis_timestamp_of_string genesis_state_timestamp_string }
+      Protocol.create ~k ~delta
+        ~genesis_state_timestamp:
+          (genesis_timestamp_of_string genesis_state_timestamp_string)
   ; txpool_max_size= pool_max_size }
 
 module type Config_intf = sig
@@ -175,21 +330,24 @@ module Config_file : Config_intf = struct
   let to_genesis_constants ~(default : T.t) (t : t) : T.t =
     let opt default x = Option.value ~default x in
     let protocol =
-      { Protocol.Poly.k= opt default.protocol.k t.k
-      ; delta= opt default.protocol.delta t.delta
-      ; genesis_state_timestamp=
-          Option.value_map ~default:default.protocol.genesis_state_timestamp
-            t.genesis_state_timestamp ~f:genesis_timestamp_of_string }
+      Protocol.create
+        ~k:(opt (Protocol.k default.protocol) t.k)
+        ~delta:(opt (Protocol.delta default.protocol) t.delta)
+        ~genesis_state_timestamp:
+          (Option.value_map
+             ~default:(Protocol.genesis_state_timestamp default.protocol)
+             t.genesis_state_timestamp ~f:genesis_timestamp_of_string)
     in
     {protocol; txpool_max_size= opt default.txpool_max_size t.txpool_max_size}
 
   let of_genesis_constants (genesis_constants : T.t) : t =
-    { k= Some genesis_constants.protocol.k
-    ; delta= Some genesis_constants.protocol.delta
+    { k= Some (Protocol.k genesis_constants.protocol)
+    ; delta= Some (Protocol.delta genesis_constants.protocol)
     ; txpool_max_size= Some genesis_constants.txpool_max_size
     ; genesis_state_timestamp=
         Some
-          (Core.Time.format genesis_constants.protocol.genesis_state_timestamp
+          (Core.Time.format
+             (Protocol.genesis_state_timestamp genesis_constants.protocol)
              "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }
 end
 
@@ -204,19 +362,23 @@ module Daemon_config : Config_intf = struct
 
   let to_genesis_constants ~(default : T.t)
       ({txpool_max_size; genesis_state_timestamp} : t) : T.t =
+    let protocol_const = default.protocol in
     { txpool_max_size=
         Option.value ~default:default.txpool_max_size txpool_max_size
     ; protocol=
-        { default.protocol with
-          genesis_state_timestamp=
-            Option.value_map genesis_state_timestamp
-              ~default:default.protocol.genesis_state_timestamp
-              ~f:genesis_timestamp_of_string } }
+        Protocol.create
+          ~k:(Protocol.k protocol_const)
+          ~delta:(Protocol.delta protocol_const)
+          ~genesis_state_timestamp:
+            (Option.value_map genesis_state_timestamp
+               ~default:(Protocol.genesis_state_timestamp protocol_const)
+               ~f:genesis_timestamp_of_string) }
 
   let of_genesis_constants (genesis_constants : T.t) : t =
     { txpool_max_size= Some genesis_constants.txpool_max_size
     ; genesis_state_timestamp=
         Some
-          (Core.Time.format genesis_constants.protocol.genesis_state_timestamp
+          (Core.Time.format
+             (Protocol.genesis_state_timestamp genesis_constants.protocol)
              "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }
 end

@@ -38,7 +38,7 @@ let gen =
   let open Quickcheck.Let_syntax in
   let constants = Constants.compiled in
   let ck3 =
-    UInt32.Infix.(constants.c * constants.k * UInt32.of_int 3) |> UInt32.to_int
+    UInt32.Infix.(constants.c * constants.c * UInt32.of_int 3) |> UInt32.to_int
   in
   Core.Int.gen_incl 0 ck3 >>| UInt32.of_int
 
@@ -47,11 +47,11 @@ let%test_unit "in_seed_update_range unchecked vs. checked equality" =
   let module Length = Coda_numbers.Length in
   let test x =
     Test_util.test_equal
-      (Snarky.Typ.tuple2 Constants.typ typ)
+      (Snarky.Typ.tuple2 Constants.In_snark.typ typ)
       Tick.Boolean.typ
       (fun (c, x) -> Checked.in_seed_update_range ~constants:c x)
-      (fun (c, x) -> in_seed_update_range ~constants:c x)
-      (constants, x)
+      (fun (_, x) -> in_seed_update_range ~constants x)
+      (Constants.to_snark_constants constants, x)
   in
   let x = UInt32.mul constants.c constants.k |> UInt32.to_int in
   let examples =

@@ -284,5 +284,5 @@ let negative_one ~genesis_ledger ~protocol_constants =
       ; consensus_state=
           Consensus.Data.Consensus_state.negative_one ~genesis_ledger
             ~protocol_constants
-      ; constants= Protocol_constants_checked.value_of_t protocol_constants }
-  }
+      ; constants=
+          Protocol_constants_checked.value_of_t protocol_constants.checked } }
