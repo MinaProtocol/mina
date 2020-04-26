@@ -34,28 +34,24 @@ module Protocol = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
-          type ('k, 'delta) t = {k: 'k; delta: 'delta}
-          [@@deriving eq, ord, hash, sexp, yojson]
+          type 'k t = {k: 'k} [@@deriving eq, ord, hash, sexp, yojson]
         end
       end]
 
-      type ('k, 'delta) t = ('k, 'delta) Stable.Latest.t =
-        {k: 'k; delta: 'delta}
-      [@@deriving eq]
+      type 'k t = 'k Stable.Latest.t = {k: 'k} [@@deriving eq]
     end
 
     [%%versioned_asserted
     module Stable = struct
       module V1 = struct
-        type t = (int, int) Poly.Stable.V1.t
-        [@@deriving eq, ord, hash, sexp, yojson]
+        type t = int Poly.Stable.V1.t [@@deriving eq, ord, hash, sexp, yojson]
 
         let to_latest = Fn.id
       end
 
       module Tests = struct
         let%test "in_snark protocol constants serialization v1" =
-          let t : V1.t = {k= 1; delta= 100} in
+          let t : V1.t = {k= 1} in
           (*from the print statement in Serialization.check_serialization*)
           let known_good_hash =
             "\x18\x3E\xF4\x11\xAC\x44\x83\xBF\x0E\x0F\x76\x5B\xF7\xE6\xFA\xE7\xEB\x24\xF6\xF7\xAA\xC8\x37\x71\xF7\xB9\x54\x66\xF6\x38\xB3\xF1"
@@ -66,11 +62,9 @@ module Protocol = struct
 
     type t = Stable.Latest.t [@@deriving eq, ord, hash, sexp, yojson]
 
-    let create ~k ~delta = {Poly.k; delta}
+    let create ~k = {Poly.k}
 
     let k t = t.Poly.k
-
-    let delta t = t.Poly.delta
   end
 
   (*constants that are not required for generating the blockchain snark*)
@@ -79,37 +73,40 @@ module Protocol = struct
       [%%versioned
       module Stable = struct
         module V1 = struct
-          type 'genesis_state_timestamp t =
-            {genesis_state_timestamp: 'genesis_state_timestamp}
+          type ('delta, 'genesis_state_timestamp) t =
+            {delta: 'delta; genesis_state_timestamp: 'genesis_state_timestamp}
           [@@deriving eq, ord, hash, sexp, yojson]
         end
       end]
 
-      type 'genesis_state_timestamp t =
-            'genesis_state_timestamp Stable.Latest.t =
-        {genesis_state_timestamp: 'genesis_state_timestamp}
+      type ('delta, 'genesis_state_timestamp) t =
+            ('delta, 'genesis_state_timestamp) Stable.Latest.t =
+        {delta: 'delta; genesis_state_timestamp: 'genesis_state_timestamp}
       [@@deriving eq, ord, hash, sexp, yojson]
     end
 
     [%%versioned_asserted
     module Stable = struct
       module V1 = struct
-        type t = Time.t Poly.Stable.V1.t [@@deriving eq, ord, hash]
+        type t = (int, Time.t) Poly.Stable.V1.t [@@deriving eq, ord, hash]
 
         let to_latest = Fn.id
 
         let to_yojson (t : t) : Yojson.Safe.json =
           `Assoc
-            [ ( "genesis_state_timestamp"
+            [ ("delta", `Int t.delta)
+            ; ( "genesis_state_timestamp"
               , `String
                   (Time.to_string_abs t.genesis_state_timestamp
                      ~zone:Time.Zone.utc) ) ]
 
         let of_yojson = function
-          | `Assoc [("genesis_state_timestamp", `String time_str)] -> (
+          | `Assoc
+              [ ("delta", `Int delta)
+              ; ("genesis_state_timestamp", `String time_str) ] -> (
             match validate_time (Some time_str) with
             | Ok genesis_state_timestamp ->
-                Ok {Poly.genesis_state_timestamp}
+                Ok {Poly.delta; genesis_state_timestamp}
             | Error e ->
                 Error
                   (sprintf
@@ -124,10 +121,11 @@ module Protocol = struct
 
         let sexp_of_t (t : t) =
           let module T = struct
-            type t = string Poly.Stable.V1.t [@@deriving sexp]
+            type t = (int, string) Poly.Stable.V1.t [@@deriving sexp]
           end in
           let t' : T.t =
-            { genesis_state_timestamp=
+            { delta= t.delta
+            ; genesis_state_timestamp=
                 Time.to_string_abs t.genesis_state_timestamp
                   ~zone:Time.Zone.utc }
           in
@@ -137,7 +135,8 @@ module Protocol = struct
       module Tests = struct
         let%test "out_of_snark protocol constants serialization v1" =
           let t : V1.t =
-            { genesis_state_timestamp=
+            { delta= 100
+            ; genesis_state_timestamp=
                 Time.of_string "2019-10-08 17:51:23.050849Z" }
           in
           (*from the print statement in Serialization.check_serialization*)
@@ -150,9 +149,12 @@ module Protocol = struct
 
     type t = Stable.Latest.t [@@deriving eq, yojson]
 
-    let create ~genesis_state_timestamp = {Poly.genesis_state_timestamp}
+    let create ~genesis_state_timestamp ~delta =
+      {Poly.delta; genesis_state_timestamp}
 
     let genesis_state_timestamp t = t.Poly.genesis_state_timestamp
+
+    let delta t = t.Poly.delta
   end
 
   [%%versioned
@@ -171,18 +173,18 @@ module Protocol = struct
   [@@deriving eq, to_yojson]
 
   let create ~k ~delta ~genesis_state_timestamp =
-    { in_snark= In_snark.create ~k ~delta
-    ; out_of_snark= Out_of_snark.create ~genesis_state_timestamp }
+    { in_snark= In_snark.create ~k
+    ; out_of_snark= Out_of_snark.create ~genesis_state_timestamp ~delta }
 
   [%%define_locally
-  In_snark.(k, delta)]
+  In_snark.(k)]
 
   [%%define_locally
-  Out_of_snark.(genesis_state_timestamp)]
+  Out_of_snark.(genesis_state_timestamp, delta)]
 
   let k t = k t.in_snark
 
-  let delta t = delta t.in_snark
+  let delta t = delta t.out_of_snark
 
   let genesis_state_timestamp t = genesis_state_timestamp t.out_of_snark
 end
@@ -275,7 +277,10 @@ module Config_file : Config_intf = struct
 end
 
 module Daemon_config : Config_intf = struct
-  type t = {txpool_max_size: int option; genesis_state_timestamp: string option}
+  type t =
+    { delta: int option
+    ; txpool_max_size: int option
+    ; genesis_state_timestamp: string option }
   [@@deriving yojson]
 
   let of_yojson s =
@@ -284,21 +289,22 @@ module Daemon_config : Config_intf = struct
       >>= fun t -> validate_time t.genesis_state_timestamp >>= fun _ -> Ok t)
 
   let to_genesis_constants ~(default : T.t)
-      ({txpool_max_size; genesis_state_timestamp} : t) : T.t =
+      ({delta; txpool_max_size; genesis_state_timestamp} : t) : T.t =
     let protocol_const = default.protocol in
     { txpool_max_size=
         Option.value ~default:default.txpool_max_size txpool_max_size
     ; protocol=
         Protocol.create
           ~k:(Protocol.k protocol_const)
-          ~delta:(Protocol.delta protocol_const)
+          ~delta:(Option.value ~default:(Protocol.delta protocol_const) delta)
           ~genesis_state_timestamp:
             (Option.value_map genesis_state_timestamp
                ~default:(Protocol.genesis_state_timestamp protocol_const)
                ~f:genesis_timestamp_of_string) }
 
   let of_genesis_constants (genesis_constants : T.t) : t =
-    { txpool_max_size= Some genesis_constants.txpool_max_size
+    { delta= Some (Protocol.delta genesis_constants.protocol)
+    ; txpool_max_size= Some genesis_constants.txpool_max_size
     ; genesis_state_timestamp=
         Some
           (Core.Time.format

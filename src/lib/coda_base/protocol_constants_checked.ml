@@ -16,24 +16,13 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 [%%endif]
 
 module T = Coda_numbers.Length
-
-(*constants actually required for blockchain snark*)
-(* k
-  ,c
-  ,slots_per_epoch
-  ,slots_per_sub_window
-  ,sub_windows_per_window
-  ,checkpoint_window_size_in_slots
-  ,block_window_duration_ms*)
-
 module Protocol_constants = Genesis_constants.Protocol.In_snark
 
 module Value = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        (T.Stable.V1.t, T.Stable.V1.t) Protocol_constants.Poly.Stable.V1.t
+      type t = T.Stable.V1.t Protocol_constants.Poly.Stable.V1.t
       [@@deriving eq, ord, hash, sexp, to_yojson, compare]
 
       let to_latest = Fn.id
@@ -44,18 +33,8 @@ module Value = struct
 
   let gen : t Quickcheck.Generator.t =
     let open Quickcheck.Let_syntax in
-    let%bind k = Int.gen_incl 1 5000 in
-    let%map delta = Int.gen_incl 0 5000 in
-    (*TODO: Bug -> Block_time.(to_time x |> of_time) != x for certain values.
-    Eg: 34702788243129 <--> 34702788243128, 8094 <--> 8093*)
-    (*let%bind ms = Int64.(gen_log_uniform_incl 0L 9999999999999L) in
-    let end_time = Block_time.of_int64 999999999999999L in
-    let%map genesis_state_timestamp =
-      Block_time.(gen_incl (of_int64 ms) end_time)
-    in*)
-    Protocol_constants.create ~k:(T.of_int k) ~delta:(T.of_int delta)
-
-  (*; genesis_state_timestamp*)
+    let%map k = Int.gen_incl 1 5000 in
+    Protocol_constants.create ~k:(T.of_int k)
 end
 
 type t = Genesis_constants.Protocol.In_snark.t
@@ -63,30 +42,26 @@ type t = Genesis_constants.Protocol.In_snark.t
 type value = Value.t
 
 let value_of_t (t : Genesis_constants.Protocol.In_snark.t) : value =
-  Protocol_constants.(create ~k:(T.of_int t.k)) ~delta:(T.of_int t.delta)
+  Protocol_constants.(create ~k:(T.of_int t.k))
 
 let t_of_value (v : value) : Genesis_constants.Protocol.In_snark.t =
-  Protocol_constants.create ~k:(T.to_int v.k) ~delta:(T.to_int v.delta)
+  Protocol_constants.create ~k:(T.to_int v.k)
 
 let to_input (t : value) =
-  Random_oracle.Input.bitstrings
-    [| T.to_bits (Protocol_constants.k t)
-     ; T.to_bits (Protocol_constants.delta t)
-       (*; Block_time.Bits.to_bits t.genesis_state_timestamp*) |]
+  Random_oracle.Input.bitstring (T.to_bits (Protocol_constants.k t))
 
 [%%if
 defined consensus_mechanism]
 
-type var = (T.Checked.t, T.Checked.t) Protocol_constants.Poly.t
+type var = T.Checked.t Protocol_constants.Poly.t
 
-let to_hlist (t : (_, _) Protocol_constants.Poly.t) =
-  H_list.[Protocol_constants.k t; Protocol_constants.delta t]
+let to_hlist (t : _ Protocol_constants.Poly.t) =
+  H_list.[Protocol_constants.k t]
 
-let of_hlist :
-    (unit, 'a -> 'b -> unit) H_list.t -> ('a, 'b) Protocol_constants.Poly.t =
- fun H_list.[k; delta] -> Protocol_constants.create ~k ~delta
+let of_hlist : (unit, 'a -> unit) H_list.t -> 'a Protocol_constants.Poly.t =
+ fun H_list.[k] -> Protocol_constants.create ~k
 
-let data_spec = Data_spec.[T.Checked.typ; T.Checked.typ]
+let data_spec = Data_spec.[T.Checked.typ]
 
 let typ =
   Typ.of_hlistable data_spec ~var_to_hlist:to_hlist ~var_of_hlist:of_hlist
@@ -94,16 +69,11 @@ let typ =
 
 let var_to_input (var : var) =
   let s = Bitstring_lib.Bitstring.Lsb_first.to_list in
-  let%map k = T.Checked.to_bits (Protocol_constants.k var)
-  and delta = T.Checked.to_bits (Protocol_constants.delta var) in
-  (*let genesis_state_timestamp =
-    Block_time.Unpacked.var_to_bits var.genesis_state_timestamp
-  in*)
-  Random_oracle.Input.bitstrings
-    (Array.map ~f:s [|k; delta (*; genesis_state_timestamp*)|])
+  let%map k = T.Checked.to_bits (Protocol_constants.k var) in
+  Random_oracle.Input.bitstring (s k)
 
-(*let%test_unit "value = var" =
-  let compiled = Genesis_constants.compiled.protocol in
+let%test_unit "value = var" =
+  let compiled = Genesis_constants.compiled.protocol.in_snark in
   let test protocol_constants =
     let open Snarky in
     let p_var =
@@ -115,6 +85,6 @@ let var_to_input (var : var) =
     [%test_eq: Value.t] protocol_constants
       (t_of_value protocol_constants |> value_of_t)
   in
-  Quickcheck.test ~trials:100 Value.gen ~examples:[value_of_t compiled] ~f:test*)
+  Quickcheck.test ~trials:100 Value.gen ~examples:[value_of_t compiled] ~f:test
 
 [%%endif]

@@ -112,6 +112,7 @@ module Constants_checked :
   let ( * ) = Integer.mul ~m
 end
 
+(*constants required for blockchain snark*)
 module In_snark = struct
   module Poly = struct
     [%%versioned
@@ -157,13 +158,11 @@ module In_snark = struct
 
   type var = (Length.Checked.t, Block_time.Span.Unpacked.var) Poly.t
 
-  let create' (type a b c)
-      (module M : M_intf
-        with type length = a
-         and type timespan = b
-         and type time = c)
-      ~(in_snark_constants : (a, a) Genesis_constants.Protocol.In_snark.Poly.t)
-      : (a, b) Poly.t =
+  let create' (type a b)
+      (module M : M_intf with type length = a
+                          and type timespan = b)
+      ~(in_snark_constants : a Genesis_constants.Protocol.In_snark.Poly.t) :
+      (a, b) Poly.t =
     let open M in
     let module P = Genesis_constants.Protocol.In_snark in
     let c = constant Coda_compile_config.c in

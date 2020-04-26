@@ -1633,7 +1633,7 @@ module Data = struct
                          ~length:
                            (Length.to_int constants.sub_windows_per_window)
                          Length.typ))
-                   Constants.typ)
+                   Constants.In_snark.typ)
                 (Typ.tuple3 Global_slot.typ
                    (Typ.list
                       ~length:(Length.to_int constants.sub_windows_per_window)
@@ -1641,19 +1641,21 @@ module Data = struct
                    Length.typ)
                 (fun ( (prev_global_slot, next_global_slots)
                      , (prev_min_window_density, prev_sub_window_densities)
-                     , constants ) ->
+                     , snark_constants ) ->
                   update_several_times_checked
                     ~f:Checked.update_min_window_density ~prev_global_slot
                     ~next_global_slots ~prev_sub_window_densities
-                    ~prev_min_window_density ~constants )
+                    ~prev_min_window_density ~constants:snark_constants )
                 (fun ( (prev_global_slot, next_global_slots)
                      , (prev_min_window_density, prev_sub_window_densities)
-                     , constants ) ->
+                     , _snark_constants ) ->
                   update_several_times ~f:update_min_window_density
                     ~prev_global_slot ~next_global_slots
                     ~prev_sub_window_densities ~prev_min_window_density
                     ~constants )
-                (slots, min_window_densities, constants) )
+                ( slots
+                , min_window_densities
+                , Constants.to_snark_constants constants ) )
       end )
   end
 

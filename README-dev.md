@@ -246,6 +246,7 @@ The exe will then package the overriden constants along with the genesis ledger 
 
 <b> 2. Constants that can be overriden at runtime are:</b>
 
+* delta
 * genesis_state_timestamp
 * transaction pool max size
 
@@ -253,6 +254,7 @@ To do this, pass a json file to the daemon using the flag `genesis-constants` wi
 
 ```json
 {
+    "delta": 3,
     "txpool_max_size": 3000,
     "genesis_state_timestamp": "2020-04-20 11:00:00-07:00"
 }
