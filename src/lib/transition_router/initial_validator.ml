@@ -169,7 +169,9 @@ let run ~logger ~trust_system ~verifier ~transition_reader
              let open Deferred.Result.Monad_infix in
              External_transition.(
                Validation.wrap transition_with_hash
-               |> defer (validate_time_received ~time_received)
+               |> defer
+                    (validate_time_received ~time_received
+                       ~protocol_constants:genesis_constants.protocol)
                >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
                >>= validate_proof ~verifier
                >>= defer validate_delta_transition_chain
@@ -194,5 +196,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                is_valid_cb false ;
                handle_validation_error ~logger ~trust_system ~sender
                  ~state_hash:(With_hash.hash transition_with_hash)
-                 ~delta:genesis_constants.protocol.delta error )
+                 ~delta:
+                   (Genesis_constants.Protocol.delta genesis_constants.protocol)
+                 error )
          else Deferred.unit ))

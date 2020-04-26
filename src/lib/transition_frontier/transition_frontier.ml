@@ -15,7 +15,7 @@ module Persistent_root = Persistent_root
 module Persistent_frontier = Persistent_frontier
 
 let global_max_length (genesis_constants : Genesis_constants.t) =
-  genesis_constants.protocol.k
+  Genesis_constants.Protocol.k genesis_constants.protocol
 
 type t =
   { logger: Logger.t

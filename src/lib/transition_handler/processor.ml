@@ -21,7 +21,7 @@ module Transition_frontier_validation =
 (* TODO: calculate a sensible value from postake consensus arguments *)
 let catchup_timeout_duration (genesis_constants : Genesis_constants.t) =
   Block_time.Span.of_ms
-    ( genesis_constants.protocol.delta
+    ( Genesis_constants.Protocol.delta genesis_constants.protocol
       * Coda_compile_config.block_window_duration_ms
     |> Int64.of_int )
 

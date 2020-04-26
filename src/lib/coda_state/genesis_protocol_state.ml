@@ -30,7 +30,7 @@ let create_with_custom_ledger ~genesis_consensus_state ~genesis_ledger
       ~previous_state_hash:negative_one_protocol_state_hash ~blockchain_state
       ~consensus_state:genesis_consensus_state
       ~constants:
-        (Protocol_constants_checked.value_of_t protocol_constants.checked)
+        (Protocol_constants_checked.value_of_t protocol_constants.in_snark)
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state
 
@@ -51,7 +51,7 @@ let t ~genesis_ledger ~(genesis_constants : Genesis_constants.t) =
       ~blockchain_state:(Blockchain_state.genesis ~genesis_ledger_hash)
       ~consensus_state:genesis_consensus_state
       ~constants:
-        (Protocol_constants_checked.value_of_t protocol_constants.checked)
+        (Protocol_constants_checked.value_of_t protocol_constants.in_snark)
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state
 

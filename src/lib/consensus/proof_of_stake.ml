@@ -3365,7 +3365,7 @@ let%test_module "Proof of stake tests" =
             ~compute:
               (As_prover.return
                  (Coda_base.Protocol_constants_checked.value_of_t
-                    Genesis_constants.compiled.protocol.checked))
+                    Genesis_constants.compiled.protocol.in_snark))
         in
         let result =
           update_var previous_state transition_data

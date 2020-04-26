@@ -323,6 +323,7 @@ module type S = sig
        , 'fork_ids )
        Validation.with_transition
     -> time_received:Block_time.t
+    -> protocol_constants:Genesis_constants.Protocol.t
     -> ( ( [`Time_received] * unit Truth.true_t
          , 'genesis_state
          , 'proof

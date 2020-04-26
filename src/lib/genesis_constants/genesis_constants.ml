@@ -29,7 +29,7 @@ let validate_time time_str =
 (*Protocol constants required for consensus and snarks. Consensus constants is generated using these*)
 module Protocol = struct
   (* Constants for blockchain snark*)
-  module Checked = struct
+  module In_snark = struct
     module Poly = struct
       [%%versioned
       module Stable = struct
@@ -54,7 +54,7 @@ module Protocol = struct
       end
 
       module Tests = struct
-        let%test "checked protocol constants serialization v1" =
+        let%test "in_snark protocol constants serialization v1" =
           let t : V1.t = {k= 1; delta= 100} in
           (*from the print statement in Serialization.check_serialization*)
           let known_good_hash =
@@ -73,7 +73,8 @@ module Protocol = struct
     let delta t = t.Poly.delta
   end
 
-  module Unchecked = struct
+  (*constants that are not required for generating the blockchain snark*)
+  module Out_of_snark = struct
     module Poly = struct
       [%%versioned
       module Stable = struct
@@ -112,12 +113,12 @@ module Protocol = struct
             | Error e ->
                 Error
                   (sprintf
-                     !"Genesis_constants.Protocol.Unchecked.of_yojson: %s"
+                     !"Genesis_constants.Protocol.Out_of_snark.of_yojson: %s"
                      e) )
           | _ ->
               Error
-                "Genesis_constants.Protocol.Unchecked.of_yojson: unexpected \
-                 JSON"
+                "Genesis_constants.Protocol.Out_of_snark.of_yojson: \
+                 unexpected JSON"
 
         let t_of_sexp _ = failwith "t_of_sexp: not implemented"
 
@@ -134,7 +135,7 @@ module Protocol = struct
       end
 
       module Tests = struct
-        let%test "unchecked protocol constants serialization v1" =
+        let%test "out_of_snark protocol constants serialization v1" =
           let t : V1.t =
             { genesis_state_timestamp=
                 Time.of_string "2019-10-08 17:51:23.050849Z" }
@@ -157,31 +158,33 @@ module Protocol = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = {checked: Checked.Stable.V1.t; unchecked: Unchecked.Stable.V1.t}
+      type t =
+        {in_snark: In_snark.Stable.V1.t; out_of_snark: Out_of_snark.Stable.V1.t}
       [@@deriving eq, ord, hash, sexp, yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t = {checked: Checked.t; unchecked: Unchecked.t}
+  type t = Stable.Latest.t =
+    {in_snark: In_snark.t; out_of_snark: Out_of_snark.t}
   [@@deriving eq, to_yojson]
 
   let create ~k ~delta ~genesis_state_timestamp =
-    { checked= Checked.create ~k ~delta
-    ; unchecked= Unchecked.create ~genesis_state_timestamp }
+    { in_snark= In_snark.create ~k ~delta
+    ; out_of_snark= Out_of_snark.create ~genesis_state_timestamp }
 
   [%%define_locally
-  Checked.(k, delta)]
+  In_snark.(k, delta)]
 
   [%%define_locally
-  Unchecked.(genesis_state_timestamp)]
+  Out_of_snark.(genesis_state_timestamp)]
 
-  let k t = k t.checked
+  let k t = k t.in_snark
 
-  let delta t = delta t.checked
+  let delta t = delta t.in_snark
 
-  let genesis_state_timestamp t = genesis_state_timestamp t.unchecked
+  let genesis_state_timestamp t = genesis_state_timestamp t.out_of_snark
 end
 
 (*module Poly = struct
@@ -282,29 +285,31 @@ end
 
 include T
 
-[%%inject
-"genesis_state_timestamp_string", genesis_state_timestamp]
+module Compiled = struct
+  [%%inject
+  "genesis_state_timestamp_string", genesis_state_timestamp]
 
-[%%ifdef
-consensus_mechanism]
+  [%%ifdef
+  consensus_mechanism]
 
-[%%inject
-"k", k]
+  [%%inject
+  "k", k]
 
-[%%inject
-"delta", delta]
+  [%%inject
+  "delta", delta]
 
-[%%endif]
+  [%%endif]
 
-[%%inject
-"pool_max_size", pool_max_size]
+  [%%inject
+  "pool_max_size", pool_max_size]
+end
 
 let compiled : t =
   { protocol=
-      Protocol.create ~k ~delta
+      Protocol.create ~k:Compiled.k ~delta:Compiled.delta
         ~genesis_state_timestamp:
-          (genesis_timestamp_of_string genesis_state_timestamp_string)
-  ; txpool_max_size= pool_max_size }
+          (genesis_timestamp_of_string Compiled.genesis_state_timestamp_string)
+  ; txpool_max_size= Compiled.pool_max_size }
 
 module type Config_intf = sig
   type t [@@deriving yojson]

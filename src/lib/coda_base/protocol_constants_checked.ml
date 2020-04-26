@@ -26,7 +26,7 @@ module T = Coda_numbers.Length
   ,checkpoint_window_size_in_slots
   ,block_window_duration_ms*)
 
-module Protocol_constants = Genesis_constants.Protocol.Checked
+module Protocol_constants = Genesis_constants.Protocol.In_snark
 
 module Value = struct
   [%%versioned
@@ -58,14 +58,14 @@ module Value = struct
   (*; genesis_state_timestamp*)
 end
 
-type t = Genesis_constants.Protocol.Checked.t
+type t = Genesis_constants.Protocol.In_snark.t
 
 type value = Value.t
 
-let value_of_t (t : Genesis_constants.Protocol.Checked.t) : value =
+let value_of_t (t : Genesis_constants.Protocol.In_snark.t) : value =
   Protocol_constants.(create ~k:(T.of_int t.k)) ~delta:(T.of_int t.delta)
 
-let t_of_value (v : value) : Genesis_constants.Protocol.Checked.t =
+let t_of_value (v : value) : Genesis_constants.Protocol.In_snark.t =
   Protocol_constants.create ~k:(T.to_int v.k) ~delta:(T.to_int v.delta)
 
 let to_input (t : value) =

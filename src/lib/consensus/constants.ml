@@ -162,10 +162,10 @@ module In_snark = struct
         with type length = a
          and type timespan = b
          and type time = c)
-      ~(in_snark_constants : (a, a) Genesis_constants.Protocol.Checked.Poly.t)
+      ~(in_snark_constants : (a, a) Genesis_constants.Protocol.In_snark.Poly.t)
       : (a, b) Poly.t =
     let open M in
-    let module P = Genesis_constants.Protocol.Checked in
+    let module P = Genesis_constants.Protocol.In_snark in
     let c = constant Coda_compile_config.c in
     let block_window_duration_ms =
       constant Coda_compile_config.block_window_duration_ms
@@ -325,7 +325,7 @@ module In_snark = struct
 
   let%test_unit "checked = unchecked" =
     let open Coda_base in
-    let compiled = Genesis_constants.compiled.protocol.checked in
+    let compiled = Genesis_constants.compiled.protocol.in_snark in
     let test =
       Test_util.test_equal Protocol_constants_checked.typ typ
         (fun in_snark_constants -> Checked.create ~in_snark_constants)
@@ -521,12 +521,12 @@ let delta_duration t = t.out_of_snark.delta_duration
 let genesis_state_timestamp t = t.out_of_snark.genesis_state_timestamp*)
 
 let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
-  let module P_in_snark = Genesis_constants.Protocol.Checked in
-  let module P_out_of_snark = Genesis_constants.Protocol.Unchecked in
+  let module P_in_snark = Genesis_constants.Protocol.In_snark in
+  let module P_out_of_snark = Genesis_constants.Protocol.Out_of_snark in
   let to_length = Length.of_int in
   let to_timespan = Fn.compose Block_time.Span.of_ms Int64.of_int in
   let in_snark_constants =
-    Coda_base.Protocol_constants_checked.value_of_t protocol_constants.checked
+    Coda_base.Protocol_constants_checked.value_of_t protocol_constants.in_snark
   in
   let in_snark = In_snark.create ~in_snark_constants in
   let block_window_duration_ms =

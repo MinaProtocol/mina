@@ -607,14 +607,9 @@ let skip_genesis_protocol_state_validation
     `This_transition_was_generated_internally (t, validation) =
   (t, Validation.Unsafe.set_valid_genesis_state validation)
 
-let validate_time_received (t, validation) ~time_received =
+let validate_time_received (t, validation) ~time_received ~protocol_constants =
   let protocol_state = With_hash.data t |> protocol_state in
-  let constants =
-    Consensus.Constants.create
-      ~protocol_constants:
-        ( Protocol_state.constants protocol_state
-        |> Protocol_constants_checked.t_of_value )
-  in
+  let constants = Consensus.Constants.create ~protocol_constants in
   let consensus_state = Protocol_state.consensus_state protocol_state in
   let received_unix_timestamp =
     Block_time.to_span_since_epoch time_received |> Block_time.Span.to_ms
