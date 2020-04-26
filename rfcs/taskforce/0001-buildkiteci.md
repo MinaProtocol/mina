@@ -187,6 +187,26 @@ Work can be parallelized across working on the deploy infrastructure, pipeline c
 
 9. Handling mac builds ourselves either with an in-house mac machine or with mac in a data center
 
+## Support for external contributors
+
+With build machines running on our infrastructure we need to be careful about
+running arbitrary code from others. Thanks @yourbuddyconner for flagging this
+one.
+
+In order to keep our systems safe, CI should not start immediately for non-core
+team members but rather only start when a core team kicks off the build. This
+can be triggered initially by a step in buildkite, and later move to a bot in
+GitHub.
+
+The nice thing about this approach is we no longer need to support a
+"second class" version of the build for non-core team members that disables
+access to necessary secrets. We can assume all builds have access to all
+variables.
+
+Core team reviewers will of course need to double check to see if any secrets
+are trying to be exfiltrated or our infrastructure is attempting to be
+compromised before granting permission for CI to run.
+
 ## Explicitly NOT in scope for this project
 
 - Autoscaling
