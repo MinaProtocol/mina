@@ -328,7 +328,7 @@ jobs:
             - run:
                 name: Fastlane
                 context: org-global
-                command: bash -c '[ -z $APPLE_CERTIFICATES ] || cd frontend/wallet && bundle exec fastlane ci && cd ../..'
+                command: bash -c '[ -z $APPLE_CERTIFICATES ] || (cd frontend/wallet && bundle exec fastlane ci && cd ../..)'
             - run:
                 name: Build portable binary
                 command: |
