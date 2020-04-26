@@ -334,97 +334,7 @@ module In_snark = struct
     Quickcheck.test ~trials:100 Protocol_constants_checked.Value.gen
       ~examples:[Protocol_constants_checked.value_of_t compiled]
       ~f:test
-
-  (*module For_tests = struct
-    let var_of_t (t : t) : var =
-      let of_length = Length.Checked.Unsafe. in
-      let of_timespan =
-        Fn.compose
-          (Snarky_integer.Integer.of_bits ~m)
-          Block_time.Span.Unpacked.var_to_bits
-      in
-      { Poly.k= of_length t.k
-      ; c= of_length t.c
-      ; slots_per_sub_window= of_length t.slots_per_sub_window
-      ; sub_windows_per_window= of_length t.sub_windows_per_window
-      ; slots_per_epoch= of_length t.slots_per_epoch
-      ; checkpoint_window_size_in_slots=
-          of_length t.checkpoint_window_size_in_slots
-      ; block_window_duration_ms= of_timespan t.block_window_duration_ms
-      ; slot_duration_ms= of_timespan t.slot_duration_ms }
-  end*)
 end
-
-(*module Out_of_snark = struct
-  module Poly = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type ('length, 'time, 'timespan) t =
-          { delta: 'length
-          ; slots_per_window: 'length
-          ; epoch_size: 'length
-          ; checkpoint_window_slots_per_year: 'length
-          ; epoch_duration: 'timespan
-          ; delta_duration: 'timespan
-          ; genesis_state_timestamp: 'time }
-        [@@deriving eq, ord, hash, sexp, to_yojson]
-      end
-    end]
-
-    type ('length, 'time, 'timespan) t =
-          ('length, 'time, 'timespan) Stable.Latest.t =
-      { delta: 'length
-      ; slots_per_window: 'length
-      ; epoch_size: 'length
-      ; checkpoint_window_slots_per_year: 'length
-      ; epoch_duration: 'timespan
-      ; delta_duration: 'timespan
-      ; genesis_state_timestamp: 'time }
-    [@@deriving sexp, eq, to_yojson]
-  end
-
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      type t =
-        ( Length.Stable.V1.t
-        , Block_time.Stable.V1.t
-        , Block_time.Span.Stable.V1.t )
-        Poly.Stable.V1.t
-      [@@deriving eq, ord, hash, sexp, to_yojson]
-
-      let to_latest = Fn.id
-    end
-  end]
-
-  type t = Stable.Latest.t [@@deriving to_yojson]
-
-  let create ~delta ~slots_per_window ~epoch_size
-      ~checkpoint_window_slots_per_year ~epoch_duration ~delta_duration
-      ~genesis_state_timestamp : t =
-    { Poly.delta
-    ; slots_per_window
-    ; epoch_size
-    ; checkpoint_window_slots_per_year
-    ; epoch_duration
-    ; delta_duration
-    ; genesis_state_timestamp }
-end
-
-[%%versioned
-module Stable = struct
-  module V1 = struct
-    type t =
-      {in_snark: In_snark.Stable.V1.t; out_of_snark: Out_of_snark.Stable.V1.t}
-    [@@deriving eq, ord, hash, sexp, to_yojson]
-
-    let to_latest = Fn.id
-  end
-end]
-
-type t = Stable.Latest.t = {in_snark: In_snark.t; out_of_snark: Out_of_snark.t}
-[@@deriving to_yojson]*)
 
 module Poly = struct
   [%%versioned
@@ -488,38 +398,6 @@ type t = Stable.Latest.t [@@deriving sexp, eq, to_yojson]
 
 type var = In_snark.var
 
-(*let c t = t.in_snark.c
-
-let k t = t.in_snark.k
-
-let slots_per_sub_window t = t.in_snark.slots_per_sub_window
-
-let sub_windows_per_window t = t.in_snark.sub_windows_per_window
-
-let slots_per_epoch t = t.in_snark.slots_per_epoch
-
-let slot_duration_ms t = t.in_snark.slot_duration_ms
-
-let checkpoint_window_size_in_slots t =
-  t.in_snark.checkpoint_window_size_in_slots
-
-let block_window_duration_ms t = t.in_snark.block_window_duration_ms
-
-let delta t = t.out_of_snark.delta
-
-let slots_per_window t = t.out_of_snark.slots_per_window
-
-let epoch_size t = t.out_of_snark.epoch_size
-
-let checkpoint_window_slots_per_year t =
-  t.out_of_snark.checkpoint_window_slots_per_year
-
-let epoch_duration t = t.out_of_snark.epoch_duration
-
-let delta_duration t = t.out_of_snark.delta_duration
-
-let genesis_state_timestamp t = t.out_of_snark.genesis_state_timestamp*)
-
 let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
   let module P_in_snark = Genesis_constants.Protocol.In_snark in
   let module P_out_of_snark = Genesis_constants.Protocol.Out_of_snark in
@@ -559,18 +437,6 @@ let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
     (to_length slots_per_year, to_length size_in_slots)
   in
   let delta_duration = Slot.duration_ms * delta in
-  (*let out_of_snark =
-    Out_of_snark.create ~delta:(to_length delta)
-      ~slots_per_window:(to_length slots_per_window)
-      ~epoch_size:(to_length Epoch.size)
-      ~epoch_duration:(to_timespan Epoch.duration)
-      ~checkpoint_window_slots_per_year
-      ~delta_duration:(to_timespan delta_duration)
-      ~genesis_state_timestamp:
-        (Block_time.of_time
-           (Genesis_constants.Protocol.genesis_state_timestamp
-              protocol_constants))
-  in*)
   { Poly.k= in_snark.k
   ; c= in_snark.c
   ; delta= to_length delta
@@ -616,7 +482,3 @@ let gc_parameters (constants : t) =
   , `Gc_width_epoch gc_width_epoch
   , `Gc_width_slot gc_width_slot
   , `Gc_interval gc_interval )
-
-(*module For_tests = struct
-  let var_of_t t : var = In_snark.For_tests.var_of_t t.in_snark
-end*)
