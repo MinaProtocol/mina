@@ -227,7 +227,7 @@ let gen_keys () =
      *)
     match (Sys.getenv "CI", Sys.getenv "DUNE_PROFILE") with
     | Some _, Some profile
-      when Option.is_some (Sys.get_env "CIRCLE_PR_USERNAME") ->
+      when Option.is_some (Sys.getenv "CIRCLE_PR_USERNAME") ->
         (* External contributors cannot upload new keys to AWS, but we would
            still like to run CI for their pull requests if they have modified the
            snark.
