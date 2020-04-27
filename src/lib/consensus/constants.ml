@@ -191,8 +191,24 @@ module In_snark = struct
     in
     res
 
-  let create ~in_snark_constants =
-    create' (module Constants_UInt32) ~in_snark_constants
+  let create ~in_snark_constants : t =
+    let c : t = create' (module Constants_UInt32) ~in_snark_constants in
+    let checkpoint_window_size_in_slots =
+      let per_year = 12 in
+      let slots_per_year =
+        let one_year_ms =
+          Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int
+        in
+        one_year_ms
+        / (Block_time.Span.to_ms c.slot_duration_ms |> Int64.to_int_exn)
+      in
+      let size_in_slots =
+        assert (slots_per_year mod per_year = 0) ;
+        slots_per_year / per_year
+      in
+      Length.of_int size_in_slots
+    in
+    {c with checkpoint_window_size_in_slots}
 
   let to_hlist
       ({ k
@@ -406,36 +422,28 @@ let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
     Coda_base.Protocol_constants_checked.value_of_t protocol_constants.in_snark
   in
   let in_snark = In_snark.create ~in_snark_constants in
-  let block_window_duration_ms =
-    Coda_compile_config.block_window_duration_ms
-  in
   let delta = Genesis_constants.Protocol.delta protocol_constants in
   let slots_per_window =
     Length.to_int in_snark.sub_windows_per_window
     * Length.to_int in_snark.slots_per_sub_window
   in
-  let module Slot = struct
-    let duration_ms = block_window_duration_ms
-  end in
+  let slot_duration_int =
+    Block_time.Span.to_ms in_snark.slot_duration_ms |> Int64.to_int_exn
+  in
   let module Epoch = struct
     let size = in_snark.slots_per_epoch
 
     (* Amount of time in total for an epoch *)
-    let duration = Slot.duration_ms * Length.to_int size
+    let duration = slot_duration_int * Length.to_int size
   end in
-  let checkpoint_window_slots_per_year, checkpoint_window_size_in_slots =
-    let per_year = 12 in
+  let checkpoint_window_slots_per_year =
     let slots_per_year =
       let one_year_ms = Core.Time.Span.(to_ms (of_day 365.)) |> Float.to_int in
-      one_year_ms / Slot.duration_ms
+      one_year_ms / slot_duration_int
     in
-    let size_in_slots =
-      assert (slots_per_year mod per_year = 0) ;
-      slots_per_year / per_year
-    in
-    (to_length slots_per_year, to_length size_in_slots)
+    to_length slots_per_year
   in
-  let delta_duration = Slot.duration_ms * delta in
+  let delta_duration = slot_duration_int * delta in
   { Poly.k= in_snark.k
   ; c= in_snark.c
   ; delta= to_length delta
@@ -448,7 +456,7 @@ let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
   ; epoch_size= Epoch.size
   ; epoch_duration= to_timespan Epoch.duration
   ; checkpoint_window_slots_per_year
-  ; checkpoint_window_size_in_slots
+  ; checkpoint_window_size_in_slots= in_snark.checkpoint_window_size_in_slots
   ; delta_duration= to_timespan delta_duration
   ; genesis_state_timestamp=
       Block_time.of_time
