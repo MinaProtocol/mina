@@ -14,13 +14,13 @@ let real_accounts =
   lazy
     [ { pk=
           Public_key.Compressed.of_base58_check_exn
-            "4vsRCVw9P7XQFJWS4FsAsiXRSJyEKiVLCnVw2mRreE7iWout75RvZnm9q46sed2GvBF9Rh972AJrnuhrpPfCDGyhgsJm6kxZGhP5x9CTdty4cpFA8FmxNL8gB2UPTweGnQ1svjTVgUAbb8qB"
+            "4vsRCVW8do8EqsgJFy8B38k1qdoQ1MW6UuZ33qk8eXTHu8qqoTMZzHPF5r6haHZbvcRgXdYoYJsWAKZwCRqiXYrHhVUPQyqThsdmfkMxjKKhPZrkN23YcAyLMpj1iSAdRjHk8KnSz5vkLBmT"
       ; balance= 0
       ; delegate= None }
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
-            "4vsRCVjpQfjQMCM8q5DrjfHHnZNcSng3zcY1tuGgVXWs9KqGGnsJuz9bz5FC4A3sxGE4Qyjb6vi1TsfacdqM7DAD52Gkc16QFJz4HyrDr4Hj29SEnt5fZo35kjzBBPLkogh9jozDYBAdC8ab"
-      ; balance= 99999999999
+            "4vsRCVW8do8EqsgJFy8B38k1qdoQ1MW6UuZ33qk8eXTHu8qqoTMZzHPF5r6haHZbvcRgXdYoYJsWAKZwCRqiXYrHhVUPQyqThsdmfkMxjKKhPZrkN23YcAyLMpj1iSAdRjHk8KnSz5vkLBmT"
+      ; balance= 1600000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
@@ -34,7 +34,7 @@ let real_accounts =
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
             "4vsRCVxE2UzLuGa1MfNtZqnJzDeR4vqX4qgn6BQ1qAAub7UWL3g6RpcTrzK5ZPZWqfsR8rZ7wzzVqnQ2mRXDLX24f4yLKSsN29dazXfcuCokipYbQCui1Ce5waTdV6sGBCarFcnw2mrMPMvG"
-      ; balance= 0
+      ; balance= 1600000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
@@ -48,7 +48,7 @@ let real_accounts =
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
             "4vsRCVveUThKmUYTfdpo41KZDyn3p8CrLYnM4sZ9q9wJtrkW4tfdGCq2CFcrw2GnQyBYCdqFSDuasj2NSmSbwryhF8McGj4JDYFyzN8SckcK5AreiiF4impwiimipEkA7ovhT47FxyPzkzUQ"
-      ; balance= 0
+      ; balance= 1600000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
@@ -62,7 +62,7 @@ let real_accounts =
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
             "4vsRCVKwNDotyLx7YE7tM4ApVHFSzb6a3r93c8cV9M9aBud3apY2fbbHUm12c9vviqiZdRmVDyV6onNQvRdMsieSHtPFA5EsnaRyjnTMsWsK3VKY8KkheCoN17SM6gaks57WZajMTP4AVh6V"
-      ; balance= 0
+      ; balance= 1600000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
@@ -90,7 +90,7 @@ let real_accounts =
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
             "4vsRCVG8eGaiychTTqHuqSiPtuUBD91WaTCbLv8UgGRMVn8oiDcE3w1fvpzhryydSh1aX647ZCTD9SNP8913MH8YGxowbFz6F7b34vpkCYLmVTsrF4pUgve94hqfeoPrATbRVeQt5gMHPMWc"
-      ; balance= 0
+      ; balance= 100000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
