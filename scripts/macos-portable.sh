@@ -56,8 +56,10 @@ fixup() {
         && echo "Moving and rewriting $lib" \
         || echo "Already copied $lib" # no clobber in case we've already moved this lib
       chmod +w "$LOCAL_LIB"
+      set +u
       [ -z $APPLE_ID ] || codesign --remove-signature "$LOCAL_LIB"
       [ -z $APPLE_ID ] || codesign -s "$APPLE_ID" "$LOCAL_LIB"
+      set -u
       install_name_tool -change "$lib" "@executable_path/$(basename $lib)" "$BIN" || exit 1
       # Add to our seen set, by adding to the array and then filtering dupes
       SEEN+=("$BIN")
