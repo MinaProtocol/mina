@@ -14,7 +14,7 @@ let real_accounts =
   lazy
     [ { pk=
           Public_key.Compressed.of_base58_check_exn
-            "4vsRCVW8do8EqsgJFy8B38k1qdoQ1MW6UuZ33qk8eXTHu8qqoTMZzHPF5r6haHZbvcRgXdYoYJsWAKZwCRqiXYrHhVUPQyqThsdmfkMxjKKhPZrkN23YcAyLMpj1iSAdRjHk8KnSz5vkLBmT"
+            "4vsRCVw9P7XQFJWS4FsAsiXRSJyEKiVLCnVw2mRreE7iWout75RvZnm9q46sed2GvBF9Rh972AJrnuhrpPfCDGyhgsJm6kxZGhP5x9CTdty4cpFA8FmxNL8gB2UPTweGnQ1svjTVgUAbb8qB"
       ; balance= 0
       ; delegate= None }
     ; { pk=
@@ -24,7 +24,7 @@ let real_accounts =
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
-               "4vsRCVjpQfjQMCM8q5DrjfHHnZNcSng3zcY1tuGgVXWs9KqGGnsJuz9bz5FC4A3sxGE4Qyjb6vi1TsfacdqM7DAD52Gkc16QFJz4HyrDr4Hj29SEnt5fZo35kjzBBPLkogh9jozDYBAdC8ab")
+               "4vsRCVW8do8EqsgJFy8B38k1qdoQ1MW6UuZ33qk8eXTHu8qqoTMZzHPF5r6haHZbvcRgXdYoYJsWAKZwCRqiXYrHhVUPQyqThsdmfkMxjKKhPZrkN23YcAyLMpj1iSAdRjHk8KnSz5vkLBmT")
       }
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
@@ -76,7 +76,7 @@ let real_accounts =
     ; { pk=
           Public_key.Compressed.of_base58_check_exn
             "4vsRCVYDaPGUK9VzzxfSm1xy3hqp9AVJvNaBKi33fdXvS4nat1Aw3s6V3dCz53x6REB6UJxiYZYbHYb47Frn7eKzazVsD5vnDJZkpsxRi3aenw6tJfdgzPFoSmmg7FFN5UNEigzYUrbRhCzF"
-      ; balance= 0
+      ; balance= 1600000
       ; delegate=
           Some
             (Public_key.Compressed.of_base58_check_exn
