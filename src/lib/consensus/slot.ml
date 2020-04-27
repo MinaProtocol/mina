@@ -38,7 +38,7 @@ let gen =
   let open Quickcheck.Let_syntax in
   let constants = Constants.compiled in
   let ck3 =
-    UInt32.Infix.(constants.c * constants.c * UInt32.of_int 3) |> UInt32.to_int
+    UInt32.Infix.(constants.c * constants.k * UInt32.of_int 3) |> UInt32.to_int
   in
   Core.Int.gen_incl 0 ck3 >>| UInt32.of_int
 
