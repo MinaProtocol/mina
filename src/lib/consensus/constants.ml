@@ -165,13 +165,16 @@ module Constants_checked :
 
   let of_time = Fn.compose (Integer.of_bits ~m) Block_time.Unpacked.var_to_bits
 
-  let to_time = Fn.compose Block_time.Unpacked.var_of_bits (Integer.to_bits ~m)
+  let to_time =
+    Fn.compose Block_time.Unpacked.var_of_bits
+      (Integer.to_bits ~m ~length:Block_time.Unpacked.size_in_bits)
 
   let of_timespan =
     Fn.compose (Integer.of_bits ~m) Block_time.Span.Unpacked.var_to_bits
 
   let to_timespan =
-    Fn.compose Block_time.Span.Unpacked.var_of_bits (Integer.to_bits ~m)
+    Fn.compose Block_time.Span.Unpacked.var_of_bits
+      (Integer.to_bits ~length:Block_time.Span.Unpacked.size_in_bits ~m)
 
   let ( / ) (t : t) (t' : t) = Integer.div_mod ~m t t' |> fst
 
