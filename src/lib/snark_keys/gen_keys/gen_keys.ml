@@ -204,7 +204,7 @@ let gen_keys () =
   if Array.mem ~equal:String.equal Sys.argv "--generate-keys-only" then
     Stdlib.exit 0 ;
   match dirty with
-  | `Generated_something -> (
+  | `Generated_something | `Locally_generated -> (
     (* If we generated any keys, then we need to make sure to upload these keys
      * to some central store to keep our builds compatible with one-another.
      *
