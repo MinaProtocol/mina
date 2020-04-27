@@ -204,7 +204,7 @@ let gen_keys () =
   if Array.mem ~equal:String.equal Sys.argv "--generate-keys-only" then
     Stdlib.exit 0 ;
   match dirty with
-  | `Generated_something -> (
+  | `Generated_something | `Locally_generated -> (
     (* If we generated any keys, then we need to make sure to upload these keys
      * to some central store to keep our builds compatible with one-another.
      *
@@ -220,8 +220,32 @@ let gen_keys () =
      *
      * See the background section of https://bkase.dev/posts/ocaml-writer
      * for more info on how this system works.
+     *
+     * NOTE: This behaviour is overriden or external contributors, because they
+     * cannot upload new keys if they have modified the snark. See branch
+     * referencing "CIRCLE_PR_USERNAME" below.
      *)
     match (Sys.getenv "CI", Sys.getenv "DUNE_PROFILE") with
+    | Some _, Some profile
+      when Option.is_some (Sys.get_env "CIRCLE_PR_USERNAME") ->
+        (* External contributors cannot upload new keys to AWS, but we would
+           still like to run CI for their pull requests if they have modified the
+           snark.
+        *)
+        ( match dirty with
+        | `Generated_something ->
+            Format.eprintf
+              "No keys were found in the cache, but this pull-request is from \
+               an external contributor.@ Generated fresh keys for this \
+               build.@."
+        | `Locally_generated ->
+            Format.eprintf
+              "Only locally-generated keys were found in the cache, but this \
+               pull-request is from an external contributor.@ Using the local \
+               keys@."
+        | `Cache_hit ->
+            (* Excluded above. *) assert false ) ;
+        return acc
     | Some _, Some profile
       when String.is_substring ~substring:"testnet" profile ->
         (* We are intentionally aborting the build here with a special error code
