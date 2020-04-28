@@ -2,21 +2,21 @@ open Core
 open Snark_params
 open Coda_state
 
+module Step_prover_state = struct
+  type t =
+    { wrap_vk: Tock.Verification_key.t
+    ; prev_proof: Tock.Proof.t
+    ; prev_state: Protocol_state.value
+    ; genesis_state_hash: Coda_base.State_hash.t
+    ; expected_next_state: Protocol_state.value option
+    ; update: Snark_transition.value }
+end
+
+module Wrap_prover_state = struct
+  type t = {proof: Tick.Proof.t}
+end
+
 module type S = sig
-  module Step_prover_state : sig
-    type t =
-      { wrap_vk: Tock.Verification_key.t
-      ; prev_proof: Tock.Proof.t
-      ; prev_state: Protocol_state.value
-      ; genesis_state_hash: Coda_base.State_hash.t
-      ; expected_next_state: Protocol_state.value option
-      ; update: Snark_transition.value }
-  end
-
-  module Wrap_prover_state : sig
-    type t = {proof: Tick.Proof.t}
-  end
-
   val transaction_snark_keys : Transaction_snark.Keys.Verification.t
 
   module Step : sig
@@ -86,20 +86,6 @@ let create () : (module S) Async.Deferred.t =
       in
       let module M = struct
         let transaction_snark_keys = tx_vk
-
-        module Step_prover_state = struct
-          type t =
-            { wrap_vk: Tock.Verification_key.t
-            ; prev_proof: Tock.Proof.t
-            ; prev_state: Protocol_state.value
-            ; genesis_state_hash: Coda_base.State_hash.t
-            ; expected_next_state: Protocol_state.value option
-            ; update: Snark_transition.value }
-        end
-
-        module Wrap_prover_state = struct
-          type t = {proof: Tick.Proof.t}
-        end
 
         module Step = struct
           include (
