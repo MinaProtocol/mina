@@ -7,7 +7,7 @@
   unix_timestamp debug_assert o1trace consensus
   incremental secrets auxiliary_database work_selector
   coda_networking block_producer genesis_constants sync_handler transition_router node_addrs_and_ports
-  otp_lib snark_worker participating_state transaction_status
+  otp_lib protocol_version snark_worker participating_state transaction_status
   receipt_chain_database sync_status daemon_rpcs archive_lib
   exit_handlers)
  (preprocessor_deps ../../config.mlh)

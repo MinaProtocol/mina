@@ -225,12 +225,36 @@ let merge_top_hash wrap_vk_bits =
   construct_input ~proof_type:(`Merge wrap_vk_bits)
 
 module Verification_keys = struct
-  (* TODO : version *)
-  type t =
+  [%%versioned_asserted
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { base: Tick.Verification_key.t
+        ; wrap: Tock.Verification_key.t
+        ; merge: Tick.Verification_key.t }
+
+      let to_latest = Fn.id
+    end
+
+    module Tests = struct
+      let%test "verification keys v1" =
+        let base = Tick.Verification_key.of_string "base key" in
+        let wrap = Tock.Verification_key.of_string "wrap key" in
+        let merge = Tick.Verification_key.of_string "merge key" in
+        let keys = V1.{base; wrap; merge} in
+        let known_good_hash =
+          "\x1B\x95\x7B\x94\xF0\xC0\xD0\x74\x47\xFA\x69\x26\x31\xBC\x19\xA5\x2E\x09\xE8\x20\x43\xEB\x4C\xFA\xEB\x11\x6B\x9A\x2A\x9B\xA2\xBA"
+        in
+        Module_version.Serialization.check_serialization
+          (module V1)
+          keys known_good_hash
+    end
+  end]
+
+  type t = Stable.Latest.t =
     { base: Tick.Verification_key.t
     ; wrap: Tock.Verification_key.t
     ; merge: Tick.Verification_key.t }
-  [@@deriving bin_io]
 
   let dummy : t =
     let groth16 =
@@ -836,7 +860,7 @@ module Base = struct
              (* this account is:
                - the fee-payer for payments
                - the fee-payer for stake delegation
-               - the fee-receiver for a coinbase 
+               - the fee-receiver for a coinbase
                - the second receiver for a fee transfer
              *)
              let%bind next_nonce =
@@ -1016,7 +1040,7 @@ module Base = struct
              (* this account is:
                - the receiver for payments
                - the delegated-to account for stake delegation
-               - the receiver for a coinbase 
+               - the receiver for a coinbase
                - the first receiver for a fee transfer
              *)
              let%bind is_empty_delegatee =
@@ -1111,7 +1135,7 @@ module Base = struct
              (* this account is:
                - the source for payments
                - the delegator for stake delegation
-               - the fee-receiver for a coinbase 
+               - the fee-receiver for a coinbase
                - the second receiver for a fee transfer
              *)
              let%bind () =
@@ -3390,7 +3414,7 @@ let%test_module "account timing check" =
       let txn_global_slot = Global_slot.of_int 2_000 in
       let timing = validate_timing ~txn_amount ~txn_global_slot ~account in
       (* we're 2_000 - 1_000 = 1_000 slots past the cliff, which is 100 vesting periods
-          subtract 100 * 100_000_000_000 = 10_000_000_000_000 from init min balance 
+          subtract 100 * 100_000_000_000 = 10_000_000_000_000 from init min balance
           of 10_000_000_000 to get zero, so we should be untimed now
         *)
       match timing with
