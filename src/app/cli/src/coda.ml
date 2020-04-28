@@ -44,7 +44,7 @@ let chain_id ~genesis_state_hash ~genesis_constants =
 "daemon_expiry", daemon_expiry]
 
 [%%inject
-"compile_time_current_fork_id", current_fork_id]
+"compile_time_current_protocol_version", current_protocol_version]
 
 let daemon logger =
   let open Command.Let_syntax in
@@ -214,6 +214,14 @@ let daemon logger =
            "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             discovery"
          (listed string)
+     and curr_protocol_version =
+       flag "current-protocol-version" (optional string)
+         ~doc:
+           "NN.NN.NN Current protocol version, only blocks with the same \
+            version accepted"
+     and proposed_protocol_version =
+       flag "proposed-protocol-version" (optional string)
+         ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
      and genesis_runtime_constants =
        flag "genesis-constants"
          ~doc:
@@ -224,13 +232,6 @@ let daemon logger =
                   Daemon_config.(of_genesis_constants compiled |> to_yojson))
               |> Yojson.Safe.to_string ))
          (optional string)
-     and curr_fork_id =
-       flag "current-fork-id" (optional string)
-         ~doc:
-           (sprintf
-              "HEX-STRING (%d characters) Current fork ID for this node, only \
-               blocks with the same ID accepted"
-              Fork_id.required_length)
      and disable_telemetry =
        flag "disable-telemetry" no_arg
          ~doc:"Disable reporting telemetry to other nodes"
@@ -767,16 +768,22 @@ let daemon logger =
            Option.value_map coinbase_receiver_flag ~default:`Producer
              ~f:(fun pk -> `Other pk)
          in
-         let current_fork_id =
-           Coda_run.get_current_fork_id ~compile_time_current_fork_id ~conf_dir
-             ~logger curr_fork_id
-           |> Fork_id.create_exn
+         let current_protocol_version =
+           Coda_run.get_current_protocol_version
+             ~compile_time_current_protocol_version ~conf_dir ~logger
+             curr_protocol_version
+         in
+         let proposed_protocol_version_opt =
+           Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
+             proposed_protocol_version
          in
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                 ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
-                ~net_config ~gossip_net_params ~initial_fork_id:current_fork_id
+                ~net_config ~gossip_net_params
+                ~initial_protocol_version:current_protocol_version
+                ~proposed_protocol_version_opt
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
