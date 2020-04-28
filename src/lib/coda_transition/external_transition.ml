@@ -229,8 +229,7 @@ module Validation = struct
     constraint 'proof = [`Proof] * (unit, _) Truth.t
     constraint
       'delta_transition_chain =
-      [`Delta_transition_chain]
-      * (State_hash.Stable.V1.t Non_empty_list.Stable.V1.t, _) Truth.t
+      [`Delta_transition_chain] * (State_hash.t Non_empty_list.t, _) Truth.t
     constraint
       'frontier_dependencies =
       [`Frontier_dependencies] * (unit, _) Truth.t
