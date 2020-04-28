@@ -21,6 +21,9 @@
 /src/app/reformat/ @CodaProtocol/infra-eng-reviewers
 /src/app/trace-tool/ @CodaProtocol/protocol-eng-reviewers
 /src/app/runtime_genesis_ledger/ @CodaProtocol/protocol-eng-reviewers
+
+/src/lib/ @CodaProtocol/protocol-eng-reviewers
+
 /src/lib/best_tip_prover/ @CodaProtocol/protocol-eng-reviewers
 /src/lib/blake2/ @CodaProtocol/crypto-eng-reviewers
 /src/lib/blockchain_snark/ @CodaProtocol/protocol-eng-reviewers
