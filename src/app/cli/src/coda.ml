@@ -780,8 +780,8 @@ let daemon logger =
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver ~net_config
-                ~gossip_net_params
+                ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
+                ~net_config ~gossip_net_params
                 ~initial_protocol_version:current_protocol_version
                 ~proposed_protocol_version_opt
                 ~work_selection_method:
