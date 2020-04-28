@@ -23,13 +23,12 @@ type feeSelection =
   | Custom(string);
 
 type errorOutcome =
-  | InvalidDelegateKey
-  | Valid;
+  | InvalidDelegateKey;
 
 type modalState = {
   delegate: option(PublicKey.t),
   fee: feeSelection,
-  error: errorOutcome,
+  error: option(errorOutcome),
 };
 
 module ChangeDelegation = [%graphql
@@ -56,7 +55,7 @@ let defaultFee = "0.1";
 let make = (~publicKey) => {
   // Form state
   let (state, changeState) =
-    React.useState(() => {delegate: None, fee: DefaultAmount, error: Valid});
+    React.useState(() => {delegate: None, fee: DefaultAmount, error: None});
 
   let feeSelectedValue =
     switch (state.fee) {
@@ -117,9 +116,9 @@ let make = (~publicKey) => {
            <AccountName pubkey=publicKey className=Styles.breadcrumbText />
          </div>
          {switch (state.error) {
-          | InvalidDelegateKey =>
+          | Some(InvalidDelegateKey) =>
             <Alert kind=`Danger defaultMessage="Please enter a public key" />
-          | _ => React.null
+          | None => React.null
           }}
          {switch (result) {
           | NotCalled
@@ -148,7 +147,7 @@ let make = (~publicKey) => {
                    delegate:
                      value == "" ? None : Some(PublicKey.ofStringExn(value)),
                    fee: state.fee,
-                   error: Valid,
+                   error: None,
                  }
                )
              }
@@ -223,7 +222,7 @@ let make = (~publicKey) => {
                    {
                      delegate: state.delegate,
                      fee: state.fee,
-                     error: InvalidDelegateKey,
+                     error: Some(InvalidDelegateKey),
                    }
                  )
                }
