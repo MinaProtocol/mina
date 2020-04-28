@@ -4,7 +4,7 @@ open Core_kernel
 open Signature_lib
 
 let make_account pk balance =
-  Functor.Without_private.{pk; balance; delegate= None}
+  Intf.Public_accounts.{pk; balance; delegate= None}
 
 let balance_gen = Quickcheck.Generator.of_list (List.range 10 500)
 

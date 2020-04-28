@@ -250,7 +250,8 @@ let create ~(protocol_constants : Genesis_constants.Protocol.t) : t =
     checkpoint_window_size_in_slots
   ; checkpoint_window_slots_per_year }
 
-let compiled = create ~protocol_constants:Genesis_constants.compiled.protocol
+let for_unit_tests =
+  create ~protocol_constants:Genesis_constants.for_unit_tests.protocol
 
 let to_hlist
     ({ k
@@ -459,7 +460,7 @@ end
 
 let%test_unit "checked = unchecked" =
   let open Coda_base in
-  let compiled = Genesis_constants.compiled.protocol in
+  let for_unit_tests = Genesis_constants.for_unit_tests.protocol in
   let test =
     Test_util.test_equal Protocol_constants_checked.typ typ
       (fun protocol_constants -> Checked.create ~protocol_constants)
@@ -469,5 +470,5 @@ let%test_unit "checked = unchecked" =
             (Protocol_constants_checked.t_of_value protocol_constants) )
   in
   Quickcheck.test ~trials:100 Protocol_constants_checked.Value.gen
-    ~examples:[Protocol_constants_checked.value_of_t compiled]
+    ~examples:[Protocol_constants_checked.value_of_t for_unit_tests]
     ~f:test

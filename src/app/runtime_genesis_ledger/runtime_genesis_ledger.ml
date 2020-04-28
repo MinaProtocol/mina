@@ -161,12 +161,14 @@ let read_write_constants read_from_opt write_to =
         let%map t =
           Yojson.Safe.from_file file |> Genesis_constants.Config_file.of_yojson
         in
-        Genesis_constants.of_config_file ~default:Genesis_constants.compiled t
+        Genesis_constants.Config_file.to_genesis_constants
+          ~default:Genesis_constants.compiled t
     | None ->
         Ok Genesis_constants.compiled
   in
   Yojson.Safe.to_file write_to
-    Genesis_constants.(to_config_file constants |> Config_file.to_yojson) ;
+    Genesis_constants.(
+      Config_file.(of_genesis_constants constants |> to_yojson)) ;
   constants
 
 let main accounts_json_file dir n constants_file =
@@ -259,7 +261,7 @@ let () =
                   "Filepath of the json file that has Coda constants. \
                    (default: %s)"
                   ( Genesis_constants.(
-                      compiled |> to_config_file |> Config_file.to_yojson)
+                      Config_file.(of_genesis_constants compiled |> to_yojson))
                   |> Yojson.Safe.to_string ))
              (optional string)
          in

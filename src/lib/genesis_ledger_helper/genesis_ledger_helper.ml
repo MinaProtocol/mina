@@ -82,6 +82,41 @@ open Coda_base
 
 let constants_filename_root = "genesis_constants.json"
 
+let load_genesis_constants (module M : Genesis_constants.Config_intf) ~path
+    ~default ~logger =
+  let config_res =
+    Result.bind
+      ( Result.try_with (fun () -> Yojson.Safe.from_file path)
+      |> Result.map_error ~f:Exn.to_string )
+      ~f:(fun json -> M.of_yojson json)
+  in
+  match config_res with
+  | Ok config ->
+      let new_constants =
+        M.to_genesis_constants ~default:Genesis_constants.compiled config
+      in
+      Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
+        "Overriding genesis constants $genesis_constants with the constants \
+         $config_constants at $path. The new genesis constants are: \
+         $new_genesis_constants"
+        ~metadata:
+          [ ("genesis_constants", Genesis_constants.(to_yojson default))
+          ; ("new_genesis_constants", Genesis_constants.to_yojson new_constants)
+          ; ("config_constants", M.to_yojson config)
+          ; ("path", `String path) ] ;
+      new_constants
+  | Error s ->
+      Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
+        "Error loading genesis constants from $path: $error. Sample data: \
+         $sample_data"
+        ~metadata:
+          [ ("path", `String path)
+          ; ("error", `String s)
+          ; ( "sample_data"
+            , M.of_genesis_constants Genesis_constants.compiled |> M.to_yojson
+            ) ] ;
+      raise Genesis_state_initialization_error
+
 let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
     (Ledger.t lazy_t * Proof.t * Genesis_constants.t) Deferred.t =
   let open Cache_dir in
@@ -164,19 +199,9 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
         "Successfully retrieved genesis ledger from $path"
         ~metadata:[("path", `String tar_dir)] ;
       let genesis_constants =
-        match
-          Result.bind
-            ( Result.try_with (fun () -> Yojson.Safe.from_file constants_file)
-            |> Result.map_error ~f:Exn.to_string )
-            ~f:(fun json -> Genesis_constants.Config_file.of_yojson json)
-        with
-        | Ok t ->
-            Genesis_constants.(of_config_file ~default:compiled t)
-        | Error s ->
-            Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
-              "Error loading genesis constants from $file: $error"
-              ~metadata:[("dir", `String constants_file); ("error", `String s)] ;
-            raise Genesis_state_initialization_error
+        load_genesis_constants
+          (module Genesis_constants.Config_file)
+          ~default:Genesis_constants.compiled ~path:constants_file ~logger
       in
       let%map base_proof =
         match%map
@@ -212,24 +237,9 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
         (* Replace runtime-configurable constants from the daemon, if any *)
         Option.value_map daemon_conf ~default:res ~f:(fun daemon_config_file ->
             let new_constants =
-              match
-                Result.bind
-                  ( Result.try_with (fun () ->
-                        Yojson.Safe.from_file daemon_config_file )
-                  |> Result.map_error ~f:Exn.to_string )
-                  ~f:(fun json ->
-                    Genesis_constants.Daemon_config.of_yojson json )
-              with
-              | Ok t ->
-                  Genesis_constants.(of_daemon_config ~default:constants t)
-              | Error s ->
-                  Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
-                    "Error loading runtime-configurable constants from $file: \
-                     $error"
-                    ~metadata:
-                      [ ("dir", `String daemon_config_file)
-                      ; ("error", `String s) ] ;
-                  raise Genesis_state_initialization_error
+              load_genesis_constants
+                (module Genesis_constants.Daemon_config)
+                ~default:constants ~path:daemon_config_file ~logger
             in
             (ledger, proof, new_constants) )
     | None ->
@@ -253,10 +263,15 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
       match%bind
         Deferred.List.fold directories ~init:None ~f:(fun acc dir ->
             if is_some acc then Deferred.return acc
-            else retrieve_genesis_data dir )
+            else
+              match%map retrieve_genesis_data dir with
+              | Some res ->
+                  Some (res, dir)
+              | None ->
+                  None )
       with
-      | Some res ->
-          Deferred.return res
+      | Some (res, dir) ->
+          Deferred.return (res_or_fail dir (Some res))
       | None ->
           (* Check if genesis data is in s3 *)
           let tgz_local_path = Cache_dir.s3_install_path ^/ tar_filename in
