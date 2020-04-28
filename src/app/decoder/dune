@@ -1,0 +1,3 @@
+(executable
+  (name decoder)
+  (libraries coda_base))

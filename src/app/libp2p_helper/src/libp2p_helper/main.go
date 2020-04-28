@@ -417,17 +417,20 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		for {
 			msg, err := sub.Next(ctx)
 			if err == nil {
-				sender, err := findPeerInfo(app, msg.ReceivedFrom)
+				// sender, err := findPeerInfo(app, msg.ReceivedFrom)
 				if err != nil && !app.UnsafeNoTrustIP {
 					app.P2p.Logger.Errorf("failed to connect to peer %s that just sent us an already-validated pubsub message, dropping it", peer.IDB58Encode(msg.ReceivedFrom))
 				} else {
-					data := codaEncode(msg.Data)
-					app.writeMsg(publishUpcall{
-						Upcall:       "publish",
-						Subscription: s.Subscription,
-						Data:         data,
-						Sender:       sender,
-					})
+          /* Don't bother informing the helper about this message; it ignores it
+					   and we don't want to block here or else we might lose messages
+            data := codaEncode(msg.Data)
+            app.writeMsg(publishUpcall{
+              Upcall:       "publish",
+              Subscription: s.Subscription,
+              Data:         data,
+              Sender:       sender,
+            })
+          */
 				}
 			} else {
 				if ctx.Err() != context.Canceled {
