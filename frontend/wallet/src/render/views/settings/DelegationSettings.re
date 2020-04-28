@@ -22,9 +22,14 @@ type feeSelection =
   | DefaultAmount
   | Custom(string);
 
+type errorOutcome =
+  | InvalidDelegateKey
+  | Valid;
+
 type modalState = {
   delegate: option(PublicKey.t),
   fee: feeSelection,
+  error: errorOutcome,
 };
 
 module ChangeDelegation = [%graphql
@@ -51,7 +56,7 @@ let defaultFee = "0.1";
 let make = (~publicKey) => {
   // Form state
   let (state, changeState) =
-    React.useState(() => {delegate: None, fee: DefaultAmount});
+    React.useState(() => {delegate: None, fee: DefaultAmount, error: Valid});
 
   let feeSelectedValue =
     switch (state.fee) {
@@ -61,9 +66,18 @@ let make = (~publicKey) => {
 
   let onChangeFee = value =>
     switch (value) {
-    | 0 => changeState(prev => {delegate: prev.delegate, fee: DefaultAmount})
+    | 0 =>
+      changeState(prev =>
+        {delegate: prev.delegate, fee: DefaultAmount, error: state.error}
+      )
     | _ =>
-      changeState(prev => {delegate: prev.delegate, fee: Custom(defaultFee)})
+      changeState(prev =>
+        {
+          delegate: prev.delegate,
+          fee: Custom(defaultFee),
+          error: state.error,
+        }
+      )
     };
 
   let goBack = () =>
@@ -102,6 +116,11 @@ let make = (~publicKey) => {
            <Spacer width=0.2 />
            <AccountName pubkey=publicKey className=Styles.breadcrumbText />
          </div>
+         {switch (state.error) {
+          | InvalidDelegateKey =>
+            <Alert kind=`Danger defaultMessage="Please enter a public key" />
+          | _ => React.null
+          }}
          {switch (result) {
           | NotCalled
           | Loading => React.null
@@ -126,8 +145,10 @@ let make = (~publicKey) => {
              onChange={value =>
                changeState(_ =>
                  {
-                   delegate: Some(PublicKey.ofStringExn(value)),
+                   delegate:
+                     value == "" ? None : Some(PublicKey.ofStringExn(value)),
                    fee: state.fee,
+                   error: Valid,
                  }
                )
              }
@@ -159,7 +180,11 @@ let make = (~publicKey) => {
                   placeholder="0"
                   onChange={value => {
                     changeState(_ =>
-                      {delegate: state.delegate, fee: Custom(value)}
+                      {
+                        delegate: state.delegate,
+                        fee: Custom(value),
+                        error: state.error,
+                      }
                     )
                   }}
                 />
@@ -185,12 +210,23 @@ let make = (~publicKey) => {
              style=Button.Green
              disabled=loading
              onClick={_ =>
-               mutate(
-                 ~variables,
-                 ~refetchQueries=[|"getAccountInfo", "queryDelegation"|],
-                 (),
-               )
-               |> ignore
+               switch (state.delegate) {
+               | Some(_) =>
+                 mutate(
+                   ~variables,
+                   ~refetchQueries=[|"getAccountInfo", "queryDelegation"|],
+                   (),
+                 )
+                 |> ignore
+               | None =>
+                 changeState(_ =>
+                   {
+                     delegate: state.delegate,
+                     fee: state.fee,
+                     error: InvalidDelegateKey,
+                   }
+                 )
+               }
              }
            />
          </div>
