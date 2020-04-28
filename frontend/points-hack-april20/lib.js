@@ -8,15 +8,35 @@ const { InMemoryCache } = require("apollo-cache-inmemory");
 const { HttpLink } = require("apollo-link-http");
 const { WebSocketLink } = require("apollo-link-ws");
 const fetch = require("node-fetch");
+const fs = require("fs");
+const { tmpdir } = require("os");
+const Path = require("path");
 
+const CODA_GRAPHQL_HOST = process.env["CODA_GRAPHQL_HOST"] || "localhost";
+const CODA_GRAPHQL_PORT = process.env["CODA_GRAPHQL_PORT"] || 3085;
+const CODA_GRAPHQL_PATH = process.env["CODA_GRAPHQL_PATH"] || "/graphql";
+
+const API_KEY_SECRET = process.env["GOOGLE_CLOUD_STORAGE_API_KEY"];
+if (!API_KEY_SECRET) {
+  console.error(
+    "Make sure you include GOOGLE_CLOUD_STORAGE_API_KEY env var with the contents of the storage private key json"
+  );
+  process.exit(1);
+}
+
+const json_file_path = Path.join(tmpdir(), "google_cloud_api_key.json");
+fs.writeFileSync(json_file_path, API_KEY_SECRET);
+
+const graphqlUriNoScheme =
+  CODA_GRAPHQL_HOST + ":" + CODA_GRAPHQL_PORT + CODA_GRAPHQL_PATH;
 const httpLink = new HttpLink({
-  uri: "http://localhost:3085/graphql",
+  uri: "http://" + graphqlUriNoScheme,
   fetch: fetch,
 });
 
 const cache = new InMemoryCache();
 const wsLink = new WebSocketLink({
-  uri: "ws://localhost:3085/graphql",
+  uri: "ws://" + graphqlUriNoScheme,
   options: { reconnect: true, connectionParams: null },
   webSocketImpl: ws,
 });
@@ -40,14 +60,20 @@ const apolloClient = new ApolloClient({
 const { Storage } = require("@google-cloud/storage");
 const { Readable } = require("stream");
 
-const storage = new Storage();
+const storage = new Storage({
+  projectId: "o1labs-192920",
+  keyFilename: json_file_path,
+});
 
 function uploadFile(result) {
   const bucketName = "points-data-hack-april20";
-  const filename = "block-" + Date.now() + ".json";
+  const filename =
+    result.data && result.data.newBlock && result.data.newBlock.stateHash
+      ? "block-success-" + result.data.newBlock.stateHash + ".json"
+      : "block-error-" + Date.now() + ".json";
 
   const bucket = storage.bucket(bucketName);
-  const file = bucket.file("32qa/" + filename);
+  const file = bucket.file("32b/" + filename);
 
   const buffer = Buffer.from(JSON.stringify(result), "utf8");
   const readable = new Readable();
@@ -67,7 +93,7 @@ function uploadFile(result) {
       })
     )
     .on("error", function (err) {
-      console.error("Failed uploading metric to google cloude", err);
+      console.error("Failed uploading metric to google cloud", err);
     })
     .on("finish", function () {
       console.log(`Finished uploading ${filename} to ${bucketName}`);
