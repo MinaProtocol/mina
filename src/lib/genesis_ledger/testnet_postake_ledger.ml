@@ -1,15 +1,17 @@
 [%%import
 "/src/config.mlh"]
 
+open Intf.Public_accounts
 open Core_kernel
-open Functor.Without_private
 module Public_key = Signature_lib.Public_key
+
+let name = "testnet_postake"
 
 [%%inject
 "fake_accounts_target", fake_accounts_target]
 
-include Make (struct
-  let real_accounts =
+let real_accounts =
+  lazy
     [ { pk=
           Public_key.Compressed.of_base58_check_exn
             "4vsRCVw9P7XQFJWS4FsAsiXRSJyEKiVLCnVw2mRreE7iWout75RvZnm9q46sed2GvBF9Rh972AJrnuhrpPfCDGyhgsJm6kxZGhP5x9CTdty4cpFA8FmxNL8gB2UPTweGnQ1svjTVgUAbb8qB"
@@ -374,16 +376,15 @@ include Make (struct
                "4vsRCVWRSCQNrGSNoojhp258eeKCeXL8JVefQ8KpZ9DJhFE7AkcFm3czHcddUUbkmpavwuKW4o2QsexWzHnjwuD3ejGkGjqha3n2omrt1fCHN9NWN24jfrqrDTkoZDhm4RNKpRMX4jixX631")
       } ]
 
-  let fake_accounts =
-    lazy
-      (let open Quickcheck in
-      random_value ~seed:(`Deterministic "fake accounts for testnet postake")
-        (Generator.list_with_length
-           (fake_accounts_target - List.length real_accounts)
-           Fake_accounts.gen))
+let fake_accounts =
+  lazy
+    (let open Quickcheck in
+    random_value ~seed:(`Deterministic "fake accounts for testnet postake")
+      (Generator.list_with_length
+         (fake_accounts_target - List.length (Lazy.force real_accounts))
+         Fake_accounts.gen))
 
-  let accounts =
-    let open Lazy.Let_syntax in
-    let%map fake_accounts = fake_accounts in
-    real_accounts @ fake_accounts
-end)
+let accounts =
+  let open Lazy.Let_syntax in
+  let%map real_accounts = real_accounts and fake_accounts = fake_accounts in
+  real_accounts @ fake_accounts
