@@ -13,10 +13,10 @@ type validation_error =
   | `Invalid_proof
   | `Invalid_delta_transition_chain_proof
   | `Verifier_error of Error.t
-  | `Mismatched_fork_id
-  | `Invalid_fork_id ]
+  | `Mismatched_protocol_version
+  | `Invalid_protocol_version ]
 
-let handle_validation_error ~logger ~trust_system ~sender ~state_hash
+let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
     (error : validation_error) =
   let open Trust_system.Actions in
   let punish action message =
@@ -49,14 +49,15 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash
   | `Invalid_genesis_protocol_state ->
       punish Has_invalid_genesis_protocol_state None
   | `Invalid_time_received (`Too_late slot_diff) ->
-      punish (Gossiped_old_transition slot_diff)
+      punish
+        (Gossiped_old_transition (slot_diff, delta))
         (Some
            ( "off by $slot_diff slots"
            , [("slot_diff", `String (Int64.to_string slot_diff))] ))
-  | `Invalid_fork_id ->
-      punish Sent_invalid_fork_id None
-  | `Mismatched_fork_id ->
-      punish Sent_mismatched_fork_id None
+  | `Invalid_protocol_version ->
+      punish Sent_invalid_protocol_version None
+  | `Mismatched_protocol_version ->
+      punish Sent_mismatched_protocol_version None
 
 module Duplicate_block_detector = struct
   (* maintain a map from block producer key, epoch, slot to state hashes *)
@@ -76,39 +77,38 @@ module Duplicate_block_detector = struct
 
   type t = {mutable table: State_hash.t Blocks.Map.t; mutable latest_epoch: int}
 
-  let delay =
-    let open Consensus in
-    Data.Consensus_state.network_delay Configuration.t
-
-  let gc_width = delay * 2
-
-  (* epoch, slot components of gc_width *)
-  let gc_width_epoch = gc_width / Consensus.epoch_size
-
-  let gc_width_slot = gc_width mod Consensus.epoch_size
-
-  let gc_interval = gc_width
-
   let gc_count = ref 0
 
   (* create dummy block to split map on *)
-  let make_splitting_block ({consensus_time; block_producer= _} : Blocks.t) :
-      Blocks.t =
+  let make_splitting_block ~consensus_constants
+      ({consensus_time; block_producer= _} : Blocks.t) : Blocks.t =
     let block_producer = Public_key.Compressed.empty in
-    { consensus_time= Consensus.Data.Consensus_time.get_old consensus_time
+    { consensus_time=
+        Consensus.Data.Consensus_time.get_old ~constants:consensus_constants
+          consensus_time
     ; block_producer }
 
   (* every gc_interval blocks seen, discard blocks more than gc_width ago *)
-  let table_gc t block =
-    gc_count := (!gc_count + 1) mod gc_interval ;
+  let table_gc ~(genesis_constants : Genesis_constants.t) t block =
+    let consensus_constants =
+      Consensus.Constants.create ~protocol_constants:genesis_constants.protocol
+    in
+    let ( `Acceptable_network_delay _
+        , `Gc_width _
+        , `Gc_width_epoch _
+        , `Gc_width_slot _
+        , `Gc_interval gc_interval ) =
+      Consensus.Constants.gc_parameters consensus_constants
+    in
+    gc_count := (!gc_count + 1) mod Unsigned.UInt32.to_int gc_interval ;
     if Int.equal !gc_count 0 then
-      let splitting_block = make_splitting_block block in
+      let splitting_block = make_splitting_block ~consensus_constants block in
       let _, _, gt_map = Map.split t.table splitting_block in
       t.table <- gt_map
 
   let create () = {table= Map.empty (module Blocks); latest_epoch= 0}
 
-  let check t logger external_transition_with_hash =
+  let check ~genesis_constants t logger external_transition_with_hash =
     let external_transition = external_transition_with_hash.With_hash.data in
     let protocol_state_hash = external_transition_with_hash.hash in
     let open Consensus.Data.Consensus_state in
@@ -121,7 +121,7 @@ module Duplicate_block_detector = struct
     in
     let block = Blocks.{consensus_time; block_producer} in
     (* try table GC *)
-    table_gc t block ;
+    table_gc ~genesis_constants t block ;
     match Map.find t.table block with
     | None ->
         t.table <- Map.add_exn t.table ~key:block ~data:protocol_state_hash
@@ -143,7 +143,7 @@ end
 
 let run ~logger ~trust_system ~verifier ~transition_reader
     ~valid_transition_writer ~initialization_finish_signal ~genesis_state_hash
-    =
+    ~genesis_constants =
   let open Deferred.Let_syntax in
   let duplicate_checker = Duplicate_block_detector.create () in
   don't_wait_for
@@ -161,8 +161,8 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                     (Fn.compose Protocol_state.hash
                        External_transition.protocol_state)
            in
-           Duplicate_block_detector.check duplicate_checker logger
-             transition_with_hash ;
+           Duplicate_block_detector.check ~genesis_constants duplicate_checker
+             logger transition_with_hash ;
            let sender = Envelope.Incoming.sender transition_env in
            let defer f = Fn.compose Deferred.return f in
            match%bind
@@ -173,7 +173,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
                >>= validate_proof ~verifier
                >>= defer validate_delta_transition_chain
-               >>= defer validate_fork_ids)
+               >>= defer validate_protocol_versions)
            with
            | Ok verified_transition ->
                External_transition.poke_validation_callback
@@ -194,5 +194,5 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                is_valid_cb false ;
                handle_validation_error ~logger ~trust_system ~sender
                  ~state_hash:(With_hash.hash transition_with_hash)
-                 error )
+                 ~delta:genesis_constants.protocol.delta error )
          else Deferred.unit ))

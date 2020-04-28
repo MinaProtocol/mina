@@ -26,11 +26,16 @@
   (modules versioned_good))
 
 ;; define locally
-
 (library
   (name define_locally_good)
   (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
   (modules define_locally_good))
+
+;; define from scope
+(library
+  (name define_from_scope_good)
+  (preprocess (pps ppx_jane ppx_deriving_yojson ppx_coda))
+  (modules define_from_scope_good))
 
 ;; module versioning
 (executable

@@ -98,8 +98,8 @@ let merge_scan_state acc scan_state =
   let hash = Staged_ledger.Scan_state.hash scan_state in
   merge_string acc (Staged_ledger_hash.Aux_hash.to_bytes hash)
 
-let merge_root_data acc
-    {Root_data.Minimal.Stable.V1.hash; scan_state; pending_coinbase} =
+let merge_root_data acc {Root_data.Minimal.hash; scan_state; pending_coinbase}
+    =
   merge_pending_coinbase
     (merge_scan_state (merge_state_hash acc hash) scan_state)
     pending_coinbase

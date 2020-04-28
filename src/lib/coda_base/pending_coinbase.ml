@@ -1116,14 +1116,14 @@ struct
 end
 
 module T = Make (struct
-  let depth = Snark_params.pending_coinbase_depth
+  let depth = Coda_compile_config.pending_coinbase_depth
 end)
 
 include T
 
 let%test_unit "add stack + remove stack = initial tree " =
   let pending_coinbases = ref (create () |> Or_error.ok_exn) in
-  let coinbases_gen = Quickcheck.Generator.list_non_empty Coinbase.gen in
+  let coinbases_gen = Quickcheck.Generator.list_non_empty Coinbase.Gen.gen in
   Quickcheck.test coinbases_gen ~trials:50 ~f:(fun cbs ->
       Async.Thread_safe.block_on_async_exn (fun () ->
           let is_new_stack = ref true in
@@ -1182,7 +1182,7 @@ let add_coinbase_with_zero_checks (type t)
 
 let%test_unit "Checked_stack = Unchecked_stack" =
   let open Quickcheck in
-  test ~trials:20 (Generator.tuple2 Stack.gen Coinbase.gen)
+  test ~trials:20 (Generator.tuple2 Stack.gen Coinbase.Gen.gen)
     ~f:(fun (base, cb) ->
       let coinbase_data = Coinbase_data.of_coinbase cb in
       let unchecked = Stack.push_coinbase cb base in
@@ -1203,7 +1203,7 @@ let%test_unit "Checked_stack = Unchecked_stack" =
 let%test_unit "Checked_tree = Unchecked_tree" =
   let open Quickcheck in
   let pending_coinbases = create () |> Or_error.ok_exn in
-  test ~trials:20 (Generator.tuple2 Coinbase.gen State_body_hash.gen)
+  test ~trials:20 (Generator.tuple2 Coinbase.Gen.gen State_body_hash.gen)
     ~f:(fun (coinbase, state_body_hash) ->
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
       let is_new_stack, action =
@@ -1240,7 +1240,7 @@ let%test_unit "Checked_tree = Unchecked_tree" =
 
 let%test_unit "Checked_tree = Unchecked_tree after pop" =
   let open Quickcheck in
-  test ~trials:20 (Generator.tuple2 Coinbase.gen State_body_hash.gen)
+  test ~trials:20 (Generator.tuple2 Coinbase.Gen.gen State_body_hash.gen)
     ~f:(fun (coinbase, state_body_hash) ->
       let pending_coinbases = create () |> Or_error.ok_exn in
       let coinbase_data = Coinbase_data.of_coinbase coinbase in
@@ -1372,6 +1372,6 @@ let%test_unit "push and pop multiple stacks" =
   in
   let coinbase_lists_gen =
     Quickcheck.Generator.(
-      list (list (Generator.tuple2 Coinbase.gen State_body_hash.gen)))
+      list (list (Generator.tuple2 Coinbase.Gen.gen State_body_hash.gen)))
   in
   test ~trials:100 coinbase_lists_gen ~f:add_remove_check

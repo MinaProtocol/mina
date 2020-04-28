@@ -4,7 +4,7 @@ module Location = String
 
 type location = Location.t [@@deriving sexp]
 
-include Checked_data
+type 'a t = 'a Checked_data.t
 
 module Controller = struct
   type nonrec 'a t = {logger: Logger.t; tc: 'a Binable.m}
@@ -19,11 +19,13 @@ let load_with_checksum (type a) (c : a Controller.t) location =
         Reader.load_bin_prot
           ~max_len:(5 * 512 * 1024 * 1024 (* 2.5 GB *))
           location
-          (bin_reader_t String.bin_reader_t)
+          (Checked_data.Stable.Latest.bin_reader_t String.bin_reader_t)
       with
       | Ok t ->
-          if valid t then
-            Ok {checksum= t.checksum; data= Binable.of_string c.tc t.data}
+          if Checked_data.valid t then
+            Ok
+              Checked_data.
+                {checksum= t.checksum; data= Binable.of_string c.tc t.data}
           else Error `Checksum_no_match
       | Error e ->
           Error (`IO_error e) )
@@ -35,14 +37,16 @@ let load c location =
 
 let atomic_write (c : 'a Controller.t) location data =
   let temp_location = location ^ ".temp" in
-  let t = wrap c.tc data in
+  let t = Checked_data.wrap c.tc data in
   let%bind () =
-    Writer.save_bin_prot temp_location (bin_writer_t String.bin_writer_t) t
+    Writer.save_bin_prot temp_location
+      (Checked_data.Stable.Latest.bin_writer_t String.bin_writer_t)
+      t
   in
   let%map () = Sys.rename temp_location location in
   t
 
 let store_with_checksum (type a) (c : a Controller.t) location (data : a) =
-  atomic_write c location data >>| fun t -> t.checksum
+  atomic_write c location data >>| fun t -> t.Checked_data.checksum
 
 let store c location data = atomic_write c location data |> Deferred.ignore

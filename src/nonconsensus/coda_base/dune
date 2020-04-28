@@ -1,9 +1,11 @@
 (library
  (name coda_base_nonconsensus)
  (public_name coda_base_nonconsensus)
+ (inline_tests)
  (library_flags -linkall)
  (libraries
     coda_numbers_nonconsensus
+    coda_compile_config_nonconsensus
     currency_nonconsensus
     hash_prefix_states_nonconsensus
     outside_pedersen_image_nonconsensus

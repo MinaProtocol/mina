@@ -35,7 +35,7 @@ module Uri : sig
   end
 
   module Archive : sig
-    val hasura : Uri.t Types.with_name Command.Spec.param
+    val postgres : Uri.t Types.with_name Command.Spec.param
   end
 end
 
@@ -72,7 +72,7 @@ val user_command_common : user_command_common Command.Param.t
 module User_command : sig
   val hd_index : Coda_numbers.Hd_index.t Command.Spec.param
 
-  val receiver : Signature_lib.Public_key.Compressed.t Command.Spec.param
+  val receiver_pk : Signature_lib.Public_key.Compressed.t Command.Spec.param
 
   val amount : Currency.Amount.t Command.Spec.param
 

@@ -54,8 +54,9 @@ type app struct {
 	Validators      map[int]*validationStatus
 	ValidatorMutex  *sync.Mutex
 	Streams         map[int]net.Stream
-	OutLock         sync.Mutex
+	StreamsMutex    sync.Mutex
 	Out             *bufio.Writer
+	OutChan         chan interface{}
 	UnsafeNoTrustIP bool
 }
 
@@ -102,25 +103,7 @@ type envelope struct {
 }
 
 func (app *app) writeMsg(msg interface{}) {
-	app.OutLock.Lock()
-	defer app.OutLock.Unlock()
-	bytes, err := json.Marshal(msg)
-	if err == nil {
-		n, err := app.Out.Write(bytes)
-		if err != nil {
-			panic(err)
-		}
-		if n != len(bytes) {
-			// TODO: handle this correctly.
-			panic("short write :(")
-		}
-		app.Out.WriteByte(0x0a)
-		if err := app.Out.Flush(); err != nil {
-			panic(err)
-		}
-	} else {
-		panic(err)
-	}
+	app.OutChan <- msg
 }
 
 type action interface {
@@ -214,6 +197,7 @@ type configureMsg struct {
 	ListenOn        []string `json:"ifaces"`
 	External        string   `json:"external_maddr"`
 	UnsafeNoTrustIP bool     `json:"unsafe_no_trust_ip"`
+	Flood           bool     `json:"flood_gossip"`
 }
 
 type discoveredPeerUpcall struct {
@@ -249,6 +233,19 @@ func (m *configureMsg) run(app *app) (interface{}, error) {
 	if err != nil {
 		return nil, badHelper(err)
 	}
+
+	var ps *pubsub.PubSub
+	if m.Flood {
+		ps, err = pubsub.NewFloodSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
+	} else {
+		ps, err = pubsub.NewRandomSub(app.Ctx, helper.Host, pubsub.WithStrictSignatureVerification(true), pubsub.WithMessageSigning(true))
+	}
+
+	if err != nil {
+		return nil, badHelper(err)
+	}
+
+	helper.Pubsub = ps
 	app.P2p = helper
 
 	return "configure success", nil
@@ -336,7 +333,6 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 		return nil, needsDHT()
 	}
 	err := app.P2p.Pubsub.RegisterTopicValidator(s.Topic, func(ctx context.Context, id peer.ID, msg *pubsub.Message) bool {
-		return true
 		if id == app.P2p.Me {
 			// messages from ourself are valid.
 			app.P2p.Logger.Info("would have validated but it's from us!")
@@ -383,6 +379,8 @@ func (s *subscribeMsg) run(app *app) (interface{}, error) {
 
 			(*app.Validators[seqno]).TimedOutAt = new(time.Time)
 			*((*app.Validators[seqno]).TimedOutAt) = time.Now()
+
+			app.ValidatorMutex.Unlock()
 
 			if app.UnsafeNoTrustIP {
 				app.P2p.Logger.Info("validated anyway!")
@@ -608,6 +606,8 @@ func (o *openStreamMsg) run(app *app) (interface{}, error) {
 		return nil, badp2p(err)
 	}
 
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
 	app.Streams[streamIdx] = stream
 	go func() {
 		// FIXME HACK: allow time for the openStreamResult to get printed before we start inserting stream events
@@ -625,6 +625,8 @@ func (cs *closeStreamMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
 		err := stream.Close()
 		if err != nil {
@@ -643,6 +645,8 @@ func (cs *resetStreamMsg) run(app *app) (interface{}, error) {
 	if app.P2p == nil {
 		return nil, needsConfigure()
 	}
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
 		err := stream.Reset()
 		delete(app.Streams, cs.StreamIdx)
@@ -668,6 +672,8 @@ func (cs *sendStreamMsgMsg) run(app *app) (interface{}, error) {
 		return nil, badRPC(err)
 	}
 
+	app.StreamsMutex.Lock()
+	defer app.StreamsMutex.Unlock()
 	if stream, ok := app.Streams[cs.StreamIdx]; ok {
 		n, err := stream.Write(data)
 		if err != nil {
@@ -700,6 +706,8 @@ func (as *addStreamHandlerMsg) run(app *app) (interface{}, error) {
 			return
 		}
 		streamIdx := <-seqs
+		app.StreamsMutex.Lock()
+		defer app.StreamsMutex.Unlock()
 		app.Streams[streamIdx] = stream
 		app.writeMsg(incomingStreamUpcall{
 			Upcall:    "incomingStream",
@@ -1001,8 +1009,9 @@ func main() {
 	}()
 
 	lines := bufio.NewScanner(os.Stdin)
-	// 11MiB buffer size, larger than the 10.66MB minimum for 8MiB to be b64'd
-	bufsize := (1024 * 1024) * 11
+	// 22MiB buffer size, larger than the 21.33MB minimum for 16MiB to be b64'd
+	// 4 * (2^24/3) / 2^20 = 21.33
+	bufsize := (1024 * 1024) * 22
 	lines.Buffer(make([]byte, bufsize), bufsize)
 	out := bufio.NewWriter(os.Stdout)
 
@@ -1013,12 +1022,43 @@ func main() {
 		ValidatorMutex: &sync.Mutex{},
 		Validators:     make(map[int]*validationStatus),
 		Streams:        make(map[int]net.Stream),
-		// OutLock doesn't need to be initialized
-		Out: out,
+		OutChan:        make(chan interface{}, 4096),
+		Out:            out,
 	}
 
+	go func() {
+		for {
+			msg := <-app.OutChan
+			bytes, err := json.Marshal(msg)
+			if err == nil {
+				n, err := app.Out.Write(bytes)
+				if err != nil {
+					panic(err)
+				}
+				if n != len(bytes) {
+					// TODO: handle this correctly.
+					panic("short write :(")
+				}
+				app.Out.WriteByte(0x0a)
+				if err := app.Out.Flush(); err != nil {
+					panic(err)
+				}
+			} else {
+				panic(err)
+			}
+		}
+	}()
+
+	var line string
+
+	defer func() {
+		if r := recover(); r != nil {
+			helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
+		}
+	}()
+
 	for lines.Scan() {
-		line := lines.Text()
+		line = lines.Text()
 		var raw json.RawMessage
 		env := envelope{
 			Body: &raw,
@@ -1032,11 +1072,6 @@ func main() {
 			log.Print("when unmarshaling the method invocation...")
 			log.Panic(err)
 		}
-		defer func() {
-			if r := recover(); r != nil {
-				helperLog.Error("While handling RPC:", line, "\nThe following panic occurred: ", r, "\nstack:\n", debug.Stack())
-			}
-		}()
 		start := time.Now()
 		res, err := msg.run(app)
 		if err == nil {

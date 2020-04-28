@@ -5,9 +5,6 @@ open Core
 open Async
 open Coda_base
 
-[%%inject
-"ledger_depth", ledger_depth]
-
 [%%if
 proof_level = "full"]
 
@@ -21,10 +18,12 @@ let use_dummy_values = true
 
 type t = Ledger.t
 
-let generate_base_proof ~ledger =
+let generate_base_proof ~ledger ~(genesis_constants : Genesis_constants.t) =
   let%map (module Keys) = Keys_lib.Keys.create () in
   let genesis_ledger = lazy ledger in
-  let genesis_state = Coda_state.Genesis_protocol_state.t ~genesis_ledger in
+  let genesis_state =
+    Coda_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_constants
+  in
   let base_hash = Keys.Step.instance_hash genesis_state.data in
   let wrap hash proof =
     let open Snark_params in
@@ -43,7 +42,9 @@ let generate_base_proof ~ledger =
     let prover_state =
       { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
       ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state= Coda_state.Protocol_state.negative_one ~genesis_ledger
+      ; prev_state=
+          Coda_state.Protocol_state.negative_one ~genesis_ledger
+            ~protocol_constants:genesis_constants.protocol
       ; genesis_state_hash= genesis_state.hash
       ; expected_next_state= None
       ; update= Coda_state.Snark_transition.genesis ~genesis_ledger }
@@ -78,10 +79,12 @@ let generate_ledger : directory_name:string -> Account_config.t -> t =
   let ledger = Ledger.create ~directory_name () in
   List.iter accounts ~f:(fun {pk; balance; delegate; _} ->
       let account =
-        let base_acct = Account.create pk balance in
+        let account_id = Account_id.create pk Token_id.default in
+        let base_acct = Account.create account_id balance in
         {base_acct with delegate= Option.value ~default:pk delegate}
       in
-      Ledger.create_new_account_exn ledger account.public_key account ) ;
+      Ledger.create_new_account_exn ledger (Account.identifier account) account
+  ) ;
   ledger
 
 let commit ledger = Ledger.commit ledger
@@ -137,10 +140,12 @@ let get_accounts accounts_json_file n =
         (Account_config.to_yojson all_accounts) ) ;
   all_accounts
 
+let genesis_dirname = Cache_dir.genesis_dir_name Genesis_constants.compiled
+
 let create_tar top_dir =
-  let tar_file = top_dir ^/ Cache_dir.genesis_dir_name ^ ".tar.gz" in
+  let tar_file = top_dir ^/ genesis_dirname ^ ".tar.gz" in
   let tar_command =
-    sprintf "tar -C %s -czf %s %s" top_dir tar_file Cache_dir.genesis_dir_name
+    sprintf "tar -C %s -czf %s %s" top_dir tar_file genesis_dirname
   in
   let exit = Core.Sys.command tar_command in
   if exit = 2 then
@@ -148,16 +153,35 @@ let create_tar top_dir =
       (sprintf "Error generating the tar for genesis ledger. Exit code: %d"
          exit)
 
-let main accounts_json_file dir n =
+let read_write_constants read_from_opt write_to =
+  let open Result.Let_syntax in
+  let%map constants =
+    match read_from_opt with
+    | Some file ->
+        let%map t =
+          Yojson.Safe.from_file file |> Genesis_constants.Config_file.of_yojson
+        in
+        Genesis_constants.Config_file.to_genesis_constants
+          ~default:Genesis_constants.compiled t
+    | None ->
+        Ok Genesis_constants.compiled
+  in
+  Yojson.Safe.to_file write_to
+    Genesis_constants.(
+      Config_file.(of_genesis_constants constants |> to_yojson)) ;
+  constants
+
+let main accounts_json_file dir n constants_file =
   let open Deferred.Let_syntax in
   let top_dir = Option.value ~default:Cache_dir.autogen_path dir in
   let%bind genesis_dir =
-    let dir = top_dir ^/ Cache_dir.genesis_dir_name in
+    let dir = top_dir ^/ genesis_dirname in
     let%map () = File_system.create_dir dir ~clear_if_exists:true in
     dir
   in
   let ledger_path = genesis_dir ^/ "ledger" in
   let proof_path = genesis_dir ^/ "genesis_proof" in
+  let constants_path = genesis_dir ^/ "genesis_constants.json" in
   let%bind accounts = get_accounts accounts_json_file n in
   let%bind () =
     match
@@ -169,12 +193,16 @@ let main accounts_json_file dir n =
           ledger )
     with
     | Ok ledger ->
+        let genesis_constants =
+          read_write_constants constants_file constants_path
+          |> Result.ok_or_failwith
+        in
         let%bind _base_hash, base_proof =
           if use_dummy_values then
             return
               ( Snark_params.Tick.Field.zero
               , Dummy_values.Tock.Bowe_gabizon18.proof )
-          else generate_base_proof ~ledger
+          else generate_base_proof ~ledger ~genesis_constants
         in
         let%bind wr = Writer.open_file proof_path in
         Writer.write wr (Proof.Stable.V1.sexp_of_t base_proof |> Sexp.to_string) ;
@@ -220,11 +248,24 @@ let () =
                    If the number of accounts in the account file, say x, is \
                    less than n then the tool will generate (n-x) fake \
                    accounts (default: x)."
-                  (Int.pow 2 ledger_depth))
+                  (Int.pow 2 Coda_compile_config.ledger_depth))
              (optional int)
+         and constants =
+           flag "constants"
+             ~doc:
+               (sprintf
+                  "Filepath of the json file that has Coda constants. \
+                   (default: %s)"
+                  ( Genesis_constants.(
+                      Config_file.(of_genesis_constants compiled |> to_yojson))
+                  |> Yojson.Safe.to_string ))
+             (optional string)
          in
          fun () ->
-           let max = Int.pow 2 ledger_depth in
+           let max = Int.pow 2 Coda_compile_config.ledger_depth in
            if Option.value ~default:0 n >= max then
              failwith (sprintf "Invalid value for n (0 <= n <= %d)" max)
-           else main accounts_json genesis_dir (Option.value ~default:0 n)))
+           else
+             main accounts_json genesis_dir
+               (Option.value ~default:0 n)
+               constants))

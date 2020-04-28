@@ -32,13 +32,17 @@ module Test_inputs = struct
   end
 
   module Snark_pool = struct
-    module T = struct
-      type t =
-        Transaction_snark.Statement.Stable.Latest.t One_or_two.Stable.Latest.t
-      [@@deriving bin_io, hash, compare, sexp]
-    end
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = Transaction_snark.Statement.Stable.V1.t One_or_two.Stable.V1.t
+        [@@deriving hash, compare, sexp]
 
-    module Work = Hashable.Make_binable (T)
+        let to_latest = Fn.id
+      end
+    end]
+
+    module Work = Hashable.Make_binable (Stable.Latest)
 
     type t = Currency.Fee.t Work.Table.t
 

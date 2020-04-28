@@ -4,6 +4,8 @@ type t = char
 
 (* each of the following values should be distinct *)
 
+let coinbase : t = '\x04'
+
 let epoch_seed : t = '\x25'
 
 let fee_transfer_single : t = '\x9F'
@@ -35,6 +37,8 @@ let staged_ledger_hash_aux_hash : t = '\x0B'
 let staged_ledger_hash_pending_coinbase_aux : t = '\x81'
 
 let state_hash : t = '\x20'
+
+let state_body_hash : t = '\x21'
 
 let transaction_hash : t = '\x9E'
 

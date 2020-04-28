@@ -196,15 +196,14 @@ let gen_imperative_list (root_gen : 'a t) (node_gen : ('a -> 'a) t) =
       | n ->
           let%bind this = node_gen in
           let%map f = with_size ~size:(n - 1) self in
-          fun parent ->
-            let x = this parent in
-            x :: f x )
+          fun parent -> parent :: f (this parent) )
 
 let%test_module "Quickcheck lib tests" =
   ( module struct
     let%test_unit "gen_imperative_list" =
       let increment = ( + ) 2 in
-      let root_gen = Int.gen_incl 0 100 in
+      let root = 1 in
+      let root_gen = return root in
       let gen =
         Int.gen_incl 2 100
         >>= fun size ->
@@ -216,6 +215,7 @@ let%test_module "Quickcheck lib tests" =
           | [] ->
               failwith "We assume that our list has at least one element"
           | x :: xs ->
+              assert (x = root) ;
               let result =
                 List.fold_result xs ~init:x ~f:(fun elem next_elem ->
                     if next_elem = increment elem then Result.return next_elem
