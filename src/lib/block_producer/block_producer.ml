@@ -411,8 +411,9 @@ let run ~logger ~prover ~verifier ~trust_system ~get_completed_work
                                   ~delta_transition_chain_proof () }
                           |> External_transition.skip_time_received_validation
                                `This_transition_was_not_received_via_gossip
-                          |> External_transition.skip_fork_ids_validation
-                               `This_transition_has_valid_fork_ids
+                          |> External_transition
+                             .skip_protocol_versions_validation
+                               `This_transition_has_valid_protocol_versions
                           |> External_transition
                              .validate_genesis_protocol_state
                                ~genesis_state_hash:
