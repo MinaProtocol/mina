@@ -233,7 +233,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
       Cached.Spec.create ~load ~name:"blockchain-snark step keys"
         ~autogen_path:Cache_dir.autogen_path
         ~manual_install_path:Cache_dir.manual_install_path
-        ~brew_install_path:Cache_dir.brew_install_path
+        ~brew_install_path:(Lazy.force Cache_dir.brew_install_path)
         ~s3_install_path:Cache_dir.s3_install_path
         ~digest_input:
           (Fn.compose Md5.to_hex Tick.R1CS_constraint_system.digest)
@@ -265,7 +265,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
         Cached.Spec.create ~load ~name:"blockchain-snark wrap keys"
           ~autogen_path:Cache_dir.autogen_path
           ~manual_install_path:Cache_dir.manual_install_path
-          ~brew_install_path:Cache_dir.brew_install_path
+          ~brew_install_path:(Lazy.force Cache_dir.brew_install_path)
           ~s3_install_path:Cache_dir.s3_install_path
           ~digest_input:(fun x ->
             Md5.to_hex (Tock.R1CS_constraint_system.digest (Lazy.force x)) )

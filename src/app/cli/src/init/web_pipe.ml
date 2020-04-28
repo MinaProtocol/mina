@@ -54,7 +54,9 @@ let verification_key_basename = "client_verification_key"
 let verification_key_location () =
   let autogen = Cache_dir.autogen_path ^/ verification_key_basename in
   let manual = Cache_dir.manual_install_path ^/ verification_key_basename in
-  let brew = Cache_dir.brew_install_path ^/ verification_key_basename in
+  let brew =
+    Lazy.force Cache_dir.brew_install_path ^/ verification_key_basename
+  in
   match%bind Sys.file_exists manual with
   | `Yes ->
       return (Ok manual)

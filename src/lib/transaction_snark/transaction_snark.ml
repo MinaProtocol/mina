@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 open Signature_lib
 open Coda_base
 open Snark_params
@@ -1377,7 +1377,7 @@ module Base = struct
     Cached.Spec.create ~load ~name:"transaction-snark base keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
-      ~brew_install_path:Cache_dir.brew_install_path
+      ~brew_install_path:(Lazy.force Cache_dir.brew_install_path)
       ~s3_install_path:Cache_dir.s3_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
@@ -1584,7 +1584,7 @@ module Merge = struct
     Cached.Spec.create ~load ~name:"transaction-snark merge keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
-      ~brew_install_path:Cache_dir.brew_install_path
+      ~brew_install_path:(Lazy.force Cache_dir.brew_install_path)
       ~s3_install_path:Cache_dir.s3_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )
@@ -1778,7 +1778,7 @@ struct
     Cached.Spec.create ~load ~name:"transaction-snark wrap keys"
       ~autogen_path:Cache_dir.autogen_path
       ~manual_install_path:Cache_dir.manual_install_path
-      ~brew_install_path:Cache_dir.brew_install_path
+      ~brew_install_path:(Lazy.force Cache_dir.brew_install_path)
       ~s3_install_path:Cache_dir.s3_install_path
       ~digest_input:(fun x ->
         Md5.to_hex (R1CS_constraint_system.digest (Lazy.force x)) )

@@ -17,15 +17,16 @@ let s3_install_path = "/tmp/s3_cache_dir"
 let manual_install_path = "/var/lib/coda"
 
 let brew_install_path =
-  match
-    let p = Core.Unix.open_process_in "brew --prefix 2>/dev/null" in
-    let r = Core.In_channel.input_lines p in
-    (r, Core.Unix.close_process_in p)
-  with
-  | brew :: _, Ok () ->
-      brew ^ "/var/coda"
-  | _ ->
-      "/usr/local/var/coda"
+  lazy
+    ( match
+        let p = Core.Unix.open_process_in "brew --prefix 2>/dev/null" in
+        let r = Core.In_channel.input_lines p in
+        (r, Core.Unix.close_process_in p)
+      with
+    | brew :: _, Ok () ->
+        brew ^ "/var/coda"
+    | _ ->
+        "/usr/local/var/coda" )
 
 [%%endif]
 
@@ -67,7 +68,8 @@ let env_path =
       manual_install_path
 
 let possible_paths base =
-  List.map [env_path; brew_install_path; s3_install_path; autogen_path]
+  List.map
+    [env_path; Lazy.force brew_install_path; s3_install_path; autogen_path]
     ~f:(fun d -> d ^/ base)
 
 let load_from_s3 s3_bucket_prefixes s3_install_paths ~logger =
