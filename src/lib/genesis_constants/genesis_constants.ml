@@ -151,6 +151,8 @@ let compiled : t =
           genesis_timestamp_of_string genesis_state_timestamp_string }
   ; txpool_max_size= pool_max_size }
 
+let for_unit_tests = compiled
+
 module type Config_intf = sig
   type t [@@deriving yojson]
 
