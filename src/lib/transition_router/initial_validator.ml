@@ -13,8 +13,8 @@ type validation_error =
   | `Invalid_proof
   | `Invalid_delta_transition_chain_proof
   | `Verifier_error of Error.t
-  | `Mismatched_fork_id
-  | `Invalid_fork_id ]
+  | `Mismatched_protocol_version
+  | `Invalid_protocol_version ]
 
 let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
     (error : validation_error) =
@@ -54,10 +54,10 @@ let handle_validation_error ~logger ~trust_system ~sender ~state_hash ~delta
         (Some
            ( "off by $slot_diff slots"
            , [("slot_diff", `String (Int64.to_string slot_diff))] ))
-  | `Invalid_fork_id ->
-      punish Sent_invalid_fork_id None
-  | `Mismatched_fork_id ->
-      punish Sent_mismatched_fork_id None
+  | `Invalid_protocol_version ->
+      punish Sent_invalid_protocol_version None
+  | `Mismatched_protocol_version ->
+      punish Sent_mismatched_protocol_version None
 
 module Duplicate_block_detector = struct
   (* maintain a map from block producer key, epoch, slot to state hashes *)
@@ -173,7 +173,7 @@ let run ~logger ~trust_system ~verifier ~transition_reader
                >>= defer (validate_genesis_protocol_state ~genesis_state_hash)
                >>= validate_proof ~verifier
                >>= defer validate_delta_transition_chain
-               >>= defer validate_fork_ids)
+               >>= defer validate_protocol_versions)
            with
            | Ok verified_transition ->
                External_transition.poke_validation_callback
