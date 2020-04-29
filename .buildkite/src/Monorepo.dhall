@@ -9,19 +9,11 @@ let jobs : List JobSpec.Type = [
   ./jobs/Sample2/Spec.dhall
 ]
 
-let prepareCommand = "date && ./.buildkite/scripts/generate-diff.sh > computed_diff.txt && date"
+let prepareCommand = "./.buildkite/scripts/generate-diff.sh > computed_diff.txt"
 
 let makeCommand = \(job : JobSpec.Type) -> ''
-  date
-  echo "Starting check for dirtyWhen"
   if cat computed_diff.txt | grep -q ${job.dirtyWhen}; then
-      date
-      echo "Running dhall to yaml"
-      dhall-to-yaml --quoted <<< './.buildkite/src/jobs/${job.name}/Pipeline.dhall' > pipe.yml
-      date
-      echo "Pipeline upload"
-      buildkite-agent pipeline upload pipe.yml
-      date
+      dhall-to-yaml --quoted <<< './.buildkite/src/jobs/${job.name}/Pipeline.dhall' | buildkite-agent pipeline upload
   fi
 ''
 
