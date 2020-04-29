@@ -19,51 +19,15 @@ let use_dummy_values = true
 type t = Ledger.t
 
 let generate_base_proof ~ledger ~(genesis_constants : Genesis_constants.t) =
-  let%map (module Keys) = Keys_lib.Keys.create () in
+  let%map ((module Keys) as keys) = Keys_lib.Keys.create () in
   let genesis_ledger = lazy ledger in
-  let genesis_state =
+  let protocol_state_with_hash =
     Coda_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_constants
   in
-  let base_hash = Keys.Step.instance_hash genesis_state.data in
-  let wrap hash proof =
-    let open Snark_params in
-    let module Wrap = Keys.Wrap in
-    let input = Wrap_input.of_tick_field hash in
-    let proof =
-      Tock.prove
-        (Tock.Keypair.pk Wrap.keys)
-        Wrap.input {Wrap.Prover_state.proof} Wrap.main input
-    in
-    assert (Tock.verify proof (Tock.Keypair.vk Wrap.keys) Wrap.input input) ;
-    proof
-  in
+  let base_hash = Keys.Step.instance_hash protocol_state_with_hash.data in
   let base_proof =
-    let open Snark_params in
-    let prover_state =
-      { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
-      ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state=
-          Coda_state.Protocol_state.negative_one ~genesis_ledger
-            ~protocol_constants:genesis_constants.protocol
-      ; genesis_state_hash= genesis_state.hash
-      ; expected_next_state= None
-      ; update= Coda_state.Snark_transition.genesis ~genesis_ledger }
-    in
-    let main x =
-      Tick.handle
-        (Keys.Step.main ~logger:(Logger.create ()) x)
-        (Consensus.Data.Prover_state.precomputed_handler ~genesis_ledger)
-    in
-    let tick =
-      Tick.prove
-        (Tick.Keypair.pk Keys.Step.keys)
-        (Keys.Step.input ()) prover_state main base_hash
-    in
-    assert (
-      Tick.verify tick
-        (Tick.Keypair.vk Keys.Step.keys)
-        (Keys.Step.input ()) base_hash ) ;
-    wrap base_hash tick
+    Genesis_proof.create ~keys ~genesis_ledger ~protocol_state_with_hash
+      ~base_hash ~protocol_constants:genesis_constants.protocol ()
   in
   (base_hash, base_proof)
 

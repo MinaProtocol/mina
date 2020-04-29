@@ -1,7 +1,22 @@
 (executable
   (name runtime_genesis_ledger)
   (public_name runtime_genesis_ledger)
-  (libraries core account_config async coda_base keys_lib coda_state snarky snark_params blockchain_snark snark_keys staged_ledger coda_version)
+  (libraries
+    ;; opam deps
+    async
+    core
+    ;; libraries
+    account_config
+    blockchain_snark
+    coda_base
+    coda_genesis_proof
+    coda_state
+    coda_version
+    keys_lib
+    snark_keys
+    snark_params
+    snarky
+    staged_ledger)
   (preprocessor_deps ../../config.mlh)
   (preprocess (pps ppx_coda ppx_let ppx_optcomp ppx_deriving_yojson)))
 
