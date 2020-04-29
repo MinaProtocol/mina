@@ -15,7 +15,7 @@ let jobs : List JobType = [
 ]
 
 let makeCommand = \(job : { dirtyWhen : Text, name : Text }) ->
-"if ./scripts/generate-diff.sh | grep -q ${job.dirtyWhen}; then dhall-to-yaml --quoted <.buildkite/src/jobs/${job.name}/Pipeline.dhall | buildkite-agent pipeline upload; fi"
+"if ./buildkite/scripts/generate-diff.sh | grep -q ${job.dirtyWhen}; then dhall-to-yaml --quoted <.buildkite/src/jobs/${job.name}/Pipeline.dhall | buildkite-agent pipeline upload; fi"
 
 let List/map = https://prelude.dhall-lang.org/v15.0.0/List/map
 
