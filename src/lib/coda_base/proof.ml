@@ -18,7 +18,7 @@ open Module_version
 [%%versioned_binable
 module Stable = struct
   module V1 = struct
-    type t = Tock.Proof.t [@@deriving version {asserted}]
+    type t = Tock.Proof.t
 
     let to_latest = Fn.id
 
