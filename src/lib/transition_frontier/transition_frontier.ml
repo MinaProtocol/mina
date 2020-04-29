@@ -1,5 +1,5 @@
 (** This module glues together the various components that compose
-*  the transition frontier, wrapping high-level initialization
+*  the transition/frontier, wrapping high-level initialization
 *  logic as well as gluing together the logic for adding items
 *  to the frontier *)
 
