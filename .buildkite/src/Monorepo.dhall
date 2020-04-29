@@ -11,7 +11,7 @@ let jobs : List JobSpec.Type = [
 
 let makeCommand = \(job : JobSpec.Type) -> ''
   if ./.buildkite/scripts/generate-diff.sh | grep -q ${job.dirtyWhen}; then
-      dhall-to-yaml --quoted <<< '.buildkite/src/jobs/${job.name}/Pipeline.dhall' | buildkite-agent pipeline upload
+      dhall-to-yaml --quoted <<< './.buildkite/src/jobs/${job.name}/Pipeline.dhall' | buildkite-agent pipeline upload
   fi
 ''
 
