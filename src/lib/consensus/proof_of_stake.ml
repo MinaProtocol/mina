@@ -128,7 +128,7 @@ module Data = struct
     include Coda_base.Data_hash.Make_full_size ()
 
     module Base58_check = Codable.Make_base58_check (struct
-      include Stable.Latest
+      type t = Stable.Latest.t [@@deriving bin_io_unversioned]
 
       let version_byte = Base58_check.Version_bytes.epoch_seed
 
@@ -563,7 +563,7 @@ module Data = struct
         type t = Stable.Latest.t [@@deriving sexp, compare, hash, yojson]
 
         include Codable.Make_base58_check (struct
-          include Stable.Latest
+          type t = Stable.Latest.t [@@deriving bin_io_unversioned]
 
           let version_byte = Base58_check.Version_bytes.vrf_truncated_output
 
@@ -1466,7 +1466,7 @@ module Data = struct
           <- Length.succ new_sub_window_densities.(n - 1) ;
           (min_window_density, new_sub_window_densities)
 
-        let constants = Constants.compiled
+        let constants = Constants.for_unit_tests
 
         (* converting the input for actual implementation to the input required by the
            reference implementation *)
@@ -3040,7 +3040,8 @@ module Hooks = struct
 
   let%test "should_bootstrap is sane" =
     (* Even when consensus constants are of prod sizes, candidate should still trigger a bootstrap *)
-    should_bootstrap_len ~constants:Constants.compiled ~existing:Length.zero
+    should_bootstrap_len ~constants:Constants.for_unit_tests
+      ~existing:Length.zero
       ~candidate:(Length.of_int 100_000_000)
 
   let to_unix_timestamp recieved_time =
@@ -3052,23 +3053,23 @@ module Hooks = struct
       Consensus_state.curr_epoch_and_slot
         (Consensus_state.negative_one
            ~genesis_ledger:Genesis_ledger.Unit_test_ledger.t
-           ~protocol_constants:Genesis_constants.compiled.protocol)
+           ~protocol_constants:Genesis_constants.for_unit_tests.protocol)
     in
-    let constants = Constants.compiled in
+    let constants = Constants.for_unit_tests in
     let delay = UInt32.(div constants.delta (of_int 2)) in
     let new_slot = UInt32.Infix.(curr_slot + delay) in
     let time_received = Epoch.slot_start_time ~constants curr_epoch new_slot in
     received_at_valid_time ~constants
       (Consensus_state.negative_one
          ~genesis_ledger:Genesis_ledger.Unit_test_ledger.t
-         ~protocol_constants:Genesis_constants.compiled.protocol)
+         ~protocol_constants:Genesis_constants.for_unit_tests.protocol)
       ~time_received:(to_unix_timestamp time_received)
     |> Result.is_ok
 
   let%test "Receive an invalid consensus_state" =
     let epoch = Epoch.of_int 5 in
-    let constants = Constants.compiled in
-    let protocol_constants = Genesis_constants.compiled.protocol in
+    let constants = Constants.for_unit_tests in
+    let protocol_constants = Genesis_constants.for_unit_tests.protocol in
     let start_time = Epoch.start_time ~constants epoch in
     let ((curr_epoch, curr_slot) as curr) =
       Epoch_and_slot.of_time_exn ~constants start_time
@@ -3226,7 +3227,7 @@ module Hooks = struct
           let curr_global_slot =
             Global_slot.(prev.curr_global_slot + slot_advancement)
           in
-          let constants = Constants.compiled in
+          let constants = Constants.for_unit_tests in
           let curr_epoch, curr_slot =
             Global_slot.to_epoch_and_slot curr_global_slot
           in
@@ -3292,9 +3293,9 @@ let%test_module "Proof of stake tests" =
         Consensus_state.create_genesis
           ~negative_one_protocol_state_hash:previous_protocol_state_hash
           ~genesis_ledger:Genesis_ledger.Unit_test_ledger.t
-          ~protocol_constants:Genesis_constants.compiled.protocol
+          ~protocol_constants:Genesis_constants.for_unit_tests.protocol
       in
-      let constants = Constants.compiled in
+      let constants = Constants.for_unit_tests in
       let global_slot =
         Core_kernel.Time.now () |> Time.of_time
         |> Epoch_and_slot.of_time_exn ~constants
@@ -3372,7 +3373,7 @@ let%test_module "Proof of stake tests" =
             ~compute:
               (As_prover.return
                  (Coda_base.Protocol_constants_checked.value_of_t
-                    Genesis_constants.compiled.protocol))
+                    Genesis_constants.for_unit_tests.protocol))
         in
         let result =
           update_var previous_state transition_data

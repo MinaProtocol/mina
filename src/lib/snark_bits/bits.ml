@@ -84,6 +84,8 @@ module Vector = struct
 
     let of_bits bools =
       List.foldi bools ~init:V.empty ~f:(fun i t bool -> V.set t i bool)
+
+    let size_in_bits = V.length
   end
 end
 
@@ -133,6 +135,8 @@ module Make_field0
       if i < 0 then acc else go (Bigint.test_bit n i :: acc) (i - 1)
     in
     go [] (bit_length - 1)
+
+  let size_in_bits = bit_length
 end
 
 module Make_field
@@ -184,6 +188,8 @@ module Snarkable = struct
 
     let () = assert (bit_length < Field.size_in_bits)
 
+    let size_in_bits = bit_length
+
     let init ~f =
       let rec go acc i =
         if i = V.length then acc else go (V.set acc i (f i)) (i + 1)
@@ -217,6 +223,8 @@ module Snarkable = struct
         let alloc = Alloc.alloc in
         let check _ = Checked.return () in
         {read; store; alloc; check}
+
+      let size_in_bits = size_in_bits
     end
 
     let v_to_list n v =
@@ -249,6 +257,8 @@ module Snarkable = struct
 
       let var_of_value v =
         List.init V.length ~f:(fun i -> Boolean.var_of_value (V.get v i))
+
+      let size_in_bits = size_in_bits
     end
 
     let unpack_var x = Impl.Field.Checked.unpack x ~length:bit_length
@@ -305,6 +315,8 @@ module Snarkable = struct
     open Impl
     include M
 
+    let size_in_bits = bit_length
+
     module Packed = struct
       type var = Field.Var.t
 
@@ -313,6 +325,8 @@ module Snarkable = struct
       let typ = Typ.field
 
       let assert_equal = Field.Checked.Assert.equal
+
+      let size_in_bits = size_in_bits
     end
 
     module Unpacked = struct
@@ -336,6 +350,8 @@ module Snarkable = struct
       let var_of_value v =
         unpack_field Field.unpack ~bit_length v
         |> List.map ~f:Boolean.var_of_value
+
+      let size_in_bits = size_in_bits
     end
 
     let project_value = Fn.id

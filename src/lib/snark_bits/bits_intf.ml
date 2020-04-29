@@ -9,6 +9,8 @@ module type Basic = sig
   type t
 
   val fold : t -> bool Fold.t
+
+  val size_in_bits : int
 end
 
 module type S = sig
@@ -38,12 +40,16 @@ module Snarkable = struct
 
     type boolean_var
 
+    val size_in_bits : int
+
     module Packed : sig
       type var
 
       type value
 
       val typ : (var, value) typ
+
+      val size_in_bits : int
     end
 
     module Unpacked : sig
@@ -60,6 +66,8 @@ module Snarkable = struct
       val var_to_triples : var -> boolean_var Triple.t list
 
       val var_of_value : value -> var
+
+      val size_in_bits : int
     end
   end
 
