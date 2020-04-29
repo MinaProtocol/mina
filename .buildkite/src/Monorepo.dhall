@@ -9,8 +9,10 @@ let jobs : List JobSpec.Type = [
   ./jobs/Sample2/Spec.dhall
 ]
 
+let prepareCommand = "./.buildkite/scripts/generate-diff.sh > computed_diff.txt"
+
 let makeCommand = \(job : JobSpec.Type) -> ''
-  if ./.buildkite/scripts/generate-diff.sh | grep -q ${job.dirtyWhen}; then
+  if cat computed_diff.txt | grep -q ${job.dirtyWhen}; then
       dhall-to-yaml --quoted <<< './.buildkite/src/jobs/${job.name}/Pipeline.dhall' | buildkite-agent pipeline upload
   fi
 ''
