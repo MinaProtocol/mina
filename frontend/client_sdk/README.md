@@ -27,7 +27,7 @@ let signedPayment = CodaSDK.signPayment({
     amount: 1,
     fee: 1,
     nonce: 0
-  }, key);
+  }, keys);
 ```
 
 NodeJS:
@@ -46,7 +46,7 @@ let signedPayment = CodaSDK.signPayment({
     amount: 1,
     fee: 1,
     nonce: 0
-  }, key);
+  }, keys);
 ```
 
 ReasonML:
@@ -69,7 +69,7 @@ let signedPayment = CodaSDK.signPayment({
     amount: "1",
     fee: "1",
     nonce: "0"
-  }, key);
+  }, keys);
 
 ```
 
