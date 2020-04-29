@@ -106,9 +106,15 @@ let make = (~publicKey) => {
          </div>
          {switch (state.error) {
           | Some(EmptyDelegateKey) =>
-            <Alert kind=`Danger defaultMessage="Please enter a public key" />
+            <>
+              <Alert kind=`Danger defaultMessage="Please enter a public key" />
+              <Spacer height=2. />
+            </>
           | Some(InvalidGraphQLResponse(error)) =>
-            <Alert kind=`Danger defaultMessage=error />
+            <>
+              <Alert kind=`Danger defaultMessage=error />
+              <Spacer height=2. />
+            </>
           | None => React.null
           }}
          <div className=Theme.Text.Header.h3>
