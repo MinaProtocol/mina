@@ -16,10 +16,17 @@ DIST_DIR="$3"
 
 mkdir -p "$DIST_DIR"
 
+# move and sign coda.exe (if has rights)
 cp "$1" "$DIST_DIR/$LOCAL_CODA_EXE"
-codesign -s "$APPLE_ID" "$DIST_DIR/$LOCAL_CODA_EXE"
+set +u
+[ -z $APPLE_ID ] || codesign -s "$APPLE_ID" "$DIST_DIR/$LOCAL_CODA_EXE"
+set -u
+
+# move and sign libp2p helper (if has rights)
 cp "$2" "$DIST_DIR/$LOCAL_LIBP2P"
-codesign -s "$APPLE_ID" "$DIST_DIR/$LOCAL_LIBP2P"
+set +u
+[ -z $APPLE_ID ] || codesign -s "$APPLE_ID" "$DIST_DIR/$LOCAL_LIBP2P"
+set -u
 chmod +w "$DIST_DIR/$LOCAL_LIBP2P"
 
 pushd "$DIST_DIR"
@@ -49,8 +56,10 @@ fixup() {
         && echo "Moving and rewriting $lib" \
         || echo "Already copied $lib" # no clobber in case we've already moved this lib
       chmod +w "$LOCAL_LIB"
-      codesign --remove-signature "$LOCAL_LIB"
-      codesign -s "$APPLE_ID" "$LOCAL_LIB"
+      set +u
+      [ -z $APPLE_ID ] || codesign --remove-signature "$LOCAL_LIB"
+      [ -z $APPLE_ID ] || codesign -s "$APPLE_ID" "$LOCAL_LIB"
+      set -u
       install_name_tool -change "$lib" "@executable_path/$(basename $lib)" "$BIN" || exit 1
       # Add to our seen set, by adding to the array and then filtering dupes
       SEEN+=("$BIN")

@@ -48,47 +48,14 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
           Ppx_util.expr_of_sexp ~loc
             (Snark_params.Tick.Field.sexp_of_t base_hash)]]
 
-  let wrap hash proof =
-    let open Snark_params in
-    let module Wrap = Keys.Wrap in
-    let input = Wrap_input.of_tick_field hash in
-    let proof =
-      Tock.prove
-        (Tock.Keypair.pk Wrap.keys)
-        Wrap.input {Wrap.Prover_state.proof} Wrap.main input
-    in
-    assert (Tock.verify proof (Tock.Keypair.vk Wrap.keys) Wrap.input input) ;
-    proof
-
   let base_proof_expr =
-    let open Snark_params in
-    let prover_state =
-      { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
-      ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-      ; prev_state=
-          Protocol_state.negative_one ~genesis_ledger:Test_genesis_ledger.t
-            ~protocol_constants:Genesis_constants.compiled.protocol
-      ; genesis_state_hash= protocol_state_with_hash.hash
-      ; expected_next_state= None
-      ; update= Snark_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
-      }
+    let proof =
+      Genesis_proof.create
+        ~keys:(module Keys : Keys_lib.Keys.S)
+        ~genesis_ledger:Test_genesis_ledger.t
+        ~protocol_constants:Genesis_constants.compiled.protocol
+        ~protocol_state_with_hash ~base_hash ()
     in
-    let main x =
-      Tick.handle
-        (Keys.Step.main ~logger:(Logger.create ()) x)
-        (Consensus.Data.Prover_state.precomputed_handler
-           ~genesis_ledger:Test_genesis_ledger.t)
-    in
-    let tick =
-      Tick.prove
-        (Tick.Keypair.pk Keys.Step.keys)
-        (Keys.Step.input ()) prover_state main base_hash
-    in
-    assert (
-      Tick.verify tick
-        (Tick.Keypair.vk Keys.Step.keys)
-        (Keys.Step.input ()) base_hash ) ;
-    let proof = wrap base_hash tick in
     [%expr
       Coda_base.Proof.Stable.V1.t_of_sexp
         [%e

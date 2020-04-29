@@ -2,5 +2,5 @@
  (name gen)
  (libraries async core ppxlib yojson cache_dir)
  (preprocess
-  (pps ppx_coda ppx_jane ppxlib.metaquot ppxlib.runner))
+  (pps ppx_coda ppx_jane ppxlib.metaquot))
  (modes native))

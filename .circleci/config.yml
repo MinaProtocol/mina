@@ -52,7 +52,7 @@ jobs:
     test-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
               environment:
                 CODA_DOCKER: true
             - image: postgres:12
@@ -70,7 +70,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Set Up Database
                   command: |
@@ -83,7 +83,7 @@ jobs:
     build-archive:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
               environment:
                 CODA_DOCKER: true
                 HASURA_PORT: 8080
@@ -109,7 +109,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                   name: Build Archive Process
-                  command:  bash -c 'eval `opam config env` && make build_archive'
+                  command:  bash -c 'eval `opam config env` && LIBP2P_NIXLESS=1 make build_archive'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
             # NOTE: If we were using a machine executor we would be able to mount the sql file in
@@ -129,7 +129,7 @@ jobs:
                   command: ./scripts/archive/build-release-archives.sh
     lint:
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -140,10 +140,10 @@ jobs:
                   command: ./scripts/test.py render --check .circleci/config.yml.jinja .mergify.yml.jinja
             - run:
                   name: OCamlformat (make check-format)
-                  command: eval `opam config env` && make check-format
+                  command: eval `opam config env` && LIBP2P_NIXLESS=1 make check-format
             - run:
                   name: Snarky tracks master (make check-snarky-submodule)
-                  command: make check-snarky-submodule
+                  command: LIBP2P_NIXLESS=1 make check-snarky-submodule
             - run:
                   name: Check ppx_optcomp preprocessor_deps
                   command: ./scripts/lint_preprocessor_deps.sh
@@ -158,7 +158,7 @@ jobs:
                   command: ./scripts/require-ppx-coda.py
     lint-opt:
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -178,7 +178,7 @@ jobs:
                   command: ./scripts/compare_ci_diff_binables.sh
     compare-test-signatures:
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -254,8 +254,8 @@ jobs:
                 keys:
                     - opam-v8-{{ checksum "opam_ci_cache.sig" }}
             - run:
-                name: Install macos dependencies - opam -- make macos-setup-compile
-                command: ./scripts/skip_if_only_frontend_or_rfcs.sh make macos-setup-compile
+                name: Install macos dependencies - opam -- LIBP2P_NIXLESS=1 make macos-setup-compile
+                command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'LIBP2P_NIXLESS=1 make macos-setup-compile'
             - save_cache:
                 name: Save cache - opam
                 key: opam-v8-{{ checksum "opam_ci_cache.sig" }}
@@ -324,15 +324,15 @@ jobs:
             - run:
                 name: Decode Apple Certificates
                 context: org-global
-                command: base64 -D -o frontend/wallet/Certificates.p12 <<< $APPLE_CERTIFICATES
+                command: bash -c '[ -z $APPLE_CERTIFICATES ] || base64 -D -o frontend/wallet/Certificates.p12 <<< $APPLE_CERTIFICATES'
             - run:
                 name: Fastlane
                 context: org-global
-                command: cd frontend/wallet && bundle exec fastlane ci && cd ../..
+                command: bash -c '[ -z $APPLE_CERTIFICATES ] || (cd frontend/wallet && bundle exec fastlane ci && cd ../..)'
             - run:
                 name: Build portable binary
                 command: |
-                    make macos-portable
+                    LIBP2P_NIXLESS=1 make macos-portable
                     cp _build/coda-daemon-macos.zip package/.
             - run:
                   name: Copy artifacts to cloud
@@ -343,7 +343,7 @@ jobs:
     build-client-sdk:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -358,14 +358,14 @@ jobs:
                   command: ./scripts/pin-external-packages.sh
             - run:
                   name: Build client SDK for Javascript
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make client_sdk 2>&1 | tee /tmp/artifacts/buildclientsdk.log'
                   environment:
                     DUNE_PROFILE: nonconsensus_medium_curves
                   no_output_timeout: 10m
     build-artifacts--testnet_postake_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -378,11 +378,14 @@ jobs:
             - run:
                   name: Pin external packages
                   command: ./scripts/pin-external-packages.sh
+            - run:
+                name: Build libp2p_helper
+                command: GO=/usr/lib/go/bin/go LIBP2P_NIXLESS=1 make libp2p_helper
             # Explicitly generate PV-keys and uploading before building
             # See https://bkase.dev/posts/ocaml-writer#fn-3 for rationale
             - run:
                   name: Generate PV keys
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'set -o pipefail; eval `opam config env` && LIBP2P_NIXLESS=1 make build_pv_keys 2>&1 | tee /tmp/artifacts/buildocaml.log'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                     EXTRA_NIX_ARGS: --option sandbox false
@@ -398,6 +401,8 @@ jobs:
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
                     EXTRA_NIX_ARGS: --option sandbox false
+                    GO: /usr/lib/go/bin/go
+                    LIBP2P_NIXLESS: 1
 
                   no_output_timeout: 20m
             - run:
@@ -407,16 +412,21 @@ jobs:
                   no_output_timeout: 20m
             - run:
                   name: Build deb package with PV keys and PV key tar
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh make deb
+                  command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make deb'
                   environment:
                     DUNE_PROFILE: testnet_postake_medium_curves
+                    LIBP2P_NIXLESS: 1
                   no_output_timeout: 20m
             - run:
                   name: Store genesis public/private keypairs
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh make genesiskeys
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make genesiskeys'
+                  environment:
+                    LIBP2P_NIXLESS: 1
             - run:
                   name: Upload deb to repo
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh make publish_deb
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make publish_deb'
+                  environment:
+                    LIBP2P_NIXLESS: 1
                   no_output_timeout: 20m
             - run:
                   name: Copy artifacts to cloud
@@ -452,7 +462,7 @@ jobs:
     test-unit--dev:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -461,12 +471,14 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build && (dune runtest src/lib --profile=dev -j8 || (./scripts/link-coredumps.sh && false))'
                   environment:
                     DUNE_PROFILE: dev
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
                   no_output_timeout: 30m
             - store_artifacts:
                 path: core_dumps
@@ -475,7 +487,7 @@ jobs:
     test-unit--nonconsensus_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -484,17 +496,21 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && (dune runtest src/nonconsensus --profile=nonconsensus_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   no_output_timeout: 30m
+                  environment:
+                    DUNE_PROFILE: nonconsensus_medium_curves
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
             - store_artifacts:
                 path: core_dumps
     test-unit--dev_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run: ulimit -c unlimited
@@ -503,19 +519,21 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Run unit tests
-                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && make build && (dune runtest src/lib --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
+                  command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && export GO=/usr/lib/go/bin/go && make build && (dune runtest src/lib --profile=dev_medium_curves -j8 || (./scripts/link-coredumps.sh && false))'
                   environment:
                     DUNE_PROFILE: dev_medium_curves
+                    LIBP2P_NIXLESS: 1
+                    GO: /usr/lib/go/bin/go
                   no_output_timeout: 1h
             - store_artifacts:
                 path: core_dumps
     test--fake_hash:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -523,7 +541,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- fake_hash:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "fake_hash:full-test"'
@@ -532,7 +550,7 @@ jobs:
     test--test_postake:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -540,7 +558,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake:full-test"'
@@ -552,7 +570,7 @@ jobs:
     test--test_postake_bootstrap:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -560,7 +578,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_bootstrap:coda-bootstrap-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_bootstrap:coda-bootstrap-test"'
@@ -572,7 +590,7 @@ jobs:
     test--test_postake_catchup:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -580,7 +598,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_catchup:coda-restart-node-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_catchup:coda-restart-node-test"'
@@ -589,7 +607,7 @@ jobs:
     test--test_postake_delegation:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -597,7 +615,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_delegation:coda-delegation-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_delegation:coda-delegation-test"'
@@ -606,7 +624,7 @@ jobs:
     test--test_postake_five_even_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -614,7 +632,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_five_even_txns:coda-shared-prefix-multiproducer-test -num-block-producers 5 -payments"'
@@ -623,7 +641,7 @@ jobs:
     test--test_postake_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -631,7 +649,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_snarkless:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless:full-test"'
@@ -643,7 +661,7 @@ jobs:
     test--test_postake_split:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -651,7 +669,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split:coda-shared-prefix-multiproducer-test -num-block-producers 2"'
@@ -660,7 +678,7 @@ jobs:
     test--test_postake_split_snarkless:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -668,7 +686,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_split_snarkless:coda-peers-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_snarkless:coda-peers-test"'
@@ -695,7 +713,7 @@ jobs:
     test--test_postake_three_producers:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -703,7 +721,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_three_producers:coda-txns-and-restart-non-producers
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_three_producers:coda-txns-and-restart-non-producers"'
@@ -712,7 +730,7 @@ jobs:
     test--test_postake_txns:
         resource_class: large
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -720,7 +738,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_txns:coda-shared-state-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_txns:coda-shared-state-test"'
@@ -732,7 +750,7 @@ jobs:
     test--test_postake_full_epoch:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -740,7 +758,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_full_epoch:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_full_epoch:full-test"'
@@ -749,7 +767,7 @@ jobs:
     test--test_postake_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -757,7 +775,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_medium_curves:full-test"'
@@ -771,7 +789,7 @@ jobs:
     test--test_postake_snarkless_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -779,7 +797,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_snarkless_medium_curves:full-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_snarkless_medium_curves:full-test"'
@@ -791,7 +809,7 @@ jobs:
     test--test_postake_split_medium_curves:
         resource_class: xlarge
         docker:
-            - image: codaprotocol/coda:toolchain-b6296db13810db67788fae9a68c346bd24818088
+            - image: codaprotocol/coda:toolchain-9396e1d959f824275c4a433ba1065bcb4e8a30ab
         steps:
             - checkout
             - run:
@@ -799,7 +817,7 @@ jobs:
                   command: ./scripts/update-opam-in-docker.sh
             - run:
                 name: Build libp2p_helper
-                command: make libp2p_helper
+                command: LIBP2P_NIXLESS=1 GO=/usr/lib/go/bin/go make libp2p_helper
             - run:
                   name: Running test -- test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run --non-interactive --collect-artifacts --yes "test_postake_split_medium_curves:coda-shared-prefix-multiproducer-test -num-block-producers 2"'

@@ -30,7 +30,7 @@ module Input = struct
     ; is_archive_rocksdb: bool
     ; is_seed: bool
     ; archive_process_location: Core.Host_and_port.t option }
-  [@@deriving bin_io]
+  [@@deriving bin_io_unversioned]
 end
 
 open Input
@@ -184,13 +184,13 @@ module T = struct
     ; coda_best_path: unit -> State_hash.t list Deferred.t }
 
   module Worker_state = struct
-    type init_arg = Input.t [@@deriving bin_io]
+    type init_arg = Input.t [@@deriving bin_io_unversioned]
 
     type t = coda_functions
   end
 
   module Connection_state = struct
-    type init_arg = unit [@@deriving bin_io]
+    type init_arg = unit [@@deriving bin_io_unversioned]
 
     type t = unit
   end
@@ -506,6 +506,7 @@ module T = struct
               ; chain_id
               ; logger
               ; unsafe_no_trust_ip= true
+              ; flood= false
               ; trust_system
               ; keypair= Some libp2p_keypair }
           in
@@ -539,8 +540,10 @@ module T = struct
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
-                 ~is_seed ~coinbase_receiver:`Producer ~net_config
-                 ~gossip_net_params ~initial_fork_id:Fork_id.empty
+                 ~is_seed ~disable_telemetry:true ~coinbase_receiver:`Producer
+                 ~net_config ~gossip_net_params
+                 ~initial_protocol_version:Protocol_version.zero
+                 ~proposed_protocol_version_opt:None
                  ~work_selection_method:
                    (Cli_lib.Arg_type.work_selection_method_to_module
                       work_selection_method)
@@ -570,8 +573,8 @@ module T = struct
               ~base_proof:Precomputed_values.base_proof
           in
           let coda_ref : Coda_lib.t option ref = ref None in
-          Coda_run.handle_shutdown ~monitor ~conf_dir ~top_logger:logger
-            coda_ref ;
+          Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir
+            ~top_logger:logger coda_ref ;
           let%map coda =
             with_monitor
               (fun () ->

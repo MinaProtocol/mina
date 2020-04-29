@@ -104,7 +104,7 @@ let var_to_input (var : var) =
     (Array.map ~f:s [|k; delta; genesis_state_timestamp|])
 
 let%test_unit "value = var" =
-  let compiled = Genesis_constants.compiled.protocol in
+  let compiled = Genesis_constants.for_unit_tests.protocol in
   let test protocol_constants =
     let open Snarky in
     let p_var =

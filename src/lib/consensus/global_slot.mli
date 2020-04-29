@@ -45,7 +45,7 @@ val to_input : t -> (_, bool) Random_oracle.Input.t
 
 val of_slot_number : constants:Constants.t -> Coda_numbers.Global_slot.t -> t
 
-val gen : t Quickcheck.Generator.t
+val gen : constants:Constants.t -> t Quickcheck.Generator.t
 
 val ( + ) : t -> int -> t
 
