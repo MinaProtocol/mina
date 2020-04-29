@@ -16,6 +16,12 @@ module Random_oracle = Random_oracle_nonconsensus.Random_oracle
 
 [%%endif]
 
+module type Data_hash_descriptor = sig
+  val version_byte : char
+
+  val description : string
+end
+
 module type Basic = sig
   type t = Field.t [@@deriving sexp, yojson]
 

@@ -26,15 +26,6 @@ end) =
 struct
   type t = Field.t [@@deriving sexp, compare]
 
-  let to_yojson t = `String (Field.to_string t)
-
-  let of_yojson = function
-    | `String s -> (
-      try Ok (Field.of_string s)
-      with exn -> Error Error.(to_string_hum (of_exn exn)) )
-    | _ ->
-        Error "of_yojson: expected string"
-
   let to_decimal_string (t : Field.t) = Field.to_string t
 
   let to_bytes t =
@@ -146,12 +137,29 @@ struct
   [%%endif]
 end
 
-module Make_full_size () = struct
+module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   module Basic = Make_basic (struct
     let length_in_bits = Field.size_in_bits
   end)
 
   include Basic
+
+  module Base58_check = Codable.Make_base58_check(struct
+    type nonrec t = t
+
+    include Hashable.Make_binable(Basic)
+
+    include B58_data
+  end)
+
+  [%%define_locally
+  Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
+
+  [%%define_locally
+  Base58_check.String_ops.(to_string, of_string)]
+
+  [%%define_locally
+  Base58_check.(to_yojson, of_yojson)]
 
   (* inside functor of no arguments, versioned types are allowed *)
 
