@@ -30,7 +30,7 @@ module Input = struct
     ; is_archive_rocksdb: bool
     ; is_seed: bool
     ; archive_process_location: Core.Host_and_port.t option }
-  [@@deriving bin_io]
+  [@@deriving bin_io_unversioned]
 end
 
 open Input
@@ -184,13 +184,13 @@ module T = struct
     ; coda_best_path: unit -> State_hash.t list Deferred.t }
 
   module Worker_state = struct
-    type init_arg = Input.t [@@deriving bin_io]
+    type init_arg = Input.t [@@deriving bin_io_unversioned]
 
     type t = coda_functions
   end
 
   module Connection_state = struct
-    type init_arg = unit [@@deriving bin_io]
+    type init_arg = unit [@@deriving bin_io_unversioned]
 
     type t = unit
   end
