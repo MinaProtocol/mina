@@ -359,6 +359,8 @@ let%test_module "Transition_handler.Processor tests" =
 
     let logger = Logger.create ()
 
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
     let time_controller = Block_time.Controller.basic ~logger
 
     let trust_system = Trust_system.null ()
@@ -377,8 +379,9 @@ let%test_module "Transition_handler.Processor tests" =
       let branch_size = 10 in
       let max_length = frontier_size + branch_size in
       Quickcheck.test ~trials:4
-        (Transition_frontier.For_tests.gen_with_branch ~max_length
-           ~frontier_size ~branch_size ()) ~f:(fun (frontier, branch) ->
+        (Transition_frontier.For_tests.gen_with_branch ~precomputed_values
+           ~max_length ~frontier_size ~branch_size ())
+        ~f:(fun (frontier, branch) ->
           assert (
             Thread_safe.block_on_async_exn (fun () ->
                 let pids = Child_processes.Termination.create_pid_table () in

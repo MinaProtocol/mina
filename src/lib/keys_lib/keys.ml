@@ -58,6 +58,13 @@ let bc_pk = lazy (Snark_keys.blockchain_proving ())
 
 let bc_vk = lazy (Snark_keys.blockchain_verification ())
 
+let step_instance_hash protocol_state =
+  let open Async in
+  let%map bc_vk = Lazy.force bc_vk in
+  unstage
+    (Blockchain_snark.Blockchain_transition.instance_hash bc_vk.wrap)
+    protocol_state
+
 let keys = Set_once.create ()
 
 let create () : (module S) Async.Deferred.t =

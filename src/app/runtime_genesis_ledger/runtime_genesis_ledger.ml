@@ -25,11 +25,17 @@ let generate_base_proof ~ledger ~(genesis_constants : Genesis_constants.t) =
     Coda_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_constants
   in
   let base_hash = Keys.Step.instance_hash protocol_state_with_hash.data in
-  let base_proof =
-    Genesis_proof.create ~keys ~genesis_ledger ~protocol_state_with_hash
-      ~base_hash ~protocol_constants:genesis_constants.protocol ()
+  let computed_values =
+    Genesis_proof.create_values ~keys
+      { genesis_ledger=
+          ( module Genesis_ledger.Of_ledger (struct
+            let t = genesis_ledger
+          end) )
+      ; protocol_state_with_hash
+      ; base_hash
+      ; genesis_constants }
   in
-  (base_hash, base_proof)
+  (base_hash, computed_values.genesis_proof)
 
 let compiled_accounts_json () : Account_config.t =
   List.map (Lazy.force Test_genesis_ledger.accounts) ~f:(fun (sk_opt, acc) ->

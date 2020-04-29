@@ -916,9 +916,12 @@ module Validated = struct
     |> Validation.reset_staged_ledger_diff_validation
 end
 
-let genesis ~genesis_ledger ~base_proof ~genesis_constants =
+let genesis ~precomputed_values =
   let genesis_protocol_state =
-    Coda_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_constants
+    Precomputed_values.genesis_state_with_hash precomputed_values
+  in
+  let protocol_state_proof =
+    Precomputed_values.genesis_proof precomputed_values
   in
   let creator = fst Consensus_state_hooks.genesis_winner in
   let empty_diff =
@@ -934,7 +937,7 @@ let genesis ~genesis_ledger ~base_proof ~genesis_constants =
   let (`I_swear_this_is_safe_see_my_comment transition) =
     Validated.create_unsafe_pre_hashed
       (With_hash.map genesis_protocol_state ~f:(fun protocol_state ->
-           create ~protocol_state ~protocol_state_proof:base_proof
+           create ~protocol_state ~protocol_state_proof
              ~staged_ledger_diff:empty_diff ~validation_callback:Fn.ignore
              ~delta_transition_chain_proof:
                (Protocol_state.previous_state_hash protocol_state, [])
@@ -951,11 +954,9 @@ module For_tests = struct
       ~delta_transition_chain_proof ~validation_callback
       ?proposed_protocol_version_opt ()
 
-  let genesis () =
+  let unit_test_genesis () =
     Protocol_version.(set_current zero) ;
-    genesis ~genesis_ledger:Test_genesis_ledger.t
-      ~base_proof:Precomputed_values.base_proof
-      ~genesis_constants:Genesis_constants.compiled
+    genesis ~precomputed_values:(Lazy.force Precomputed_values.for_unit_tests)
 end
 
 module Transition_frontier_validation (Transition_frontier : sig
