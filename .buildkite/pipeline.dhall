@@ -10,8 +10,8 @@ let Command =
 let JobType = { dirtyWhen : Text, name : Text }
 
 let jobs : List JobType = [
-  ./src/jobs/Sample/Spec.dhall,
-  ./src/jobs/Sample2/Spec.dhall
+  ./.buildkite/src/jobs/Sample/Spec.dhall,
+  ./.buildkite/src/jobs/Sample2/Spec.dhall
 ]
 
 let diff = "git diff $(diff -u <(git rev-list --first-parent $BUILDKITE_PULL_REQUEST_BASE_BRANCH) <(git rev-list --first-parent $BUILDKITE_BRANCH) | sed -ne 's/^ //p' | head -1) --name-only"
