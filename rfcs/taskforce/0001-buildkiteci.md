@@ -89,7 +89,7 @@ Pipeline are configured with Dhall rather than jinja-templated yaml. Dynamic pip
 
 **General Pipeline Writing Things**
 
-- Use the [BuildKite monorepo plugin](https://github.com/chronotc/monorepo-diff-buildkite-plugin) for granular test execution.
+- Use something like the [BuildKite monorepo plugin](https://github.com/chronotc/monorepo-diff-buildkite-plugin) for granular test execution. This is easy to implement with BuildKite's dynamic pipelines as described above.
 - Explicitly opt-in to the dependency graph. Don't support the "wait" instruction that blocks all parallel work.
 
 Assuming this proposal is accepted, more details will follow on how to structure the Dhall descriptions, but here is a rough cut of what it could look like:
