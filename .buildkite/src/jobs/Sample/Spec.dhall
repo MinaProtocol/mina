@@ -1,0 +1,3 @@
+{ dirtyWhen = "transition",
+  name = "Sample"
+}
