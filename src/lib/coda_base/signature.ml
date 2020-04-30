@@ -16,22 +16,12 @@ open Snark_params_nonconsensus
 [%%endif]
 
 module Arg = struct
-  [%%versioned_asserted
-  module Stable = struct
-    module V1 = struct
-      type t = (Field.t, Inner_curve.Scalar.t) Signature_poly.Stable.V1.t
+  type t = (Field.t, Inner_curve.Scalar.t) Signature_poly.Stable.Latest.t
+  [@@deriving bin_io_unversioned]
 
-      let to_latest = Fn.id
+  let description = "Signature"
 
-      let description = "Signature"
-
-      let version_byte = Base58_check.Version_bytes.signature
-    end
-
-    module Tests = struct
-      (* actual tests in Stable below *)
-    end
-  end]
+  let version_byte = Base58_check.Version_bytes.signature
 end
 
 [%%versioned_asserted
@@ -40,9 +30,9 @@ module Stable = struct
     type t = (Field.t, Inner_curve.Scalar.t) Signature_poly.Stable.V1.t
     [@@deriving sexp, compare, eq, hash]
 
-    type _unused = unit constraint t = Arg.Stable.V1.t
+    type _unused = unit constraint t = Arg.t
 
-    include Codable.Make_base58_check (Arg.Stable.V1)
+    include Codable.Make_base58_check (Arg)
 
     let to_latest = Fn.id
 

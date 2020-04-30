@@ -4,7 +4,7 @@
 
 PACKAGES="ocaml-sodium rpc_parallel ocaml-extlib digestif ocaml-extlib async_kernel coda_base58 graphql_ppx"
 
-git package sync && git package update --init --recursive
+git submodule sync && git submodule update --init --recursive
 
 for pkg in $PACKAGES; do
     echo "Pinning package" $pkg
