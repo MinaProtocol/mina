@@ -1,9 +1,22 @@
 (executable
  (name gen_values)
- (libraries async core snarky snark_params coda_base blockchain_snark
-   keys_lib snark_keys ppxlib ppx_util staged_ledger
-   global_signer_private_key)
+ (libraries
+   ;; opam deps
+   async
+   core
+   ;; libraries
+   blockchain_snark
+   coda_base
+   genesis_proof
+   global_signer_private_key
+   keys_lib
+   ppxlib
+   ppx_util
+   snark_keys
+   snark_params
+   snarky
+   staged_ledger)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
-  (pps ppx_optcomp ppx_let ppxlib.metaquot))
+  (pps ppx_coda ppx_optcomp ppx_let ppxlib.metaquot))
  (modes native))

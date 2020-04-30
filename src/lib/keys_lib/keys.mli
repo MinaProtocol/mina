@@ -29,7 +29,7 @@ module type S = sig
       val to_bool_list : Tock.Verification_key.t -> bool list
     end
 
-    module Prover_state = Step_prover_state
+    module Prover_state : module type of Step_prover_state
 
     val instance_hash : Protocol_state.value -> Tick.Field.t
 
@@ -45,7 +45,7 @@ module type S = sig
     val input :
       ('a, 'b, Wrap_input.var -> 'a, Wrap_input.t -> 'b) Tock.Data_spec.t
 
-    module Prover_state = Wrap_prover_state
+    module Prover_state : module type of Wrap_prover_state
 
     val main : Wrap_input.var -> (unit, Prover_state.t) Tock.Checked.t
   end
