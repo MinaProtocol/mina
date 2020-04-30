@@ -8,7 +8,7 @@ let make = () => {
     </p>
     <Spacer height=1. />
     <Button
-      link="https://codaprotocol.com/genesis"
+      link="/genesis"
       label="Join Genesis"
       bgColor=Theme.Colors.hyperlink
       bgColorHover={Theme.Colors.hyperlinkAlpha(1.)}
