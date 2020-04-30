@@ -1,3 +1,5 @@
+-- Commands are the individual command steps that CI runs
+
 let Prelude = ../External/Prelude.dhall
 
 let Map = ../Lib/Map.dhall
@@ -11,6 +13,13 @@ let Shared =
     , default = {=}
     }
 
+-- Everything here is taken directly from the buildkite Command documentation
+-- https://buildkite.com/docs/pipelines/command-step#command-step-attributes
+-- except "target" replaces "agents"
+--
+-- Target is our explicit union of large or small instances. As we build more
+-- complicated targeting rules we can replace this abstraction with something
+-- more powerful.
 let Config =
     { Type = Shared.Type  //\\
         { target : <Large | Small>
@@ -21,6 +30,8 @@ let Config =
       }
     }
 in
+-- The result type wraps our containers in optionals so that they are omitted
+-- from the rendered yaml if they are empty.
 let Result =
   { Type = Shared.Type //\\
     { agents : Optional (Map.Type Text)

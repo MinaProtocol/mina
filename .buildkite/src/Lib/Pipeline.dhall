@@ -1,3 +1,8 @@
+-- A Pipeline is a series of build steps
+--
+-- Pipelines are rendered by separate invocations to dhall-to-yaml when our
+-- monorepo triage step determines it be necessary.
+
 let Prelude = ../External/Prelude.dhall
 let List/map = Prelude.List.map
 
@@ -12,6 +17,7 @@ let Result = {
   default = {=}
 }
 
+-- We build a pipeline out of a spec and the commands in a step
 let Config = {
   Type = {
     spec: JobSpec.Type,
