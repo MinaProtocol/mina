@@ -63,6 +63,7 @@ to be on unstable private addresses without having to reconfigure the sentries.
 [drawbacks]: #drawbacks
 
 - Not using pubsub requires some additional code.
+- This unavoidably adds (at least) one hop of latency before the block producers will see new blocks from the network.
 
 ## Rationale and alternatives
 [rationale-and-alternatives]: #rationale-and-alternatives
