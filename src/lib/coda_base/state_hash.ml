@@ -3,7 +3,7 @@
 [%%import
 "/src/config.mlh"]
 
-open Core
+open Core_kernel
 
 [%%ifndef
 consensus_mechanism]
@@ -60,7 +60,7 @@ module Stable = struct
 
     include T
 
-    let to_latest = Core.Fn.id
+    let to_latest = Fn.id
 
     let to_yojson = to_yojson
 

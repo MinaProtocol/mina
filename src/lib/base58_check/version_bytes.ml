@@ -16,10 +16,6 @@ let ledger_hash : t = '\x05'
 
 let lite_precomputed : t = '\x06'
 
-let non_zero_curve_point : t = '\x07'
-
-let non_zero_curve_point_compressed : t = '\x08'
-
 let proof : t = '\x0A'
 
 let random_oracle_base : t = '\x0B'
@@ -27,8 +23,6 @@ let random_oracle_base : t = '\x0B'
 let receipt_chain_hash : t = '\x0C'
 
 let epoch_seed : t = '\x0D'
-
-let signature : t = '\x0E'
 
 let staged_ledger_hash_aux_hash : t = '\x0F'
 
@@ -55,3 +49,9 @@ let coinbase_stack_hash : t = '\x19'
 let pending_coinbase_hash_builder : t = '\x1A'
 
 let private_key : t = '\x5A'
+
+let non_zero_curve_point : t = '\xCE'
+
+let non_zero_curve_point_compressed : t = '\xCB'
+
+let signature : t = '\x9A'
