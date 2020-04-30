@@ -51,17 +51,18 @@ let medium_curves = false
 [%%if
 time_offsets = true]
 
-let setup_time_offsets () =
+let setup_time_offsets consensus_constants =
   Unix.putenv ~key:"CODA_TIME_OFFSET"
     ~data:
-      ( Time.Span.to_int63_seconds_round_down_exn (force Coda_processes.offset)
+      ( Time.Span.to_int63_seconds_round_down_exn
+          (Coda_processes.offset consensus_constants)
       |> Int63.to_int
       |> Option.value_exn ?here:None ?message:None ?error:None
       |> Int.to_string )
 
 [%%else]
 
-let setup_time_offsets () = ()
+let setup_time_offsets _ = ()
 
 [%%endif]
 
@@ -84,7 +85,11 @@ let print_heartbeat logger =
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
   let pids = Child_processes.Termination.create_pid_table () in
-  setup_time_offsets () ;
+  let consensus_constants =
+    Consensus.Constants.create
+      ~protocol_constants:Genesis_constants.compiled.protocol
+  in
+  setup_time_offsets consensus_constants ;
   print_heartbeat logger |> don't_wait_for ;
   Parallel.init_master () ;
   File_system.with_temp_dir (Filename.temp_dir_name ^/ "full_test_config")
@@ -189,7 +194,8 @@ let run_test () : unit Deferred.t =
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
              ~coinbase_receiver:`Producer ~conf_dir:temp_conf_dir
              ~gossip_net_params ~is_seed:true ~disable_telemetry:true
-             ~initial_fork_id:Fork_id.empty
+             ~initial_protocol_version:Protocol_version.zero
+             ~proposed_protocol_version_opt:None
              ~work_selection_method:
                (module Work_selector.Selection_methods.Sequence)
              ~initial_block_production_keypairs:(Keypair.Set.singleton keypair)
@@ -449,7 +455,6 @@ let run_test () : unit Deferred.t =
         else if with_snark then 15.
         else 7.
       in
-      let consensus_constants = Consensus.Constants.compiled in
       let wait_till_length =
         if medium_curves then Length.of_int 1
         else if test_full_epoch then

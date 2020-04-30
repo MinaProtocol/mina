@@ -13,7 +13,10 @@ let restart_node worker ~config ~logger =
   Coda_process.spawn_exn config
 
 let main () =
-  let consensus_constants = Consensus.Constants.compiled in
+  let consensus_constants =
+    Consensus.Constants.create
+      ~protocol_constants:Genesis_constants.compiled.protocol
+  in
   let open Keypair in
   let logger = Logger.create () in
   let largest_account_keypair =
