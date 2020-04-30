@@ -425,7 +425,7 @@ module For_tests = struct
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
         let genesis_transition =
-          External_transition.genesis ~precomputed_values
+          External_transition.For_tests.genesis ~precomputed_values
         in
         let genesis_ledger =
           Lazy.force (Precomputed_values.genesis_ledger precomputed_values)

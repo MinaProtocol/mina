@@ -954,9 +954,9 @@ module For_tests = struct
       ~delta_transition_chain_proof ~validation_callback
       ?proposed_protocol_version_opt ()
 
-  let unit_test_genesis () =
+  let genesis ~precomputed_values =
     Protocol_version.(set_current zero) ;
-    genesis ~precomputed_values:(Lazy.force Precomputed_values.for_unit_tests)
+    genesis ~precomputed_values
 end
 
 module Transition_frontier_validation (Transition_frontier : sig
