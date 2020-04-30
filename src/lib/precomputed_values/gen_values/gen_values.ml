@@ -42,11 +42,11 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
 
   let base_hash = Keys.Step.instance_hash protocol_state_with_hash.data
 
-  let values_for_unit_tests =
+  let compiled_values =
     Genesis_proof.create_values
       ~keys:(module Keys : Keys_lib.Keys.S)
-      { genesis_constants= Genesis_constants.for_unit_tests
-      ; genesis_ledger= Genesis_ledger.for_unit_tests
+      { genesis_constants= Genesis_constants.compiled
+      ; genesis_ledger= (module Test_genesis_ledger)
       ; protocol_state_with_hash
       ; base_hash }
 
@@ -62,8 +62,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
       Coda_base.Proof.Stable.V1.t_of_sexp
         [%e
           Ppx_util.expr_of_sexp ~loc
-            (Coda_base.Proof.Stable.V1.sexp_of_t
-               values_for_unit_tests.genesis_proof)]]
+            (Coda_base.Proof.Stable.V1.sexp_of_t compiled_values.genesis_proof)]]
 end
 
 open Async
@@ -83,9 +82,9 @@ let main () =
       module T = Genesis_proof.T
       include T
 
-      let unit_test_base_hash = [%e M.base_hash_expr]
+      let unit_test_base_hash = Snark_params.Tick.Field.zero
 
-      let unit_test_base_proof = [%e M.base_proof_expr]
+      let unit_test_base_proof = Dummy_values.Tock.Bowe_gabizon18.proof
 
       let for_unit_tests =
         lazy
@@ -96,7 +95,22 @@ let main () =
            ; genesis_ledger= Genesis_ledger.for_unit_tests
            ; protocol_state_with_hash
            ; base_hash= unit_test_base_hash
-           ; genesis_proof= unit_test_base_proof })]
+           ; genesis_proof= unit_test_base_proof })
+
+      let compiled_base_hash = [%e M.base_hash_expr]
+
+      let compiled_base_proof = [%e M.base_proof_expr]
+
+      let compiled =
+        lazy
+          (let protocol_state_with_hash =
+             Lazy.force Coda_state.Genesis_protocol_state.compile_time_genesis
+           in
+           { genesis_constants= Genesis_constants.compiled
+           ; genesis_ledger= (module Test_genesis_ledger)
+           ; protocol_state_with_hash
+           ; base_hash= compiled_base_hash
+           ; genesis_proof= compiled_base_proof })]
   in
   Pprintast.top_phrase fmt (Ptop_def structure) ;
   exit 0

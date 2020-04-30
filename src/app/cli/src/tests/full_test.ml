@@ -84,7 +84,7 @@ let print_heartbeat logger =
 
 let run_test () : unit Deferred.t =
   let logger = Logger.create () in
-  let precomputed_values = Lazy.force Precomputed_values.for_unit_tests in
+  let precomputed_values = Lazy.force Precomputed_values.compiled in
   let (module Genesis_ledger) = precomputed_values.genesis_ledger in
   let pids = Child_processes.Termination.create_pid_table () in
   let consensus_constants =

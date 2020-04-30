@@ -431,7 +431,7 @@ module T = struct
             ; ("port", `Int addrs_and_ports.libp2p_port) ]
           ()
       in
-      let precomputed_values = Lazy.force Precomputed_values.for_unit_tests in
+      let precomputed_values = Lazy.force Precomputed_values.compiled in
       let (module Genesis_ledger) = precomputed_values.genesis_ledger in
       let pids = Child_processes.Termination.create_pid_table () in
       let%bind () =
