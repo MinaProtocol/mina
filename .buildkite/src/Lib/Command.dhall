@@ -1,8 +1,9 @@
 -- Commands are the individual command steps that CI runs
 
 let Prelude = ../External/Prelude.dhall
+let Map = Prelude.Map
 
-let Map = ../Lib/Map.dhall
+let Size = ./Size.dhall
 
 let Shared =
     { Type =
@@ -22,7 +23,7 @@ let Shared =
 -- more powerful.
 let Config =
     { Type = Shared.Type  //\\
-        { target : <Large | Small>
+        { target : Size
         , depends_on : List Text
         }
     , default = Shared.default /\ {
@@ -34,7 +35,7 @@ in
 -- from the rendered yaml if they are empty.
 let Result =
   { Type = Shared.Type //\\
-    { agents : Optional (Map.Type Text)
+    { agents : Optional (Map.Type Text Text)
     , depends_on : Optional (List Text)
     }
   , default = Shared.default /\ {
@@ -43,7 +44,7 @@ let Result =
   }
 in
 
-let targetToAgent = \(target : <Large | Small>) ->
+let targetToAgent = \(target : Size) ->
   merge { Large = [ { mapKey = "size", mapValue = "large" } ],
           Small = [ { mapKey = "size", mapValue = "small" } ]
         }
@@ -57,7 +58,7 @@ let build : Config.Type -> Result.Type = \(c : Config.Type) ->
     depends_on = if Prelude.List.null Text c.depends_on then None (List Text) else Some c.depends_on,
     agents =
       let agents = targetToAgent c.target in
-      if Prelude.List.null (Map.Entry.Type Text) agents then None (Map.Type Text) else Some agents
+      if Prelude.List.null (Map.Entry Text Text) agents then None (Map.Type Text Text) else Some agents
   }
 
 in {Config = Config, build = build} /\ Result

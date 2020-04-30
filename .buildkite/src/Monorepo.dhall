@@ -3,6 +3,7 @@ let Prelude = ./External/Prelude.dhall
 let Command = ./Lib/Command.dhall
 let JobSpec = ./Lib/JobSpec.dhall
 let Pipeline = ./Lib/Pipeline.dhall
+let Size = ./Lib/Size.dhall
 
 let jobs : List JobSpec.Type = ./Jobs.dhall
 
@@ -29,7 +30,7 @@ in Pipeline.build Pipeline.Config::{
       command = [ prepareCommand ] # commands,
       label = "Monorepo triage",
       key = "cmds",
-      target = <Large | Small>.Small
+      target = Size.Small
     }
   ]
 }
