@@ -285,7 +285,7 @@ module type S = sig
       -> unit
       -> t
 
-    val unit_test_genesis : unit -> Validated.t
+    val genesis : precomputed_values:Precomputed_values.t -> Validated.t
   end
 
   val timestamp : t -> Block_time.t
