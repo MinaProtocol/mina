@@ -22,15 +22,24 @@ let Shared =
 -- complicated targeting rules we can replace this abstraction with something
 -- more powerful.
 let Config =
-    { Type = Shared.Type  //\\
+    let Typ = Shared.Type //\\
         { target : Size
         , depends_on : List Text
         }
+    let upcast : Typ -> Shared.Type =
+      \(c : Typ) -> Shared::{
+        command = c.command,
+        label = c.label,
+        key = c.key
+      }
+    in
+    { Type = Typ
     , default = Shared.default /\ {
         depends_on = [] : List Text
       }
+    , upcast = upcast
     }
-in
+
 -- The result type wraps our containers in optionals so that they are omitted
 -- from the rendered yaml if they are empty.
 let Result =
@@ -51,10 +60,7 @@ let targetToAgent = \(target : Size) ->
         target
 
 let build : Config.Type -> Result.Type = \(c : Config.Type) ->
-  {
-    command = c.command,
-    label = c.label,
-    key = c.key,
+  Config.upcast c /\ {
     depends_on = if Prelude.List.null Text c.depends_on then None (List Text) else Some c.depends_on,
     agents =
       let agents = targetToAgent c.target in
