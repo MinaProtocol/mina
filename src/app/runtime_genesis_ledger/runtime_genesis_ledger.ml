@@ -20,17 +20,15 @@ type t = Ledger.t
 
 let generate_base_proof ~ledger ~(genesis_constants : Genesis_constants.t) =
   let%map ((module Keys) as keys) = Keys_lib.Keys.create () in
-  let genesis_ledger = lazy ledger in
   let protocol_state_with_hash =
-    Coda_state.Genesis_protocol_state.t ~genesis_ledger ~genesis_constants
+    Coda_state.Genesis_protocol_state.t
+      ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
+      ~genesis_constants
   in
   let base_hash = Keys.Step.instance_hash protocol_state_with_hash.data in
   let computed_values =
     Genesis_proof.create_values ~keys
-      { genesis_ledger=
-          ( module Genesis_ledger.Of_ledger (struct
-            let t = genesis_ledger
-          end) )
+      { genesis_ledger= ledger
       ; protocol_state_with_hash
       ; base_hash
       ; genesis_constants }
@@ -44,20 +42,30 @@ let compiled_accounts_json () : Account_config.t =
       ; balance= acc.balance
       ; delegate= Some acc.delegate } )
 
-let generate_ledger : directory_name:string -> Account_config.t -> t =
+let generate_ledger :
+    directory_name:string -> Account_config.t -> Genesis_ledger.Packed.t =
  fun ~directory_name accounts ->
   let ledger = Ledger.create ~directory_name () in
-  List.iter accounts ~f:(fun {pk; balance; delegate; _} ->
-      let account =
-        let account_id = Account_id.create pk Token_id.default in
-        let base_acct = Account.create account_id balance in
-        {base_acct with delegate= Option.value ~default:pk delegate}
-      in
-      Ledger.create_new_account_exn ledger (Account.identifier account) account
-  ) ;
-  ledger
+  let accounts =
+    List.map accounts ~f:(fun {pk; sk; balance; delegate} ->
+        let account =
+          let account_id = Account_id.create pk Token_id.default in
+          let base_acct = Account.create account_id balance in
+          {base_acct with delegate= Option.value ~default:pk delegate}
+        in
+        Ledger.create_new_account_exn ledger
+          (Account.identifier account)
+          account ;
+        (sk, account) )
+  in
+  Ledger.commit ledger ;
+  ( module struct
+    include Genesis_ledger.Make (struct
+      let accounts = lazy accounts
+    end)
 
-let commit ledger = Ledger.commit ledger
+    let t = lazy ledger
+  end )
 
 let get_accounts accounts_json_file n =
   let open Deferred.Or_error.Let_syntax in
@@ -159,7 +167,6 @@ let main accounts_json_file dir n constants_file =
           let open Or_error.Let_syntax in
           let%map accounts = accounts in
           let ledger = generate_ledger ~directory_name:ledger_path accounts in
-          let () = commit ledger in
           ledger )
     with
     | Ok ledger ->
