@@ -24,7 +24,7 @@ module Make_basic (M : sig
   val length_in_bits : int
 end) =
 struct
-  type t = Field.t [@@deriving sexp, compare]
+  type t = Field.t [@@deriving sexp, compare, hash]
 
   let to_decimal_string (t : Field.t) = Field.to_string t
 
@@ -144,11 +144,24 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
 
   include Basic
 
-  module Base58_check = Codable.Make_base58_check(struct
-    type nonrec t = t
+  module Base58_check = Codable.Make_base58_check (struct
+    module T0 = struct
+      module T = struct
+        type t = Field.t [@@deriving sexp, compare, hash]
 
-    include Hashable.Make_binable(Basic)
+        [%%define_locally
+        Field.(to_string, of_string)]
+      end
 
+      include T
+      include Binable.Of_stringable (T)
+    end
+
+    include T0
+
+    (* the serialization here is only used for the hash impl which is only
+       used for hashtbl, it's ok to disagree with the "real" serialization *)
+    include Hashable.Make_binable (T0)
     include B58_data
   end)
 
@@ -163,29 +176,12 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
 
   (* inside functor of no arguments, versioned types are allowed *)
 
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
-      end
+  module T = struct
+    type t = Field.t [@@deriving sexp, compare, hash]
+  end
 
-      include T
-
-      let to_latest = Fn.id
-
-      [%%define_locally
-      Basic.(to_yojson, of_yojson)]
-
-      include Comparable.Make (T)
-      include Hashable.Make_binable (T)
-    end
-  end]
-
-  type _unused = unit constraint t = Stable.Latest.t
-
-  include Comparable.Make (Stable.Latest)
-  include Hashable.Make (Stable.Latest)
+  include Comparable.Make (T)
+  include Hashable.Make (T)
 
   let of_hash = Fn.id
 

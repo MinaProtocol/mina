@@ -58,24 +58,21 @@ module type Basic = sig
 
   [%%endif]
 
+  val to_string : t -> string
+
+  val of_string : string -> t
+
+  val to_base58_check : t -> string
+
+  val of_base58_check : string -> t Base.Or_error.t
+
+  val of_base58_check_exn : string -> t
+
   val to_input : t -> (Field.t, bool) Random_oracle.Input.t
 end
 
 module type Full_size = sig
   include Basic
-
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t = Field.t [@@deriving sexp, compare, hash, yojson]
-
-      val to_latest : t -> t
-
-      include Comparable.S with type t := t
-
-      include Hashable_binable with type t := t
-    end
-  end]
 
   include Comparable.S with type t := t
 

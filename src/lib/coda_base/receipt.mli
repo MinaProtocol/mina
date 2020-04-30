@@ -37,4 +37,17 @@ module Chain_hash : sig
   end
 
   [%%endif]
+
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = Field.t [@@deriving sexp, compare, hash, yojson]
+
+      val to_latest : t -> t
+
+      include Comparable.S with type t := t
+
+      include Hashable_binable with type t := t
+    end
+  end]
 end
