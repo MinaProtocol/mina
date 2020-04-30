@@ -45,7 +45,7 @@ For new keypair generation, we can use the new client-sdk which is a much lighte
 ```
 type keypair = {
   publicKey: string,
-  privateKey: option(string)
+  privateKey: string
 }
 ```
 
