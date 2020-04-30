@@ -48,6 +48,10 @@ let coinbase_stack_hash : t = '\x19'
 
 let pending_coinbase_hash_builder : t = '\x1A'
 
+(* the following version bytes are non-sequential because existing testnet
+   user key infrastructure depend on them. don't change them while we 
+   care about user keys! *)
+
 let private_key : t = '\x5A'
 
 let non_zero_curve_point : t = '\xCE'
