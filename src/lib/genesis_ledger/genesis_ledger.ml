@@ -169,7 +169,7 @@ end) : Intf.S = struct
             Balance.compare a.Account.Poly.balance b.Account.Poly.balance )
         |> Option.value_exn ?here:None ?error:None ~message:error_msg )
 
-  let largest_account_keypair_exn =
+  let largest_account_keypair_exn () =
     failwith "cannot access genesis ledger account private key"
 end
 
