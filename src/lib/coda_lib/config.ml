@@ -1,6 +1,5 @@
 open Core_kernel
 open Async_kernel
-open Coda_base
 open Auxiliary_database
 open Signature_lib
 
@@ -48,7 +47,6 @@ type t =
       Core.Host_and_port.t Cli_lib.Flag.Types.with_name option
         [@default None]
   ; demo_mode: bool [@default false]
-  ; genesis_state_hash: State_hash.t
   ; log_block_creation: bool [@default false]
-  ; genesis_constants: Genesis_constants.t }
+  ; precomputed_values: Precomputed_values.t }
 [@@deriving make]

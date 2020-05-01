@@ -370,6 +370,23 @@ let daemon logger =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
              ~logger ~conf_dir ~daemon_conf:genesis_runtime_constants
          in
+         let%bind precomputed_values =
+           let protocol_state_with_hash =
+             Coda_state.Genesis_protocol_state.t ~genesis_ledger
+               ~genesis_constants
+           in
+           let%map base_hash =
+             Keys_lib.Keys.step_instance_hash protocol_state_with_hash.data
+           in
+           { Precomputed_values.genesis_constants
+           ; genesis_ledger=
+               ( module Genesis_ledger.Of_ledger (struct
+                 let t = genesis_ledger
+               end) )
+           ; protocol_state_with_hash
+           ; base_hash
+           ; genesis_proof= base_proof }
+         in
          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
            "Initializing with genesis constants $genesis_constants"
            ~metadata:
@@ -801,8 +818,8 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~genesis_state_hash ~log_block_creation ~genesis_constants ())
-             ~genesis_ledger ~base_proof
+                ~log_block_creation ~precomputed_values ())
+             ~precomputed_values
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in
