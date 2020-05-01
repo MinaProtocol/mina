@@ -111,5 +111,8 @@ module Diff_versioned : sig
     end
   end]
 
-  type t = Stable.Latest.t
+  type t = Stable.Latest.t =
+    | Add_solved_work of
+        Transaction_snark_work.Statement.t
+        * Ledger_proof.t One_or_two.t Priced_proof.t
 end
