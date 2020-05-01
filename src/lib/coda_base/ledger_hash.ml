@@ -36,15 +36,15 @@ let depth = Coda_compile_config.ledger_depth
 
 include Data_hash.Make_full_size ()
 
-module T = struct
-  type t = Stable.Latest.t [@@deriving bin_io]
+module Arg = struct
+  type t = Stable.Latest.t [@@deriving bin_io_unversioned]
 
   let description = "Ledger hash"
 
   let version_byte = Base58_check.Version_bytes.ledger_hash
 end
 
-module Base58_check = Codable.Make_base58_check (T)
+module Base58_check = Codable.Make_base58_check (Arg)
 
 [%%define_locally
 Base58_check.String_ops.(to_string, of_string)]
