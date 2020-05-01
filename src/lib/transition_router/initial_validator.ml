@@ -142,8 +142,14 @@ module Duplicate_block_detector = struct
 end
 
 let run ~logger ~trust_system ~verifier ~transition_reader
-    ~valid_transition_writer ~initialization_finish_signal ~genesis_state_hash
-    ~genesis_constants =
+    ~valid_transition_writer ~initialization_finish_signal ~precomputed_values
+    =
+  let genesis_state_hash =
+    Precomputed_values.genesis_state_hash precomputed_values
+  in
+  let genesis_constants =
+    Precomputed_values.genesis_constants precomputed_values
+  in
   let open Deferred.Let_syntax in
   let duplicate_checker = Duplicate_block_detector.create () in
   don't_wait_for
