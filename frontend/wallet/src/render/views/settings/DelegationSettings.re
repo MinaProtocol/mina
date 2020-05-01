@@ -90,22 +90,11 @@ let make = (~publicKey) => {
 
   let renderError = () => {
     switch (state.error) {
-    | Some(EmptyDelegateKey) =>
-      <>
-        <Alert kind=`Danger defaultMessage="Please enter a public key" />
-        <Spacer height=2. />
-      </>
+    | Some(EmptyDelegateKey) => Some("Please enter a public key")
     | Some(InvalidTransactionFee) =>
-      <>
-        <Alert
-          kind=`Danger
-          defaultMessage={"The minimum transaction fee is " ++ minimumFee}
-        />
-        <Spacer height=2. />
-      </>
-    | Some(InvalidGraphQLResponse(error)) =>
-      <> <Alert kind=`Danger defaultMessage=error /> <Spacer height=2. /> </>
-    | None => React.null
+      Some("The minimum transaction fee is " ++ minimumFee)
+    | Some(InvalidGraphQLResponse(error)) => Some(error)
+    | None => None
     };
   };
 
@@ -155,7 +144,14 @@ let make = (~publicKey) => {
            <Spacer width=0.2 />
            <AccountName pubkey=publicKey className=Styles.breadcrumbText />
          </div>
-         {renderError()}
+         {switch (renderError()) {
+          | Some(errorMessage) =>
+            <>
+              <Alert kind=`Danger defaultMessage=errorMessage />
+              <Spacer height=2. />
+            </>
+          | None => React.null
+          }}
          <div className=Theme.Text.Header.h3>
            {React.string("Delegate Participation To")}
          </div>
