@@ -1,4 +1,4 @@
-open Async
+open Async_rpc_kernel
 open Core_kernel
 open Coda_transition
 open Network_pool
@@ -12,7 +12,7 @@ module Master = struct
     [@@deriving sexp, to_yojson]
   end
 
-  let name = "message"
+  let name = "consensus-message"
 
   module Caller = T
   module Callee = T

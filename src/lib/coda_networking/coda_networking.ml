@@ -1101,18 +1101,19 @@ let fill_first_received_message_signal {first_received_message_signal; _} =
 (* TODO: Have better pushback behavior *)
 let broadcast t msg =
   Logger.trace t.logger ~module_:__MODULE__ ~location:__LOC__
-    ~metadata:[("message", Gossip_net.Message.msg_to_yojson msg)]
+    ~metadata:[("message", Gossip_net.Consensus_message.msg_to_yojson msg)]
     !"Broadcasting %s over gossip net"
-    (Gossip_net.Message.summary msg) ;
+    (Gossip_net.Consensus_message.summary msg) ;
   Gossip_net.Any.broadcast t.gossip_net msg
 
-let broadcast_state t state = broadcast t (Gossip_net.Message.New_state state)
+let broadcast_state t state =
+  broadcast t (Gossip_net.Consensus_message.New_state state)
 
 let broadcast_transaction_pool_diff t diff =
-  broadcast t (Gossip_net.Message.Transaction_pool_diff diff)
+  broadcast t (Gossip_net.Consensus_message.Transaction_pool_diff diff)
 
 let broadcast_snark_pool_diff t diff =
-  broadcast t (Gossip_net.Message.Snark_pool_diff diff)
+  broadcast t (Gossip_net.Consensus_message.Snark_pool_diff diff)
 
 (* TODO: This is kinda inefficient *)
 let find_map xs ~f =

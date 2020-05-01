@@ -35,7 +35,7 @@ module type Gossip_net_intf = sig
 
   val ip_for_peer : t -> Peer.Id.t -> Peer.t option Deferred.t
 
-  val broadcast : t -> Message.msg -> unit
+  val broadcast : t -> Consensus_message.msg -> unit
 
   val on_first_connect : t -> f:(unit -> 'a) -> 'a Deferred.t
 
@@ -43,7 +43,8 @@ module type Gossip_net_intf = sig
 
   val received_message_reader :
        t
-    -> (Message.msg Envelope.Incoming.t * (bool -> unit)) Strict_pipe.Reader.t
+    -> (Consensus_message.msg Envelope.Incoming.t * (bool -> unit))
+       Strict_pipe.Reader.t
 
   val ban_notification_reader : t -> ban_notification Linear_pipe.Reader.t
 

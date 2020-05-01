@@ -45,6 +45,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
   S with module Rpc_intf := Rpc_intf = struct
   open Rpc_intf
 
+  [%%inject
+  "for_consensus", defined consensus_mechanism]
+
   module T = struct
     type t =
       { config: Config.t
@@ -52,10 +55,28 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; first_peer_ivar: unit Ivar.t
       ; high_connectivity_ivar: unit Ivar.t
       ; ban_reader: Intf.ban_notification Linear_pipe.Reader.t
-      ; message_reader:
-          (Message.msg Envelope.Incoming.t * (bool -> unit))
+            (* nonconsensus nodes don't subscribe to consensus messages *)
+      ; consensus_reader_opt:
+          (Consensus_message.msg Envelope.Incoming.t * (bool -> unit))
           Strict_pipe.Reader.t
-      ; subscription: Message.msg Coda_net2.Pubsub.Subscription.t }
+          option
+      ; consensus_subscription_opt:
+          Consensus_message.msg Coda_net2.Pubsub.Subscription.t option
+            (* consensus nodes don't subscribe to block headers, though they can
+         publish using the topic name
+      *)
+      ; block_header_reader_opt:
+          (Block_header_message.msg Envelope.Incoming.t * (bool -> unit))
+          Strict_pipe.Reader.t
+          option
+      ; block_header_subscription_opt:
+          Block_header_message.msg Coda_net2.Pubsub.Subscription.t option
+            (* consensus and nonconsensus nodes subscribe to transactions, so no option types *)
+      ; transaction_reader:
+          (Transaction_message.msg Envelope.Incoming.t * (bool -> unit))
+          Strict_pipe.Reader.t
+      ; transaction_subscription:
+          Transaction_message.msg Coda_net2.Pubsub.Subscription.t }
 
     let create_rpc_implementations (Rpc_handler (rpc, handler)) =
       let (module Impl) = implementation_of_rpc rpc in
@@ -83,10 +104,90 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       in
       transport
 
+    let create_subscription net2 my_peer_id config ~topic ~bin_prot =
+      let message_reader, message_writer =
+        Strict_pipe.(
+          create
+            ~name:
+              (sprintf
+                 "Gossip_net.Libp2p messages for topic \"%s\" with validation \
+                  callbacks"
+                 topic)
+            Synchronous)
+      in
+      let open Deferred.Or_error.Let_syntax in
+      let%map subscription =
+        Coda_net2.Pubsub.subscribe_encode net2
+          topic
+          (* Fix for #4097: validation is tied into a lot of complex control flow.
+                   Instead of refactoring it to have validation up-front and decoupled,
+                   we pass along a validation callback with the message. This ends up
+                   ignoring the actual subscription message pipe, so drain it separately. *)
+          ~should_forward_message:(fun envelope ->
+            (* Messages from ourselves are valid. Don't try and reingest them. *)
+            match Envelope.Incoming.sender envelope with
+            | Local ->
+                Deferred.return true
+            | Remote (_, sender_peer_id) ->
+                if not (Peer.Id.equal sender_peer_id my_peer_id) then
+                  let valid_ivar = Ivar.create () in
+                  Deferred.bind
+                    (Strict_pipe.Writer.write message_writer
+                       (envelope, Ivar.fill valid_ivar))
+                    ~f:(fun () -> Ivar.read valid_ivar)
+                else Deferred.return true )
+          ~bin_prot
+          ~on_decode_failure:
+            (`Call
+              (fun envelope (err : Error.t) ->
+                let host, peer_id =
+                  Envelope.Incoming.sender envelope
+                  |> Envelope.Sender.remote_exn
+                in
+                let metadata =
+                  [ ("sender_peer_id", `String peer_id)
+                  ; ("error", `String (Error.to_string_hum err)) ]
+                in
+                Trust_system.(
+                  record config.Config.trust_system config.logger host
+                    Actions.
+                      ( Violated_protocol
+                      , Some ("failed to decode gossip message", metadata) ))
+                |> don't_wait_for ;
+                () ))
+      in
+      (* #4097 fix: drain the published message pipe, which we don't care about. *)
+      don't_wait_for
+        (Strict_pipe.Reader.iter
+           (Coda_net2.Pubsub.Subscription.message_pipe subscription)
+           ~f:(fun _envelope -> Deferred.unit)) ;
+      (message_reader, subscription)
+
+    type net_with_subscriptions =
+      { net2: Coda_net2.net
+      ; consensus_reader_opt:
+          (Consensus_message.msg Envelope.Incoming.t * (bool -> unit))
+          Strict_pipe.Reader.t
+          option
+      ; consensus_subscription_opt:
+          Consensus_message.msg Coda_net2.Pubsub.Subscription.t option
+      ; block_header_reader_opt:
+          (Block_header_message.msg Envelope.Incoming.t * (bool -> unit))
+          Strict_pipe.Reader.t
+          option
+      ; block_header_subscription_opt:
+          Consensus_message.msg Coda_net2.Pubsub.Subscription.t option
+      ; transaction_reader_opt:
+          (Transaction_message.msg Envelope.Incoming.t * (bool -> unit))
+          Strict_pipe.Reader.t
+          option
+      ; transaction_subscription_opt:
+          Consensus_message.msg Coda_net2.Pubsub.Subscription.t option }
+
     (* Creates just the helper, making sure to register everything
-      BEFORE we start listening/advertise ourselves for discovery. *)
+       BEFORE we start listening/advertise ourselves for discovery. *)
     let create_libp2p (config : Config.t) rpc_handlers first_peer_ivar
-        high_connectivity_ivar =
+        high_connectivity_ivar : net_with_subscriptions =
       let fail m =
         failwithf "Failed to connect to libp2p_helper process: %s" m ()
       in
@@ -225,58 +326,29 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                       | Ok () ->
                           () ) )
             in
-            let message_reader, message_writer =
-              Strict_pipe.(
-                create
-                  ~name:"Gossip_net.Libp2p messages with validation callbacks"
-                  Synchronous)
+            let subscribe = create_subscription net2 my_peer_id config in
+            let%bind consensus_reader_opt, consensus_subscription_opt =
+              if for_consensus then
+                let%map rdr, sub =
+                  subscribe ~topic:Topics.consensus
+                    ~bin_prot:Consensus_message.Latest.T.bin_msg
+                in
+                (Some rdr, Some sub)
+              else return (None, None)
             in
-            let%bind subscription =
-              Coda_net2.Pubsub.subscribe_encode net2
-                "coda/consensus-messages/0.0.1"
-                (* Fix for #4097: validation is tied into a lot of complex control flow.
-                   Instead of refactoring it to have validation up-front and decoupled,
-                   we pass along a validation callback with the message. This ends up
-                   ignoring the actual subscription message pipe, so drain it separately. *)
-                ~should_forward_message:(fun envelope ->
-                  (* Messages from ourselves are valid. Don't try and reingest them. *)
-                  match Envelope.Incoming.sender envelope with
-                  | Local ->
-                      Deferred.return true
-                  | Remote (_, sender_peer_id) ->
-                      if not (Peer.Id.equal sender_peer_id my_peer_id) then
-                        let valid_ivar = Ivar.create () in
-                        Deferred.bind
-                          (Strict_pipe.Writer.write message_writer
-                             (envelope, Ivar.fill valid_ivar))
-                          ~f:(fun () -> Ivar.read valid_ivar)
-                      else Deferred.return true )
-                ~bin_prot:Message.Latest.T.bin_msg
-                ~on_decode_failure:
-                  (`Call
-                    (fun envelope (err : Error.t) ->
-                      let host, peer_id =
-                        Envelope.Incoming.sender envelope
-                        |> Envelope.Sender.remote_exn
-                      in
-                      let metadata =
-                        [ ("sender_peer_id", `String peer_id)
-                        ; ("error", `String (Error.to_string_hum err)) ]
-                      in
-                      Trust_system.(
-                        record config.trust_system config.logger host
-                          Actions.
-                            ( Violated_protocol
-                            , Some ("failed to decode gossip message", metadata)
-                            ))
-                      |> don't_wait_for ;
-                      () ))
+            let%bind block_header_reader_opt, block_header_subscription_opt =
+              if for_consensus then (None, None)
+              else
+                let%map rdr, sub =
+                  subscribe ~topic:Topics.block_headers
+                    ~bin_prot:Block_headers_message.Latest.T.bin_msg
+                in
+                return (Some rdr, Some sub)
             in
-            (* #4097 fix: drain the published message pipe, which we don't care about. *)
-            don't_wait_for
-              (Strict_pipe.Reader.iter
-                 (Coda_net2.Pubsub.Subscription.message_pipe subscription)
-                 ~f:(fun _envelope -> Deferred.unit)) ;
+            let%bind transactions_header_reader, transactions_subscription =
+              subscribe ~topic:Topics.transactions
+                ~bin_prot:Transactions.Latest.T.bin_msg
+            in
             let%map _ =
               (* XXX: this ALWAYS needs to be AFTER handle_protocol/subscribe
                 or it is possible to miss connections! *)
@@ -295,7 +367,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                  (Deferred.all
                     (List.map ~f:(Coda_net2.add_peer net2) config.initial_peers)))
             |> don't_wait_for ;
-            (subscription, message_reader)
+            { net2
+            ; consensus_reader_opt
+            ; consensus_subscription_opt
+            ; block_headers_reader_opt
+            ; block_headers_subscription_opt
+            ; transactions_reader
+            ; transactions_subscription }
           in
           match%map initializing_libp2p_result with
           | Ok (subscription, message_reader) ->
@@ -310,7 +388,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     let create config rpc_handlers =
       let first_peer_ivar = Ivar.create () in
       let high_connectivity_ivar = Ivar.create () in
-      let%bind net2, subscription, message_reader =
+      let%bind { net2
+               ; consensus_reader_opt
+               ; consensus_subscription_opt
+               ; block_headers_reader_opt
+               ; block_headers_subscription_opt
+               ; transactions_reader
+               ; transactions_subscription } =
         create_libp2p config rpc_handlers first_peer_ivar
           high_connectivity_ivar
       in
@@ -342,8 +426,12 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; net2
       ; first_peer_ivar
       ; high_connectivity_ivar
-      ; subscription
-      ; message_reader
+      ; consensus_reader_opt
+      ; consensus_subscription_opt
+      ; block_headers_reader_opt
+      ; block_headers_subscription_opt
+      ; transactions_reader
+      ; transactions_subscription
       ; ban_reader }
 
     let peers t = Coda_net2.peers t.net2

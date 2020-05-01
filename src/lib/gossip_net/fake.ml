@@ -30,7 +30,7 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
 
     type network_interface =
       { broadcast_message_writer:
-          ( Message.msg Envelope.Incoming.t * (bool -> unit)
+          ( Consensus_message.msg Envelope.Incoming.t * (bool -> unit)
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
@@ -110,10 +110,10 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ; peer_table: (Peer.Id.t, Peer.t) Hashtbl.t
       ; initial_peers: Peer.t list
       ; received_message_reader:
-          (Message.msg Envelope.Incoming.t * (bool -> unit))
+          (Consensus_message.msg Envelope.Incoming.t * (bool -> unit))
           Strict_pipe.Reader.t
       ; received_message_writer:
-          ( Message.msg Envelope.Incoming.t * (bool -> unit)
+          ( Consensus_message.msg Envelope.Incoming.t * (bool -> unit)
           , Strict_pipe.crash Strict_pipe.buffered
           , unit )
           Strict_pipe.Writer.t
