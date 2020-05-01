@@ -3,6 +3,34 @@ open Pipe_lib
 open Network_peer
 open Core_kernel
 
+module Snark_tables : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t =
+        { all:
+            Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+            Priced_proof.Stable.V1.t
+            Transaction_snark_work.Statement.Stable.V1.Table.t
+        ; rebroadcastable:
+            ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+              Priced_proof.Stable.V1.t
+            * Core.Time.Stable.With_utc_sexp.V2.t )
+            Transaction_snark_work.Statement.Stable.V1.Table.t }
+      [@@deriving sexp]
+    end
+  end]
+
+  type t = Stable.Latest.t =
+    { all:
+        Ledger_proof.t One_or_two.t Priced_proof.t
+        Transaction_snark_work.Statement.Stable.V1.Table.t
+    ; rebroadcastable:
+        ( Ledger_proof.t One_or_two.t Priced_proof.t
+        * Core.Time.Stable.With_utc_sexp.V2.t )
+        Transaction_snark_work.Statement.Table.t }
+end
+
 module type S = sig
   type transition_frontier
 
@@ -10,6 +38,7 @@ module type S = sig
     include
       Intf.Snark_resource_pool_intf
       with type transition_frontier := transition_frontier
+       and type serializable := Snark_tables.t
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
@@ -68,3 +97,19 @@ module Make (Transition_frontier : Transition_frontier_intf) :
   S with type transition_frontier := Transition_frontier.t
 
 include S with type transition_frontier := Transition_frontier.t
+
+module Diff_versioned : sig
+  [%%versioned:
+  module Stable : sig
+    module V1 : sig
+      type t = Resource_pool.Diff.t =
+        | Add_solved_work of
+            Transaction_snark_work.Statement.Stable.V1.t
+            * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+              Priced_proof.Stable.V1.t
+      [@@deriving compare, sexp]
+    end
+  end]
+
+  type t = Stable.Latest.t
+end
