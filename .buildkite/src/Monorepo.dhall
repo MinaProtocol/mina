@@ -15,9 +15,9 @@ let prepareCommand = "git fetch origin && ./.buildkite/scripts/generate-diff.sh 
 let makeCommand = \(job : JobSpec.Type) ->
   let trigger = triggerCommand "src/jobs/${job.name}/Pipeline.dhall"
   in ''
-    if cat computed_diff.txt | egrep -q ${job.dirtyWhen}; then
+    if cat computed_diff.txt | egrep -q '${job.dirtyWhen}'; then
         echo "Triggering ${job.name} for reason:"
-        cat computed_diff.txt | egrep ${job.dirtyWhen}
+        cat computed_diff.txt | egrep '${job.dirtyWhen}'
         ${trigger}
     fi
   ''
