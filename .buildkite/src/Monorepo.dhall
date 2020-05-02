@@ -16,6 +16,8 @@ let makeCommand = \(job : JobSpec.Type) ->
   let trigger = triggerCommand "src/jobs/${job.name}/Pipeline.dhall"
   in ''
     if cat computed_diff.txt | grep -q ${job.dirtyWhen}; then
+        echo "Triggering ${job.name} for reason:"
+        cat computed_diff.txt | grep ${job.dirtyWhen}
         ${trigger}
     fi
   ''

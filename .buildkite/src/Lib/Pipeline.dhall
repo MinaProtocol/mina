@@ -8,7 +8,6 @@ let List/map = Prelude.List.map
 
 let Command = ./Command.dhall
 let JobSpec = ./JobSpec.dhall
-let Size = ./Size.dhall
 
 let Result = {
   Type = {
@@ -32,16 +31,7 @@ let build : Config.Type -> Result.Type = \(c : Config.Type) ->
   let name = c.spec.name
   let buildCommand = \(c : Command.Config.Type) ->
     Command.build c // { key = "$${name}-${c.key}" }
-  let explainCommand = Command.build Command.Config::{
-    command = [
-        "echo \"Running ${name} because these files were changed:\"",
-        "./.buildkite/scripts/generate-diff.sh | grep ${c.spec.dirtyWhen}"
-      ],
-    label = "Rebuild reason: \"${name}\"",
-    key = "$rebuild-${name}",
-    target = Size.Small
-  }
   in
-  { steps = [ explainCommand ] # (List/map Command.Config.Type Command.Type buildCommand c.steps) }
+  { steps = List/map Command.Config.Type Command.Type buildCommand c.steps }
 
 in {Config = Config, build = build} /\ Result
