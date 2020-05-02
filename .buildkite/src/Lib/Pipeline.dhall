@@ -35,9 +35,9 @@ let build : Config.Type -> Result.Type = \(c : Config.Type) ->
   let explainCommand = Command.build Command.Config::{
     command = [
         "echo \"Running ${name} because these files were changed:\"",
-        "cat computed_diff.txt | grep ${c.spec.dirtyWhen}"
+        "./.buildkite/scripts/generate-diff.sh | grep ${c.spec.dirtyWhen}"
       ],
-    label = "Rebuild reason: ${name}",
+    label = "Rebuild reason: \"${name}\"",
     key = "$rebuild-${name}",
     target = Size.Small
   }
