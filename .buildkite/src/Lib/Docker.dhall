@@ -14,11 +14,13 @@ let Result = {
   Type = {
      image: Text,
      `propagate-environment`: Bool,
-     `propagate-uid-gid`: Bool
+     `propagate-uid-gid`: Bool,
+     environment: List Text
   },
   default = {
     `propagate-environment` = True,
-    `propagate-uid-gid` = True
+    `propagate-uid-gid` = True,
+    environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
   }
 }
 
