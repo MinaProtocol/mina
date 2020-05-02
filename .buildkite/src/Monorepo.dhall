@@ -10,7 +10,7 @@ let triggerCommand = ./Lib/TriggerCommand.dhall
 let jobs : List JobSpec.Type = ./gen/Jobs.dhall
 
 -- precompute the diffed files as this command takes a few seconds to run
-let prepareCommand = "git fetch origin && ./.buildkite/scripts/generate-diff.sh > computed_diff.txt"
+let prepareCommand = "./.buildkite/scripts/generate-diff.sh > computed_diff.txt"
 
 -- Run a job if we touched a dirty path
 let makeCommand = \(job : JobSpec.Type) ->
