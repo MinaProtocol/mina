@@ -2,6 +2,7 @@
 -- Keep these rules lean! They have to run unconditionally.
 
 let Command = ./Lib/Command.dhall
+let Docker = ./Lib/Docker.dhall
 let JobSpec = ./Lib/JobSpec.dhall
 let Pipeline = ./Lib/Pipeline.dhall
 let Size = ./Lib/Size.dhall
@@ -21,7 +22,8 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
       ],
       label = "Prepare monorepo triage",
       key = "monorepo",
-      target = Size.Small
+      target = Size.Small,
+      docker = Docker.Config::{ image = "localhost:8080/bash/coreutils/git/buildkite-agent/dhall/dhall-json" }
     }
   ]
 }
