@@ -431,6 +431,8 @@ module T = struct
             ; ("port", `Int addrs_and_ports.libp2p_port) ]
           ()
       in
+      let precomputed_values = Lazy.force Precomputed_values.compiled in
+      let (module Genesis_ledger) = precomputed_values.genesis_ledger in
       let pids = Child_processes.Termination.create_pid_table () in
       let%bind () =
         Option.value_map trace_dir
@@ -479,8 +481,8 @@ module T = struct
           in
           let block_production_keypair =
             Option.map block_production_key ~f:(fun i ->
-                List.nth_exn (Lazy.force Test_genesis_ledger.accounts) i
-                |> Test_genesis_ledger.keypair_of_account_record_exn )
+                List.nth_exn (Lazy.force Genesis_ledger.accounts) i
+                |> Genesis_ledger.keypair_of_account_record_exn )
           in
           let initial_block_production_keypairs =
             Keypair.Set.of_list (block_production_keypair |> Option.to_list)
@@ -494,7 +496,7 @@ module T = struct
           in
           let consensus_local_state =
             Consensus.Data.Local_state.create initial_block_production_keys
-              ~genesis_ledger:Test_genesis_ledger.t
+              ~genesis_ledger:Genesis_ledger.t
           in
           let gossip_net_params =
             Gossip_net.Libp2p.Config.
@@ -517,7 +519,7 @@ module T = struct
             ; consensus_local_state
             ; is_seed= List.is_empty peers
             ; genesis_ledger_hash=
-                Ledger.merkle_root (Lazy.force Test_genesis_ledger.t)
+                Ledger.merkle_root (Lazy.force Genesis_ledger.t)
             ; log_gossip_heard=
                 { snark_pool_diff= true
                 ; transaction_pool_diff= true
@@ -530,12 +532,6 @@ module T = struct
           let monitor = Async.Monitor.create ~name:"coda" () in
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
-          in
-          let genesis_state_hash =
-            Coda_state.Genesis_protocol_state.t
-              ~genesis_ledger:Test_genesis_ledger.t
-              ~genesis_constants:Genesis_constants.compiled
-            |> With_hash.hash
           in
           let coda_deferred () =
             Coda_lib.create
@@ -561,16 +557,14 @@ module T = struct
                  ~initial_block_production_keypairs ~monitor
                  ~consensus_local_state ~transaction_database
                  ~external_transition_database ~is_archive_rocksdb
-                 ~work_reassignment_wait:420000 ~genesis_state_hash
-                 ~genesis_constants:Genesis_constants.compiled
+                 ~work_reassignment_wait:420000 ~precomputed_values
                  ~archive_process_location:
                    (Option.map archive_process_location
                       ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
                           {name= "dummy"; value= host_and_port} ))
                  ())
-              ~genesis_ledger:Test_genesis_ledger.t
-              ~base_proof:Precomputed_values.base_proof
+              ~precomputed_values
           in
           let coda_ref : Coda_lib.t option ref = ref None in
           Coda_run.handle_shutdown ~monitor ~time_controller ~conf_dir

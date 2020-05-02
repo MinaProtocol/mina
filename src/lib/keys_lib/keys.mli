@@ -51,4 +51,6 @@ module type S = sig
   end
 end
 
+val step_instance_hash : Protocol_state.value -> Tick.Field.t Async.Deferred.t
+
 val create : unit -> (module S) Async.Deferred.t
