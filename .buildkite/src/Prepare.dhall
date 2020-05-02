@@ -16,7 +16,7 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
   steps = [
     Command.Config::{
       command = [
-        "./.buildkite/scripts/generate-jobs.sh > src/gen/Jobs.dhall",
+        "./.buildkite/scripts/generate-jobs.sh > .buildkite/src/gen/Jobs.dhall",
         triggerCommand "src/Monorepo.dhall"
       ],
       label = "Prepare monorepo triage",
