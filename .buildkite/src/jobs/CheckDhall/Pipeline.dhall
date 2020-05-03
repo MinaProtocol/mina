@@ -10,7 +10,7 @@ Pipeline.build
     spec = ./Spec.dhall,
     steps = [
       Command.Config::{ command = [ "cd .buildkite && make check" ], label = "Check all CI Dhall entrypoints", key = "check", target = Size.Small,
-      docker = Docker.Config::{ image = "localhost:8080/bash/git/buildkite-agent/coreutils/dhall/gnumake" }
+      docker = Docker.Config::{ image = "localhost:8080/bash/git/buildkite-agent/coreutils/dhall/gnumake/findutils" }
       }
     ]
   }
