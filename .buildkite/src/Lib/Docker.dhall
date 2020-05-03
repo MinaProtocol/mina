@@ -23,8 +23,8 @@ let Result = {
     `propagate-uid-gid` = True,
     environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ],
     volumes = [
-      (env:HOME as Text) ++ "/.cache/dhall:/.cache/dhall",
-      (env:HOME as Text) ++ "/.cache/dhall-haskell:/.cache/dhall-haskell"
+      "/Users/bkase/.cache/dhall:/.cache/dhall",
+      "/Users/bkase/.cache/dhall-haskell:/.cache/dhall-haskell"
     ]
   }
 }
