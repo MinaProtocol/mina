@@ -15,12 +15,17 @@ let Result = {
      image: Text,
      `propagate-environment`: Bool,
      `propagate-uid-gid`: Bool,
-     environment: List Text
+     environment: List Text,
+     volumes: List Text
   },
   default = {
     `propagate-environment` = True,
     `propagate-uid-gid` = True,
-    environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
+    environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ],
+    volumes = [
+      "~/.cache/dhall:~/.cache/dhall",
+      "~/.cache/dhall-haskell:~/.cache/dhall-haskell"
+    ]
   }
 }
 
