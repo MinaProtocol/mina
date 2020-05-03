@@ -9,16 +9,13 @@ let triggerCommand = ./Lib/TriggerCommand.dhall
 
 let jobs : List JobSpec.Type = ./gen/Jobs.dhall
 
--- precompute the diffed files as this command takes a few seconds to run
-let prepareCommand = "./.buildkite/scripts/generate-diff.sh > computed_diff.txt"
-
 -- Run a job if we touched a dirty path
 let makeCommand = \(job : JobSpec.Type) ->
   let trigger = triggerCommand "src/jobs/${job.name}/Pipeline.dhall"
   in ''
-    if cat computed_diff.txt | egrep -q '${job.dirtyWhen}'; then
+    if cat $computed_diff.txt | egrep -q '${job.dirtyWhen}'; then
         echo "Triggering ${job.name} for reason:"
-        cat computed_diff.txt | egrep '${job.dirtyWhen}'
+        cat $computed_diff.txt | egrep '${job.dirtyWhen}'
         ${trigger}
     fi
   ''
@@ -33,7 +30,7 @@ in Pipeline.build Pipeline.Config::{
   },
   steps = [
     Command.Config::{
-      command = [ prepareCommand ] # commands,
+      command = commands,
       label = "Monorepo triage",
       key = "cmds",
       target = Size.Small,

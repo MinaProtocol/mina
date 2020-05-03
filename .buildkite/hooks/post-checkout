@@ -1,1 +1,3 @@
 git fetch origin
+./.buildkite/scripts/generate-diff.sh > $computed_diff.txt
+
