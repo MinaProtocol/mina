@@ -24,29 +24,29 @@ let receipt_chain_hash : t = '\x0C'
 
 let epoch_seed : t = '\x0D'
 
-let staged_ledger_hash_aux_hash : t = '\x0F'
+let staged_ledger_hash_aux_hash : t = '\x0E'
 
-let staged_ledger_hash_pending_coinbase_aux : t = '\x10'
+let staged_ledger_hash_pending_coinbase_aux : t = '\x0F'
 
-let state_hash : t = '\x11'
+let state_hash : t = '\x10'
 
-let state_body_hash : t = '\x12'
+let state_body_hash : t = '\x11'
 
-let transaction_hash : t = '\x13'
+let transaction_hash : t = '\x12'
 
-let user_command : t = '\x14'
+let user_command : t = '\x13'
 
-let user_command_memo : t = '\x15'
+let user_command_memo : t = '\x14'
 
-let vrf_truncated_output : t = '\x16'
+let vrf_truncated_output : t = '\x15'
 
-let web_pipe : t = '\x17'
+let web_pipe : t = '\x16'
 
-let coinbase_stack_data : t = '\x18'
+let coinbase_stack_data : t = '\x17'
 
-let coinbase_stack_hash : t = '\x19'
+let coinbase_stack_hash : t = '\x18'
 
-let pending_coinbase_hash_builder : t = '\x1A'
+let pending_coinbase_hash_builder : t = '\x19'
 
 (* the following version bytes are non-sequential because existing testnet
    user key infrastructure depend on them. don't change them while we 

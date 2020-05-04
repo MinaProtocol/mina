@@ -172,9 +172,8 @@ module Coinbase_stack_data = struct
 
       let to_latest = Core.Fn.id
 
-      let to_yojson = to_yojson
-
-      let of_yojson = of_yojson
+      [%%define_from_scope
+      to_yojson, of_yojson]
 
       include Comparable.Make (T)
       include Hashable.Make_binable (T)
@@ -230,9 +229,8 @@ module Stack_hash = struct
 
       let to_latest = Core.Fn.id
 
-      let to_yojson = to_yojson
-
-      let of_yojson = of_yojson
+      [%%define_from_scope
+      to_yojson, of_yojson]
 
       include Comparable.Make (T)
       include Hashable.Make_binable (T)
@@ -374,9 +372,8 @@ module Hash_builder = struct
 
       let to_latest = Fn.id
 
-      let to_yojson = to_yojson
-
-      let of_yojson = of_yojson
+      [%%define_from_scope
+      to_yojson, of_yojson]
 
       include Comparable.Make (T)
       include Hashable.Make_binable (T)

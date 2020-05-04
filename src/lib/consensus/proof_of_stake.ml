@@ -145,9 +145,8 @@ module Data = struct
 
         let to_latest = Core.Fn.id
 
-        let to_yojson = to_yojson
-
-        let of_yojson = of_yojson
+        [%%define_from_scope
+        to_yojson, of_yojson]
 
         include Comparable.Make (T)
         include Hashable.Make_binable (T)
