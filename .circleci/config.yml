@@ -414,8 +414,8 @@ jobs:
                   name: Build deb package with PV keys and PV key tar
                   command:  ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'make deb'
                   environment:
-                    LIBP2P_NIXLESS: 1
                     DUNE_PROFILE: testnet
+                    LIBP2P_NIXLESS: 1
                   no_output_timeout: 20m
             - run:
                   name: Store genesis public/private keypairs
