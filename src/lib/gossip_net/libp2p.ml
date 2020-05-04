@@ -71,6 +71,9 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
           option
       ; block_header_subscription_opt:
           Block_header_message.msg Coda_net2.Pubsub.Subscription.t option
+            (* TODO: consensus nodes have transactions in consensus messages, make this an option type
+               and don't have consensus nodes subscribe to transactions separately!!!
+            *)
             (* consensus and nonconsensus nodes subscribe to transactions, so no option types *)
       ; transaction_reader:
           (Transaction_message.msg Envelope.Incoming.t * (bool -> unit))
