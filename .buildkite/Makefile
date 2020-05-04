@@ -2,4 +2,4 @@
 check:
 	dhall <<< './src/Prepare.dhall'
 	dhall <<< './src/Monorepo.dhall'
-	ls src/jobs | xargs -I{} bash -c 'dhall <<< ./src/jobs/{}/Pipeline.dhall'
+	for f in ./src/Jobs/**/Pipeline.dhall; do dhall --file $$f; done
