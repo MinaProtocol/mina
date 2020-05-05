@@ -46,6 +46,42 @@ module Tar = struct
           file (Error.to_string_hum err)
 end
 
+module Accounts = struct
+  let path ~root = root ^/ "accounts.json"
+
+  let compiled () =
+    List.map (Lazy.force Test_genesis_ledger.accounts) ~f:(fun (sk_opt, acc) ->
+        { Account_config.pk= acc.public_key
+        ; sk= sk_opt
+        ; balance= acc.balance
+        ; delegate= Some acc.delegate } )
+
+  let store ~filename accounts =
+    Out_channel.with_file filename ~f:(fun json_file ->
+        Yojson.Safe.pretty_to_channel json_file
+          (Account_config.to_yojson accounts) )
+
+  let load filename =
+    let open Deferred.Let_syntax in
+    match%map
+      Deferred.Or_error.try_with_join (fun () ->
+          let%map accounts_str = Reader.file_contents filename in
+          let res = Yojson.Safe.from_string accounts_str in
+          match Account_config.of_yojson res with
+          | Ok res ->
+              Ok res
+          | Error s ->
+              Error
+                (Error.of_string
+                   (sprintf "Account_config.of_yojson failed: %s" s)) )
+    with
+    | Ok res ->
+        Ok res
+    | Error e ->
+        Or_error.errorf "Could not read accounts from file: %s\n%s" filename
+          (Error.to_string_hum e)
+end
+
 module Ledger = struct
   let path ~root = root ^/ "ledger"
 

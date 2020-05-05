@@ -4,38 +4,14 @@ open Coda_base
 
 type t = Ledger.t
 
-let compiled_accounts_json () : Account_config.t =
-  List.map (Lazy.force Test_genesis_ledger.accounts) ~f:(fun (sk_opt, acc) ->
-      { Account_config.pk= acc.public_key
-      ; sk= sk_opt
-      ; balance= acc.balance
-      ; delegate= Some acc.delegate } )
-
 let get_accounts accounts_json_file n =
   let open Deferred.Or_error.Let_syntax in
   let%map accounts =
     match accounts_json_file with
-    | Some file -> (
-        let open Deferred.Let_syntax in
-        match%map
-          Deferred.Or_error.try_with_join (fun () ->
-              let%map accounts_str = Reader.file_contents file in
-              let res = Yojson.Safe.from_string accounts_str in
-              match Account_config.of_yojson res with
-              | Ok res ->
-                  Ok res
-              | Error s ->
-                  Error
-                    (Error.of_string
-                       (sprintf "Account_config.of_yojson failed: %s" s)) )
-        with
-        | Ok res ->
-            Ok res
-        | Error e ->
-            Or_error.errorf "Could not read accounts from file: %s\n%s" file
-              (Error.to_string_hum e) )
+    | Some file ->
+        Genesis_ledger_helper.Accounts.load file
     | None ->
-        Deferred.return (Ok (compiled_accounts_json ()))
+        Deferred.return (Ok (Genesis_ledger_helper.Accounts.compiled ()))
   in
   let real_accounts =
     let genesis_winner_account : Account_config.account_data =
@@ -57,9 +33,7 @@ let get_accounts accounts_json_file n =
     real_accounts @ fake_accounts
   in
   (*the accounts file that can be edited later*)
-  Out_channel.with_file "accounts.json" ~f:(fun json_file ->
-      Yojson.Safe.pretty_to_channel json_file
-        (Account_config.to_yojson all_accounts) ) ;
+  Genesis_ledger_helper.Accounts.store ~filename:"accounts.json" all_accounts ;
   all_accounts
 
 let genesis_dirname = Cache_dir.genesis_dir_name Genesis_constants.compiled
