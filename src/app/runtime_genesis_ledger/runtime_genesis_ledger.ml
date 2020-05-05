@@ -151,7 +151,7 @@ let main accounts_json_file dir n constants_file =
     let%map () = File_system.create_dir dir ~clear_if_exists:true in
     dir
   in
-  let ledger_path = genesis_dir ^/ "ledger" in
+  let ledger_path = Genesis_ledger_helper.Ledger.path ~root:genesis_dir in
   let proof_path = genesis_dir ^/ "genesis_proof" in
   let constants_path = genesis_dir ^/ "genesis_constants.json" in
   let%bind accounts = get_accounts accounts_json_file n in
@@ -160,8 +160,8 @@ let main accounts_json_file dir n constants_file =
       Or_error.try_with_join (fun () ->
           let open Or_error.Let_syntax in
           let%map accounts = accounts in
-          let ledger = generate_ledger ~directory_name:ledger_path accounts in
-          ledger )
+          Genesis_ledger_helper.Ledger.generate ~directory_name:ledger_path
+            accounts )
     with
     | Ok ledger ->
         let genesis_constants =

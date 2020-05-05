@@ -46,6 +46,39 @@ module Tar = struct
           file (Error.to_string_hum err)
 end
 
+module Ledger = struct
+  let path ~root = root ^/ "ledger"
+
+  let generate ?directory_name (accounts : Account_config.t) :
+      Genesis_ledger.Packed.t =
+    let ledger = Ledger.create ?directory_name () in
+    let accounts =
+      List.map accounts ~f:(fun {pk; sk; balance; delegate} ->
+          let account =
+            let account_id = Account_id.create pk Token_id.default in
+            let base_acct = Account.create account_id balance in
+            {base_acct with delegate= Option.value ~default:pk delegate}
+          in
+          Ledger.create_new_account_exn ledger
+            (Account.identifier account)
+            account ;
+          (sk, account) )
+    in
+    Ledger.commit ledger ;
+    ( module struct
+      include Genesis_ledger.Make (struct
+        let accounts = lazy accounts
+      end)
+
+      let t = lazy ledger
+    end )
+
+  let load directory_name : Genesis_ledger.Packed.t =
+    ( module Genesis_ledger.Of_ledger (struct
+      let t = lazy (Ledger.create ~directory_name ())
+    end) )
+end
+
 let load_genesis_constants (module M : Genesis_constants.Config_intf) ~path
     ~default ~logger =
   let config_res =
@@ -82,7 +115,7 @@ let load_genesis_constants (module M : Genesis_constants.Config_intf) ~path
       raise Genesis_state_initialization_error
 
 let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
-    (Ledger.t lazy_t * Proof.t * Genesis_constants.t) Deferred.t =
+    (Genesis_ledger.Packed.t * Proof.t * Genesis_constants.t) Deferred.t =
   let open Cache_dir in
   let genesis_dir_name =
     Cache_dir.genesis_dir_name Genesis_constants.compiled
@@ -122,7 +155,7 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
       ~metadata:[("path", `String tar_dir)] ;
     let%bind () = extract tar_dir in
     let extract_target = conf_dir ^/ genesis_dir_name in
-    let ledger_dir = extract_target ^/ "ledger" in
+    let ledger_dir = Ledger.path ~root:extract_target in
     let proof_file = extract_target ^/ "genesis_proof" in
     let constants_file = extract_target ^/ "genesis_constants.json" in
     if
@@ -131,8 +164,11 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
       && Core.Sys.file_exists constants_file = `Yes
     then (
       let genesis_ledger =
-        let ledger = lazy (Ledger.create ~directory_name:ledger_dir ()) in
-        match Or_error.try_with (fun () -> Lazy.force ledger |> ignore) with
+        let ledger = Ledger.load ledger_dir in
+        match
+          Or_error.try_with (fun () ->
+              Lazy.force (Genesis_ledger.Packed.t ledger) |> ignore )
+        with
         | Ok _ ->
             ledger
         | Error e ->
