@@ -38,32 +38,91 @@ While this system is effective, there are a variety of potential improvements to
 
 All of these features should be included in a simple command line tool that also exposes a TypeScript API. This service will be written in Reason with TypeScript bindings.
 
+Since there may be some initial configuration required for the operation of a network, the following command will take care of setting up all the required services (google-cloud-sdk, aws, etc.)
+
+```
+coda-network init
+```
+
 ### Keypair Management
 
-For new keypair generation, we can use the new client-sdk which is a much lighter dependency and has a clean JavaScript interface.
+Keypairs have a private key and a corresponding public key. For new keypair generation, we can use the new client-sdk which is a much lighter dependency and has a clean JavaScript interface.
+
+However there are also existing keys which we'll need to be able to reference by public key alone since we don't control the private keys. An example of this would be community owned wallets for inclusion in the genesis ledger. Since this distinction can be made at a higher level, we'll keep the definition of a keypair to mean a public key for which we also have th private key.
 
 ```
-type keypair = {
-  publicKey: string,
-  privateKey: string
-}
+coda-network keypair create
 ```
 
-However there are also existing keys which we'll need to be able to reference by public key alone since we don't control the private keys. These include community owned wallets for inclusion in the genesis ledger.The basic type of a keypair consists of the following:
+This command will generate a new keypair and save it locally.
+
+```
+coda-network keypair upload <PUBLIC_KEY>
+```
+
+This command will upload a locally stored keypair to an S3 bucket for distribution.
+
+```
+coda-network keypair download <PUBLIC_KEY>
+```
+
+This will attempt to download a given keypair from S3 if the keypair exists.
 
 ### Keyset Management
 
 Keysets are simply a collection of keypairs. We use these for categorizing different groups of keys that will be used in the lifecycle of a network. For each keypair in a keyset, we MAY or MAY NOT have the corresponding private keys. For each keyset, we may want to allocate a different amount of funds to their corresponding accounts in a genesis ledger.
 
+The datastructure for a given keyset is much simpler since it's essentially a list public keys. As such we can simply maintain a simple CSV style document that contains all the public keys included in a given keyset using the name of the keyset for the filename. 
+
 ```
-type keysetMember = | Owned(keypair) | Unowned(publicKey)
+coda-network keyset create <NAME>
 ```
 
-Where it's implied that `type publicKey = string`.
+This simply creates a new keyset that keys can be included in.
+
+```
+coda-network keyset add <NAME> <PUBLIC_KEY> ...
+```
+
+This command would add a public key to a keyset.
+
+```
+coda-network keyset remove <NAME> <PUBLIC_KEY> ...
+```
+
+This command would remove a public key to a keyset.
+
+```
+coda-network keyset [ls|list]
+```
+
+This command will show all keysets that are stored locally on the machine.
+
+```
+coda-network keyset show <NAME>
+```
+
+This command displays all public keys included in a given keyset.
+
+```
+coda-network keyset import <KEYSET_NAME> <CSV_FILENAME>
+```
+
+```
+coda-network keyset destroy <NAME>
+```
+
+This simply creates a keyset for inclusion .
 
 ### Runtime Ledger Generation
 
 The code for generating the Runtime Genesis Ledger should be ported over from the [existing code](https://github.com/CodaProtocol/coda-automation/blob/master/scripts/testnet-keys.py#L203) but with the added flexibility of being able to inject any variety of keysets into the ledger with corresponding initial amounts.
+
+```
+coda-network genesis create
+```
+
+This would ideally take you through an interactive process where all the keysets are selected and associated parameters required for genesis ledger generation are collected. Afterwards this ledgeer is stored locally. Once generated locally, we should upload the genesis ledger to an S3 bucket or Google Cloud Storage where they can be downloaded and used for deploying.
 
 ### Configuration Deployment
 
@@ -72,6 +131,40 @@ The configuration deployment should be updated to take advantage of the kubernet
 ### Network Deployment and Monitoring
 
 This tool could optionally wrap the coda-automation tools and provide a simple interface for deploying a full testnet from a single command.
+
+## Command-line Framework
+
+After investigating the current state of commandline infrastructure I've come up with the following three options listed in priority order:
+
+### Cmdliner
+
+This is an OCaml project that a variety of members of our engineering team have experience with. This framework supports a variety of features out of the box that we'd like to have such as:
+
+1. Robust Argument Parsing
+2. Subcommands
+3. Documentation support
+4. Strongly typed with Reason support
+
+Given all these benefits and existing Bucklescript integration, this seems like the best solution to get going quickly and allowing other members of the team to contribute without having to learn a new tool.
+
+**Links**
+
+Original project - [github](https://github.com/dbuenzli/cmdliner), [website](https://erratique.ch/software/cmdliner)
+Bucklescript bindings - [github](https://github.com/ELLIOTTCABLE/bs-cmdliner)
+
+### Ink
+
+React based framework for building command-line tools. While this project seems to have a ton of functionality, it seems like it might be a bit overkill for this project. There's no Reason bindings, however they could be ported over reasonably easily from the TypeScript definitions. Overall this seems like a strong contender however is more work than cmdliner and would require everyone to learn a new tool.
+
+**Links**
+
+Ink - [github](https://github.com/vadimdemedes/ink)
+
+### Custom Implementation
+
+This was also a strong option since the amount of functionality we wish to support is well scoped and could be implemented by hand without too much work. The benefits of this approach are dropping a dependency and allowing us to only implement the features that we plan to use. 
+
+Downside of this approach is needing to maintain functionality that is reasonably well supported and maintained by the previously mentioned projects.
 
 ## External Users
 
@@ -96,12 +189,14 @@ Cons:
 
 - Requires lots of rewriting from the ground up in an untyped language
 - Less clean integrating with the client-sdk
+- Lots of functinality we'd like to add in the future that will further muddy the python code
 
 # Outstanding Questions
 
 - Are there any more usecases this tool should cover or have we over extended the scope of this project.
 
-- Carey has played with a couple frameworks for writing CLI tools but they all seem over complicated and unneccissary, should they still be considered?
+- ~Carey has played with a couple frameworks for writing CLI tools but they all seem over complicated and unneccissary, should they still be considered?~
+  - After talking with people on the team I've settled on cmdliner, see the above section.
 
 # Epic Link
 
