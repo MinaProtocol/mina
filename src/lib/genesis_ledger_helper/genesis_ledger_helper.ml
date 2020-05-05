@@ -79,6 +79,50 @@ module Ledger = struct
     end) )
 end
 
+module Genesis_proof = struct
+  let path ~root = root ^/ "genesis_proof"
+
+  let generate ~ledger ~(genesis_constants : Genesis_constants.t) =
+    (* TODO(4829): Runtime proof-level. *)
+    if Coda_compile_config.proof_level = "full" then
+      let%map ((module Keys) as keys) = Keys_lib.Keys.create () in
+      let protocol_state_with_hash =
+        Coda_state.Genesis_protocol_state.t
+          ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
+          ~genesis_constants
+      in
+      let base_hash = Keys.Step.instance_hash protocol_state_with_hash.data in
+      let computed_values =
+        Genesis_proof.create_values ~keys
+          { genesis_ledger= ledger
+          ; protocol_state_with_hash
+          ; base_hash
+          ; genesis_constants }
+      in
+      (base_hash, computed_values.genesis_proof)
+    else
+      return
+        (Snark_params.Tick.Field.zero, Dummy_values.Tock.Bowe_gabizon18.proof)
+
+  let store ~filename proof =
+    (* TODO: Use [Writer.write_bin_prot]. *)
+    Monitor.try_with_or_error ~extract_exn:true (fun () ->
+        let%bind wr = Writer.open_file filename in
+        Writer.write wr (Proof.Stable.V1.sexp_of_t proof |> Sexp.to_string) ;
+        Writer.close wr )
+
+  let load filename =
+    (* TODO: Use [Reader.load_bin_prot]. *)
+    Monitor.try_with_or_error ~extract_exn:true (fun () ->
+        let%bind rd = Reader.open_file filename in
+        let%bind ret =
+          rd |> Reader.lines |> Pipe.to_list >>| String.concat
+          >>| Sexp.of_string >>| Proof.Stable.V1.t_of_sexp
+        in
+        let%map () = Reader.close rd in
+        ret )
+end
+
 let load_genesis_constants (module M : Genesis_constants.Config_intf) ~path
     ~default ~logger =
   let config_res =
@@ -156,7 +200,7 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
     let%bind () = extract tar_dir in
     let extract_target = conf_dir ^/ genesis_dir_name in
     let ledger_dir = Ledger.path ~root:extract_target in
-    let proof_file = extract_target ^/ "genesis_proof" in
+    let proof_file = Genesis_proof.path ~root:extract_target in
     let constants_file = extract_target ^/ "genesis_constants.json" in
     if
       Core.Sys.file_exists ledger_dir = `Yes
@@ -185,14 +229,7 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
           ~default:Genesis_constants.compiled ~path:constants_file ~logger
       in
       let%map base_proof =
-        match%map
-          Monitor.try_with_or_error ~extract_exn:true (fun () ->
-              let%bind r = Reader.open_file proof_file in
-              let%map contents =
-                Pipe.to_list (Reader.lines r) >>| String.concat
-              in
-              Sexp.of_string contents |> Proof.Stable.V1.t_of_sexp )
-        with
+        match%map Genesis_proof.load proof_file with
         | Ok base_proof ->
             base_proof
         | Error e ->

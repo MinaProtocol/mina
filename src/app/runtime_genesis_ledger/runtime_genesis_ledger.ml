@@ -1,20 +1,6 @@
-[%%import
-"../../config.mlh"]
-
 open Core
 open Async
 open Coda_base
-
-[%%if
-proof_level = "full"]
-
-let use_dummy_values = false
-
-[%%else]
-
-let use_dummy_values = true
-
-[%%endif]
 
 type t = Ledger.t
 
@@ -152,7 +138,9 @@ let main accounts_json_file dir n constants_file =
     dir
   in
   let ledger_path = Genesis_ledger_helper.Ledger.path ~root:genesis_dir in
-  let proof_path = genesis_dir ^/ "genesis_proof" in
+  let proof_path =
+    Genesis_ledger_helper.Genesis_proof.path ~root:genesis_dir
+  in
   let constants_path = genesis_dir ^/ "genesis_constants.json" in
   let%bind accounts = get_accounts accounts_json_file n in
   let%bind () =
@@ -169,15 +157,12 @@ let main accounts_json_file dir n constants_file =
           |> Result.ok_or_failwith
         in
         let%bind _base_hash, base_proof =
-          if use_dummy_values then
-            return
-              ( Snark_params.Tick.Field.zero
-              , Dummy_values.Tock.Bowe_gabizon18.proof )
-          else generate_base_proof ~ledger ~genesis_constants
+          Genesis_ledger_helper.Genesis_proof.generate ~ledger
+            ~genesis_constants
         in
-        let%bind wr = Writer.open_file proof_path in
-        Writer.write wr (Proof.Stable.V1.sexp_of_t base_proof |> Sexp.to_string) ;
-        Writer.close wr
+        Deferred.Or_error.ok_exn
+        @@ Genesis_ledger_helper.Genesis_proof.store ~filename:proof_path
+             base_proof
     | Error e ->
         failwithf "Failed to create genesis ledger\n%s" (Error.to_string_hum e)
           ()
