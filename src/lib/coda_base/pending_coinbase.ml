@@ -150,16 +150,37 @@ module type Data_hash_binable_intf = sig
   val gen : t Quickcheck.Generator.t
 end
 
-module Data_hash_binable = struct
-  include Data_hash.Make_full_size ()
-end
-
 (* a coinbase stack has two components, data and a state_hash
    we create modules for each component
 *)
 
 module Coinbase_stack_data = struct
-  include Data_hash_binable
+  include Data_hash.Make_full_size (struct
+    let description = "Coinbase stack data"
+
+    let version_byte = Base58_check.Version_bytes.coinbase_stack_data
+  end)
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+      end
+
+      include T
+
+      let to_latest = Core.Fn.id
+
+      [%%define_from_scope
+      to_yojson, of_yojson]
+
+      include Comparable.Make (T)
+      include Hashable.Make_binable (T)
+    end
+  end]
+
+  type _unused = unit constraint t = Stable.Latest.t
 
   let push (h : t) cb =
     let coinbase = Coinbase_data.of_coinbase cb in
@@ -189,7 +210,34 @@ module Coinbase_stack_data = struct
 end
 
 module Stack_hash = struct
-  include Data_hash_binable
+  include Data_hash.Make_full_size (struct
+    let description = "Coinbase stack hash"
+
+    let version_byte = Base58_check.Version_bytes.coinbase_stack_hash
+  end)
+
+  (* Data hash versioned boilerplate below *)
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+      end
+
+      include T
+
+      let to_latest = Core.Fn.id
+
+      [%%define_from_scope
+      to_yojson, of_yojson]
+
+      include Comparable.Make (T)
+      include Hashable.Make_binable (T)
+    end
+  end]
+
+  type _unused = unit constraint t = Stable.Latest.t
 
   let dummy = of_hash Outside_pedersen_image.t
 end
@@ -305,7 +353,34 @@ end
 
 (* Pending coinbase hash *)
 module Hash_builder = struct
-  include Data_hash_binable
+  include Data_hash.Make_full_size (struct
+    let description = "Pending coinbase hash builder"
+
+    let version_byte = Base58_check.Version_bytes.receipt_chain_hash
+  end)
+
+  (* Data hash versioned boilerplate below *)
+
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      module T = struct
+        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+      end
+
+      include T
+
+      let to_latest = Fn.id
+
+      [%%define_from_scope
+      to_yojson, of_yojson]
+
+      include Comparable.Make (T)
+      include Hashable.Make_binable (T)
+    end
+  end]
+
+  type _unused = unit constraint t = Stable.Latest.t
 
   let merge ~height (h1 : t) (h2 : t) =
     Random_oracle.hash
@@ -894,7 +969,7 @@ struct
     List.fold
       (List.init depth ~f:(fun i -> i + 1))
       ~init:([(0, init_hash)], init_hash)
-      ~f:(fun (hashes, (cur_hash : Data_hash_binable.t)) height ->
+      ~f:(fun (hashes, (cur_hash : Hash.t)) height ->
         let (merged : Hash.t) =
           Hash.merge ~height:(height - 1) cur_hash cur_hash
         in

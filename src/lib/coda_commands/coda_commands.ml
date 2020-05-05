@@ -214,7 +214,9 @@ type active_state_fields =
 let get_status ~flag t =
   let open Coda_lib.Config in
   let config = Coda_lib.config t in
-  let protocol_constants = config.genesis_constants.protocol in
+  let protocol_constants =
+    config.precomputed_values.genesis_constants.protocol
+  in
   let consensus_constants = Consensus.Constants.create ~protocol_constants in
   let uptime_secs =
     Time_ns.diff (Time_ns.now ()) start_time

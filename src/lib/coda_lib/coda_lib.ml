@@ -89,6 +89,8 @@ type t =
   ; sync_status: Sync_status.t Coda_incremental.Status.Observer.t }
 [@@deriving fields]
 
+let time_controller t = t.config.time_controller
+
 let subscription t = t.subscriptions
 
 let peek_frontier frontier_broadcast_pipe =
@@ -521,7 +523,7 @@ let initialization_finish_signal t = t.initialization_finish_signal
  *   - uses an abstraction leak to patch new functionality instead of making a new extension
  *   - every call to this function will create a new, unique pipe with it's own thread for transfering
  *     items from the identity extension with no route for termination
- *)
+*)
 let root_diff t =
   let root_diff_reader, root_diff_writer =
     Strict_pipe.create ~name:"root diff"
@@ -665,7 +667,8 @@ let staking_ledger t =
   let open Option.Let_syntax in
   let consensus_constants =
     Consensus.Constants.create
-      ~protocol_constants:t.config.genesis_constants.protocol
+      ~protocol_constants:
+        (Precomputed_values.protocol_constants t.config.precomputed_values)
   in
   let%map transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
@@ -721,13 +724,15 @@ let start t =
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
-    ~genesis_constants:t.config.genesis_constants ;
+    ~genesis_constants:
+      (Precomputed_values.genesis_constants t.config.precomputed_values) ;
   Snark_worker.start t
 
-let create (config : Config.t) ~genesis_ledger ~base_proof =
+let create (config : Config.t) ~precomputed_values =
   let consensus_constants =
     Consensus.Constants.create
-      ~protocol_constants:config.genesis_constants.protocol
+      ~protocol_constants:
+        (Precomputed_values.protocol_constants precomputed_values)
   in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
@@ -773,7 +778,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     ; kill_ivar= Ivar.create () }
                   , config.snark_work_fee ) )
           in
-          Fork_id.set_current config.initial_fork_id ;
+          Protocol_version.set_current config.initial_protocol_version ;
+          Protocol_version.set_proposed_opt
+            config.proposed_protocol_version_opt ;
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
           in
@@ -817,58 +824,67 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
               Option.value_map peer_opt ~default:"<UNKNOWN>" ~f:(fun peer ->
                   peer.peer_id )
             in
-            match !net_ref with
-            | None ->
-                (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
-                Logger.info config.logger
-                  "Network not instantiated when telemetry data requested"
-                  ~module_:__MODULE__ ~location:__LOC__ ;
-                Deferred.return
-                @@ Error
-                     (Error.of_string
-                        (sprintf
-                           !"Node with IP address=%{sexp: Unix.Inet_addr.t}, \
-                             peer ID=%s, network not instantiated when \
-                             telemetry data requested"
-                           node_ip_addr node_peer_id))
-            | Some net -> (
-              match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
+            if config.disable_telemetry then
+              Deferred.return
+              @@ Error
+                   (Error.of_string
+                      (sprintf
+                         !"Node with IP address=%{sexp: Unix.Inet_addr.t}, \
+                           peer ID=%s, telemetry is disabled"
+                         node_ip_addr node_peer_id))
+            else
+              match !net_ref with
               | None ->
+                  (* essentially unreachable; without a network, we wouldn't receive this RPC call *)
+                  Logger.info config.logger
+                    "Network not instantiated when telemetry data requested"
+                    ~module_:__MODULE__ ~location:__LOC__ ;
                   Deferred.return
                   @@ Error
                        (Error.of_string
                           (sprintf
                              !"Node with IP address=%{sexp: \
-                               Unix.Inet_addr.t}, peer ID=%s, could not get \
-                               transition frontier for telemetry data"
+                               Unix.Inet_addr.t}, peer ID=%s, network not \
+                               instantiated when telemetry data requested"
                              node_ip_addr node_peer_id))
-              | Some frontier ->
-                  let%map peers = Coda_networking.peers net in
-                  let protocol_state_hash =
-                    let tip = Transition_frontier.best_tip frontier in
-                    let state =
-                      Transition_frontier.Breadcrumb.protocol_state tip
+              | Some net -> (
+                match Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r with
+                | None ->
+                    Deferred.return
+                    @@ Error
+                         (Error.of_string
+                            (sprintf
+                               !"Node with IP address=%{sexp: \
+                                 Unix.Inet_addr.t}, peer ID=%s, could not get \
+                                 transition frontier for telemetry data"
+                               node_ip_addr node_peer_id))
+                | Some frontier ->
+                    let%map peers = Coda_networking.peers net in
+                    let protocol_state_hash =
+                      let tip = Transition_frontier.best_tip frontier in
+                      let state =
+                        Transition_frontier.Breadcrumb.protocol_state tip
+                      in
+                      Coda_state.Protocol_state.hash state
                     in
-                    Coda_state.Protocol_state.hash state
-                  in
-                  let ban_statuses =
-                    Trust_system.Peer_trust.peer_statuses config.trust_system
-                  in
-                  let k_block_hashes =
-                    List.map
-                      ( Transition_frontier.root frontier
-                      :: Transition_frontier.best_tip_path frontier )
-                      ~f:Transition_frontier.Breadcrumb.state_hash
-                  in
-                  Ok
-                    Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
-                      { node_ip_addr
-                      ; node_peer_id
-                      ; peers
-                      ; block_producers
-                      ; protocol_state_hash
-                      ; ban_statuses
-                      ; k_block_hashes } )
+                    let ban_statuses =
+                      Trust_system.Peer_trust.peer_statuses config.trust_system
+                    in
+                    let k_block_hashes =
+                      List.map
+                        ( Transition_frontier.root frontier
+                        :: Transition_frontier.best_tip_path frontier )
+                        ~f:Transition_frontier.Breadcrumb.state_hash
+                    in
+                    Ok
+                      Coda_networking.Rpcs.Get_telemetry_data.Telemetry_data.
+                        { node_ip_addr
+                        ; node_peer_id
+                        ; peers
+                        ; block_producers
+                        ; protocol_state_hash
+                        ; ban_statuses
+                        ; k_block_hashes } )
           in
           let%bind net =
             Coda_networking.create config.net_config
@@ -952,7 +968,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config
               ~trust_system:config.trust_system
-              ~pool_max_size:config.genesis_constants.txpool_max_size
+              ~pool_max_size:
+                config.precomputed_values.genesis_constants.txpool_max_size
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
@@ -988,8 +1005,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
             Broadcast_pipe.create
-              ( External_transition.genesis ~genesis_ledger ~base_proof
-                  ~genesis_constants:config.genesis_constants
+              ( External_transition.genesis ~precomputed_values
               |> External_transition.Validated.to_initial_validated )
           in
           let valid_transitions, initialization_finish_signal =
@@ -1040,16 +1056,15 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                          let et =
                            Transition_frontier.Breadcrumb.validated_transition
                              breadcrumb
-                           |> External_transition.Validation.forget_validation
                          in
-                         External_transition.poke_validation_callback et
-                           (fun v ->
-                             if v then Coda_networking.broadcast_state net et
-                         ) ;
+                         External_transition.Validated.poke_validation_callback
+                           et (fun v ->
+                             if v then
+                               Coda_networking.broadcast_state net
+                               @@ External_transition.Validation
+                                  .forget_validation et ) ;
                          breadcrumb ))
-                  ~most_recent_valid_block
-                  ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
-                  ~base_proof ~genesis_constants:config.genesis_constants )
+                  ~most_recent_valid_block ~precomputed_values )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api
@@ -1134,7 +1149,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                (Coda_networking.states net)
                external_transitions_writer ~f:ident) ;
           (* FIXME #4093: augment ban_notifications with a Peer.ID so we can implement ban_notify
-           trace_task "ban notification loop" (fun () ->
+             trace_task "ban notification loop" (fun () ->
               Linear_pipe.iter (Coda_networking.ban_notification_reader net)
                 ~f:(fun notification ->
                   let open Gossip_net in

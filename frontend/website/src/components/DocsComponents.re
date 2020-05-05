@@ -40,6 +40,9 @@ module Wrap = (C: Component) => {
   let make = props => {
     ReasonReact.cloneElement(C.element, ~props, [||]);
   };
+
+  [@bs.obj]
+  external makeProps: (~children: 'a, unit) => {. "children": 'a} = "";
 };
 
 module WrapHeader = (C: Component) => {
@@ -138,15 +141,12 @@ module Strong =
 external writeText: string => Js.Promise.t(unit) = "writeText";
 
 module Pre = {
-  let make = props => {
+  [@react.component]
+  let make = (~children) => {
     let text =
       Js.String.trim(
         Js.String.make(
-          {
-            let props =
-              ReactExt.Children.only(props##children) |> ReactExt.props;
-            props##children;
-          },
+          (ReactExt.Children.only(children) |> ReactExt.props)##children,
         ),
       );
     <div className={style([position(`relative)])}>
@@ -182,7 +182,7 @@ module Pre = {
           overflow(`scroll),
           selector("code", [Theme.Typeface.pragmataPro]),
         ])}>
-        {props##children}
+        children
       </pre>
     </div>;
   };
@@ -214,8 +214,23 @@ module Img =
     let element = <img width="100%" />;
   });
 
+module DaemonCommandExample = {
+  let defaultArgs = ["coda daemon", "-peer $SEED1", "-peer $SEED2"];
+  [@react.component]
+  let make = (~args: array(string)=[||]) => {
+    let allArgs = defaultArgs @ Array.to_list(args);
+    let argsLength =
+      List.fold_left((a, e) => a + String.length(e), 0, allArgs);
+    let sep = argsLength > 60 ? " \\\n    " : " ";
+    let processedArgs =
+      String.concat(sep, defaultArgs @ Array.to_list(args));
+    <Pre> <Code> {React.string(processedArgs)} </Code> </Pre>;
+  };
+};
+
 let allComponents = () => {
   "Alert": Alert.make,
+  "DaemonCommandExample": DaemonCommandExample.make,
   "h1": H1.make,
   "h2": H2.make,
   "h3": H3.make,

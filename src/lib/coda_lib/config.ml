@@ -1,5 +1,5 @@
+open Core_kernel
 open Async_kernel
-open Coda_base
 open Auxiliary_database
 open Signature_lib
 
@@ -20,6 +20,7 @@ type t =
   ; trust_system: Trust_system.t
   ; monitor: Monitor.t option
   ; is_seed: bool
+  ; disable_telemetry: bool
   ; initial_block_production_keypairs: Keypair.Set.t
   ; coinbase_receiver: [`Producer | `Other of Public_key.Compressed.t]
   ; work_selection_method: (module Work_selector.Selection_method_intf)
@@ -27,7 +28,9 @@ type t =
   ; work_reassignment_wait: int
   ; gossip_net_params: Gossip_net.Libp2p.Config.t
   ; net_config: Coda_networking.Config.t
-  ; initial_fork_id: Fork_id.t
+  ; initial_protocol_version: Protocol_version.t
+        (* Option.t instead of option, so that the derived `make' requires an argument *)
+  ; proposed_protocol_version_opt: Protocol_version.t Option.t
   ; snark_pool_disk_location: string
   ; wallets_disk_location: string
   ; persistent_root_location: string
@@ -44,7 +47,6 @@ type t =
       Core.Host_and_port.t Cli_lib.Flag.Types.with_name option
         [@default None]
   ; demo_mode: bool [@default false]
-  ; genesis_state_hash: State_hash.t
   ; log_block_creation: bool [@default false]
-  ; genesis_constants: Genesis_constants.t }
+  ; precomputed_values: Precomputed_values.t }
 [@@deriving make]
