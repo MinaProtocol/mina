@@ -150,13 +150,8 @@ module Genesis_proof = struct
   let load filename =
     (* TODO: Use [Reader.load_bin_prot]. *)
     Monitor.try_with_or_error ~extract_exn:true (fun () ->
-        let%bind rd = Reader.open_file filename in
-        let%bind ret =
-          rd |> Reader.lines |> Pipe.to_list >>| String.concat
-          >>| Sexp.of_string >>| Proof.Stable.V1.t_of_sexp
-        in
-        let%map () = Reader.close rd in
-        ret )
+        Reader.file_contents filename
+        >>| Sexp.of_string >>| Proof.Stable.V1.t_of_sexp )
 end
 
 let load_genesis_constants (module M : Genesis_constants.Config_intf) ~path
