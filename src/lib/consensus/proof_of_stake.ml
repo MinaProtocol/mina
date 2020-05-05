@@ -125,15 +125,35 @@ module Constants = Constants
 
 module Data = struct
   module Epoch_seed = struct
-    include Coda_base.Data_hash.Make_full_size ()
-
-    module Base58_check = Codable.Make_base58_check (struct
-      type t = Stable.Latest.t [@@deriving bin_io_unversioned]
-
+    include Coda_base.Data_hash.Make_full_size (struct
       let version_byte = Base58_check.Version_bytes.epoch_seed
 
       let description = "Epoch Seed"
     end)
+
+    (* Data hash versioned boilerplate below *)
+
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        module T = struct
+          type t = Snark_params.Tick.Field.t
+          [@@deriving sexp, compare, hash, version {asserted}]
+        end
+
+        include T
+
+        let to_latest = Core.Fn.id
+
+        [%%define_from_scope
+        to_yojson, of_yojson]
+
+        include Comparable.Make (T)
+        include Hashable.Make_binable (T)
+      end
+    end]
+
+    type _unused = unit constraint t = Stable.Latest.t
 
     let initial : t = of_hash Tick.Pedersen.zero_hash
 
@@ -149,9 +169,6 @@ module Data = struct
           hash ~init:Hash_prefix_states.epoch_seed
             [|var_to_hash_packed seed; vrf_result|]
           |> var_of_hash_packed )
-
-    [%%define_locally
-    Base58_check.(to_base58_check)]
   end
 
   module Epoch_and_slot = struct
