@@ -81,6 +81,10 @@ end
 
 let global_metadata = ref []
 
+(* List.append isn't tail-recursive (recurses over first arg), so hopefully it doesn't get too big! *)
+let append_to_global_metadata l =
+  global_metadata := List.append !global_metadata l
+
 module Message = struct
   type t =
     { timestamp: Time.t

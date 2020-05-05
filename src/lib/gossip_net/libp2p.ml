@@ -108,16 +108,13 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
                 Keypair.random net2
           in
           let my_peer_id = Keypair.to_peer_id me |> Peer.Id.to_string in
-          Logger.(
-            global_metadata :=
-              List.append
-                [ ("peer_id", `String my_peer_id)
-                ; ( "host"
-                  , `String
-                      (Unix.Inet_addr.to_string
-                         config.addrs_and_ports.external_ip) )
-                ; ("port", `Int config.addrs_and_ports.libp2p_port) ]
-                !global_metadata) ;
+          Logger.append_to_global_metadata
+            [ ("peer_id", `String my_peer_id)
+            ; ( "host"
+              , `String
+                  (Unix.Inet_addr.to_string config.addrs_and_ports.external_ip)
+              )
+            ; ("port", `Int config.addrs_and_ports.libp2p_port) ] ;
           ( match config.addrs_and_ports.peer with
           | Some _ ->
               ()
