@@ -21,9 +21,8 @@ module Send_user_commands = struct
   [@@deriving bin_io_unversioned]
 
   type response =
-    ( Network_pool.Transaction_pool.Resource_pool.Diff.Stable.Latest.t
-    * Network_pool.Transaction_pool.Resource_pool.Diff.Rejected.Stable.Latest.t
-    )
+    ( Network_pool.Transaction_pool.Diff.Stable.Latest.t
+    * Network_pool.Transaction_pool.Diff.Rejected.Stable.Latest.t )
     Or_error.t
   [@@deriving bin_io_unversioned]
 

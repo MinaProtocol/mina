@@ -32,6 +32,76 @@ module type Transition_frontier_intf = sig
   val best_tip_diff_pipe : t -> best_tip_diff Broadcast_pipe.Reader.t
 end
 
+(* versioned type, outside of functors *)
+module Diff = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = User_command.Stable.V1.t list [@@deriving sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = User_command.t list [@@deriving sexp, yojson]
+
+  module Diff_error = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t =
+          | Insufficient_replace_fee
+          | Invalid_signature
+          | Duplicate
+          | Sender_account_does_not_exist
+          | Insufficient_amount_for_account_creation
+          | Delegate_not_found
+          | Invalid_nonce
+          | Insufficient_funds
+          | Insufficient_fee
+          | Overflow
+        [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t =
+      | Insufficient_replace_fee
+      | Invalid_signature
+      | Duplicate
+      | Sender_account_does_not_exist
+      | Insufficient_amount_for_account_creation
+      | Delegate_not_found
+      | Invalid_nonce
+      | Insufficient_funds
+      | Insufficient_fee
+      | Overflow
+    [@@deriving sexp, yojson]
+  end
+
+  module Rejected = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
+        [@@deriving sexp, yojson]
+
+        let to_latest = Fn.id
+      end
+    end]
+
+    type t = Stable.Latest.t [@@deriving sexp, yojson]
+  end
+
+  type rejected = Rejected.t [@@deriving sexp, yojson]
+
+  let summary t =
+    Printf.sprintf "Transaction diff of length %d" (List.length t)
+
+  let is_empty t = List.is_empty t
+end
+
 module type S = sig
   open Intf
 
@@ -42,18 +112,22 @@ module type S = sig
       Transaction_resource_pool_intf
       with type transition_frontier := transition_frontier
 
-    module Diff : Transaction_pool_diff_intf with type resource_pool := t
+    module Diff :
+      Transaction_pool_diff_intf
+      with type resource_pool := t
+       and type Diff_error.t = Diff.Diff_error.t
+       and type Rejected.t = Diff.Rejected.t
   end
 
   include
     Network_pool_base_intf
     with type resource_pool := Resource_pool.t
      and type transition_frontier := transition_frontier
-     and type resource_pool_diff := Resource_pool.Diff.t
+     and type resource_pool_diff := Diff.t
      and type config := Resource_pool.Config.t
      and type transition_frontier_diff :=
                 Resource_pool.transition_frontier_diff
-     and type rejected_diff := Resource_pool.Diff.rejected
+     and type rejected_diff := Diff.rejected
 end
 
 (* Functor over user command, base ledger and transaction validator for
@@ -502,39 +576,12 @@ struct
       t
 
     module Diff = struct
-      [%%versioned
-      module Stable = struct
-        module V1 = struct
-          type t = User_command.Stable.V1.t list [@@deriving sexp, yojson]
-
-          let to_latest = Fn.id
-        end
-      end]
-
       type t = User_command.t list [@@deriving sexp, yojson]
 
+      type _unused = unit constraint t = Diff.t
+
       module Diff_error = struct
-        [%%versioned
-        module Stable = struct
-          module V1 = struct
-            type t =
-              | Insufficient_replace_fee
-              | Invalid_signature
-              | Duplicate
-              | Sender_account_does_not_exist
-              | Insufficient_amount_for_account_creation
-              | Delegate_not_found
-              | Invalid_nonce
-              | Insufficient_funds
-              | Insufficient_fee
-              | Overflow
-            [@@deriving sexp, yojson]
-
-            let to_latest = Fn.id
-          end
-        end]
-
-        type t = Stable.Latest.t =
+        type t = Diff.Diff_error.t =
           | Insufficient_replace_fee
           | Invalid_signature
           | Duplicate
@@ -549,17 +596,9 @@ struct
       end
 
       module Rejected = struct
-        [%%versioned
-        module Stable = struct
-          module V1 = struct
-            type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
-            [@@deriving sexp, yojson]
+        type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
 
-            let to_latest = Fn.id
-          end
-        end]
-
-        type t = Stable.Latest.t [@@deriving sexp, yojson]
+        type _unused = unit constraint t = Diff.Rejected.t
       end
 
       type rejected = Rejected.t [@@deriving sexp, yojson]
@@ -567,7 +606,7 @@ struct
       let summary t =
         Printf.sprintf "Transaction diff of length %d" (List.length t)
 
-      let is_empty = List.is_empty
+      let is_empty t = List.is_empty t
 
       let apply t env =
         let txs = Envelope.Incoming.data env in
@@ -612,7 +651,7 @@ struct
                           (Trust_system.Actions.Sent_old_gossip, None)
                       in
                       go txs'' pool
-                        (accepted, (tx, Diff_error.Duplicate) :: rejected)
+                        (accepted, (tx, Diff.Diff_error.Duplicate) :: rejected)
                     else
                       let account ledger account_id =
                         Option.bind
@@ -630,7 +669,9 @@ struct
                           in
                           go txs'' pool
                             ( accepted
-                            , (tx, Diff_error.Sender_account_does_not_exist)
+                            , ( tx
+                              , Diff.Diff_error.Sender_account_does_not_exist
+                              )
                               :: rejected )
                       | Some sender_account ->
                           if has_sufficient_fee pool tx ~pool_max_size then (
@@ -674,7 +715,7 @@ struct
                             in
                             let of_indexed_pool_error = function
                               | `Invalid_nonce ->
-                                  Diff_error.Invalid_nonce
+                                  Diff.Diff_error.Invalid_nonce
                               | `Insufficient_funds ->
                                   Insufficient_funds
                               | `Insufficient_replace_fee ->
@@ -779,10 +820,10 @@ struct
                                 go txs'' pool'' (tx :: accepted, rejected)
                             | Error `Insufficient_replace_fee ->
                                 (* We can't punish peers for this, since an
-                                   attacker can simultaneously send different
-                                   transactions at the same nonce to different
-                                   nodes, which will then naturally gossip them.
-                                *)
+                             attacker can simultaneously send different
+                             transactions at the same nonce to different
+                             nodes, which will then naturally gossip them.
+                          *)
                                 let f_log =
                                   if is_sender_local then Logger.error
                                   else Logger.debug
@@ -794,7 +835,9 @@ struct
                                   ~metadata:[("cmd", User_command.to_yojson tx)] ;
                                 go txs'' pool
                                   ( accepted
-                                  , (tx, Diff_error.Insufficient_replace_fee)
+                                  , ( tx
+                                    , Diff.Diff_error.Insufficient_replace_fee
+                                    )
                                     :: rejected )
                             | Error err ->
                                 let diff_err = of_indexed_pool_error err in
@@ -805,7 +848,8 @@ struct
                                     ~metadata:
                                       [ ("cmd", User_command.to_yojson tx)
                                       ; ( "reason"
-                                        , Diff_error.to_yojson diff_err ) ] ;
+                                        , Diff.Diff_error.to_yojson diff_err )
+                                      ] ;
                                 let%bind _ =
                                   trust_record
                                     ( Trust_system.Actions.Sent_useless_gossip
@@ -829,8 +873,8 @@ struct
                             in
                             go txs'' pool
                               ( accepted
-                              , (tx, Diff_error.Insufficient_fee) :: rejected
-                              ) ) )
+                              , (tx, Diff.Diff_error.Insufficient_fee)
+                                :: rejected ) ) )
             in
             go txs t.pool ([], [])
 
