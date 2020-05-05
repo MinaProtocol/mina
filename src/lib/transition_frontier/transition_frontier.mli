@@ -81,18 +81,21 @@ module For_tests : sig
 
   val gen_genesis_breadcrumb :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> unit
     -> Breadcrumb.t Quickcheck.Generator.t
 
   val gen_persistence :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> unit
     -> (Persistent_root.t * Persistent_frontier.t) Quickcheck.Generator.t
 
   val gen :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t
@@ -106,6 +109,7 @@ module For_tests : sig
 
   val gen_with_branch :
        ?logger:Logger.t
+    -> proof_level:Genesis_constants.Proof_level.t
     -> ?verifier:Verifier.t
     -> ?trust_system:Trust_system.t
     -> ?consensus_local_state:Consensus.Data.Local_state.t

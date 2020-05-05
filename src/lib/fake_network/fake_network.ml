@@ -137,26 +137,30 @@ module Generator = struct
   open Quickcheck
   open Generator.Let_syntax
 
-  type peer_config = max_frontier_length:int -> peer_state Generator.t
+  type peer_config =
+       proof_level:Genesis_constants.Proof_level.t
+    -> max_frontier_length:int
+    -> peer_state Generator.t
 
-  let fresh_peer ~max_frontier_length =
+  let fresh_peer ~proof_level ~max_frontier_length =
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
         ~genesis_ledger:Test_genesis_ledger.t
     in
     let%map frontier =
-      Transition_frontier.For_tests.gen ~consensus_local_state
+      Transition_frontier.For_tests.gen ~proof_level ~consensus_local_state
         ~max_length:max_frontier_length ~size:0 ()
     in
     {frontier; consensus_local_state}
 
-  let peer_with_branch ~frontier_branch_size ~max_frontier_length =
+  let peer_with_branch ~frontier_branch_size ~proof_level ~max_frontier_length
+      =
     let consensus_local_state =
       Consensus.Data.Local_state.create Public_key.Compressed.Set.empty
         ~genesis_ledger:Test_genesis_ledger.t
     in
     let%map frontier, branch =
-      Transition_frontier.For_tests.gen_with_branch
+      Transition_frontier.For_tests.gen_with_branch ~proof_level
         ~max_length:max_frontier_length ~frontier_size:0
         ~branch_size:frontier_branch_size ~consensus_local_state ()
     in
@@ -165,11 +169,11 @@ module Generator = struct
           ~f:(Transition_frontier.add_breadcrumb_exn frontier) ) ;
     {frontier; consensus_local_state}
 
-  let gen ~max_frontier_length configs =
+  let gen ~proof_level ~max_frontier_length configs =
     let open Quickcheck.Generator.Let_syntax in
     let%map states =
       Vect.Quickcheck_generator.map configs ~f:(fun config ->
-          config ~max_frontier_length )
+          config ~proof_level ~max_frontier_length )
     in
     setup states
 end

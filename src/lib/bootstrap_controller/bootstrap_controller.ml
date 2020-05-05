@@ -408,6 +408,8 @@ let%test_module "Bootstrap_controller tests" =
 
     let logger = Logger.create ()
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
     let trust_system = Trust_system.null ()
 
     let pids = Child_processes.Termination.create_pid_table ()
@@ -431,7 +433,7 @@ let%test_module "Bootstrap_controller tests" =
     let make_non_running_bootstrap ~genesis_root ~network =
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~logger ~conf_dir:None ~pids )
+            Verifier.create ~logger ~proof_level ~conf_dir:None ~pids )
       in
       let transition =
         genesis_root
@@ -454,10 +456,10 @@ let%test_module "Bootstrap_controller tests" =
         (* we only need one node for this test, but we need more than one peer so that coda_networking does not throw an error *)
         let%bind fake_network =
           Fake_network.Generator.(
-            gen ~max_frontier_length [fresh_peer; fresh_peer])
+            gen ~proof_level ~max_frontier_length [fresh_peer; fresh_peer])
         in
         let%map make_branch =
-          Transition_frontier.Breadcrumb.For_tests.gen_seq
+          Transition_frontier.Breadcrumb.For_tests.gen_seq ~proof_level
             ~accounts_with_secret_keys:
               (Lazy.force Test_genesis_ledger.accounts)
             branch_size
@@ -518,7 +520,7 @@ let%test_module "Bootstrap_controller tests" =
       let open Fake_network in
       let verifier =
         Async.Thread_safe.block_on_async_exn (fun () ->
-            Verifier.create ~conf_dir:None ~logger ~pids )
+            Verifier.create ~conf_dir:None ~proof_level ~logger ~pids )
       in
       let genesis_state_hash =
         Transition_frontier.genesis_state_hash my_net.state.frontier
@@ -576,7 +578,7 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "sync with one node after receiving a transition" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~max_frontier_length
+          gen ~proof_level ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2) ])
@@ -615,8 +617,9 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
       Quickcheck.test ~trials:1
-        (Transition_frontier.For_tests.gen ~max_length:max_frontier_length
-           ~size:max_frontier_length ()) ~f:(fun frontier ->
+        (Transition_frontier.For_tests.gen ~proof_level:Check
+           ~max_length:max_frontier_length ~size:max_frontier_length ())
+        ~f:(fun frontier ->
           Thread_safe.block_on_async_exn
           @@ fun () ->
           Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)
@@ -636,7 +639,7 @@ let%test_module "Bootstrap_controller tests" =
                 Staged_ledger.pending_coinbase_collection staged_ledger
               in
               let%bind verifier =
-                Verifier.create ~conf_dir:None ~logger ~pids
+                Verifier.create ~conf_dir:None ~proof_level ~logger ~pids
               in
               let%map actual_staged_ledger =
                 Staged_ledger

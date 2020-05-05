@@ -566,7 +566,7 @@ module T = struct
                       ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
                           {name= "dummy"; value= host_and_port} ))
-                 ())
+                 ~proof_level:Genesis_constants.Proof_level.compiled ())
               ~genesis_ledger:Test_genesis_ledger.t
               ~base_proof:Precomputed_values.base_proof
           in

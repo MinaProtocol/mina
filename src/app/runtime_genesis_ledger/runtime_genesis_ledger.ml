@@ -1,20 +1,6 @@
-[%%import
-"../../config.mlh"]
-
 open Core
 open Async
 open Coda_base
-
-[%%if
-proof_level = "full"]
-
-let use_dummy_values = false
-
-[%%else]
-
-let use_dummy_values = true
-
-[%%endif]
 
 type t = Ledger.t
 
@@ -51,7 +37,7 @@ let generate_base_proof ~ledger ~(genesis_constants : Genesis_constants.t) =
     in
     let main x =
       Tick.handle
-        (Keys.Step.main ~logger:(Logger.create ()) x)
+        (Keys.Step.main ~logger:(Logger.create ()) ~proof_level:Full x)
         (Consensus.Data.Prover_state.precomputed_handler ~genesis_ledger)
     in
     let tick =
@@ -140,9 +126,7 @@ let get_accounts accounts_json_file n =
         (Account_config.to_yojson all_accounts) ) ;
   all_accounts
 
-let genesis_dirname = Cache_dir.genesis_dir_name Genesis_constants.compiled
-
-let create_tar top_dir =
+let create_tar ~genesis_dirname top_dir =
   let tar_file = top_dir ^/ genesis_dirname ^ ".tar.gz" in
   let tar_command =
     sprintf "tar -C %s -czf %s %s" top_dir tar_file genesis_dirname
@@ -171,9 +155,13 @@ let read_write_constants read_from_opt write_to =
       Config_file.(of_genesis_constants constants |> to_yojson)) ;
   constants
 
-let main accounts_json_file dir n constants_file =
+let main accounts_json_file dir n proof_level constants_file =
   let open Deferred.Let_syntax in
   let top_dir = Option.value ~default:Cache_dir.autogen_path dir in
+  let genesis_dirname =
+    Cache_dir.genesis_dir_name ~genesis_constants:Genesis_constants.compiled
+      ~proof_level:Genesis_constants.Proof_level.compiled
+  in
   let%bind genesis_dir =
     let dir = top_dir ^/ genesis_dirname in
     let%map () = File_system.create_dir dir ~clear_if_exists:true in
@@ -198,11 +186,13 @@ let main accounts_json_file dir n constants_file =
           |> Result.ok_or_failwith
         in
         let%bind _base_hash, base_proof =
-          if use_dummy_values then
-            return
-              ( Snark_params.Tick.Field.zero
-              , Dummy_values.Tock.Bowe_gabizon18.proof )
-          else generate_base_proof ~ledger ~genesis_constants
+          match proof_level with
+          | Genesis_constants.Proof_level.Full ->
+              generate_base_proof ~ledger ~genesis_constants
+          | Check | None ->
+              return
+                ( Snark_params.Tick.Field.zero
+                , Dummy_values.Tock.Bowe_gabizon18.proof )
         in
         let%bind wr = Writer.open_file proof_path in
         Writer.write wr (Proof.Stable.V1.sexp_of_t base_proof |> Sexp.to_string) ;
@@ -211,7 +201,7 @@ let main accounts_json_file dir n constants_file =
         failwithf "Failed to create genesis ledger\n%s" (Error.to_string_hum e)
           ()
   in
-  create_tar top_dir ;
+  create_tar ~genesis_dirname top_dir ;
   File_system.remove_dir genesis_dir
 
 let () =
@@ -260,6 +250,11 @@ let () =
                       Config_file.(of_genesis_constants compiled |> to_yojson))
                   |> Yojson.Safe.to_string ))
              (optional string)
+         and proof_level =
+           flag "proof-level"
+             (optional
+                (Arg_type.create Genesis_constants.Proof_level.of_string))
+             ~doc:"full|check|none"
          in
          fun () ->
            let max = Int.pow 2 Coda_compile_config.ledger_depth in
@@ -268,4 +263,6 @@ let () =
            else
              main accounts_json genesis_dir
                (Option.value ~default:0 n)
+               (Option.value ~default:Genesis_constants.Proof_level.compiled
+                  proof_level)
                constants))

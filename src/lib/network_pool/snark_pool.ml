@@ -432,7 +432,7 @@ let%test_module "random set test" =
       let res =
         let open Deferred.Let_syntax in
         let%bind verifier =
-          Verifier.create ~logger
+          Verifier.create ~logger ~proof_level:Check
             ~pids:(Child_processes.Termination.create_pid_table ())
             ~conf_dir:None
         in
@@ -583,7 +583,7 @@ let%test_module "random set test" =
             Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
           in
           let%bind verifier =
-            Verifier.create ~logger
+            Verifier.create ~logger ~proof_level:Check
               ~pids:(Child_processes.Termination.create_pid_table ())
               ~conf_dir:None
           in
@@ -671,7 +671,7 @@ let%test_module "random set test" =
                 (Some (Mocks.Transition_frontier.create ()))
             in
             let%bind verifier =
-              Verifier.create ~logger
+              Verifier.create ~logger ~proof_level:Check
                 ~pids:(Child_processes.Termination.create_pid_table ())
                 ~conf_dir:None
             in
@@ -725,7 +725,7 @@ let%test_module "random set test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
           let%bind verifier =
-            Verifier.create ~logger
+            Verifier.create ~logger ~proof_level:Check
               ~pids:(Child_processes.Termination.create_pid_table ())
               ~conf_dir:None
           in

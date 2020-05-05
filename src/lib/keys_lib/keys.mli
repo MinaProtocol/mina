@@ -35,6 +35,7 @@ module type S = sig
 
     val main :
          logger:Logger.t
+      -> proof_level:Genesis_constants.Proof_level.t
       -> Tick.Field.Var.t
       -> (unit, Prover_state.t) Tick.Checked.t
   end

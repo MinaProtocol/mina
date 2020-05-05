@@ -234,6 +234,10 @@ let daemon logger =
      and disable_telemetry =
        flag "disable-telemetry" no_arg
          ~doc:"Disable reporting telemetry to other nodes"
+     and proof_level =
+       flag "proof-level"
+         (optional (Arg_type.create Genesis_constants.Proof_level.of_string))
+         ~doc:"full|check|none"
      in
      fun () ->
        let open Deferred.Let_syntax in
@@ -364,10 +368,32 @@ let daemon logger =
        let time_controller =
          Block_time.Controller.create @@ Block_time.Controller.basic ~logger
        in
+       let proof_level =
+         match (proof_level, Genesis_constants.Proof_level.compiled) with
+         | Some (Full as proof_level), _
+         | Some (Check as proof_level), Check
+         | Some (None as proof_level), None ->
+             proof_level
+         | None, compiled ->
+             compiled
+         | Some proof_level, compiled ->
+             let str = Genesis_constants.Proof_level.to_string in
+             Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+               "Proof level $proof_level is not compatible with compile-time \
+                proof level $compiled_proof_level"
+               ~metadata:
+                 [ ("proof_level", `String (str proof_level))
+                 ; ("compiled_proof_level", `String (str compiled)) ] ;
+             failwithf
+               "Proof level %s is not compatible with compile-time proof \
+                level %s"
+               (str proof_level) (str compiled) ()
+       in
        let coda_initialization_deferred () =
          let%bind genesis_ledger, base_proof, genesis_constants =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
-             ~logger ~conf_dir ~daemon_conf:genesis_runtime_constants
+             ~logger ~proof_level ~conf_dir
+             ~daemon_conf:genesis_runtime_constants
          in
          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
            "Initializing with genesis constants $genesis_constants"
@@ -794,7 +820,8 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~genesis_state_hash ~log_block_creation ~genesis_constants ())
+                ~genesis_state_hash ~log_block_creation ~genesis_constants ()
+                ~proof_level)
              ~genesis_ledger ~base_proof
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
@@ -926,7 +953,9 @@ let internal_commands =
                  Logger.info logger "Prover state being logged to %s" conf_dir
                    ~module_:__MODULE__ ~location:__LOC__ ;
                  let%bind prover =
-                   Prover.create ~logger ~pids:(Pid.Table.create ()) ~conf_dir
+                   Prover.create ~logger
+                     ~proof_level:Genesis_constants.Proof_level.compiled
+                     ~pids:(Pid.Table.create ()) ~conf_dir
                  in
                  Prover.prove_from_input_sexp prover sexp >>| ignore
              | `Eof ->

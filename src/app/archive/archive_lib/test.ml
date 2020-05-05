@@ -103,9 +103,10 @@ let%test_unit "Block: read and write" =
   Quickcheck.test ~trials:20
     ( Quickcheck.Generator.with_size ~size:10
     @@ Quickcheck_lib.gen_imperative_list
-         (Transition_frontier.For_tests.gen_genesis_breadcrumb ())
+         (Transition_frontier.For_tests.gen_genesis_breadcrumb
+            ~proof_level:Check ())
          (Transition_frontier.Breadcrumb.For_tests.gen_non_deferred
-            ?logger:None ?verifier:None ?trust_system:None
+            ?logger:None ~proof_level:Check ?verifier:None ?trust_system:None
             ~accounts_with_secret_keys:
               (Lazy.force Test_genesis_ledger.accounts)) )
     ~f:(fun breadcrumbs ->

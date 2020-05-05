@@ -75,7 +75,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
     in
     let main x =
       Tick.handle
-        (Keys.Step.main ~logger:(Logger.create ()) x)
+        (Keys.Step.main ~logger:(Logger.create ()) ~proof_level:Full x)
         (Consensus.Data.Prover_state.precomputed_handler
            ~genesis_ledger:Test_genesis_ledger.t)
     in

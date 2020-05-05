@@ -240,7 +240,7 @@ module Make (T : Transaction_snark.Verification.S) = struct
         ~create_env:Tick.Keypair.generate
         ~input:
           (Tick.constraint_system ~exposing:(Step_base.input ())
-             (Step_base.main (Logger.null ())))
+             (Step_base.main ~logger:(Logger.null ()) ~proof_level:Full))
 
     let cached () =
       let open Cached.Deferred_with_track_generated.Let_syntax in
@@ -319,7 +319,7 @@ let constraint_system_digests () =
   [ ( "blockchain-step"
     , digest
         M.Step_base.(
-          Tick.constraint_system ~exposing:(input ()) (main (Logger.null ())))
-    )
+          Tick.constraint_system ~exposing:(input ())
+            (main ~logger:(Logger.null ()) ~proof_level:Full)) )
   ; ("blockchain-wrap", digest' W.(Tock.constraint_system ~exposing:input main))
   ]

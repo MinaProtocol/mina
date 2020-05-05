@@ -418,14 +418,15 @@ module For_tests = struct
   *)
 
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
-  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ?verifier () =
+  let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~proof_level ?verifier
+      () =
     let verifier =
       match verifier with
       | Some x ->
           x
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger ~conf_dir:None
+              Verifier.create ~logger ~proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     Quickcheck.Generator.create (fun ~size:_ ~random:_ ->
@@ -445,7 +446,7 @@ module For_tests = struct
         in
         Breadcrumb.create genesis_transition genesis_staged_ledger )
 
-  let gen_persistence ?(logger = Logger.null ()) ?verifier () =
+  let gen_persistence ?(logger = Logger.null ()) ~proof_level ?verifier () =
     let open Core in
     let verifier =
       match verifier with
@@ -453,7 +454,7 @@ module For_tests = struct
           x
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger ~conf_dir:None
+              Verifier.create ~logger ~proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let root_dir = "/tmp/coda_unit_test" in
@@ -497,13 +498,14 @@ module For_tests = struct
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
-  let gen ?(logger = Logger.null ()) ?verifier ?trust_system
+  let gen ?(logger = Logger.null ()) ~proof_level ?verifier ?trust_system
       ?consensus_local_state
       ?(root_ledger_and_accounts =
         ( Lazy.force Test_genesis_ledger.t
         , Lazy.force Test_genesis_ledger.accounts ))
-      ?(gen_root_breadcrumb = gen_genesis_breadcrumb ~logger ?verifier ())
-      ~max_length ~size () =
+      ?(gen_root_breadcrumb =
+        gen_genesis_breadcrumb ~logger ~proof_level ?verifier ()) ~max_length
+      ~size () =
     let open Quickcheck.Generator.Let_syntax in
     let genesis_state_hash =
       Coda_state.Genesis_protocol_state.t ~genesis_ledger:Test_genesis_ledger.t
@@ -516,7 +518,7 @@ module For_tests = struct
           x
       | None ->
           Async.Thread_safe.block_on_async_exn (fun () ->
-              Verifier.create ~logger ~conf_dir:None
+              Verifier.create ~logger ~proof_level ~conf_dir:None
                 ~pids:(Child_processes.Termination.create_pid_table ()) )
     in
     let trust_system =
@@ -534,8 +536,9 @@ module For_tests = struct
     let%bind (Rose_tree.T (root, branches)) =
       Quickcheck.Generator.with_size ~size
         (Quickcheck_lib.gen_imperative_rose_tree gen_root_breadcrumb
-           (Breadcrumb.For_tests.gen_non_deferred ~logger ~verifier
-              ~trust_system ~accounts_with_secret_keys:root_ledger_accounts))
+           (Breadcrumb.For_tests.gen_non_deferred ~logger ~proof_level
+              ~verifier ~trust_system
+              ~accounts_with_secret_keys:root_ledger_accounts))
     in
     let root_data =
       { Root_data.Limited.Stable.Latest.transition=
@@ -546,7 +549,7 @@ module For_tests = struct
           |> Staged_ledger.pending_coinbase_collection }
     in
     let%map persistent_root, persistent_frontier =
-      gen_persistence ~logger ()
+      gen_persistence ~logger ~proof_level ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_frontier.reset_database_exn persistent_frontier ~root_data
@@ -583,19 +586,20 @@ module For_tests = struct
           ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) ) ;
     frontier
 
-  let gen_with_branch ?logger ?verifier ?trust_system ?consensus_local_state
+  let gen_with_branch ?logger ~proof_level ?verifier ?trust_system
+      ?consensus_local_state
       ?(root_ledger_and_accounts =
         ( Lazy.force Test_genesis_ledger.t
         , Lazy.force Test_genesis_ledger.accounts )) ?gen_root_breadcrumb
       ?(get_branch_root = root) ~max_length ~frontier_size ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
-      gen ?logger ?verifier ?trust_system ?consensus_local_state
+      gen ?logger ~proof_level ?verifier ?trust_system ?consensus_local_state
         ?gen_root_breadcrumb ~root_ledger_and_accounts ~max_length
         ~size:frontier_size ()
     in
     let%map make_branch =
-      Breadcrumb.For_tests.gen_seq ?logger ?verifier ?trust_system
+      Breadcrumb.For_tests.gen_seq ?logger ~proof_level ?verifier ?trust_system
         ~accounts_with_secret_keys:(snd root_ledger_and_accounts)
         branch_size
     in
