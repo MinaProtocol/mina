@@ -124,14 +124,17 @@ let with_instance_exn t ~f =
   let x = f instance in
   Instance.destroy instance ; x
 
-let reset_to_genesis_exn t ~genesis_ledger ~genesis_state_hash =
+let reset_to_genesis_exn t ~precomputed_values =
   let open Deferred.Let_syntax in
   assert (t.instance = None) ;
   let%map () = File_system.remove_dir t.directory in
   with_instance_exn t ~f:(fun instance ->
       ignore
         (Ledger_transfer.transfer_accounts
-           ~src:(Lazy.force genesis_ledger)
+           ~src:
+             (Lazy.force (Precomputed_values.genesis_ledger precomputed_values))
            ~dest:(Instance.snarked_ledger instance)) ;
       Instance.set_root_identifier instance
-        (genesis_root_identifier ~genesis_state_hash) )
+        (genesis_root_identifier
+           ~genesis_state_hash:
+             (Precomputed_values.genesis_state_hash precomputed_values)) )
