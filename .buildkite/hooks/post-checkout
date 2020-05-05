@@ -1,3 +1,13 @@
+# Freshen the remote so that our diff is accurate
 git fetch origin
 ./.buildkite/scripts/generate-diff.sh > $computed_diff.txt
+
+#
+# TODO: Remove this when we figure out where to stick this cache long term
+#
+# Docker volumes by default are created if they do not exist, but there is not
+# an easy way to set the uid/guid or permissions on the volume. Since we intend
+# on running our agent containers without root, we need to fix the volume first.
+#
+docker run -v dhall-cache:/.cache -it nixos/nix sh -c 'chmod 777 .cache'
 
