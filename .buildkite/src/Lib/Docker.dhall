@@ -25,7 +25,7 @@ let Result = {
     `propagate-uid-gid` = True,
     environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ],
     volumes = [
-      "dhall-cache:/.cache",
+      "dhall-cache:/.cache"
     ]
   }
 }
