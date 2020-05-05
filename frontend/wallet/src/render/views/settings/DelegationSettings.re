@@ -22,6 +22,7 @@ type feeSelection =
 
 type errorOutcome =
   | EmptyDelegateKey
+  | InvalidTransactionFee
   | InvalidGraphQLResponse(string);
 
 type modalState = {
@@ -49,12 +50,28 @@ module ChangeDelegationMutation =
   ReasonApollo.CreateMutation(ChangeDelegation);
 
 let defaultFee = "0.1";
+let minimumFee = "0.00001";
 
 [@react.component]
 let make = (~publicKey) => {
   // Form state
   let (state, changeState) =
     React.useState(() => {delegate: "", fee: DefaultAmount, error: None});
+
+  // Mutation variables and handlers
+  let variables =
+    ChangeDelegation.make(
+      ~from=Apollo.Encoders.publicKey(publicKey),
+      ~to_=Apollo.Encoders.publicKey(PublicKey.ofStringExn(state.delegate)),
+      ~fee=
+        Apollo.Encoders.currency(
+          switch (state.fee) {
+          | DefaultAmount => defaultFee
+          | Custom(amount) => amount
+          },
+        ),
+      (),
+    )##variables;
 
   let feeSelectedValue =
     switch (state.fee) {
@@ -71,20 +88,43 @@ let make = (~publicKey) => {
   let goBack = () =>
     ReasonReact.Router.push("/settings/" ++ PublicKey.uriEncode(publicKey));
 
-  // Mutation variables and handlers
-  let variables =
-    ChangeDelegation.make(
-      ~from=Apollo.Encoders.publicKey(publicKey),
-      ~to_=Apollo.Encoders.publicKey(PublicKey.ofStringExn(state.delegate)),
-      ~fee=
-        Apollo.Encoders.currency(
-          switch (state.fee) {
-          | DefaultAmount => defaultFee
-          | Custom(amount) => amount
-          },
-        ),
-      (),
-    )##variables;
+  let renderError = () => {
+    switch (state.error) {
+    | Some(EmptyDelegateKey) => Some("Please enter a public key")
+    | Some(InvalidTransactionFee) =>
+      Some("The minimum transaction fee is " ++ minimumFee)
+    | Some(InvalidGraphQLResponse(error)) => Some(error)
+    | None => None
+    };
+  };
+
+  let onDelegateClick = (mutate: ChangeDelegationMutation.apolloMutation) => {
+    switch (state.delegate, state.fee) {
+    | ("", _) =>
+      changeState(prev => {...prev, error: Some(EmptyDelegateKey)})
+    | (_, Custom(fee)) =>
+      switch (fee) {
+      | "" =>
+        changeState(prev => {...prev, error: Some(InvalidTransactionFee)})
+      | fee when float_of_string(fee) < float_of_string(minimumFee) =>
+        changeState(prev => {...prev, error: Some(InvalidTransactionFee)})
+      | _ =>
+        mutate(
+          ~variables,
+          ~refetchQueries=[|"getAccountInfo", "queryDelegation"|],
+          (),
+        )
+        |> ignore
+      }
+    | _ =>
+      mutate(
+        ~variables,
+        ~refetchQueries=[|"getAccountInfo", "queryDelegation"|],
+        (),
+      )
+      |> ignore
+    };
+  };
 
   <ChangeDelegationMutation
     onCompleted={_ => goBack()}
@@ -104,15 +144,10 @@ let make = (~publicKey) => {
            <Spacer width=0.2 />
            <AccountName pubkey=publicKey className=Styles.breadcrumbText />
          </div>
-         {switch (state.error) {
-          | Some(EmptyDelegateKey) =>
+         {switch (renderError()) {
+          | Some(errorMessage) =>
             <>
-              <Alert kind=`Danger defaultMessage="Please enter a public key" />
-              <Spacer height=2. />
-            </>
-          | Some(InvalidGraphQLResponse(error)) =>
-            <>
-              <Alert kind=`Danger defaultMessage=error />
+              <Alert kind=`Danger defaultMessage=errorMessage />
               <Spacer height=2. />
             </>
           | None => React.null
@@ -158,7 +193,9 @@ let make = (~publicKey) => {
                   value=fee
                   placeholder="0"
                   onChange={value => {
-                    changeState(prev => {...prev, fee: Custom(value)})
+                    changeState(prev =>
+                      {...prev, fee: Custom(value), error: None}
+                    )
                   }}
                 />
               </>
@@ -182,21 +219,7 @@ let make = (~publicKey) => {
              label="Delegate"
              style=Button.Green
              disabled=loading
-             onClick={_ =>
-               switch (state.delegate) {
-               | "" =>
-                 changeState(prev =>
-                   {...prev, error: Some(EmptyDelegateKey)}
-                 )
-               | _ =>
-                 mutate(
-                   ~variables,
-                   ~refetchQueries=[|"getAccountInfo", "queryDelegation"|],
-                   (),
-                 )
-                 |> ignore
-               }
-             }
+             onClick={_ => onDelegateClick(mutate)}
            />
          </div>
        </div>}
