@@ -77,7 +77,7 @@ function uploadFile(result) {
 
   const buffer = Buffer.from(JSON.stringify(result), "utf8");
   const readable = new Readable();
-  readable._read = () => {};
+  readable._read = () => { };
   readable.push(buffer);
   readable.push(null);
 
@@ -105,6 +105,9 @@ function uploadFile(result) {
 const SUBSCRIPTION = `
 subscription Blocks {
   newBlock {
+    creatorAccount {
+      publicKey
+    }
     protocolState {
       previousStateHash
       consensusState {
