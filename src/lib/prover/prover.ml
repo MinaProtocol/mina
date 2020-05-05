@@ -161,7 +161,7 @@ module Worker_state = struct
                         prover_state)
                      ~f:(fun () ->
                        { Blockchain.state= next_state
-                       ; proof= Precomputed_values.base_proof } )
+                       ; proof= Dummy_values.Tock.Bowe_gabizon18.proof } )
                  in
                  Or_error.iter_error res ~f:(fun e ->
                      Logger.error logger ~module_:__MODULE__ ~location:__LOC__
@@ -179,7 +179,7 @@ module Worker_state = struct
                let extend_blockchain _chain next_state _block
                    _state_for_handler _pending_coinbase =
                  Ok
-                   { Blockchain.proof= Precomputed_values.base_proof
+                   { Blockchain.proof= Dummy_values.Tock.Bowe_gabizon18.proof
                    ; state= next_state }
 
                let verify _ _ = true

@@ -166,12 +166,16 @@ module Make (T : Transaction_snark.Verification.S) = struct
 
   include Transition_system.Make (struct
               module Tick = struct
+                let size_in_bits = Tick.Field.size_in_bits
+
                 module Packed = struct
                   type value = Tick.Pedersen.Digest.t
 
                   type var = Tick.Pedersen.Checked.Digest.var
 
                   let typ = Tick.Pedersen.Checked.Digest.typ
+
+                  let size_in_bits = size_in_bits
                 end
 
                 module Unpacked = struct
@@ -196,6 +200,8 @@ module Make (T : Transaction_snark.Verification.S) = struct
 
                   let var_of_value =
                     Tick.Pedersen.Checked.Digest.Unpacked.constant
+
+                  let size_in_bits = size_in_bits
                 end
 
                 let project_value =

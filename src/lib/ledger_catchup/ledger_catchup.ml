@@ -67,8 +67,8 @@ let verify_transition ~logger ~trust_system ~verifier ~frontier
       External_transition.Validation.wrap transition
       |> External_transition.skip_time_received_validation
            `This_transition_was_not_received_via_gossip
-      |> External_transition.skip_fork_ids_validation
-           `This_transition_has_valid_fork_ids
+      |> External_transition.skip_protocol_versions_validation
+           `This_transition_has_valid_protocol_versions
       |> Fn.compose Deferred.return
            (External_transition.validate_genesis_protocol_state
               ~genesis_state_hash)
@@ -410,6 +410,8 @@ let%test_module "Ledger_catchup tests" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
     let trust_system = Trust_system.null ()
 
     let time_controller = Block_time.Controller.basic ~logger
@@ -531,7 +533,7 @@ let%test_module "Ledger_catchup tests" =
           let%bind peer_branch_size =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
-          gen ~proof_level ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size ])
         ~f:(fun network ->
@@ -550,7 +552,7 @@ let%test_module "Ledger_catchup tests" =
                    in the frontier" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [fresh_peer; peer_with_branch ~frontier_branch_size:1])
         ~f:(fun network ->
           let open Fake_network in
@@ -564,7 +566,7 @@ let%test_module "Ledger_catchup tests" =
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])

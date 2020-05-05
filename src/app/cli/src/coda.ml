@@ -44,7 +44,7 @@ let chain_id ~genesis_state_hash ~genesis_constants =
 "daemon_expiry", daemon_expiry]
 
 [%%inject
-"compile_time_current_fork_id", current_fork_id]
+"compile_time_current_protocol_version", current_protocol_version]
 
 let daemon logger =
   let open Command.Let_syntax in
@@ -214,6 +214,14 @@ let daemon logger =
            "/ip4/IPADDR/tcp/PORT/ipfs/PEERID initial \"bootstrap\" peers for \
             discovery"
          (listed string)
+     and curr_protocol_version =
+       flag "current-protocol-version" (optional string)
+         ~doc:
+           "NN.NN.NN Current protocol version, only blocks with the same \
+            version accepted"
+     and proposed_protocol_version =
+       flag "proposed-protocol-version" (optional string)
+         ~doc:"NN.NN.NN Proposed protocol version to signal other nodes"
      and genesis_runtime_constants =
        flag "genesis-constants"
          ~doc:
@@ -224,13 +232,6 @@ let daemon logger =
                   Daemon_config.(of_genesis_constants compiled |> to_yojson))
               |> Yojson.Safe.to_string ))
          (optional string)
-     and curr_fork_id =
-       flag "current-fork-id" (optional string)
-         ~doc:
-           (sprintf
-              "HEX-STRING (%d characters) Current fork ID for this node, only \
-               blocks with the same ID accepted"
-              Fork_id.required_length)
      and disable_telemetry =
        flag "disable-telemetry" no_arg
          ~doc:"Disable reporting telemetry to other nodes"
@@ -392,8 +393,24 @@ let daemon logger =
        let coda_initialization_deferred () =
          let%bind genesis_ledger, base_proof, genesis_constants =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
-             ~logger ~proof_level ~conf_dir
-             ~daemon_conf:genesis_runtime_constants
+             ~logger ~conf_dir ~daemon_conf:genesis_runtime_constants
+         in
+         let%bind precomputed_values =
+           let protocol_state_with_hash =
+             Coda_state.Genesis_protocol_state.t ~genesis_ledger
+               ~genesis_constants
+           in
+           let%map base_hash =
+             Keys_lib.Keys.step_instance_hash protocol_state_with_hash.data
+           in
+           { Precomputed_values.genesis_constants
+           ; genesis_ledger=
+               ( module Genesis_ledger.Of_ledger (struct
+                 let t = genesis_ledger
+               end) )
+           ; protocol_state_with_hash
+           ; base_hash
+           ; genesis_proof= base_proof }
          in
          Logger.info logger ~module_:__MODULE__ ~location:__LOC__
            "Initializing with genesis constants $genesis_constants"
@@ -793,16 +810,22 @@ let daemon logger =
            Option.value_map coinbase_receiver_flag ~default:`Producer
              ~f:(fun pk -> `Other pk)
          in
-         let current_fork_id =
-           Coda_run.get_current_fork_id ~compile_time_current_fork_id ~conf_dir
-             ~logger curr_fork_id
-           |> Fork_id.create_exn
+         let current_protocol_version =
+           Coda_run.get_current_protocol_version
+             ~compile_time_current_protocol_version ~conf_dir ~logger
+             curr_protocol_version
+         in
+         let proposed_protocol_version_opt =
+           Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
+             proposed_protocol_version
          in
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir
                 ~is_seed ~disable_telemetry ~demo_mode ~coinbase_receiver
-                ~net_config ~gossip_net_params ~initial_fork_id:current_fork_id
+                ~net_config ~gossip_net_params
+                ~initial_protocol_version:current_protocol_version
+                ~proposed_protocol_version_opt
                 ~work_selection_method:
                   (Cli_lib.Arg_type.work_selection_method_to_module
                      work_selection_method)
@@ -820,9 +843,8 @@ let daemon logger =
                 ~consensus_local_state ~transaction_database
                 ~external_transition_database ~is_archive_rocksdb
                 ~work_reassignment_wait ~archive_process_location
-                ~genesis_state_hash ~log_block_creation ~genesis_constants ()
-                ~proof_level)
-             ~genesis_ledger ~base_proof
+                ~log_block_creation ~precomputed_values ~proof_level ())
+             ~precomputed_values
          in
          {Coda_initialization.coda; client_trustlist; rest_server_port}
        in

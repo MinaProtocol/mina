@@ -155,7 +155,8 @@ module Types = struct
               let constants =
                 Consensus.Constants.create
                   ~protocol_constants:
-                    (Coda_lib.config coda).genesis_constants.protocol
+                    (Coda_lib.config coda).precomputed_values.genesis_constants
+                      .protocol
               in
               Block_time.to_string @@ C.start_time ~constants global_slot )
         ; field "endTime" ~typ:(non_null string)
@@ -164,7 +165,8 @@ module Types = struct
               let constants =
                 Consensus.Constants.create
                   ~protocol_constants:
-                    (Coda_lib.config coda).genesis_constants.protocol
+                    (Coda_lib.config coda).precomputed_values.genesis_constants
+                      .protocol
               in
               Block_time.to_string @@ C.end_time ~constants global_slot ) ] )
 
@@ -185,7 +187,8 @@ module Types = struct
               let consensus_constants =
                 Consensus.Constants.create
                   ~protocol_constants:
-                    (Coda_lib.config coda).genesis_constants.protocol
+                    (Coda_lib.config coda).precomputed_values.genesis_constants
+                      .protocol
               in
               function
               | `Check_again _time ->

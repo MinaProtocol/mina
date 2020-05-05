@@ -39,8 +39,8 @@ let load_genesis_constants (module M : Genesis_constants.Config_intf) ~path
             ) ] ;
       raise Genesis_state_initialization_error
 
-let retrieve_genesis_state dir_opt ~logger ~proof_level ~conf_dir ~daemon_conf
-    : (Ledger.t lazy_t * Proof.t * Genesis_constants.t) Deferred.t =
+let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
+    (Ledger.t lazy_t * Proof.t * Genesis_constants.t) Deferred.t =
   let open Cache_dir in
   let genesis_dir_name =
     Cache_dir.genesis_dir_name ~genesis_constants:Genesis_constants.compiled

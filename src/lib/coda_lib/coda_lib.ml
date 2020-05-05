@@ -667,7 +667,8 @@ let staking_ledger t =
   let open Option.Let_syntax in
   let consensus_constants =
     Consensus.Constants.create
-      ~protocol_constants:t.config.genesis_constants.protocol
+      ~protocol_constants:
+        (Precomputed_values.protocol_constants t.config.precomputed_values)
   in
   let%map transition_frontier =
     Broadcast_pipe.Reader.peek t.components.transition_frontier
@@ -723,13 +724,15 @@ let start t =
     ~frontier_reader:t.components.transition_frontier
     ~transition_writer:t.pipes.producer_transition_writer
     ~log_block_creation:t.config.log_block_creation
-    ~genesis_constants:t.config.genesis_constants ;
+    ~genesis_constants:
+      (Precomputed_values.genesis_constants t.config.precomputed_values) ;
   Snark_worker.start t
 
-let create (config : Config.t) ~genesis_ledger ~base_proof =
+let create (config : Config.t) ~precomputed_values =
   let consensus_constants =
     Consensus.Constants.create
-      ~protocol_constants:config.genesis_constants.protocol
+      ~protocol_constants:
+        (Precomputed_values.protocol_constants precomputed_values)
   in
   let monitor = Option.value ~default:(Monitor.create ()) config.monitor in
   Async.Scheduler.within' ~monitor (fun () ->
@@ -777,7 +780,9 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                     ; kill_ivar= Ivar.create () }
                   , config.snark_work_fee ) )
           in
-          Fork_id.set_current config.initial_fork_id ;
+          Protocol_version.set_current config.initial_protocol_version ;
+          Protocol_version.set_proposed_opt
+            config.proposed_protocol_version_opt ;
           let external_transitions_reader, external_transitions_writer =
             Strict_pipe.create Synchronous
           in
@@ -965,7 +970,8 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           let txn_pool_config =
             Network_pool.Transaction_pool.Resource_pool.make_config
               ~trust_system:config.trust_system
-              ~pool_max_size:config.genesis_constants.txpool_max_size
+              ~pool_max_size:
+                config.precomputed_values.genesis_constants.txpool_max_size
           in
           let transaction_pool =
             Network_pool.Transaction_pool.create ~config:txn_pool_config
@@ -1001,8 +1007,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
           let ((most_recent_valid_block_reader, _) as most_recent_valid_block)
               =
             Broadcast_pipe.create
-              ( External_transition.genesis ~genesis_ledger ~base_proof
-                  ~genesis_constants:config.genesis_constants
+              ( External_transition.genesis ~precomputed_values
               |> External_transition.Validated.to_initial_validated )
           in
           let valid_transitions, initialization_finish_signal =
@@ -1061,9 +1066,7 @@ let create (config : Config.t) ~genesis_ledger ~base_proof =
                                @@ External_transition.Validation
                                   .forget_validation et ) ;
                          breadcrumb ))
-                  ~most_recent_valid_block
-                  ~genesis_state_hash:config.genesis_state_hash ~genesis_ledger
-                  ~base_proof ~genesis_constants:config.genesis_constants )
+                  ~most_recent_valid_block ~precomputed_values )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

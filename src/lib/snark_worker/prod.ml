@@ -126,7 +126,7 @@ module Inputs = struct
                  ~proof_type ~supply_increase:stmt.supply_increase
                  ~pending_coinbase_stack_state:
                    stmt.pending_coinbase_stack_state ~fee_excess ~sok_digest
-                 ~proof:Precomputed_values.base_proof
+                 ~proof:Precomputed_values.unit_test_base_proof
              , Time.Span.zero )
 end
 

@@ -109,11 +109,20 @@ module Keys : sig
   end
 
   module Verification : sig
-    type t =
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type t =
+          { base: Tick.Verification_key.t
+          ; wrap: Tock.Verification_key.t
+          ; merge: Tick.Verification_key.t }
+      end
+    end]
+
+    type t = Stable.Latest.t =
       { base: Tick.Verification_key.t
       ; wrap: Tock.Verification_key.t
       ; merge: Tick.Verification_key.t }
-    [@@deriving bin_io]
 
     val dummy : t
 
