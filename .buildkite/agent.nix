@@ -23,9 +23,13 @@
 #
 #   nix-build docker.nix
 #
+# Note: The first built has to download things, but subsequent builds will cache
+# hit no matter the order of the packages in the below array.
+#
 # Finally, copy the built image to your host OS (if necessary) and load it:
 #
-#   docker cp <CONTAINER ID>:<PATH TO BUILT IMAGE> image.tar.gz
+#   export CONTAINER_ID=$(docker ps | grep nixos | awk '{ print $1 }')
+#   docker cp ${CONTAINER_ID}:<PATH TO BUILT IMAGE> image.tar.gz
 #   docker load < image.tar.gz
 #
 # You will now see:
@@ -41,23 +45,27 @@
 { pkgs ? import <nixpkgs> {} }:
 
 # Stick deps in here
-let deps = with pkgs; [
-  # buildkite
-  buildkite-agent
+let
+  deps = with pkgs; [
+    # buildkite
+    buildkite-agent
 
-  # dhall
-  dhall
-  dhall-json
+    # ssl
+    cacert
 
-  # shell stuff
-  bash
-  git
-  coreutils
-  gnused
-  gnugrep
-  findutils
-  diffutils
-  gnumake
+    # dhall
+    dhall
+    dhall-json
+
+    # shell stuff
+    bash
+    git
+    coreutils
+    gnused
+    gnugrep
+    findutils
+    diffutils
+    gnumake
   ];
 in
 {
@@ -76,5 +84,4 @@ in
       tag = "latest";
       contents = deps;
     };
-  }
-
+}
