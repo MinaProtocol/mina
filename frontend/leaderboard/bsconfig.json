@@ -1,0 +1,25 @@
+{
+  "name": "leaderboard",
+  "sources": [
+    {
+      "dir": "src",
+      "subdirs": true
+    }
+  ],
+  "bs-dependencies": [
+    "bsc-stdlib-polyfill",
+    "bs-fetch"
+  ],
+  "reason": {
+    "react-jsx": 3
+  },
+  "package-specs": {
+    "module": "commonjs"
+  },
+  "suffix": ".bs.js",
+  "bsc-flags": [
+    "-bs-super-errors",
+    "-open BscStdlibPolyfill"
+  ],
+  "refmt": 3
+}
