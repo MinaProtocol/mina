@@ -122,14 +122,8 @@ let genesis_dirname = Cache_dir.genesis_dir_name Genesis_constants.compiled
 
 let create_tar top_dir =
   let tar_file = top_dir ^/ genesis_dirname ^ ".tar.gz" in
-  let tar_command =
-    sprintf "tar -C %s -czf %s %s" top_dir tar_file genesis_dirname
-  in
-  let exit = Core.Sys.command tar_command in
-  if exit = 2 then
-    failwith
-      (sprintf "Error generating the tar for genesis ledger. Exit code: %d"
-         exit)
+  Genesis_ledger_helper.Tar.create ~root:top_dir ~file:tar_file
+    ~directory:genesis_dirname ()
 
 let read_write_constants read_from_opt write_to =
   let open Result.Let_syntax in
@@ -188,7 +182,7 @@ let main accounts_json_file dir n constants_file =
         failwithf "Failed to create genesis ledger\n%s" (Error.to_string_hum e)
           ()
   in
-  create_tar top_dir ;
+  let%bind () = Deferred.Or_error.ok_exn @@ create_tar top_dir in
   File_system.remove_dir genesis_dir
 
 let () =

@@ -4,6 +4,48 @@ open Coda_base
 
 type exn += Genesis_state_initialization_error
 
+module Tar = struct
+  let create ~root ~directory ~file () =
+    match%map
+      Process.run ~prog:"tar"
+        ~args:
+          [ (* Change directory to [root]. *)
+            "-C"
+          ; root
+          ; (* Create gzipped tar file [file]. *)
+            "-czf"
+          ; file
+          ; (* Add [directory] to tar file. *)
+            directory ]
+        ()
+    with
+    | Ok _ ->
+        Ok ()
+    | Error err ->
+        Or_error.errorf
+          !"Error generating tar file %s. %s"
+          file (Error.to_string_hum err)
+
+  let extract ~root ~file () =
+    match%map
+      Process.run ~prog:"tar"
+        ~args:
+          [ (* Change directory to [root]. *)
+            "-C"
+          ; root
+          ; (* Extract gzipped tar file [file]. *)
+            "-xzf"
+          ; file ]
+        ()
+    with
+    | Ok _ ->
+        Ok ()
+    | Error err ->
+        Or_error.errorf
+          !"Error extracting tar file %s. %s"
+          file (Error.to_string_hum err)
+end
+
 let load_genesis_constants (module M : Genesis_constants.Config_intf) ~path
     ~default ~logger =
   let config_res =
@@ -62,12 +104,8 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
           in
           (*Look for the tar and extract*)
           let tar_file = tar_dir ^/ genesis_dir_name ^ ".tar.gz" in
-          let%map _result =
-            Process.run_exn ~prog:"tar"
-              ~args:["-C"; conf_dir; "-xzf"; tar_file]
-              ()
-          in
-          () )
+          Deferred.Or_error.ok_exn
+          @@ Tar.extract ~root:conf_dir ~file:tar_file () )
     with
     | Ok () ->
         Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
