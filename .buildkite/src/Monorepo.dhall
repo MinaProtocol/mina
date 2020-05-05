@@ -34,7 +34,7 @@ in Pipeline.build Pipeline.Config::{
       label = "Monorepo triage",
       key = "cmds",
       target = Size.Small,
-      docker = Docker.Config::{ image = "localhost:8080/bash/coreutils/git/buildkite-agent/dhall/dhall-json/gnugrep/gnused/diffutils" }
+      docker = Docker.Config::{ image = "codaprotocol/ci-toolchain-base" }
     }
   ]
 }

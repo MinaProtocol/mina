@@ -23,7 +23,7 @@ let config : Pipeline.Config.Type = Pipeline.Config::{
       label = "Prepare monorepo triage",
       key = "monorepo",
       target = Size.Small,
-      docker = Docker.Config::{ image = "localhost:8080/bash/coreutils/git/buildkite-agent/dhall/dhall-json" }
+      docker = Docker.Config::{ image = "codaprotocol/ci-toolchain-base" }
     }
   ]
 }

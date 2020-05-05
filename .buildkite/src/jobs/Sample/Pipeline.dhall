@@ -13,7 +13,7 @@ Pipeline.build
         command = [ "echo \"hello\"" ],
         label = "Test Echo", key = "hello",
         target = Size.Small,
-        docker = Docker.Config::{ image = "localhost:8080/bash/coreutils/git/buildkite-agent" }
+        docker = Docker.Config::{ image = "codaprotocol/ci-toolchain-base" }
       }
     ]
   }
