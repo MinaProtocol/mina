@@ -2,6 +2,8 @@
 --
 -- See https://github.com/buildkite-plugins/docker-buildkite-plugin for options
 -- if you'd like to extend this definition for example
+--
+-- TODO: Move volume to something in the cloud or artifacts from gcloud storage
 
 let Config = {
   Type = {
@@ -23,8 +25,7 @@ let Result = {
     `propagate-uid-gid` = True,
     environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ],
     volumes = [
-      "/Users/bkase/.cache/dhall:/.cache/dhall",
-      "/Users/bkase/.cache/dhall-haskell:/.cache/dhall-haskell"
+      "dhall-cache:/.cache",
     ]
   }
 }
