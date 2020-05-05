@@ -133,9 +133,7 @@ let load_genesis_constants (module M : Genesis_constants.Config_intf) ~path
   in
   match config_res with
   | Ok config ->
-      let new_constants =
-        M.to_genesis_constants ~default:Genesis_constants.compiled config
-      in
+      let new_constants = M.to_genesis_constants ~default config in
       Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
         "Overriding genesis constants $genesis_constants with the constants \
          $config_constants at $path. The new genesis constants are: \
