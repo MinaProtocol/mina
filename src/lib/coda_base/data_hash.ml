@@ -137,6 +137,65 @@ struct
   [%%endif]
 end
 
+module T0 = struct
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      type t = Field.t [@@deriving sexp, compare, hash]
+
+      let to_latest = Fn.id
+
+      module Arg = struct
+        type nonrec t = t
+
+        [%%define_locally Field.(to_string, of_string)]
+      end
+
+      include Binable.Of_stringable (Arg)
+    end
+  end]
+
+  module Tests = struct
+    (* these test the stability of the serialization derived from the
+       string representation of Field.t, not the direct serialization of
+       Field.t
+    *)
+
+    let field =
+      Quickcheck.random_value ~seed:(`Deterministic "Data_hash.T0 tests")
+        Field.gen
+
+    [%%if
+    curve_size = 298]
+
+    let%test "Binable from stringable V1" =
+      let known_good_hash =
+        "\x6D\xB1\xAB\x5F\x4C\xA2\x8F\xBA\xF5\x31\x2D\xE9\xEB\x07\xD1\x78\x1F\x20\xD5\x22\xA6\x9F\x5E\x0B\x77\xE0\x00\x07\x78\x85\x90\x8B"
+      in
+      Module_version.Serialization.check_serialization
+        (module Stable.V1)
+        field known_good_hash
+
+    [%%elif
+    curve_size = 753]
+
+    let%test "Binable from stringable V1" =
+      let known_good_hash =
+        "\x68\xDA\x30\x2C\xD0\xE5\x71\x3C\xAB\x42\x02\x8B\x31\xC1\x2E\x93\xE3\xC0\x99\x6B\xF6\xAA\xE2\x11\xF4\x2F\x88\x97\x3C\xC2\xA2\xF0"
+      in
+      Module_version.Serialization.check_serialization
+        (module Stable.V1)
+        field known_good_hash
+
+    [%%else]
+
+    let%test "Binable from stringable V1" =
+      failwith "No test for this curve size"
+
+    [%%endif]
+  end
+end
+
 module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   module Basic = Make_basic (struct
     let length_in_bits = Field.size_in_bits
@@ -145,23 +204,11 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   include Basic
 
   module Base58_check = Codable.Make_base58_check (struct
-    module T0 = struct
-      module T = struct
-        type t = Field.t [@@deriving sexp, compare, hash]
-
-        [%%define_locally
-        Field.(to_string, of_string)]
-      end
-
-      include T
-      include Binable.Of_stringable (T)
-    end
-
-    include T0
+    include T0.Stable.Latest
 
     (* the serialization here is only used for the hash impl which is only
        used for hashtbl, it's ok to disagree with the "real" serialization *)
-    include Hashable.Make_binable (T0)
+    include Hashable.Make_binable (T0.Stable.Latest)
     include B58_data
   end)
 
@@ -173,8 +220,6 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
 
   [%%define_locally
   Base58_check.(to_yojson, of_yojson)]
-
-  (* inside functor of no arguments, versioned types are allowed *)
 
   module T = struct
     type t = Field.t [@@deriving sexp, compare, hash]

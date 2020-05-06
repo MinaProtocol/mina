@@ -1,97 +1,17 @@
-[%%import
-"../../config.mlh"]
-
 open Core
 open Async
 open Coda_base
 
-[%%if
-proof_level = "full"]
-
-let use_dummy_values = false
-
-[%%else]
-
-let use_dummy_values = true
-
-[%%endif]
-
 type t = Ledger.t
-
-let generate_base_proof ~ledger ~(genesis_constants : Genesis_constants.t) =
-  let%map ((module Keys) as keys) = Keys_lib.Keys.create () in
-  let protocol_state_with_hash =
-    Coda_state.Genesis_protocol_state.t
-      ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
-      ~genesis_constants
-  in
-  let base_hash = Keys.Step.instance_hash protocol_state_with_hash.data in
-  let computed_values =
-    Genesis_proof.create_values ~keys
-      { genesis_ledger= ledger
-      ; protocol_state_with_hash
-      ; base_hash
-      ; genesis_constants }
-  in
-  (base_hash, computed_values.genesis_proof)
-
-let compiled_accounts_json () : Account_config.t =
-  List.map (Lazy.force Test_genesis_ledger.accounts) ~f:(fun (sk_opt, acc) ->
-      { Account_config.pk= acc.public_key
-      ; sk= sk_opt
-      ; balance= acc.balance
-      ; delegate= Some acc.delegate } )
-
-let generate_ledger :
-    directory_name:string -> Account_config.t -> Genesis_ledger.Packed.t =
- fun ~directory_name accounts ->
-  let ledger = Ledger.create ~directory_name () in
-  let accounts =
-    List.map accounts ~f:(fun {pk; sk; balance; delegate} ->
-        let account =
-          let account_id = Account_id.create pk Token_id.default in
-          let base_acct = Account.create account_id balance in
-          {base_acct with delegate= Option.value ~default:pk delegate}
-        in
-        Ledger.create_new_account_exn ledger
-          (Account.identifier account)
-          account ;
-        (sk, account) )
-  in
-  Ledger.commit ledger ;
-  ( module struct
-    include Genesis_ledger.Make (struct
-      let accounts = lazy accounts
-    end)
-
-    let t = lazy ledger
-  end )
 
 let get_accounts accounts_json_file n =
   let open Deferred.Or_error.Let_syntax in
   let%map accounts =
     match accounts_json_file with
-    | Some file -> (
-        let open Deferred.Let_syntax in
-        match%map
-          Deferred.Or_error.try_with_join (fun () ->
-              let%map accounts_str = Reader.file_contents file in
-              let res = Yojson.Safe.from_string accounts_str in
-              match Account_config.of_yojson res with
-              | Ok res ->
-                  Ok res
-              | Error s ->
-                  Error
-                    (Error.of_string
-                       (sprintf "Account_config.of_yojson failed: %s" s)) )
-        with
-        | Ok res ->
-            Ok res
-        | Error e ->
-            Or_error.errorf "Could not read accounts from file: %s\n%s" file
-              (Error.to_string_hum e) )
+    | Some file ->
+        Genesis_ledger_helper.Accounts.load file
     | None ->
-        Deferred.return (Ok (compiled_accounts_json ()))
+        Deferred.return (Ok (Genesis_ledger_helper.Accounts.compiled ()))
   in
   let real_accounts =
     let genesis_winner_account : Account_config.account_data =
@@ -113,23 +33,15 @@ let get_accounts accounts_json_file n =
     real_accounts @ fake_accounts
   in
   (*the accounts file that can be edited later*)
-  Out_channel.with_file "accounts.json" ~f:(fun json_file ->
-      Yojson.Safe.pretty_to_channel json_file
-        (Account_config.to_yojson all_accounts) ) ;
+  Genesis_ledger_helper.Accounts.store ~filename:"accounts.json" all_accounts ;
   all_accounts
 
 let genesis_dirname = Cache_dir.genesis_dir_name Genesis_constants.compiled
 
 let create_tar top_dir =
   let tar_file = top_dir ^/ genesis_dirname ^ ".tar.gz" in
-  let tar_command =
-    sprintf "tar -C %s -czf %s %s" top_dir tar_file genesis_dirname
-  in
-  let exit = Core.Sys.command tar_command in
-  if exit = 2 then
-    failwith
-      (sprintf "Error generating the tar for genesis ledger. Exit code: %d"
-         exit)
+  Genesis_ledger_helper.Tar.create ~root:top_dir ~file:tar_file
+    ~directory:genesis_dirname ()
 
 let read_write_constants read_from_opt write_to =
   let open Result.Let_syntax in
@@ -157,8 +69,10 @@ let main accounts_json_file dir n constants_file =
     let%map () = File_system.create_dir dir ~clear_if_exists:true in
     dir
   in
-  let ledger_path = genesis_dir ^/ "ledger" in
-  let proof_path = genesis_dir ^/ "genesis_proof" in
+  let ledger_path = Genesis_ledger_helper.Ledger.path ~root:genesis_dir in
+  let proof_path =
+    Genesis_ledger_helper.Genesis_proof.path ~root:genesis_dir
+  in
   let constants_path = genesis_dir ^/ "genesis_constants.json" in
   let%bind accounts = get_accounts accounts_json_file n in
   let%bind () =
@@ -166,8 +80,8 @@ let main accounts_json_file dir n constants_file =
       Or_error.try_with_join (fun () ->
           let open Or_error.Let_syntax in
           let%map accounts = accounts in
-          let ledger = generate_ledger ~directory_name:ledger_path accounts in
-          ledger )
+          Genesis_ledger_helper.Ledger.generate ~directory_name:ledger_path
+            accounts )
     with
     | Ok ledger ->
         let genesis_constants =
@@ -175,20 +89,17 @@ let main accounts_json_file dir n constants_file =
           |> Result.ok_or_failwith
         in
         let%bind _base_hash, base_proof =
-          if use_dummy_values then
-            return
-              ( Snark_params.Tick.Field.zero
-              , Dummy_values.Tock.Bowe_gabizon18.proof )
-          else generate_base_proof ~ledger ~genesis_constants
+          Genesis_ledger_helper.Genesis_proof.generate ~ledger
+            ~genesis_constants
         in
-        let%bind wr = Writer.open_file proof_path in
-        Writer.write wr (Proof.Stable.V1.sexp_of_t base_proof |> Sexp.to_string) ;
-        Writer.close wr
+        Deferred.Or_error.ok_exn
+        @@ Genesis_ledger_helper.Genesis_proof.store ~filename:proof_path
+             base_proof
     | Error e ->
         failwithf "Failed to create genesis ledger\n%s" (Error.to_string_hum e)
           ()
   in
-  create_tar top_dir ;
+  let%bind () = Deferred.Or_error.ok_exn @@ create_tar top_dir in
   File_system.remove_dir genesis_dir
 
 let () =

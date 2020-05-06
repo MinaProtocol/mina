@@ -26,8 +26,7 @@ module V1 = struct
     type msg = Master.T.msg =
       | New_state of External_transition.Stable.V1.t
       | Snark_pool_diff of Snark_pool.Diff_versioned.Stable.V1.t
-      | Transaction_pool_diff of
-          Transaction_pool.Resource_pool.Diff.Stable.V1.t
+      | Transaction_pool_diff of Transaction_pool.Diff_versioned.Stable.V1.t
     [@@deriving bin_io, sexp, version {rpc}]
 
     let callee_model_of_msg = Fn.id
