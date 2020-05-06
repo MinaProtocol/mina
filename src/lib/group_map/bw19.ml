@@ -1,3 +1,5 @@
+(* Based on this paper. https://eprint.iacr.org/2019/403 *)
+
 open Core_kernel
 
 module Spec = struct
