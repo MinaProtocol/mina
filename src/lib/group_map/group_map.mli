@@ -25,6 +25,8 @@ module type S = sig
       end
     end]
 
+    type 'f t = 'f Stable.Latest.t
+
     val map : 'a t -> f:('a -> 'b) -> 'b t
 
     val spec : 'f t -> 'f Spec.t

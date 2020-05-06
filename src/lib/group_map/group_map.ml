@@ -80,7 +80,14 @@ module type S = sig
   end
 
   module Params : sig
-    type _ t [@@deriving bin_io]
+    [%%versioned:
+    module Stable : sig
+      module V1 : sig
+        type _ t [@@deriving bin_io]
+      end
+    end]
+
+    type 'f t = 'f Stable.Latest.t
 
     val map : 'a t -> f:('a -> 'b) -> 'b t
 
@@ -136,7 +143,14 @@ module V = struct
 end
 
 module Spec = struct
-  type 'f t = {a: 'f; b: 'f} [@@deriving fields, bin_io]
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type 'f t = {a: 'f; b: 'f} [@@deriving fields, bin_io, version]
+    end
+  end]
+
+  include Stable.Latest
 end
 
 module Params = struct
@@ -148,9 +162,8 @@ module Params = struct
         ; u_over_2: 'f
         ; projection_point: 'f Conic.Stable.V1.t
         ; conic_c: 'f
-        ; a: 'f
-        ; b: 'f }
-      [@@deriving fields]
+        ; spec: 'f Spec.Stable.V1.t }
+      [@@deriving fields, version]
     end
   end]
 
@@ -160,7 +173,7 @@ module Params = struct
     ; projection_point: 'f Conic.t
     ; conic_c: 'f
     ; spec: 'f Spec.t }
-  [@@deriving fields, bin_io]
+  [@@deriving fields]
 
   let map {u; u_over_2; projection_point; conic_c; spec= {a; b}} ~f =
     { u= f u
