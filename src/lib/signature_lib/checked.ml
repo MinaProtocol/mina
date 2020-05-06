@@ -160,8 +160,6 @@ module Schnorr
         val scale : t -> Scalar.t -> t
 
         val to_affine_exn : t -> Field.t * Field.t
-
-        val to_affine : t -> (Field.t * Field.t) option
     end)
     (Message : Message_intf
                with type boolean_var := Impl.Boolean.var
@@ -224,11 +222,11 @@ module Schnorr
   let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
     let e = Message.hash ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
-    match Curve.to_affine r_pt with
-    | None ->
-        false
-    | Some (rx, ry) ->
+    match Curve.to_affine_exn r_pt with
+    | rx, ry ->
         is_even ry && Field.equal rx r
+    | exception _ ->
+        false
 
   [%%if
   call_logger]
@@ -404,8 +402,6 @@ module Schnorr
         val scale : t -> Scalar.t -> t
 
         val to_affine_exn : t -> Field.t * Field.t
-
-        val to_affine : t -> (Field.t * Field.t) option
     end)
     (Message : Message_intf
                with type curve := Curve.t
@@ -450,11 +446,11 @@ module Schnorr
   let verify ((r, s) : Signature.t) (pk : Public_key.t) (m : Message.t) =
     let e = Message.hash ~public_key:pk ~r m in
     let r_pt = Curve.(scale one s + negate (scale pk e)) in
-    match Curve.to_affine r_pt with
-    | None ->
-        false
-    | Some (rx, ry) ->
+    match Curve.to_affine_exn r_pt with
+    | rx, ry ->
         is_even ry && Impl.Field.(equal rx r)
+    | exception _ ->
+        false
 end
 
 [%%endif]
