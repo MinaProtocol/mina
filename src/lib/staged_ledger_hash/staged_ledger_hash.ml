@@ -1,5 +1,6 @@
-[%%import
+(* [%%import
 "../../config.mlh"]
+*)
 
 open Core
 open Coda_base
@@ -148,18 +149,19 @@ module Non_snark = struct
   let var_of_t t : var =
     List.map (Fold.to_list @@ fold t) ~f:Boolean.var_of_value
 
-  [%%if
+  (*  [%%if
   proof_level = "check"]
-
+*)
   let warn_improper_transport () = ()
 
+  (*
   [%%else]
 
   let warn_improper_transport () =
     printf "WARNING: improperly transporting staged-ledger-hash\n"
 
   [%%endif]
-
+*)
   let typ : (var, value) Typ.t =
     Typ.transport (Typ.list ~length:length_in_bits Boolean.typ)
       ~there:(Fn.compose Fold.to_list fold) ~back:(fun _ ->
@@ -196,7 +198,7 @@ module Stable = struct
       *)
     type t =
       ( Non_snark.Stable.V1.t
-      , Pending_coinbase.Hash.Stable.V1.t )
+      , Pending_coinbase.Hash_versioned.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving sexp, eq, compare, hash, yojson]
 
