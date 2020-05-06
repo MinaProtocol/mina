@@ -27,12 +27,6 @@ module Worker_state = struct
   type t = (module S) Deferred.t
 
   let create {logger; proof_level; _} : t Deferred.t =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
     Memory_stats.log_memory_stats logger ~process:"verifier" ;
     match proof_level with
     | Full ->
@@ -135,12 +129,6 @@ module Worker = struct
               , verify_transaction_snark ) }
 
       let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
         ( if Option.is_some conf_dir then
           let max_size = 256 * 1024 * 512 in
           Logger.Consumer_registry.register ~id:"default"
@@ -165,12 +153,6 @@ type t = Worker.Connection.t
 
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ~proof_level ~pids ~conf_dir =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
   let on_failure err =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       "Verifier process failed with error $err"

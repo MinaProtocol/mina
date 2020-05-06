@@ -116,12 +116,6 @@ let replace_block_production_keypairs t kps =
 
 module Snark_worker = struct
   let run_process ~logger ~proof_level client_port kill_ivar num_threads =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
     let env =
       Option.map
         ~f:(fun num -> `Extend [("OMP_NUM_THREADS", string_of_int num)])
@@ -735,9 +729,6 @@ let start t =
   Snark_worker.start t
 
 let create (config : Config.t) ~precomputed_values =
-          if (Genesis_constants.Proof_level.is_compiled config.proof_level) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string config.proof_level) ; assert false) ) ;
   let consensus_constants =
     Consensus.Constants.create
       ~protocol_constants:

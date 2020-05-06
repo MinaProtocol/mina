@@ -8,12 +8,6 @@ let s3_install_path = "/tmp/s3_cache_dir"
 let manual_install_path = "/var/lib/coda"
 
 let genesis_dir_name ~(genesis_constants : Genesis_constants.t) ~proof_level =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
   let digest =
     (*include all the time constants that would affect the genesis
     ledger and the proof*)

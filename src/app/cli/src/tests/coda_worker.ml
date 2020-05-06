@@ -533,9 +533,6 @@ module T = struct
           let with_monitor f input =
             Async.Scheduler.within' ~monitor (fun () -> f input)
           in
-          if (Genesis_constants.Proof_level.is_compiled Genesis_constants.Proof_level.compiled) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string Genesis_constants.Proof_level.compiled) ; assert false) ) ;
           let coda_deferred () =
             Coda_lib.create
               (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir

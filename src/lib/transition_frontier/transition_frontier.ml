@@ -414,12 +414,6 @@ module For_tests = struct
   (* a helper quickcheck generator which always returns the genesis breadcrumb *)
   let gen_genesis_breadcrumb ?(logger = Logger.null ()) ~proof_level ?verifier
       ~precomputed_values () =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
     let verifier =
       match verifier with
       | Some x ->
@@ -451,12 +445,6 @@ module For_tests = struct
         Breadcrumb.create genesis_transition genesis_staged_ledger )
 
   let gen_persistence ?(logger = Logger.null ()) ~proof_level ?verifier () =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
     let open Core in
     let verifier =
       match verifier with
@@ -516,12 +504,6 @@ module For_tests = struct
       ?(gen_root_breadcrumb =
         gen_genesis_breadcrumb ~logger ~proof_level ?verifier
           ~precomputed_values ()) ~max_length ~size () =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
     let open Quickcheck.Generator.Let_syntax in
     let genesis_state_hash =
       Precomputed_values.genesis_state_hash precomputed_values
@@ -606,12 +588,6 @@ module For_tests = struct
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?gen_root_breadcrumb ?(get_branch_root = root) ~max_length ~frontier_size
       ~branch_size () =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
       gen ?logger ~proof_level ?verifier ?trust_system ?consensus_local_state

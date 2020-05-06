@@ -123,12 +123,6 @@ struct
 
     let%snarkydef prev_state_valid ~proof_level wrap_vk_section wrap_vk
         prev_state_hash =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
       match proof_level with
       | Genesis_constants.Proof_level.Full ->
           (* TODO: Should build compositionally on the prev_state hash (instead of converting to bits) *)
@@ -157,12 +151,6 @@ struct
 
     let%snarkydef main ~(logger : Logger.t) ~proof_level
         (top_hash : Digest.Tick.Packed.var) =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
       let%bind prev_state = exists' State.typ ~f:Prover_state.prev_state
       and update = exists' Update.typ ~f:Prover_state.update in
       let%bind prev_state_hash, prev_state_body_hash =

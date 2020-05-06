@@ -67,12 +67,6 @@ let wrap ~keys:(module Keys : Keys_lib.Keys.S) hash proof =
 
 let base_proof ?(logger = Logger.create ()) ~proof_level
     ~keys:((module Keys : Keys_lib.Keys.S) as keys) (t : Inputs.t) =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Core_kernel.Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Core_kernel.Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
   let genesis_ledger = Genesis_ledger.Packed.t t.genesis_ledger in
   let protocol_constants = t.genesis_constants.protocol in
   let open Snark_params in
@@ -102,12 +96,6 @@ let base_proof ?(logger = Logger.create ()) ~proof_level
   wrap ~keys t.base_hash tick
 
 let create_values ?logger ~proof_level ~keys (t : Inputs.t) =
-          if (Genesis_constants.Proof_level.is_compiled proof_level) then
-                          (Core_kernel.Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Core_kernel.Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
-
-
-
   { genesis_constants= t.genesis_constants
   ; genesis_ledger= t.genesis_ledger
   ; protocol_state_with_hash= t.protocol_state_with_hash

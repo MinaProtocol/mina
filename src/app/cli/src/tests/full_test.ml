@@ -191,9 +191,6 @@ let run_test () : unit Deferred.t =
       let snark_work_fee, transaction_fee =
         if with_snark then (fee 0, fee 0) else (fee 1, fee 2)
       in
-          if (Genesis_constants.Proof_level.is_compiled Genesis_constants.Proof_level.compiled) then
-                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
-                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string Genesis_constants.Proof_level.compiled) ; assert false) ) ;
       let%bind coda =
         Coda_lib.create
           (Coda_lib.Config.make ~logger ~pids ~trust_system ~net_config
