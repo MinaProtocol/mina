@@ -180,7 +180,7 @@ let main accounts_json_file dir num_accounts constants_file =
           read_write_constants constants_file constants_path
             ~f:(fun (genesis_constants : Genesis_constants.t) ->
               (* Store the true number of accounts in the configuration. *)
-              {genesis_constants with fake_accounts_target= num_accounts} )
+              {genesis_constants with num_accounts} )
           |> Result.ok_or_failwith
         in
         let%bind _base_hash, base_proof =

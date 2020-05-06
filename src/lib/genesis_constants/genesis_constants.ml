@@ -112,9 +112,7 @@ end
 
 module T = struct
   type t =
-    { protocol: Protocol.t
-    ; txpool_max_size: int
-    ; fake_accounts_target: int option }
+    {protocol: Protocol.t; txpool_max_size: int; num_accounts: int option}
   [@@deriving to_yojson]
 
   let hash (t : t) =
@@ -152,7 +150,7 @@ let compiled : t =
       ; genesis_state_timestamp=
           genesis_timestamp_of_string genesis_state_timestamp_string }
   ; txpool_max_size= pool_max_size
-  ; fake_accounts_target= None }
+  ; num_accounts= None }
 
 let for_unit_tests = compiled
 
@@ -170,7 +168,7 @@ module Config_file : Config_intf = struct
     ; delta: int option [@default None]
     ; txpool_max_size: int option [@default None]
     ; genesis_state_timestamp: string option [@default None]
-    ; fake_accounts_target: int option [@default None] }
+    ; num_accounts: int option [@default None] }
   [@@deriving yojson]
 
   let of_yojson s =
@@ -189,10 +187,10 @@ module Config_file : Config_intf = struct
     in
     { protocol
     ; txpool_max_size= opt default.txpool_max_size t.txpool_max_size
-    ; fake_accounts_target=
-        Option.value_map ~default:default.fake_accounts_target
+    ; num_accounts=
+        Option.value_map ~default:default.num_accounts
           ~f:(fun x -> Core_kernel.Option.some_if (x > 0) x)
-          t.fake_accounts_target }
+          t.num_accounts }
 
   let of_genesis_constants (genesis_constants : T.t) : t =
     { k= Some genesis_constants.protocol.k
@@ -202,7 +200,7 @@ module Config_file : Config_intf = struct
         Some
           (Core.Time.format genesis_constants.protocol.genesis_state_timestamp
              "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc)
-    ; fake_accounts_target= genesis_constants.fake_accounts_target }
+    ; num_accounts= genesis_constants.num_accounts }
 end
 
 module Daemon_config : Config_intf = struct
@@ -224,7 +222,7 @@ module Daemon_config : Config_intf = struct
             Option.value_map genesis_state_timestamp
               ~default:default.protocol.genesis_state_timestamp
               ~f:genesis_timestamp_of_string }
-    ; fake_accounts_target= default.fake_accounts_target }
+    ; num_accounts= default.num_accounts }
 
   let of_genesis_constants (genesis_constants : T.t) : t =
     { txpool_max_size= Some genesis_constants.txpool_max_size
