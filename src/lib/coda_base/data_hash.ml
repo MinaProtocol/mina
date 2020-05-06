@@ -137,6 +137,28 @@ struct
   [%%endif]
 end
 
+module T0 = struct
+  module Arg = struct
+    type t = Field.t [@@deriving sexp, compare, hash]
+
+    [%%define_locally
+    Field.(to_string, of_string)]
+  end
+
+  [%%versioned_binable
+  module Stable = struct
+    module V1 = struct
+      type t = Field.t [@@deriving sexp, compare, hash]
+
+      type _unused = unit constraint t = Arg.t
+
+      let to_latest = Fn.id
+
+      include Binable.Of_stringable (Arg)
+    end
+  end]
+end
+
 module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   module Basic = Make_basic (struct
     let length_in_bits = Field.size_in_bits
@@ -145,23 +167,11 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   include Basic
 
   module Base58_check = Codable.Make_base58_check (struct
-    module T0 = struct
-      module T = struct
-        type t = Field.t [@@deriving sexp, compare, hash]
-
-        [%%define_locally
-        Field.(to_string, of_string)]
-      end
-
-      include T
-      include Binable.Of_stringable (T)
-    end
-
-    include T0
+    include T0.Stable.Latest
 
     (* the serialization here is only used for the hash impl which is only
        used for hashtbl, it's ok to disagree with the "real" serialization *)
-    include Hashable.Make_binable (T0)
+    include Hashable.Make_binable (T0.Stable.Latest)
     include B58_data
   end)
 
@@ -173,8 +183,6 @@ module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
 
   [%%define_locally
   Base58_check.(to_yojson, of_yojson)]
-
-  (* inside functor of no arguments, versioned types are allowed *)
 
   module T = struct
     type t = Field.t [@@deriving sexp, compare, hash]
