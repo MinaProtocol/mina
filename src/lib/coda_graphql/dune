@@ -5,5 +5,5 @@
     ; opam deps
     async node_addrs_and_ports network_peer core cohttp graphql-async graphql-cohttp
     ; libs
-    auxiliary_database coda_base coda_commands coda_lib lite_compat)
+    auxiliary_database coda_base coda_commands coda_lib)
   (preprocess (pps ppx_coda ppx_jane)))
