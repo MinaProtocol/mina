@@ -24,9 +24,6 @@ module Currency = Currency_nonconsensus.Currency
 "curve_size", curve_size]
 
 [%%inject
-"fake_accounts_target", fake_accounts_target]
-
-[%%inject
 "genesis_ledger", genesis_ledger]
 
 [%%inject

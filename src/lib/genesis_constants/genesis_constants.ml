@@ -111,7 +111,9 @@ module Protocol = struct
 end
 
 module T = struct
-  type t = {protocol: Protocol.t; txpool_max_size: int} [@@deriving to_yojson]
+  type t =
+    {protocol: Protocol.t; txpool_max_size: int; fake_accounts_target: int}
+  [@@deriving to_yojson]
 
   let hash (t : t) =
     let str =
@@ -129,19 +131,24 @@ include T
 [%%inject
 "genesis_state_timestamp_string", genesis_state_timestamp]
 
-[%%ifdef
-consensus_mechanism]
-
 [%%inject
 "k", k]
 
 [%%inject
 "delta", delta]
 
-[%%endif]
-
 [%%inject
 "pool_max_size", pool_max_size]
+
+[%%inject
+"fake_accounts_target", fake_accounts_target]
+
+[%%inject
+"ledger_depth", ledger_depth]
+
+let _ =
+  if Base.Int.(fake_accounts_target > pow 2 ledger_depth) then
+    failwith "Genesis_ledger: fake_accounts_target >= 2**ledger_depth"
 
 let compiled : t =
   { protocol=
@@ -149,7 +156,8 @@ let compiled : t =
       ; delta
       ; genesis_state_timestamp=
           genesis_timestamp_of_string genesis_state_timestamp_string }
-  ; txpool_max_size= pool_max_size }
+  ; txpool_max_size= pool_max_size
+  ; fake_accounts_target }
 
 let for_unit_tests = compiled
 
@@ -163,10 +171,11 @@ end
 
 module Config_file : Config_intf = struct
   type t =
-    { k: int option
-    ; delta: int option
-    ; txpool_max_size: int option
-    ; genesis_state_timestamp: string option }
+    { k: int option [@default None]
+    ; delta: int option [@default None]
+    ; txpool_max_size: int option [@default None]
+    ; genesis_state_timestamp: string option [@default None]
+    ; fake_accounts_target: int option [@default None] }
   [@@deriving yojson]
 
   let of_yojson s =
@@ -183,7 +192,11 @@ module Config_file : Config_intf = struct
           Option.value_map ~default:default.protocol.genesis_state_timestamp
             t.genesis_state_timestamp ~f:genesis_timestamp_of_string }
     in
-    {protocol; txpool_max_size= opt default.txpool_max_size t.txpool_max_size}
+    { protocol
+    ; txpool_max_size= opt default.txpool_max_size t.txpool_max_size
+    ; fake_accounts_target=
+        Option.value ~default:default.fake_accounts_target
+          t.fake_accounts_target }
 
   let of_genesis_constants (genesis_constants : T.t) : t =
     { k= Some genesis_constants.protocol.k
@@ -192,7 +205,8 @@ module Config_file : Config_intf = struct
     ; genesis_state_timestamp=
         Some
           (Core.Time.format genesis_constants.protocol.genesis_state_timestamp
-             "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }
+             "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc)
+    ; fake_accounts_target= Some genesis_constants.fake_accounts_target }
 end
 
 module Daemon_config : Config_intf = struct
@@ -213,7 +227,8 @@ module Daemon_config : Config_intf = struct
           genesis_state_timestamp=
             Option.value_map genesis_state_timestamp
               ~default:default.protocol.genesis_state_timestamp
-              ~f:genesis_timestamp_of_string } }
+              ~f:genesis_timestamp_of_string }
+    ; fake_accounts_target= default.fake_accounts_target }
 
   let of_genesis_constants (genesis_constants : T.t) : t =
     { txpool_max_size= Some genesis_constants.txpool_max_size

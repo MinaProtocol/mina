@@ -105,10 +105,12 @@ let get_accounts accounts_json_file n =
     then accounts
     else genesis_winner_account :: accounts
   in
+  let num_real_accounts = List.length real_accounts in
+  let num_fake_accounts = max 0 (n - num_real_accounts) in
+  let num_accounts = num_real_accounts + num_fake_accounts in
   let all_accounts =
     let fake_accounts =
-      Account_config.Fake_accounts.generate
-        (max (n - List.length real_accounts) 0)
+      Account_config.Fake_accounts.generate num_fake_accounts
     in
     real_accounts @ fake_accounts
   in
@@ -116,7 +118,7 @@ let get_accounts accounts_json_file n =
   Out_channel.with_file "accounts.json" ~f:(fun json_file ->
       Yojson.Safe.pretty_to_channel json_file
         (Account_config.to_yojson all_accounts) ) ;
-  all_accounts
+  (all_accounts, num_accounts)
 
 let genesis_dirname = Cache_dir.genesis_dir_name Genesis_constants.compiled
 
@@ -131,7 +133,7 @@ let create_tar top_dir =
       (sprintf "Error generating the tar for genesis ledger. Exit code: %d"
          exit)
 
-let read_write_constants read_from_opt write_to =
+let read_write_constants ~f read_from_opt write_to =
   let open Result.Let_syntax in
   let%map constants =
     match read_from_opt with
@@ -144,12 +146,13 @@ let read_write_constants read_from_opt write_to =
     | None ->
         Ok Genesis_constants.compiled
   in
+  let constants = f constants in
   Yojson.Safe.to_file write_to
     Genesis_constants.(
       Config_file.(of_genesis_constants constants |> to_yojson)) ;
   constants
 
-let main accounts_json_file dir n constants_file =
+let main accounts_json_file dir num_accounts constants_file =
   let open Deferred.Let_syntax in
   let top_dir = Option.value ~default:Cache_dir.autogen_path dir in
   let%bind genesis_dir =
@@ -160,18 +163,21 @@ let main accounts_json_file dir n constants_file =
   let ledger_path = genesis_dir ^/ "ledger" in
   let proof_path = genesis_dir ^/ "genesis_proof" in
   let constants_path = genesis_dir ^/ "genesis_constants.json" in
-  let%bind accounts = get_accounts accounts_json_file n in
+  let%bind accounts = get_accounts accounts_json_file num_accounts in
   let%bind () =
     match
       Or_error.try_with_join (fun () ->
           let open Or_error.Let_syntax in
-          let%map accounts = accounts in
+          let%map accounts, num_accounts = accounts in
           let ledger = generate_ledger ~directory_name:ledger_path accounts in
-          ledger )
+          (ledger, num_accounts) )
     with
-    | Ok ledger ->
+    | Ok (ledger, num_accounts) ->
         let genesis_constants =
           read_write_constants constants_file constants_path
+            ~f:(fun (genesis_constants : Genesis_constants.t) ->
+              (* Store the true number of accounts in the configuration. *)
+              {genesis_constants with fake_accounts_target= num_accounts} )
           |> Result.ok_or_failwith
         in
         let%bind _base_hash, base_proof =
@@ -240,9 +246,7 @@ let () =
          in
          fun () ->
            let max = Int.pow 2 Coda_compile_config.ledger_depth in
-           if Option.value ~default:0 n >= max then
+           let n = Option.value ~default:0 n in
+           if n >= max then
              failwith (sprintf "Invalid value for n (0 <= n <= %d)" max)
-           else
-             main accounts_json genesis_dir
-               (Option.value ~default:0 n)
-               constants))
+           else main accounts_json genesis_dir n constants))
