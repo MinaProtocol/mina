@@ -34,6 +34,8 @@ module type Input_intf = sig
 
   val add : t -> t -> t
 
+  val double : t -> t
+
   val scale : t -> ScalarField.t -> t
 
   val sub : t -> t -> t
@@ -46,20 +48,37 @@ module type Input_intf = sig
 end
 
 module type Field_intf = sig
-  include Type_with_delete
+  type t [@@deriving bin_io, sexp, compare, yojson]
 
-  include Binable.S with type t := t
+  include Type_with_delete with type t := t
+
+  val ( + ) : t -> t -> t
+
+  val ( * ) : t -> t -> t
+
+  val one : t
+
+  val square : t -> t
+
+  val is_square : t -> bool
+
+  val sqrt : t -> t
 end
 
 module Make
     (BaseField : Field_intf)
-    (ScalarField : Field_intf)
+    (ScalarField : Field_intf) (Params : sig
+        val a : BaseField.t
+
+        val b : BaseField.t
+    end)
     (C : Input_intf
          with module BaseField := BaseField
           and module ScalarField := ScalarField) =
 struct
   module Affine = struct
-    type t = BaseField.t * BaseField.t [@@deriving bin_io]
+    type t = BaseField.t * BaseField.t
+    [@@deriving bin_io, sexp, compare, yojson]
 
     let to_backend (x, y) =
       let t = C.Affine.create x y in
@@ -123,13 +142,32 @@ struct
 
   let sub = op2 sub
 
+  let double = op1 double
+
   let negate = op1 negate
 
   let random = op1 random
 
   let one = one ()
 
+  let zero = sub one one
+
   let ( + ) = add
 
   let ( * ) s t = scale t s
+
+  let find_y x =
+    let open BaseField in
+    let y2 = (x * square x) + (Params.a * x) + Params.b in
+    if is_square y2 then Some (sqrt y2) else None
+
+  let point_near_x (x : BaseField.t) =
+    let rec go x = function
+      | Some y ->
+          of_affine (x, y)
+      | None ->
+          let x' = BaseField.(one + x) in
+          go x' (find_y x')
+    in
+    go x (find_y x)
 end

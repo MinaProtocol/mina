@@ -10,6 +10,12 @@ module type Input_intf = sig
 
   val of_bigint : B.R.t -> t
 
+  val to_bigint_raw : t -> B.R.t
+
+  val to_bigint_raw_noalloc : t -> B.R.t
+
+  val of_bigint_raw : B.R.t -> t
+
   val of_int : Unsigned.UInt64.t -> t
 
   val add : t -> t -> t
@@ -50,9 +56,11 @@ module type Input_intf = sig
 end
 
 module type S = sig
-  type t [@@deriving sexp, bin_io]
+  type t [@@deriving sexp, bin_io, compare, yojson]
 
   val to_bigint : t -> B.R.t
+
+  val to_bigint_raw_noalloc : t -> B.R.t
 
   val of_bigint : B.R.t -> t
 
@@ -144,7 +152,7 @@ end
 module Make (F : Input_intf) : S with type t = F.t = struct
   open F
 
-  type t = F.t sexp_opaque [@@deriving sexp]
+  type t = F.t
 
   let gc2 op x1 x2 =
     let r = op x1 x2 in
@@ -161,16 +169,42 @@ module Make (F : Input_intf) : S with type t = F.t = struct
 
   let of_bigint = gc1 of_bigint
 
+  let of_bigint_raw = gc1 of_bigint_raw
+
+  let to_bigint_raw_noalloc = to_bigint_raw_noalloc
+
   (* TODO: Don't allocate the bigint when writing and reading *)
   include Binable.Of_binable
             (B.R)
             (struct
               type nonrec t = t
 
-              let to_binable = to_bigint
+              let to_binable = to_bigint_raw_noalloc
 
-              let of_binable = of_bigint
+              let of_binable = of_bigint_raw
             end)
+
+  include Sexpable.Of_sexpable
+            (B.R)
+            (struct
+              type nonrec t = t
+
+              let to_sexpable = to_bigint
+
+              let of_sexpable = of_bigint
+            end)
+
+  let compare t1 t2 = B.R.compare (to_bigint t1) (to_bigint t2)
+
+  let to_yojson t : Yojson.Safe.json =
+    `String (B.R.to_hex_string (to_bigint t))
+
+  let of_yojson j =
+    match j with
+    | `String h ->
+        Ok (of_bigint (B.R.of_hex_string h))
+    | _ ->
+        Error "expected hex string"
 
   let of_int = gc1 (Fn.compose of_int Unsigned.UInt64.of_int)
 
@@ -211,6 +245,10 @@ module Make (F : Input_intf) : S with type t = F.t = struct
   let print = print
 
   let random = gc1 random
+
+  let%test_unit "sexp round trip" =
+    let t = random () in
+    assert (equal t (t_of_sexp (sexp_of_t t)))
 
   let negate = gc1 negate
 

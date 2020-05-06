@@ -2,7 +2,8 @@ open Core_kernel
 open Pickles_types
 
 module Challenge_polynomial = struct
-  type t = {challenges: Fq.t array; commitment: G.Affine.t} [@@deriving bin_io]
+  type t = {challenges: Fq.t array; commitment: G.Affine.t}
+  [@@deriving bin_io, sexp, compare, yojson]
 end
 
 type message = Challenge_polynomial.t list
@@ -12,7 +13,7 @@ type t =
   , Fq.t
   , (Fq.t, G.Affine.t) Dlog_marlin_types.Openings.t )
   Pairing_marlin_types.Proof.t
-[@@deriving bin_io]
+[@@deriving bin_io, compare, sexp, yojson]
 
 let g t f = G.Affine.of_backend (f t)
 
