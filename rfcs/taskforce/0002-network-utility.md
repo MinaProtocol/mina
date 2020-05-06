@@ -38,12 +38,6 @@ While this system is effective, there are a variety of potential improvements to
 
 All of these features should be included in a simple command line tool that also exposes a TypeScript API. This service will be written in Reason with TypeScript bindings.
 
-Since there may be some initial configuration required for the operation of a network, the following command will take care of setting up all the required services (google-cloud-sdk, aws, etc.)
-
-```
-coda-network init
-```
-
 ### Keypair Management
 
 Keypairs have a private key and a corresponding public key. For new keypair generation, we can use the new client-sdk which is a much lighter dependency and has a clean JavaScript interface.
@@ -96,23 +90,11 @@ This command would remove a public key to a keyset.
 coda-network keyset [ls|list]
 ```
 
-This command will show all keysets that are stored locally on the machine.
-
-```
-coda-network keyset show <NAME>
-```
-
-This command displays all public keys included in a given keyset.
+This command will show all keysets that are stored locally in addition to the keysets that are available in remote storage.
 
 ```
 coda-network keyset import <KEYSET_NAME> <CSV_FILENAME>
 ```
-
-```
-coda-network keyset destroy <NAME>
-```
-
-This simply creates a keyset for inclusion .
 
 ### Runtime Ledger Generation
 
@@ -122,11 +104,36 @@ The code for generating the Runtime Genesis Ledger should be ported over from th
 coda-network genesis create
 ```
 
-This would ideally take you through an interactive process where all the keysets are selected and associated parameters required for genesis ledger generation are collected. Afterwards this ledgeer is stored locally. Once generated locally, we should upload the genesis ledger to an S3 bucket or Google Cloud Storage where they can be downloaded and used for deploying.
+This command will prompt the user for the keysets which should be included in the ledger, their corresponding amounts and delegates. This would then output a `genesis_ledger.json` which contains entries of the following form:
+
+```
+[
+  {
+    "pk": "<PUBLIC_KEY>",
+    "sk": "<PRIVATEY_KEY>", // nullable
+    "balance": "<AMOUNT>",
+    "delegate": "<PUBLIC_KEY>" // nullable
+  }
+]
+```
+
+Additionally we can output an annotated ledger file with additional fields such as `nickname`, `discord_username` etc for use with testnet challenges.
+
+Again this can be uploaded to S3 for sharing.
+
+```
+coda-network genesis upload <VERSION>
+```
 
 ### Configuration Deployment
 
-The configuration deployment should be updated to take advantage of the kubernetes JavaScript client API. This tool should expose similar functionality to the existing tool, allowing users to upload keypairs to the kubernetes ConfigMap however not splitting out the task into predefined groups but rather allowing arbitrary keysets to be deployed.
+The configuration deployment will consist of collecting all the "online" keys and the genesis ledger and uploading them to the kubernetes secret service. This tool should expose similar functionality to the existing tool, allowing users to upload keypairs to the kubernetes ConfigMap however not splitting out the task into predefined groups but rather allowing arbitrary keysets to be deployed.
+
+```
+coda-network deploy <KEYSET_NAME>
+```
+
+This would attempt to find all the keypairs in a given keyset locally or remotely and upload them to the Kubernetes secret service.
 
 ### Network Deployment and Monitoring
 
