@@ -700,20 +700,7 @@ module Data = struct
     end
 
     module T =
-      Vrf_lib.Integrated.Make (Tick) (Scalar)
-        (struct
-          include (
-            Group : module type of Group with module Checked := Group.Checked )
-
-          let scale = scale
-
-          module Checked = struct
-            include Group.Checked
-
-            let scale = scale
-          end
-        end)
-        (Message)
+      Vrf_lib.Integrated.Make (Tick) (Scalar) (Group) (Message)
         (struct
           type value = Snark_params.Tick.Field.t
 
