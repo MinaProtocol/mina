@@ -66,20 +66,13 @@ module Make (Depth : Intf.Depth) = struct
     let hash depth = UInt8.of_int (Depth.depth - depth)
   end
 
-  (* TODO : version *)
-  module T = struct
-    type t =
-      | Generic of Bigstring.Stable.V1.t
-          [@printer
-            fun fmt bstr ->
-              Format.pp_print_string fmt (Bigstring.to_string bstr)]
-      | Account of Addr.Stable.V1.t
-      | Hash of Addr.Stable.V1.t
-    [@@deriving hash, sexp, compare, eq, bin_io]
-  end
-
-  include T
-  include Hashable.Make_binable (T)
+  type t =
+    | Generic of Bigstring.t
+        [@printer
+          fun fmt bstr -> Format.pp_print_string fmt (Bigstring.to_string bstr)]
+    | Account of Addr.t
+    | Hash of Addr.t
+  [@@deriving hash, sexp, compare, eq]
 
   let is_generic = function Generic _ -> true | _ -> false
 

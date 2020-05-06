@@ -13,6 +13,33 @@ module Ledger_inner = struct
 
   module Location_at_depth = Location0
 
+  module Location_binable = struct
+    module Arg = struct
+      type t = Location_at_depth.t =
+        | Generic of Location.Bigstring.Stable.Latest.t
+            [@printer
+              fun fmt bstr ->
+                Format.pp_print_string fmt (Bigstring.to_string bstr)]
+        | Account of Location0.Addr.Stable.Latest.t
+        | Hash of Location0.Addr.Stable.Latest.t
+      [@@deriving bin_io_unversioned, hash, sexp, compare]
+    end
+
+    type t = Arg.t =
+      | Generic of Location.Bigstring.Stable.Latest.t
+          [@printer
+            fun fmt bstr ->
+              Format.pp_print_string fmt (Bigstring.to_string bstr)]
+      | Account of Location0.Addr.Stable.Latest.t
+      | Hash of Location0.Addr.Stable.Latest.t
+    [@@deriving hash, sexp, compare]
+
+    type _unused = unit constraint t = Location_at_depth.t
+
+    include Hashable.Make_binable (Arg) [@@deriving
+                                          sexp, compare, hash, yojson]
+  end
+
   module Kvdb : Intf.Key_value_database with type config := string =
     Rocksdb.Database
 
@@ -85,6 +112,7 @@ module Ledger_inner = struct
     module Depth = Depth
     module Kvdb = Kvdb
     module Location = Location_at_depth
+    module Location_binable = Location_binable
     module Storage_locations = Storage_locations
   end
 

@@ -3,6 +3,8 @@ open Core
 module type Inputs_intf = sig
   module Location : Location_intf.S
 
+  module Location_binable : Hashable.S_binable with type t := Location.t
+
   module Key : Intf.Key
 
   module Token_id : Intf.Token_id
@@ -84,7 +86,7 @@ end = struct
       let height = Inputs.Location.height @@ List.hd_exn locations in
       if height < Inputs.Depth.depth then
         let location_to_hash_table =
-          Inputs.Location.Table.of_alist_exn locations_and_hashes
+          Inputs.Location_binable.Table.of_alist_exn locations_and_hashes
         in
         let _, parent_locations_and_hashes =
           List.fold locations_and_hashes ~init:([], [])
