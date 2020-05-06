@@ -619,9 +619,9 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
       Quickcheck.test ~trials:1
-        (Transition_frontier.For_tests.gen ~proof_level:Check
-           ~precomputed_values ~max_length:max_frontier_length
-           ~size:max_frontier_length ()) ~f:(fun frontier ->
+        (Transition_frontier.For_tests.gen ~proof_level ~precomputed_values
+           ~max_length:max_frontier_length ~size:max_frontier_length ())
+        ~f:(fun frontier ->
           Thread_safe.block_on_async_exn
           @@ fun () ->
           Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)

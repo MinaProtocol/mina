@@ -388,8 +388,7 @@ let%test_module "Transition_handler.Processor tests" =
             Thread_safe.block_on_async_exn (fun () ->
                 let pids = Child_processes.Termination.create_pid_table () in
                 let%bind verifier =
-                  Verifier.create ~logger ~proof_level:Check ~conf_dir:None
-                    ~pids
+                  Verifier.create ~logger ~proof_level ~conf_dir:None ~pids
                 in
                 let valid_transition_reader, valid_transition_writer =
                   Strict_pipe.create
