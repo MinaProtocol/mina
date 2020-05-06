@@ -107,7 +107,10 @@ let get_accounts accounts_json_file n =
   in
   let num_real_accounts = List.length real_accounts in
   let num_fake_accounts = max 0 (n - num_real_accounts) in
-  let num_accounts = num_real_accounts + num_fake_accounts in
+  let num_accounts =
+    Option.some_if (num_fake_accounts > 0)
+      (num_real_accounts + num_fake_accounts)
+  in
   let all_accounts =
     let fake_accounts =
       Account_config.Fake_accounts.generate num_fake_accounts

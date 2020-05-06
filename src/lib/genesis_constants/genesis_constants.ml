@@ -112,7 +112,9 @@ end
 
 module T = struct
   type t =
-    {protocol: Protocol.t; txpool_max_size: int; fake_accounts_target: int}
+    { protocol: Protocol.t
+    ; txpool_max_size: int
+    ; fake_accounts_target: int option }
   [@@deriving to_yojson]
 
   let hash (t : t) =
@@ -141,14 +143,7 @@ include T
 "pool_max_size", pool_max_size]
 
 [%%inject
-"fake_accounts_target", fake_accounts_target]
-
-[%%inject
 "ledger_depth", ledger_depth]
-
-let _ =
-  if Base.Int.(fake_accounts_target > pow 2 ledger_depth) then
-    failwith "Genesis_ledger: fake_accounts_target >= 2**ledger_depth"
 
 let compiled : t =
   { protocol=
@@ -157,7 +152,7 @@ let compiled : t =
       ; genesis_state_timestamp=
           genesis_timestamp_of_string genesis_state_timestamp_string }
   ; txpool_max_size= pool_max_size
-  ; fake_accounts_target }
+  ; fake_accounts_target= None }
 
 let for_unit_tests = compiled
 
@@ -195,7 +190,8 @@ module Config_file : Config_intf = struct
     { protocol
     ; txpool_max_size= opt default.txpool_max_size t.txpool_max_size
     ; fake_accounts_target=
-        Option.value ~default:default.fake_accounts_target
+        Option.value_map ~default:default.fake_accounts_target
+          ~f:(fun x -> Core_kernel.Option.some_if (x > 0) x)
           t.fake_accounts_target }
 
   let of_genesis_constants (genesis_constants : T.t) : t =
@@ -206,7 +202,7 @@ module Config_file : Config_intf = struct
         Some
           (Core.Time.format genesis_constants.protocol.genesis_state_timestamp
              "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc)
-    ; fake_accounts_target= Some genesis_constants.fake_accounts_target }
+    ; fake_accounts_target= genesis_constants.fake_accounts_target }
 end
 
 module Daemon_config : Config_intf = struct
