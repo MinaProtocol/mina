@@ -1,4 +1,3 @@
-open Core_kernel
 open Async_kernel
 open Coda_base
 
@@ -6,18 +5,7 @@ type t = unit
 
 type ledger_proof = Ledger_proof.Debug.t
 
-let create ~logger ~proof_level ~pids:_ ~conf_dir:_ =
-  if Genesis_constants.Proof_level.is_compiled proof_level then (
-    Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-      "Bad proof level $level (expected $expected)"
-      ~metadata:
-        [ ( "level"
-          , `String (Genesis_constants.Proof_level.to_string proof_level) )
-        ; ( "expected"
-          , `String Genesis_constants.Proof_level.(to_string compiled) ) ] ;
-    Genesis_constants.Proof_level.(
-      failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-        (to_string compiled) ()) ) ;
+let create ~logger:_ ~proof_level ~pids:_ ~conf_dir:_ =
   match proof_level with
   | Genesis_constants.Proof_level.Full ->
       failwith "Unable to handle proof-level=Full"

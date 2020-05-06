@@ -226,17 +226,6 @@ module For_tests = struct
   let gen ?(logger = Logger.null ()) ~proof_level ?verifier
       ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys :
       (t -> t Deferred.t) Quickcheck.Generator.t =
-    if Genesis_constants.Proof_level.is_compiled proof_level then (
-      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-        "Bad proof level $level (expected $expected)"
-        ~metadata:
-          [ ( "level"
-            , `String (Genesis_constants.Proof_level.to_string proof_level) )
-          ; ( "expected"
-            , `String Genesis_constants.Proof_level.(to_string compiled) ) ] ;
-      Genesis_constants.Proof_level.(
-        failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-          (to_string compiled) ()) ) ;
     let open Quickcheck.Let_syntax in
     let verifier =
       match verifier with
@@ -370,20 +359,6 @@ module For_tests = struct
 
   let gen_non_deferred ?logger ~proof_level ?verifier ?trust_system
       ~accounts_with_secret_keys =
-    if Genesis_constants.Proof_level.is_compiled proof_level then (
-      Option.iter logger ~f:(fun logger ->
-          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-            "Bad proof level $level (expected $expected)"
-            ~metadata:
-              [ ( "level"
-                , `String (Genesis_constants.Proof_level.to_string proof_level)
-                )
-              ; ( "expected"
-                , `String Genesis_constants.Proof_level.(to_string compiled) )
-              ] ) ;
-      Genesis_constants.Proof_level.(
-        failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-          (to_string compiled) ()) ) ;
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
       gen ?logger ?verifier ~proof_level ?trust_system
@@ -393,20 +368,6 @@ module For_tests = struct
 
   let gen_seq ?logger ~proof_level ?verifier ?trust_system
       ~accounts_with_secret_keys n =
-    if Genesis_constants.Proof_level.is_compiled proof_level then (
-      Option.iter logger ~f:(fun logger ->
-          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-            "Bad proof level $level (expected $expected)"
-            ~metadata:
-              [ ( "level"
-                , `String (Genesis_constants.Proof_level.to_string proof_level)
-                )
-              ; ( "expected"
-                , `String Genesis_constants.Proof_level.(to_string compiled) )
-              ] ) ;
-      Genesis_constants.Proof_level.(
-        failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-          (to_string compiled) ()) ) ;
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n

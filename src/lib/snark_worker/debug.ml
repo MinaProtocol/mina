@@ -8,10 +8,6 @@ module Inputs = struct
     include Unit
 
     let create ~proof_level () =
-      ( if Genesis_constants.Proof_level.is_compiled proof_level then
-        Genesis_constants.Proof_level.(
-          failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-            (to_string compiled) ()) ) ;
       match proof_level with
       | Genesis_constants.Proof_level.Full ->
           failwith "Unable to handle proof-level=Full"

@@ -390,19 +390,6 @@ let daemon logger =
                 level %s"
                (str proof_level) (str compiled) ()
        in
-       if Genesis_constants.Proof_level.is_compiled proof_level then (
-         Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-           "Bad proof level $level (expected $expected)"
-           ~metadata:
-             [ ( "level"
-               , `String (Genesis_constants.Proof_level.to_string proof_level)
-               )
-             ; ( "expected"
-               , `String Genesis_constants.Proof_level.(to_string compiled) )
-             ] ;
-         Genesis_constants.Proof_level.(
-           failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-             (to_string compiled) ()) ) ;
        let coda_initialization_deferred () =
          let%bind genesis_ledger, base_proof, genesis_constants =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
@@ -832,19 +819,6 @@ let daemon logger =
            Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
              proposed_protocol_version
          in
-         if Genesis_constants.Proof_level.is_compiled proof_level then (
-           Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-             "Bad proof level $level (expected $expected)"
-             ~metadata:
-               [ ( "level"
-                 , `String
-                     (Genesis_constants.Proof_level.to_string proof_level) )
-               ; ( "expected"
-                 , `String Genesis_constants.Proof_level.(to_string compiled)
-                 ) ] ;
-           Genesis_constants.Proof_level.(
-             failwithf "Bad proof level %s (expected %s)"
-               (to_string proof_level) (to_string compiled) ()) ) ;
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir

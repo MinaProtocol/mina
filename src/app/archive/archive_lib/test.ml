@@ -10,20 +10,6 @@ let%test_module "Archive node unit tests" =
 
     let proof_level = Genesis_constants.Proof_level.None
 
-    let () =
-      if Genesis_constants.Proof_level.is_compiled proof_level then (
-        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-          "Bad proof level $level (expected $expected)"
-          ~metadata:
-            [ ( "level"
-              , `String (Genesis_constants.Proof_level.to_string proof_level)
-              )
-            ; ( "expected"
-              , `String Genesis_constants.Proof_level.(to_string compiled) ) ] ;
-        Genesis_constants.Proof_level.(
-          failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-            (to_string compiled) ()) )
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let conn_lazy =

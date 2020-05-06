@@ -1,4 +1,3 @@
-open Core_kernel
 open Coda_base
 open Coda_state
 
@@ -68,17 +67,6 @@ let wrap ~keys:(module Keys : Keys_lib.Keys.S) hash proof =
 
 let base_proof ?(logger = Logger.create ()) ~proof_level
     ~keys:((module Keys : Keys_lib.Keys.S) as keys) (t : Inputs.t) =
-  if Genesis_constants.Proof_level.is_compiled proof_level then (
-    Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-      "Bad proof level $level (expected $expected)"
-      ~metadata:
-        [ ( "level"
-          , `String (Genesis_constants.Proof_level.to_string proof_level) )
-        ; ( "expected"
-          , `String Genesis_constants.Proof_level.(to_string compiled) ) ] ;
-    Genesis_constants.Proof_level.(
-      failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-        (to_string compiled) ()) ) ;
   let genesis_ledger = Genesis_ledger.Packed.t t.genesis_ledger in
   let protocol_constants = t.genesis_constants.protocol in
   let open Snark_params in
@@ -108,20 +96,6 @@ let base_proof ?(logger = Logger.create ()) ~proof_level
   wrap ~keys t.base_hash tick
 
 let create_values ?logger ~proof_level ~keys (t : Inputs.t) =
-  if Genesis_constants.Proof_level.is_compiled proof_level then (
-    Option.iter logger ~f:(fun logger ->
-        Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-          "Bad proof level $level (expected $expected)"
-          ~metadata:
-            [ ( "level"
-              , `String (Genesis_constants.Proof_level.to_string proof_level)
-              )
-            ; ( "expected"
-              , `String Genesis_constants.Proof_level.(to_string compiled) ) ]
-    ) ;
-    Genesis_constants.Proof_level.(
-      failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-        (to_string compiled) ()) ) ;
   { genesis_constants= t.genesis_constants
   ; genesis_ledger= t.genesis_ledger
   ; protocol_state_with_hash= t.protocol_state_with_hash

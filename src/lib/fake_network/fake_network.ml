@@ -144,10 +144,6 @@ module Generator = struct
     -> peer_state Generator.t
 
   let fresh_peer ~proof_level ~precomputed_values ~max_frontier_length =
-    ( if Genesis_constants.Proof_level.is_compiled proof_level then
-      Genesis_constants.Proof_level.(
-        failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-          (to_string compiled) ()) ) ;
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values
     in
@@ -163,10 +159,6 @@ module Generator = struct
 
   let peer_with_branch ~frontier_branch_size ~proof_level ~precomputed_values
       ~max_frontier_length =
-    ( if Genesis_constants.Proof_level.is_compiled proof_level then
-      Genesis_constants.Proof_level.(
-        failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-          (to_string compiled) ()) ) ;
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values
     in
@@ -185,10 +177,6 @@ module Generator = struct
     {frontier; consensus_local_state}
 
   let gen ~proof_level ~precomputed_values ~max_frontier_length configs =
-    ( if Genesis_constants.Proof_level.is_compiled proof_level then
-      Genesis_constants.Proof_level.(
-        failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-          (to_string compiled) ()) ) ;
     let open Quickcheck.Generator.Let_syntax in
     let%map states =
       Vect.Quickcheck_generator.map configs ~f:(fun config ->

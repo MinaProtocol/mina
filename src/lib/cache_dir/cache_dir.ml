@@ -8,10 +8,6 @@ let s3_install_path = "/tmp/s3_cache_dir"
 let manual_install_path = "/var/lib/coda"
 
 let genesis_dir_name ~(genesis_constants : Genesis_constants.t) ~proof_level =
-  ( if Genesis_constants.Proof_level.is_compiled proof_level then
-    Genesis_constants.Proof_level.(
-      failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-        (to_string compiled) ()) ) ;
   let digest =
     (*include all the time constants that would affect the genesis
     ledger and the proof*)

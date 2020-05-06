@@ -60,17 +60,6 @@ module Worker_state = struct
   type t = (module S) Deferred.t
 
   let create {logger; proof_level; _} : t Deferred.t =
-    if Genesis_constants.Proof_level.is_compiled proof_level then (
-      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-        "Bad proof level $level (expected $expected)"
-        ~metadata:
-          [ ( "level"
-            , `String (Genesis_constants.Proof_level.to_string proof_level) )
-          ; ( "expected"
-            , `String Genesis_constants.Proof_level.(to_string compiled) ) ] ;
-      Genesis_constants.Proof_level.(
-        failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-          (to_string compiled) ()) ) ;
     Deferred.return
       (let%map (module Keys) = Keys_lib.Keys.create () in
        let module Transaction_snark =
@@ -267,19 +256,6 @@ module Worker = struct
         ; verify_blockchain= f verify_blockchain }
 
       let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
-        if Genesis_constants.Proof_level.is_compiled proof_level then (
-          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-            "Bad proof level $level (expected $expected)"
-            ~metadata:
-              [ ( "level"
-                , `String (Genesis_constants.Proof_level.to_string proof_level)
-                )
-              ; ( "expected"
-                , `String Genesis_constants.Proof_level.(to_string compiled) )
-              ] ;
-          Genesis_constants.Proof_level.(
-            failwithf "Bad proof level %s (expected %s)"
-              (to_string proof_level) (to_string compiled) ()) ) ;
         let max_size = 256 * 1024 * 512 in
         Logger.Consumer_registry.register ~id:"default"
           ~processor:(Logger.Processor.raw ())
@@ -301,17 +277,6 @@ end
 type t = {connection: Worker.Connection.t; process: Process.t; logger: Logger.t}
 
 let create ~logger ~pids ~conf_dir ~proof_level =
-  if Genesis_constants.Proof_level.is_compiled proof_level then (
-    Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
-      "Bad proof level $level (expected $expected)"
-      ~metadata:
-        [ ( "level"
-          , `String (Genesis_constants.Proof_level.to_string proof_level) )
-        ; ( "expected"
-          , `String Genesis_constants.Proof_level.(to_string compiled) ) ] ;
-    Genesis_constants.Proof_level.(
-      failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
-        (to_string compiled) ()) ) ;
   let on_failure err =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       "Prover process failed with error $err"
