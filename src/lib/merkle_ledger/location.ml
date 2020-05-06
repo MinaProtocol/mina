@@ -66,12 +66,7 @@ module Make (Depth : Intf.Depth) = struct
     let hash depth = UInt8.of_int (Depth.depth - depth)
   end
 
-  type t =
-    | Generic of Bigstring.t
-        [@printer
-          fun fmt bstr -> Format.pp_print_string fmt (Bigstring.to_string bstr)]
-    | Account of Addr.t
-    | Hash of Addr.t
+  type t = Generic of Bigstring.t | Account of Addr.t | Hash of Addr.t
   [@@deriving hash, sexp, compare, eq]
 
   let is_generic = function Generic _ -> true | _ -> false
