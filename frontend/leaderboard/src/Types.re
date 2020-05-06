@@ -1,19 +1,19 @@
 module NewBlock = {
-  type publicKey = {publicKey: string};
-  type creatorAccount = {creatorAccount: publicKey};
+  type creatorAccount = {publicKey: string};
 
-  type prover = {prover: string};
-  type snarkJobs = {snarkJobs: prover};
+  type snarkJobs = {prover: string};
 
-  type fromAccount = {fromAccount: string};
-  type userCommands = {userCommands: fromAccount};
+  type userCommands = {fromAccount: string};
   type transactions = {transactions: userCommands};
 
-  type newBlock = {
+  type data = {
     creatorAccount,
-    snarkJobs,
+    userCommands,
     transactions,
   };
+
+  type newBlock = {newBlock: data};
+
   type t = {data: newBlock};
 
   external unsafeJSONToNewBlock: Js.Json.t => t = "%identity";
