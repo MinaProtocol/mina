@@ -1,4 +1,5 @@
-type 'a t = {a: 'a; b: 'a; c: 'a} [@@deriving fields, bin_io, sexp]
+type 'a t = {a: 'a; b: 'a; c: 'a}
+[@@deriving fields, bin_io, sexp, compare, yojson]
 
 module H_list = Snarky.H_list
 

@@ -16,7 +16,7 @@ module Evals = struct
     ; g_1: 'a
     ; g_2: 'a
     ; g_3: 'a }
-  [@@deriving fields, bin_io]
+  [@@deriving fields, bin_io, sexp, compare, yojson]
 
   let to_vectors
       { w_hat
@@ -100,7 +100,7 @@ module Openings = struct
   module Bulletproof = struct
     type ('fq, 'g) t =
       {lr: ('g * 'g) array; z_1: 'fq; z_2: 'fq; delta: 'g; sg: 'g}
-    [@@deriving bin_io]
+    [@@deriving bin_io, sexp, compare, yojson]
 
     open Snarky.H_list
 
@@ -119,9 +119,10 @@ module Openings = struct
 
   open Evals
 
-  type ('fq, 'g) t =
-    {proof: ('fq, 'g) Bulletproof.t; evals: 'fq Evals.t Triple.t}
-  [@@deriving bin_io]
+  type 'a triple = 'a * 'a * 'a [@@deriving bin_io, sexp, compare, yojson]
+
+  type ('fq, 'g) t = {proof: ('fq, 'g) Bulletproof.t; evals: 'fq Evals.t triple}
+  [@@deriving bin_io, sexp, compare, yojson]
 
   let to_hlist {proof; evals} = Snarky.H_list.[proof; evals]
 

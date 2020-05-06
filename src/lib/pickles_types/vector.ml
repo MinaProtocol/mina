@@ -192,6 +192,29 @@ struct
   let t_of_sexp f s = of_list_and_length_exn (List.t_of_sexp f s) N.n
 end
 
+module L = struct
+  type 'a t = 'a list [@@deriving yojson]
+end
+
+module type Yojson_intf1 = sig
+  type 'a t
+
+  val to_yojson : ('a -> Yojson.Safe.json) -> 'a t -> Yojson.Safe.json
+
+  val of_yojson :
+       (Yojson.Safe.json -> 'a Ppx_deriving_yojson_runtime.error_or)
+    -> Yojson.Safe.json
+    -> 'a t Ppx_deriving_yojson_runtime.error_or
+end
+
+module Yojson (N : Nat_intf) : Yojson_intf1 with type 'a t := ('a, N.n) t =
+struct
+  let to_yojson f t = L.to_yojson f (to_list t)
+
+  let of_yojson f s =
+    Result.map (L.of_yojson f s) ~f:(Fn.flip of_list_and_length_exn N.n)
+end
+
 module Binable (N : Nat_intf) : Binable.S1 with type 'a t := ('a, N.n) t =
 struct
   open Bin_prot
@@ -283,6 +306,18 @@ struct
 
   let __bin_read_t__ _f _buf ~pos_ref _vint =
     Common.raise_variant_wrong_type "vector" !pos_ref
+end
+
+module With_length (N : Nat.Intf) = struct
+  type nonrec 'a t = ('a, N.n) t
+
+  let compare c t1 t2 = Core.List.compare c (to_list t1) (to_list t2)
+
+  include Yojson (N)
+  include Binable (N)
+  include Sexpable (N)
+
+  let map (t : 'a t) = map t
 end
 
 let rec typ : type f var value n.

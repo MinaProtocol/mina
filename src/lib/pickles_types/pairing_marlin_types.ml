@@ -3,8 +3,6 @@ module H_list = Snarky.H_list
 module Typ = Snarky.Typ
 
 module Evals = struct
-  open Vector
-
   type 'a t =
     { w_hat: 'a
     ; z_hat_a: 'a
@@ -19,7 +17,9 @@ module Evals = struct
     ; col: 'a Abc.t
     ; value: 'a Abc.t
     ; rc: 'a Abc.t }
-  [@@deriving fields, bin_io]
+  [@@deriving fields, bin_io, sexp, compare, yojson]
+
+  open Vector
 
   (* This is just the order used for iterating when absorbing the evaluations
      into the sponge. *)
@@ -219,12 +219,27 @@ module Accumulator = struct
     module Shift = Int
 
     module Unshifted_accumulators = struct
-      type 'a t = 'a Shift.Map.t [@@deriving sexp, bin_io]
+      module Alist = struct
+        type 'a t = (int * 'a) list [@@deriving yojson]
+      end
+
+      type 'a t = 'a Shift.Map.t [@@deriving sexp, bin_io, compare]
+
+      let to_yojson f t = Alist.to_yojson f (Map.to_alist t)
+
+      let of_yojson f t =
+        let open Result.Let_syntax in
+        let%bind t = Alist.of_yojson f t in
+        match Shift.Map.of_alist t with
+        | `Ok t ->
+            return t
+        | `Duplicate_key k ->
+            Error (sprintf "Duplicate key %d" k)
     end
 
     type ('g, 'unshifted) t =
       {shifted_accumulator: 'g; unshifted_accumulators: 'unshifted}
-    [@@deriving fields, bin_io, sexp]
+    [@@deriving fields, bin_io, sexp, yojson, compare]
 
     let to_hlist {shifted_accumulator; unshifted_accumulators} =
       H_list.[shifted_accumulator; unshifted_accumulators]
@@ -291,7 +306,7 @@ module Accumulator = struct
        e(f - [v] + z pi, H) = e(pi, beta*H)
     *)
     type 'g t = {r_f_minus_r_v_plus_rz_pi: 'g; r_pi: 'g}
-    [@@deriving fields, bin_io, sexp]
+    [@@deriving fields, bin_io, sexp, compare, yojson]
 
     let to_hlist {r_f_minus_r_v_plus_rz_pi; r_pi} =
       H_list.[r_f_minus_r_v_plus_rz_pi; r_pi]
@@ -320,7 +335,7 @@ module Accumulator = struct
   type ('g, 'unshifted) t =
     { opening_check: 'g Opening_check.t
     ; degree_bound_checks: ('g, 'unshifted) Degree_bound_checks.t }
-  [@@deriving fields, bin_io, sexp]
+  [@@deriving fields, bin_io, sexp, compare, yojson]
 
   let to_hlist {opening_check; degree_bound_checks} =
     H_list.[opening_check; degree_bound_checks]
@@ -389,7 +404,8 @@ module Openings = struct
 end
 
 module Messages = struct
-  type 'pc degree_bounded = 'pc * 'pc [@@deriving bin_io]
+  type 'pc degree_bounded = 'pc * 'pc
+  [@@deriving bin_io, sexp, compare, yojson]
 
   type ('pc, 'fp) t =
     { w_hat: 'pc
@@ -398,7 +414,7 @@ module Messages = struct
     ; gh_1: 'pc degree_bounded * 'pc
     ; sigma_gh_2: 'fp * ('pc degree_bounded * 'pc)
     ; sigma_gh_3: 'fp * ('pc degree_bounded * 'pc) }
-  [@@deriving fields, bin_io]
+  [@@deriving fields, bin_io, sexp, compare, yojson]
 
   let to_hlist {w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3} =
     H_list.[w_hat; z_hat_a; z_hat_b; gh_1; sigma_gh_2; sigma_gh_3]
@@ -421,7 +437,8 @@ module Proof = struct
   type ('pc, 'fp, 'openings) t =
     {messages: ('pc, 'fp) Messages.t; openings: 'openings}
   [@@(* ('proof, 'fp) Openings.t} *)
-    deriving fields, bin_io]
+    deriving
+    fields, bin_io, sexp, compare, yojson]
 
   let to_hlist {messages; openings} = H_list.[messages; openings]
 
