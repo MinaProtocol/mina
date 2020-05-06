@@ -22,27 +22,59 @@ let try_load bin path =
         Or_error.error_string "Cached value not found in default location" )
 
 module Component = struct
+  module Storer = struct
+    type 'a t =
+      | Binable of 'a Binable.m
+      | Read_write of
+          { read: path:string -> 'a Deferred.Or_error.t
+          ; write: 'a -> path:string -> unit Deferred.Or_error.t }
+  end
+
   type (_, 'env) t =
     | Load :
         { label: string
         ; f: 'env -> 'a
-        ; bin: 'a Binable.m }
+        ; storer: 'a Storer.t }
         -> ('a value, 'env) t
 
-  let path (Load {label; f= _; bin= _}) ~base_path = base_path ^ "_" ^ label
+  let path (Load {label; f= _; storer= _}) ~base_path = base_path ^ "_" ^ label
 
-  let load (Load {label= _; f= _; bin} as l) ~base_path =
-    try_load bin (path ~base_path l)
-
-  let store (Load {label= _; f; bin} as l) ~base_path ~env =
-    let path = path ~base_path l in
-    let logger = Logger.create () in
-    let controller = Storage.Disk.Controller.create ~logger bin in
-    let value = f env in
-    let%map checksum =
-      Storage.Disk.store_with_checksum controller path value
+  let md5 path =
+    let open Deferred.Or_error.Let_syntax in
+    let%bind x =
+      Async.Process.run ~prog:"bash"
+        ~args:
+          [ "-c"
+          ; sprintf "md5 %s 2>/dev/null || md5sum %s | head -c 32" path path ]
+        ()
     in
-    {path; value; checksum}
+    Deferred.return (Or_error.try_with (fun () -> Md5.of_hex_exn x))
+
+  let load (Load {label= _; f= _; storer} as l) ~base_path =
+    let path = path ~base_path l in
+    match storer with
+    | Binable bin ->
+        try_load bin path
+    | Read_write {read; _} ->
+        let open Deferred.Or_error.Let_syntax in
+        let%map checksum = md5 path and value = read ~path in
+        {checksum; path; value}
+
+  let store (Load {label= _; f; storer} as l) ~base_path ~env =
+    let path = path ~base_path l in
+    let value = f env in
+    match storer with
+    | Binable bin ->
+        let logger = Logger.create () in
+        let controller = Storage.Disk.Controller.create ~logger bin in
+        let%map checksum =
+          Storage.Disk.store_with_checksum controller path value
+        in
+        {path; value; checksum}
+    | Read_write {write; _} ->
+        let%bind () = write value ~path >>| Or_error.ok_exn in
+        let%map checksum = md5 path >>| Or_error.ok_exn in
+        {value; path; checksum}
 end
 
 module With_components = struct
@@ -125,7 +157,11 @@ include With_components
 
 type ('a, 'e) cached = ('a, 'e) t
 
-let component ~label ~f bin = Ap (Component.Load {label; f; bin}, Pure Fn.id)
+let of_binable ~label ~f bin =
+  Ap (Component.Load {label; f; storer= Binable bin}, Pure Fn.id)
+
+let of_read_write ~label ~f ~read ~write =
+  Ap (Component.Load {label; f; storer= Read_write {read; write}}, Pure Fn.id)
 
 module Spec = struct
   type 'a t =

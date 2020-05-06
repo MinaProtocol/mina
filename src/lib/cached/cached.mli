@@ -19,8 +19,15 @@ module Let_syntax : sig
   end
 end
 
-val component :
+val of_binable :
   label:string -> f:('e -> 'a) -> 'a Binable.m -> ('a value, 'e) t
+
+val of_read_write :
+     label:string
+  -> f:('e -> 'a)
+  -> read:(path:string -> 'a Deferred.Or_error.t)
+  -> write:('a -> path:string -> unit Deferred.Or_error.t)
+  -> ('a value, 'e) t
 
 type ('a, 'e) cached = ('a, 'e) t
 
