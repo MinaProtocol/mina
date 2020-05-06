@@ -34,21 +34,22 @@ module Node_list = struct
     List.map ~f
 
   module Lite = struct
-    [%%versioned
+    module Binable_arg = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = State_hash.Stable.V1.t list
+
+          let to_latest = Fn.id
+        end
+      end]
+    end
+
+    [%%versioned_binable
     module Stable = struct
       module V1 = struct
-        module T = struct
-          (* Note: The versioning linter views this as the stable type. *)
-          type t = State_hash.Stable.V1.t list
-        end
-
         type t = lite node_list
 
-        (* Migrate this to a new latest version and expose the underlying
-           serialised type directly when this type changes.
-
-           TODO(#4556): replace this mechanism with %%versioned_binable.
-        *)
         module T_nonbinable = struct
           type nonrec t = t
 
@@ -57,9 +58,7 @@ module Node_list = struct
           let of_binable ls = Lite ls
         end
 
-        include (T : module type of T with type t := T.t)
-
-        include Binable.Of_binable (T) (T_nonbinable)
+        include Binable.Of_binable (Binable_arg.Stable.V1) (T_nonbinable)
 
         let to_latest = Fn.id
       end
@@ -93,30 +92,33 @@ module Root_transition = struct
   end
 
   module Lite = struct
-    [%%versioned
+    module Binable_arg = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = Lite_binable.Stable.V1.t
+
+          let to_latest = Fn.id
+        end
+      end]
+    end
+
+    [%%versioned_binable
     module Stable = struct
       module V1 = struct
-        module T = struct
-          (* Note: The versioning linter views this as the stable type. *)
-          type t = Lite_binable.Stable.V1.t
-        end
-
-        (* Migrate this to a new latest version and expose the underlying
-           serialised type directly when this type changes.
-        *)
         type t = lite root_transition
 
         module T_nonbinable = struct
           type nonrec t = t
 
-          let to_binable ({new_root; garbage} : t) : T.t = {new_root; garbage}
+          let to_binable ({new_root; garbage} : t) : Binable_arg.Stable.V1.t =
+            {new_root; garbage}
 
-          let of_binable ({new_root; garbage} : T.t) : t = {new_root; garbage}
+          let of_binable ({new_root; garbage} : Binable_arg.Stable.V1.t) : t =
+            {new_root; garbage}
         end
 
-        include (T : module type of T with type t := T.t)
-
-        include Binable.Of_binable (T) (T_nonbinable)
+        include Binable.Of_binable (Binable_arg.Stable.V1) (T_nonbinable)
 
         let to_latest = Fn.id
       end
@@ -201,32 +203,35 @@ module Lite = struct
   type 'mutant t = (lite, 'mutant) diff
 
   module E = struct
-    [%%versioned
+    module Binable_arg = struct
+      [%%versioned
+      module Stable = struct
+        module V1 = struct
+          type t = Lite_binable.Stable.V1.t
+
+          let to_latest = Fn.id
+        end
+      end]
+    end
+
+    [%%versioned_binable
     module Stable = struct
       module V1 = struct
-        module T = struct
-          (* Note: The versioning linter views this as the stable type. *)
-          type t = Lite_binable.Stable.V1.t
-        end
-
         type t = E : (lite, 'mutant) diff -> t
 
-        (* Migrate this to a new latest version and expose the underlying
-           serialised type directly when this type changes.
-        *)
         module T_nonbinable = struct
           type nonrec t = t
 
           let to_binable = function
             | E (New_node (Lite x)) ->
-                (New_node x : T.t)
+                (New_node x : Binable_arg.Stable.V1.t)
             | E (Root_transitioned x) ->
                 Root_transitioned x
             | E (Best_tip_changed x) ->
                 Best_tip_changed x
 
           let of_binable = function
-            | (New_node x : T.t) ->
+            | (New_node x : Binable_arg.Stable.V1.t) ->
                 E (New_node (Lite x))
             | Root_transitioned x ->
                 E (Root_transitioned x)
@@ -234,9 +239,7 @@ module Lite = struct
                 E (Best_tip_changed x)
         end
 
-        include (T : module type of T with type t := T.t)
-
-        include Binable.Of_binable (T) (T_nonbinable)
+        include Binable.Of_binable (Binable_arg.Stable.V1) (T_nonbinable)
 
         let to_latest = Fn.id
       end

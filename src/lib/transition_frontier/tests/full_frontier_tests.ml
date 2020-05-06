@@ -50,7 +50,10 @@ let%test_module "Full_frontier tests" =
       in
       let root_data =
         let open Root_data in
-        { transition= External_transition.For_tests.genesis ()
+        { transition=
+            External_transition.For_tests.genesis
+              ~precomputed_values:
+                (Lazy.force Precomputed_values.for_unit_tests)
         ; staged_ledger= Staged_ledger.create_exn ~ledger:root_ledger
         ; protocol_states= [] }
       in

@@ -1,6 +1,5 @@
 open Core_kernel
 open Coda_base
-open Module_version
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -126,22 +125,21 @@ end
 
 type job = Available_job.t [@@deriving sexp]
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        ( Ledger_proof_with_sok_message.Stable.V1.t
-        , Transaction_with_witness.Stable.V1.t )
-        Parallel_scan.State.Stable.V1.t
-      [@@deriving sexp, bin_io, version]
-    end
+    type t =
+      ( Ledger_proof_with_sok_message.Stable.V1.t
+      , Transaction_with_witness.Stable.V1.t )
+      Parallel_scan.State.Stable.V1.t
+    [@@deriving sexp]
 
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
 
     (* TODO: Review this. The version bytes for the underlying types are
        included in the hash, so it can never be stable between versions.
     *)
+
     let hash t =
       let state_hash =
         Parallel_scan.State.hash t
@@ -151,18 +149,7 @@ module Stable = struct
       Staged_ledger_hash.Aux_hash.of_bytes
         (state_hash |> Digestif.SHA256.to_raw_string)
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "transaction_snark_scan_state"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 type t = Stable.Latest.t [@@deriving sexp]
 

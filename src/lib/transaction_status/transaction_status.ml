@@ -71,6 +71,8 @@ let%test_module "transaction_status" =
 
     let logger = Logger.null ()
 
+    let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
+
     let trust_system = Trust_system.null ()
 
     let pool_max_size = Genesis_constants.compiled.txpool_max_size
@@ -87,8 +89,8 @@ let%test_module "transaction_status" =
           (Option.value_exn random_key_opt) )
 
     let gen_frontier =
-      Transition_frontier.For_tests.gen ~logger ~trust_system ~max_length
-        ~size:frontier_size ()
+      Transition_frontier.For_tests.gen ~logger ~precomputed_values
+        ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
       User_command.Gen.payment ~sign_type:`Real ~max_amount:100 ~max_fee:10
