@@ -36,8 +36,8 @@ module Pending_coinbase_stack_state = struct
   module Stable = struct
     module V1 = struct
       type t =
-        { source: Pending_coinbase.Stack.Stable.V1.t
-        ; target: Pending_coinbase.Stack.Stable.V1.t }
+        { source: Pending_coinbase.Stack_versioned.Stable.V1.t
+        ; target: Pending_coinbase.Stack_versioned.Stable.V1.t }
       [@@deriving sexp, hash, compare, eq, fields, yojson]
 
       let to_latest = Fn.id
