@@ -27,6 +27,17 @@ module Worker_state = struct
   type t = (module S) Deferred.t
 
   let create {logger; proof_level; _} : t Deferred.t =
+    if Genesis_constants.Proof_level.is_compiled proof_level then (
+      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+        "Bad proof level $level (expected $expected)"
+        ~metadata:
+          [ ( "level"
+            , `String (Genesis_constants.Proof_level.to_string proof_level) )
+          ; ( "expected"
+            , `String Genesis_constants.Proof_level.(to_string compiled) ) ] ;
+      Genesis_constants.Proof_level.(
+        failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
+          (to_string compiled) ()) ) ;
     Memory_stats.log_memory_stats logger ~process:"verifier" ;
     match proof_level with
     | Full ->
@@ -129,6 +140,19 @@ module Worker = struct
               , verify_transaction_snark ) }
 
       let init_worker_state Worker_state.{conf_dir; logger; proof_level} =
+        if Genesis_constants.Proof_level.is_compiled proof_level then (
+          Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+            "Bad proof level $level (expected $expected)"
+            ~metadata:
+              [ ( "level"
+                , `String (Genesis_constants.Proof_level.to_string proof_level)
+                )
+              ; ( "expected"
+                , `String Genesis_constants.Proof_level.(to_string compiled) )
+              ] ;
+          Genesis_constants.Proof_level.(
+            failwithf "Bad proof level %s (expected %s)"
+              (to_string proof_level) (to_string compiled) ()) ) ;
         ( if Option.is_some conf_dir then
           let max_size = 256 * 1024 * 512 in
           Logger.Consumer_registry.register ~id:"default"
@@ -153,6 +177,17 @@ type t = Worker.Connection.t
 
 (* TODO: investigate why conf_dir wasn't being used *)
 let create ~logger ~proof_level ~pids ~conf_dir =
+  if Genesis_constants.Proof_level.is_compiled proof_level then (
+    Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+      "Bad proof level $level (expected $expected)"
+      ~metadata:
+        [ ( "level"
+          , `String (Genesis_constants.Proof_level.to_string proof_level) )
+        ; ( "expected"
+          , `String Genesis_constants.Proof_level.(to_string compiled) ) ] ;
+    Genesis_constants.Proof_level.(
+      failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
+        (to_string compiled) ()) ) ;
   let on_failure err =
     Logger.error logger ~module_:__MODULE__ ~location:__LOC__
       "Verifier process failed with error $err"

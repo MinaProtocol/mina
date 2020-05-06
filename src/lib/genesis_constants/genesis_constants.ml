@@ -32,6 +32,9 @@ module Proof_level = struct
   "compiled", proof_level]
 
   let compiled = of_string compiled
+
+  (* Oops, bad name *)
+  let is_compiled proof_level = not (proof_level = compiled)
 end
 
 (*Constants that can be specified for generating the base proof (that are not required for key-generation) in runtime_genesis_ledger.exe and that can be configured at runtime.

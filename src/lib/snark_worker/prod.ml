@@ -30,6 +30,10 @@ module Inputs = struct
       ; proof_level: Genesis_constants.Proof_level.t }
 
     let create ~proof_level () =
+      ( if Genesis_constants.Proof_level.is_compiled proof_level then
+        Genesis_constants.Proof_level.(
+          failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
+            (to_string compiled) ()) ) ;
       let%map proving, verification =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
@@ -60,6 +64,10 @@ module Inputs = struct
   (* TODO: Use public_key once SoK is implemented *)
   let perform_single ({m= (module M); cache; proof_level} : Worker_state.t)
       ~message =
+    ( if Genesis_constants.Proof_level.is_compiled proof_level then
+      Genesis_constants.Proof_level.(
+        failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
+          (to_string compiled) ()) ) ;
     let open Snark_work_lib in
     let sok_digest = Coda_base.Sok_message.digest message in
     fun (single : single_spec) ->

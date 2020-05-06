@@ -116,6 +116,17 @@ let replace_block_production_keypairs t kps =
 
 module Snark_worker = struct
   let run_process ~logger ~proof_level client_port kill_ivar num_threads =
+    if Genesis_constants.Proof_level.is_compiled proof_level then (
+      Logger.fatal logger ~module_:__MODULE__ ~location:__LOC__
+        "Bad proof level $level (expected $expected)"
+        ~metadata:
+          [ ( "level"
+            , `String (Genesis_constants.Proof_level.to_string proof_level) )
+          ; ( "expected"
+            , `String Genesis_constants.Proof_level.(to_string compiled) ) ] ;
+      Genesis_constants.Proof_level.(
+        failwithf "Bad proof level %s (expected %s)" (to_string proof_level)
+          (to_string compiled) ()) ) ;
     let env =
       Option.map
         ~f:(fun num -> `Extend [("OMP_NUM_THREADS", string_of_int num)])
@@ -729,6 +740,19 @@ let start t =
   Snark_worker.start t
 
 let create (config : Config.t) ~precomputed_values =
+  if Genesis_constants.Proof_level.is_compiled config.proof_level then (
+    Logger.fatal config.logger ~module_:__MODULE__ ~location:__LOC__
+      "Bad proof level $level (expected $expected)"
+      ~metadata:
+        [ ( "level"
+          , `String
+              (Genesis_constants.Proof_level.to_string config.proof_level) )
+        ; ( "expected"
+          , `String Genesis_constants.Proof_level.(to_string compiled) ) ] ;
+    Genesis_constants.Proof_level.(
+      failwithf "Bad proof level %s (expected %s)"
+        (to_string config.proof_level)
+        (to_string compiled) ()) ) ;
   let consensus_constants =
     Consensus.Constants.create
       ~protocol_constants:

@@ -163,6 +163,10 @@ let main accounts_json_file dir n proof_level constants_file =
           |> Result.ok_or_failwith
         in
         let%bind _base_hash, base_proof =
+          ( if Genesis_constants.Proof_level.is_compiled proof_level then
+            Genesis_constants.Proof_level.(
+              failwithf "Bad proof level %s (expected %s)"
+                (to_string proof_level) (to_string compiled) ()) ) ;
           match proof_level with
           | Genesis_constants.Proof_level.Full ->
               generate_base_proof ~ledger ~genesis_constants
