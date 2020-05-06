@@ -2,10 +2,21 @@ open Core_kernel
 
 type account_data =
   { pk: Signature_lib.Public_key.Compressed.t
-  ; sk: Signature_lib.Private_key.t option
+  ; sk: Signature_lib.Private_key.t option [@default None]
   ; balance: Currency.Balance.t
-  ; delegate: Signature_lib.Public_key.Compressed.t option }
+  ; delegate: Signature_lib.Public_key.Compressed.t option [@default None] }
 [@@deriving yojson]
+
+let account_data_of_yojson = function
+  | `Assoc l ->
+      account_data_of_yojson
+        (`Assoc
+          (List.filter l ~f:(fun (key, _) ->
+               Array.mem ~equal:String.equal
+                 [|"pk"; "sk"; "balance"; "delegate"|]
+                 key )))
+  | json ->
+      account_data_of_yojson json
 
 type t = account_data list [@@deriving yojson]
 
