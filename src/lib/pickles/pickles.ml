@@ -35,21 +35,21 @@ module Timer = struct
   let r = ref (Time.now ())
 
   let start loc =
-    Common.when_profiling (fun () ->
-      r := Time.now () ;
-      l := loc)
-      ignore
-      ()
+    Common.when_profiling
+      (fun () ->
+        r := Time.now () ;
+        l := loc )
+      ignore ()
 
   let clock loc =
-    Common.when_profiling (fun () ->
-      let t = Time.now () in
-      Core.printf "%s -> %s: %s\n%!" !l loc
-        (Time.Span.to_string_hum (Time.diff t !r)) ;
-      r := t ;
-      l := loc)
-      ignore
-      ()
+    Common.when_profiling
+      (fun () ->
+        let t = Time.now () in
+        Core.printf "%s -> %s: %s\n%!" !l loc
+          (Time.Span.to_string_hum (Time.diff t !r)) ;
+        r := t ;
+        l := loc )
+      ignore ()
 end
 
 (* Making this dynamic was a bit complicated. *)
