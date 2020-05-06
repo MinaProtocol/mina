@@ -209,36 +209,10 @@ end
 module type Transaction_pool_diff_intf = sig
   type resource_pool
 
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t = User_command.Stable.V1.t list [@@deriving sexp, to_yojson]
-    end
-  end]
-
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = User_command.t list [@@deriving sexp]
 
   module Diff_error : sig
-    module Stable : sig
-      module V1 : sig
-        type t =
-          | Insufficient_replace_fee
-          | Invalid_signature
-          | Duplicate
-          | Sender_account_does_not_exist
-          | Insufficient_amount_for_account_creation
-          | Delegate_not_found
-          | Invalid_nonce
-          | Insufficient_funds
-          | Insufficient_fee
-          | Overflow
-        [@@deriving sexp, yojson, bin_io]
-      end
-
-      module Latest = V1
-    end
-
-    type t = Stable.Latest.t =
+    type t =
       | Insufficient_replace_fee
       | Invalid_signature
       | Duplicate
@@ -253,16 +227,7 @@ module type Transaction_pool_diff_intf = sig
   end
 
   module Rejected : sig
-    module Stable : sig
-      module V1 : sig
-        type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
-        [@@deriving sexp, bin_io, yojson, version]
-      end
-
-      module Latest = V1
-    end
-
-    type t = Stable.Latest.t [@@deriving sexp, yojson]
+    type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
   end
 
   include
