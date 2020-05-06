@@ -8,7 +8,7 @@ let%test_module "Archive node unit tests" =
   ( module struct
     let logger = Logger.create ()
 
-    let proof_level = Genesis_constants.Proof_level.Check
+    let proof_level = Genesis_constants.Proof_level.None
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
