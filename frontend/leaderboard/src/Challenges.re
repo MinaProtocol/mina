@@ -18,22 +18,20 @@ let getUsers = blocks => {
 };
 
 let calculateBlocksCreated = blocks => {
-  printMap(
-    Array.fold_left(
-      (map, block: Types.NewBlock.t) => {
-        StringMap.update(
-          block.data.newBlock.creatorAccount.publicKey,
-          value =>
-            switch (value) {
-            | Some(blockCount) => Some(blockCount + 1)
-            | None => Some(1)
-            },
-          map,
-        )
-      },
-      StringMap.empty,
-      blocks,
-    ),
+  Array.fold_left(
+    (map, block: Types.NewBlock.t) => {
+      StringMap.update(
+        block.data.newBlock.creatorAccount.publicKey,
+        value =>
+          switch (value) {
+          | Some(blockCount) => Some(blockCount + 1)
+          | None => Some(1)
+          },
+        map,
+      )
+    },
+    StringMap.empty,
+    blocks,
   );
 };
 
