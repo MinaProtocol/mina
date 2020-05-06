@@ -33,7 +33,7 @@ module type Transition_frontier_intf = sig
 end
 
 (* versioned type, outside of functors *)
-module Diff = struct
+module Diff_versioned = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
@@ -115,19 +115,19 @@ module type S = sig
     module Diff :
       Transaction_pool_diff_intf
       with type resource_pool := t
-       and type Diff_error.t = Diff.Diff_error.t
-       and type Rejected.t = Diff.Rejected.t
+       and type Diff_error.t = Diff_versioned.Diff_error.t
+       and type Rejected.t = Diff_versioned.Rejected.t
   end
 
   include
     Network_pool_base_intf
     with type resource_pool := Resource_pool.t
      and type transition_frontier := transition_frontier
-     and type resource_pool_diff := Diff.t
+     and type resource_pool_diff := Diff_versioned.t
      and type config := Resource_pool.Config.t
      and type transition_frontier_diff :=
                 Resource_pool.transition_frontier_diff
-     and type rejected_diff := Diff.rejected
+     and type rejected_diff := Diff_versioned.rejected
 end
 
 (* Functor over user command, base ledger and transaction validator for
@@ -578,10 +578,10 @@ struct
     module Diff = struct
       type t = User_command.t list [@@deriving sexp, yojson]
 
-      type _unused = unit constraint t = Diff.t
+      type _unused = unit constraint t = Diff_versioned.t
 
       module Diff_error = struct
-        type t = Diff.Diff_error.t =
+        type t = Diff_versioned.Diff_error.t =
           | Insufficient_replace_fee
           | Invalid_signature
           | Duplicate
@@ -598,7 +598,7 @@ struct
       module Rejected = struct
         type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
 
-        type _unused = unit constraint t = Diff.Rejected.t
+        type _unused = unit constraint t = Diff_versioned.Rejected.t
       end
 
       type rejected = Rejected.t [@@deriving sexp, yojson]
@@ -651,7 +651,9 @@ struct
                           (Trust_system.Actions.Sent_old_gossip, None)
                       in
                       go txs'' pool
-                        (accepted, (tx, Diff.Diff_error.Duplicate) :: rejected)
+                        ( accepted
+                        , (tx, Diff_versioned.Diff_error.Duplicate) :: rejected
+                        )
                     else
                       let account ledger account_id =
                         Option.bind
@@ -670,8 +672,8 @@ struct
                           go txs'' pool
                             ( accepted
                             , ( tx
-                              , Diff.Diff_error.Sender_account_does_not_exist
-                              )
+                              , Diff_versioned.Diff_error
+                                .Sender_account_does_not_exist )
                               :: rejected )
                       | Some sender_account ->
                           if has_sufficient_fee pool tx ~pool_max_size then (
@@ -715,7 +717,7 @@ struct
                             in
                             let of_indexed_pool_error = function
                               | `Invalid_nonce ->
-                                  Diff.Diff_error.Invalid_nonce
+                                  Diff_versioned.Diff_error.Invalid_nonce
                               | `Insufficient_funds ->
                                   Insufficient_funds
                               | `Insufficient_replace_fee ->
@@ -836,8 +838,8 @@ struct
                                 go txs'' pool
                                   ( accepted
                                   , ( tx
-                                    , Diff.Diff_error.Insufficient_replace_fee
-                                    )
+                                    , Diff_versioned.Diff_error
+                                      .Insufficient_replace_fee )
                                     :: rejected )
                             | Error err ->
                                 let diff_err = of_indexed_pool_error err in
@@ -848,8 +850,8 @@ struct
                                     ~metadata:
                                       [ ("cmd", User_command.to_yojson tx)
                                       ; ( "reason"
-                                        , Diff.Diff_error.to_yojson diff_err )
-                                      ] ;
+                                        , Diff_versioned.Diff_error.to_yojson
+                                            diff_err ) ] ;
                                 let%bind _ =
                                   trust_record
                                     ( Trust_system.Actions.Sent_useless_gossip
@@ -873,7 +875,7 @@ struct
                             in
                             go txs'' pool
                               ( accepted
-                              , (tx, Diff.Diff_error.Insufficient_fee)
+                              , (tx, Diff_versioned.Diff_error.Insufficient_fee)
                                 :: rejected ) ) )
             in
             go txs t.pool ([], [])
