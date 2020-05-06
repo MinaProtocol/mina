@@ -340,11 +340,13 @@ module T = struct
     ( undo
     , { Transaction_snark.Statement.source
       ; target= Ledger.merkle_root ledger |> Frozen_ledger_hash.of_ledger_hash
-      ; fee_excess
+      ; fee_excess=
+          { fee_excess with
+            magnitude= Currency.Amount.of_fee fee_excess.magnitude }
       ; supply_increase
       ; pending_coinbase_stack_state=
           {source= current_stack; target= pending_coinbase_after}
-      ; proof_type= `Base }
+      ; sok_digest= () }
     , pending_coinbase_after )
 
   let apply_transaction_and_get_witness ledger current_stack s
@@ -1719,7 +1721,6 @@ let%test_module "test" =
        hashing faster is a big win.
     *)
     let () =
-      Snark_params.set_chunked_hashing true ;
       Async.Scheduler.set_record_backtraces true ;
       Backtrace.elide := false
 
@@ -1744,10 +1745,10 @@ let%test_module "test" =
         (Ledger_proof.t * Transaction.t list) option -> unit =
      fun proof_opt ->
       let fee_excess =
-        Option.value_map ~default:Fee.Signed.zero proof_opt ~f:(fun proof ->
+        Option.value_map ~default:Amount.Signed.zero proof_opt ~f:(fun proof ->
             (Ledger_proof.statement (fst proof)).fee_excess )
       in
-      assert (Fee.Signed.(equal fee_excess zero))
+      assert (Amount.Signed.(equal fee_excess zero))
 
     let transaction_capacity =
       Int.pow 2
