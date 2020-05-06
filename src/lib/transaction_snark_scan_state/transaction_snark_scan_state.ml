@@ -89,7 +89,7 @@ module Job_view = struct
         [ ("Work_id", `Int (Transaction_snark.Statement.hash s))
         ; ("Source", hash_yojson s.source)
         ; ("Target", hash_yojson s.target)
-        ; ("Fee Excess", Currency.Fee.Signed.to_yojson s.fee_excess)
+        ; ("Fee Excess", Currency.Amount.Signed.to_yojson s.fee_excess)
         ; ("Supply Increase", Currency.Amount.to_yojson s.supply_increase) ]
     in
     let job_to_yojson =
@@ -216,13 +216,14 @@ let create_expected_statement
   let%map supply_increase = Transaction.supply_increase transaction in
   { Transaction_snark.Statement.source
   ; target
-  ; fee_excess
+  ; fee_excess=
+      {fee_excess with magnitude= Currency.Amount.of_fee fee_excess.magnitude}
   ; supply_increase
   ; pending_coinbase_stack_state=
       { Transaction_snark.Pending_coinbase_stack_state.source=
           pending_coinbase_before
       ; target= pending_coinbase_after }
-  ; proof_type= `Base }
+  ; sok_digest= () }
 
 let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
     'a Or_error.t =
@@ -236,7 +237,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
       let s = Ledger_proof.statement p and s' = Ledger_proof.statement p' in
       let open Or_error.Let_syntax in
       let%map fee_excess =
-        Currency.Fee.Signed.add s.fee_excess s'.fee_excess
+        Currency.Amount.Signed.add s.fee_excess s'.fee_excess
         |> option "Error adding fees"
       and supply_increase =
         Currency.Amount.add s.supply_increase s'.supply_increase
@@ -250,7 +251,7 @@ let completed_work_to_scanable_work (job : job) (fee, current_proof, prover) :
             { source= s.pending_coinbase_stack_state.source
             ; target= s'.pending_coinbase_stack_state.target }
         ; fee_excess
-        ; proof_type= `Merge }
+        ; sok_digest= () }
       in
       ( Ledger_proof.create ~statement ~sok_digest ~proof
       , Sok_message.create ~fee ~prover )
@@ -412,7 +413,7 @@ struct
         ; target
         ; supply_increase= _
         ; pending_coinbase_stack_state= _ (*TODO: check pending coinbases?*)
-        ; proof_type= _ } ->
+        ; sok_digest= () } ->
         let open Or_error.Let_syntax in
         let%map () =
           Option.value_map ~default:(Ok ()) snarked_ledger_hash ~f:(fun hash ->
@@ -425,7 +426,8 @@ struct
             "incorrect statement target hash"
         and () =
           clarify_error
-            (Currency.Fee.Signed.equal Currency.Fee.Signed.zero fee_excess)
+            (Currency.Amount.Signed.equal Currency.Amount.Signed.zero
+               fee_excess)
             "nonzero fee excess"
         in
         ()
@@ -454,7 +456,7 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
         Option.some_if (Frozen_ledger_hash.equal stmt1.target stmt2.source) ()
       in
       let%map fee_excess =
-        Currency.Fee.Signed.add stmt1.fee_excess stmt2.fee_excess
+        Currency.Amount.Signed.add stmt1.fee_excess stmt2.fee_excess
       and supply_increase =
         Currency.Amount.add stmt1.supply_increase stmt2.supply_increase
       in
@@ -465,7 +467,7 @@ let statement_of_job : job -> Transaction_snark.Statement.t option = function
           { source= stmt1.pending_coinbase_stack_state.source
           ; target= stmt2.pending_coinbase_stack_state.target }
       ; fee_excess
-      ; proof_type= `Merge }
+      ; sok_digest= () }
 
 let create ~work_delay ~transaction_capacity_log_2 =
   let k = Int.pow 2 transaction_capacity_log_2 in
