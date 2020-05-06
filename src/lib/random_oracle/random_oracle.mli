@@ -2,7 +2,7 @@
 
 [%%ifdef consensus_mechanism]
 
-open Curve_choice.Tick0
+open Pickles.Impls.Pairing_based.Internal_Basic
 
 [%%else]
 
