@@ -32,37 +32,34 @@ module Source = struct
 end
 
 module Metadata = struct
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Yojson.Safe.json String.Map.t [@@deriving version {asserted}]
+      type t = Yojson.Safe.json String.Map.t
 
-        let to_yojson t = `Assoc (String.Map.to_alist t)
+      let to_latest = Fn.id
 
-        let of_yojson = function
-          | `Assoc alist ->
-              Ok (String.Map.of_alist_exn alist)
-          | _ ->
-              Error "Unexpected object"
+      let to_yojson t = `Assoc (String.Map.to_alist t)
 
-        include Binable.Of_binable
-                  (String)
-                  (struct
-                    type nonrec t = t
+      let of_yojson = function
+        | `Assoc alist ->
+            Ok (String.Map.of_alist_exn alist)
+        | _ ->
+            Error "Unexpected object"
 
-                    let to_binable t = to_yojson t |> Yojson.Safe.to_string
+      include Binable.Of_binable
+                (Core_kernel.String.Stable.V1)
+                (struct
+                  type nonrec t = t
 
-                    let of_binable (t : string) : t =
-                      Yojson.Safe.from_string t |> of_yojson |> Result.ok
-                      |> Option.value_exn
-                  end)
-      end
+                  let to_binable t = to_yojson t |> Yojson.Safe.to_string
 
-      include T
+                  let of_binable (t : string) : t =
+                    Yojson.Safe.from_string t |> of_yojson |> Result.ok
+                    |> Option.value_exn
+                end)
     end
-
-    module Latest = V1
-  end
+  end]
 
   let empty = String.Map.empty
 
@@ -135,20 +132,23 @@ module Processor = struct
   type t = T : (module S with type t = 't) * 't -> t
 
   module Raw = struct
-    type t = unit
+    type t = Level.t
 
-    let create () = ()
+    let create ~log_level = log_level
 
-    let process () msg =
-      let msg_json_fields =
-        Message.to_yojson msg |> Yojson.Safe.Util.to_assoc
-      in
-      let json =
-        if Level.compare msg.level Spam = 0 then
-          `Assoc (List.filter msg_json_fields ~f:(fun (k, _) -> k <> "source"))
-        else `Assoc msg_json_fields
-      in
-      Some (Yojson.Safe.to_string json)
+    let process log_level (msg : Message.t) =
+      if msg.level < log_level then None
+      else
+        let msg_json_fields =
+          Message.to_yojson msg |> Yojson.Safe.Util.to_assoc
+        in
+        let json =
+          if Level.compare msg.level Level.Spam = 0 then
+            `Assoc
+              (List.filter msg_json_fields ~f:(fun (k, _) -> k <> "source"))
+          else `Assoc msg_json_fields
+        in
+        Some (Yojson.Safe.to_string json)
   end
 
   module Pretty = struct
@@ -183,7 +183,7 @@ module Processor = struct
               ^ formatted_extra )
   end
 
-  let raw () = T ((module Raw), Raw.create ())
+  let raw ?(log_level = Level.Spam) () = T ((module Raw), Raw.create ~log_level)
 
   let pretty ~log_level ~config =
     T ((module Pretty), Pretty.create ~log_level ~config)
@@ -303,18 +303,14 @@ module Consumer_registry = struct
             () )
 end
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t = {null: bool; metadata: Metadata.Stable.V1.t; id: string}
-      [@@deriving bin_io, version]
-    end
+    type t = {null: bool; metadata: Metadata.Stable.V1.t; id: string}
 
-    include T
+    let to_latest = Fn.id
   end
-
-  module Latest = V1
-end
+end]
 
 type t = Stable.Latest.t = {null: bool; metadata: Metadata.t; id: string}
 

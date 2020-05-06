@@ -86,18 +86,20 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
     let call_rpc : type q r.
            t
         -> _
-        -> Peer.Id.t
+        -> sender_id:Peer.Id.t
+        -> responder_id:Peer.Id.t
         -> (q, r) rpc
         -> q
         -> r Coda_base.Rpc_intf.rpc_response Deferred.t =
-     fun t peer_table peer_id rpc query ->
-      let peer =
+     fun t peer_table ~sender_id ~responder_id rpc query ->
+      let responder =
         Option.value_exn
-          (Hashtbl.find peer_table peer_id)
-          ~error:(Error.createf "failed to find peer %s in peer_table" peer_id)
+          (Hashtbl.find peer_table responder_id)
+          ~error:
+            (Error.createf "failed to find peer %s in peer_table" responder_id)
       in
-      let intf = get_interface (lookup_node t peer) in
-      intf.rpc_hook.hook peer_id rpc query
+      let intf = get_interface (lookup_node t responder) in
+      intf.rpc_hook.hook sender_id rpc query
   end
 
   module Instance = struct
@@ -154,7 +156,6 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       let peer_table = Hashtbl.create (module Peer.Id) in
       List.iter initial_peers ~f:(fun peer ->
           Hashtbl.add_exn peer_table ~key:peer.peer_id ~data:peer ) ;
-      Hashtbl.add_exn peer_table ~key:me.peer_id ~data:me ;
       let received_message_reader, received_message_writer =
         Strict_pipe.(create (Buffered (`Capacity 5, `Overflow Crash)))
       in
@@ -208,7 +209,8 @@ module Make (Rpc_intf : Coda_base.Rpc_intf.Rpc_interface_intf) :
       ban_notification_reader
 
     let query_peer t peer rpc query =
-      Network.call_rpc t.network t.peer_table peer rpc query
+      Network.call_rpc t.network t.peer_table ~sender_id:t.me.peer_id
+        ~responder_id:peer rpc query
 
     let query_random_peers _ = failwith "TODO stub"
 

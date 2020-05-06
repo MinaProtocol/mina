@@ -196,7 +196,7 @@ module Stable = struct
       *)
     type t =
       ( Non_snark.Stable.V1.t
-      , Pending_coinbase.Hash.Stable.V1.t )
+      , Pending_coinbase.Hash_versioned.Stable.V1.t )
       Poly.Stable.V1.t
     [@@deriving sexp, eq, compare, hash, yojson]
 

@@ -1,7 +1,5 @@
 open Core_kernel
 open Coda_base
-open Module_version
-module Constants = Snark_params.Scan_state_constants
 
 let option lab =
   Option.value_map ~default:(Or_error.error_string lab) ~f:(fun x -> Ok x)
@@ -34,7 +32,6 @@ module Transaction_with_witness = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
       type t =
         { transaction_with_info:
             Transaction_logic.Undo.Stable.V1.t
@@ -47,6 +44,7 @@ module Transaction_with_witness = struct
     end
   end]
 
+  (* TODO: The statement is redundant here - it can be computed from the witness and the transaction *)
   type t = Stable.Latest.t =
     { transaction_with_info: Ledger.Undo.t Transaction_protocol_state.t
     ; statement: Transaction_snark.Statement.t
@@ -127,18 +125,20 @@ end
 
 type job = Available_job.t [@@deriving sexp]
 
+[%%versioned
 module Stable = struct
   module V1 = struct
-    module T = struct
-      type t =
-        ( Ledger_proof_with_sok_message.Stable.V1.t
-        , Transaction_with_witness.Stable.V1.t )
-        Parallel_scan.State.Stable.V1.t
-      [@@deriving sexp, bin_io, version]
-    end
+    type t =
+      ( Ledger_proof_with_sok_message.Stable.V1.t
+      , Transaction_with_witness.Stable.V1.t )
+      Parallel_scan.State.Stable.V1.t
+    [@@deriving sexp]
 
-    include T
-    include Registration.Make_latest_version (T)
+    let to_latest = Fn.id
+
+    (* TODO: Review this. The version bytes for the underlying types are
+       included in the hash, so it can never be stable between versions.
+    *)
 
     let hash t =
       let state_hash =
@@ -148,29 +148,8 @@ module Stable = struct
       in
       Staged_ledger_hash.Aux_hash.of_bytes
         (state_hash |> Digestif.SHA256.to_raw_string)
-
-    include Binable.Of_binable
-              (T)
-              (struct
-                type nonrec t = t
-
-                let to_binable = Fn.id
-
-                let of_binable = Fn.id
-              end)
   end
-
-  module Latest = V1
-
-  module Module_decl = struct
-    let name = "transaction_snark_scan_state"
-
-    type latest = Latest.t
-  end
-
-  module Registrar = Registration.Make (Module_decl)
-  module Registered_V1 = Registrar.Register (V1)
-end
+end]
 
 type t = Stable.Latest.t [@@deriving sexp]
 
@@ -472,8 +451,8 @@ let create ~work_delay ~transaction_capacity_log_2 =
   Parallel_scan.empty ~delay:work_delay ~max_base_jobs:k
 
 let empty () =
-  let open Constants in
-  create ~work_delay ~transaction_capacity_log_2
+  create ~work_delay:Coda_compile_config.work_delay
+    ~transaction_capacity_log_2:Coda_compile_config.transaction_capacity_log_2
 
 let extract_txns txns_with_witnesses =
   (* TODO: This type checks, but are we actually pulling the inverse txn here? *)

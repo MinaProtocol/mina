@@ -15,31 +15,31 @@ var newDelegate =
 
 var payments = [
     {
-      paymentPayload: {receiver, amount: "42"},
-      common: {fee: "3", nonce: "200", validUntil:"10000", memo: "this is a memo"},
+      paymentPayload: {source: keypair.publicKey, receiver, amount: "42"},
+      common: {fee: "3", feePayer: keypair.publicKey, nonce: "200", validUntil:"10000", memo: "this is a memo"},
     },
     {
-      paymentPayload: {receiver, amount: "2048"},
-      common: {fee: "15", nonce: "212", validUntil:"305", memo: "this is not a pipe"},
+      paymentPayload: {source: keypair.publicKey, receiver, amount: "2048"},
+      common: {fee: "15", feePayer: keypair.publicKey, nonce: "212", validUntil:"305", memo: "this is not a pipe"},
     },
     {
-      paymentPayload: {receiver, amount: "109"},
-      common: {fee: "2001", nonce: "3050", validUntil:"9000", memo: "blessed be the geek"},
+      paymentPayload: {source: keypair.publicKey, receiver, amount: "109"},
+      common: {fee: "2001", feePayer: keypair.publicKey, nonce: "3050", validUntil:"9000", memo: "blessed be the geek"},
     },
   ];
 
 var delegations = [
     {
-      newDelegate,
-      common: {fee: "3", nonce: "10", validUntil:"4000", memo: "more delegates, more fun"},
+      delegationPayload: {delegator: keypair.publicKey, newDelegate},
+      common: {fee: "3", feePayer: keypair.publicKey, nonce: "10", validUntil:"4000", memo: "more delegates, more fun"},
     },
     {
-      newDelegate,
-      common: {fee: "10", nonce: "1000", validUntil:"8192", memo: "enough stake to kill a vampire"},
+      delegationPayload: {delegator: keypair.publicKey, newDelegate},
+      common: {fee: "10", feePayer: keypair.publicKey, nonce: "1000", validUntil:"8192", memo: "enough stake to kill a vampire"},
     },
     {
-      newDelegate,
-      common: {fee: "8", nonce: "1010", validUntil:"100000", memo: "another memo"},
+      delegationPayload: {delegator: keypair.publicKey, newDelegate},
+      common: {fee: "8", feePayer: keypair.publicKey, nonce: "1010", validUntil:"100000", memo: "another memo"},
     },
   ];
 

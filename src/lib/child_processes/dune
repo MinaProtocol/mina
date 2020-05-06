@@ -1,7 +1,7 @@
 (library
   (name child_processes)
   (public_name child_processes)
-  (c_names caml_syslimits)
+  (foreign_stubs (language c) (names caml_syslimits))
   (inline_tests)
   (preprocess (pps
     ppx_assert ppx_coda ppx_custom_printf ppx_deriving.show ppx_inline_test ppx_let

@@ -55,6 +55,7 @@ let%test_module "Command line tests" =
           Process.run ~prog:coda_exe
             ~args:
               [ "daemon"
+              ; "-seed"
               ; "-working-dir"
               ; working_dir
               ; "-background"
@@ -64,8 +65,8 @@ let%test_module "Command line tests" =
               ; config_dir
               ; "-genesis-ledger-dir"
               ; genesis_ledger_dir
-              ; "-current-fork-id"
-              ; "00000" ]
+              ; "-current-protocol-version"
+              ; "0.0.0" ]
             ()
         with
         | Ok s ->

@@ -1,0 +1,3 @@
+[%%define default_transaction_fee "5"]
+[%%define default_snark_worker_fee "1"]
+

@@ -4,6 +4,10 @@ open Async
 let name = "coda-long-fork"
 
 let main n waiting_time () =
+  let consensus_constants =
+    Consensus.Constants.create
+      ~protocol_constants:Genesis_constants.compiled.protocol
+  in
   let logger = Logger.create () in
   let keypairs =
     List.map
@@ -21,7 +25,14 @@ let main n waiting_time () =
       ~max_concurrent_connections:None
   in
   let epoch_duration =
-    Consensus.Constants.(block_window_duration_ms * 3 * c * k)
+    let block_window_duration_ms =
+      Block_time.Span.to_ms consensus_constants.block_window_duration_ms
+      |> Int64.to_int_exn
+    in
+    Unsigned.UInt32.(
+      block_window_duration_ms * 3
+      * to_int consensus_constants.c
+      * to_int consensus_constants.k)
   in
   let%bind () =
     Coda_worker_testnet.Restarts.restart_node testnet ~logger ~node:1
