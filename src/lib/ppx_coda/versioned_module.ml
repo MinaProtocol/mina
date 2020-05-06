@@ -3,7 +3,7 @@ open Ppxlib
 open Versioned_util
 
 (* option to `deriving version' *)
-type version_option = No_version_option | Asserted
+type version_option = No_version_option | Asserted | Binable
 
 let parse_opt = Ast_pattern.parse ~on_error:(fun () -> None)
 
@@ -31,11 +31,19 @@ let rec add_deriving ~loc ~version_option attributes =
         [%expr version]
     | Asserted ->
         [%expr version {asserted}]
+    | Binable ->
+        [%expr version {binable}]
   in
   match attributes with
   | [] ->
       let attr_name = mk_loc ~loc "deriving" in
-      let attr_payload = payload [[%expr bin_io]; version_expr] in
+      let attr_payload =
+        match version_option with
+        | No_version_option | Asserted ->
+            payload [[%expr bin_io]; version_expr]
+        | Binable ->
+            payload [version_expr]
+      in
       [create_attr ~loc attr_name attr_payload]
   | attr :: attributes -> (
       let idents =
@@ -263,7 +271,7 @@ let version_type ~version_option version stri =
   in
   match stri.pstr_desc with
   | Pstr_type _ ->
-      (List.is_empty params, t :: with_version :: bin_io_shadows)
+      (List.is_empty params, [t], with_version :: bin_io_shadows)
   | Pstr_module
       ( {pmb_expr= {pmod_desc= Pmod_structure (stri :: str); _} as pmod; _} as
       pmb ) ->
@@ -272,12 +280,9 @@ let version_type ~version_option version stri =
             pstr_desc=
               Pstr_module
                 { pmb with
-                  pmb_expr=
-                    { pmod with
-                      pmod_desc=
-                        Pmod_structure
-                          (t :: with_version :: (bin_io_shadows @ str)) } } }
-        ] )
+                  pmb_expr= {pmod with pmod_desc= Pmod_structure (t :: str)} }
+          } ]
+      , with_version :: bin_io_shadows )
   | _ ->
       assert false
 
@@ -319,7 +324,7 @@ let convert_module_stri ~version_option last_version stri =
     | type_stri :: str ->
         (type_stri, str)
   in
-  let should_convert, type_versioning_str =
+  let should_convert, type_str, with_version_bin_io_shadows =
     version_type ~version_option version type_stri
   in
   (* TODO: If [should_convert] then look for [to_latest]. *)
@@ -327,7 +332,9 @@ let convert_module_stri ~version_option last_version stri =
   ( version
   , pstr_module ~loc
       (module_binding ~loc ~name
-         ~expr:(pmod_structure ~loc:str.loc (type_versioning_str @ str_rest)))
+         ~expr:
+           (pmod_structure ~loc:str.loc
+              (type_str @ str_rest @ with_version_bin_io_shadows)))
   , should_convert )
 
 let convert_modbody ~loc ~version_option body =
@@ -352,6 +359,8 @@ let convert_modbody ~loc ~version_option body =
               Location.raise_errorf ~loc:tests_str_item.pstr_loc
                 "Expected a module named Tests" ) ;
           (vns, tests)
+    | Binable ->
+        (body, [])
   in
   let _, rev_str, convs =
     List.fold ~init:(None, [], []) body
@@ -600,6 +609,11 @@ let () =
       declare "versioned_asserted" Context.structure_item module_ast_pattern
         (version_module ~version_option:Asserted))
   in
+  let module_extension_binable =
+    Extension.(
+      declare "versioned_binable" Context.structure_item module_ast_pattern
+        (version_module ~version_option:Binable))
+  in
   let module_decl_ast_pattern =
     Ast_pattern.(
       psig
@@ -615,6 +629,11 @@ let () =
   let module_rule_asserted =
     Context_free.Rule.extension module_extension_asserted
   in
+  let module_rule_binable =
+    Context_free.Rule.extension module_extension_binable
+  in
   let module_decl_rule = Context_free.Rule.extension module_decl_extension in
-  let rules = [module_rule; module_rule_asserted; module_decl_rule] in
+  let rules =
+    [module_rule; module_rule_asserted; module_rule_binable; module_decl_rule]
+  in
   Driver.register_transformation "ppx_coda/versioned_module" ~rules

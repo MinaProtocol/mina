@@ -1,6 +1,3 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Bitstring_lib
 open Snark_bits
@@ -8,7 +5,6 @@ module Tick_backend = Crypto_params.Tick_backend
 module Tock_backend = Crypto_params.Tock_backend
 module Snarkette_tick = Crypto_params.Snarkette_tick
 module Snarkette_tock = Crypto_params.Snarkette_tock
-module Scan_state_constants = Scan_state_constants
 
 module Make_snarkable (Impl : Snarky.Snark_intf.S) = struct
   open Impl
@@ -772,11 +768,6 @@ let embed (x : Tick.Field.t) : Tock.Field.t =
 
 (** enable/disable use of chunk table in Pedersen hashing *)
 let set_chunked_hashing b = Tick.Pedersen.State.set_chunked_fold b
-
-[%%inject
-"ledger_depth", ledger_depth]
-
-let pending_coinbase_depth = Scan_state_constants.pending_coinbase_depth
 
 (* Let n = Tick.Field.size_in_bits.
    Let k = n - 3.

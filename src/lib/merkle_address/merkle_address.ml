@@ -1,6 +1,5 @@
 open Core
 open Bitstring
-open Module_version
 
 module type S = sig
   type t [@@deriving sexp, hash, eq, compare, to_yojson]
@@ -119,59 +118,55 @@ module T = struct
 
   let of_tuple (length, string) = slice (bitstring_of_string string) 0 length
 
+  module Binable_arg = struct
+    [%%versioned
+    module Stable = struct
+      module V1 = struct
+        type t = int * string
+
+        let to_latest = Fn.id
+      end
+    end]
+  end
+
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Bitstring.t [@@deriving version]
+      type t = Bitstring.t
 
-        include Binable.Of_binable (struct
-                    type t = int * string [@@deriving bin_io]
-                  end)
-                  (struct
-                    type nonrec t = t
+      let to_latest = Fn.id
 
-                    let to_binable = to_tuple
+      include Binable.Of_binable
+                (Binable_arg.Stable.V1)
+                (struct
+                  type nonrec t = t
 
-                    let of_binable = of_tuple
-                  end)
+                  let to_binable = to_tuple
 
-        let sexp_of_t = Fn.compose sexp_of_string to_string
+                  let of_binable = of_tuple
+                end)
 
-        let t_of_sexp =
-          let of_string buf =
-            String.to_list buf
-            |> List.map ~f:(Fn.compose Direction.of_int_exn Char.to_int)
-            |> of_directions
-          in
-          Fn.compose of_string string_of_sexp
+      let sexp_of_t = Fn.compose sexp_of_string to_string
 
-        let hash = Fn.compose [%hash: int * string] to_tuple
+      let t_of_sexp =
+        let of_string buf =
+          String.to_list buf
+          |> List.map ~f:(Fn.compose Direction.of_int_exn Char.to_int)
+          |> of_directions
+        in
+        Fn.compose of_string string_of_sexp
 
-        let hash_fold_t hash_state t =
-          [%hash_fold: int * string] hash_state (to_tuple t)
+      let hash = Fn.compose [%hash: int * string] to_tuple
 
-        let compare = compare
+      let hash_fold_t hash_state t =
+        [%hash_fold: int * string] hash_state (to_tuple t)
 
-        let equal = equals
+      [%%define_from_scope
+      compare, to_yojson]
 
-        let to_yojson = to_yojson
-      end
-
-      include T
-      include Registration.Make_latest_version (T)
+      let equal = equals
     end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "merkle_address"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
+  end]
 end
 
 module Stable = T.Stable
@@ -179,6 +174,11 @@ module Stable = T.Stable
 module Make (Input : sig
   val depth : int
 end) : S = struct
+  (* TODO: this "include" puts a stable-versioned type inside a functor
+     (hard to detect this statically)
+     that should be hoisted outside the functor
+  *)
+
   include T
 
   let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
@@ -355,20 +355,17 @@ end) : S = struct
 
   let%test "Bitstring bin_io serialization does not change" =
     (* Bitstring.t is trustlisted as a versioned type. This test assures that serializations of that type haven't changed *)
-    let buff = Bin_prot.Common.create_buf 256 in
     let text =
       "Contrary to popular belief, Lorem Ipsum is not simply random text. It \
        has roots in a piece of classical Latin literature."
     in
-    let known_good_serialization =
-      Bytes.of_string
-        "\x01\xFE\xC8\x03\x79\x43\x6F\x6E\x74\x72\x61\x72\x79\x20\x74\x6F\x20\x70\x6F\x70\x75\x6C\x61\x72\x20\x62\x65\x6C\x69\x65\x66\x2C\x20\x4C\x6F\x72\x65\x6D\x20\x49\x70\x73\x75\x6D\x20\x69\x73\x20\x6E\x6F\x74\x20\x73\x69\x6D\x70\x6C\x79\x20\x72\x61\x6E\x64\x6F\x6D\x20\x74\x65\x78\x74\x2E\x20\x49\x74\x20\x68\x61\x73\x20\x72\x6F\x6F\x74\x73\x20\x69\x6E\x20\x61\x20\x70\x69\x65\x63\x65\x20\x6F\x66\x20\x63\x6C\x61\x73\x73\x69\x63\x61\x6C\x20\x4C\x61\x74\x69\x6E\x20\x6C\x69\x74\x65\x72\x61\x74\x75\x72\x65\x2E"
+    let bitstring = Bitstring.bitstring_of_string text in
+    let known_good_hash =
+      "\x0D\xF3\x25\xCE\xD4\x05\xBD\x6C\xB9\xC6\x88\x9E\x16\xD1\x4A\x1B\xEF\xB8\xBC\x3F\xB7\x16\x58\xCB\xC6\x16\xAC\x4B\xD6\x3B\x70\x5B"
     in
-    let bs = Bitstring.bitstring_of_string text in
-    let len = Stable.Latest.bin_write_t buff ~pos:0 bs in
-    let bytes = Bytes.create len in
-    Bin_prot.Common.blit_buf_bytes buff bytes ~len ;
-    Bytes.equal bytes known_good_serialization
+    Module_version.Serialization.check_serialization
+      (module Stable.V1)
+      bitstring known_good_hash
 
   let%test "the merkle root should have no path" =
     dirs_from_root (root ()) = []

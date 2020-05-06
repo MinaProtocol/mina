@@ -6,19 +6,11 @@ type member = {
 
 type entry = array(string);
 
-/*
- type entry = {
-   member,
-   score: int,
- };
- */
-
 external parseEntry: Js.Json.t => entry = "%identity";
 
 let fetchLeaderboard = () => {
-  //"https://points.o1test.net/api/v1/leaderboard/?ordering=-score",
   ReFetch.fetch(
-    "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/B3:C?key="
+    "https://sheets.googleapis.com/v4/spreadsheets/1CLX9DF7oFDWb1UiimQXgh_J6jO4fVLJEcEnPVAOfq24/values/D4:Z?key="
     ++ Next.Config.google_api_key,
     ~method_=Get,
     ~headers={
@@ -32,9 +24,7 @@ let fetchLeaderboard = () => {
          Option.bind(Js.Json.decodeObject(r), o => Js.Dict.get(o, "values"));
 
        switch (Option.bind(results, Js.Json.decodeArray)) {
-       | Some(resultsArr) =>
-         Array.map(parseEntry, resultsArr)
-         ->Array.sub(1, Array.length(resultsArr) - 1)
+       | Some(resultsArr) => Array.map(parseEntry, resultsArr)
        | None => [||]
        };
      })
@@ -105,12 +95,11 @@ module LeaderboardRow = {
           {React.string(string_of_int(rank))}
         </span>
         <span className=Styles.username> {React.string(entry[0])} </span>
-        //{React.string(entry.member.nickname)}
-        <span className=Styles.current> {React.string(entry[1])} </span>
-        //{React.string(string_of_int(entry.score))}
+        <span className=Styles.current>
+          {React.string(entry[Array.length(entry) - 1])}
+        </span>
         <span className=Styles.total> {React.string(entry[1])} </span>
       </div>
-      //{React.string(string_of_int(entry.score))}
     </>;
   };
 };
@@ -138,7 +127,6 @@ let make = () => {
          (i, entry) =>
            <LeaderboardRow
              key={entry[0] ++ string_of_int(i)}
-             //key={string_of_int(entry.member.id)}
              rank={i + 1}
              entry
            />,

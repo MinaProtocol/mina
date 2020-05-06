@@ -4,5 +4,5 @@
    curve_choice chunk_table chunked_triples)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
-  (pps ppx_bin_prot ppx_optcomp ppxlib.metaquot ppxlib.runner))
+  (pps ppx_coda ppx_bin_prot ppx_optcomp ppxlib.metaquot))
  (modes native))

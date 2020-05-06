@@ -45,9 +45,9 @@
   with this option. The type must be contained in the module hierarchy "Stable.Vn.T".
   Eventually, all uses of this option should be removed.
 
-  The "of_binable" option is a synonym for "asserted". It assumes that the type
-  will be serialized using "Binable.Of_binable" (or similar functors), which
-  relies on the serialization of some other type.
+  The "binable" option is a synonym for "asserted". It assumes that the type
+  will be serialized using a "Binable.Of_..." or "Make_binable" functors, which relies
+  on the serialization of some other type.
 
   The "for_test" option implies "asserted" and "unnumbered", for use in test code.
 
@@ -124,18 +124,6 @@ let type_decls_to_stri type_decls =
   (* type derivers only work with recursive types *)
   {pstr_desc= Pstr_type (Ast.Recursive, type_decls); pstr_loc= Location.none}
 
-(* replace newlines in standard formmatter with a space, so type is all on one line *)
-let formatter =
-  let std_formatter = Format.std_formatter in
-  let funs = Format.pp_get_formatter_out_functions std_formatter () in
-  let funs' =
-    { funs with
-      out_newline= (fun () -> funs.out_spaces 1)
-    ; out_indent= (fun _ -> ()) }
-  in
-  Format.pp_set_formatter_out_functions std_formatter funs' ;
-  std_formatter
-
 (* prints module_path:type_definition *)
 let print_type ~options:_ ~path type_decls =
   let path_len = List.length path in
@@ -147,8 +135,8 @@ let print_type ~options:_ ~path type_decls =
     List.map type_decls ~f:filter_type_decls_attrs
   in
   let stri = type_decls_to_stri type_decls_filtered_attrs in
-  Pprintast.structure_item formatter stri ;
-  Format.print_flush () ;
+  Pprintast.structure_item Versioned_util.diff_formatter stri ;
+  Format.pp_print_flush Versioned_util.diff_formatter () ;
   printf "\n%!" ;
   []
 
@@ -284,25 +272,26 @@ let ocaml_builtin_type_constructors = ["list"; "array"; "option"; "ref"]
 
 let jane_street_type_constructors = ["sexp_opaque"]
 
+let is_version_module vn =
+  let len = String.length vn in
+  len > 1
+  && Char.equal vn.[0] 'V'
+  &&
+  let numeric_part = String.sub vn ~pos:1 ~len:(len - 1) in
+  String.for_all numeric_part ~f:Char.is_digit
+  && not (Int.equal (Char.get_digit_exn numeric_part.[0]) 0)
+
 (* true iff module_path is of form M. ... .Stable.Vn, where M is Core or Core_kernel, and n is integer *)
 let is_jane_street_stable_module module_path =
   let hd_elt = List.hd_exn module_path in
-  let is_version_module vn =
-    let len = String.length vn in
-    len > 1
-    && Char.equal vn.[0] 'V'
-    &&
-    let numeric_part = String.sub vn ~pos:1 ~len:(len - 1) in
-    String.for_all numeric_part ~f:Char.is_digit
-    && not (Int.equal (Char.get_digit_exn numeric_part.[0]) 0)
-  in
   List.mem jane_street_modules hd_elt ~equal:String.equal
   &&
   match List.rev module_path with
   | vn :: "Stable" :: _ ->
       is_version_module vn
-  | vn :: "Span" :: "Stable" :: "Time" :: _ ->
-      (* special case, maybe improper module structure *)
+  | vn :: label :: "Stable" :: "Time" :: _
+    when List.mem ["Span"; "With_utc_sexp"] label ~equal:String.equal ->
+      (* special cases, maybe improper module structure *)
       is_version_module vn
   | _ ->
       false
@@ -384,8 +373,24 @@ let rec generate_core_type_version_decls type_name core_type =
         else
           let loc = core_type.ptyp_loc in
           let pexp_loc = loc in
+          let new_prefix =
+            (* allow types within stable-versioned modules generated
+               by Hashable.Make_binable, like M.Stable.Vn.Table.t;
+               generate "let _ = M.Stable.Vn.__versioned__"
+            *)
+            match prefix with
+            | Ldot ((Ldot (_, vn) as longident), label)
+              when is_version_module vn
+                   && List.mem
+                        ["Table"; "Hash_set"; "Hash_queue"]
+                        label ~equal:String.equal ->
+                longident
+            | _ ->
+                prefix
+          in
           let versioned_ident =
-            { pexp_desc= Pexp_ident {txt= Ldot (prefix, "__versioned__"); loc}
+            { pexp_desc=
+                Pexp_ident {txt= Ldot (new_prefix, "__versioned__"); loc}
             ; pexp_loc
             ; pexp_attributes= [] }
           in
@@ -542,7 +547,7 @@ let validate_options valid options =
 let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
   ignore
     (validate_options
-       ["wrapped"; "unnumbered"; "rpc"; "asserted"; "of_binable"; "for_test"]
+       ["wrapped"; "unnumbered"; "rpc"; "asserted"; "binable"; "for_test"]
        options) ;
   let type_decl = get_type_decl_representative type_decls in
   let wrapped = check_for_option "wrapped" options in
@@ -552,7 +557,7 @@ let generate_let_bindings_for_type_decl_str ~options ~path type_decls =
   in
   let asserted =
     check_for_option "asserted" options
-    || check_for_option "of_binable" options
+    || check_for_option "binable" options
     || check_for_option "for_test" options
   in
   let rpc = check_for_option "rpc" options in

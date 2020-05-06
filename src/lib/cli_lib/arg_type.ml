@@ -42,6 +42,9 @@ include (
         [@@deprecated "Use public_key_compressed in commandline args"]
     end )
 
+let token_id =
+  Command.Arg_type.map ~f:Coda_base.Token_id.of_string Command.Param.string
+
 let receipt_chain_hash =
   Command.Arg_type.map Command.Param.string
     ~f:Coda_base.Receipt.Chain_hash.of_string
@@ -68,6 +71,9 @@ let hd_index =
 
 let ip_address =
   Command.Arg_type.map Command.Param.string ~f:Unix.Inet_addr.of_string
+
+let cidr_mask =
+  Command.Arg_type.map Command.Param.string ~f:Unix.Cidr.of_string
 
 let log_level =
   Command.Arg_type.map Command.Param.string ~f:(fun log_level_str_with_case ->
