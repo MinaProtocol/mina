@@ -7,11 +7,9 @@
  (libraries
   hash_prefixes
   group_map
-  chunked_pedersen_lib
   snarky
+  pickles
   bignum_bigint
-  curve_choice
-  chunk_table
   bowe_gabizon_hash
   random_oracle
   tuple_lib)
@@ -19,9 +17,3 @@
   (pps ppx_coda ppx_jane bisect_ppx -- -conditional))
  (synopsis "Cryptographic parameters"))
 
-(rule
- (targets pedersen_params.ml pedersen_chunk_table.ml)
- (deps
-  (:< gen/gen.exe))
- (action
-  (run %{<} %{targets})))
