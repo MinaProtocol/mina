@@ -1,23 +1,17 @@
-module NewBlock = {
-  type stateHash = {stateHash: string};
-  type newBlock = {newBlock: stateHash};
-  type t = {data: newBlock};
-};
-
-external unsafeJSONToNewBlock: Js.Json.t => NewBlock.t = "%identity";
-
 let blockDirectory =
   ([%bs.node __dirname] |> Belt.Option.getExn |> Filename.dirname)
   ++ "/src/blocks/";
 
-let files = Node.Fs.readdirSync(blockDirectory);
+let files = blockDirectory |> Node.Fs.readdirSync;
 
-Array.iter(
-  _file => {
-    let fileContents = Node.Fs.readFileAsUtf8Sync(blockDirectory ++ _file);
-    let blockDataJson = Js.Json.parseExn(fileContents);
-    let newBlock = unsafeJSONToNewBlock(blockDataJson);
-    print_endline(newBlock.data.newBlock.stateHash);
-  },
-  files,
-);
+let blocks =
+  Array.map(
+    _file => {
+      Node.Fs.readFileAsUtf8Sync(blockDirectory ++ _file)
+      |> Js.Json.parseExn
+      |> Types.NewBlock.unsafeJSONToNewBlock
+    },
+    files,
+  );
+
+let results = Challanges.handleMetrics([|TransactionsSent|], blocks);
