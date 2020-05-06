@@ -18,8 +18,8 @@ module Pending_coinbase_stack_state : sig
   module Stable : sig
     module V1 : sig
       type t =
-        { source: Pending_coinbase.Stack.Stable.V1.t
-        ; target: Pending_coinbase.Stack.Stable.V1.t }
+        { source: Pending_coinbase.Stack_versioned.Stable.V1.t
+        ; target: Pending_coinbase.Stack_versioned.Stable.V1.t }
       [@@deriving bin_io, compare, eq, fields, hash, sexp, version, yojson]
     end
 
@@ -27,8 +27,7 @@ module Pending_coinbase_stack_state : sig
   end
 
   type t = Stable.Latest.t =
-    { source: Pending_coinbase.Stack.Stable.V1.t
-    ; target: Pending_coinbase.Stack.Stable.V1.t }
+    {source: Pending_coinbase.Stack.t; target: Pending_coinbase.Stack.t}
   [@@deriving sexp, hash, compare, eq]
 end
 
