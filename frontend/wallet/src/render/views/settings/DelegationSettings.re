@@ -1,5 +1,3 @@
-open Tc;
-
 module Styles = {
   open Css;
 
@@ -20,11 +18,17 @@ module Styles = {
 
 type feeSelection =
   | DefaultAmount
-  | Custom(Int64.t);
+  | Custom(string);
+
+type errorOutcome =
+  | EmptyDelegateKey
+  | InvalidTransactionFee
+  | InvalidGraphQLResponse(string);
 
 type modalState = {
-  delegate: option(PublicKey.t),
+  delegate: string,
   fee: feeSelection,
+  error: option(errorOutcome),
 };
 
 module ChangeDelegation = [%graphql
@@ -45,11 +49,29 @@ module ChangeDelegation = [%graphql
 module ChangeDelegationMutation =
   ReasonApollo.CreateMutation(ChangeDelegation);
 
+let defaultFee = "0.1";
+let minimumFee = "0.00001";
+
 [@react.component]
 let make = (~publicKey) => {
   // Form state
   let (state, changeState) =
-    React.useState(() => {delegate: None, fee: DefaultAmount});
+    React.useState(() => {delegate: "", fee: DefaultAmount, error: None});
+
+  // Mutation variables and handlers
+  let variables =
+    ChangeDelegation.make(
+      ~from=Apollo.Encoders.publicKey(publicKey),
+      ~to_=Apollo.Encoders.publicKey(PublicKey.ofStringExn(state.delegate)),
+      ~fee=
+        Apollo.Encoders.currency(
+          switch (state.fee) {
+          | DefaultAmount => defaultFee
+          | Custom(amount) => amount
+          },
+        ),
+      (),
+    )##variables;
 
   let feeSelectedValue =
     switch (state.fee) {
@@ -59,39 +81,59 @@ let make = (~publicKey) => {
 
   let onChangeFee = value =>
     switch (value) {
-    | 0 => changeState(prev => {delegate: prev.delegate, fee: DefaultAmount})
-    | _ =>
-      changeState(prev =>
-        {delegate: prev.delegate, fee: Custom(Int64.of_int(5))}
-      )
+    | 0 => changeState(prev => {...prev, fee: DefaultAmount})
+    | _ => changeState(prev => {...prev, fee: Custom(defaultFee)})
     };
 
   let goBack = () =>
     ReasonReact.Router.push("/settings/" ++ PublicKey.uriEncode(publicKey));
 
-  // Mutation variables and handlers
-  let variables =
-    ChangeDelegation.make(
-      ~from=Apollo.Encoders.publicKey(publicKey),
-      ~to_=
-        Apollo.Encoders.publicKey(
-          Option.withDefault(
-            ~default=PublicKey.ofStringExn(""),
-            state.delegate,
-          ),
-        ),
-      ~fee=
-        Apollo.Encoders.int64(
-          switch (state.fee) {
-          | DefaultAmount => Int64.of_int(5)
-          | Custom(amount) => amount
-          },
-        ),
-      (),
-    )##variables;
+  let renderError = () => {
+    switch (state.error) {
+    | Some(EmptyDelegateKey) => Some("Please enter a public key")
+    | Some(InvalidTransactionFee) =>
+      Some("The minimum transaction fee is " ++ minimumFee)
+    | Some(InvalidGraphQLResponse(error)) => Some(error)
+    | None => None
+    };
+  };
 
-  <ChangeDelegationMutation>
-    {(mutate, {loading, result}) =>
+  let onDelegateClick = (mutate: ChangeDelegationMutation.apolloMutation) => {
+    switch (state.delegate, state.fee) {
+    | ("", _) =>
+      changeState(prev => {...prev, error: Some(EmptyDelegateKey)})
+    | (_, Custom(fee)) =>
+      switch (fee) {
+      | "" =>
+        changeState(prev => {...prev, error: Some(InvalidTransactionFee)})
+      | fee when float_of_string(fee) < float_of_string(minimumFee) =>
+        changeState(prev => {...prev, error: Some(InvalidTransactionFee)})
+      | _ =>
+        mutate(
+          ~variables,
+          ~refetchQueries=[|"getAccountInfo", "queryDelegation"|],
+          (),
+        )
+        |> ignore
+      }
+    | _ =>
+      mutate(
+        ~variables,
+        ~refetchQueries=[|"getAccountInfo", "queryDelegation"|],
+        (),
+      )
+      |> ignore
+    };
+  };
+
+  <ChangeDelegationMutation
+    onCompleted={_ => goBack()}
+    onError={(err: ReasonApolloTypes.apolloError) =>
+      changeState(prev =>
+        {...prev, error: Some(InvalidGraphQLResponse(err.message))}
+      )
+    }>
+    {(mutate, {loading}) =>
        <div className=SettingsPage.Styles.container>
          <div className=Styles.backHeader>
            <a
@@ -102,14 +144,13 @@ let make = (~publicKey) => {
            <Spacer width=0.2 />
            <AccountName pubkey=publicKey className=Styles.breadcrumbText />
          </div>
-         {switch (result) {
-          | NotCalled
-          | Loading => React.null
-          | Error((err: ReasonApolloTypes.apolloError)) =>
-            <Alert kind=`Danger defaultMessage={err.message} />
-          | Data(_) =>
-            goBack();
-            React.null;
+         {switch (renderError()) {
+          | Some(errorMessage) =>
+            <>
+              <Alert kind=`Danger defaultMessage=errorMessage />
+              <Spacer height=2. />
+            </>
+          | None => React.null
           }}
          <div className=Theme.Text.Header.h3>
            {React.string("Delegate Participation To")}
@@ -118,17 +159,11 @@ let make = (~publicKey) => {
          <div className=Styles.fields>
            <TextField
              label="Key"
-             value={
-               Option.map(~f=PublicKey.toString, state.delegate)
-               |> Option.withDefault(~default="")
-             }
+             value={state.delegate}
              mono=true
              onChange={value =>
                changeState(_ =>
-                 {
-                   delegate: Some(PublicKey.ofStringExn(value)),
-                   fee: state.fee,
-                 }
+                 {delegate: value, fee: state.fee, error: None}
                )
              }
            />
@@ -140,34 +175,27 @@ let make = (~publicKey) => {
            </div>
            <div className=Styles.fields>
              <ToggleButton
-               options=[|"Standard: 5 Coda", "Custom Amount"|]
+               options=[|
+                 "Standard: " ++ defaultFee ++ " Coda",
+                 "Custom Amount",
+               |]
                selected=feeSelectedValue
                onChange=onChangeFee
              />
            </div>
            {switch (state.fee) {
             | DefaultAmount => React.null
-            | Custom(feeAmount) =>
+            | Custom(fee) =>
               <>
                 <Spacer height=1. />
                 <TextField.Currency
                   label="Fee"
-                  value={
-                    feeAmount == Int64.zero ? "" : Int64.to_string(feeAmount)
-                  }
+                  value=fee
                   placeholder="0"
                   onChange={value => {
-                    let serializedValue =
-                      switch (value) {
-                      | "" => Int64.zero
-                      | nonEmpty => Int64.of_string(nonEmpty)
-                      };
-                    changeState(_ =>
-                      {
-                        delegate: state.delegate,
-                        fee: Custom(serializedValue),
-                      }
-                    );
+                    changeState(prev =>
+                      {...prev, fee: Custom(value), error: None}
+                    )
                   }}
                 />
               </>
@@ -191,14 +219,7 @@ let make = (~publicKey) => {
              label="Delegate"
              style=Button.Green
              disabled=loading
-             onClick={_ =>
-               mutate(
-                 ~variables,
-                 ~refetchQueries=[|"getAccountInfo", "queryDelegation"|],
-                 (),
-               )
-               |> ignore
-             }
+             onClick={_ => onDelegateClick(mutate)}
            />
          </div>
        </div>}

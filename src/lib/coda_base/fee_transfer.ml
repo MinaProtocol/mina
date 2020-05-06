@@ -70,3 +70,6 @@ let fee_excess = function
     )
 
 let receivers t = One_or_two.map t ~f:(fun (pk, _) -> pk)
+
+let receiver_ids =
+  One_or_two.map ~f:(fun (pk, _) -> Account_id.create pk Token_id.default)

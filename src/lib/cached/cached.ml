@@ -9,7 +9,8 @@ let try_load bin path =
   match%map Storage.Disk.load_with_checksum controller path with
   | Ok {Storage.Checked_data.data; checksum} ->
       Logger.trace logger ~module_:__MODULE__ ~location:__LOC__
-        "Loaded value successfully from %s" path ;
+        ~metadata:[("path", `String path)]
+        "Loaded value successfully from $path" ;
       Ok {path; value= data; checksum}
   | Error `Checksum_no_match ->
       Or_error.error_string "Checksum failure"
@@ -156,7 +157,7 @@ module Spec = struct
 end
 
 module Track_generated = struct
-  type t = [`Generated_something | `Cache_hit]
+  type t = [`Generated_something | `Locally_generated | `Cache_hit]
 
   let empty = `Cache_hit
 
@@ -164,6 +165,8 @@ module Track_generated = struct
     match (x, y) with
     | `Generated_something, _ | _, `Generated_something ->
         `Generated_something
+    | `Locally_generated, _ | _, `Locally_generated ->
+        `Locally_generated
     | `Cache_hit, `Cache_hit ->
         `Cache_hit
 end
@@ -281,8 +284,8 @@ let run
                 !"Loaded %s from autogen path %{sexp: string list}\n"
                 name (full_paths autogen_path) ;
               (* We consider this a "cache miss" for the purposes of tracking
-             * that we need to push to s3 *)
-              return {With_track_generated.data; dirty= `Generated_something}
+               * that we need to push to s3 *)
+              return {With_track_generated.data; dirty= `Locally_generated}
           | Error _e ->
               Core_kernel.printf
                 !"Could not load %s from autogen path %{sexp: string list}. \

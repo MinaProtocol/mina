@@ -8,6 +8,41 @@ open Coda_transition
 open Pipe_lib
 open Signature_lib
 
+module Caqti_type_spec = struct
+  type (_, _) t =
+    | [] : (unit, unit) t
+    | ( :: ) : 'c Caqti_type.t * ('a, 'b) t -> ('c -> 'a, 'c * 'b) t
+
+  let rec to_rep : 'hlist 'tuple. ('hlist, 'tuple) t -> 'tuple Caqti_type.t =
+    fun (type hlist tuple) (spec : (hlist, tuple) t) ->
+     match spec with
+     | [] ->
+         (Caqti_type.unit : tuple Caqti_type.t)
+     | rep :: spec ->
+         Caqti_type.tup2 rep (to_rep spec)
+
+  let rec hlist_to_tuple :
+            'hlist 'tuple.    ('hlist, 'tuple) t -> (unit, 'hlist) H_list.t
+            -> 'tuple =
+    fun (type hlist tuple) (spec : (hlist, tuple) t)
+        (l : (unit, hlist) H_list.t) ->
+     match (spec, l) with
+     | [], [] ->
+         (() : tuple)
+     | _ :: spec, x :: l ->
+         ((x, hlist_to_tuple spec l) : tuple)
+
+  let rec tuple_to_hlist :
+            'hlist 'tuple.    ('hlist, 'tuple) t -> 'tuple
+            -> (unit, 'hlist) H_list.t =
+    fun (type hlist tuple) (spec : (hlist, tuple) t) (t : tuple) ->
+     match (spec, t) with
+     | [], () ->
+         ([] : (unit, hlist) H_list.t)
+     | _ :: spec, (x, t) ->
+         x :: tuple_to_hlist spec t
+end
+
 let rec deferred_result_list_fold ls ~init ~f =
   let open Deferred.Result.Let_syntax in
   match ls with
@@ -60,38 +95,86 @@ end
 module User_command = struct
   type t =
     { typ: string
-    ; sender_id: int
+    ; fee_payer_id: int
+    ; source_id: int
     ; receiver_id: int
+    ; fee_token: string
+    ; token: string
     ; nonce: int
     ; amount: int option
     ; fee: int
     ; memo: string
     ; hash: string }
 
+  let to_hlist
+      { typ
+      ; fee_payer_id
+      ; source_id
+      ; receiver_id
+      ; fee_token
+      ; token
+      ; nonce
+      ; amount
+      ; fee
+      ; memo
+      ; hash } =
+    H_list.
+      [ typ
+      ; fee_payer_id
+      ; source_id
+      ; receiver_id
+      ; fee_token
+      ; token
+      ; nonce
+      ; amount
+      ; fee
+      ; memo
+      ; hash ]
+
+  let of_hlist
+      ([ typ
+       ; fee_payer_id
+       ; source_id
+       ; receiver_id
+       ; fee_token
+       ; token
+       ; nonce
+       ; amount
+       ; fee
+       ; memo
+       ; hash ] :
+        (unit, _) H_list.t) =
+    { typ
+    ; fee_payer_id
+    ; source_id
+    ; receiver_id
+    ; fee_token
+    ; token
+    ; nonce
+    ; amount
+    ; fee
+    ; memo
+    ; hash }
+
   let typ =
-    let encode t =
-      Ok
-        ( t.typ
-        , ( t.sender_id
-          , ( t.receiver_id
-            , (t.nonce, (t.amount, (t.fee, (t.memo, (t.hash, ()))))) ) ) )
+    let open Caqti_type_spec in
+    let spec =
+      Caqti_type.
+        [ string
+        ; int
+        ; int
+        ; int
+        ; string
+        ; string
+        ; int
+        ; option int
+        ; int
+        ; string
+        ; string ]
     in
-    let decode
-        ( typ
-        , ( sender_id
-          , (receiver_id, (nonce, (amount, (fee, (memo, (hash, ())))))) ) ) =
-      Ok {typ; sender_id; receiver_id; nonce; amount; fee; memo; hash}
-    in
-    let rep =
-      Caqti_type.(
-        tup2 string
-          (tup2 int
-             (tup2 int
-                (tup2 int
-                   (tup2 (option int)
-                      (tup2 int (tup2 string (tup2 string unit))))))))
-    in
-    Caqti_type.custom ~encode ~decode rep
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
 
   let find (module Conn : CONNECTION) ~(transaction_hash : Transaction_hash.t)
       =
@@ -107,22 +190,32 @@ module User_command = struct
     | Some user_command_id ->
         return user_command_id
     | None ->
-        let%bind sender_id =
-          Public_key.add_if_doesn't_exist (module Conn) (User_command.sender t)
+        let%bind fee_payer_id =
+          Public_key.add_if_doesn't_exist
+            (module Conn)
+            (User_command.fee_payer_pk t)
+        in
+        let%bind source_id =
+          Public_key.add_if_doesn't_exist
+            (module Conn)
+            (User_command.source_pk t)
         in
         let%bind receiver_id =
           Public_key.add_if_doesn't_exist
             (module Conn)
-            (User_command.receiver t)
+            (User_command.receiver_pk t)
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
-             "INSERT INTO user_commands (type, sender_id, receiver_id, nonce, \
-              amount, fee, memo, hash) VALUES (?, ?, ?, ?, ?, ?, ?, ?) \
-              RETURNING id")
+             "INSERT INTO user_commands (type, fee_payer_id, source_id, \
+              receiver_id, fee_token, token, nonce, amount, fee, memo, hash) \
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?) RETURNING id")
           { typ= (if User_command.is_payment t then "payment" else "delegation")
-          ; sender_id
+          ; fee_payer_id
+          ; source_id
           ; receiver_id
+          ; fee_token= User_command.fee_token t |> Token_id.to_string
+          ; token= User_command.token t |> Token_id.to_string
           ; nonce= User_command.nonce t |> Unsigned.UInt32.to_int
           ; amount=
               User_command.amount t
@@ -191,7 +284,9 @@ module Coinbase = struct
         return internal_command_id
     | None ->
         let%bind receiver_id =
-          Public_key.add_if_doesn't_exist (module Conn) (Coinbase.receiver t)
+          Public_key.add_if_doesn't_exist
+            (module Conn)
+            (Coinbase.receiver_pk t)
         in
         Conn.find
           (Caqti_request.find typ Caqti_type.int
@@ -233,43 +328,52 @@ module Block = struct
     ; timestamp: int64
     ; coinbase_id: int option }
 
+  let to_hlist
+      { state_hash
+      ; parent_id
+      ; creator_id
+      ; snarked_ledger_hash_id
+      ; ledger_hash
+      ; height
+      ; timestamp
+      ; coinbase_id } =
+    H_list.
+      [ state_hash
+      ; parent_id
+      ; creator_id
+      ; snarked_ledger_hash_id
+      ; ledger_hash
+      ; height
+      ; timestamp
+      ; coinbase_id ]
+
+  let of_hlist
+      ([ state_hash
+       ; parent_id
+       ; creator_id
+       ; snarked_ledger_hash_id
+       ; ledger_hash
+       ; height
+       ; timestamp
+       ; coinbase_id ] :
+        (unit, _) H_list.t) =
+    { state_hash
+    ; parent_id
+    ; creator_id
+    ; snarked_ledger_hash_id
+    ; ledger_hash
+    ; height
+    ; timestamp
+    ; coinbase_id }
+
   let typ =
-    let encode t =
-      Ok
-        ( t.state_hash
-        , ( t.parent_id
-          , ( t.creator_id
-            , ( t.snarked_ledger_hash_id
-              , (t.ledger_hash, (t.height, (t.timestamp, (t.coinbase_id, ()))))
-              ) ) ) )
+    let open Caqti_type_spec in
+    let spec =
+      Caqti_type.[string; option int; int; int; string; int; int64; option int]
     in
-    let decode
-        ( state_hash
-        , ( parent_id
-          , ( creator_id
-            , ( snarked_ledger_hash_id
-              , (ledger_hash, (height, (timestamp, (coinbase_id, ())))) ) ) )
-        ) =
-      Ok
-        { state_hash
-        ; parent_id
-        ; creator_id
-        ; snarked_ledger_hash_id
-        ; ledger_hash
-        ; height
-        ; timestamp
-        ; coinbase_id }
-    in
-    let rep =
-      Caqti_type.(
-        tup2 string
-          (tup2 (option int)
-             (tup2 int
-                (tup2 int
-                   (tup2 string
-                      (tup2 int (tup2 int64 (tup2 (option int) unit))))))))
-    in
-    Caqti_type.custom ~encode ~decode rep
+    let encode t = Ok (hlist_to_tuple spec (to_hlist t)) in
+    let decode t = Ok (of_hlist (tuple_to_hlist spec t)) in
+    Caqti_type.custom ~encode ~decode (to_rep spec)
 
   let find (module Conn : CONNECTION) ~(state_hash : State_hash.t) =
     Conn.find_opt
@@ -348,9 +452,9 @@ module Block = struct
                   ( acc_user_commands
                   , acc_fee_transfers
                   , coinbase :: acc_coinbases )
-              | Some fee_transfer ->
+              | Some {receiver_pk; fee} ->
                   ( acc_user_commands
-                  , fee_transfer :: acc_fee_transfers
+                  , (receiver_pk, fee) :: acc_fee_transfers
                   , coinbase :: acc_coinbases ) ) )
         in
         let%bind user_command_ids =
@@ -424,7 +528,7 @@ module Block = struct
                           (Coinbase.amount coinbase1)
                           (Coinbase.amount coinbase2)
                       |> Core.Option.value_exn )
-                    ~receiver:(Coinbase.receiver coinbase1)
+                    ~receiver:(Coinbase.receiver_pk coinbase1)
                     ~fee_transfer:None
                   |> Core.Result.map_error ~f:(fun _ ->
                          failwith "Coinbase_combination_failed" )
