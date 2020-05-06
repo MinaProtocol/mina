@@ -27,14 +27,8 @@ module Inputs = struct
     type t = {m: (module S); cache: Cache.t}
 
     let create () =
-      let%map proving = Snark_keys.transaction_proving ()
-      and verification = Snark_keys.transaction_verification () in
-      { m=
-          ( module Transaction_snark.Make (struct
-            let keys = {Transaction_snark.Keys.proving; verification}
-          end)
-          : S )
-      ; cache= Cache.create () }
+      Deferred.return
+        {m= (module Transaction_snark.Make () : S); cache= Cache.create ()}
 
     let worker_wait_time = 5.
   end
