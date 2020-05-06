@@ -1,7 +1,7 @@
 (library
  (name precomputed_values)
  (public_name precomputed_values)
- (libraries crypto_params dummy_values snarky snark_keys coda_base)
+ (libraries crypto_params snarky coda_base)
  (ppx_runtime_libraries base)
  (preprocess
   (pps ppx_coda ppx_jane ppxlib.metaquot ppxlib.runner)))

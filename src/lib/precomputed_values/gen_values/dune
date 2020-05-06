@@ -1,7 +1,8 @@
 (executable
  (name gen_values)
- (libraries async core snarky snark_params coda_base blockchain_snark
-   keys_lib snark_keys ppxlib ppx_util staged_ledger
+ (libraries
+   async core snarky snark_params coda_base blockchain_snark
+   ppxlib ppx_util
    global_signer_private_key)
  (preprocessor_deps ../../../config.mlh)
  (preprocess
