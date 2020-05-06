@@ -397,17 +397,14 @@ let daemon logger =
          in
          let%bind precomputed_values =
            let protocol_state_with_hash =
-             Coda_state.Genesis_protocol_state.t ~genesis_ledger
-               ~genesis_constants
+             Coda_state.Genesis_protocol_state.t ~genesis_constants
+               ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
            in
            let%map base_hash =
              Keys_lib.Keys.step_instance_hash protocol_state_with_hash.data
            in
            { Precomputed_values.genesis_constants
-           ; genesis_ledger=
-               ( module Genesis_ledger.Of_ledger (struct
-                 let t = genesis_ledger
-               end) )
+           ; genesis_ledger
            ; protocol_state_with_hash
            ; base_hash
            ; genesis_proof= base_proof }
@@ -669,18 +666,20 @@ let daemon logger =
          let trust_system = Trust_system.create trust_dir in
          trace_database_initialization "trust_system" __LOC__ trust_dir ;
          let genesis_state_hash =
-           Coda_state.Genesis_protocol_state.t ~genesis_ledger
-             ~genesis_constants
+           Coda_state.Genesis_protocol_state.t ~genesis_constants
+             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
            |> With_hash.hash
          in
          let genesis_ledger_hash =
-           Lazy.force genesis_ledger |> Ledger.merkle_root
+           genesis_ledger |> Genesis_ledger.Packed.t |> Lazy.force
+           |> Ledger.merkle_root
          in
          let initial_block_production_keypairs =
            block_production_keypair |> Option.to_list |> Keypair.Set.of_list
          in
          let consensus_local_state =
-           Consensus.Data.Local_state.create ~genesis_ledger
+           Consensus.Data.Local_state.create
+             ~genesis_ledger:(Genesis_ledger.Packed.t genesis_ledger)
              ( Option.map block_production_keypair ~f:(fun keypair ->
                    let open Keypair in
                    Public_key.compress keypair.public_key )
