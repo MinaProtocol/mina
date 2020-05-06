@@ -161,11 +161,10 @@ module T = struct
       let hash_fold_t hash_state t =
         [%hash_fold: int * string] hash_state (to_tuple t)
 
-      let compare = compare
+      [%%define_from_scope
+      compare, to_yojson]
 
       let equal = equals
-
-      let to_yojson = to_yojson
     end
   end]
 end

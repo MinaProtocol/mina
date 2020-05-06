@@ -24,16 +24,7 @@ module Make_basic (M : sig
   val length_in_bits : int
 end) =
 struct
-  type t = Field.t [@@deriving sexp, compare]
-
-  let to_yojson t = `String (Field.to_string t)
-
-  let of_yojson = function
-    | `String s -> (
-      try Ok (Field.of_string s)
-      with exn -> Error Error.(to_string_hum (of_exn exn)) )
-    | _ ->
-        Error "of_yojson: expected string"
+  type t = Field.t [@@deriving sexp, compare, hash]
 
   let to_decimal_string (t : Field.t) = Field.to_string t
 
@@ -146,38 +137,51 @@ struct
   [%%endif]
 end
 
-module Make_full_size () = struct
+module Make_full_size (B58_data : Data_hash_intf.Data_hash_descriptor) = struct
   module Basic = Make_basic (struct
     let length_in_bits = Field.size_in_bits
   end)
 
   include Basic
 
-  (* inside functor of no arguments, versioned types are allowed *)
-
-  [%%versioned
-  module Stable = struct
-    module V1 = struct
+  module Base58_check = Codable.Make_base58_check (struct
+    module T0 = struct
       module T = struct
-        type t = Field.t [@@deriving sexp, compare, hash, version {asserted}]
+        type t = Field.t [@@deriving sexp, compare, hash]
+
+        [%%define_locally
+        Field.(to_string, of_string)]
       end
 
       include T
-
-      let to_latest = Fn.id
-
-      [%%define_locally
-      Basic.(to_yojson, of_yojson)]
-
-      include Comparable.Make (T)
-      include Hashable.Make_binable (T)
+      include Binable.Of_stringable (T)
     end
-  end]
 
-  type _unused = unit constraint t = Stable.Latest.t
+    include T0
 
-  include Comparable.Make (Stable.Latest)
-  include Hashable.Make (Stable.Latest)
+    (* the serialization here is only used for the hash impl which is only
+       used for hashtbl, it's ok to disagree with the "real" serialization *)
+    include Hashable.Make_binable (T0)
+    include B58_data
+  end)
+
+  [%%define_locally
+  Base58_check.(to_base58_check, of_base58_check, of_base58_check_exn)]
+
+  [%%define_locally
+  Base58_check.String_ops.(to_string, of_string)]
+
+  [%%define_locally
+  Base58_check.(to_yojson, of_yojson)]
+
+  (* inside functor of no arguments, versioned types are allowed *)
+
+  module T = struct
+    type t = Field.t [@@deriving sexp, compare, hash]
+  end
+
+  include Comparable.Make (T)
+  include Hashable.Make (T)
 
   let of_hash = Fn.id
 
