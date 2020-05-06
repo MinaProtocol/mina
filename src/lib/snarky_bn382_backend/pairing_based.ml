@@ -47,6 +47,8 @@ module Oracles = struct
     Caml.Gc.finalise Field.delete x ;
     x
 
+  let scalar_challenge f t = Pickles_types.Scalar_challenge.create (field f t)
+
   open Fp_oracles
 
   let alpha = field alpha
@@ -57,17 +59,17 @@ module Oracles = struct
 
   let eta_c = field eta_c
 
-  let beta1 = field beta1
+  let beta1 = scalar_challenge beta1
 
-  let beta2 = field beta2
+  let beta2 = scalar_challenge beta2
 
-  let beta3 = field beta3
+  let beta3 = scalar_challenge beta3
 
-  let batch = field batch
+  let batch = scalar_challenge batch
 
-  let r_k = field r_k
+  let r_k = scalar_challenge r_k
 
-  let r = field r
+  let r = scalar_challenge r
 
   let x_hat_beta1 = field x_hat_beta1
 
@@ -83,34 +85,57 @@ module Keypair = struct
   let set_urs_info, load_urs =
     let urs_info = Set_once.create () in
     let urs = ref None in
-    let set_urs_info ?(degree = 2 * 786_433) path =
-      Set_once.set_exn urs_info Lexing.dummy_pos (degree, path)
+    let set_urs_info ?(degree = 2 * 786_433) specs =
+      Set_once.set_exn urs_info Lexing.dummy_pos (degree, specs)
     in
     let load () =
       match !urs with
       | Some urs ->
           urs
       | None ->
-          let degree, path =
+          let degree, specs =
             match Set_once.get urs_info with
             | None ->
                 failwith "Pairing_based.urs: Info not set"
             | Some t ->
                 t
           in
+          let store =
+            Key_cache.Disk_storable.simple
+              (fun () -> "fp-urs")
+              (fun () ~path -> Snarky_bn382.Fp_urs.read path)
+              Snarky_bn382.Fp_urs.write
+          in
           let u =
-            if Sys.file_exists path then Snarky_bn382.Fp_urs.read path
-            else
-              let urs =
-                Snarky_bn382.Fp_urs.create (Unsigned.Size_t.of_int degree)
-              in
-              Snarky_bn382.Fp_urs.write urs path ;
-              urs
+            Async.Thread_safe.block_on_async_exn (fun () ->
+                let open Async in
+                match%bind Key_cache.read specs store () with
+                | Ok (u, _) ->
+                    return u
+                | Error _e ->
+                    let urs =
+                      Snarky_bn382.Fp_urs.create
+                        (Unsigned.Size_t.of_int degree)
+                    in
+                    let%map _ =
+                      Key_cache.write
+                        (List.filter specs ~f:(function
+                          | On_disk _ ->
+                              true
+                          | S3 _ ->
+                              false ))
+                        store () urs
+                    in
+                    urs )
           in
           urs := Some u ;
           u
     in
     (set_urs_info, load)
+
+  let () =
+    set_urs_info
+      [On_disk {directory= "/home/izzy/pickles-new/"; should_write= true}]
 
   let create
       { R1cs_constraint_system.public_input_size
@@ -118,6 +143,8 @@ module Keypair = struct
       ; m= {a; b; c}
       ; weight } =
     let vars = 1 + public_input_size + auxiliary_input_size in
+    Core.printf "pairing weight %d\n%!"
+      (R1cs_constraint_system.Weight.norm weight) ;
     Fp_index.create a b c
       (Unsigned.Size_t.of_int vars)
       (Unsigned.Size_t.of_int (public_input_size + 1))
@@ -130,22 +157,11 @@ module Keypair = struct
   open Pickles_types
 
   let vk_commitments t : G1.Affine.t Abc.t Matrix_evals.t =
-    { row=
-        { Abc.a= Fp_index.a_row_comm t
-        ; b= Fp_index.b_row_comm t
-        ; c= Fp_index.c_row_comm t }
-    ; col=
-        { a= Fp_index.a_col_comm t
-        ; b= Fp_index.b_col_comm t
-        ; c= Fp_index.c_col_comm t }
-    ; value=
-        { a= Fp_index.a_val_comm t
-        ; b= Fp_index.b_val_comm t
-        ; c= Fp_index.c_val_comm t }
-    ; rc=
-        { a= Fp_index.a_rc_comm t
-        ; b= Fp_index.b_rc_comm t
-        ; c= Fp_index.c_rc_comm t } }
+    let open Fp_verifier_index in
+    { row= {Abc.a= a_row_comm t; b= b_row_comm t; c= c_row_comm t}
+    ; col= {a= a_col_comm t; b= b_col_comm t; c= c_col_comm t}
+    ; value= {a= a_val_comm t; b= b_val_comm t; c= c_val_comm t}
+    ; rc= {a= a_rc_comm t; b= b_rc_comm t; c= c_rc_comm t} }
     |> Matrix_evals.map ~f:(Abc.map ~f:G1.Affine.of_backend)
 end
 

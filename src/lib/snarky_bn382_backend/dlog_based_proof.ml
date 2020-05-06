@@ -2,7 +2,8 @@ open Core_kernel
 open Pickles_types
 
 module Challenge_polynomial = struct
-  type t = {challenges: Fq.t array; commitment: G.Affine.t} [@@deriving bin_io]
+  type t = {challenges: Fq.t array; commitment: G.Affine.t}
+  [@@deriving bin_io, sexp, compare, yojson]
 end
 
 type message = Challenge_polynomial.t list
@@ -12,7 +13,7 @@ type t =
   , Fq.t
   , (Fq.t, G.Affine.t) Dlog_marlin_types.Openings.t )
   Pairing_marlin_types.Proof.t
-[@@deriving bin_io]
+[@@deriving bin_io, compare, sexp, yojson]
 
 let g t f = G.Affine.of_backend (f t)
 
@@ -102,7 +103,12 @@ let eval_to_backend
     h_3 g_3 row_a row_b row_c col_a col_b col_c value_a value_b value_c rc_a
     rc_b rc_c
 
-let to_backend chal_polys primary_input
+let field_vector_of_list xs =
+  let v = Fq.Vector.create () in
+  List.iter ~f:(Fq.Vector.emplace_back v) xs ;
+  v
+
+let to_backend' chal_polys primary_input
     ({ messages=
          { w_hat= w_comm
          ; z_hat_a= za_comm
@@ -113,11 +119,6 @@ let to_backend chal_polys primary_input
      ; openings=
          {proof= {lr; z_1; z_2; delta; sg}; evals= evals0, evals1, evals2} } :
       t) : Snarky_bn382.Fq_proof.t =
-  let primary_input =
-    let v = Fq.Vector.create () in
-    List.iter ~f:(Fq.Vector.emplace_back v) primary_input ;
-    v
-  in
   let g (a, b) =
     let open Snarky_bn382.G.Affine in
     let t = create a b in
@@ -150,6 +151,9 @@ let to_backend chal_polys primary_input
     (eval_to_backend evals0)
     (eval_to_backend evals1) (eval_to_backend evals2) challenges commitments
 
+let to_backend chal_polys primary_input t =
+  to_backend' chal_polys (field_vector_of_list primary_input) t
+
 let create ?message pk ~primary ~auxiliary =
   let chal_polys = Option.value_exn message in
   let challenges =
@@ -170,4 +174,17 @@ let create ?message pk ~primary ~auxiliary =
   Snarky_bn382.Fq_proof.delete res ;
   t
 
-let verify ?message:_ _ _ _ = true
+let batch_verify' (conv : 'a -> Fq.Vector.t)
+    (ts : (t * 'a * message option) list)
+    (vk : Snarky_bn382.Fq_verifier_index.t) =
+  let open Snarky_bn382.Fq_proof in
+  let v = Vector.create () in
+  List.iter ts ~f:(fun (t, xs, m) ->
+      let p = to_backend' (Option.value ~default:[] m) (conv xs) t in
+      Vector.emplace_back v p ; delete p ) ;
+  let res = batch_verify vk v in
+  Vector.delete v ; res
+
+let batch_verify = batch_verify' field_vector_of_list
+
+let verify ?message t vk xs : bool = batch_verify' Fn.id [(t, xs, message)] vk
