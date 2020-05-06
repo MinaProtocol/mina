@@ -1,6 +1,10 @@
 open Core_kernel
 open Pickles_types
 open Hlist
+module Sponge_inputs = Sponge_inputs
+module Impls = Impls
+module Inductive_rule = Inductive_rule
+module Tag = Tag
 
 module type Statement_intf = sig
   type field
@@ -13,10 +17,22 @@ end
 module type Statement_var_intf =
   Statement_intf with type field := Impls.Pairing_based.Field.t
 
-module type Statement_value_intf = sig
-  include Statement_intf with type field := Impls.Pairing_based.field
+module type Statement_value_intf =
+  Statement_intf with type field := Impls.Pairing_based.field
 
-  include Binable.S with type t := t
+module Verification_key : sig
+  include Binable.S
+
+  val dummy : t
+
+  module Id : sig
+    type t [@@deriving sexp]
+  end
+
+  val load :
+       cache:Key_cache.Spec.t list
+    -> Id.t
+    -> (t * [`Cache_hit | `Generated_something]) Async.Deferred.Or_error.t
 end
 
 module type Proof_intf = sig
@@ -24,28 +40,56 @@ module type Proof_intf = sig
 
   type t [@@deriving bin_io]
 
-  val statement : t -> statement
+  val verification_key : Verification_key.t Lazy.t
 
-  val verify : t list -> bool
+  val id : Verification_key.Id.t Lazy.t
+
+  val verify : (statement * t) list -> bool
 end
 
-module Prev_proof : sig
-  type ('s, 'max_width, 'max_height) t
+module Proof : sig
+  type ('max_width, 'mlmb) t
+
+  val dummy : 'w Nat.t -> 'm Nat.t -> ('w, 'm) t
+
+  module Make (W : Nat.Intf) (MLMB : Nat.Intf) : sig
+    type nonrec t = (W.n, MLMB.n) t [@@deriving bin_io, sexp, compare, yojson]
+  end
 end
+
+module Statement_with_proof : sig
+  type ('s, 'max_width, _) t = 's * ('max_width, 'max_width) Proof.t
+end
+
+val verify :
+     (module Nat.Intf with type n = 'n)
+  -> (module Statement_value_intf with type t = 'a)
+  -> Verification_key.t
+  -> ('a * ('n, 'n) Proof.t) list
+  -> bool
 
 module Prover : sig
   type ('prev_values, 'local_widths, 'local_heights, 'a_value, 'proof) t =
        ?handler:(Snarky.Request.request -> Snarky.Request.response)
-    -> ('prev_values, 'local_widths, 'local_heights) H3.T(Prev_proof).t
+    -> ( 'prev_values
+       , 'local_widths
+       , 'local_heights )
+       H3.T(Statement_with_proof).t
     -> 'a_value
     -> 'proof
 end
+
+module Provers : module type of H3_2.T (Prover)
 
 (** This compiles a series of inductive rules defining a set into a proof
     system for proving membership in that set, with a prover corresponding
     to each inductive rule. *)
 val compile :
-     (module Statement_var_intf with type t = 'a_var)
+     ?self:('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+  -> ?cache:Key_cache.Spec.t list
+  -> ?disk_keys:(Cache.Step.Key.Verification.t, 'branches) Vector.t
+                * Cache.Wrap.Key.Verification.t
+  -> (module Statement_var_intf with type t = 'a_var)
   -> (module Statement_value_intf with type t = 'a_value)
   -> typ:('a_var, 'a_value) Impls.Pairing_based.Typ.t
   -> branches:(module Nat.Intf with type n = 'branches)
@@ -61,11 +105,11 @@ val compile :
                  H4_2.T(Inductive_rule).t)
   -> ('a_var, 'a_value, 'max_branching, 'branches) Tag.t
      * (module Proof_intf
-          with type t = ('a_value, 'max_branching, 'branches) Prev_proof.t
+          with type t = ('max_branching, 'max_branching) Proof.t
            and type statement = 'a_value)
      * ( 'prev_valuess
        , 'widthss
        , 'heightss
        , 'a_value
-       , ('a_value, 'max_branching, 'branches) Prev_proof.t )
+       , ('max_branching, 'max_branching) Proof.t )
        H3_2.T(Prover).t

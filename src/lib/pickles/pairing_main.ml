@@ -8,10 +8,11 @@ module SC = Scalar_challenge
 open Pickles_types
 open Common
 
-module Make (Inputs : Intf.Pairing_main_inputs.S
-             with type Impl.field = Snarky_bn382_backend.Fp.t
-              and type G.Constant.Scalar.t = Snarky_bn382_backend.Fq.t
-            ) = struct
+module Make
+    (Inputs : Intf.Pairing_main_inputs.S
+              with type Impl.field = Snarky_bn382_backend.Fp.t
+               and type G.Constant.Scalar.t = Snarky_bn382_backend.Fq.t) =
+struct
   open Inputs
   open Impl
   module Branching = Nat.S (Branching_pred)
@@ -103,11 +104,10 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
         let absorb t = absorb sponge t in
         absorb ty1 t1 ; absorb ty2 t2
 
-  module Scalar_challenge = SC.Make(Impl)(G)(Challenge)(Endo.Dlog)
+  module Scalar_challenge = SC.Make (Impl) (G) (Challenge) (Endo.Dlog)
 
   let squeeze_scalar sponge : Scalar_challenge.t =
-    Scalar_challenge
-      (Sponge.squeeze sponge ~length:Challenge.length)
+    Scalar_challenge (Sponge.squeeze sponge ~length:Challenge.length)
 
   let bullet_reduce sponge gammas =
     let absorb t = absorb sponge t in
@@ -125,9 +125,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
                 Fq.Constant.(
                   is_square
                     (Scalar_challenge.Constant.to_field
-                       (read Scalar_challenge.typ pre))
-                )
-            )
+                       (read Scalar_challenge.typ pre))))
       in
       let left_term =
         let base =
@@ -147,12 +145,11 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
       , {Bulletproof_challenge.prechallenge= pre; is_square= pre_is_square} )
     in
     let terms, challenges =
-      Array.map2_exn gammas prechallenges
-        ~f:term_and_challenge |> Array.unzip
+      Array.map2_exn gammas prechallenges ~f:term_and_challenge |> Array.unzip
     in
     (Array.reduce_exn terms ~f:G.( + ), challenges)
 
-  let h_precomp = G.Scaling_precomputation.create Generators.h
+  let h_precomp = Lazy.map ~f:G.Scaling_precomputation.create Generators.h
 
   let check_bulletproof ~pcs_batch ~domain_h ~domain_k ~sponge ~xi
       ~combined_inner_product
@@ -172,9 +169,8 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
     in
     let open G in
     let combined_polynomial (* Corresponds to xi in figure 7 of WTS *) =
-      Pcs_batch.combine_commitments
-        pcs_batch ~scale:Scalar_challenge.endo ~add:( + ) ~xi
-        without_degree_bound with_degree_bound
+      Pcs_batch.combine_commitments pcs_batch ~scale:Scalar_challenge.endo
+        ~add:( + ) ~xi without_degree_bound with_degree_bound
     in
     let lr_prod, challenges = bullet_reduce sponge lr in
     let p_prime =
@@ -189,20 +185,22 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
       let scale t x = scale t (Fq.to_bits x) in
       let b_u = scale u advice.b in
       let z_1_g_plus_b_u = scale (sg + b_u) z_1 in
-      let z2_h = G.multiscale_known [|(Fq.to_bits z_2, h_precomp)|] in
+      let z2_h =
+        G.multiscale_known [|(Fq.to_bits z_2, Lazy.force h_precomp)|]
+      in
       z_1_g_plus_b_u + z2_h
     in
     (`Success (equal_g lhs rhs), challenges)
 
   let lagrange_precomputations =
-    Array.map Input_domain.lagrange_commitments
-      ~f:G.Scaling_precomputation.create
+    lazy
+      (Array.map
+         (Lazy.force Input_domain.lagrange_commitments)
+         ~f:G.Scaling_precomputation.create)
 
   let incrementally_verify_proof (type b)
       (module Branching : Nat.Add.Intf with type n = b) ~domain_h ~domain_k
-      ~verification_key:(m : _ Abc.t Matrix_evals.t)
-      ~xi
-      ~sponge ~public_input
+      ~verification_key:(m : _ Abc.t Matrix_evals.t) ~xi ~sponge ~public_input
       ~(sg_old : (_, Branching.n) Vector.t) ~combined_inner_product ~advice
       ~messages ~openings_proof =
     let receive ty f =
@@ -218,7 +216,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
         = Domain.size Input_domain.domain ) ;
       G.multiscale_known
         (Array.mapi public_input ~f:(fun i x ->
-             (x, lagrange_precomputations.(i)) ))
+             (x, (Lazy.force lagrange_precomputations).(i)) ))
     in
     absorb sponge PC x_hat ;
     let w_hat = receive PC w_hat in
@@ -292,8 +290,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
              ~h_minus_1:(Domain.size domain_h - 1)
              ~k_minus_1:(Domain.size domain_k - 1)
              (Branching.add Nat.N19.n))
-        ~domain_h ~domain_k ~sponge:sponge_before_evaluations
-        ~xi
+        ~domain_h ~domain_k ~sponge:sponge_before_evaluations ~xi
         ~combined_inner_product ~advice ~openings_proof
         ~polynomials:(without_degree_bound, [g_1; g_2; g_3])
     in
@@ -309,7 +306,8 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
       ; beta_2
       ; beta_3 } )
 
-  let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t) =
+  let pack_scalar_challenge (Pickles_types.Scalar_challenge.Scalar_challenge t)
+      =
     Field.pack (Challenge.to_bits t)
 
   let finalize_other_proof ~input_domain ~domain_k ~domain_h ~sponge
@@ -327,11 +325,10 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
     let xi_correct =
       Fp.equal (pack_scalar_challenge xi_actual) (pack_scalar_challenge xi)
     in
-    let r_correct = Fp.equal (pack_scalar_challenge r_actual) (pack_scalar_challenge r) in
-    let scalar =
-      SC.to_field_checked (module Impl)
-        ~endo:Endo.Pairing.scalar
+    let r_correct =
+      Fp.equal (pack_scalar_challenge r_actual) (pack_scalar_challenge r)
     in
+    let scalar = SC.to_field_checked (module Impl) ~endo:Endo.Pairing.scalar in
     let r = scalar r in
     let xi = scalar xi in
     let combined_evaluation batch pt without_bound =
@@ -340,9 +337,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
     in
     let marlin =
       Types.Pairing_based.Proof_state.Deferred_values.Marlin.map_challenges
-        ~f:Field.pack
-        ~scalar
-        marlin
+        ~f:Field.pack ~scalar marlin
     in
     let beta1, beta2, beta3 =
       Evals.to_combined_vectors ~x_hat:x_hat_beta_1 evals
@@ -350,8 +345,7 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
     let r_xi_sum_correct =
       let r_xi_sum_actual =
         r
-        * ( combined_evaluation Common.Pairing_pcs_batch.beta_1
-              marlin.beta_1
+        * ( combined_evaluation Common.Pairing_pcs_batch.beta_1 marlin.beta_1
               beta1
           + r
             * ( combined_evaluation Common.Pairing_pcs_batch.beta_2
@@ -397,7 +391,8 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
 
   (* TODO *)
   let assert_eq_marlin m1 m2 = ()
-    (*
+
+  (*
     let open Types.Dlog_based.Proof_state.Deferred_values.Marlin in
     let fq (x1, b1) (x2, b2) =
       Field.Assert.equal x1 x2 ;
@@ -455,9 +450,12 @@ module Make (Inputs : Intf.Pairing_main_inputs.S
         let c2 = bulletproof_challenges_actual.(i) in
         Boolean.Assert.( = ) c1.Bulletproof_challenge.is_square
           (Boolean.if_ is_base_case ~then_:c1.is_square ~else_:c2.is_square) ;
-        let Pickles_types.Scalar_challenge.Scalar_challenge c1 = c1.prechallenge in
+        let (Pickles_types.Scalar_challenge.Scalar_challenge c1) =
+          c1.prechallenge
+        in
         let c2 =
-          Field.if_ is_base_case ~then_:c1 ~else_:(pack_scalar_challenge c2.prechallenge)
+          Field.if_ is_base_case ~then_:c1
+            ~else_:(pack_scalar_challenge c2.prechallenge)
         in
         Field.Assert.equal c1 c2 ) ;
     bulletproof_success

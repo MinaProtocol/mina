@@ -63,33 +63,3 @@ module Dlog_based = struct
     let typ = Typ.transport typ ~there:to_data ~back:of_data in
     Spec.ETyp.T (typ, fun x -> of_data (f x))
 end
-
-(*
-    Snarky.Typ.tuple4
-      (typ Impl.Boolean.typ Nat.N1.n)
-      (typ fp Nat.N3.n)
-      (typ Challenge.packed_typ Nat.N9.n)
-      (typ Digest.packed_typ Nat.N3.n)
-*)
-(*
-  let input ~bulletproof_log2 =
-    let open Pickles_types in
-    let v = Vector.typ in
-    let bulletproof_challenge =
-      let open Types.Bulletproof_challenge in
-      Typ.transport Typ.field
-        ~there:(fun {prechallenge; is_square} ->
-          Field.Constant.project
-            (is_square :: Challenge.Constant.to_bits prechallenge) )
-        ~back:(fun x ->
-          match List.take (Field.Constant.unpack x) (1 + Challenge.length) with
-          | is_square :: bs ->
-              {is_square; prechallenge= Challenge.Constant.of_bits bs}
-          | _ ->
-              assert false )
-    in
-    Snarky.Typ.tuple5 (v Boolean.typ Nat.N1.n) (v Fq.typ Nat.N4.n)
-      (v Digest.packed_typ Nat.N3.n)
-      (v Challenge.packed_typ Nat.N9.n)
-      (Typ.array ~length:bulletproof_log2 bulletproof_challenge)
-*)

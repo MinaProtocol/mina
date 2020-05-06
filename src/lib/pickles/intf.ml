@@ -286,7 +286,7 @@ module Pairing_main_inputs = struct
     end
 
     module Generators : sig
-      val h : G.Constant.t
+      val h : G.Constant.t Lazy.t
     end
 
     module Input_domain : sig
@@ -294,7 +294,7 @@ module Pairing_main_inputs = struct
 
       val self : Domain.t
 
-      val lagrange_commitments : G.Constant.t array
+      val lagrange_commitments : G.Constant.t array Lazy.t
     end
 
     val sponge_params : Impl.Field.t Sponge_lib.Params.t

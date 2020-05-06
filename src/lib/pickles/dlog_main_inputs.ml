@@ -1,12 +1,6 @@
 open Core_kernel
 open Common
 
-(*
-let () =
-  Snarky_bn382_backend.Pairing_based.Keypair.set_urs_info
-    "/home/izzy/pickles/urs"
-
-*)
 module type S = Intf.Dlog_main_inputs.S
 
 open Snarky_bn382_backend
@@ -88,7 +82,6 @@ module G1 = struct
 
     module Constant = struct
       include G1.Affine
-
       module Scalar = Impls.Pairing_based.Field.Constant
 
       let scale (t : t) x : t = G1.(to_affine_exn (scale (of_affine t) x))
