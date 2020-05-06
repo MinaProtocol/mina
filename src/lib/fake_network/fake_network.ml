@@ -144,6 +144,12 @@ module Generator = struct
     -> peer_state Generator.t
 
   let fresh_peer ~proof_level ~precomputed_values ~max_frontier_length =
+          if (Genesis_constants.Proof_level.is_compiled proof_level) then
+                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
+
+
+
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values
     in
@@ -159,6 +165,12 @@ module Generator = struct
 
   let peer_with_branch ~frontier_branch_size ~proof_level ~precomputed_values
       ~max_frontier_length =
+          if (Genesis_constants.Proof_level.is_compiled proof_level) then
+                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
+
+
+
     let genesis_ledger =
       Precomputed_values.genesis_ledger precomputed_values
     in
@@ -177,6 +189,12 @@ module Generator = struct
     {frontier; consensus_local_state}
 
   let gen ~proof_level ~precomputed_values ~max_frontier_length configs =
+          if (Genesis_constants.Proof_level.is_compiled proof_level) then
+                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
+
+
+
     let open Quickcheck.Generator.Let_syntax in
     let%map states =
       Vect.Quickcheck_generator.map configs ~f:(fun config ->

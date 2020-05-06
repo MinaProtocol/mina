@@ -94,6 +94,12 @@ module Make (Inputs : Intf.Inputs_intf) :
               ~metadata:[("time", `String (Time.Span.to_string_hum total))] )
 
   let main ~logger ~proof_level daemon_address shutdown_on_disconnect =
+          if (Genesis_constants.Proof_level.is_compiled proof_level) then
+                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
+
+
+
     let%bind state = Worker_state.create ~proof_level () in
     let wait ?(sec = 0.5) () = after (Time.Span.of_sec sec) in
     (* retry interval with jitter *)
@@ -193,6 +199,12 @@ module Make (Inputs : Intf.Inputs_intf) :
           (Option.value ~default:true shutdown_on_disconnect))
 
   let arguments ~proof_level ~daemon_address ~shutdown_on_disconnect =
+          if (Genesis_constants.Proof_level.is_compiled proof_level) then
+                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
+
+
+
     [ "-daemon-address"
     ; Host_and_port.to_string daemon_address
     ; "-proof-level"

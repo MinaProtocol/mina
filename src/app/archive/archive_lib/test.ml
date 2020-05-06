@@ -10,6 +10,11 @@ let%test_module "Archive node unit tests" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
+    let () =
+     if (Genesis_constants.Proof_level.is_compiled proof_level) then
+      (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+        (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) )
+
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let conn_lazy =

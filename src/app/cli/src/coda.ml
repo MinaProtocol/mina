@@ -390,6 +390,10 @@ let daemon logger =
                 level %s"
                (str proof_level) (str compiled) ()
        in
+     if (Genesis_constants.Proof_level.is_compiled proof_level) then
+      (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
+
        let coda_initialization_deferred () =
          let%bind genesis_ledger, base_proof, genesis_constants =
            Genesis_ledger_helper.retrieve_genesis_state genesis_ledger_dir_flag
@@ -819,6 +823,9 @@ let daemon logger =
            Coda_run.get_proposed_protocol_version_opt ~conf_dir ~logger
              proposed_protocol_version
          in
+          if (Genesis_constants.Proof_level.is_compiled proof_level) then
+                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
          let%map coda =
            Coda_lib.create
              (Coda_lib.Config.make ~logger ~pids ~trust_system ~conf_dir

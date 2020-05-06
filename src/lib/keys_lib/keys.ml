@@ -112,6 +112,12 @@ let create () : (module S) Async.Deferred.t =
                  (Tock.Keypair.vk Wrap.keys))
 
           let main ~logger ~proof_level x =
+          if (Genesis_constants.Proof_level.is_compiled proof_level) then
+                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
+
+
+
             let there
                 { Prover_state.wrap_vk
                 ; prev_proof

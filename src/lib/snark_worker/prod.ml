@@ -30,6 +30,12 @@ module Inputs = struct
       ; proof_level: Genesis_constants.Proof_level.t }
 
     let create ~proof_level () =
+          if (Genesis_constants.Proof_level.is_compiled proof_level) then
+                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
+
+
+
       let%map proving, verification =
         match proof_level with
         | Genesis_constants.Proof_level.Full ->
@@ -60,6 +66,12 @@ module Inputs = struct
   (* TODO: Use public_key once SoK is implemented *)
   let perform_single ({m= (module M); cache; proof_level} : Worker_state.t)
       ~message =
+          if (Genesis_constants.Proof_level.is_compiled proof_level) then
+                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
+
+
+
     let open Snark_work_lib in
     let sok_digest = Coda_base.Sok_message.digest message in
     fun (single : single_spec) ->

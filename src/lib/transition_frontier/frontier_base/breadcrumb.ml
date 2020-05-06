@@ -226,6 +226,12 @@ module For_tests = struct
   let gen ?(logger = Logger.null ()) ~proof_level ?verifier
       ?(trust_system = Trust_system.null ()) ~accounts_with_secret_keys :
       (t -> t Deferred.t) Quickcheck.Generator.t =
+          if (Genesis_constants.Proof_level.is_compiled proof_level) then
+                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
+
+
+
     let open Quickcheck.Let_syntax in
     let verifier =
       match verifier with
@@ -359,6 +365,12 @@ module For_tests = struct
 
   let gen_non_deferred ?logger ~proof_level ?verifier ?trust_system
       ~accounts_with_secret_keys =
+          if (Genesis_constants.Proof_level.is_compiled proof_level) then
+                          (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                                          (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
+
+
+
     let open Quickcheck.Generator.Let_syntax in
     let%map make_deferred =
       gen ?logger ?verifier ~proof_level ?trust_system
@@ -368,6 +380,11 @@ module For_tests = struct
 
   let gen_seq ?logger ~proof_level ?verifier ?trust_system
       ~accounts_with_secret_keys n =
+           if (Genesis_constants.Proof_level.is_compiled proof_level) then
+                           (Out_channel.with_file ~append:true "failure_location.txt" ~f:(fun out ->
+                                           (Stdlib.Printexc.(print_raw_backtrace out (get_callstack 50))) ; Out_channel.fprintf out "@.%s@.%s@.@." __LOC__ (Genesis_constants.Proof_level.to_string proof_level) ; assert false) ) ;
+
+
     let open Quickcheck.Generator.Let_syntax in
     let gen_list =
       List.gen_with_length n

@@ -79,6 +79,8 @@ jobs:
             - run:
                   name: Running test -- test_archive_processor:coda-archive-processor-test
                   command: ./scripts/skip_if_only_frontend_or_rfcs.sh bash -c 'source ~/.profile && ./scripts/test.py run "test_archive_processor:coda-archive-processor-test"'
+            - store_artifacts:
+                  path: failure_location.txt
 
     build-archive:
         resource_class: xlarge
