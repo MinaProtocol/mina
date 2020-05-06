@@ -17,9 +17,6 @@ module Ledger_inner = struct
     module Arg = struct
       type t = Location_at_depth.t =
         | Generic of Location.Bigstring.Stable.Latest.t
-            [@printer
-              fun fmt bstr ->
-                Format.pp_print_string fmt (Bigstring.to_string bstr)]
         | Account of Location0.Addr.Stable.Latest.t
         | Hash of Location0.Addr.Stable.Latest.t
       [@@deriving bin_io_unversioned, hash, sexp, compare]
@@ -27,9 +24,6 @@ module Ledger_inner = struct
 
     type t = Arg.t =
       | Generic of Location.Bigstring.Stable.Latest.t
-          [@printer
-            fun fmt bstr ->
-              Format.pp_print_string fmt (Bigstring.to_string bstr)]
       | Account of Location0.Addr.Stable.Latest.t
       | Hash of Location0.Addr.Stable.Latest.t
     [@@deriving hash, sexp, compare]
