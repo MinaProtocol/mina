@@ -3,7 +3,7 @@
   (name pickles)
   (public_name pickles)
   (flags -warn-error -27)
-  (preprocess (pps ppx_coda ppx_jane ppx_deriving.std))
+  (preprocess (pps ppx_coda ppx_jane ppx_deriving.std ppx_deriving_yojson ))
   (libraries
     digestif
     snarky_bn382_backend
@@ -14,4 +14,12 @@
     snarky_curve
     snarky
     snarkette
+    key_cache
     core_kernel ))
+
+(rule
+ (targets precomputed_values.ml)
+ (deps
+  (:< gen/gen.exe))
+ (action
+  (run %{<} %{targets})))
