@@ -63,7 +63,7 @@ struct
       ~f:(fun x -> Bigint.(to_field (of_bignum_bigint x)))
 
   type var =
-    { digest: Pedersen.Checked.Digest.var
+    { digest: Random_oracle.Checked.Digest.t
     ; mutable bits: Boolean.var Bitstring.Lsb_first.t option }
 
   let var_of_t t =
@@ -77,17 +77,12 @@ struct
 
   open Let_syntax
 
-  let var_of_hash_unpacked unpacked =
-    { digest= Pedersen.Checked.Digest.Unpacked.project unpacked
-    ; bits= Some (Bitstring.Lsb_first.of_list (unpacked :> Boolean.var list))
-    }
-
   let var_to_hash_packed {digest; _} = digest
 
   (* TODO: Audit this usage of choose_preimage *)
   let unpack =
     if Int.( = ) length_in_bits Field.size_in_bits then fun x ->
-      Pedersen.Checked.Digest.choose_preimage x
+      Field.Checked.choose_preimage_var x ~length:length_in_bits
       >>| fun x -> (x :> Boolean.var list)
     else Field.Checked.unpack ~length:length_in_bits
 
@@ -105,7 +100,12 @@ struct
   (* TODO : use Random oracle.Digest to satisfy Bits_intf.S, move out of
      consensus_mechanism guard
   *)
-  include Pedersen.Digest.Bits
+  module T =
+    Snark_bits.Bits.Make_field
+      (Snark_params.Tick.Field)
+      (Snark_params.Tick.Bigint)
+
+  include (T : module type of T with type t := t)
 
   let assert_equal x y = Field.Checked.Assert.equal x.digest y.digest
 

@@ -163,8 +163,8 @@ let to_bits t = Fold_lib.Fold.to_list (fold_bits t)
 [%%ifdef
 consensus_mechanism]
 
-module Boolean = Tick0.Boolean
-module Typ = Tick0.Typ
+module Boolean = Tick.Boolean
+module Typ = Tick.Typ
 
 (* the code below is much the same as in Random_oracle.Digest; tag and length bytes
    make it a little different

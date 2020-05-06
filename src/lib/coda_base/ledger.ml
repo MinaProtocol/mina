@@ -217,7 +217,7 @@ module Ledger_inner = struct
 
   (* shadows definition in MaskedLedger, extra assurance hash is of right type  *)
   let merkle_root t =
-    Ledger_hash.of_hash (merkle_root t :> Tick.Pedersen.Digest.t)
+    Ledger_hash.of_hash (merkle_root t :> Random_oracle.Digest.t)
 
   let get_or_create ledger key =
     let action, loc =
@@ -248,10 +248,10 @@ module Ledger_inner = struct
         match request with
         | Ledger_hash.Get_element idx ->
             let elt = get_at_index_exn t idx in
-            let path = (path_exn idx :> Pedersen.Digest.t list) in
+            let path = (path_exn idx :> Random_oracle.Digest.t list) in
             respond (Provide (elt, path))
         | Ledger_hash.Get_path idx ->
-            let path = (path_exn idx :> Pedersen.Digest.t list) in
+            let path = (path_exn idx :> Random_oracle.Digest.t list) in
             respond (Provide path)
         | Ledger_hash.Set (idx, account) ->
             set_at_index_exn t idx account ;

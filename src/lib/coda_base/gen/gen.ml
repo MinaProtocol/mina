@@ -15,12 +15,27 @@ let keypairs =
     in
     List.map sks ~f:Keypair.of_private_key_exn
   in
+  let () =
+    Core.printf "key0 ex: %s\n%!"
+      (Private_key.to_base58_check (Private_key.create ())) ;
+    let pk =
+      Private_key.of_base58_check_exn
+        "Z2iaQ1FMKJFt5YzrgFhn5umKjca7sKpPHPzrzdyc8oT2fZY1iTniSRqrAWWve6NXsaxFD2sk4MT"
+      (*        non-raw binio  "Z2iaxFLZ3Xnb3mHYg56vwrbCdC5Y7ZQo1FUf31j8L18cW7XWH7GYxFxkZgztD6DXxQpNBs5FnD4" *)
+      (*         "6BnSKU5GQjgvEPbM45Qzazsf6M8eCrQdpL7x4jAvA4sr8Ga3FAx8AxdgWcqN7uNGu1SthMgDeMSUvEbkY9a56UxwmJpTzhzVUjfgfFsjJSVp9H1yWHt6H5couPNpF7L7e5u7NBGYnDMhx" *)
+    in
+    let pubkey = Public_key.of_private_key_exn pk in
+    Core.printf !"privkey0 %{sexp:Private_key.t}\n%!" pk ;
+    Core.printf !"pubkey0 %{sexp:Public_key.t}\n%!" pubkey
+  in
   List.cons
     (* FIXME #2936: remove this "precomputed VRF keypair" *)
     (* This key is also at the start of all the release ledgers. It's needed to generate a valid genesis transition *)
     (Keypair.of_private_key_exn
        (Private_key.of_base58_check_exn
-          "6BnSKU5GQjgvEPbM45Qzazsf6M8eCrQdpL7x4jAvA4sr8Ga3FAx8AxdgWcqN7uNGu1SthMgDeMSUvEbkY9a56UxwmJpTzhzVUjfgfFsjJSVp9H1yWHt6H5couPNpF7L7e5u7NBGYnDMhx"))
+          "Z2iaQ1FMKJFt5YzrgFhn5umKjca7sKpPHPzrzdyc8oT2fZY1iTniSRqrAWWve6NXsaxFD2sk4MT"
+          (*        non-raw binio  "Z2iaxFLZ3Xnb3mHYg56vwrbCdC5Y7ZQo1FUf31j8L18cW7XWH7GYxFxkZgztD6DXxQpNBs5FnD4" *)
+          (*           "6BnSKU5GQjgvEPbM45Qzazsf6M8eCrQdpL7x4jAvA4sr8Ga3FAx8AxdgWcqN7uNGu1SthMgDeMSUvEbkY9a56UxwmJpTzhzVUjfgfFsjJSVp9H1yWHt6H5couPNpF7L7e5u7NBGYnDMhx" *)))
     generated_keypairs
 
 let expr ~loc =
@@ -31,6 +46,12 @@ let expr ~loc =
   let earray =
     E.pexp_array
       (List.map keypairs ~f:(fun {public_key; private_key} ->
+           Core.printf
+             !"keypair gen privkey %s %{sexp:Private_key.t}\n%!"
+             __LOC__ private_key ;
+           Core.printf
+             !"keypair gen %s %{sexp:Public_key.t}\n%!"
+             __LOC__ public_key ;
            E.pexp_tuple
              [ estring
                  (Binable.to_string

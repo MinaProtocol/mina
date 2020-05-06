@@ -4,7 +4,6 @@ open Snark_params
 open Snarky
 open Tick
 open Let_syntax
-open Fold_lib
 
 module Merkle_tree =
   Snarky.Merkle_tree.Checked
@@ -56,18 +55,14 @@ let merge ~height (h1 : t) (h2 : t) =
     [|(h1 :> field); (h2 :> field)|]
   |> of_hash
 
-(* TODO: @ihm cryptography review *)
-let empty_hash =
-  let open Tick.Pedersen in
-  digest_fold (State.create ()) (Fold.string_triples "nothing up my sleeve")
-  |> of_hash
+let empty_hash = of_hash Outside_hash_image.t
 
 let%bench "Ledger_hash.merge ~height:1 empty_hash empty_hash" =
   merge ~height:1 empty_hash empty_hash
 
 let of_digest = Fn.compose Fn.id of_hash
 
-type path = Pedersen.Digest.t list
+type path = Random_oracle.Digest.t list
 
 type _ Request.t +=
   | Get_path : Account.Index.t -> path Request.t

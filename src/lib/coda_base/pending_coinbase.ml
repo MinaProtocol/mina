@@ -6,7 +6,6 @@ open Snark_params
 open Snark_params.Tick
 open Let_syntax
 open Currency
-open Fold_lib
 
 (* A pending coinbase is basically a Merkle tree of "stacks", each of which contains two hashes. The first hash
    is computed from the components in the coinbase via a "push" operation. The second hash, a protocol
@@ -168,8 +167,7 @@ module Coinbase_stack_data = struct
       (pack_input (Input.append (Coinbase_data.to_input coinbase) (to_input h)))
     |> of_hash
 
-  let empty =
-    of_hash (Pedersen.(State.salt "CoinbaseStack") |> Pedersen.State.digest)
+  let empty = Random_oracle.salt "CoinbaseStack" |> Random_oracle.digest
 
   module Checked = struct
     type t = var
@@ -191,7 +189,7 @@ end
 module Stack_hash = struct
   include Data_hash_binable
 
-  let dummy = of_hash Outside_pedersen_image.t
+  let dummy = of_hash Outside_hash_image.t
 end
 
 module Coinbase_stack_state = struct
@@ -314,10 +312,7 @@ module Hash_builder = struct
     |> of_hash
 
   let empty_hash =
-    let open Tick.Pedersen in
-    digest_fold (State.create ())
-      (Fold.string_triples "Pending coinbases merkle tree")
-    |> of_hash
+    Random_oracle.(digest (salt "PendingCoinbaseMerkleTree")) |> of_hash
 
   let of_digest = Fn.compose Fn.id of_hash
 end
@@ -1051,7 +1046,7 @@ struct
         match request with
         | Checked.Coinbase_stack_path idx ->
             let path =
-              (coinbase_stack_path_exn idx :> Pedersen.Digest.t list)
+              (coinbase_stack_path_exn idx :> Random_oracle.Digest.t list)
             in
             respond (Provide path)
         | Checked.Find_index_of_oldest_stack ->
@@ -1082,7 +1077,7 @@ struct
         | Checked.Get_coinbase_stack idx ->
             let elt = get_stack !pending_coinbase idx |> Or_error.ok_exn in
             let path =
-              (coinbase_stack_path_exn idx :> Pedersen.Digest.t list)
+              (coinbase_stack_path_exn idx :> Random_oracle.Digest.t list)
             in
             respond (Provide (elt, path))
         | Checked.Set_coinbase_stack (idx, stack) ->
