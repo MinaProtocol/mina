@@ -189,7 +189,6 @@ module type Snark_transition = sig
   module Poly : sig
     type ( 'blockchain_state
          , 'consensus_transition
-         , 'sok_digest
          , 'amount
          , 'public_key
          , 'pending_coinbase_action )
@@ -204,14 +203,16 @@ module type Snark_transition = sig
   type var =
     ( blockchain_state_var
     , consensus_transition_var
-    , Sok_message.Digest.Checked.t
     , Amount.var
     , Public_key.Compressed.var
     , Pending_coinbase.Update.Action.var )
     Poly.t
 
   val consensus_transition :
-    (_, 'consensus_transition, _, _, _, _) Poly.t -> 'consensus_transition
+    (_, 'consensus_transition, _, _, _) Poly.t -> 'consensus_transition
+
+  val blockchain_state :
+    ('blockchain_state, _, _, _, _) Poly.t -> 'blockchain_state
 end
 
 module type State_hooks = sig
@@ -433,8 +434,6 @@ module type S = sig
         var -> ((Field.Var.t, Boolean.var) Random_oracle.Input.t, _) Checked.t
 
       val to_input : Value.t -> (Field.t, bool) Random_oracle.Input.t
-
-      val to_lite : (Value.t -> Lite_base.Consensus_state.t) option
 
       val display : Value.t -> display
 

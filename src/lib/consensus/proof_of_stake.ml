@@ -70,7 +70,7 @@ let compute_delegatee_table_sparse_ledger keys ledger =
 
 module Segment_id = Nat.Make32 ()
 
-module Typ = Crypto_params.Tick0.Typ
+module Typ = Snark_params.Tick.Typ
 module Constants = Constants
 
 let epoch_size = UInt32.to_int Constants.Epoch.size
@@ -112,7 +112,7 @@ module Data = struct
       let description = "Epoch Seed"
     end)
 
-    let initial : t = of_hash Tick.Pedersen.zero_hash
+    let initial : t = of_hash Snark_params.Tick.Field.zero
 
     let update (seed : t) vrf_result =
       let open Random_oracle in
@@ -451,8 +451,10 @@ module Data = struct
     module Message = struct
       type ('global_slot, 'epoch_seed, 'delegator) t =
         {global_slot: 'global_slot; seed: 'epoch_seed; delegator: 'delegator}
+      [@@deriving sexp]
 
       type value = (Global_slot.t, Epoch_seed.t, Coda_base.Account.Index.t) t
+      [@@deriving sexp]
 
       type var =
         ( Global_slot.Checked.t
@@ -489,10 +491,9 @@ module Data = struct
           ~value_of_hlist:of_hlist
 
       let hash_to_group msg =
-        Group_map.to_group
-          (Random_oracle.hash ~init:Coda_base.Hash_prefix.vrf_message
-             (Random_oracle.pack_input (to_input msg)))
-        |> Tick.Inner_curve.of_affine
+        Random_oracle.hash ~init:Coda_base.Hash_prefix.vrf_message
+          (Random_oracle.pack_input (to_input msg))
+        |> Group_map.to_group |> Tick.Inner_curve.of_affine
 
       module Checked = struct
         open Tick
@@ -508,10 +509,10 @@ module Data = struct
         let hash_to_group msg =
           let%bind input = to_input msg in
           Tick.make_checked (fun () ->
-              Group_map.Checked.to_group
-                (Random_oracle.Checked.hash
-                   ~init:Coda_base.Hash_prefix.vrf_message
-                   (Random_oracle.Checked.pack_input input)) )
+              Random_oracle.Checked.hash
+                ~init:Coda_base.Hash_prefix.vrf_message
+                (Random_oracle.Checked.pack_input input)
+              |> Group_map.Checked.to_group )
       end
 
       let gen =
@@ -699,7 +700,20 @@ module Data = struct
     end
 
     module T =
-      Vrf_lib.Integrated.Make (Snark_params.Tick) (Scalar) (Group) (Message)
+      Vrf_lib.Integrated.Make (Tick) (Scalar)
+        (struct
+          include (
+            Group : module type of Group with module Checked := Group.Checked )
+
+          let scale = scale
+
+          module Checked = struct
+            include Group.Checked
+
+            let scale = scale
+          end
+        end)
+        (Message)
         (struct
           type value = Snark_params.Tick.Field.t
 
