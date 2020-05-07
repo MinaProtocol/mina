@@ -10,13 +10,6 @@ let printMap = map => {
   );
 };
 
-let getUsers = blocks => {
-  Array.map(
-    (block: Types.NewBlock.t) => block.data.newBlock.creatorAccount.publicKey,
-    blocks,
-  );
-};
-
 let calculateBlocksCreated = blocks => {
   Array.fold_left(
     (map, block: Types.NewBlock.t) => {
@@ -36,11 +29,51 @@ let calculateBlocksCreated = blocks => {
 };
 
 let calculateTransactionSent = blocks => {
-  Js.log("calculateTransactionSent");
+  Array.fold_left(
+    (map, block: Types.NewBlock.t) => {
+      Array.fold_left(
+        (map, userCommand: Types.NewBlock.userCommands) => {
+          StringMap.update(
+            userCommand.fromAccount.publicKey,
+            value =>
+              switch (value) {
+              | Some(transaction) => Some(transaction + 1)
+              | None => Some(1)
+              },
+            map,
+          )
+        },
+        map,
+        block.data.newBlock.transactions.userCommands,
+      )
+    },
+    StringMap.empty,
+    blocks,
+  );
 };
 
 let calculateSnarkWorkCreated = blocks => {
-  Js.log("calculateSnarkWorkCreated");
+  Array.fold_left(
+    (map, block: Types.NewBlock.t) => {
+      Array.fold_left(
+        (map, snarkJob: Types.NewBlock.snarkJobs) => {
+          StringMap.update(
+            snarkJob.prover,
+            value =>
+              switch (value) {
+              | Some(snarkWork) => Some(snarkWork + 1)
+              | None => Some(1)
+              },
+            map,
+          )
+        },
+        map,
+        block.data.newBlock.snarkJobs,
+      )
+    },
+    StringMap.empty,
+    blocks,
+  );
 };
 
 // Expected Output
@@ -55,6 +88,7 @@ let handleMetrics = (metrics, blocks) => {
       metric => {
         switch (metric) {
         | BlocksCreated => blocks |> calculateBlocksCreated
+        | TransactionsSent => blocks |> calculateTransactionSent
         | _ => StringMap.empty
         }
       },

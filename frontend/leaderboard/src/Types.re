@@ -1,14 +1,15 @@
 module NewBlock = {
+  type account = {publicKey: string};
   type creatorAccount = {publicKey: string};
 
   type snarkJobs = {prover: string};
 
-  type userCommands = {fromAccount: string};
-  type transactions = {transactions: userCommands};
+  type userCommands = {fromAccount: account};
+  type transactions = {userCommands: array(userCommands)};
 
   type data = {
     creatorAccount,
-    userCommands,
+    snarkJobs: array(snarkJobs),
     transactions,
   };
 
