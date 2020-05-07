@@ -118,27 +118,31 @@ end
 module Genesis_proof = struct
   let path ~root = root ^/ "genesis_proof"
 
-  let generate ~ledger ~(genesis_constants : Genesis_constants.t) =
+  let generate ~proof_level ~ledger ~(genesis_constants : Genesis_constants.t)
+      =
     (* TODO(4829): Runtime proof-level. *)
-    if Coda_compile_config.proof_level = "full" then
-      let%map ((module Keys) as keys) = Keys_lib.Keys.create () in
-      let protocol_state_with_hash =
-        Coda_state.Genesis_protocol_state.t
-          ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
-          ~genesis_constants
-      in
-      let base_hash = Keys.Step.instance_hash protocol_state_with_hash.data in
-      let computed_values =
-        Genesis_proof.create_values ~keys
-          { genesis_ledger= ledger
-          ; protocol_state_with_hash
-          ; base_hash
-          ; genesis_constants }
-      in
-      (base_hash, computed_values.genesis_proof)
-    else
-      return
-        (Snark_params.Tick.Field.zero, Dummy_values.Tock.Bowe_gabizon18.proof)
+    match proof_level with
+    | Genesis_constants.Proof_level.Full ->
+        let%map ((module Keys) as keys) = Keys_lib.Keys.create () in
+        let protocol_state_with_hash =
+          Coda_state.Genesis_protocol_state.t
+            ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
+            ~genesis_constants
+        in
+        let base_hash =
+          Keys.Step.instance_hash protocol_state_with_hash.data
+        in
+        let computed_values =
+          Genesis_proof.create_values ~proof_level ~keys
+            { genesis_ledger= ledger
+            ; protocol_state_with_hash
+            ; base_hash
+            ; genesis_constants }
+        in
+        (base_hash, computed_values.genesis_proof)
+    | _ ->
+        return
+          (Snark_params.Tick.Field.zero, Dummy_values.Tock.Bowe_gabizon18.proof)
 
   let store ~filename proof =
     (* TODO: Use [Writer.write_bin_prot]. *)
@@ -191,7 +195,8 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
     (Genesis_ledger.Packed.t * Proof.t * Genesis_constants.t) Deferred.t =
   let open Cache_dir in
   let genesis_dir_name =
-    Cache_dir.genesis_dir_name Genesis_constants.compiled
+    Cache_dir.genesis_dir_name ~genesis_constants:Genesis_constants.compiled
+      ~proof_level:Genesis_constants.Proof_level.compiled
   in
   let tar_filename = genesis_dir_name ^ ".tar.gz" in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
