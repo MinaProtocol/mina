@@ -2,14 +2,42 @@ open Core_kernel
 open Coda_base
 open Coda_transition
 
+module Common = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { scan_state: Staged_ledger.Scan_state.Stable.V1.t
+        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
+
+      let to_latest = Fn.id
+
+      let to_yojson {scan_state= _; pending_coinbase} =
+        `Assoc
+          [ ("scan_state", `String "<opaque>")
+          ; ( "pending_coinbase"
+            , Pending_coinbase.Stable.V1.to_yojson pending_coinbase ) ]
+    end
+  end]
+
+  type t = Stable.Latest.t =
+    { scan_state: Staged_ledger.Scan_state.t
+    ; pending_coinbase: Pending_coinbase.t }
+
+  let create ~scan_state ~pending_coinbase = {scan_state; pending_coinbase}
+
+  let scan_state t = t.scan_state
+
+  let pending_coinbase t = t.pending_coinbase
+end
+
 module Historical = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
       type t =
         { transition: External_transition.Validated.Stable.V1.t
-        ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t
+        ; common: Common.Stable.V1.t
         ; staged_ledger_target_ledger_hash: Ledger_hash.Stable.V1.t }
 
       let to_latest = Fn.id
@@ -18,9 +46,16 @@ module Historical = struct
 
   type t = Stable.Latest.t =
     { transition: External_transition.Validated.t
-    ; scan_state: Staged_ledger.Scan_state.t
-    ; pending_coinbase: Pending_coinbase.t
+    ; common: Common.t
     ; staged_ledger_target_ledger_hash: Ledger_hash.t }
+
+  let transition t = t.transition
+
+  let staged_ledger_target_ledger_hash t = t.staged_ledger_target_ledger_hash
+
+  let scan_state t = Common.scan_state t.common
+
+  let pending_coinbase t = Common.pending_coinbase t.common
 
   let of_breadcrumb breadcrumb =
     let transition = Breadcrumb.validated_transition breadcrumb in
@@ -32,7 +67,8 @@ module Historical = struct
     let staged_ledger_target_ledger_hash =
       Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
     in
-    {transition; scan_state; pending_coinbase; staged_ledger_target_ledger_hash}
+    let common = Common.create ~scan_state ~pending_coinbase in
+    {transition; common; staged_ledger_target_ledger_hash}
 end
 
 module Limited = struct
@@ -41,70 +77,105 @@ module Limited = struct
     module V1 = struct
       type t =
         { transition: External_transition.Validated.Stable.V1.t
-        ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
+        ; protocol_states:
+            ( Coda_base.State_hash.Stable.V1.t
+            * Coda_state.Protocol_state.Value.Stable.V1.t )
+            list
+        ; common: Common.Stable.V1.t }
+
+      let to_yojson {transition; protocol_states= _; common} =
+        `Assoc
+          [ ( "transition"
+            , External_transition.Validated.Stable.V1.to_yojson transition )
+          ; ("protocol_states", `String "<opaque>")
+          ; ("common", Common.Stable.V1.to_yojson common) ]
 
       let to_latest = Fn.id
-
-      let to_yojson {transition; scan_state= _; pending_coinbase} =
-        `Assoc
-          [ ("transition", External_transition.Validated.to_yojson transition)
-          ; ("scan_state", `String "<opaque>")
-          ; ("pending_coinbase", Pending_coinbase.to_yojson pending_coinbase)
-          ]
     end
   end]
 
   type t = Stable.Latest.t =
     { transition: External_transition.Validated.t
-    ; scan_state: Staged_ledger.Scan_state.t
-    ; pending_coinbase: Pending_coinbase.t }
+    ; protocol_states:
+        (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list
+    ; common: Common.t }
 
   [%%define_locally
   Stable.Latest.(to_yojson)]
+
+  let create ~transition ~scan_state ~pending_coinbase ~protocol_states =
+    let common = {Common.scan_state; pending_coinbase} in
+    {transition; common; protocol_states}
+
+  let transition t = t.transition
+
+  let hash t = External_transition.Validated.state_hash t.transition
+
+  let protocol_states t = t.protocol_states
+
+  let scan_state t = Common.scan_state t.common
+
+  let pending_coinbase t = Common.pending_coinbase t.common
 end
 
 module Minimal = struct
   [%%versioned
   module Stable = struct
     module V1 = struct
-      type t =
-        { hash: State_hash.Stable.V1.t
-        ; scan_state: Staged_ledger.Scan_state.Stable.V1.t
-        ; pending_coinbase: Pending_coinbase.Stable.V1.t }
+      type t = {hash: State_hash.Stable.V1.t; common: Common.Stable.V1.t}
+      [@@driving to_yojson]
 
       let to_latest = Fn.id
     end
   end]
 
-  type t = Stable.Latest.t =
-    { hash: State_hash.t
-    ; scan_state: Staged_ledger.Scan_state.t
-    ; pending_coinbase: Pending_coinbase.t }
+  type t = Stable.Latest.t = {hash: State_hash.t; common: Common.t}
+  [@@driving to_yojson]
 
-  let of_limited {Limited.transition; scan_state; pending_coinbase} =
-    let hash = External_transition.Validated.state_hash transition in
-    {hash; scan_state; pending_coinbase}
+  let hash t = t.hash
 
-  let upgrade {hash; scan_state; pending_coinbase} transition =
+  let of_limited (l : Limited.t) =
+    let hash = External_transition.Validated.state_hash l.transition in
+    {hash; common= l.common}
+
+  let upgrade t ~transition ~protocol_states =
+    let hash = hash t in
     assert (
       State_hash.equal
         (External_transition.Validated.state_hash transition)
         hash ) ;
-    {Limited.transition; scan_state; pending_coinbase}
+    Staged_ledger.Scan_state.check_required_protocol_states t.common.scan_state
+      ~protocol_states:(List.map ~f:snd protocol_states)
+    |> Or_error.ok_exn |> ignore ;
+    {Limited.transition; protocol_states; common= t.common}
+
+  let create ~hash ~scan_state ~pending_coinbase =
+    let common = {Common.scan_state; pending_coinbase} in
+    {hash; common}
+
+  let scan_state t = Common.scan_state t.common
+
+  let pending_coinbase t = Common.pending_coinbase t.common
 end
 
 type t =
-  {transition: External_transition.Validated.t; staged_ledger: Staged_ledger.t}
+  { transition: External_transition.Validated.t
+  ; staged_ledger: Staged_ledger.t
+  ; protocol_states:
+      (Coda_base.State_hash.t * Coda_state.Protocol_state.Value.t) list }
 
-let minimize {transition; staged_ledger} =
-  { Minimal.hash= External_transition.Validated.state_hash transition
-  ; scan_state= Staged_ledger.scan_state staged_ledger
-  ; pending_coinbase= Staged_ledger.pending_coinbase_collection staged_ledger
-  }
+let minimize {transition; staged_ledger; protocol_states= _} =
+  let scan_state = Staged_ledger.scan_state staged_ledger in
+  let pending_coinbase =
+    Staged_ledger.pending_coinbase_collection staged_ledger
+  in
+  let common = Common.create ~scan_state ~pending_coinbase in
+  {Minimal.hash= External_transition.Validated.state_hash transition; common}
 
-let limit {transition; staged_ledger} =
-  { Limited.transition
-  ; scan_state= Staged_ledger.scan_state staged_ledger
-  ; pending_coinbase= Staged_ledger.pending_coinbase_collection staged_ledger
-  }
+let limit {transition; staged_ledger; protocol_states} =
+  let scan_state = Staged_ledger.scan_state staged_ledger in
+  let pending_coinbase =
+    Staged_ledger.pending_coinbase_collection staged_ledger
+  in
+  let common = Common.create ~scan_state ~pending_coinbase in
+  {Limited.transition; common; protocol_states}
