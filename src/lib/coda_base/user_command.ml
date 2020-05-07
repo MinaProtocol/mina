@@ -78,9 +78,9 @@ let fee = Fn.compose Payload.fee payload
 let nonce = Fn.compose Payload.nonce payload
 
 (* for filtering *)
-let minimum_fee = Fee.of_int 2_000_000_000
+let minimum_fee = Coda_compile_config.minimum_user_command_fee
 
-let is_trivial t = Fee.(fee t < minimum_fee)
+let has_insufficient_fee t = Fee.(fee t < minimum_fee)
 
 let signer {Poly.signer; _} = signer
 
@@ -368,9 +368,12 @@ let create_with_signature_checked signature signer payload =
   Option.some_if (check_signature t) t
 
 let gen_test =
-  let keys = Array.init 2 ~f:(fun _ -> Signature_keypair.create ()) in
-  Gen.payment_with_random_participants ~sign_type:`Real ~keys ~max_amount:10000
-    ~max_fee:1000 ()
+  let open Quickcheck.Let_syntax in
+  let%bind keys =
+    Quickcheck.Generator.list_with_length 2 Signature_keypair.gen
+  in
+  Gen.payment_with_random_participants ~sign_type:`Real
+    ~keys:(Array.of_list keys) ~max_amount:10000 ~max_fee:1000 ()
 
 let%test_unit "completeness" =
   Quickcheck.test ~trials:20 gen_test ~f:(fun t -> assert (check_signature t))

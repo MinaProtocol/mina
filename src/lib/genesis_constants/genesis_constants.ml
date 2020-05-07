@@ -4,6 +4,36 @@
 open Core_kernel
 open Module_version
 
+module Proof_level = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Full | Check | None
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t = Full | Check | None
+
+  let to_string = function Full -> "full" | Check -> "check" | None -> "none"
+
+  let of_string = function
+    | "full" ->
+        Full
+    | "check" ->
+        Check
+    | "none" ->
+        None
+    | s ->
+        failwithf "unrecognised proof level %s" s ()
+
+  [%%inject
+  "compiled", proof_level]
+
+  let compiled = of_string compiled
+end
+
 (*Constants that can be specified for generating the base proof (that are not required for key-generation) in runtime_genesis_ledger.exe and that can be configured at runtime.
 The types are defined such that this module doesn't depend on any of the coda libraries (except blake2 and module_version) to avoid dependency cycles.
 TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
@@ -107,26 +137,29 @@ module Protocol = struct
     end
   end]
 
-  type t = Stable.Latest.t [@@deriving eq]
+  type t = Stable.Latest.t [@@deriving eq, to_yojson]
 end
 
-type t = {protocol: Protocol.t; txpool_max_size: int}
+module T = struct
+  type t =
+    {protocol: Protocol.t; txpool_max_size: int; num_accounts: int option}
+  [@@deriving to_yojson]
 
-let hash (t : t) =
-  let str =
-    ( List.map
-        [t.protocol.k; t.protocol.delta; t.txpool_max_size]
-        ~f:Int.to_string
-    |> String.concat ~sep:"" )
-    ^ Core.Time.to_string t.protocol.genesis_state_timestamp
-  in
-  Blake2.digest_string str |> Blake2.to_hex
+  let hash (t : t) =
+    let str =
+      ( List.map
+          [t.protocol.k; t.protocol.delta; t.txpool_max_size]
+          ~f:Int.to_string
+      |> String.concat ~sep:"" )
+      ^ Core.Time.to_string t.protocol.genesis_state_timestamp
+    in
+    Blake2.digest_string str |> Blake2.to_hex
+end
+
+include T
 
 [%%inject
 "genesis_state_timestamp_string", genesis_state_timestamp]
-
-[%%ifdef
-consensus_mechanism]
 
 [%%inject
 "k", k]
@@ -134,10 +167,11 @@ consensus_mechanism]
 [%%inject
 "delta", delta]
 
-[%%endif]
-
 [%%inject
 "pool_max_size", pool_max_size]
+
+[%%inject
+"ledger_depth", ledger_depth]
 
 let compiled : t =
   { protocol=
@@ -145,66 +179,85 @@ let compiled : t =
       ; delta
       ; genesis_state_timestamp=
           genesis_timestamp_of_string genesis_state_timestamp_string }
-  ; txpool_max_size= pool_max_size }
+  ; txpool_max_size= pool_max_size
+  ; num_accounts= None }
 
-module Config_file = struct
+let for_unit_tests = compiled
+
+module type Config_intf = sig
+  type t [@@deriving yojson]
+
+  val to_genesis_constants : default:T.t -> t -> T.t
+
+  val of_genesis_constants : T.t -> t
+end
+
+module Config_file : Config_intf = struct
   type t =
-    { k: int option
-    ; delta: int option
-    ; txpool_max_size: int option
-    ; genesis_state_timestamp: string option }
+    { k: int option [@default None]
+    ; delta: int option [@default None]
+    ; txpool_max_size: int option [@default None]
+    ; genesis_state_timestamp: string option [@default None]
+    ; num_accounts: int option [@default None] }
   [@@deriving yojson]
 
   let of_yojson s =
     Result.(
       of_yojson s
       >>= fun t -> validate_time t.genesis_state_timestamp >>= fun _ -> Ok t)
+
+  let to_genesis_constants ~(default : T.t) (t : t) : T.t =
+    let opt default x = Option.value ~default x in
+    let protocol =
+      { Protocol.Poly.k= opt default.protocol.k t.k
+      ; delta= opt default.protocol.delta t.delta
+      ; genesis_state_timestamp=
+          Option.value_map ~default:default.protocol.genesis_state_timestamp
+            t.genesis_state_timestamp ~f:genesis_timestamp_of_string }
+    in
+    { protocol
+    ; txpool_max_size= opt default.txpool_max_size t.txpool_max_size
+    ; num_accounts=
+        Option.value_map ~default:default.num_accounts
+          ~f:(fun x -> Core_kernel.Option.some_if (x > 0) x)
+          t.num_accounts }
+
+  let of_genesis_constants (genesis_constants : T.t) : t =
+    { k= Some genesis_constants.protocol.k
+    ; delta= Some genesis_constants.protocol.delta
+    ; txpool_max_size= Some genesis_constants.txpool_max_size
+    ; genesis_state_timestamp=
+        Some
+          (Core.Time.format genesis_constants.protocol.genesis_state_timestamp
+             "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc)
+    ; num_accounts= genesis_constants.num_accounts }
 end
 
-module Daemon_config = struct
+module Daemon_config : Config_intf = struct
   type t = {txpool_max_size: int option; genesis_state_timestamp: string option}
-  [@@deriving yojson, eq]
+  [@@deriving yojson]
 
   let of_yojson s =
     Result.(
       of_yojson s
       >>= fun t -> validate_time t.genesis_state_timestamp >>= fun _ -> Ok t)
-end
 
-let of_config_file ~(default : t) (t : Config_file.t) : t =
-  let opt default x = Option.value ~default x in
-  let protocol =
-    { Protocol.Poly.k= opt default.protocol.k t.k
-    ; delta= opt default.protocol.delta t.delta
+  let to_genesis_constants ~(default : T.t)
+      ({txpool_max_size; genesis_state_timestamp} : t) : T.t =
+    { txpool_max_size=
+        Option.value ~default:default.txpool_max_size txpool_max_size
+    ; protocol=
+        { default.protocol with
+          genesis_state_timestamp=
+            Option.value_map genesis_state_timestamp
+              ~default:default.protocol.genesis_state_timestamp
+              ~f:genesis_timestamp_of_string }
+    ; num_accounts= default.num_accounts }
+
+  let of_genesis_constants (genesis_constants : T.t) : t =
+    { txpool_max_size= Some genesis_constants.txpool_max_size
     ; genesis_state_timestamp=
-        Option.value_map ~default:default.protocol.genesis_state_timestamp
-          t.genesis_state_timestamp ~f:genesis_timestamp_of_string }
-  in
-  {protocol; txpool_max_size= opt default.txpool_max_size t.txpool_max_size}
-
-let to_config_file t : Config_file.t =
-  { Config_file.k= Some t.protocol.k
-  ; delta= Some t.protocol.delta
-  ; txpool_max_size= Some t.txpool_max_size
-  ; genesis_state_timestamp=
-      Some
-        (Core.Time.format t.protocol.genesis_state_timestamp
-           "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }
-
-let of_daemon_config ~(default : t)
-    ({txpool_max_size; genesis_state_timestamp} : Daemon_config.t) : t =
-  { txpool_max_size=
-      Option.value ~default:default.txpool_max_size txpool_max_size
-  ; protocol=
-      { default.protocol with
-        genesis_state_timestamp=
-          Option.value_map genesis_state_timestamp
-            ~default:default.protocol.genesis_state_timestamp
-            ~f:genesis_timestamp_of_string } }
-
-let to_daemon_config (t : t) : Daemon_config.t =
-  { txpool_max_size= Some t.txpool_max_size
-  ; genesis_state_timestamp=
-      Some
-        (Core.Time.format t.protocol.genesis_state_timestamp
-           "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }
+        Some
+          (Core.Time.format genesis_constants.protocol.genesis_state_timestamp
+             "%Y-%m-%d %H:%M:%S%z" ~zone:Core.Time.Zone.utc) }
+end

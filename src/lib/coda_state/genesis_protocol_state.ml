@@ -53,11 +53,12 @@ let t ~genesis_ledger ~(genesis_constants : Genesis_constants.t) =
   in
   With_hash.of_data ~hash_data:Protocol_state.hash state
 
-let compile_time_genesis () =
-  t ~genesis_ledger:Test_genesis_ledger.t
-    ~genesis_constants:Genesis_constants.compiled
+let compile_time_genesis =
+  lazy
+    (t ~genesis_ledger:Test_genesis_ledger.t
+       ~genesis_constants:Genesis_constants.compiled)
 
 module For_tests = struct
   (*Use test_ledger generated at compile time*)
-  let genesis_state_hash () = compile_time_genesis () |> With_hash.hash
+  let genesis_state_hash = Lazy.map ~f:With_hash.hash compile_time_genesis
 end

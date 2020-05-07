@@ -8,10 +8,27 @@ module Ledger_inner = struct
     let depth = Coda_compile_config.ledger_depth
   end
 
-  module Location0 : Merkle_ledger.Location_intf.S =
+  module Location_at_depth : Merkle_ledger.Location_intf.S =
     Merkle_ledger.Location.Make (Depth)
 
-  module Location_at_depth = Location0
+  module Location_binable = struct
+    module Arg = struct
+      type t = Location_at_depth.t =
+        | Generic of Location.Bigstring.Stable.Latest.t
+        | Account of Location_at_depth.Addr.Stable.Latest.t
+        | Hash of Location_at_depth.Addr.Stable.Latest.t
+      [@@deriving bin_io_unversioned, hash, sexp, compare]
+    end
+
+    type t = Arg.t =
+      | Generic of Location.Bigstring.t
+      | Account of Location_at_depth.Addr.t
+      | Hash of Location_at_depth.Addr.t
+    [@@deriving hash, sexp, compare]
+
+    include Hashable.Make_binable (Arg) [@@deriving
+                                          sexp, compare, hash, yojson]
+  end
 
   module Kvdb : Intf.Key_value_database with type config := string =
     Rocksdb.Database
@@ -21,23 +38,23 @@ module Ledger_inner = struct
   end
 
   module Hash = struct
+    module Arg = struct
+      type t = Ledger_hash.Stable.Latest.t
+      [@@deriving sexp, compare, hash, bin_io_unversioned]
+    end
+
     [%%versioned
     module Stable = struct
       module V1 = struct
         type t = Ledger_hash.Stable.V1.t
         [@@deriving sexp, compare, hash, eq, yojson]
 
+        type _unused = unit constraint t = Arg.t
+
         let to_latest = Fn.id
 
-        (* TODO: move T outside V1 when %%versioned ppx allows it *)
-        module T = struct
-          type typ = t [@@deriving sexp, compare, hash, bin_io]
-
-          type t = typ [@@deriving sexp, compare, hash, bin_io]
-        end
-
-        include Hashable.Make_binable (T) [@@deriving
-                                            sexp, compare, hash, eq, yojson]
+        include Hashable.Make_binable (Arg) [@@deriving
+                                              sexp, compare, hash, eq, yojson]
 
         let to_string = Ledger_hash.to_string
 
@@ -85,6 +102,7 @@ module Ledger_inner = struct
     module Depth = Depth
     module Kvdb = Kvdb
     module Location = Location_at_depth
+    module Location_binable = Location_binable
     module Storage_locations = Storage_locations
   end
 

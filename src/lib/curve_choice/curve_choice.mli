@@ -5,8 +5,8 @@ module Cycle : sig
 
   module Mnt6 :
     Intf.Backend_intf
-    with type Common.Field.t = Mnt4.Fq.t
-     and type Fq.t = Mnt4.Field.t
+    with module Common.Field = Mnt4.Fq
+    with module Fq = Mnt4.Common.Field
 end
 
 module Snarkette_tick : Intf.Snarkette_tick_intf
@@ -21,13 +21,12 @@ module Tick_backend : sig
 
   include
     module type of Full.Default
-    with type Field.t = Full.Default.Field.t
-     and type Bigint.R.t = Full.Default.Bigint.R.t
-     and type Bigint.Q.t = Full.Default.Bigint.Q.t
-     and type Proving_key.t = Full.Default.Proving_key.t
-     and type Verification_key.t = Full.Default.Verification_key.t
-     and type Keypair.t = Full.Default.Keypair.t
-     and type Proof.t = Full.Default.Proof.t
+    with module Field = Full.Default.Field
+    with module Bigint = Full.Default.Bigint
+    with module Proving_key = Full.Default.Proving_key
+    with module Verification_key = Full.Default.Verification_key
+    with module Keypair = Full.Default.Keypair
+    with module Proof = Full.Default.Proof
 
   module Inner_curve : sig
     include

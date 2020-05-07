@@ -150,6 +150,7 @@ module type Snark_resource_pool_intf = sig
   val make_config :
     trust_system:Trust_system.t -> verifier:Verifier.t -> Config.t
 
+  (* TODO: we don't seem to be using the bin_io here, can this type be removed? *)
   type serializable [@@deriving bin_io]
 
   val of_serializable : serializable -> config:Config.t -> logger:Logger.t -> t
@@ -186,20 +187,11 @@ end
 module type Snark_pool_diff_intf = sig
   type resource_pool
 
-  module Stable : sig
-    module V1 : sig
-      type t =
-        | Add_solved_work of
-            Transaction_snark_work.Statement.Stable.V1.t
-            * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-              Priced_proof.Stable.V1.t
-      [@@deriving bin_io, compare, sexp, to_yojson, version]
-    end
-
-    module Latest = V1
-  end
-
-  type t = Stable.Latest.t [@@deriving compare, sexp]
+  type t =
+    | Add_solved_work of
+        Transaction_snark_work.Statement.t
+        * Ledger_proof.t One_or_two.t Priced_proof.t
+  [@@deriving compare, sexp]
 
   include
     Resource_pool_diff_intf with type t := t and type pool := resource_pool
@@ -217,36 +209,10 @@ end
 module type Transaction_pool_diff_intf = sig
   type resource_pool
 
-  [%%versioned:
-  module Stable : sig
-    module V1 : sig
-      type t = User_command.Stable.V1.t list [@@deriving sexp, to_yojson]
-    end
-  end]
-
-  type t = Stable.Latest.t [@@deriving sexp]
+  type t = User_command.t list [@@deriving sexp]
 
   module Diff_error : sig
-    module Stable : sig
-      module V1 : sig
-        type t =
-          | Insufficient_replace_fee
-          | Invalid_signature
-          | Duplicate
-          | Sender_account_does_not_exist
-          | Insufficient_amount_for_account_creation
-          | Delegate_not_found
-          | Invalid_nonce
-          | Insufficient_funds
-          | Insufficient_fee
-          | Overflow
-        [@@deriving sexp, yojson, bin_io]
-      end
-
-      module Latest = V1
-    end
-
-    type t = Stable.Latest.t =
+    type t =
       | Insufficient_replace_fee
       | Invalid_signature
       | Duplicate
@@ -261,16 +227,7 @@ module type Transaction_pool_diff_intf = sig
   end
 
   module Rejected : sig
-    module Stable : sig
-      module V1 : sig
-        type t = (User_command.Stable.V1.t * Diff_error.Stable.V1.t) list
-        [@@deriving sexp, bin_io, yojson, version]
-      end
-
-      module Latest = V1
-    end
-
-    type t = Stable.Latest.t [@@deriving sexp, yojson]
+    type t = (User_command.t * Diff_error.t) list [@@deriving sexp, yojson]
   end
 
   include

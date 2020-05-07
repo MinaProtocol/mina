@@ -866,8 +866,8 @@ module T = struct
                 fill the last two slots of the tree with coinbase trnasactions
                 and if there's any work in [works] then that has to be included,
                 either in the coinbase or as fee transfers that gets paid by
-                the transaction fees. So having it as coinbase ft will atleast
-                get reduce the slots occupied by fee transfers*)
+                the transaction fees. So having it as coinbase ft will at least
+                reduce the slots occupied by fee transfers*)
               in
               (cb, diff works (Sequence.of_list [stmt w1; stmt w2]))
             else if Amount.(of_fee w1.fee <= Coda_compile_config.coinbase) then
@@ -1420,11 +1420,17 @@ module T = struct
         ~f:(fun (seq, count) w ->
           match get_completed_work w with
           | Some cw_checked ->
-              (*If new provers can't pay the account-creation-fee then discard their work. To encourage using an existing account for snark workers*)
+              (*If new provers can't pay the account-creation-fee then discard
+              their work unless their fee is zero in which case their account
+              won't be created. This is to encourage using an existing accounts
+              for snarking.
+              This also imposes new snarkers to have a min fee until one of
+              their snarks are purchased and their accounts get created*)
               if
-                (not (is_new_account cw_checked.prover))
+                Currency.Fee.(cw_checked.fee = zero)
                 || Currency.Fee.(
                      cw_checked.fee >= Coda_compile_config.account_creation_fee)
+                || not (is_new_account cw_checked.prover)
               then
                 Continue
                   ( Sequence.append seq (Sequence.singleton cw_checked)
@@ -1524,6 +1530,8 @@ let%test_module "test" =
       Quickcheck.random_value ~seed:(`Deterministic "receiver_pk")
         Public_key.Compressed.gen
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
     (* Functor for testing with different instantiated staged ledger modules. *)
     let create_and_apply_with_state_body_hash state_body_hash sl logger pids
         txns stmt_to_work =
@@ -1534,7 +1542,9 @@ let%test_module "test" =
           ~coinbase_receiver:(`Other coinbase_receiver)
       in
       let diff' = Staged_ledger_diff.forget diff in
-      let%bind verifier = Verifier.create ~logger ~pids ~conf_dir:None in
+      let%bind verifier =
+        Verifier.create ~logger ~proof_level ~pids ~conf_dir:None
+      in
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
@@ -1970,6 +1980,28 @@ let%test_module "test" =
               test_simple ledger_init_state cmds iters sl test_mask `One_prover
                 stmt_to_work_one_prover ) )
 
+    let%test_unit "Zero proof-fee should not create a fee transfer" =
+      let stmt_to_work_zero_fee stmts =
+        Some
+          { Transaction_snark_work.Checked.fee= Currency.Fee.zero
+          ; proofs= proofs stmts
+          ; prover= snark_worker_pk }
+      in
+      let expected_proof_count = 3 in
+      Quickcheck.test (gen_at_capacity_fixed_blocks expected_proof_count)
+        ~trials:20 ~f:(fun (ledger_init_state, cmds, iters) ->
+          async_with_ledgers ledger_init_state (fun sl test_mask ->
+              let%map () =
+                test_simple ~expected_proof_count:(Some expected_proof_count)
+                  ledger_init_state cmds iters sl test_mask `One_prover
+                  stmt_to_work_zero_fee
+              in
+              assert (
+                Option.is_none
+                  (Coda_base.Ledger.location_of_account test_mask
+                     (Account_id.create snark_worker_pk Token_id.default)) ) )
+      )
+
     let%test_unit "Invalid diff test: check zero fee excess for partitions" =
       let create_diff_with_non_zero_fee_excess txns completed_works
           (partition : Sl.Scan_state.Space_partition.t) : Staged_ledger_diff.t
@@ -2043,7 +2075,7 @@ let%test_module "test" =
                         work_done partitions
                     in
                     let%bind verifier =
-                      Verifier.create ~logger ~pids ~conf_dir:None
+                      Verifier.create ~logger ~proof_level ~pids ~conf_dir:None
                     in
                     let%bind apply_res =
                       Sl.apply !sl diff ~logger ~verifier

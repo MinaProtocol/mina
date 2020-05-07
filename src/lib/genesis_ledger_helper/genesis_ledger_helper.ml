@@ -4,11 +4,199 @@ open Coda_base
 
 type exn += Genesis_state_initialization_error
 
+module Tar = struct
+  let create ~root ~directory ~file () =
+    match%map
+      Process.run ~prog:"tar"
+        ~args:
+          [ (* Change directory to [root]. *)
+            "-C"
+          ; root
+          ; (* Create gzipped tar file [file]. *)
+            "-czf"
+          ; file
+          ; (* Add [directory] to tar file. *)
+            directory ]
+        ()
+    with
+    | Ok _ ->
+        Ok ()
+    | Error err ->
+        Or_error.errorf
+          !"Error generating tar file %s. %s"
+          file (Error.to_string_hum err)
+
+  let extract ~root ~file () =
+    match%map
+      Process.run ~prog:"tar"
+        ~args:
+          [ (* Change directory to [root]. *)
+            "-C"
+          ; root
+          ; (* Extract gzipped tar file [file]. *)
+            "-xzf"
+          ; file ]
+        ()
+    with
+    | Ok _ ->
+        Ok ()
+    | Error err ->
+        Or_error.errorf
+          !"Error extracting tar file %s. %s"
+          file (Error.to_string_hum err)
+end
+
+module Accounts = struct
+  let path ~root = root ^/ "accounts.json"
+
+  let compiled () =
+    List.map (Lazy.force Test_genesis_ledger.accounts) ~f:(fun (sk_opt, acc) ->
+        { Account_config.pk= acc.public_key
+        ; sk= sk_opt
+        ; balance= acc.balance
+        ; delegate= Some acc.delegate } )
+
+  let store ~filename accounts =
+    Out_channel.with_file filename ~f:(fun json_file ->
+        Yojson.Safe.pretty_to_channel json_file
+          (Account_config.to_yojson accounts) )
+
+  let load filename =
+    let open Deferred.Let_syntax in
+    match%map
+      Deferred.Or_error.try_with_join (fun () ->
+          let%map accounts_str = Reader.file_contents filename in
+          let res = Yojson.Safe.from_string accounts_str in
+          match Account_config.of_yojson res with
+          | Ok res ->
+              Ok res
+          | Error s ->
+              Error
+                (Error.of_string
+                   (sprintf "Account_config.of_yojson failed: %s" s)) )
+    with
+    | Ok res ->
+        Ok res
+    | Error e ->
+        Or_error.errorf "Could not read accounts from file: %s\n%s" filename
+          (Error.to_string_hum e)
+end
+
+module Ledger = struct
+  let path ~root = root ^/ "ledger"
+
+  let generate ?directory_name (accounts : Account_config.t) :
+      Genesis_ledger.Packed.t =
+    let ledger = Ledger.create ?directory_name () in
+    let accounts =
+      List.map accounts ~f:(fun {pk; sk; balance; delegate} ->
+          let account =
+            let account_id = Account_id.create pk Token_id.default in
+            let base_acct = Account.create account_id balance in
+            {base_acct with delegate= Option.value ~default:pk delegate}
+          in
+          Ledger.create_new_account_exn ledger
+            (Account.identifier account)
+            account ;
+          (sk, account) )
+    in
+    Ledger.commit ledger ;
+    ( module struct
+      include Genesis_ledger.Make (struct
+        let accounts = lazy accounts
+      end)
+
+      let t = lazy ledger
+    end )
+
+  let load directory_name : Genesis_ledger.Packed.t =
+    ( module Genesis_ledger.Of_ledger (struct
+      let t = lazy (Ledger.create ~directory_name ())
+    end) )
+end
+
+module Genesis_proof = struct
+  let path ~root = root ^/ "genesis_proof"
+
+  let generate ~proof_level ~ledger ~(genesis_constants : Genesis_constants.t)
+      =
+    (* TODO(4829): Runtime proof-level. *)
+    match proof_level with
+    | Genesis_constants.Proof_level.Full ->
+        let%map ((module Keys) as keys) = Keys_lib.Keys.create () in
+        let protocol_state_with_hash =
+          Coda_state.Genesis_protocol_state.t
+            ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
+            ~genesis_constants
+        in
+        let base_hash =
+          Keys.Step.instance_hash protocol_state_with_hash.data
+        in
+        let computed_values =
+          Genesis_proof.create_values ~proof_level ~keys
+            { genesis_ledger= ledger
+            ; protocol_state_with_hash
+            ; base_hash
+            ; genesis_constants }
+        in
+        (base_hash, computed_values.genesis_proof)
+    | _ ->
+        return
+          (Snark_params.Tick.Field.zero, Dummy_values.Tock.Bowe_gabizon18.proof)
+
+  let store ~filename proof =
+    (* TODO: Use [Writer.write_bin_prot]. *)
+    Monitor.try_with_or_error ~extract_exn:true (fun () ->
+        let%bind wr = Writer.open_file filename in
+        Writer.write wr (Proof.Stable.V1.sexp_of_t proof |> Sexp.to_string) ;
+        Writer.close wr )
+
+  let load filename =
+    (* TODO: Use [Reader.load_bin_prot]. *)
+    Monitor.try_with_or_error ~extract_exn:true (fun () ->
+        Reader.file_contents filename
+        >>| Sexp.of_string >>| Proof.Stable.V1.t_of_sexp )
+end
+
+let load_genesis_constants (module M : Genesis_constants.Config_intf) ~path
+    ~default ~logger =
+  let config_res =
+    Result.bind
+      ( Result.try_with (fun () -> Yojson.Safe.from_file path)
+      |> Result.map_error ~f:Exn.to_string )
+      ~f:(fun json -> M.of_yojson json)
+  in
+  match config_res with
+  | Ok config ->
+      let new_constants = M.to_genesis_constants ~default config in
+      Logger.debug ~module_:__MODULE__ ~location:__LOC__ logger
+        "Overriding genesis constants $genesis_constants with the constants \
+         $config_constants at $path. The new genesis constants are: \
+         $new_genesis_constants"
+        ~metadata:
+          [ ("genesis_constants", Genesis_constants.(to_yojson default))
+          ; ("new_genesis_constants", Genesis_constants.to_yojson new_constants)
+          ; ("config_constants", M.to_yojson config)
+          ; ("path", `String path) ] ;
+      new_constants
+  | Error s ->
+      Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
+        "Error loading genesis constants from $path: $error. Sample data: \
+         $sample_data"
+        ~metadata:
+          [ ("path", `String path)
+          ; ("error", `String s)
+          ; ( "sample_data"
+            , M.of_genesis_constants Genesis_constants.compiled |> M.to_yojson
+            ) ] ;
+      raise Genesis_state_initialization_error
+
 let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
-    (Ledger.t lazy_t * Proof.t * Genesis_constants.t) Deferred.t =
+    (Genesis_ledger.Packed.t * Proof.t * Genesis_constants.t) Deferred.t =
   let open Cache_dir in
   let genesis_dir_name =
-    Cache_dir.genesis_dir_name Genesis_constants.compiled
+    Cache_dir.genesis_dir_name ~genesis_constants:Genesis_constants.compiled
+      ~proof_level:Genesis_constants.Proof_level.compiled
   in
   let tar_filename = genesis_dir_name ^ ".tar.gz" in
   Logger.info logger ~module_:__MODULE__ ~location:__LOC__
@@ -27,12 +215,8 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
           in
           (*Look for the tar and extract*)
           let tar_file = tar_dir ^/ genesis_dir_name ^ ".tar.gz" in
-          let%map _result =
-            Process.run_exn ~prog:"tar"
-              ~args:["-C"; conf_dir; "-xzf"; tar_file]
-              ()
-          in
-          () )
+          Deferred.Or_error.ok_exn
+          @@ Tar.extract ~root:conf_dir ~file:tar_file () )
     with
     | Ok () ->
         Logger.info ~module_:__MODULE__ ~location:__LOC__ logger
@@ -49,8 +233,8 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
       ~metadata:[("path", `String tar_dir)] ;
     let%bind () = extract tar_dir in
     let extract_target = conf_dir ^/ genesis_dir_name in
-    let ledger_dir = extract_target ^/ "ledger" in
-    let proof_file = extract_target ^/ "genesis_proof" in
+    let ledger_dir = Ledger.path ~root:extract_target in
+    let proof_file = Genesis_proof.path ~root:extract_target in
     let constants_file = extract_target ^/ "genesis_constants.json" in
     if
       Core.Sys.file_exists ledger_dir = `Yes
@@ -58,8 +242,11 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
       && Core.Sys.file_exists constants_file = `Yes
     then (
       let genesis_ledger =
-        let ledger = lazy (Ledger.create ~directory_name:ledger_dir ()) in
-        match Or_error.try_with (fun () -> Lazy.force ledger |> ignore) with
+        let ledger = Ledger.load ledger_dir in
+        match
+          Or_error.try_with (fun () ->
+              Lazy.force (Genesis_ledger.Packed.t ledger) |> ignore )
+        with
         | Ok _ ->
             ledger
         | Error e ->
@@ -71,29 +258,12 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
             raise Genesis_state_initialization_error
       in
       let genesis_constants =
-        match
-          Result.bind
-            ( Result.try_with (fun () -> Yojson.Safe.from_file constants_file)
-            |> Result.map_error ~f:Exn.to_string )
-            ~f:(fun json -> Genesis_constants.Config_file.of_yojson json)
-        with
-        | Ok t ->
-            Genesis_constants.(of_config_file ~default:compiled t)
-        | Error s ->
-            Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
-              "Error loading genesis constants from $file: $error"
-              ~metadata:[("dir", `String constants_file); ("error", `String s)] ;
-            raise Genesis_state_initialization_error
+        load_genesis_constants
+          (module Genesis_constants.Config_file)
+          ~default:Genesis_constants.compiled ~path:constants_file ~logger
       in
       let%map base_proof =
-        match%map
-          Monitor.try_with_or_error ~extract_exn:true (fun () ->
-              let%bind r = Reader.open_file proof_file in
-              let%map contents =
-                Pipe.to_list (Reader.lines r) >>| String.concat
-              in
-              Sexp.of_string contents |> Proof.Stable.V1.t_of_sexp )
-        with
+        match%map Genesis_proof.load proof_file with
         | Ok base_proof ->
             base_proof
         | Error e ->
@@ -119,24 +289,9 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
         (*Replace runtime-configurable constants from the dameon, if any*)
         Option.value_map daemon_conf ~default:res ~f:(fun daemon_config_file ->
             let new_constants =
-              match
-                Result.bind
-                  ( Result.try_with (fun () ->
-                        Yojson.Safe.from_file daemon_config_file )
-                  |> Result.map_error ~f:Exn.to_string )
-                  ~f:(fun json ->
-                    Genesis_constants.Daemon_config.of_yojson json )
-              with
-              | Ok t ->
-                  Genesis_constants.(of_daemon_config ~default:constants t)
-              | Error s ->
-                  Logger.fatal ~module_:__MODULE__ ~location:__LOC__ logger
-                    "Error loading runtime-configurable constants from $file: \
-                     $error"
-                    ~metadata:
-                      [ ("dir", `String daemon_config_file)
-                      ; ("error", `String s) ] ;
-                  raise Genesis_state_initialization_error
+              load_genesis_constants
+                (module Genesis_constants.Daemon_config)
+                ~default:constants ~path:daemon_config_file ~logger
             in
             (ledger, proof, new_constants) )
     | None ->
@@ -159,10 +314,16 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
       in
       match%bind
         Deferred.List.fold directories ~init:None ~f:(fun acc dir ->
-            if is_some acc then Deferred.return acc else retrieve dir )
+            if is_some acc then Deferred.return acc
+            else
+              match%map retrieve dir with
+              | Some res ->
+                  Some (res, dir)
+              | None ->
+                  None )
       with
-      | Some res ->
-          Deferred.return res
+      | Some (res, dir) ->
+          Deferred.return (res_or_fail dir (Some res))
       | None ->
           (*Check if it's in s3*)
           let local_path = Cache_dir.s3_install_path ^/ tar_filename in

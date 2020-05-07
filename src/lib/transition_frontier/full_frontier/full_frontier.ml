@@ -32,6 +32,27 @@ module Node = struct
     {state_hash; blockchain_state; length= t.length; consensus_state}
 end
 
+module Protocol_states_for_root_scan_state = struct
+  type t = Protocol_state.value State_hash.Map.t
+
+  let protocol_states_for_next_root_scan_state protocol_states_for_old_root
+      ~new_scan_state
+      ~(old_root_state : (Protocol_state.value, State_hash.t) With_hash.t) =
+    let required_state_hashes =
+      Staged_ledger.Scan_state.required_state_hashes new_scan_state
+      |> State_hash.Set.to_list
+    in
+    let protocol_state_map =
+      (*Note: Protocol states for the next root should all be in this map
+      assuming roots transition to their successors and do not skip any node in
+      between*)
+      State_hash.Map.set protocol_states_for_old_root ~key:old_root_state.hash
+        ~data:old_root_state.data
+    in
+    List.map required_state_hashes ~f:(fun hash ->
+        (hash, State_hash.Map.find_exn protocol_state_map hash) )
+end
+
 (* Invariant: The path from the root to the tip inclusively, will be max_length *)
 type t =
   { root_ledger: Ledger.Any_ledger.witness
@@ -40,6 +61,8 @@ type t =
   ; mutable hash: Frontier_hash.t
   ; logger: Logger.t
   ; table: Node.t State_hash.Table.t
+  ; mutable protocol_states_for_root_scan_state:
+      Protocol_states_for_root_scan_state.t
   ; consensus_local_state: Consensus.Data.Local_state.t
   ; max_length: int
   ; genesis_constants: Genesis_constants.t }
@@ -62,6 +85,15 @@ let find_exn t hash =
   let node = Hashtbl.find_exn t.table hash in
   node.breadcrumb
 
+let find_protocol_state (t : t) hash =
+  match find t hash with
+  | None ->
+      State_hash.Map.find t.protocol_states_for_root_scan_state hash
+  | Some breadcrumb ->
+      Some
+        ( Breadcrumb.validated_transition breadcrumb
+        |> External_transition.Validated.protocol_state )
+
 let root t = find_exn t t.root
 
 let best_tip t = find_exn t t.best_tip
@@ -77,6 +109,9 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
   let open Root_data in
   let root_hash =
     External_transition.Validated.state_hash root_data.transition
+  in
+  let protocol_states_for_root_scan_state =
+    State_hash.Map.of_alist_exn root_data.protocol_states
   in
   let root_protocol_state =
     External_transition.Validated.protocol_state root_data.transition
@@ -109,7 +144,8 @@ let create ~logger ~root_data ~root_ledger ~base_hash ~consensus_local_state
     ; table
     ; consensus_local_state
     ; max_length
-    ; genesis_constants }
+    ; genesis_constants
+    ; protocol_states_for_root_scan_state }
   in
   t
 
@@ -117,7 +153,9 @@ let root_data t =
   let open Root_data in
   let root = root t in
   { transition= Breadcrumb.validated_transition root
-  ; staged_ledger= Breadcrumb.staged_ledger root }
+  ; staged_ledger= Breadcrumb.staged_ledger root
+  ; protocol_states=
+      State_hash.Map.to_alist t.protocol_states_for_root_scan_state }
 
 let max_length {max_length; _} = max_length
 
@@ -229,9 +267,10 @@ let visualize_to_string t =
 
 (* given an heir, calculate the diff that will transition the root to that heir *)
 let calculate_root_transition_diff t heir =
-  let open Root_data.Minimal in
   let root = root t in
+  let root_hash = t.root in
   let heir_hash = Breadcrumb.state_hash heir in
+  let heir_transition = Breadcrumb.validated_transition heir in
   let heir_staged_ledger = Breadcrumb.staged_ledger heir in
   let heir_siblings =
     List.filter (successors t root) ~f:(fun breadcrumb ->
@@ -251,16 +290,26 @@ let calculate_root_transition_diff t heir =
         in
         {transition; scan_state} )
   in
+  let protocol_states =
+    Protocol_states_for_root_scan_state
+    .protocol_states_for_next_root_scan_state
+      t.protocol_states_for_root_scan_state
+      ~new_scan_state:(Staged_ledger.scan_state heir_staged_ledger)
+      ~old_root_state:
+        {With_hash.hash= root_hash; data= Breadcrumb.protocol_state root}
+  in
   let new_root_data =
-    { hash= heir_hash
-    ; scan_state= Staged_ledger.scan_state heir_staged_ledger
-    ; pending_coinbase=
-        Staged_ledger.pending_coinbase_collection heir_staged_ledger }
+    Root_data.Limited.create ~transition:heir_transition
+      ~scan_state:(Staged_ledger.scan_state heir_staged_ledger)
+      ~pending_coinbase:
+        (Staged_ledger.pending_coinbase_collection heir_staged_ledger)
+      ~protocol_states
   in
   Diff.Full.E.E
     (Root_transitioned {new_root= new_root_data; garbage= Full garbage_nodes})
 
-let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
+let move_root t ~new_root_hash ~new_root_protocol_states ~garbage
+    ~ignore_consensus_local_state =
   (* The transition frontier at this point in time has the following mask topology:
    *
    *   (`s` represents a snarked ledger, `m` represents a mask)
@@ -371,6 +420,11 @@ let move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state =
       (Breadcrumb.validated_transition new_root_node.breadcrumb)
       new_staged_ledger
   in
+  (*Update the protocol states required for scan state at the new root*)
+  let new_protocol_states_map =
+    State_hash.Map.of_alist_exn new_root_protocol_states
+  in
+  t.protocol_states_for_root_scan_state <- new_protocol_states_map ;
   let new_root_node = {new_root_node with breadcrumb= new_root_breadcrumb} in
   (* update the new root breadcrumb in the frontier *)
   Hashtbl.set t.table ~key:new_root_hash ~data:new_root_node ;
@@ -432,10 +486,14 @@ let apply_diff (type mutant) t (diff : (Diff.full, mutant) Diff.t)
       let old_best_tip = t.best_tip in
       t.best_tip <- new_best_tip ;
       (old_best_tip, None)
-  | Root_transitioned
-      {new_root= {hash= new_root_hash; _}; garbage= Full garbage} ->
+  | Root_transitioned {new_root; garbage= Full garbage} ->
+      let new_root_hash = Root_data.Limited.hash new_root in
       let old_root_hash = t.root in
-      move_root t ~new_root_hash ~garbage ~ignore_consensus_local_state ;
+      let new_root_protocol_states =
+        Root_data.Limited.protocol_states new_root
+      in
+      move_root t ~new_root_hash ~new_root_protocol_states ~garbage
+        ~ignore_consensus_local_state ;
       (old_root_hash, Some new_root_hash)
   (* These are invalid inhabitants for the type signature of this function,
    * but the OCaml compiler isn't smart enough to realize this. *)
@@ -573,6 +631,16 @@ let apply_diffs t diffs ~ignore_consensus_local_state =
   `New_root_and_diffs_with_mutants (new_root, diffs_with_mutants)
 
 module For_tests = struct
+  let find_protocol_state_exn t hash =
+    match find_protocol_state t hash with
+    | Some s ->
+        s
+    | None ->
+        failwith
+          (sprintf
+             !"Protocol state with hash %s not found"
+             (State_body_hash.to_yojson hash |> Yojson.Safe.to_string))
+
   let equal t1 t2 =
     let sort_breadcrumbs = List.sort ~compare:Breadcrumb.compare in
     let equal_breadcrumb breadcrumb1 breadcrumb2 =
