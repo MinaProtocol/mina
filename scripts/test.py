@@ -57,7 +57,7 @@ small_curves_tests = {
     simple_tests,
     'test_postake_catchup': ['coda-restart-node-test'],
     'test_postake_bootstrap':
-    ['coda-bootstrap-test', 'coda-long-fork -num-block-producers 2'],
+    ['coda-bootstrap-test'],
     'test_postake_three_producers': ['coda-txns-and-restart-non-producers'],
     'test_postake_delegation': ['coda-delegation-test'],
     'test_postake_txns': ['coda-shared-state-test', 'coda-batch-payment-test'],
@@ -91,7 +91,8 @@ ci_excludes = [
 # of all the generated CI jobs, allow these specific ones to fail (extra excludes on top of ci_excludes)
 required_excludes = [
     'test_postake_catchup:*',
-    'test_postake_three_producers:*'
+    'test_postake_three_producers:*',
+    'test_postake_split_snarkless:*'
 ]
 
 # these extra jobs are not filters, they are full status check names
@@ -379,14 +380,14 @@ class CodaProject:
 class OutDirectory:
     def __init__(self, root):
         self.root = root
-        self.build_logs = os.path.join(self.root, 'build_logs') 
-        self.test_logs = os.path.join(self.root, 'test_logs') 
+        self.build_logs = os.path.join(self.root, 'build_logs')
+        self.test_logs = os.path.join(self.root, 'test_logs')
         self.test_configs = os.path.join(self.root, 'test_configs')
         self.artifacts = os.path.join(self.root, 'artifacts')
         self.all_directories = [
             self.root,
             self.build_logs,
-            self.test_logs, 
+            self.test_logs,
             self.test_configs,
             self.artifacts
         ]
