@@ -21,23 +21,23 @@ module Ledger_inner = struct
   end
 
   module Hash = struct
+    module Arg = struct
+      type t = Ledger_hash.Stable.Latest.t
+      [@@deriving sexp, compare, hash, bin_io_unversioned]
+    end
+
     [%%versioned
     module Stable = struct
       module V1 = struct
         type t = Ledger_hash.Stable.V1.t
         [@@deriving sexp, compare, hash, eq, yojson]
 
+        type _unused = unit constraint t = Arg.t
+
         let to_latest = Fn.id
 
-        (* TODO: move T outside V1 when %%versioned ppx allows it *)
-        module T = struct
-          type typ = t [@@deriving sexp, compare, hash, bin_io]
-
-          type t = typ [@@deriving sexp, compare, hash, bin_io]
-        end
-
-        include Hashable.Make_binable (T) [@@deriving
-                                            sexp, compare, hash, eq, yojson]
+        include Hashable.Make_binable (Arg) [@@deriving
+                                              sexp, compare, hash, eq, yojson]
 
         let to_string = Ledger_hash.to_string
 

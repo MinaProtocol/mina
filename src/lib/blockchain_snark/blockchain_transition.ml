@@ -166,12 +166,16 @@ module Make (T : Transaction_snark.Verification.S) = struct
 
   include Transition_system.Make (struct
               module Tick = struct
+                let size_in_bits = Tick.Field.size_in_bits
+
                 module Packed = struct
                   type value = Tick.Pedersen.Digest.t
 
                   type var = Tick.Pedersen.Checked.Digest.var
 
                   let typ = Tick.Pedersen.Checked.Digest.typ
+
+                  let size_in_bits = size_in_bits
                 end
 
                 module Unpacked = struct
@@ -196,6 +200,8 @@ module Make (T : Transaction_snark.Verification.S) = struct
 
                   let var_of_value =
                     Tick.Pedersen.Checked.Digest.Unpacked.constant
+
+                  let size_in_bits = size_in_bits
                 end
 
                 let project_value =
@@ -240,7 +246,8 @@ module Make (T : Transaction_snark.Verification.S) = struct
         ~create_env:Tick.Keypair.generate
         ~input:
           (Tick.constraint_system ~exposing:(Step_base.input ())
-             (Step_base.main (Logger.null ())))
+             (Step_base.main ~logger:(Logger.null ())
+                ~proof_level:Genesis_constants.Proof_level.compiled))
 
     let cached () =
       let open Cached.Deferred_with_track_generated.Let_syntax in
@@ -319,7 +326,8 @@ let constraint_system_digests () =
   [ ( "blockchain-step"
     , digest
         M.Step_base.(
-          Tick.constraint_system ~exposing:(input ()) (main (Logger.null ())))
-    )
+          Tick.constraint_system ~exposing:(input ())
+            (main ~logger:(Logger.null ())
+               ~proof_level:Genesis_constants.Proof_level.compiled)) )
   ; ("blockchain-wrap", digest' W.(Tock.constraint_system ~exposing:input main))
   ]

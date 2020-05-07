@@ -12,8 +12,8 @@ val t :
   -> (Protocol_state.Value.t, State_hash.t) With_hash.t
 
 val compile_time_genesis :
-  unit -> (Protocol_state.Value.t, State_hash.t) With_hash.t
+  (Protocol_state.Value.t, State_hash.t) With_hash.t Lazy.t
 
 module For_tests : sig
-  val genesis_state_hash : unit -> State_hash.t
+  val genesis_state_hash : State_hash.t Lazy.t
 end

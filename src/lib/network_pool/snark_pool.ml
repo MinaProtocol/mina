@@ -2,6 +2,42 @@ open Core_kernel
 open Async
 open Pipe_lib
 open Network_peer
+module Statement_table = Transaction_snark_work.Statement.Table
+
+module Snark_tables = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t =
+        { all:
+            Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+            Priced_proof.Stable.V1.t
+            Transaction_snark_work.Statement.Stable.V1.Table.t
+              (** Every SNARK in the pool *)
+        ; rebroadcastable:
+            ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+              Priced_proof.Stable.V1.t
+            * Core.Time.Stable.With_utc_sexp.V2.t )
+            Transaction_snark_work.Statement.Stable.V1.Table.t
+              (** Rebroadcastable SNARKs generated on this machine, along with
+                  when they were first added. *)
+        }
+      [@@deriving sexp]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t =
+    { all:
+        Ledger_proof.t One_or_two.t Priced_proof.t
+        Transaction_snark_work.Statement.Table.t
+    ; rebroadcastable:
+        ( Ledger_proof.t One_or_two.t Priced_proof.t
+        * Time.Stable.With_utc_sexp.V2.t )
+        Transaction_snark_work.Statement.Table.t }
+  [@@deriving sexp]
+end
 
 module type S = sig
   type transition_frontier
@@ -10,6 +46,7 @@ module type S = sig
     include
       Intf.Snark_resource_pool_intf
       with type transition_frontier := transition_frontier
+       and type serializable := Snark_tables.t
 
     val remove_solved_work : t -> Transaction_snark_work.Statement.t -> unit
 
@@ -66,27 +103,8 @@ end
 
 module Make (Transition_frontier : Transition_frontier_intf) :
   S with type transition_frontier := Transition_frontier.t = struct
-  module Statement_table = Transaction_snark_work.Statement.Stable.V1.Table
-
   module Resource_pool = struct
     module T = struct
-      (* TODO : Version this type *)
-      type serializable =
-        { all:
-            Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-            Priced_proof.Stable.V1.t
-            Statement_table.t
-              (** Every SNARK in the pool *)
-        ; rebroadcastable:
-            ( Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-              Priced_proof.Stable.V1.t
-            * Time.Stable.With_utc_sexp.V2.t )
-            Statement_table.t
-              (** Rebroadcastable SNARKs generated on this machine, along with
-                  when they were first added. *)
-        }
-      [@@deriving sexp, bin_io]
-
       module Config = struct
         type t =
           { trust_system: Trust_system.t sexp_opaque
@@ -98,7 +116,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
         int * int Transaction_snark_work.Statement.Table.t
 
       type t =
-        { snark_tables: serializable
+        { snark_tables: Snark_tables.t
         ; mutable ref_table: int Statement_table.t option
         ; config: Config.t
         ; logger: Logger.t sexp_opaque
@@ -106,6 +124,9 @@ module Make (Transition_frontier : Transition_frontier_intf) :
               (*A counter for transition frontier breadcrumbs removed. When this reaches a certain value, unreferenced snark work is removed from ref_table*)
         }
       [@@deriving sexp]
+
+      type serializable = Snark_tables.Stable.Latest.t
+      [@@deriving bin_io_unversioned]
 
       let make_config = Config.make
 
@@ -334,7 +355,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
               true ) ;
       Hashtbl.to_alist t.snark_tables.rebroadcastable
       |> List.map ~f:(fun (stmt, (snark, _time)) ->
-             Diff.Stable.Latest.Add_solved_work (stmt, snark) )
+             Diff.Add_solved_work (stmt, snark) )
 
     let remove_solved_work t work =
       Statement_table.remove t.snark_tables.all work ;
@@ -362,7 +383,7 @@ module Make (Transition_frontier : Transition_frontier_intf) :
     in
     match%map
       Async.Reader.load_bin_prot disk_location
-        Resource_pool.bin_reader_serializable
+        Snark_tables.Stable.Latest.bin_reader_t
     with
     | Ok snark_table ->
         let pool = Resource_pool.of_serializable snark_table ~config ~logger in
@@ -386,11 +407,35 @@ include Make (struct
     Extensions.(get_view_pipe (extensions t) Snark_pool_refcount)
 end)
 
+module Diff_versioned = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Resource_pool.Diff.t =
+        | Add_solved_work of
+            Transaction_snark_work.Statement.Stable.V1.t
+            * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
+              Priced_proof.Stable.V1.t
+      [@@deriving compare, sexp, to_yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t =
+    | Add_solved_work of
+        Transaction_snark_work.Statement.t
+        * Ledger_proof.t One_or_two.t Priced_proof.t
+  [@@deriving compare, sexp, to_yojson]
+end
+
 let%test_module "random set test" =
   ( module struct
     open Coda_base
 
     let trust_system = Mocks.trust_system
+
+    let proof_level = Genesis_constants.Proof_level.Check
 
     let logger = Logger.null ()
 
@@ -401,7 +446,7 @@ let%test_module "random set test" =
         ?(proof = One_or_two.map ~f:mk_dummy_proof)
         ?(sender = Envelope.Sender.Local) fee =
       let diff =
-        Mock_snark_pool.Resource_pool.Diff.Stable.Latest.Add_solved_work
+        Mock_snark_pool.Resource_pool.Diff.Add_solved_work
           (work, {Priced_proof.Stable.Latest.proof= proof work; fee})
       in
       Mock_snark_pool.Resource_pool.Diff.unsafe_apply resource_pool
@@ -432,7 +477,7 @@ let%test_module "random set test" =
       let res =
         let open Deferred.Let_syntax in
         let%bind verifier =
-          Verifier.create ~logger
+          Verifier.create ~logger ~proof_level
             ~pids:(Child_processes.Termination.create_pid_table ())
             ~conf_dir:None
         in
@@ -583,7 +628,7 @@ let%test_module "random set test" =
             Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
           in
           let%bind verifier =
-            Verifier.create ~logger
+            Verifier.create ~logger ~proof_level
               ~pids:(Child_processes.Termination.create_pid_table ())
               ~conf_dir:None
           in
@@ -605,7 +650,7 @@ let%test_module "random set test" =
                 ; prover= Signature_lib.Public_key.Compressed.empty } }
           in
           let command =
-            Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
+            Mock_snark_pool.Resource_pool.Diff.Add_solved_work
               (fake_work, priced_proof)
           in
           don't_wait_for
@@ -637,7 +682,7 @@ let%test_module "random set test" =
           in
           let per_reader = work_count / 2 in
           let create_work work =
-            Mock_snark_pool.Resource_pool.Diff.Stable.V1.Add_solved_work
+            Mock_snark_pool.Resource_pool.Diff.Add_solved_work
               ( work
               , Priced_proof.
                   { proof= One_or_two.map ~f:mk_dummy_proof work
@@ -671,7 +716,7 @@ let%test_module "random set test" =
                 (Some (Mocks.Transition_frontier.create ()))
             in
             let%bind verifier =
-              Verifier.create ~logger
+              Verifier.create ~logger ~proof_level
                 ~pids:(Child_processes.Termination.create_pid_table ())
                 ~conf_dir:None
             in
@@ -686,8 +731,8 @@ let%test_module "random set test" =
                  ~f:(fun work_command ->
                    let work =
                      match work_command with
-                     | Mock_snark_pool.Resource_pool.Diff.Stable.V1
-                       .Add_solved_work (work, _) ->
+                     | Mock_snark_pool.Resource_pool.Diff.Add_solved_work
+                         (work, _) ->
                          work
                    in
                    assert (List.mem works work ~equal:( = )) ;
@@ -725,7 +770,7 @@ let%test_module "random set test" =
       Async.Thread_safe.block_on_async_exn (fun () ->
           let open Deferred.Let_syntax in
           let%bind verifier =
-            Verifier.create ~logger
+            Verifier.create ~logger ~proof_level
               ~pids:(Child_processes.Termination.create_pid_table ())
               ~conf_dir:None
           in

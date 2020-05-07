@@ -1,21 +1,7 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Currency
 open Signature_lib
 open Coda_base
-
-[%%inject
-"ledger_depth", ledger_depth]
-
-[%%inject
-"fake_accounts_target", fake_accounts_target]
-
-let _ =
-  if Base.Int.(fake_accounts_target > pow 2 ledger_depth) then
-    failwith "Genesis_ledger: fake_accounts_target >= 2**ledger_depth"
-
 module Intf = Intf
 
 module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
@@ -134,6 +120,43 @@ module Packed = struct
 
   let keypair_of_account_record_exn ((module L) : t) =
     L.keypair_of_account_record_exn
+end
+
+module Of_ledger (T : sig
+  val t : Ledger.t Lazy.t
+end) : Intf.S = struct
+  include T
+
+  let accounts =
+    Lazy.map t
+      ~f:(Ledger.foldi ~init:[] ~f:(fun _loc accs acc -> (None, acc) :: accs))
+
+  let find_account_record_exn ~f =
+    List.find_exn (Lazy.force accounts) ~f:(fun (_, account) -> f account)
+
+  let find_new_account_record_exn old_account_pks =
+    find_account_record_exn ~f:(fun new_account ->
+        not
+          (List.exists old_account_pks ~f:(fun old_account_pk ->
+               Public_key.equal
+                 (Public_key.decompress_exn (Account.public_key new_account))
+                 old_account_pk )) )
+
+  let keypair_of_account_record_exn _ =
+    failwith "cannot access genesis ledger account private key"
+
+  let largest_account_exn =
+    let error_msg =
+      "cannot calculate largest account in genesis ledger: "
+      ^ "genesis ledger has no accounts"
+    in
+    Memo.unit (fun () ->
+        List.max_elt (Lazy.force accounts) ~compare:(fun (_, a) (_, b) ->
+            Balance.compare a.Account.Poly.balance b.Account.Poly.balance )
+        |> Option.value_exn ?here:None ?error:None ~message:error_msg )
+
+  let largest_account_keypair_exn () =
+    failwith "cannot access genesis ledger account private key"
 end
 
 let fetch_ledger, register_ledger =
