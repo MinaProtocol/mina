@@ -45,34 +45,20 @@ Keypairs have a private key and a corresponding public key. For new keypair gene
 However there are also existing keys which we'll need to be able to reference by public key alone since we don't control the private keys. An example of this would be community owned wallets for inclusion in the genesis ledger. Since this distinction can be made at a higher level, we'll keep the definition of a keypair to mean a public key for which we also have th private key.
 
 ```
-coda-network keypair create
+coda-network keypair create [--nickname <NAME>]
 ```
-
-This command will generate a new keypair and save it locally.
-
-```
-coda-network keypair upload <PUBLIC_KEY>
-```
-
-This command will upload a locally stored keypair to an S3 bucket for distribution.
-
-```
-coda-network keypair download <PUBLIC_KEY>
-```
-
-This will attempt to download a given keypair from S3 if the keypair exists.
 
 ### Keyset Management
 
 Keysets are simply a collection of keypairs. We use these for categorizing different groups of keys that will be used in the lifecycle of a network. For each keypair in a keyset, we MAY or MAY NOT have the corresponding private keys. For each keyset, we may want to allocate a different amount of funds to their corresponding accounts in a genesis ledger.
 
-The datastructure for a given keyset is much simpler since it's essentially a list public keys. As such we can simply maintain a simple CSV style document that contains all the public keys included in a given keyset using the name of the keyset for the filename. 
+The datastructure for a given keyset is much simpler since it's essentially a list public keys. As such we can simply maintain a simple CSV style document that contains all the public keys included in a given keyset using the name of the keyset for the filename.
 
 ```
-coda-network keyset create <NAME>
+coda-network keyset create <NAME> [--count <NUMBER>]
 ```
 
-This simply creates a new keyset that keys can be included in.
+This simply creates a new keyset that keys can be included in. Optionally you can pass `-c`/`--count` to have the keyset populated with freshly generated keys.
 
 ```
 coda-network keyset add <NAME> <PUBLIC_KEY> ...
@@ -94,6 +80,13 @@ This command will show all keysets that are stored locally in addition to the ke
 
 ```
 coda-network keyset import <KEYSET_NAME> <CSV_FILENAME>
+```
+
+Keysets and their corresponding keypairs can also be individually uploaded / downloaded which will also sync any keypairs which which are included in the tool.
+
+```
+coda-network keyset upload <KEYSET_NAME>
+coda-network keyset download <KEYSET_NAME>
 ```
 
 ### Runtime Ledger Generation
@@ -125,15 +118,17 @@ Again this can be uploaded to S3 for sharing.
 coda-network genesis upload <VERSION>
 ```
 
+Since the genesis ledger must be combined with the keypairs needed this command will also ensure the corresponding keysets have been uploaded.
+
 ### Configuration Deployment
 
-The configuration deployment will consist of collecting all the "online" keys and the genesis ledger and uploading them to the kubernetes secret service. This tool should expose similar functionality to the existing tool, allowing users to upload keypairs to the kubernetes ConfigMap however not splitting out the task into predefined groups but rather allowing arbitrary keysets to be deployed.
+The configuration deployment will consist of collecting all the "online" keys and the genesis ledger and uploading them to the kubernetes secret service. This tool should expose similar functionality to the existing tool, allowing users to upload keypairs to the kubernetes ConfigMap however not splitting out the task into predefined groups but rather allowing arbitrary keysets to be deployed. 
 
 ```
-coda-network deploy <KEYSET_NAME>
+coda-network deploy <GENESIS_VERSION>
 ```
 
-This would attempt to find all the keypairs in a given keyset locally or remotely and upload them to the Kubernetes secret service.
+This would collect all the "online" keypairs needed by the provided genesis version locally or remotely and upload them to the Kubernetes secret service.
 
 ### Network Deployment and Monitoring
 
