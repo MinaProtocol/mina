@@ -97,7 +97,11 @@ module For_tests : sig
     -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
-    -> ?gen_root_breadcrumb:Breadcrumb.t Quickcheck.Generator.t
+    -> ?gen_root_breadcrumb:( Breadcrumb.t
+                            * ( Coda_base.State_hash.t
+                              * Coda_state.Protocol_state.value )
+                              list )
+                            Quickcheck.Generator.t
     -> max_length:int
     -> size:int
     -> unit
@@ -112,7 +116,11 @@ module For_tests : sig
     -> precomputed_values:Precomputed_values.t
     -> ?root_ledger_and_accounts:Ledger.t
                                  * (Private_key.t option * Account.t) list
-    -> ?gen_root_breadcrumb:Breadcrumb.t Quickcheck.Generator.t
+    -> ?gen_root_breadcrumb:( Breadcrumb.t
+                            * ( Coda_base.State_hash.t
+                              * Coda_state.Protocol_state.value )
+                              list )
+                            Quickcheck.Generator.t
     -> ?get_branch_root:(t -> Breadcrumb.t)
     -> max_length:int
     -> frontier_size:int
