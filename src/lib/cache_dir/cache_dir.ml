@@ -15,7 +15,7 @@ let genesis_dir_name ~(genesis_constants : Genesis_constants.t) ~proof_level =
       ( List.map
           [ Coda_compile_config.curve_size
           ; Coda_compile_config.ledger_depth
-          ; Coda_compile_config.fake_accounts_target
+          ; Option.value ~default:0 genesis_constants.num_accounts
           ; Coda_compile_config.c
           ; genesis_constants.protocol.k ]
           ~f:Int.to_string
