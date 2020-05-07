@@ -9,6 +9,8 @@ let%test_module "network pool test" =
 
     let logger = Logger.null ()
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
     module Mock_snark_pool = Snark_pool.Make (Mocks.Transition_frontier)
 
     let config verifier =
@@ -37,7 +39,7 @@ let%test_module "network pool test" =
       in
       Async.Thread_safe.block_on_async_exn (fun () ->
           let%bind verifier =
-            Verifier.create ~logger
+            Verifier.create ~logger ~proof_level
               ~pids:(Child_processes.Termination.create_pid_table ())
               ~conf_dir:None
           in
@@ -106,7 +108,7 @@ let%test_module "network pool test" =
           Broadcast_pipe.create (Some (Mocks.Transition_frontier.create ()))
         in
         let%bind verifier =
-          Verifier.create ~logger
+          Verifier.create ~logger ~proof_level
             ~pids:(Child_processes.Termination.create_pid_table ())
             ~conf_dir:None
         in
