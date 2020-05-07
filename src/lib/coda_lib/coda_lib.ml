@@ -556,14 +556,16 @@ let root_diff t =
                       Deferred.unit
                   | Transition_frontier.Diff.Full.With_mutant.E
                       (Root_transitioned {new_root; _}, _) ->
+                      let root_hash =
+                        Transition_frontier.Root_data.Limited.hash new_root
+                      in
                       let new_root_breadcrumb =
-                        Transition_frontier.find_exn frontier new_root.hash
+                        Transition_frontier.(find_exn frontier root_hash)
                       in
                       Strict_pipe.Writer.write root_diff_writer
                         { user_commands=
                             Transition_frontier.Breadcrumb.user_commands
-                              (Transition_frontier.find_exn frontier
-                                 new_root.hash)
+                              new_root_breadcrumb
                         ; root_length= length_of_breadcrumb new_root_breadcrumb
                         } ;
                       Deferred.unit )) ) ) ;
@@ -902,8 +904,10 @@ let create (config : Config.t) ~precomputed_values =
                     let%bind frontier =
                       Broadcast_pipe.Reader.peek frontier_broadcast_pipe_r
                     in
-                    let%map scan_state, expected_merkle_root, pending_coinbases
-                        =
+                    let%map ( scan_state
+                            , expected_merkle_root
+                            , pending_coinbases
+                            , protocol_states ) =
                       Sync_handler
                       .get_staged_ledger_aux_and_pending_coinbases_at_hash
                         ~frontier input
@@ -920,7 +924,10 @@ let create (config : Config.t) ~precomputed_values =
                           , Staged_ledger_hash.to_yojson staged_ledger_hash )
                         ]
                       "sending scan state and pending coinbase" ;
-                    (scan_state, expected_merkle_root, pending_coinbases) ) )
+                    ( scan_state
+                    , expected_merkle_root
+                    , pending_coinbases
+                    , protocol_states ) ) )
               ~answer_sync_ledger_query:(fun query_env ->
                 let open Deferred.Or_error.Let_syntax in
                 trace_recurring "answer_sync_ledger_query" (fun () ->
