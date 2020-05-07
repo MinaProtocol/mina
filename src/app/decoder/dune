@@ -1,3 +1,4 @@
 (executable
   (name decoder)
-  (libraries coda_base))
+  (libraries coda_base)
+  (preprocess (pps ppx_coda)))
