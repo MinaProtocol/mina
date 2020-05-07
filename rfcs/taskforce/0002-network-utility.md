@@ -64,13 +64,13 @@ This simply creates a new keyset that keys can be included in. Optionally you ca
 coda-network keyset add <NAME> <PUBLIC_KEY> ...
 ```
 
-This command would add a public key to a keyset.
+This command would add the public key(s) to a keyset.
 
 ```
 coda-network keyset remove <NAME> <PUBLIC_KEY> ...
 ```
 
-This command would remove a public key to a keyset.
+This command would remove the public key(s) from a keyset.
 
 ```
 coda-network keyset [ls|list]
@@ -82,7 +82,7 @@ This command will show all keysets that are stored locally in addition to the ke
 coda-network keyset import <KEYSET_NAME> <CSV_FILENAME>
 ```
 
-Keysets and their corresponding keypairs can also be individually uploaded / downloaded which will also sync any keypairs which which are included in the tool.
+Keysets and their corresponding keypairs can also be individually uploaded / downloaded which will also sync any keypairs that we have.
 
 ```
 coda-network keyset upload <KEYSET_NAME>
