@@ -118,8 +118,8 @@ end
 module Genesis_proof = struct
   let path ~root = root ^/ "genesis_proof"
 
-  let generate ~proof_level ~ledger ~(genesis_constants : Genesis_constants.t)
-      =
+  let generate ~proof_level ~ledger ~constraint_constants
+      ~(genesis_constants : Genesis_constants.t) =
     (* TODO(4829): Runtime proof-level. *)
     match proof_level with
     | Genesis_constants.Proof_level.Full ->
@@ -127,13 +127,13 @@ module Genesis_proof = struct
         let protocol_state_with_hash =
           Coda_state.Genesis_protocol_state.t
             ~genesis_ledger:(Genesis_ledger.Packed.t ledger)
-            ~genesis_constants
+            ~constraint_constants ~genesis_constants
         in
         let base_hash =
           Keys.Step.instance_hash protocol_state_with_hash.data
         in
         let computed_values =
-          Genesis_proof.create_values ~proof_level ~keys
+          Genesis_proof.create_values ~constraint_constants ~proof_level ~keys
             { genesis_ledger= ledger
             ; protocol_state_with_hash
             ; base_hash
@@ -195,7 +195,9 @@ let retrieve_genesis_state dir_opt ~logger ~conf_dir ~daemon_conf :
     (Genesis_ledger.Packed.t * Proof.t * Genesis_constants.t) Deferred.t =
   let open Cache_dir in
   let genesis_dir_name =
-    Cache_dir.genesis_dir_name ~genesis_constants:Genesis_constants.compiled
+    Cache_dir.genesis_dir_name
+      ~constraint_constants:Genesis_constants.Constraint_constants.compiled
+      ~genesis_constants:Genesis_constants.compiled
       ~proof_level:Genesis_constants.Proof_level.compiled
   in
   let tar_filename = genesis_dir_name ^ ".tar.gz" in

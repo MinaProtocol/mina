@@ -144,7 +144,7 @@ let sync_ledger t ~root_sync_ledger ~transition_graph ~sync_ledger_reader
    isolation *)
 let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     ~transition_reader ~persistent_root ~persistent_frontier
-    ~initial_root_transition ~precomputed_values =
+    ~initial_root_transition ~constraint_constants ~precomputed_values =
   let genesis_constants =
     Precomputed_values.genesis_constants precomputed_values
   in
@@ -286,7 +286,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
           match
             Consensus.Hooks.required_local_state_sync
               ~constants:
-                (Consensus.Constants.create
+                (Consensus.Constants.create ~constraint_constants
                    ~protocol_constants:
                      (Precomputed_values.protocol_constants precomputed_values))
               ~consensus_state ~local_state:consensus_local_state
@@ -352,7 +352,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
               in
               Transition_frontier.load ~retry_with_fresh_db:false ~logger
                 ~verifier ~consensus_local_state ~persistent_root
-                ~persistent_frontier ~precomputed_values ()
+                ~persistent_frontier ~constraint_constants ~precomputed_values
+                ()
               >>| function
               | Ok frontier ->
                   frontier
@@ -425,6 +426,9 @@ let%test_module "Bootstrap_controller tests" =
 
     let trust_system = Trust_system.null ()
 
+    let constraint_constants =
+      Genesis_constants.Constraint_constants.for_unit_tests
+
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let pids = Child_processes.Termination.create_pid_table ()
@@ -471,8 +475,8 @@ let%test_module "Bootstrap_controller tests" =
         (* we only need one node for this test, but we need more than one peer so that coda_networking does not throw an error *)
         let%bind fake_network =
           Fake_network.Generator.(
-            gen ~proof_level ~precomputed_values ~max_frontier_length
-              [fresh_peer; fresh_peer])
+            gen ~proof_level ~constraint_constants ~precomputed_values
+              ~max_frontier_length [fresh_peer; fresh_peer])
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq ~proof_level
@@ -556,7 +560,7 @@ let%test_module "Bootstrap_controller tests" =
         (run ~logger ~trust_system ~verifier ~network:my_net.network
            ~consensus_local_state:my_net.state.consensus_local_state
            ~transition_reader ~persistent_root ~persistent_frontier
-           ~initial_root_transition ~precomputed_values)
+           ~initial_root_transition ~constraint_constants ~precomputed_values)
 
     let assert_transitions_increasingly_sorted ~root
         (incoming_transitions :
@@ -589,7 +593,8 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "sync with one node after receiving a transition" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~precomputed_values ~max_frontier_length
+          gen ~proof_level ~constraint_constants ~precomputed_values
+            ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2) ])
@@ -628,9 +633,9 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
       Quickcheck.test ~trials:1
-        (Transition_frontier.For_tests.gen ~proof_level ~precomputed_values
-           ~max_length:max_frontier_length ~size:max_frontier_length ())
-        ~f:(fun frontier ->
+        (Transition_frontier.For_tests.gen ~proof_level ~constraint_constants
+           ~precomputed_values ~max_length:max_frontier_length
+           ~size:max_frontier_length ()) ~f:(fun frontier ->
           Thread_safe.block_on_async_exn
           @@ fun () ->
           Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)

@@ -34,6 +34,36 @@ module Proof_level = struct
   let compiled = of_string compiled
 end
 
+module Constraint_constants = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = {c: int}
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t = {c: int}
+
+  [%%ifdef
+  consensus_mechanism]
+
+  [%%inject
+  "c", c]
+
+  [%%else]
+
+  (* Invalid value, this should not be used by nonconsensus nodes. *)
+  let c = -1
+
+  [%%endif]
+
+  let compiled = {c}
+
+  let for_unit_tests = compiled
+end
+
 (*Constants that can be specified for generating the base proof (that are not required for key-generation) in runtime_genesis_ledger.exe and that can be configured at runtime.
 The types are defined such that this module doesn't depend on any of the coda libraries (except blake2 and module_version) to avoid dependency cycles.
 TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)
