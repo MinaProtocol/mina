@@ -14,17 +14,19 @@ let%test_module "Full_frontier tests" =
 
     let logger = Logger.null ()
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
     let accounts_with_secret_keys = Lazy.force Test_genesis_ledger.accounts
 
     let max_length = 5
 
     let gen_breadcrumb =
-      Breadcrumb.For_tests.gen ~logger ?verifier:None ?trust_system:None
-        ~accounts_with_secret_keys
+      Breadcrumb.For_tests.gen ~logger ~proof_level ?verifier:None
+        ?trust_system:None ~accounts_with_secret_keys
 
     let gen_breadcrumb_seq =
-      Breadcrumb.For_tests.gen_seq ~logger ?verifier:None ?trust_system:None
-        ~accounts_with_secret_keys
+      Breadcrumb.For_tests.gen_seq ~logger ~proof_level ?verifier:None
+        ?trust_system:None ~accounts_with_secret_keys
 
     module Transfer = Ledger_transfer.Make (Ledger) (Ledger)
 
