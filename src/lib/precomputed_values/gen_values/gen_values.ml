@@ -45,6 +45,7 @@ module Make_real (Keys : Keys_lib.Keys.S) = struct
   let compiled_values =
     Genesis_proof.create_values
       ~keys:(module Keys : Keys_lib.Keys.S)
+      ~proof_level:Full
       { genesis_constants= Genesis_constants.compiled
       ; genesis_ledger= (module Test_genesis_ledger)
       ; protocol_state_with_hash

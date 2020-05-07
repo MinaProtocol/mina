@@ -1530,6 +1530,8 @@ let%test_module "test" =
       Quickcheck.random_value ~seed:(`Deterministic "receiver_pk")
         Public_key.Compressed.gen
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
     (* Functor for testing with different instantiated staged ledger modules. *)
     let create_and_apply_with_state_body_hash state_body_hash sl logger pids
         txns stmt_to_work =
@@ -1540,7 +1542,9 @@ let%test_module "test" =
           ~coinbase_receiver:(`Other coinbase_receiver)
       in
       let diff' = Staged_ledger_diff.forget diff in
-      let%bind verifier = Verifier.create ~logger ~pids ~conf_dir:None in
+      let%bind verifier =
+        Verifier.create ~logger ~proof_level ~pids ~conf_dir:None
+      in
       let%map ( `Hash_after_applying hash
               , `Ledger_proof ledger_proof
               , `Staged_ledger sl'
@@ -2071,7 +2075,7 @@ let%test_module "test" =
                         work_done partitions
                     in
                     let%bind verifier =
-                      Verifier.create ~logger ~pids ~conf_dir:None
+                      Verifier.create ~logger ~proof_level ~pids ~conf_dir:None
                     in
                     let%bind apply_res =
                       Sl.apply !sl diff ~logger ~verifier
