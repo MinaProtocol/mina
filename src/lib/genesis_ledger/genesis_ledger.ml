@@ -1,21 +1,7 @@
-[%%import
-"/src/config.mlh"]
-
 open Core_kernel
 open Currency
 open Signature_lib
 open Coda_base
-
-[%%inject
-"ledger_depth", ledger_depth]
-
-[%%inject
-"fake_accounts_target", fake_accounts_target]
-
-let _ =
-  if Base.Int.(fake_accounts_target > pow 2 ledger_depth) then
-    failwith "Genesis_ledger: fake_accounts_target >= 2**ledger_depth"
-
 module Intf = Intf
 
 module Private_accounts (Accounts : Intf.Private_accounts.S) = struct
