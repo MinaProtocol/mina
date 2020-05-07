@@ -586,7 +586,8 @@ let%test_module "Ledger_catchup tests" =
             let failing_root_data =
               List.nth_exn (Root_history.to_list history) 1
             in
-            downcast_transition failing_root_data.transition
+            downcast_transition
+              (Frontier_base.Root_data.Historical.transition failing_root_data)
           in
           Thread_safe.block_on_async_exn (fun () ->
               let%bind `Test {cache; _}, `Cached_transition cached_transition =

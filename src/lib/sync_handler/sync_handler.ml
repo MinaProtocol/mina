@@ -2,6 +2,7 @@ open Core_kernel
 open Async
 open Coda_base
 open Coda_transition
+open Frontier_base
 open Network_peer
 
 module type Inputs_intf = sig
@@ -23,6 +24,13 @@ module Make (Inputs : Inputs_intf) :
       get_extension (Transition_frontier.extensions frontier) Root_history
     in
     Root_history.lookup root_history state_hash
+
+  let protocol_states_in_root_history frontier state_hash =
+    let open Transition_frontier.Extensions in
+    let root_history =
+      get_extension (Transition_frontier.extensions frontier) Root_history
+    in
+    Root_history.protocol_states_for_scan_state root_history state_hash
 
   let get_ledger_by_hash ~frontier ledger_hash =
     let root_ledger =
@@ -56,24 +64,49 @@ module Make (Inputs : Inputs_intf) :
   let get_staged_ledger_aux_and_pending_coinbases_at_hash ~frontier state_hash
       =
     let open Option.Let_syntax in
-    Option.merge
-      (let%map breadcrumb = Transition_frontier.find frontier state_hash in
-       let staged_ledger =
-         Transition_frontier.Breadcrumb.staged_ledger breadcrumb
-       in
-       let scan_state = Staged_ledger.scan_state staged_ledger in
-       let merkle_root =
-         Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
-       in
-       let pending_coinbase =
-         Staged_ledger.pending_coinbase_collection staged_ledger
-       in
-       (scan_state, merkle_root, pending_coinbase))
-      (let%map root = find_in_root_history frontier state_hash in
-       ( root.scan_state
-       , root.staged_ledger_target_ledger_hash
-       , root.pending_coinbase ))
-      ~f:Fn.const
+    let protocol_states scan_state =
+      Staged_ledger.Scan_state.required_state_hashes scan_state
+      |> State_hash.Set.to_list
+      |> List.fold_until ~init:(Some [])
+           ~f:(fun acc hash ->
+             match
+               Option.map2
+                 (Transition_frontier.find_protocol_state frontier hash)
+                 acc ~f:List.cons
+             with
+             | None ->
+                 Stop None
+             | Some acc' ->
+                 Continue (Some acc') )
+           ~finish:Fn.id
+    in
+    match
+      let%bind breadcrumb = Transition_frontier.find frontier state_hash in
+      let staged_ledger =
+        Transition_frontier.Breadcrumb.staged_ledger breadcrumb
+      in
+      let scan_state = Staged_ledger.scan_state staged_ledger in
+      let merkle_root =
+        Staged_ledger.hash staged_ledger |> Staged_ledger_hash.ledger_hash
+      in
+      let%map scan_state_protocol_states = protocol_states scan_state in
+      let pending_coinbase =
+        Staged_ledger.pending_coinbase_collection staged_ledger
+      in
+      (scan_state, merkle_root, pending_coinbase, scan_state_protocol_states)
+    with
+    | Some res ->
+        Some res
+    | None ->
+        let open Root_data.Historical in
+        let%bind root = find_in_root_history frontier state_hash in
+        let%map scan_state_protocol_states =
+          protocol_states_in_root_history frontier state_hash
+        in
+        ( scan_state root
+        , staged_ledger_target_ledger_hash root
+        , pending_coinbase root
+        , scan_state_protocol_states )
 
   let get_transition_chain ~frontier hashes =
     let open Option.Let_syntax in
@@ -83,7 +116,8 @@ module Make (Inputs : Inputs_intf) :
              Option.merge
                Transition_frontier.(
                  find frontier hash >>| Breadcrumb.validated_transition)
-               (find_in_root_history frontier hash >>| fun x -> x.transition)
+               ( find_in_root_history frontier hash
+               >>| fun x -> Root_data.Historical.transition x )
                ~f:Fn.const
            in
            External_transition.Validation.forget_validation
