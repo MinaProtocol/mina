@@ -1,0 +1,19 @@
+{
+  "name": "leaderboard",
+  "version": "1.0.0",
+  "scripts": {
+    "dev": "bsb -clean-world -make-world -w",
+    "build": "bsb -clean-world -make-world",
+    "clean": "bsb -clean-world",
+    "reformat": "bsrefmt --in-place src/**/*.re"
+  },
+  "license": "ISC",
+  "dependencies": {
+    "bs-fetch": "^0.5.0",
+    "bsc-stdlib-polyfill": "Schmavery/bsc-stdlib-polyfill",
+    "isomorphic-unfetch": "^3.0.0"
+  },
+  "devDependencies": {
+    "bs-platform": "7.0.0-dev.1"
+  }
+}

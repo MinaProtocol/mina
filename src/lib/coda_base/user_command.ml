@@ -78,9 +78,9 @@ let fee = Fn.compose Payload.fee payload
 let nonce = Fn.compose Payload.nonce payload
 
 (* for filtering *)
-let minimum_fee = Fee.of_int 2_000_000_000
+let minimum_fee = Coda_compile_config.minimum_user_command_fee
 
-let is_trivial t = Fee.(fee t < minimum_fee)
+let has_insufficient_fee t = Fee.(fee t < minimum_fee)
 
 let signer {Poly.signer; _} = signer
 
