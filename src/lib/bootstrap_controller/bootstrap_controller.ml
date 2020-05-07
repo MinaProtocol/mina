@@ -194,7 +194,10 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
     in
     let%bind staged_ledger_aux_result =
       let open Deferred.Or_error.Let_syntax in
-      let%bind scan_state, expected_merkle_root, pending_coinbases =
+      let%bind ( scan_state
+               , expected_merkle_root
+               , pending_coinbases
+               , protocol_states ) =
         Coda_networking.get_staged_ledger_aux_and_pending_coinbases_at_hash
           t.network sender_peer_id hash
       in
@@ -223,7 +226,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
       (* Construct the staged ledger before constructing the transition
        * frontier in order to verify the scan state we received.
        * TODO: reorganize the code to avoid doing this twice (#3480)  *)
-      let%map _ =
+      let%bind _ =
         let open Deferred.Let_syntax in
         let temp_mask = Ledger.of_database temp_snarked_ledger in
         let%map result =
@@ -234,7 +237,12 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         ignore (Ledger.Maskable.unregister_mask_exn temp_mask) ;
         result
       in
-      (scan_state, pending_coinbases, new_root)
+      let%map protocol_states =
+        Staged_ledger.Scan_state.check_required_protocol_states scan_state
+          ~protocol_states
+        |> Deferred.return
+      in
+      (scan_state, pending_coinbases, new_root, protocol_states)
     in
     Transition_frontier.Persistent_root.Instance.destroy
       temp_persistent_root_instance ;
@@ -261,7 +269,7 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
            bootstrap" ;
         Writer.close sync_ledger_writer ;
         loop ()
-    | Ok (scan_state, pending_coinbase, new_root) -> (
+    | Ok (scan_state, pending_coinbase, new_root, protocol_states) -> (
         let%bind () =
           Trust_system.(
             record t.trust_system t.logger sender_host
@@ -322,7 +330,8 @@ let run ~logger ~trust_system ~verifier ~network ~consensus_local_state
         | Ok () ->
             (* Close the old frontier and reload a new on from disk. *)
             let new_root_data : Transition_frontier.Root_data.Limited.t =
-              {transition= new_root; scan_state; pending_coinbase}
+              Transition_frontier.Root_data.Limited.create ~transition:new_root
+                ~scan_state ~pending_coinbase ~protocol_states
             in
             let%bind () =
               Transition_frontier.Persistent_frontier.reset_database_exn
