@@ -508,9 +508,29 @@ let%test_module "test functor on in memory databases" =
 
       module Location = Merkle_ledger.Location.Make (Depth)
 
+      module Location_binable = struct
+        module Arg = struct
+          type t = Location.t =
+            | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+            | Account of Location.Addr.Stable.Latest.t
+            | Hash of Location.Addr.Stable.Latest.t
+          [@@deriving bin_io_unversioned, hash, sexp, compare]
+        end
+
+        type t = Arg.t =
+          | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+          | Account of Location.Addr.Stable.Latest.t
+          | Hash of Location.Addr.Stable.Latest.t
+        [@@deriving hash, sexp, compare]
+
+        include Hashable.Make_binable (Arg) [@@deriving
+                                              sexp, compare, hash, yojson]
+      end
+
       module Inputs = struct
         include Test_stubs.Base_inputs
         module Location = Location
+        module Location_binable = Location_binable
         module Kvdb = In_memory_kvdb
         module Storage_locations = Storage_locations
         module Depth = Depth

@@ -5,6 +5,8 @@ module type Inputs_intf = sig
 
   module Location : Location_intf.S
 
+  module Location_binable : Hashable.S_binable with type t := Location.t
+
   module Kvdb : Intf.Key_value_database with type config := string
 
   module Storage_locations : Intf.Storage_locations
@@ -420,6 +422,7 @@ module Make (Inputs : Inputs_intf) :
     module Account_id = Account_id
     module Balance = Balance
     module Location = Location
+    module Location_binable = Location_binable
     module Account = Account
     module Hash = Hash
     module Depth = Depth
