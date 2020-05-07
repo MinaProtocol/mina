@@ -59,12 +59,8 @@ struct
    *)
 
   let to_group x =
-    let f x =
-      Field.(
-        (x * x * x)
-        + scale x (Group_map.Params.a params)
-        + constant (Group_map.Params.b params))
-    in
+    let {Group_map.Spec.a; b} = Group_map.Params.spec params in
+    let f x = Field.((x * x * x) + scale x a + constant b) in
     let x1, x2, x3 = B.potential_xs x in
     let y1, b1 = sqrt_flagged (f x1)
     and y2, b2 = sqrt_flagged (f x2)

@@ -103,8 +103,7 @@ let params_ast affine_params ~loc =
 let group_map_params =
   Group_map.Params.create
     (module Curve_choice.Tick0.Field)
-    ~a:Curve_choice.Tick_backend.Inner_curve.Coefficients.a
-    ~b:Curve_choice.Tick_backend.Inner_curve.Coefficients.b
+    Curve_choice.Tick_backend.Inner_curve.Coefficients.{a; b}
 
 let group_map_params_structure ~loc =
   let module T = struct
