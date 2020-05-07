@@ -24,14 +24,15 @@ let fetchLeaderboard = () => {
          Option.bind(Js.Json.decodeObject(r), o => Js.Dict.get(o, "values"));
 
        switch (Option.bind(results, Js.Json.decodeArray)) {
-       | Some(resultsArr) => {
-           let arr = Array.map(parseEntry, resultsArr);
-           arr |> Array.sort((e1, e2) => {
+       | Some(resultsArr) =>
+         let arr = Array.map(parseEntry, resultsArr);
+         arr
+         |> Array.sort((e1, e2) => {
               let len = Array.length;
-              int_of_string(e2[len(e2) - 1]) - int_of_string(e1[len(e1)-1])
-           })
-           arr
-       }
+              int_of_string(e2[len(e2) - 1])
+              - int_of_string(e1[len(e1) - 1]);
+            });
+         arr;
        | None => [||]
        };
      })
