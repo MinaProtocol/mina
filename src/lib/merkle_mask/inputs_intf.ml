@@ -19,6 +19,9 @@ module type S = sig
 
   module Location : Merkle_ledger.Location_intf.S
 
+  module Location_binable :
+    Core_kernel.Hashable.S_binable with type t := Location.t
+
   module Base :
     Base_merkle_tree_intf.S
     with module Addr = Location.Addr
