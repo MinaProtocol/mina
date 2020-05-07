@@ -30,11 +30,13 @@ type t =
   ; genesis_state_hash: State_hash.t }
 
 let genesis_root_data ~precomputed_values =
-  let open Root_data.Limited.Stable.Latest in
+  let open Root_data.Limited in
   let transition = External_transition.genesis ~precomputed_values in
   let scan_state = Staged_ledger.Scan_state.empty () in
+  (*if scan state is empty the protocol states required is also empty*)
+  let protocol_states = [] in
   let pending_coinbase = Or_error.ok_exn (Pending_coinbase.create ()) in
-  {transition; scan_state; pending_coinbase}
+  create ~transition ~scan_state ~pending_coinbase ~protocol_states
 
 let load_from_persistence_and_start ~logger ~verifier ~consensus_local_state
     ~max_length ~persistent_root ~persistent_root_instance ~persistent_frontier
@@ -367,6 +369,8 @@ include struct
 
   let best_tip_path_length_exn = proxy1 best_tip_path_length_exn
 
+  let find_protocol_state = proxy1 find_protocol_state
+
   (* why can't this one be proxied? *)
   let path_map {full_frontier; _} breadcrumb ~f =
     path_map full_frontier breadcrumb ~f
@@ -496,14 +500,25 @@ module For_tests = struct
             clean_temp_dirs x ) ;
         (persistent_root, persistent_frontier) )
 
+  let gen_genesis_breadcrumb_with_protocol_states ~logger ~proof_level
+      ?verifier ~precomputed_values () =
+    let open Quickcheck.Generator.Let_syntax in
+    let%map root =
+      gen_genesis_breadcrumb ~logger ~proof_level ?verifier ~precomputed_values
+        ()
+    in
+    (* List of protocol states required to prove transactions in the scan state; empty scan state at genesis*)
+    let protocol_states = [] in
+    (root, protocol_states)
+
   let gen ?(logger = Logger.null ()) ~proof_level ?verifier ?trust_system
       ?consensus_local_state ~precomputed_values
       ?(root_ledger_and_accounts =
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
       ?(gen_root_breadcrumb =
-        gen_genesis_breadcrumb ~logger ~proof_level ?verifier
-          ~precomputed_values ()) ~max_length ~size () =
+        gen_genesis_breadcrumb_with_protocol_states ~logger ~proof_level
+          ?verifier ~precomputed_values ()) ~max_length ~size () =
     let open Quickcheck.Generator.Let_syntax in
     let genesis_state_hash =
       Precomputed_values.genesis_state_hash precomputed_values
@@ -530,20 +545,26 @@ module For_tests = struct
     in
     let root_snarked_ledger, root_ledger_accounts = root_ledger_and_accounts in
     (* TODO: ensure that rose_tree cannot be longer than k *)
-    let%bind (Rose_tree.T (root, branches)) =
-      Quickcheck.Generator.with_size ~size
-        (Quickcheck_lib.gen_imperative_rose_tree gen_root_breadcrumb
-           (Breadcrumb.For_tests.gen_non_deferred ~logger ~proof_level
-              ~verifier ~trust_system
-              ~accounts_with_secret_keys:root_ledger_accounts))
+    let%bind root, branches, protocol_states =
+      let%bind root, protocol_states = gen_root_breadcrumb in
+      let%map (Rose_tree.T (root, branches)) =
+        Quickcheck.Generator.with_size ~size
+          (Quickcheck_lib.gen_imperative_rose_tree
+             (Quickcheck.Generator.return root)
+             (Breadcrumb.For_tests.gen_non_deferred ~logger ~proof_level
+                ~verifier ~trust_system
+                ~accounts_with_secret_keys:root_ledger_accounts))
+      in
+      (root, branches, protocol_states)
     in
     let root_data =
-      { Root_data.Limited.Stable.Latest.transition=
-          Breadcrumb.validated_transition root
-      ; scan_state= Breadcrumb.staged_ledger root |> Staged_ledger.scan_state
-      ; pending_coinbase=
-          Breadcrumb.staged_ledger root
-          |> Staged_ledger.pending_coinbase_collection }
+      Root_data.Limited.create
+        ~transition:(Breadcrumb.validated_transition root)
+        ~scan_state:(Breadcrumb.staged_ledger root |> Staged_ledger.scan_state)
+        ~pending_coinbase:
+          ( Breadcrumb.staged_ledger root
+          |> Staged_ledger.pending_coinbase_collection )
+        ~protocol_states
     in
     let%map persistent_root, persistent_frontier =
       gen_persistence ~logger ~proof_level ()
@@ -554,7 +575,8 @@ module For_tests = struct
     Persistent_root.with_instance_exn persistent_root ~f:(fun instance ->
         Persistent_root.Instance.set_root_state_hash instance
           ~genesis_state_hash
-          (External_transition.Validated.state_hash root_data.transition) ;
+          (External_transition.Validated.state_hash
+             (Root_data.Limited.transition root_data)) ;
         ignore
         @@ Ledger_transfer.transfer_accounts ~src:root_snarked_ledger
              ~dest:(Persistent_root.Instance.snarked_ledger instance) ) ;
