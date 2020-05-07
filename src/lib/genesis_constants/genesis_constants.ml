@@ -4,6 +4,36 @@
 open Core_kernel
 open Module_version
 
+module Proof_level = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = Full | Check | None
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t = Full | Check | None
+
+  let to_string = function Full -> "full" | Check -> "check" | None -> "none"
+
+  let of_string = function
+    | "full" ->
+        Full
+    | "check" ->
+        Check
+    | "none" ->
+        None
+    | s ->
+        failwithf "unrecognised proof level %s" s ()
+
+  [%%inject
+  "compiled", proof_level]
+
+  let compiled = of_string compiled
+end
+
 (*Constants that can be specified for generating the base proof (that are not required for key-generation) in runtime_genesis_ledger.exe and that can be configured at runtime.
 The types are defined such that this module doesn't depend on any of the coda libraries (except blake2 and module_version) to avoid dependency cycles.
 TODO: #4659 move key generation to runtime_genesis_ledger.exe to include scan_state constants, consensus constants (c and  block_window_duration) and ledger depth here*)

@@ -41,9 +41,7 @@ let get_accounts accounts_json_file n =
   Genesis_ledger_helper.Accounts.store ~filename:"accounts.json" all_accounts ;
   (all_accounts, num_accounts)
 
-let genesis_dirname = Cache_dir.genesis_dir_name Genesis_constants.compiled
-
-let create_tar top_dir =
+let create_tar ~genesis_dirname top_dir =
   let tar_file = top_dir ^/ genesis_dirname ^ ".tar.gz" in
   Genesis_ledger_helper.Tar.create ~root:top_dir ~file:tar_file
     ~directory:genesis_dirname ()
@@ -67,9 +65,13 @@ let read_write_constants ~f read_from_opt write_to =
       Config_file.(of_genesis_constants constants |> to_yojson)) ;
   constants
 
-let main accounts_json_file dir num_accounts constants_file =
+let main accounts_json_file dir num_accounts proof_level constants_file =
   let open Deferred.Let_syntax in
   let top_dir = Option.value ~default:Cache_dir.autogen_path dir in
+  let genesis_dirname =
+    Cache_dir.genesis_dir_name ~genesis_constants:Genesis_constants.compiled
+      ~proof_level:Genesis_constants.Proof_level.compiled
+  in
   let%bind genesis_dir =
     let dir = top_dir ^/ genesis_dirname in
     let%map () = File_system.create_dir dir ~clear_if_exists:true in
@@ -101,7 +103,7 @@ let main accounts_json_file dir num_accounts constants_file =
           |> Result.ok_or_failwith
         in
         let%bind _base_hash, base_proof =
-          Genesis_ledger_helper.Genesis_proof.generate ~ledger
+          Genesis_ledger_helper.Genesis_proof.generate ~proof_level ~ledger
             ~genesis_constants
         in
         Deferred.Or_error.ok_exn
@@ -111,7 +113,9 @@ let main accounts_json_file dir num_accounts constants_file =
         failwithf "Failed to create genesis ledger\n%s" (Error.to_string_hum e)
           ()
   in
-  let%bind () = Deferred.Or_error.ok_exn @@ create_tar top_dir in
+  let%bind () =
+    Deferred.Or_error.ok_exn @@ create_tar ~genesis_dirname top_dir
+  in
   File_system.remove_dir genesis_dir
 
 let () =
@@ -160,10 +164,19 @@ let () =
                       Config_file.(of_genesis_constants compiled |> to_yojson))
                   |> Yojson.Safe.to_string ))
              (optional string)
+         and proof_level =
+           flag "proof-level"
+             (optional
+                (Arg_type.create Genesis_constants.Proof_level.of_string))
+             ~doc:"full|check|none"
          in
          fun () ->
            let max = Int.pow 2 Coda_compile_config.ledger_depth in
            let n = Option.value ~default:0 n in
+           let proof_level =
+             Option.value ~default:Genesis_constants.Proof_level.compiled
+               proof_level
+           in
            if n >= max then
              failwith (sprintf "Invalid value for n (0 <= n <= %d)" max)
-           else main accounts_json genesis_dir n constants))
+           else main accounts_json genesis_dir n proof_level constants))

@@ -15,9 +15,6 @@ module Currency = Currency_nonconsensus.Currency
 *)
 
 [%%inject
-"proof_level", proof_level]
-
-[%%inject
 "coinbase_string", coinbase]
 
 [%%inject
