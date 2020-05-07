@@ -408,6 +408,8 @@ let%test_module "Ledger_catchup tests" =
 
     let logger = Logger.null ()
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let trust_system = Trust_system.null ()
@@ -459,7 +461,9 @@ let%test_module "Ledger_catchup tests" =
         Transition_handler.Unprocessed_transition_cache.create ~logger
       in
       let pids = Child_processes.Termination.create_pid_table () in
-      let%map verifier = Verifier.create ~logger ~conf_dir:None ~pids in
+      let%map verifier =
+        Verifier.create ~logger ~proof_level ~conf_dir:None ~pids
+      in
       run ~logger ~verifier ~trust_system ~network ~frontier
         ~catchup_breadcrumbs_writer ~catchup_job_reader
         ~unprocessed_transition_cache ;
@@ -529,7 +533,7 @@ let%test_module "Ledger_catchup tests" =
           let%bind peer_branch_size =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
-          gen ~precomputed_values ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size ])
         ~f:(fun network ->
@@ -548,7 +552,7 @@ let%test_module "Ledger_catchup tests" =
                    in the frontier" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~precomputed_values ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [fresh_peer; peer_with_branch ~frontier_branch_size:1])
         ~f:(fun network ->
           let open Fake_network in
@@ -562,7 +566,7 @@ let%test_module "Ledger_catchup tests" =
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~precomputed_values ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])

@@ -115,7 +115,7 @@ let replace_block_production_keypairs t kps =
   Agent.update t.block_production_keypairs kps
 
 module Snark_worker = struct
-  let run_process ~logger client_port kill_ivar num_threads =
+  let run_process ~logger ~proof_level client_port kill_ivar num_threads =
     let env =
       Option.map
         ~f:(fun num -> `Extend [("OMP_NUM_THREADS", string_of_int num)])
@@ -126,7 +126,7 @@ module Snark_worker = struct
       Process.create_exn () ~prog:our_binary ?env
         ~args:
           ( "internal" :: Snark_worker.Intf.command_name
-          :: Snark_worker.arguments
+          :: Snark_worker.arguments ~proof_level
                ~daemon_address:
                  (Host_and_port.create ~host:"127.0.0.1" ~port:client_port)
                ~shutdown_on_disconnect:false )
@@ -181,7 +181,7 @@ module Snark_worker = struct
           !"Starting snark worker process"
           ~module_:__MODULE__ ~location:__LOC__ ;
         let%map snark_worker_process =
-          run_process ~logger:t.config.logger
+          run_process ~logger:t.config.logger ~proof_level:t.config.proof_level
             t.config.gossip_net_params.addrs_and_ports.client_port kill_ivar
             t.config.snark_worker_config.num_threads
         in
@@ -748,7 +748,8 @@ let create (config : Config.t) ~precomputed_values =
                       ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
               (fun () ->
                 trace "prover" (fun () ->
-                    Prover.create ~logger:config.logger ~pids:config.pids
+                    Prover.create ~logger:config.logger
+                      ~proof_level:config.proof_level ~pids:config.pids
                       ~conf_dir:config.conf_dir ) )
             >>| Result.ok_exn
           in
@@ -764,7 +765,8 @@ let create (config : Config.t) ~precomputed_values =
                       ~metadata:[("exn", `String (Exn.to_string_mach exn))] ))
               (fun () ->
                 trace "verifier" (fun () ->
-                    Verifier.create ~logger:config.logger ~pids:config.pids
+                    Verifier.create ~logger:config.logger
+                      ~proof_level:config.proof_level ~pids:config.pids
                       ~conf_dir:(Some config.conf_dir) ) )
             >>| Result.ok_exn
           in
