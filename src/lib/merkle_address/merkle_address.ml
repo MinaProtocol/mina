@@ -6,8 +6,6 @@ module type S = sig
 
   module Stable : sig
     module V1 : sig
-      val version : int
-
       type nonrec t = t
       [@@deriving sexp, bin_io, hash, eq, compare, to_yojson, version]
     end
@@ -31,9 +29,9 @@ module type S = sig
 
   val parent : t -> t Or_error.t
 
-  val child : t -> Direction.t -> t Or_error.t
+  val child : ledger_depth:int -> t -> Direction.t -> t Or_error.t
 
-  val child_exn : t -> Direction.t -> t
+  val child_exn : ledger_depth:int -> t -> Direction.t -> t
 
   val parent_exn : t -> t
 
@@ -45,11 +43,11 @@ module type S = sig
 
   val prev : t -> t Option.t
 
-  val is_leaf : t -> bool
+  val is_leaf : ledger_depth:int -> t -> bool
 
   val is_parent_of : t -> maybe_child:t -> bool
 
-  val serialize : t -> Bigstring.t
+  val serialize : ledger_depth:int -> t -> Bigstring.t
 
   val to_string : t -> string
 
@@ -65,18 +63,19 @@ module type S = sig
       -> f:(Stable.Latest.t -> 'a -> 'a)
       -> 'a
 
-    val subtree_range : Stable.V1.t -> t
+    val subtree_range : ledger_depth:int -> Stable.Latest.t -> t
 
-    val subtree_range_seq : Stable.V1.t -> Stable.V1.t Sequence.t
+    val subtree_range_seq :
+      ledger_depth:int -> Stable.Latest.t -> Stable.Latest.t Sequence.t
   end
 
   val depth : t -> int
 
-  val height : t -> int
+  val height : ledger_depth:int -> t -> int
 
   val to_int : t -> int
 
-  val of_int_exn : int -> t
+  val of_int_exn : ledger_depth:int -> int -> t
 end
 
 module T = struct
@@ -171,9 +170,7 @@ end
 
 module Stable = T.Stable
 
-module Make (Input : sig
-  val depth : int
-end) : S = struct
+module Make (Input : sig end) : S = struct
   (* TODO: this "include" puts a stable-versioned type inside a functor
      (hard to detect this statically)
      that should be hoisted outside the functor
@@ -183,9 +180,7 @@ end) : S = struct
 
   let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
 
-  let path_byte_count = byte_count_of_bits Input.depth
-
-  let height path = Input.depth - depth path
+  let height ~ledger_depth path = ledger_depth - depth path
 
   let get = get
 
@@ -214,17 +209,18 @@ end) : S = struct
 
   let parent_exn = Fn.compose Or_error.ok_exn parent
 
-  let is_leaf path = bitstring_length path >= Input.depth
+  let is_leaf ~ledger_depth path = bitstring_length path >= ledger_depth
 
-  let child (path : t) dir : t Or_error.t =
-    if is_leaf path then
+  let child ~ledger_depth (path : t) dir : t Or_error.t =
+    if is_leaf ~ledger_depth path then
       Or_error.error_string "The address length cannot be greater than depth"
     else
       let dir_bit = Direction.to_bool dir in
       let%bitstring path = {| path: -1: bitstring; dir_bit: 1|} in
       Or_error.return path
 
-  let child_exn (path : t) dir : t = child path dir |> Or_error.ok_exn
+  let child_exn ~ledger_depth (path : t) dir : t =
+    child ~ledger_depth path dir |> Or_error.ok_exn
 
   let to_int (path : t) : int =
     Sequence.range 0 (depth path)
@@ -232,12 +228,12 @@ end) : S = struct
            let index = depth path - 1 - i in
            acc + ((if get path index <> 0 then 1 else 0) lsl i) )
 
-  let of_int_exn index =
-    if index >= 1 lsl Input.depth then failwith "Index is too large"
+  let of_int_exn ~ledger_depth index =
+    if index >= 1 lsl ledger_depth then failwith "Index is too large"
     else
-      let buf = create_bitstring Input.depth in
+      let buf = create_bitstring ledger_depth in
       Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
-        (Input.depth - 1) 0
+        (ledger_depth - 1) 0
       |> Sequence.fold ~init:index ~f:(fun i pos ->
              Bitstring.put buf pos (i % 2) ;
              i / 2 )
@@ -296,10 +292,10 @@ end) : S = struct
     set_bits (rightmost_clear_index + 1) ;
     path
 
-  let serialize path =
+  let serialize ~ledger_depth path =
     let path = add_padding path in
     let path_len = depth path in
-    let required_bits = 8 * path_byte_count in
+    let required_bits = 8 * byte_count_of_bits ledger_depth in
     assert (path_len <= required_bits) ;
     let required_padding = required_bits - path_len in
     Bigstring.of_string @@ string_of_bitstring
@@ -333,13 +329,17 @@ end) : S = struct
       | `Exclusive ->
           fold_exl (first, last) ~init ~f
 
-    let subtree_range address =
-      let first_node = concat [address; zeroes_bitstring @@ height address] in
-      let last_node = concat [address; ones_bitstring @@ height address] in
+    let subtree_range ~ledger_depth address =
+      let first_node =
+        concat [address; zeroes_bitstring @@ height ~ledger_depth address]
+      in
+      let last_node =
+        concat [address; ones_bitstring @@ height ~ledger_depth address]
+      in
       (first_node, last_node)
 
-    let subtree_range_seq address =
-      let first_node, last_node = subtree_range address in
+    let subtree_range_seq ~ledger_depth address =
+      let first_node, last_node = subtree_range ~ledger_depth address in
       Sequence.unfold
         ~init:(first_node, `Don't_stop)
         ~f:(function
@@ -352,20 +352,27 @@ end) : S = struct
                 Option.map (next current_node) ~f:(fun next_node ->
                     (current_node, (next_node, `Don't_stop)) ) )
   end
+end
 
-  let%test "Bitstring bin_io serialization does not change" =
-    (* Bitstring.t is trustlisted as a versioned type. This test assures that serializations of that type haven't changed *)
-    let text =
-      "Contrary to popular belief, Lorem Ipsum is not simply random text. It \
-       has roots in a piece of classical Latin literature."
-    in
-    let bitstring = Bitstring.bitstring_of_string text in
-    let known_good_hash =
-      "\x0D\xF3\x25\xCE\xD4\x05\xBD\x6C\xB9\xC6\x88\x9E\x16\xD1\x4A\x1B\xEF\xB8\xBC\x3F\xB7\x16\x58\xCB\xC6\x16\xAC\x4B\xD6\x3B\x70\x5B"
-    in
-    Module_version.Serialization.check_serialization
-      (module Stable.V1)
-      bitstring known_good_hash
+let%test "Bitstring bin_io serialization does not change" =
+  (* Bitstring.t is trustlisted as a versioned type. This test assures that serializations of that type haven't changed *)
+  let text =
+    "Contrary to popular belief, Lorem Ipsum is not simply random text. It \
+     has roots in a piece of classical Latin literature."
+  in
+  let bitstring = Bitstring.bitstring_of_string text in
+  let known_good_hash =
+    "\x0D\xF3\x25\xCE\xD4\x05\xBD\x6C\xB9\xC6\x88\x9E\x16\xD1\x4A\x1B\xEF\xB8\xBC\x3F\xB7\x16\x58\xCB\xC6\x16\xAC\x4B\xD6\x3B\x70\x5B"
+  in
+  Module_version.Serialization.check_serialization
+    (module Stable.V1)
+    bitstring known_good_hash
+
+module Make_test (Input : sig
+  val depth : int
+end) =
+struct
+  include Make ()
 
   let%test "the merkle root should have no path" =
     dirs_from_root (root ()) = []
@@ -377,19 +384,23 @@ end) : S = struct
          Direction.gen)
       ~f:(fun (path, direction) ->
         let address = of_directions path in
-        [%test_eq: t] (parent_exn (child_exn address direction)) address )
+        [%test_eq: t]
+          (parent_exn (child_exn ~ledger_depth:Input.depth address direction))
+          address )
 
   let%test_unit "to_index(of_index_exn(i)) = i" =
     Quickcheck.test ~sexp_of:[%sexp_of: int]
       (Int.gen_incl 0 ((1 lsl Input.depth) - 1))
       ~f:(fun index ->
-        [%test_result: int] ~expect:index (to_int @@ of_int_exn index) )
+        [%test_result: int] ~expect:index
+          (to_int @@ of_int_exn ~ledger_depth:Input.depth index) )
 
   let%test_unit "of_index_exn(to_index(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
       (Direction.gen_list Input.depth) ~f:(fun directions ->
         let address = of_directions directions in
-        [%test_result: t] ~expect:address (of_int_exn @@ to_int address) )
+        [%test_result: t] ~expect:address
+          (of_int_exn ~ledger_depth:Input.depth @@ to_int address) )
 
   let%test_unit "nonempty(addr): sibling(sibling(addr)) = addr" =
     Quickcheck.test ~sexp_of:[%sexp_of: Direction.t list]
@@ -411,15 +422,15 @@ end
 
 let%test_module "Address" =
   ( module struct
-    module Test4 = Make (struct
+    module Test4 = Make_test (struct
       let depth = 4
     end)
 
-    module Test16 = Make (struct
+    module Test16 = Make_test (struct
       let depth = 16
     end)
 
-    module Test30 = Make (struct
+    module Test30 = Make_test (struct
       let depth = 30
     end)
   end )

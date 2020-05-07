@@ -75,13 +75,13 @@ module Make (Depth : Intf.Depth) = struct
 
   let is_hash = function Hash _ -> true | _ -> false
 
-  let height : t -> int = function
+  let height ~ledger_depth : t -> int = function
     | Generic _ ->
         raise (Invalid_argument "height: generic location has no height")
     | Account _ ->
         0
     | Hash path ->
-        Addr.height path
+        Addr.height ~ledger_depth path
 
   let root_hash : t = Hash (Addr.root ())
 
@@ -116,15 +116,17 @@ module Make (Depth : Intf.Depth) = struct
     | Generic _ ->
         raise (Invalid_argument "to_path_exn: generic does not have a path")
 
-  let serialize = function
+  let serialize ~ledger_depth = function
     | Generic data ->
         prefix_bigstring Prefix.generic data
     | Account path ->
         assert (Addr.depth path = Depth.depth) ;
-        prefix_bigstring Prefix.account (Addr.serialize path)
+        prefix_bigstring Prefix.account (Addr.serialize ~ledger_depth path)
     | Hash path ->
         assert (Addr.depth path <= Depth.depth) ;
-        prefix_bigstring (Prefix.hash (Addr.depth path)) (Addr.serialize path)
+        prefix_bigstring
+          (Prefix.hash (Addr.depth path))
+          (Addr.serialize ~ledger_depth path)
 
   let parent : t -> t = function
     | Generic _ ->

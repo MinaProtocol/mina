@@ -87,7 +87,6 @@ module Ledger = struct
 
   let generate ?directory_name (accounts : Account_config.t) :
       Genesis_ledger.Packed.t =
-    let ledger = Ledger.create ?directory_name () in
     let accounts =
       List.map accounts ~f:(fun {pk; sk; balance; delegate} ->
           let account =
@@ -95,23 +94,31 @@ module Ledger = struct
             let base_acct = Account.create account_id balance in
             {base_acct with delegate= Option.value ~default:pk delegate}
           in
-          Ledger.create_new_account_exn ledger
-            (Account.identifier account)
-            account ;
           (sk, account) )
     in
-    Ledger.commit ledger ;
-    ( module struct
-      include Genesis_ledger.Make (struct
+    let (packed : Genesis_ledger.Packed.t) =
+      ( module Genesis_ledger.Make (struct
         let accounts = lazy accounts
-      end)
 
-      let t = lazy ledger
-    end )
+        let directory =
+          match directory_name with
+          | Some directory_name ->
+              `Path directory_name
+          | None ->
+              `New
+
+        let depth = Genesis_constants.ledger_depth
+      end) )
+    in
+    packed |> Genesis_ledger.Packed.t |> Lazy.force |> Ledger.commit ;
+    packed
 
   let load directory_name : Genesis_ledger.Packed.t =
     ( module Genesis_ledger.Of_ledger (struct
-      let t = lazy (Ledger.create ~directory_name ())
+      let t =
+        lazy
+          (Ledger.create ~depth:Genesis_constants.ledger_depth ~directory_name
+             ())
     end) )
 end
 

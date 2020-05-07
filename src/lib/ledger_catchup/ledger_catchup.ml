@@ -410,6 +410,8 @@ let%test_module "Ledger_catchup tests" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
+    let ledger_depth = Genesis_constants.ledger_depth_for_unit_tests
+
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let trust_system = Trust_system.null ()
@@ -533,7 +535,8 @@ let%test_module "Ledger_catchup tests" =
           let%bind peer_branch_size =
             Int.gen_incl (max_frontier_length / 2) (max_frontier_length - 1)
           in
-          gen ~proof_level ~precomputed_values ~max_frontier_length
+          gen ~proof_level ~ledger_depth ~precomputed_values
+            ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:peer_branch_size ])
         ~f:(fun network ->
@@ -552,7 +555,8 @@ let%test_module "Ledger_catchup tests" =
                    in the frontier" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~precomputed_values ~max_frontier_length
+          gen ~proof_level ~ledger_depth ~precomputed_values
+            ~max_frontier_length
             [fresh_peer; peer_with_branch ~frontier_branch_size:1])
         ~f:(fun network ->
           let open Fake_network in
@@ -566,7 +570,8 @@ let%test_module "Ledger_catchup tests" =
     let%test_unit "catchup fails if one of the parent transitions fail" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~precomputed_values ~max_frontier_length
+          gen ~proof_level ~ledger_depth ~precomputed_values
+            ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch ~frontier_branch_size:(max_frontier_length * 2)
             ])

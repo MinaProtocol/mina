@@ -448,7 +448,8 @@ module For_tests = struct
         in
         Breadcrumb.create genesis_transition genesis_staged_ledger )
 
-  let gen_persistence ?(logger = Logger.null ()) ~proof_level ?verifier () =
+  let gen_persistence ?(logger = Logger.null ()) ~proof_level ~ledger_depth
+      ?verifier () =
     let open Core in
     let verifier =
       match verifier with
@@ -484,7 +485,7 @@ module For_tests = struct
         Unix.mkdir root_dir ;
         Unix.mkdir frontier_dir ;
         let persistent_root =
-          Persistent_root.create ~logger ~directory:root_dir
+          Persistent_root.create ~logger ~directory:root_dir ~ledger_depth
         in
         let persistent_frontier =
           Persistent_frontier.create ~logger ~verifier
@@ -511,8 +512,8 @@ module For_tests = struct
     let protocol_states = [] in
     (root, protocol_states)
 
-  let gen ?(logger = Logger.null ()) ~proof_level ?verifier ?trust_system
-      ?consensus_local_state ~precomputed_values
+  let gen ?(logger = Logger.null ()) ~proof_level ~ledger_depth ?verifier
+      ?trust_system ?consensus_local_state ~precomputed_values
       ?(root_ledger_and_accounts =
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
@@ -567,7 +568,7 @@ module For_tests = struct
         ~protocol_states
     in
     let%map persistent_root, persistent_frontier =
-      gen_persistence ~logger ~proof_level ()
+      gen_persistence ~logger ~proof_level ~ledger_depth ()
     in
     Async.Thread_safe.block_on_async_exn (fun () ->
         Persistent_frontier.reset_database_exn persistent_frontier ~root_data
@@ -603,8 +604,8 @@ module For_tests = struct
           ~f:(deferred_rose_tree_iter ~f:(add_breadcrumb_exn frontier)) ) ;
     frontier
 
-  let gen_with_branch ?logger ~proof_level ?verifier ?trust_system
-      ?consensus_local_state ~precomputed_values
+  let gen_with_branch ?logger ~proof_level ~ledger_depth ?verifier
+      ?trust_system ?consensus_local_state ~precomputed_values
       ?(root_ledger_and_accounts =
         ( Lazy.force (Precomputed_values.genesis_ledger precomputed_values)
         , Lazy.force (Precomputed_values.accounts precomputed_values) ))
@@ -612,9 +613,9 @@ module For_tests = struct
       ~branch_size () =
     let open Quickcheck.Generator.Let_syntax in
     let%bind frontier =
-      gen ?logger ~proof_level ?verifier ?trust_system ?consensus_local_state
-        ~precomputed_values ?gen_root_breadcrumb ~root_ledger_and_accounts
-        ~max_length ~size:frontier_size ()
+      gen ?logger ~proof_level ~ledger_depth ?verifier ?trust_system
+        ?consensus_local_state ~precomputed_values ?gen_root_breadcrumb
+        ~root_ledger_and_accounts ~max_length ~size:frontier_size ()
     in
     let%map make_branch =
       Breadcrumb.For_tests.gen_seq ?logger ~proof_level ?verifier ?trust_system

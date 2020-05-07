@@ -22,7 +22,7 @@ module type S = sig
 
   val is_hash : t -> bool
 
-  val height : t -> int
+  val height : ledger_depth:int -> t -> int
 
   val root_hash : t
 
@@ -36,7 +36,7 @@ module type S = sig
 
   val to_path_exn : t -> Addr.t
 
-  val serialize : t -> Bigstring.t
+  val serialize : ledger_depth:int -> t -> Bigstring.t
 
   val parent : t -> t
 

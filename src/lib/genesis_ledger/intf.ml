@@ -41,6 +41,14 @@ module type Named_accounts_intf = sig
   include Accounts_intf
 end
 
+module type Ledger_input_intf = sig
+  include Accounts_intf
+
+  val directory : [`Ephemeral | `New | `Path of string]
+
+  val depth : int
+end
+
 module type S = sig
   val t : Ledger.t Lazy.t
 

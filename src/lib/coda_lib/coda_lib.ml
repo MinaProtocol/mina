@@ -1073,7 +1073,8 @@ let create (config : Config.t) ~precomputed_values =
                                @@ External_transition.Validation
                                   .forget_validation et ) ;
                          breadcrumb ))
-                  ~most_recent_valid_block ~precomputed_values )
+                  ~most_recent_valid_block ~ledger_depth:config.ledger_depth
+                  ~precomputed_values )
           in
           let ( valid_transitions_for_network
               , valid_transitions_for_api

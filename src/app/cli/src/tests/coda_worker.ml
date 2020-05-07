@@ -563,7 +563,8 @@ module T = struct
                       ~f:(fun host_and_port ->
                         Cli_lib.Flag.Types.
                           {name= "dummy"; value= host_and_port} ))
-                 ~proof_level:Genesis_constants.Proof_level.compiled ())
+                 ~proof_level:Genesis_constants.Proof_level.compiled
+                 ~ledger_depth:Genesis_constants.ledger_depth ())
               ~precomputed_values
           in
           let coda_ref : Coda_lib.t option ref = ref None in
