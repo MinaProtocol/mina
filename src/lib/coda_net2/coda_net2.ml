@@ -94,8 +94,8 @@ module Go_log = struct
                ~location:"(not tracked)")
       ; message= r.message
       ; metadata=
-          String.Map.of_alist_exn
-            [("go_message_id", `String (Int64.to_string r.id))] }
+          String.Map.singleton "go_message_id" (`String (Int64.to_string r.id))
+      }
 end
 
 module Helper = struct
