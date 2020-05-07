@@ -20,12 +20,10 @@ let%test_module "Database integration test" =
       end
 
       type t = Arg.t =
-        | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
-        | Account of Location.Addr.Stable.Latest.t
-        | Hash of Location.Addr.Stable.Latest.t
+        | Generic of Merkle_ledger.Location.Bigstring.t
+        | Account of Location.Addr.t
+        | Hash of Location.Addr.t
       [@@deriving hash, sexp, compare]
-
-      type _unused = unit constraint t = Location.t
 
       include Hashable.Make_binable (Arg) [@@deriving
                                             sexp, compare, hash, yojson]

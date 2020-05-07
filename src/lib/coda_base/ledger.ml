@@ -23,12 +23,10 @@ module Ledger_inner = struct
     end
 
     type t = Arg.t =
-      | Generic of Location.Bigstring.Stable.Latest.t
-      | Account of Location0.Addr.Stable.Latest.t
-      | Hash of Location0.Addr.Stable.Latest.t
+      | Generic of Location.Bigstring.t
+      | Account of Location0.Addr.t
+      | Hash of Location0.Addr.t
     [@@deriving hash, sexp, compare]
-
-    type _unused = unit constraint t = Location_at_depth.t
 
     include Hashable.Make_binable (Arg) [@@deriving
                                           sexp, compare, hash, yojson]

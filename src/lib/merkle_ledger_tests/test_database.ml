@@ -523,8 +523,6 @@ let%test_module "test functor on in memory databases" =
           | Hash of Location.Addr.Stable.Latest.t
         [@@deriving hash, sexp, compare]
 
-        type _unused = unit constraint t = Location.t
-
         include Hashable.Make_binable (Arg) [@@deriving
                                               sexp, compare, hash, yojson]
       end
