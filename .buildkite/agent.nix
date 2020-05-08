@@ -68,6 +68,22 @@ let
     gnumake
   ];
 in
+  # little nix derivation that caches dhall
+  # Note: `make check` runs in the buildPhase to make sure to fully
+  #      populate the dhall cache
+let
+  dhallCache = pkgs.stdenv.mkDerivation {
+    name = "dhall-ci-cache-0.0.1";
+    src = ./.;
+    buildInputs = [ pkgs.dhall ];
+    buildPhase = ''
+      mkdir -p $out/.cache
+      export XDG_CACHE_HOME=$out/.cache
+      make check
+    '';
+    installPhase = "echo 'skip'";
+  };
+in
 {
   shell =
     pkgs.mkShell {
@@ -82,6 +98,6 @@ in
     pkgs.dockerTools.buildLayeredImage {
       name = "codaprotocol/ci-toolchain-base";
       tag = "latest";
-      contents = deps;
+      contents = deps ++ [ dhallCache ];
     };
 }

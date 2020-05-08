@@ -17,16 +17,12 @@ let Result = {
      image: Text,
      `propagate-environment`: Bool,
      `propagate-uid-gid`: Bool,
-     environment: List Text,
-     volumes: List Text
+     environment: List Text
   },
   default = {
     `propagate-environment` = True,
     `propagate-uid-gid` = True,
-    environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ],
-    volumes = [
-      "dhall-cache:/.cache:rw"
-    ]
+    environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
   }
 }
 
