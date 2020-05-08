@@ -151,8 +151,8 @@ Given all these benefits and existing Bucklescript integration, this seems like 
 
 **Links**
 
-Original project - [github](https://github.com/dbuenzli/cmdliner), [website](https://erratique.ch/software/cmdliner)
-Bucklescript bindings - [github](https://github.com/ELLIOTTCABLE/bs-cmdliner)
+* Original project - [github](https://github.com/dbuenzli/cmdliner), [website](https://erratique.ch/software/cmdliner)
+* Bucklescript bindings - [github](https://github.com/ELLIOTTCABLE/bs-cmdliner)
 
 ### Ink
 
@@ -160,7 +160,7 @@ React based framework for building command-line tools. While this project seems 
 
 **Links**
 
-Ink - [github](https://github.com/vadimdemedes/ink)
+* Ink - [github](https://github.com/vadimdemedes/ink)
 
 ### Custom Implementation
 
@@ -168,9 +168,48 @@ This was also a strong option since the amount of functionality we wish to suppo
 
 Downside of this approach is needing to maintain functionality that is reasonably well supported and maintained by the previously mentioned projects.
 
-## External Users
+## Use Cases
+
+There are three target use cases for this tool. The main use case is sharing the required configuration and keyfiles for deploying testnets. Secondarily the programatic API would enable integrations into other flows (such as interation testing). Finally the tool should be useful for monitoring the health of a live network.
+
+### Deploying Testnets
+
+When we need to deploy a testnet, we first need to collect all the keysets needed for inclusion in the genesis ledger of the new network.
+
+1. Generate new keys for "whale" / "fish" keysets
+2. Re-use keys for "services" keyset
+3. Gather keys from community with discord info
+
+This is accomplished with the `coda keyset` commands.
+
+Once we have the keys we can generate the genesis ledger, for each keyset the keys will have the following state:
+
+* Initial account balance
+* Initial delegate status
+
+This happens with the `coda genesis` commands.
+
+Finally the configuration can be deployed to the kubernetes environment for use in a deployment using the `coda publish` command.
+
+### Programmatic API
+
+For other tools that might want to use some aspects of the functionality, they can use the JavaScript API. Any other node based program will be able to do anything that can be accomplished on the command line:
+
+```js
+import testnetSdk from 'coda-network'
+
+testnetSdk.keyset.import(csv);
+testnetSdk.keyset.list();
+testnetSdk.keyset.get(id);
+testnetSdk.genesis.create(config);
+testnetSdk.publish(version);
+```
 
 Ideally this tool should be an easy starting point for users that are trying to run large node operations and particularly staking operations who wish to deploy complex infrastructure.
+
+### Testnet Validation
+
+In the future this tool could also integrate with some of the tooling we develop for automated testnet validation, by checking such things as the GraphQL status of deployed nodes etc.
 
 ## Explicitly NOT in scope for this project
 
