@@ -23,7 +23,7 @@ let Result = {
   default = {
     `propagate-environment` = True,
     `propagate-uid-gid` = True,
-    `mount-buildkite-agent` = True,
+    `mount-buildkite-agent` = False,
     environment = [ "BUILDKITE_AGENT_ACCESS_TOKEN" ]
   }
 }
