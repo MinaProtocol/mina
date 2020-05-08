@@ -78,8 +78,8 @@ let
     buildInputs = [ pkgs.dhall ];
     buildPhase = ''
       #!${pkgs.runtimeShell}
-      mkdir -p $out/cache
-      export XDG_CACHE_HOME=$out/cache
+      mkdir -p $out/.cache
+      export XDG_CACHE_HOME=$out/.cache
       make check
     '';
     installPhase = "echo 'skip'";
