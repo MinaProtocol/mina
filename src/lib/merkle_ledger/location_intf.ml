@@ -3,7 +3,7 @@
 open Core
 
 module type S = sig
-  module Addr : Merkle_address.S
+  module Addr : module type of Merkle_address
 
   module Prefix : sig
     val generic : Unsigned.UInt8.t

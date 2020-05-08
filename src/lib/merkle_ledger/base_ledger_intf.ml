@@ -22,7 +22,7 @@ module type S = sig
   (* no deriving, purposely; signatures that include this one may add deriving *)
   type t
 
-  module Addr : Merkle_address.S
+  module Addr : module type of Merkle_address
 
   module Path : Merkle_path.S with type hash := hash
 

@@ -56,7 +56,7 @@ module Make (Depth : Intf.Depth) = struct
    * any bitstring.
    *)
 
-  module Addr = Merkle_address.Make (Depth)
+  module Addr = Merkle_address
 
   module Prefix = struct
     let generic = UInt8.of_int 0xff

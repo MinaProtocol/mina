@@ -1,357 +1,263 @@
 open Core
 open Bitstring
 
-module type S = sig
-  type t [@@deriving sexp, hash, eq, compare, to_yojson]
+let depth = bitstring_length
 
-  module Stable : sig
-    module V1 : sig
-      type nonrec t = t
-      [@@deriving sexp, bin_io, hash, eq, compare, to_yojson, version]
-    end
+let add_padding path =
+  let length = depth path in
+  if length mod 8 = 0 then path
+  else concat [path; zeroes_bitstring (8 - (length mod 8))]
 
-    module Latest : module type of V1
-  end
+let slice = subbitstring
 
-  include Hashable.S_binable with type t := t
+let to_string path : string =
+  let len = depth path in
+  let bytes = Bytes.create len in
+  for i = 0 to len - 1 do
+    let ch = if is_clear path i then '0' else '1' in
+    Bytes.set bytes i ch
+  done ;
+  Bytes.to_string bytes
 
-  val of_byte_string : string -> t
+let of_directions dirs =
+  let path = create_bitstring (List.length dirs) in
+  let rec loop i = function
+    | [] ->
+        ()
+    | h :: t ->
+        if Direction.to_bool h then set path i ;
+        loop (i + 1) t
+  in
+  loop 0 dirs ; path
 
-  val of_directions : Direction.t list -> t
+let to_yojson t = `String (to_string t)
 
-  val root : unit -> t
+let to_tuple path =
+  let length = depth path in
+  let padded_bitstring = add_padding path in
+  (length, string_of_bitstring padded_bitstring)
 
-  val slice : t -> int -> int -> t
+let of_tuple (length, string) = slice (bitstring_of_string string) 0 length
 
-  val get : t -> int -> int
-
-  val copy : t -> t
-
-  val parent : t -> t Or_error.t
-
-  val child : ledger_depth:int -> t -> Direction.t -> t Or_error.t
-
-  val child_exn : ledger_depth:int -> t -> Direction.t -> t
-
-  val parent_exn : t -> t
-
-  val dirs_from_root : t -> Direction.t list
-
-  val sibling : t -> t
-
-  val next : t -> t Option.t
-
-  val prev : t -> t Option.t
-
-  val is_leaf : ledger_depth:int -> t -> bool
-
-  val is_parent_of : t -> maybe_child:t -> bool
-
-  val serialize : ledger_depth:int -> t -> Bigstring.t
-
-  val to_string : t -> string
-
-  val pp : Format.formatter -> t -> unit
-
-  module Range : sig
-    type nonrec t = t * t
-
-    val fold :
-         ?stop:[`Inclusive | `Exclusive]
-      -> t
-      -> init:'a
-      -> f:(Stable.Latest.t -> 'a -> 'a)
-      -> 'a
-
-    val subtree_range : ledger_depth:int -> Stable.Latest.t -> t
-
-    val subtree_range_seq :
-      ledger_depth:int -> Stable.Latest.t -> Stable.Latest.t Sequence.t
-  end
-
-  val depth : t -> int
-
-  val height : ledger_depth:int -> t -> int
-
-  val to_int : t -> int
-
-  val of_int_exn : ledger_depth:int -> int -> t
-end
-
-module T = struct
-  let depth = bitstring_length
-
-  let add_padding path =
-    let length = depth path in
-    if length mod 8 = 0 then path
-    else concat [path; zeroes_bitstring (8 - (length mod 8))]
-
-  let slice = subbitstring
-
-  let to_string path : string =
-    let len = depth path in
-    let bytes = Bytes.create len in
-    for i = 0 to len - 1 do
-      let ch = if is_clear path i then '0' else '1' in
-      Bytes.set bytes i ch
-    done ;
-    Bytes.to_string bytes
-
-  let of_directions dirs =
-    let path = create_bitstring (List.length dirs) in
-    let rec loop i = function
-      | [] ->
-          ()
-      | h :: t ->
-          if Direction.to_bool h then set path i ;
-          loop (i + 1) t
-    in
-    loop 0 dirs ; path
-
-  let to_yojson t = `String (to_string t)
-
-  let to_tuple path =
-    let length = depth path in
-    let padded_bitstring = add_padding path in
-    (length, string_of_bitstring padded_bitstring)
-
-  let of_tuple (length, string) = slice (bitstring_of_string string) 0 length
-
-  module Binable_arg = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = int * string
-
-        let to_latest = Fn.id
-      end
-    end]
-  end
-
-  [%%versioned_binable
+module Binable_arg = struct
+  [%%versioned
   module Stable = struct
     module V1 = struct
-      type t = Bitstring.t
+      type t = int * string
 
       let to_latest = Fn.id
-
-      include Binable.Of_binable
-                (Binable_arg.Stable.V1)
-                (struct
-                  type nonrec t = t
-
-                  let to_binable = to_tuple
-
-                  let of_binable = of_tuple
-                end)
-
-      let sexp_of_t = Fn.compose sexp_of_string to_string
-
-      let t_of_sexp =
-        let of_string buf =
-          String.to_list buf
-          |> List.map ~f:(Fn.compose Direction.of_int_exn Char.to_int)
-          |> of_directions
-        in
-        Fn.compose of_string string_of_sexp
-
-      let hash = Fn.compose [%hash: int * string] to_tuple
-
-      let hash_fold_t hash_state t =
-        [%hash_fold: int * string] hash_state (to_tuple t)
-
-      [%%define_from_scope
-      compare, to_yojson]
-
-      let equal = equals
     end
   end]
 end
 
-module Stable = T.Stable
+[%%versioned_binable
+module Stable = struct
+  module V1 = struct
+    type t = Bitstring.t
 
-module Make (Input : sig end) : S = struct
-  (* TODO: this "include" puts a stable-versioned type inside a functor
-     (hard to detect this statically)
-     that should be hoisted outside the functor
-  *)
+    let to_latest = Fn.id
 
-  include T
+    include Binable.Of_binable
+              (Binable_arg.Stable.V1)
+              (struct
+                type nonrec t = t
 
-  let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
+                let to_binable = to_tuple
 
-  let height ~ledger_depth path = ledger_depth - depth path
+                let of_binable = of_tuple
+              end)
 
-  let get = get
+    let sexp_of_t = Fn.compose sexp_of_string to_string
 
-  type t = Stable.Latest.t
-
-  [%%define_locally
-  Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, compare, equal)]
-
-  include Hashable.Make_binable (Stable.Latest)
-
-  let of_byte_string = bitstring_of_string
-
-  let pp (fmt : Format.formatter) : t -> unit =
-    Fn.compose (Format.pp_print_string fmt) to_string
-
-  let copy (path : t) : t =
-    let%bitstring path = {| path: -1: bitstring |} in
-    path
-
-  (* returns a slice of the original path, so the returned key needs to be
-       copied before mutating the path *)
-  let parent (path : t) =
-    if bitstring_length path = 0 then
-      Or_error.error_string "Address length should be nonzero"
-    else Or_error.return (slice path 0 (bitstring_length path - 1))
-
-  let parent_exn = Fn.compose Or_error.ok_exn parent
-
-  let is_leaf ~ledger_depth path = bitstring_length path >= ledger_depth
-
-  let child ~ledger_depth (path : t) dir : t Or_error.t =
-    if is_leaf ~ledger_depth path then
-      Or_error.error_string "The address length cannot be greater than depth"
-    else
-      let dir_bit = Direction.to_bool dir in
-      let%bitstring path = {| path: -1: bitstring; dir_bit: 1|} in
-      Or_error.return path
-
-  let child_exn ~ledger_depth (path : t) dir : t =
-    child ~ledger_depth path dir |> Or_error.ok_exn
-
-  let to_int (path : t) : int =
-    Sequence.range 0 (depth path)
-    |> Sequence.fold ~init:0 ~f:(fun acc i ->
-           let index = depth path - 1 - i in
-           acc + ((if get path index <> 0 then 1 else 0) lsl i) )
-
-  let of_int_exn ~ledger_depth index =
-    if index >= 1 lsl ledger_depth then failwith "Index is too large"
-    else
-      let buf = create_bitstring ledger_depth in
-      Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
-        (ledger_depth - 1) 0
-      |> Sequence.fold ~init:index ~f:(fun i pos ->
-             Bitstring.put buf pos (i % 2) ;
-             i / 2 )
-      |> ignore ;
-      buf
-
-  let dirs_from_root t =
-    List.init (depth t) ~f:(fun pos -> Direction.of_bool (is_set t pos))
-
-  let root () = create_bitstring 0
-
-  let sibling (path : t) : t =
-    let path = copy path in
-    let last_bit_index = depth path - 1 in
-    let last_bit = if get path last_bit_index = 0 then 1 else 0 in
-    put path last_bit_index last_bit ;
-    path
-
-  let next (path : t) : t Option.t =
-    let open Option.Let_syntax in
-    let path = copy path in
-    let len = depth path in
-    let rec find_rightmost_clear_bit i =
-      if i < 0 then None
-      else if is_clear path i then Some i
-      else find_rightmost_clear_bit (i - 1)
-    in
-    let rec clear_bits i =
-      if i >= len then ()
-      else (
-        clear path i ;
-        clear_bits (i + 1) )
-    in
-    let%map rightmost_clear_index = find_rightmost_clear_bit (len - 1) in
-    set path rightmost_clear_index ;
-    clear_bits (rightmost_clear_index + 1) ;
-    path
-
-  let prev (path : t) : t Option.t =
-    let open Option.Let_syntax in
-    let path = copy path in
-    let len = depth path in
-    let rec find_rightmost_one_bit i =
-      if i < 0 then None
-      else if is_set path i then Some i
-      else find_rightmost_one_bit (i - 1)
-    in
-    let rec set_bits i =
-      if i >= len then ()
-      else (
-        set path i ;
-        set_bits (i + 1) )
-    in
-    let%map rightmost_clear_index = find_rightmost_one_bit (len - 1) in
-    clear path rightmost_clear_index ;
-    set_bits (rightmost_clear_index + 1) ;
-    path
-
-  let serialize ~ledger_depth path =
-    let path = add_padding path in
-    let path_len = depth path in
-    let required_bits = 8 * byte_count_of_bits ledger_depth in
-    assert (path_len <= required_bits) ;
-    let required_padding = required_bits - path_len in
-    Bigstring.of_string @@ string_of_bitstring
-    @@ concat [path; zeroes_bitstring required_padding]
-
-  let is_parent_of parent ~maybe_child =
-    (* yikes! https://github.com/xguerin/bitstring/issues/16 *)
-    String.is_prefix
-      (Bitstring.string_of_bitstring maybe_child)
-      ~prefix:(Bitstring.string_of_bitstring parent)
-
-  module Range = struct
-    type nonrec t = t * t
-
-    let rec fold_exl (first, last) ~init ~f =
-      let comparison = compare first last in
-      if comparison > 0 then
-        raise (Invalid_argument "first address needs to precede last address")
-      else if comparison = 0 then init
-      else
-        fold_exl (next first |> Option.value_exn, last) ~init:(f first init) ~f
-
-    let fold_incl (first, last) ~init ~f =
-      f last @@ fold_exl (first, last) ~init ~f
-
-    let fold ?(stop = `Inclusive) (first, last) ~init ~f =
-      assert (depth first = depth last) ;
-      match stop with
-      | `Inclusive ->
-          fold_incl (first, last) ~init ~f
-      | `Exclusive ->
-          fold_exl (first, last) ~init ~f
-
-    let subtree_range ~ledger_depth address =
-      let first_node =
-        concat [address; zeroes_bitstring @@ height ~ledger_depth address]
+    let t_of_sexp =
+      let of_string buf =
+        String.to_list buf
+        |> List.map ~f:(Fn.compose Direction.of_int_exn Char.to_int)
+        |> of_directions
       in
-      let last_node =
-        concat [address; ones_bitstring @@ height ~ledger_depth address]
-      in
-      (first_node, last_node)
+      Fn.compose of_string string_of_sexp
 
-    let subtree_range_seq ~ledger_depth address =
-      let first_node, last_node = subtree_range ~ledger_depth address in
-      Sequence.unfold
-        ~init:(first_node, `Don't_stop)
-        ~f:(function
-          | _, `Stop ->
-              None
-          | current_node, `Don't_stop ->
-              if compare current_node last_node = 0 then
-                Some (current_node, (current_node, `Stop))
-              else
-                Option.map (next current_node) ~f:(fun next_node ->
-                    (current_node, (next_node, `Don't_stop)) ) )
+    let hash = Fn.compose [%hash: int * string] to_tuple
+
+    let hash_fold_t hash_state t =
+      [%hash_fold: int * string] hash_state (to_tuple t)
+
+    [%%define_from_scope
+    compare, to_yojson]
+
+    let equal = equals
   end
+end]
+
+let byte_count_of_bits n = (n / 8) + min 1 (n % 8)
+
+let height ~ledger_depth path = ledger_depth - depth path
+
+let get = get
+
+type t = Stable.Latest.t
+
+[%%define_locally
+Stable.Latest.(t_of_sexp, sexp_of_t, to_yojson, compare, equal)]
+
+include Hashable.Make_binable (Stable.Latest)
+
+let of_byte_string = bitstring_of_string
+
+let pp (fmt : Format.formatter) : t -> unit =
+  Fn.compose (Format.pp_print_string fmt) to_string
+
+let copy (path : t) : t =
+  let%bitstring path = {| path: -1: bitstring |} in
+  path
+
+(* returns a slice of the original path, so the returned key needs to be
+       copied before mutating the path *)
+let parent (path : t) =
+  if bitstring_length path = 0 then
+    Or_error.error_string "Address length should be nonzero"
+  else Or_error.return (slice path 0 (bitstring_length path - 1))
+
+let parent_exn = Fn.compose Or_error.ok_exn parent
+
+let is_leaf ~ledger_depth path = bitstring_length path >= ledger_depth
+
+let child ~ledger_depth (path : t) dir : t Or_error.t =
+  if is_leaf ~ledger_depth path then
+    Or_error.error_string "The address length cannot be greater than depth"
+  else
+    let dir_bit = Direction.to_bool dir in
+    let%bitstring path = {| path: -1: bitstring; dir_bit: 1|} in
+    Or_error.return path
+
+let child_exn ~ledger_depth (path : t) dir : t =
+  child ~ledger_depth path dir |> Or_error.ok_exn
+
+let to_int (path : t) : int =
+  Sequence.range 0 (depth path)
+  |> Sequence.fold ~init:0 ~f:(fun acc i ->
+         let index = depth path - 1 - i in
+         acc + ((if get path index <> 0 then 1 else 0) lsl i) )
+
+let of_int_exn ~ledger_depth index =
+  if index >= 1 lsl ledger_depth then failwith "Index is too large"
+  else
+    let buf = create_bitstring ledger_depth in
+    Sequence.range ~stride:(-1) ~start:`inclusive ~stop:`inclusive
+      (ledger_depth - 1) 0
+    |> Sequence.fold ~init:index ~f:(fun i pos ->
+           Bitstring.put buf pos (i % 2) ;
+           i / 2 )
+    |> ignore ;
+    buf
+
+let dirs_from_root t =
+  List.init (depth t) ~f:(fun pos -> Direction.of_bool (is_set t pos))
+
+let root () = create_bitstring 0
+
+let sibling (path : t) : t =
+  let path = copy path in
+  let last_bit_index = depth path - 1 in
+  let last_bit = if get path last_bit_index = 0 then 1 else 0 in
+  put path last_bit_index last_bit ;
+  path
+
+let next (path : t) : t Option.t =
+  let open Option.Let_syntax in
+  let path = copy path in
+  let len = depth path in
+  let rec find_rightmost_clear_bit i =
+    if i < 0 then None
+    else if is_clear path i then Some i
+    else find_rightmost_clear_bit (i - 1)
+  in
+  let rec clear_bits i =
+    if i >= len then ()
+    else (
+      clear path i ;
+      clear_bits (i + 1) )
+  in
+  let%map rightmost_clear_index = find_rightmost_clear_bit (len - 1) in
+  set path rightmost_clear_index ;
+  clear_bits (rightmost_clear_index + 1) ;
+  path
+
+let prev (path : t) : t Option.t =
+  let open Option.Let_syntax in
+  let path = copy path in
+  let len = depth path in
+  let rec find_rightmost_one_bit i =
+    if i < 0 then None
+    else if is_set path i then Some i
+    else find_rightmost_one_bit (i - 1)
+  in
+  let rec set_bits i =
+    if i >= len then ()
+    else (
+      set path i ;
+      set_bits (i + 1) )
+  in
+  let%map rightmost_clear_index = find_rightmost_one_bit (len - 1) in
+  clear path rightmost_clear_index ;
+  set_bits (rightmost_clear_index + 1) ;
+  path
+
+let serialize ~ledger_depth path =
+  let path = add_padding path in
+  let path_len = depth path in
+  let required_bits = 8 * byte_count_of_bits ledger_depth in
+  assert (path_len <= required_bits) ;
+  let required_padding = required_bits - path_len in
+  Bigstring.of_string @@ string_of_bitstring
+  @@ concat [path; zeroes_bitstring required_padding]
+
+let is_parent_of parent ~maybe_child = Bitstring.is_prefix maybe_child parent
+
+module Range = struct
+  type nonrec t = t * t
+
+  let rec fold_exl (first, last) ~init ~f =
+    let comparison = compare first last in
+    if comparison > 0 then
+      raise (Invalid_argument "first address needs to precede last address")
+    else if comparison = 0 then init
+    else
+      fold_exl (next first |> Option.value_exn, last) ~init:(f first init) ~f
+
+  let fold_incl (first, last) ~init ~f =
+    f last @@ fold_exl (first, last) ~init ~f
+
+  let fold ?(stop = `Inclusive) (first, last) ~init ~f =
+    assert (depth first = depth last) ;
+    match stop with
+    | `Inclusive ->
+        fold_incl (first, last) ~init ~f
+    | `Exclusive ->
+        fold_exl (first, last) ~init ~f
+
+  let subtree_range ~ledger_depth address =
+    let first_node =
+      concat [address; zeroes_bitstring @@ height ~ledger_depth address]
+    in
+    let last_node =
+      concat [address; ones_bitstring @@ height ~ledger_depth address]
+    in
+    (first_node, last_node)
+
+  let subtree_range_seq ~ledger_depth address =
+    let first_node, last_node = subtree_range ~ledger_depth address in
+    Sequence.unfold
+      ~init:(first_node, `Don't_stop)
+      ~f:(function
+        | _, `Stop ->
+            None
+        | current_node, `Don't_stop ->
+            if compare current_node last_node = 0 then
+              Some (current_node, (current_node, `Stop))
+            else
+              Option.map (next current_node) ~f:(fun next_node ->
+                  (current_node, (next_node, `Don't_stop)) ) )
 end
 
 let%test "Bitstring bin_io serialization does not change" =
@@ -372,8 +278,6 @@ module Make_test (Input : sig
   val depth : int
 end) =
 struct
-  include Make ()
-
   let%test "the merkle root should have no path" =
     dirs_from_root (root ()) = []
 

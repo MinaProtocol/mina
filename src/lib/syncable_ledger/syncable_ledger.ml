@@ -55,7 +55,7 @@ module Answer = struct
 end
 
 module type Inputs_intf = sig
-  module Addr : Merkle_address.S
+  module Addr : module type of Merkle_address
 
   module Account : sig
     type t [@@deriving bin_io, sexp, yojson]
