@@ -58,7 +58,7 @@ in
 
 let targetToAgent = \(target : Size) ->
   merge { Large = toMap { size = "large" },
-          Small = toMap { size = "size" }
+          Small = toMap { size = "small" }
         }
         target
 
