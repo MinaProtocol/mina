@@ -19,6 +19,7 @@ module type S = sig
        logger:Logger.t
     -> pids:Child_processes.Termination.t
     -> conf_dir:string
+    -> proof_level:Genesis_constants.Proof_level.t
     -> t Deferred.t
 
   val initialized : t -> [`Initialized] Deferred.Or_error.t
