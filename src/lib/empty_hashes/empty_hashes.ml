@@ -6,28 +6,30 @@ module type Hash_intf = sig
   val merge : height:int -> t -> t -> t
 end
 
-let cache_mutable (type hash) (module Hash : Hash_intf with type t = hash)
-    ~(init_hash : hash) depth =
-  let empty_hashes = Array.create ~len:(depth + 1) init_hash in
-  let rec loop last_hash height =
-    if height <= depth then (
-      let hash = Hash.merge ~height:(height - 1) last_hash last_hash in
-      empty_hashes.(height) <- hash ;
-      loop hash (height + 1) )
-  in
-  loop init_hash 1 ; empty_hashes
+let merge_hash (type hash) (module Hash : Hash_intf with type t = hash) height
+    (last_hash : hash) =
+  Hash.merge ~height last_hash last_hash
 
-let cache hash ~init_hash depth =
-  Immutable_array.of_array (cache_mutable hash ~init_hash depth)
+let cache hash_mod ~init_hash depth =
+  let last_hash = ref init_hash in
+  Immutable_array.of_array
+  @@ Array.init (depth + 1) ~f:(fun i ->
+         if Int.equal i 0 then !last_hash
+         else (
+           last_hash := merge_hash hash_mod (i - 1) !last_hash ;
+           !last_hash ) )
 
-let extensible_cache (type hash) (module Hash : Hash_intf with type t = hash)
-    ~(init_hash : hash) =
+let extensible_cache hash_mod ~init_hash =
   let empty_hashes = ref [|init_hash|] in
   fun i ->
     let prev = !empty_hashes in
-    let deficit = i - Array.length prev + 1 in
-    if deficit > 0 then
+    let height = Array.length prev - 1 in
+    let deficit = i - height in
+    ( if deficit > 0 then
+      let last_hash = ref (Array.last prev) in
       empty_hashes :=
         Array.append prev
-          (cache_mutable (module Hash) ~init_hash:(Array.last prev) deficit) ;
+          (Array.init deficit ~f:(fun i ->
+               last_hash := merge_hash hash_mod i !last_hash ;
+               !last_hash )) ) ;
     !empty_hashes.(i)
