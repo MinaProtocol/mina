@@ -32,7 +32,7 @@ module Verification_key : sig
   val load :
        cache:Key_cache.Spec.t list
     -> Id.t
-    -> (t * [`Cache_hit | `Generated_something]) Async.Deferred.Or_error.t
+    -> (t * [`Cache_hit | `Locally_generated]) Async.Deferred.Or_error.t
 end
 
 module type Proof_intf = sig
@@ -81,6 +81,18 @@ end
 
 module Provers : module type of H3_2.T (Prover)
 
+module Dirty : sig
+  type t = [ `Cache_hit | `Generated_something | `Locally_generated ]
+
+  val ( + ) : t -> t -> t
+end
+
+module Cache_handle : sig
+  type t
+
+  val generate_or_load : t -> Dirty.t
+end
+
 (** This compiles a series of inductive rules defining a set into a proof
     system for proving membership in that set, with a prover corresponding
     to each inductive rule. *)
@@ -104,6 +116,7 @@ val compile :
                  , 'a_value )
                  H4_2.T(Inductive_rule).t)
   -> ('a_var, 'a_value, 'max_branching, 'branches) Tag.t
+     * Cache_handle.t
      * (module Proof_intf
           with type t = ('max_branching, 'max_branching) Proof.t
            and type statement = 'a_value)

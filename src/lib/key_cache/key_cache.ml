@@ -96,7 +96,7 @@ let read spec {Disk_storable.to_string; read= r; write= w} k =
             Some (i, x) )
   with
   | Some (i, x) ->
-      Ok (x, if i = 0 then `Cache_hit else `Generated_something)
+      Ok (x, if i = 0 then `Cache_hit else `Locally_generated)
   | None ->
       Error (Error.of_list !errs)
 

@@ -91,12 +91,12 @@ struct
   (* TODO : use Random oracle.Digest to satisfy Bits_intf.S, move out of
      consensus_mechanism guard
   *)
-  module T =
+  module Bs =
     Snark_bits.Bits.Make_field
       (Snark_params.Tick.Field)
       (Snark_params.Tick.Bigint)
 
-  include (T : module type of T with type t := t)
+  include (Bs : module type of Bs with type t := t)
 
   let assert_equal x y = Field.Checked.Assert.equal x.digest y.digest
 

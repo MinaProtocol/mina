@@ -1,5 +1,4 @@
 open Core
-open Snark_params
 open Signature_lib
 open Merkle_ledger
 

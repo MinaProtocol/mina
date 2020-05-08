@@ -7,7 +7,7 @@ module Inputs = struct
     ; genesis_ledger: Genesis_ledger.Packed.t
     ; protocol_state_with_hash:
         (Protocol_state.value, State_hash.t) With_hash.t
-    ; base_hash: State_hash.t }
+    }
 end
 
 module T = struct
@@ -16,7 +16,6 @@ module T = struct
     ; genesis_ledger: Genesis_ledger.Packed.t
     ; protocol_state_with_hash:
         (Protocol_state.value, State_hash.t) With_hash.t
-    ; base_hash: State_hash.t
     ; genesis_proof: Proof.t }
 
   let genesis_constants {genesis_constants; _} = genesis_constants
@@ -53,50 +52,41 @@ end
 
 include T
 
-let wrap ~keys:(module Keys : Keys_lib.Keys.S) hash proof =
-  let open Snark_params in
-  let module Wrap = Keys.Wrap in
-  let input = Wrap_input.of_tick_field hash in
-  let proof =
-    Tock.prove
-      (Tock.Keypair.pk Wrap.keys)
-      Wrap.input {Wrap.Prover_state.proof} Wrap.main input
-  in
-  assert (Tock.verify proof (Tock.Keypair.vk Wrap.keys) Wrap.input input) ;
-  proof
-
-let base_proof ?(logger = Logger.create ())
-    ~keys:((module Keys : Keys_lib.Keys.S) as keys) (t : Inputs.t) =
+let base_proof (module B : Blockchain_snark.Blockchain_snark_state.S) (t : Inputs.t) =
   let genesis_ledger = Genesis_ledger.Packed.t t.genesis_ledger in
   let protocol_constants = t.genesis_constants.protocol in
-  let open Snark_params in
-  let prover_state =
-    { Keys.Step.Prover_state.prev_proof= Tock.Proof.dummy
-    ; wrap_vk= Tock.Keypair.vk Keys.Wrap.keys
-    ; prev_state=
-        Protocol_state.negative_one ~genesis_ledger ~protocol_constants
-    ; genesis_state_hash= t.protocol_state_with_hash.hash
-    ; expected_next_state= None
-    ; update= Snark_transition.genesis ~genesis_ledger }
+  let prev_state =
+    Protocol_state.negative_one ~genesis_ledger
+      ~protocol_constants
   in
-  let main x =
-    Tick.handle (Keys.Step.main ~logger x)
-      (Consensus.Data.Prover_state.precomputed_handler ~genesis_ledger)
+  let curr = t.protocol_state_with_hash.data in
+  let dummy_txn_stmt : Transaction_snark.Statement.With_sok.t =
+    { sok_digest= Coda_base.Sok_message.Digest.default
+    ; source=
+        Blockchain_state.snarked_ledger_hash
+          (Protocol_state.blockchain_state prev_state)
+    ; target=
+        Blockchain_state.snarked_ledger_hash
+          (Protocol_state.blockchain_state curr)
+    ; supply_increase= Currency.Amount.zero
+    ; fee_excess= Currency.Amount.Signed.zero
+    ; pending_coinbase_stack_state=
+        { source= Coda_base.Pending_coinbase.Stack.empty
+        ; target= Coda_base.Pending_coinbase.Stack.empty } }
   in
-  let tick =
-    Tick.prove
-      (Tick.Keypair.pk Keys.Step.keys)
-      (Keys.Step.input ()) prover_state main t.base_hash
-  in
-  assert (
-    Tick.verify tick
-      (Tick.Keypair.vk Keys.Step.keys)
-      (Keys.Step.input ()) t.base_hash ) ;
-  wrap ~keys t.base_hash tick
+  let dummy = Coda_base.Proof.dummy in
+  B.step
+    ~handler:
+      (Consensus.Data.Prover_state.precomputed_handler
+          ~genesis_ledger:Test_genesis_ledger.t)
+    { transition=
+        Snark_transition.genesis ~genesis_ledger:Test_genesis_ledger.t
+    ; prev_state }
+    [(prev_state, dummy); (dummy_txn_stmt, dummy)]
+    t.protocol_state_with_hash.data
 
-let create_values ?logger ~keys (t : Inputs.t) =
+let create_values b (t : Inputs.t) =
   { genesis_constants= t.genesis_constants
   ; genesis_ledger= t.genesis_ledger
   ; protocol_state_with_hash= t.protocol_state_with_hash
-  ; base_hash= t.base_hash
-  ; genesis_proof= base_proof ?logger ~keys t }
+  ; genesis_proof= base_proof b t }

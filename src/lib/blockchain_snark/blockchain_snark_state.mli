@@ -21,15 +21,15 @@ val check :
   -> State_hash.t
   -> unit Or_error.t
 
-module Make (T : sig
-  val tag : Transaction_snark.tag
-end) : sig
+module type S = sig
   module Proof :
     Pickles.Proof_intf
     with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
      and type statement = Protocol_state.Value.t
 
   val tag : tag
+
+  val cache_handle : Pickles.Cache_handle.t
 
   open Nat
 
@@ -43,5 +43,9 @@ end) : sig
        , Proof.t )
        Pickles.Prover.t
 end
+
+module Make (T : sig
+  val tag : Transaction_snark.tag
+end) : S
 
 val constraint_system_digests : unit -> (string * Md5.t) list

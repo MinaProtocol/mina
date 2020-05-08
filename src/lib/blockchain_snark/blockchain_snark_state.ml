@@ -286,6 +286,29 @@ let typ =
 type tag =
   (State_hash.var, Protocol_state.value, Nat.N2.n, Nat.N1.n) Pickles.Tag.t
 
+module type S = sig
+  module Proof :
+    Pickles.Proof_intf
+    with type t = (Nat.N2.n, Nat.N2.n) Pickles.Proof.t
+     and type statement = Protocol_state.Value.t
+
+  val tag : tag
+
+  val cache_handle : Pickles.Cache_handle.t
+
+  open Nat
+
+  val step :
+       Witness.t
+    -> ( Protocol_state.Value.t
+         * (Transaction_snark.Statement.With_sok.t * unit)
+       , N2.n * (N2.n * unit)
+       , N1.n * (N2.n * unit)
+       , Protocol_state.Value.t
+       , Proof.t )
+       Pickles.Prover.t
+end
+
 let verify state proof ~key =
   Pickles.verify (module Nat.N2) (module Statement) key [(state, proof)]
 
@@ -293,7 +316,7 @@ module Make (T : sig
   val tag : Transaction_snark.tag
 end) =
 struct
-  let tag, p, Pickles.Provers.[step] =
+  let tag, cache_handle, p, Pickles.Provers.[step] =
     Pickles.compile ~cache:Cache_dir.cache
       (module Statement_var)
       (module Statement)

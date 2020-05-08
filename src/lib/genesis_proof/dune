@@ -4,7 +4,7 @@
  (libraries
    coda_base
    coda_state
-   keys_lib
+   blockchain_snark
    genesis_constants
    with_hash)
  (preprocess (pps ppx_coda)))
