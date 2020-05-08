@@ -33,7 +33,8 @@ let%test_module "test functor on in memory databases" =
 
       let%test_unit "getting a non existing account returns None" =
         Test.with_instance (fun mdb ->
-            Quickcheck.test MT.For_tests.gen_account_location
+            Quickcheck.test
+              (MT.For_tests.gen_account_location ~ledger_depth:(MT.depth mdb))
               ~f:(fun location -> assert (MT.get mdb location = None)) )
 
       let create_new_account_exn mdb account =
