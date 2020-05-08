@@ -205,6 +205,8 @@ testnetSdk.genesis.create(config);
 testnetSdk.publish(version);
 ```
 
+For O(1)'s management of testnets: we can use this API to automate most of the Genesis Program signup process, going all the way to genesis ledger creation. Additionally for integration testing dynamic reconfiguration of keysets as desired by specific tests.
+
 Ideally this tool should be an easy starting point for users that are trying to run large node operations and particularly staking operations who wish to deploy complex infrastructure.
 
 ### Testnet Validation
