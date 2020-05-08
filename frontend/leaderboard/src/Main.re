@@ -14,4 +14,8 @@ let blocks =
     files,
   );
 
-let results = Challenges.handleMetrics([||], blocks);
+let results =
+  Challenges.handleMetrics(
+    [|BlocksCreated, TransactionsSent, SnarkWorkCreated|],
+    blocks,
+  );

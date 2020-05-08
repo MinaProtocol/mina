@@ -24,13 +24,24 @@ module Metrics = {
   type t =
     | BlocksCreated
     | TransactionsSent
-    | SnarkWorkCreated;
+    | SnarkWorkCreated
+    | None;
 
   let stringOfMetric = metric => {
     switch (metric) {
     | BlocksCreated => "blocks_created"
     | TransactionsSent => "transactions_sent"
     | SnarkWorkCreated => "snarkwork_created"
+    | None => ""
+    };
+  };
+
+  let metricOfString = metric => {
+    switch (metric) {
+    | "blocks_created" => BlocksCreated
+    | "transactions_sent" => TransactionsSent
+    | "snarkwork_created" => SnarkWorkCreated
+    | _ => None
     };
   };
 };

@@ -10,6 +10,10 @@ let printMap = map => {
   );
 };
 
+let encodeMetric = (metricType, metric) => {
+  (Types.Metrics.stringOfMetric(metricType), metric);
+};
+
 let calculateBlocksCreated = blocks => {
   Array.fold_left(
     (map, block: Types.NewBlock.t) => {
@@ -76,23 +80,69 @@ let calculateSnarkWorkCreated = blocks => {
   );
 };
 
-// Expected Output
-// {
-//       "pk1": {"block_count": 1, "transactions_sent": 134, "snark_jobs": 11}
-//       "pk2": {"block_count": 4, "transactions_sent": 55, "snark_jobs": 3}
-//       "pk3": {"block_count": 0, "transactions_sent": 3, "snark_jobs": 8}
-//}
+/*
+     Returns a map that contains a publicKey and an array of tuples representing it's data.
+     The tuple is a pair of metric name and the metric value.
+
+     The final output should be of the form:
+       [
+         publicKey1: [(blocks_created, 2), (transactions_sent, 5)]
+         publicKey2: [(blocks_created, 1))]
+         ...
+       ]
+
+ */
+let mergeMetrics = metricsList => {
+  Array.fold_left(
+    (map, result) => {
+      let (metricName, metricData) = result;
+
+      StringMap.fold(
+        (publicKey, metricCount, map) => {
+          StringMap.update(
+            publicKey,
+            value =>
+              switch (value) {
+              | Some(currentMetrics) =>
+                Some(
+                  Array.append(
+                    [|(metricName, metricCount)|],
+                    currentMetrics,
+                  ),
+                )
+              | None => Some([|(metricName, metricCount)|])
+              },
+            map,
+          )
+        },
+        metricData,
+        map,
+      );
+    },
+    StringMap.empty,
+    metricsList,
+  );
+};
+
 let handleMetrics = (metrics, blocks) => {
   Types.Metrics.(
     Array.map(
       metric => {
         switch (metric) {
-        | BlocksCreated => blocks |> calculateBlocksCreated
-        | TransactionsSent => blocks |> calculateTransactionSent
-        | _ => StringMap.empty
+        | BlocksCreated =>
+          blocks |> calculateBlocksCreated |> encodeMetric(BlocksCreated)
+        | TransactionsSent =>
+          blocks |> calculateTransactionSent |> encodeMetric(TransactionsSent)
+        | SnarkWorkCreated =>
+          blocks
+          |> calculateSnarkWorkCreated
+          |> encodeMetric(SnarkWorkCreated)
+
+        | _ => ("", StringMap.empty)
         }
       },
       metrics,
     )
+    |> mergeMetrics
   );
 };
