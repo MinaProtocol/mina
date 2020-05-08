@@ -46,7 +46,7 @@ let get_lite_chain :
               (Lite_compat.account (Option.value_exn (Ledger.get ledger loc)))
             )
           ~init:
-            (Lite_lib.Sparse_ledger.of_hash ~depth:Ledger.depth
+            (Lite_lib.Sparse_ledger.of_hash ~depth:(Ledger.depth ledger)
                (Lite_compat.digest
                   ( Ledger.merkle_root ledger
                     :> Snark_params.Tick.Pedersen.Digest.t )))

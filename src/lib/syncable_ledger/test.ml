@@ -187,10 +187,32 @@ module Db = struct
       let to_hash = Fn.id
     end
 
+    module Location = Merkle_ledger.Location.Make (Depth)
+
+    module Location_binable = struct
+      module Arg = struct
+        type t = Location.t =
+          | Generic of Merkle_ledger.Location.Bigstring.Stable.Latest.t
+          | Account of Location.Addr.Stable.Latest.t
+          | Hash of Location.Addr.Stable.Latest.t
+        [@@deriving bin_io_unversioned, hash, sexp, compare]
+      end
+
+      type t = Arg.t =
+        | Generic of Merkle_ledger.Location.Bigstring.t
+        | Account of Location.Addr.t
+        | Hash of Location.Addr.t
+      [@@deriving hash, sexp, compare]
+
+      include Hashable.Make_binable (Arg) [@@deriving
+                                            sexp, compare, hash, yojson]
+    end
+
     module Base_ledger_inputs = struct
       include Base_ledger_inputs
       module Depth = Depth
-      module Location = Merkle_ledger.Location.Make (Depth)
+      module Location = Location
+      module Location_binable = Location_binable
       module Kvdb = In_memory_kvdb
     end
 
@@ -204,7 +226,7 @@ module Db = struct
       type addr = Addr.t
 
       let load_ledger num_accounts (balance : int) =
-        let ledger = create () in
+        let ledger = create ~depth:Base_ledger_inputs.Depth.depth () in
         let account_ids = Account_id.gen_accounts num_accounts in
         let currency_balance = Currency.Balance.of_int balance in
         List.iter account_ids ~f:(fun aid ->
@@ -300,7 +322,7 @@ module Mask = struct
          `balance`. For all of the accounts of a mask at layer n with balance
          `b`, all of the accounts at layer n + 1 will have a balance of `2 * b` *)
       let load_ledger num_accounts (balance : int) : t * 'a =
-        let db = Base_db.create () in
+        let db = Base_db.create ~depth:Input.depth () in
         let maskable = Any_base.cast (module Base_db) db in
         let account_ids = Account_id.gen_accounts num_accounts in
         let initial_balance_multiplier =
@@ -315,7 +337,7 @@ module Mask = struct
               Maskable.get_or_create_account_exn maskable account_id account
             in
             assert (action = `Added) ) ;
-        let mask = Mask.create () in
+        let mask = Mask.create ~depth:Input.depth () in
         let attached_mask = Maskable.register_mask maskable mask in
         (* On the mask, all the children will have different values *)
         let rec construct_layered_masks iter child_balance parent_mask =
@@ -326,7 +348,7 @@ module Mask = struct
             let parent_base =
               Any_base.cast (module Mask.Attached) parent_mask
             in
-            let child_mask = Mask.create () in
+            let child_mask = Mask.create ~depth:Input.depth () in
             let attached_mask =
               Maskable.register_mask parent_base child_mask
             in

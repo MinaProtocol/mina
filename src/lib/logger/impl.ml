@@ -32,37 +32,34 @@ module Source = struct
 end
 
 module Metadata = struct
+  [%%versioned_binable
   module Stable = struct
     module V1 = struct
-      module T = struct
-        type t = Yojson.Safe.json String.Map.t [@@deriving version {asserted}]
+      type t = Yojson.Safe.json String.Map.t
 
-        let to_yojson t = `Assoc (String.Map.to_alist t)
+      let to_latest = Fn.id
 
-        let of_yojson = function
-          | `Assoc alist ->
-              Ok (String.Map.of_alist_exn alist)
-          | _ ->
-              Error "Unexpected object"
+      let to_yojson t = `Assoc (String.Map.to_alist t)
 
-        include Binable.Of_binable
-                  (String)
-                  (struct
-                    type nonrec t = t
+      let of_yojson = function
+        | `Assoc alist ->
+            Ok (String.Map.of_alist_exn alist)
+        | _ ->
+            Error "Unexpected object"
 
-                    let to_binable t = to_yojson t |> Yojson.Safe.to_string
+      include Binable.Of_binable
+                (Core_kernel.String.Stable.V1)
+                (struct
+                  type nonrec t = t
 
-                    let of_binable (t : string) : t =
-                      Yojson.Safe.from_string t |> of_yojson |> Result.ok
-                      |> Option.value_exn
-                  end)
-      end
+                  let to_binable t = to_yojson t |> Yojson.Safe.to_string
 
-      include T
+                  let of_binable (t : string) : t =
+                    Yojson.Safe.from_string t |> of_yojson |> Result.ok
+                    |> Option.value_exn
+                end)
     end
-
-    module Latest = V1
-  end
+  end]
 
   let empty = String.Map.empty
 
@@ -76,8 +73,14 @@ module Metadata = struct
 
   let extend (t : t) alist =
     List.fold_left alist ~init:t ~f:(fun acc (key, data) ->
-        String.Map.add_exn acc ~key ~data )
+        String.Map.set acc ~key ~data )
 end
+
+let global_metadata = ref []
+
+(* List.append isn't tail-recursive (recurses over first arg), so hopefully it doesn't get too big! *)
+let append_to_global_metadata l =
+  global_metadata := List.append !global_metadata l
 
 module Message = struct
   type t =
@@ -335,7 +338,8 @@ let make_message (t : t) ~level ~module_ ~location ~metadata ~message =
   ; level
   ; source= Some (Source.create ~module_ ~location)
   ; message
-  ; metadata= Metadata.extend t.metadata metadata }
+  ; metadata=
+      Metadata.extend (Metadata.extend t.metadata metadata) !global_metadata }
 
 let raw ({id; _} as t) msg =
   if t.null then ()

@@ -14,17 +14,21 @@ let%test_module "Full_frontier tests" =
 
     let logger = Logger.null ()
 
+    let proof_level = Genesis_constants.Proof_level.Check
+
+    let ledger_depth = Genesis_constants.ledger_depth_for_unit_tests
+
     let accounts_with_secret_keys = Lazy.force Test_genesis_ledger.accounts
 
     let max_length = 5
 
     let gen_breadcrumb =
-      Breadcrumb.For_tests.gen ~logger ?verifier:None ?trust_system:None
-        ~accounts_with_secret_keys
+      Breadcrumb.For_tests.gen ~logger ~proof_level ?verifier:None
+        ?trust_system:None ~accounts_with_secret_keys
 
     let gen_breadcrumb_seq =
-      Breadcrumb.For_tests.gen_seq ~logger ?verifier:None ?trust_system:None
-        ~accounts_with_secret_keys
+      Breadcrumb.For_tests.gen_seq ~logger ~proof_level ?verifier:None
+        ?trust_system:None ~accounts_with_secret_keys
 
     module Transfer = Ledger_transfer.Make (Ledger) (Ledger)
 
@@ -46,12 +50,16 @@ let%test_module "Full_frontier tests" =
         Or_error.ok_exn
           (Transfer.transfer_accounts
              ~src:(Lazy.force Test_genesis_ledger.t)
-             ~dest:(Ledger.create ()))
+             ~dest:(Ledger.create ~depth:ledger_depth ()))
       in
       let root_data =
         let open Root_data in
-        { transition= External_transition.For_tests.genesis ()
-        ; staged_ledger= Staged_ledger.create_exn ~ledger:root_ledger }
+        { transition=
+            External_transition.For_tests.genesis
+              ~precomputed_values:
+                (Lazy.force Precomputed_values.for_unit_tests)
+        ; staged_ledger= Staged_ledger.create_exn ~ledger:root_ledger
+        ; protocol_states= [] }
       in
       Full_frontier.create ~logger ~root_data
         ~root_ledger:(Ledger.Any_ledger.cast (module Ledger) root_ledger)
@@ -139,6 +147,29 @@ let%test_module "Full_frontier tests" =
                            "roots should be the same before max_length \
                             breadcrumbs" ;
                      i + 1 ) ) )
+
+    let%test_unit "Protocol states are available for every transaction in the \
+                   frontier" =
+      Quickcheck.test
+        (gen_breadcrumb_seq (max_length * 4))
+        ~trials:2
+        ~f:(fun make_seq ->
+          Async.Thread_safe.block_on_async_exn (fun () ->
+              let frontier = create_frontier () in
+              let root = Full_frontier.root frontier in
+              let%map rest = make_seq root in
+              List.iter rest ~f:(fun breadcrumb ->
+                  add_breadcrumb frontier breadcrumb ;
+                  let required_state_hashes =
+                    Breadcrumb.staged_ledger breadcrumb
+                    |> Staged_ledger.scan_state
+                    |> Staged_ledger.Scan_state.required_state_hashes
+                  in
+                  List.iter (State_hash.Set.to_list required_state_hashes)
+                    ~f:(fun hash ->
+                      Full_frontier.For_tests.find_protocol_state_exn frontier
+                        hash
+                      |> ignore ) ) ) )
 
     let%test_unit "The length of the longest branch should never be greater \
                    than max_length" =

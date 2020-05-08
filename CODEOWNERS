@@ -1,4 +1,5 @@
 /CODEOWNERS @nholland94 @bkase @imeckler
+/.buildkite @CodaProtocol/infra-eng-reviewers
 /frontend/ @CodaProtocol/product-eng-reviewers
 /dockerfiles/ @CodaProtocol/infra-eng-reviewers
 /scripts/ @CodaProtocol/infra-eng-reviewers @CodaProtocol/protocol-eng-reviewers

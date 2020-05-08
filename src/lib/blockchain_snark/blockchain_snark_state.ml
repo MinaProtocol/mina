@@ -10,6 +10,7 @@ module type Update_intf = sig
   module Checked : sig
     val update :
          logger:Logger.t
+      -> proof_level:Genesis_constants.Proof_level.t
       -> State_hash.var * State_body_hash.var * Protocol_state.var
       -> Snark_transition.var
       -> ( State_hash.var * Protocol_state.var * [`Success of Boolean.var]
@@ -40,14 +41,14 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
             transition consensus data is valid
             new consensus state is a function of the old consensus state
     *)
-    let verify_complete_merge =
-      match Coda_compile_config.proof_level with
-      | "full" ->
+    let verify_complete_merge ~proof_level =
+      match proof_level with
+      | Genesis_constants.Proof_level.Full ->
           T.verify_complete_merge
       | _ ->
           fun _ _ _ _ _ _ _ -> Checked.return Boolean.true_
 
-    let%snarkydef update ~(logger : Logger.t)
+    let%snarkydef update ~(logger : Logger.t) ~proof_level
         ((previous_state_hash, previous_state_body_hash, previous_state) :
           State_hash.var * State_body_hash.var * Protocol_state.var)
         (transition : Snark_transition.var) :
@@ -116,7 +117,7 @@ module Make_update (T : Transaction_snark.Verification.S) = struct
         in
         let%bind correct_transaction_snark =
           with_label __LOC__
-            (verify_complete_merge
+            (verify_complete_merge ~proof_level
                (Snark_transition.sok_digest transition)
                ( previous_state |> Protocol_state.blockchain_state
                |> Blockchain_state.snarked_ledger_hash )

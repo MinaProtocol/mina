@@ -1,59 +1,31 @@
 open Core_kernel
 open Async_kernel
-open Module_version
 module Work = Transaction_snark_work.Statement
 module Ledger_proof = Ledger_proof
 module Work_info = Transaction_snark_work.Info
 open Network_peer
+
+module Rejected = struct
+  [%%versioned
+  module Stable = struct
+    module V1 = struct
+      type t = unit [@@deriving sexp, yojson]
+
+      let to_latest = Fn.id
+    end
+  end]
+
+  type t = Stable.Latest.t [@@deriving sexp, yojson]
+end
 
 module Make
     (Transition_frontier : T)
     (Pool : Intf.Snark_resource_pool_intf
             with type transition_frontier := Transition_frontier.t) :
   Intf.Snark_pool_diff_intf with type resource_pool := Pool.t = struct
-  module Stable = struct
-    module V1 = struct
-      module T = struct
-        type t =
-          | Add_solved_work of
-              Transaction_snark_work.Statement.Stable.V1.t
-              * Ledger_proof.Stable.V1.t One_or_two.Stable.V1.t
-                Priced_proof.Stable.V1.t
-        [@@deriving bin_io, compare, sexp, to_yojson, version]
-      end
-
-      include T
-      include Registration.Make_latest_version (T)
-    end
-
-    module Latest = V1
-
-    module Module_decl = struct
-      let name = "snark_pool_diff"
-
-      type latest = Latest.t
-    end
-
-    module Registrar = Registration.Make (Module_decl)
-    module Registered_V1 = Registrar.Register (V1)
-  end
-
-  type t = Stable.Latest.t =
+  type t =
     | Add_solved_work of Work.t * Ledger_proof.t One_or_two.t Priced_proof.t
   [@@deriving compare, sexp, to_yojson]
-
-  module Rejected = struct
-    [%%versioned
-    module Stable = struct
-      module V1 = struct
-        type t = unit [@@deriving sexp, yojson]
-
-        let to_latest = Fn.id
-      end
-    end]
-
-    type t = Stable.Latest.t [@@deriving sexp, yojson]
-  end
 
   type rejected = Rejected.t [@@deriving sexp, yojson]
 
@@ -65,7 +37,7 @@ module Make
           ; ("prover", Signature_lib.Public_key.Compressed.to_yojson prover) ]
 
   let summary = function
-    | Stable.V1.Add_solved_work (work, {proof= _; fee}) ->
+    | Add_solved_work (work, {proof= _; fee}) ->
         Printf.sprintf
           !"Snark_pool_diff for work %s added with fee-prover %s"
           (Yojson.Safe.to_string @@ Work.compact_json work)
@@ -94,7 +66,7 @@ module Make
           Ok (diff, ())
     in
     match diff with
-    | Stable.V1.Add_solved_work (work, ({Priced_proof.proof; fee} as p)) -> (
+    | Add_solved_work (work, ({Priced_proof.proof; fee} as p)) -> (
         let reject_and_log_if_local reason =
           if is_local then (
             Logger.trace (Pool.get_logger pool) ~module_:__MODULE__
