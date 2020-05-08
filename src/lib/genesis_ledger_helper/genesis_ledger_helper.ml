@@ -115,10 +115,9 @@ module Ledger = struct
 
   let load directory_name : Genesis_ledger.Packed.t =
     ( module Genesis_ledger.Of_ledger (struct
-      let t =
-        lazy
-          (Ledger.create ~depth:Genesis_constants.ledger_depth ~directory_name
-             ())
+      let depth = Genesis_constants.ledger_depth
+
+      let t = lazy (Ledger.create ~depth ~directory_name ())
     end) )
 end
 

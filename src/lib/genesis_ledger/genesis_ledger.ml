@@ -114,6 +114,8 @@ module Packed = struct
 
   let t ((module L) : t) = L.t
 
+  let depth ((module L) : t) = L.depth
+
   let accounts ((module L) : t) = L.accounts
 
   let find_account_record_exn ((module L) : t) = L.find_account_record_exn
@@ -132,6 +134,8 @@ end
 
 module Of_ledger (T : sig
   val t : Ledger.t Lazy.t
+
+  val depth : int
 end) : Intf.S = struct
   include T
 

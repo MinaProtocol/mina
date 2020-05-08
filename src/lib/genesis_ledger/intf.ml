@@ -52,6 +52,8 @@ end
 module type S = sig
   val t : Ledger.t Lazy.t
 
+  val depth : int
+
   val accounts : (Private_key.t option * Account.t) list Lazy.t
 
   val find_account_record_exn :
