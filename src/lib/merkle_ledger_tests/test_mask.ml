@@ -830,11 +830,11 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
 
   (* test runner *)
   let with_instances f =
-    let db = Base_db.create () in
+    let db = Base_db.create ~depth:Depth.depth () in
     [%test_result: Int.t] ~message:"Base_db num accounts should start at zero"
       ~expect:0 (Base_db.num_accounts db) ;
     let maskable = Any_base.cast (module Base_db) db in
-    let mask = Mask.create () in
+    let mask = Mask.create ~depth:Depth.depth () in
     f maskable mask
 
   let with_chain f =
@@ -843,7 +843,7 @@ module Make_maskable_and_mask_with_depth (Depth : Depth_S) = struct
         let attached1_as_base =
           Any_base.cast (module Mask.Attached) attached1
         in
-        let mask2 = Mask.create () in
+        let mask2 = Mask.create ~depth:Depth.depth () in
         let attached2 = Maskable.register_mask attached1_as_base mask2 in
         f maskable ~mask:attached1 ~mask_as_base:attached1_as_base
           ~mask2:attached2 )

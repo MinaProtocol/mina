@@ -53,7 +53,7 @@ let%test_module "Database integration test" =
           let accounts =
             List.map2_exn account_ids balances ~f:Account.create
           in
-          DB.with_ledger ~f:(fun db ->
+          DB.with_ledger ~depth:Depth.depth ~f:(fun db ->
               let enumerate_dir_combinations max_depth =
                 Sequence.range 0 (max_depth - 1)
                 |> Sequence.fold ~init:[[]] ~f:(fun acc _ ->

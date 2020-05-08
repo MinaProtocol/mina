@@ -26,9 +26,6 @@ module Make (Inputs : Inputs_intf) :
    and type account_id_set := Inputs.Account_id.Set.t = struct
   (* The max depth of a merkle tree can never be greater than 253. *)
   open Inputs
-  include Depth
-
-  let () = assert (Depth.depth < 0xfe)
 
   module Db_error = struct
     type t = Account_location_not_found | Out_of_leaves | Malformed_database
@@ -48,11 +45,15 @@ module Make (Inputs : Inputs_intf) :
 
   type path = Path.t
 
-  type t = {uuid: Uuid.Stable.V1.t; kvdb: Kvdb.t sexp_opaque} [@@deriving sexp]
+  type t = {uuid: Uuid.Stable.V1.t; kvdb: Kvdb.t sexp_opaque; depth: int}
+  [@@deriving sexp]
 
   let get_uuid t = t.uuid
 
-  let create ?directory_name () =
+  let depth t = t.depth
+
+  let create ?directory_name ~depth () =
+    assert (depth < 0xfe) ;
     let uuid = Uuid_unix.create () in
     let directory =
       match directory_name with
@@ -63,29 +64,29 @@ module Make (Inputs : Inputs_intf) :
     in
     Unix.mkdir_p directory ;
     let kvdb = Kvdb.create directory in
-    {uuid; kvdb}
+    {uuid; kvdb; depth}
 
-  let close {kvdb; uuid= _} = Kvdb.close kvdb
+  let close {kvdb; uuid= _; depth= _} = Kvdb.close kvdb
 
-  let with_ledger ~f =
-    let t = create () in
+  let with_ledger ~depth ~f =
+    let t = create ~depth () in
     try
       let result = f t in
       close t ; result
     with exn -> close t ; raise exn
 
-  let empty_hashes =
-    Empty_hashes.cache (module Hash) ~init_hash:Hash.empty_account Depth.depth
+  let empty_hash =
+    Empty_hashes.extensible_cache (module Hash) ~init_hash:Hash.empty_account
 
-  let get_raw {kvdb; _} location =
-    Kvdb.get kvdb ~key:(Location.serialize location)
+  let get_raw {kvdb; depth; _} location =
+    Kvdb.get kvdb ~key:(Location.serialize ~ledger_depth:depth location)
 
   let get_bin mdb location bin_read =
     get_raw mdb location
     |> Option.map ~f:(fun v -> bin_read v ~pos_ref:(ref 0))
 
-  let delete_raw {kvdb; _} location =
-    Kvdb.remove kvdb ~key:(Location.serialize location)
+  let delete_raw {kvdb; depth; _} location =
+    Kvdb.remove kvdb ~key:(Location.serialize ~ledger_depth:depth location)
 
   let get mdb location =
     assert (Location.is_account location) ;
@@ -97,7 +98,7 @@ module Make (Inputs : Inputs_intf) :
     | Some hash ->
         hash
     | None ->
-        Immutable_array.get empty_hashes (Location.height location)
+        empty_hash (Location.height ~ledger_depth:mdb.depth location)
 
   let account_list_bin {kvdb; _} account_bin_read : Account.t list =
     let all_keys_values = Kvdb.to_alist kvdb in
@@ -119,11 +120,15 @@ module Make (Inputs : Inputs_intf) :
   let accounts mdb =
     to_list mdb |> List.map ~f:Account.identifier |> Account_id.Set.of_list
 
-  let set_raw {kvdb; _} location bin =
-    Kvdb.set kvdb ~key:(Location.serialize location) ~data:bin
+  let set_raw {kvdb; depth; _} location bin =
+    Kvdb.set kvdb
+      ~key:(Location.serialize ~ledger_depth:depth location)
+      ~data:bin
 
-  let set_raw_batch {kvdb; _} locations_bins =
-    let serialize_location (loc, bin) = (Location.serialize loc, bin) in
+  let set_raw_batch {kvdb; depth; _} locations_bins =
+    let serialize_location (loc, bin) =
+      (Location.serialize ~ledger_depth:depth loc, bin)
+    in
     let serialized = List.map locations_bins ~f:serialize_location in
     Kvdb.set_batch kvdb ~key_data_pairs:serialized
 
@@ -142,11 +147,11 @@ module Make (Inputs : Inputs_intf) :
     set_raw_batch ~remove_keys:[] mdb locs_bufs
 
   let get_inner_hash_at_addr_exn mdb address =
-    assert (Addr.depth address <= Depth.depth) ;
+    assert (Addr.depth address <= mdb.depth) ;
     get_hash mdb (Location.Hash address)
 
   let set_inner_hash_at_addr_exn mdb address hash =
-    assert (Addr.depth address <= Depth.depth) ;
+    assert (Addr.depth address <= mdb.depth) ;
     set_bin mdb (Location.Hash address) Hash.bin_size_t Hash.bin_write_t hash
 
   let make_space_for _t _tot = ()
@@ -168,8 +173,9 @@ module Make (Inputs : Inputs_intf) :
                (Account_id.public_key account_id)
                (Account_id.token_id account_id) ))
 
-    let serialize_kv (aid, location) =
-      (Location.serialize @@ build_location aid, Location.serialize location)
+    let serialize_kv ~ledger_depth (aid, location) =
+      ( Location.serialize ~ledger_depth @@ build_location aid
+      , Location.serialize ~ledger_depth location )
 
     let get mdb key =
       match get_generic mdb (build_location key) with
@@ -182,31 +188,37 @@ module Make (Inputs : Inputs_intf) :
     let delete mdb key = delete_raw mdb (build_location key)
 
     let set mdb key location =
-      set_raw mdb (build_location key) (Location.serialize location)
+      set_raw mdb (build_location key)
+        (Location.serialize ~ledger_depth:mdb.depth location)
 
-    let set_batch_create keys_to_locations =
-      List.map ~f:serialize_kv keys_to_locations
+    let set_batch_create ~ledger_depth keys_to_locations =
+      List.map ~f:(serialize_kv ~ledger_depth) keys_to_locations
 
     let _set_batch mdb keys_to_locations =
       Kvdb.set_batch mdb.kvdb
-        ~key_data_pairs:(set_batch_create keys_to_locations)
+        ~key_data_pairs:
+          (set_batch_create ~ledger_depth:mdb.depth keys_to_locations)
 
     let last_location_key () =
       Location.build_generic (Bigstring.of_string "last_account_location")
 
-    let serialize_last_account_kv (location, last_account_location) =
-      (Location.serialize location, Location.serialize last_account_location)
+    let serialize_last_account_kv ~ledger_depth
+        (location, last_account_location) =
+      ( Location.serialize ~ledger_depth location
+      , Location.serialize ~ledger_depth last_account_location )
 
     let increment_last_account_location mdb =
       let location = last_location_key () in
+      let ledger_depth = mdb.depth in
       match get_generic mdb location with
       | None ->
           let first_location =
             Location.Account
               ( Addr.of_directions
-              @@ List.init Depth.depth ~f:(fun _ -> Direction.Left) )
+              @@ List.init mdb.depth ~f:(fun _ -> Direction.Left) )
           in
-          set_raw mdb location (Location.serialize first_location) ;
+          set_raw mdb location
+            (Location.serialize ~ledger_depth first_location) ;
           Result.return first_location
       | Some prev_location -> (
         match Location.parse prev_location with
@@ -217,7 +229,7 @@ module Make (Inputs : Inputs_intf) :
             |> Result.of_option ~error:Db_error.Out_of_leaves
             |> Result.map ~f:(fun next_account_location ->
                    set_raw mdb location
-                     (Location.serialize next_account_location) ;
+                     (Location.serialize ~ledger_depth next_account_location) ;
                    next_account_location ) )
 
     let allocate mdb key =
@@ -333,10 +345,10 @@ module Make (Inputs : Inputs_intf) :
       Location.build_generic
         (Bigstring.of_string (Format.sprintf !"$tids!%{sexp: Key.t}" pk))
 
-    let serialize_kv (pk, tids) =
+    let serialize_kv ~ledger_depth (pk, tids) =
       let tokens_buf = Bigstring.create (Token_id.Set.bin_size_t tids) in
       ignore (Token_id.Set.bin_write_t tokens_buf ~pos:0 tids) ;
-      (Location.serialize (build_location pk), tokens_buf)
+      (Location.serialize ~ledger_depth (build_location pk), tokens_buf)
 
     let get_opt mdb pk =
       get_bin mdb (build_location pk) Token_id.Set.bin_read_t
@@ -391,7 +403,8 @@ module Make (Inputs : Inputs_intf) :
         Map.filter_mapi pks_to_tokens ~f:(fun ~key:pk ~data:tokens_to_add ->
             to_opt (Set.union (get mdb pk) tokens_to_add) )
       in
-      Map.to_alist pks_to_all_tokens |> List.map ~f:serialize_kv
+      Map.to_alist pks_to_all_tokens
+      |> List.map ~f:(serialize_kv ~ledger_depth:mdb.depth)
 
     let _add_batch mdb pks_to_tokens =
       Kvdb.set_batch mdb.kvdb
@@ -425,7 +438,6 @@ module Make (Inputs : Inputs_intf) :
     module Location_binable = Location_binable
     module Account = Account
     module Hash = Hash
-    module Depth = Depth
 
     module Base = struct
       type nonrec t = t
@@ -436,6 +448,8 @@ module Make (Inputs : Inputs_intf) :
     end
 
     let get_hash = get_hash
+
+    let ledger_depth = depth
 
     let location_of_account_addr addr = Location.Account addr
 
@@ -459,9 +473,11 @@ module Make (Inputs : Inputs_intf) :
                   Token_id.Set.singleton (Account_id.token_id aid) ) )
       in
       let batched_changes =
-        Account_location.serialize_last_account_kv last_location_key_value
+        Account_location.serialize_last_account_kv ~ledger_depth:mdb.depth
+          last_location_key_value
         :: ( Tokens.add_batch_create mdb account_tokens
-           @ Account_location.set_batch_create key_to_location_list )
+           @ Account_location.set_batch_create ~ledger_depth:mdb.depth
+               key_to_location_list )
       in
       Kvdb.set_batch mdb.kvdb ~remove_keys:[] ~key_data_pairs:batched_changes
 
@@ -474,14 +490,14 @@ module Make (Inputs : Inputs_intf) :
   let set_hash mdb location new_hash = set_hash_batch mdb [(location, new_hash)]
 
   module For_tests = struct
-    let gen_account_location =
+    let gen_account_location ~ledger_depth =
       let open Quickcheck.Let_syntax in
       let build_account (path : Direction.t list) =
-        assert (List.length path = Depth.depth) ;
+        assert (List.length path = ledger_depth) ;
         Location.Account (Addr.of_directions path)
       in
       let%map dirs =
-        Quickcheck.Generator.list_with_length Depth.depth Direction.gen
+        Quickcheck.Generator.list_with_length ledger_depth Direction.gen
       in
       build_account dirs
   end
@@ -498,11 +514,11 @@ module Make (Inputs : Inputs_intf) :
     Addr.to_int addr
 
   let get_at_index_exn mdb index =
-    let addr = Addr.of_int_exn index in
+    let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
     get mdb (Location.Account addr) |> Option.value_exn
 
   let set_at_index_exn mdb index account =
-    let addr = Addr.of_int_exn index in
+    let addr = Addr.of_int_exn ~ledger_depth:mdb.depth index in
     set mdb (Location.Account addr) account
 
   let get_or_create_account mdb account_id account =
@@ -544,7 +560,9 @@ module Make (Inputs : Inputs_intf) :
      maybe use that here, instead of loading all accounts into memory See Issue
      #1191 *)
   let foldi_with_ignored_accounts t ignored_accounts ~init ~f =
-    let f' index accum account = f (Addr.of_int_exn index) accum account in
+    let f' index accum account =
+      f (Addr.of_int_exn ~ledger_depth:(depth t) index) accum account
+    in
     match Account_location.last_location_address t with
     | None ->
         init
@@ -618,7 +636,7 @@ module Make (Inputs : Inputs_intf) :
     in
     assert (Location.is_hash location) ;
     let rec loop k =
-      if Location.height k >= Depth.depth then []
+      if Location.height ~ledger_depth:mdb.depth k >= mdb.depth then []
       else
         let sibling = Location.sibling k in
         let sibling_dir = Location.last_direction (Location.to_path_exn k) in
@@ -631,6 +649,6 @@ module Make (Inputs : Inputs_intf) :
   let merkle_path_at_addr_exn t addr = merkle_path t (Location.Hash addr)
 
   let merkle_path_at_index_exn t index =
-    let addr = Addr.of_int_exn index in
+    let addr = Addr.of_int_exn ~ledger_depth:t.depth index in
     merkle_path_at_addr_exn t addr
 end

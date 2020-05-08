@@ -182,33 +182,34 @@ module Ledger_inner = struct
 
   let of_database db =
     let casted = Any_ledger.cast (module Db) db in
-    let mask = Mask.create () in
+    let mask = Mask.create ~depth:(Db.depth db) () in
     Maskable.register_mask casted mask
 
   (* Mask.Attached.create () fails, can't create an attached mask directly
   shadow create in order to create an attached mask
   *)
-  let create ?directory_name () = of_database (Db.create ?directory_name ())
+  let create ?directory_name ~depth () =
+    of_database (Db.create ?directory_name ~depth ())
 
-  let create_ephemeral_with_base () =
-    let maskable = Null.create () in
+  let create_ephemeral_with_base ~depth () =
+    let maskable = Null.create ~depth () in
     let casted = Any_ledger.cast (module Null) maskable in
-    let mask = Mask.create () in
+    let mask = Mask.create ~depth () in
     (casted, Maskable.register_mask casted mask)
 
-  let create_ephemeral () =
-    let _base, mask = create_ephemeral_with_base () in
+  let create_ephemeral ~depth () =
+    let _base, mask = create_ephemeral_with_base ~depth () in
     mask
 
-  let with_ledger ~f =
-    let ledger = create () in
+  let with_ledger ~depth ~f =
+    let ledger = create ~depth () in
     try
       let result = f ledger in
       close ledger ; result
     with exn -> close ledger ; raise exn
 
-  let with_ephemeral_ledger ~f =
-    let _base_ledger, masked_ledger = create_ephemeral_with_base () in
+  let with_ephemeral_ledger ~depth ~f =
+    let _base_ledger, masked_ledger = create_ephemeral_with_base ~depth () in
     try
       let result = f masked_ledger in
       let (_ : Mask.t) =

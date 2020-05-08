@@ -173,6 +173,8 @@ include T
 [%%inject
 "ledger_depth", ledger_depth]
 
+let ledger_depth_for_unit_tests = ledger_depth
+
 let compiled : t =
   { protocol=
       { k
