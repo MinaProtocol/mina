@@ -77,10 +77,10 @@ let
     src = ./.;
     buildInputs = [ pkgs.dhall ];
     buildPhase = ''
-      mkdir -p $out/.cache
-      export XDG_CACHE_HOME=$out/.cache
+      #!${pkgs.runtimeShell}
+      mkdir -p $out/cache
+      export XDG_CACHE_HOME=$out/cache
       make check
-      chmod -R 766 $out/.cache
     '';
     installPhase = "echo 'skip'";
   };

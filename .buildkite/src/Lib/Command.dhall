@@ -62,8 +62,15 @@ let targetToAgent = \(target : Size) ->
         }
         target
 
+-- /cache is read-only for the uid/gid we run our steps in. We fix the
+-- permissions by copying it to our work directory, fixing perms, and redirects
+-- all cache accesses here instead.
+-- This command adds no observable overhead to build steps.
+let fixCacheCommand = "cp -r /cache .cache && chmod -R 766 .cache && export XDG_CACHE_HOME=\$PWD/.cache"
+
 let build : Config.Type -> Result.Type = \(c : Config.Type) ->
-  Config.upcast c /\ {
+  Config.upcast c // {
+    command = [ fixCacheCommand ] # c.command,
     depends_on = if Prelude.List.null Text c.depends_on then None (List Text) else Some c.depends_on,
     agents =
       let agents = targetToAgent c.target in
