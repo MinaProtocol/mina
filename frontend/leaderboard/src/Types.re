@@ -1,6 +1,5 @@
 module NewBlock = {
   type account = {publicKey: string};
-  type creatorAccount = {publicKey: string};
 
   type snarkJobs = {prover: string};
 
@@ -8,7 +7,7 @@ module NewBlock = {
   type transactions = {userCommands: array(userCommands)};
 
   type data = {
-    creatorAccount,
+    creatorAccount: account,
     snarkJobs: array(snarkJobs),
     transactions,
   };
@@ -24,23 +23,22 @@ module Metrics = {
   type t =
     | BlocksCreated
     | TransactionsSent
-    | SnarkWorkCreated
-    | None;
+    | SnarkWorkCreated;
 
   let stringOfMetric = metric => {
     switch (metric) {
-    | BlocksCreated => "blocks_created"
-    | TransactionsSent => "transactions_sent"
-    | SnarkWorkCreated => "snarkwork_created"
+    | Some(BlocksCreated) => "blocks_created"
+    | Some(TransactionsSent) => "transactions_sent"
+    | Some(SnarkWorkCreated) => "snarkwork_created"
     | None => ""
     };
   };
 
   let metricOfString = metric => {
     switch (metric) {
-    | "blocks_created" => BlocksCreated
-    | "transactions_sent" => TransactionsSent
-    | "snarkwork_created" => SnarkWorkCreated
+    | "blocks_created" => Some(BlocksCreated)
+    | "transactions_sent" => Some(TransactionsSent)
+    | "snarkwork_created" => Some(SnarkWorkCreated)
     | _ => None
     };
   };

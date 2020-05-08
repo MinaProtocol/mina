@@ -130,15 +130,17 @@ let handleMetrics = (metrics, blocks) => {
       metric => {
         switch (metric) {
         | BlocksCreated =>
-          blocks |> calculateBlocksCreated |> encodeMetric(BlocksCreated)
+          blocks
+          |> calculateBlocksCreated
+          |> encodeMetric(Some(BlocksCreated))
         | TransactionsSent =>
-          blocks |> calculateTransactionSent |> encodeMetric(TransactionsSent)
+          blocks
+          |> calculateTransactionSent
+          |> encodeMetric(Some(TransactionsSent))
         | SnarkWorkCreated =>
           blocks
           |> calculateSnarkWorkCreated
-          |> encodeMetric(SnarkWorkCreated)
-
-        | _ => ("", StringMap.empty)
+          |> encodeMetric(Some(SnarkWorkCreated))
         }
       },
       metrics,
