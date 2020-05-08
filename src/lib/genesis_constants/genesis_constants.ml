@@ -34,6 +34,13 @@ module Proof_level = struct
   let compiled = of_string compiled
 end
 
+(** Constants that affect the constraint systems for proofs (and thus also key
+    generation).
+
+    Care must be taken to ensure that these match against the proving/
+    verification keys when [proof_level=Full], otherwise generated proofs will
+    be invalid.
+*)
 module Constraint_constants = struct
   [%%versioned
   module Stable = struct
