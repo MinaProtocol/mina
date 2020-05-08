@@ -30,22 +30,4 @@ module Metrics = {
     transactionSent: option(int),
     snarkWorkCreated: option(int),
   };
-
-  let stringOfMetric = metric => {
-    switch (metric) {
-    | Some(BlocksCreated) => "blocks_created"
-    | Some(TransactionsSent) => "transactions_sent"
-    | Some(SnarkWorkCreated) => "snarkwork_created"
-    | None => ""
-    };
-  };
-
-  let metricOfString = metric => {
-    switch (metric) {
-    | "blocks_created" => Some(BlocksCreated)
-    | "transactions_sent" => Some(TransactionsSent)
-    | "snarkwork_created" => Some(SnarkWorkCreated)
-    | _ => None
-    };
-  };
 };
