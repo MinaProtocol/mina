@@ -216,8 +216,7 @@ let run_test () : unit Deferred.t =
              ~consensus_local_state ~transaction_database
              ~external_transition_database ~work_reassignment_wait:420000
              ~precomputed_values
-             ~proof_level:Genesis_constants.Proof_level.compiled
-             ~ledger_depth:Genesis_constants.ledger_depth ())
+             ~proof_level:Genesis_constants.Proof_level.compiled ())
           ~precomputed_values
       in
       don't_wait_for

@@ -49,6 +49,5 @@ type t =
         [@default None]
   ; demo_mode: bool [@default false]
   ; log_block_creation: bool [@default false]
-  ; precomputed_values: Precomputed_values.t
-  ; ledger_depth: int }
+  ; precomputed_values: Precomputed_values.t }
 [@@deriving make]

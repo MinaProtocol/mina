@@ -423,8 +423,6 @@ let%test_module "Bootstrap_controller tests" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
-    let ledger_depth = Genesis_constants.ledger_depth_for_unit_tests
-
     let trust_system = Trust_system.null ()
 
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
@@ -473,8 +471,8 @@ let%test_module "Bootstrap_controller tests" =
         (* we only need one node for this test, but we need more than one peer so that coda_networking does not throw an error *)
         let%bind fake_network =
           Fake_network.Generator.(
-            gen ~proof_level ~ledger_depth ~precomputed_values
-              ~max_frontier_length [fresh_peer; fresh_peer])
+            gen ~proof_level ~precomputed_values ~max_frontier_length
+              [fresh_peer; fresh_peer])
         in
         let%map make_branch =
           Transition_frontier.Breadcrumb.For_tests.gen_seq ~proof_level
@@ -591,8 +589,7 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "sync with one node after receiving a transition" =
       Quickcheck.test ~trials:1
         Fake_network.Generator.(
-          gen ~proof_level ~ledger_depth ~precomputed_values
-            ~max_frontier_length
+          gen ~proof_level ~precomputed_values ~max_frontier_length
             [ fresh_peer
             ; peer_with_branch
                 ~frontier_branch_size:((max_frontier_length * 2) + 2) ])
@@ -631,9 +628,9 @@ let%test_module "Bootstrap_controller tests" =
     let%test_unit "reconstruct staged_ledgers using \
                    of_scan_state_and_snarked_ledger" =
       Quickcheck.test ~trials:1
-        (Transition_frontier.For_tests.gen ~proof_level ~ledger_depth
-           ~precomputed_values ~max_length:max_frontier_length
-           ~size:max_frontier_length ()) ~f:(fun frontier ->
+        (Transition_frontier.For_tests.gen ~proof_level ~precomputed_values
+           ~max_length:max_frontier_length ~size:max_frontier_length ())
+        ~f:(fun frontier ->
           Thread_safe.block_on_async_exn
           @@ fun () ->
           Deferred.List.iter (Transition_frontier.all_breadcrumbs frontier)

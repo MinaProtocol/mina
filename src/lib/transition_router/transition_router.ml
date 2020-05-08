@@ -353,7 +353,7 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
     ~frontier_broadcast_pipe:(frontier_r, frontier_w)
     ~network_transition_reader ~producer_transition_reader
     ~most_recent_valid_block:( most_recent_valid_block_reader
-                             , most_recent_valid_block_writer ) ~ledger_depth
+                             , most_recent_valid_block_writer )
     ~precomputed_values =
   let initialization_finish_signal = Ivar.create () in
   let clear_reader, clear_writer =
@@ -384,7 +384,8 @@ let run ~logger ~trust_system ~verifier ~network ~is_seed ~time_controller
       in
       let persistent_root =
         Transition_frontier.Persistent_root.create ~logger
-          ~directory:persistent_root_location ~ledger_depth
+          ~directory:persistent_root_location
+          ~ledger_depth:(Precomputed_values.ledger_depth precomputed_values)
       in
       upon
         (initialize ~logger ~network ~is_seed ~verifier ~trust_system

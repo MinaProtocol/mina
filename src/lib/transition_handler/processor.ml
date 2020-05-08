@@ -361,8 +361,6 @@ let%test_module "Transition_handler.Processor tests" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
-    let ledger_depth = Genesis_constants.ledger_depth_for_unit_tests
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let time_controller = Block_time.Controller.basic ~logger
@@ -384,8 +382,8 @@ let%test_module "Transition_handler.Processor tests" =
       let max_length = frontier_size + branch_size in
       Quickcheck.test ~trials:4
         (Transition_frontier.For_tests.gen_with_branch ~proof_level
-           ~ledger_depth ~precomputed_values ~max_length ~frontier_size
-           ~branch_size ()) ~f:(fun (frontier, branch) ->
+           ~precomputed_values ~max_length ~frontier_size ~branch_size ())
+        ~f:(fun (frontier, branch) ->
           assert (
             Thread_safe.block_on_async_exn (fun () ->
                 let pids = Child_processes.Termination.create_pid_table () in

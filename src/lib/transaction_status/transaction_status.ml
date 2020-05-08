@@ -73,8 +73,6 @@ let%test_module "transaction_status" =
 
     let proof_level = Genesis_constants.Proof_level.Check
 
-    let ledger_depth = Genesis_constants.ledger_depth_for_unit_tests
-
     let precomputed_values = Lazy.force Precomputed_values.for_unit_tests
 
     let trust_system = Trust_system.null ()
@@ -93,7 +91,7 @@ let%test_module "transaction_status" =
           (Option.value_exn random_key_opt) )
 
     let gen_frontier =
-      Transition_frontier.For_tests.gen ~logger ~proof_level ~ledger_depth
+      Transition_frontier.For_tests.gen ~logger ~proof_level
         ~precomputed_values ~trust_system ~max_length ~size:frontier_size ()
 
     let gen_user_command =
