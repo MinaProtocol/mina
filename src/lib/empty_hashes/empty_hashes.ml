@@ -30,6 +30,6 @@ let extensible_cache hash_mod ~init_hash =
       empty_hashes :=
         Array.append prev
           (Array.init deficit ~f:(fun i ->
-               last_hash := merge_hash hash_mod i !last_hash ;
+               last_hash := merge_hash hash_mod (i + height) !last_hash ;
                !last_hash )) ) ;
     !empty_hashes.(i)
