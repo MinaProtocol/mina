@@ -80,6 +80,7 @@ let
       mkdir -p $out/.cache
       export XDG_CACHE_HOME=$out/.cache
       make check
+      chmod -R 766 $out/.cache
     '';
     installPhase = "echo 'skip'";
   };
